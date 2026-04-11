@@ -1,0 +1,10 @@
+TASK-16: Reliability Hardening + Release Checklist
+==================================================
+
+SCENARIO: overload protection
+
+VERIFICATION:
+  - `packages/ts-shell/src/runtime/backpressure.test.ts` verifies that work above the configured limit is rejected with `Backpressure limit reached`.
+
+RESULT:
+  ✅ PASS - overload is rejected gracefully instead of allowing unbounded queue growth.

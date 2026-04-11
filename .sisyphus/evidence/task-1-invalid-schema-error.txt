@@ -1,0 +1,6 @@
+REJECT cancellation-immediate-not-boolean.json E_CANCELLATION_INVALID /immediate
+REJECT malformed-permission-scope.json E_PERMISSION_RESPONSE_INVALID /scope/mode
+REJECT malformed-schema-version.json E_SCHEMA_VERSION_FORMAT /schemaVersion
+REJECT missing-schema-version.json E_SCHEMA_VERSION_REQUIRED /schemaVersion
+REJECT task-status-invalid.json E_TASK_STATUS_INVALID /status
+REJECT unsupported-major-version.json E_COMPATIBILITY_UNSUPPORTED /schemaVersion

@@ -1,0 +1,13 @@
+TASK-10: MVP End-to-End Flow Integration and Acceptance Suite
+=============================================================
+
+SCENARIO: full MVP happy path
+
+VERIFICATION:
+  - Added acceptance harness: `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`
+  - Added E2E acceptance suite: `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.test.ts`
+  - Executed: `npm run test:ts`
+  - Asserted flow: prompt -> planner/coder/reviewer handoff -> permission-aware tool dispatch (read + escalation-approved bash) -> streamed role output -> completed run
+
+RESULT:
+  ✅ PASS - integrated MVP flow completes with deterministic handoff chain, tool approval path, and streamed final output.

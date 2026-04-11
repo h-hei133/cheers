@@ -1,0 +1,11 @@
+TASK-13: Rust Daemon v1 Skeleton
+================================
+
+SCENARIO: timeout cancellation
+
+VERIFICATION:
+  - `npm run test:rust` passes with `test_execute_command_timeout` and `test_execute_command_cancel`.
+  - Direct daemon run with a long command and `--timeout-ms 50` returns JSON status `timeout` and exits non-zero.
+
+RESULT:
+  ✅ PASS - Rust daemon enforces timeout and cancellation behavior deterministically.

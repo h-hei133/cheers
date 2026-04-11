@@ -1,0 +1,12 @@
+TASK-16: Reliability Hardening + Release Checklist
+==================================================
+
+SCENARIO: sustained stability baseline
+
+VERIFICATION:
+  - `packages/ts-shell/src/runtime/backpressure.test.ts` passes.
+  - `npm test` passes after backpressure and release hardening changes.
+  - `RELEASE-CHECKLIST.md` and `RUNBOOK.md` exist.
+
+RESULT:
+  ✅ PASS - the current phase has bounded tool concurrency, release checklist coverage, and a documented rollback path.

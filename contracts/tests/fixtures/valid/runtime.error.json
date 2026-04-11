@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "runtime.error",
+  "errorId": "err_001",
+  "taskId": "task_001",
+  "code": "E_FIELD_REQUIRED",
+  "message": "Missing required field",
+  "recoverable": true,
+  "details": {
+    "field": "commandName"
+  },
+  "emittedAt": 1712456703000
+}

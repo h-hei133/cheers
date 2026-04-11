@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "2.0.0",
+  "kind": "stream.chunk",
+  "streamId": "stream_002",
+  "taskId": "task_002",
+  "channel": "stdout",
+  "chunkIndex": 0,
+  "content": "test",
+  "isFinal": true,
+  "emittedAt": 1712456708000
+}

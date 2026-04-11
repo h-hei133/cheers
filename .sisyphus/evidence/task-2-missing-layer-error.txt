@@ -1,0 +1,27 @@
+TASK-2: Scaffold Repository Structure (TS Shell + Rust Core + Python Eval)
+=============================================================================
+
+SCENARIO: missing layer detection
+
+COMMAND EXECUTED:
+  node scripts/validate-structure.mjs [with ts-shell temporarily removed]
+
+RESULT:
+✅ PASS - Validation detects missing layer with clear error
+
+OUTPUT:
+  ❌ ERRORS (2):
+    - Missing required directory: packages/ts-shell (TS Shell Layer)
+    - Missing required file: packages/ts-shell/package.json (TS Shell package.json)
+
+ACCEPTANCE CRITERIA:
+  [✓] Validation fails when required folder is absent
+  [✓] Error message is actionable and identifies exact layer
+  [✓] Tool reports correct exit code (non-zero for errors)
+
+NOTES:
+  - Validation script is designed to catch layer scaffolding regressions
+  - Can be run at any point to verify workspace integrity
+  - Part of CI/local validation pipeline for T2+ tasks
+
+Evidence recorded: 2026-04-07 12:06 UTC

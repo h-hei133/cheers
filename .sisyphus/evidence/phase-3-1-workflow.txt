@@ -1,0 +1,11 @@
+PHASE 3.1: Git / Worktree / Workflow Integration
+===============================================
+
+VERIFICATION:
+- `npm run workflow:status` prints branch, cleanliness, worktree list, and current changes.
+- `npm run doctor` now includes git branch and workspace cleanliness.
+- CLI `--doctor` now includes git branch and git root.
+- `npm run test:ts`, `npm test`, and `npm run build` all pass.
+
+RESULT:
+✅ Daily workflow visibility is now built into the shell and root scripts.

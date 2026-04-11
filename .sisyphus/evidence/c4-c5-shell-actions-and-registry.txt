@@ -1,0 +1,17 @@
+C4/C5 Shell Actions + Command Registry Semantics
+===============================================
+
+Implemented:
+- shell actions: `/resume`, `/cancel`, `/sessions`, `/mcp`, `/help`
+- command registry semantics with availability, enabled, and bridgeSafe fields
+- hidden-command behavior for `/mcp` when MCP visibility is disabled
+
+Verification:
+- `packages/ts-shell/src/core/commands/slashRouter.test.ts`
+- `npm run build`
+- `npm test`
+- manual `cli --doctor`
+
+Result:
+- slash commands now route through typed shell actions rather than prompt rewriting alone
+- registry semantics now distinguish visibility and enablement instead of acting as a flat command list

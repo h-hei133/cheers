@@ -1,0 +1,10 @@
+PHASE 2.3: Stability and Recovery
+=================================
+
+VERIFICATION:
+- Rust-daemon bridge falls back to local TS execution when daemon startup/execution fails.
+- Session manager can suggest a recoverable interrupted/errored session.
+- `npm run test:ts` and `npm test` pass after the recovery changes.
+
+RESULT:
+✅ Recovery behavior is clearer and daemon-path failures no longer hard-stop the shell execution path.

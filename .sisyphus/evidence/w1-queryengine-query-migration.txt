@@ -1,0 +1,24 @@
+W1 QueryEngine / query Migration
+================================
+
+Implemented:
+- `packages/ts-shell/src/core/query/QueryEngine.ts`
+- `packages/ts-shell/src/core/query/queryLoop.ts`
+- `packages/ts-shell/src/core/query/runtimeState.ts`
+- `packages/ts-shell/src/core/query/transitions.ts`
+- `packages/ts-shell/src/core/query/resultMapper.ts`
+- compatibility wrapper: `packages/ts-shell/src/orchestration/MultiAgentOrchestrator.ts`
+
+Mapping artifact:
+- `.sisyphus/drafts/w1-query-responsibility-map.md`
+
+Verification:
+- `node node_modules/vitest/vitest.mjs run packages/ts-shell/src/core/query/QueryEngine.test.ts`
+- `node node_modules/vitest/vitest.mjs run packages/ts-shell/src/orchestration/MultiAgentOrchestrator.test.ts packages/ts-shell/src/orchestration/runMvpIntegratedFlow.test.ts`
+- `npm run test:ts`
+- `npm test`
+- `npm run build`
+
+Result:
+- Core query execution loop now lives in `src/core/query/`
+- Existing orchestration and integrated-flow behavior remains green

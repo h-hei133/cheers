@@ -1,0 +1,11 @@
+TASK-5: Strict Sandbox + Explicit Escalation Workflow
+=====================================================
+
+SCENARIO: escalation rejection
+
+VERIFICATION:
+  - `npm run test:ts` passed with `src/sandbox/sandbox.test.ts`
+  - Escalation handler returned `deny`, the operation remained blocked, and audit entries recorded permission_check + escalation_request + escalation_decision.
+
+RESULT:
+  ✅ PASS - escalation requires explicit user approval, denial is respected, and the decision is logged for auditability.

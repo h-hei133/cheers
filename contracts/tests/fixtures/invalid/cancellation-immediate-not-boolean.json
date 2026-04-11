@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "task.cancel",
+  "requestId": "cancel_002",
+  "taskId": "task_002",
+  "requestedBy": "user",
+  "requestedAt": 1712456710000,
+  "immediate": "yes"
+}

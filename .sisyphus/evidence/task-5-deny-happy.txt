@@ -1,0 +1,12 @@
+TASK-5: Strict Sandbox + Explicit Escalation Workflow
+=====================================================
+
+SCENARIO: default deny
+
+VERIFICATION:
+  - `npm run test:ts` passed with `src/sandbox/sandbox.test.ts`
+  - Out-of-workspace writes and network access are denied by default.
+  - Policy decisions are marked as requiring escalation rather than silently allowing execution.
+
+RESULT:
+  ✅ PASS - disallowed filesystem and network operations are blocked by default with explicit policy reasons.

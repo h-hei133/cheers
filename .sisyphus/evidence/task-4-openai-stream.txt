@@ -1,0 +1,13 @@
+TASK-4: Pluggable Model Adapter (OpenAI-first)
+==============================================
+
+SCENARIO: adapter streaming success
+
+VERIFICATION:
+  - `npm run test:ts` passed with `OpenAIModelAdapter.test.ts`
+  - SSE fixture stream was normalized into:
+      response.started -> content.delta -> response.completed
+  - Tool-call deltas were assembled into completed normalized tool call envelopes.
+
+RESULT:
+  ✅ PASS - OpenAI streaming responses are mapped into provider-agnostic normalized events.

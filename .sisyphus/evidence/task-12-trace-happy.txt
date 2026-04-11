@@ -1,0 +1,11 @@
+TASK-12: Observability Baseline
+===============================
+
+SCENARIO: trace continuity
+
+VERIFICATION:
+  - `packages/ts-shell/src/observability/traceContext.e2e.test.ts` passes.
+  - One trace ID is preserved across orchestration, tool dispatch, and provider logging in the integrated TS-shell MVP flow.
+
+RESULT:
+  ✅ PASS - major lifecycle events carry a shared trace ID across the shipped TS-shell runtime path.

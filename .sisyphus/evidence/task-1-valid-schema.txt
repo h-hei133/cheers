@@ -1,0 +1,6 @@
+PASS command.request.json
+PASS permission.prompt.json
+PASS runtime.error.json
+PASS stream.chunk.json
+PASS task.cancel.json
+PASS task.lifecycle.json

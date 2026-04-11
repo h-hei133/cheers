@@ -1,0 +1,11 @@
+TASK-9: Session State + Interrupt/Resume Reliability
+====================================================
+
+SCENARIO: restart + resume
+
+VERIFICATION:
+  - `npm run test:ts` passed with `src/session/SessionManager.test.ts`
+  - Interrupted session resume restores the session, keeps the pending prompt metadata, and reactivates the session status.
+
+RESULT:
+  ✅ PASS - interrupted sessions can be resumed reliably without losing the pending run context.

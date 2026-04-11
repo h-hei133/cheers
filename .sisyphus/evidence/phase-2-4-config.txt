@@ -1,0 +1,11 @@
+PHASE 2.4: Configuration and Maintainability
+============================================
+
+VERIFICATION:
+- Runtime config loader added and covered by tests.
+- CLI doctor now reports provider/maxTurns/config sources.
+- Example config file added: `.private-agents.example.json`.
+- `npm run test:ts`, `npm test`, and `npm run build` all pass.
+
+RESULT:
+✅ Runtime settings are now centralized and maintainable instead of being scattered across ad-hoc env-only paths.

@@ -1,0 +1,18 @@
+D4/D5 Shell Substrate Atomicity + Core Ownership
+================================================
+
+Implemented:
+- runtime context now includes `cwd`, `originalCwd`, `projectRoot`, and atomic active session identity
+- `switchActiveSession()` performs atomic session identity switching
+- resume and close logic moved into `core/shell/recovery.ts` and `core/shell/signalHandlers.ts`
+
+Verification:
+- `packages/ts-shell/src/core/shell/runtimeContext.test.ts`
+- `packages/ts-shell/src/core/shell/recovery.test.ts`
+- `packages/ts-shell/src/core/shell/signalHandlers.test.ts`
+- `npm run build`
+- `npm test`
+
+Result:
+- shell substrate now owns recovery/close semantics more centrally
+- entrypoint is thinner and less likely to drift from shell runtime semantics

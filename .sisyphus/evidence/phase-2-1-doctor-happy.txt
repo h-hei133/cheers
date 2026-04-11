@@ -1,0 +1,11 @@
+PHASE 2.1: Installation and Startup Experience
+==============================================
+
+VERIFICATION:
+- `npm run doctor` passed and reported Node/Python/Cargo/Rustup plus active execution path.
+- `npm run setup` passed and chained bootstrap + validate + doctor.
+- `node node_modules/tsx/dist/cli.mjs packages/ts-shell/src/entrypoints/cli.tsx --doctor` passed.
+- `npm run build` and `npm test` remained green afterward.
+
+RESULT:
+✅ Daily-use startup diagnostics and one-command setup are working.

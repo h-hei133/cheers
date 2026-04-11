@@ -1,0 +1,11 @@
+TASK-15: TS -> Rust Bridge Behind Feature Flag
+==============================================
+
+SCENARIO: feature-flagged Rust execution path
+
+VERIFICATION:
+  - `packages/ts-shell/src/tools/registry-rust-bridge.test.ts` passes.
+  - With `DAEMON_ENABLED=1`, the bash tool returns metadata `{ executionPath: 'rust-daemon' }`.
+
+RESULT:
+  ✅ PASS - the TS shell can switch to the Rust daemon execution path behind a feature flag.

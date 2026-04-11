@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "command.request",
+  "commandId": "cmd_001",
+  "taskId": "task_001",
+  "commandName": "bash",
+  "args": {
+    "command": "git status",
+    "timeout": 120000
+  },
+  "requestedBy": "typescript",
+  "issuedAt": 1712456700000,
+  "correlationId": "corr_001"
+}

@@ -1,0 +1,11 @@
+TASK-14: Rust-Side Sandbox Enforcement + Escalation Propagation
+===============================================================
+
+SCENARIO: allowed command inside workspace
+
+VERIFICATION:
+  - `npm run test:rust` passes with Rust sandbox evaluation tests.
+  - Direct daemon run with `--cwd` inside `--workspace-root` returns status `completed`.
+
+RESULT:
+  ✅ PASS - Rust daemon permits commands that stay within the declared workspace policy.

@@ -1,0 +1,10 @@
+PHASE 2.2: Daily-use Safety UX
+==============================
+
+VERIFICATION:
+- `npm run audit:recent` prints recent permission audit entries in readable form.
+- `packages/ts-shell/src/sandbox/escalationWorkflow.test.ts` passes.
+- `npm run test:ts` and `npm test` remain green.
+
+RESULT:
+✅ Escalation prompts are more readable and audit visibility is available for daily use.

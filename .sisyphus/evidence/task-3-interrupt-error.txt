@@ -1,0 +1,11 @@
+TASK-3: CLI-first Streaming Shell Baseline
+=========================================
+
+SCENARIO: interrupt behavior
+
+VERIFICATION:
+  - `npm run test:ts` passed with `src/cli-baseline.test.ts` covering the SIGINT cancellation branch.
+  - `handleSigint()` test confirms: active run aborts, session is marked interrupted, and the prompt remains available.
+
+RESULT:
+  ✅ PASS - Ctrl+C cancellation semantics are deterministic in the shell runtime and keep the shell alive for the next prompt.

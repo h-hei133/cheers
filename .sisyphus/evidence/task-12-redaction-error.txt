@@ -1,0 +1,11 @@
+TASK-12: Observability Baseline
+===============================
+
+SCENARIO: secret redaction
+
+VERIFICATION:
+  - `packages/ts-shell/src/observability/structuredLogger.test.ts` passes.
+  - `packages/ts-shell/src/observability/traceContext.e2e.test.ts` verifies redacted emitted logs.
+
+RESULT:
+  ✅ PASS - API keys, bearer tokens, passwords, and sensitive fields are redacted before logs leave the structured logger.

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "task.lifecycle",
+  "eventId": "evt_001",
+  "taskId": "task_001",
+  "status": "running",
+  "previousStatus": "pending",
+  "message": "Task started",
+  "progress": 12.5,
+  "timestamp": 1712456701000
+}

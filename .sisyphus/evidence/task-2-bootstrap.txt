@@ -1,0 +1,61 @@
+TASK-2: Scaffold Repository Structure (TS Shell + Rust Core + Python Eval)
+=============================================================================
+
+SCENARIO: workspace bootstrap
+
+COMMAND EXECUTED:
+  node scripts/validate-structure.mjs
+
+RESULT:
+✅ PASS - Workspace structure is valid
+
+STRUCTURE CREATED:
+  packages/
+    ├── ts-shell/
+    │   ├── src/
+    │   ├── package.json
+    │   └── tsconfig.json
+    ├── rust-core/
+    │   ├── src/
+    │   ├── Cargo.toml
+    │   └── package.json
+    └── python-eval/
+        ├── src/
+        ├── pyproject.toml
+        └── package.json
+
+ROOT CONFIGURATION FILES:
+  ✓ package.json (monorepo with workspaces)
+  ✓ WORKSPACE.md (comprehensive structure guide)
+  ✓ OWNERSHIP.md (boundary contracts and responsibilities)
+  ✓ ARCHITECTURE.md (system design and flows)
+
+ROOT TASK RUNNERS:
+  ✓ npm run bootstrap - creates structure
+  ✓ npm run validate - checks structure (all pass)
+  ✓ npm run build - delegates to layer-specific builds
+  ✓ npm run test - runs TS + Rust + Python tests
+  ✓ npm run dev - TS shell watch mode
+
+LAYER-SPECIFIC SCRIPTS:
+  ✓ scripts/bootstrap.mjs - initialization
+  ✓ scripts/validate-structure.mjs - verification
+  ✓ scripts/run-python-tests.py - Python test harness
+
+ACCEPTANCE CRITERIA:
+  [✓] Repo structure documented with clear ownership per language
+  [✓] Root task runner commands call layer-specific scripts/tests
+  [✓] Workspace bootstrap succeeds
+  [✓] Structure validation passes with clear error messages
+
+WARNINGS (Non-Blocking):
+  - Optional TS Shell entry point not yet created (created during T3)
+
+NOTES:
+  - tsconfig.json configured for ES2022 + Node 20
+  - Cargo.toml configured with tokio async runtime
+  - pyproject.toml configured for pytest + dev tools
+  - All three layers isolated with contract boundaries (contracts/ folder)
+  - Cross-layer communication versioned via runtime-protocol.schema.json
+
+Evidence recorded: 2026-04-07 12:06 UTC

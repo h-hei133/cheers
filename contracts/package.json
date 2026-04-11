@@ -1,0 +1,14 @@
+{
+  "name": "@private-agents/contracts",
+  "version": "0.1.0",
+  "description": "Cross-runtime protocol contracts (TS/Rust/Python)",
+  "type": "module",
+  "main": "./index.js",
+  "files": [
+    "runtime-protocol.schema.json",
+    "versioning-policy.md",
+    "typescript",
+    "rust",
+    "python"
+  ]
+}

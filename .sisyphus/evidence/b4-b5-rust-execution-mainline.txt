@@ -1,0 +1,18 @@
+B4/B5 Rust Execution Mainline + Contract Parity
+===============================================
+
+Implemented:
+- daemon-first default execution routing
+- TS local execution normalization aligned to Rust daemon result shape
+- parity tests for success + timeout semantics
+
+Verification:
+- `packages/ts-shell/src/daemon/parity.test.ts`
+- `packages/ts-shell/src/tools/registry-rust-bridge.test.ts`
+- `npm run build`
+- `npm test`
+- manual `cli --doctor` shows `Execution path: rust-daemon`
+
+Result:
+- Rust is now the preferred execution backend for execution-plane workloads
+- TS↔Rust success/timeout semantics are explicitly tested

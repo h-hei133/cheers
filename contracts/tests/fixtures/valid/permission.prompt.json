@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "permission.prompt",
+  "promptId": "perm_001",
+  "taskId": "task_001",
+  "toolName": "bash",
+  "action": "execute",
+  "rationale": "Run project test suite",
+  "scope": {
+    "mode": "execute",
+    "target": "npm test contracts/"
+  },
+  "defaultDecision": "ask",
+  "requestedAt": 1712456704000,
+  "expiresAt": 1712456764000
+}

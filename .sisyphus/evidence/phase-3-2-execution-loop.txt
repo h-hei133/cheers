@@ -1,0 +1,10 @@
+PHASE 3.2: Real Coding-Task Execution Loop Hardening
+====================================================
+
+VERIFICATION:
+- Integrated flow now records workflow notes (branch / cleanliness) in shared context.
+- Dirty-main style workflow warning is available to the execution loop.
+- `npm run test:ts` and `npm test` pass with the workflow-aware execution loop.
+
+RESULT:
+✅ Real task execution is now workflow-aware instead of blind to branch/worktree state.

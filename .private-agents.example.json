@@ -1,0 +1,5 @@
+{
+  "provider": "openai",
+  "daemonEnabled": true,
+  "maxTurns": 6
+}

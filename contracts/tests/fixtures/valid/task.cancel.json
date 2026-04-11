@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "task.cancel",
+  "requestId": "cancel_001",
+  "taskId": "task_001",
+  "reason": "User requested stop",
+  "requestedBy": "user",
+  "requestedAt": 1712456705000,
+  "immediate": true,
+  "correlationId": "corr_001"
+}

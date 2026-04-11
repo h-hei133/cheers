@@ -1,0 +1,13 @@
+E4 Visible Tool Pool Combination Coverage
+========================================
+
+Implemented:
+- combined visible-tool-pool tests for disabled tools, hidden prefixes, MCP visibility, and mixed combinations
+
+Verification:
+- `packages/ts-shell/src/core/tools/prefilter.test.ts`
+- `npm run build`
+- `npm test`
+
+Result:
+- model-visible capability filtering now has deterministic combination coverage instead of only single-rule coverage

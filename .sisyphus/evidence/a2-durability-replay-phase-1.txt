@@ -1,0 +1,17 @@
+A2 Durability / Replay Phase 1
+==============================
+
+Implemented:
+- richer transcript events in `transcript.jsonl`
+- session recovery snapshot helpers
+- shell runtime appends query/lifecycle events into transcript substrate
+
+Verification:
+- `packages/ts-shell/src/session/SessionManager.test.ts`
+- `packages/ts-shell/src/core/shell/sessionRuntime.test.ts`
+- `npm run build`
+- `npm test`
+
+Result:
+- session substrate now stores more than final messages
+- recovery logic can inspect pending prompt, recent lifecycle, and transcript events

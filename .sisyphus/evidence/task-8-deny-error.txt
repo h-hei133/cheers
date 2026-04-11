@@ -1,0 +1,11 @@
+TASK-8: MVP Tool Registry + Permission-Aware Dispatch
+=====================================================
+
+SCENARIO: blocked tool usage
+
+VERIFICATION:
+  - `npm run test:ts` passed with `src/tools/dispatcher.test.ts`
+  - Non-allowlisted tool name `network-fetch` was rejected before execution with an explicit MVP allowlist error.
+
+RESULT:
+  ✅ PASS - non-allowlisted tools are blocked pre-execution with a clear policy explanation.

@@ -1,0 +1,17 @@
+TASK-7: Multi-Agent Orchestration Skeleton
+==========================================
+
+SCENARIO: cycle prevention
+
+COMMAND EXECUTED:
+  npm test
+
+RESULT:
+  ✅ PASS - recursive handoff loop is detected and stopped safely
+
+ASSERTED BY TEST:
+  - File: packages/ts-shell/src/orchestration/MultiAgentOrchestrator.test.ts
+  - Case: detects recursive reviewer <-> coder cycle and stops safely
+  - Verified stop status: stopped_cycle
+  - Verified stop reason contains repeated transition signature
+  - Verified loop does not run indefinitely

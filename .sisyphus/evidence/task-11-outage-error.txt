@@ -1,0 +1,11 @@
+TASK-11: Provider Abstraction Hardening + Fallback Policy
+=========================================================
+
+SCENARIO: prolonged outage
+
+VERIFICATION:
+  - `packages/ts-shell/src/model-adapters/client.test.ts` verifies degraded mode after repeated failed requests.
+  - Provider health can be reset manually after fallback engagement.
+
+RESULT:
+  ✅ PASS - prolonged provider outages degrade deterministically to a non-retriable fallback state instead of crashing the client loop.

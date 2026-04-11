@@ -1,0 +1,20 @@
+A1 Directory-based Session Substrate
+===================================
+
+Implemented:
+- `packages/ts-shell/src/session/SessionManager.ts`
+  - per-session directory substrate
+  - `metadata.json`
+  - `transcript.jsonl`
+  - `state.json`
+
+Verification:
+- `packages/ts-shell/src/session/SessionManager.test.ts`
+- `packages/ts-shell/src/cli-baseline.test.ts`
+- `npm run test:ts`
+- `npm test`
+- `npm run build`
+
+Result:
+- Session persistence is no longer single-file JSON only
+- Query/shell runtime can now evolve toward append-only transcript semantics on top of a directory substrate

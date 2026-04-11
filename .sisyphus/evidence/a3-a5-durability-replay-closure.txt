@@ -1,0 +1,19 @@
+A3-A5 Durability / Replay Closure
+=================================
+
+Implemented:
+- append-before-model-call durability barrier
+- interrupted prompt vs interrupted turn distinction in persisted state
+- replay plan + transcript normalization helpers
+- richer transcript event append through shell runtime
+
+Verification:
+- `packages/ts-shell/src/session/SessionManager.test.ts`
+- `packages/ts-shell/src/core/shell/sessionRuntime.test.ts`
+- `npm run build`
+- `npm test`
+- manual `cli --doctor`
+
+Result:
+- TS control plane now records and recovers runtime state with stronger durability semantics
+- session substrate can generate replay and recovery-oriented views instead of only final turns

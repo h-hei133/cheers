@@ -1,0 +1,11 @@
+TASK-4: Pluggable Model Adapter (OpenAI-first)
+==============================================
+
+SCENARIO: provider failure normalization
+
+VERIFICATION:
+  - `npm run test:ts` passed with normalization assertions for 429 and 401-class failures.
+  - Adapter classifies provider errors into normalized categories with retriable flags and retry-after metadata.
+
+RESULT:
+  ✅ PASS - provider failures are normalized into stable retriable/non-retriable error shapes without leaking provider-specific handling into orchestration logic.

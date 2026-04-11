@@ -1,0 +1,27 @@
+[package]
+name = "private-agents-core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "private_agents_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "daemon"
+path = "src/bin/daemon.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+regex = "1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true

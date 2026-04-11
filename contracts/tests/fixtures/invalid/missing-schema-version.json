@@ -1,0 +1,11 @@
+{
+  "kind": "command.request",
+  "commandId": "cmd_002",
+  "taskId": "task_002",
+  "commandName": "bash",
+  "args": {
+    "command": "ls"
+  },
+  "requestedBy": "typescript",
+  "issuedAt": 1712456706000
+}

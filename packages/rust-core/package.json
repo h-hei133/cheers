@@ -1,0 +1,15 @@
+{
+  "name": "@private-agents/rust-core",
+  "version": "0.1.0",
+  "description": "Rust execution core daemon and high-performance operations",
+  "scripts": {
+    "build": "node ../../scripts/run-rust-command.mjs build --release",
+    "test": "node ../../scripts/run-rust-command.mjs test",
+    "test:watch": "node ../../scripts/run-rust-command.mjs watch -x test",
+    "check": "node ../../scripts/run-rust-command.mjs check",
+    "lint": "node ../../scripts/run-rust-command.mjs clippy -- -D warnings"
+  },
+  "cargo": {
+    "workspace": true
+  }
+}

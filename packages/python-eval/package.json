@@ -1,0 +1,12 @@
+{
+  "name": "@private-agents/python-eval",
+  "version": "0.1.0",
+  "description": "Python evaluation layer for offline research and analysis",
+  "scripts": {
+    "build": "node ../../scripts/run-python-command.mjs -m compileall .",
+    "test": "node ../../scripts/run-python-command.mjs -m pytest",
+    "test:watch": "node ../../scripts/run-python-command.mjs -m pytest_watch",
+    "check": "node ../../scripts/run-python-command.mjs -m mypy src",
+    "lint": "node ../../scripts/run-python-command.mjs -m pylint src"
+  }
+}

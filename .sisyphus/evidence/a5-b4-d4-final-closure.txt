@@ -1,0 +1,23 @@
+A5 / B4 / D4 Final Closure
+===========================
+
+Implemented:
+- A5 transcript replay repair now repairs orphaned/partial runtime state before replay generation
+- B4 doctor/runtime execution-path labeling now follows the same daemon preference semantics as the TS runtime
+- D4 shell substrate now has an atomic transition surface for session + project/worktree state
+
+Verification:
+- `npm run build`
+- `npm test`
+- `npm run doctor`
+- `node node_modules/tsx/dist/cli.mjs packages/ts-shell/src/entrypoints/cli.tsx --doctor`
+
+Observed results:
+- build passed
+- tests passed (`TS 98`, `Rust 8`, `Python 4`)
+- root doctor reported `Execution path: rust-daemon`
+- CLI doctor reported `Execution path: rust-daemon`
+
+Result:
+- A5, B4, and D4 are now closed at the current implementation checkpoint
+- the prior semantic gap around replay repair, execution-path preference labeling, and atomic shell substrate transitions has been resolved

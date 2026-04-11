@@ -1,0 +1,13 @@
+TASK-3: CLI-first Streaming Shell Baseline
+=========================================
+
+SCENARIO: streaming happy path
+
+VERIFICATION:
+  - `npm run test:ts` passed with `src/cli-baseline.test.ts` green (4 tests)
+  - Manual CLI run succeeded:
+      `node node_modules/tsx/dist/cli.mjs packages/ts-shell/src/entrypoints/cli.tsx --version`
+      `@'hello from manual check'@ | node node_modules/tsx/dist/cli.mjs packages/ts-shell/src/entrypoints/cli.tsx`
+
+RESULT:
+  ✅ PASS - CLI starts, prints session metadata, accepts input, and emits assistant output incrementally.

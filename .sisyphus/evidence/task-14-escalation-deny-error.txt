@@ -1,0 +1,11 @@
+TASK-14: Rust-Side Sandbox Enforcement + Escalation Propagation
+===============================================================
+
+SCENARIO: network-style command requires escalation
+
+VERIFICATION:
+  - `npm run test:rust` passes with `test_sandbox_requires_escalation_for_network`.
+  - Direct daemon run with `curl https://example.com` returns non-zero JSON result with `Network access requires escalation`.
+
+RESULT:
+  ✅ PASS - Rust daemon surfaces escalation-required outcomes before execution for disallowed network-style commands.

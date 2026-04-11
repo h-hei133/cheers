@@ -1,0 +1,12 @@
+TASK-11: Provider Abstraction Hardening + Fallback Policy
+=========================================================
+
+SCENARIO: transient provider failure
+
+VERIFICATION:
+  - `packages/ts-shell/src/model-adapters/retryPolicy.test.ts` passes (12 tests)
+  - `packages/ts-shell/src/model-adapters/client.test.ts` passes (5 tests)
+  - Retriable failures back off and recover successfully.
+
+RESULT:
+  ✅ PASS - transient provider failures are retried with bounded backoff and recover without changing orchestration code.

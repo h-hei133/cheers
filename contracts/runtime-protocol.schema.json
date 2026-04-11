@@ -1,0 +1,446 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claudecode.dev/schemas/runtime-protocol.schema.json",
+  "title": "Cross-runtime Protocol Contract",
+  "description": "Versioned protocol contract for TypeScript ↔ Rust ↔ Python runtime boundaries.",
+  "type": "object",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/CommandRequest"
+    },
+    {
+      "$ref": "#/$defs/TaskLifecycleEvent"
+    },
+    {
+      "$ref": "#/$defs/StreamChunk"
+    },
+    {
+      "$ref": "#/$defs/RuntimeError"
+    },
+    {
+      "$ref": "#/$defs/PermissionPrompt"
+    },
+    {
+      "$ref": "#/$defs/CancellationRequest"
+    }
+  ],
+  "$defs": {
+    "SchemaVersion": {
+      "type": "string",
+      "description": "Semantic version string with major.minor.patch.",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "RuntimeOrigin": {
+      "type": "string",
+      "enum": [
+        "typescript",
+        "rust",
+        "python",
+        "user",
+        "system",
+        "external"
+      ]
+    },
+    "ErrorCode": {
+      "type": "string",
+      "description": "Protocol-level error code returned by validators/runtime boundaries.",
+      "enum": [
+        "E_SCHEMA_VERSION_REQUIRED",
+        "E_SCHEMA_VERSION_FORMAT",
+        "E_COMPATIBILITY_UNSUPPORTED",
+        "E_KIND_INVALID",
+        "E_FIELD_REQUIRED",
+        "E_FIELD_INVALID_TYPE",
+        "E_FIELD_INVALID_VALUE",
+        "E_COMMAND_INVALID",
+        "E_TASK_STATUS_INVALID",
+        "E_PERMISSION_RESPONSE_INVALID",
+        "E_CANCELLATION_INVALID"
+      ]
+    },
+    "BaseMessage": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "kind"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "CommandRequest": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/BaseMessage"
+        }
+      ],
+      "required": [
+        "schemaVersion",
+        "kind",
+        "commandId",
+        "taskId",
+        "commandName",
+        "args",
+        "requestedBy",
+        "issuedAt"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "const": "command.request"
+        },
+        "commandId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commandName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "requestedBy": {
+          "$ref": "#/$defs/RuntimeOrigin"
+        },
+        "issuedAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "correlationId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TaskLifecycleEvent": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/BaseMessage"
+        }
+      ],
+      "required": [
+        "schemaVersion",
+        "kind",
+        "eventId",
+        "taskId",
+        "status",
+        "timestamp"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "const": "task.lifecycle"
+        },
+        "eventId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "killed",
+            "cancelled"
+          ]
+        },
+        "previousStatus": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "killed",
+            "cancelled"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "progress": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "StreamChunk": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/BaseMessage"
+        }
+      ],
+      "required": [
+        "schemaVersion",
+        "kind",
+        "streamId",
+        "taskId",
+        "channel",
+        "chunkIndex",
+        "content",
+        "isFinal",
+        "emittedAt"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "const": "stream.chunk"
+        },
+        "streamId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "channel": {
+          "type": "string",
+          "enum": [
+            "stdout",
+            "stderr",
+            "system",
+            "assistant",
+            "tool"
+          ]
+        },
+        "chunkIndex": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "content": {
+          "type": "string"
+        },
+        "isFinal": {
+          "type": "boolean"
+        },
+        "emittedAt": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "RuntimeError": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/BaseMessage"
+        }
+      ],
+      "required": [
+        "schemaVersion",
+        "kind",
+        "errorId",
+        "code",
+        "message",
+        "recoverable",
+        "emittedAt"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "const": "runtime.error"
+        },
+        "errorId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recoverable": {
+          "type": "boolean"
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "emittedAt": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "PermissionPrompt": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/BaseMessage"
+        }
+      ],
+      "required": [
+        "schemaVersion",
+        "kind",
+        "promptId",
+        "taskId",
+        "toolName",
+        "action",
+        "scope",
+        "defaultDecision",
+        "requestedAt"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "const": "permission.prompt"
+        },
+        "promptId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "toolName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "object",
+          "required": [
+            "mode",
+            "target"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "read",
+                "write",
+                "execute",
+                "network",
+                "system"
+              ]
+            },
+            "target": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "defaultDecision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "deny",
+            "ask"
+          ]
+        },
+        "requestedAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "CancellationRequest": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/BaseMessage"
+        }
+      ],
+      "required": [
+        "schemaVersion",
+        "kind",
+        "requestId",
+        "taskId",
+        "requestedBy",
+        "requestedAt",
+        "immediate"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "const": "task.cancel"
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string"
+        },
+        "requestedBy": {
+          "$ref": "#/$defs/RuntimeOrigin"
+        },
+        "requestedAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "immediate": {
+          "type": "boolean"
+        },
+        "correlationId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

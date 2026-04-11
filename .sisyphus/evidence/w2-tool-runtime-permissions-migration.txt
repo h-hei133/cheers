@@ -1,0 +1,26 @@
+W2 Tool Runtime / Permission Model Migration
+============================================
+
+Implemented:
+- `packages/ts-shell/src/core/tools/permissionContext.ts`
+- `packages/ts-shell/src/core/tools/toolResultLifecycle.ts`
+- `packages/ts-shell/src/core/tools/approvalFlow.ts`
+- `packages/ts-shell/src/core/tools/registry.ts`
+- `packages/ts-shell/src/core/tools/runtime.ts`
+- compatibility wrappers:
+  - `packages/ts-shell/src/tools/registry.ts`
+  - `packages/ts-shell/src/tools/dispatcher.ts`
+
+Mapping artifact:
+- `.sisyphus/drafts/w2-tool-runtime-map.md`
+
+Verification:
+- `node node_modules/vitest/vitest.mjs run packages/ts-shell/src/core/tools/runtime.test.ts`
+- `node node_modules/vitest/vitest.mjs run packages/ts-shell/src/tools/dispatcher.test.ts packages/ts-shell/src/tools/registry-rust-bridge.test.ts packages/ts-shell/src/sandbox/sandbox.test.ts`
+- `npm run test:ts`
+- `npm test`
+- `npm run build`
+
+Result:
+- Tool registry, runtime, permission context, approval flow, and result lifecycle now have distinct modules
+- Existing dispatcher/sandbox behavior remains green through compatibility entrypoints

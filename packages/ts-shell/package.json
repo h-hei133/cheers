@@ -1,0 +1,27 @@
+{
+  "name": "@private-agents/ts-shell",
+  "version": "0.1.0",
+  "description": "TypeScript CLI shell and orchestration layer",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "agents": "./dist/entrypoints/cli.js"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc --noEmit",
+    "dev": "tsx watch src/entrypoints/cli.tsx",
+    "start": "tsx src/entrypoints/cli.tsx",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vitest": "^0.34.0",
+    "typescript": "^5.2.0",
+    "tsx": "^4.0.0"
+  }
+}

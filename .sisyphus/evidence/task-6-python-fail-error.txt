@@ -1,0 +1,20 @@
+TASK-6: Tri-Stack Minimal Test Infrastructure
+=============================================
+
+SCENARIO: one-stack failure propagation
+
+COMMAND EXECUTED:
+  PRIVATE_AGENTS_FAIL_PYTHON_SMOKE=1 npm test
+
+RESULT:
+  ✅ PASS - unified runner returned non-zero and attributed the failure to Python
+
+FAILURE ATTRIBUTION:
+  - TypeScript (Vitest): passed
+  - Rust (cargo test): passed
+  - Python (pytest): failed
+  - Unified runner error: `Python Tests (pytest) failed with exit code 1`
+
+NOTES:
+  - Failure was injected through the Python smoke test env flag
+  - Runner preserved fail-fast semantics and surfaced the failing stack name clearly

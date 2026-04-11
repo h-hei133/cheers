@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "task.lifecycle",
+  "eventId": "evt_003",
+  "taskId": "task_003",
+  "status": "done",
+  "timestamp": 1712456711000
+}
