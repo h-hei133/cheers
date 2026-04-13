@@ -1,4 +1,4 @@
-import type { AgentRole, ContinuationReason, TerminalReason } from '../../orchestration/types.js'
+import type { AgentRole, ContinuationReason, TerminalClassification, TerminalReason } from '../../orchestration/types.js'
 
 export type QueryContinue = {
   readonly action: 'continue'
@@ -11,6 +11,7 @@ export type QueryContinue = {
 export type QueryTerminal = {
   readonly action: 'terminal'
   readonly terminalReason: TerminalReason
+  readonly terminalClassification?: TerminalClassification
   readonly stopReason?: string
 }
 
@@ -38,10 +39,12 @@ export function continueQuery(
 export function terminalQuery(
   terminalReason: QueryTerminal['terminalReason'],
   stopReason?: string,
+  terminalClassification?: QueryTerminal['terminalClassification'],
 ): QueryTerminal {
   return {
     action: 'terminal',
     terminalReason,
     stopReason,
+    terminalClassification,
   }
 }

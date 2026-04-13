@@ -47,7 +47,9 @@ export class ShellSessionRuntime {
     let enteredQueryPhase = false
 
     try {
-      this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt)
+      if (!options?.runtimeSeed) {
+        this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt)
+      }
 
       let sawTerminalEvent = false
 

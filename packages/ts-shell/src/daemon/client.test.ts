@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isRustDaemonEnabled } from './client.js'
 import { getExecutionPathLabel } from '../../../../scripts/toolchain.mjs'
 
@@ -59,5 +59,83 @@ describe('rust daemon feature flag', () => {
 
     expect(getExecutionPathLabel(fakeRoot)).toBe('rust-daemon')
     expect(isRustDaemonEnabled()).toBe(true)
+  })
+
+  it('treats cargo on PATH as available when the home cargo binary is missing', async () => {
+    vi.resetModules()
+    vi.doMock('node:child_process', () => ({
+      execFile: vi.fn(),
+      execFileSync: vi.fn((command: string) => {
+        if (command.includes('.cargo')) {
+          throw new Error('ENOENT')
+        }
+
+        return Buffer.from('cargo 1.0.0')
+      }),
+    }))
+
+    try {
+      const { checkRustDaemonAvailability } = await import('./client.js')
+      expect(checkRustDaemonAvailability()).toEqual({ available: true })
+    } finally {
+      vi.doUnmock('node:child_process')
+      vi.resetModules()
+    }
+  })
+
+  it('executes through cargo on PATH when the home cargo binary is missing', async () => {
+    const daemonPayload = JSON.stringify({
+      status: 'completed',
+      exitCode: 0,
+      stdout: 'daemon path via PATH cargo',
+      stderr: '',
+    })
+
+    const execFileMock = vi.fn((command: string, args: string[], _options: unknown, callback: (error: unknown, stdout?: string, stderr?: string) => void) => {
+      expect(['cargo', 'cargo.exe']).toContain(path.basename(command).toLowerCase())
+      expect(command.includes('.cargo')).toBe(false)
+      expect(args).toContain('--manifest-path')
+      callback(null, daemonPayload, '')
+    })
+    const promisifiedExecFileMock = vi.fn(async (command: string, args: string[]) => {
+      expect(['cargo', 'cargo.exe']).toContain(path.basename(command).toLowerCase())
+      expect(args).toContain('--manifest-path')
+      return { stdout: daemonPayload, stderr: '' }
+    })
+    execFileMock[Symbol.for('nodejs.util.promisify.custom') as unknown as 'custom'] = promisifiedExecFileMock
+
+    vi.resetModules()
+    vi.doMock('node:child_process', () => ({
+      execFile: execFileMock,
+      execFileSync: vi.fn((command: string) => {
+        if (command.includes('.cargo')) {
+          throw new Error('ENOENT')
+        }
+
+        return Buffer.from('cargo 1.0.0')
+      }),
+    }))
+
+    try {
+      const { executeViaRustDaemon } = await import('./client.js')
+      const result = await executeViaRustDaemon({
+        command: 'cmd',
+        args: ['/C', 'echo ok'],
+        cwd: fakeRoot,
+        workspaceRoot: fakeRoot,
+        timeoutMs: 1000,
+      })
+
+      expect(result).toEqual({
+        status: 'completed',
+        exitCode: 0,
+        stdout: 'daemon path via PATH cargo',
+        stderr: '',
+      })
+      expect(promisifiedExecFileMock).toHaveBeenCalledOnce()
+    } finally {
+      vi.doUnmock('node:child_process')
+      vi.resetModules()
+    }
   })
 })

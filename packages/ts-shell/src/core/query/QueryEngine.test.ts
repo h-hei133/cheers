@@ -145,6 +145,81 @@ describe('core QueryEngine migration (W1)', () => {
     ])
   })
 
+  it('emits exactly one synthetic tool cleanup event and preserves direct tool results', async () => {
+    const runAgent: AgentRunner = async ({ role }) => ({
+      role,
+      content: 'done',
+      events: [
+        { type: 'tool.started', toolName: 'read', taskId: 'task_cleanup' },
+        { type: 'approval.requested', toolName: 'bash', taskId: 'task_direct' },
+        { type: 'approval.resolved', toolName: 'bash', taskId: 'task_direct', outcome: 'approved' },
+        { type: 'tool.result', toolName: 'bash', taskId: 'task_direct', success: true },
+      ],
+    })
+
+    const engine = new QueryEngine({ runAgent })
+    const timeline: string[] = []
+    const syntheticToolResults: string[] = []
+    const directToolResults: string[] = []
+
+    for await (const event of engine.streamMessage('sess_tool_cleanup', 'cleanup it')) {
+      timeline.push(event.type)
+      if (event.type === 'tool.result') {
+        const marker = `${event.toolName}:${event.taskId}:${event.success}:${event.compensated === true ? 'synthetic' : 'direct'}`
+        if (event.compensated === true) {
+          syntheticToolResults.push(marker)
+        } else {
+          directToolResults.push(marker)
+        }
+      }
+    }
+
+    expect(syntheticToolResults).toEqual(['read:task_cleanup:false:synthetic'])
+    expect(directToolResults).toEqual(['bash:task_direct:true:direct'])
+    expect(timeline.filter(type => type === 'tool.result')).toHaveLength(2)
+    expect(timeline.indexOf('tool.result')).toBeLessThan(timeline.indexOf('turn.completed'))
+    expect(timeline.indexOf('tool.result')).toBeLessThan(timeline.indexOf('query.completed'))
+  })
+
+  it('keeps direct approval/tool resolutions and orphaned synthetic cleanup exactly-once in one run', async () => {
+    const runAgent: AgentRunner = async ({ role }) => ({
+      role,
+      content: 'done',
+      events: [
+        { type: 'approval.requested', toolName: 'bash', taskId: 'task_direct_approval' },
+        { type: 'approval.resolved', toolName: 'bash', taskId: 'task_direct_approval', outcome: 'approved' },
+        { type: 'tool.started', toolName: 'bash', taskId: 'task_direct_tool' },
+        { type: 'tool.result', toolName: 'bash', taskId: 'task_direct_tool', success: true },
+        { type: 'tool.started', toolName: 'read', taskId: 'task_orphan_tool' },
+      ],
+    })
+
+    const engine = new QueryEngine({ runAgent })
+    const approvalEvents: string[] = []
+    const toolEvents: string[] = []
+    const timeline: string[] = []
+
+    for await (const event of engine.streamMessage('sess_bundle_cleanup', 'bundle cleanup')) {
+      timeline.push(event.type)
+      if (event.type === 'approval.resolved') {
+        approvalEvents.push(`${event.toolName}:${event.taskId}:${event.outcome}:${event.compensated === true ? 'compensated' : 'direct'}`)
+      }
+      if (event.type === 'tool.result') {
+        toolEvents.push(`${event.toolName}:${event.taskId}:${event.success}:${event.compensated === true ? 'compensated' : 'direct'}`)
+      }
+    }
+
+    expect(approvalEvents).toEqual(['bash:task_direct_approval:approved:direct'])
+    expect(toolEvents).toEqual([
+      'bash:task_direct_tool:true:direct',
+      'read:task_orphan_tool:false:compensated',
+    ])
+    expect(timeline.filter(type => type === 'approval.resolved')).toHaveLength(1)
+    expect(timeline.filter(type => type === 'tool.result')).toHaveLength(2)
+    expect(timeline.indexOf('approval.resolved')).toBeLessThan(timeline.indexOf('query.completed'))
+    expect(timeline.indexOf('tool.result')).toBeLessThan(timeline.indexOf('query.completed'))
+  })
+
   it('withholds retryable errors and continues the same turn before completing', async () => {
     let attempts = 0
     const runAgent: AgentRunner = async ({ role }) => {
@@ -310,12 +385,7 @@ describe('core QueryEngine migration (W1)', () => {
             source: 'durable-replay',
             normalizedEventCount: 3,
             pairedTurnCount: 1,
-            policyEvidence: {
-              hasOpenTurn: true,
-              hasPairedTurns: true,
-              hasPendingLifecycle: false,
-              hasRepairDrift: false,
-            },
+            policyEvidence: new Set(['open-turn', 'paired-turns']),
             repairSummary: {
               insertedPromptMessage: false,
               insertedQueryStarted: false,
@@ -350,6 +420,71 @@ describe('core QueryEngine migration (W1)', () => {
     expect(result.sharedContext.handoffs).toEqual([
       { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
       { from: 'coder', to: 'reviewer', reason: 'resume-ready', turn: 2 },
+    ])
+  })
+
+  it('drops compacted transcript and derived context for fresh-only recovery seeds', async () => {
+    const seenTurns: string[] = []
+    const runAgent: AgentRunner = async ({ role, turn, transcript, sharedContext }) => {
+      seenTurns.push(`${role}:${turn}:${transcript.length}:${sharedContext.notes.length}:${sharedContext.handoffs.length}`)
+      return {
+        role,
+        content: 'fresh-only-output',
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_fresh_only_seed', 'fresh prompt', {
+      runtimeSeed: {
+        config: {
+          sessionId: 'sess_fresh_only_seed',
+          initialPrompt: 'fresh prompt',
+          maxTurns: 6,
+          startingRole: 'coder',
+        },
+        currentRole: 'coder',
+        turn: 3,
+        pendingLifecycle: { pendingApprovals: {}, pendingTools: {}, taskStates: {} },
+        recoveryBoundary: 'fresh-entry',
+        truthBoundary: {
+          source: 'durable-replay',
+          normalizedEventCount: 5,
+          pairedTurnCount: 1,
+          policyEvidence: new Set(['open-turn', 'repair-drift']),
+          repairSummary: {
+            insertedPromptMessage: true,
+            insertedQueryStarted: true,
+            strippedInterruptedTerminalEvents: 1,
+            insertedRunInterrupted: true,
+            ignoredDuplicateTurnStarts: 0,
+            ignoredUnpairedTurnCompletions: 0,
+            ignoredRoleMismatchedTurnCompletions: 0,
+          },
+          continuationSafety: 'fresh-only',
+          openTurn: undefined,
+        },
+        derivedState: {
+          transcript: [
+            {
+              role: 'planner',
+              content: 'old plan',
+              handoffTo: 'coder',
+              handoffReason: 'stale-handoff',
+              notes: ['stale-note'],
+            },
+          ],
+        },
+      },
+    })
+
+    expect(seenTurns).toEqual(['coder:3:0:0:0'])
+    expect(result.sharedContext.notes).toEqual([])
+    expect(result.sharedContext.handoffs).toEqual([])
+    expect(result.transcript).toEqual([
+      {
+        role: 'coder',
+        content: 'fresh-only-output',
+      },
     ])
   })
 })

@@ -9,7 +9,7 @@ export function mapTerminalToOrchestrationResult(
   return {
     status: terminal.terminalReason,
     terminalReason: terminal.terminalReason,
-    terminalClassification: classifyTerminalReason(terminal.terminalReason),
+    terminalClassification: terminal.terminalClassification ?? classifyTerminalReason(terminal.terminalReason),
     lastContinuationReason: state.lastContinuationReason,
     stopReason: terminal.stopReason,
     transcript: state.transcript,

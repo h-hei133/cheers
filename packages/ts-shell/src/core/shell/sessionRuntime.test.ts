@@ -64,6 +64,89 @@ describe('shell session runtime (W5)', () => {
     ])
   })
 
+  it('does not persist prompt barrier again for resumed runs with a non-fresh runtime seed', async () => {
+    const calls: string[] = []
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier(sessionId: string, prompt: string) {
+          calls.push(`barrier:${sessionId}:${prompt}`)
+        },
+        markRecoveryReentry(sessionId: string, boundary: string) {
+          calls.push(`reentry:${sessionId}:${boundary}`)
+        },
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn(sessionId: string, turn: { role: string; content: string }) {
+          calls.push(`turn:${sessionId}:${turn.role}:${turn.content}`)
+        },
+        saveCompleted(sessionId: string) {
+          calls.push(`completed:${sessionId}`)
+        },
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine() {},
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* (prompt) {
+        yield {
+          type: 'query.completed',
+          result: {
+            status: 'completed',
+            terminalReason: 'completed',
+            terminalClassification: 'success',
+            transcript: [],
+            sharedContext: { sessionId: 'sess_resume', initialPrompt: prompt, notes: [], handoffs: [] },
+            finalOutput: `done:${prompt}`,
+          },
+        }
+      },
+    })
+
+    const output = await runtime.executePrompt('sess_resume', 'resume me', {
+      runtimeSeed: {
+        config: {
+          sessionId: 'sess_resume',
+          initialPrompt: 'resume me',
+          maxTurns: 6,
+          startingRole: 'planner',
+        },
+        currentRole: 'coder',
+        turn: 2,
+        pendingLifecycle: { pendingApprovals: {}, pendingTools: {}, taskStates: {} },
+        recoveryBoundary: 'mid-turn-reentry',
+        truthBoundary: {
+          source: 'durable-replay',
+          normalizedEventCount: 0,
+          pairedTurnCount: 1,
+          policyEvidence: new Set(['open-turn']),
+          repairSummary: {
+            insertedPromptMessage: false,
+            insertedQueryStarted: false,
+            strippedInterruptedTerminalEvents: 0,
+            insertedRunInterrupted: false,
+            ignoredDuplicateTurnStarts: 0,
+            ignoredUnpairedTurnCompletions: 0,
+            ignoredRoleMismatchedTurnCompletions: 0,
+          },
+          continuationSafety: 'mid-turn-safe',
+          openTurn: { role: 'coder', turn: 2 },
+        },
+        derivedState: { transcript: [] },
+      },
+    })
+
+    expect(output).toBe('done:resume me')
+    expect(calls).toEqual([
+      'reentry:sess_resume:mid-turn-reentry',
+      'turn:sess_resume:assistant:done:resume me',
+      'completed:sess_resume',
+    ])
+  })
+
   it('maps non-completed terminal query results to session error state', async () => {
     const calls: string[] = []
     const runtime = new ShellSessionRuntime({
@@ -292,11 +375,52 @@ describe('shell session runtime (W5)', () => {
         status: string
         terminalReason?: string
         lastContinuationReason?: string
+        lastError?: string
       }
 
       expect(state.status).toBe('error')
       expect(state.terminalReason).toBe('stopped_error')
       expect(state.lastContinuationReason).toBe('retryable-error')
+      expect(state.lastError).toBeUndefined()
+    } finally {
+      process.env.USERPROFILE = originalUserProfile
+      process.env.HOME = originalHome
+      fs.rmSync(fakeHome, { recursive: true, force: true })
+    }
+  })
+
+  it('persists true error terminal envelope when query.failed is emitted', async () => {
+    const originalUserProfile = process.env.USERPROFILE
+    const originalHome = process.env.HOME
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'private-agents-query-failed-state-'))
+    process.env.USERPROFILE = fakeHome
+    process.env.HOME = fakeHome
+
+    try {
+      const manager = new SessionManager()
+      const session = manager.createNew()
+      const runtime = new ShellSessionRuntime({
+        sessionManager: manager,
+        renderer: { renderLine() {}, renderChunk() {} } as never,
+        runPrompt: async function* () {
+          yield { type: 'query.failed', error: 'daemon panic' }
+        },
+      })
+
+      await expect(runtime.executePrompt(session.id, 'hello')).rejects.toThrow('daemon panic')
+
+      const statePath = path.join(manager.getSessionDirPath(session.id), 'state.json')
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf8')) as {
+        status: string
+        terminalReason?: string
+        terminalClassification?: string
+        lastError?: string
+      }
+
+      expect(state.status).toBe('error')
+      expect(state.terminalReason).toBe('stopped_error')
+      expect(state.terminalClassification).toBe('error')
+      expect(state.lastError).toBe('daemon panic')
     } finally {
       process.env.USERPROFILE = originalUserProfile
       process.env.HOME = originalHome

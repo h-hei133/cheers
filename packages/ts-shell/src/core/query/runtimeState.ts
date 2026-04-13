@@ -44,11 +44,23 @@ export interface QueryRuntimeRepairSummary {
 
 export type ContinuationSafety = 'fresh-only' | 'completed-turn-only' | 'mid-turn-safe'
 
-export interface ContinuationPolicyEvidence {
-  readonly hasOpenTurn: boolean
-  readonly hasPairedTurns: boolean
-  readonly hasPendingLifecycle: boolean
-  readonly hasRepairDrift: boolean
+export type ContinuationEvidenceToken =
+  | 'open-turn'
+  | 'paired-turns'
+  | 'pending-lifecycle'
+  | 'repair-drift'
+
+export type ContinuationPolicyEvidence = ReadonlySet<ContinuationEvidenceToken>
+
+export function buildContinuationPolicyEvidence(tokens: Iterable<ContinuationEvidenceToken>): ContinuationPolicyEvidence {
+  return new Set(tokens)
+}
+
+export function hasContinuationEvidence(
+  evidence: ContinuationPolicyEvidence,
+  token: ContinuationEvidenceToken,
+): boolean {
+  return evidence.has(token)
 }
 
 export interface ContinuationSafetyPolicyRow {
@@ -72,14 +84,17 @@ export const CONTINUATION_SAFETY_POLICY: Record<ContinuationSafety, Continuation
     runtimeRecoveryBoundary: 'completed-turn-reentry',
     allowDerivedContext: true,
     resetToStartingRole: false,
-    accepts: evidence => evidence.hasPairedTurns,
+    accepts: evidence => hasContinuationEvidence(evidence, 'paired-turns'),
   },
   'mid-turn-safe': {
     safety: 'mid-turn-safe',
     runtimeRecoveryBoundary: 'mid-turn-reentry',
     allowDerivedContext: true,
     resetToStartingRole: false,
-    accepts: evidence => evidence.hasOpenTurn && !evidence.hasRepairDrift && !evidence.hasPendingLifecycle,
+    accepts: evidence =>
+      hasContinuationEvidence(evidence, 'open-turn')
+      && !hasContinuationEvidence(evidence, 'repair-drift')
+      && !hasContinuationEvidence(evidence, 'pending-lifecycle'),
   },
 }
 
@@ -154,6 +169,7 @@ export function createQueryRuntimeStateFromSeed(
   seed: QueryRuntimeStateSeed,
 ): QueryRuntimeState {
   const derivedContext = deriveQueryContextFromTranscript(seed)
+  const policy = CONTINUATION_SAFETY_POLICY[seed.truthBoundary.continuationSafety]
 
   return {
     config: seed.config,
@@ -166,7 +182,7 @@ export function createQueryRuntimeStateFromSeed(
       taskStates: { ...seed.pendingLifecycle.taskStates },
     },
     sharedContext: derivedContext.sharedContext,
-    transcript: [...seed.derivedState.transcript],
+    transcript: policy.allowDerivedContext ? [...seed.derivedState.transcript] : [],
     visitedTransitions: new Set(derivedContext.visitedTransitions),
   }
 }

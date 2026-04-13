@@ -71,7 +71,12 @@ export async function resumeShellSession(input: {
   const recoverySnapshot = input.sessionManager.getRecoverySnapshot(input.runtimeContext.session.id)
   const pendingPrompt = input.runtimeContext.session.pendingPrompt ?? recoverySnapshot.pendingPrompt
 
-  if (recoverySnapshot.interruptedKind === 'turn') {
+  if (
+    recoverySnapshot.interruptedKind === 'turn'
+    || recoverySnapshot.interruptedKind === 'prompt'
+    || Object.keys(recoverySnapshot.pendingLifecycle.pendingApprovals).length > 0
+    || Object.keys(recoverySnapshot.pendingLifecycle.pendingTools).length > 0
+  ) {
     input.sessionManager.reconcilePendingLifecycle(input.runtimeContext.session.id)
   }
 

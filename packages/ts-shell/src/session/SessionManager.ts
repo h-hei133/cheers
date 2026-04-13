@@ -15,11 +15,16 @@ import type { QueryEvent } from '../core/query/events.js'
 import type {
   ContinuationSafety,
   ContinuationPolicyEvidence,
+  ContinuationEvidenceToken,
   QueryRuntimeRepairSummary,
   QueryRuntimeRecoveryBoundary,
   QueryRuntimeStateSeed,
 } from '../core/query/runtimeState.js'
-import { CONTINUATION_SAFETY_POLICY, resolveContinuationSafety } from '../core/query/runtimeState.js'
+import {
+  buildContinuationPolicyEvidence,
+  CONTINUATION_SAFETY_POLICY,
+  resolveContinuationSafety,
+} from '../core/query/runtimeState.js'
 import type { ContinuationReason, TerminalClassification, TerminalReason } from '../orchestration/types.js'
 import {
   applyLifecycleEventToIndex,
@@ -54,6 +59,7 @@ interface SessionStateSnapshot {
   status: Session['status']
   pendingPrompt?: string
   lastError?: string
+  durableStatus?: 'success' | 'stopped' | 'error'
   runPhase?: 'idle' | 'prompt-persisted' | 'turn-active'
   interruptedKind?: 'prompt' | 'turn'
   terminalReason?: TerminalReason
@@ -78,6 +84,7 @@ export interface RecoverySnapshot {
   readonly pendingPrompt?: string
   readonly runPhase?: 'idle' | 'prompt-persisted' | 'turn-active'
   readonly interruptedKind?: 'prompt' | 'turn'
+  readonly durableStatus?: 'success' | 'stopped' | 'error'
   readonly terminalReason?: TerminalReason
   readonly terminalClassification?: TerminalClassification
   readonly lastContinuationReason?: ContinuationReason
@@ -93,6 +100,25 @@ interface TerminalPersistence {
   readonly terminalReason?: TerminalReason
   readonly terminalClassification?: TerminalClassification
   readonly lastContinuationReason?: ContinuationReason
+}
+
+function toDurableStatus(
+  terminalClassification: TerminalClassification | undefined,
+  status: Session['status'],
+): 'success' | 'stopped' | 'error' | undefined {
+  if (terminalClassification === 'success' || status === 'completed') {
+    return 'success'
+  }
+
+  if (terminalClassification === 'stopped') {
+    return 'stopped'
+  }
+
+  if (terminalClassification === 'error' || status === 'error') {
+    return 'error'
+  }
+
+  return undefined
 }
 
 export interface ReplayPlan {
@@ -199,7 +225,6 @@ export class SessionManager {
       session.status = 'active'
       session.updatedAt = new Date().toISOString()
       this.writeSessionMetadata(session)
-      this.writeSessionState(session)
       return session
     } catch (error) {
       throw new Error(`Failed to resume session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`)
@@ -237,6 +262,7 @@ export class SessionManager {
   markRunStarted(sessionId: string, prompt: string): void {
     const session = this.load(sessionId)
     session.status = 'active'
+    delete session.lastError
     session.pendingPrompt = prompt
     session.updatedAt = new Date().toISOString()
     this.appendTranscriptEvent(sessionId, {
@@ -260,6 +286,7 @@ export class SessionManager {
     const nextMessage: SessionMessage = { role: 'user', content: prompt, timestamp }
 
     session.status = 'active'
+    delete session.lastError
     session.pendingPrompt = prompt
     session.updatedAt = timestamp
     session.turns.push(nextMessage)
@@ -290,6 +317,7 @@ export class SessionManager {
 
   markTurnActive(sessionId: string): void {
     const session = this.load(sessionId)
+    delete session.lastError
     session.updatedAt = new Date().toISOString()
     this.writeSessionMetadata(session)
     this.writeSessionState(session, {
@@ -308,6 +336,7 @@ export class SessionManager {
   ): void {
     const session = this.load(sessionId)
     session.status = 'active'
+    delete session.lastError
     session.updatedAt = new Date().toISOString()
     this.writeSessionMetadata(session)
     this.writeSessionState(session, {
@@ -322,6 +351,7 @@ export class SessionManager {
   saveInterrupted(sessionId: string, interruptedKind: 'prompt' | 'turn' = 'prompt'): void {
     const session = this.load(sessionId)
     session.status = 'interrupted'
+    delete session.lastError
     session.updatedAt = new Date().toISOString()
     this.appendTranscriptEvent(sessionId, {
       type: 'lifecycle',
@@ -341,6 +371,7 @@ export class SessionManager {
   saveCompleted(sessionId: string, terminal?: TerminalPersistence): void {
     const session = this.load(sessionId)
     session.status = 'completed'
+    delete session.lastError
     delete session.pendingPrompt
     session.updatedAt = new Date().toISOString()
     this.appendTranscriptEvent(sessionId, {
@@ -360,9 +391,14 @@ export class SessionManager {
 
   saveError(sessionId: string, error: string, terminal?: TerminalPersistence): void {
     const session = this.load(sessionId)
+    const terminalClassification = terminal?.terminalClassification ?? 'error'
     session.status = 'error'
     delete session.pendingPrompt
-    session.lastError = error
+    if (terminalClassification === 'stopped') {
+      delete session.lastError
+    } else {
+      session.lastError = error
+    }
     session.updatedAt = new Date().toISOString()
     this.appendTranscriptEvent(sessionId, {
       type: 'lifecycle',
@@ -375,7 +411,7 @@ export class SessionManager {
       runPhase: 'idle',
       interruptedKind: undefined,
       terminalReason: terminal?.terminalReason,
-      terminalClassification: terminal?.terminalClassification ?? 'error',
+      terminalClassification,
       lastContinuationReason: terminal?.lastContinuationReason,
     })
   }
@@ -383,6 +419,7 @@ export class SessionManager {
   saveTerminated(sessionId: string): void {
     const session = this.load(sessionId)
     session.status = 'terminated'
+    delete session.lastError
     delete session.pendingPrompt
     session.updatedAt = new Date().toISOString()
     this.appendTranscriptEvent(sessionId, {
@@ -403,6 +440,17 @@ export class SessionManager {
   reconcilePendingLifecycle(sessionId: string): DurableLifecycleIndex {
     const snapshot = this.getRecoverySnapshot(sessionId)
     for (const pendingApproval of Object.values(snapshot.pendingLifecycle.pendingApprovals)) {
+      const compensatedApproval = this.findCompensatedLifecycleEvent(sessionId, {
+        type: 'approval.resolved',
+        toolName: pendingApproval.toolName,
+        taskId: pendingApproval.taskId,
+      })
+
+      if (compensatedApproval) {
+        this.applyQueryEventToState(sessionId, compensatedApproval)
+        continue
+      }
+
       this.appendQueryEvent(sessionId, {
         type: 'approval.resolved',
         toolName: pendingApproval.toolName,
@@ -412,6 +460,17 @@ export class SessionManager {
       })
     }
     for (const pendingTool of Object.values(snapshot.pendingLifecycle.pendingTools)) {
+      const compensatedTool = this.findCompensatedLifecycleEvent(sessionId, {
+        type: 'tool.result',
+        toolName: pendingTool.toolName,
+        taskId: pendingTool.taskId,
+      })
+
+      if (compensatedTool) {
+        this.applyQueryEventToState(sessionId, compensatedTool)
+        continue
+      }
+
       this.appendQueryEvent(sessionId, {
         type: 'tool.result',
         toolName: pendingTool.toolName,
@@ -425,12 +484,30 @@ export class SessionManager {
   }
 
   appendQueryEvent(sessionId: string, event: QueryEvent): void {
+    if (this.isDuplicateDurableResolutionEvent(sessionId, event)) {
+      return
+    }
+
     this.appendTranscriptEvent(sessionId, {
       type: 'query-event',
       event,
       timestamp: new Date().toISOString(),
     })
     this.applyQueryEventToState(sessionId, event)
+  }
+
+  private isDuplicateDurableResolutionEvent(sessionId: string, event: QueryEvent): boolean {
+    if (event.type !== 'approval.resolved' && event.type !== 'tool.result') {
+      return false
+    }
+
+    return this.getTranscriptEvents(sessionId).some(existing => {
+      if (existing.type !== 'query-event') {
+        return false
+      }
+
+      return JSON.stringify(existing.event) === JSON.stringify(event)
+    })
   }
 
   getTranscriptEvents(sessionId: string): TranscriptEvent[] {
@@ -461,6 +538,7 @@ export class SessionManager {
     const transcriptEvents = replayPreparation.transcriptEvents
     const messageEvents = transcriptEvents.filter((event): event is Extract<TranscriptEvent, { type: 'message' }> => event.type === 'message')
     const lifecycleEvents = transcriptEvents.filter((event): event is Extract<TranscriptEvent, { type: 'lifecycle' }> => event.type === 'lifecycle')
+    const readModelLifecycle = this.deriveLifecycleIndexFromTranscript(transcriptEvents)
 
     const lastUserMessage = [...messageEvents].reverse().find(event => event.role === 'user')
     const lastAssistantMessage = [...messageEvents].reverse().find(event => event.role === 'assistant')
@@ -469,16 +547,27 @@ export class SessionManager {
       pendingPrompt: session.pendingPrompt,
       runPhase: state.runPhase,
       interruptedKind: state.interruptedKind,
+      durableStatus: state.durableStatus,
       terminalReason: state.terminalReason,
       terminalClassification: state.terminalClassification,
       lastContinuationReason: state.lastContinuationReason,
-      pendingLifecycle: state.pendingLifecycle ?? createEmptyLifecycleIndex(),
+      pendingLifecycle: readModelLifecycle,
       repairSummary: replayPreparation.repairSummary,
       lastUserMessage,
       lastAssistantMessage,
       lastLifecycleEvent: lifecycleEvents[lifecycleEvents.length - 1],
       transcriptEvents,
     }
+  }
+
+  private deriveLifecycleIndexFromTranscript(events: TranscriptEvent[]): DurableLifecycleIndex {
+    return events.reduce<DurableLifecycleIndex>((index, event) => {
+      if (event.type !== 'query-event') {
+        return index
+      }
+
+      return applyLifecycleEventToIndex(index, event.event)
+    }, createEmptyLifecycleIndex())
   }
 
   normalizeTranscriptEvents(events: TranscriptEvent[]): TranscriptEvent[] {
@@ -654,12 +743,20 @@ export class SessionManager {
         : 'fresh-entry'
     const hasPendingLifecycle = Object.keys(snapshot.pendingLifecycle.pendingApprovals).length > 0
       || Object.keys(snapshot.pendingLifecycle.pendingTools).length > 0
-    const policyEvidence: ContinuationPolicyEvidence = {
-      hasOpenTurn: computedBoundary === 'mid-turn-reentry',
-      hasPairedTurns: turnPairing.pairedTurns.length > 0,
-      hasPendingLifecycle,
-      hasRepairDrift: driftCount > 0,
+    const policyEvidenceTokens: ContinuationEvidenceToken[] = []
+    if (computedBoundary === 'mid-turn-reentry') {
+      policyEvidenceTokens.push('open-turn')
     }
+    if (turnPairing.pairedTurns.length > 0) {
+      policyEvidenceTokens.push('paired-turns')
+    }
+    if (hasPendingLifecycle) {
+      policyEvidenceTokens.push('pending-lifecycle')
+    }
+    if (driftCount > 0) {
+      policyEvidenceTokens.push('repair-drift')
+    }
+    const policyEvidence: ContinuationPolicyEvidence = buildContinuationPolicyEvidence(policyEvidenceTokens)
     const continuationSafety: ContinuationSafety = resolveContinuationSafety({
       evidence: policyEvidence,
     })
@@ -833,6 +930,12 @@ export class SessionManager {
       terminalClassification: overrides && Object.prototype.hasOwnProperty.call(overrides, 'terminalClassification')
         ? overrides.terminalClassification
         : current?.terminalClassification,
+      durableStatus: toDurableStatus(
+        overrides && Object.prototype.hasOwnProperty.call(overrides, 'terminalClassification')
+          ? overrides.terminalClassification
+          : current?.terminalClassification,
+        session.status,
+      ),
       lastContinuationReason: overrides && Object.prototype.hasOwnProperty.call(overrides, 'lastContinuationReason')
         ? overrides.lastContinuationReason
         : current?.lastContinuationReason,
@@ -845,6 +948,31 @@ export class SessionManager {
 
   private appendTranscriptEvent(sessionId: string, event: TranscriptEvent): void {
     fs.appendFileSync(this.getTranscriptPath(sessionId), `${JSON.stringify(event)}\n`, 'utf8')
+  }
+
+  private findCompensatedLifecycleEvent(
+    sessionId: string,
+    input:
+      | { type: 'approval.resolved'; taskId: string; toolName: string }
+      | { type: 'tool.result'; taskId: string; toolName: string },
+  ): Extract<QueryEvent, { type: 'approval.resolved' | 'tool.result' }> | undefined {
+    return this.getTranscriptEvents(sessionId).find((event): event is Extract<TranscriptEvent, { type: 'query-event' }> & {
+      event: Extract<QueryEvent, { type: 'approval.resolved' | 'tool.result' }>
+    } => {
+      if (event.type !== 'query-event') {
+        return false
+      }
+
+      if (event.event.type !== input.type) {
+        return false
+      }
+
+      if (event.event.taskId !== input.taskId || event.event.toolName !== input.toolName) {
+        return false
+      }
+
+      return true
+    })?.event
   }
 
   private applyQueryEventToState(sessionId: string, event: QueryEvent): void {

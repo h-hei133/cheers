@@ -40,6 +40,59 @@ describe('SessionManager', () => {
     expect(resumed.session.turns).toHaveLength(1)
   })
 
+  it('preserves interrupted durable state for runtime seed construction after tryResume', () => {
+    const manager = new SessionManager()
+    const session = manager.createNew()
+    const transcriptPath = path.join(manager.getSessionDirPath(session.id), 'transcript.jsonl')
+    const statePath = path.join(manager.getSessionDirPath(session.id), 'state.json')
+
+    fs.writeFileSync(
+      transcriptPath,
+      [
+        JSON.stringify({
+          type: 'lifecycle',
+          event: 'run-started',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          detail: 'repair after resume',
+        }),
+        JSON.stringify({
+          type: 'query-event',
+          event: { type: 'turn.started', role: 'planner', turn: 1 },
+          timestamp: '2026-01-01T00:00:01.000Z',
+        }),
+      ].join('\n') + '\n',
+      'utf8',
+    )
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify({
+        status: 'interrupted',
+        pendingPrompt: 'repair after resume',
+        runPhase: 'turn-active',
+        interruptedKind: 'turn',
+      }, null, 2),
+      'utf8',
+    )
+
+    const resumed = manager.tryResume(session.id)
+    expect(resumed.ok).toBe(true)
+    if (!resumed.ok) {
+      throw new Error('Expected interrupted session to resume successfully')
+    }
+
+    const persistedState = JSON.parse(fs.readFileSync(statePath, 'utf8')) as { status: string }
+    const seed = manager.buildRuntimeStateSeed(session.id, { maxTurns: 8 })
+
+    expect(resumed.session.status).toBe('active')
+    expect(persistedState.status).toBe('interrupted')
+    expect(seed.truthBoundary.repairSummary.insertedRunInterrupted).toBe(true)
+    expect(seed.truthBoundary.repairSummary.insertedPromptMessage).toBe(true)
+    expect(seed.truthBoundary.policyEvidence.has('open-turn')).toBe(true)
+    expect(seed.truthBoundary.policyEvidence.has('repair-drift')).toBe(false)
+    expect(seed.truthBoundary.continuationSafety).toBe('mid-turn-safe')
+    expect(seed.recoveryBoundary).toBe('mid-turn-reentry')
+  })
+
   it('returns recovery guidance when a session file is corrupt', () => {
     const manager = new SessionManager()
     const session = manager.createNew()
@@ -158,13 +211,15 @@ describe('SessionManager', () => {
 
     const completedState = JSON.parse(
       fs.readFileSync(path.join(manager.getSessionDirPath(completed.id), 'state.json'), 'utf8'),
-    ) as { terminalReason?: string; terminalClassification?: string; lastContinuationReason?: string }
+    ) as { terminalReason?: string; terminalClassification?: string; durableStatus?: string; lastContinuationReason?: string }
 
     expect(completedState.terminalReason).toBe('completed')
     expect(completedState.terminalClassification).toBe('success')
+    expect(completedState.durableStatus).toBe('success')
     expect(completedState.lastContinuationReason).toBe('handoff')
 
     const completedSnapshot = manager.getRecoverySnapshot(completed.id)
+    expect(completedSnapshot.durableStatus).toBe('success')
     expect(completedSnapshot.terminalReason).toBe('completed')
     expect(completedSnapshot.terminalClassification).toBe('success')
     expect(completedSnapshot.lastContinuationReason).toBe('handoff')
@@ -179,21 +234,63 @@ describe('SessionManager', () => {
 
     const errorState = JSON.parse(
       fs.readFileSync(path.join(manager.getSessionDirPath(errored.id), 'state.json'), 'utf8'),
-    ) as { terminalReason?: string; terminalClassification?: string; lastContinuationReason?: string; pendingPrompt?: string }
+    ) as { terminalReason?: string; terminalClassification?: string; durableStatus?: string; lastContinuationReason?: string; pendingPrompt?: string; lastError?: string }
 
     expect(errorState.terminalReason).toBe('stopped_error')
     expect(errorState.terminalClassification).toBe('stopped')
+    expect(errorState.durableStatus).toBe('stopped')
     expect(errorState.lastContinuationReason).toBe('retryable-error')
     expect(errorState.pendingPrompt).toBeUndefined()
+    expect(errorState.lastError).toBeUndefined()
+
+    const erroredSnapshot = manager.getRecoverySnapshot(errored.id)
+    expect(erroredSnapshot.durableStatus).toBe('stopped')
+    expect(erroredSnapshot.terminalReason).toBe('stopped_error')
+    expect(erroredSnapshot.terminalClassification).toBe('stopped')
 
     manager.markRunStarted(errored.id, 'fresh prompt')
     const resetState = JSON.parse(
       fs.readFileSync(path.join(manager.getSessionDirPath(errored.id), 'state.json'), 'utf8'),
-    ) as { terminalReason?: string; terminalClassification?: string; lastContinuationReason?: string }
+    ) as { terminalReason?: string; terminalClassification?: string; durableStatus?: string; lastContinuationReason?: string; lastError?: string }
 
     expect(resetState.terminalReason).toBeUndefined()
     expect(resetState.terminalClassification).toBeUndefined()
+    expect(resetState.durableStatus).toBeUndefined()
     expect(resetState.lastContinuationReason).toBeUndefined()
+    expect(resetState.lastError).toBeUndefined()
+  })
+
+  it('preserves lastError only for true durable errors', () => {
+    const manager = new SessionManager()
+    const stopped = manager.createNew()
+    manager.markRunStarted(stopped.id, 'stop prompt')
+    manager.saveError(stopped.id, 'Retry budget exhausted', {
+      terminalReason: 'stopped_error',
+      terminalClassification: 'stopped',
+    })
+
+    const stoppedState = JSON.parse(
+      fs.readFileSync(path.join(manager.getSessionDirPath(stopped.id), 'state.json'), 'utf8'),
+    ) as { status: string; lastError?: string; terminalClassification?: string; durableStatus?: string }
+    expect(stoppedState.status).toBe('error')
+    expect(stoppedState.terminalClassification).toBe('stopped')
+    expect(stoppedState.durableStatus).toBe('stopped')
+    expect(stoppedState.lastError).toBeUndefined()
+
+    const failed = manager.createNew()
+    manager.markRunStarted(failed.id, 'fail prompt')
+    manager.saveError(failed.id, 'Transport exploded', {
+      terminalReason: 'stopped_error',
+      terminalClassification: 'error',
+    })
+
+    const failedState = JSON.parse(
+      fs.readFileSync(path.join(manager.getSessionDirPath(failed.id), 'state.json'), 'utf8'),
+    ) as { status: string; lastError?: string; terminalClassification?: string; durableStatus?: string }
+    expect(failedState.status).toBe('error')
+    expect(failedState.terminalClassification).toBe('error')
+    expect(failedState.durableStatus).toBe('error')
+    expect(failedState.lastError).toBe('Transport exploded')
   })
 
   it('filters empty assistant messages from replay normalization', () => {
@@ -377,12 +474,10 @@ describe('SessionManager', () => {
     expect(seed.pendingLifecycle.pendingTools.task_pending_tool?.toolName).toBe('read')
     expect(seed.truthBoundary.source).toBe('durable-replay')
     expect(seed.truthBoundary.continuationSafety).toBe('completed-turn-only')
-    expect(seed.truthBoundary.policyEvidence).toEqual({
-      hasOpenTurn: true,
-      hasPairedTurns: true,
-      hasPendingLifecycle: true,
-      hasRepairDrift: false,
-    })
+    expect(seed.truthBoundary.policyEvidence.has('open-turn')).toBe(true)
+    expect(seed.truthBoundary.policyEvidence.has('paired-turns')).toBe(true)
+    expect(seed.truthBoundary.policyEvidence.has('pending-lifecycle')).toBe(true)
+    expect(seed.truthBoundary.policyEvidence.has('repair-drift')).toBe(false)
     expect(Object.keys(seed.derivedState)).toEqual(['transcript'])
   })
 
@@ -420,12 +515,10 @@ describe('SessionManager', () => {
     expect(seed.turn).toBe(2)
     expect(seed.derivedState.transcript).toHaveLength(1)
     expect(seed.truthBoundary.continuationSafety).toBe('completed-turn-only')
-    expect(seed.truthBoundary.policyEvidence).toEqual({
-      hasOpenTurn: false,
-      hasPairedTurns: true,
-      hasPendingLifecycle: false,
-      hasRepairDrift: false,
-    })
+    expect(seed.truthBoundary.policyEvidence.has('open-turn')).toBe(false)
+    expect(seed.truthBoundary.policyEvidence.has('paired-turns')).toBe(true)
+    expect(seed.truthBoundary.policyEvidence.has('pending-lifecycle')).toBe(false)
+    expect(seed.truthBoundary.policyEvidence.has('repair-drift')).toBe(false)
   })
 
   it('classifies fresh-entry when no turn has started yet', () => {
@@ -442,12 +535,10 @@ describe('SessionManager', () => {
     expect(seed.turn).toBe(1)
     expect(seed.derivedState.transcript).toHaveLength(0)
     expect(seed.truthBoundary.continuationSafety).toBe('fresh-only')
-    expect(seed.truthBoundary.policyEvidence).toEqual({
-      hasOpenTurn: false,
-      hasPairedTurns: false,
-      hasPendingLifecycle: false,
-      hasRepairDrift: false,
-    })
+    expect(seed.truthBoundary.policyEvidence.has('open-turn')).toBe(false)
+    expect(seed.truthBoundary.policyEvidence.has('paired-turns')).toBe(false)
+    expect(seed.truthBoundary.policyEvidence.has('pending-lifecycle')).toBe(false)
+    expect(seed.truthBoundary.policyEvidence.has('repair-drift')).toBe(false)
   })
 
   it('keeps recovery boundary stable across repeated seed builds for the same open turn', () => {
@@ -470,7 +561,10 @@ describe('SessionManager', () => {
     expect(second.recoveryBoundary).toBe('mid-turn-reentry')
     expect(second.currentRole).toBe(first.currentRole)
     expect(second.turn).toBe(first.turn)
-    expect(second.truthBoundary).toEqual(first.truthBoundary)
+    expect(Array.from(second.truthBoundary.policyEvidence).sort()).toEqual(Array.from(first.truthBoundary.policyEvidence).sort())
+    expect(second.truthBoundary.continuationSafety).toBe(first.truthBoundary.continuationSafety)
+    expect(second.truthBoundary.openTurn).toEqual(first.truthBoundary.openTurn)
+    expect(second.truthBoundary.repairSummary).toEqual(first.truthBoundary.repairSummary)
   })
 
   it('computes continuation safety from the shared policy table when unresolved lifecycle exists', () => {
@@ -494,12 +588,10 @@ describe('SessionManager', () => {
     const seed = manager.buildRuntimeStateSeed(session.id, { maxTurns: 8 })
 
     expect(seed.truthBoundary.continuationSafety).toBe('fresh-only')
-    expect(seed.truthBoundary.policyEvidence).toEqual({
-      hasOpenTurn: true,
-      hasPairedTurns: false,
-      hasPendingLifecycle: true,
-      hasRepairDrift: false,
-    })
+    expect(seed.truthBoundary.policyEvidence.has('open-turn')).toBe(true)
+    expect(seed.truthBoundary.policyEvidence.has('paired-turns')).toBe(false)
+    expect(seed.truthBoundary.policyEvidence.has('pending-lifecycle')).toBe(true)
+    expect(seed.truthBoundary.policyEvidence.has('repair-drift')).toBe(false)
     expect(seed.recoveryBoundary).toBe('fresh-entry')
     expect(seed.currentRole).toBe('planner')
     expect(seed.turn).toBe(1)
@@ -568,23 +660,182 @@ describe('SessionManager', () => {
       ignoredRoleMismatchedTurnCompletions: 1,
     })
     expect(seed.recoveryBoundary).toBe('fresh-entry')
-    expect(seed.truthBoundary).toEqual({
-      source: 'durable-replay',
-      normalizedEventCount: first.normalizedTranscriptEvents.length,
-      pairedTurnCount: 0,
-      policyEvidence: {
-        hasOpenTurn: true,
-        hasPairedTurns: false,
-        hasPendingLifecycle: false,
-        hasRepairDrift: true,
-      },
-      repairSummary: first.repairSummary,
-      continuationSafety: 'fresh-only',
-      openTurn: undefined,
-    })
+    expect(seed.truthBoundary.source).toBe('durable-replay')
+    expect(seed.truthBoundary.normalizedEventCount).toBe(first.normalizedTranscriptEvents.length)
+    expect(seed.truthBoundary.pairedTurnCount).toBe(0)
+    expect(seed.truthBoundary.policyEvidence.has('open-turn')).toBe(true)
+    expect(seed.truthBoundary.policyEvidence.has('paired-turns')).toBe(false)
+    expect(seed.truthBoundary.policyEvidence.has('pending-lifecycle')).toBe(false)
+    expect(seed.truthBoundary.policyEvidence.has('repair-drift')).toBe(true)
+    expect(seed.truthBoundary.repairSummary).toEqual(first.repairSummary)
+    expect(seed.truthBoundary.continuationSafety).toBe('fresh-only')
+    expect(seed.truthBoundary.openTurn).toBeUndefined()
     expect(seed.derivedState).toEqual({
       transcript: [],
     })
+  })
+
+  it('keeps stripped interrupted terminal counts aligned between replay plan and runtime seed truth boundary', () => {
+    const manager = new SessionManager()
+    const session = manager.createNew()
+    const sessionDir = manager.getSessionDirPath(session.id)
+    const transcriptPath = path.join(sessionDir, 'transcript.jsonl')
+    const statePath = path.join(sessionDir, 'state.json')
+
+    fs.writeFileSync(
+      transcriptPath,
+      [
+        JSON.stringify({
+          type: 'lifecycle',
+          event: 'run-started',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          detail: 'strip terminal event',
+        }),
+        JSON.stringify({
+          type: 'query-event',
+          event: {
+            type: 'query.started',
+            sessionId: session.id,
+            prompt: 'strip terminal event',
+          },
+          timestamp: '2026-01-01T00:00:01.000Z',
+        }),
+        JSON.stringify({
+          type: 'query-event',
+          event: {
+            type: 'query.completed',
+            result: {
+              status: 'completed',
+              terminalReason: 'completed',
+              terminalClassification: 'success',
+              transcript: [],
+              sharedContext: { sessionId: session.id, initialPrompt: 'strip terminal event', notes: [], handoffs: [] },
+              finalOutput: 'done',
+            },
+          },
+          timestamp: '2026-01-01T00:00:02.000Z',
+        }),
+      ].join('\n') + '\n',
+      'utf8',
+    )
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify({
+        status: 'interrupted',
+        pendingPrompt: 'strip terminal event',
+        runPhase: 'turn-active',
+        interruptedKind: 'turn',
+      }, null, 2),
+      'utf8',
+    )
+
+    const replayPlan = manager.getReplayPlan(session.id)
+    const seed = manager.buildRuntimeStateSeed(session.id, { maxTurns: 8 })
+
+    expect(replayPlan.normalizedTranscriptEvents.some(
+      event => event.type === 'query-event' && (event.event.type === 'query.completed' || event.event.type === 'query.failed'),
+    )).toBe(false)
+    expect(replayPlan.repairSummary.strippedInterruptedTerminalEvents).toBe(1)
+    expect(seed.truthBoundary.repairSummary.strippedInterruptedTerminalEvents).toBe(1)
+    expect(seed.truthBoundary.normalizedEventCount).toBe(replayPlan.normalizedTranscriptEvents.length)
+    expect(seed.truthBoundary.repairSummary).toEqual(replayPlan.repairSummary)
+  })
+
+  it('derives recovery snapshot and runtime seed pending lifecycle from transcript truth instead of stale state', () => {
+    const manager = new SessionManager()
+    const session = manager.createNew()
+    const transcriptPath = path.join(manager.getSessionDirPath(session.id), 'transcript.jsonl')
+    const statePath = path.join(manager.getSessionDirPath(session.id), 'state.json')
+
+    fs.writeFileSync(
+      transcriptPath,
+      [
+        JSON.stringify({
+          type: 'message',
+          role: 'user',
+          content: 'repair read-model prompt',
+          timestamp: '2026-01-01T00:00:00.000Z',
+        }),
+        JSON.stringify({
+          type: 'query-event',
+          event: {
+            type: 'approval.requested',
+            toolName: 'bash',
+            taskId: 'task_read_approval',
+          },
+          timestamp: '2026-01-01T00:00:01.000Z',
+        }),
+        JSON.stringify({
+          type: 'query-event',
+          event: {
+            type: 'approval.resolved',
+            toolName: 'bash',
+            taskId: 'task_read_approval',
+            outcome: 'approved',
+          },
+          timestamp: '2026-01-01T00:00:02.000Z',
+        }),
+        JSON.stringify({
+          type: 'query-event',
+          event: {
+            type: 'tool.started',
+            toolName: 'read',
+            taskId: 'task_read_tool',
+          },
+          timestamp: '2026-01-01T00:00:03.000Z',
+        }),
+        JSON.stringify({
+          type: 'query-event',
+          event: {
+            type: 'tool.result',
+            toolName: 'read',
+            taskId: 'task_read_tool',
+            success: true,
+          },
+          timestamp: '2026-01-01T00:00:04.000Z',
+        }),
+      ].join('\n') + '\n',
+      'utf8',
+    )
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify({
+        status: 'interrupted',
+        pendingPrompt: 'repair read-model prompt',
+        runPhase: 'turn-active',
+        interruptedKind: 'turn',
+        pendingLifecycle: {
+          pendingApprovals: {
+            task_read_approval: { taskId: 'task_read_approval', toolName: 'bash' },
+          },
+          pendingTools: {
+            task_read_tool: { taskId: 'task_read_tool', toolName: 'read' },
+          },
+          taskStates: {},
+        },
+      }, null, 2),
+      'utf8',
+    )
+
+    const snapshot = manager.getRecoverySnapshot(session.id)
+    const seed = manager.buildRuntimeStateSeed(session.id, { maxTurns: 8 })
+
+    expect(snapshot.pendingLifecycle.pendingApprovals).toEqual({})
+    expect(snapshot.pendingLifecycle.pendingTools).toEqual({})
+    expect(snapshot.pendingLifecycle.taskStates.task_read_approval).toMatchObject({
+      lastEvent: 'approval.resolved',
+      outcome: 'approved',
+      toolName: 'bash',
+      taskId: 'task_read_approval',
+    })
+    expect(snapshot.pendingLifecycle.taskStates.task_read_tool).toMatchObject({
+      lastEvent: 'tool.result',
+      success: true,
+      toolName: 'read',
+      taskId: 'task_read_tool',
+    })
+    expect(seed.pendingLifecycle).toEqual(snapshot.pendingLifecycle)
+    expect(seed.truthBoundary.policyEvidence.has('pending-lifecycle')).toBe(false)
   })
 
   it('tracks pending lifecycle durably and clears it when resolved or restarted', () => {
@@ -632,10 +883,306 @@ describe('SessionManager', () => {
 
     manager.markRunStarted(session.id, 'fresh run')
     snapshot = manager.getRecoverySnapshot(session.id)
-    expect(snapshot.pendingLifecycle).toEqual({
+    expect(snapshot.pendingLifecycle.pendingApprovals).toEqual({})
+    expect(snapshot.pendingLifecycle.pendingTools).toEqual({})
+    expect(snapshot.pendingLifecycle.taskStates.task_approval).toMatchObject({
+      lastEvent: 'approval.resolved',
+      compensated: true,
+      outcome: 'denied',
+    })
+    expect(snapshot.pendingLifecycle.taskStates.task_tool).toMatchObject({
+      lastEvent: 'tool.result',
+      compensated: true,
+      success: false,
+    })
+  })
+
+  it('reconcilePendingLifecycle is idempotent across repeated calls', () => {
+    const manager = new SessionManager()
+    const session = manager.createNew()
+
+    manager.persistUserPromptBarrier(session.id, 'reconcile prompt')
+    manager.appendQueryEvent(session.id, {
+      type: 'approval.requested',
+      toolName: 'bash',
+      taskId: 'task_repeat_approval',
+    })
+    manager.appendQueryEvent(session.id, {
+      type: 'tool.started',
+      toolName: 'read',
+      taskId: 'task_repeat_tool',
+    })
+
+    const first = manager.reconcilePendingLifecycle(session.id)
+    const second = manager.reconcilePendingLifecycle(session.id)
+
+    expect(first).toEqual({
       pendingApprovals: {},
       pendingTools: {},
-      taskStates: {},
+      taskStates: {
+        task_repeat_approval: {
+          taskId: 'task_repeat_approval',
+          toolName: 'bash',
+          lastEvent: 'approval.resolved',
+          outcome: 'denied',
+          compensated: true,
+        },
+        task_repeat_tool: {
+          taskId: 'task_repeat_tool',
+          toolName: 'read',
+          lastEvent: 'tool.result',
+          success: false,
+          compensated: true,
+        },
+      },
+    })
+    expect(second).toEqual(first)
+
+    const transcriptEvents = manager.getTranscriptEvents(session.id)
+    expect(transcriptEvents.filter(
+      event => event.type === 'query-event' && event.event.type === 'approval.resolved' && event.event.taskId === 'task_repeat_approval',
+    )).toHaveLength(1)
+    expect(transcriptEvents.filter(
+      event => event.type === 'query-event' && event.event.type === 'tool.result' && event.event.taskId === 'task_repeat_tool',
+    )).toHaveLength(1)
+  })
+
+  it('reconcilePendingLifecycle reuses existing compensated transcript events without duplicating them', () => {
+    const manager = new SessionManager()
+    const session = manager.createNew()
+    const transcriptPath = path.join(manager.getSessionDirPath(session.id), 'transcript.jsonl')
+    const statePath = path.join(manager.getSessionDirPath(session.id), 'state.json')
+
+    manager.persistUserPromptBarrier(session.id, 'drift reconcile prompt')
+    manager.appendQueryEvent(session.id, {
+      type: 'approval.requested',
+      toolName: 'bash',
+      taskId: 'task_drift_approval',
+    })
+    manager.appendQueryEvent(session.id, {
+      type: 'tool.started',
+      toolName: 'read',
+      taskId: 'task_drift_tool',
+    })
+
+    fs.appendFileSync(
+      transcriptPath,
+      `${JSON.stringify({
+        type: 'query-event',
+        event: {
+          type: 'approval.resolved',
+          toolName: 'bash',
+          taskId: 'task_drift_approval',
+          outcome: 'denied',
+          compensated: true,
+        },
+        timestamp: new Date().toISOString(),
+      })}\n`,
+      'utf8',
+    )
+    fs.appendFileSync(
+      transcriptPath,
+      `${JSON.stringify({
+        type: 'query-event',
+        event: {
+          type: 'tool.result',
+          toolName: 'read',
+          taskId: 'task_drift_tool',
+          success: false,
+          compensated: true,
+        },
+        timestamp: new Date().toISOString(),
+      })}\n`,
+      'utf8',
+    )
+
+    const state = JSON.parse(fs.readFileSync(statePath, 'utf8')) as {
+      pendingLifecycle: {
+        pendingApprovals: Record<string, { taskId: string; toolName: string }>
+        pendingTools: Record<string, { taskId: string; toolName: string }>
+        taskStates: Record<string, unknown>
+      }
+    }
+
+    expect(state.pendingLifecycle.pendingApprovals.task_drift_approval?.toolName).toBe('bash')
+    expect(state.pendingLifecycle.pendingTools.task_drift_tool?.toolName).toBe('read')
+
+    const reconciled = manager.reconcilePendingLifecycle(session.id)
+    expect(reconciled.pendingApprovals).toEqual({})
+    expect(reconciled.pendingTools).toEqual({})
+    expect(reconciled.taskStates.task_drift_approval).toMatchObject({
+      lastEvent: 'approval.resolved',
+      compensated: true,
+      outcome: 'denied',
+    })
+    expect(reconciled.taskStates.task_drift_tool).toMatchObject({
+      lastEvent: 'tool.result',
+      compensated: true,
+      success: false,
+    })
+
+    const transcriptEvents = manager.getTranscriptEvents(session.id)
+    expect(transcriptEvents.filter(
+      event => event.type === 'query-event' && event.event.type === 'approval.resolved' && event.event.taskId === 'task_drift_approval',
+    )).toHaveLength(1)
+    expect(transcriptEvents.filter(
+      event => event.type === 'query-event' && event.event.type === 'tool.result' && event.event.taskId === 'task_drift_tool',
+    )).toHaveLength(1)
+  })
+
+  it('reconcilePendingLifecycle does not append synthetic cleanup when direct tool.result already exists', () => {
+    const manager = new SessionManager()
+    const session = manager.createNew()
+    const transcriptPath = path.join(manager.getSessionDirPath(session.id), 'transcript.jsonl')
+    const taskId = 'task_direct_tool'
+
+    manager.persistUserPromptBarrier(session.id, 'duplication guard prompt')
+    manager.appendQueryEvent(session.id, {
+      type: 'tool.started',
+      toolName: 'read',
+      taskId,
+    })
+
+    const before = manager.getRecoverySnapshot(session.id)
+    expect(before.pendingLifecycle.pendingTools[taskId]?.toolName).toBe('read')
+
+    fs.appendFileSync(
+      transcriptPath,
+      `${JSON.stringify({
+        type: 'query-event',
+        event: {
+          type: 'tool.result',
+          toolName: 'read',
+          taskId,
+          success: true,
+        },
+        timestamp: new Date().toISOString(),
+      })}\n`,
+      'utf8',
+    )
+
+    const transcriptBefore = manager.getTranscriptEvents(session.id)
+    expect(transcriptBefore.filter(
+      event => event.type === 'query-event' && event.event.type === 'tool.result' && event.event.taskId === taskId,
+    )).toHaveLength(1)
+
+    const reconciled = manager.reconcilePendingLifecycle(session.id)
+    expect(reconciled.pendingTools[taskId]).toBeUndefined()
+    expect(reconciled.taskStates[taskId]).toMatchObject({
+      lastEvent: 'tool.result',
+      success: true,
+      toolName: 'read',
+      taskId,
+    })
+
+    const transcriptAfter = manager.getTranscriptEvents(session.id)
+    expect(transcriptAfter.filter(
+      event => event.type === 'query-event' && event.event.type === 'tool.result' && event.event.taskId === taskId,
+    )).toHaveLength(1)
+  })
+
+  it('reconcilePendingLifecycle does not append compensated denial when direct approval.resolved already exists', () => {
+    const manager = new SessionManager()
+    const session = manager.createNew()
+    const transcriptPath = path.join(manager.getSessionDirPath(session.id), 'transcript.jsonl')
+    const taskId = 'task_direct_approval'
+
+    manager.persistUserPromptBarrier(session.id, 'approval drift prompt')
+    manager.appendQueryEvent(session.id, {
+      type: 'approval.requested',
+      toolName: 'bash',
+      taskId,
+    })
+
+    const before = manager.getRecoverySnapshot(session.id)
+    expect(before.pendingLifecycle.pendingApprovals[taskId]?.toolName).toBe('bash')
+
+    fs.appendFileSync(
+      transcriptPath,
+      `${JSON.stringify({
+        type: 'query-event',
+        event: {
+          type: 'approval.resolved',
+          toolName: 'bash',
+          taskId,
+          outcome: 'approved',
+        },
+        timestamp: new Date().toISOString(),
+      })}\n`,
+      'utf8',
+    )
+
+    const transcriptBefore = manager.getTranscriptEvents(session.id)
+    expect(transcriptBefore.filter(
+      event => event.type === 'query-event' && event.event.type === 'approval.resolved' && event.event.taskId === taskId,
+    )).toHaveLength(1)
+
+    const reconciled = manager.reconcilePendingLifecycle(session.id)
+    expect(reconciled.pendingApprovals[taskId]).toBeUndefined()
+    expect(reconciled.taskStates[taskId]).toMatchObject({
+      lastEvent: 'approval.resolved',
+      outcome: 'approved',
+      toolName: 'bash',
+      taskId,
+    })
+    expect(reconciled.taskStates[taskId]?.compensated).toBeUndefined()
+
+    const transcriptAfter = manager.getTranscriptEvents(session.id)
+    expect(transcriptAfter.filter(
+      event => event.type === 'query-event' && event.event.type === 'approval.resolved' && event.event.taskId === taskId,
+    )).toHaveLength(1)
+  })
+
+  it('appendQueryEvent is idempotent for identical direct resolution events', () => {
+    const manager = new SessionManager()
+    const session = manager.createNew()
+
+    manager.appendQueryEvent(session.id, {
+      type: 'approval.resolved',
+      toolName: 'bash',
+      taskId: 'task_append_approval',
+      outcome: 'approved',
+    })
+    manager.appendQueryEvent(session.id, {
+      type: 'approval.resolved',
+      toolName: 'bash',
+      taskId: 'task_append_approval',
+      outcome: 'approved',
+    })
+
+    manager.appendQueryEvent(session.id, {
+      type: 'tool.result',
+      toolName: 'read',
+      taskId: 'task_append_tool',
+      success: true,
+    })
+    manager.appendQueryEvent(session.id, {
+      type: 'tool.result',
+      toolName: 'read',
+      taskId: 'task_append_tool',
+      success: true,
+    })
+
+    const transcriptEvents = manager.getTranscriptEvents(session.id)
+    expect(transcriptEvents.filter(
+      event => event.type === 'query-event' && event.event.type === 'approval.resolved' && event.event.taskId === 'task_append_approval',
+    )).toHaveLength(1)
+    expect(transcriptEvents.filter(
+      event => event.type === 'query-event' && event.event.type === 'tool.result' && event.event.taskId === 'task_append_tool',
+    )).toHaveLength(1)
+
+    const snapshot = manager.getRecoverySnapshot(session.id)
+    expect(snapshot.pendingLifecycle.taskStates.task_append_approval).toMatchObject({
+      lastEvent: 'approval.resolved',
+      outcome: 'approved',
+      toolName: 'bash',
+      taskId: 'task_append_approval',
+    })
+    expect(snapshot.pendingLifecycle.taskStates.task_append_tool).toMatchObject({
+      lastEvent: 'tool.result',
+      success: true,
+      toolName: 'read',
+      taskId: 'task_append_tool',
     })
   })
 })

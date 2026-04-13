@@ -19,8 +19,31 @@ export interface DaemonAvailability {
 
 export type NormalizedExecutionResult = DaemonExecutionResult
 
+function resolveCargoCommandCandidates(): string[] {
+  const homeDir = process.env.USERPROFILE ?? process.env.HOME ?? ''
+  const preferredBinary = homeDir
+    ? path.join(homeDir, '.cargo', 'bin', process.platform === 'win32' ? 'cargo.exe' : 'cargo')
+    : ''
+
+  const candidates = [preferredBinary, process.platform === 'win32' ? 'cargo.exe' : 'cargo', 'cargo']
+  return candidates.filter((candidate, index, all) => candidate.length > 0 && all.indexOf(candidate) === index)
+}
+
+function resolveAvailableCargoBinary(): string | null {
+  for (const candidate of resolveCargoCommandCandidates()) {
+    try {
+      execFileSync(candidate, ['--version'], { windowsHide: true })
+      return candidate
+    } catch {
+      continue
+    }
+  }
+
+  return null
+}
+
 function resolveCargoBinary(): string {
-  return path.join(process.env.USERPROFILE ?? '', '.cargo', 'bin', 'cargo.exe')
+  return resolveAvailableCargoBinary() ?? resolveCargoCommandCandidates()[0] ?? 'cargo'
 }
 
 export async function executeViaRustDaemon(options: {
@@ -30,7 +53,10 @@ export async function executeViaRustDaemon(options: {
   workspaceRoot: string
   timeoutMs?: number
 }): Promise<DaemonExecutionResult> {
-  const cargo = resolveCargoBinary()
+  const cargo = resolveAvailableCargoBinary()
+  if (!cargo) {
+    throw new Error(`Cargo executable not available. Checked: ${resolveCargoCommandCandidates().join(', ')}`)
+  }
   const commandArgs = [
     'run',
     '--manifest-path',
@@ -121,15 +147,13 @@ export function isRustDaemonEnabled(): boolean {
 }
 
 export function checkRustDaemonAvailability(): DaemonAvailability {
-  const cargo = resolveCargoBinary()
-  try {
-    const result = execFileSync(cargo, ['--version'])
-    void result
+  const cargo = resolveAvailableCargoBinary()
+  if (cargo) {
     return { available: true }
-  } catch {
-    return {
-      available: false,
-      reason: `Cargo executable not available at ${cargo}`,
-    }
+  }
+
+  return {
+    available: false,
+    reason: `Cargo executable not available. Checked: ${resolveCargoCommandCandidates().join(', ')}`,
   }
 }
