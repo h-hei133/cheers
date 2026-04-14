@@ -763,12 +763,16 @@ export class SessionManager {
     const continuationPolicy = CONTINUATION_SAFETY_POLICY[continuationSafety]
     const recoveryBoundary: QueryRuntimeRecoveryBoundary = continuationPolicy.runtimeRecoveryBoundary
 
-    const currentRole = recoveryBoundary === 'mid-turn-reentry'
-      ? turnPairing.openTurn!.role
-      : lastCompletedOutput?.handoffTo ?? startingRole
-    const turn = recoveryBoundary === 'mid-turn-reentry'
-      ? turnPairing.openTurn!.turn
-      : (lastPairedTurn?.turn ?? 0) + 1
+    const currentRole = continuationPolicy.resetToStartingRole
+      ? startingRole
+      : recoveryBoundary === 'mid-turn-reentry'
+        ? turnPairing.openTurn!.role
+        : lastCompletedOutput?.handoffTo ?? startingRole
+    const turn = continuationPolicy.resetToStartingRole
+      ? 1
+      : recoveryBoundary === 'mid-turn-reentry'
+        ? turnPairing.openTurn!.turn
+        : (lastPairedTurn?.turn ?? 0) + 1
 
     return {
       config: {
@@ -797,7 +801,7 @@ export class SessionManager {
           : undefined,
       },
       derivedState: {
-        transcript: turnCompletedOutputs,
+        transcript: continuationPolicy.allowDerivedContext ? turnCompletedOutputs : [],
       },
     }
   }
@@ -820,7 +824,9 @@ export class SessionManager {
         if (!openTurn) {
           openTurn = event.event
         } else {
-          ignoredDuplicateTurnStarts += 1
+          if (openTurn.role !== event.event.role || openTurn.turn !== event.event.turn) {
+            ignoredDuplicateTurnStarts += 1
+          }
         }
         continue
       }
@@ -879,9 +885,18 @@ export class SessionManager {
   }
 
   getSuggestedRecoverySession(): Session | null {
-    return this.listSessions().find(session =>
-      session.status === 'interrupted' || session.status === 'error',
-    ) ?? null
+    return this.listSessions().find(session => {
+      if (session.status === 'interrupted') {
+        return true
+      }
+
+      if (session.status !== 'error') {
+        return false
+      }
+
+      const snapshot = this.getRecoverySnapshot(session.id)
+      return snapshot.durableStatus !== 'stopped'
+    }) ?? null
   }
 
   private writeSession(session: Session): void {

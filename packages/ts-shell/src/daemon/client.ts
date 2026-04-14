@@ -1,5 +1,6 @@
 import { execFile, execFileSync } from 'node:child_process'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { getRuntimeConfig } from '../config/runtimeConfig.js'
 
@@ -10,6 +11,7 @@ export interface DaemonExecutionResult {
   readonly exitCode: number | null
   readonly stdout: string
   readonly stderr: string
+  readonly failureKind?: 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 }
 
 export interface DaemonAvailability {
@@ -46,6 +48,11 @@ function resolveCargoBinary(): string {
   return resolveAvailableCargoBinary() ?? resolveCargoCommandCandidates()[0] ?? 'cargo'
 }
 
+function resolveRustDaemonManifestPath(): string {
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url))
+  return path.resolve(moduleDir, '..', '..', '..', 'rust-core', 'Cargo.toml')
+}
+
 export async function executeViaRustDaemon(options: {
   command: string
   args: string[]
@@ -60,7 +67,7 @@ export async function executeViaRustDaemon(options: {
   const commandArgs = [
     'run',
     '--manifest-path',
-    'packages/rust-core/Cargo.toml',
+    resolveRustDaemonManifestPath(),
     '--bin',
     'daemon',
     '--',

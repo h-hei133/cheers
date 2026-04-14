@@ -6,10 +6,13 @@ export function mapTerminalToOrchestrationResult(
   state: QueryRuntimeState,
   terminal: QueryTerminal,
 ): OrchestrationResult {
+  const terminalClassification = terminal.terminalClassification
+    ?? classifyTerminalReason(terminal.terminalReason, state.lastContinuationReason)
+
   return {
     status: terminal.terminalReason,
     terminalReason: terminal.terminalReason,
-    terminalClassification: terminal.terminalClassification ?? classifyTerminalReason(terminal.terminalReason),
+    terminalClassification,
     lastContinuationReason: state.lastContinuationReason,
     stopReason: terminal.stopReason,
     transcript: state.transcript,
@@ -18,6 +21,13 @@ export function mapTerminalToOrchestrationResult(
   }
 }
 
-export function classifyTerminalReason(reason: TerminalReason): OrchestrationResult['terminalClassification'] {
+export function classifyTerminalReason(
+  reason: TerminalReason,
+  lastContinuationReason?: QueryRuntimeState['lastContinuationReason'],
+): OrchestrationResult['terminalClassification'] {
+  if (reason === 'stopped_error') {
+    return lastContinuationReason === 'retryable-error' ? 'stopped' : 'error'
+  }
+
   return reason === 'completed' ? 'success' : 'stopped'
 }

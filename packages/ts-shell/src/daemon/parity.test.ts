@@ -46,5 +46,6 @@ describe('TS/Rust execution parity (B5)', () => {
 
     expect(local.status).toBe('timeout')
     expect(rust.status).toBe('timeout')
+    expect(rust.failureKind).toBe('timeout')
   }, 20000)
 })

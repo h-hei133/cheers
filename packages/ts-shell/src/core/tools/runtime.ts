@@ -20,6 +20,7 @@ export class ToolRuntime {
   private readonly approvalFlow: ToolApprovalFlow
   private readonly logger = createComponentLogger('tool-runtime')
   private readonly runtimeConfig?: RuntimeConfig
+  private readonly mcpGateway?: CoreMcpGateway
 
   constructor(
     enforcer: SandboxEnforcer,
@@ -32,6 +33,7 @@ export class ToolRuntime {
     this.approvalFlow = new ToolApprovalFlow(enforcer)
     this.registry = createCoreToolRegistry(options)
     this.runtimeConfig = options?.runtimeConfig
+    this.mcpGateway = options?.mcpGateway
   }
 
   listTools(): readonly string[] {
@@ -43,7 +45,38 @@ export class ToolRuntime {
       return this.listTools()
     }
 
-    return filterVisibleToolNames(Array.from(this.registry.keys()), this.runtimeConfig)
+    let visible = filterVisibleToolNames(Array.from(this.registry.keys()), this.runtimeConfig)
+
+    if (this.mcpGateway) {
+      try {
+        const configs = this.mcpGateway.loadConfigs()
+        visible = visible.filter(name => {
+          if (!name.startsWith('mcp__')) {
+            return true
+          }
+
+          const [, serverName] = name.split('__')
+          const config = configs[serverName]
+          if (!config) {
+            return false
+          }
+
+          if (config.enabled === false) {
+            return false
+          }
+
+          if (config.authRequired === true) {
+            return false
+          }
+
+          return true
+        })
+      } catch {
+        // Keep previously computed visibility when config loading fails.
+      }
+    }
+
+    return visible
   }
 
   async execute(

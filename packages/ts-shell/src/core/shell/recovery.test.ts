@@ -2,6 +2,9 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import type { AgentRunner } from '../../orchestration/types.js'
+import { QueryEngine } from '../query/QueryEngine.js'
+import { createQueryRuntimeStateFromSeed } from '../query/runtimeState.js'
 import { SessionManager } from '../../session/SessionManager.js'
 import { ShellSessionRuntime } from './sessionRuntime.js'
 import type { ShellRuntimeContext } from './runtimeContext.js'
@@ -1432,4 +1435,919 @@ describe('shell recovery helpers', () => {
       fs.rmSync(fakeHome, { recursive: true, force: true })
     }
   })
+
+  it('keeps pending lifecycle cleanup and replay repair stable across repeated resumes', async () => {
+    const originalUserProfile = process.env.USERPROFILE
+    const originalHome = process.env.HOME
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'private-agents-repeated-resume-bundle-'))
+    process.env.USERPROFILE = fakeHome
+    process.env.HOME = fakeHome
+
+    try {
+      const manager = new SessionManager()
+      const session = manager.createNew()
+      const sessionDir = manager.getSessionDirPath(session.id)
+      const transcriptPath = path.join(sessionDir, 'transcript.jsonl')
+      const statePath = path.join(sessionDir, 'state.json')
+
+      manager.persistUserPromptBarrier(session.id, 'repeated resume prompt')
+      manager.appendQueryEvent(session.id, {
+        type: 'approval.requested',
+        toolName: 'bash',
+        taskId: 'task_repeat_approval',
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'approval.resolved',
+        toolName: 'bash',
+        taskId: 'task_repeat_approval',
+        outcome: 'approved',
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'tool.started',
+        toolName: 'read',
+        taskId: 'task_repeat_tool',
+      })
+      manager.saveInterrupted(session.id, 'prompt')
+
+      const transcriptWithoutInterrupted = manager.getTranscriptEvents(session.id).filter(
+        event => !(event.type === 'lifecycle' && event.event === 'run-interrupted'),
+      )
+      fs.writeFileSync(
+        transcriptPath,
+        `${transcriptWithoutInterrupted.map(event => JSON.stringify(event)).join('\n')}\n`,
+        'utf8',
+      )
+
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf8')) as {
+        pendingLifecycle?: {
+          pendingApprovals: Record<string, { taskId: string; toolName: string }>
+          pendingTools: Record<string, { taskId: string; toolName: string }>
+          taskStates: Record<string, unknown>
+        }
+      }
+      state.pendingLifecycle = {
+        pendingApprovals: {
+          task_repeat_approval: { taskId: 'task_repeat_approval', toolName: 'bash' },
+        },
+        pendingTools: {
+          task_repeat_tool: { taskId: 'task_repeat_tool', toolName: 'read' },
+        },
+        taskStates: {},
+      }
+      fs.writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf8')
+
+      let firstSeed: Awaited<ReturnType<SessionManager['buildRuntimeStateSeed']>> | undefined
+      const firstRuntime = {
+        getState: () => 'idle',
+        executePrompt: async (_sessionId: string, _prompt: string, options?: { runtimeSeed?: Awaited<ReturnType<SessionManager['buildRuntimeStateSeed']>> }) => {
+          firstSeed = options?.runtimeSeed
+          manager.appendQueryEvent(session.id, {
+            type: 'turn.started',
+            role: 'coder',
+            turn: 2,
+          })
+          manager.saveInterrupted(session.id, 'turn')
+          return 'interrupted once'
+        },
+      } as never
+
+      const firstResult = await resumeShellSession({
+        requestedSessionId: session.id,
+        sessionManager: manager,
+        runtimeContext: createRuntimeContext(),
+        sessionRuntime: firstRuntime,
+        renderer: { renderLine() {} } as never,
+      })
+
+      expect(firstResult).toEqual({ resumed: true })
+      expect(firstSeed?.recoveryBoundary).toBe('fresh-entry')
+      expect(firstSeed?.truthBoundary.repairSummary.insertedRunInterrupted).toBe(true)
+      expect(firstSeed?.pendingLifecycle.pendingApprovals).toEqual({})
+      expect(firstSeed?.pendingLifecycle.pendingTools).toEqual({})
+      expect(firstSeed?.pendingLifecycle.taskStates.task_repeat_approval).toMatchObject({
+        lastEvent: 'approval.resolved',
+        outcome: 'approved',
+        taskId: 'task_repeat_approval',
+      })
+      expect(firstSeed?.pendingLifecycle.taskStates.task_repeat_tool).toMatchObject({
+        lastEvent: 'tool.result',
+        success: false,
+        compensated: true,
+        taskId: 'task_repeat_tool',
+      })
+
+      let secondSeed: Awaited<ReturnType<SessionManager['buildRuntimeStateSeed']>> | undefined
+      const secondRuntime = new ShellSessionRuntime({
+        sessionManager: manager,
+        renderer: { renderLine() {}, renderChunk() {} } as never,
+        runPrompt: async function* (_prompt, _signal, runtimeSeed) {
+          secondSeed = runtimeSeed
+          yield {
+            type: 'query.completed',
+            result: {
+              status: 'stopped_error',
+              terminalReason: 'stopped_error',
+              terminalClassification: 'stopped',
+              lastContinuationReason: 'retryable-error',
+              stopReason: 'Repeated resume stop',
+              transcript: [],
+              sharedContext: { sessionId: session.id, initialPrompt: 'repeated resume prompt', notes: [], handoffs: [] },
+              finalOutput: 'partial repeated output',
+            },
+          }
+        },
+      })
+
+      const secondResult = await resumeShellSession({
+        requestedSessionId: session.id,
+        sessionManager: manager,
+        runtimeContext: createRuntimeContext(),
+        sessionRuntime: secondRuntime,
+        renderer: { renderLine() {} } as never,
+      })
+
+      expect(secondResult).toEqual({ resumed: true })
+      expect(secondSeed?.recoveryBoundary).toBe('mid-turn-reentry')
+      expect(secondSeed?.truthBoundary.repairSummary.insertedRunInterrupted).toBe(false)
+      expect(secondSeed?.pendingLifecycle.pendingApprovals).toEqual({})
+      expect(secondSeed?.pendingLifecycle.pendingTools).toEqual({})
+      expect(secondSeed?.pendingLifecycle.taskStates.task_repeat_approval).toMatchObject({
+        lastEvent: 'approval.resolved',
+        outcome: 'approved',
+      })
+      expect(secondSeed?.pendingLifecycle.taskStates.task_repeat_tool).toMatchObject({
+        lastEvent: 'tool.result',
+        success: false,
+        compensated: true,
+      })
+
+      const transcript = manager.getTranscriptEvents(session.id)
+      expect(transcript.filter(event => event.type === 'lifecycle' && event.event === 'run-started')).toHaveLength(1)
+      expect(transcript.filter(
+        event => event.type === 'message' && event.role === 'user' && event.content === 'repeated resume prompt',
+      )).toHaveLength(1)
+      expect(transcript.filter(
+        event => event.type === 'query-event' && event.event.type === 'approval.resolved' && event.event.taskId === 'task_repeat_approval',
+      )).toHaveLength(1)
+      expect(transcript.filter(
+        event => event.type === 'query-event' && event.event.type === 'tool.result' && event.event.taskId === 'task_repeat_tool',
+      )).toHaveLength(1)
+
+      const finalState = JSON.parse(fs.readFileSync(statePath, 'utf8')) as {
+        status: string
+        terminalReason?: string
+        terminalClassification?: string
+        lastError?: string
+      }
+      expect(finalState.status).toBe('error')
+      expect(finalState.terminalReason).toBe('stopped_error')
+      expect(finalState.terminalClassification).toBe('stopped')
+      expect(finalState.lastError).toBeUndefined()
+    } finally {
+      process.env.USERPROFILE = originalUserProfile
+      process.env.HOME = originalHome
+      fs.rmSync(fakeHome, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps multi-turn handoff projection and stopped terminal durability aligned through completed-turn recovery', async () => {
+    const originalUserProfile = process.env.USERPROFILE
+    const originalHome = process.env.HOME
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'private-agents-handoff-recovery-'))
+    process.env.USERPROFILE = fakeHome
+    process.env.HOME = fakeHome
+
+    try {
+      const manager = new SessionManager()
+      const session = manager.createNew()
+      const plannerOutput = {
+        role: 'planner' as const,
+        content: 'plan',
+        handoffTo: 'coder' as const,
+        handoffReason: 'plan-ready',
+        notes: ['planner-note'],
+      }
+      const coderOutput = {
+        role: 'coder' as const,
+        content: 'code',
+        handoffTo: 'reviewer' as const,
+        handoffReason: 'ready-for-review',
+        notes: ['coder-note'],
+      }
+
+      manager.persistUserPromptBarrier(session.id, 'handoff recovery prompt')
+      manager.markTurnActive(session.id)
+      manager.appendQueryEvent(session.id, {
+        type: 'query.started',
+        sessionId: session.id,
+        prompt: 'handoff recovery prompt',
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.started',
+        role: 'planner',
+        turn: 1,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.completed',
+        output: plannerOutput,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.started',
+        role: 'coder',
+        turn: 2,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.completed',
+        output: coderOutput,
+      })
+      manager.saveInterrupted(session.id, 'turn')
+
+      let capturedRuntimeSeed: Awaited<ReturnType<SessionManager['buildRuntimeStateSeed']>> | undefined
+      let reconstructedState: ReturnType<typeof createQueryRuntimeStateFromSeed> | undefined
+      const runtime = new ShellSessionRuntime({
+        sessionManager: manager,
+        renderer: { renderLine() {}, renderChunk() {} } as never,
+        runPrompt: async function* (_prompt, _signal, runtimeSeed) {
+          capturedRuntimeSeed = runtimeSeed
+          reconstructedState = runtimeSeed ? createQueryRuntimeStateFromSeed(runtimeSeed) : undefined
+          yield {
+            type: 'query.completed',
+            result: {
+              status: 'stopped_error',
+              terminalReason: 'stopped_error',
+              terminalClassification: 'stopped',
+              lastContinuationReason: 'handoff',
+              stopReason: 'Reviewer stopped after recovery',
+              transcript: [
+                plannerOutput,
+                coderOutput,
+                {
+                  role: 'reviewer' as const,
+                  content: 'review paused',
+                  notes: ['reviewer-note'],
+                },
+              ],
+              sharedContext: {
+                sessionId: session.id,
+                initialPrompt: 'handoff recovery prompt',
+                notes: ['planner-note', 'coder-note', 'reviewer-note'],
+                handoffs: [
+                  { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
+                  { from: 'coder', to: 'reviewer', reason: 'ready-for-review', turn: 2 },
+                ],
+              },
+              finalOutput: 'review paused',
+            },
+          }
+        },
+      })
+
+      const result = await resumeShellSession({
+        requestedSessionId: session.id,
+        sessionManager: manager,
+        runtimeContext: createRuntimeContext(),
+        sessionRuntime: runtime,
+        renderer: { renderLine() {} } as never,
+      })
+
+      expect(result).toEqual({ resumed: true })
+      expect(capturedRuntimeSeed?.recoveryBoundary).toBe('completed-turn-reentry')
+      expect(capturedRuntimeSeed?.truthBoundary.continuationSafety).toBe('completed-turn-only')
+      expect(capturedRuntimeSeed?.currentRole).toBe('reviewer')
+      expect(capturedRuntimeSeed?.turn).toBe(3)
+      expect(capturedRuntimeSeed?.derivedState.transcript).toEqual([
+        plannerOutput,
+        coderOutput,
+      ])
+
+      expect(reconstructedState?.sharedContext.notes).toEqual([
+        'planner-note',
+        'coder-note',
+      ])
+      expect(reconstructedState?.sharedContext.handoffs).toEqual([
+        { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
+        { from: 'coder', to: 'reviewer', reason: 'ready-for-review', turn: 2 },
+      ])
+      expect(Array.from(reconstructedState?.visitedTransitions ?? [])).toEqual([
+        'planner->coder',
+        'coder->reviewer',
+      ])
+      expect(reconstructedState?.transcript).toEqual([
+        plannerOutput,
+        coderOutput,
+      ])
+
+      const state = JSON.parse(
+        fs.readFileSync(path.join(manager.getSessionDirPath(session.id), 'state.json'), 'utf8'),
+      ) as {
+        status: string
+        terminalReason?: string
+        terminalClassification?: string
+        durableStatus?: string
+        lastContinuationReason?: string
+        lastError?: string
+      }
+      expect(state.status).toBe('error')
+      expect(state.terminalReason).toBe('stopped_error')
+      expect(state.terminalClassification).toBe('stopped')
+      expect(state.durableStatus).toBe('stopped')
+      expect(state.lastContinuationReason).toBe('handoff')
+      expect(state.lastError).toBeUndefined()
+
+      const snapshot = manager.getRecoverySnapshot(session.id)
+      expect(snapshot.durableStatus).toBe('stopped')
+      expect(snapshot.terminalClassification).toBe('stopped')
+      expect(snapshot.lastContinuationReason).toBe('handoff')
+      expect(snapshot.pendingLifecycle.pendingApprovals).toEqual({})
+      expect(snapshot.pendingLifecycle.pendingTools).toEqual({})
+    } finally {
+      process.env.USERPROFILE = originalUserProfile
+      process.env.HOME = originalHome
+      fs.rmSync(fakeHome, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps prior handoff projection and stopped terminal durability aligned through mid-turn recovery', async () => {
+    const originalUserProfile = process.env.USERPROFILE
+    const originalHome = process.env.HOME
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'private-agents-midturn-handoff-recovery-'))
+    process.env.USERPROFILE = fakeHome
+    process.env.HOME = fakeHome
+
+    try {
+      const manager = new SessionManager()
+      const session = manager.createNew()
+      const plannerOutput = {
+        role: 'planner' as const,
+        content: 'plan',
+        handoffTo: 'coder' as const,
+        handoffReason: 'plan-ready',
+        notes: ['planner-note'],
+      }
+      const coderOutput = {
+        role: 'coder' as const,
+        content: 'code',
+        handoffTo: 'reviewer' as const,
+        handoffReason: 'ready-for-review',
+        notes: ['coder-note'],
+      }
+
+      manager.persistUserPromptBarrier(session.id, 'mid-turn handoff recovery prompt')
+      manager.markTurnActive(session.id)
+      manager.appendQueryEvent(session.id, {
+        type: 'query.started',
+        sessionId: session.id,
+        prompt: 'mid-turn handoff recovery prompt',
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.started',
+        role: 'planner',
+        turn: 1,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.completed',
+        output: plannerOutput,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.started',
+        role: 'coder',
+        turn: 2,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.completed',
+        output: coderOutput,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.started',
+        role: 'reviewer',
+        turn: 3,
+      })
+      manager.saveInterrupted(session.id, 'turn')
+
+      let capturedRuntimeSeed: Awaited<ReturnType<SessionManager['buildRuntimeStateSeed']>> | undefined
+      let reconstructedState: ReturnType<typeof createQueryRuntimeStateFromSeed> | undefined
+      const runtime = new ShellSessionRuntime({
+        sessionManager: manager,
+        renderer: { renderLine() {}, renderChunk() {} } as never,
+        runPrompt: async function* (_prompt, _signal, runtimeSeed) {
+          capturedRuntimeSeed = runtimeSeed
+          reconstructedState = runtimeSeed ? createQueryRuntimeStateFromSeed(runtimeSeed) : undefined
+          yield {
+            type: 'query.completed',
+            result: {
+              status: 'stopped_error',
+              terminalReason: 'stopped_error',
+              terminalClassification: 'stopped',
+              lastContinuationReason: 'handoff',
+              stopReason: 'Reviewer stopped during resumed open turn',
+              transcript: [
+                plannerOutput,
+                coderOutput,
+                {
+                  role: 'reviewer' as const,
+                  content: 'review in progress',
+                  notes: ['reviewer-note'],
+                },
+              ],
+              sharedContext: {
+                sessionId: session.id,
+                initialPrompt: 'mid-turn handoff recovery prompt',
+                notes: ['planner-note', 'coder-note', 'reviewer-note'],
+                handoffs: [
+                  { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
+                  { from: 'coder', to: 'reviewer', reason: 'ready-for-review', turn: 2 },
+                ],
+              },
+              finalOutput: 'review in progress',
+            },
+          }
+        },
+      })
+
+      const result = await resumeShellSession({
+        requestedSessionId: session.id,
+        sessionManager: manager,
+        runtimeContext: createRuntimeContext(),
+        sessionRuntime: runtime,
+        renderer: { renderLine() {} } as never,
+      })
+
+      expect(result).toEqual({ resumed: true })
+      expect(capturedRuntimeSeed?.recoveryBoundary).toBe('mid-turn-reentry')
+      expect(capturedRuntimeSeed?.truthBoundary.continuationSafety).toBe('mid-turn-safe')
+      expect(capturedRuntimeSeed?.truthBoundary.openTurn).toEqual({ role: 'reviewer', turn: 3 })
+      expect(capturedRuntimeSeed?.currentRole).toBe('reviewer')
+      expect(capturedRuntimeSeed?.turn).toBe(3)
+      expect(capturedRuntimeSeed?.derivedState.transcript).toEqual([
+        plannerOutput,
+        coderOutput,
+      ])
+
+      expect(reconstructedState?.sharedContext.notes).toEqual([
+        'planner-note',
+        'coder-note',
+      ])
+      expect(reconstructedState?.sharedContext.handoffs).toEqual([
+        { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
+        { from: 'coder', to: 'reviewer', reason: 'ready-for-review', turn: 2 },
+      ])
+      expect(Array.from(reconstructedState?.visitedTransitions ?? [])).toEqual([
+        'planner->coder',
+        'coder->reviewer',
+      ])
+      expect(reconstructedState?.transcript).toEqual([
+        plannerOutput,
+        coderOutput,
+      ])
+
+      const state = JSON.parse(
+        fs.readFileSync(path.join(manager.getSessionDirPath(session.id), 'state.json'), 'utf8'),
+      ) as {
+        status: string
+        terminalReason?: string
+        terminalClassification?: string
+        durableStatus?: string
+        lastContinuationReason?: string
+        lastError?: string
+      }
+      expect(state.status).toBe('error')
+      expect(state.terminalReason).toBe('stopped_error')
+      expect(state.terminalClassification).toBe('stopped')
+      expect(state.durableStatus).toBe('stopped')
+      expect(state.lastContinuationReason).toBe('handoff')
+      expect(state.lastError).toBeUndefined()
+
+      const snapshot = manager.getRecoverySnapshot(session.id)
+      expect(snapshot.durableStatus).toBe('stopped')
+      expect(snapshot.terminalClassification).toBe('stopped')
+      expect(snapshot.lastContinuationReason).toBe('handoff')
+      expect(snapshot.pendingLifecycle.pendingApprovals).toEqual({})
+      expect(snapshot.pendingLifecycle.pendingTools).toEqual({})
+    } finally {
+      process.env.USERPROFILE = originalUserProfile
+      process.env.HOME = originalHome
+      fs.rmSync(fakeHome, { recursive: true, force: true })
+    }
+  })
+
+  it('persists merged handoffs in terminal transcript order when a resumed mid-turn emits a new handoff', async () => {
+    const originalUserProfile = process.env.USERPROFILE
+    const originalHome = process.env.HOME
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'private-agents-midturn-handoff-merge-'))
+    process.env.USERPROFILE = fakeHome
+    process.env.HOME = fakeHome
+
+    try {
+      const manager = new SessionManager()
+      const session = manager.createNew()
+      const plannerOutput = {
+        role: 'planner' as const,
+        content: 'plan',
+        handoffTo: 'coder' as const,
+        handoffReason: 'plan-ready',
+        notes: ['planner-note'],
+      }
+      const coderOutput = {
+        role: 'coder' as const,
+        content: 'code',
+        handoffTo: 'reviewer' as const,
+        handoffReason: 'ready-for-review',
+        notes: ['coder-note'],
+      }
+      const reviewerOutput = {
+        role: 'reviewer' as const,
+        content: 'needs another coding pass',
+        handoffTo: 'coder' as const,
+        handoffReason: 'needs-more-code',
+        notes: ['reviewer-note'],
+      }
+
+      manager.persistUserPromptBarrier(session.id, 'mid-turn handoff merge prompt')
+      manager.markTurnActive(session.id)
+      manager.appendQueryEvent(session.id, {
+        type: 'query.started',
+        sessionId: session.id,
+        prompt: 'mid-turn handoff merge prompt',
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.started',
+        role: 'planner',
+        turn: 1,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.completed',
+        output: plannerOutput,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.started',
+        role: 'coder',
+        turn: 2,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.completed',
+        output: coderOutput,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.started',
+        role: 'reviewer',
+        turn: 3,
+      })
+      manager.saveInterrupted(session.id, 'turn')
+
+      let capturedRuntimeSeed: Awaited<ReturnType<SessionManager['buildRuntimeStateSeed']>> | undefined
+      const seenTurns: string[] = []
+      const runAgent: AgentRunner = async ({ role, sharedContext, turn, transcript }) => {
+        seenTurns.push(`${role}:${turn}`)
+
+        if (role === 'reviewer') {
+          expect(sharedContext.handoffs).toEqual([
+            { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
+            { from: 'coder', to: 'reviewer', reason: 'ready-for-review', turn: 2 },
+          ])
+          expect(turn).toBe(3)
+          expect(transcript).toEqual([
+            plannerOutput,
+            coderOutput,
+          ])
+          return reviewerOutput
+        }
+
+        expect(role).toBe('coder')
+        expect(turn).toBe(4)
+        expect(sharedContext.handoffs).toEqual([
+          { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
+          { from: 'coder', to: 'reviewer', reason: 'ready-for-review', turn: 2 },
+          { from: 'reviewer', to: 'coder', reason: 'needs-more-code', turn: 3 },
+        ])
+        expect(transcript).toEqual([
+          plannerOutput,
+          coderOutput,
+          reviewerOutput,
+        ])
+        return {
+          role: 'coder',
+          content: 'coding patch applied',
+          notes: ['coder-return-note'],
+        }
+      }
+      const engine = new QueryEngine({ runAgent })
+      const runtime = new ShellSessionRuntime({
+        sessionManager: manager,
+        renderer: { renderLine() {}, renderChunk() {} } as never,
+        runPrompt: async function* (prompt, _signal, runtimeSeed) {
+          capturedRuntimeSeed = runtimeSeed
+          for await (const event of engine.streamMessage(session.id, prompt, { runtimeSeed })) {
+            yield event
+          }
+        },
+      })
+
+      const result = await resumeShellSession({
+        requestedSessionId: session.id,
+        sessionManager: manager,
+        runtimeContext: createRuntimeContext(),
+        sessionRuntime: runtime,
+        renderer: { renderLine() {} } as never,
+      })
+
+      expect(result).toEqual({ resumed: true })
+      expect(capturedRuntimeSeed?.recoveryBoundary).toBe('mid-turn-reentry')
+      expect(capturedRuntimeSeed?.currentRole).toBe('reviewer')
+      expect(capturedRuntimeSeed?.turn).toBe(3)
+      expect(seenTurns).toEqual(['reviewer:3', 'coder:4'])
+      const mergedHandoffs = [
+        { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
+        { from: 'coder', to: 'reviewer', reason: 'ready-for-review', turn: 2 },
+        { from: 'reviewer', to: 'coder', reason: 'needs-more-code', turn: 3 },
+      ]
+
+      const transcriptEvents = manager.getTranscriptEvents(session.id)
+      const terminalEvents = transcriptEvents.filter(
+        (event): event is Extract<(typeof transcriptEvents)[number], { type: 'query-event' }> =>
+          event.type === 'query-event' && event.event.type === 'query.completed',
+      )
+      expect(terminalEvents).toHaveLength(1)
+      expect(terminalEvents[0].event.result.sharedContext.handoffs).toEqual(mergedHandoffs)
+      expect(terminalEvents[0].event.result.terminalReason).toBe('completed')
+      expect(terminalEvents[0].event.result.terminalClassification).toBe('success')
+
+      const state = JSON.parse(
+        fs.readFileSync(path.join(manager.getSessionDirPath(session.id), 'state.json'), 'utf8'),
+      ) as {
+        status: string
+        terminalReason?: string
+        terminalClassification?: string
+        durableStatus?: string
+        lastError?: string
+      }
+      expect(state.status).toBe('completed')
+      expect(state.terminalReason).toBe('completed')
+      expect(state.terminalClassification).toBe('success')
+      expect(state.durableStatus).toBe('success')
+      expect(state.lastError).toBeUndefined()
+
+      const snapshot = manager.getRecoverySnapshot(session.id)
+      expect(snapshot.terminalReason).toBe('completed')
+      expect(snapshot.terminalClassification).toBe('success')
+      expect(snapshot.durableStatus).toBe('success')
+      const snapshotTerminalEvents = snapshot.transcriptEvents.filter(
+        (event): event is Extract<(typeof snapshot.transcriptEvents)[number], { type: 'query-event' }> =>
+          event.type === 'query-event' && event.event.type === 'query.completed',
+      )
+      expect(snapshotTerminalEvents).toHaveLength(1)
+      expect(snapshotTerminalEvents[0].event.result.sharedContext.handoffs).toEqual(mergedHandoffs)
+      expect(snapshotTerminalEvents[0].event.result).toMatchObject({
+        terminalReason: state.terminalReason,
+        terminalClassification: state.terminalClassification,
+      })
+    } finally {
+      process.env.USERPROFILE = originalUserProfile
+      process.env.HOME = originalHome
+      fs.rmSync(fakeHome, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps merged handoffs and terminal durable payload stable after resumed handoff is interrupted and resumed again', async () => {
+    const originalUserProfile = process.env.USERPROFILE
+    const originalHome = process.env.HOME
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'private-agents-repeated-handoff-resume-'))
+    process.env.USERPROFILE = fakeHome
+    process.env.HOME = fakeHome
+
+    try {
+      const manager = new SessionManager()
+      const session = manager.createNew()
+      const plannerOutput = {
+        role: 'planner' as const,
+        content: 'plan',
+        handoffTo: 'coder' as const,
+        handoffReason: 'plan-ready',
+        notes: ['planner-note'],
+      }
+      const coderOutput = {
+        role: 'coder' as const,
+        content: 'code',
+        handoffTo: 'reviewer' as const,
+        handoffReason: 'ready-for-review',
+        notes: ['coder-note'],
+      }
+      const reviewerOutput = {
+        role: 'reviewer' as const,
+        content: 'needs another coding pass',
+        handoffTo: 'coder' as const,
+        handoffReason: 'needs-more-code',
+        notes: ['reviewer-note'],
+      }
+
+      manager.persistUserPromptBarrier(session.id, 'repeated handoff resume prompt')
+      manager.markTurnActive(session.id)
+      manager.appendQueryEvent(session.id, {
+        type: 'query.started',
+        sessionId: session.id,
+        prompt: 'repeated handoff resume prompt',
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.started',
+        role: 'planner',
+        turn: 1,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.completed',
+        output: plannerOutput,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.started',
+        role: 'coder',
+        turn: 2,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.completed',
+        output: coderOutput,
+      })
+      manager.appendQueryEvent(session.id, {
+        type: 'turn.started',
+        role: 'reviewer',
+        turn: 3,
+      })
+      manager.saveInterrupted(session.id, 'turn')
+
+      const firstEngine = new QueryEngine({
+        runAgent: async ({ role, turn, sharedContext, transcript }) => {
+          expect(role).toBe('reviewer')
+          expect(turn).toBe(3)
+          expect(sharedContext.handoffs).toEqual([
+            { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
+            { from: 'coder', to: 'reviewer', reason: 'ready-for-review', turn: 2 },
+          ])
+          expect(transcript).toEqual([
+            plannerOutput,
+            coderOutput,
+          ])
+          return reviewerOutput
+        },
+      })
+
+      let firstSeed: Awaited<ReturnType<SessionManager['buildRuntimeStateSeed']>> | undefined
+      const firstRuntime = {
+        getState: () => 'interrupted',
+        executePrompt: async (_sessionId: string, prompt: string, options?: { runtimeSeed?: Awaited<ReturnType<SessionManager['buildRuntimeStateSeed']>> }) => {
+          firstSeed = options?.runtimeSeed
+          for await (const event of firstEngine.streamMessage(session.id, prompt, { runtimeSeed: options?.runtimeSeed })) {
+            if (event.type === 'query.completed') {
+              break
+            }
+            manager.appendQueryEvent(session.id, event)
+            if (event.type === 'turn.started' && event.role === 'coder' && event.turn === 4) {
+              manager.saveInterrupted(session.id, 'turn')
+              return 'interrupted after resumed handoff'
+            }
+          }
+          throw new Error('Expected coder turn after resumed handoff before terminal completion')
+        },
+      } as never
+
+      const firstResult = await resumeShellSession({
+        requestedSessionId: session.id,
+        sessionManager: manager,
+        runtimeContext: createRuntimeContext(),
+        sessionRuntime: firstRuntime,
+        renderer: { renderLine() {} } as never,
+      })
+
+      expect(firstResult).toEqual({ resumed: true })
+      expect(firstSeed?.recoveryBoundary).toBe('mid-turn-reentry')
+      expect(firstSeed?.currentRole).toBe('reviewer')
+      expect(firstSeed?.turn).toBe(3)
+      const postFirstInterruptSeed = manager.buildRuntimeStateSeed(session.id, { maxTurns: 6 })
+      expect(postFirstInterruptSeed.recoveryBoundary).toBe('mid-turn-reentry')
+      expect(postFirstInterruptSeed.currentRole).toBe('coder')
+      expect(postFirstInterruptSeed.turn).toBe(4)
+      expect(postFirstInterruptSeed.truthBoundary.openTurn).toEqual({ role: 'coder', turn: 4 })
+      expect(postFirstInterruptSeed.derivedState.transcript).toEqual([
+        plannerOutput,
+        coderOutput,
+        reviewerOutput,
+      ])
+      const reconstructedPostFirstInterruptState = createQueryRuntimeStateFromSeed(postFirstInterruptSeed)
+      expect(reconstructedPostFirstInterruptState.sharedContext.handoffs).toEqual([
+        { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
+        { from: 'coder', to: 'reviewer', reason: 'ready-for-review', turn: 2 },
+        { from: 'reviewer', to: 'coder', reason: 'needs-more-code', turn: 3 },
+      ])
+
+      let secondSeed: Awaited<ReturnType<SessionManager['buildRuntimeStateSeed']>> | undefined
+      const seenTurns: string[] = []
+      const secondEngine = new QueryEngine({
+        runAgent: async ({ role, turn, sharedContext, transcript }) => {
+          seenTurns.push(`${role}:${turn}`)
+          expect(role).toBe('coder')
+          expect(turn).toBe(4)
+          expect(sharedContext.handoffs).toEqual([
+            { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
+            { from: 'coder', to: 'reviewer', reason: 'ready-for-review', turn: 2 },
+            { from: 'reviewer', to: 'coder', reason: 'needs-more-code', turn: 3 },
+          ])
+          expect(transcript).toEqual([
+            plannerOutput,
+            coderOutput,
+            reviewerOutput,
+          ])
+          return {
+            role: 'coder',
+            content: 'coding patch applied after repeated resume',
+            notes: ['coder-return-note'],
+          }
+        },
+      })
+
+      const secondRuntime = new ShellSessionRuntime({
+        sessionManager: manager,
+        renderer: { renderLine() {}, renderChunk() {} } as never,
+        runPrompt: async function* (prompt, _signal, runtimeSeed) {
+          secondSeed = runtimeSeed
+          for await (const event of secondEngine.streamMessage(session.id, prompt, { runtimeSeed })) {
+            yield event
+          }
+        },
+      })
+
+      const secondResult = await resumeShellSession({
+        requestedSessionId: session.id,
+        sessionManager: manager,
+        runtimeContext: createRuntimeContext(),
+        sessionRuntime: secondRuntime,
+        renderer: { renderLine() {} } as never,
+      })
+
+      expect(secondResult).toEqual({ resumed: true })
+      expect(secondSeed?.recoveryBoundary).toBe('mid-turn-reentry')
+      expect(secondSeed?.currentRole).toBe('coder')
+      expect(secondSeed?.turn).toBe(4)
+      expect(secondSeed?.truthBoundary.openTurn).toEqual({ role: 'coder', turn: 4 })
+      expect(secondSeed?.derivedState.transcript).toEqual([
+        plannerOutput,
+        coderOutput,
+        reviewerOutput,
+      ])
+      const reconstructedSecondState = secondSeed
+        ? createQueryRuntimeStateFromSeed(secondSeed)
+        : undefined
+      expect(reconstructedSecondState?.sharedContext.handoffs).toEqual([
+        { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
+        { from: 'coder', to: 'reviewer', reason: 'ready-for-review', turn: 2 },
+        { from: 'reviewer', to: 'coder', reason: 'needs-more-code', turn: 3 },
+      ])
+      expect(seenTurns).toEqual(['coder:4'])
+
+      const mergedHandoffs = [
+        { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
+        { from: 'coder', to: 'reviewer', reason: 'ready-for-review', turn: 2 },
+        { from: 'reviewer', to: 'coder', reason: 'needs-more-code', turn: 3 },
+      ]
+
+      const transcriptEvents = manager.getTranscriptEvents(session.id)
+      const terminalEvents = transcriptEvents.filter(
+        (event): event is Extract<(typeof transcriptEvents)[number], { type: 'query-event' }> =>
+          event.type === 'query-event' && event.event.type === 'query.completed',
+      )
+      expect(terminalEvents).toHaveLength(1)
+      expect(terminalEvents[0].event.result.sharedContext.handoffs).toEqual(mergedHandoffs)
+      expect(terminalEvents[0].event.result.terminalReason).toBe('completed')
+      expect(terminalEvents[0].event.result.terminalClassification).toBe('success')
+
+      const statePath = path.join(manager.getSessionDirPath(session.id), 'state.json')
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf8')) as {
+        status: string
+        terminalReason?: string
+        terminalClassification?: string
+        durableStatus?: string
+        lastError?: string
+      }
+      expect(state.status).toBe('completed')
+      expect(state.terminalReason).toBe('completed')
+      expect(state.terminalClassification).toBe('success')
+      expect(state.durableStatus).toBe('success')
+      expect(state.lastError).toBeUndefined()
+
+      const snapshot = manager.getRecoverySnapshot(session.id)
+      expect(snapshot.terminalReason).toBe('completed')
+      expect(snapshot.terminalClassification).toBe('success')
+      expect(snapshot.durableStatus).toBe('success')
+      const snapshotTerminalEvents = snapshot.transcriptEvents.filter(
+        (event): event is Extract<(typeof snapshot.transcriptEvents)[number], { type: 'query-event' }> =>
+          event.type === 'query-event' && event.event.type === 'query.completed',
+      )
+      expect(snapshotTerminalEvents).toHaveLength(1)
+      expect(snapshotTerminalEvents[0].event.result.sharedContext.handoffs).toEqual(mergedHandoffs)
+      expect(snapshotTerminalEvents[0].event.result).toMatchObject({
+        terminalReason: state.terminalReason,
+        terminalClassification: state.terminalClassification,
+      })
+    } finally {
+      process.env.USERPROFILE = originalUserProfile
+      process.env.HOME = originalHome
+      fs.rmSync(fakeHome, { recursive: true, force: true })
+    }
+  })
+
 })

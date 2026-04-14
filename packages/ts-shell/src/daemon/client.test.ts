@@ -89,6 +89,7 @@ describe('rust daemon feature flag', () => {
       exitCode: 0,
       stdout: 'daemon path via PATH cargo',
       stderr: '',
+      failureKind: undefined,
     })
 
     const execFileMock = vi.fn((command: string, args: string[], _options: unknown, callback: (error: unknown, stdout?: string, stderr?: string) => void) => {
@@ -131,8 +132,55 @@ describe('rust daemon feature flag', () => {
         exitCode: 0,
         stdout: 'daemon path via PATH cargo',
         stderr: '',
+        failureKind: undefined,
       })
       expect(promisifiedExecFileMock).toHaveBeenCalledOnce()
+    } finally {
+      vi.doUnmock('node:child_process')
+      vi.resetModules()
+    }
+  })
+
+  it('preserves structured failure kind from daemon payload', async () => {
+    const daemonPayload = JSON.stringify({
+      status: 'failed',
+      exitCode: null,
+      stdout: '',
+      stderr: 'wording drifted completely',
+      failureKind: 'sandbox_preflight',
+    })
+
+    const execFileMock = vi.fn((command: string, args: string[], _options: unknown, callback: (error: unknown, stdout?: string, stderr?: string) => void) => {
+      expect(['cargo', 'cargo.exe']).toContain(path.basename(command).toLowerCase())
+      expect(args).toContain('--manifest-path')
+      callback(null, daemonPayload, '')
+    })
+    const promisifiedExecFileMock = vi.fn(async () => ({ stdout: daemonPayload, stderr: '' }))
+    execFileMock[Symbol.for('nodejs.util.promisify.custom') as unknown as 'custom'] = promisifiedExecFileMock
+
+    vi.resetModules()
+    vi.doMock('node:child_process', () => ({
+      execFile: execFileMock,
+      execFileSync: vi.fn(() => Buffer.from('cargo 1.0.0')),
+    }))
+
+    try {
+      const { executeViaRustDaemon } = await import('./client.js')
+      const result = await executeViaRustDaemon({
+        command: 'cmd',
+        args: ['/C', 'echo ignored'],
+        cwd: fakeRoot,
+        workspaceRoot: fakeRoot,
+        timeoutMs: 1000,
+      })
+
+      expect(result).toEqual({
+        status: 'failed',
+        exitCode: null,
+        stdout: '',
+        stderr: 'wording drifted completely',
+        failureKind: 'sandbox_preflight',
+      })
     } finally {
       vi.doUnmock('node:child_process')
       vi.resetModules()

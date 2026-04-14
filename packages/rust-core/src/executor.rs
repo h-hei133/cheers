@@ -18,6 +18,15 @@ pub enum CommandExecutionStatus {
     Cancelled,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum FailureKind {
+    SandboxPreflight,
+    ExecutionFailure,
+    Timeout,
+    Cancelled,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandExecutionRequest {
@@ -35,6 +44,7 @@ pub struct CommandExecutionResult {
     pub exit_code: Option<i32>,
     pub stdout: String,
     pub stderr: String,
+    pub failure_kind: Option<FailureKind>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -110,6 +120,7 @@ pub async fn execute_command(
             exit_code: None,
             stdout: String::new(),
             stderr: sandbox.reason,
+            failure_kind: Some(FailureKind::SandboxPreflight),
         };
     }
 
@@ -131,6 +142,7 @@ pub async fn execute_command(
                 exit_code: None,
                 stdout: String::new(),
                 stderr: error.to_string(),
+                failure_kind: Some(FailureKind::ExecutionFailure),
             }
         }
     };
@@ -147,6 +159,7 @@ pub async fn execute_command(
                     exit_code: None,
                     stdout: String::new(),
                     stderr: format!("Command timed out after {} ms", limit.as_millis()),
+                    failure_kind: Some(FailureKind::Timeout),
                 }
             }
             _ = wait_for_cancellation(cancellation) => {
@@ -156,6 +169,7 @@ pub async fn execute_command(
                     exit_code: None,
                     stdout: String::new(),
                     stderr: "Command cancelled".to_string(),
+                    failure_kind: Some(FailureKind::Cancelled),
                 }
             }
         }
@@ -169,6 +183,7 @@ pub async fn execute_command(
                     exit_code: None,
                     stdout: String::new(),
                     stderr: "Command cancelled".to_string(),
+                    failure_kind: Some(FailureKind::Cancelled),
                 }
             }
         }
@@ -227,24 +242,32 @@ fn map_join_result(
             exit_code: output.status.code(),
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
             stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+            failure_kind: if output.status.success() {
+                None
+            } else {
+                Some(FailureKind::ExecutionFailure)
+            },
         },
         Ok(Err(error)) => CommandExecutionResult {
             status: CommandExecutionStatus::Failed,
             exit_code: None,
             stdout: String::new(),
             stderr: error.to_string(),
+            failure_kind: Some(FailureKind::ExecutionFailure),
         },
         Err(error) if error.is_cancelled() => CommandExecutionResult {
             status: CommandExecutionStatus::Cancelled,
             exit_code: None,
             stdout: String::new(),
             stderr: "Command cancelled".to_string(),
+            failure_kind: Some(FailureKind::Cancelled),
         },
         Err(error) => CommandExecutionResult {
             status: CommandExecutionStatus::Failed,
             exit_code: None,
             stdout: String::new(),
             stderr: error.to_string(),
+            failure_kind: Some(FailureKind::ExecutionFailure),
         },
     }
 }

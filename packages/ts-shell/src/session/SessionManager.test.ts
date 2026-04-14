@@ -137,6 +137,30 @@ describe('SessionManager', () => {
     expect(['interrupted', 'error']).toContain(suggested?.status)
   })
 
+  it('does not suggest durable-stopped sessions as recoverable errors', () => {
+    const manager = new SessionManager()
+
+    const stopped = manager.createNew()
+    manager.markRunStarted(stopped.id, 'stopped prompt')
+    manager.saveError(stopped.id, 'Retry budget exhausted', {
+      terminalReason: 'stopped_error',
+      terminalClassification: 'stopped',
+    })
+
+    const durableError = manager.createNew()
+    manager.markRunStarted(durableError.id, 'error prompt')
+    manager.saveError(durableError.id, 'Transport exploded', {
+      terminalReason: 'stopped_error',
+      terminalClassification: 'error',
+    })
+
+    const suggested = manager.getSuggestedRecoverySession()
+    expect(suggested?.id).toBe(durableError.id)
+    expect(suggested?.status).toBe('error')
+    expect(manager.getRecoverySnapshot(stopped.id).durableStatus).toBe('stopped')
+    expect(manager.getRecoverySnapshot(durableError.id).durableStatus).toBe('error')
+  })
+
   it('stores richer transcript events and exposes a recovery snapshot', () => {
     const manager = new SessionManager()
     const session = manager.createNew()

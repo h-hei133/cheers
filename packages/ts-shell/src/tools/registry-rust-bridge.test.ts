@@ -103,4 +103,115 @@ describe('tool registry rust bridge', () => {
     expect(result.metadata).toMatchObject({ executionPath: 'ts-local-fallback' })
     expect(result.metadata).toHaveProperty('recoveryReason')
   }, 15000)
+
+  it('surfaces stable failure metadata when rust-daemon falls back to ts-local-failure', async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true })
+    process.env.DAEMON_ENABLED = '1'
+    vi.doMock('../daemon/client.js', async () => {
+      const actual = await vi.importActual<typeof import('../daemon/client.js')>('../daemon/client.js')
+      return {
+        ...actual,
+        executeViaRustDaemon: vi.fn().mockRejectedValue(new Error('daemon boot failed')),
+        isRustDaemonEnabled: () => true,
+        checkRustDaemonAvailability: () => ({ available: true }),
+      }
+    })
+    vi.resetModules()
+
+    const { createMvpToolRegistry } = await import('./registry.js')
+    const registry = createMvpToolRegistry()
+    const bashTool = registry.get('bash')
+    if (!bashTool) {
+      throw new Error('bash tool missing from registry')
+    }
+
+    const result = await bashTool.execute(
+      { command: process.platform === 'win32' ? 'exit /B 7' : 'exit 7' },
+      { taskId: 'task_fallback_failure', workspaceRoot },
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.metadata).toMatchObject({
+      executionPath: 'ts-local-fallback',
+      status: 'failed',
+      exitCode: 7,
+      failureKind: 'execution_failure',
+    })
+    expect(result.metadata).toHaveProperty('recoveryReason')
+  }, 15000)
+
+  it.each([
+    { status: 'timeout', expectedFailureKind: 'timeout' },
+    { status: 'cancelled', expectedFailureKind: 'cancelled' },
+  ] as const)('surfaces stable rust-daemon failure metadata for %s results', async ({ status, expectedFailureKind }) => {
+    process.env.DAEMON_ENABLED = '1'
+    vi.resetModules()
+    vi.doMock('../daemon/client.js', () => ({
+      executeViaRustDaemon: vi.fn().mockResolvedValue({
+        status,
+        exitCode: null,
+        stdout: '',
+        stderr: status,
+        failureKind: expectedFailureKind,
+      }),
+      isRustDaemonEnabled: () => true,
+      checkRustDaemonAvailability: () => ({ available: true }),
+    }))
+
+    const { createMvpToolRegistry } = await import('./registry.js')
+    const registry = createMvpToolRegistry()
+    const bashTool = registry.get('bash')
+    if (!bashTool) {
+      throw new Error('bash tool missing from registry')
+    }
+
+    const result = await bashTool.execute(
+      { command: 'echo ignored' },
+      { taskId: `task_${status}`, workspaceRoot },
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.metadata).toMatchObject({
+      executionPath: 'rust-daemon',
+      status,
+      exitCode: null,
+      failureKind: expectedFailureKind,
+    })
+  })
+
+  it('prefers structured failureKind over stderr wording for rust-daemon failures', async () => {
+    process.env.DAEMON_ENABLED = '1'
+    vi.resetModules()
+    vi.doMock('../daemon/client.js', () => ({
+      executeViaRustDaemon: vi.fn().mockResolvedValue({
+        status: 'failed',
+        exitCode: null,
+        stdout: '',
+        stderr: 'totally different message',
+        failureKind: 'sandbox_preflight',
+      }),
+      isRustDaemonEnabled: () => true,
+      checkRustDaemonAvailability: () => ({ available: true }),
+    }))
+
+    const { createMvpToolRegistry } = await import('./registry.js')
+    const registry = createMvpToolRegistry()
+    const bashTool = registry.get('bash')
+    if (!bashTool) {
+      throw new Error('bash tool missing from registry')
+    }
+
+    const result = await bashTool.execute(
+      { command: 'echo ignored' },
+      { taskId: 'task_failure_kind_precedence', workspaceRoot },
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.metadata).toMatchObject({
+      executionPath: 'rust-daemon',
+      status: 'failed',
+      exitCode: null,
+      failureKind: 'sandbox_preflight',
+    })
+  })
 })

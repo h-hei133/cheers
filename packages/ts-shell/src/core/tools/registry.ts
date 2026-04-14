@@ -16,6 +16,31 @@ import { approvedResult } from './toolResultLifecycle.js'
 
 const exec = promisify(execCallback)
 
+type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
+
+function inferFailureKind(result: {
+  status: 'completed' | 'failed' | 'timeout' | 'cancelled'
+  stderr: string
+  failureKind?: ExecutionFailureKind
+}): ExecutionFailureKind | undefined {
+  if (result.failureKind) {
+    return result.failureKind
+  }
+
+  switch (result.status) {
+    case 'timeout':
+      return 'timeout'
+    case 'cancelled':
+      return 'cancelled'
+    case 'failed':
+      return /requires escalation/i.test(result.stderr)
+        ? 'sandbox_preflight'
+        : 'execution_failure'
+    default:
+      return undefined
+  }
+}
+
 async function recursiveList(root: string): Promise<string[]> {
   const entries = await fs.readdir(root, { withFileTypes: true })
   const files = await Promise.all(
@@ -50,6 +75,7 @@ async function runLocalCommand(
       ...metadata,
       status: result.status,
       exitCode: result.exitCode,
+      failureKind: inferFailureKind(result),
     },
   }
 }
@@ -145,7 +171,12 @@ export function createCoreToolRegistry(options?: {
                 success: daemonResult.status === 'completed',
                 output: daemonResult.stdout,
                 error: daemonResult.status === 'completed' ? undefined : daemonResult.stderr,
-                metadata: { executionPath: 'rust-daemon', status: daemonResult.status },
+                metadata: {
+                  executionPath: 'rust-daemon',
+                  status: daemonResult.status,
+                  exitCode: daemonResult.exitCode,
+                  failureKind: inferFailureKind(daemonResult),
+                },
               }
             } catch (error) {
               return runLocalCommand(command, context, {

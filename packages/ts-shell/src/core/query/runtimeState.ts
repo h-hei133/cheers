@@ -84,7 +84,9 @@ export const CONTINUATION_SAFETY_POLICY: Record<ContinuationSafety, Continuation
     runtimeRecoveryBoundary: 'completed-turn-reentry',
     allowDerivedContext: true,
     resetToStartingRole: false,
-    accepts: evidence => hasContinuationEvidence(evidence, 'paired-turns'),
+    accepts: evidence =>
+      hasContinuationEvidence(evidence, 'paired-turns')
+      && !hasContinuationEvidence(evidence, 'repair-drift'),
   },
   'mid-turn-safe': {
     safety: 'mid-turn-safe',

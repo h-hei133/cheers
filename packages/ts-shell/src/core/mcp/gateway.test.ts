@@ -133,4 +133,70 @@ describe('core MCP gateway (W3)', () => {
     const result = await gateway.invokeTool('stdioEcho', 'echo_message', { message: 'hello' })
     expect(result.content).toBe('echo:hello')
   }, 15000)
+
+  it('drops stale cached clients when a server disappears on the next snapshot', async () => {
+    fs.writeFileSync(
+      path.join(workspaceRoot, '.private-agents.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          localSdk: {
+            transport: 'sdk',
+            mockTools: [{ serverName: 'localSdk', toolName: 'search', qualifiedName: 'mcp__localSdk__search', description: 'Search MCP' }],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const gateway = new CoreMcpGateway(workspaceRoot)
+    await gateway.snapshot()
+
+    fs.writeFileSync(
+      path.join(workspaceRoot, '.private-agents.mcp.json'),
+      JSON.stringify({ mcpServers: {} }),
+      'utf8',
+    )
+
+    const snapshot = await gateway.snapshot()
+    expect(snapshot.clients).toEqual([])
+    await expect(gateway.invokeTool('localSdk', 'search', {})).rejects.toThrow('Unknown MCP server: localSdk')
+  })
+
+  it('invalidates cached clients when reconnect reveals auth is now required', async () => {
+    fs.writeFileSync(
+      path.join(workspaceRoot, '.private-agents.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          localSdk: {
+            transport: 'sdk',
+            mockTools: [{ serverName: 'localSdk', toolName: 'search', qualifiedName: 'mcp__localSdk__search', description: 'Search MCP' }],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const gateway = new CoreMcpGateway(workspaceRoot)
+    await gateway.snapshot()
+
+    fs.writeFileSync(
+      path.join(workspaceRoot, '.private-agents.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          localSdk: {
+            transport: 'sdk',
+            authRequired: true,
+            mockTools: [{ serverName: 'localSdk', toolName: 'search', qualifiedName: 'mcp__localSdk__search', description: 'Search MCP' }],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const snapshot = await gateway.snapshot()
+    expect(snapshot.clients).toHaveLength(1)
+    expect(snapshot.clients[0]).toMatchObject({ type: 'needs-auth', name: 'localSdk' })
+    expect(snapshot.tools).toEqual([])
+    await expect(gateway.invokeTool('localSdk', 'search', {})).rejects.toThrow('MCP server localSdk requires authentication')
+  })
 })
