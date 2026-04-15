@@ -9,15 +9,16 @@ describe("provider readiness boundary", () => {
     const result = await checkRealProviderReadiness({ apiKey: "" });
 
     expect(result.ok).toBe(false);
-    if (result.ok) {
-      throw new Error("Expected readiness failure for missing API key");
+    if ("failure" in result) {
+      expect(result.failure.kind).toBe("missing-key");
+      expect(result.failure.stopReason).toContain(
+        "provider-readiness:missing-key",
+      );
+      expect(result.failure.stopReason).toContain("OPENAI_API_KEY");
+      return;
     }
 
-    expect(result.failure.kind).toBe("missing-key");
-    expect(result.failure.stopReason).toContain(
-      "provider-readiness:missing-key",
-    );
-    expect(result.failure.stopReason).toContain("OPENAI_API_KEY");
+    throw new Error("Expected readiness failure for missing API key");
   });
 
   it("classifies auth rejection (401/403) into actionable readiness failure", async () => {
@@ -27,12 +28,13 @@ describe("provider readiness boundary", () => {
     });
 
     expect(result.ok).toBe(false);
-    if (result.ok) {
-      throw new Error("Expected readiness failure for auth rejection");
+    if ("failure" in result) {
+      expect(result.failure.kind).toBe("auth");
+      expect(result.failure.stopReason).toContain("provider-readiness:auth");
+      return;
     }
 
-    expect(result.failure.kind).toBe("auth");
-    expect(result.failure.stopReason).toContain("provider-readiness:auth");
+    throw new Error("Expected readiness failure for auth rejection");
   });
 
   it("classifies network/unreachable into actionable readiness failure", async () => {
@@ -44,12 +46,13 @@ describe("provider readiness boundary", () => {
     });
 
     expect(result.ok).toBe(false);
-    if (result.ok) {
-      throw new Error("Expected readiness failure for network issue");
+    if ("failure" in result) {
+      expect(result.failure.kind).toBe("network");
+      expect(result.failure.stopReason).toContain("provider-readiness:network");
+      return;
     }
 
-    expect(result.failure.kind).toBe("network");
-    expect(result.failure.stopReason).toContain("provider-readiness:network");
+    throw new Error("Expected readiness failure for network issue");
   });
 
   it("maps readiness failure into a unified stopped_error terminal event", () => {
