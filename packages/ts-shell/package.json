@@ -16,6 +16,7 @@
     "dev": "tsx watch src/entrypoints/cli.tsx",
     "start": "tsx src/entrypoints/cli.tsx",
     "test": "vitest run",
+    "test:gate:golden-main-path": "vitest run src/cli-baseline.test.ts -t \"GOLDEN_MAIN_PATH\"",
     "test:watch": "vitest"
   },
   "dependencies": {},

@@ -2,23 +2,26 @@
 
 ## Scope
 
-This directory is the working project for the private coding agents rewrite.
+This repository is the working project for a private multi-language coding agents rewrite.
 
-- Working directory: `private-coding-agents/`
-- Reference/source library: parent directory `..\` (the ClaudeCode source snapshot)
+Writable target repo:
+D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents
 
-Use the parent repository as a read-only architecture and migration reference.
-Implement new code only inside this working project unless the task is explicitly source analysis against the parent snapshot.
+Read-only reference repo:
+D:\LenovoSoftstore\pyproject\source-claudecode
 
-## Repository boundaries
+The target repo is the only place where code may be modified.
+The reference repo is used only to recover ClaudeCode’s load-bearing runtime semantics, responsibility boundaries, and migration truth.
 
-- Default to editing only files under this directory.
-- Treat the parent snapshot as read-only.
+## Repository Boundaries
+
+- Default to editing only files under this repository.
+- Treat the parent ClaudeCode snapshot as strictly read-only.
 - Do not modify files in `..\`.
-- Run build and test commands from this directory, not the parent source snapshot root.
+- Run build and test commands from this repository root, not from the parent snapshot root.
 - Keep TypeScript imports ending in `.js`.
 
-Reference-oriented parent paths that are especially important during migration include:
+Important reference-oriented parent paths include:
 
 - `..\QueryEngine.ts`
 - `..\query.ts`
@@ -29,184 +32,32 @@ Reference-oriented parent paths that are especially important during migration i
 
 If source and target responsibilities differ, preserve the source snapshot as reference truth for responsibilities, but implement the target design inside this working project.
 
-## Working mode
+## Stage Intent
 
-Default to execution-first mode.
+The current stage is not primarily about expanding product surface or continuing local runtime hardening by default.
 
-Your default job is not to write plans, summaries, or project-level audits.
-Your default job is to complete one bounded implementation or hardening cycle in the real repo:
+The current stage goal is:
 
-- inspect the relevant code, tests, and failure surface
-- make the smallest necessary code change
-- run directly related validation
-- report what actually changed and what was actually verified
-- recommend the single best next action
+Close a user-minimal real main path while staying aligned with ClaudeCode-grade load-bearing architecture.
 
-Do not claim implementation is complete unless files were actually modified and validation was actually run.
+Default task selection rule:
+Do not ask "what can still be locally hardened?"
+Ask "what most directly blocks a user from continuously completing a real task?"
 
-If you cannot access the repo, cannot modify files, cannot run commands, or cannot validate, output:
+Do not treat the current stage as:
 
-BLOCKED
-- reason
-- missing capability or permission
-- what the user needs to provide
+- proof-family closure as the default
+- acceptance-surface micro-patching as the default
+- document-sync-first work
+- project-level audit mode
+- roadmap expansion mode
 
-## Core principles
-
-### 1. Code reality first
-
-Prioritize evidence in this order:
-
-1) current task input
-2) related code
-3) related tests
-4) current failure output or validation results
-5) recent changes in the directly relevant files
-6) `PROJECT_STATE.md` or other documents
-
-Documents are reference material, not automatic truth.
-If documents conflict with code reality, trust code reality.
-
-### 2. Simplicity first
-
-Prefer the simplest change that closes the current gap.
-Do not introduce abstraction, wrappers, or new layers unless the task clearly requires them.
-
-### 3. Surgical changes
-
-Make narrow, local changes tied to the current task.
-Do not opportunistically refactor unrelated areas.
-Do not expand a small task into a broad cleanup or redesign.
-
-### 4. Goal-driven execution
-
-Translate the task into a concrete, verifiable target before changing code.
-A good target is something you can validate directly in code, tests, or runtime behavior.
-
-Validation does not automatically mean “add another test”.
-Use the most direct proof for the current change.
-
-### 5. No default project-level audit
-
-Do not default to:
-- project-wide reprioritization
-- go/no-go judgment
-- broad architecture review
-- routine document correction
-- routine `PROJECT_STATE.md` updates
-
-Only switch into a refocus decision if the current task is clearly stale, contradicted by code reality, or obviously lower value than a more direct nearby failure surface.
-
-## Task handling
-
-For each task, work in this order:
-
-1) read the current task
-2) read `PROJECT_STATE.md` if it is easily available
-3) inspect the related implementation, tests, failure output, and recent relevant file changes
-4) decide whether the task is still worth continuing at the current slice
-5) if yes, make one bounded implementation or hardening pass
-6) run directly related validation
-7) report actual results
-8) recommend one next action
-
-Do not treat `PROJECT_STATE.md` as a blocker.
-If it is missing, outdated, or unclear, continue using code and tests as the primary evidence base.
-
-## Task validity check
-
-Before changing code, only check these questions:
-
-1) Does the task still match the current code reality?
-2) Does it still serve the current acceptance surface or failure surface?
-3) Has it been overtaken by a more direct and better-evidenced nearby failure?
-
-Do not ask whether this is “the most important problem in the whole project”.
-Only ask whether it is still the best current slice to continue.
-
-If the task should not continue as written, output:
-
-REFOCUS
-- why the current task should not continue
-- what code, tests, or failures were actually checked
-- the direct evidence
-- the better next implementation action
-- why that action is closer to the real gap
-- why no code was changed in this round
-
-## Result priorities
-
-A successful round only needs one of the following:
-
-### A. Implementation increment
-
-Preferred outcome.
-
-Examples:
-- real implementation code changed and directly validated
-- one runtime semantic made explicit
-- one contract, boundary, or invariant tightened
-- one minimal fix landed and verified
-
-### B. Test increment
-
-Acceptable but secondary.
-
-Examples:
-- one directly relevant regression test added
-- one previously unclear behavior boundary made explicit through a test
-
-Do not let test-only output become the default multi-round progression pattern.
-If recent rounds were test-dominant and no new failure was exposed, prefer the next action to be:
-- the smallest implementation slice
-- the smallest fix exposed by the tests
-- or an implementation task in a neighboring acceptance surface
-
-### C. Clear stop or switch signal
-
-If there is neither code increment nor evidence-based state increment, explicitly choose one:
-- continue current task
-- close the real failure first
-- switch to a new concrete slice
-- pause current direction
-
-Do not repeat the same ineffective loop without a real change in evidence.
-
-## Saturation awareness
-
-When recommending the next action, check whether recent work is staying inside the same acceptance surface and the same core invariant family.
-
-Core invariant families include:
-- recovery lifecycle exactly-once
-- terminal envelope / durable status classification
-- replay / read-model consistency
-- MCP capability routing / visibility / execute rejection
-- execution parity / sandbox / daemon
-- other clearly named families
-
-If recent rounds are staying in the same family, do not recommend a near-duplicate proof unless you can explain:
-- what new boundary class it covers
-- why that boundary is more valuable than switching to a nearby implementation slice or adjacent acceptance surface
-
-Switching families is not, by itself, a good reason to keep adding test-only work.
-If recent rounds were mostly proof-oriented, prefer the next action to move toward implementation closure.
-
-## Test recommendations
-
-If the recommended next action is primarily “add a test”, you must be able to explain:
-
-1) what new invariant family or boundary class the test covers
-2) why it is not a near-duplicate of the current family
-3) why there is no more direct minimal implementation slice to do first
-4) why the test reduces uncertainty more than an implementation slice would
-
-If you cannot explain all four, do not recommend a pure test task as the next best action.
-
-## Architecture boundaries
+## Architecture Boundaries
 
 ### TypeScript = control plane
 
 Includes:
+
 - shell
 - session
 - orchestration
@@ -214,106 +65,253 @@ Includes:
 - recovery
 - permission UX
 - MCP capability routing
-- durability / replay / recovery semantics
+- runtime durability / replay / recovery semantics
 
 ### Rust = execution plane
 
 Includes:
+
 - daemon
 - command execution
-- timeout / cancel
+- timeout
+- cancel
 - sandbox preflight
-- process-oriented execution responsibility
+- execution responsibility
 
 ### contracts = cross-runtime semantic boundary
 
+Used to carry protocol, boundary, lifecycle, and semantic constraints shared by TypeScript and Rust.
+
 ### Python eval layer
+
+Includes:
 
 - `packages/python-eval/`
 
 Default rules:
-- keep replay, recovery, orchestration, transcript re-entry, and durability semantics in the TypeScript control plane
-- only move work into Rust when it is clearly execution responsibility
-- do not push control-plane recovery or orchestration semantics down into Rust unless the task is explicitly about execution-plane behavior
 
-## Core project layout
+- replay / recovery / orchestration / transcript re-entry / durability stay in TypeScript
+- only clear execution responsibility goes into Rust
+- do not move control-plane semantics into Rust for local convenience
+- do not break TS / Rust / contracts boundaries just to make a demo path appear usable
 
-- `contracts/` = cross-runtime schemas and generated types
-- `packages/ts-shell/` = TypeScript shell and orchestration runtime
-- `packages/rust-core/` = Rust execution core / daemon
-- `packages/python-eval/` = Python eval layer
-- `scripts/` = workspace scripts for doctor, setup, build, test, workflow
-- `.sisyphus/` = plans, drafts, evidence, notes
+## User-Minimal Real Main Path
 
-Treat `.sisyphus/` as supporting context, not as stronger evidence than code, tests, or runtime behavior.
+All implementation work in this stage must directly serve at least one of these six steps:
 
-## Migration guidance
+1. User starts the CLI in a clean runnable environment and sees clear runtime mode and session state.
+2. User creates a new session or resumes an interrupted one, and session health is checked first; broken sessions must not pollute the current flow.
+3. User enters a real task, and the system enters a unified query loop.
+4. The system uses a real model and real toolchain; permission escalation is explicitly approved or denied by the user, not inferred from prompt keywords.
+5. The system emits a clear terminal state (success / stopped / error) and persists it; errors are actionable and retryable.
+6. The user can continue the next turn or resume after interruption with consistent semantics and without manual repair.
 
-Parent snapshot = source-of-truth for responsibilities.
-This project = target implementation.
+Before starting each round, always identify:
 
-When migrating a ClaudeCode subsystem:
+- which of the six steps the current task directly advances
+- if none, the task is not a default mainline task for this stage
 
-1) identify the source-side responsibility clearly
-2) build a source-to-target responsibility map
-3) implement the target behavior inside this project
-4) use compatibility wrappers where practical
-5) validate behavior in the target repo, not only by reference comparison
+## Current Priority Principle
 
-Do not cargo-cult source structure if the target architecture already has a better placement consistent with this repo’s control-plane / execution-plane / contracts split.
+Use `PROJECT_STATE.md` as the current stage snapshot for top blockers and immediate priorities.
 
-## Validation rules
+Unless newer evidence clearly overrides it, prefer work that directly closes the current top blockers on the real main path.
 
-Run the narrowest validation that directly matches the change.
+Do not freely jump to unrelated local correctness slices unless they more directly improve real user continuity than the current main-path blockers do.
 
-Validation priority:
-1) directly related tests
-2) acceptance-surface-related tests
-3) broader build or wider verification only when needed
+## ClaudeCode Reference Alignment
+
+The reference repo is the architecture truth source for ClaudeCode’s load-bearing runtime semantics.
+
+When the current task touches:
+
+- session lifecycle
+- query loop / orchestration
+- permission model
+- recovery / resume
+- capability routing
+- terminal / durable semantics
+- execution-plane responsibility
+
+you must:
+
+1. inspect the target repo implementation first
+2. do a small, targeted comparison against the ClaudeCode reference
+3. use that comparison to keep responsibility boundaries and runtime semantics aligned
+
+Do not use the reference repo for:
+
+- large-scale source scanning
+- architecture audits
+- mechanical source-structure copying
+
+Do not create a toy implementation that merely runs while drifting away from ClaudeCode-grade architecture.
+
+The goal is not a simplified demo clone.
+The goal is a target implementation whose user-facing main path is being closed while staying aligned with ClaudeCode’s load-bearing semantics.
+
+## Modes
+
+This prompt supports two modes, but Implementation is the default.
+
+### Mode=Implementation
+
+Use when the current blocker is sufficiently clear.
+
+Requirements:
+
+- must modify code around a real blocker on the six-step main path
+- must run directly related validation
+- must not stop at summary only
+- must not default to test-only output
+- must not prioritize document sync over implementation closure
+
+### Mode=State-Recovery
+
+Use only when:
+
+- taking over an interrupted scene
+- the factual state is unclear
+- docs, code, tests, and behavior disagree
+- the main-path blocker is not yet clear enough for direct implementation
+
+Requirements:
+
+- recover factual state first
+- identify:
+  1. which of the six steps is currently blocked
+  2. which current blocker is the most direct
+  3. what the smallest implementation action is
+- do not stop at status summary
+- state recovery must lead into an implementation action unless truly BLOCKED
+
+## Evidence Priority
+
+Prefer evidence in this order:
+
+1. current task input
+2. current main-path blocker
+3. related code
+4. related tests
+5. current failure output / validation result
+6. recent changes in directly relevant files
+7. `PROJECT_STATE.md` and other docs
+8. small targeted ClaudeCode reference comparison
+
+Documents are reference material, not automatic truth.
+If docs conflict with code reality, trust code reality.
+
+## Task Selection Rules
+
+Before editing code, answer:
+
+1. Which of the six main-path steps does this task directly advance?
+2. Which current blocker does it address?
+3. If it does not directly address the main path, why is it still more urgent?
+4. If you cannot justify 3, do not choose it as the main task.
+
+If the current task should not continue as written, output:
+
+REFOCUS
+
+- why the current task should not continue
+- what code / tests / failures / docs were actually checked
+- the direct evidence
+- the better next implementation action
+- why it is closer to the real main path
+- why no code was changed this round
+
+## Default Prohibitions
+
+Unless directly blocking the real main path, do not:
+
+- keep adding same-family local runtime hardening cases
+- prioritize doc sync above implementation closure
+- do project-level audits, roadmap expansion, or wide refactors
+- expand naming systems or state taxonomy
+- do UI polish unrelated to the minimal real main path
+- add test-only work as the default mainline output
+- keep closing local correctness slices that do not move real user usability
+- introduce temporary behavior that makes the path look usable while drifting away from ClaudeCode-grade semantics
+
+## Success Criteria
+
+In this stage, success is not "local state increment".
+A round only counts as meaningful progress if it achieves at least one of:
+
+1. Main-path increment
+
+- one of the six steps becomes more real / usable
+
+2. Main-path blocker reduction
+
+- one current blocker is materially reduced or removed
+
+3. Main-path validation gate
+
+- a direct smoke / E2E gate is added for the real user main path
+
+Tests only count as primary progress if they gate the real user main path.
+A local proof test alone is not enough.
+
+## Validation Rules
+
+Run the narrowest validation that directly supports the main-path change.
+
+Priority:
+
+1. directly related tests
+2. directly related smoke / E2E for the main path
+3. broader build / wider checks only when needed
 
 Do not default every round to full-repo validation.
 
 If validation fails, distinguish:
-- failures introduced by this round
-- failures relevant to the current task
+
+- failures introduced this round
+- failures relevant to the current main path
 - pre-existing unrelated failures
 
 If a failure is pre-existing and unrelated, record it as such and do not automatically widen the task just to clean it up.
 
-## Stop conditions
+## Stop Conditions
 
-Stop expanding the current round if any of the following becomes true:
+Stop expanding the round when:
 
 - the next step would require a new persistence layer
-- the next step would require broad event protocol or taxonomy changes
-- the next step would push control-plane semantics into Rust
-- changes are spreading clearly outside the current acceptance surface
-- further progress would depend on broad scaffolding rather than the current slice itself
-- a more direct real failure surface has overtaken the current task
+- the next step would require broad event protocol / taxonomy changes
+- the next step would move control-plane semantics into Rust
+- changes spread beyond the directly relevant main-path slice
+- progress would now depend on broad scaffolding instead of the current slice itself
+- a more direct blocker has overtaken the current action
+- further progress would visibly drift away from ClaudeCode load-bearing semantics
 
-At that point, close the smallest honest loop and report the result.
+## Reporting Requirements
 
-## Reporting expectations
+If implementation is claimed complete, include:
 
-When claiming implementation work is complete, include:
-- the files actually changed
+- files actually changed
 - what changed in each file
-- the commands actually run
-- the results of those commands
+- commands actually run
+- results of those commands
 - what was not run
+- which of the six steps was advanced
+- which blocker was reduced
 - the single best next action
 
-Do not present a design or intention as a completed implementation.
+Do not present intention or design as completed implementation.
 Do not say something was validated unless it was actually run.
 
-## PROJECT_STATE.md handling
+## PROJECT_STATE.md Handling
 
-Do not update `PROJECT_STATE.md` by default.
+Do not treat `PROJECT_STATE.md` as the source of truth.
+Use it as a stage snapshot only.
 
-Only update it when one of these is true:
-- a real state increment was established
-- a valuable runtime semantic proof was added
-- the main current slice or main gap materially changed
-- the file is clearly behind code reality in an important way
+Only update it when:
+
+- a blocker materially changes
+- a real main-path fact is established
+- the current recommended action materially changes
+- the file is clearly behind code reality
 
 Otherwise, leave it unchanged and only mention what would be worth recording there.

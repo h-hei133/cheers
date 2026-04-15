@@ -1,163 +1,207 @@
-# PROJECT_STATE
+# PROJECT_STATE.md
 
-## 1. 项目定位
+## 1. Current Stage Positioning
 
-- 项目名称：private-coding-agents
-- 当前定位：严格设限的 runtime hardening 项目
-- 不是：全面 ClaudeCode clone / 开放式功能扩张项目
-- 当前目标：保住既有 TS control plane / Rust execution plane / contracts 边界，在核心 runtime 闭环上逐块收口
+- Project name: private-coding-agents
+- Current stage mainline: user-minimal real main path closure
+- Default working mode in this stage: Implementation first; State-Recovery only when factual state is unclear
+- The default mainline is no longer local runtime hardening / proof-family closure
+- The current goal is not to build a simplified toy agent that merely runs, but to move the real user path toward continuous usability while staying aligned with ClaudeCode-grade load-bearing architecture
 
-## 2. 架构立场
+## 2. Repository and Reference Boundaries
 
-- TypeScript = control plane
-  - shell
-  - session
-  - orchestration
-  - slash command
-  - recovery
-  - permission UX
-  - MCP capability routing
-  - runtime durability / replay / recovery semantics
+- Read-only reference repo:
+  - `D:\LenovoSoftstore\pyproject\source-claudecode`
+- Writable working repo:
+  - `D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents`
 
-- Rust = execution plane
-  - daemon
-  - command execution
-  - timeout / cancel
-  - sandbox preflight
-  - process-oriented execution responsibility
+Boundary rules:
 
-- contracts = cross-runtime semantic boundary
+- The ClaudeCode snapshot is used to recover load-bearing runtime semantics, responsibility boundaries, and lifecycle truth
+- The private project directory is the only place where code may actually be modified, validated, and diffed
+- Do not trade away ClaudeCode-grade load-bearing semantics just to make a demo path appear usable
+- Do not mechanically mirror ClaudeCode file structure either
 
-## 3. 当前阶段
+## 3. Architectural Position
 
-- 当前阶段：晚期基础建设 / 早期硬化
-- 当前工作模式：收口式 hardening，不做开放式扩张
-- 当前成功标准：热点 runtime 面在真实代码与 targeted 验证中持续收口，且下一步能升级到更宽的 runtime-closure 审计而不是继续局部打磨
+### TypeScript = control plane
 
-## 4. 当前 acceptance surface
+Includes but is not limited to:
 
-- query loop / terminal envelope / stop vs fail
-- session durability / replay / recovery invariants
-- transcript -> runtime re-entry
-- pending lifecycle -> reconcile -> resume
-- tool lifecycle / permission / approval / compensation
-- command / shell / MCP capability routing
+- shell
+- session
+- orchestration
+- slash command
+- recovery
+- permission UX
+- MCP capability routing
+- runtime durability / replay / recovery semantics
 
-## 5. 已确认成立的能力
+### Rust = execution plane
 
-- unified query loop：`submitMessage()` / `streamMessage()` 已统一到同一套 query loop
-- `terminalReason`
-- `terminalClassification = success | stopped | error`
-- retryable error with withhold-and-retry
-- orphaned tool / approval lifecycle compensation
-- `QueryRuntimeStateSeed` 驱动的 replay / recovery
-- durable lifecycle index in `state.json`
-- terminal persistence
-- recovery re-entry marker（`markRecoveryReentry()`）
-- Rust daemon 入口发现支持 PATH cargo fallback，且 unavailable reason 会显式列出已检查候选
-- pending lifecycle reconcile 对重复调用保持幂等
-- pending lifecycle reconcile 在 transcript 已存在 direct / compensated resolution 时不会重复追加 synthetic cleanup
-- prompt-level recovery 也会在 resume 前 reconcile pending lifecycle，不再只覆盖 turn-interrupted 分支
-- runtime seed 在 `tryResume()` 之后仍基于 interrupted durable truth 构建，不会被提前洗平成 fresh state
-- `stopped_*` 不再通过 durable `lastError` 污染终态，而 true error 仍保留 `lastError`
-- `state.json` / recovery snapshot 现在显式持久化 `durableStatus = success | stopped | error`，不再只靠 `status + terminalClassification + lastError` 拼语义
-- fresh-only recovery seed 不再泄漏 compacted transcript / derived context
-- replayPlan.repairSummary 与 `QueryRuntimeStateSeed.truthBoundary.repairSummary` 在 stripped terminal facts 上保持一致
-- recovery snapshot 与 runtime seed 的 pendingLifecycle read-model 现在会优先反映 transcript truth，而不是盲信 stale state.json
-- resumed run 不会再次写入 duplicate prompt barrier（`run-started` / user message）污染 durable transcript
-- direct resolution 与 orphaned lifecycle cleanup 在同一轮 query path 中已验证保持 bundle 级 exactly-once 语义
-- identical direct `approval.resolved` / `tool.result` durable events 现在具备 append-time exactly-once 防护
-- cross-interrupt replay / recovery path 已验证可在同一链路上同时保持 replay repair、pendingLifecycle cleanup、runtime seed 与 true-error durable terminal state 一致
-- explicit terminal envelope classification（尤其 `error`）现在不会在 result mapping 阶段被静默压成 `stopped`
-- repeated resume 长链路已验证可在同一会话上稳定经历 fresh-entry -> mid-turn-reentry 转换，并保持 pendingLifecycle cleanup / replay repair / terminal durable payload 一致
-- 跨中断恢复链路已验证：pending lifecycle reconcile、repairSummary 注入、runtime seed boundary 与 stopped terminal durable payload 可在同一条 runtime 路径里同时成立
-- MCP gateway 在 snapshot 后会清理 stale client cache，invoke 时也会按当前 config 重新校验连接状态，不再继续暴露 stale capability
-- stale visible MCP tool descriptor 即使仍暂留在 runtime visibility 中，execute 路径也会按当前 auth / reconnect state 正确拒绝
-- stale MCP tool descriptors 即使仍短暂保留在 runtime visibility 中，执行时也会被当前 reconnect/auth state 正确拒绝，不会继续成功调用旧 capability
-- 当前热点验证现实：`core/mcp/gateway.test.ts`、`core/tools/runtime.test.ts`、`daemon/parity.test.ts`、`sandbox.test.ts` 在当前工作树上均可通过
-- 当前工作树验证现实：`npm run build` 通过，`packages/ts-shell/src` 的 LSP diagnostics 为 0 errors
+Includes but is not limited to:
 
-## 6. 当前故意不做的边界
+- daemon
+- command execution
+- timeout
+- cancel
+- sandbox preflight
+- execution responsibility
 
-- 不改 `query.completed / query.failed` 事件命名
-- 不扩 session 顶层 status taxonomy
-- 不扩 shell UX
-- 不做 sidecar lifecycle store
-- 不把 replay/recovery/orchestration 推到 Rust
+### contracts = cross-runtime semantic boundary
 
-## 7. 已知高价值缺口
+Default rules:
 
-- 更强的 stop-vs-fail 终态协议收口
-- replay substrate / compact / recovery read-model 在更长 bundle 上的一致性审计
-- 更大范围的 cross-interrupt replay / recovery integration audit
-- 更长 multi-turn / handoff replay read-model consistency audit
-- 当前 targeted runtime slices 虽然可通过，但系统级 runtime-closure gate 仍未建立
+- replay / recovery / orchestration / transcript re-entry / durability stay in the TS control plane
+- only clear execution responsibility goes into Rust
+- do not push control-plane semantics into Rust for local convenience
+- do not break TS / Rust / contracts boundaries just to achieve short-term pathability
 
-## 8. 当前首选切片
+## 4. User-Minimal Real Main Path (6 Steps)
 
-- session durability / replay / recovery invariants
-- 选择原因：
-  - 当前真实改动热点在 MCP gateway / tool runtime，且对应 targeted tests 已通过
-  - 这些热点已经不再是当前最值得继续追加 case 的位置
-  - 当前更值当的是回到更长的 replay/recovery combined audit，把前几轮已收口的点放进更长链路继续验证
-  - 这一层仍最接近“组合路径里是否会再次分叉”的下一类高价值风险
+All implementation work in this stage should directly serve at least one of the following steps:
 
-## 9. 当前首选任务
+1. The user starts the CLI in a clean runnable environment and sees clear runtime mode and session state
+2. The user creates a new session or resumes an interrupted one, and session health is checked first; broken sessions must not pollute the current flow
+3. The user enters a real task, and the system enters a unified query loop
+4. The system uses a real model and real toolchain; permission escalation is explicitly approved or denied by the user, not inferred from prompt keywords
+5. The system emits a clear terminal state (success / stopped / error) and persists it; errors are actionable and retryable
+6. The user can continue the next turn or resume after interruption with consistent semantics and without manual repair
 
-- 任务标题：进入系统级 recovery hardening 审计 / 测试加固
-- 任务归属：TS control plane
-- 本轮目标：
-  - 枚举未覆盖的 recovery 长路径
-  - 检查 repeated resume / mixed boundary / pending lifecycle / drift 组合下是否仍有退化路径
-  - 判断当前 transcript -> runtime re-entry 切片是否接近收口上限
-  - 停止继续在 MCP visibility / reconnect 这类已通过 targeted 验证的热点上追加低收益 case
+## 5. Current Top 3 Blockers
 
-## 10. 上一轮完成
+Unless new evidence overrides them, the current stage should default to choosing work from these three blockers first.
 
-- 任务：补齐 recovery 长链路中 pending lifecycle + drift + repeated resume 的系统级组合路径实现与验证
-- 结果：
-  - pending lifecycle reconcile、replay repair / drift、repeated resume、terminal durable payload 已在同一条更长 recovery 链路中联合验证
-  - 第一次 resume 正确 fresh-entry repair，第二次 resume 稳定回到 mid-turn-reentry，未发生 fresh rerun 退化
-  - prompt barrier 去重、direct approval resolution、synthetic orphan cleanup 与 final stopped terminal 在 repeated resume 下保持一致
-- 关键结论：
-  - recovery 长链路不只是单次 resume 可用，repeated resume 也能保持关键读写层一致而不发生 fresh rerun 退化
-  - 当前 recovery 主线仍值得继续放大到更长 multi-turn / handoff 路径，但同粒度继续追加相似 case 的收益已经开始下降
-- 验证来源：当前工作树 targeted vitest（gateway / tool runtime / parity / sandbox）/ `npm run build` / `lsp_diagnostics`
+### Blocker 1
 
-## 11. 当前风险
+- The default happy-path still lacks a repeatedly proven real-task chain under real provider mode (with explicit approval + durable terminal) outside narrow scripted slices
+- Directly affects main-path steps: 3 / 4 / 5
+- Current judgment:
+  - This is the heaviest blocker and the best default priority
+  - If this is not addressed first, later hardening continues to reinforce partial slices rather than a continuously usable default path
 
-- TS / Rust contract drift
-- long-tail parity chase
-- cross-layer regression risk
-- recovery path 悄悄退化为 fresh rerun
-- seed 职责膨胀成隐式全状态容器
-- tool / approval lifecycle direct-resolution 与 synthetic cleanup 再次分叉
-- replay read-model 与 compact substrate 在更长 multi-turn / handoff 场景下悄悄漂移
-- recovery read-model 在 bundle 级别只局部成立、但跨 acceptance surface 组合后再次分叉
-- transcript append-only truth 与 mutable state snapshot 再次出现优先级倒置
-- tool / approval cleanup 在更长 bundle 中仍可能出现“只局部 exactly-once、整体仍分叉”问题
-- 当前 bundle 级 exactly-once 仍主要覆盖单轮 runtime path，跨中断恢复后的组合路径还需要更长 integration audit
-- append-time dedupe 现在已收口，但跨 writer / recovery bundle 的更长路径仍需继续组合验证
-- terminal durable state 仍然偏 coarse，需要依赖 envelope 字段补语义
-- top-level `status` 依旧 coarse，但 durableStatus 已开始承接更明确的 coarse durable boundary
-- result mapping 如果忽略 explicit terminalClassification，仍会把 richer envelope 再次压扁
-- 当前 focused integration 覆盖增强后，容易高估系统级 recovery 覆盖面
-- recovery 长路径测试对 `SessionManager + resumeShellSession` 当前结构的依赖增强，后续重构时需要同步维护测试编排
-- repeated resume 虽已拿到高价值 proof，但 multi-turn / handoff 长链路仍未进入系统级 closure gate
+### Blocker 2
 
-## 12. 下一轮候选任务
+- The approval loop has moved to explicit user-driven callback in CLI, but synthetic decision fallback still exists in non-interactive/integration call paths and remains a semantic drift risk
+- Directly affects main-path steps: 4 / 5 / 6
+- Current judgment:
+  - This remains the second-priority blocker
+  - The next reduction target is to constrain synthetic fallback to explicit test harness use and keep production/default path user-driven
 
-- P1：进入系统级 recovery hardening 审计 / 测试加固
-- P2：更长 multi-turn / handoff replay read-model consistency audit
-- P3：tool / approval cleanup 的更长 multi-step exactly-once 审计
-- P4：收紧 terminal envelope 与 durable status 的剩余 coarse boundary
-- P5：切到相邻 acceptance surface：pending lifecycle reconcile / tool cleanup 的更强集成验证
+### Blocker 3
 
-## 13. 本轮不要扩做的内容
+- Session corruption handling has improved (aggregated unreadable-directory warning), but the broader resume trust boundary is not yet closed for long-lived noisy environments
+- Directly affects main-path steps: 1 / 2 / 6
+- Current judgment:
+  - This is currently the third-priority blocker
+  - It does not outrank default real-path closure yet, but it will become high-frequency as soon as real usage grows
 
-- 广义 command/skill surface parity
-- shell UX / renderer polish
-- completed/stopped/error 大范围 taxonomy 扩展
-- lifecycle index sidecar store
-- replay/recovery/orchestration 下沉 Rust
-- 与 acceptance surface 无关的 CLI 行为细节
+## 6. Confirmed Foundation Capabilities
+
+The following capabilities should currently be treated as foundation, not as the default place to keep digging for more micro-proofs:
+
+- a unified query loop exists
+- terminal persistence / terminal classification baseline exists
+- replay / recovery substrate exists
+- pending lifecycle reconcile / compensation / resume baseline semantics exist
+- durableStatus has started carrying clearer durable semantics than coarse top-level status
+- MCP stale capability execute rejection has targeted proof
+- rust-daemon / ts-local / ts-local-fallback failure metadata has reached a minimum consistency proof
+- CLI real-provider readiness pre-query gate exists, including actionable missing-key/auth/network terminal mapping
+- CLI explicit user approval callback path is wired and persisted through terminal evidence
+- startup handling for unreadable session directories now uses aggregated warning to reduce noise
+- a golden main-path smoke gate is wired into workspace test entry (`test:gate:golden-main-path`)
+- targeted tests for provider readiness and shell runtime behavior pass on the current working tree
+
+Interpretation:
+
+- These capabilities mean the project is not missing all foundations
+- But they do not automatically mean the project is close to continuous real use
+- This stage should not keep defaulting to deeper proof work inside these families unless they directly block the real main path
+
+## 7. Current Most Important Factual Judgments
+
+### Confirmed
+
+- The project has moved from pure integrated-demo leaning toward a partial real-path baseline at CLI entry
+- The main current risk is no longer that local runtime semantics are too weak in isolation, but that the real user path is not yet the default path
+- Continuing to default to local hardening/proof work still produces diminishing returns relative to main-path closure
+- The current stage must shift its center of gravity toward:
+  - moving the default main execution path back to real-task semantics
+  - constraining synthetic approval fallback to test-only contexts
+  - improving session corruption handling enough that bad sessions do not pollute the current path
+
+### Still Unverified
+
+- Along the default CLI entry -> unified query loop path, whether one full real-provider success path is repeatedly stable without relying on synthetic provider mode
+- Which non-CLI call paths still depend on synthetic escalation decisions and should be explicitly fenced as test-only
+- The minimal fix point where session corruption handling becomes operationally “good enough” in large/noisy local histories
+
+## 8. Things the Current Stage Should Not Default To
+
+Unless they directly block the user-minimal real main path, do not default to the following:
+
+- do not keep adding same-family local runtime hardening cases, especially where targeted tests are already green
+- do not prioritize document sync above implementation closure
+- do not do project-level audits, roadmap expansion, or broad refactors
+- do not expand naming systems / state taxonomy unless that expansion directly blocks the main path
+- do not do UI / rendering polish unrelated to the minimal main path
+- do not keep closing acceptance-surface / invariant-family / micro-boundary slices unless they directly block the current main path
+- do not use test-only work as the default mainline progression pattern
+
+## 9. Current Preferred Action
+
+- Action title:
+  - Close one repeatedly stable default real-task success chain under real provider mode on CLI
+- Corresponding main-path steps:
+  - 3. The user enters a real task and the system enters a unified query loop
+  - 4. The system uses a real model and real toolchain with explicit approval
+  - 5. The system emits and persists a clear terminal state
+- Corresponding blocker:
+  - Blocker 1: the main execution flow still leans toward integrated-demo semantics instead of default real-task semantics
+- Current objective:
+  - Ensure at least one allowlisted real task intent can repeatedly pass through CLI default path with real provider + explicit approval callback + success durable terminal evidence
+  - Keep failure path strict and actionable when real provider readiness fails, without silently falling back into synthetic semantics
+- Why this is the current best priority:
+  - It shortens the distance to “a user can continuously complete a real task” more directly than continuing local runtime hardening
+  - It does not discard existing runtime hardening work; it begins to make that work serve the real main path
+  - It best matches the current stage goal: real user path closure while staying aligned with ClaudeCode load-bearing semantics
+
+## 10. Current Secondary Actions
+
+### Secondary 1
+
+- Action title:
+  - Fence synthetic escalation decision paths to test harness use; keep default runtime approval explicitly user-driven
+- Corresponding blocker:
+  - Blocker 2
+
+### Secondary 2
+
+- Action title:
+  - Continue session corruption isolation work from aggregated startup warning toward stronger resume trust boundaries
+- Corresponding blocker:
+  - Blocker 3
+
+## 11. Near-Term Risks
+
+- making the path look usable by introducing temporary implementations that drift away from ClaudeCode load-bearing semantics
+- slipping back into local runtime hardening as the default mainline just to preserve a feeling of progress
+- failing to actually move the default path back to real-task semantics, and instead only adding a parallel side-path
+- creating an approval loop that appears usable on the surface but still depends on prompt keywords or synthetic branches
+- leaving synthetic fallback behavior reachable from non-test execution paths
+- leaving session corruption handling too weak, so that once the real path begins to be used, experience degrades quickly
+- over-trusting targeted green tests and misreading that as “close to continuously usable”
+
+## 12. Update Rules
+
+Only update this file when one of the following becomes true:
+
+- the top 3 blockers materially change
+- the stage judgment for the six-step main path materially changes
+- a confirmed fact materially changes
+- the current preferred action changes
+- code reality has clearly falsified the current stage judgment
+
+Otherwise, do not rewrite this file frequently.
+Do not turn it into an audit log or a roadmap document.

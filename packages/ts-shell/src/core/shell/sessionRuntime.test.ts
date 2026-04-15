@@ -1,37 +1,37 @@
-import { describe, expect, it } from 'vitest'
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
-import { ShellSessionRuntime } from './sessionRuntime.js'
-import { SessionManager } from '../../session/SessionManager.js'
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { SessionManager } from "../../session/SessionManager.js";
+import { ShellSessionRuntime } from "./sessionRuntime.js";
 
-describe('shell session runtime (W5)', () => {
-  it('moves through a successful prompt execution lifecycle', async () => {
-    const calls: string[] = []
+describe("shell session runtime (W5)", () => {
+  it("moves through a successful prompt execution lifecycle", async () => {
+    const calls: string[] = [];
     const runtime = new ShellSessionRuntime({
       sessionManager: {
         markRunStarted(sessionId: string, prompt: string) {
-          calls.push(`started:${sessionId}:${prompt}`)
+          calls.push(`started:${sessionId}:${prompt}`);
         },
         persistUserPromptBarrier(sessionId: string, prompt: string) {
-          calls.push(`barrier:${sessionId}:${prompt}`)
+          calls.push(`barrier:${sessionId}:${prompt}`);
         },
         markTurnActive(_sessionId: string) {},
         appendQueryEvent(_sessionId: string, _event: unknown) {},
         addTurn(sessionId: string, turn: { role: string; content: string }) {
-          calls.push(`turn:${sessionId}:${turn.role}:${turn.content}`)
+          calls.push(`turn:${sessionId}:${turn.role}:${turn.content}`);
         },
         saveCompleted(sessionId: string) {
-          calls.push(`completed:${sessionId}`)
+          calls.push(`completed:${sessionId}`);
         },
         saveInterrupted(sessionId: string) {
-          calls.push(`interrupted:${sessionId}`)
+          calls.push(`interrupted:${sessionId}`);
         },
         saveError(sessionId: string, error: string) {
-          calls.push(`error:${sessionId}:${error}`)
+          calls.push(`error:${sessionId}:${error}`);
         },
         saveTerminated(sessionId: string) {
-          calls.push(`terminated:${sessionId}`)
+          calls.push(`terminated:${sessionId}`);
         },
       } as never,
       renderer: {
@@ -39,49 +39,54 @@ describe('shell session runtime (W5)', () => {
         renderChunk() {},
       } as never,
       runPrompt: async function* (prompt) {
-        yield { type: 'message.delta', role: 'reviewer', delta: 'partial ' }
+        yield { type: "message.delta", role: "reviewer", delta: "partial " };
         yield {
-          type: 'query.completed',
+          type: "query.completed",
           result: {
-            status: 'completed',
-            terminalReason: 'completed',
-            terminalClassification: 'success',
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
             transcript: [],
-            sharedContext: { sessionId: 'sess_1', initialPrompt: prompt, notes: [], handoffs: [] },
+            sharedContext: {
+              sessionId: "sess_1",
+              initialPrompt: prompt,
+              notes: [],
+              handoffs: [],
+            },
             finalOutput: `done:${prompt}`,
           },
-        }
+        };
       },
-    })
+    });
 
-    const output = await runtime.executePrompt('sess_1', 'hello')
-    expect(output).toBe('done:hello')
-    expect(runtime.getState()).toBe('idle')
+    const output = await runtime.executePrompt("sess_1", "hello");
+    expect(output).toBe("done:hello");
+    expect(runtime.getState()).toBe("idle");
     expect(calls).toEqual([
-      'barrier:sess_1:hello',
-      'turn:sess_1:assistant:done:hello',
-      'completed:sess_1',
-    ])
-  })
+      "barrier:sess_1:hello",
+      "turn:sess_1:assistant:done:hello",
+      "completed:sess_1",
+    ]);
+  });
 
-  it('does not persist prompt barrier again for resumed runs with a non-fresh runtime seed', async () => {
-    const calls: string[] = []
+  it("does not persist prompt barrier again for resumed runs with a non-fresh runtime seed", async () => {
+    const calls: string[] = [];
     const runtime = new ShellSessionRuntime({
       sessionManager: {
         markRunStarted() {},
         persistUserPromptBarrier(sessionId: string, prompt: string) {
-          calls.push(`barrier:${sessionId}:${prompt}`)
+          calls.push(`barrier:${sessionId}:${prompt}`);
         },
         markRecoveryReentry(sessionId: string, boundary: string) {
-          calls.push(`reentry:${sessionId}:${boundary}`)
+          calls.push(`reentry:${sessionId}:${boundary}`);
         },
         markTurnActive() {},
         appendQueryEvent() {},
         addTurn(sessionId: string, turn: { role: string; content: string }) {
-          calls.push(`turn:${sessionId}:${turn.role}:${turn.content}`)
+          calls.push(`turn:${sessionId}:${turn.role}:${turn.content}`);
         },
         saveCompleted(sessionId: string) {
-          calls.push(`completed:${sessionId}`)
+          calls.push(`completed:${sessionId}`);
         },
         saveInterrupted() {},
         saveError() {},
@@ -93,36 +98,45 @@ describe('shell session runtime (W5)', () => {
       } as never,
       runPrompt: async function* (prompt) {
         yield {
-          type: 'query.completed',
+          type: "query.completed",
           result: {
-            status: 'completed',
-            terminalReason: 'completed',
-            terminalClassification: 'success',
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
             transcript: [],
-            sharedContext: { sessionId: 'sess_resume', initialPrompt: prompt, notes: [], handoffs: [] },
+            sharedContext: {
+              sessionId: "sess_resume",
+              initialPrompt: prompt,
+              notes: [],
+              handoffs: [],
+            },
             finalOutput: `done:${prompt}`,
           },
-        }
+        };
       },
-    })
+    });
 
-    const output = await runtime.executePrompt('sess_resume', 'resume me', {
+    const output = await runtime.executePrompt("sess_resume", "resume me", {
       runtimeSeed: {
         config: {
-          sessionId: 'sess_resume',
-          initialPrompt: 'resume me',
+          sessionId: "sess_resume",
+          initialPrompt: "resume me",
           maxTurns: 6,
-          startingRole: 'planner',
+          startingRole: "planner",
         },
-        currentRole: 'coder',
+        currentRole: "coder",
         turn: 2,
-        pendingLifecycle: { pendingApprovals: {}, pendingTools: {}, taskStates: {} },
-        recoveryBoundary: 'mid-turn-reentry',
+        pendingLifecycle: {
+          pendingApprovals: {},
+          pendingTools: {},
+          taskStates: {},
+        },
+        recoveryBoundary: "mid-turn-reentry",
         truthBoundary: {
-          source: 'durable-replay',
+          source: "durable-replay",
           normalizedEventCount: 0,
           pairedTurnCount: 1,
-          policyEvidence: new Set(['open-turn']),
+          policyEvidence: new Set(["open-turn"]),
           repairSummary: {
             insertedPromptMessage: false,
             insertedQueryStarted: false,
@@ -132,77 +146,293 @@ describe('shell session runtime (W5)', () => {
             ignoredUnpairedTurnCompletions: 0,
             ignoredRoleMismatchedTurnCompletions: 0,
           },
-          continuationSafety: 'mid-turn-safe',
-          openTurn: { role: 'coder', turn: 2 },
+          continuationSafety: "mid-turn-safe",
+          openTurn: { role: "coder", turn: 2 },
         },
         derivedState: { transcript: [] },
       },
-    })
+    });
 
-    expect(output).toBe('done:resume me')
+    expect(output).toBe("done:resume me");
     expect(calls).toEqual([
-      'reentry:sess_resume:mid-turn-reentry',
-      'turn:sess_resume:assistant:done:resume me',
-      'completed:sess_resume',
-    ])
-  })
+      "reentry:sess_resume:mid-turn-reentry",
+      "turn:sess_resume:assistant:done:resume me",
+      "completed:sess_resume",
+    ]);
+  });
 
-  it('maps non-completed terminal query results to session error state', async () => {
-    const calls: string[] = []
+  it("maps non-completed terminal query results to session error state", async () => {
+    const calls: string[] = [];
+    const renderedLines: string[] = [];
     const runtime = new ShellSessionRuntime({
       sessionManager: {
         markRunStarted() {},
         persistUserPromptBarrier(sessionId: string, prompt: string) {
-          calls.push(`barrier:${sessionId}:${prompt}`)
+          calls.push(`barrier:${sessionId}:${prompt}`);
         },
         markTurnActive() {},
         appendQueryEvent() {},
         addTurn(sessionId: string, turn: { role: string; content: string }) {
-          calls.push(`turn:${sessionId}:${turn.role}:${turn.content}`)
+          calls.push(`turn:${sessionId}:${turn.role}:${turn.content}`);
         },
         saveCompleted(sessionId: string) {
-          calls.push(`completed:${sessionId}`)
+          calls.push(`completed:${sessionId}`);
         },
         saveInterrupted(sessionId: string) {
-          calls.push(`interrupted:${sessionId}`)
+          calls.push(`interrupted:${sessionId}`);
         },
         saveError(sessionId: string, error: string) {
-          calls.push(`error:${sessionId}:${error}`)
+          calls.push(`error:${sessionId}:${error}`);
         },
         saveTerminated() {},
       } as never,
       renderer: {
-        renderLine() {},
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
         renderChunk() {},
       } as never,
       runPrompt: async function* () {
         yield {
-          type: 'query.completed',
+          type: "query.completed",
           result: {
-            status: 'stopped_error',
-            terminalReason: 'stopped_error',
-            terminalClassification: 'stopped',
-            stopReason: 'Retry budget exhausted',
+            status: "stopped_error",
+            terminalReason: "stopped_error",
+            terminalClassification: "stopped",
+            stopReason: "Retry budget exhausted",
             transcript: [],
-            sharedContext: { sessionId: 'sess_stop', initialPrompt: 'hello', notes: [], handoffs: [] },
-            finalOutput: 'partial result',
+            sharedContext: {
+              sessionId: "sess_stop",
+              initialPrompt: "hello",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "partial result",
           },
-        }
+        };
       },
-    })
+    });
 
-    const output = await runtime.executePrompt('sess_stop', 'hello')
+    const output = await runtime.executePrompt("sess_stop", "hello");
 
-    expect(output).toBe('partial result')
+    expect(output).toBe("partial result");
     expect(calls).toEqual([
-      'barrier:sess_stop:hello',
-      'turn:sess_stop:assistant:partial result',
-      'error:sess_stop:Retry budget exhausted',
-    ])
-  })
+      "barrier:sess_stop:hello",
+      "turn:sess_stop:assistant:partial result",
+      "error:sess_stop:Retry budget exhausted",
+    ]);
+    expect(
+      renderedLines.some((line) =>
+        line.includes("Run stopped: Retry budget exhausted"),
+      ),
+    ).toBe(true);
+  });
 
-  it('marks interrupted state when aborted', async () => {
-    const calls: string[] = []
+  it("prints actionable hint when real provider key is missing", async () => {
+    const renderedLines: string[] = [];
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield {
+          type: "query.completed",
+          result: {
+            status: "stopped_error",
+            terminalReason: "stopped_error",
+            terminalClassification: "error",
+            stopReason:
+              "OPENAI_API_KEY is required for the real provider path. Set it before running the CLI.",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_provider",
+              initialPrompt: "hello",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "",
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_provider", "hello");
+
+    expect(
+      renderedLines.some((line) =>
+        line.includes(
+          "Run failed: OPENAI_API_KEY is required for the real provider path",
+        ),
+      ),
+    ).toBe(true);
+    expect(renderedLines).toContain(
+      "Hint: set OPENAI_API_KEY in your shell, then submit another prompt.",
+    );
+  });
+
+  it("prints actionable allowlist block guidance for non-allowlisted command intent", async () => {
+    const renderedLines: string[] = [];
+    const calls: string[] = [];
+    const blockedReason =
+      "Run-command intent is not allowed in the MVP allowlist: npm publish Allowed commands: node --version, npm test -- --help, npm run build -- --help Please rephrase your request to one of the allowed command intents.";
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier(sessionId: string, prompt: string) {
+          calls.push(`barrier:${sessionId}:${prompt}`);
+        },
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError(sessionId: string, error: string) {
+          calls.push(`error:${sessionId}:${error}`);
+        },
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield {
+          type: "query.completed",
+          result: {
+            status: "stopped_error",
+            terminalReason: "stopped_error",
+            terminalClassification: "error",
+            stopReason: blockedReason,
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_blocked",
+              initialPrompt: "please publish this package",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "",
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_blocked", "please publish this package");
+
+    expect(
+      renderedLines.some((line) =>
+        line.includes(
+          "Run failed: Run-command intent is not allowed in the MVP allowlist",
+        ),
+      ),
+    ).toBe(true);
+    expect(renderedLines).toContain(
+      "Why not executed: run-command intent was blocked by the MVP allowlist.",
+    );
+    expect(renderedLines).toContain(
+      "Allowed commands: node --version, npm test -- --help, npm run build -- --help",
+    );
+    expect(renderedLines).toContain(
+      'Hint: rephrase your prompt to request one allowed command, for example: "Run node --version".',
+    );
+    expect(calls).toContain(`error:sess_blocked:${blockedReason}`);
+  });
+
+  it("prints actionable hints for provider readiness auth/network failures and keeps error persistence", async () => {
+    for (const scenario of [
+      {
+        sessionId: "sess_provider_auth",
+        stopReason:
+          "Provider readiness failed (provider-readiness:auth): OpenAI authentication was rejected (401/403). Verify OPENAI_API_KEY validity and access scope, then retry.",
+        expectedHint:
+          "Hint: check OPENAI_API_KEY validity/permissions, then submit another prompt.",
+      },
+      {
+        sessionId: "sess_provider_network",
+        stopReason:
+          "Provider readiness failed (provider-readiness:network): Unable to reach the OpenAI endpoint. Check network/proxy/firewall settings and retry.",
+        expectedHint:
+          "Hint: check network/proxy/firewall reachability to the provider endpoint, then submit another prompt.",
+      },
+    ]) {
+      const renderedLines: string[] = [];
+      const calls: string[] = [];
+
+      const runtime = new ShellSessionRuntime({
+        sessionManager: {
+          markRunStarted() {},
+          persistUserPromptBarrier(sessionId: string, prompt: string) {
+            calls.push(`barrier:${sessionId}:${prompt}`);
+          },
+          markTurnActive() {},
+          appendQueryEvent() {},
+          addTurn() {},
+          saveCompleted() {},
+          saveInterrupted() {},
+          saveError(sessionId: string, error: string) {
+            calls.push(`error:${sessionId}:${error}`);
+          },
+          saveTerminated() {},
+        } as never,
+        renderer: {
+          renderLine(line: string) {
+            renderedLines.push(line);
+          },
+          renderChunk() {},
+        } as never,
+        runPrompt: async function* () {
+          yield {
+            type: "query.completed",
+            result: {
+              status: "stopped_error",
+              terminalReason: "stopped_error",
+              terminalClassification: "error",
+              stopReason: scenario.stopReason,
+              transcript: [],
+              sharedContext: {
+                sessionId: scenario.sessionId,
+                initialPrompt: "run real task",
+                notes: [],
+                handoffs: [],
+              },
+              finalOutput: "",
+            },
+          };
+        },
+      });
+
+      await runtime.executePrompt(scenario.sessionId, "run real task");
+
+      expect(
+        renderedLines.some((line) =>
+          line.includes("Run failed: Provider readiness failed"),
+        ),
+      ).toBe(true);
+      expect(renderedLines).toContain(scenario.expectedHint);
+      expect(calls).toContain(
+        `error:${scenario.sessionId}:${scenario.stopReason}`,
+      );
+    }
+  });
+
+  it("marks interrupted state when aborted", async () => {
+    const calls: string[] = [];
     const runtime = new ShellSessionRuntime({
       sessionManager: {
         markRunStarted() {},
@@ -212,7 +442,7 @@ describe('shell session runtime (W5)', () => {
         addTurn() {},
         saveCompleted() {},
         saveInterrupted(sessionId: string) {
-          calls.push(`interrupted:${sessionId}`)
+          calls.push(`interrupted:${sessionId}`);
         },
         saveError() {},
         saveTerminated() {},
@@ -222,31 +452,38 @@ describe('shell session runtime (W5)', () => {
         renderChunk() {},
       } as never,
       runPrompt: async function* (_prompt, signal) {
-        runtime.cancelCurrentRun()
+        runtime.cancelCurrentRun();
         if (signal.aborted) {
-          throw new Error('Aborted')
+          throw new Error("Aborted");
         }
         yield {
-          type: 'query.completed',
+          type: "query.completed",
           result: {
-            status: 'completed',
-            terminalReason: 'completed',
-            terminalClassification: 'success',
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
             transcript: [],
-            sharedContext: { sessionId: 'sess_abort', initialPrompt: 'stop', notes: [], handoffs: [] },
-            finalOutput: 'never',
+            sharedContext: {
+              sessionId: "sess_abort",
+              initialPrompt: "stop",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "never",
           },
-        }
+        };
       },
-    })
+    });
 
-    await expect(runtime.executePrompt('sess_abort', 'stop')).rejects.toThrow('Aborted')
-    expect(runtime.getState()).toBe('interrupted')
-    expect(calls).toEqual(['interrupted:sess_abort'])
-  })
+    await expect(runtime.executePrompt("sess_abort", "stop")).rejects.toThrow(
+      "Aborted",
+    );
+    expect(runtime.getState()).toBe("interrupted");
+    expect(calls).toEqual(["interrupted:sess_abort"]);
+  });
 
-  it('terminates independently from prompt execution lifecycle', () => {
-    const calls: string[] = []
+  it("terminates independently from prompt execution lifecycle", () => {
+    const calls: string[] = [];
     const runtime = new ShellSessionRuntime({
       sessionManager: {
         markRunStarted() {},
@@ -258,7 +495,7 @@ describe('shell session runtime (W5)', () => {
         saveInterrupted() {},
         saveError() {},
         saveTerminated(sessionId: string) {
-          calls.push(`terminated:${sessionId}`)
+          calls.push(`terminated:${sessionId}`);
         },
       } as never,
       renderer: {
@@ -267,200 +504,237 @@ describe('shell session runtime (W5)', () => {
       } as never,
       runPrompt: async function* (prompt) {
         yield {
-          type: 'query.completed',
+          type: "query.completed",
           result: {
-            status: 'completed',
-            terminalReason: 'completed',
-            terminalClassification: 'success',
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
             transcript: [],
-            sharedContext: { sessionId: 'sess_term', initialPrompt: prompt, notes: [], handoffs: [] },
+            sharedContext: {
+              sessionId: "sess_term",
+              initialPrompt: prompt,
+              notes: [],
+              handoffs: [],
+            },
             finalOutput: prompt,
           },
-        }
+        };
       },
-    })
+    });
 
-    runtime.terminate('sess_term')
-    expect(runtime.getState()).toBe('terminated')
-    expect(calls).toEqual(['terminated:sess_term'])
-  })
+    runtime.terminate("sess_term");
+    expect(runtime.getState()).toBe("terminated");
+    expect(calls).toEqual(["terminated:sess_term"]);
+  });
 
-  it('records interrupted prompt vs interrupted turn differently', async () => {
-    const originalUserProfile = process.env.USERPROFILE
-    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'private-agents-interrupt-kind-'))
-    process.env.USERPROFILE = fakeHome
+  it("records interrupted prompt vs interrupted turn differently", async () => {
+    const originalUserProfile = process.env.USERPROFILE;
+    const fakeHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), "private-agents-interrupt-kind-"),
+    );
+    process.env.USERPROFILE = fakeHome;
 
     try {
-      const manager = new SessionManager()
-      const session = manager.createNew()
+      const manager = new SessionManager();
+      const session = manager.createNew();
 
       const promptInterruptedRuntime = new ShellSessionRuntime({
         sessionManager: manager,
         renderer: { renderLine() {}, renderChunk() {} } as never,
         runPrompt: async function* (_prompt, signal) {
-          await new Promise(resolve => setTimeout(resolve, 0))
-          for await (const event of [] as import('../query/events.js').QueryEvent[]) {
-            yield event
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          for await (const event of [] as import("../query/events.js").QueryEvent[]) {
+            yield event;
           }
           if (signal.aborted) {
-            throw new Error('Aborted')
+            throw new Error("Aborted");
           }
-          throw new Error('Aborted')
+          throw new Error("Aborted");
         },
-      })
+      });
 
-      const promptRun = promptInterruptedRuntime.executePrompt(session.id, 'prompt-only')
-      promptInterruptedRuntime.cancelCurrentRun()
-      await expect(promptRun).rejects.toThrow()
-      let snapshot = manager.getRecoverySnapshot(session.id)
-      expect(snapshot.interruptedKind).toBe('prompt')
+      const promptRun = promptInterruptedRuntime.executePrompt(
+        session.id,
+        "prompt-only",
+      );
+      promptInterruptedRuntime.cancelCurrentRun();
+      await expect(promptRun).rejects.toThrow();
+      let snapshot = manager.getRecoverySnapshot(session.id);
+      expect(snapshot.interruptedKind).toBe("prompt");
 
-      const resumed = manager.resume(session.id)
+      const resumed = manager.resume(session.id);
       const turnInterruptedRuntime = new ShellSessionRuntime({
         sessionManager: manager,
         renderer: { renderLine() {}, renderChunk() {} } as never,
         runPrompt: async function* (_prompt, signal) {
-          yield { type: 'query.started', sessionId: resumed.id, prompt: 'turn-phase' }
-          turnInterruptedRuntime.cancelCurrentRun()
+          yield {
+            type: "query.started",
+            sessionId: resumed.id,
+            prompt: "turn-phase",
+          };
+          turnInterruptedRuntime.cancelCurrentRun();
           if (signal.aborted) {
-            throw new Error('Aborted')
+            throw new Error("Aborted");
           }
-          throw new Error('Aborted')
+          throw new Error("Aborted");
         },
-      })
+      });
 
-      await expect(turnInterruptedRuntime.executePrompt(resumed.id, 'turn-phase')).rejects.toThrow()
-      snapshot = manager.getRecoverySnapshot(resumed.id)
-      expect(snapshot.interruptedKind).toBe('turn')
+      await expect(
+        turnInterruptedRuntime.executePrompt(resumed.id, "turn-phase"),
+      ).rejects.toThrow();
+      snapshot = manager.getRecoverySnapshot(resumed.id);
+      expect(snapshot.interruptedKind).toBe("turn");
     } finally {
-      process.env.USERPROFILE = originalUserProfile
-      fs.rmSync(fakeHome, { recursive: true, force: true })
+      process.env.USERPROFILE = originalUserProfile;
+      fs.rmSync(fakeHome, { recursive: true, force: true });
     }
-  })
+  });
 
-  it('persists terminal classification from query.completed into state.json', async () => {
-    const originalUserProfile = process.env.USERPROFILE
-    const originalHome = process.env.HOME
-    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'private-agents-terminal-state-'))
-    process.env.USERPROFILE = fakeHome
-    process.env.HOME = fakeHome
+  it("persists terminal classification from query.completed into state.json", async () => {
+    const originalUserProfile = process.env.USERPROFILE;
+    const originalHome = process.env.HOME;
+    const fakeHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), "private-agents-terminal-state-"),
+    );
+    process.env.USERPROFILE = fakeHome;
+    process.env.HOME = fakeHome;
 
     try {
-      const manager = new SessionManager()
-      const session = manager.createNew()
+      const manager = new SessionManager();
+      const session = manager.createNew();
       const runtime = new ShellSessionRuntime({
         sessionManager: manager,
         renderer: { renderLine() {}, renderChunk() {} } as never,
         runPrompt: async function* () {
           yield {
-            type: 'query.completed',
+            type: "query.completed",
             result: {
-              status: 'stopped_error',
-              terminalReason: 'stopped_error',
-              terminalClassification: 'stopped',
-              lastContinuationReason: 'retryable-error',
-              stopReason: 'Retry budget exhausted',
+              status: "stopped_error",
+              terminalReason: "stopped_error",
+              terminalClassification: "stopped",
+              lastContinuationReason: "retryable-error",
+              stopReason: "Retry budget exhausted",
               transcript: [],
-              sharedContext: { sessionId: session.id, initialPrompt: 'hello', notes: [], handoffs: [] },
-              finalOutput: 'partial result',
+              sharedContext: {
+                sessionId: session.id,
+                initialPrompt: "hello",
+                notes: [],
+                handoffs: [],
+              },
+              finalOutput: "partial result",
             },
-          }
+          };
         },
-      })
+      });
 
-      await runtime.executePrompt(session.id, 'hello')
+      await runtime.executePrompt(session.id, "hello");
 
-      const statePath = path.join(manager.getSessionDirPath(session.id), 'state.json')
-      const state = JSON.parse(fs.readFileSync(statePath, 'utf8')) as {
-        status: string
-        terminalReason?: string
-        lastContinuationReason?: string
-        lastError?: string
-      }
+      const statePath = path.join(
+        manager.getSessionDirPath(session.id),
+        "state.json",
+      );
+      const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+        status: string;
+        terminalReason?: string;
+        lastContinuationReason?: string;
+        lastError?: string;
+      };
 
-      expect(state.status).toBe('error')
-      expect(state.terminalReason).toBe('stopped_error')
-      expect(state.lastContinuationReason).toBe('retryable-error')
-      expect(state.lastError).toBeUndefined()
+      expect(state.status).toBe("error");
+      expect(state.terminalReason).toBe("stopped_error");
+      expect(state.lastContinuationReason).toBe("retryable-error");
+      expect(state.lastError).toBeUndefined();
     } finally {
-      process.env.USERPROFILE = originalUserProfile
-      process.env.HOME = originalHome
-      fs.rmSync(fakeHome, { recursive: true, force: true })
+      process.env.USERPROFILE = originalUserProfile;
+      process.env.HOME = originalHome;
+      fs.rmSync(fakeHome, { recursive: true, force: true });
     }
-  })
+  });
 
-  it('persists true error terminal envelope when query.failed is emitted', async () => {
-    const originalUserProfile = process.env.USERPROFILE
-    const originalHome = process.env.HOME
-    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'private-agents-query-failed-state-'))
-    process.env.USERPROFILE = fakeHome
-    process.env.HOME = fakeHome
+  it("persists true error terminal envelope when query.failed is emitted", async () => {
+    const originalUserProfile = process.env.USERPROFILE;
+    const originalHome = process.env.HOME;
+    const fakeHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), "private-agents-query-failed-state-"),
+    );
+    process.env.USERPROFILE = fakeHome;
+    process.env.HOME = fakeHome;
 
     try {
-      const manager = new SessionManager()
-      const session = manager.createNew()
+      const manager = new SessionManager();
+      const session = manager.createNew();
       const runtime = new ShellSessionRuntime({
         sessionManager: manager,
         renderer: { renderLine() {}, renderChunk() {} } as never,
         runPrompt: async function* () {
-          yield { type: 'query.failed', error: 'daemon panic' }
+          yield { type: "query.failed", error: "daemon panic" };
         },
-      })
+      });
 
-      await expect(runtime.executePrompt(session.id, 'hello')).rejects.toThrow('daemon panic')
+      await expect(runtime.executePrompt(session.id, "hello")).rejects.toThrow(
+        "daemon panic",
+      );
 
-      const statePath = path.join(manager.getSessionDirPath(session.id), 'state.json')
-      const state = JSON.parse(fs.readFileSync(statePath, 'utf8')) as {
-        status: string
-        terminalReason?: string
-        terminalClassification?: string
-        lastError?: string
-      }
+      const statePath = path.join(
+        manager.getSessionDirPath(session.id),
+        "state.json",
+      );
+      const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+        status: string;
+        terminalReason?: string;
+        terminalClassification?: string;
+        lastError?: string;
+      };
 
-      expect(state.status).toBe('error')
-      expect(state.terminalReason).toBe('stopped_error')
-      expect(state.terminalClassification).toBe('error')
-      expect(state.lastError).toBe('daemon panic')
+      expect(state.status).toBe("error");
+      expect(state.terminalReason).toBe("stopped_error");
+      expect(state.terminalClassification).toBe("error");
+      expect(state.lastError).toBe("daemon panic");
     } finally {
-      process.env.USERPROFILE = originalUserProfile
-      process.env.HOME = originalHome
-      fs.rmSync(fakeHome, { recursive: true, force: true })
+      process.env.USERPROFILE = originalUserProfile;
+      process.env.HOME = originalHome;
+      fs.rmSync(fakeHome, { recursive: true, force: true });
     }
-  })
+  });
 
-  it('fails defensively when the prompt stream ends without a terminal event', async () => {
-    const calls: string[] = []
+  it("fails defensively when the prompt stream ends without a terminal event", async () => {
+    const calls: string[] = [];
     const runtime = new ShellSessionRuntime({
       sessionManager: {
         markRunStarted() {},
         persistUserPromptBarrier(sessionId: string, prompt: string) {
-          calls.push(`barrier:${sessionId}:${prompt}`)
+          calls.push(`barrier:${sessionId}:${prompt}`);
         },
         markTurnActive() {},
         appendQueryEvent() {},
         addTurn() {},
         saveCompleted(sessionId: string) {
-          calls.push(`completed:${sessionId}`)
+          calls.push(`completed:${sessionId}`);
         },
         saveInterrupted() {},
         saveError(sessionId: string, error: string) {
-          calls.push(`error:${sessionId}:${error}`)
+          calls.push(`error:${sessionId}:${error}`);
         },
         saveTerminated() {},
       } as never,
       renderer: { renderLine() {}, renderChunk() {} } as never,
       runPrompt: async function* () {
-        yield { type: 'query.started', sessionId: 'sess_missing_terminal', prompt: 'hello' }
-        yield { type: 'turn.started', role: 'planner', turn: 1 }
+        yield {
+          type: "query.started",
+          sessionId: "sess_missing_terminal",
+          prompt: "hello",
+        };
+        yield { type: "turn.started", role: "planner", turn: 1 };
       },
-    })
+    });
 
-    await expect(runtime.executePrompt('sess_missing_terminal', 'hello')).rejects.toThrow(
-      'Query runtime ended without a terminal event',
-    )
+    await expect(
+      runtime.executePrompt("sess_missing_terminal", "hello"),
+    ).rejects.toThrow("Query runtime ended without a terminal event");
     expect(calls).toEqual([
-      'barrier:sess_missing_terminal:hello',
-      'error:sess_missing_terminal:Query runtime ended without a terminal event',
-    ])
-  })
-})
+      "barrier:sess_missing_terminal:hello",
+      "error:sess_missing_terminal:Query runtime ended without a terminal event",
+    ]);
+  });
+});
