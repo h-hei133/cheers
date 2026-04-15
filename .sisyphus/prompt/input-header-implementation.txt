@@ -1,0 +1,46 @@
+【本轮输入】
+
+Mode:
+Implementation
+
+参考仓库路径（只读，用于对照 ClaudeCode 语义）：
+D:\LenovoSoftstore\pyproject\source-claudecode
+
+目标仓库路径（可修改，只允许在这里改代码）：
+D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents
+
+本轮直接服务的主路径步骤：
+[从 1~6 中填 1 个]
+
+本轮直接针对的主阻塞：
+[从当前 1~3 个主阻塞中填 1 个]
+
+当前任务 / 当前动作：
+[写本轮唯一主任务；必须是实现动作，不是总结动作]
+
+本轮目标：
+[写清楚本轮最小可接受目标]
+[必须是“实现闭环”或“主路径设门”]
+[不要写成 acceptance-surface 微差收口]
+
+可选补充上下文：
+- 当前为什么轮到做这件事
+- 上一轮已经确认了什么
+- 本轮不要继续做什么
+- 若涉及 ClaudeCode load-bearing 语义，请先做少量定点对照，不要大规模扫描
+
+特别要求：
+- 请先读取 PROJECT_STATE.md
+- 不要完全信任 PROJECT_STATE.md
+- 只允许在 coding agents 仓库内实际修改文件
+- ClaudeCode 源码仓库只用于阅读、对照、提取 reference truth
+- 本轮必须明确推进六步主路径中的一个真实环节
+- 本轮不要默认继续局部 runtime hardening
+- 本轮不要把 test-only 当主产出
+- 若本轮未发现真实实现缺口，可形成状态判断，但不要为了产出而机械补测试
+- 若发现当前任务不再最直接服务主路径，请输出 REFOCUS，不要硬做
+
+建议验证范围：
+- 先跑与本轮改动直接相关的测试
+- 若本轮主路径已可脚本化验证，优先补或更新 1 条直接 smoke / E2E
+- 不要默认扩大成全量 build，除非本轮改动已触达更广边界
