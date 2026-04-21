@@ -24,6 +24,11 @@ export interface EscalationPrompt {
   id: string;
   title: string;
   message: string;
+  context: {
+    toolName: string;
+    operation: string;
+    target: string;
+  };
   options: EscalationOption[];
   defaultOption: EscalationDecision;
   recommendedAction: string;
@@ -88,6 +93,7 @@ export class EscalationWorkflow {
       id: request.promptId,
       title: `Permission escalation required`,
       message: this.formatMessage(policyDecision, context),
+      context,
       options: [
         {
           value: 'deny',

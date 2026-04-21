@@ -301,6 +301,85 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     return { modulePath, logPath };
   }
 
+  function createTransientFailureOpenAiFetchMockModule(fakeHome: string): {
+    modulePath: string;
+    logPath: string;
+  } {
+    const modulePath = path.join(
+      fakeHome,
+      "openai-fetch-mock-transient-failure.cjs",
+    );
+    const logPath = path.join(
+      fakeHome,
+      "openai-fetch-log-transient-failure.jsonl",
+    );
+    const moduleBody = `
+const fs = require("node:fs");
+let chatCallCount = 0;
+let firstChatAttempt = true;
+const logPath = ${JSON.stringify(logPath)};
+
+globalThis.fetch = async function mockOpenAiFetch(url, init) {
+  const target = String(url);
+  const headers = init && init.headers ? init.headers : {};
+  let authorization = "";
+
+  if (headers && typeof headers.get === "function") {
+    authorization = headers.get("authorization") || "";
+  } else if (headers && typeof headers === "object") {
+    authorization = headers.authorization || headers.Authorization || "";
+  }
+
+  fs.appendFileSync(
+    logPath,
+    JSON.stringify({ url: target, authorization }) + "\\n",
+    "utf8",
+  );
+
+  if (target.endsWith("/models")) {
+    return new Response(
+      JSON.stringify({ data: [{ id: "gpt-4.1-mini" }] }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    );
+  }
+
+  if (target.endsWith("/chat/completions")) {
+    chatCallCount += 1;
+    if (firstChatAttempt) {
+      firstChatAttempt = false;
+      throw new TypeError("fetch failed");
+    }
+
+    const marker = "REAL_MOCK_CALL_" + chatCallCount;
+    const body =
+      "data: " + JSON.stringify({
+        model: "gpt-4.1-mini",
+        choices: [{ delta: { content: marker } }],
+      }) + "\\n\\n" +
+      "data: " + JSON.stringify({
+        model: "gpt-4.1-mini",
+        choices: [{ delta: { content: "" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }) + "\\n\\n" +
+      "data: [DONE]\\n\\n";
+
+    return new Response(body, {
+      status: 200,
+      headers: { "content-type": "text/event-stream" },
+    });
+  }
+
+  return new Response("mock route not found", { status: 404 });
+};
+`;
+
+    fs.writeFileSync(modulePath, moduleBody, "utf8");
+    return { modulePath, logPath };
+  }
+
   it("streams output incrementally without blocking", async () => {
     await new Promise<void>((resolve, reject) => {
       const cli = spawnCli(fakeHomeDir);
@@ -490,7 +569,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
           sessionId &&
           output.includes("provider-readiness:missing-key") &&
           output.includes(
-            "Hint: set OPENAI_API_KEY in your shell, then submit another prompt.",
+            "Hint: configure credential via /connect set <provider> <api-key> (or export env var), then submit another prompt.",
           )
         ) {
           clearTimeout(timeout);
@@ -498,7 +577,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             expect(output).toContain("❌ Run failed:");
             expect(output).toContain("provider-readiness:missing-key");
             expect(output).toContain(
-              "Hint: set OPENAI_API_KEY in your shell, then submit another prompt.",
+              "Hint: configure credential via /connect set <provider> <api-key> (or export env var), then submit another prompt.",
             );
             expect(output.includes("approval> ")).toBe(false);
             expect(output.includes("✅ Response complete")).toBe(false);
@@ -557,7 +636,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     });
   }, 40000);
 
-  it("proves CLI real success chain with explicit approval and completed persistence", async () => {
+  it("proves default CLI real-provider chain can complete twice with explicit approvals and durable success", async () => {
     const { modulePath, logPath } = createOpenAiFetchMockModule(fakeHomeDir);
     const normalizedModulePath = modulePath.replace(/\\/g, "/");
     const nodeOptionsParts = [
@@ -574,11 +653,16 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       });
       let output = "";
       let settled = false;
-      let promptSent = false;
-      let approvalSent = false;
+      let firstPromptSent = false;
+      let secondPromptSent = false;
       let sessionId = "";
-      const promptText =
-        "Run node version in this workspace (real chain smoke)\n";
+      let completionCount = 0;
+      let observedApprovalPrompts = 0;
+      let approvalResponses = 0;
+      const firstPrompt =
+        "Run node version in this workspace (real chain smoke #1)\n";
+      const secondPrompt =
+        "Run node version in this workspace (real chain smoke #2)\n";
 
       const finish = (callback: () => void) => {
         if (settled) {
@@ -607,7 +691,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       const timeout = setTimeout(() => {
         fail(
           new Error(
-            `Timed out waiting for CLI real success chain completion. Output:\n${output}`,
+            `Timed out waiting for two real success-chain completions. Output:\n${output}`,
           ),
         );
       }, 40000);
@@ -623,28 +707,43 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
         }
 
         if (
-          !promptSent &&
+          !firstPromptSent &&
           (output.includes(
             "Type your prompt or Ctrl+C to cancel current run, Ctrl+D to exit",
           ) ||
             output.includes("\n> "))
         ) {
-          promptSent = true;
-          cli.stdin?.write(promptText);
+          firstPromptSent = true;
+          cli.stdin?.write(firstPrompt);
         }
 
-        if (!approvalSent && output.includes("approval> ")) {
-          approvalSent = true;
-          cli.stdin?.write("y\n");
+        const approvalPromptCount = output.match(/approval> /g)?.length ?? 0;
+        if (approvalPromptCount > observedApprovalPrompts) {
+          while (observedApprovalPrompts < approvalPromptCount) {
+            observedApprovalPrompts += 1;
+            approvalResponses += 1;
+            cli.stdin?.write("y\n");
+          }
         }
 
-        if (sessionId && output.includes("✅ Response complete")) {
+        const completionMarkers = output.match(/✅ Response complete/g);
+        completionCount = completionMarkers?.length ?? 0;
+
+        if (completionCount >= 1 && !secondPromptSent) {
+          secondPromptSent = true;
+          cli.stdin?.write(secondPrompt);
+        }
+
+        if (sessionId && completionCount >= 2) {
           clearTimeout(timeout);
           finish(() => {
             expect(output).toContain(
               "[approval] Permission escalation required",
             );
-            expect(output).toContain("[approval] decision=allow-once");
+            const approvalDecisionCount =
+              output.match(/\[approval\] decision=allow-once/g)?.length ?? 0;
+            expect(approvalDecisionCount).toBeGreaterThanOrEqual(2);
+            expect(approvalResponses).toBeGreaterThanOrEqual(2);
 
             const fetchLogs = fs
               .readFileSync(logPath, "utf8")
@@ -661,7 +760,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             const chatCalls = fetchLogs.filter((entry) =>
               entry.url.endsWith("/chat/completions"),
             );
-            expect(chatCalls.length).toBeGreaterThanOrEqual(3);
+            expect(chatCalls.length).toBeGreaterThanOrEqual(6);
             expect(
               chatCalls.every(
                 (entry) => entry.authorization === "Bearer test-real-cli-key",
@@ -672,14 +771,33 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             const transcriptEntries = parseTranscriptJsonl(
               path.join(sessionDir, "transcript.jsonl"),
             );
-            const queryCompleted = transcriptEntries.find(
+            const queryStartedCount = transcriptEntries.filter(
+              (entry) =>
+                entry.type === "query-event" &&
+                entry.event?.type === "query.started",
+            ).length;
+            const queryCompleted = transcriptEntries.filter(
               (entry) =>
                 entry.type === "query-event" &&
                 entry.event?.type === "query.completed",
             );
+            expect(queryStartedCount).toBeGreaterThanOrEqual(2);
+            expect(queryCompleted.length).toBeGreaterThanOrEqual(2);
+            expect(
+              queryCompleted.every(
+                (entry) => entry.event?.result?.status === "completed",
+              ),
+            ).toBe(true);
+            expect(
+              queryCompleted.every(
+                (entry) =>
+                  entry.event?.result?.terminalClassification === "success",
+              ),
+            ).toBe(true);
 
-            expect(queryCompleted?.event?.result?.status).toBe("completed");
-            expect(queryCompleted?.event?.result?.terminalClassification).toBe(
+            const latestTerminal = queryCompleted.at(-1);
+            expect(latestTerminal?.event?.result?.status).toBe("completed");
+            expect(latestTerminal?.event?.result?.terminalClassification).toBe(
               "success",
             );
 
@@ -703,7 +821,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
           clearTimeout(timeout);
           fail(
             new Error(
-              `CLI real success chain failed unexpectedly. Output:\n${output}`,
+              `CLI repeated real success chain failed unexpectedly. Output:\n${output}`,
             ),
           );
         }
@@ -713,9 +831,9 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       cli.stderr?.on("data", onData);
 
       setTimeout(() => {
-        if (!settled && !promptSent) {
-          promptSent = true;
-          cli.stdin?.write(promptText);
+        if (!settled && !firstPromptSent) {
+          firstPromptSent = true;
+          cli.stdin?.write(firstPrompt);
         }
       }, 1200);
 
@@ -731,7 +849,506 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
         clearTimeout(timeout);
         fail(
           new Error(
-            `CLI exited before success chain completed (code=${code}). Output:\n${output}`,
+            `CLI exited before repeated success chain completed (code=${code}). Output:\n${output}`,
+          ),
+        );
+      });
+    });
+  }, 50000);
+
+  it("keeps CLI real-provider path alive across one transient chat fetch failure", async () => {
+    const { modulePath, logPath } =
+      createTransientFailureOpenAiFetchMockModule(fakeHomeDir);
+    const normalizedModulePath = modulePath.replace(/\\/g, "/");
+    const nodeOptionsParts = [
+      process.env.NODE_OPTIONS ?? "",
+      "--require",
+      `\"${normalizedModulePath}\"`,
+    ].filter((part) => part.trim().length > 0);
+
+    await new Promise<void>((resolve, reject) => {
+      const cli = spawnCli(fakeHomeDir, [], {
+        PRIVATE_AGENTS_PROVIDER_MODE: "real",
+        OPENAI_API_KEY: "test-real-cli-key",
+        NODE_OPTIONS: nodeOptionsParts.join(" "),
+      });
+      let output = "";
+      let settled = false;
+      let promptSent = false;
+      let sessionId = "";
+      let approvalResponses = 0;
+      let observedApprovalPrompts = 0;
+
+      const finish = (callback: () => void) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        try {
+          callback();
+          resolve();
+        } catch (error) {
+          reject(error);
+        } finally {
+          cli.kill();
+        }
+      };
+
+      const fail = (error: unknown) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cli.kill();
+        reject(error);
+      };
+
+      const timeout = setTimeout(() => {
+        fail(
+          new Error(
+            `Timed out waiting for CLI transient-failure recovery. Output:\n${output}`,
+          ),
+        );
+      }, 40000);
+
+      const onData = (data: Buffer) => {
+        output += data.toString();
+
+        if (!sessionId) {
+          const matched = output.match(/Session:\s*(sess_[^\s\r\n]+)/);
+          if (matched?.[1]) {
+            sessionId = matched[1];
+          }
+        }
+
+        if (
+          !promptSent &&
+          (output.includes(
+            "Type your prompt or Ctrl+C to cancel current run, Ctrl+D to exit",
+          ) ||
+            output.includes("\n> "))
+        ) {
+          promptSent = true;
+          cli.stdin?.write("Run node version after one transient provider failure\n");
+        }
+
+        const approvalPromptCount = output.match(/approval> /g)?.length ?? 0;
+        if (approvalPromptCount > observedApprovalPrompts) {
+          while (observedApprovalPrompts < approvalPromptCount) {
+            observedApprovalPrompts += 1;
+            approvalResponses += 1;
+            cli.stdin?.write("y\n");
+          }
+        }
+
+        if (sessionId && output.includes("✅ Response complete")) {
+          clearTimeout(timeout);
+          finish(() => {
+            expect(output).not.toContain("❂ Run failed:");
+            expect(output).toContain("[approval] Permission escalation required");
+            expect(output).toContain("[approval] decision=allow-once");
+            expect(approvalResponses).toBeGreaterThanOrEqual(1);
+
+            const fetchLogs = fs
+              .readFileSync(logPath, "utf8")
+              .split("\n")
+              .filter((line) => line.trim().length > 0)
+              .map(
+                (line) =>
+                  JSON.parse(line) as { url: string; authorization: string },
+              );
+
+            const modelsCalls = fetchLogs.filter((entry) =>
+              entry.url.endsWith("/models"),
+            );
+            const chatCalls = fetchLogs.filter((entry) =>
+              entry.url.endsWith("/chat/completions"),
+            );
+
+            expect(modelsCalls.length).toBeGreaterThanOrEqual(1);
+            expect(chatCalls.length).toBeGreaterThanOrEqual(4);
+            expect(
+              chatCalls.every(
+                (entry) => entry.authorization === "Bearer test-real-cli-key",
+              ),
+            ).toBe(true);
+
+            const sessionDir = path.join(sessionsDir, sessionId);
+            const transcriptEntries = parseTranscriptJsonl(
+              path.join(sessionDir, "transcript.jsonl"),
+            );
+            const queryCompleted = transcriptEntries.filter(
+              (entry) =>
+                entry.type === "query-event" &&
+                entry.event?.type === "query.completed",
+            );
+
+            expect(queryCompleted.length).toBeGreaterThanOrEqual(1);
+            expect(queryCompleted.at(-1)?.event?.result?.status).toBe(
+              "completed",
+            );
+            expect(
+              queryCompleted.at(-1)?.event?.result?.terminalClassification,
+            ).toBe("success");
+
+            const state = JSON.parse(
+              fs.readFileSync(path.join(sessionDir, "state.json"), "utf8"),
+            ) as {
+              status?: string;
+              terminalReason?: string;
+              terminalClassification?: string;
+              durableStatus?: string;
+              lastError?: string;
+            };
+
+            expect(state.status).toBe("completed");
+            expect(state.terminalReason).toBe("completed");
+            expect(state.terminalClassification).toBe("success");
+            expect(state.durableStatus).toBe("success");
+            expect(state.lastError).toBeUndefined();
+          });
+        }
+
+        if (output.includes("❂ Run failed:")) {
+          clearTimeout(timeout);
+          fail(
+            new Error(
+              `CLI transient-failure recovery failed unexpectedly. Output:\n${output}`,
+            ),
+          );
+        }
+      };
+
+      cli.stdout?.on("data", onData);
+      cli.stderr?.on("data", onData);
+
+      setTimeout(() => {
+        if (!settled && !promptSent) {
+          promptSent = true;
+          cli.stdin?.write(
+            "Run node version after one transient provider failure\n",
+          );
+        }
+      }, 1200);
+
+      cli.on("error", (error) => {
+        clearTimeout(timeout);
+        fail(error);
+      });
+
+      cli.on("close", (code) => {
+        if (settled) {
+          return;
+        }
+        clearTimeout(timeout);
+        fail(
+          new Error(
+            `CLI exited before transient-failure recovery completed (code=${code}). Output:\n${output}`,
+          ),
+        );
+      });
+    });
+  }, 45000);
+
+  it("proves default real CLI non-node allowlisted intent can sustain two consecutive tasks in one session with continuous durable evidence", async () => {
+    const { modulePath, logPath } = createOpenAiFetchMockModule(fakeHomeDir);
+    const normalizedModulePath = modulePath.replace(/\\/g, "/");
+    const nodeOptionsParts = [
+      process.env.NODE_OPTIONS ?? "",
+      "--require",
+      `\"${normalizedModulePath}\"`,
+    ].filter((part) => part.trim().length > 0);
+
+    await new Promise<void>((resolve, reject) => {
+      const cli = spawnCli(fakeHomeDir, [], {
+        PRIVATE_AGENTS_PROVIDER_MODE: "real",
+        OPENAI_API_KEY: "test-real-cli-key",
+        NODE_OPTIONS: nodeOptionsParts.join(" "),
+      });
+
+      let output = "";
+      let settled = false;
+      let sessionId = "";
+      let observedInputPrompts = 0;
+      let observedApprovalPrompts = 0;
+      let approvalResponses = 0;
+      let firstPromptSent = false;
+      let secondPromptSent = false;
+      let firstRoundStateSnapshot:
+        | {
+            status?: string;
+            terminalReason?: string;
+            terminalClassification?: string;
+            durableStatus?: string;
+          }
+        | undefined;
+      let firstRoundMetadataUpdatedAt = "";
+
+      const firstPrompt =
+        "Continuous main path turn #1: run build help with explicit approval\n";
+      const secondPrompt =
+        "Continuous main path turn #2: run build help with explicit approval\n";
+
+      const finish = (callback: () => void) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        try {
+          callback();
+          resolve();
+        } catch (error) {
+          reject(error);
+        } finally {
+          cli.kill();
+        }
+      };
+
+      const fail = (error: unknown) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cli.kill();
+        reject(error);
+      };
+
+      const timeout = setTimeout(() => {
+        fail(
+          new Error(
+            `Timed out waiting for same-session consecutive real main-path completions. Output:\n${output}`,
+          ),
+        );
+      }, 50000);
+
+      const onData = (data: Buffer) => {
+        output += data.toString();
+
+        if (!sessionId) {
+          const matched = output.match(/Session:\s*(sess_[^\s\r\n]+)/);
+          if (matched?.[1]) {
+            sessionId = matched[1];
+          }
+        }
+
+        const inputPromptCount = output.match(/\n> /g)?.length ?? 0;
+        if (inputPromptCount > observedInputPrompts) {
+          observedInputPrompts = inputPromptCount;
+        }
+
+        if (!firstPromptSent && observedInputPrompts >= 1) {
+          firstPromptSent = true;
+          cli.stdin?.write(firstPrompt);
+        }
+
+        const approvalPromptCount = output.match(/approval> /g)?.length ?? 0;
+        if (approvalPromptCount > observedApprovalPrompts) {
+          while (observedApprovalPrompts < approvalPromptCount) {
+            observedApprovalPrompts += 1;
+            approvalResponses += 1;
+            cli.stdin?.write("y\n");
+          }
+        }
+
+        const completionCount =
+          output.match(/✅ Response complete/g)?.length ?? 0;
+
+        if (
+          completionCount >= 1 &&
+          !secondPromptSent &&
+          observedInputPrompts >= 2 &&
+          sessionId
+        ) {
+          const sessionDir = path.join(sessionsDir, sessionId);
+          const firstStatePath = path.join(sessionDir, "state.json");
+          const firstMetadataPath = path.join(sessionDir, "metadata.json");
+          if (fs.existsSync(firstStatePath)) {
+            firstRoundStateSnapshot = JSON.parse(
+              fs.readFileSync(firstStatePath, "utf8"),
+            ) as {
+              status?: string;
+              terminalReason?: string;
+              terminalClassification?: string;
+              durableStatus?: string;
+            };
+          }
+          if (fs.existsSync(firstMetadataPath)) {
+            const metadata = JSON.parse(
+              fs.readFileSync(firstMetadataPath, "utf8"),
+            ) as { updatedAt?: string };
+            firstRoundMetadataUpdatedAt = metadata.updatedAt ?? "";
+          }
+          secondPromptSent = true;
+          cli.stdin?.write(secondPrompt);
+        }
+
+        if (sessionId && secondPromptSent && completionCount >= 2) {
+          clearTimeout(timeout);
+          finish(() => {
+            const approvalDecisionCount =
+              output.match(/\[approval\] decision=allow-once/g)?.length ?? 0;
+            expect(approvalDecisionCount).toBeGreaterThanOrEqual(2);
+            expect(approvalResponses).toBeGreaterThanOrEqual(2);
+
+            const fetchLogs = fs
+              .readFileSync(logPath, "utf8")
+              .split("\n")
+              .filter((line) => line.trim().length > 0)
+              .map(
+                (line) =>
+                  JSON.parse(line) as { url: string; authorization: string },
+              );
+
+            const chatCalls = fetchLogs.filter((entry) =>
+              entry.url.endsWith("/chat/completions"),
+            );
+            expect(chatCalls.length).toBeGreaterThanOrEqual(6);
+            expect(
+              chatCalls.every(
+                (entry) => entry.authorization === "Bearer test-real-cli-key",
+              ),
+            ).toBe(true);
+
+            const sessionDir = path.join(sessionsDir, sessionId);
+            const transcriptPath = path.join(sessionDir, "transcript.jsonl");
+            const transcriptEntries = parseTranscriptJsonl(transcriptPath);
+            const transcriptEntriesRaw = fs
+              .readFileSync(transcriptPath, "utf8")
+              .split("\n")
+              .filter((line) => line.trim().length > 0)
+              .map(
+                (line) =>
+                  JSON.parse(line) as { type?: string; event?: unknown },
+              );
+
+            const queryStartedEntries = transcriptEntries.filter(
+              (entry) =>
+                entry.type === "query-event" &&
+                entry.event?.type === "query.started",
+            );
+            const queryStartedPrompts = queryStartedEntries.map(
+              (entry) => entry.event?.prompt,
+            );
+            expect(queryStartedPrompts).toContain(firstPrompt.trim());
+            expect(queryStartedPrompts).toContain(secondPrompt.trim());
+            const firstPromptIndex = queryStartedPrompts.indexOf(
+              firstPrompt.trim(),
+            );
+            const secondPromptIndex = queryStartedPrompts.indexOf(
+              secondPrompt.trim(),
+            );
+            expect(firstPromptIndex).toBeGreaterThanOrEqual(0);
+            expect(secondPromptIndex).toBeGreaterThan(firstPromptIndex);
+
+            const queryCompletedEntries = transcriptEntries.filter(
+              (entry) =>
+                entry.type === "query-event" &&
+                entry.event?.type === "query.completed",
+            );
+            expect(queryCompletedEntries.length).toBeGreaterThanOrEqual(2);
+            expect(
+              queryCompletedEntries.every(
+                (entry) => entry.event?.result?.status === "completed",
+              ),
+            ).toBe(true);
+            expect(
+              queryCompletedEntries.every(
+                (entry) =>
+                  entry.event?.result?.terminalClassification === "success",
+              ),
+            ).toBe(true);
+            const completedSharedNotes = queryCompletedEntries.flatMap(
+              (entry) => entry.event?.result?.sharedContext?.notes ?? [],
+            );
+            expect(
+              completedSharedNotes.some((note) =>
+                note.includes("bash(npm run build -- --help)"),
+              ),
+            ).toBe(true);
+
+            const runStartedCount = transcriptEntriesRaw.filter(
+              (entry) =>
+                entry.type === "lifecycle" && entry.event === "run-started",
+            ).length;
+            const runCompletedCount = transcriptEntriesRaw.filter(
+              (entry) =>
+                entry.type === "lifecycle" && entry.event === "run-completed",
+            ).length;
+            expect(runStartedCount).toBeGreaterThanOrEqual(2);
+            expect(runCompletedCount).toBeGreaterThanOrEqual(2);
+
+            const state = JSON.parse(
+              fs.readFileSync(path.join(sessionDir, "state.json"), "utf8"),
+            ) as {
+              status?: string;
+              terminalReason?: string;
+              terminalClassification?: string;
+              durableStatus?: string;
+            };
+            const metadata = JSON.parse(
+              fs.readFileSync(path.join(sessionDir, "metadata.json"), "utf8"),
+            ) as { updatedAt?: string };
+
+            expect(state.status).toBe("completed");
+            expect(state.terminalReason).toBe("completed");
+            expect(state.terminalClassification).toBe("success");
+            expect(state.durableStatus).toBe("success");
+
+            expect(firstRoundStateSnapshot).toBeDefined();
+            expect(firstRoundStateSnapshot?.status).toBe("completed");
+            expect(firstRoundStateSnapshot?.terminalReason).toBe("completed");
+            expect(firstRoundStateSnapshot?.terminalClassification).toBe(
+              "success",
+            );
+            expect(firstRoundStateSnapshot?.durableStatus).toBe("success");
+            expect(firstRoundMetadataUpdatedAt.length).toBeGreaterThan(0);
+            expect(metadata.updatedAt).toBeTruthy();
+
+            const firstUpdatedAt = new Date(
+              firstRoundMetadataUpdatedAt,
+            ).getTime();
+            const finalUpdatedAt = metadata.updatedAt
+              ? new Date(metadata.updatedAt).getTime()
+              : Number.NaN;
+            expect(Number.isNaN(firstUpdatedAt)).toBe(false);
+            expect(Number.isNaN(finalUpdatedAt)).toBe(false);
+            expect(finalUpdatedAt).toBeGreaterThan(firstUpdatedAt);
+          });
+        }
+
+        if (output.includes("❌ Run failed:")) {
+          clearTimeout(timeout);
+          fail(
+            new Error(
+              `CLI same-session consecutive real main-path test failed unexpectedly. Output:\n${output}`,
+            ),
+          );
+        }
+      };
+
+      cli.stdout?.on("data", onData);
+      cli.stderr?.on("data", onData);
+
+      setTimeout(() => {
+        if (!settled && !firstPromptSent) {
+          firstPromptSent = true;
+          cli.stdin?.write(firstPrompt);
+        }
+      }, 1200);
+
+      cli.on("error", (error) => {
+        clearTimeout(timeout);
+        fail(error);
+      });
+
+      cli.on("close", (code) => {
+        if (settled) {
+          return;
+        }
+        clearTimeout(timeout);
+        fail(
+          new Error(
+            `CLI exited before same-session consecutive main path completed (code=${code}). Output:\n${output}`,
           ),
         );
       });
@@ -1083,6 +1700,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
     expect(phaseOneQueryStarted.length).toBeGreaterThanOrEqual(1);
     expect(phaseOneQueryCompleted.length).toBe(0);
+    const phaseOneTranscriptCount = phaseOneTranscript.length;
 
     const phaseOneState = JSON.parse(
       fs.readFileSync(path.join(sessionDir, "state.json"), "utf8"),
@@ -1108,6 +1726,11 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
     expect(phaseOneModelsCallCount).toBeGreaterThanOrEqual(1);
     expect(phaseOneChatCallCount).toBeGreaterThanOrEqual(1);
+    expect(
+      phaseOneFetchLogs.every(
+        (entry) => entry.authorization === "Bearer test-real-cli-key",
+      ),
+    ).toBe(true);
 
     await new Promise<void>((resolve, reject) => {
       const cli = spawnCli(fakeHomeDir, ["--session-id", sessionId], {
@@ -1212,6 +1835,19 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             const transcriptEntries = parseTranscriptJsonl(
               path.join(sessionDir, "transcript.jsonl"),
             );
+            expect(transcriptEntries.length).toBeGreaterThan(
+              phaseOneTranscriptCount,
+            );
+
+            const resumedQueryStarted = transcriptEntries.filter(
+              (entry) =>
+                entry.type === "query-event" &&
+                entry.event?.type === "query.started",
+            );
+            expect(resumedQueryStarted.length).toBeGreaterThanOrEqual(
+              phaseOneQueryStarted.length,
+            );
+
             const queryCompleted = transcriptEntries.filter(
               (entry) =>
                 entry.type === "query-event" &&

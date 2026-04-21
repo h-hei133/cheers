@@ -95,7 +95,9 @@ export function createModelClient(config: ModelClientConfig): ModelClient {
         logger.info('Provider request succeeded', { provider: adapter.id, attempt: state.attemptCount + 1 })
         return
       } catch (error) {
-        const normalized = adapter.normalizeError(error)
+        const normalized = isNormalizedProviderError(error)
+          ? error
+          : adapter.normalizeError(error)
         state.lastError = normalized
         state.totalElapsedMs = Date.now() - startTime
         lastError = normalized
@@ -166,4 +168,19 @@ export function createModelClient(config: ModelClientConfig): ModelClient {
       lastError = undefined
     },
   }
+}
+
+function isNormalizedProviderError(
+  error: unknown,
+): error is NormalizedProviderError {
+  if (typeof error !== 'object' || error === null) {
+    return false
+  }
+
+  return (
+    'provider' in error &&
+    'kind' in error &&
+    'message' in error &&
+    'retriable' in error
+  )
 }

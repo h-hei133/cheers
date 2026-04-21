@@ -44,6 +44,26 @@ export class CoreMcpGateway {
     }
   }
 
+  async refresh(target: string = 'all'): Promise<McpClientSnapshot> {
+    const normalizedTarget = target.trim()
+    const configs = this.loadConfigs()
+    if (
+      normalizedTarget &&
+      normalizedTarget.toLowerCase() !== 'all' &&
+      !configs[normalizedTarget]
+    ) {
+      throw new Error(`Unknown MCP server: ${normalizedTarget}`)
+    }
+
+    if (!normalizedTarget || normalizedTarget.toLowerCase() === 'all') {
+      this.clientCache.clear()
+    } else {
+      this.clientCache.delete(normalizedTarget)
+    }
+
+    return this.snapshot()
+  }
+
   async invokeTool(serverName: string, toolName: string, args: Record<string, unknown>): Promise<McpToolCallResult> {
     const configs = this.loadConfigs()
     const config = configs[serverName]

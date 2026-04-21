@@ -1,13 +1,16 @@
 import type {
   ContinuationReason,
+  CodingResultSummary,
   OrchestrationStatus,
   TerminalReason,
 } from "../../orchestration/types.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionManager } from "../../session/SessionManager.js";
+import type { SessionContinuitySnapshot } from "../../session/SessionManager.js";
 import type { QueryEvent } from "../query/events.js";
 import type { QueryRuntimeStateSeed } from "../query/runtimeState.js";
 import { ShellStateMachine } from "./stateMachine.js";
+import type { SessionResumeProvenance } from "./runtimeContext.js";
 
 export interface SessionRuntimeDependencies {
   readonly sessionManager: SessionManager;
@@ -16,6 +19,7 @@ export interface SessionRuntimeDependencies {
     prompt: string,
     signal: AbortSignal,
     runtimeSeed?: QueryRuntimeStateSeed,
+    continuityState?: SessionContinuitySnapshot,
   ) => AsyncIterable<QueryEvent>;
 }
 
@@ -23,6 +27,8 @@ export class ShellSessionRuntime {
   private readonly deps: SessionRuntimeDependencies;
   private readonly stateMachine = new ShellStateMachine();
   private currentRunController: AbortController | null = null;
+  private viewMode: "compact" | "verbose" = "compact";
+  private agentMode: "plan" | "build" = "build";
 
   constructor(deps: SessionRuntimeDependencies) {
     this.deps = deps;
@@ -36,10 +42,31 @@ export class ShellSessionRuntime {
     return this.currentRunController;
   }
 
+  getViewMode(): "compact" | "verbose" {
+    return this.viewMode;
+  }
+
+  setViewMode(mode: "compact" | "verbose"): void {
+    this.viewMode = mode;
+  }
+
+  getAgentMode(): "plan" | "build" {
+    return this.agentMode;
+  }
+
+  setAgentMode(mode: "plan" | "build"): void {
+    this.agentMode = mode;
+  }
+
   async executePrompt(
     sessionId: string,
     prompt: string,
-    options?: { runtimeSeed?: QueryRuntimeStateSeed },
+    options?: {
+      runtimeSeed?: QueryRuntimeStateSeed;
+      continuityState?: SessionContinuitySnapshot;
+      outputMode?: "interactive" | "print";
+      resumeProvenance?: SessionResumeProvenance;
+    },
   ): Promise<string> {
     this.currentRunController = new AbortController();
     const signal = this.currentRunController.signal;
@@ -50,10 +77,56 @@ export class ShellSessionRuntime {
     let terminalReason: TerminalReason = "completed";
     let terminalClassification: "success" | "stopped" | "error" = "success";
     let lastContinuationReason: ContinuationReason | undefined;
-    let startedRendering = false;
-    let enteredQueryPhase = false;
+      let terminalCodingResult: CodingResultSummary | undefined;
+      let startedRendering = false;
+      const printMode = options?.outputMode === "print";
+      let enteredQueryPhase = false;
+      const eventDigest: RuntimeEventDigest = createRuntimeEventDigest();
 
     try {
+      const continuityBuilder = (
+        this.deps.sessionManager as SessionManager & {
+          buildPromptContinuitySnapshot?: (
+            sessionId: string,
+            currentPrompt: string,
+          ) => SessionContinuitySnapshot | undefined;
+          buildContinuitySnapshot?: (
+            sessionId: string,
+          ) => SessionContinuitySnapshot;
+        }
+      ).buildPromptContinuitySnapshot;
+      const activeContinuityBuilder = (
+        this.deps.sessionManager as SessionManager & {
+          buildContinuitySnapshot?: (
+            sessionId: string,
+          ) => SessionContinuitySnapshot;
+        }
+      ).buildContinuitySnapshot;
+      const outputMode = options?.outputMode ?? "interactive";
+      let continuityState = options?.continuityState;
+      if (!continuityState) {
+        continuityState =
+          !options?.runtimeSeed && outputMode === "interactive"
+            ? typeof activeContinuityBuilder === "function"
+              ? activeContinuityBuilder.call(this.deps.sessionManager, sessionId)
+              : typeof continuityBuilder === "function"
+                ? continuityBuilder.call(this.deps.sessionManager, sessionId, prompt)
+                : undefined
+            : !options?.runtimeSeed && typeof continuityBuilder === "function"
+              ? continuityBuilder.call(this.deps.sessionManager, sessionId, prompt)
+              : undefined;
+      }
+      if (!continuityState && options?.resumeProvenance) {
+        continuityState = buildMinimalContinuitySnapshotForProvenance(
+          sessionId,
+          this.deps.sessionManager.getSessionProjectRoot(sessionId),
+        );
+      }
+      continuityState = applyResumeProvenanceToContinuityState(
+        continuityState,
+        options?.resumeProvenance,
+      );
+
       if (!options?.runtimeSeed) {
         this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt);
       }
@@ -76,53 +149,111 @@ export class ShellSessionRuntime {
         prompt,
         signal,
         options?.runtimeSeed,
+        continuityState,
       )) {
         if (!enteredQueryPhase) {
           enteredQueryPhase = true;
           this.deps.sessionManager.markTurnActive(sessionId);
         }
         this.deps.sessionManager.appendQueryEvent(sessionId, event);
+        updateRuntimeEventDigest(eventDigest, event);
         switch (event.type) {
           case "mcp.snapshot":
-            this.deps.renderer.renderLine(
-              `\n[MCP] clients=${event.clients} tools=${event.tools}`,
-            );
+            if (printMode) {
+              break;
+            }
+            if (this.viewMode === "verbose") {
+              this.deps.renderer.renderLine(
+                `\n[MCP] clients=${event.clients} tools=${event.tools}`,
+              );
+            }
             break;
           case "tool.started":
-            this.deps.renderer.renderLine(`\n[tool:start] ${event.toolName}`);
+            if (printMode) {
+              break;
+            }
+            if (this.viewMode === "verbose") {
+              this.deps.renderer.renderLine(`\n[tool:start] ${event.toolName}`);
+            }
             break;
           case "approval.requested":
-            this.deps.renderer.renderLine(
-              `\n[approval] requested for ${event.toolName}`,
-            );
+            if (printMode) {
+              break;
+            }
+            if (this.viewMode === "verbose") {
+              this.deps.renderer.renderLine(
+                `\n[approval] requested for ${event.toolName}`,
+              );
+            }
             break;
           case "approval.resolved":
-            this.deps.renderer.renderLine(
-              `\n[approval] ${event.toolName} ${event.outcome}`,
-            );
+            if (printMode) {
+              break;
+            }
+            if (this.viewMode === "verbose") {
+              this.deps.renderer.renderLine(
+                `\n[approval] ${event.toolName} ${event.outcome}`,
+              );
+            }
             break;
           case "tool.result":
-            this.deps.renderer.renderLine(
-              `\n[tool:result] ${event.toolName} success=${event.success}`,
-            );
+            if (printMode) {
+              break;
+            }
+            if (this.viewMode === "verbose") {
+              this.deps.renderer.renderLine(
+                `\n[tool:result] ${event.toolName} success=${event.success}`,
+              );
+            }
             break;
           case "query.retrying":
-            this.deps.renderer.renderLine(
-              `\n[query:retry] role=${event.role} turn=${event.turn} attempt=${event.attempt} reason=${event.reason}`,
-            );
+            if (printMode) {
+              break;
+            }
+            if (this.viewMode === "verbose") {
+              this.deps.renderer.renderLine(
+                `\n[query:retry] role=${event.role} turn=${event.turn} attempt=${event.attempt} reason=${event.reason}`,
+              );
+            } else {
+              renderCompactRetryNotice(this.deps.renderer, eventDigest);
+            }
             break;
           case "message.delta":
+            if (printMode) {
+              break;
+            }
+            if (this.viewMode !== "verbose" && event.role === "planner") {
+              break;
+            }
             if (!startedRendering) {
-              this.deps.renderer.renderLine("\n🤖 Assistant:");
+              this.deps.renderer.renderLine("\nAssistant:");
               startedRendering = true;
             }
             this.deps.renderer.renderChunk(event.delta);
             break;
           case "lifecycle.cancelled":
-            this.deps.renderer.renderLine(`\n[cancelled] ${event.reason}`);
+            if (printMode) {
+              break;
+            }
+            if (this.viewMode === "verbose") {
+              this.deps.renderer.renderLine(`\n[cancelled] ${event.reason}`);
+            } else {
+              this.deps.renderer.renderLine(
+                "\nCurrent request was cancelled before completion.",
+              );
+            }
             break;
           case "lifecycle.error":
-            this.deps.renderer.renderLine(`\n[error] ${event.error}`);
+            if (printMode) {
+              break;
+            }
+            if (this.viewMode === "verbose") {
+              this.deps.renderer.renderLine(`\n[error] ${event.error}`);
+            } else {
+              this.deps.renderer.renderLine(
+                "\nRuntime error occurred while processing this request.",
+              );
+            }
             break;
           case "query.completed":
             sawTerminalEvent = true;
@@ -132,6 +263,7 @@ export class ShellSessionRuntime {
             terminalReason = event.result.terminalReason;
             terminalClassification = event.result.terminalClassification;
             lastContinuationReason = event.result.lastContinuationReason;
+            terminalCodingResult = event.result.codingResult;
             break;
           case "query.failed":
             sawTerminalEvent = true;
@@ -141,56 +273,112 @@ export class ShellSessionRuntime {
         }
       }
 
-      if (startedRendering && terminalStatus === "completed") {
-        this.deps.renderer.renderLine("\n");
-        this.deps.renderer.renderLine("✅ Response complete\n");
-      }
-
-      if (terminalStatus !== "completed") {
-        const terminalDetail = terminalStopReason ?? terminalStatus;
-        const terminalLabel =
-          terminalClassification === "stopped"
-            ? "⏹ Run stopped"
-            : "❌ Run failed";
-
-        this.deps.renderer.renderLine(`\n${terminalLabel}: ${terminalDetail}`);
-
-        const runCommandBlockContext =
-          parseRunCommandAllowlistBlockContext(terminalDetail);
-        if (runCommandBlockContext) {
+      if (printMode) {
+        if (terminalStatus === "completed") {
+          if (finalOutput.length > 0) {
+            this.deps.renderer.renderLine(finalOutput);
+          }
+        } else {
           this.deps.renderer.renderLine(
-            "Why not executed: run-command intent was blocked by the MVP allowlist.",
-          );
-          this.deps.renderer.renderLine(
-            `Allowed commands: ${runCommandBlockContext.allowedCommands}`,
-          );
-          this.deps.renderer.renderLine(
-            'Hint: rephrase your prompt to request one allowed command, for example: "Run node --version".',
+            terminalStopReason ?? terminalStatus,
           );
         }
-
-        if (terminalDetail.includes("provider-readiness:network")) {
-          this.deps.renderer.renderLine(
-            "Hint: check network/proxy/firewall reachability to the provider endpoint, then submit another prompt.",
-          );
-        } else if (terminalDetail.includes("provider-readiness:auth")) {
-          this.deps.renderer.renderLine(
-            "Hint: check OPENAI_API_KEY validity/permissions, then submit another prompt.",
-          );
-        } else if (
-          terminalDetail.includes("provider-readiness:missing-key") ||
-          terminalDetail.includes("OPENAI_API_KEY")
-        ) {
-          this.deps.renderer.renderLine(
-            "Hint: set OPENAI_API_KEY in your shell, then submit another prompt.",
-          );
-        } else if (terminalDetail.includes("Approval denied by user")) {
-          this.deps.renderer.renderLine(
-            "Hint: submit another prompt and approve escalation when asked.",
-          );
+        renderTerminalResultBlock(this.deps.renderer, {
+          status: terminalStatus,
+          terminalClassification,
+          terminalStopReason,
+          terminalReason,
+          mode: "minimal",
+        });
+        renderCodingResultContract(this.deps.renderer, terminalCodingResult, {
+          mode: "minimal",
+        });
+      } else {
+        if (!startedRendering && finalOutput.length > 0 && terminalStatus === "completed") {
+          this.deps.renderer.renderLine("\nAssistant:");
+          this.deps.renderer.renderLine(finalOutput);
         }
 
-        this.deps.renderer.renderLine("");
+        if (startedRendering && terminalStatus === "completed") {
+          this.deps.renderer.renderLine("");
+        }
+
+        if (this.viewMode === "verbose") {
+          const compactSummary = buildCompactRunSummary(eventDigest);
+          if (compactSummary) {
+            this.deps.renderer.renderLine(compactSummary);
+          }
+        }
+
+        renderTerminalResultBlock(this.deps.renderer, {
+          status: terminalStatus,
+          terminalClassification,
+          terminalStopReason,
+          terminalReason,
+          mode: this.viewMode === "verbose" ? "verbose" : "minimal",
+        });
+        renderCodingResultContract(this.deps.renderer, terminalCodingResult, {
+          mode: this.viewMode === "verbose" ? "verbose" : "minimal",
+        });
+
+        if (terminalStatus !== "completed") {
+          const terminalDetail = terminalStopReason ?? terminalStatus;
+          const terminalLabel =
+            terminalClassification === "stopped"
+              ? "Run stopped"
+              : "Run failed";
+
+          this.deps.renderer.renderLine(`\n${terminalLabel}: ${terminalDetail}`);
+
+          const runCommandBlockContext =
+            parseRunCommandAllowlistBlockContext(terminalDetail);
+          if (runCommandBlockContext) {
+            this.deps.renderer.renderLine(
+              "Why not executed: run-command intent was blocked by the MVP allowlist.",
+            );
+            this.deps.renderer.renderLine(
+              `Allowed commands: ${runCommandBlockContext.allowedCommands}`,
+            );
+            this.deps.renderer.renderLine(
+              'Hint: rephrase your prompt to request one allowed command, for example: "Run node --version".',
+            );
+          }
+
+          if (terminalDetail.includes("provider-readiness:network")) {
+            this.deps.renderer.renderLine(
+              "Hint: check network/proxy/firewall reachability to the provider endpoint, then submit another prompt.",
+            );
+          } else if (
+            terminalDetail.includes("provider-readiness:unsupported-provider")
+          ) {
+            this.deps.renderer.renderLine(
+              "Hint: switch to supported provider with /connect use openai, then submit another prompt.",
+            );
+          } else if (
+            terminalDetail.includes("provider-readiness:missing-config")
+          ) {
+            this.deps.renderer.renderLine(
+              "Hint: configure provider base URL and model via /connect set <provider> <api-key> <base-url> <model>, then submit another prompt.",
+            );
+          } else if (terminalDetail.includes("provider-readiness:auth")) {
+            this.deps.renderer.renderLine(
+              "Hint: check provider API key validity/permissions, then submit another prompt.",
+            );
+          } else if (
+            terminalDetail.includes("provider-readiness:missing-key") ||
+            terminalDetail.includes("OPENAI_API_KEY")
+          ) {
+            this.deps.renderer.renderLine(
+              "Hint: configure credential via /connect set <provider> <api-key> (or export env var), then submit another prompt.",
+            );
+          } else if (terminalDetail.includes("Approval denied by user")) {
+            this.deps.renderer.renderLine(
+              "Hint: submit another prompt and approve escalation when asked.",
+            );
+          }
+
+          this.deps.renderer.renderLine("");
+        }
       }
 
       if (finalOutput.length > 0) {
@@ -267,6 +455,66 @@ export class ShellSessionRuntime {
   }
 }
 
+function applyResumeProvenanceToContinuityState(
+  continuityState: SessionContinuitySnapshot | undefined,
+  resumeProvenance: SessionResumeProvenance | undefined,
+): SessionContinuitySnapshot | undefined {
+  if (!continuityState || !resumeProvenance) {
+    return continuityState;
+  }
+
+  const nextEvidence = (continuityState.lastContinuationEvidence ?? []).filter(
+    (entry) =>
+      !/^session-resume-(?:source|requested|resolved|rebind-from-missing):/i.test(
+        entry,
+      ),
+  );
+  const pushUnique = (marker: string | undefined): void => {
+    if (!marker?.trim()) {
+      return;
+    }
+    if (!nextEvidence.includes(marker)) {
+      nextEvidence.push(marker);
+    }
+  };
+
+  pushUnique(`session-resume-source:${resumeProvenance.source}`);
+  pushUnique(
+    `session-resume-requested:${resumeProvenance.requestedSessionId ?? "(none)"}`,
+  );
+  pushUnique(
+    `session-resume-resolved:${resumeProvenance.resolvedSessionId ?? continuityState.sessionId}`,
+  );
+  if (resumeProvenance.rebindFromMissingSessionId?.trim()) {
+    pushUnique(
+      `session-resume-rebind-from-missing:${resumeProvenance.rebindFromMissingSessionId}`,
+    );
+  }
+
+  return {
+    ...continuityState,
+    lastContinuationEvidence: nextEvidence,
+  };
+}
+
+function buildMinimalContinuitySnapshotForProvenance(
+  sessionId: string,
+  projectRoot: string,
+): SessionContinuitySnapshot {
+  return {
+    sessionId,
+    projectRoot,
+    recentChangedFiles: [],
+    recentTargetFiles: [],
+    recentFailedFiles: [],
+    recentVerifiedFiles: [],
+    lastRepairNotes: [],
+    lastContinuationEvidence: [],
+    lastTaskSatisfactionReasons: [],
+    unresolvedItems: [],
+  };
+}
+
 function parseRunCommandAllowlistBlockContext(
   terminalDetail: string,
 ): { allowedCommands: string } | null {
@@ -285,4 +533,331 @@ function parseRunCommandAllowlistBlockContext(
   return {
     allowedCommands: allowedMatch?.[1]?.trim() ?? "node --version",
   };
+}
+
+interface RuntimeEventDigest {
+  mcpSnapshots: number;
+  mcpClients: number;
+  mcpTools: number;
+  retries: number;
+  toolsStarted: number;
+  toolsFailed: number;
+  approvalsRequested: number;
+  approvalsApproved: number;
+  approvalsDenied: number;
+  retryNoticeShown: boolean;
+}
+
+function createRuntimeEventDigest(): RuntimeEventDigest {
+  return {
+    mcpSnapshots: 0,
+    mcpClients: 0,
+    mcpTools: 0,
+    retries: 0,
+    toolsStarted: 0,
+    toolsFailed: 0,
+    approvalsRequested: 0,
+    approvalsApproved: 0,
+    approvalsDenied: 0,
+    retryNoticeShown: false,
+  };
+}
+
+function updateRuntimeEventDigest(
+  digest: RuntimeEventDigest,
+  event: QueryEvent,
+): void {
+  switch (event.type) {
+    case "mcp.snapshot":
+      digest.mcpSnapshots += 1;
+      digest.mcpClients = event.clients;
+      digest.mcpTools = event.tools;
+      break;
+    case "query.retrying":
+      digest.retries += 1;
+      break;
+    case "tool.started":
+      digest.toolsStarted += 1;
+      break;
+    case "tool.result":
+      if (!event.success) {
+        digest.toolsFailed += 1;
+      }
+      break;
+    case "approval.requested":
+      digest.approvalsRequested += 1;
+      break;
+    case "approval.resolved":
+      if (event.outcome === "approved") {
+        digest.approvalsApproved += 1;
+      } else {
+        digest.approvalsDenied += 1;
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+function renderCompactRetryNotice(
+  renderer: StreamingRenderer,
+  digest: RuntimeEventDigest,
+): void {
+  if (digest.retryNoticeShown) {
+    return;
+  }
+  digest.retryNoticeShown = true;
+  renderer.renderLine("\nWorking through a temporary provider retry...");
+}
+
+function buildCompactRunSummary(digest: RuntimeEventDigest): string | null {
+  const summaryParts: string[] = [];
+
+  if (digest.approvalsRequested > 0) {
+    summaryParts.push(
+      `approvals ${digest.approvalsApproved}/${digest.approvalsRequested} approved`,
+    );
+  }
+  if (digest.toolsStarted > 0) {
+    summaryParts.push(
+      digest.toolsFailed > 0
+        ? `tools ${digest.toolsStarted} run (${digest.toolsFailed} failed)`
+        : `tools ${digest.toolsStarted} run`,
+    );
+  }
+  if (digest.retries > 0) {
+    summaryParts.push(`retries ${digest.retries}`);
+  }
+  if (digest.mcpSnapshots > 0) {
+    summaryParts.push(`mcp clients=${digest.mcpClients} tools=${digest.mcpTools}`);
+  }
+
+  if (summaryParts.length === 0) {
+    return null;
+  }
+
+  return `Run summary: ${summaryParts.join(" | ")}\n`;
+}
+
+function renderTerminalResultBlock(
+  renderer: StreamingRenderer,
+  input: {
+    status: OrchestrationStatus;
+    terminalClassification: "success" | "stopped" | "error";
+    terminalStopReason?: string;
+    terminalReason: TerminalReason;
+    mode: "minimal" | "verbose";
+  },
+): void {
+  const statusLabel =
+    input.terminalClassification === "success"
+      ? "success"
+      : input.terminalClassification === "stopped"
+        ? "stopped"
+        : "error";
+  if (input.mode === "minimal") {
+    const detail =
+      input.status === "completed"
+        ? "completed"
+        : input.terminalStopReason ?? input.status;
+    renderer.renderLine(`Result: ${statusLabel} (${detail})`);
+    renderer.renderLine("");
+    return;
+  }
+  renderer.renderLine("Final result");
+  renderer.renderLine(`- Classification: ${statusLabel}`);
+  renderer.renderLine(`- Terminal reason: ${input.terminalReason}`);
+  if (input.status !== "completed") {
+    renderer.renderLine(`- Stop detail: ${input.terminalStopReason ?? input.status}`);
+  }
+  renderer.renderLine("");
+}
+
+function renderCodingResultContract(
+  renderer: StreamingRenderer,
+  codingResult: CodingResultSummary | undefined,
+  options: { mode: "minimal" | "verbose" },
+): void {
+  if (!codingResult) {
+    return;
+  }
+
+  if (options.mode === "minimal") {
+    const verificationStatus =
+      codingResult.verification.status === "passed"
+        ? "passed"
+        : codingResult.verification.status === "failed"
+          ? "failed"
+          : codingResult.verification.status === "blocked"
+            ? "blocked"
+            : codingResult.verification.status === "skipped"
+              ? "skipped"
+              : "not-requested";
+    const changedFilesSummary =
+      codingResult.changedFiles.length > 0
+        ? `${codingResult.changedFiles.length} file(s)`
+        : "none";
+    renderer.renderLine(
+      `Task: ${codingResult.taskKind} | Changed: ${changedFilesSummary} | Verify: ${verificationStatus}`,
+    );
+    if (codingResult.verification.nextAction) {
+      renderer.renderLine(`Next: ${codingResult.verification.nextAction}`);
+    } else if (codingResult.taskSatisfaction.reasons.length > 0) {
+      renderer.renderLine(
+        `Notes: ${codingResult.taskSatisfaction.reasons[0]}`,
+      );
+    }
+    renderer.renderLine("");
+    return;
+  }
+
+  renderer.renderLine("Coding result");
+  renderer.renderLine(`- Task kind: ${codingResult.taskKind}`);
+  if (codingResult.changedFiles.length > 0) {
+    renderer.renderLine(`- Changed files: ${codingResult.changedFiles.join(", ")}`);
+  } else {
+    renderer.renderLine("- Changed files: none");
+  }
+  if (codingResult.failedFiles.length > 0) {
+    renderer.renderLine(
+      `- Failed files: ${codingResult.failedFiles.map((entry) => `${entry.path} (${entry.reason})`).join("; ")}`,
+    );
+  }
+  if (codingResult.verifiedFiles.length > 0) {
+    renderer.renderLine(`- Verified files: ${codingResult.verifiedFiles.join(", ")}`);
+  }
+  if (codingResult.unverifiedFiles.length > 0) {
+    renderer.renderLine(
+      `- Unverified files: ${codingResult.unverifiedFiles.map((entry) => `${entry.path} (${entry.reason})`).join("; ")}`,
+    );
+  }
+  if ((codingResult.patches?.length ?? 0) > 0) {
+    renderer.renderLine(
+      `- Patch results: ${codingResult.patches
+        ?.map((record) =>
+          record.status === "applied"
+            ? `${record.path} [${record.operation}] applied (changed=${record.changedLines ?? 0}, added=${record.addedLines ?? 0}, removed=${record.removedLines ?? 0})`
+            : `${record.path} [${record.operation}] failed (${record.failureCode ?? "unknown"}: ${record.reason ?? "unknown"})`,
+        )
+        .join("; ")}`,
+    );
+  }
+  if (codingResult.diagnosis) {
+    renderer.renderLine(
+      `- Diagnosis disposition: ${codingResult.diagnosis.disposition}`,
+    );
+    renderer.renderLine(
+      `- Diagnosis evidence files: ${codingResult.diagnosis.evidenceFiles.length > 0 ? codingResult.diagnosis.evidenceFiles.join(", ") : "none"}`,
+    );
+    renderer.renderLine(
+      `- Diagnosis candidates: ${codingResult.diagnosis.candidateFiles.length > 0 ? codingResult.diagnosis.candidateFiles.join(", ") : "none"}`,
+    );
+    if (codingResult.diagnosis.evidenceLinks.length > 0) {
+      renderer.renderLine(
+        `- Diagnosis evidence chain: ${codingResult.diagnosis.evidenceLinks
+          .slice(0, 2)
+          .map((link) => `${link.from} -> ${link.to} (${link.relation})`)
+          .join(" | ")}`,
+      );
+    }
+    renderer.renderLine(`- Diagnosis note: ${codingResult.diagnosis.reason}`);
+  }
+
+  const verificationStatus =
+    codingResult.verification.status === "passed"
+      ? "passed"
+      : codingResult.verification.status === "failed"
+        ? "failed"
+        : codingResult.verification.status === "blocked"
+          ? "blocked"
+        : codingResult.verification.status === "skipped"
+          ? "skipped"
+          : "not-requested";
+  renderer.renderLine(`- Verification: ${verificationStatus}`);
+  if (codingResult.verification.command) {
+    renderer.renderLine(`- Verify command: ${codingResult.verification.command}`);
+  }
+  if (codingResult.verification.selectionScope) {
+    renderer.renderLine(
+      `- Verify scope: ${codingResult.verification.selectionScope}`,
+    );
+  }
+  if (codingResult.verification.selectionSource) {
+    renderer.renderLine(
+      `- Verify selection: ${codingResult.verification.selectionSource}`,
+    );
+  }
+  if (codingResult.verification.reason) {
+    renderer.renderLine(`- Verify note: ${codingResult.verification.reason}`);
+  }
+  if (codingResult.verification.blockerKind) {
+    renderer.renderLine(
+      `- Verify blocker kind: ${codingResult.verification.blockerKind}`,
+    );
+  }
+  if (codingResult.verification.nextAction) {
+    renderer.renderLine(
+      `- Verify next action: ${codingResult.verification.nextAction}`,
+    );
+  }
+  renderer.renderLine(
+    `- Repair status: ${codingResult.repair.status} (attempts=${codingResult.repair.attempts})`,
+  );
+  renderer.renderLine(
+    `- Continuation: ${codingResult.continuation.status} (attempts=${codingResult.continuation.attempts})`,
+  );
+  if (codingResult.continuation.evidence.length > 0) {
+    renderer.renderLine(
+      `- Continuation evidence: ${codingResult.continuation.evidence.join(" | ")}`,
+    );
+  }
+  if (codingResult.repair.recoveredItems.length > 0) {
+    renderer.renderLine(
+      `- Recovered items: ${codingResult.repair.recoveredItems.join(", ")}`,
+    );
+  }
+  if (codingResult.repair.failedItems.length > 0) {
+    renderer.renderLine(
+      `- Repair failed items: ${codingResult.repair.failedItems.join(", ")}`,
+    );
+  }
+  if (codingResult.repair.notes.length > 0) {
+    renderer.renderLine(`- Repair notes: ${codingResult.repair.notes.join(" | ")}`);
+  }
+  renderer.renderLine(
+    `- Change set (git-aware): ${codingResult.changeSet.gitAware ? "yes" : "no"}`,
+  );
+  if (codingResult.changeSet.gitAware) {
+    renderer.renderLine(
+      `- Attempted files: ${codingResult.changeSet.attemptedFiles.length > 0 ? codingResult.changeSet.attemptedFiles.join(", ") : "none"}`,
+    );
+    renderer.renderLine(
+      `- Diff-grounded changed files: ${codingResult.changeSet.changedFiles.length > 0 ? codingResult.changeSet.changedFiles.join(", ") : "none"}`,
+    );
+    if (codingResult.changeSet.unchangedAttemptedFiles.length > 0) {
+      renderer.renderLine(
+        `- Unchanged attempted files: ${codingResult.changeSet.unchangedAttemptedFiles.join(", ")}`,
+      );
+    }
+    if (codingResult.changeSet.preExistingDirtyFiles.length > 0) {
+      renderer.renderLine(
+        `- Pre-existing dirty files: ${codingResult.changeSet.preExistingDirtyFiles.join(", ")}`,
+      );
+    }
+  }
+  renderer.renderLine(
+    `- Task satisfaction: ${codingResult.taskSatisfaction.verdict}`,
+  );
+  if (codingResult.taskSatisfaction.reasons.length > 0) {
+    renderer.renderLine(
+      `- Task satisfaction notes: ${codingResult.taskSatisfaction.reasons.join(" | ")}`,
+    );
+  }
+  if (codingResult.failureBoundary) {
+    renderer.renderLine(`- Failure boundary: ${codingResult.failureBoundary}`);
+  }
+  if (codingResult.evidence.length > 0) {
+    renderer.renderLine(`- Evidence: ${codingResult.evidence.join(" | ")}`);
+  }
+  renderer.renderLine("");
 }

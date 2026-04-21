@@ -34,13 +34,14 @@ export function createOpenAIStreamMapperState(): OpenAIStreamMapperState {
 export function mapOpenAIChunkToNormalizedEvents(
   chunk: OpenAIChatCompletionsStreamChunk,
   state: OpenAIStreamMapperState,
+  provider: ProviderId = OPENAI_PROVIDER_ID,
 ): readonly NormalizedStreamEvent[] {
   const events: NormalizedStreamEvent[] = []
   if (!state.started) {
     state.started = true
     events.push({
       type: 'response.started',
-      provider: OPENAI_PROVIDER_ID,
+      provider,
       model: chunk.model ?? 'unknown',
     })
   }
@@ -153,6 +154,58 @@ export function toOpenAIRequestBody(request: ModelRequest): Record<string, unkno
   return body
 }
 
+export function toCodexResponsesRequestBody(
+  request: ModelRequest,
+): Record<string, unknown> {
+  const systemMessages = request.messages.filter((message) => message.role === 'system')
+  const nonSystemMessages = request.messages.filter(
+    (message) => message.role !== 'system',
+  )
+  const instructions = systemMessages
+    .map((message) => message.content.trim())
+    .filter(Boolean)
+    .join('\n\n')
+  const input = nonSystemMessages.map((message) => ({
+    role:
+      message.role === 'tool'
+        ? 'assistant'
+        : message.role === 'assistant'
+          ? 'assistant'
+          : 'user',
+    content: [
+      {
+        type: 'input_text',
+        text: message.content || ' ',
+      },
+    ],
+  }))
+
+  const body: Record<string, unknown> = {
+    model: request.model,
+    stream: true,
+    store: false,
+    // Codex backend requires instructions for account-auth requests.
+    instructions:
+      instructions || 'You are a coding assistant. Follow user instructions exactly.',
+    input: input.length > 0 ? input : [{ role: 'user', content: [{ type: 'input_text', text: ' ' }] }],
+  }
+
+  // Codex backend does not accept max_output_tokens on this account-auth path.
+
+  if (request.tools && request.tools.length > 0) {
+    body.tools = request.tools.map((tool) => ({
+      type: 'function',
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.inputSchema,
+    }))
+    body.tool_choice = 'auto'
+    body.parallel_tool_calls = true
+  }
+
+  return body
+}
+
 function toOpenAIMessage(message: NormalizedMessage): Record<string, unknown> {
   if (message.role === 'tool') {
     return {
@@ -183,7 +236,10 @@ function toOpenAIMessage(message: NormalizedMessage): Record<string, unknown> {
   }
 }
 
-export function normalizeOpenAIError(error: unknown): NormalizedProviderError {
+export function normalizeOpenAIError(
+  error: unknown,
+  provider: ProviderId = OPENAI_PROVIDER_ID,
+): NormalizedProviderError {
   const statusCode = getStatusCode(error)
   const code = getErrorCode(error)
   const message = getErrorMessage(error)
@@ -191,7 +247,7 @@ export function normalizeOpenAIError(error: unknown): NormalizedProviderError {
 
   if (statusCode === 429) {
     return {
-      provider: OPENAI_PROVIDER_ID,
+      provider,
       kind: 'rate_limit',
       message,
       retriable: true,
@@ -204,7 +260,7 @@ export function normalizeOpenAIError(error: unknown): NormalizedProviderError {
 
   if (statusCode === 401 || statusCode === 403) {
     return {
-      provider: OPENAI_PROVIDER_ID,
+      provider,
       kind: 'authentication',
       message,
       retriable: false,
@@ -217,7 +273,7 @@ export function normalizeOpenAIError(error: unknown): NormalizedProviderError {
 
   if (statusCode != null && statusCode >= 400 && statusCode < 500) {
     return {
-      provider: OPENAI_PROVIDER_ID,
+      provider,
       kind: 'invalid_request',
       message,
       retriable: false,
@@ -230,7 +286,7 @@ export function normalizeOpenAIError(error: unknown): NormalizedProviderError {
 
   if (statusCode != null && statusCode >= 500) {
     return {
-      provider: OPENAI_PROVIDER_ID,
+      provider,
       kind: 'server',
       message,
       retriable: true,
@@ -243,7 +299,7 @@ export function normalizeOpenAIError(error: unknown): NormalizedProviderError {
 
   if (error instanceof TypeError) {
     return {
-      provider: OPENAI_PROVIDER_ID,
+      provider,
       kind: 'network',
       message,
       retriable: true,
@@ -255,7 +311,7 @@ export function normalizeOpenAIError(error: unknown): NormalizedProviderError {
   }
 
   return {
-    provider: OPENAI_PROVIDER_ID,
+    provider,
     kind: 'unknown',
     message,
     retriable: false,

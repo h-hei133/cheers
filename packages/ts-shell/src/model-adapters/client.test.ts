@@ -73,6 +73,40 @@ function createBaseConfig(adapter: ModelProviderAdapter): ModelClientConfig {
 }
 
 describe('ModelClient fallback policy', () => {
+  it('retries normalized retriable errors without downgrading them on re-entry', async () => {
+    let attemptCount = 0
+    const normalizedNetworkError: NormalizedProviderError = {
+      provider: 'openai',
+      kind: 'network',
+      message: 'fetch failed',
+      retriable: true,
+    }
+    const adapter = createMockAdapter(async function* () {
+      attemptCount += 1
+      if (attemptCount === 1) {
+        throw normalizedNetworkError
+      }
+      yield { type: 'response.started', provider: 'openai', model: 'gpt-4' }
+      yield { type: 'content.delta', delta: 'Recovered' }
+      yield { type: 'response.completed', finishReason: 'stop' }
+    })
+
+    const client = createModelClient(createBaseConfig(adapter))
+    const request: ModelRequest = {
+      schemaVersion: '1.0.0',
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: 'test' }],
+    }
+
+    const events: NormalizedStreamEvent[] = []
+    for await (const event of client.stream(request)) {
+      events.push(event)
+    }
+
+    expect(events).toHaveLength(3)
+    expect(attemptCount).toBe(2)
+  })
+
   it('retries transient failures and succeeds', async () => {
     let attemptCount = 0
     const adapter = createMockAdapter(async function* () {

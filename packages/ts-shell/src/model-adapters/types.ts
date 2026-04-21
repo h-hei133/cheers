@@ -1,6 +1,16 @@
 import type { SchemaVersion } from '../../../../contracts/typescript/types.js'
+import type {
+  GoogleAccountAuthConfig,
+  OpenAIAccountAuthConfig,
+} from '../config/runtimeConfig.js'
 
-export type ProviderId = 'openai'
+export type ProviderId =
+  | 'openai'
+  | 'anthropic'
+  | 'openai-compatible'
+  | 'google'
+  | 'antigravity'
+  | 'claudecode'
 
 export interface ProviderCapabilities {
   readonly supportsStreaming: boolean
@@ -43,6 +53,7 @@ export interface ModelProviderConfig {
   readonly provider: ProviderId
   readonly baseUrl?: string
   readonly apiKey?: string
+  readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig
 }
 
 export type NormalizedMessageRole = 'system' | 'user' | 'assistant' | 'tool'

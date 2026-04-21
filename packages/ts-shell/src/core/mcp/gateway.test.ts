@@ -199,4 +199,30 @@ describe('core MCP gateway (W3)', () => {
     expect(snapshot.tools).toEqual([])
     await expect(gateway.invokeTool('localSdk', 'search', {})).rejects.toThrow('MCP server localSdk requires authentication')
   })
+
+  it('refresh supports target/all and rejects unknown server targets', async () => {
+    fs.writeFileSync(
+      path.join(workspaceRoot, '.private-agents.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          localSdk: {
+            transport: 'sdk',
+            mockTools: [{ serverName: 'localSdk', toolName: 'search', qualifiedName: 'mcp__localSdk__search', description: 'Search MCP' }],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const gateway = new CoreMcpGateway(workspaceRoot)
+    await gateway.snapshot()
+
+    await expect(gateway.refresh('localSdk')).resolves.toMatchObject({
+      clients: [{ type: 'connected', name: 'localSdk' }],
+    })
+    await expect(gateway.refresh('all')).resolves.toMatchObject({
+      clients: [{ type: 'connected', name: 'localSdk' }],
+    })
+    await expect(gateway.refresh('missing-server')).rejects.toThrow('Unknown MCP server: missing-server')
+  })
 })

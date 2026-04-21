@@ -3,6 +3,7 @@ import {
   createOpenAIStreamMapperState,
   mapOpenAIChunkToNormalizedEvents,
   normalizeOpenAIError,
+  toCodexResponsesRequestBody,
 } from './normalize.js'
 
 describe('openai stream normalization', () => {
@@ -133,5 +134,33 @@ describe('openai provider failure normalization', () => {
 
     expect(normalized.kind).toBe('authentication')
     expect(normalized.retriable).toBe(false)
+  })
+})
+
+describe('codex request body mapping', () => {
+  it('includes instructions and input for account-auth codex endpoint', () => {
+    const body = toCodexResponsesRequestBody({
+      schemaVersion: '1.0.0',
+      model: 'gpt-5.4',
+      messages: [
+        { role: 'system', content: 'You are an assistant.' },
+        { role: 'user', content: 'hello' },
+      ],
+      maxOutputTokens: 256,
+    })
+
+    expect(body).toMatchObject({
+      model: 'gpt-5.4',
+      stream: true,
+      store: false,
+      instructions: 'You are an assistant.',
+    })
+    expect(body).not.toHaveProperty('max_output_tokens')
+    expect(body.input).toEqual([
+      {
+        role: 'user',
+        content: [{ type: 'input_text', text: 'hello' }],
+      },
+    ])
   })
 })

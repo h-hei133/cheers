@@ -69,6 +69,314 @@ describe("shell session runtime (W5)", () => {
     ]);
   });
 
+  it("builds follow-up continuity context before persisting the current prompt barrier", async () => {
+    const calls: string[] = [];
+    let continuitySeenByRunner: string | undefined;
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        buildPromptContinuityContext(sessionId: string, prompt: string) {
+          calls.push(`continuity:${sessionId}:${prompt}`);
+          return "recent-target-files: ./continuity_demo.py";
+        },
+        markRunStarted() {},
+        persistUserPromptBarrier(sessionId: string, prompt: string) {
+          calls.push(`barrier:${sessionId}:${prompt}`);
+        },
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn(sessionId: string, turn: { role: string; content: string }) {
+          calls.push(`turn:${sessionId}:${turn.role}:${turn.content}`);
+        },
+        saveCompleted(sessionId: string) {
+          calls.push(`completed:${sessionId}`);
+        },
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine() {},
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* (_prompt, _signal, _seed, continuityContext) {
+        continuitySeenByRunner = continuityContext;
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_followup",
+              initialPrompt: "continue previous issue and read first 2 lines",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "ok",
+          },
+        };
+      },
+    });
+
+    const output = await runtime.executePrompt(
+      "sess_followup",
+      "continue previous issue and read first 2 lines",
+    );
+
+    expect(output).toBe("ok");
+    expect(continuitySeenByRunner).toContain("recent-target-files");
+    expect(calls.slice(0, 2)).toEqual([
+      "continuity:sess_followup:continue previous issue and read first 2 lines",
+      "barrier:sess_followup:continue previous issue and read first 2 lines",
+    ]);
+  });
+
+  it("uses compact mode by default and only prints final assistant output", async () => {
+    const renderedLines: string[] = [];
+    const renderedChunks: string[] = [];
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk(chunk: string) {
+          renderedChunks.push(chunk);
+        },
+      } as never,
+      runPrompt: async function* () {
+        yield { type: "mcp.snapshot", clients: 0, tools: 0 };
+        yield { type: "tool.started", toolName: "bash", taskId: "task_1" };
+        yield {
+          type: "approval.requested",
+          toolName: "bash",
+          taskId: "task_1",
+        };
+        yield {
+          type: "query.retrying",
+          role: "coder",
+          turn: 1,
+          attempt: 1,
+          reason: "network-failure",
+        };
+        yield { type: "message.delta", role: "reviewer", delta: "final answer" };
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_compact",
+              initialPrompt: "hello",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "final answer",
+            codingResult: {
+              taskKind: "edit-file",
+              changedFiles: ["src/app.ts"],
+              failedFiles: [],
+              patches: [
+                {
+                  path: "src/app.ts",
+                  operation: "replace",
+                  status: "applied",
+                  changedLines: 2,
+                  addedLines: 1,
+                  removedLines: 1,
+                },
+              ],
+              repair: {
+                status: "not-needed",
+                attempts: 0,
+                recoveredItems: [],
+                failedItems: [],
+                notes: [],
+              },
+              continuation: {
+                status: "first-pass-success",
+                attempts: 0,
+                evidence: [],
+              },
+              changeSet: {
+                gitAware: true,
+                preExistingDirtyFiles: ["src/legacy.ts"],
+                postRunDirtyFiles: ["src/legacy.ts", "src/app.ts"],
+                attemptedFiles: ["src/app.ts"],
+                changedFiles: ["src/app.ts"],
+                unchangedAttemptedFiles: [],
+              },
+              taskSatisfaction: {
+                verdict: "satisfied",
+                reasons: [],
+                requiredEvidence: ["changed-files"],
+                observedEvidence: ["verify=passed(node --version)"],
+              },
+              verifiedFiles: ["src/app.ts"],
+              unverifiedFiles: [],
+              verification: {
+                status: "passed",
+                command: "node --version",
+                reason: "verify request mapped to allowlisted command",
+              },
+              evidence: ["readback:export const ok = true;"],
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_compact", "hello");
+
+    expect(runtime.getViewMode()).toBe("compact");
+    expect(renderedChunks).toEqual(["final answer"]);
+    expect(renderedLines).toContain("\nAssistant:");
+    expect(renderedLines).not.toContain("final answer");
+    expect(
+      renderedLines.some((line) => line.includes("[tool:start]")),
+    ).toBe(false);
+    expect(
+      renderedLines.some((line) => line.includes("Tool running: bash")),
+    ).toBe(true);
+    expect(
+      renderedLines.some((line) => line.includes("[approval] requested")),
+    ).toBe(false);
+    expect(
+      renderedLines.some((line) => line.includes("[query:retry]")),
+    ).toBe(false);
+    expect(
+      renderedLines.some((line) =>
+        line.includes("Working through a temporary provider retry"),
+      ),
+    ).toBe(true);
+    expect(
+      renderedLines.some((line) =>
+        line.includes(
+          "Run summary: approvals 0/1 approved | tools 1 run | retries 1 | mcp clients=0 tools=0",
+        ),
+      ),
+    ).toBe(true);
+    expect(renderedLines).toContain("Final result");
+    expect(
+      renderedLines.some((line) => line.includes("- Classification: success")),
+    ).toBe(true);
+    expect(renderedLines).toContain("Coding result");
+    expect(
+      renderedLines.some((line) => line.includes("- Changed files: src/app.ts")),
+    ).toBe(true);
+    expect(
+      renderedLines.some((line) => line.includes("- Verification: passed")),
+    ).toBe(true);
+    expect(
+      renderedLines.some((line) =>
+        line.includes("- Continuation: first-pass-success"),
+      ),
+    ).toBe(true);
+    expect(
+      renderedLines.some((line) =>
+        line.includes("- Change set (git-aware): yes"),
+      ),
+    ).toBe(true);
+    expect(
+      renderedLines.some((line) =>
+        line.includes("- Task satisfaction: satisfied"),
+      ),
+    ).toBe(true);
+    expect(
+      renderedLines.some((line) =>
+        line.includes("- Patch results: src/app.ts [replace] applied"),
+      ),
+    ).toBe(true);
+  });
+
+  it("prints streaming details in verbose mode", async () => {
+    const renderedLines: string[] = [];
+    const renderedChunks: string[] = [];
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk(chunk: string) {
+          renderedChunks.push(chunk);
+        },
+      } as never,
+      runPrompt: async function* () {
+        yield { type: "tool.started", toolName: "bash", taskId: "task_2" };
+        yield {
+          type: "query.retrying",
+          role: "coder",
+          turn: 1,
+          attempt: 1,
+          reason: "network-failure",
+        };
+        yield { type: "message.delta", role: "reviewer", delta: "hello " };
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_verbose",
+              initialPrompt: "hello",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "final answer",
+          },
+        };
+      },
+    });
+
+    runtime.setViewMode("verbose");
+    await runtime.executePrompt("sess_verbose", "hello");
+
+    expect(renderedChunks).toEqual(["hello "]);
+    expect(
+      renderedLines.some((line) => line.includes("[tool:start] bash")),
+    ).toBe(true);
+    expect(
+      renderedLines.some((line) => line.includes("[query:retry] role=coder")),
+    ).toBe(true);
+    expect(
+      renderedLines.some((line) => line.includes("[tool:start] bash")),
+    ).toBe(true);
+    expect(
+      renderedLines.some((line) => line.includes("Run summary:")),
+    ).toBe(false);
+    expect(renderedLines).toContain("Final result");
+    expect(renderedLines).toContain("\nAssistant:");
+  });
+
   it("does not persist prompt barrier again for resumed runs with a non-fresh runtime seed", async () => {
     const calls: string[] = [];
     const runtime = new ShellSessionRuntime({
@@ -280,7 +588,7 @@ describe("shell session runtime (W5)", () => {
       ),
     ).toBe(true);
     expect(renderedLines).toContain(
-      "Hint: set OPENAI_API_KEY in your shell, then submit another prompt.",
+            "Hint: configure credential via /connect set <provider> <api-key> (or export env var), then submit another prompt.",
     );
   });
 
@@ -361,7 +669,7 @@ describe("shell session runtime (W5)", () => {
         stopReason:
           "Provider readiness failed (provider-readiness:auth): OpenAI authentication was rejected (401/403). Verify OPENAI_API_KEY validity and access scope, then retry.",
         expectedHint:
-          "Hint: check OPENAI_API_KEY validity/permissions, then submit another prompt.",
+          "Hint: check provider API key validity/permissions, then submit another prompt.",
       },
       {
         sessionId: "sess_provider_network",

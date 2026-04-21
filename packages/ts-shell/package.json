@@ -5,14 +5,14 @@
   "type": "module",
   "main": "./dist/index.js",
   "bin": {
-    "agents": "./dist/entrypoints/cli.js"
+    "agents": "./dist/packages/ts-shell/src/entrypoints/cli.js"
   },
   "files": [
     "dist",
     "src"
   ],
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
     "dev": "tsx watch src/entrypoints/cli.tsx",
     "start": "tsx src/entrypoints/cli.tsx",
     "test": "vitest run",

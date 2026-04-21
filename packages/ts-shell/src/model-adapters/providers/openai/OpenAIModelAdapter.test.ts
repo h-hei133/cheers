@@ -162,4 +162,69 @@ describe('OpenAI model adapter', () => {
       },
     ])
   })
+
+  it('uses codex endpoint for account-auth and emits response text', async () => {
+    const calls: Array<{ url: string; body?: string }> = []
+    const encoder = new TextEncoder()
+    const sseBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            'data: {"type":"response.created","response":{"id":"resp_1","created_at":1,"model":"gpt-5.4"}}\n\n',
+          ),
+        )
+        controller.enqueue(
+          encoder.encode(
+            'data: {"type":"response.output_text.delta","item_id":"msg_1","delta":"Hello from codex"}\n\n',
+          ),
+        )
+        controller.enqueue(
+          encoder.encode(
+            'data: {"type":"response.completed","response":{"usage":{"input_tokens":1,"output_tokens":1}}}\n\n',
+          ),
+        )
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+        controller.close()
+      },
+    })
+    const adapter = new OpenAIModelAdapter(
+      {
+        provider: 'openai',
+        accountAuth: {
+          type: 'openai-chatgpt-account',
+          accessToken: 'acct-token',
+          refreshToken: 'refresh-token',
+          expiresAt: Date.now() + 3600_000,
+        },
+      },
+      async (input, init) => {
+        calls.push({
+          url: String(input),
+          body: typeof init?.body === 'string' ? init.body : undefined,
+        })
+        return new Response(sseBody, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        })
+      },
+    )
+
+    const events: unknown[] = []
+    for await (const event of adapter.streamResponse({
+      schemaVersion: '1.0.0',
+      model: 'gpt-5.4',
+      messages: [{ role: 'user', content: 'hello' }],
+    })) {
+      events.push(event)
+    }
+
+    expect(calls[0]?.url).toBe('https://chatgpt.com/backend-api/codex/responses')
+    expect(calls[0]?.body).toContain('"instructions"')
+    expect(calls[0]?.body).toContain('"store":false')
+    expect(events).toEqual([
+      { type: 'response.started', provider: 'openai', model: 'gpt-5.4' },
+      { type: 'content.delta', delta: 'Hello from codex' },
+      { type: 'response.completed', finishReason: 'stop' },
+    ])
+  })
 })

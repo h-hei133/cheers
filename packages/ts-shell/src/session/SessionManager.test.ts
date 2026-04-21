@@ -123,6 +123,92 @@ describe("SessionManager", () => {
     throw new Error("Expected corrupt session resume to fail");
   });
 
+  it("rebinds project root while preserving session identity and rebasing continuity anchors", () => {
+    const manager = new SessionManager();
+    const oldRoot = fs.mkdtempSync(path.join(fakeHome, "proj-old-"));
+    const newRoot = fs.mkdtempSync(path.join(fakeHome, "proj-new-"));
+    const session = manager.createNew(oldRoot);
+    const statePath = path.join(manager.getSessionDirPath(session.id), "state.json");
+    const oldTarget = path.join(oldRoot, "src", "feature.ts");
+    const oldTarget2 = path.join(oldRoot, "src", "other.ts");
+
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify(
+        {
+          status: "completed",
+          projectRoot: oldRoot,
+          runPhase: "idle",
+          durableStatus: "success",
+          terminalReason: "completed",
+          terminalClassification: "success",
+          pendingLifecycle: {
+            pendingApprovals: {},
+            pendingTools: {},
+            taskStates: {},
+          },
+          workingMemory: {
+            schemaVersion: 1,
+            updatedAt: new Date().toISOString(),
+            sourceEventCount: 9,
+            sourceTurnCount: 2,
+            compacted: false,
+            compactReason: "none",
+            continuity: {
+              sessionId: session.id,
+              projectRoot: oldRoot,
+              continuationFamilyId: `session:${session.id}`,
+              continuationEpoch: 0,
+              continuationFamilyAnchor: oldTarget,
+              recentChangedFiles: [oldTarget2],
+              recentTargetFiles: [oldTarget],
+              recentFailedFiles: [{ path: oldTarget, reason: `failed at ${oldRoot}` }],
+              recentVerifiedFiles: [oldTarget2],
+              lastRepairNotes: [],
+              lastContinuationEvidence: [`evidence rooted at ${oldRoot}`],
+              lastTaskSatisfactionReasons: [],
+              unresolvedItems: [`unresolved rooted at ${oldRoot}`],
+            },
+            summary: [`summary rooted at ${oldRoot}`],
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const rebound = manager.rebindSessionProjectRoot(session.id, newRoot);
+    expect(rebound.id).toBe(session.id);
+    expect(path.resolve(rebound.projectRoot)).toBe(path.resolve(newRoot));
+
+    const afterState = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+      workingMemory?: {
+        continuity?: {
+          projectRoot?: string;
+          continuationFamilyAnchor?: string;
+          recentTargetFiles?: string[];
+          recentChangedFiles?: string[];
+          recentVerifiedFiles?: string[];
+          recentFailedFiles?: Array<{ path: string; reason: string }>;
+          lastContinuationEvidence?: string[];
+          unresolvedItems?: string[];
+        };
+        summary?: string[];
+      };
+    };
+    const continuity = afterState.workingMemory?.continuity;
+    expect(continuity?.projectRoot).toBe(newRoot);
+    expect(continuity?.continuationFamilyAnchor?.startsWith(newRoot)).toBe(true);
+    expect(continuity?.recentTargetFiles?.[0]?.startsWith(newRoot)).toBe(true);
+    expect(continuity?.recentChangedFiles?.[0]?.startsWith(newRoot)).toBe(true);
+    expect(continuity?.recentVerifiedFiles?.[0]?.startsWith(newRoot)).toBe(true);
+    expect(continuity?.recentFailedFiles?.[0]?.path.startsWith(newRoot)).toBe(true);
+    expect(continuity?.lastContinuationEvidence?.[0]?.includes(newRoot)).toBe(true);
+    expect(continuity?.unresolvedItems?.[0]?.includes(newRoot)).toBe(true);
+    expect(afterState.workingMemory?.summary?.[0]?.includes(newRoot)).toBe(true);
+  });
+
   it("isolates unreadable session directories and emits one aggregated warning", () => {
     const manager = new SessionManager();
     const healthy = manager.createNew();
@@ -172,20 +258,38 @@ describe("SessionManager", () => {
     expect(fs.existsSync(path.join(sessionDir, "state.json"))).toBe(true);
   });
 
-  it("suggests the latest interrupted or errored session for recovery", () => {
+  it("keeps interrupted sessions recoverable while filtering durable errors without continuation evidence", () => {
     const manager = new SessionManager();
-    const first = manager.createNew();
-    manager.markRunStarted(first.id, "first prompt");
-    manager.saveInterrupted(first.id);
+    const interrupted = manager.createNew();
+    manager.markRunStarted(interrupted.id, "first prompt");
+    manager.saveInterrupted(interrupted.id);
 
-    const second = manager.createNew();
-    manager.markRunStarted(second.id, "second prompt");
-    manager.saveError(second.id, "daemon unavailable");
+    const noEvidenceError = manager.createNew();
+    manager.markRunStarted(noEvidenceError.id, "second prompt");
+    manager.saveError(noEvidenceError.id, "daemon unavailable", {
+      terminalReason: "stopped_error",
+      terminalClassification: "error",
+    });
 
-    const suggested = manager.getSuggestedRecoverySession();
-    expect(suggested).toBeTruthy();
-    expect([first.id, second.id]).toContain(suggested?.id);
-    expect(["interrupted", "error"]).toContain(suggested?.status);
+    const suggestedWithNoEvidenceError = manager.getSuggestedRecoverySession();
+    expect(suggestedWithNoEvidenceError?.id).toBe(interrupted.id);
+    expect(suggestedWithNoEvidenceError?.status).toBe("interrupted");
+
+    const evidenceError = manager.createNew();
+    manager.markRunStarted(evidenceError.id, "third prompt");
+    manager.appendQueryEvent(evidenceError.id, {
+      type: "approval.requested",
+      toolName: "bash",
+      taskId: "task_recovery_candidate_evidence",
+    });
+    manager.saveError(evidenceError.id, "transport exploded", {
+      terminalReason: "stopped_error",
+      terminalClassification: "error",
+    });
+
+    const suggestedWithEvidenceError = manager.getSuggestedRecoverySession();
+    expect(suggestedWithEvidenceError?.id).toBe(evidenceError.id);
+    expect(suggestedWithEvidenceError?.status).toBe("error");
   });
 
   it("does not suggest durable-stopped sessions as recoverable errors", () => {
@@ -200,6 +304,11 @@ describe("SessionManager", () => {
 
     const durableError = manager.createNew();
     manager.markRunStarted(durableError.id, "error prompt");
+    manager.appendQueryEvent(durableError.id, {
+      type: "approval.requested",
+      toolName: "bash",
+      taskId: "task_durable_error_recovery_evidence",
+    });
     manager.saveError(durableError.id, "Transport exploded", {
       terminalReason: "stopped_error",
       terminalClassification: "error",
@@ -214,6 +323,63 @@ describe("SessionManager", () => {
     expect(manager.getRecoverySnapshot(durableError.id).durableStatus).toBe(
       "error",
     );
+  });
+
+  it("blocks indeterminate terminal evidence from recovery entry and keeps interrupted recovery semantics", () => {
+    const manager = new SessionManager();
+
+    const interrupted = manager.createNew();
+    manager.markRunStarted(interrupted.id, "still recoverable prompt");
+    manager.saveInterrupted(interrupted.id);
+
+    const ambiguousError = manager.createNew();
+    manager.markRunStarted(ambiguousError.id, "ambiguous error prompt");
+    manager.saveError(ambiguousError.id, "unknown failure", {
+      terminalReason: "stopped_error",
+      terminalClassification: "error",
+    });
+
+    const ambiguousSessionDir = manager.getSessionDirPath(ambiguousError.id);
+    fs.writeFileSync(
+      path.join(ambiguousSessionDir, "state.json"),
+      JSON.stringify(
+        {
+          status: "error",
+          runPhase: "idle",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(ambiguousSessionDir, "transcript.jsonl"),
+      "",
+      "utf8",
+    );
+
+    const suggested = manager.getSuggestedRecoverySession();
+    expect(suggested?.id).toBe(interrupted.id);
+    expect(suggested?.status).toBe("interrupted");
+
+    const block = manager.getRecoveryTrustBoundaryBlock();
+    expect(block?.sessionId).toBe(ambiguousError.id);
+    expect(block?.reason).toBe("terminal-evidence-indeterminate");
+    expect(block?.recoveryHint).toContain(
+      "Start a fresh session or manually repair",
+    );
+
+    const resumeResult = manager.tryResume(ambiguousError.id);
+    expect(resumeResult.ok).toBe(false);
+    if (!resumeResult.ok) {
+      expect(resumeResult.error).toContain("is not recoverable");
+      expect(resumeResult.error).toContain(
+        "terminal evidence is indeterminate",
+      );
+      expect(resumeResult.recoveryHint).toContain(
+        "Start a fresh session or manually repair",
+      );
+    }
   });
 
   it("stores richer transcript events and exposes a recovery snapshot", () => {
@@ -249,6 +415,80 @@ describe("SessionManager", () => {
     expect(snapshot.pendingPrompt).toBe("recover this prompt");
     expect(snapshot.lastUserMessage?.content).toBe("recover this prompt");
     expect(snapshot.lastLifecycleEvent?.event).toBe("run-interrupted");
+  });
+
+  it("builds re-entry summaries ranked toward recoverable sessions in the current project", () => {
+    const manager = new SessionManager();
+    const projectA = path.join(fakeHome, "workspace-a");
+    const projectB = path.join(fakeHome, "workspace-b");
+
+    const recoverable = manager.createNew(projectA);
+    manager.markRunStarted(recoverable.id, "continue feature work");
+    manager.saveInterrupted(recoverable.id);
+
+    const blocked = manager.createNew(projectA);
+    manager.markRunStarted(blocked.id, "stopped by policy");
+    manager.saveError(blocked.id, "policy", {
+      terminalReason: "stopped_error",
+      terminalClassification: "stopped",
+    });
+
+    const otherProject = manager.createNew(projectB);
+    manager.markRunStarted(otherProject.id, "other project task");
+    manager.saveInterrupted(otherProject.id);
+
+    const summaries = manager.listReentrySummaries({
+      preferredProjectRoot: projectA,
+    });
+
+    expect(summaries.length).toBeGreaterThanOrEqual(3);
+    expect(summaries[0]?.id).toBe(recoverable.id);
+    expect(summaries[0]?.recoverable).toBe(true);
+    expect(summaries.find((item) => item.id === blocked.id)?.recoverable).toBe(
+      false,
+    );
+    expect(
+      summaries.find((item) => item.id === blocked.id)?.blockedReason,
+    ).toBe("continuation-evidence-missing");
+    expect(
+      summaries.find((item) => item.id === otherProject.id)?.projectRoot,
+    ).toBe(projectB);
+  });
+
+  it("aggregates recent project contexts for workspace control plane", () => {
+    const manager = new SessionManager();
+    const projectA = path.join(fakeHome, "workspace-a");
+    const projectB = path.join(fakeHome, "workspace-b");
+
+    const aRecoverable = manager.createNew(projectA);
+    manager.markRunStarted(aRecoverable.id, "continue a");
+    manager.saveInterrupted(aRecoverable.id);
+
+    const aCompleted = manager.createNew(projectA);
+    manager.markRunStarted(aCompleted.id, "done a");
+    manager.saveCompleted(aCompleted.id, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+    });
+
+    const bRecoverable = manager.createNew(projectB);
+    manager.markRunStarted(bRecoverable.id, "continue b");
+    manager.saveInterrupted(bRecoverable.id);
+
+    const projectSummaries = manager.listRecentProjectContexts();
+    const projectAContext = projectSummaries.find(
+      (item) => item.projectRoot === projectA,
+    );
+    const projectBContext = projectSummaries.find(
+      (item) => item.projectRoot === projectB,
+    );
+
+    expect(projectAContext?.sessionCount).toBe(2);
+    expect(projectAContext?.recoverableCount).toBe(1);
+    expect(projectAContext?.lastSessionId).toBe(aCompleted.id);
+    expect(projectBContext?.sessionCount).toBe(1);
+    expect(projectBContext?.recoverableCount).toBe(1);
+    expect(projectBContext?.lastSessionId).toBe(bRecoverable.id);
   });
 
   it("persists append-before-model-call barrier before query events begin", () => {

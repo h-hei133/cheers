@@ -2,12 +2,20 @@ node_modules/
 packages/*/node_modules/
 
 packages/rust-core/target/
+dist/
+packages/*/dist/
 
 .pytest_cache/
 packages/python-eval/.pytest_cache/
 .ruff_cache/
 __pycache__/
 *.py[cod]
+*.corrupted.bak
+
+# local scratch / replay artifacts
+.tmp-*
+packages/ts-shell/.tmp-debug-*/
+packages/ts-shell/_cli_input.txt
 
 .DS_Store
 Thumbs.db

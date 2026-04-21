@@ -9,6 +9,7 @@ This workspace is no longer at the initial scaffold-only stage. The TypeScript s
 ## Layers
 
 ### 1. **ts-shell** — TypeScript CLI Shell & Orchestration
+
 - **Location**: `packages/ts-shell/`
 - **Purpose**: CLI-first user interface, request routing, session management, agent orchestration
 - **Language**: TypeScript (Node.js 20+)
@@ -18,18 +19,24 @@ This workspace is no longer at the initial scaffold-only stage. The TypeScript s
 - **Runtime**: `npm start` or `npm run dev` (watch mode)
 
 **Responsibilities**:
+
 - Streaming CLI input/output loop
 - Multi-agent handoff orchestration (planner/coder/reviewer)
 - Permission/sandbox policy enforcement (default-deny)
 - Session state persistence
 - Model provider adapter interface
+- Provider onboarding and selection via `/auth`
+- Real-provider readiness gating for openai/openai-compatible configurations
 
 **Current runtime position**:
+
 - This is the long-term control plane of the system
 - Core runtime semantics have been pulled under `src/core/`
 - Query, tool runtime, MCP routing, command semantics, bootstrap, and recovery now live primarily in TS
+- Provider credentials are resolved from CLI args, environment, and per-user config before entering the real-provider path
 
 **Key runtime areas**:
+
 - `src/entrypoints/cli.tsx` — CLI bootstrap and thin IO entrypoint
 - `src/core/query/` — query runtime, transitions, result mapping
 - `src/core/tools/` — tool runtime, approval flow, permission context, visible tool prefilter
@@ -42,6 +49,7 @@ This workspace is no longer at the initial scaffold-only stage. The TypeScript s
 ---
 
 ### 2. **rust-core** — High-Performance Execution Daemon
+
 - **Location**: `packages/rust-core/`
 - **Purpose**: Long-running daemon for command execution, timeout management, resource control
 - **Language**: Rust (Edition 2021)
@@ -50,6 +58,7 @@ This workspace is no longer at the initial scaffold-only stage. The TypeScript s
 - **Test**: `npm run test:rust` (delegates to `cargo test`)
 
 **Responsibilities**:
+
 - Command execution with timeout/cancellation
 - Process resource limits and cleanup
 - Sandbox preflight / denial semantics for execution requests
@@ -57,11 +66,13 @@ This workspace is no longer at the initial scaffold-only stage. The TypeScript s
 - IPC bridge for TS↔Rust communication
 
 **Current runtime position**:
+
 - Rust is the execution plane, not the control plane
 - It is already integrated behind the TS caller boundary and covered by parity-oriented tests
 - It must not absorb session ownership, slash routing, permission UX, or orchestration logic
 
 **Key files**:
+
 - `src/lib.rs` — Core library
 - `src/bin/daemon.rs` — Daemon entry point
 - `src/executor.rs` — Command execution engine and contract-shaped execution results
@@ -69,6 +80,7 @@ This workspace is no longer at the initial scaffold-only stage. The TypeScript s
 ---
 
 ### 3. **python-eval** — Offline Research & Analysis Layer
+
 - **Location**: `packages/python-eval/`
 - **Purpose**: Offline-only research, analysis, and evaluation utilities
 - **Language**: Python 3.10+
@@ -76,15 +88,18 @@ This workspace is no longer at the initial scaffold-only stage. The TypeScript s
 - **Test**: `npm run test:python` (delegates to pytest)
 
 **Responsibilities**:
+
 - Document analysis and schema validation
 - Offline evaluation harness
 - Research utilities (never in online critical path)
 
 **Current runtime position**:
+
 - Python remains intentionally minimal
 - It is kept out of the online execution path by design
 
 **Key files**:
+
 - `src/` — Library modules
 - `tests/` — Unit tests
 
@@ -122,6 +137,7 @@ npm start              # TS shell production mode
 ### Cross-Layer Communication
 
 **STRICT ISOLATION RULES**:
+
 1. **TS → Rust**: Only via versioned RPC contracts (`contracts/runtime-protocol.schema.json`)
 2. **TS ↔ Python**: Only via CLI subprocess (never imported)
 3. **Rust ↔ Python**: Rust may call Python subprocess for offline eval only
@@ -129,6 +145,7 @@ npm start              # TS shell production mode
 5. **No circular dependencies** between layers
 
 ### Internal Dependencies
+
 - Each layer may have its own npm/cargo/pip dependencies
 - Root `package.json` defines workspace configuration only
 - Layer-specific `package.json`, `Cargo.toml`, `pyproject.toml` define layer dependencies
@@ -138,6 +155,7 @@ npm start              # TS shell production mode
 ## Contract Boundaries
 
 All cross-layer communication must conform to versioned schemas in `contracts/`:
+
 - `runtime-protocol.schema.json` — RPC envelope, task lifecycle, stream events
 - `versioning-policy.md` — Schema versioning and compatibility rules
 - `types.ts` — TypeScript type definitions (derived from schema)
@@ -159,12 +177,14 @@ The workspace has already moved past the original MVP-only framing. The current 
 Feature gate: `DAEMON_ENABLED=1` (environment variable or config flag)
 
 Current transition status:
+
 1. TS control-plane ownership is established in the current runtime
 2. Rust execution path exists and has timeout/cancel/sandbox-parity coverage
 3. TS↔Rust contract parity is part of the test and evidence story
 4. Fallback remains explicit; current local runs may still report `ts-local` depending on config/runtime path
 
 Guardrail:
+
 - future work should move only execution-bound responsibilities into Rust
 - shell, session, orchestration, permission UX, and MCP capability policy stay in TS
 

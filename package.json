@@ -4,6 +4,10 @@
   "description": "Maintainable three-layer workspace: TypeScript shell, Rust core, Python eval",
   "private": true,
   "type": "module",
+  "bin": {
+    "private-agents": "./dist/cli.js",
+    "cheer": "./dist/cli.js"
+  },
   "workspaces": [
     "packages/*"
   ],
@@ -14,7 +18,8 @@
     "audit:recent": "node scripts/show-audit.mjs",
     "workflow:status": "node scripts/workflow-status.mjs",
     "build": "npm run build --workspaces",
-    "build:ts": "npm run build -w packages/ts-shell",
+    "build:ts": "npm run build -w packages/ts-shell && node scripts/build-cli-bin.mjs",
+    "build:cli": "npm run build:ts",
     "build:rust": "npm run build -w packages/rust-core",
     "test": "npm run test:gate:golden-main-path && node scripts/test-all-stacks.mjs",
     "test:ts": "npm run test -w packages/ts-shell",
@@ -22,8 +27,8 @@
     "test:rust": "npm run test -w packages/rust-core",
     "test:python": "D:\\conda-envs\\coding_agents\\python.exe scripts/run-python-tests.py",
     "test:all": "npm run test:gate:golden-main-path && node scripts/test-all-stacks.mjs",
-    "dev": "npm run dev -w packages/ts-shell",
-    "start": "npm run start -w packages/ts-shell",
+    "dev": "npm run dev -w packages/ts-shell --",
+    "start": "npm run start -w packages/ts-shell --",
     "validate": "node scripts/validate-structure.mjs",
     "worktree:create": "node scripts/worktree-create.mjs"
   },

@@ -1,0 +1,238 @@
+# Private Coding Agents 使用手册
+
+适用目录：`D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents`
+
+## 1. 先说结论：用户态与开发态是否已区分
+已区分，方式是“同一 CLI 下的视图与职责分层”：
+- 用户态（默认）：`/view user`（等价 `compact`），强调任务结果与必要提示，隐藏大部分调试噪音。
+- 开发态：`/view developer`（等价 `verbose`），显示更完整的运行时事件（tool、approval、retry、MCP 状态等）。
+
+## 2. 快速开始
+### 2.1 初始化
+```bash
+npm install
+npm run setup
+```
+
+### 2.2 以用户方式启动（推荐）
+```bash
+npm start
+```
+推荐进入后先执行：
+1. `/connect status` 或 `/auth status`
+2. `/workspace status`
+3. 输入你的任务
+
+### 2.3 指定“目标项目”启动（非常推荐）
+```bash
+npm start -- --project D:\your\repo
+```
+也可以用别名：
+```bash
+npm start -- --attach D:\your\repo
+```
+
+### 2.4 常用 CLI 参数
+- `--version` / `-v` / `-V`：打印版本并退出
+- `--doctor`：打印诊断信息并退出
+- `--session-id <id>`：直接恢复指定会话
+- `--project <path>` / `--attach <path>`：启动即附着目标项目
+- `--provider <openai|anthropic|openai-compatible>`：仅本次进程覆盖 provider
+- `--api-key <key>`：仅本次进程覆盖 API key
+
+## 3. 会话内控制面（Slash 命令）
+
+### 3.1 `/help`
+显示用户命令指南（推荐当作总入口）。
+
+### 3.2 `/view`
+- `/view status`：查看当前视图
+- `/view user` 或 `/view compact`：用户态输出
+- `/view developer` 或 `/view verbose`：开发态输出
+
+### 3.3 `/workspace`（项目上下文控制面）
+- `/workspace status`：当前项目、cwd、git、会话绑定信息
+- `/workspace attach <path>`：会话内切换目标项目（无需重启 CLI）
+- `/workspace recent`：最近项目上下文
+
+### 3.4 `/sessions`（会话控制面）
+- `/sessions`：打开交互面板（推荐）
+- `/sessions list`：文本列表
+- `/sessions current`：当前会话详情
+- `/sessions switch <session-id>`：直接切换
+
+#### Sessions 面板快捷键
+- `↑/↓`：上下移动
+- `Enter`：切换到选中会话
+- `Ctrl+R`：重命名会话
+- `Ctrl+D`：删除会话
+- `Esc` 或 `Q`：关闭面板
+
+### 3.5 `/resume [session-id]`
+恢复可恢复会话。  
+不带参数时，按恢复策略选择最合适的会话；带参数时恢复指定会话。
+
+### 3.6 `/cancel`
+取消当前正在运行的这一次请求（不是退出整个 CLI 进程）。
+
+### 3.7 `/mcp`（MCP 控制面）
+- `/mcp status`：查看 MCP 服务连接总览
+- `/mcp tools [server]`：查看工具清单
+- `/mcp doctor`：诊断连接/鉴权异常
+- `/mcp refresh [server|all]`：刷新连接
+
+### 3.8 `/permissions`（审批信任策略管理）
+- `/permissions list`：查看当前项目的持久化 trust grants
+- `/permissions explain`：解释最近一次自动放行命中来源
+- `/permissions revoke <index|scope-key>`：撤销单条规则
+- `/permissions reset`：清空当前项目规则
+- `/permissions reset all`：清空全部规则
+
+### 3.9 `/connect`（推荐的 provider onboarding 入口）
+- `/connect status` 或 `/connect list`
+- `/connect presets`
+- `/connect login <provider|preset> --api-key <key> [--base-url <url>] [--model <model>] [--label <name>]`
+- `/connect login <provider|preset> --browser [--label <name>]`
+- `/connect use <connection-id|provider>`
+- `/connect logout <connection-id|provider>`
+
+支持目标：`openai`、`anthropic`、`openai-compatible`、`siliconflow`
+
+### 3.10 `/auth`（兼容入口，建议逐步迁移到 `/connect`）
+- `/auth status`
+- `/auth set <provider> <api-key> [base-url] [model]`
+- `/auth use <provider>`
+- `/auth logout [provider]`
+
+### 3.11 其他
+- `/doctor`：本地诊断
+- `/workflow-status`（别名 `/status`）：工作区 git/状态信息
+
+## 4. Approval（审批）与信任边界
+
+### 4.1 提示含义
+当请求涉及受限操作（通常是工具执行）时，会出现 `approval>`。
+
+输入选项：
+- `y`：Allow Once（仅本次）
+- `a`：Allow Always（写入持久化策略）
+- `n`：Deny
+
+### 4.2 作用域（关键）
+`allow-always` 不是“全局永远放行所有命令”，而是按项目边界与操作范围命中。  
+你可以用 `/permissions list/explain/revoke/reset` 进行查看与回收。
+
+## 5. 中断与退出
+
+- `Ctrl+C`：若当前有运行中的请求，取消本次请求；若空闲，再次触发会退出 CLI。
+- `Esc` 双击中断：运行中按一次 `Esc` 会进入 3 秒确认窗，3 秒内再按一次 `Esc`，取消当前响应。
+- `Ctrl+D`：退出 CLI。
+
+## 6. 典型用户路径
+
+### 6.1 纯聊天/问答
+1. `npm start`
+2. `/view user`
+3. 直接提问
+
+### 6.2 在某个仓库内做任务（推荐）
+1. `npm start -- --project D:\my-repo`
+2. `/workspace status` 确认绑定
+3. `/connect status` 确认 provider
+4. 提交任务
+5. 需要审批时按需 `y/a/n`
+
+### 6.3 会话恢复继续工作
+1. `/sessions`
+2. 选中并 Enter 切换，或 `/resume <id>`
+3. 看 `/sessions current` 与 `/workspace status` 确认上下文
+
+## 7. npm 命令总览（根目录）
+
+来源：`D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents\package.json`
+
+### 7.1 初始化与诊断
+- `npm run bootstrap`
+- `npm run setup`
+- `npm run doctor`
+- `npm run workflow:status`
+- `npm run audit:recent`
+
+### 7.2 构建
+- `npm run build`
+- `npm run build:ts`
+- `npm run build:rust`
+
+### 7.3 测试
+- `npm test`
+- `npm run test:gate:golden-main-path`
+- `npm run test:ts`
+- `npm run test:rust`
+- `npm run test:python`
+- `npm run test:all`
+
+### 7.4 运行
+- `npm run dev`
+- `npm start`
+
+### 7.5 结构/工作区工具
+- `npm run validate`
+- `npm run worktree:create -- <branch> <targetPath>`
+
+## 8. 子包常用命令
+
+### 8.1 `@private-agents/ts-shell`
+- `npm run build -w packages/ts-shell`
+- `npm run dev -w packages/ts-shell`
+- `npm run start -w packages/ts-shell`
+- `npm run test -w packages/ts-shell`
+- `npm run test:gate:golden-main-path -w packages/ts-shell`
+- `npm run test:watch -w packages/ts-shell`
+
+### 8.2 `@private-agents/rust-core`
+- `npm run build -w packages/rust-core`
+- `npm run test -w packages/rust-core`
+- `npm run test:watch -w packages/rust-core`
+- `npm run check -w packages/rust-core`
+- `npm run lint -w packages/rust-core`
+
+### 8.3 `@private-agents/python-eval`
+- `npm run build -w packages/python-eval`
+- `npm run test -w packages/python-eval`
+- `npm run test:watch -w packages/python-eval`
+- `npm run check -w packages/python-eval`
+- `npm run lint -w packages/python-eval`
+
+## 9. 配置与优先级
+
+### 9.1 配置文件位置
+- 用户级：`%USERPROFILE%\.private-agents\config.json`
+- 项目级：`<projectRoot>\.private-agents.json`
+
+### 9.2 Provider/凭证优先级（简化）
+- provider：CLI 参数 > runtime 配置
+- api key：CLI 参数 > 环境变量 > 配置文件
+
+环境变量映射：
+- `openai` -> `OPENAI_API_KEY`
+- `anthropic` -> `ANTHROPIC_API_KEY`
+- `openai-compatible` -> `OPENAI_COMPATIBLE_API_KEY`
+
+## 10. 常见问题
+
+### 10.1 为什么有时还会弹 approval？
+因为该动作触发了受限工具执行。  
+如果你确认当前项目内同类动作可长期信任，可使用 `a`，并通过 `/permissions` 管理。
+
+### 10.2 `/resume` 是“恢复什么”？
+恢复的是会话上下文与可恢复运行边界，不只是把某个 session id 设为 current。
+
+### 10.3 我怎么确认它到底在哪个项目工作？
+看 `/workspace status` 的 `Project root`，并确认当前会话绑定项目是否一致。
+
+### 10.4 我只想看简洁输出
+使用 `/view user`（默认）。排障时临时切 `/view developer`，结束后切回。
+
+---
+
+如果你希望，我下一步可以再补一份“纯用户版速查手册（1页）”，只保留最常用 12 条命令和 3 条典型流程。

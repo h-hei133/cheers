@@ -21,10 +21,10 @@ npm run doctor
 
 ## Optional local config
 
-Copy the example file and customize it:
+You can bootstrap credentials either by editing the user config file or by using `/auth` inside the CLI.
 
 ```bash
-cp .private-agents.example.json .private-agents.json
+npm start
 ```
 
 Supported keys:
@@ -32,12 +32,41 @@ Supported keys:
 - `provider`
 - `daemonEnabled`
 - `maxTurns`
+- `providerCredentials`
+
+Supported provider profiles:
+
+- `openai`
+- `anthropic`
+- `openai-compatible` (for SiliconFlow-style OpenAI-compatible endpoints)
+
+For `openai-compatible`, store all three fields:
+
+- `apiKey`
+- `baseUrl`
+- `model`
+
+Recommended CLI onboarding flow:
+
+```bash
+/auth set openai-compatible <api-key> https://api.siliconflow.cn/v1 deepseek-ai/DeepSeek-V3
+/auth status
+```
 
 ## Daily-use commands
 
 ```bash
 npm run build
 npm test
+npm start
+```
+
+Inside the CLI, you can then submit a real task prompt directly at the `>` prompt.
+
+If you want to force the real-provider path during a session, set:
+
+```powershell
+$env:PRIVATE_AGENTS_PROVIDER_MODE='real'
 npm start
 ```
 

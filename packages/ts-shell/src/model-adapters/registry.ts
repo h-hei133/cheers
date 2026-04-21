@@ -6,6 +6,11 @@ export function createModelProviderAdapter(
 ): ModelProviderAdapter {
   switch (config.provider) {
     case 'openai':
+    case 'anthropic':
+    case 'openai-compatible':
+    case 'google':
+    case 'antigravity':
+    case 'claudecode':
       return new OpenAIModelAdapter(config)
     default: {
       const exhaustive: never = config.provider
