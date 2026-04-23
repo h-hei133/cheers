@@ -187,7 +187,7 @@ function renderConnectionStatus(): string {
       );
     } else {
       lines.push(
-        `    credential=${connection.apiKey ? maskApiKey(connection.apiKey) : "none"}${connection.baseUrl ? ` baseUrl=${connection.baseUrl}` : ""}${connection.model ? ` model=${connection.model}` : ""}`,
+        `    credential=${renderApiKeyCredentialSummary(connection.apiKey)}${connection.baseUrl ? ` baseUrl=${connection.baseUrl}` : ""}${connection.model ? ` model=${connection.model}` : ""}`,
       );
     }
   }
@@ -197,6 +197,14 @@ function renderConnectionStatus(): string {
     "Use /connect use <connection-id> to switch runtime provider context.",
   );
   return lines.join("\n");
+}
+
+function renderApiKeyCredentialSummary(apiKey?: string): string {
+  if (!apiKey?.trim()) {
+    return "api-key:missing";
+  }
+
+  return "api-key:redacted";
 }
 
 function maskClientId(clientId: string): string {

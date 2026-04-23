@@ -209,6 +209,103 @@ describe("SessionManager", () => {
     expect(afterState.workingMemory?.summary?.[0]?.includes(newRoot)).toBe(true);
   });
 
+  it("rebinds approval audit cache-key root during project-root migration", () => {
+    const manager = new SessionManager();
+    const oldRoot = fs.mkdtempSync(path.join(fakeHome, "approval-old-"));
+    const newRoot = fs.mkdtempSync(path.join(fakeHome, "approval-new-"));
+    const session = manager.createNew(oldRoot);
+    const statePath = path.join(manager.getSessionDirPath(session.id), "state.json");
+
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify(
+        {
+          status: "completed",
+          projectRoot: oldRoot,
+          runPhase: "idle",
+          durableStatus: "success",
+          terminalReason: "completed",
+          terminalClassification: "success",
+          pendingLifecycle: {
+            pendingApprovals: {},
+            pendingTools: {},
+            taskStates: {},
+          },
+          workingMemory: {
+            approvalAudit: {
+              decision: "allow-once",
+              decisionSource: "cli-policy",
+              persistent: false,
+              cacheEffect: "none",
+              projectRoot: oldRoot,
+              cacheKey: `${oldRoot.toLowerCase()}|bash:spawn:process:node`,
+              scopeLabel: "bash/spawn/process(node)",
+            },
+            continuity: {
+              lastApprovalCacheKey: `${oldRoot.toLowerCase()}|bash:spawn:process:node`,
+              lastRequestScopeCacheKey: `${oldRoot.toLowerCase()}|bash:spawn:process:node`,
+              lastPermissionRequestCacheKey: `${oldRoot.toLowerCase()}|bash:spawn:process:node`,
+            },
+            summary: [
+              `- last-approval-cache-key: ${oldRoot.toLowerCase()}|bash:spawn:process:node`,
+              `- last-request-scope-cache-key: ${oldRoot.toLowerCase()}|bash:spawn:process:node`,
+              `- last-permission-request-cache-key: ${oldRoot.toLowerCase()}|bash:spawn:process:node`,
+            ],
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    manager.rebindSessionProjectRoot(session.id, newRoot);
+    const afterState = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+      workingMemory?: {
+        approvalAudit?: {
+          projectRoot?: string;
+          cacheKey?: string;
+        };
+        continuity?: {
+          lastApprovalCacheKey?: string;
+          lastRequestScopeCacheKey?: string;
+          lastPermissionRequestCacheKey?: string;
+        };
+        summary?: unknown;
+      };
+    };
+
+    expect(afterState.workingMemory?.approvalAudit?.projectRoot).toBe(newRoot);
+    expect(afterState.workingMemory?.approvalAudit?.cacheKey).toBe(
+      `${newRoot.toLowerCase()}|bash:spawn:process:node`,
+    );
+    expect(afterState.workingMemory?.continuity?.lastApprovalCacheKey).toBe(
+      `${newRoot.toLowerCase()}|bash:spawn:process:node`,
+    );
+    expect(afterState.workingMemory?.continuity?.lastRequestScopeCacheKey).toBe(
+      `${newRoot.toLowerCase()}|bash:spawn:process:node`,
+    );
+    expect(
+      afterState.workingMemory?.continuity?.lastPermissionRequestCacheKey,
+    ).toBe(`${newRoot.toLowerCase()}|bash:spawn:process:node`);
+    const summary =
+      afterState.workingMemory?.summary &&
+      Array.isArray(afterState.workingMemory.summary)
+        ? (afterState.workingMemory.summary as unknown[]).filter(
+            (entry): entry is string => typeof entry === "string",
+          )
+        : [];
+    expect(summary).toContain(
+      `- last-approval-cache-key: ${newRoot.toLowerCase()}|bash:spawn:process:node`,
+    );
+    expect(summary).toContain(
+      `- last-request-scope-cache-key: ${newRoot.toLowerCase()}|bash:spawn:process:node`,
+    );
+    expect(summary).toContain(
+      `- last-permission-request-cache-key: ${newRoot.toLowerCase()}|bash:spawn:process:node`,
+    );
+  });
+
   it("isolates unreadable session directories and emits one aggregated warning", () => {
     const manager = new SessionManager();
     const healthy = manager.createNew();
@@ -256,6 +353,680 @@ describe("SessionManager", () => {
     expect(fs.existsSync(path.join(sessionDir, "metadata.json"))).toBe(true);
     expect(fs.existsSync(path.join(sessionDir, "transcript.jsonl"))).toBe(true);
     expect(fs.existsSync(path.join(sessionDir, "state.json"))).toBe(true);
+  });
+
+  it("normalizes legacy permission cache keys on snapshot build for old sessions", () => {
+    const manager = new SessionManager();
+    const projectRoot = path.join(fakeHome, "proj-current");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const session = manager.createNew(projectRoot);
+    const statePath = path.join(
+      fakeHome,
+      ".private-agents",
+      "sessions",
+      session.id,
+      "state.json",
+    );
+    const legacyRoot = "D:\\legacy-old";
+    const legacyCacheKey = `${legacyRoot.toLowerCase()}|bash:spawn:process:npm`;
+    const expectedCacheKey = `${projectRoot.toLowerCase()}|bash:spawn:process:npm`;
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify(
+        {
+          status: "completed",
+          projectRoot,
+          runPhase: "idle",
+          durableStatus: "success",
+          terminalReason: "completed",
+          terminalClassification: "success",
+          pendingLifecycle: {
+            pendingApprovals: {},
+            pendingTools: {},
+            taskStates: {},
+          },
+          workingMemory: {
+            approvalAudit: {
+              decision: "allow-always",
+              decisionSource: "cli-policy",
+              persistent: true,
+              cacheEffect: "allow-always-persisted",
+              projectRoot,
+              cacheKey: legacyCacheKey,
+              scopeLabel: "bash/spawn/process(npm)",
+            },
+            continuity: {
+              lastApprovalCacheKey: legacyCacheKey,
+              lastRequestScopeCacheKey: legacyCacheKey,
+              lastPermissionRequestCacheKey: legacyCacheKey,
+              lastPermissionRequestToolName: "bash",
+              lastPermissionRequestOperation: "spawn",
+              lastPermissionRequestTarget: "npm test -- --help",
+              lastPermissionRequestScopeLabel: "bash/spawn/process(npm)",
+              lastPermissionRequestProjectRoot: projectRoot,
+              lastPermissionRequestSource: "approval-request",
+            },
+            summary: [
+              `- last-approval-cache-key: ${legacyCacheKey}`,
+              `- last-request-scope-cache-key: ${legacyCacheKey}`,
+              `- last-permission-request-cache-key: ${legacyCacheKey}`,
+            ],
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const snapshot = manager.buildContinuitySnapshot(session.id);
+    expect(snapshot.lastApprovalCacheKey).toBe(expectedCacheKey);
+    expect(snapshot.lastRequestScopeCacheKey).toBe(expectedCacheKey);
+    expect(snapshot.lastPermissionRequestCacheKey).toBe(expectedCacheKey);
+
+    const afterState = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+      workingMemory?: {
+        approvalAudit?: { cacheKey?: string };
+        continuity?: {
+          lastApprovalCacheKey?: string;
+          lastRequestScopeCacheKey?: string;
+          lastPermissionRequestCacheKey?: string;
+        };
+        summary?: unknown;
+      };
+    };
+    expect(afterState.workingMemory?.approvalAudit?.cacheKey).toBe(
+      expectedCacheKey,
+    );
+    expect(afterState.workingMemory?.continuity?.lastApprovalCacheKey).toBe(
+      expectedCacheKey,
+    );
+    expect(
+      afterState.workingMemory?.continuity?.lastRequestScopeCacheKey,
+    ).toBe(expectedCacheKey);
+    expect(
+      afterState.workingMemory?.continuity?.lastPermissionRequestCacheKey,
+    ).toBe(expectedCacheKey);
+    const summary =
+      afterState.workingMemory?.summary &&
+      Array.isArray(afterState.workingMemory.summary)
+        ? (afterState.workingMemory.summary as unknown[]).filter(
+            (entry): entry is string => typeof entry === "string",
+          )
+        : [];
+    expect(summary).toContain(`- last-approval-cache-key: ${expectedCacheKey}`);
+    expect(summary).toContain(
+      `- last-request-scope-cache-key: ${expectedCacheKey}`,
+    );
+    expect(summary).toContain(
+      `- last-permission-request-cache-key: ${expectedCacheKey}`,
+    );
+  });
+
+  it("hydrates missing lastPermissionRequest cache key from scoped legacy continuity", () => {
+    const manager = new SessionManager();
+    const projectRoot = path.join(fakeHome, "proj-current-hydrate");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const session = manager.createNew(projectRoot);
+    const statePath = path.join(
+      fakeHome,
+      ".private-agents",
+      "sessions",
+      session.id,
+      "state.json",
+    );
+    const legacyRoot = "D:\\legacy-old";
+    const legacyCacheKey = `${legacyRoot.toLowerCase()}|bash:spawn:process:npm`;
+    const expectedCacheKey = `${projectRoot.toLowerCase()}|bash:spawn:process:npm`;
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify(
+        {
+          status: "completed",
+          projectRoot,
+          runPhase: "idle",
+          durableStatus: "success",
+          terminalReason: "completed",
+          terminalClassification: "success",
+          pendingLifecycle: {
+            pendingApprovals: {},
+            pendingTools: {},
+            taskStates: {},
+          },
+          workingMemory: {
+            continuity: {
+              lastApprovalDecision: "allow-always",
+              lastApprovalCacheKey: legacyCacheKey,
+              lastRequestScopeCacheKey: legacyCacheKey,
+              lastRequestScopeLabel: "bash/spawn/process(npm)",
+              lastRequestScopeProjectRoot: projectRoot,
+              lastRequestScopeSource: "approval-request",
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const snapshot = manager.buildContinuitySnapshot(session.id);
+    expect(snapshot.lastPermissionRequestCacheKey).toBe(expectedCacheKey);
+    expect(snapshot.lastPermissionRequestScopeLabel).toBe(
+      "bash/spawn/process(npm)",
+    );
+    expect(snapshot.lastPermissionRequestSource).toBe("approval-request");
+
+    const afterState = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+      workingMemory?: {
+        continuity?: {
+          lastPermissionRequestCacheKey?: string;
+          lastPermissionRequestScopeLabel?: string;
+          lastPermissionRequestSource?: string;
+        };
+      };
+    };
+    expect(
+      afterState.workingMemory?.continuity?.lastPermissionRequestCacheKey,
+    ).toBe(expectedCacheKey);
+    expect(
+      afterState.workingMemory?.continuity?.lastPermissionRequestScopeLabel,
+    ).toBe("bash/spawn/process(npm)");
+    expect(afterState.workingMemory?.continuity?.lastPermissionRequestSource).toBe(
+      "approval-request",
+    );
+  });
+
+  it("normalizes legacy permission project-root fields and rooted targets for old sessions", () => {
+    const manager = new SessionManager();
+    const projectRoot = path.join(fakeHome, "proj-current-root-rebase");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const session = manager.createNew(projectRoot);
+    const statePath = path.join(
+      fakeHome,
+      ".private-agents",
+      "sessions",
+      session.id,
+      "state.json",
+    );
+    const legacyRoot = "D:\\legacy-old-root";
+    const legacyCacheKey = `${legacyRoot.toLowerCase()}|edit:write:target:d:\\legacy-old-root\\a.txt`;
+    const expectedCacheKey = `${projectRoot.toLowerCase()}|edit:write:target:d:\\legacy-old-root\\a.txt`;
+    const legacyScope = `edit/write/target(${legacyRoot}\\a.txt)`;
+    const expectedScope = `edit/write/target(${projectRoot}\\a.txt)`;
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify(
+        {
+          status: "completed",
+          projectRoot,
+          runPhase: "idle",
+          durableStatus: "success",
+          terminalReason: "completed",
+          terminalClassification: "success",
+          pendingLifecycle: {
+            pendingApprovals: {},
+            pendingTools: {},
+            taskStates: {},
+          },
+          workingMemory: {
+            approvalAudit: {
+              decision: "allow-always",
+              decisionSource: "cli-policy",
+              persistent: true,
+              cacheEffect: "allow-always-persisted",
+              projectRoot: legacyRoot,
+              cacheKey: legacyCacheKey,
+              scopeLabel: legacyScope,
+              lineage: "edit-file-primary",
+            },
+            continuity: {
+              lastApprovalProjectRoot: legacyRoot,
+              lastApprovalCacheKey: legacyCacheKey,
+              lastApprovalScope: legacyScope,
+              lastRequestScopeProjectRoot: legacyRoot,
+              lastRequestScopeCacheKey: legacyCacheKey,
+              lastRequestScopeLabel: legacyScope,
+              lastPermissionRequestProjectRoot: legacyRoot,
+              lastPermissionRequestCacheKey: legacyCacheKey,
+              lastPermissionRequestScopeLabel: legacyScope,
+              lastPermissionRequestTarget: `${legacyRoot}\\a.txt`,
+              lastPermissionRequestSource: "approval-request",
+            },
+            summary: [
+              `- last-approval-project-root: ${legacyRoot}`,
+              `- last-approval-cache-key: ${legacyCacheKey}`,
+              `- last-permission-request-project-root: ${legacyRoot}`,
+              `- last-permission-request-cache-key: ${legacyCacheKey}`,
+              `- last-request-scope-project-root: ${legacyRoot}`,
+              `- last-request-scope-cache-key: ${legacyCacheKey}`,
+            ],
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const snapshot = manager.buildContinuitySnapshot(session.id);
+    expect(snapshot.lastApprovalProjectRoot).toBe(projectRoot);
+    expect(snapshot.lastRequestScopeProjectRoot).toBe(projectRoot);
+    expect(snapshot.lastPermissionRequestProjectRoot).toBe(projectRoot);
+    expect(snapshot.lastApprovalCacheKey).toBe(expectedCacheKey);
+    expect(snapshot.lastPermissionRequestCacheKey).toBe(expectedCacheKey);
+    expect(snapshot.lastRequestScopeCacheKey).toBe(expectedCacheKey);
+    expect(snapshot.lastApprovalScope).toBe(expectedScope);
+    expect(snapshot.lastPermissionRequestScopeLabel).toBe(expectedScope);
+    expect(snapshot.lastPermissionRequestTarget).toBe(`${projectRoot}\\a.txt`);
+
+    const afterState = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+      workingMemory?: {
+        approvalAudit?: {
+          projectRoot?: string;
+          cacheKey?: string;
+          scopeLabel?: string;
+        };
+        continuity?: {
+          lastApprovalProjectRoot?: string;
+          lastRequestScopeProjectRoot?: string;
+          lastPermissionRequestProjectRoot?: string;
+          lastPermissionRequestTarget?: string;
+        };
+      };
+    };
+    expect(afterState.workingMemory?.approvalAudit?.projectRoot).toBe(projectRoot);
+    expect(afterState.workingMemory?.approvalAudit?.cacheKey).toBe(expectedCacheKey);
+    expect(afterState.workingMemory?.approvalAudit?.scopeLabel).toBe(expectedScope);
+    expect(afterState.workingMemory?.continuity?.lastApprovalProjectRoot).toBe(
+      projectRoot,
+    );
+    expect(afterState.workingMemory?.continuity?.lastRequestScopeProjectRoot).toBe(
+      projectRoot,
+    );
+    expect(
+      afterState.workingMemory?.continuity?.lastPermissionRequestProjectRoot,
+    ).toBe(projectRoot);
+    expect(afterState.workingMemory?.continuity?.lastPermissionRequestTarget).toBe(
+      `${projectRoot}\\a.txt`,
+    );
+  });
+
+  it("does not rewrite legacy rooted permission fields when multiple legacy roots conflict", () => {
+    const manager = new SessionManager();
+    const projectRoot = path.join(fakeHome, "proj-current-multi-legacy");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const session = manager.createNew(projectRoot);
+    const statePath = path.join(
+      fakeHome,
+      ".private-agents",
+      "sessions",
+      session.id,
+      "state.json",
+    );
+    const legacyRootA = "D:\\legacy-a";
+    const legacyRootB = "D:\\legacy-b";
+    const legacyCacheKeyA = `${legacyRootA.toLowerCase()}|bash:spawn:process:npm`;
+    const legacyCacheKeyB = `${legacyRootB.toLowerCase()}|bash:spawn:process:npm`;
+    const expectedCacheKey = `${projectRoot.toLowerCase()}|bash:spawn:process:npm`;
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify(
+        {
+          status: "completed",
+          projectRoot,
+          runPhase: "idle",
+          durableStatus: "success",
+          terminalReason: "completed",
+          terminalClassification: "success",
+          pendingLifecycle: {
+            pendingApprovals: {},
+            pendingTools: {},
+            taskStates: {},
+          },
+          workingMemory: {
+            approvalAudit: {
+              decision: "allow-always",
+              decisionSource: "cli-policy",
+              persistent: true,
+              cacheEffect: "allow-always-persisted",
+              projectRoot: legacyRootA,
+              cacheKey: legacyCacheKeyA,
+              scopeLabel: "bash/spawn/process(npm)",
+            },
+            approvalAuditHistory: [
+              {
+                decision: "allow-always",
+                decisionSource: "cli-policy",
+                persistent: true,
+                cacheEffect: "allow-always-persisted",
+                projectRoot: legacyRootB,
+                cacheKey: legacyCacheKeyB,
+                scopeLabel: "bash/spawn/process(npm)",
+              },
+            ],
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const snapshot = manager.buildContinuitySnapshot(session.id);
+    expect(snapshot.lastApprovalCacheKey).toBe(expectedCacheKey);
+    expect(snapshot.lastApprovalProjectRoot).toBe(legacyRootA);
+
+    const afterState = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+      workingMemory?: {
+        approvalAudit?: { projectRoot?: string; cacheKey?: string };
+        approvalAuditHistory?: Array<{ projectRoot?: string; cacheKey?: string }>;
+      };
+    };
+    expect(afterState.workingMemory?.approvalAudit?.cacheKey).toBe(
+      expectedCacheKey,
+    );
+    expect(afterState.workingMemory?.approvalAudit?.projectRoot).toBe(legacyRootA);
+    expect(afterState.workingMemory?.approvalAuditHistory?.[0]?.cacheKey).toBe(
+      expectedCacheKey,
+    );
+    expect(afterState.workingMemory?.approvalAuditHistory?.[0]?.projectRoot).toBe(
+      legacyRootB,
+    );
+  });
+
+  it("preserves approval memory across boundary-only continuity snapshots", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+
+    manager.recordApprovalAuditDecision(session.id, {
+      decision: "allow-once",
+      decisionSource: "tty-keypress",
+      persistent: false,
+      cacheEffect: "none",
+      projectRoot: session.projectRoot,
+      cacheKey: `${session.projectRoot.toLowerCase()}|bash:spawn:process:node`,
+      scopeLabel: "bash/spawn/process(node)",
+      channel: "interactive",
+      inputKey: "y",
+    });
+    manager.markRunStarted(session.id, "run node --version");
+    manager.saveError(session.id, "approval denied by user", {
+      terminalReason: "stopped_error",
+      terminalClassification: "error",
+    });
+
+    const boundarySnapshot = manager.buildPromptContinuitySnapshot(
+      session.id,
+      "continue with another task",
+    );
+
+    expect(boundarySnapshot).toBeDefined();
+    expect(boundarySnapshot?.lastApprovalDecision).toBe("allow-once");
+    expect(boundarySnapshot?.lastApprovalPersistent).toBe(false);
+    expect(boundarySnapshot?.lastApprovalCacheEffect).toBe("none");
+    expect(boundarySnapshot?.lastApprovalProjectRoot).toBe(session.projectRoot);
+    expect(boundarySnapshot?.lastApprovalChannel).toBe("interactive");
+    expect(boundarySnapshot?.lastApprovalInputKey).toBe("y");
+    expect((boundarySnapshot?.recentTargetFiles ?? []).length).toBe(0);
+  });
+
+  it("preserves task truth anchors across boundary-only continuity snapshots", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew("D:/Test/task-continuity-real3");
+
+    manager.addTurn(session.id, {
+      role: "user",
+      content: "TASK=ContinuityTruth3 continue from step1 and keep same task label",
+    });
+    manager.addTurn(session.id, {
+      role: "assistant",
+      content:
+        "TASK=ContinuityTruth3\nDONE=step1 complete\nNEXT=step2",
+    });
+    manager.markRunStarted(session.id, "continue same task");
+    manager.saveError(session.id, "verification stopped on step2", {
+      terminalReason: "stopped_error",
+      terminalClassification: "stopped",
+    });
+
+    const boundarySnapshot = manager.buildPromptContinuitySnapshot(
+      session.id,
+      "continue with another task",
+    );
+
+    expect(boundarySnapshot).toBeDefined();
+    expect(boundarySnapshot?.lastUserIntent).toContain("TASK=ContinuityTruth3");
+    expect(boundarySnapshot?.lastAssistantOutput).toContain(
+      "DONE=step1 complete",
+    );
+    expect(boundarySnapshot?.lastFailure).toContain("verification stopped");
+    expect((boundarySnapshot?.recentTargetFiles ?? []).length).toBe(0);
+  });
+
+  it("keeps approval memory available for reflective permission prompts", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+
+    manager.recordApprovalAuditDecision(session.id, {
+      decision: "allow-always",
+      decisionSource: "cli-policy",
+      persistent: true,
+      cacheEffect: "allow-always-persisted",
+      projectRoot: session.projectRoot,
+      cacheKey: `${session.projectRoot.toLowerCase()}|bash:spawn:process:node`,
+      scopeLabel: "bash/spawn/process(node)",
+      lineage: "verify:blocked->resumed",
+      channel: "non-interactive",
+      inputKey: "a",
+    });
+
+    const reflectiveSnapshot = manager.buildPromptContinuitySnapshot(
+      session.id,
+      "what did I just approve",
+    );
+
+    expect(reflectiveSnapshot).toBeDefined();
+    expect(reflectiveSnapshot?.lastApprovalDecision).toBe("allow-always");
+    expect(reflectiveSnapshot?.lastApprovalPersistent).toBe(true);
+    expect(reflectiveSnapshot?.lastApprovalCacheEffect).toBe(
+      "allow-always-persisted",
+    );
+    expect(reflectiveSnapshot?.lastApprovalLineage).toBe(
+      "verify:blocked->resumed",
+    );
+  });
+
+  it("retains approval memory via continuity and summary after structured approvalAudit is dropped", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    const statePath = path.join(manager.getSessionDirPath(session.id), "state.json");
+
+    manager.recordApprovalAuditDecision(session.id, {
+      decision: "allow-once",
+      decisionSource: "tty-keypress",
+      persistent: false,
+      cacheEffect: "none",
+      projectRoot: session.projectRoot,
+      cacheKey: `${session.projectRoot.toLowerCase()}|bash:spawn:process:node`,
+      scopeLabel: "bash/spawn/process(node)",
+      lineage: "verify:blocked->resumed",
+      channel: "interactive",
+      inputKey: "y",
+    });
+
+    const stateWithAudit = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+      workingMemory?: Record<string, unknown>;
+    };
+    const workingMemory = {
+      ...(stateWithAudit.workingMemory ?? {}),
+    };
+    delete (workingMemory as Record<string, unknown>).approvalAudit;
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify(
+        {
+          ...JSON.parse(fs.readFileSync(statePath, "utf8")),
+          workingMemory,
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const reflectiveSnapshot = manager.buildPromptContinuitySnapshot(
+      session.id,
+      "what did I just approve",
+    );
+    expect(reflectiveSnapshot).toBeDefined();
+    expect(reflectiveSnapshot?.lastApprovalDecision).toBe("allow-once");
+    expect(reflectiveSnapshot?.lastApprovalDecisionSource).toBe("tty-keypress");
+    expect(reflectiveSnapshot?.lastApprovalPersistent).toBe(false);
+    expect(reflectiveSnapshot?.lastApprovalLineage).toBe(
+      "verify:blocked->resumed",
+    );
+    expect(reflectiveSnapshot?.lastApprovalChannel).toBe("interactive");
+    expect(reflectiveSnapshot?.lastApprovalInputKey).toBe("y");
+  });
+
+  it("retains permission memory after real auto-compact threshold crossing", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    const statePath = path.join(manager.getSessionDirPath(session.id), "state.json");
+
+    manager.recordApprovalAuditDecision(session.id, {
+      decision: "allow-once",
+      decisionSource: "cli-policy",
+      persistent: false,
+      cacheEffect: "none",
+      projectRoot: session.projectRoot,
+      cacheKey: `${session.projectRoot.toLowerCase()}|bash:spawn:process:node`,
+      scopeLabel: "bash/spawn/process(node)",
+      channel: "non-interactive",
+      inputKey: "y",
+    });
+
+    const result = {
+      status: "completed",
+      terminalReason: "completed",
+      terminalClassification: "success",
+      transcript: [],
+      sharedContext: {
+        sessionId: session.id,
+        initialPrompt: "noop",
+        notes: [],
+        handoffs: [],
+      },
+      finalOutput: "ok",
+    } as const;
+
+    for (let index = 0; index < 12; index += 1) {
+      manager.appendQueryEvent(session.id, {
+        type: "query.completed",
+        result,
+      });
+    }
+
+    const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+      workingMemory?: {
+        compacted?: boolean;
+        compactReason?: string;
+        sourceTurnCount?: number;
+        approvalAudit?: {
+          decision?: string;
+          cacheEffect?: string;
+        };
+      };
+    };
+    expect(state.workingMemory?.compacted).toBe(true);
+    expect(state.workingMemory?.compactReason).toBe("auto-threshold");
+    expect((state.workingMemory?.sourceTurnCount ?? 0) >= 12).toBe(true);
+    expect(state.workingMemory?.approvalAudit?.decision).toBe("allow-once");
+    expect(state.workingMemory?.approvalAudit?.cacheEffect).toBe("none");
+
+    const reflectiveSnapshot = manager.buildPromptContinuitySnapshot(
+      session.id,
+      "what did I just approve",
+    );
+    expect(reflectiveSnapshot).toBeDefined();
+    expect(reflectiveSnapshot?.lastApprovalDecision).toBe("allow-once");
+    expect(reflectiveSnapshot?.lastApprovalCacheEffect).toBe("none");
+    expect(reflectiveSnapshot?.lastApprovalProjectRoot).toBe(session.projectRoot);
+  });
+
+  it("retains approval audit history after real auto-compact threshold crossing", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    const statePath = path.join(manager.getSessionDirPath(session.id), "state.json");
+    const root = session.projectRoot;
+
+    manager.recordApprovalAuditDecision(session.id, {
+      decision: "allow-always",
+      decisionSource: "tty-keypress",
+      persistent: true,
+      cacheEffect: "persisted",
+      projectRoot: root,
+      cacheKey: `${root.toLowerCase()}|bash:spawn:process:npm`,
+      scopeLabel: "bash/spawn/process(npm)",
+      recordedAt: "2026-04-23T12:00:00.000Z",
+    });
+    manager.recordApprovalAuditDecision(session.id, {
+      decision: "deny",
+      decisionSource: "tty-keypress",
+      persistent: false,
+      cacheEffect: "none",
+      projectRoot: root,
+      cacheKey: `${root.toLowerCase()}|bash:spawn:process:npm`,
+      scopeLabel: "bash/spawn/process(npm)",
+      stopReason: "user denied escalation",
+      recordedAt: "2026-04-23T12:03:00.000Z",
+    });
+
+    const result = {
+      status: "completed",
+      terminalReason: "completed",
+      terminalClassification: "success",
+      transcript: [],
+      sharedContext: {
+        sessionId: session.id,
+        initialPrompt: "noop",
+        notes: [],
+        handoffs: [],
+      },
+      finalOutput: "ok",
+    } as const;
+
+    for (let index = 0; index < 12; index += 1) {
+      manager.appendQueryEvent(session.id, {
+        type: "query.completed",
+        result,
+      });
+    }
+
+    const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+      workingMemory?: {
+        compacted?: boolean;
+        approvalAuditHistory?: Array<{ decision?: string }>;
+        continuity?: {
+          lastApprovalHistory?: Array<{ decision?: string }>;
+        };
+      };
+    };
+    expect(state.workingMemory?.compacted).toBe(true);
+    expect(state.workingMemory?.approvalAuditHistory?.length).toBeGreaterThanOrEqual(
+      2,
+    );
+    expect(
+      state.workingMemory?.approvalAuditHistory?.[
+        (state.workingMemory?.approvalAuditHistory?.length ?? 1) - 1
+      ]?.decision,
+    ).toBe("deny");
+    expect(
+      state.workingMemory?.continuity?.lastApprovalHistory?.[
+        (state.workingMemory?.continuity?.lastApprovalHistory?.length ?? 1) - 1
+      ]?.decision,
+    ).toBe("deny");
   });
 
   it("keeps interrupted sessions recoverable while filtering durable errors without continuation evidence", () => {
@@ -489,6 +1260,23 @@ describe("SessionManager", () => {
     expect(projectBContext?.sessionCount).toBe(1);
     expect(projectBContext?.recoverableCount).toBe(1);
     expect(projectBContext?.lastSessionId).toBe(bRecoverable.id);
+  });
+
+  it("tracks and restores current session selection per project", () => {
+    const manager = new SessionManager();
+    const projectA = path.join(fakeHome, "workspace-a-current");
+    const projectB = path.join(fakeHome, "workspace-b-current");
+
+    const a1 = manager.createNew(projectA);
+    const a2 = manager.createNew(projectA);
+    const b1 = manager.createNew(projectB);
+
+    // Selecting an older session should override latest-created session.
+    manager.resume(a1.id);
+
+    expect(manager.getCurrentSessionForProject(projectA)?.id).toBe(a1.id);
+    expect(manager.getCurrentSessionForProject(projectA)?.id).not.toBe(a2.id);
+    expect(manager.getCurrentSessionForProject(projectB)?.id).toBe(b1.id);
   });
 
   it("persists append-before-model-call barrier before query events begin", () => {
@@ -1755,6 +2543,96 @@ describe("SessionManager", () => {
         toolName: "read",
         taskId: "task_append_tool",
       },
+    );
+  });
+
+  it("retains transform evidence in continuity snapshot for temporal multi-hop rollover", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+
+    manager.markRunStarted(session.id, "next");
+    manager.addTurn(session.id, { role: "user", content: "next" });
+    manager.appendQueryEvent(session.id, {
+      type: "query.completed",
+      result: {
+        status: "completed",
+        terminalReason: "completed",
+        terminalClassification: "success",
+        transcript: [],
+        sharedContext: {
+          sessionId: session.id,
+          initialPrompt: "next",
+          notes: [],
+          handoffs: [],
+        },
+        finalOutput: "Edit completed for src/temporal-target.txt.",
+        codingResult: {
+          taskKind: "edit-file",
+          changedFiles: ["src/temporal-target.txt"],
+          failedFiles: [],
+          patches: [],
+          repair: {
+            status: "not-needed",
+            attempts: 1,
+            recoveredItems: [],
+            failedItems: [],
+            notes: [],
+          },
+          continuation: {
+            status: "first-pass-success",
+            attempts: 1,
+            evidence: [
+              "freshness-boundary:restored-session-state-consumed",
+              "freshness-boundary:degraded-reopen",
+              "freshness-boundary:last-terminal=success:completed",
+              "freshness-retained:reopen-candidates=1",
+              "reopen-reason:continuation reopen recovered single candidate target from remaining/failure evidence",
+              "reopen-candidates:src/temporal-target.txt",
+              "reopen-candidate-source:recent-failed=1",
+              "reopen-candidate-pruned:(missing-target)::placeholder",
+              "reopen-target:src/temporal-target.txt",
+              "inspect: read src/temporal-target.txt",
+              "rebind-transform:src/temporal-target.txt:status=done=>status=fixed->status=fixed=>status=modern",
+              "transform:src/temporal-target.txt:status=fixed=>status=modern",
+              "edit/write applied on src/temporal-target.txt",
+            ],
+          },
+          changeSet: {
+            gitAware: false,
+            preExistingDirtyFiles: [],
+            postRunDirtyFiles: [],
+            attemptedFiles: ["src/temporal-target.txt"],
+            changedFiles: ["src/temporal-target.txt"],
+            unchangedAttemptedFiles: [],
+          },
+          taskSatisfaction: {
+            verdict: "satisfied",
+            reasons: ["Workflow completed under inspect/edit/verify contract."],
+            requiredEvidence: ["inspect->edit->verify contract execution"],
+            observedEvidence: ["transform:src/temporal-target.txt:status=fixed=>status=modern"],
+          },
+          verifiedFiles: [],
+          unverifiedFiles: [],
+          verification: {
+            status: "not-requested",
+            reason: "mutation completed without explicit verify intent",
+            selectionScope: "none",
+            selectionSource: "not-requested",
+          },
+          evidence: [
+            "reopen-target:src/temporal-target.txt",
+            "transform:src/temporal-target.txt:status=fixed=>status=modern",
+          ],
+        },
+      },
+    });
+
+    const snapshot = manager.buildContinuitySnapshot(session.id);
+    expect(snapshot.lastContinuationEvidence).toContain(
+      "transform:src/temporal-target.txt:status=fixed=>status=modern",
+    );
+    expect(snapshot.lastContinuationEvidence).toContain(
+      "reopen-target:src/temporal-target.txt",
     );
   });
 });

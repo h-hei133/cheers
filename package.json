@@ -29,8 +29,24 @@
     "test:all": "npm run test:gate:golden-main-path && node scripts/test-all-stacks.mjs",
     "dev": "npm run dev -w packages/ts-shell --",
     "start": "npm run start -w packages/ts-shell --",
+    "start:live:interactive": "node scripts/live-interactive-runner.mjs",
     "validate": "node scripts/validate-structure.mjs",
-    "worktree:create": "node scripts/worktree-create.mjs"
+    "worktree:create": "node scripts/worktree-create.mjs",
+    "test:daily": "node scripts/daily-regression.mjs",
+    "test:broader": "node scripts/broader-regression.mjs --tier full",
+    "test:broader:p0": "node scripts/broader-regression.mjs --tier p0",
+    "test:broader:p1": "node scripts/broader-regression.mjs --tier p1",
+    "test:artifacts:validate": "node scripts/validate-broader-artifacts.mjs",
+    "test:comprehensive": "node scripts/comprehensive-regression.mjs --mode daily",
+    "test:release-gate": "node scripts/comprehensive-regression.mjs --mode release",
+    "test:delta:contracts": "node scripts/delta-regression.mjs --suite contracts",
+    "test:delta:xlayer": "node scripts/delta-regression.mjs --suite xlayer",
+    "test:delta:faults": "node scripts/delta-regression.mjs --suite faults",
+    "test:delta:concurrency": "node scripts/delta-regression.mjs --suite concurrency",
+    "test:delta:full": "node scripts/delta-regression.mjs --suite full",
+    "test:delta:nightly": "node scripts/delta-nightly.mjs --duration-minutes 45",
+    "test:delta:release": "cmd /d /s /c \"npm run test:delta:full && npm run test:delta:full && node scripts/delta-nightly.mjs --duration-minutes 1\"",
+    "test:coverage:real-shapes": "node scripts/real-shape-coverage.mjs"
   },
   "engines": {
     "node": ">=20.0.0"

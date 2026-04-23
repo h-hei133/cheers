@@ -5,6 +5,7 @@ export interface ToolExecutionContext {
   readonly workspaceRoot: string
   readonly sessionId?: string
   readonly correlationId?: string
+  readonly abortSignal?: AbortSignal
 }
 
 export interface ToolExecutionResult {

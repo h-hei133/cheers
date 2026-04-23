@@ -67,6 +67,17 @@ const KIND_REQUIRED_FIELDS = {
   'task.cancel': ['requestId', 'taskId', 'requestedBy', 'requestedAt', 'immediate'],
 }
 
+const KIND_OPTIONAL_FIELDS = {
+  'command.request': ['correlationId'],
+  'task.lifecycle': ['previousStatus', 'message', 'progress'],
+  'stream.chunk': [],
+  'runtime.error': ['taskId', 'details'],
+  'permission.prompt': ['rationale', 'expiresAt'],
+  'task.cancel': ['reason', 'correlationId'],
+}
+
+const COMMON_FIELDS = ['schemaVersion', 'kind']
+
 function isObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -131,6 +142,23 @@ export function validatePayload(payload) {
     if (payload[field] === undefined) {
       return [
         failure('E_FIELD_REQUIRED', `${field} is required for ${payload.kind}`, `/${field}`),
+      ]
+    }
+  }
+
+  const allowedFields = new Set([
+    ...COMMON_FIELDS,
+    ...KIND_REQUIRED_FIELDS[payload.kind],
+    ...(KIND_OPTIONAL_FIELDS[payload.kind] ?? []),
+  ])
+  for (const key of Object.keys(payload)) {
+    if (!allowedFields.has(key)) {
+      return [
+        failure(
+          'E_FIELD_UNKNOWN',
+          `${key} is not allowed for ${payload.kind}`,
+          `/${key}`,
+        ),
       ]
     }
   }

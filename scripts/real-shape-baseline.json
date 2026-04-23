@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "canonicalBlockerContains": "Cross-file follow-up is ambiguous for direct execution (missing transform evidence).",
+  "networkRetry": {
+    "maxAttempts": 3,
+    "retryOnContains": [
+      "Provider readiness failed (provider-readiness:network)"
+    ]
+  },
+  "cueFamily": [
+    "next",
+    "what next",
+    "after that",
+    "go on",
+    "keep going",
+    "do it",
+    "and then?"
+  ],
+  "shapes": [
+    {
+      "id": "shapeA_stale_mixed_exhausted",
+      "project": "D:/Test/cp_temporal_real_closure",
+      "sessionId": "sess_c4dd1fd822114a09_1776856812305",
+      "expectedCueOutcome": "canonical-blocker",
+      "explicitReopen": {
+        "targetFile": "D:/Test/cp_temporal_real_closure/src/temporal-target.txt",
+        "transforms": [
+          {
+            "from": "status=finalized2",
+            "to": "status=finalized3"
+          },
+          {
+            "from": "status=finalized",
+            "to": "status=finalized2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "shapeB_multihop_exhausted",
+      "project": "D:/Test/cp_temporal_convergence_real",
+      "sessionId": "sess_1130a0227b357987_1776860932518",
+      "expectedCueOutcome": "canonical-blocker"
+    },
+    {
+      "id": "shapeC_polluted_lineage",
+      "project": "D:/Test/cp_crossfile_polluted_real",
+      "sessionId": "sess_7498d9b0ca4fb50d_1776843714497",
+      "expectedCueOutcome": "canonical-blocker",
+      "plainChatProbe": "thanks"
+    }
+  ]
+}

@@ -10,6 +10,13 @@ export async function routeSlashCommand(
   }
 
   const [rawName, ...args] = input.slice(1).split(/\s+/).filter(Boolean)
+  if (!rawName) {
+    return {
+      kind: 'local',
+      output: buildSlashDiscoveryMessage(),
+    }
+  }
+
   const registry = createCommandRegistry(context.cwd)
   const command =
     registry.get(rawName) ??
@@ -18,9 +25,58 @@ export async function routeSlashCommand(
   if (!command || command.availability === 'hidden' || command.enabled === false) {
     return {
       kind: 'local',
-      output: `Unknown slash command: /${rawName}`,
+      output: buildUnknownSlashOutput(rawName, registry),
     }
   }
 
   return command.execute(args, context)
+}
+
+function buildUnknownSlashOutput(
+  rawName: string,
+  registry: ReadonlyMap<string, { aliases?: readonly string[] }>,
+): string {
+  const knownCommands = Array.from(registry.keys()).sort()
+  const maybeMatches = knownCommands.filter((name) =>
+    name.startsWith(rawName.toLowerCase()),
+  )
+  const aliasMatches = Array.from(registry.entries())
+    .filter(([, entry]) =>
+      (entry.aliases ?? []).some((alias) =>
+        alias.startsWith(rawName.toLowerCase()),
+      ),
+    )
+    .map(([name]) => name)
+
+  const uniqueHints = Array.from(new Set([...maybeMatches, ...aliasMatches]))
+  const hintLine =
+    uniqueHints.length > 0
+      ? `Did you mean: ${uniqueHints.slice(0, 3).map((name) => `/${name}`).join(', ')}?`
+      : `Try /help to view grouped commands.`
+
+  return [
+    `Unknown slash command: /${rawName}`,
+    hintLine,
+    '',
+    ...buildSlashDiscoveryLines(),
+  ].join('\n')
+}
+
+function buildSlashDiscoveryMessage(): string {
+  return [
+    `Slash command required after '/'.`,
+    `Try /help to view grouped commands.`,
+    '',
+    ...buildSlashDiscoveryLines(),
+  ].join('\n')
+}
+
+function buildSlashDiscoveryLines(): string[] {
+  return [
+    'Quick actions:',
+    '- /sessions              view active session + recent sessions',
+    '- /resume                continue best recoverable session context',
+    '- /workspace status      confirm current project/workdir binding',
+    '- /diagnose              inspect repo status and suggested next step',
+  ]
 }

@@ -32,7 +32,7 @@ export interface ShellActionResult {
   readonly sessionId?: string
   readonly viewMode?: 'compact' | 'verbose'
   readonly agentMode?: 'plan' | 'build'
-  readonly sessionAction?: 'panel' | 'list' | 'switch' | 'current'
+  readonly sessionAction?: 'panel' | 'list' | 'switch' | 'current' | 'help'
   readonly permissionAction?: 'list' | 'explain' | 'revoke' | 'reset'
   readonly permissionSelector?: string
   readonly mcpAction?: 'status' | 'tools' | 'doctor' | 'refresh'

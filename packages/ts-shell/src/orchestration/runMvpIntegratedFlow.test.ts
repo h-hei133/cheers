@@ -941,6 +941,13 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.codingResult?.taskKind).toBe("write-file");
     expect(result.codingResult?.changedFiles).toContain("scripts/verify.py");
     expect(result.codingResult?.verification.status).toBe("not-requested");
+    expect(result.codingResult?.evidence).toContain("current-permission-request-tool:write");
+    expect(result.codingResult?.evidence).toContain("current-permission-request-operation:write");
+    expect(
+      result.codingResult?.evidence.some((entry) =>
+        entry.startsWith("current-permission-request-scope-label:write/write/target("),
+      ),
+    ).toBe(true);
   }, 15000);
 
   it("executes edit workflow with diff evidence and explicit verify command", async () => {
@@ -979,6 +986,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.codingResult?.verification.command).toBe("node --version");
     expect(result.codingResult?.taskSatisfaction.verdict).toBe("satisfied");
     expect(result.codingResult?.evidence.length).toBeGreaterThan(0);
+    expect(result.codingResult?.evidence).toContain("current-permission-request-tool:edit");
+    expect(result.codingResult?.evidence).toContain("current-permission-request-operation:write");
     expect(
       result.codingResult?.evidence.some((entry) =>
         entry.startsWith("patch:src/edit-target.ts"),
@@ -2211,6 +2220,499 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
   }, 15000);
 
+  it("normalizes ambiguous ultra-weak variant to cross-file blocker surface instead of read-type blocker", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      '{"name":"t10-weak-cross-file-variant-normalization"}\n',
+      "utf8",
+    );
+    await fs.writeFile(path.join(workspaceRoot, "src", "variant-a.txt"), "value=a\n", "utf8");
+    await fs.writeFile(path.join(workspaceRoot, "src", "variant-b.txt"), "value=b\n", "utf8");
+
+    const prompt = [
+      "and then?",
+      "",
+      "[FOLLOW-UP CONTINUITY CONTEXT]",
+      "- recent-target-files: src/variant-a.txt,src/variant-b.txt",
+      "- last-continuation-evidence: repair-remaining-files:src/variant-a.txt,src/variant-b.txt | reopen-candidates:src/variant-a.txt,src/variant-b.txt | repair-failed-files:src/variant-a.txt::patch-generation-failed::retry pending",
+      "[END CONTINUITY CONTEXT]",
+    ].join("\n");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_weak_cross_file_variant_normalization",
+      prompt,
+      workspaceRoot,
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason ?? "").toContain("missing transform evidence");
+    expect(result.stopReason ?? "").not.toContain("no active file could be inherited");
+    expect(result.codingResult?.taskKind).toBe("edit-file");
+  }, 15000);
+
+  it("normalizes temporal successor cue 'next' to cross-file blocker surface in polluted history", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      '{"name":"t10-weak-cross-file-temporal-next"}\n',
+      "utf8",
+    );
+    await fs.writeFile(path.join(workspaceRoot, "src", "temporal-a.txt"), "value=a\n", "utf8");
+    await fs.writeFile(path.join(workspaceRoot, "src", "temporal-b.txt"), "value=b\n", "utf8");
+
+    const prompt = [
+      "next",
+      "",
+      "[FOLLOW-UP CONTINUITY CONTEXT]",
+      "- recent-target-files: src/temporal-a.txt,src/temporal-b.txt",
+      "- recent-failed-files: src/temporal-a.txt (patch failed (patch-generation-failed): retry pending)",
+      "- last-continuation-evidence: repair-remaining-files:src/temporal-a.txt,src/temporal-b.txt | reopen-candidates:src/temporal-a.txt,src/temporal-b.txt | continuation-lineage-active:src/legacy-read.txt::read::* | continuation-lineage-slot:src/legacy-read.txt::read::*",
+      "[END CONTINUITY CONTEXT]",
+    ].join("\n");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_weak_cross_file_temporal_next",
+      prompt,
+      workspaceRoot,
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason ?? "").toContain("missing transform evidence");
+    expect(result.stopReason ?? "").not.toContain("no active file could be inherited");
+    expect(result.codingResult?.taskKind).toBe("edit-file");
+  }, 15000);
+
+  it("normalizes temporal successor cue 'what next' to cross-file blocker surface in polluted history", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      '{"name":"t10-weak-cross-file-temporal-what-next"}\n',
+      "utf8",
+    );
+    await fs.writeFile(path.join(workspaceRoot, "src", "temporal-c.txt"), "value=c\n", "utf8");
+    await fs.writeFile(path.join(workspaceRoot, "src", "temporal-d.txt"), "value=d\n", "utf8");
+
+    const prompt = [
+      "what next",
+      "",
+      "[FOLLOW-UP CONTINUITY CONTEXT]",
+      "- recent-target-files: src/temporal-c.txt,src/temporal-d.txt",
+      "- recent-failed-files: src/temporal-c.txt (patch failed (patch-generation-failed): retry pending)",
+      "- last-continuation-evidence: repair-remaining-files:src/temporal-c.txt,src/temporal-d.txt | reopen-candidates:src/temporal-c.txt,src/temporal-d.txt | continuation-lineage-active:src/legacy-read.txt::read::* | continuation-lineage-slot:src/legacy-read.txt::read::*",
+      "[END CONTINUITY CONTEXT]",
+    ].join("\n");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_weak_cross_file_temporal_what_next",
+      prompt,
+      workspaceRoot,
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason ?? "").toContain("missing transform evidence");
+    expect(result.stopReason ?? "").not.toContain("no active file could be inherited");
+    expect(result.codingResult?.taskKind).toBe("edit-file");
+  }, 15000);
+
+  it("auto-continues temporal successor cue 'next' when cross-file evidence is single-target and executable", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      '{"name":"t10-weak-cross-file-temporal-next-auto"}\n',
+      "utf8",
+    );
+    const targetPath = path.join(workspaceRoot, "src", "temporal-next-auto.txt");
+    await fs.writeFile(targetPath, "status=pending\n", "utf8");
+
+    const prompt = [
+      "next",
+      "",
+      "[FOLLOW-UP CONTINUITY CONTEXT]",
+      "- recent-target-files: src/temporal-next-auto.txt",
+      "- recent-failed-files: src/temporal-next-auto.txt (patch failed (patch-generation-failed): retry pending)",
+      "- last-continuation-evidence: repair-remaining-files:src/temporal-next-auto.txt | reopen-candidates:src/temporal-next-auto.txt | replan-transform:src/temporal-next-auto.txt:status=pending=>status=done",
+      "[END CONTINUITY CONTEXT]",
+    ].join("\n");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_weak_cross_file_temporal_next_auto",
+      prompt,
+      workspaceRoot,
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("edit-file");
+    expect(result.stopReason).toBeUndefined();
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "cross-file ultra-weak follow-up auto-activated from single recoverable continuation target",
+    );
+    expect(result.stopReason ?? "").not.toContain(
+      "Continuation follow-up is ambiguous for direct execution",
+    );
+  }, 15000);
+
+  it("auto-continues temporal successor cue 'what next' when latest rebind transform evidence is executable", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      '{"name":"t10-weak-cross-file-temporal-what-next-auto"}\n',
+      "utf8",
+    );
+    const targetPath = path.join(workspaceRoot, "src", "temporal-what-next-auto.txt");
+    await fs.writeFile(targetPath, "mode=legacy\n", "utf8");
+
+    const prompt = [
+      "what next",
+      "",
+      "[FOLLOW-UP CONTINUITY CONTEXT]",
+      "- recent-target-files: src/temporal-what-next-auto.txt",
+      "- recent-failed-files: src/temporal-what-next-auto.txt (patch failed (patch-generation-failed): retry pending)",
+      "- last-continuation-evidence: repair-remaining-files:src/temporal-what-next-auto.txt | reopen-candidates:src/temporal-what-next-auto.txt | transform:src/temporal-what-next-auto.txt:mode=legacy=>mode=wrong | rebind-transform:src/temporal-what-next-auto.txt:mode=legacy=>mode=wrong->mode=legacy=>mode=modern",
+      "[END CONTINUITY CONTEXT]",
+    ].join("\n");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_weak_cross_file_temporal_what_next_auto",
+      prompt,
+      workspaceRoot,
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("edit-file");
+    expect(result.stopReason).toBeUndefined();
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "cross-file ultra-weak follow-up auto-activated from single recoverable continuation target",
+    );
+    expect(result.stopReason ?? "").not.toContain(
+      "Continuation follow-up is ambiguous for direct execution",
+    );
+  }, 15000);
+
+  it("rolls temporal continuation evidence across multi-hop successor cues", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "temporal-multihop-rollover.txt");
+    await fs.writeFile(targetPath, "status=pending\n", "utf8");
+
+    const firstPrompt = [
+      "next",
+      "",
+      "[FOLLOW-UP CONTINUITY CONTEXT]",
+      "- recent-target-files: src/temporal-multihop-rollover.txt",
+      "- recent-failed-files: src/temporal-multihop-rollover.txt (patch failed (patch-generation-failed): retry pending)",
+      "- last-continuation-evidence: repair-remaining-files:src/temporal-multihop-rollover.txt | reopen-candidates:src/temporal-multihop-rollover.txt | replan-transform:src/temporal-multihop-rollover.txt:status=pending=>status=done",
+      "[END CONTINUITY CONTEXT]",
+    ].join("\n");
+
+    const first = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_temporal_multihop_rollover_1",
+      prompt: firstPrompt,
+      workspaceRoot,
+      maxTurns: 6,
+    });
+
+    expect(first.status).toBe("completed");
+    expect(first.codingResult?.taskKind).toBe("edit-file");
+
+    const firstCodingResult = first.codingResult;
+    if (!firstCodingResult) {
+      throw new Error("Expected first hop coding result");
+    }
+
+    const second = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_temporal_multihop_rollover_2",
+      prompt: "what next",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: firstCodingResult.taskKind,
+        lastTerminalClassification: first.terminalClassification,
+        lastTerminalReason: first.terminalReason,
+        recentChangedFiles: firstCodingResult.changedFiles ?? [],
+        recentTargetFiles: firstCodingResult.changeSet?.attemptedFiles ?? [],
+        recentFailedFiles: (firstCodingResult.failedFiles ?? []).map((entry) => ({
+          path: entry.path,
+          reason: entry.reason,
+        })),
+        recentVerifiedFiles: firstCodingResult.verifiedFiles ?? [],
+        lastRepairStatus: firstCodingResult.repair.status,
+        lastRepairNotes: firstCodingResult.repair.notes ?? [],
+        lastContinuationStatus: firstCodingResult.continuation.status,
+        lastContinuationEvidence: firstCodingResult.continuation.evidence ?? [],
+        lastTaskSatisfactionVerdict: firstCodingResult.taskSatisfaction.verdict,
+        lastTaskSatisfactionReasons: firstCodingResult.taskSatisfaction.reasons ?? [],
+        unresolvedItems: [],
+      },
+      maxTurns: 6,
+    });
+
+    expect(["completed", "stopped_error"]).toContain(second.status);
+    expect(second.codingResult?.taskKind).toBe("edit-file");
+    if (second.status === "stopped_error") {
+      expect(second.codingResult?.failedFiles?.[0]?.path).toBe(
+        "src/temporal-multihop-rollover.txt",
+      );
+      expect(second.stopReason ?? "").not.toContain("no active file could be inherited");
+    }
+    expect(second.finalOutput.toLowerCase()).not.toContain("i'm here to chat");
+  }, 15000);
+
+  it("prevents inverse stale-transform rebound across temporal successor hops after rollover", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "temporal-multihop-exhaustion.txt");
+    await fs.writeFile(targetPath, "status=modern\n", "utf8");
+
+    const first = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_temporal_multihop_exhaustion_1",
+      prompt: "next",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: "edit-file",
+        lastTerminalClassification: "success",
+        lastTerminalReason: "completed",
+        recentChangedFiles: ["src/temporal-multihop-exhaustion.txt"],
+        recentTargetFiles: ["src/temporal-multihop-exhaustion.txt"],
+        recentFailedFiles: [],
+        unresolvedItems: [],
+        lastContinuationEvidence: [
+          "repair-remaining-files:src/temporal-multihop-exhaustion.txt",
+          "reopen-candidates:src/temporal-multihop-exhaustion.txt",
+          "rebind-transform:src/temporal-multihop-exhaustion.txt:status=future=>status=modern->status=modern=>status=right",
+        ],
+      },
+      maxTurns: 6,
+    });
+
+    expect(first.status).toBe("completed");
+    expect(await fs.readFile(targetPath, "utf8")).toBe("status=right\n");
+
+    const firstCodingResult = first.codingResult;
+    if (!firstCodingResult) {
+      throw new Error("Expected first hop coding result");
+    }
+
+    const second = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_temporal_multihop_exhaustion_2",
+      prompt: "after that",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: firstCodingResult.taskKind,
+        lastTerminalClassification: first.terminalClassification,
+        lastTerminalReason: first.terminalReason,
+        recentChangedFiles: firstCodingResult.changedFiles ?? [],
+        recentTargetFiles: firstCodingResult.changeSet?.attemptedFiles ?? [],
+        recentFailedFiles: (firstCodingResult.failedFiles ?? []).map((entry) => ({
+          path: entry.path,
+          reason: entry.reason,
+        })),
+        recentVerifiedFiles: firstCodingResult.verifiedFiles ?? [],
+        lastRepairStatus: firstCodingResult.repair.status,
+        lastRepairNotes: firstCodingResult.repair.notes ?? [],
+        lastContinuationStatus: firstCodingResult.continuation.status,
+        lastContinuationEvidence: firstCodingResult.continuation.evidence ?? [],
+        lastTaskSatisfactionVerdict: firstCodingResult.taskSatisfaction.verdict,
+        lastTaskSatisfactionReasons: firstCodingResult.taskSatisfaction.reasons ?? [],
+        unresolvedItems: [],
+      },
+      maxTurns: 6,
+    });
+
+    expect(second.status).toBe("stopped_error");
+    expect(second.stopReason ?? "").toContain("stale against current file content");
+    expect(second.finalOutput.toLowerCase()).not.toContain("i'm here to chat");
+    expect(await fs.readFile(targetPath, "utf8")).toBe("status=right\n");
+  }, 15000);
+
+  it("retires stale blocker evidence for generic temporal re-entry while allowing explicit transform override", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "temporal-post-exhaustion.txt");
+    await fs.writeFile(targetPath, "status=modern\n", "utf8");
+
+    const first = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_temporal_post_exhaustion_1",
+      prompt: "next",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: "edit-file",
+        lastTerminalClassification: "success",
+        lastTerminalReason: "completed",
+        recentChangedFiles: ["src/temporal-post-exhaustion.txt"],
+        recentTargetFiles: ["src/temporal-post-exhaustion.txt"],
+        recentFailedFiles: [],
+        unresolvedItems: [],
+        lastContinuationEvidence: [
+          "repair-remaining-files:src/temporal-post-exhaustion.txt",
+          "reopen-candidates:src/temporal-post-exhaustion.txt",
+          "rebind-transform:src/temporal-post-exhaustion.txt:status=future=>status=modern->status=modern=>status=right",
+        ],
+      },
+      maxTurns: 6,
+    });
+
+    expect(first.status).toBe("completed");
+    const firstCodingResult = first.codingResult;
+    if (!firstCodingResult) {
+      throw new Error("Expected first hop coding result");
+    }
+    expect(await fs.readFile(targetPath, "utf8")).toBe("status=right\n");
+
+    const second = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_temporal_post_exhaustion_2",
+      prompt: "after that",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: firstCodingResult.taskKind,
+        lastTerminalClassification: first.terminalClassification,
+        lastTerminalReason: first.terminalReason,
+        recentChangedFiles: firstCodingResult.changedFiles ?? [],
+        recentTargetFiles: firstCodingResult.changeSet?.attemptedFiles ?? [],
+        recentFailedFiles: (firstCodingResult.failedFiles ?? []).map((entry) => ({
+          path: entry.path,
+          reason: entry.reason,
+        })),
+        recentVerifiedFiles: firstCodingResult.verifiedFiles ?? [],
+        lastRepairStatus: firstCodingResult.repair.status,
+        lastRepairNotes: firstCodingResult.repair.notes ?? [],
+        lastContinuationStatus: firstCodingResult.continuation.status,
+        lastContinuationEvidence: firstCodingResult.continuation.evidence ?? [],
+        lastTaskSatisfactionVerdict: firstCodingResult.taskSatisfaction.verdict,
+        lastTaskSatisfactionReasons: firstCodingResult.taskSatisfaction.reasons ?? [],
+        unresolvedItems: [],
+      },
+      maxTurns: 6,
+    });
+
+    expect(second.status).toBe("stopped_error");
+    expect(second.stopReason ?? "").toContain("stale against current file content");
+    const secondCodingResult = second.codingResult;
+    if (!secondCodingResult) {
+      throw new Error("Expected second hop coding result");
+    }
+
+    const third = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_temporal_post_exhaustion_3",
+      prompt: "next",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: secondCodingResult.taskKind,
+        lastTerminalClassification: second.terminalClassification,
+        lastTerminalReason: second.terminalReason,
+        recentChangedFiles: secondCodingResult.changedFiles ?? [],
+        recentTargetFiles: secondCodingResult.changeSet?.attemptedFiles ?? [],
+        recentFailedFiles: (secondCodingResult.failedFiles ?? []).map((entry) => ({
+          path: entry.path,
+          reason: entry.reason,
+        })),
+        recentVerifiedFiles: secondCodingResult.verifiedFiles ?? [],
+        lastRepairStatus: secondCodingResult.repair.status,
+        lastRepairNotes: secondCodingResult.repair.notes ?? [],
+        lastContinuationStatus: secondCodingResult.continuation.status,
+        lastContinuationEvidence: secondCodingResult.continuation.evidence ?? [],
+        lastTaskSatisfactionVerdict: secondCodingResult.taskSatisfaction.verdict,
+        lastTaskSatisfactionReasons: secondCodingResult.taskSatisfaction.reasons ?? [],
+        unresolvedItems: [],
+      },
+      maxTurns: 6,
+    });
+
+    expect(third.status).toBe("stopped_error");
+    expect(third.stopReason ?? "").not.toContain("stale against current file content");
+    expect(third.stopReason ?? "").toContain("missing transform evidence");
+    expect(await fs.readFile(targetPath, "utf8")).toBe("status=right\n");
+
+    const thirdCodingResult = third.codingResult;
+    if (!thirdCodingResult) {
+      throw new Error("Expected third hop coding result");
+    }
+
+    const fourth = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_temporal_post_exhaustion_4",
+      prompt: "replace status=right with status=final in src/temporal-post-exhaustion.txt",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: thirdCodingResult.taskKind,
+        lastTerminalClassification: third.terminalClassification,
+        lastTerminalReason: third.terminalReason,
+        recentChangedFiles: thirdCodingResult.changedFiles ?? [],
+        recentTargetFiles: thirdCodingResult.changeSet?.attemptedFiles ?? [],
+        recentFailedFiles: (thirdCodingResult.failedFiles ?? []).map((entry) => ({
+          path: entry.path,
+          reason: entry.reason,
+        })),
+        recentVerifiedFiles: thirdCodingResult.verifiedFiles ?? [],
+        lastRepairStatus: thirdCodingResult.repair.status,
+        lastRepairNotes: thirdCodingResult.repair.notes ?? [],
+        lastContinuationStatus: thirdCodingResult.continuation.status,
+        lastContinuationEvidence: thirdCodingResult.continuation.evidence ?? [],
+        lastTaskSatisfactionVerdict: thirdCodingResult.taskSatisfaction.verdict,
+        lastTaskSatisfactionReasons: thirdCodingResult.taskSatisfaction.reasons ?? [],
+        unresolvedItems: [],
+      },
+      maxTurns: 6,
+    });
+
+    expect(fourth.status).toBe("completed");
+    expect(await fs.readFile(targetPath, "utf8")).toContain("status=final");
+  }, 15000);
+
+  it("unifies post-exhaustion cross-file ultra-weak cues to a single missing-transform blocker surface", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "temporal-surface-unify.txt");
+    await fs.writeFile(targetPath, "status=right\n", "utf8");
+
+    const cues = [
+      "next",
+      "what next",
+      "after that",
+      "go on",
+      "keep going",
+      "do it",
+      "and then?",
+    ];
+
+    for (const cue of cues) {
+      const result = await runMvpIntegratedFlow({
+        sessionId: `sess_t10_temporal_surface_unify_${cue.replace(/[^a-z0-9]+/gi, "_")}`,
+        prompt: cue,
+        workspaceRoot,
+        continuityState: {
+          projectRoot: workspaceRoot,
+          lastTaskKind: "edit-file",
+          lastTerminalClassification: "stopped",
+          lastTerminalReason: "stopped_error",
+          lastFailure:
+            "Reopened target recovered, but previous transform is stale against current file content (replacement already present). Provide an explicit next transform to continue.",
+          recentChangedFiles: [],
+          recentTargetFiles: ["src/temporal-surface-unify.txt"],
+          recentFailedFiles: [],
+          unresolvedItems: [],
+          lastContinuationEvidence: [
+            "repair-remaining-files:src/temporal-surface-unify.txt",
+            "reopen-candidates:src/temporal-surface-unify.txt",
+            "rebind-blocker:src/temporal-surface-unify.txt:stale-transform-already-applied:status=modern=>status=right",
+          ],
+        },
+        maxTurns: 6,
+      });
+
+      expect(result.status).toBe("stopped_error");
+      expect(result.stopReason ?? "").toContain("missing transform evidence");
+      expect(result.stopReason ?? "").not.toContain("stale against current file content");
+      expect(result.finalOutput.toLowerCase()).not.toContain("i'm here to chat");
+    }
+  }, 15000);
+
   it("keeps plain chat at chat-boundary with cross-file remaining history", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
@@ -2240,6 +2742,1319 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.status).toBe("completed");
     expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
     expect(await fs.readFile(targetPath, "utf8")).toBe("value=keep\n");
+  }, 15000);
+
+  it("routes reflective stop-reason query to rebased continuity state instead of repo-explain", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "reflective-stop.ts"),
+      "export const v = 1;\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_stop_rebased",
+      prompt: "why did it stop",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastTerminalClassification: "stopped",
+        lastTerminalReason: "stopped_error",
+        lastFailure: "verify failed: npm test -- --help",
+        recentTargetFiles: ["D:/legacy-root/src/reflective-stop.ts"],
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: stop-reason",
+    );
+    expect(result.sharedContext.notes.join("\n")).not.toContain("plan: intent=repo-explain");
+    expect(result.finalOutput).toContain("Last run status:");
+    expect(result.finalOutput).toContain("verify failed");
+    expect(result.finalOutput).toContain("src/reflective-stop.ts");
+  }, 15000);
+
+  it("answers reflective explain scope from rebased explain object after migration-like root change", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src", "nested"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "nested", "reflective-explain.ts"),
+      ["gamma", "delta", "epsilon"].join("\n"),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_explain_rebased",
+      prompt: "what part did you just explain",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastGroundedDeliverableMode: "explain",
+        recentTargetFiles: ["D:/legacy-root/src/nested/reflective-explain.ts"],
+        lastReadFragmentRanges: ["0-1"],
+        lastReadFragmentLineIndexes: [0, 1],
+        lastTaskKind: "read-file",
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: explain-scope",
+    );
+    expect(result.finalOutput).toContain("Last explain scope: slice 0-1.");
+    expect(result.finalOutput).toContain("src/nested/reflective-explain.ts");
+  }, 15000);
+
+  it("answers reflective read-position query from rebased session state after migration-like root change", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src", "nested"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "nested", "reflective-read.ts"),
+      ["l1", "l2", "l3", "l4", "l5"].join("\n"),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_read_rebased",
+      prompt: "刚才读到哪里了",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastTaskKind: "read-file",
+        recentTargetFiles: ["D:/legacy-root/src/nested/reflective-read.ts"],
+        lastReadWindowStart: 2,
+        lastReadWindowEnd: 4,
+        lastReadWindowSize: 2,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: read-position",
+    );
+    expect(result.finalOutput).toContain("Last read position: lines 3-4.");
+    expect(result.finalOutput).toContain("src/nested/reflective-read.ts");
+  }, 15000);
+
+  it("keeps post-compact permission explanation prompts on approval-memory reflective routing (English)", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "reflective-approval-en.txt"),
+      "approval-memory\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_compact_en",
+      prompt: "why didn't that approval apply directly this time",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: "chat",
+        lastApprovalDecision: "allow-once",
+        lastApprovalDecisionSource: "tty-keypress",
+        lastApprovalPersistent: false,
+        lastApprovalCacheEffect: "none",
+        lastApprovalProjectRoot: workspaceRoot,
+        lastApprovalCacheKey: `${workspaceRoot.replace(/\\/g, "/").toLowerCase()}|bash:spawn:process:npm`,
+        lastApprovalScope: "bash/spawn/process(npm)",
+        lastApprovalLineage: "verify:node --version",
+        lastApprovalRecordedAt: "2026-04-23T12:00:00.000Z",
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 17,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: approval-memory",
+    );
+    expect(result.sharedContext.notes.join("\n")).not.toContain("plan: intent=repo-explain");
+    expect(result.finalOutput).toContain("Last approval decision: allow-once.");
+    expect(result.finalOutput).toContain("Why asking again:");
+  }, 15000);
+
+  it("keeps post-compact permission explanation prompts on approval-memory reflective routing (Chinese)", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "reflective-approval-zh.txt"),
+      "approval-memory\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_compact_zh",
+      prompt: "\u521A\u624D\u90A3\u4E2A\u6388\u6743\u4E3A\u4EC0\u4E48\u8FD9\u6B21\u53C8\u6CA1\u76F4\u63A5\u751F\u6548",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: "chat",
+        lastApprovalDecision: "allow-once",
+        lastApprovalDecisionSource: "cli-policy",
+        lastApprovalPersistent: false,
+        lastApprovalCacheEffect: "none",
+        lastApprovalProjectRoot: workspaceRoot,
+        lastApprovalCacheKey: `${workspaceRoot.replace(/\\/g, "/").toLowerCase()}|bash:spawn:process:npm`,
+        lastApprovalScope: "bash/spawn/process(npm)",
+        lastApprovalLineage: "verify:npm test -- --help",
+        lastApprovalRecordedAt: "2026-04-23T12:05:00.000Z",
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 19,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: approval-memory",
+    );
+    expect(result.sharedContext.notes.join("\n")).not.toContain("plan: intent=repo-explain");
+    expect(result.finalOutput).toContain("Last approval decision: allow-once.");
+    expect(result.finalOutput).toContain("Why asking again:");
+  }, 15000);
+
+  it("resolves authoritative approval from rebased root when latest history is from another root", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "reflective-approval-authority-root.txt"),
+      "approval-memory\n",
+      "utf8",
+    );
+
+    const rebasedRoot = workspaceRoot.replace(/\\/g, "/");
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_authority_root",
+      prompt: "why is it asking again for approval",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: rebasedRoot,
+        lastTaskKind: "chat",
+        lastApprovalDecision: "allow-always",
+        lastApprovalDecisionSource: "tty-keypress",
+        lastApprovalPersistent: true,
+        lastApprovalCacheEffect: "persisted",
+        lastApprovalProjectRoot: "D:/legacy-root",
+        lastApprovalCacheKey: "d:/legacy-root|bash:spawn:process:npm",
+        lastApprovalScope: "bash/spawn/process(npm)",
+        lastApprovalLineage: "verify:npm test",
+        lastApprovalRecordedAt: "2026-04-23T12:05:00.000Z",
+        lastApprovalHistory: [
+          {
+            decision: "allow-once",
+            decisionSource: "tty-keypress",
+            persistent: false,
+            cacheEffect: "none",
+            projectRoot: rebasedRoot,
+            cacheKey: `${rebasedRoot.toLowerCase()}|bash:spawn:process:npm`,
+            scopeLabel: "bash/spawn/process(npm)",
+            lineage: "verify:npm test",
+            recordedAt: "2026-04-23T12:00:00.000Z",
+          },
+          {
+            decision: "allow-always",
+            decisionSource: "tty-keypress",
+            persistent: true,
+            cacheEffect: "persisted",
+            projectRoot: "D:/legacy-root",
+            cacheKey: "d:/legacy-root|bash:spawn:process:npm",
+            scopeLabel: "bash/spawn/process(npm)",
+            lineage: "verify:npm test",
+            recordedAt: "2026-04-23T12:05:00.000Z",
+          },
+        ],
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 21,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: approval-memory",
+    );
+    expect(result.finalOutput).toContain("Authoritative approval now: allow-once");
+    expect(result.finalOutput).toContain("rebased authority root");
+  }, 15000);
+
+  it("explains same-root authority override after compact using approval history", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "reflective-approval-authority-override.txt"),
+      "approval-memory\n",
+      "utf8",
+    );
+
+    const rebasedRoot = workspaceRoot.replace(/\\/g, "/");
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_authority_override",
+      prompt: "\u4E3A\u4EC0\u4E48\u8FD9\u6B21\u53C8\u8981\u95EE\u5BA1\u6279",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: rebasedRoot,
+        lastTaskKind: "chat",
+        lastApprovalDecision: "deny",
+        lastApprovalDecisionSource: "tty-keypress",
+        lastApprovalPersistent: false,
+        lastApprovalCacheEffect: "none",
+        lastApprovalProjectRoot: rebasedRoot,
+        lastApprovalCacheKey: `${rebasedRoot.toLowerCase()}|bash:spawn:process:npm`,
+        lastApprovalScope: "bash/spawn/process(npm)",
+        lastApprovalLineage: "verify:npm test",
+        lastApprovalStopReason: "user denied escalation",
+        lastApprovalRecordedAt: "2026-04-23T12:03:00.000Z",
+        lastApprovalHistory: [
+          {
+            decision: "allow-always",
+            decisionSource: "tty-keypress",
+            persistent: true,
+            cacheEffect: "persisted",
+            projectRoot: rebasedRoot,
+            cacheKey: `${rebasedRoot.toLowerCase()}|bash:spawn:process:npm`,
+            scopeLabel: "bash/spawn/process(npm)",
+            lineage: "verify:npm test",
+            recordedAt: "2026-04-23T12:00:00.000Z",
+          },
+          {
+            decision: "deny",
+            decisionSource: "tty-keypress",
+            persistent: false,
+            cacheEffect: "none",
+            projectRoot: rebasedRoot,
+            cacheKey: `${rebasedRoot.toLowerCase()}|bash:spawn:process:npm`,
+            scopeLabel: "bash/spawn/process(npm)",
+            lineage: "verify:npm test",
+            stopReason: "user denied escalation",
+            recordedAt: "2026-04-23T12:03:00.000Z",
+          },
+        ],
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 22,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: approval-memory",
+    );
+    expect(result.finalOutput).toContain("Authoritative approval now: deny");
+    expect(result.finalOutput).toContain(
+      "newer deny decision overrides earlier allow-always decision",
+    );
+  }, 15000);
+
+  it("keeps scoped allow-always authority when newer decision is for another cacheKey in same root", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const rebasedRoot = workspaceRoot.replace(/\\/g, "/");
+    const nodeCacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:node`;
+    const npmCacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:npm`;
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_scope_precedence",
+      prompt: "why is it asking again",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: rebasedRoot,
+        lastTaskKind: "chat",
+        lastVerificationStatus: "blocked",
+        lastVerificationCommand: "node --version",
+        lastApprovalDecision: "deny",
+        lastApprovalDecisionSource: "tty-keypress",
+        lastApprovalPersistent: false,
+        lastApprovalCacheEffect: "none",
+        lastApprovalProjectRoot: rebasedRoot,
+        lastApprovalCacheKey: npmCacheKey,
+        lastApprovalScope: "bash/spawn/process(npm)",
+        lastApprovalLineage: "verify:npm test",
+        lastApprovalStopReason: "user denied escalation",
+        lastApprovalRecordedAt: "2026-04-23T12:08:00.000Z",
+        lastApprovalHistory: [
+          {
+            decision: "allow-always",
+            decisionSource: "cli-policy",
+            persistent: true,
+            cacheEffect: "allow-always-persisted",
+            projectRoot: rebasedRoot,
+            cacheKey: nodeCacheKey,
+            scopeLabel: "bash/spawn/process(node)",
+            lineage: "verify:node --version",
+            recordedAt: "2026-04-23T12:02:00.000Z",
+          },
+          {
+            decision: "deny",
+            decisionSource: "tty-keypress",
+            persistent: false,
+            cacheEffect: "none",
+            projectRoot: rebasedRoot,
+            cacheKey: npmCacheKey,
+            scopeLabel: "bash/spawn/process(npm)",
+            lineage: "verify:npm test",
+            stopReason: "user denied escalation",
+            recordedAt: "2026-04-23T12:08:00.000Z",
+          },
+        ],
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 24,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: approval-memory",
+    );
+    expect(result.finalOutput).toContain("Authoritative approval now: allow-always");
+    expect(result.finalOutput).toContain(
+      "different scope/cacheKey",
+    );
+  }, 15000);
+
+  it("prioritizes explicit current request scope over command-derived scope inference", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const rebasedRoot = workspaceRoot.replace(/\\/g, "/");
+    const nodeCacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:node`;
+    const npmCacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:npm`;
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_scope_explicit_request_scope",
+      prompt: "why is it asking again",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: rebasedRoot,
+        lastTaskKind: "chat",
+        // Intentionally conflicts with explicit current request scope below.
+        lastVerificationCommand: "node --version",
+        lastRequestScopeCacheKey: npmCacheKey,
+        lastRequestScopeLabel: "bash/spawn/process(npm)",
+        lastRequestScopeProjectRoot: rebasedRoot,
+        lastRequestScopeSource: "approval-request",
+        lastApprovalDecision: "deny",
+        lastApprovalDecisionSource: "tty-keypress",
+        lastApprovalPersistent: false,
+        lastApprovalCacheEffect: "none",
+        lastApprovalProjectRoot: rebasedRoot,
+        lastApprovalCacheKey: npmCacheKey,
+        lastApprovalScope: "bash/spawn/process(npm)",
+        lastApprovalLineage: "verify:npm test",
+        lastApprovalStopReason: "user denied escalation",
+        lastApprovalRecordedAt: "2026-04-23T12:08:00.000Z",
+        lastApprovalHistory: [
+          {
+            decision: "allow-always",
+            decisionSource: "cli-policy",
+            persistent: true,
+            cacheEffect: "allow-always-persisted",
+            projectRoot: rebasedRoot,
+            cacheKey: nodeCacheKey,
+            scopeLabel: "bash/spawn/process(node)",
+            lineage: "verify:node --version",
+            recordedAt: "2026-04-23T12:02:00.000Z",
+          },
+          {
+            decision: "deny",
+            decisionSource: "tty-keypress",
+            persistent: false,
+            cacheEffect: "none",
+            projectRoot: rebasedRoot,
+            cacheKey: npmCacheKey,
+            scopeLabel: "bash/spawn/process(npm)",
+            lineage: "verify:npm test",
+            stopReason: "user denied escalation",
+            recordedAt: "2026-04-23T12:08:00.000Z",
+          },
+        ],
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 25,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: approval-memory",
+    );
+    expect(result.finalOutput).toContain("Authoritative approval now: deny");
+    expect(result.finalOutput).toContain(
+      "Current request context scope: bash/spawn/process(npm).",
+    );
+  }, 15000);
+
+  it("keeps non-run-command scoped authority explanation on approval-memory reflective routing", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const rebasedRoot = workspaceRoot.replace(/\\/g, "/");
+    const writeTarget = `${rebasedRoot}/src/permission-target.txt`;
+    const writeCacheKey = `${rebasedRoot.toLowerCase()}|write:write:target:${writeTarget.toLowerCase()}`;
+    const bashCacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:npm`;
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_non_run_scope",
+      prompt: "why is it asking again for approval",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: rebasedRoot,
+        lastTaskKind: "chat",
+        // Intentionally noisy command-derived hint that should not override explicit permission request.
+        lastVerificationCommand: "npm test -- --help",
+        lastRequestScopeCacheKey: bashCacheKey,
+        lastRequestScopeLabel: "bash/spawn/process(npm)",
+        lastRequestScopeProjectRoot: rebasedRoot,
+        lastRequestScopeSource: "approval-request",
+        lastPermissionRequestToolName: "write",
+        lastPermissionRequestOperation: "write",
+        lastPermissionRequestTarget: writeTarget,
+        lastPermissionRequestScopeKey: `write:write:target:${writeTarget.toLowerCase()}`,
+        lastPermissionRequestScopeLabel: `write/write/target(${writeTarget})`,
+        lastPermissionRequestCacheKey: writeCacheKey,
+        lastPermissionRequestProjectRoot: rebasedRoot,
+        lastPermissionRequestSource: "approval-request",
+        lastApprovalDecision: "deny",
+        lastApprovalDecisionSource: "tty-keypress",
+        lastApprovalPersistent: false,
+        lastApprovalCacheEffect: "none",
+        lastApprovalProjectRoot: rebasedRoot,
+        lastApprovalCacheKey: bashCacheKey,
+        lastApprovalScope: "bash/spawn/process(npm)",
+        lastApprovalLineage: "verify:npm test",
+        lastApprovalStopReason: "user denied escalation",
+        lastApprovalRecordedAt: "2026-04-23T12:28:00.000Z",
+        lastApprovalHistory: [
+          {
+            decision: "allow-always",
+            decisionSource: "cli-policy",
+            persistent: true,
+            cacheEffect: "allow-always-persisted",
+            projectRoot: rebasedRoot,
+            cacheKey: writeCacheKey,
+            scopeLabel: `write/write/target(${writeTarget})`,
+            lineage: "write:src/permission-target.txt",
+            recordedAt: "2026-04-23T12:21:00.000Z",
+          },
+          {
+            decision: "deny",
+            decisionSource: "tty-keypress",
+            persistent: false,
+            cacheEffect: "none",
+            projectRoot: rebasedRoot,
+            cacheKey: bashCacheKey,
+            scopeLabel: "bash/spawn/process(npm)",
+            lineage: "verify:npm test",
+            stopReason: "user denied escalation",
+            recordedAt: "2026-04-23T12:28:00.000Z",
+          },
+        ],
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 26,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: approval-memory",
+    );
+    expect(result.finalOutput).toContain("Authoritative approval now: allow-always");
+    expect(result.finalOutput).toContain("Subject permission request: write/write.");
+    expect(result.finalOutput).toContain(
+      "Current request context scope: bash/spawn/process(npm).",
+    );
+    expect(result.finalOutput).toContain(
+      "Subject/current disambiguation: the subject approval request differs from the current request context scope.",
+    );
+    expect(result.finalOutput).toContain("different scope/cacheKey");
+  }, 15000);
+
+  it("avoids collapsing subject scope into approval scope when post-compact subject fields are partial", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const rebasedRoot = workspaceRoot.replace(/\\/g, "/");
+    const writeTarget = `${rebasedRoot}/src/partial-subject.txt`;
+    const bashCacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:npm`;
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_subject_partial_after_compact",
+      prompt: "what did I just approve and why is it asking again",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: rebasedRoot,
+        lastTaskKind: "chat",
+        lastPermissionRequestToolName: "write",
+        lastPermissionRequestOperation: "write",
+        lastPermissionRequestTarget: writeTarget,
+        // Intentionally missing subject scope/cacheKey/root in compacted memory.
+        lastRequestScopeCacheKey: bashCacheKey,
+        lastRequestScopeLabel: "bash/spawn/process(npm)",
+        lastRequestScopeProjectRoot: rebasedRoot,
+        lastRequestScopeSource: "approval-request",
+        lastApprovalDecision: "allow-once",
+        lastApprovalDecisionSource: "cli-policy",
+        lastApprovalPersistent: false,
+        lastApprovalCacheEffect: "none",
+        lastApprovalProjectRoot: rebasedRoot,
+        lastApprovalCacheKey: bashCacheKey,
+        lastApprovalScope: "bash/spawn/process(npm)",
+        lastApprovalRecordedAt: "2026-04-23T12:41:00.000Z",
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 30,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: approval-memory",
+    );
+    expect(result.finalOutput).toContain("Subject permission request: write/write.");
+    expect(result.finalOutput).not.toContain("Subject permission scope: bash/spawn/process(npm).");
+    expect(result.finalOutput).toContain(
+      "Subject permission scope details are incomplete in compacted/recovered memory; using current context for why-asking-again reasoning.",
+    );
+    expect(result.finalOutput).toContain(
+      "Current request context scope: bash/spawn/process(npm).",
+    );
+  }, 15000);
+
+  it("reconstructs partial subject request from scoped approval history when lastPermissionRequest fields are missing", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const rebasedRoot = workspaceRoot.replace(/\\/g, "/");
+    const writeTarget = `${rebasedRoot}/src/history-reconstruct.txt`;
+    const writeCacheKey = `${rebasedRoot.toLowerCase()}|write:write:target:${writeTarget.toLowerCase()}`;
+    const bashCacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:npm`;
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_subject_history_reconstruct",
+      prompt: "what did I just approve and why is it asking again",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: rebasedRoot,
+        lastTaskKind: "chat",
+        // Subject object is intentionally absent to emulate legacy compacted sessions.
+        lastRequestScopeCacheKey: bashCacheKey,
+        lastRequestScopeLabel: "bash/spawn/process(npm)",
+        lastRequestScopeProjectRoot: rebasedRoot,
+        lastRequestScopeSource: "approval-request",
+        lastApprovalDecision: "allow-once",
+        lastApprovalDecisionSource: "cli-policy",
+        lastApprovalPersistent: false,
+        lastApprovalCacheEffect: "none",
+        lastApprovalProjectRoot: rebasedRoot,
+        lastApprovalCacheKey: bashCacheKey,
+        lastApprovalScope: "bash/spawn/process(npm)",
+        lastApprovalRecordedAt: "2026-04-23T12:51:00.000Z",
+        lastApprovalHistory: [
+          {
+            decision: "allow-always",
+            decisionSource: "cli-policy",
+            persistent: true,
+            cacheEffect: "allow-always-persisted",
+            projectRoot: rebasedRoot,
+            cacheKey: writeCacheKey,
+            scopeLabel: `write/write/target(${writeTarget})`,
+            lineage: "write:src/history-reconstruct.txt",
+            recordedAt: "2026-04-23T12:49:00.000Z",
+          },
+          {
+            decision: "allow-once",
+            decisionSource: "cli-policy",
+            persistent: false,
+            cacheEffect: "none",
+            projectRoot: rebasedRoot,
+            cacheKey: bashCacheKey,
+            scopeLabel: "bash/spawn/process(npm)",
+            lineage: "verify:npm test",
+            recordedAt: "2026-04-23T12:51:00.000Z",
+          },
+        ],
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 31,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: approval-memory",
+    );
+    expect(result.finalOutput).toContain("Subject permission request: bash/spawn/process(npm).");
+    expect(result.finalOutput).toContain(
+      "Subject reconstruction source: approval-history.",
+    );
+    expect(result.finalOutput).toContain(
+      "Current request context scope: bash/spawn/process(npm).",
+    );
+  }, 15000);
+
+  it("keeps subject-current separation after compact for non-run-command history when current context is bash", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const rebasedRoot = workspaceRoot.replace(/\\/g, "/");
+    const writeTarget = `${rebasedRoot}/src/cross-tool-subject.txt`;
+    const writeCacheKey = `${rebasedRoot.toLowerCase()}|write:write:target:${writeTarget.toLowerCase()}`;
+    const bashCacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:npm`;
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_cross_tool_subject_current_compact",
+      prompt: "what did I just approve and why is it asking again",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: rebasedRoot,
+        lastTaskKind: "chat",
+        // Current context is now bash, but latest approved subject request was write/write.
+        lastRequestScopeCacheKey: bashCacheKey,
+        lastRequestScopeLabel: "bash/spawn/process(npm)",
+        lastRequestScopeProjectRoot: rebasedRoot,
+        lastRequestScopeSource: "approval-request",
+        lastApprovalDecision: "allow-always",
+        lastApprovalDecisionSource: "cli-policy",
+        lastApprovalPersistent: true,
+        lastApprovalCacheEffect: "allow-always-persisted",
+        lastApprovalProjectRoot: rebasedRoot,
+        lastApprovalCacheKey: writeCacheKey,
+        lastApprovalScope: `write/write/target(${writeTarget})`,
+        lastApprovalLineage: "write:src/cross-tool-subject.txt",
+        lastApprovalRecordedAt: "2026-04-23T12:58:00.000Z",
+        lastApprovalHistory: [
+          {
+            decision: "allow-once",
+            decisionSource: "cli-policy",
+            persistent: false,
+            cacheEffect: "none",
+            projectRoot: rebasedRoot,
+            cacheKey: bashCacheKey,
+            scopeLabel: "bash/spawn/process(npm)",
+            lineage: "verify:npm test",
+            recordedAt: "2026-04-23T12:55:00.000Z",
+          },
+          {
+            decision: "allow-always",
+            decisionSource: "cli-policy",
+            persistent: true,
+            cacheEffect: "allow-always-persisted",
+            projectRoot: rebasedRoot,
+            cacheKey: writeCacheKey,
+            scopeLabel: `write/write/target(${writeTarget})`,
+            lineage: "write:src/cross-tool-subject.txt",
+            recordedAt: "2026-04-23T12:58:00.000Z",
+          },
+        ],
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 34,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: approval-memory",
+    );
+    expect(result.finalOutput).toContain("Subject permission request: write/write.");
+    expect(result.finalOutput).toContain(
+      `Subject permission target: ${writeTarget}.`,
+    );
+    expect(result.finalOutput).toContain(
+      "Current request context scope: bash/spawn/process(npm).",
+    );
+    expect(result.finalOutput).toContain(
+      "Subject/current disambiguation: the subject approval request differs from the current request context scope.",
+    );
+    expect(result.finalOutput).toContain(
+      "Subject reconstruction source: approval-history.",
+    );
+  }, 15000);
+
+  it("falls back to last-approval scoped reconstruction with explicit partial marker when history is unavailable", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const rebasedRoot = workspaceRoot.replace(/\\/g, "/");
+    const bashCacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:node`;
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_subject_last_approval_reconstruct",
+      prompt: "what did I just approve and why is it asking again",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: rebasedRoot,
+        lastTaskKind: "chat",
+        lastApprovalDecision: "allow-once",
+        lastApprovalDecisionSource: "cli-policy",
+        lastApprovalPersistent: false,
+        lastApprovalCacheEffect: "none",
+        lastApprovalProjectRoot: rebasedRoot,
+        lastApprovalCacheKey: bashCacheKey,
+        lastApprovalScope: "bash/spawn/process(node)",
+        lastApprovalRecordedAt: "2026-04-23T12:53:00.000Z",
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 33,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "reflective-state-query: approval-memory",
+    );
+    expect(result.finalOutput).toContain("Subject permission request: bash/spawn/process(node).");
+    expect(result.finalOutput).toContain(
+      "Subject permission scope details are incomplete in compacted/recovered memory; using current context for why-asking-again reasoning.",
+    );
+    expect(result.finalOutput).toContain(
+      "Subject reconstruction source: last-approval.",
+    );
+  }, 15000);
+
+  it("prefers subject tool/operation/target coherence over stale scope fragments after compact recovery", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const rebasedRoot = workspaceRoot.replace(/\\/g, "/");
+    const target = `${rebasedRoot}/src/coherent-subject.txt`;
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_subject_coherence_compact",
+      prompt: "what did I just approve and why is it asking again",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: rebasedRoot,
+        lastTaskKind: "chat",
+        lastPermissionRequestToolName: "edit",
+        lastPermissionRequestOperation: "write",
+        lastPermissionRequestTarget: target,
+        // Legacy/stale scope fragments from earlier run-command-like request.
+        lastPermissionRequestProcess: "node",
+        lastPermissionRequestScopeLabel: "bash/spawn/process(node)",
+        lastPermissionRequestCacheKey: `${rebasedRoot.toLowerCase()}|bash:spawn:process:node`,
+        lastPermissionRequestProjectRoot: rebasedRoot,
+        lastApprovalDecision: "allow-once",
+        lastApprovalDecisionSource: "cli-policy",
+        lastApprovalPersistent: false,
+        lastApprovalCacheEffect: "none",
+        lastApprovalProjectRoot: rebasedRoot,
+        lastApprovalCacheKey: `${rebasedRoot.toLowerCase()}|bash:spawn:process:node`,
+        lastApprovalScope: "bash/spawn/process(node)",
+        lastApprovalRecordedAt: "2026-04-23T13:02:00.000Z",
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 35,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.finalOutput).toContain("Subject permission request: edit/write.");
+    expect(result.finalOutput).toContain(
+      `Subject permission scope: edit/write/target(${target}).`,
+    );
+    expect(result.finalOutput).toContain("Subject permission cacheKey:");
+    expect(result.finalOutput).toContain("edit:write:target:");
+    expect(result.finalOutput).not.toContain("Subject permission request: edit/write/process(node).");
+  }, 15000);
+
+  it("materializes migration-rebased next-step reflective handoff into continuation execution", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src", "nested"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "nested", "reflective-next-step.txt"),
+      ["a1", "a2", "a3", "a4"].join("\n"),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_next_step_handoff_rebased",
+      prompt: "what should we do next? do that",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastTaskKind: "read-file",
+        lastGroundedDeliverableMode: "read",
+        recentTargetFiles: ["D:/legacy-root/src/nested/reflective-next-step.txt"],
+        lastReadWindowStart: 0,
+        lastReadWindowEnd: 2,
+        lastReadWindowSize: 2,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=read-file");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "continuation: restored-session-state-consumed",
+    );
+    expect(result.finalOutput).toContain("reflective-next-step.txt");
+  }, 15000);
+
+  it("keeps reflective read-position plus action handoff on rebased read continuity", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src", "nested"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "nested", "reflective-read-handoff.txt"),
+      ["r1", "r2", "r3", "r4", "r5"].join("\n"),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_read_handoff_rebased",
+      prompt: "where did we stop reading? continue reading next 2 lines",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastTaskKind: "read-file",
+        lastGroundedDeliverableMode: "read",
+        recentTargetFiles: ["D:/legacy-root/src/nested/reflective-read-handoff.txt"],
+        lastReadWindowStart: 1,
+        lastReadWindowEnd: 3,
+        lastReadWindowSize: 2,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=read-file");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "continuation: restored-session-state-consumed",
+    );
+    expect(result.finalOutput).toContain("reflective-read-handoff.txt");
+  }, 15000);
+
+  it("consumes restored task anchors for resume-check prompts without forcing edit/read continuation branches", async () => {
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_resume_task_anchor_chat",
+      prompt:
+        "After resume, report in 3 lines only: TASK=..., DONE=..., NEXT=... . Keep the exact task we have been doing.",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: "chat",
+        lastTerminalClassification: "success",
+        lastTerminalReason: "completed",
+        lastUserIntent:
+          "TASK=ContinuityTruth5 keep this task label and continue stepwise",
+        lastAssistantOutput:
+          "TASK=ContinuityTruth5\nDONE=step12 complete\nNEXT=step13",
+        lastContinuationStatus: "continued",
+        lastTaskSatisfactionVerdict: "satisfied",
+        freshnessHistoryCount: 14,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
+    expect(result.sharedContext.notes.join("\n")).not.toContain(
+      "freshness-reset:new-task",
+    );
+    expect(result.stopReason ?? "").not.toContain(
+      "no active file could be inherited",
+    );
+    expect(result.stopReason ?? "").not.toContain(
+      "no recoverable target candidate",
+    );
+  }, 15000);
+
+  it("keeps task identity on explicit session-id resume-check prompts", async () => {
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_resume_task_anchor_explicit_session_id",
+      prompt:
+        "Explicit session-id resume check: report in 3 lines only with TASK=..., DONE=..., NEXT=... and keep the exact task.",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: "chat",
+        lastTerminalClassification: "success",
+        lastTerminalReason: "completed",
+        lastUserIntent:
+          "TASK=ContinuityTruth5 keep this task label and continue stepwise",
+        lastAssistantOutput:
+          "TASK=ContinuityTruth5\nDONE=step12 complete\nNEXT=step13",
+        lastContinuationStatus: "continued",
+        lastTaskSatisfactionVerdict: "satisfied",
+        freshnessHistoryCount: 14,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
+    expect(result.sharedContext.notes.join("\n")).not.toContain(
+      "freshness-reset:new-task",
+    );
+    expect(result.finalOutput).toContain("TASK=ContinuityTruth5");
+    expect(result.finalOutput).toContain("DONE=step12");
+    expect(result.finalOutput).toContain("NEXT=step13");
+    expect(result.finalOutput).not.toMatch(/Explicit\s+resume/i);
+  }, 15000);
+
+  it("continues blocker->fix on rebased target after migration-like root change (English)", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "reflective-fix-rebased-en.txt");
+    await fs.writeFile(targetPath, ["alpha", "gamma", "omega"].join("\n"), "utf8");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_fix_rebased_en",
+      prompt: "why did it stop, then continue",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastTaskKind: "edit-file",
+        lastTerminalClassification: "stopped",
+        lastTerminalReason: "stopped_error",
+        lastFailure: "verify failed after previous replacement",
+        recentTargetFiles: ["D:/legacy-root/src/reflective-fix-rebased-en.txt"],
+        recentFailedFiles: [
+          {
+            path: "D:/legacy-root/src/reflective-fix-rebased-en.txt",
+            reason: "patch-generation-failed",
+          },
+        ],
+        lastContinuationEvidence: [
+          "transform:D:/legacy-root/src/reflective-fix-rebased-en.txt:gamma=>delta",
+        ],
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=edit-file");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "continuation: restored-session-state-consumed",
+    );
+    expect(await fs.readFile(targetPath, "utf8")).toContain("delta");
+  }, 15000);
+
+  it("continues blocker->fix on rebased target after migration-like root change (Chinese)", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "reflective-fix-rebased-zh.txt");
+    await fs.writeFile(targetPath, ["left", "gamma", "right"].join("\n"), "utf8");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_fix_rebased_zh",
+      prompt: "刚才为什么停了？那继续修",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastTaskKind: "edit-file",
+        lastTerminalClassification: "stopped",
+        lastTerminalReason: "stopped_error",
+        lastFailure: "verify failed after previous replacement",
+        recentTargetFiles: ["D:/legacy-root/src/reflective-fix-rebased-zh.txt"],
+        recentFailedFiles: [
+          {
+            path: "D:/legacy-root/src/reflective-fix-rebased-zh.txt",
+            reason: "patch-generation-failed",
+          },
+        ],
+        lastContinuationEvidence: [
+          "transform:D:/legacy-root/src/reflective-fix-rebased-zh.txt:gamma=>delta",
+        ],
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=edit-file");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "continuation: restored-session-state-consumed",
+    );
+    expect(await fs.readFile(targetPath, "utf8")).toContain("delta");
+  }, 15000);
+
+  it("materializes migration-rebased verify continuation via structured verify object", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({
+        name: "t10-verify-object-rebased",
+        private: true,
+      }),
+      "utf8",
+    );
+    const targetPath = path.join(workspaceRoot, "src", "verify-rebased.txt");
+    await fs.writeFile(targetPath, "value=delta\n", "utf8");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_verify_object_rebased",
+      prompt: "verify it again",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastTaskKind: "edit-file",
+        lastVerificationStatus: "failed",
+        lastVerificationCommand: "node --version",
+        lastVerificationReason: "tests failed in previous run",
+        recentTargetFiles: ["D:/legacy-root/src/verify-rebased.txt"],
+      },
+      maxTurns: 6,
+    });
+
+    expect(["completed", "stopped_error"]).toContain(result.status);
+    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=run-command");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "continuation: restored-session-state-consumed",
+    );
+    if (result.status === "completed") {
+      expect(result.codingResult?.verification.command).toBe("node --version");
+    } else {
+      expect(result.stopReason).toMatch(
+        /(?:Run-command intent is not allowed in the MVP allowlist|Escalation denied by user|Re-run and approve escalation for verify command execution\.)/,
+      );
+    }
+  }, 15000);
+
+  it("persists verify command hint after blocker->fix continuation for verify closure", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "repair-verify-hint.txt");
+    await fs.writeFile(targetPath, ["alpha", "gamma", "omega"].join("\n"), "utf8");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_repair_verify_hint",
+      prompt: "why did it stop, then continue",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastTaskKind: "edit-file",
+        lastTerminalClassification: "stopped",
+        lastTerminalReason: "stopped_error",
+        lastFailure: "verify failed after previous replacement",
+        lastVerificationStatus: "failed",
+        lastVerificationCommand: "npm test -- --help",
+        recentTargetFiles: ["D:/legacy-root/src/repair-verify-hint.txt"],
+        recentFailedFiles: [
+          {
+            path: "D:/legacy-root/src/repair-verify-hint.txt",
+            reason: "patch-generation-failed",
+          },
+        ],
+        lastContinuationEvidence: [
+          "transform:D:/legacy-root/src/repair-verify-hint.txt:gamma=>delta",
+        ],
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=edit-file");
+    expect(result.codingResult?.evidence).toContain(
+      "verify-command-hint:npm test -- --help",
+    );
+    expect(result.codingResult?.evidence).toContain(
+      `verify-target-hint:${targetPath.replace(/\\/g, "/")}`,
+    );
+  }, 15000);
+
+  it("truthfully blocks verify continuation when structured verify object misses command evidence", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "verify-missing-command.txt");
+    await fs.writeFile(targetPath, "value=delta\n", "utf8");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_verify_object_missing_command",
+      prompt: "verify it again",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastTaskKind: "edit-file",
+        lastVerificationStatus: "failed",
+        recentTargetFiles: ["D:/legacy-root/src/verify-missing-command.txt"],
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason).toContain("Verify continuation is unavailable: missing command.");
+  }, 15000);
+
+  it("persists blocked verify lineage when approval is denied for verify continuation", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({
+        name: "t10-verify-approval-lineage",
+        private: true,
+      }),
+      "utf8",
+    );
+    const targetPath = path.join(workspaceRoot, "src", "verify-approval-lineage.txt");
+    await fs.writeFile(targetPath, "value=delta\n", "utf8");
+
+    const events: QueryEvent[] = [];
+    for await (const event of streamMvpIntegratedFlow({
+      sessionId: "sess_t10_verify_approval_lineage",
+      prompt: "continue with that verification",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastTaskKind: "run-command",
+        lastVerificationStatus: "blocked",
+        lastVerificationCommand: "node --version",
+        lastVerificationReason: "Approval denied by user for bash",
+        recentTargetFiles: ["D:/legacy-root/src/verify-approval-lineage.txt"],
+        lastContinuationEvidence: [
+          "verify-command-hint:node --version",
+          "verify-target-hint:D:/legacy-root/src/verify-approval-lineage.txt",
+          "verify-blocker-kind:approval-denied",
+        ],
+      },
+      maxTurns: 6,
+    })) {
+      events.push(event);
+    }
+
+    const completed = events.find(
+      (event): event is Extract<QueryEvent, { type: "query.completed" }> =>
+        event.type === "query.completed",
+    );
+    expect(completed?.result.status).toBe("stopped_error");
+    expect(completed?.result.codingResult?.verification.status).toBe("blocked");
+    expect(completed?.result.codingResult?.verification.blockerKind).toBe(
+      "approval-denied",
+    );
+    expect(completed?.result.codingResult?.verification.command).toBe("node --version");
+    expect(completed?.result.codingResult?.evidence).toContain(
+      "verify-blocker-kind:approval-denied",
+    );
+    expect(
+      completed?.result.codingResult?.evidence.some((entry) =>
+        entry.startsWith("verify-next-action:"),
+      ),
+    ).toBe(true);
+  }, 15000);
+
+  it("keeps blocked verify next-step recommendation resumable via structured verify object", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "verify-next-step-blocked.txt");
+    await fs.writeFile(targetPath, "value=delta\n", "utf8");
+
+    const recommendation = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_verify_next_step_blocked",
+      prompt: "what should we do next?",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastTaskKind: "run-command",
+        lastVerificationStatus: "blocked",
+        lastVerificationCommand: "node --version",
+        lastVerificationReason: "Approval denied by user for bash",
+        recentTargetFiles: ["D:/legacy-root/src/verify-next-step-blocked.txt"],
+        lastContinuationEvidence: [
+          "verify-command-hint:node --version",
+          "verify-target-hint:D:/legacy-root/src/verify-next-step-blocked.txt",
+          "verify-blocker-kind:approval-denied",
+        ],
+      },
+      maxTurns: 6,
+    });
+
+    expect(recommendation.status).toBe("completed");
+    expect(recommendation.finalOutput).toContain(
+      "rerun verification command (node --version) after resolving blocker (approval-denied)",
+    );
+
+    const resumed = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_verify_next_step_blocked_resume",
+      prompt: "continue with that verification",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: "D:/legacy-root",
+        lastTaskKind: "run-command",
+        lastVerificationStatus: "blocked",
+        lastVerificationCommand: "node --version",
+        lastVerificationReason: "Approval denied by user for bash",
+        recentTargetFiles: ["D:/legacy-root/src/verify-next-step-blocked.txt"],
+        lastContinuationEvidence: [
+          "verify-command-hint:node --version",
+          "verify-target-hint:D:/legacy-root/src/verify-next-step-blocked.txt",
+          "verify-blocker-kind:approval-denied",
+        ],
+      },
+      maxTurns: 6,
+    });
+
+    expect(["completed", "stopped_error"]).toContain(resumed.status);
+    expect(resumed.sharedContext.notes.join("\n")).toContain("plan: intent=run-command");
+    if (resumed.codingResult) {
+      expect(resumed.codingResult.verification.command).toBe("node --version");
+    }
+  }, 15000);
+
+  it("resumes blocked verify via the same verify object after approval is granted", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "verify-resume-granted.txt");
+    await fs.writeFile(targetPath, "value=delta\n", "utf8");
+
+    const resumed = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_verify_resume_granted",
+      prompt: "what should we do next? do that",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: "run-command",
+        lastVerificationStatus: "blocked",
+        lastVerificationCommand: "node --version",
+        lastVerificationReason: "Approval denied by user for bash",
+        lastVerificationBlockerKind: "approval-denied",
+        lastVerificationResumeEligible: true,
+        recentTargetFiles: [targetPath],
+        lastContinuationEvidence: [
+          "verify-command-hint:node --version",
+          `verify-target-hint:${targetPath.replace(/\\/g, "/")}`,
+          `verify-cwd-hint:${workspaceRoot.replace(/\\/g, "/")}`,
+          "verify-blocker-kind:approval-denied",
+          "verify-next-action:Re-run and approve escalation for verify command execution.",
+          "verify-resume-eligible:true",
+        ],
+      },
+      maxTurns: 6,
+    });
+
+    expect(resumed.status).toBe("completed");
+    expect(resumed.sharedContext.notes.join("\n")).toContain("plan: intent=run-command");
+    expect(resumed.codingResult?.verification.status).toBe("passed");
+    expect(resumed.codingResult?.verification.command).toBe("node --version");
+  }, 15000);
+
+  it("truthfully blocks verify resume when verify object cwd authority mismatches workspace root", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "verify-resume-mismatch.txt");
+    await fs.writeFile(targetPath, "value=delta\n", "utf8");
+
+    const resumed = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_verify_resume_mismatch",
+      prompt: "continue with that verification",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      continuityState: {
+        projectRoot: workspaceRoot,
+        lastTaskKind: "run-command",
+        lastVerificationStatus: "blocked",
+        lastVerificationCommand: "node --version",
+        lastVerificationReason: "Approval denied by user for bash",
+        lastVerificationBlockerKind: "approval-denied",
+        lastVerificationResumeEligible: true,
+        recentTargetFiles: [targetPath],
+        lastContinuationEvidence: [
+          "verify-command-hint:node --version",
+          `verify-target-hint:${targetPath.replace(/\\/g, "/")}`,
+          "verify-cwd-hint:D:/legacy-root",
+          "verify-blocker-kind:approval-denied",
+          "verify-resume-eligible:true",
+        ],
+      },
+      maxTurns: 6,
+    });
+
+    expect(resumed.status).toBe("stopped_error");
+    expect(resumed.stopReason).toContain(
+      "Verify continuation is unavailable: rebased workspace authority mismatch for verify command cwd.",
+    );
   }, 15000);
 
   it("blocks command intents outside MVP allowlist with actionable stopped_error", async () => {

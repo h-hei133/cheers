@@ -3,15 +3,16 @@ import process from "node:process";
 import * as readline from "node:readline";
 import path from "node:path";
 import fs from "node:fs";
-import { execSync } from "node:child_process";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
 import type { ShellActionResult } from "../core/commands/types.js";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
 import type { McpClientSnapshot } from "../core/mcp/types.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
-import { bootstrapShellRuntime } from "../core/shell/bootstrap.js";
-import { SessionBootstrapError } from "../core/shell/bootstrap.js";
+import {
+  bootstrapShellRuntime,
+  SessionBootstrapError,
+} from "../core/shell/bootstrap.js";
 import {
   resolveProviderCredential,
   type ProviderCredentialResolution,
@@ -22,10 +23,10 @@ import {
   createProviderReadinessTerminalEvent,
 } from "../core/shell/providerReadiness.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
+import { applyInteractiveApprovalDecisionWiring } from "../core/shell/interactiveApprovalWiring.js";
 import { resumeShellSession } from "../core/shell/recovery.js";
 import { switchActiveSession } from "../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
-import type { SessionResumeProvenance } from "../core/shell/runtimeContext.js";
 import {
   handleShellClose,
   handleShellSigint,
@@ -41,14 +42,17 @@ import { streamMvpIntegratedFlow } from "../orchestration/runMvpIntegratedFlow.j
 import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import { SessionManager } from "../session/SessionManager.js";
-import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
-import type { SessionMaterializedStepHint } from "../session/SessionManager.js";
+import type {
+  ApprovalAuditMemoryState,
+  RecoveryTrustBoundaryBlock,
+  SessionReentrySummary,
+  SessionContinuitySnapshot,
+} from "../session/SessionManager.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import { openSessionsPanel } from "./sessionsPanel.js";
 
 interface CliOptions {
   sessionId?: string;
-  migrateSessionRoot?: boolean;
   provider?:
     | "openai"
     | "anthropic"
@@ -61,6 +65,8 @@ interface CliOptions {
   replayFile?: string;
   printMode?: boolean;
   promptArg?: string;
+  migrateSessionRoot?: boolean;
+  nonInteractiveApproval?: "deny" | "allow-once" | "allow-always";
 }
 
 type StdinTransportMode = "none" | "capture-batch" | "stream-live";
@@ -73,22 +79,106 @@ type TurnInputResolution =
   | { kind: "handled" }
   | { kind: "shell-action"; slashResult: Extract<SlashRouteResult, { kind: "shell-action" }> }
   | { kind: "execute"; effectivePrompt: string };
-type PromptPreparationResult =
-  | { kind: "ready"; prompt: string }
-  | { kind: "blocked"; reason: string };
-type StdinDecodeResult =
-  | { kind: "ok"; text: string }
-  | { kind: "blocked"; reason: string };
-type ShellEncodingTrust = "supported" | "risky" | "unsupported";
-interface ShellEncodingProfile {
-  readonly shell: "powershell" | "pwsh" | "cmd" | "bash" | "zsh" | "unknown";
-  readonly platform: NodeJS.Platform;
-  readonly stdinIsTty: boolean;
-  readonly transportMode: StdinTransportMode;
-  readonly windowsCodePage?: number;
-  readonly trust: ShellEncodingTrust;
-  readonly reason: string;
-  readonly fallbackHints: readonly string[];
+
+interface ApprovalModeObject {
+  readonly mode: "deny" | "allow-once" | "allow-always";
+  readonly persistent: boolean;
+  readonly source:
+    | "prompt-explicit-verify-lineage"
+    | "prompt-ambiguous-verify-lineage";
+  readonly verifyLineage: "blocked-verify-resume";
+  readonly command?: string;
+  readonly commandCwd?: string;
+  readonly targetPath?: string;
+  readonly executableNow: boolean;
+  readonly missingFields: readonly string[];
+}
+
+type ApprovalDecisionSource =
+  | "cli-policy"
+  | "approval-mode-object"
+  | "allow-once-cache"
+  | "allow-always-policy"
+  | "default-deny"
+  | "ambiguous-stop";
+
+interface NonInteractiveApprovalDecisionPlan {
+  readonly source: ApprovalDecisionSource;
+  readonly decision?: "deny" | "allow-once" | "allow-always";
+  readonly stopReason?: string;
+  readonly overrideNotes: readonly string[];
+}
+
+interface ApprovalModeConflictAnalysis {
+  readonly ambiguousStop: boolean;
+  readonly stopReason?: string;
+}
+
+interface ApprovalAuditRecord {
+  readonly channel: "interactive" | "non-interactive";
+  readonly decision: "deny" | "allow-once" | "allow-always";
+  readonly decisionSource: string;
+  readonly persistent: boolean;
+  readonly cacheEffect:
+    | "none"
+    | "allow-once-cache-consumed"
+    | "allow-always-persisted"
+    | "allow-always-cache-hit"
+    | "ambiguous-stop";
+  readonly projectRoot: string;
+  readonly cacheKey: string;
+  readonly scopeLabel: string;
+  readonly lineage?: string;
+  readonly inputKey?: string;
+  readonly stopReason?: string;
+}
+
+function analyzeApprovalModeConflict(
+  approvalModeObject?: ApprovalModeObject,
+): ApprovalModeConflictAnalysis {
+  if (!approvalModeObject) {
+    return { ambiguousStop: false };
+  }
+  if (approvalModeObject.source === "prompt-ambiguous-verify-lineage") {
+    return {
+      ambiguousStop: true,
+      stopReason:
+        "Conflicting prompt approval signals (allow-once vs allow-always) for blocked verify continuation.",
+    };
+  }
+  if (!approvalModeObject.executableNow) {
+    return {
+      ambiguousStop: true,
+      stopReason: `Approval mode cannot be applied safely for blocked verify continuation: missing ${approvalModeObject.missingFields.join(", ")}.`,
+    };
+  }
+  return { ambiguousStop: false };
+}
+
+function renderApprovalAuditRecord(
+  renderer: StreamingRenderer,
+  record: ApprovalAuditRecord,
+): void {
+  renderer.renderLine("approval-audit:event=decision");
+  renderer.renderLine(`approval-audit:channel=${record.channel}`);
+  renderer.renderLine(`approval-audit:decision=${record.decision}`);
+  renderer.renderLine(`approval-audit:decision-source=${record.decisionSource}`);
+  renderer.renderLine(
+    `approval-audit:persistent=${record.persistent ? "true" : "false"}`,
+  );
+  renderer.renderLine(`approval-audit:cache-effect=${record.cacheEffect}`);
+  renderer.renderLine(`approval-audit:project-root=${record.projectRoot}`);
+  renderer.renderLine(`approval-audit:cache-key=${record.cacheKey}`);
+  renderer.renderLine(`approval-audit:scope=${record.scopeLabel}`);
+  if (record.lineage) {
+    renderer.renderLine(`approval-audit:lineage=${record.lineage}`);
+  }
+  if (record.inputKey) {
+    renderer.renderLine(`approval-audit:input-key=${record.inputKey}`);
+  }
+  if (record.stopReason) {
+    renderer.renderLine(`approval-audit:stop-reason=${record.stopReason}`);
+  }
 }
 
 async function main(): Promise<void> {
@@ -97,6 +187,7 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const launchCwd = process.cwd();
   const approvalTrustPolicy = new ApprovalTrustPolicy();
+  let activeNonInteractiveApprovalMode: ApprovalModeObject | undefined;
   let pendingEscPressAt: number | null = null;
 
   if (
@@ -153,7 +244,6 @@ async function main(): Promise<void> {
   if (sessionIdIdx !== -1 && args[sessionIdIdx + 1]) {
     options.sessionId = args[sessionIdIdx + 1];
   }
-  options.migrateSessionRoot = args.includes("--migrate-session-root");
   const providerIdx = args.indexOf("--provider");
   if (providerIdx !== -1 && args[providerIdx + 1]) {
     const provider = args[providerIdx + 1].trim().toLowerCase();
@@ -187,6 +277,8 @@ async function main(): Promise<void> {
     options.replayFile = replayPath;
   }
   options.printMode = args.includes("--print") || args.includes("-p");
+  options.migrateSessionRoot = args.includes("--migrate-session-root");
+  options.nonInteractiveApproval = parseNonInteractiveApprovalMode(args);
   options.promptArg = derivePromptArgument(args, options.projectPath);
 
   const resolveCredentialSnapshot = (): ProviderCredentialResolution =>
@@ -213,28 +305,28 @@ async function main(): Promise<void> {
           preferredProjectRoot: workspaceRoot,
         })
       : null;
-  let bootstrap;
-  try {
-    bootstrap = bootstrapShellRuntime({
-      cwd: workspaceRoot,
-      launchCwd,
-      runtimeConfig,
-      gitContext,
-      sessionManager,
-      renderer,
-      requestedSessionId: options.sessionId,
-      allowSessionRootMigration: options.migrateSessionRoot,
-    });
-  } catch (error) {
-    if (error instanceof SessionBootstrapError) {
-      renderer.renderLine(error.message);
-      if (error.hint?.trim()) {
-        renderer.renderLine(`Hint: ${error.hint}`);
+  const bootstrap = (() => {
+    try {
+      return bootstrapShellRuntime({
+        cwd: workspaceRoot,
+        launchCwd,
+        runtimeConfig,
+        gitContext,
+        sessionManager,
+        renderer,
+        requestedSessionId: options.sessionId,
+        allowSessionRootMigration: options.migrateSessionRoot === true,
+        emitLifecycleMessages: false,
+      });
+    } catch (error) {
+      if (error instanceof SessionBootstrapError) {
+        console.error(error.message);
+        console.error(error.recoveryHint);
+        process.exit(1);
       }
-      return;
+      throw error;
     }
-    throw error;
-  }
+  })();
   const runtimeContext = bootstrap.context;
   resolvedCredential = resolveCredentialSnapshot();
   let mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
@@ -245,105 +337,32 @@ async function main(): Promise<void> {
     hasReplayFile: Boolean(options.replayFile),
     hasPromptArg: Boolean(options.promptArg?.trim()),
   });
-  const quietStartup = Boolean(options.printMode);
-  const shellEncodingProfile = detectShellEncodingProfile({
-    stdinIsTty: Boolean(process.stdin.isTTY),
-    transportMode: stdinTransportMode,
-  });
-  if (
-    !quietStartup &&
-    stdinTransportMode !== "none" &&
-    shellEncodingProfile.trust !== "supported"
-  ) {
-    renderer.renderLine(
-      `stdin compatibility: ${shellEncodingProfile.trust} (${shellEncodingProfile.reason})`,
-    );
-    renderer.renderLine(
-      `Recommended fallback: ${shellEncodingProfile.fallbackHints.join(" | ")}`,
-    );
-  }
-  const pipedInputBuffer =
+  const pipedInput =
     stdinTransportMode === "capture-batch" ? await readStdinToEnd() : null;
-  const pipedDecodeResult =
-    pipedInputBuffer !== null
-      ? decodeStdinPayload(pipedInputBuffer, shellEncodingProfile)
-      : null;
-  if (pipedDecodeResult?.kind === "blocked") {
-    renderer.renderLine(
-      options.printMode
-        ? pipedDecodeResult.reason
-        : `\n${pipedDecodeResult.reason}\n`,
-    );
-    return;
-  }
   const nonInteractivePrompts = buildNonInteractivePrompts(
     options.promptArg,
-    pipedDecodeResult?.text ?? null,
+    pipedInput,
   );
+  const showStartupSurface =
+    !options.printMode &&
+    !options.replayFile &&
+    nonInteractivePrompts.length === 0 &&
+    stdinTransportMode !== "capture-batch";
 
-  if (!quietStartup) {
-    renderer.renderLine("Private Coding Agents Shell (ts-shell MVP)");
-    renderer.renderLine(
-      `Workspace context: ${path.basename(runtimeContext.projectRoot) || runtimeContext.projectRoot}`,
-    );
-    if (
-      path.resolve(runtimeContext.originalCwd) !==
-      path.resolve(runtimeContext.projectRoot)
-    ) {
-      renderer.renderLine(
-        `Attached target project: ${runtimeContext.projectRoot}`,
-      );
-    }
-    renderer.renderLine(`Project root: ${runtimeContext.projectRoot}`);
-    renderer.renderLine(`Launch directory: ${runtimeContext.originalCwd}`);
-    renderer.renderLine(`Session: ${runtimeContext.session.id}`);
-    renderer.renderLine(
-      `Execution path: ${isRustDaemonEnabled() ? "rust-daemon" : "ts-local"}`,
-    );
-    renderer.renderLine(`Workspace: ${runtimeContext.cwd}`);
-    if (runtimeContext.gitContext.insideGit) {
-      renderer.renderLine(
-        `Git branch: ${runtimeContext.gitContext.branch ?? "unknown"}`,
-      );
-      renderer.renderLine(
-        `Workspace clean: ${runtimeContext.gitContext.isClean ? "yes" : "no"}`,
-      );
-    }
-    renderer.renderLine(`Provider: ${resolvedCredential.provider}`);
-    renderer.renderLine(
-      `Credential source: ${resolvedCredential.credential?.source ?? "missing"}`,
-    );
-    if (resolvedCredential.credential) {
-      renderer.renderLine(
-        `Credential mode: ${resolvedCredential.credential.authMode}`,
-      );
-    }
-    if (resolvedCredential.baseUrl) {
-      renderer.renderLine(`Endpoint: ${resolvedCredential.baseUrl}`);
-    }
-    if (resolvedCredential.model) {
-      renderer.renderLine(`Model: ${resolvedCredential.model}`);
-    }
-    renderer.renderLine(`Max turns: ${runtimeContext.runtimeConfig.maxTurns}`);
-    if (recoveryCandidate && recoveryCandidateSummary) {
-      if (recoveryCandidateSummary.autoResumeReady) {
-        renderer.renderLine(
-          `Recovery available: rerun with --session-id ${recoveryCandidate.id} to continue the latest interrupted session`,
-        );
-      } else {
-        renderer.renderLine(
-          `Recovery context available: rerun with --session-id ${recoveryCandidate.id} to reopen context, then submit an explicit follow-up prompt`,
-        );
-      }
-    } else if (recoveryBlockedNotice) {
-      renderer.renderLine(
-        `Recovery blocked for session ${recoveryBlockedNotice.sessionId}: ${recoveryBlockedNotice.detail}`,
-      );
-      renderer.renderLine(recoveryBlockedNotice.recoveryHint);
-    }
-    renderer.renderLine(
-      "Type your prompt, /help for command guide, Ctrl+C to cancel run, Ctrl+D to exit\n",
-    );
+  if (showStartupSurface) {
+    renderStartupSurface(renderer, {
+      runtimeContext: runtimeContext as never,
+      sessionManager,
+      lifecycleNotices: bootstrap.lifecycleNotices,
+      recoveryCandidate,
+      recoveryCandidateSummary: recoveryCandidateSummary ?? undefined,
+      recoveryBlockedNotice: recoveryBlockedNotice ?? undefined,
+      provider: resolvedCredential.provider,
+      model: resolvedCredential.model,
+      maxTurns: runtimeContext.runtimeConfig.maxTurns,
+      executionPath: isRustDaemonEnabled() ? "rust-daemon" : "ts-local",
+      stdinTransportMode,
+    });
   }
   logger.info("CLI session initialized", {
     sessionId: runtimeContext.session.id,
@@ -364,6 +383,36 @@ async function main(): Promise<void> {
         () => sessionRuntime.getViewMode(),
         approvalTrustPolicy,
         () => runtimeContext.projectRoot,
+        () =>
+          !process.stdin.isTTY
+            ? options.nonInteractiveApproval
+            : undefined,
+        () => activeNonInteractiveApprovalMode,
+        (record) => {
+          const payload: Omit<ApprovalAuditMemoryState, "recordedAt"> = {
+            decision: record.decision,
+            decisionSource: record.decisionSource,
+            persistent: record.persistent,
+            cacheEffect: record.cacheEffect,
+            projectRoot: record.projectRoot,
+            cacheKey: record.cacheKey,
+            scopeLabel: record.scopeLabel,
+            ...(record.lineage ? { lineage: record.lineage } : {}),
+            ...(record.stopReason ? { stopReason: record.stopReason } : {}),
+            ...(record.channel ? { channel: record.channel } : {}),
+            ...(record.inputKey &&
+            (record.inputKey === "y" ||
+              record.inputKey === "a" ||
+              record.inputKey === "n" ||
+              record.inputKey === "other")
+              ? { inputKey: record.inputKey }
+              : {}),
+          };
+          sessionManager.recordApprovalAuditDecision(
+            runtimeContext.session.id,
+            payload,
+          );
+        },
       );
       return streamOrchestratedResponse(
         prompt,
@@ -388,11 +437,12 @@ async function main(): Promise<void> {
       renderer,
       sessionRuntime,
       logger,
-      printMode: false,
+      printMode: Boolean(options.printMode),
       fallbackSessionId: recoveryCandidate?.id,
-      onSessionSwitched: () => {
-        mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+      setActiveNonInteractiveApprovalMode: (mode) => {
+        activeNonInteractiveApprovalMode = mode;
       },
+      nonInteractiveCliApprovalMode: options.nonInteractiveApproval,
     });
     return;
   }
@@ -405,9 +455,10 @@ async function main(): Promise<void> {
       sessionRuntime,
       logger,
       fallbackSessionId: recoveryCandidate?.id,
-      onSessionSwitched: () => {
-        mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+      setActiveNonInteractiveApprovalMode: (mode) => {
+        activeNonInteractiveApprovalMode = mode;
       },
+      nonInteractiveCliApprovalMode: options.nonInteractiveApproval,
     });
     return;
   }
@@ -422,11 +473,7 @@ async function main(): Promise<void> {
       }
       return;
     }
-    if (
-      pipedInputBuffer !== null &&
-      nonInteractivePrompts.length > 1 &&
-      !options.printMode
-    ) {
+    if (pipedInput !== null && nonInteractivePrompts.length > 1 && !options.printMode) {
       renderer.renderLine(
         `Stdin batch mode: running ${nonInteractivePrompts.length} prompt(s) sequentially in session ${runtimeContext.session.id}.`,
       );
@@ -441,9 +488,10 @@ async function main(): Promise<void> {
         logger,
         printMode: Boolean(options.printMode),
         fallbackSessionId: recoveryCandidate?.id,
-        onSessionSwitched: () => {
-          mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+        setActiveNonInteractiveApprovalMode: (mode) => {
+          activeNonInteractiveApprovalMode = mode;
         },
+        nonInteractiveCliApprovalMode: options.nonInteractiveApproval,
       });
     }
     return;
@@ -452,8 +500,25 @@ async function main(): Promise<void> {
   rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    prompt: "> ",
+    prompt: buildPersistentShellPrompt({
+      projectRoot: runtimeContext.projectRoot,
+      sessionId: runtimeContext.session.id,
+      agentMode: sessionRuntime.getAgentMode(),
+    }),
   });
+
+  const refreshInteractivePromptChrome = (): void => {
+    if (!rl) {
+      return;
+    }
+    rl.setPrompt(
+      buildPersistentShellPrompt({
+        projectRoot: runtimeContext.projectRoot,
+        sessionId: runtimeContext.session.id,
+        agentMode: sessionRuntime.getAgentMode(),
+      }),
+    );
+  };
 
   process.on("SIGINT", () => {
     handleShellSigint({
@@ -501,8 +566,6 @@ async function main(): Promise<void> {
       const resolved = await resolveTurnInputForExecution({
         prompt: trimmed,
         cwd: runtimeContext.cwd,
-        sessionId: runtimeContext.session.id,
-        sessionManager,
         renderer,
         printMode: false,
         interactive: true,
@@ -530,9 +593,13 @@ async function main(): Promise<void> {
           logger,
           renderer,
           turnNumber: interactiveTurnNumber,
+          setActiveNonInteractiveApprovalMode: (mode) => {
+            activeNonInteractiveApprovalMode = mode;
+          },
         });
         interactiveTurnNumber = resumeBridge.turnNumber;
         mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+        refreshInteractivePromptChrome();
         rl.prompt();
         return;
       }
@@ -551,17 +618,98 @@ async function main(): Promise<void> {
       slashResult?.kind === "shell-action" &&
       slashResult.action === "list-sessions"
     ) {
-      await handleSessionsShellAction({
-        slashResult,
-        interactive: true,
-        rl,
-        sessionManager,
-        runtimeContext,
-        renderer,
-        onSessionSwitched: () => {
+      const sessionAction = slashResult.sessionAction ?? "panel";
+      if (sessionAction === "list") {
+        renderSessionList(
+          renderer,
+          sessionManager,
+          runtimeContext.session.id,
+          runtimeContext.projectRoot,
+        );
+        rl.prompt();
+        return;
+      }
+
+      if (sessionAction === "current") {
+        renderCurrentSession(renderer, sessionManager, runtimeContext);
+        renderSessionCommandMap(renderer, { compact: true });
+        rl.prompt();
+        return;
+      }
+
+      if (sessionAction === "switch") {
+        const targetSessionId = slashResult.sessionId?.trim();
+        if (!targetSessionId) {
+          renderer.renderLine(
+            "\nUsage: /sessions switch <session-id>\n",
+          );
+          rl.prompt();
+          return;
+        }
+
+        try {
+          const resumed = sessionManager.resume(targetSessionId);
+          const previousSessionId = runtimeContext.session.id;
+          switchRuntimeSessionProjectContext(runtimeContext, resumed);
           mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
-        },
-      });
+          renderer.renderLine(
+            `\nSwitched session: ${previousSessionId} -> ${resumed.id}\n`,
+          );
+          renderer.renderLine(`Project context: ${runtimeContext.projectRoot}`);
+          renderSwitchedSessionContext(renderer, sessionManager, resumed.id);
+          renderSessionCommandMap(renderer, { compact: true });
+          renderer.renderLine("");
+          refreshInteractivePromptChrome();
+        } catch (error) {
+          renderer.renderLine(
+            `\nFailed to switch session: ${error instanceof Error ? error.message : String(error)}\n`,
+          );
+        }
+        rl.prompt();
+        return;
+      }
+
+      if (sessionAction === "help") {
+        renderSessionCommandMap(renderer);
+        rl.prompt();
+        return;
+      }
+
+      try {
+        const sessions = sessionManager.listRecentSessions(5);
+        if (sessions.length === 0) {
+          renderer.renderLine("\nNo sessions found.\n");
+          rl.prompt();
+          return;
+        }
+        const panelResult = await openSessionsPanel({
+          rl,
+          sessionManager,
+          runtimeContext,
+        });
+        if (panelResult.switchedSessionId) {
+          const resumed = sessionManager.resume(panelResult.switchedSessionId);
+          switchRuntimeSessionProjectContext(runtimeContext, resumed);
+          mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+          renderer.renderLine(
+            `\nSwitched to session ${panelResult.switchedSessionId}.\n`,
+          );
+          renderer.renderLine(`Project context: ${runtimeContext.projectRoot}`);
+          renderSwitchedSessionContext(
+            renderer,
+            sessionManager,
+            panelResult.switchedSessionId,
+          );
+          renderer.renderLine("");
+          refreshInteractivePromptChrome();
+        } else {
+          renderer.renderLine("\nSessions panel closed.\n");
+        }
+      } catch (error) {
+        renderer.renderLine(
+          `\nSessions panel failed: ${error instanceof Error ? error.message : String(error)}\n`,
+        );
+      }
       rl.prompt();
       return;
     }
@@ -621,6 +769,7 @@ async function main(): Promise<void> {
           renderer.renderLine(`New project session: ${attachedSession.id}`);
           renderWorkspaceSummary(renderer, runtimeContext);
           renderRecentProjectContexts(renderer, sessionManager);
+          refreshInteractivePromptChrome();
         } catch (error) {
           renderer.renderLine(
             `\nFailed to attach project: ${error instanceof Error ? error.message : String(error)}\n`,
@@ -732,12 +881,13 @@ async function main(): Promise<void> {
       return;
     }
 
-    if (
+      if (
       slashResult?.kind === "shell-action" &&
       slashResult.action === "set-agent-mode"
     ) {
       const nextMode = slashResult.agentMode ?? "build";
       sessionRuntime.setAgentMode(nextMode);
+      refreshInteractivePromptChrome();
       renderer.renderLine(
         `\nAgent mode updated to ${nextMode}.`,
       );
@@ -832,6 +982,10 @@ async function main(): Promise<void> {
         await executeResolvedPromptTurn({
           source: "interactive",
           effectivePrompt: resolved.effectivePrompt,
+          sessionManager,
+          setActiveNonInteractiveApprovalMode: (mode) => {
+            activeNonInteractiveApprovalMode = mode;
+          },
           runtimeContext,
           sessionRuntime,
           logger,
@@ -973,6 +1127,7 @@ async function* streamOrchestratedResponse(
     prompt,
     continuityState,
     workspaceRoot,
+    abortSignal: signal,
     escalationPromptHandler,
     providerMode,
     maxTurns,
@@ -980,10 +1135,6 @@ async function* streamOrchestratedResponse(
     agentMode,
     runtimeSeed,
   })) {
-    if (signal.aborted) {
-      throw new Error("Aborted");
-    }
-
     yield event;
   }
 }
@@ -994,12 +1145,310 @@ function createCliEscalationPromptHandler(
   getViewMode: () => "compact" | "verbose",
   trustPolicy: ApprovalTrustPolicy,
   getProjectRoot: () => string,
+  getNonInteractiveDecision?: () =>
+    | "deny"
+    | "allow-once"
+    | "allow-always"
+    | undefined,
+  getApprovalModeObject?: () => ApprovalModeObject | undefined,
+  persistApprovalAudit?: (record: ApprovalAuditRecord) => void,
 ): (prompt: EscalationPrompt) => Promise<EscalationResponse> {
+  function emitApprovalAudit(record: ApprovalAuditRecord): void {
+    renderApprovalAuditRecord(renderer, record);
+    persistApprovalAudit?.(record);
+  }
+
+  function resolveNonInteractiveApprovalDecision(input: {
+    cliDecision?: "deny" | "allow-once" | "allow-always";
+    approvalModeObject?: ApprovalModeObject;
+    hasAllowOnceCache: boolean;
+    hasAllowAlwaysGrant: boolean;
+  }): NonInteractiveApprovalDecisionPlan {
+    const overrideNotes: string[] = [];
+    const hasCachedGrant = input.hasAllowOnceCache || input.hasAllowAlwaysGrant;
+    if (input.cliDecision) {
+      if (input.approvalModeObject) {
+        if (input.approvalModeObject.mode !== input.cliDecision) {
+          overrideNotes.push(
+            `Prompt approval-mode object (${input.approvalModeObject.mode}) is overridden by explicit CLI policy (${input.cliDecision}).`,
+          );
+        } else {
+          overrideNotes.push(
+            "Prompt approval-mode object is present; explicit CLI policy remains the source of truth.",
+          );
+        }
+      }
+      if (hasCachedGrant) {
+        overrideNotes.push(
+          "Cached grant is present but overridden by explicit non-interactive policy.",
+        );
+      }
+      if (
+        input.approvalModeObject &&
+        (input.approvalModeObject.source === "prompt-ambiguous-verify-lineage" ||
+          !input.approvalModeObject.executableNow)
+      ) {
+        overrideNotes.push(
+          "Prompt approval-mode signal is not safely executable and is overridden by explicit CLI policy.",
+        );
+      }
+      return {
+        source: "cli-policy",
+        decision: input.cliDecision,
+        overrideNotes,
+      };
+    }
+
+    if (input.approvalModeObject) {
+      const conflict = analyzeApprovalModeConflict(input.approvalModeObject);
+      if (conflict.ambiguousStop) {
+        return {
+          source: "ambiguous-stop",
+          stopReason: conflict.stopReason,
+          overrideNotes,
+        };
+      }
+      if (hasCachedGrant) {
+        overrideNotes.push(
+          "Prompt approval-mode object overrides cached grant for this blocked verify continuation.",
+        );
+      }
+      return {
+        source: "approval-mode-object",
+        decision: input.approvalModeObject.mode,
+        overrideNotes,
+      };
+    }
+
+    if (input.hasAllowOnceCache) {
+      return {
+        source: "allow-once-cache",
+        decision: "allow-once",
+        overrideNotes,
+      };
+    }
+    if (input.hasAllowAlwaysGrant) {
+      return {
+        source: "allow-always-policy",
+        decision: "allow-always",
+        overrideNotes,
+      };
+    }
+    return {
+      source: "default-deny",
+      decision: "deny",
+      overrideNotes,
+    };
+  }
+
   return async (prompt) => {
     const projectRoot = getProjectRoot();
     const evaluation = trustPolicy.evaluate(prompt, projectRoot);
+    const isNonInteractive = rl === null;
+    const cliNonInteractiveDecision =
+      isNonInteractive ? getNonInteractiveDecision?.() : undefined;
+    const approvalModeObject = getApprovalModeObject?.();
+    const hasAllowOnceCache = trustPolicy.hasAllowOnce(evaluation.cacheKey);
+    const hasAllowAlwaysGrant = Boolean(evaluation.matchedGrant);
+    const hasCachedGrant = hasAllowOnceCache || hasAllowAlwaysGrant;
 
-    if (trustPolicy.hasAllowOnce(evaluation.cacheKey)) {
+    if (isNonInteractive) {
+      const nonInteractiveDecisionPlan = resolveNonInteractiveApprovalDecision({
+        cliDecision: cliNonInteractiveDecision,
+        approvalModeObject,
+        hasAllowOnceCache,
+        hasAllowAlwaysGrant,
+      });
+      renderApprovalHeader(renderer, "approval-required");
+      renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
+      renderer.renderLine(`- Action: ${prompt.context.operation}`);
+      renderer.renderLine(`- Target: ${prompt.context.target}`);
+      renderer.renderLine(`- Risk: ${prompt.severity}`);
+      renderer.renderLine(
+        `- Decision source: ${nonInteractiveDecisionPlan.source}`,
+      );
+      for (const note of nonInteractiveDecisionPlan.overrideNotes) {
+        renderer.renderLine(`- ${note}`);
+      }
+      if (approvalModeObject) {
+        renderer.renderLine(
+          `Non-interactive approval object: mode=${approvalModeObject.mode}, lineage=${approvalModeObject.verifyLineage}, persistent=${approvalModeObject.persistent ? "yes" : "no"}`,
+        );
+      }
+      if (nonInteractiveDecisionPlan.source === "ambiguous-stop") {
+        const stopReason =
+          nonInteractiveDecisionPlan.stopReason ?? "Approval mode is ambiguous.";
+        renderer.renderLine(stopReason);
+        renderer.renderLine(
+          "Resolve approval conflict explicitly with --non-interactive-approval deny|allow-once|allow-always.",
+        );
+        emitApprovalAudit({
+          channel: "non-interactive",
+          decision: "deny",
+          decisionSource: "ambiguous-stop",
+          persistent: false,
+          cacheEffect: "ambiguous-stop",
+          projectRoot,
+          cacheKey: evaluation.cacheKey,
+          scopeLabel: evaluation.scopeLabel,
+          lineage: approvalModeObject?.verifyLineage,
+          stopReason,
+        });
+        renderer.renderLine("");
+        return {
+          promptId: prompt.id,
+          decision: "deny",
+          respondedAt: Date.now(),
+          userComment: `CLI non-interactive approval blocked: ${stopReason}`,
+        };
+      }
+      const resolvedDecision = nonInteractiveDecisionPlan.decision ?? "deny";
+      renderer.renderLine(
+        `Non-interactive approval policy: ${resolvedDecision}${cliNonInteractiveDecision !== undefined ? " (explicit CLI)" : nonInteractiveDecisionPlan.source === "approval-mode-object" ? " (prompt approval-mode-object)" : hasCachedGrant ? " (cached grant)" : " (default deny)"}`,
+      );
+      if (resolvedDecision === "allow-once") {
+        renderer.renderLine(
+          "Allow-once applied to this execution only (non-persistent).",
+        );
+      }
+      if (resolvedDecision === "allow-always") {
+        const persisted = trustPolicy.rememberAllowAlways(prompt, projectRoot);
+        renderer.renderLine(
+          `Trust policy updated: ${persisted.scopeLabel} @ ${path.basename(projectRoot) || projectRoot}`,
+        );
+      }
+      if (nonInteractiveDecisionPlan.source === "allow-once-cache") {
+        trustPolicy.recordLastHit({
+          source: "allow-once-cache",
+          projectRoot,
+          scopeLabel: evaluation.scopeLabel,
+          cacheKey: evaluation.cacheKey,
+        });
+      }
+      if (nonInteractiveDecisionPlan.source === "allow-always-policy") {
+        trustPolicy.recordLastHit({
+          source: "allow-always-policy",
+          projectRoot,
+          scopeLabel: evaluation.scopeLabel,
+          cacheKey: evaluation.cacheKey,
+        });
+      }
+      emitApprovalAudit({
+        channel: "non-interactive",
+        decision: resolvedDecision,
+        decisionSource: nonInteractiveDecisionPlan.source,
+        persistent: resolvedDecision === "allow-always",
+        cacheEffect:
+          resolvedDecision === "allow-always"
+            ? nonInteractiveDecisionPlan.source === "allow-always-policy"
+              ? "allow-always-cache-hit"
+              : "allow-always-persisted"
+            : nonInteractiveDecisionPlan.source === "allow-once-cache"
+              ? "allow-once-cache-consumed"
+              : "none",
+        projectRoot,
+        cacheKey: evaluation.cacheKey,
+        scopeLabel: evaluation.scopeLabel,
+        lineage: approvalModeObject?.verifyLineage,
+      });
+      renderer.renderLine(`Approval decision: ${resolvedDecision}`);
+      renderer.renderLine("");
+      return {
+        promptId: prompt.id,
+        decision: resolvedDecision,
+        respondedAt: Date.now(),
+        userComment: `CLI non-interactive approval: ${resolvedDecision} (${nonInteractiveDecisionPlan.source})`,
+      };
+    }
+
+    if (approvalModeObject) {
+      const interactiveDecisionPlan = resolveNonInteractiveApprovalDecision({
+        approvalModeObject,
+        hasAllowOnceCache,
+        hasAllowAlwaysGrant,
+      });
+      if (interactiveDecisionPlan.source === "ambiguous-stop") {
+        const stopReason =
+          interactiveDecisionPlan.stopReason ?? "Approval mode is ambiguous.";
+        renderApprovalHeader(renderer, "approval-required");
+        renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
+        renderer.renderLine(`- Action: ${prompt.context.operation}`);
+        renderer.renderLine(`- Target: ${prompt.context.target}`);
+        renderer.renderLine(`- Risk: ${prompt.severity}`);
+        renderer.renderLine(`- Decision source: ${interactiveDecisionPlan.source}`);
+        renderer.renderLine(stopReason);
+        emitApprovalAudit({
+          channel: "interactive",
+          decision: "deny",
+          decisionSource: "ambiguous-stop",
+          persistent: false,
+          cacheEffect: "ambiguous-stop",
+          projectRoot,
+          cacheKey: evaluation.cacheKey,
+          scopeLabel: evaluation.scopeLabel,
+          lineage: approvalModeObject?.verifyLineage,
+          stopReason,
+        });
+        renderer.renderLine("");
+        return {
+          promptId: prompt.id,
+          decision: "deny",
+          respondedAt: Date.now(),
+          userComment: `CLI interactive approval blocked: ${stopReason}`,
+        };
+      }
+      if (interactiveDecisionPlan.source === "approval-mode-object") {
+        const resolvedDecision = interactiveDecisionPlan.decision ?? "deny";
+        renderApprovalHeader(renderer, "approval-required");
+        renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
+        renderer.renderLine(`- Action: ${prompt.context.operation}`);
+        renderer.renderLine(`- Target: ${prompt.context.target}`);
+        renderer.renderLine(`- Risk: ${prompt.severity}`);
+        renderer.renderLine(`- Decision source: ${interactiveDecisionPlan.source}`);
+        for (const note of interactiveDecisionPlan.overrideNotes) {
+          renderer.renderLine(`- ${note}`);
+        }
+        renderer.renderLine(
+          `Interactive approval object: mode=${approvalModeObject.mode}, lineage=${approvalModeObject.verifyLineage}, persistent=${approvalModeObject.persistent ? "yes" : "no"}`,
+        );
+        if (resolvedDecision === "allow-once") {
+          renderer.renderLine(
+            "Allow-once applied to this execution only (non-persistent).",
+          );
+        }
+        if (resolvedDecision === "allow-always") {
+          const persisted = trustPolicy.rememberAllowAlways(prompt, projectRoot);
+          renderer.renderLine(
+            `Trust policy updated: ${persisted.scopeLabel} @ ${path.basename(projectRoot) || projectRoot}`,
+          );
+        }
+        emitApprovalAudit({
+          channel: "interactive",
+          decision: resolvedDecision,
+          decisionSource: interactiveDecisionPlan.source,
+          persistent: resolvedDecision === "allow-always",
+          cacheEffect:
+            resolvedDecision === "allow-always"
+              ? "allow-always-persisted"
+              : "none",
+          projectRoot,
+          cacheKey: evaluation.cacheKey,
+          scopeLabel: evaluation.scopeLabel,
+          lineage: approvalModeObject?.verifyLineage,
+        });
+        renderer.renderLine(`Approval decision: ${resolvedDecision}`);
+        renderer.renderLine("");
+        return {
+          promptId: prompt.id,
+          decision: resolvedDecision,
+          respondedAt: Date.now(),
+          userComment: `CLI interactive approval: ${resolvedDecision} (${interactiveDecisionPlan.source})`,
+        };
+      }
+    }
+
+    if (hasAllowOnceCache) {
+      trustPolicy.consumeAllowOnce(evaluation.cacheKey);
       trustPolicy.recordLastHit({
         source: "allow-once-cache",
         projectRoot,
@@ -1011,6 +1460,16 @@ function createCliEscalationPromptHandler(
       renderer.renderLine(`- Action: ${prompt.context.operation}`);
       renderer.renderLine(`- Target: ${prompt.context.target}`);
       renderer.renderLine("- Decision: allow-once (cached in current shell run)");
+      emitApprovalAudit({
+        channel: isNonInteractive ? "non-interactive" : "interactive",
+        decision: "allow-once",
+        decisionSource: "allow-once-cache",
+        persistent: false,
+        cacheEffect: "allow-once-cache-consumed",
+        projectRoot,
+        cacheKey: evaluation.cacheKey,
+        scopeLabel: evaluation.scopeLabel,
+      });
       renderer.renderLine("");
       return {
         promptId: prompt.id,
@@ -1033,6 +1492,16 @@ function createCliEscalationPromptHandler(
       renderer.renderLine("- Decision: allow-always (project policy match)");
       renderer.renderLine(`- Scope: ${evaluation.scopeLabel}`);
       renderer.renderLine(`- Rule key: ${evaluation.matchedGrant.scopeKey}`);
+      emitApprovalAudit({
+        channel: isNonInteractive ? "non-interactive" : "interactive",
+        decision: "allow-always",
+        decisionSource: "allow-always-policy",
+        persistent: true,
+        cacheEffect: "allow-always-cache-hit",
+        projectRoot,
+        cacheKey: evaluation.cacheKey,
+        scopeLabel: evaluation.scopeLabel,
+      });
       renderer.renderLine("");
       return {
         promptId: prompt.id,
@@ -1065,24 +1534,74 @@ function createCliEscalationPromptHandler(
     }
     renderer.renderLine("Decision: y=allow-once, a=allow-always, n=deny (default n)");
 
-    const answer = await askReadline(rl, "approval> ");
-    const normalized = answer.trim().toLowerCase();
-    const decision =
-      normalized === "y"
-        ? "allow-once"
-        : normalized === "a"
-          ? "allow-always"
-          : "deny";
+    let decision: "deny" | "allow-once" | "allow-always";
+    let decisionInputKey: "y" | "a" | "n" | "other" | undefined;
+    if (isNonInteractive) {
+      decision = "deny";
+      decisionInputKey = "n";
+      renderer.renderLine(
+        "Non-interactive approval policy: deny (default deny)",
+      );
+      if (approvalModeObject) {
+        renderer.renderLine(
+          `Non-interactive approval object: mode=${approvalModeObject.mode}, lineage=${approvalModeObject.verifyLineage}, persistent=${approvalModeObject.persistent ? "yes" : "no"}`,
+        );
+      }
+    } else {
+      const answer = await askReadline(rl, "approval> ");
+      const normalized = answer.trim().toLowerCase();
+      decisionInputKey =
+        normalized === "y"
+          ? "y"
+          : normalized === "a"
+            ? "a"
+            : normalized === "n"
+              ? "n"
+              : "other";
+      decision =
+        normalized === "y"
+          ? "allow-once"
+          : normalized === "a"
+            ? "allow-always"
+            : "deny";
+    }
 
     if (decision === "allow-once") {
-      trustPolicy.rememberAllowOnce(evaluation.cacheKey);
+      renderer.renderLine(
+        "Allow-once applied to this execution only (non-persistent).",
+      );
     }
-    if (decision === "allow-always") {
-      const persisted = trustPolicy.rememberAllowAlways(prompt, projectRoot);
+    const interactiveWiring = applyInteractiveApprovalDecisionWiring({
+      decision,
+      prompt,
+      projectRoot,
+      evaluation,
+      trustPolicy,
+    });
+    if (decision === "allow-always" && interactiveWiring.persistedGrant) {
+      const persisted = interactiveWiring.persistedGrant;
       renderer.renderLine(
         `Trust policy updated: ${persisted.scopeLabel} @ ${path.basename(projectRoot) || projectRoot}`,
       );
     }
+    emitApprovalAudit({
+      channel: isNonInteractive ? "non-interactive" : "interactive",
+      decision,
+      decisionSource: isNonInteractive ? "default-deny" : "interactive-keypress",
+      persistent: decision === "allow-always",
+      cacheEffect:
+        decision === "allow-always"
+          ? "allow-always-persisted"
+          : "none",
+      projectRoot,
+      cacheKey: evaluation.cacheKey,
+      scopeLabel: evaluation.scopeLabel,
+      lineage: approvalModeObject?.verifyLineage,
+      ...(decisionInputKey ? { inputKey: decisionInputKey } : {}),
+      ...(decision === "deny"
+        ? { stopReason: "Interactive approval denied by user input." }
+        : {}),
+    });
 
     renderer.renderLine(`Approval decision: ${decision}`);
     renderer.renderLine("");
@@ -1090,7 +1609,7 @@ function createCliEscalationPromptHandler(
       promptId: prompt.id,
       decision,
       respondedAt: Date.now(),
-      userComment: `CLI explicit approval: ${decision}`,
+      userComment: `CLI explicit approval: ${decision}${getApprovalModeObject?.() ? " (approval-mode-object)" : ""}`,
     };
   };
 }
@@ -1122,95 +1641,194 @@ function askReadline(
   });
 }
 
-async function readStdinToEnd(): Promise<Buffer | null> {
-  try {
-    const chunks: Buffer[] = [];
-    for await (const chunk of process.stdin) {
-      if (typeof chunk === "string") {
-        chunks.push(Buffer.from(chunk, "utf8"));
-      } else {
-        chunks.push(chunk as Buffer);
-      }
+function parseNonInteractiveApprovalMode(
+  args: readonly string[],
+): "deny" | "allow-once" | "allow-always" | undefined {
+  let raw: string | undefined;
+  const idx = args.indexOf("--non-interactive-approval");
+  if (idx !== -1) {
+    raw = args[idx + 1];
+  }
+  if (!raw) {
+    const inline = args.find((arg) =>
+      arg.toLowerCase().startsWith("--non-interactive-approval="),
+    );
+    if (inline) {
+      raw = inline.split("=", 2)[1];
     }
-    if (chunks.length === 0) {
-      return Buffer.alloc(0);
+  }
+  if (!raw) {
+    if (idx === -1) {
+      return undefined;
     }
-    return Buffer.concat(chunks);
-  } catch {
-    return Buffer.alloc(0);
+    console.error(
+      "Missing value for --non-interactive-approval. Use deny, allow-once, or allow-always.",
+    );
+    process.exit(1);
   }
-}
-
-function decodeStdinPayload(
-  buffer: Buffer,
-  profile: ShellEncodingProfile,
-): StdinDecodeResult {
-  if (buffer.length === 0) {
-    return { kind: "ok", text: "" };
-  }
-
-  const strictDecoder = new TextDecoder("utf-8", { fatal: true });
-  try {
-    strictDecoder.decode(buffer);
-  } catch {
-    return {
-      kind: "blocked",
-      reason: buildCorruptedInputReason(
-        profile,
-        "Input bytes are not valid UTF-8.",
-      ),
-    };
-  }
-
-  const text = buffer.toString("utf8");
-  const trimmed = text.trim();
-  if (!trimmed) {
-    return { kind: "ok", text };
-  }
-
-  const replacementCount = (text.match(/\uFFFD/g) ?? []).length;
-  const questionCount = (text.match(/[?？]/g) ?? []).length;
-  const visibleCount = (text.match(/[^\s]/g) ?? []).length;
-  const hasCjk = /[\u3400-\u9FFF]/u.test(text);
-  const hasAsciiWord = /[A-Za-z0-9]/.test(text);
-  const severeMojibakeSignal = /(?:\u00C3.|\u00E2.|\uFFFD{2,}|鍏|锟)/u.test(text);
-  const questionRatio = visibleCount > 0 ? questionCount / visibleCount : 0;
-
+  const normalizedRaw = raw.trim().toLowerCase();
   if (
-    replacementCount > 0 ||
-    (questionRatio >= 0.6 && !hasAsciiWord && !hasCjk) ||
-    (severeMojibakeSignal && !hasCjk && !hasAsciiWord)
+    normalizedRaw === "deny" ||
+    normalizedRaw === "allow-once" ||
+    normalizedRaw === "allow-always"
   ) {
-    return {
-      kind: "blocked",
-      reason: buildCorruptedInputReason(
-        profile,
-        "Input appears corrupted before orchestration (shell/codepage boundary).",
-      ),
-    };
+    return normalizedRaw;
   }
-
-  return { kind: "ok", text };
+  if (normalizedRaw === "n") {
+    return "deny";
+  }
+  if (normalizedRaw === "y") {
+    return "allow-once";
+  }
+  if (normalizedRaw === "a") {
+    return "allow-always";
+  }
+  console.error(
+    `Invalid --non-interactive-approval value: ${normalizedRaw}. Use deny, allow-once, or allow-always.`,
+  );
+  process.exit(1);
 }
+
+function materializeApprovalModeObject(input: {
+  prompt: string;
+  continuity?: SessionContinuitySnapshot;
+}): ApprovalModeObject | undefined {
+  const modeCue = detectApprovalModeCue(input.prompt);
+  if (!modeCue) {
+    return undefined;
+  }
+  const continuity = input.continuity;
+  const verifyLineageReady = hasBlockedVerifyResumeLineage(continuity);
+  const missingFields: string[] = [];
+  if (!verifyLineageReady) {
+    missingFields.push("verify-lineage");
+  }
+  if (modeCue.ambiguous) {
+    missingFields.push("approval-mode");
+  }
+  return {
+    mode: modeCue.mode ?? "deny",
+    persistent: modeCue.mode === "allow-always",
+    source: modeCue.ambiguous
+      ? "prompt-ambiguous-verify-lineage"
+      : "prompt-explicit-verify-lineage",
+    verifyLineage: "blocked-verify-resume",
+    command: continuity?.lastVerificationCommand,
+    commandCwd: extractVerifyHintFromContinuity(continuity, "verify-cwd-hint"),
+    targetPath:
+      extractVerifyHintFromContinuity(continuity, "verify-target-hint") ??
+      continuity?.recentTargetFiles?.[0],
+    executableNow: missingFields.length === 0 && Boolean(modeCue.mode),
+    missingFields,
+  };
+}
+
+function detectApprovalModeCue(prompt: string):
+  | { mode?: "allow-once" | "allow-always"; ambiguous: boolean }
+  | undefined {
+  const normalized = prompt.toLowerCase();
+  const hasVerifyContinuationCue =
+    /(?:\b(?:continue|rerun|re-run|retry|run|execute|do that)\b.*\b(?:verify|verification|test|tests|build|lint|check)\b|\b(?:verify|verification|test|tests|build|lint|check)\b.*\b(?:again|retry|rerun|re-run|continue)\b|继续.*(?:验证|测试|构建|编译|检查)|重跑.*(?:测试|构建|编译)|再跑一次.*(?:测试|构建|编译)|继续刚才那个验证)/iu.test(
+      prompt,
+    );
+  if (!hasVerifyContinuationCue) {
+    return undefined;
+  }
+  const onceCue =
+    /\ballow[-\s]?once\b|\bone[\s-]?time\b|\bjust this time\b|\btemporar(?:y|ily)\b|一次性授权|仅这一次|这次授权|临时授权|就这一次/u.test(
+      normalized,
+    );
+  const alwaysCue =
+    /\ballow[-\s]?always\b|\balways allow\b|\bremember(?:\s+it|\s+this)?\b|\bpermanent(?:ly)?\b|姘镐箙鍏佽|闀挎湡鎺堟潈|璁颁綇(?:杩欎釜)?鎺堟潈|姘镐箙鎺堟潈/u.test(
+      normalized,
+    );
+  if (!onceCue && !alwaysCue) {
+    return undefined;
+  }
+  if (onceCue && alwaysCue) {
+    return { ambiguous: true };
+  }
+  return { mode: onceCue ? "allow-once" : "allow-always", ambiguous: false };
+}
+
+function hasBlockedVerifyResumeLineage(
+  continuity?: SessionContinuitySnapshot,
+): boolean {
+  if (!continuity) {
+    return false;
+  }
+  if (
+    continuity.lastVerificationResumeEligible === true &&
+    Boolean(continuity.lastVerificationCommand?.trim())
+  ) {
+    return true;
+  }
+  if (
+    continuity.lastVerificationStatus === "blocked" &&
+    continuity.lastVerificationBlockerKind === "approval-denied" &&
+    Boolean(continuity.lastVerificationCommand?.trim())
+  ) {
+    return true;
+  }
+  return (
+    (continuity.lastContinuationEvidence ?? []).some((entry) =>
+      /^verify-resume-eligible:(?:1|true|yes)$/i.test(entry.trim()),
+    ) &&
+    Boolean(continuity.lastVerificationCommand?.trim())
+  );
+}
+
+function extractVerifyHintFromContinuity(
+  continuity: SessionContinuitySnapshot | undefined,
+  prefix: "verify-cwd-hint" | "verify-target-hint",
+): string | undefined {
+  if (!continuity) {
+    return undefined;
+  }
+  const matcher = new RegExp(`^${prefix}:(.+)$`, "i");
+  for (const entry of continuity.lastContinuationEvidence ?? []) {
+    const match = entry.match(matcher);
+    if (match?.[1]?.trim()) {
+      return match[1].trim();
+    }
+  }
+  return undefined;
+}
+
+async function readStdinToEnd(): Promise<string | null> {
+  try {
+    let content = "";
+    process.stdin.setEncoding("utf8");
+    for await (const chunk of process.stdin) {
+      content += chunk;
+    }
+    return content.length > 0 ? content : "";
+  } catch {
+    return "";
+  }
+}
+
 async function runNonTtyPromptStream(options: {
   sessionManager: SessionManager;
   runtimeContext: {
-    session: { id: string; projectRoot: string };
+    session: { id: string };
     cwd: string;
-    originalCwd: string;
     projectRoot: string;
-    gitContext: ReturnType<typeof getWorkflowGitContext>;
     runtimeConfig: { maxTurns: number };
-    resumeProvenance?: SessionResumeProvenance;
   };
   renderer: StreamingRenderer;
   sessionRuntime: ShellSessionRuntime;
   logger: ReturnType<typeof createComponentLogger>;
   fallbackSessionId?: string;
-  onSessionSwitched?: () => void;
+  setActiveNonInteractiveApprovalMode: (
+    mode: ApprovalModeObject | undefined,
+  ) => void;
+  nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
 }): Promise<void> {
+  const contextTag = (): string =>
+    `[${toProjectLabel(options.runtimeContext.projectRoot)}|${toSessionShortLabel(options.runtimeContext.session.id)}]`;
   options.renderer.renderLine(
-    `Non-TTY stdin mode: waiting for newline-delimited prompts on session ${options.runtimeContext.session.id}.`,
+    `Non-TTY stdin mode ${contextTag()}: waiting for newline-delimited prompts.`,
   );
   options.renderer.renderLine(
     "Send one prompt per line. Close stdin to finish.\n",
@@ -1234,7 +1852,7 @@ async function runNonTtyPromptStream(options: {
       turnChain = turnChain
         .then(async () => {
           processedCount += 1;
-          options.renderer.renderLine(`> ${prompt}`);
+          options.renderer.renderLine(`${contextTag()} > ${prompt}`);
           await runNonInteractivePrompt({
             prompt,
             sessionManager: options.sessionManager,
@@ -1244,7 +1862,10 @@ async function runNonTtyPromptStream(options: {
             logger: options.logger,
             printMode: false,
             fallbackSessionId: options.fallbackSessionId,
-            onSessionSwitched: options.onSessionSwitched,
+            setActiveNonInteractiveApprovalMode:
+              options.setActiveNonInteractiveApprovalMode,
+            nonInteractiveCliApprovalMode:
+              options.nonInteractiveCliApprovalMode,
           });
         })
         .catch((error) => {
@@ -1272,20 +1893,20 @@ async function runNonInteractivePrompt(options: {
   prompt: string;
   sessionManager: SessionManager;
   runtimeContext: {
-    session: { id: string; projectRoot: string };
+    session: { id: string };
     cwd: string;
-    originalCwd: string;
     projectRoot: string;
-    gitContext: ReturnType<typeof getWorkflowGitContext>;
     runtimeConfig: { maxTurns: number };
-    resumeProvenance?: SessionResumeProvenance;
   };
   renderer: StreamingRenderer;
   sessionRuntime: ShellSessionRuntime;
   logger: ReturnType<typeof createComponentLogger>;
   printMode: boolean;
   fallbackSessionId?: string;
-  onSessionSwitched?: () => void;
+  setActiveNonInteractiveApprovalMode: (
+    mode: ApprovalModeObject | undefined,
+  ) => void;
+  nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
 }): Promise<void> {
   const trimmedPrompt = options.prompt.trim();
   if (!trimmedPrompt) {
@@ -1294,8 +1915,6 @@ async function runNonInteractivePrompt(options: {
   const resolved = await resolveTurnInputForExecution({
     prompt: trimmedPrompt,
     cwd: options.runtimeContext.cwd,
-    sessionId: options.runtimeContext.session.id,
-    sessionManager: options.sessionManager,
     renderer: options.renderer,
     printMode: options.printMode,
     interactive: false,
@@ -1304,18 +1923,81 @@ async function runNonInteractivePrompt(options: {
     return;
   }
   if (resolved.kind === "shell-action") {
-    if (resolved.slashResult.action === "list-sessions") {
-      await handleSessionsShellAction({
-        slashResult: resolved.slashResult,
-        interactive: false,
-        sessionManager: options.sessionManager,
-        runtimeContext: options.runtimeContext as never,
-        renderer: options.renderer,
-        printMode: options.printMode,
-        onSessionSwitched: options.onSessionSwitched,
-      });
+    if (resolved.slashResult.action === "show-help") {
+      renderUserHelp(options.renderer);
       return;
     }
+
+    if (resolved.slashResult.action === "list-sessions") {
+      const sessionAction = resolved.slashResult.sessionAction ?? "panel";
+      if (sessionAction === "list") {
+        renderSessionList(
+          options.renderer,
+          options.sessionManager,
+          options.runtimeContext.session.id,
+          options.runtimeContext.projectRoot,
+        );
+        return;
+      }
+
+      if (sessionAction === "current") {
+        renderCurrentSession(
+          options.renderer,
+          options.sessionManager,
+          options.runtimeContext as never,
+        );
+        renderSessionCommandMap(options.renderer, { compact: true });
+        return;
+      }
+
+      if (sessionAction === "switch") {
+        const targetSessionId = resolved.slashResult.sessionId?.trim();
+        if (!targetSessionId) {
+          options.renderer.renderLine("Usage: /sessions switch <session-id>");
+          return;
+        }
+
+        try {
+          const resumed = options.sessionManager.resume(targetSessionId);
+          const previousSessionId = options.runtimeContext.session.id;
+          switchRuntimeSessionProjectContext(
+            options.runtimeContext as never,
+            resumed,
+          );
+          options.renderer.renderLine(
+            `Switched session: ${previousSessionId} -> ${resumed.id}`,
+          );
+          options.renderer.renderLine(
+            `Project context: ${options.runtimeContext.projectRoot}`,
+          );
+          renderSwitchedSessionContext(
+            options.renderer,
+            options.sessionManager,
+            resumed.id,
+          );
+          renderSessionCommandMap(options.renderer, { compact: true });
+          return;
+        } catch (error) {
+          options.renderer.renderLine(
+            `Failed to switch session: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          return;
+        }
+      }
+
+      if (sessionAction === "help") {
+        renderSessionCommandMap(options.renderer);
+        return;
+      }
+
+      renderSessionSurfaceOverview(
+        options.renderer,
+        options.sessionManager,
+        options.runtimeContext as never,
+      );
+      return;
+    }
+
     if (
       resolved.slashResult.action === "resume-session" ||
       resolved.slashResult.action === "continue-session"
@@ -1331,6 +2013,9 @@ async function runNonInteractivePrompt(options: {
         sessionRuntime: options.sessionRuntime,
         logger: options.logger,
         renderer: options.renderer,
+        setActiveNonInteractiveApprovalMode:
+          options.setActiveNonInteractiveApprovalMode,
+        nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
       });
       return;
     }
@@ -1344,6 +2029,10 @@ async function runNonInteractivePrompt(options: {
   await executeResolvedPromptTurn({
     source: "non-interactive",
     effectivePrompt: resolved.effectivePrompt,
+    sessionManager: options.sessionManager,
+    setActiveNonInteractiveApprovalMode:
+      options.setActiveNonInteractiveApprovalMode,
+    nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
     runtimeContext: options.runtimeContext,
     sessionRuntime: options.sessionRuntime,
     logger: options.logger,
@@ -1355,127 +2044,22 @@ async function runNonInteractivePrompt(options: {
 async function resolveTurnInputForExecution(options: {
   prompt: string;
   cwd: string;
-  sessionId: string;
-  sessionManager: SessionManager;
   renderer: StreamingRenderer;
   printMode: boolean;
   interactive: boolean;
 }): Promise<TurnInputResolution> {
-  const preparedPrompt = preparePromptForExecution({
-    prompt: options.prompt,
-    sessionId: options.sessionId,
-    sessionManager: options.sessionManager,
-  });
-  if (preparedPrompt.kind === "blocked") {
+  const repoAwareResponse = resolveRepoAwarePromptResponse(
+    options.prompt,
+    options.cwd,
+  );
+  if (repoAwareResponse) {
     options.renderer.renderLine(
-      options.printMode ? preparedPrompt.reason : `\n${preparedPrompt.reason}\n`,
+      options.printMode ? repoAwareResponse : `\n${repoAwareResponse}\n`,
     );
     return { kind: "handled" };
   }
 
-  let promptForRouting = preparedPrompt.prompt;
-  const clauses = decomposeQueryClauses(preparedPrompt.prompt);
-  const reflectiveAnswers: string[] = [];
-  const conversationalAnswers: string[] = [];
-  const repoAwareAnswers: string[] = [];
-  const residualClauses: string[] = [];
-  let continuationPrompt: string | undefined;
-  let continuationStepHint: SessionMaterializedStepHint | undefined;
-
-  for (const clause of clauses) {
-    const reflectiveStatusHandoff =
-      options.sessionManager.resolveReflectiveStatusHandoff(
-        options.sessionId,
-        clause,
-      );
-    if (reflectiveStatusHandoff) {
-      reflectiveAnswers.push(reflectiveStatusHandoff.answer);
-      if (!continuationPrompt && reflectiveStatusHandoff.continuationPrompt) {
-        continuationPrompt = reflectiveStatusHandoff.continuationPrompt;
-      }
-      continue;
-    }
-
-    if (!continuationPrompt && isActionContinuationClause(clause)) {
-      const materialized =
-        options.sessionManager.materializeContinuationFromActionClause(
-          options.sessionId,
-          clause,
-        );
-      if (materialized?.prompt) {
-        continuationPrompt = materialized.prompt;
-        continuationStepHint = materialized.stepHint;
-        continue;
-      }
-      if (materialized?.blockedReason) {
-        options.renderer.renderLine(
-          options.printMode
-            ? materialized.blockedReason
-            : `\n${materialized.blockedReason}\n`,
-        );
-        return { kind: "handled" };
-      }
-      continuationPrompt = clause;
-      continue;
-    }
-
-    const conversationalHandoff =
-      options.sessionManager.resolveConversationalActionHandoff(
-        options.sessionId,
-        clause,
-      );
-    if (conversationalHandoff) {
-      conversationalAnswers.push(conversationalHandoff.answer);
-      if (!continuationPrompt && conversationalHandoff.continuationPrompt) {
-        continuationPrompt = conversationalHandoff.continuationPrompt;
-      }
-      continue;
-    }
-
-    if (shouldAllowRepoAwareRouting(clause)) {
-      const normalizedRepoClause = normalizeRepoAwareClause(clause);
-      const repoAwareResponse = resolveRepoAwarePromptResponse(
-        normalizedRepoClause,
-        options.cwd,
-      );
-      if (repoAwareResponse) {
-        repoAwareAnswers.push(repoAwareResponse);
-        continue;
-      }
-    }
-
-    residualClauses.push(clause);
-  }
-
-  const renderedAnswers = [
-    ...reflectiveAnswers,
-    ...conversationalAnswers,
-    ...repoAwareAnswers,
-  ];
-  if (renderedAnswers.length > 0) {
-    const combined = renderedAnswers.join("\n\n");
-    options.renderer.renderLine(
-      options.printMode ? combined : `\n${combined}\n`,
-    );
-  }
-
-  if (!continuationPrompt) {
-    continuationPrompt = residualClauses.length > 0
-      ? residualClauses.join(" then ")
-      : undefined;
-  }
-
-  if (!continuationPrompt) {
-    return { kind: "handled" };
-  }
-  promptForRouting = continuationPrompt;
-  if (!options.printMode && renderedAnswers.length > 0) {
-    options.renderer.renderLine(
-      `\nContinuing with normalized action: ${promptForRouting}\n`,
-    );
-  }
-
-  const slashResult = await routeSlashCommand(promptForRouting, {
+  const slashResult = await routeSlashCommand(options.prompt, {
     cwd: options.cwd,
   });
   if (slashResult?.kind === "local") {
@@ -1495,93 +2079,8 @@ async function resolveTurnInputForExecution(options: {
     );
   }
   const rawPrompt =
-    slashResult?.kind === "prompt" ? slashResult.prompt : promptForRouting;
-  const promptWithStepContext = continuationStepHint
-    ? attachFollowUpStepContext(rawPrompt, continuationStepHint)
-    : rawPrompt;
-  const normalizedPrompt = normalizePromptForExecution(promptWithStepContext);
-  const budgetedPrompt = options.sessionManager.buildBudgetedPromptWithContinuityContext(
-    options.sessionId,
-    normalizedPrompt,
-  );
-  return { kind: "execute", effectivePrompt: budgetedPrompt };
-}
-
-function attachFollowUpStepContext(
-  prompt: string,
-  stepHint: SessionMaterializedStepHint,
-): string {
-  const lines = ["[FOLLOW-UP STEP CONTEXT]"];
-  lines.push(`step-kind: ${stepHint.kind}`);
-  lines.push(`step-confidence: ${stepHint.confidence}`);
-  if (stepHint.targetPath?.trim()) {
-    lines.push(`step-target: ${stepHint.targetPath.trim()}`);
-  }
-  if (stepHint.command?.trim()) {
-    lines.push(`step-command: ${stepHint.command.trim()}`);
-  }
-  if (stepHint.replaceFrom?.trim()) {
-    lines.push(`step-replace-from: ${stepHint.replaceFrom.trim()}`);
-  }
-  if (stepHint.replaceTo?.trim()) {
-    lines.push(`step-replace-to: ${stepHint.replaceTo.trim()}`);
-  }
-  if (stepHint.readLineCount !== undefined && Number.isFinite(stepHint.readLineCount)) {
-    lines.push(`step-read-line-count: ${Math.max(1, Math.trunc(stepHint.readLineCount))}`);
-  }
-  if (stepHint.readFilter) {
-    lines.push(`step-read-filter: ${stepHint.readFilter}`);
-  }
-  if (stepHint.readFragmentStart !== undefined && Number.isFinite(stepHint.readFragmentStart)) {
-    lines.push(`step-read-fragment-start: ${Math.max(0, Math.trunc(stepHint.readFragmentStart))}`);
-  }
-  if (stepHint.readFragmentEnd !== undefined && Number.isFinite(stepHint.readFragmentEnd)) {
-    lines.push(`step-read-fragment-end: ${Math.max(0, Math.trunc(stepHint.readFragmentEnd))}`);
-  }
-  if ((stepHint.readFragmentLineIndexes?.length ?? 0) > 0) {
-    lines.push(
-      `step-read-fragment-line-indexes: ${stepHint.readFragmentLineIndexes
-        .map((value) => Math.max(0, Math.trunc(value)))
-        .join(",")}`,
-    );
-  }
-  if ((stepHint.readFragmentRanges?.length ?? 0) > 0) {
-    lines.push(`step-read-fragment-ranges: ${stepHint.readFragmentRanges.join(";")}`);
-  }
-  if (
-    stepHint.readFragmentSourceWindowStart !== undefined &&
-    Number.isFinite(stepHint.readFragmentSourceWindowStart)
-  ) {
-    lines.push(
-      `step-read-fragment-source-window-start: ${Math.max(0, Math.trunc(stepHint.readFragmentSourceWindowStart))}`,
-    );
-  }
-  if (
-    stepHint.readFragmentSourceWindowEnd !== undefined &&
-    Number.isFinite(stepHint.readFragmentSourceWindowEnd)
-  ) {
-    lines.push(
-      `step-read-fragment-source-window-end: ${Math.max(0, Math.trunc(stepHint.readFragmentSourceWindowEnd))}`,
-    );
-  }
-  if (stepHint.readFragmentFingerprint?.trim()) {
-    lines.push(`step-read-fragment-fingerprint: ${stepHint.readFragmentFingerprint.trim()}`);
-  }
-  if (stepHint.readFragmentStructureSignature?.trim()) {
-    lines.push(
-      `step-read-fragment-structure-signature: ${stepHint.readFragmentStructureSignature.trim()}`,
-    );
-  }
-  if (stepHint.readFragmentNeighborhoodSignature?.trim()) {
-    lines.push(
-      `step-read-fragment-neighborhood-signature: ${stepHint.readFragmentNeighborhoodSignature.trim()}`,
-    );
-  }
-  if (stepHint.continuationPrompt?.trim()) {
-    lines.push(`step-continuation-prompt: ${stepHint.continuationPrompt.trim()}`);
-  }
-  lines.push("[END STEP CONTEXT]");
-  return `${prompt.trim()}\n${lines.join("\n")}`.trim();
+    slashResult?.kind === "prompt" ? slashResult.prompt : options.prompt;
+  return { kind: "execute", effectivePrompt: normalizePromptForExecution(rawPrompt) };
 }
 
 async function runResumeLikeShellAction(options: {
@@ -1600,6 +2099,10 @@ async function runResumeLikeShellAction(options: {
   logger: ReturnType<typeof createComponentLogger>;
   renderer: StreamingRenderer;
   turnNumber?: number;
+  setActiveNonInteractiveApprovalMode: (
+    mode: ApprovalModeObject | undefined,
+  ) => void;
+  nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
 }): Promise<{ turnNumber: number }> {
   const resumed = await resumeShellSession({
     requestedSessionId: options.slashResult.sessionId,
@@ -1623,6 +2126,10 @@ async function runResumeLikeShellAction(options: {
     await executeResolvedPromptTurn({
       source: options.source,
       effectivePrompt: effectiveFollowUp,
+      sessionManager: options.sessionManager,
+      setActiveNonInteractiveApprovalMode:
+        options.setActiveNonInteractiveApprovalMode,
+      nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
       runtimeContext: options.runtimeContext,
       sessionRuntime: options.sessionRuntime,
       logger: options.logger,
@@ -1641,6 +2148,10 @@ async function runResumeLikeShellAction(options: {
       effectivePrompt: resumed.autoResume.prompt,
       runtimeSeed: resumed.autoResume.runtimeSeed,
       continuityState: resumed.autoResume.continuityState,
+      sessionManager: options.sessionManager,
+      setActiveNonInteractiveApprovalMode:
+        options.setActiveNonInteractiveApprovalMode,
+      nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
       runtimeContext: options.runtimeContext,
       sessionRuntime: options.sessionRuntime,
       logger: options.logger,
@@ -1658,6 +2169,23 @@ async function runResumeLikeShellAction(options: {
         ? "Session continuation ready. Submit an explicit follow-up prompt."
         : "Session continuation ready. Enter your next instruction, or use /continue <follow-up prompt>.\n",
     );
+    renderSessionCommandMap(options.renderer, {
+      compact: options.printMode,
+      includeHelpHint: false,
+    });
+    if (!options.printMode) {
+      options.renderer.renderLine("");
+    }
+  }
+
+  if (options.slashResult.action === "resume-session") {
+    renderSessionCommandMap(options.renderer, {
+      compact: options.printMode,
+      includeHelpHint: false,
+    });
+    if (!options.printMode) {
+      options.renderer.renderLine("");
+    }
   }
 
   return { turnNumber: options.turnNumber ?? 0 };
@@ -1668,10 +2196,12 @@ async function executeResolvedPromptTurn(options: {
   effectivePrompt: string;
   runtimeSeed?: QueryRuntimeStateSeed;
   continuityState?: SessionContinuitySnapshot;
-  runtimeContext: {
-    session: { id: string };
-    resumeProvenance?: SessionResumeProvenance;
-  };
+  sessionManager: SessionManager;
+  setActiveNonInteractiveApprovalMode: (
+    mode: ApprovalModeObject | undefined,
+  ) => void;
+  nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
+  runtimeContext: { session: { id: string } };
   sessionRuntime: ShellSessionRuntime;
   logger: ReturnType<typeof createComponentLogger>;
   printMode: boolean;
@@ -1704,19 +2234,48 @@ async function executeResolvedPromptTurn(options: {
       promptLength: options.effectivePrompt.length,
     },
   );
+  const continuitySnapshot =
+    options.continuityState ??
+    options.sessionManager.buildPromptContinuitySnapshot(
+      options.runtimeContext.session.id,
+      options.effectivePrompt,
+    );
+  const approvalModeObject = materializeApprovalModeObject({
+    prompt: options.effectivePrompt,
+    continuity: continuitySnapshot,
+  });
+  const approvalModeConflict = analyzeApprovalModeConflict(approvalModeObject);
+  if (
+    approvalModeConflict.ambiguousStop &&
+    (options.source === "interactive" || !options.nonInteractiveCliApprovalMode)
+  ) {
+    options.renderer.renderLine(
+      approvalModeConflict.stopReason ?? "Approval mode is ambiguous.",
+    );
+    options.renderer.renderLine(
+      "Re-run with an explicit verify continuation lineage or set --non-interactive-approval for this run.",
+    );
+    return;
+  }
   recordCount("cli.prompts", 1, {
     sessionId: options.runtimeContext.session.id,
   });
-  await options.sessionRuntime.executePrompt(
-    options.runtimeContext.session.id,
-    options.effectivePrompt,
-    {
-      outputMode: options.printMode ? "print" : "interactive",
-      runtimeSeed: options.runtimeSeed,
-      continuityState: options.continuityState,
-      resumeProvenance: options.runtimeContext.resumeProvenance,
-    },
+  options.setActiveNonInteractiveApprovalMode(
+    approvalModeObject,
   );
+  try {
+    await options.sessionRuntime.executePrompt(
+      options.runtimeContext.session.id,
+      options.effectivePrompt,
+      {
+        outputMode: options.printMode ? "print" : "interactive",
+        runtimeSeed: options.runtimeSeed,
+        continuityState: continuitySnapshot,
+      },
+    );
+  } finally {
+    options.setActiveNonInteractiveApprovalMode(undefined);
+  }
   options.logger.info(
     options.source === "interactive"
       ? "CLI run completed"
@@ -1737,20 +2296,20 @@ async function runReplayPromptScript(options: {
   replayFile: string;
   sessionManager: SessionManager;
   runtimeContext: {
-    session: { id: string; projectRoot: string };
+    session: { id: string };
     cwd: string;
-    originalCwd: string;
     projectRoot: string;
-    gitContext: ReturnType<typeof getWorkflowGitContext>;
     runtimeConfig: { maxTurns: number };
-    resumeProvenance?: SessionResumeProvenance;
   };
   renderer: StreamingRenderer;
   sessionRuntime: ShellSessionRuntime;
   logger: ReturnType<typeof createComponentLogger>;
   printMode: boolean;
   fallbackSessionId?: string;
-  onSessionSwitched?: () => void;
+  setActiveNonInteractiveApprovalMode: (
+    mode: ApprovalModeObject | undefined,
+  ) => void;
+  nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
 }): Promise<void> {
   const resolvedReplayPath = path.resolve(process.cwd(), options.replayFile);
   if (!fs.existsSync(resolvedReplayPath)) {
@@ -1772,7 +2331,6 @@ async function runReplayPromptScript(options: {
     `Replay mode: running ${prompts.length} prompt(s) in live query loop against session ${options.runtimeContext.session.id}.`,
   );
   for (const prompt of prompts) {
-    options.renderer.renderLine(`\n> ${prompt}`);
     await runNonInteractivePrompt({
       prompt,
       sessionManager: options.sessionManager,
@@ -1782,7 +2340,9 @@ async function runReplayPromptScript(options: {
       logger: options.logger,
       printMode: options.printMode,
       fallbackSessionId: options.fallbackSessionId,
-      onSessionSwitched: options.onSessionSwitched,
+      setActiveNonInteractiveApprovalMode:
+        options.setActiveNonInteractiveApprovalMode,
+      nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
     });
   }
 }
@@ -1845,147 +2405,25 @@ function resolveStdinTransportMode(input: {
   return "stream-live";
 }
 
-function detectShellEncodingProfile(input: {
-  stdinIsTty: boolean;
-  transportMode: StdinTransportMode;
-}): ShellEncodingProfile {
-  const shell = detectShellKind();
-  const platform = process.platform;
-  const codePage = platform === "win32" ? detectWindowsCodePage() : undefined;
-  const fallbackHints = [
-    "Use --replay-file <path> with UTF-8 file",
-    "Use --print \"<prompt>\" for single-turn runs",
-    "Use interactive TTY mode for CJK-heavy prompts",
-  ];
-  if (platform === "win32") {
-    fallbackHints.push(
-      "Prefer PowerShell 7 (pwsh) with UTF-8 output/input encoding",
-    );
-  } else {
-    fallbackHints.push("Prefer bash/zsh with UTF-8 locale");
-  }
-
-  if (input.transportMode === "none" || input.stdinIsTty) {
-    return {
-      shell,
-      platform,
-      stdinIsTty: input.stdinIsTty,
-      transportMode: input.transportMode,
-      windowsCodePage: codePage,
-      trust: "supported",
-      reason: "stdin transport is not used or is interactive TTY",
-      fallbackHints,
-    };
-  }
-
-  if (platform !== "win32") {
-    return {
-      shell,
-      platform,
-      stdinIsTty: input.stdinIsTty,
-      transportMode: input.transportMode,
-      trust: "supported",
-      reason: "non-Windows stdin path with explicit UTF-8 integrity checks",
-      fallbackHints,
-    };
-  }
-
-  const isUtf8CodePage = codePage === 65001;
-  if (shell === "pwsh" && isUtf8CodePage) {
-    return {
-      shell,
-      platform,
-      stdinIsTty: input.stdinIsTty,
-      transportMode: input.transportMode,
-      windowsCodePage: codePage,
-      trust: "supported",
-      reason: "pwsh + UTF-8 codepage",
-      fallbackHints,
-    };
-  }
-
-  if (shell === "powershell" || shell === "cmd" || !isUtf8CodePage) {
-    return {
-      shell,
-      platform,
-      stdinIsTty: input.stdinIsTty,
-      transportMode: input.transportMode,
-      windowsCodePage: codePage,
-      trust: "risky",
-      reason: `Windows ${shell} stdin pipe may damage CJK before process ingestion (codepage=${codePage ?? "unknown"})`,
-      fallbackHints,
-    };
-  }
-
-  return {
-    shell,
-    platform,
-    stdinIsTty: input.stdinIsTty,
-    transportMode: input.transportMode,
-    windowsCodePage: codePage,
-    trust: "risky",
-    reason: "Windows stdin pipeline with unknown shell characteristics",
-    fallbackHints,
-  };
+function toProjectLabel(projectRoot: string): string {
+  return path.basename(projectRoot) || projectRoot;
 }
 
-function detectShellKind():
-  | "powershell"
-  | "pwsh"
-  | "cmd"
-  | "bash"
-  | "zsh"
-  | "unknown" {
-  const shell = process.env.SHELL?.toLowerCase() ?? "";
-  if (shell.includes("bash")) {
-    return "bash";
-  }
-  if (shell.includes("zsh")) {
-    return "zsh";
-  }
-  const parentHint = [
-    process.env.TERM_PROGRAM,
-    process.env.ComSpec,
-    process.env.PSModulePath ? "powershell-env" : "",
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  if (parentHint.includes("pwsh")) {
-    return "pwsh";
-  }
-  if (parentHint.includes("powershell")) {
-    return "powershell";
-  }
-  if (parentHint.includes("cmd.exe")) {
-    return "cmd";
-  }
-  return "unknown";
+function toSessionShortLabel(sessionId: string): string {
+  const normalized = sessionId.startsWith("sess_")
+    ? sessionId.slice("sess_".length)
+    : sessionId;
+  return normalized.slice(0, 8);
 }
 
-function detectWindowsCodePage(): number | undefined {
-  try {
-    const output = execSync("chcp", { stdio: ["ignore", "pipe", "ignore"] })
-      .toString("utf8")
-      .trim();
-    const match = output.match(/(\d{3,5})/);
-    if (!match?.[1]) {
-      return undefined;
-    }
-    const parsed = Number.parseInt(match[1], 10);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function buildCorruptedInputReason(
-  profile: ShellEncodingProfile,
-  detail: string,
-): string {
-  const profileLine = `stdin profile: shell=${profile.shell}, transport=${profile.transportMode}, trust=${profile.trust}${profile.windowsCodePage ? `, codepage=${profile.windowsCodePage}` : ""}.`;
-  const hintLine = `Recommended fallback: ${profile.fallbackHints.join(" | ")}.`;
-  return `${detail} ${profileLine} ${hintLine}`;
+function buildPersistentShellPrompt(input: {
+  projectRoot: string;
+  sessionId: string;
+  agentMode: "plan" | "build";
+}): string {
+  const project = toProjectLabel(input.projectRoot);
+  const session = toSessionShortLabel(input.sessionId);
+  return `[${project}|${session}|${input.agentMode}] > `;
 }
 
 function derivePromptArgument(
@@ -2000,6 +2438,7 @@ function derivePromptArgument(
     "--provider",
     "--api-key",
     "--replay-file",
+    "--non-interactive-approval",
   ]);
 
   for (let index = 0; index < args.length; index += 1) {
@@ -2069,6 +2508,89 @@ function renderWorkspaceSummary(
   renderer.renderLine("");
 }
 
+function renderStartupSurface(
+  renderer: StreamingRenderer,
+  input: {
+    runtimeContext: {
+      session: { id: string; status: string };
+      cwd: string;
+      originalCwd: string;
+      projectRoot: string;
+      gitContext: {
+        insideGit: boolean;
+        branch: string | null;
+        isClean: boolean | null;
+      };
+    };
+    sessionManager: SessionManager;
+    lifecycleNotices: readonly string[];
+    recoveryCandidate?: { id: string } | null;
+    recoveryCandidateSummary?: SessionReentrySummary;
+    recoveryBlockedNotice?: RecoveryTrustBoundaryBlock;
+    provider: string;
+    model?: string;
+    maxTurns: number;
+    executionPath: "rust-daemon" | "ts-local";
+    stdinTransportMode: StdinTransportMode;
+  },
+): void {
+  const summary = input.sessionManager.describeSessionReentry(
+    input.runtimeContext.session.id,
+  );
+  const projectLabel =
+    path.basename(input.runtimeContext.projectRoot) ||
+    input.runtimeContext.projectRoot;
+
+  renderer.renderLine("\nPrivate Coding Agents Shell");
+  renderer.renderLine(`- Project: ${projectLabel}`);
+  renderer.renderLine(`- Project root: ${input.runtimeContext.projectRoot}`);
+  if (
+    path.resolve(input.runtimeContext.originalCwd) !==
+    path.resolve(input.runtimeContext.projectRoot)
+  ) {
+    renderer.renderLine(`- Launch directory: ${input.runtimeContext.originalCwd}`);
+  }
+  renderer.renderLine(`- Session: ${summary.id} [${summary.status}]`);
+  renderer.renderLine(
+    `- Resume state: ${summary.resumeDisposition}${summary.autoResumeReady ? " (auto)" : ""}`,
+  );
+  renderer.renderLine(
+    `- Runtime: ${input.executionPath}; provider=${input.provider}${input.model ? `; model=${input.model}` : ""}; max-turns=${input.maxTurns}`,
+  );
+  if (input.runtimeContext.gitContext.insideGit) {
+    renderer.renderLine(
+      `- Git: ${input.runtimeContext.gitContext.branch ?? "unknown"} (${input.runtimeContext.gitContext.isClean ? "clean" : "dirty"})`,
+    );
+  }
+
+  const lifecycleNotice = input.lifecycleNotices.at(-1);
+  if (lifecycleNotice) {
+    renderer.renderLine(`- Session lifecycle: ${lifecycleNotice}`);
+  }
+  if (input.recoveryCandidate && input.recoveryCandidateSummary) {
+    renderer.renderLine(
+      `- Recovery hint: /resume or --session-id ${input.recoveryCandidate.id} (${input.recoveryCandidateSummary.resumeDisposition})`,
+    );
+  } else if (input.recoveryBlockedNotice) {
+    renderer.renderLine(
+      `- Recovery boundary: ${truncate(input.recoveryBlockedNotice.detail, 180)}`,
+    );
+  }
+
+  renderer.renderLine("Next actions:");
+  renderer.renderLine("- Type a prompt to start work in this project.");
+  renderer.renderLine("- /sessions    inspect active + recent sessions.");
+  renderer.renderLine("- /resume      continue the best recoverable context.");
+  renderer.renderLine("- /workspace status    verify project/workdir binding.");
+  renderer.renderLine("- /help        open grouped command navigation.");
+  if (input.stdinTransportMode === "stream-live") {
+    renderer.renderLine(
+      "- Non-TTY stream mode active: each input line is processed as a sequential turn.",
+    );
+  }
+  renderer.renderLine("Ctrl+C cancels the current run. Ctrl+D exits.\n");
+}
+
 function renderRecentProjectContexts(
   renderer: StreamingRenderer,
   sessionManager: SessionManager,
@@ -2116,7 +2638,7 @@ function renderSessionList(
 
   renderer.renderLine("\nRe-entry sessions");
   renderer.renderLine(
-    "Use /sessions switch <session-id> to jump directly, /resume to continue the best interrupted context, or /sessions for interactive panel.",
+    "Use /sessions switch <session-id> to jump directly, /resume to continue recoverable work, or /sessions current for active-session details.",
   );
   for (const summary of summaries) {
     const activeMarker = summary.id === activeSessionId ? "*" : " ";
@@ -2200,47 +2722,96 @@ function renderCurrentSession(
   renderer.renderLine("");
 }
 
+function renderSessionSurfaceOverview(
+  renderer: StreamingRenderer,
+  sessionManager: SessionManager,
+  runtimeContext: {
+    session: {
+      id: string;
+      status: string;
+      updatedAt: string;
+      title?: string;
+      projectRoot: string;
+    };
+    projectRoot: string;
+  },
+): void {
+  renderer.renderLine("\n/sessions (session surface)");
+  renderCurrentSession(renderer, sessionManager, runtimeContext);
+  renderSessionList(
+    renderer,
+    sessionManager,
+    runtimeContext.session.id,
+    runtimeContext.projectRoot,
+  );
+  renderSessionCommandMap(renderer);
+}
+
+function renderSessionCommandMap(
+  renderer: StreamingRenderer,
+  options?: { compact?: boolean; includeHelpHint?: boolean },
+): void {
+  const compact = options?.compact === true;
+  const includeHelpHint = options?.includeHelpHint !== false;
+  renderer.renderLine(compact ? "Session command map:" : "\nSession command map");
+  renderer.renderLine(
+    "- /sessions            open the session surface (interactive panel in TTY; overview in print/non-TTY).",
+  );
+  renderer.renderLine("- /sessions current    inspect the active session.");
+  renderer.renderLine("- /sessions list       inspect recent sessions for this project.");
+  renderer.renderLine("- /sessions switch <id> switch active session and project context.");
+  renderer.renderLine("- /resume [id]         resume the best recoverable context.");
+  if (includeHelpHint) {
+    renderer.renderLine("- /help                show full command guide.");
+  }
+}
+
 function renderUserHelp(renderer: StreamingRenderer): void {
-  renderer.renderLine("\nUser command guide");
-  renderer.renderLine("Core flow:");
-  renderer.renderLine(
-    "- Launch into a specific project with --project <path> (or --attach <path>).",
-  );
-  renderer.renderLine("- Type a prompt to run a task in the current workspace.");
-  renderer.renderLine(
-    "- Approval trust policy is project-scoped: allow-always applies to matching tool/action scopes in the current project.",
-  );
-  renderer.renderLine("- Use /cancel to stop only the current run.");
-  renderer.renderLine("- Use /workspace status to confirm where the shell is operating.");
-  renderer.renderLine("- Use /workspace attach <path> to switch active target project without restarting the shell.");
-  renderer.renderLine("- Use /cd <path> for quick project/workdir attach, and /pwd to print current workspace status.");
-  renderer.renderLine("- Use /workspace recent to inspect re-entry project contexts.");
-  renderer.renderLine("- Session switches also switch project context for subsequent tool/model execution.");
+  renderer.renderLine("\nSlash command guide");
+  renderer.renderLine("Next actions (start here):");
+  renderer.renderLine("- /sessions               inspect active + recent sessions.");
+  renderer.renderLine("- /resume                 continue best recoverable context.");
+  renderer.renderLine("- /workspace status       confirm project/workdir binding.");
+  renderer.renderLine("- /diagnose               get actionable repo next step.");
   renderer.renderLine("");
-  renderer.renderLine("Session flow:");
-  renderer.renderLine("- /sessions                open interactive panel (switch / rename / delete).");
-  renderer.renderLine("- /sessions list           show recent sessions in-place.");
-  renderer.renderLine("- /sessions current        show current session details.");
-  renderer.renderLine("- /sessions switch <id>    switch directly to a known session ID.");
-  renderer.renderLine("- /resume [id]             resume interrupted/latest session logic.");
-  renderer.renderLine("- /continue [id] [text]    recover a session and optionally run immediate follow-up.");
+
+  renderer.renderLine("Command groups:");
+  renderer.renderLine("1) Session & Continuation");
+  renderer.renderLine("- /sessions               session surface entrypoint (TTY: panel, non-TTY/print: overview).");
+  renderer.renderLine("- /sessions current       active session identity and resume readiness.");
+  renderer.renderLine("- /sessions list          recent sessions for current project context.");
+  renderer.renderLine("- /sessions switch <id>   switch active session + project context.");
+  renderer.renderLine("- /resume [id]            resume recoverable context (latest or explicit id).");
+  renderer.renderLine("- /continue [id] [text]   resume context and optionally run immediate follow-up.");
   renderer.renderLine("");
-  renderer.renderLine("Environment and diagnostics:");
-  renderer.renderLine("- /diagnose                repo-aware diagnosis (change inventory, hotspots, actionable next step).");
-  renderer.renderLine("- /connect status|login|use|logout   provider onboarding and active connection management.");
-  renderer.renderLine("- /connect set <provider> <api-key> [base-url] [model]   legacy credential compatibility path.");
-  renderer.renderLine("- /model status|list|use             inspect and switch active model (models.dev aligned).");
-  renderer.renderLine("- /permissions list                  show persisted trust grants for current project.");
-  renderer.renderLine("- /permissions explain               explain latest automatic trust-policy hit.");
-  renderer.renderLine("- /permissions revoke <selector>     remove one persisted trust grant by index or scope key.");
-  renderer.renderLine("- /permissions reset [all]           reset current project grants or all grants.");
-  renderer.renderLine("- /view user               user-facing output (default).");
-  renderer.renderLine("- /view developer          runtime diagnostics and lifecycle details.");
-  renderer.renderLine("- /build                   switch to build mode (default coding workflow).");
-  renderer.renderLine("- /plan                    switch to plan mode (planning-first workflow).");
-  renderer.renderLine("- /mode [status|plan|build] show/switch current agent mode.");
-  renderer.renderLine("- /mcp status|tools|doctor|refresh [server]   MCP control plane: inspect, diagnose, and refresh MCP connectivity.");
-  renderer.renderLine("- /help                    show this guide.");
+
+  renderer.renderLine("2) Workspace & Navigation");
+  renderer.renderLine("- /workspace status       show current project/workdir binding.");
+  renderer.renderLine("- /workspace attach <path> attach/switch active project target.");
+  renderer.renderLine("- /workspace recent       list recently attached project contexts.");
+  renderer.renderLine("- /cd <path>              quick attach by path.");
+  renderer.renderLine("- /pwd                    print current workspace status.");
+  renderer.renderLine("");
+
+  renderer.renderLine("3) Workflow & Runtime");
+  renderer.renderLine("- /cancel                 stop only the current run.");
+  renderer.renderLine("- /build                  switch to build mode.");
+  renderer.renderLine("- /plan                   switch to plan mode.");
+  renderer.renderLine("- /mode [status|plan|build] inspect or switch agent mode.");
+  renderer.renderLine("- /view user|developer    switch output verbosity.");
+  renderer.renderLine("");
+
+  renderer.renderLine("4) Diagnostics & Integrations");
+  renderer.renderLine("- /diagnose               repo-aware diagnosis and next action.");
+  renderer.renderLine("- /model status|list|use  inspect and switch active model.");
+  renderer.renderLine("- /mcp status|tools|doctor|refresh [server] inspect and recover MCP state.");
+  renderer.renderLine("- /permissions list|explain|revoke|reset inspect trust policy state.");
+  renderer.renderLine("- /connect status|login|use|logout|set ... provider connection management.");
+  renderer.renderLine("");
+
+  renderer.renderLine("Discovery tips:");
+  renderer.renderLine("- Unknown slash commands now return this guide path with quick actions.");
+  renderer.renderLine("- Use /help any time to get back to grouped command navigation.");
   renderer.renderLine("");
 }
 
@@ -2394,17 +2965,11 @@ function switchRuntimeSessionProjectContext(
     originalCwd: string;
     projectRoot: string;
     gitContext: ReturnType<typeof getWorkflowGitContext>;
-    resumeProvenance?: SessionResumeProvenance;
   },
-  resumedSession: { id: string; projectRoot: string },
-  switchMeta?: {
-    source?: SessionResumeProvenance["source"];
-    requestedSessionId?: string;
-  },
+  resumedSession: { projectRoot: string },
 ): void {
   const nextProjectRoot =
     resumedSession.projectRoot?.trim() || runtimeContext.projectRoot;
-  const switchSource = switchMeta?.source;
   switchActiveSession(
     runtimeContext as never,
     resumedSession as never,
@@ -2413,174 +2978,8 @@ function switchRuntimeSessionProjectContext(
       cwd: nextProjectRoot,
       projectRoot: nextProjectRoot,
       gitContext: getWorkflowGitContext(nextProjectRoot),
-      ...(switchSource
-        ? {
-            resumeProvenance: {
-              source: switchSource,
-              requestedSessionId: switchMeta?.requestedSessionId,
-              resolvedSessionId: resumedSession.id,
-            } satisfies SessionResumeProvenance,
-          }
-        : {}),
     },
   );
-}
-
-async function handleSessionsShellAction(options: {
-  slashResult: Extract<SlashRouteResult, { kind: "shell-action"; action: "list-sessions" }>;
-  interactive: boolean;
-  rl?: readline.Interface;
-  sessionManager: SessionManager;
-  runtimeContext: {
-    session: { id: string };
-    cwd: string;
-    originalCwd: string;
-    projectRoot: string;
-    gitContext: ReturnType<typeof getWorkflowGitContext>;
-    resumeProvenance?: SessionResumeProvenance;
-  };
-  renderer: StreamingRenderer;
-  printMode?: boolean;
-  onSessionSwitched?: () => void;
-}): Promise<void> {
-  const sessionAction = options.slashResult.sessionAction ?? "panel";
-  if (sessionAction === "list") {
-    renderSessionList(
-      options.renderer,
-      options.sessionManager,
-      options.runtimeContext.session.id,
-      options.runtimeContext.projectRoot,
-    );
-    return;
-  }
-
-  if (sessionAction === "current") {
-    renderCurrentSession(
-      options.renderer,
-      options.sessionManager,
-      options.runtimeContext as never,
-    );
-    return;
-  }
-
-  const trySwitchTo = (targetSessionId: string): boolean => {
-    const resumeResult = options.sessionManager.tryResume(
-      targetSessionId,
-      options.runtimeContext.projectRoot,
-      { mode: "runtime-recovery" },
-    );
-    if (!resumeResult.ok) {
-      const detail = resumeResult.error?.trim() || "unknown-reason";
-      const hint = resumeResult.recoveryHint?.trim();
-      options.renderer.renderLine(
-        options.printMode
-          ? `session-switch-blocked:${detail}`
-          : `\nSession switch blocked: ${detail}`,
-      );
-      options.renderer.renderLine(
-        options.printMode
-          ? `session-switch-requested:${targetSessionId}`
-          : `Requested session: ${targetSessionId}`,
-      );
-      if (hint) {
-        options.renderer.renderLine(
-          options.printMode
-            ? `session-switch-reason:${hint}`
-            : `Reason: ${hint}`,
-        );
-      }
-      if (!options.printMode) {
-        options.renderer.renderLine("");
-      }
-      return false;
-    }
-
-    const resumed = resumeResult.session;
-    const previousSessionId = options.runtimeContext.session.id;
-    switchRuntimeSessionProjectContext(
-      options.runtimeContext,
-      resumed,
-      {
-        source: "explicit-switch",
-        requestedSessionId: targetSessionId,
-      },
-    );
-    options.onSessionSwitched?.();
-    options.renderer.renderLine(
-      options.printMode
-        ? `session-switch-selected:${targetSessionId}`
-        : `\nSwitched session: ${previousSessionId} -> ${resumed.id}`,
-    );
-    options.renderer.renderLine(
-      options.printMode
-        ? `session-switch-resolved:${resumed.id}`
-        : `Project context: ${options.runtimeContext.projectRoot}`,
-    );
-    options.renderer.renderLine(
-      options.printMode
-        ? "session-switch-source:explicit-switch"
-        : "Switch reason: explicit user selection",
-    );
-    if (!options.printMode) {
-      renderSwitchedSessionContext(options.renderer, options.sessionManager, resumed.id);
-      options.renderer.renderLine("");
-    }
-    return true;
-  };
-
-  if (sessionAction === "switch") {
-    const targetSessionId = options.slashResult.sessionId?.trim();
-    if (!targetSessionId) {
-      options.renderer.renderLine(
-        options.printMode
-          ? "session-switch-blocked:missing-session-id"
-          : "\nUsage: /sessions switch <session-id>\n",
-      );
-      return;
-    }
-    trySwitchTo(targetSessionId);
-    return;
-  }
-
-  if (!options.interactive || !options.rl) {
-    renderSessionList(
-      options.renderer,
-      options.sessionManager,
-      options.runtimeContext.session.id,
-      options.runtimeContext.projectRoot,
-    );
-    options.renderer.renderLine(
-      options.printMode
-        ? "session-switch-required:use-/sessions-switch-<session-id>"
-        : "Use /sessions switch <session-id> to explicitly switch session.",
-    );
-    if (!options.printMode) {
-      options.renderer.renderLine("");
-    }
-    return;
-  }
-
-  try {
-    const sessions = options.sessionManager.listRecentSessions(5);
-    if (sessions.length === 0) {
-      options.renderer.renderLine("\nNo sessions found.\n");
-      return;
-    }
-    const panelResult = await openSessionsPanel({
-      rl: options.rl,
-      sessionManager: options.sessionManager,
-      runtimeContext: options.runtimeContext as never,
-    });
-    if (panelResult.switchedSessionId) {
-      trySwitchTo(panelResult.switchedSessionId);
-    } else {
-      options.renderer.renderLine("\nSessions panel closed.\n");
-    }
-  } catch (error) {
-    options.renderer.renderLine(
-      `\nSessions panel failed: ${error instanceof Error ? error.message : String(error)}\n`,
-    );
-  }
 }
 
 function renderSwitchedSessionContext(
@@ -2688,13 +3087,15 @@ function toRelativeTime(iso: string): string {
 
 function isWorkspaceInfoPrompt(prompt: string): boolean {
   const normalized = prompt.toLowerCase();
-  const trimmed = prompt.trim();
   const hasQuestionShape =
-    /[?？]$/.test(trimmed) ||
+    /[?？]$/.test(prompt.trim()) ||
     normalized.startsWith("what ") ||
     normalized.startsWith("where ") ||
-    /(?:\u4ec0\u4e48|\u54ea\u91cc|\u5728\u54ea|\u54ea\u4e2a)/u.test(prompt);
+    prompt.includes("什么") ||
+    prompt.includes("哪里") ||
+    prompt.includes("哪");
 
+  // Only treat as workspace-info when the user is asking.
   if (!hasQuestionShape) {
     return false;
   }
@@ -2756,400 +3157,49 @@ function isWorkspaceInfoPromptStrict(prompt: string): boolean {
   return !hasMutationIntent;
 }
 
-function shouldAllowRepoAwareRouting(prompt: string): boolean {
-  const trimmed = prompt.trim();
-  if (!trimmed) {
-    return false;
-  }
-  const normalized = trimmed.toLowerCase();
-  const hasExplicitRepoTaskCue =
-    /\b(read|inspect|open|show|summari[sz]e|explain|edit|write|modify|fix|patch|test|build|lint|repo|repository|directory|files?)\b/i.test(
-      normalized,
-    ) ||
-    /(?:读取|查看|检查|总结|解释|修改|编辑|写|修复|测试|构建|编译|仓库|目录|文件|改动|变化)/u.test(
-      trimmed,
-    ) ||
-    /(?:[A-Za-z]:\\|\.{0,2}\/|\\|\/).+\.\w+/u.test(trimmed);
-  if (hasExplicitRepoTaskCue) {
-    return true;
-  }
-
-  const isConversational =
-    /\b(you|i|we|understand|plan first|don't execute|do not execute|just answer|chat)\b/i.test(
-      normalized,
-    ) ||
-    /(?:你|我|我们|先别执行|不要执行|先说计划|普通聊天|直接回答)/u.test(trimmed);
-  if (isConversational) {
-    return false;
-  }
-
-  return false;
-}
-
-function normalizeRepoAwareClause(clause: string): string {
-  const trimmed = clause.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-  if (
-    /(?:检查|看看|看一下|帮我看看).*(?:目录|仓库|repo).*(?:改动|变化|状态)/u.test(
-      trimmed,
-    )
-  ) {
-    return "看看这个仓库现在什么情况";
-  }
-  if (/^(?:帮我看看哪些文件改了|这个目录最近改了什么)$/u.test(trimmed)) {
-    return "这个 repo 改动主要集中在哪";
-  }
-  return trimmed;
-}
-
-function decomposeQueryClauses(prompt: string): string[] {
-  const trimmed = prompt.trim();
-  if (!trimmed) {
-    return [];
-  }
-  const firstPass = trimmed
-    .split(/(?<=[。！？?!;；])\s*/u)
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
-  const secondPass: string[] = [];
-  for (const part of firstPass) {
-    const splitParts = part
-      .split(
-        /\s*,\s*(?=(?:then|and then|after that|next|finally)\b)|，\s*(?=(?:然后|接着|再|最后|那就|并且|并且再))/iu,
-      )
-      .map((seg) => seg.trim())
-      .filter((seg) => seg.length > 0);
-    secondPass.push(...splitParts);
-  }
-  return secondPass.length > 0 ? secondPass : [trimmed];
-}
-
-function isActionContinuationClause(clause: string): boolean {
-  const normalized = clause.trim().toLowerCase();
-  if (!normalized) {
-    return false;
-  }
-  return (
-    /^(?:then\s+)?(?:continue|go on|keep going|resume|proceed|fix it|do that|do it|continue with that|then fix|then continue|then do that|then do it)\b/i.test(
-      normalized,
-    ) ||
-    /^(?:那就|然后|接着|再)?\s*(?:继续|继续修|继续做|继续处理|按这个继续|继续读取|继续解释|继续总结)(?:吧|一下)?$/u.test(
-      clause.trim(),
-    ) ||
-    /(?:继续修|继续做|继续处理|继续读取|继续解释|继续总结|then continue|then fix|continue fixing|continue reading|continue explaining)/i.test(
-      normalized,
-    )
-  );
-}
-
-function preparePromptForExecution(options: {
-  prompt: string;
-  sessionId: string;
-  sessionManager: SessionManager;
-}): PromptPreparationResult {
-  const normalized = canonicalizeGroundedPrompt(
-    normalizePromptForExecution(options.prompt),
-  );
-  const integrity = evaluatePromptIntegrity(normalized);
-  if (integrity.ok === false) {
-    return { kind: "blocked", reason: integrity.reason };
-  }
-
-  const continuity = options.sessionManager.buildPromptContinuitySnapshot(
-    options.sessionId,
-    integrity.prompt,
-  );
-  const contextualizedPrompt = contextualizeReadContinuationPrompt(
-    integrity.prompt,
-    continuity,
-  );
-
-  if (isTerseFollowUpPrompt(contextualizedPrompt)) {
-    const grounded = groundTerseFollowUpPrompt({
-      prompt: contextualizedPrompt,
-      sessionId: options.sessionId,
-      sessionManager: options.sessionManager,
-      continuity,
-    });
-    if (grounded.kind === "blocked") {
-      return grounded;
-    }
-    return { kind: "ready", prompt: grounded.prompt };
-  }
-
-  return { kind: "ready", prompt: contextualizedPrompt };
-}
-
-function canonicalizeGroundedPrompt(prompt: string): string {
-  const trimmed = prompt.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-
-  const summarizeMatch = trimmed.match(
-    /^(?:\u8bf7)?(?:\u603b\u7ed3|\u6982\u62ec|\u6458\u8981)(?:\u4e00\u4e0b)?\s+(.+?)\s*(?:\u6587\u4ef6\u5185\u5bb9|\u5185\u5bb9)?$/u,
-  );
-  if (summarizeMatch?.[1]) {
-    return `summarize ${summarizeMatch[1].trim()}`;
-  }
-
-  const readFirstMatch = trimmed.match(
-    /^(?:\u8bf7)?(?:\u8bfb\u53d6|\u8bfb)\s+(.+?)\s*\u524d\s*([\d\u4e00\u4e8c\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]+)\s*\u884c$/u,
-  );
-  if (readFirstMatch?.[1] && readFirstMatch?.[2]) {
-    const count = parseLineCountToken(readFirstMatch[2]);
-    if (count) {
-      return `read first ${count} lines of ${readFirstMatch[1].trim()}`;
-    }
-  }
-
-  const readFromLineMatch = trimmed.match(
-    /^(?:\u8bf7)?\u4ece\u7b2c\s*([\d\u4e00\u4e8c\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]+)\s*\u884c\u5f00\u59cb\u8bfb\s*([\d\u4e00\u4e8c\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]+)\s*\u884c$/u,
-  );
-  if (readFromLineMatch?.[1] && readFromLineMatch?.[2]) {
-    const startLine = parseLineCountToken(readFromLineMatch[1]);
-    const count = parseLineCountToken(readFromLineMatch[2]);
-    if (startLine && count) {
-      return `read ${count} lines from line ${startLine}`;
-    }
-  }
-
-  const continueReadMatch = trimmed.match(
-    /^(?:\u8bf7)?(?:\u7ee7\u7eed\u8bfb\u53d6|\u7ee7\u7eed\u8bfb|\u518d\u8bfb)(?:\u540e|\u4e0b\u4e00\u6bb5|\u4e0b)?\s*([\d\u4e00\u4e8c\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]+)?\s*(?:\u884c|\u6bb5)?$/u,
-  );
-  if (continueReadMatch) {
-    const count = continueReadMatch[1]
-      ? parseLineCountToken(continueReadMatch[1])
-      : undefined;
-    return count
-      ? `continue reading next ${count} lines`
-      : "continue reading";
-  }
-
-  const explainPartMatch = trimmed.match(
-    /^(?:\u8bf7)?(?:\u89e3\u91ca|\u8bf4\u660e)(?:\u8fd9\u90e8\u5206|\u8fd9\u4e00\u6bb5|\u521a\u624d\u90a3\u51e0\u884c)(?:\u5728\u505a\u4ec0\u4e48|\u662f\u4ec0\u4e48\u610f\u601d)?$/u,
-  );
-  if (explainPartMatch) {
-    return "explain this part";
-  }
-
-  const explainFileMatch = trimmed.match(
-    /^(?:\u8bf7)?(?:\u89e3\u91ca|\u8bf4\u660e)\s+(.+?)\s*(?:\u5728\u505a\u4ec0\u4e48|\u505a\u4ec0\u4e48|\u662f\u4ec0\u4e48\u610f\u601d)?$/u,
-  );
-  if (explainFileMatch?.[1]) {
-    return `explain ${explainFileMatch[1].trim()}`;
-  }
-
-  return trimmed;
-}
-
-function parseLineCountToken(token: string): number | undefined {
-  const normalized = token.trim();
-  if (!normalized) {
-    return undefined;
-  }
-  if (/^\d+$/u.test(normalized)) {
-    const parsed = Number.parseInt(normalized, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-  }
-  const map: Record<string, number> = {
-    "\u4e00": 1,
-    "\u4e8c": 2,
-    "\u4e24": 2,
-    "\u4e09": 3,
-    "\u56db": 4,
-    "\u4e94": 5,
-    "\u516d": 6,
-    "\u4e03": 7,
-    "\u516b": 8,
-    "\u4e5d": 9,
-    "\u5341": 10,
-  };
-  if (normalized === "\u5341") {
-    return 10;
-  }
-  if (normalized.startsWith("\u5341")) {
-    const ones = map[normalized.slice(1)];
-    return ones ? 10 + ones : undefined;
-  }
-  if (normalized.endsWith("\u5341")) {
-    const tens = map[normalized.slice(0, -1)];
-    return tens ? tens * 10 : undefined;
-  }
-  if (normalized.includes("\u5341")) {
-    const [tensPart, onesPart] = normalized.split("\u5341");
-    const tens = map[tensPart];
-    const ones = map[onesPart];
-    if (tens && ones !== undefined) {
-      return tens * 10 + ones;
-    }
-  }
-  return map[normalized];
-}
-
-function evaluatePromptIntegrity(prompt: string):
-  | { ok: true; prompt: string }
-  | { ok: false; reason: string } {
-  const trimmed = prompt.trim();
-  if (!trimmed) {
-    return {
-      ok: false,
-      reason:
-        "Prompt is empty after normalization. Provide a valid instruction.",
-    };
-  }
-
-  const containsReplacementChar = trimmed.includes("\uFFFD");
-  const mostlyQuestionMarks =
-    trimmed.length >= 4 && /^[?？\uFFFD\s]+$/u.test(trimmed);
-  const hasCjk = /[\u3400-\u9FFF]/u.test(trimmed);
-  const hasAsciiWord = /[A-Za-z0-9]/.test(trimmed);
-  const severeMojibakeSignal = /(?:\u00C3.|\u00E2.|\uFFFD{2,})/u.test(trimmed);
-
-  if (
-    containsReplacementChar ||
-    mostlyQuestionMarks ||
-    (severeMojibakeSignal && !hasCjk && !hasAsciiWord)
-  ) {
-    return {
-      ok: false,
-      reason:
-        "Input appears corrupted (encoding/transport issue). Please resend the prompt with UTF-8 stdin (or run in --print/interactive mode) and avoid mojibake text.",
-    };
-  }
-
-  return { ok: true, prompt: trimmed };
-}
-
-function isTerseFollowUpPrompt(prompt: string): boolean {
-  const normalized = prompt
-    .trim()
-    .toLowerCase()
-    .replace(/[。！？!?.\s]+$/gu, "")
-    .replace(/\s+/g, " ");
-  if (!normalized) {
-    return false;
-  }
-
-  const terse = new Set([
-    "then",
-    "then?",
-    "then now",
-    "go on",
-    "go on?",
-    "so",
-    "so?",
-    "continue",
-    "continue?",
-    "and then",
-    "继续",
-    "然后呢",
-    "然后",
-    "接着",
-    "接下来呢",
-    "继续呢",
-  ]);
-  if (terse.has(normalized)) {
-    return true;
-  }
-
-  return /^(then|go on|so|continue)\??$/i.test(normalized);
-}
-
-function groundTerseFollowUpPrompt(options: {
-  prompt: string;
-  sessionId: string;
-  sessionManager: SessionManager;
-  continuity?: SessionContinuitySnapshot;
-}): PromptPreparationResult {
-  const snapshot =
-    options.continuity ??
-    options.sessionManager.buildPromptContinuitySnapshot(
-      options.sessionId,
-      options.prompt,
-    );
-  if (!snapshot) {
-    return {
-      kind: "blocked",
-      reason:
-        "No active continuation context is available for this short follow-up. Please specify the target/task explicitly.",
-    };
-  }
-
-  const hasActionableContext =
-    Boolean(snapshot.lastTaskKind) ||
-    Boolean(snapshot.lastGroundedDeliverableMode) ||
-    snapshot.recentTargetFiles.length > 0 ||
-    snapshot.recentChangedFiles.length > 0;
-  if (!hasActionableContext) {
-    return {
-      kind: "blocked",
-      reason:
-        "Continuation context is too weak for a terse follow-up. Please include the file or task you want to continue.",
-    };
-  }
-
-  return {
-    kind: "ready",
-    prompt: buildGroundedTerseFollowUpPrompt(options.prompt.trim(), snapshot),
-  };
-}
-
-function buildGroundedTerseFollowUpPrompt(
-  prompt: string,
-  snapshot: SessionContinuitySnapshot,
-): string {
-  const targetHint = snapshot.recentTargetFiles[0]
-    ? ` Target file: ${snapshot.recentTargetFiles[0]}.`
-    : "";
-  if (snapshot.lastGroundedDeliverableMode === "read") {
-    const readCount = snapshot.lastReadWindowSize ?? snapshot.lastReadDeliveredLines ?? 2;
-    return `Continue reading the same file window with active continuity.${targetHint} Continue reading next ${readCount} lines. User follow-up: ${prompt}`;
-  }
-  if (snapshot.lastGroundedDeliverableMode === "summary") {
-    return `Continue the same grounded summary for the same target.${targetHint} Provide the next concise summary refinement. User follow-up: ${prompt}`;
-  }
-  if (snapshot.lastGroundedDeliverableMode === "explain") {
-    return `Continue the same grounded explanation for the same target.${targetHint} Extend the explanation without changing target scope. User follow-up: ${prompt}`;
-  }
-  return `Continue the current task using active continuity context.${targetHint} User follow-up: ${prompt}`;
-}
-
-function contextualizeReadContinuationPrompt(
-  prompt: string,
-  continuity?: SessionContinuitySnapshot,
-): string {
-  if (!continuity) {
-    return prompt;
-  }
-  const normalized = prompt.trim().toLowerCase();
-  const continuationMatch = normalized.match(
-    /^(?:continue reading(?: next)?|\u7ee7\u7eed\u8bfb\u53d6(?:\u540e)?|\u7ee7\u7eed\u8bfb(?:\u540e)?|\u518d\u8bfb(?:\u540e)?)(?:\s*([\d\u4e00\u4e8c\u4e24\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]+))?(?:\s*lines?|\u884c|\u6bb5)?$/,
-  );
-  if (!continuationMatch) {
-    return prompt;
-  }
-  const target = continuity.recentTargetFiles[0];
-  const lastEnd = continuity.lastReadWindowEnd;
-  if (!target || lastEnd === undefined) {
-    return prompt;
-  }
-  const requestedCount = continuationMatch[1]
-    ? parseLineCountToken(continuationMatch[1])
-    : undefined;
-  const count =
-    requestedCount && Number.isFinite(requestedCount)
-      ? requestedCount
-      : (continuity.lastReadWindowSize ?? continuity.lastReadDeliveredLines ?? 2);
-  const start = Math.max(1, lastEnd + 1);
-  return `read ${count} lines from line ${start} of ${target}`;
-}
-
 function normalizePromptForExecution(prompt: string): string {
-  return prompt.replace(/\u0000/g, "").replace(/\r\n/g, "\n").trim();
+  const normalized = prompt.toLowerCase();
+  const likelyMojibake = prompt.includes("�");
+  const currentDirCue =
+    /(?:current\s+directory|in\s+this\s+directory|当前目录|当前工作目录|在当前目录中|在本目录)/iu.test(
+      prompt,
+    );
+  const pythonCue =
+    /\bpython\b/i.test(normalized) &&
+    (/script|file|py/i.test(normalized) ||
+      /(?:脚本|目录|文件)/u.test(prompt));
+
+  if ((!pythonCue || !currentDirCue) && !(likelyMojibake && /\bpython\b/i.test(normalized))) {
+    return prompt;
+  }
+
+  const asciiTokens: string[] =
+    prompt.match(/\b[A-Za-z][A-Za-z0-9_-]{1,}\b/g) ?? [];
+  const reserved = new Set([
+    "python",
+    "script",
+    "file",
+    "write",
+    "create",
+    "generate",
+    "save",
+    "current",
+    "directory",
+    "in",
+    "this",
+  ]);
+  const candidate = asciiTokens.find(
+    (token) => !reserved.has(token.toLowerCase()),
+  );
+  if (!candidate) {
+    return prompt;
+  }
+
+  // Guard against Windows terminal mojibake by converting fuzzy natural language
+  // into a deterministic file-targeted coding task.
+  return `Create a python script at ./${candidate}.py with a minimal hello world implementation.`;
 }
+
 function truncate(value: string, max: number): string {
   if (value.length <= max) {
     return value;
@@ -3218,3 +3268,4 @@ main().catch((error) => {
   console.error("Fatal error:", error);
   process.exit(1);
 });
+

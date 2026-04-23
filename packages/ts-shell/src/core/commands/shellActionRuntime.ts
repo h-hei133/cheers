@@ -42,10 +42,18 @@ export async function runSessionsShellAction(_args: string[], _context: CommandC
     }
   }
 
+  if (mode === 'help' || mode === '?') {
+    return {
+      kind: 'shell-action',
+      action: 'list-sessions',
+      sessionAction: 'help',
+    }
+  }
+
   return {
     kind: 'shell-action',
     action: 'list-sessions',
-    sessionAction: 'panel',
+    sessionAction: 'help',
   }
 }
 

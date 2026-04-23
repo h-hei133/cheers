@@ -78,6 +78,14 @@ export class ApprovalTrustPolicy {
     this.allowOnceCache.add(cacheKey);
   }
 
+  consumeAllowOnce(cacheKey: string): boolean {
+    const had = this.allowOnceCache.has(cacheKey);
+    if (had) {
+      this.allowOnceCache.delete(cacheKey);
+    }
+    return had;
+  }
+
   recordLastHit(input: {
     source: ApprovalLastHit["source"];
     projectRoot: string;
@@ -260,7 +268,14 @@ function defaultPolicyFilePath(): string {
 }
 
 function normalizeProjectRoot(projectRoot: string): string {
-  return path.resolve(projectRoot.trim());
+  const resolved = path.resolve(projectRoot.trim());
+  let canonical = resolved;
+  try {
+    canonical = fs.realpathSync.native(resolved);
+  } catch {
+    canonical = resolved;
+  }
+  return process.platform === "win32" ? canonical.toLowerCase() : canonical;
 }
 
 function buildCacheKey(projectRoot: string, scopeKey: string): string {

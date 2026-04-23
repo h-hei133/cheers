@@ -20,7 +20,6 @@ type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout
 
 function inferFailureKind(result: {
   status: 'completed' | 'failed' | 'timeout' | 'cancelled'
-  stderr: string
   failureKind?: ExecutionFailureKind
 }): ExecutionFailureKind | undefined {
   if (result.failureKind) {
@@ -33,9 +32,7 @@ function inferFailureKind(result: {
     case 'cancelled':
       return 'cancelled'
     case 'failed':
-      return /requires escalation/i.test(result.stderr)
-        ? 'sandbox_preflight'
-        : 'execution_failure'
+      return 'execution_failure'
     default:
       return undefined
   }
@@ -76,6 +73,27 @@ async function runLocalCommand(
       status: result.status,
       exitCode: result.exitCode,
       failureKind: inferFailureKind(result),
+    },
+  }
+}
+
+function daemonUnavailableResult(
+  command: string,
+  context: ToolExecutionContext,
+  reason: string,
+) {
+  return {
+    success: false,
+    output: '',
+    error: reason,
+    metadata: {
+      executionPath: 'rust-daemon',
+      status: 'failed',
+      exitCode: null,
+      failureKind: 'execution_failure' as const,
+      recoveryReason: reason,
+      blockedCommand: command,
+      workspaceRoot: context.workspaceRoot,
     },
   }
 }
@@ -166,6 +184,7 @@ export function createCoreToolRegistry(options?: {
                 cwd: context.workspaceRoot,
                 workspaceRoot: context.workspaceRoot,
                 timeoutMs: 30_000,
+                abortSignal: context.abortSignal,
               })
               return {
                 success: daemonResult.status === 'completed',
@@ -176,20 +195,23 @@ export function createCoreToolRegistry(options?: {
                   status: daemonResult.status,
                   exitCode: daemonResult.exitCode,
                   failureKind: inferFailureKind(daemonResult),
+                  daemonInstanceId: daemonResult.daemonInstanceId,
+                  daemonPid: daemonResult.daemonPid,
+                  daemonRequestSeq: daemonResult.daemonRequestSeq,
+                  daemonExecutionId: daemonResult.daemonExecutionId,
                 },
               }
             } catch (error) {
-              return runLocalCommand(command, context, {
-                executionPath: 'ts-local-fallback',
-                recoveryReason: error instanceof Error ? error.message : String(error),
-              })
+              const reason = error instanceof Error ? error.message : String(error)
+              return daemonUnavailableResult(command, context, `Rust daemon execution failed: ${reason}`)
             }
           }
 
-          return runLocalCommand(command, context, {
-            executionPath: 'ts-local-fallback',
-            recoveryReason: availability.reason ?? 'Rust daemon unavailable',
-          })
+          return daemonUnavailableResult(
+            command,
+            context,
+            availability.reason ?? 'Rust daemon unavailable',
+          )
         }
 
         return runLocalCommand(command, context, { executionPath: 'ts-local' })

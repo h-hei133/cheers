@@ -1,9 +1,78 @@
+import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isRustDaemonEnabled } from './client.js'
 import { getExecutionPathLabel } from '../../../../scripts/toolchain.mjs'
+
+interface MockDaemonHarness {
+  readonly spawnMock: ReturnType<typeof vi.fn>
+  readonly emitResponse: (payload: unknown) => void
+}
+
+function createResidentDaemonHarness(): MockDaemonHarness {
+  const stdoutEmitter = new EventEmitter()
+  const readlineEmitter = new EventEmitter() as EventEmitter & { close: () => void }
+  readlineEmitter.close = () => undefined
+  const responseQueue: unknown[] = []
+
+  const stdin = Object.assign(new EventEmitter(), {
+    write: vi.fn((_chunk: string, callback?: (error?: Error | null) => void) => {
+      const next = responseQueue.shift()
+      if (next !== undefined) {
+        setImmediate(() => {
+          readlineEmitter.emit('line', JSON.stringify(next))
+        })
+      }
+      callback?.(null)
+      return true
+    }),
+    unref: vi.fn(),
+  })
+  const processEmitter = new EventEmitter() as EventEmitter & {
+    stdin: typeof stdin
+    stdout: EventEmitter
+    stderr: EventEmitter
+    killed: boolean
+    exitCode: number | null
+    signalCode: string | null
+    kill: () => void
+  }
+  processEmitter.stdin = stdin
+  processEmitter.stdout = stdoutEmitter
+  processEmitter.stderr = new EventEmitter() as EventEmitter & { unref: () => void }
+  ;(processEmitter.stdout as EventEmitter & { unref?: () => void }).unref = vi.fn()
+  ;(processEmitter.stderr as EventEmitter & { unref: () => void }).unref = vi.fn()
+  processEmitter.killed = false
+  processEmitter.exitCode = null
+  processEmitter.signalCode = null
+  processEmitter.kill = () => {
+    processEmitter.killed = true
+  }
+  ;(processEmitter as EventEmitter & { unref?: () => void }).unref = vi.fn()
+
+  const spawnMock = vi.fn(() => processEmitter)
+
+  vi.doMock('node:readline', () => ({
+    default: {
+      createInterface: vi.fn(() => readlineEmitter),
+    },
+    createInterface: vi.fn(() => readlineEmitter),
+  }))
+
+  const emitResponse = (payload: unknown) => {
+    responseQueue.push(payload)
+  }
+
+  vi.doMock('node:child_process', () => ({
+    execFile: vi.fn(),
+    execFileSync: vi.fn(() => Buffer.from('cargo 1.0.0')),
+    spawn: spawnMock,
+  }))
+
+  return { spawnMock, emitResponse }
+}
 
 describe('rust daemon feature flag', () => {
   const originalUserProfile = process.env.USERPROFILE
@@ -25,6 +94,9 @@ describe('rust daemon feature flag', () => {
     delete process.env.DAEMON_ENABLED
     fs.rmSync(fakeHome, { recursive: true, force: true })
     fs.rmSync(fakeRoot, { recursive: true, force: true })
+    vi.doUnmock('node:child_process')
+    vi.doUnmock('node:readline')
+    vi.resetModules()
   })
 
   it('reads the daemon flag from the environment', () => {
@@ -49,141 +121,255 @@ describe('rust daemon feature flag', () => {
     expect(getExecutionPathLabel(fakeRoot)).toBe('ts-local')
   })
 
-  it('lets env override project config for execution-path reporting', () => {
-    fs.writeFileSync(
-      path.join(fakeRoot, '.private-agents.json'),
-      JSON.stringify({ daemonEnabled: false }),
-      'utf8',
-    )
-    process.env.DAEMON_ENABLED = '1'
-
-    expect(getExecutionPathLabel(fakeRoot)).toBe('rust-daemon')
-    expect(isRustDaemonEnabled()).toBe(true)
-  })
-
-  it('treats cargo on PATH as available when the home cargo binary is missing', async () => {
+  it('reuses the same resident daemon across sequential requests', async () => {
+    const harness = createResidentDaemonHarness()
     vi.resetModules()
-    vi.doMock('node:child_process', () => ({
-      execFile: vi.fn(),
-      execFileSync: vi.fn((command: string) => {
-        if (command.includes('.cargo')) {
-          throw new Error('ENOENT')
-        }
+    const { executeViaRustDaemon } = await import('./client.js')
 
-        return Buffer.from('cargo 1.0.0')
-      }),
-    }))
-
-    try {
-      const { checkRustDaemonAvailability } = await import('./client.js')
-      expect(checkRustDaemonAvailability()).toEqual({ available: true })
-    } finally {
-      vi.doUnmock('node:child_process')
-      vi.resetModules()
-    }
-  })
-
-  it('executes through cargo on PATH when the home cargo binary is missing', async () => {
-    const daemonPayload = JSON.stringify({
-      status: 'completed',
-      exitCode: 0,
-      stdout: 'daemon path via PATH cargo',
-      stderr: '',
-      failureKind: undefined,
+    const firstCall = executeViaRustDaemon({
+      command: 'cmd',
+      args: ['/C', 'echo one'],
+      cwd: fakeRoot,
+      workspaceRoot: fakeRoot,
+      timeoutMs: 1000,
     })
-
-    const execFileMock = vi.fn((command: string, args: string[], _options: unknown, callback: (error: unknown, stdout?: string, stderr?: string) => void) => {
-      expect(['cargo', 'cargo.exe']).toContain(path.basename(command).toLowerCase())
-      expect(command.includes('.cargo')).toBe(false)
-      expect(args).toContain('--manifest-path')
-      callback(null, daemonPayload, '')
+    harness.emitResponse({
+      type: 'health',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 1,
     })
-    const promisifiedExecFileMock = vi.fn(async (command: string, args: string[]) => {
-      expect(['cargo', 'cargo.exe']).toContain(path.basename(command).toLowerCase())
-      expect(args).toContain('--manifest-path')
-      return { stdout: daemonPayload, stderr: '' }
+    await Promise.resolve()
+    harness.emitResponse({
+      type: 'exec_started',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 2,
+      executionId: 'exec-1',
     })
-    execFileMock[Symbol.for('nodejs.util.promisify.custom') as unknown as 'custom'] = promisifiedExecFileMock
-
-    vi.resetModules()
-    vi.doMock('node:child_process', () => ({
-      execFile: execFileMock,
-      execFileSync: vi.fn((command: string) => {
-        if (command.includes('.cargo')) {
-          throw new Error('ENOENT')
-        }
-
-        return Buffer.from('cargo 1.0.0')
-      }),
-    }))
-
-    try {
-      const { executeViaRustDaemon } = await import('./client.js')
-      const result = await executeViaRustDaemon({
-        command: 'cmd',
-        args: ['/C', 'echo ok'],
-        cwd: fakeRoot,
-        workspaceRoot: fakeRoot,
-        timeoutMs: 1000,
-      })
-
-      expect(result).toEqual({
+    harness.emitResponse({
+      type: 'execution_status',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 3,
+      executionId: 'exec-1',
+      state: 'finished',
+      result: {
         status: 'completed',
         exitCode: 0,
-        stdout: 'daemon path via PATH cargo',
+        stdout: 'one',
         stderr: '',
-        failureKind: undefined,
-      })
-      expect(promisifiedExecFileMock).toHaveBeenCalledOnce()
-    } finally {
-      vi.doUnmock('node:child_process')
-      vi.resetModules()
-    }
-  })
-
-  it('preserves structured failure kind from daemon payload', async () => {
-    const daemonPayload = JSON.stringify({
-      status: 'failed',
-      exitCode: null,
-      stdout: '',
-      stderr: 'wording drifted completely',
-      failureKind: 'sandbox_preflight',
+      },
     })
+    const firstResult = await firstCall
 
-    const execFileMock = vi.fn((command: string, args: string[], _options: unknown, callback: (error: unknown, stdout?: string, stderr?: string) => void) => {
-      expect(['cargo', 'cargo.exe']).toContain(path.basename(command).toLowerCase())
-      expect(args).toContain('--manifest-path')
-      callback(null, daemonPayload, '')
+    const secondCall = executeViaRustDaemon({
+      command: 'cmd',
+      args: ['/C', 'echo two'],
+      cwd: fakeRoot,
+      workspaceRoot: fakeRoot,
+      timeoutMs: 1000,
     })
-    const promisifiedExecFileMock = vi.fn(async () => ({ stdout: daemonPayload, stderr: '' }))
-    execFileMock[Symbol.for('nodejs.util.promisify.custom') as unknown as 'custom'] = promisifiedExecFileMock
+    harness.emitResponse({
+      type: 'health',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 3,
+    })
+    await Promise.resolve()
+    harness.emitResponse({
+      type: 'exec_started',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 4,
+      executionId: 'exec-2',
+    })
+    harness.emitResponse({
+      type: 'execution_status',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 5,
+      executionId: 'exec-2',
+      state: 'finished',
+      result: {
+        status: 'completed',
+        exitCode: 0,
+        stdout: 'two',
+        stderr: '',
+      },
+    })
+    const secondResult = await secondCall
 
+    expect(harness.spawnMock).toHaveBeenCalledOnce()
+    expect(firstResult.daemonInstanceId).toBe('daemon-1')
+    expect(secondResult.daemonInstanceId).toBe('daemon-1')
+    expect(firstResult.daemonRequestSeq).toBe(3)
+    expect(secondResult.daemonRequestSeq).toBe(5)
+  }, 15000)
+
+  it('fails closed on invalid daemon response payload', async () => {
+    const harness = createResidentDaemonHarness()
     vi.resetModules()
-    vi.doMock('node:child_process', () => ({
-      execFile: execFileMock,
-      execFileSync: vi.fn(() => Buffer.from('cargo 1.0.0')),
-    }))
+    const { executeViaRustDaemon } = await import('./client.js')
 
-    try {
-      const { executeViaRustDaemon } = await import('./client.js')
-      const result = await executeViaRustDaemon({
-        command: 'cmd',
-        args: ['/C', 'echo ignored'],
-        cwd: fakeRoot,
-        workspaceRoot: fakeRoot,
-        timeoutMs: 1000,
-      })
-
-      expect(result).toEqual({
+    const pending = executeViaRustDaemon({
+      command: 'cmd',
+      args: ['/C', 'echo ignored'],
+      cwd: fakeRoot,
+      workspaceRoot: fakeRoot,
+      timeoutMs: 1000,
+    })
+    harness.emitResponse({
+      type: 'health',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 1,
+    })
+    await Promise.resolve()
+    harness.emitResponse({
+      type: 'exec_started',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 2,
+      executionId: 'exec-invalid',
+    })
+    harness.emitResponse({
+      type: 'execution_status',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 3,
+      executionId: 'exec-invalid',
+      state: 'finished',
+      result: {
         status: 'failed',
         exitCode: null,
         stdout: '',
-        stderr: 'wording drifted completely',
-        failureKind: 'sandbox_preflight',
-      })
-    } finally {
-      vi.doUnmock('node:child_process')
-      vi.resetModules()
-    }
-  })
+        stderr: '',
+        failureKind: 'unknown_kind',
+      },
+    })
+
+    await expect(pending).rejects.toThrow(/Invalid daemon result failureKind/)
+  }, 15000)
+
+  it('routes abort through daemon cancel and returns cancelled result from rust', async () => {
+    const harness = createResidentDaemonHarness()
+    vi.resetModules()
+    const { executeViaRustDaemon } = await import('./client.js')
+    const abortController = new AbortController()
+
+    const pending = executeViaRustDaemon({
+      command: 'cmd',
+      args: ['/C', 'echo ignored'],
+      cwd: fakeRoot,
+      workspaceRoot: fakeRoot,
+      timeoutMs: 1000,
+      abortSignal: abortController.signal,
+    })
+
+    harness.emitResponse({
+      type: 'health',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 1,
+    })
+    await Promise.resolve()
+    harness.emitResponse({
+      type: 'exec_started',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 2,
+      executionId: 'exec-cancel',
+    })
+    abortController.abort()
+    harness.emitResponse({
+      type: 'cancel',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 3,
+      executionId: 'exec-cancel',
+      outcome: 'cancelled',
+    })
+    harness.emitResponse({
+      type: 'execution_status',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 4,
+      executionId: 'exec-cancel',
+      state: 'finished',
+      result: {
+        status: 'cancelled',
+        exitCode: null,
+        stdout: '',
+        stderr: 'Command cancelled',
+        failureKind: 'cancelled',
+      },
+    })
+
+    const result = await pending
+    expect(result.status).toBe('cancelled')
+    expect(result.failureKind).toBe('cancelled')
+    const writes = (harness.spawnMock.mock.results[0]?.value.stdin.write as ReturnType<typeof vi.fn>).mock.calls
+      .map(call => String(call[0]))
+      .join('\n')
+    expect(writes).toContain('"type":"cancel"')
+    expect(writes).toContain('"execution_id":"exec-cancel"')
+  }, 15000)
+
+  it('treats timeout as rust terminal outcome (not local wait timeout)', async () => {
+    const harness = createResidentDaemonHarness()
+    vi.resetModules()
+    const { executeViaRustDaemon } = await import('./client.js')
+
+    const pending = executeViaRustDaemon({
+      command: 'cmd',
+      args: ['/C', 'echo ignored'],
+      cwd: fakeRoot,
+      workspaceRoot: fakeRoot,
+      timeoutMs: 1000,
+    })
+
+    harness.emitResponse({
+      type: 'health',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 1,
+    })
+    await Promise.resolve()
+    harness.emitResponse({
+      type: 'exec_started',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 2,
+      executionId: 'exec-timeout',
+    })
+    harness.emitResponse({
+      type: 'execution_status',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 3,
+      executionId: 'exec-timeout',
+      state: 'running',
+    })
+    harness.emitResponse({
+      type: 'execution_status',
+      instanceId: 'daemon-1',
+      pid: 4242,
+      requestSeq: 4,
+      executionId: 'exec-timeout',
+      state: 'finished',
+      terminalOutcome: 'timed_out',
+      result: {
+        status: 'timeout',
+        exitCode: null,
+        stdout: '',
+        stderr: 'Command timed out',
+        failureKind: 'timeout',
+      },
+    })
+
+    const result = await pending
+    expect(result.status).toBe('timeout')
+    expect(result.failureKind).toBe('timeout')
+  }, 15000)
 })

@@ -14,8 +14,11 @@ __pycache__/
 
 # local scratch / replay artifacts
 .tmp-*
+tmp-*
 packages/ts-shell/.tmp-debug-*/
 packages/ts-shell/_cli_input.txt
+status=*
+Microsoft/
 
 .DS_Store
 Thumbs.db

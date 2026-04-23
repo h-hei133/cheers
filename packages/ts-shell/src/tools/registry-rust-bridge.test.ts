@@ -49,6 +49,41 @@ describe('tool registry rust bridge', () => {
     expect(result.metadata).toMatchObject({ executionPath: 'rust-daemon' })
   })
 
+  it('forwards abortSignal from tool runtime context into rust daemon execution', async () => {
+    process.env.DAEMON_ENABLED = '1'
+    const executeViaRustDaemonMock = vi.fn().mockResolvedValue({
+      status: 'completed',
+      exitCode: 0,
+      stdout: 'daemon path',
+      stderr: '',
+    })
+    vi.resetModules()
+    vi.doMock('../daemon/client.js', () => ({
+      executeViaRustDaemon: executeViaRustDaemonMock,
+      isRustDaemonEnabled: () => true,
+      checkRustDaemonAvailability: () => ({ available: true }),
+    }))
+
+    const { createMvpToolRegistry } = await import('./registry.js')
+    const registry = createMvpToolRegistry()
+    const bashTool = registry.get('bash')
+    if (!bashTool) {
+      throw new Error('bash tool missing from registry')
+    }
+
+    const abortController = new AbortController()
+    await bashTool.execute(
+      { command: 'echo ok' },
+      { taskId: 'task_abort_forward', workspaceRoot, abortSignal: abortController.signal },
+    )
+
+    expect(executeViaRustDaemonMock).toHaveBeenCalledTimes(1)
+    const firstCall = executeViaRustDaemonMock.mock.calls[0]?.[0] as
+      | { abortSignal?: AbortSignal }
+      | undefined
+    expect(firstCall?.abortSignal).toBe(abortController.signal)
+  })
+
   it('keeps local TS execution available when the feature flag is disabled', async () => {
     await fs.mkdir(workspaceRoot, { recursive: true })
     process.env.DAEMON_ENABLED = '0'
@@ -72,7 +107,7 @@ describe('tool registry rust bridge', () => {
     expect(result.metadata).toMatchObject({ executionPath: 'ts-local' })
   }, 15000)
 
-  it('falls back to local execution when rust daemon is unavailable', async () => {
+  it('fails closed when rust daemon execution is unavailable', async () => {
     await fs.mkdir(workspaceRoot, { recursive: true })
     process.env.DAEMON_ENABLED = '1'
     vi.doMock('../daemon/client.js', async () => {
@@ -98,13 +133,18 @@ describe('tool registry rust bridge', () => {
       { taskId: 'task_fallback', workspaceRoot },
     )
 
-    expect(result.success).toBe(true)
-    expect(result.output?.toLowerCase()).toContain('fallback-ok')
-    expect(result.metadata).toMatchObject({ executionPath: 'ts-local-fallback' })
+    expect(result.success).toBe(false)
+    expect(result.error?.toLowerCase()).toContain('rust daemon execution failed')
+    expect(result.metadata).toMatchObject({
+      executionPath: 'rust-daemon',
+      status: 'failed',
+      exitCode: null,
+      failureKind: 'execution_failure',
+    })
     expect(result.metadata).toHaveProperty('recoveryReason')
   }, 15000)
 
-  it('surfaces stable failure metadata when rust-daemon falls back to ts-local-failure', async () => {
+  it('surfaces stable failure metadata when rust-daemon fails closed', async () => {
     await fs.mkdir(workspaceRoot, { recursive: true })
     process.env.DAEMON_ENABLED = '1'
     vi.doMock('../daemon/client.js', async () => {
@@ -126,15 +166,15 @@ describe('tool registry rust bridge', () => {
     }
 
     const result = await bashTool.execute(
-      { command: process.platform === 'win32' ? 'exit /B 7' : 'exit 7' },
+      { command: process.platform === 'win32' ? 'echo should-not-run' : 'printf should-not-run' },
       { taskId: 'task_fallback_failure', workspaceRoot },
     )
 
     expect(result.success).toBe(false)
     expect(result.metadata).toMatchObject({
-      executionPath: 'ts-local-fallback',
+      executionPath: 'rust-daemon',
       status: 'failed',
-      exitCode: 7,
+      exitCode: null,
       failureKind: 'execution_failure',
     })
     expect(result.metadata).toHaveProperty('recoveryReason')

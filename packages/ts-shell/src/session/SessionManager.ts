@@ -98,18 +98,10 @@ export interface ProjectContextSummary {
 export interface SessionContinuitySnapshot {
   readonly sessionId: string;
   readonly projectRoot: string;
-  readonly continuationFamilyId?: string;
-  readonly continuationEpoch?: number;
-  readonly continuationFamilyAnchor?: string;
   readonly lastUserIntent?: string;
   readonly lastAssistantOutput?: string;
   readonly lastTerminalClassification?: TerminalClassification;
   readonly lastTerminalReason?: TerminalReason;
-  readonly lastDurableStatus?: "success" | "stopped" | "error";
-  readonly lastRecoveryDisposition?:
-    | "fully-resumable"
-    | "partially-resumable"
-    | "not-resumable";
   readonly lastFailure?: string;
   readonly lastTaskKind?: CodingTaskKind;
   readonly lastGroundedDeliverableMode?: "read" | "summary" | "explain";
@@ -124,8 +116,6 @@ export interface SessionContinuitySnapshot {
   readonly lastReadFragmentSourceWindowStart?: number;
   readonly lastReadFragmentSourceWindowEnd?: number;
   readonly lastReadFragmentFingerprint?: string;
-  readonly lastReadFragmentStructureSignature?: string;
-  readonly lastReadFragmentNeighborhoodSignature?: string;
   readonly lastReadFilter?: "none" | "function-definitions";
   readonly lastStagedRepairStepCount?: number;
   readonly lastStagedRepairCompletedStep?: number;
@@ -139,107 +129,79 @@ export interface SessionContinuitySnapshot {
   readonly lastVerificationStatus?: string;
   readonly lastVerificationCommand?: string;
   readonly lastVerificationReason?: string;
+  readonly lastVerificationBlockerKind?: string;
+  readonly lastVerificationNextAction?: string;
+  readonly lastVerificationResumeEligible?: boolean;
+  readonly lastApprovalDecision?: "deny" | "allow-once" | "allow-always";
+  readonly lastApprovalDecisionSource?: string;
+  readonly lastApprovalPersistent?: boolean;
+  readonly lastApprovalCacheEffect?: string;
+  readonly lastApprovalProjectRoot?: string;
+  readonly lastApprovalCacheKey?: string;
+  readonly lastApprovalScope?: string;
+  readonly lastApprovalLineage?: string;
+  readonly lastApprovalStopReason?: string;
+  readonly lastApprovalChannel?: "interactive" | "non-interactive";
+  readonly lastApprovalInputKey?: "y" | "a" | "n" | "other";
+  readonly lastApprovalRecordedAt?: string;
+  readonly lastApprovalHistory?: readonly ApprovalAuditMemoryState[];
+  readonly lastPermissionRequestToolName?: string;
+  readonly lastPermissionRequestOperation?: string;
+  readonly lastPermissionRequestTarget?: string;
+  readonly lastPermissionRequestProcess?: string;
+  readonly lastPermissionRequestScopeKey?: string;
+  readonly lastPermissionRequestScopeLabel?: string;
+  readonly lastPermissionRequestCacheKey?: string;
+  readonly lastPermissionRequestProjectRoot?: string;
+  readonly lastPermissionRequestSource?: "verification-command" | "approval-request";
+  readonly lastPermissionRequestLineage?: string;
+  readonly lastRequestScopeCacheKey?: string;
+  readonly lastRequestScopeLabel?: string;
+  readonly lastRequestScopeProjectRoot?: string;
+  readonly lastRequestScopeSource?: "verification-command" | "approval-request";
   readonly lastRepairStatus?: string;
   readonly lastRepairNotes: readonly string[];
   readonly lastContinuationStatus?: string;
   readonly lastContinuationEvidence: readonly string[];
   readonly lastTaskSatisfactionVerdict?: string;
   readonly lastTaskSatisfactionReasons: readonly string[];
-  readonly lastStructuredNextStep?: SessionStructuredNextStep;
-  readonly lastStructuredNextStepPlan?: SessionStructuredNextStepPlan;
   readonly unresolvedItems: readonly string[];
   readonly freshnessHistoryCount?: number;
-  readonly freshnessAgeTurnDistance?: number;
-  readonly freshnessAgeNotConsumedTurns?: number;
-  readonly workingMemoryCompacted?: boolean;
-  readonly workingMemorySourceEventCount?: number;
-  readonly workingMemorySourceTurnCount?: number;
-  readonly workingMemorySummary?: readonly string[];
-  readonly workingMemoryUpdatedAt?: string;
 }
 
-type SessionNextStepKind =
-  | "run-command"
-  | "edit-fix"
-  | "read-continuation"
-  | "explain-continuation"
-  | "summary-continuation"
-  | "task-continuation";
-
-interface SessionStructuredNextStep {
-  readonly kind: SessionNextStepKind;
-  readonly executableNow: boolean;
-  readonly confidence: "high" | "medium" | "low";
-  readonly reason: string;
-  readonly targetPath?: string;
-  readonly command?: string;
-  readonly replaceFrom?: string;
-  readonly replaceTo?: string;
-  readonly readLineCount?: number;
-  readonly readFilter?: "none" | "function-definitions";
-  readonly readFragmentStart?: number;
-  readonly readFragmentEnd?: number;
-  readonly readFragmentLineIndexes?: readonly number[];
-  readonly readFragmentRanges?: readonly string[];
-  readonly readFragmentSourceWindowStart?: number;
-  readonly readFragmentSourceWindowEnd?: number;
-  readonly readFragmentFingerprint?: string;
-  readonly readFragmentStructureSignature?: string;
-  readonly readFragmentNeighborhoodSignature?: string;
-  readonly continuationPrompt?: string;
-  readonly missingFields?: readonly string[];
+export interface ApprovalAuditMemoryState {
+  readonly decision: "deny" | "allow-once" | "allow-always";
+  readonly decisionSource: string;
+  readonly persistent: boolean;
+  readonly cacheEffect: string;
+  readonly projectRoot: string;
+  readonly cacheKey: string;
+  readonly scopeLabel: string;
+  readonly lineage?: string;
+  readonly stopReason?: string;
+  readonly channel?: "interactive" | "non-interactive";
+  readonly inputKey?: "y" | "a" | "n" | "other";
+  readonly recordedAt: string;
 }
 
-export interface SessionMaterializedStepHint {
-  readonly kind: SessionNextStepKind;
-  readonly targetPath?: string;
-  readonly command?: string;
-  readonly replaceFrom?: string;
-  readonly replaceTo?: string;
-  readonly continuationPrompt?: string;
-  readonly readLineCount?: number;
-  readonly readFilter?: "none" | "function-definitions";
-  readonly readFragmentStart?: number;
-  readonly readFragmentEnd?: number;
-  readonly readFragmentLineIndexes?: readonly number[];
-  readonly readFragmentRanges?: readonly string[];
-  readonly readFragmentSourceWindowStart?: number;
-  readonly readFragmentSourceWindowEnd?: number;
-  readonly readFragmentFingerprint?: string;
-  readonly readFragmentStructureSignature?: string;
-  readonly readFragmentNeighborhoodSignature?: string;
-  readonly confidence: "high" | "medium" | "low";
+interface PermissionRequestMemoryState {
+  readonly toolName?: string;
+  readonly operation?: string;
+  readonly target?: string;
+  readonly process?: string;
+  readonly scopeKey?: string;
+  readonly scopeLabel?: string;
+  readonly cacheKey?: string;
+  readonly projectRoot?: string;
+  readonly source?: "verification-command" | "approval-request";
+  readonly lineage?: string;
 }
 
-interface SessionStructuredNextStepPlanStep extends SessionStructuredNextStep {
-  readonly id: string;
-  readonly title: string;
-}
-
-interface SessionStructuredNextStepPlan {
-  readonly planId: string;
-  readonly reason: string;
-  readonly confidence: "high" | "medium" | "low";
-  readonly executableNow: boolean;
-  readonly currentStepIndex: number;
-  readonly completedStepCount: number;
-  readonly steps: readonly SessionStructuredNextStepPlanStep[];
-}
-
-interface SessionWorkingMemory {
-  readonly schemaVersion: 1;
-  readonly updatedAt: string;
-  readonly sourceEventCount: number;
-  readonly sourceTurnCount: number;
-  readonly compacted: boolean;
-  readonly compactReason?: "event-budget" | "turn-budget" | "none";
-  readonly continuity: SessionContinuitySnapshot;
-  readonly summary: readonly string[];
-}
-
-interface PromptContextAssemblyOptions {
-  readonly maxChars?: number;
-  readonly recentTurnLimit?: number;
+interface RequestScopeMemoryState {
+  readonly cacheKey?: string;
+  readonly scopeLabel?: string;
+  readonly projectRoot?: string;
+  readonly source?: "verification-command" | "approval-request";
 }
 
 interface SessionMetadata {
@@ -255,6 +217,7 @@ interface SessionStateSnapshot {
   projectRoot?: string;
   pendingPrompt?: string;
   lastError?: string;
+  workingMemory?: unknown;
   durableStatus?: "success" | "stopped" | "error";
   runPhase?: "idle" | "prompt-persisted" | "turn-active";
   interruptedKind?: "prompt" | "turn";
@@ -262,7 +225,16 @@ interface SessionStateSnapshot {
   terminalClassification?: TerminalClassification;
   lastContinuationReason?: ContinuationReason;
   pendingLifecycle?: DurableLifecycleIndex;
-  workingMemory?: SessionWorkingMemory;
+}
+
+interface CurrentSessionSelectionRecord {
+  readonly sessionId: string;
+  readonly updatedAt: string;
+}
+
+interface CurrentSessionSelectionStore {
+  readonly schemaVersion: 1;
+  readonly byProjectRoot: Record<string, CurrentSessionSelectionRecord>;
 }
 
 interface TranscriptRepairContext {
@@ -394,32 +366,26 @@ export interface SessionResumeEligibility {
   readonly block?: RecoveryTrustBoundaryBlock;
 }
 
-interface MissingSessionRebindContext {
-  readonly requestedMissingSessionId: string;
-  readonly projectRoot: string;
-  readonly candidateSessionIds: readonly string[];
-  readonly createdAt: string;
-}
-
 export class SessionManager {
   private static readonly STATE_IO_MAX_ATTEMPTS = 6;
   private static readonly STATE_IO_RETRY_DELAY_MS = 12;
   private static readonly STATE_LOCK_TIMEOUT_MS = 1200;
   private static readonly STATE_LOCK_RETRY_DELAY_MS = 20;
-  private static readonly WORKING_MEMORY_EVENT_COMPACT_THRESHOLD = 72;
-  private static readonly WORKING_MEMORY_TURN_COMPACT_THRESHOLD = 24;
-  private static readonly WORKING_MEMORY_SUMMARY_ITEM_LIMIT = 8;
-  private static readonly WORKING_MEMORY_RECENT_FILE_LIMIT = 8;
-  private static readonly WORKING_MEMORY_RECENT_FAILURE_LIMIT = 6;
-  private static readonly WORKING_MEMORY_EVIDENCE_LIMIT = 10;
-  private static readonly WORKING_MEMORY_REPAIR_NOTE_LIMIT = 6;
+  private static readonly AUTO_COMPACT_TURN_THRESHOLD = 12;
+  private static readonly APPROVAL_AUDIT_HISTORY_LIMIT = 16;
   private sessionsDir: string;
+  private readonly currentSessionStorePath: string;
   private readonly warnedUnreadableSessionDirs = new Set<string>();
   private didWarnListSessionsFailure = false;
 
   constructor() {
     const homeDir = process.env.USERPROFILE || process.env.HOME || os.homedir();
     this.sessionsDir = path.join(homeDir, ".private-agents", "sessions");
+    this.currentSessionStorePath = path.join(
+      homeDir,
+      ".private-agents",
+      "current-session.json",
+    );
     this.ensureSessionsDir();
   }
 
@@ -453,19 +419,6 @@ export class SessionManager {
     return path.join(this.getSessionDir(sessionId), "state.lock");
   }
 
-  private getMissingSessionRebindPath(): string {
-    const homeDir = process.env.USERPROFILE || process.env.HOME || os.homedir();
-    return path.join(homeDir, ".private-agents", "missing-session-rebind.json");
-  }
-
-  private normalizeProjectRootForComparison(root: string): string {
-    const resolved = path.resolve(root.trim());
-    if (process.platform === "win32") {
-      return resolved.toLowerCase();
-    }
-    return resolved;
-  }
-
   getSessionFilePath(sessionId: string): string {
     return this.getMetadataPath(sessionId);
   }
@@ -479,6 +432,64 @@ export class SessionManager {
       return false;
     }
     return fs.existsSync(this.getSessionDir(sessionId.trim()));
+  }
+
+  getCurrentSessionForProject(projectRoot: string): Session | null {
+    const normalizedProjectRoot = this.normalizeProjectRootKey(projectRoot);
+    const store = this.readCurrentSessionStore();
+    const selection = store.byProjectRoot[normalizedProjectRoot];
+    if (!selection?.sessionId?.trim()) {
+      return null;
+    }
+    if (!this.sessionExists(selection.sessionId)) {
+      this.removeCurrentSessionSelection(normalizedProjectRoot);
+      return null;
+    }
+
+    try {
+      const session = this.load(selection.sessionId);
+      if (
+        this.normalizeProjectRootKey(
+          session.projectRoot || normalizedProjectRoot,
+        ) !== normalizedProjectRoot
+      ) {
+        this.removeCurrentSessionSelection(normalizedProjectRoot);
+        return null;
+      }
+      return session;
+    } catch {
+      this.removeCurrentSessionSelection(normalizedProjectRoot);
+      return null;
+    }
+  }
+
+  setCurrentSessionForProject(projectRoot: string, sessionId: string): void {
+    const normalizedProjectRoot = this.normalizeProjectRootKey(projectRoot);
+    const normalizedSessionId = sessionId.trim();
+    if (!normalizedProjectRoot || !normalizedSessionId) {
+      return;
+    }
+
+    const current = this.readCurrentSessionStore();
+    const next: CurrentSessionSelectionStore = {
+      schemaVersion: 1,
+      byProjectRoot: {
+        ...current.byProjectRoot,
+        [normalizedProjectRoot]: {
+          sessionId: normalizedSessionId,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    };
+    this.writeCurrentSessionStore(next);
+  }
+
+  clearCurrentSessionForProject(projectRoot: string): void {
+    const normalizedProjectRoot = this.normalizeProjectRootKey(projectRoot);
+    if (!normalizedProjectRoot) {
+      return;
+    }
+    this.removeCurrentSessionSelection(normalizedProjectRoot);
   }
 
   createNewWithId(sessionId: string, projectRoot: string = process.cwd()): Session {
@@ -505,6 +516,7 @@ export class SessionManager {
       turns: [],
     };
     this.writeSession(session);
+    this.setCurrentSessionForProject(projectRoot, session.id);
     return session;
   }
 
@@ -521,255 +533,8 @@ export class SessionManager {
     };
 
     this.writeSession(session);
+    this.setCurrentSessionForProject(projectRoot, session.id);
     return session;
-  }
-
-  getSessionProjectRoot(sessionId: string): string {
-    return this.load(sessionId).projectRoot;
-  }
-
-  recordMissingSessionRebindContext(input: {
-    requestedMissingSessionId: string;
-    projectRoot: string;
-    candidateSessionIds: readonly string[];
-  }): void {
-    const payload: MissingSessionRebindContext = {
-      requestedMissingSessionId: input.requestedMissingSessionId.trim(),
-      projectRoot: input.projectRoot.trim(),
-      candidateSessionIds: [...input.candidateSessionIds].map((id) => id.trim()),
-      createdAt: new Date().toISOString(),
-    };
-    try {
-      fs.writeFileSync(
-        this.getMissingSessionRebindPath(),
-        JSON.stringify(payload, null, 2),
-        "utf8",
-      );
-    } catch {
-      // Observability helper only; ignore persistence failure.
-    }
-  }
-
-  consumeMissingSessionRebindContext(input: {
-    requestedSessionId: string;
-    projectRoot: string;
-    maxAgeMs?: number;
-  }): { requestedMissingSessionId: string; resolvedSessionId: string } | undefined {
-    const filePath = this.getMissingSessionRebindPath();
-    if (!fs.existsSync(filePath)) {
-      return undefined;
-    }
-
-    const clearContext = (): void => {
-      try {
-        fs.rmSync(filePath, { force: true });
-      } catch {
-        // Ignore best-effort cleanup.
-      }
-    };
-
-    let parsed: MissingSessionRebindContext | undefined;
-    try {
-      parsed = this.readJsonFileWithRetry<MissingSessionRebindContext>(filePath, {
-        required: false,
-        parseErrorDetail: "Invalid missing-session rebind context",
-      });
-    } catch {
-      clearContext();
-      return undefined;
-    }
-    if (!parsed) {
-      clearContext();
-      return undefined;
-    }
-
-    const createdAt = Date.parse(parsed.createdAt);
-    const now = Date.now();
-    const maxAgeMs = input.maxAgeMs ?? 15 * 60 * 1000;
-    if (
-      !Number.isFinite(createdAt) ||
-      createdAt <= 0 ||
-      now - createdAt > maxAgeMs
-    ) {
-      clearContext();
-      return undefined;
-    }
-
-    const sameProject =
-      this.normalizeProjectRootForComparison(parsed.projectRoot) ===
-      this.normalizeProjectRootForComparison(input.projectRoot);
-    if (!sameProject) {
-      return undefined;
-    }
-
-    const matched = parsed.candidateSessionIds.some(
-      (candidate) => candidate.trim() === input.requestedSessionId.trim(),
-    );
-    if (!matched) {
-      return undefined;
-    }
-
-    clearContext();
-    return {
-      requestedMissingSessionId: parsed.requestedMissingSessionId,
-      resolvedSessionId: input.requestedSessionId.trim(),
-    };
-  }
-
-  rebindSessionProjectRoot(sessionId: string, nextProjectRoot: string): Session {
-    const normalizedRoot = nextProjectRoot.trim();
-    if (!normalizedRoot) {
-      throw new Error("Project root is required for session rebind");
-    }
-    const session = this.load(sessionId);
-    const previousProjectRoot = session.projectRoot;
-    const currentState = this.readStateSnapshotSafely(this.getStatePath(sessionId));
-    const rebasedWorkingMemory = this.rebaseWorkingMemoryForProjectMigration(
-      currentState?.workingMemory,
-      previousProjectRoot,
-      normalizedRoot,
-    );
-    session.projectRoot = normalizedRoot;
-    session.updatedAt = new Date().toISOString();
-    this.writeSessionMetadata(session);
-    this.writeSessionState(session, {
-      ...(rebasedWorkingMemory ? { workingMemory: rebasedWorkingMemory } : {}),
-    });
-    return session;
-  }
-
-  private rebaseWorkingMemoryForProjectMigration(
-    memory: SessionWorkingMemory | undefined,
-    previousProjectRoot: string,
-    nextProjectRoot: string,
-  ): SessionWorkingMemory | undefined {
-    if (!memory) {
-      return undefined;
-    }
-    const oldRoot = path.resolve(previousProjectRoot);
-    const newRoot = path.resolve(nextProjectRoot);
-    const rebasePath = (candidate: string | undefined): string | undefined => {
-      if (!candidate?.trim()) {
-        return candidate;
-      }
-      const raw = candidate.trim();
-      if (!path.isAbsolute(raw)) {
-        return raw;
-      }
-      const normalizedRaw = path.resolve(raw);
-      const oldWithSep = `${oldRoot}${path.sep}`;
-      if (normalizedRaw === oldRoot) {
-        return newRoot;
-      }
-      if (normalizedRaw.startsWith(oldWithSep)) {
-        const relative = path.relative(oldRoot, normalizedRaw);
-        return path.join(newRoot, relative);
-      }
-      return undefined;
-    };
-    const rebaseTextPaths = (text: string): string => {
-      if (!text.includes(oldRoot)) {
-        return text;
-      }
-      return text.split(oldRoot).join(newRoot);
-    };
-
-    const continuity = memory.continuity;
-    const rebasedAnchor = rebasePath(continuity.continuationFamilyAnchor);
-    const rebasedTargets = (continuity.recentTargetFiles ?? [])
-      .map((item) => rebasePath(item) ?? item)
-      .filter((item): item is string => Boolean(item?.trim()));
-    const rebasedChanged = (continuity.recentChangedFiles ?? [])
-      .map((item) => rebasePath(item) ?? item)
-      .filter((item): item is string => Boolean(item?.trim()));
-    const rebasedVerified = (continuity.recentVerifiedFiles ?? [])
-      .map((item) => rebasePath(item) ?? item)
-      .filter((item): item is string => Boolean(item?.trim()));
-    const rebasedFailed = (continuity.recentFailedFiles ?? [])
-      .map((entry) => {
-        const nextPath = rebasePath(entry.path);
-        if (!nextPath && path.isAbsolute(entry.path)) {
-          return undefined;
-        }
-        return {
-          path: nextPath ?? entry.path,
-          reason: rebaseTextPaths(entry.reason),
-        };
-      })
-      .filter(
-        (
-          entry,
-        ): entry is {
-          path: string;
-          reason: string;
-        } => Boolean(entry?.path?.trim()),
-      );
-    const rebasedEvidence = (continuity.lastContinuationEvidence ?? [])
-      .map((entry) => rebaseTextPaths(entry))
-      .slice(0, SessionManager.WORKING_MEMORY_EVIDENCE_LIMIT);
-    const rebasedUnresolved = (continuity.unresolvedItems ?? [])
-      .map((entry) => rebaseTextPaths(entry))
-      .slice(0, SessionManager.WORKING_MEMORY_EVIDENCE_LIMIT);
-    const rebasedNextStep = continuity.lastStructuredNextStep
-      ? {
-          ...continuity.lastStructuredNextStep,
-          ...(continuity.lastStructuredNextStep.targetPath
-            ? {
-                targetPath:
-                  rebasePath(continuity.lastStructuredNextStep.targetPath) ??
-                  continuity.lastStructuredNextStep.targetPath,
-              }
-            : {}),
-          ...(continuity.lastStructuredNextStep.continuationPrompt
-            ? {
-                continuationPrompt: rebaseTextPaths(
-                  continuity.lastStructuredNextStep.continuationPrompt,
-                ),
-              }
-            : {}),
-        }
-      : undefined;
-    const rebasedNextStepPlan = continuity.lastStructuredNextStepPlan
-      ? {
-          ...continuity.lastStructuredNextStepPlan,
-          steps: continuity.lastStructuredNextStepPlan.steps.map((step) => ({
-            ...step,
-            ...(step.targetPath
-              ? { targetPath: rebasePath(step.targetPath) ?? step.targetPath }
-              : {}),
-            ...(step.continuationPrompt
-              ? {
-                  continuationPrompt: rebaseTextPaths(step.continuationPrompt),
-                }
-              : {}),
-          })),
-        }
-      : undefined;
-
-    const nextContinuity: SessionContinuitySnapshot = {
-      ...continuity,
-      projectRoot: nextProjectRoot,
-      continuationFamilyAnchor:
-        rebasedAnchor ??
-        (rebasedTargets[0]?.trim() ? rebasedTargets[0].trim() : undefined),
-      recentTargetFiles: rebasedTargets,
-      recentChangedFiles: rebasedChanged,
-      recentVerifiedFiles: rebasedVerified,
-      recentFailedFiles: rebasedFailed,
-      lastContinuationEvidence: rebasedEvidence,
-      ...(rebasedNextStep ? { lastStructuredNextStep: rebasedNextStep } : {}),
-      ...(rebasedNextStepPlan
-        ? { lastStructuredNextStepPlan: rebasedNextStepPlan }
-        : {}),
-      unresolvedItems: rebasedUnresolved,
-    };
-
-    return {
-      ...memory,
-      updatedAt: new Date().toISOString(),
-      continuity: nextContinuity,
-      summary: memory.summary.map((entry) => rebaseTextPaths(entry)),
-    };
   }
 
   resume(sessionId: string, projectRoot?: string): Session {
@@ -786,6 +551,10 @@ export class SessionManager {
       session.status = "active";
       session.updatedAt = new Date().toISOString();
       this.writeSessionMetadata(session);
+      this.setCurrentSessionForProject(
+        session.projectRoot || projectRoot || process.cwd(),
+        session.id,
+      );
       return session;
     } catch (error) {
       throw new Error(
@@ -841,7 +610,184 @@ export class SessionManager {
     });
     this.writeSessionMetadata(session);
     this.writeSessionState(session);
-    this.refreshWorkingMemory(sessionId);
+  }
+
+  recordApprovalAuditDecision(
+    sessionId: string,
+    decision: Omit<ApprovalAuditMemoryState, "recordedAt"> & {
+      readonly recordedAt?: string;
+    },
+  ): void {
+    const session = this.load(sessionId);
+    const recordedAt = decision.recordedAt ?? new Date().toISOString();
+    const normalizedProjectRoot = path.resolve(
+      decision.projectRoot?.trim() || session.projectRoot,
+    );
+    this.withSessionStateLock(session.id, () => {
+      const statePath = this.getStatePath(session.id);
+      const current = this.readStateSnapshotSafely(statePath);
+      const currentWorkingMemory =
+        current?.workingMemory &&
+        typeof current.workingMemory === "object" &&
+        !Array.isArray(current.workingMemory)
+          ? { ...(current.workingMemory as Record<string, unknown>) }
+          : {};
+      const nextApprovalAudit: ApprovalAuditMemoryState = {
+        decision: decision.decision,
+        decisionSource: decision.decisionSource,
+        persistent: decision.persistent,
+        cacheEffect: decision.cacheEffect,
+        projectRoot: normalizedProjectRoot,
+        cacheKey: decision.cacheKey,
+        scopeLabel: decision.scopeLabel,
+        ...(decision.lineage ? { lineage: decision.lineage } : {}),
+        ...(decision.stopReason ? { stopReason: decision.stopReason } : {}),
+        ...(decision.channel ? { channel: decision.channel } : {}),
+        ...(decision.inputKey ? { inputKey: decision.inputKey } : {}),
+        recordedAt,
+      };
+      const approvalAuditHistory = this.extractApprovalAuditHistoryMemoryState(
+        currentWorkingMemory,
+      );
+      const nextApprovalAuditHistory = [
+        ...approvalAuditHistory,
+        nextApprovalAudit,
+      ].slice(-SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT);
+      const currentContinuity =
+        currentWorkingMemory.continuity &&
+        typeof currentWorkingMemory.continuity === "object" &&
+        !Array.isArray(currentWorkingMemory.continuity)
+          ? { ...(currentWorkingMemory.continuity as Record<string, unknown>) }
+          : {};
+      const nextContinuity: Record<string, unknown> = {
+        ...currentContinuity,
+        lastApprovalDecision: nextApprovalAudit.decision,
+        lastApprovalDecisionSource: nextApprovalAudit.decisionSource,
+        lastApprovalPersistent: nextApprovalAudit.persistent,
+        lastApprovalCacheEffect: nextApprovalAudit.cacheEffect,
+        lastApprovalProjectRoot: nextApprovalAudit.projectRoot,
+        lastApprovalCacheKey: nextApprovalAudit.cacheKey,
+        lastApprovalScope: nextApprovalAudit.scopeLabel,
+        lastApprovalRecordedAt: nextApprovalAudit.recordedAt,
+        ...(nextApprovalAudit.lineage
+          ? { lastApprovalLineage: nextApprovalAudit.lineage }
+          : {}),
+        ...(nextApprovalAudit.stopReason
+          ? { lastApprovalStopReason: nextApprovalAudit.stopReason }
+          : {}),
+        ...(nextApprovalAudit.channel
+          ? { lastApprovalChannel: nextApprovalAudit.channel }
+          : {}),
+        ...(nextApprovalAudit.inputKey
+          ? { lastApprovalInputKey: nextApprovalAudit.inputKey }
+          : {}),
+        lastRequestScopeCacheKey: nextApprovalAudit.cacheKey,
+        lastRequestScopeLabel: nextApprovalAudit.scopeLabel,
+        lastRequestScopeProjectRoot: nextApprovalAudit.projectRoot,
+        lastRequestScopeSource: "approval-request",
+        lastPermissionRequestCacheKey: nextApprovalAudit.cacheKey,
+        lastPermissionRequestScopeLabel: nextApprovalAudit.scopeLabel,
+        lastPermissionRequestProjectRoot: nextApprovalAudit.projectRoot,
+        lastPermissionRequestSource: "approval-request",
+        ...(nextApprovalAudit.lineage
+          ? { lastPermissionRequestLineage: nextApprovalAudit.lineage }
+          : {}),
+        lastApprovalHistory: nextApprovalAuditHistory,
+      };
+      const currentSummaryEntries = Array.isArray(currentWorkingMemory.summary)
+        ? currentWorkingMemory.summary.filter(
+            (entry): entry is string => typeof entry === "string",
+          )
+        : [];
+      const summaryByKey = new Map<string, string>();
+      for (const rawEntry of currentSummaryEntries) {
+        const entry = rawEntry.trim();
+        if (!entry) {
+          continue;
+        }
+        const normalized = entry.startsWith("- ")
+          ? entry.slice(2).trim()
+          : entry;
+        const separator = normalized.indexOf(":");
+        if (separator <= 0) {
+          continue;
+        }
+        const key = normalized.slice(0, separator).trim().toLowerCase();
+        const value = normalized.slice(separator + 1).trim();
+        if (key.startsWith("last-approval-") && value) {
+          summaryByKey.set(key, value);
+        }
+      }
+      const setSummaryApproval = (key: string, value: string | undefined): void => {
+        if (!value?.trim()) {
+          summaryByKey.delete(key);
+          return;
+        }
+        summaryByKey.set(key, value.trim());
+      };
+      setSummaryApproval("last-approval-decision", nextApprovalAudit.decision);
+      setSummaryApproval(
+        "last-approval-decision-source",
+        nextApprovalAudit.decisionSource,
+      );
+      setSummaryApproval(
+        "last-approval-persistent",
+        nextApprovalAudit.persistent ? "yes" : "no",
+      );
+      setSummaryApproval(
+        "last-approval-cache-effect",
+        nextApprovalAudit.cacheEffect,
+      );
+      setSummaryApproval(
+        "last-approval-project-root",
+        nextApprovalAudit.projectRoot,
+      );
+      setSummaryApproval("last-approval-cache-key", nextApprovalAudit.cacheKey);
+      setSummaryApproval("last-approval-scope", nextApprovalAudit.scopeLabel);
+      setSummaryApproval("last-approval-lineage", nextApprovalAudit.lineage);
+      setSummaryApproval(
+        "last-approval-stop-reason",
+        nextApprovalAudit.stopReason,
+      );
+      setSummaryApproval("last-approval-channel", nextApprovalAudit.channel);
+      setSummaryApproval("last-approval-input-key", nextApprovalAudit.inputKey);
+      setSummaryApproval(
+        "last-approval-recorded-at",
+        nextApprovalAudit.recordedAt,
+      );
+      const preservedSummaryEntries = currentSummaryEntries.filter((entry) => {
+        const trimmed = entry.trim();
+        if (!trimmed) {
+          return false;
+        }
+        const normalized = trimmed.startsWith("- ")
+          ? trimmed.slice(2).trim()
+          : trimmed;
+        const separator = normalized.indexOf(":");
+        if (separator <= 0) {
+          return true;
+        }
+        const key = normalized.slice(0, separator).trim().toLowerCase();
+        return !key.startsWith("last-approval-");
+      });
+      const nextSummary = [
+        ...preservedSummaryEntries,
+        ...Array.from(summaryByKey.entries()).map(([key, value]) =>
+          `- ${key}: ${value}`,
+        ),
+      ];
+      const snapshot = this.buildSessionStateSnapshot(session, current);
+      this.writeJsonFileAtomic(statePath, {
+        ...snapshot,
+        workingMemory: {
+          ...currentWorkingMemory,
+          approvalAudit: nextApprovalAudit,
+          approvalAuditHistory: nextApprovalAuditHistory,
+          continuity: nextContinuity,
+          summary: nextSummary,
+        },
+      } satisfies SessionStateSnapshot);
+    });
   }
 
   markRunStarted(sessionId: string, prompt: string): void {
@@ -863,7 +809,6 @@ export class SessionManager {
       lastContinuationReason: undefined,
       pendingLifecycle: createEmptyLifecycleIndex(),
     });
-    this.refreshWorkingMemory(sessionId);
   }
 
   persistUserPromptBarrier(sessionId: string, prompt: string): void {
@@ -903,7 +848,6 @@ export class SessionManager {
       lastContinuationReason: undefined,
       pendingLifecycle: createEmptyLifecycleIndex(),
     });
-    this.refreshWorkingMemory(sessionId);
   }
 
   markTurnActive(sessionId: string): void {
@@ -919,7 +863,6 @@ export class SessionManager {
       lastContinuationReason: undefined,
       pendingLifecycle: createEmptyLifecycleIndex(),
     });
-    this.refreshWorkingMemory(sessionId);
   }
 
   markRecoveryReentry(
@@ -939,7 +882,6 @@ export class SessionManager {
       terminalClassification: undefined,
       lastContinuationReason: undefined,
     });
-    this.refreshWorkingMemory(sessionId);
   }
 
   saveInterrupted(
@@ -963,7 +905,6 @@ export class SessionManager {
       terminalClassification: undefined,
       lastContinuationReason: undefined,
     });
-    this.refreshWorkingMemory(sessionId);
   }
 
   saveCompleted(sessionId: string, terminal?: TerminalPersistence): void {
@@ -986,7 +927,6 @@ export class SessionManager {
       lastContinuationReason: terminal?.lastContinuationReason,
       pendingLifecycle: createEmptyLifecycleIndex(),
     });
-    this.refreshWorkingMemory(sessionId);
   }
 
   renameSession(sessionId: string, title: string): Session {
@@ -1036,7 +976,6 @@ export class SessionManager {
       lastContinuationReason: terminal?.lastContinuationReason,
       pendingLifecycle: createEmptyLifecycleIndex(),
     });
-    this.refreshWorkingMemory(sessionId);
   }
 
   saveTerminated(sessionId: string): void {
@@ -1059,7 +998,6 @@ export class SessionManager {
       lastContinuationReason: undefined,
       pendingLifecycle: createEmptyLifecycleIndex(),
     });
-    this.refreshWorkingMemory(sessionId);
   }
 
   reconcilePendingLifecycle(sessionId: string): DurableLifecycleIndex {
@@ -1126,7 +1064,6 @@ export class SessionManager {
       timestamp: new Date().toISOString(),
     });
     this.applyQueryEventToState(sessionId, event);
-    this.refreshWorkingMemory(sessionId);
   }
 
   private isDuplicateDurableResolutionEvent(
@@ -1712,6 +1649,395 @@ export class SessionManager {
     return null;
   }
 
+  rebindSessionProjectRoot(sessionId: string, nextProjectRoot: string): Session {
+    const session = this.load(sessionId);
+    const previousRoot = session.projectRoot;
+    const normalizedRoot = path.resolve(nextProjectRoot.trim());
+    session.projectRoot = normalizedRoot;
+    session.updatedAt = new Date().toISOString();
+    this.writeSessionMetadata(session);
+    this.withSessionStateLock(session.id, () => {
+      const statePath = this.getStatePath(session.id);
+      const current = this.readStateSnapshotSafely(statePath);
+      if (!current) {
+        this.writeJsonFileAtomic(
+          statePath,
+          this.buildSessionStateSnapshot(session, undefined),
+        );
+        return;
+      }
+
+      const rebasedWorkingMemory = this.rebaseProjectRootInValue(
+        current.workingMemory,
+        previousRoot,
+        normalizedRoot,
+      );
+      const rebasedWorkingMemoryWithNormalizedApprovalCacheKey =
+        this.rebaseApprovalAuditCacheKeyRoot(
+          rebasedWorkingMemory,
+          normalizedRoot,
+        );
+
+      this.writeJsonFileAtomic(statePath, {
+        ...current,
+        projectRoot: normalizedRoot,
+        ...(rebasedWorkingMemoryWithNormalizedApprovalCacheKey !== undefined
+          ? {
+              workingMemory: rebasedWorkingMemoryWithNormalizedApprovalCacheKey,
+            }
+          : {}),
+      } satisfies SessionStateSnapshot);
+    });
+    this.setCurrentSessionForProject(normalizedRoot, session.id);
+    return session;
+  }
+
+  private normalizeProjectRootKey(projectRoot: string): string {
+    const trimmed = projectRoot.trim();
+    if (!trimmed) {
+      return "";
+    }
+    return path.resolve(trimmed).toLowerCase();
+  }
+
+  private readCurrentSessionStore(): CurrentSessionSelectionStore {
+    if (!fs.existsSync(this.currentSessionStorePath)) {
+      return {
+        schemaVersion: 1,
+        byProjectRoot: {},
+      };
+    }
+
+    try {
+      const parsed = JSON.parse(
+        fs.readFileSync(this.currentSessionStorePath, "utf8"),
+      ) as Partial<CurrentSessionSelectionStore>;
+      if (
+        parsed.schemaVersion !== 1 ||
+        !parsed.byProjectRoot ||
+        typeof parsed.byProjectRoot !== "object"
+      ) {
+        return {
+          schemaVersion: 1,
+          byProjectRoot: {},
+        };
+      }
+      return {
+        schemaVersion: 1,
+        byProjectRoot: parsed.byProjectRoot,
+      };
+    } catch {
+      return {
+        schemaVersion: 1,
+        byProjectRoot: {},
+      };
+    }
+  }
+
+  private writeCurrentSessionStore(store: CurrentSessionSelectionStore): void {
+    const storeDir = path.dirname(this.currentSessionStorePath);
+    if (!fs.existsSync(storeDir)) {
+      fs.mkdirSync(storeDir, { recursive: true });
+    }
+    fs.writeFileSync(
+      this.currentSessionStorePath,
+      JSON.stringify(store, null, 2),
+      "utf8",
+    );
+  }
+
+  private removeCurrentSessionSelection(normalizedProjectRoot: string): void {
+    const current = this.readCurrentSessionStore();
+    if (!current.byProjectRoot[normalizedProjectRoot]) {
+      return;
+    }
+
+    const nextByProjectRoot = { ...current.byProjectRoot };
+    delete nextByProjectRoot[normalizedProjectRoot];
+    this.writeCurrentSessionStore({
+      schemaVersion: 1,
+      byProjectRoot: nextByProjectRoot,
+    });
+  }
+
+  private rebaseProjectRootInValue(
+    value: unknown,
+    previousRoot: string,
+    nextRoot: string,
+  ): unknown {
+    if (typeof value === "string") {
+      return this.replaceProjectRootInText(value, previousRoot, nextRoot);
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((entry) =>
+        this.rebaseProjectRootInValue(entry, previousRoot, nextRoot),
+      );
+    }
+
+    if (value && typeof value === "object") {
+      const rebasedEntries = Object.entries(value).map(([key, entry]) => [
+        key,
+        this.rebaseProjectRootInValue(entry, previousRoot, nextRoot),
+      ]);
+      return Object.fromEntries(rebasedEntries);
+    }
+
+    return value;
+  }
+
+  private replaceProjectRootInText(
+    input: string,
+    previousRoot: string,
+    nextRoot: string,
+  ): string {
+    const variants = new Set<string>([
+      previousRoot,
+      previousRoot.replaceAll("\\", "/"),
+      previousRoot.replaceAll("/", "\\"),
+    ]);
+    let output = input;
+    for (const variant of variants) {
+      if (!variant) continue;
+      output = output.split(variant).join(nextRoot);
+    }
+    return output;
+  }
+
+  private rebaseApprovalAuditCacheKeyRoot(
+    value: unknown,
+    nextProjectRoot: string,
+  ): unknown {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return value;
+    }
+    const normalizedCacheKeyRoot = this.normalizeProjectRootKey(nextProjectRoot);
+
+    const normalizeCacheKey = (cacheKeyValue: unknown): string | undefined => {
+      if (typeof cacheKeyValue !== "string") {
+        return undefined;
+      }
+      const cacheKey = cacheKeyValue.trim();
+      if (!cacheKey) {
+        return undefined;
+      }
+      const dividerIndex = cacheKey.indexOf("|");
+      if (dividerIndex <= 0 || dividerIndex === cacheKey.length - 1) {
+        return undefined;
+      }
+      const cacheSuffix = cacheKey.slice(dividerIndex + 1).trim();
+      if (!cacheSuffix) {
+        return undefined;
+      }
+      return `${normalizedCacheKeyRoot}|${cacheSuffix}`;
+    };
+
+    const rewriteCacheKeyObject = (input: unknown): unknown => {
+      if (!input || typeof input !== "object" || Array.isArray(input)) {
+        return input;
+      }
+      const obj = input as Record<string, unknown>;
+      let nextObj: Record<string, unknown> = obj;
+      const normalizedCacheKey = normalizeCacheKey(obj.cacheKey);
+      if (normalizedCacheKey && normalizedCacheKey !== obj.cacheKey) {
+        nextObj = { ...nextObj, cacheKey: normalizedCacheKey };
+      }
+      return nextObj;
+    };
+
+    const root = value as Record<string, unknown>;
+    let nextRoot: Record<string, unknown> = root;
+
+    const rebasedApprovalAudit = rewriteCacheKeyObject(root.approvalAudit);
+    if (rebasedApprovalAudit !== root.approvalAudit) {
+      nextRoot = { ...nextRoot, approvalAudit: rebasedApprovalAudit };
+    }
+
+    if (Array.isArray(root.approvalAuditHistory)) {
+      let changed = false;
+      const rebasedHistory = root.approvalAuditHistory.map((entry) => {
+        const rebasedEntry = rewriteCacheKeyObject(entry);
+        if (rebasedEntry !== entry) {
+          changed = true;
+        }
+        return rebasedEntry;
+      });
+      if (changed) {
+        nextRoot = { ...nextRoot, approvalAuditHistory: rebasedHistory };
+      }
+    }
+
+    if (
+      nextRoot.continuity &&
+      typeof nextRoot.continuity === "object" &&
+      !Array.isArray(nextRoot.continuity)
+    ) {
+      const continuity = nextRoot.continuity as Record<string, unknown>;
+      let nextContinuity: Record<string, unknown> = continuity;
+      const continuityKeys = [
+        "lastApprovalCacheKey",
+        "lastRequestScopeCacheKey",
+        "lastPermissionRequestCacheKey",
+      ] as const;
+      for (const key of continuityKeys) {
+        const normalized = normalizeCacheKey(continuity[key]);
+        if (normalized && normalized !== continuity[key]) {
+          nextContinuity = { ...nextContinuity, [key]: normalized };
+        }
+      }
+      const scopeCacheKeyCandidate =
+        (typeof nextContinuity.lastPermissionRequestCacheKey === "string"
+          ? nextContinuity.lastPermissionRequestCacheKey
+          : undefined) ??
+        (typeof nextContinuity.lastRequestScopeCacheKey === "string"
+          ? nextContinuity.lastRequestScopeCacheKey
+          : undefined) ??
+        (typeof nextContinuity.lastApprovalCacheKey === "string"
+          ? nextContinuity.lastApprovalCacheKey
+          : undefined);
+      if (
+        scopeCacheKeyCandidate &&
+        (typeof nextContinuity.lastPermissionRequestCacheKey !== "string" ||
+          !nextContinuity.lastPermissionRequestCacheKey.trim())
+      ) {
+        nextContinuity = {
+          ...nextContinuity,
+          lastPermissionRequestCacheKey: scopeCacheKeyCandidate,
+        };
+      }
+      const scopeLabelCandidate =
+        (typeof nextContinuity.lastPermissionRequestScopeLabel === "string"
+          ? nextContinuity.lastPermissionRequestScopeLabel
+          : undefined) ??
+        (typeof nextContinuity.lastRequestScopeLabel === "string"
+          ? nextContinuity.lastRequestScopeLabel
+          : undefined) ??
+        (typeof nextContinuity.lastApprovalScope === "string"
+          ? nextContinuity.lastApprovalScope
+          : undefined);
+      if (
+        scopeLabelCandidate &&
+        (typeof nextContinuity.lastPermissionRequestScopeLabel !== "string" ||
+          !nextContinuity.lastPermissionRequestScopeLabel.trim())
+      ) {
+        nextContinuity = {
+          ...nextContinuity,
+          lastPermissionRequestScopeLabel: scopeLabelCandidate,
+        };
+      }
+      const projectRootCandidate =
+        (typeof nextContinuity.lastPermissionRequestProjectRoot === "string"
+          ? nextContinuity.lastPermissionRequestProjectRoot
+          : undefined) ??
+        (typeof nextContinuity.lastRequestScopeProjectRoot === "string"
+          ? nextContinuity.lastRequestScopeProjectRoot
+          : undefined) ??
+        (typeof nextContinuity.lastApprovalProjectRoot === "string"
+          ? nextContinuity.lastApprovalProjectRoot
+          : undefined) ??
+        nextProjectRoot;
+      if (
+        projectRootCandidate &&
+        (typeof nextContinuity.lastPermissionRequestProjectRoot !== "string" ||
+          !nextContinuity.lastPermissionRequestProjectRoot.trim())
+      ) {
+        nextContinuity = {
+          ...nextContinuity,
+          lastPermissionRequestProjectRoot: projectRootCandidate,
+        };
+      }
+      if (
+        (typeof nextContinuity.lastPermissionRequestSource !== "string" ||
+          !nextContinuity.lastPermissionRequestSource.trim()) &&
+        (typeof nextContinuity.lastRequestScopeSource === "string" ||
+          typeof nextContinuity.lastApprovalDecision === "string")
+      ) {
+        nextContinuity = {
+          ...nextContinuity,
+          lastPermissionRequestSource:
+            typeof nextContinuity.lastRequestScopeSource === "string" &&
+            nextContinuity.lastRequestScopeSource.trim()
+              ? nextContinuity.lastRequestScopeSource
+              : "approval-request",
+        };
+      }
+      if (Array.isArray(continuity.lastApprovalHistory)) {
+        let historyChanged = false;
+        const rebasedContinuityHistory = continuity.lastApprovalHistory.map(
+          (entry) => {
+            const rebasedEntry = rewriteCacheKeyObject(entry);
+            if (rebasedEntry !== entry) {
+              historyChanged = true;
+            }
+            return rebasedEntry;
+          },
+        );
+        if (historyChanged) {
+          nextContinuity = {
+            ...nextContinuity,
+            lastApprovalHistory: rebasedContinuityHistory,
+          };
+        }
+      }
+      if (nextContinuity !== continuity) {
+        nextRoot = { ...nextRoot, continuity: nextContinuity };
+      }
+    }
+
+    return nextRoot === root
+      ? value
+      : {
+          ...nextRoot,
+          summary: this.rebaseCacheKeysInSummaryEntries(nextRoot.summary, normalizedCacheKeyRoot),
+        };
+  }
+
+  private rebaseCacheKeysInSummaryEntries(
+    summaryValue: unknown,
+    normalizedCacheKeyRoot: string,
+  ): unknown {
+    if (!Array.isArray(summaryValue)) {
+      return summaryValue;
+    }
+    let changed = false;
+    const nextSummary = summaryValue.map((entry) => {
+      if (typeof entry !== "string") {
+        return entry;
+      }
+      const line = entry.trim();
+      const normalizedLine =
+        line.startsWith("- ") || line.startsWith("* ") ? line.slice(2).trim() : line;
+      const colonIndex = normalizedLine.indexOf(":");
+      if (colonIndex <= 0) {
+        return entry;
+      }
+      const key = normalizedLine.slice(0, colonIndex).trim().toLowerCase();
+      if (
+        key !== "last-approval-cache-key" &&
+        key !== "last-request-scope-cache-key" &&
+        key !== "last-permission-request-cache-key"
+      ) {
+        return entry;
+      }
+      const valuePart = normalizedLine.slice(colonIndex + 1).trim();
+      const dividerIndex = valuePart.indexOf("|");
+      if (dividerIndex <= 0 || dividerIndex === valuePart.length - 1) {
+        return entry;
+      }
+      const suffix = valuePart.slice(dividerIndex + 1).trim();
+      if (!suffix) {
+        return entry;
+      }
+      const rebased = `${normalizedCacheKeyRoot}|${suffix}`;
+      if (rebased === valuePart) {
+        return entry;
+      }
+      changed = true;
+      return `- ${key}: ${rebased}`;
+    });
+    return changed ? nextSummary : summaryValue;
+  }
+
   getRecoveryTrustBoundaryBlock(input?: {
     readonly preferredProjectRoot?: string;
   }): RecoveryTrustBoundaryBlock | null {
@@ -1795,8 +2121,11 @@ export class SessionManager {
 
   buildContinuitySnapshot(sessionId: string): SessionContinuitySnapshot {
     const session = this.load(sessionId);
+    const stateSnapshot = this.normalizeLegacyPermissionStateForSession(
+      session,
+      this.readStateSnapshotSafely(this.getStatePath(sessionId)),
+    );
     const recoverySnapshot = this.getRecoverySnapshot(sessionId);
-    const recoveryTrustBoundary = this.evaluateRecoveryTrustBoundary(session);
     const transcriptEvents = this.getTranscriptEvents(sessionId);
     const lastRunErrorEvent = this.findLastLifecycleEvent(
       transcriptEvents,
@@ -1805,66 +2134,168 @@ export class SessionManager {
     const lastQueryCompletion = this.findLastQueryCompletionEvent(transcriptEvents);
     const lastCodingCompletion =
       this.findLastCodingCompletionEvent(transcriptEvents);
-    const lastNonChatCodingCompletion =
-      this.findLastNonChatCodingCompletionEvent(transcriptEvents);
     const lastCodingResult = lastCodingCompletion?.event.result.codingResult;
     const recentCodingResults = this.collectRecentCodingResults(
       transcriptEvents,
       4,
     );
-    const queryCompletions = transcriptEvents.filter(
-      (
-        event,
-      ): event is Extract<TranscriptEvent, { type: "query-event" }> & {
-        event: Extract<QueryEvent, { type: "query.completed" }>;
-      } => event.type === "query-event" && event.event.type === "query.completed",
-    );
-    const lastNonChatCodingCompletionIndex =
-      lastNonChatCodingCompletion !== undefined
-        ? queryCompletions.findIndex(
-            (event) => event === lastNonChatCodingCompletion,
-          )
-        : -1;
-    const freshnessAgeTurnDistance =
-      lastNonChatCodingCompletionIndex >= 0
-        ? Math.max(queryCompletions.length - lastNonChatCodingCompletionIndex - 1, 0)
-        : undefined;
-    const latestReadEvidenceSource =
-      recentCodingResults.find((result) =>
-        this.hasReadStateEvidence(result.continuation.evidence),
-      ) ?? lastCodingResult;
-    const latestStagedEvidenceSource =
-      recentCodingResults.find((result) =>
-        this.hasStagedProgressEvidence(result.continuation.evidence),
-      ) ?? lastCodingResult;
-    const latestDeliverableSource =
-      recentCodingResults.find((result) =>
-        this.extractGroundedDeliverableMode(result.continuation.evidence) !==
-        undefined,
-      ) ?? lastCodingResult;
-    const lastGroundedDeliverableMode = this.extractGroundedDeliverableMode(
-      latestDeliverableSource?.continuation.evidence,
-    );
+    const lastGroundedDeliverableMode =
+      this.extractGroundedDeliverableMode(lastCodingResult?.continuation.evidence);
     const lastReadDeliveredLines = this.extractLastReadDeliveredLines(
-      latestReadEvidenceSource?.continuation.evidence,
+      lastCodingResult?.continuation.evidence,
     );
     const lastReadWindow = this.extractLastReadWindow(
-      latestReadEvidenceSource?.continuation.evidence,
+      lastCodingResult?.continuation.evidence,
     );
     const lastReadFragment = this.extractLastReadFragment(
-      latestReadEvidenceSource?.continuation.evidence,
+      lastCodingResult?.continuation.evidence,
     );
     const stagedRepairProgress = this.extractStagedRepairProgress(
-      latestStagedEvidenceSource?.continuation.evidence,
+      lastCodingResult?.continuation.evidence,
     );
-    const continuityEvidence = this.selectContinuationEvidenceForSnapshot(
-      lastCodingResult?.continuation.evidence ?? [],
+    const lastRequestScope = this.extractLastRequestScopeFromEvidence(
+      lastCodingResult?.continuation.evidence,
     );
-    const continuationFamilyId =
-      this.extractContinuationFamilyId(continuityEvidence) ??
-      `session:${session.id}`;
-    const continuationEpoch =
-      this.extractContinuationEpoch(continuityEvidence) ?? 0;
+    const lastRequestScopeFromMemory = this.extractRequestScopeMemoryState(
+      stateSnapshot?.workingMemory,
+    );
+    const lastPermissionRequest = this.extractLastPermissionRequestFromEvidence(
+      lastCodingResult?.continuation.evidence,
+    );
+    const lastPermissionRequestFromMemory =
+      this.extractPermissionRequestMemoryState(stateSnapshot?.workingMemory);
+    const inferRootFromCacheKey = (cacheKey: string | undefined): string | undefined => {
+      if (!cacheKey) {
+        return undefined;
+      }
+      const divider = cacheKey.indexOf("|");
+      if (divider <= 0) {
+        return undefined;
+      }
+      const rootPart = cacheKey.slice(0, divider).trim();
+      return rootPart.length > 0 ? rootPart : undefined;
+    };
+    const evidenceRequestRoot =
+      lastPermissionRequest.projectRoot &&
+      this.normalizeOptionalString(lastPermissionRequest.projectRoot);
+    const memoryRequestRoot =
+      lastPermissionRequestFromMemory?.projectRoot &&
+      this.normalizeOptionalString(lastPermissionRequestFromMemory.projectRoot);
+    const evidenceRequestRootFromCacheKey = inferRootFromCacheKey(
+      lastPermissionRequest.cacheKey,
+    );
+    const memoryRequestRootFromCacheKey = inferRootFromCacheKey(
+      lastPermissionRequestFromMemory?.cacheKey,
+    );
+    const normalizedSessionRoot = path.resolve(session.projectRoot);
+    const evidenceRequestRootCandidate =
+      evidenceRequestRoot ?? evidenceRequestRootFromCacheKey;
+    const memoryRequestRootCandidate =
+      memoryRequestRoot ?? memoryRequestRootFromCacheKey;
+    const preferMemoryPermissionRequest =
+      Boolean(memoryRequestRootCandidate) &&
+      path.resolve(memoryRequestRootCandidate!) === normalizedSessionRoot &&
+      Boolean(evidenceRequestRootCandidate) &&
+      path.resolve(evidenceRequestRootCandidate!) !== normalizedSessionRoot;
+    const pickPermissionField = <T,>(
+      evidenceValue: T | undefined,
+      memoryValue: T | undefined,
+    ): T | undefined =>
+      preferMemoryPermissionRequest
+        ? (memoryValue ?? evidenceValue)
+        : (evidenceValue ?? memoryValue);
+    const resolvedLastPermissionRequest: PermissionRequestMemoryState = {
+      toolName: pickPermissionField(
+        lastPermissionRequest.toolName,
+        lastPermissionRequestFromMemory?.toolName,
+      ),
+      operation: pickPermissionField(
+        lastPermissionRequest.operation,
+        lastPermissionRequestFromMemory?.operation,
+      ),
+      target: pickPermissionField(
+        lastPermissionRequest.target,
+        lastPermissionRequestFromMemory?.target,
+      ),
+      process: pickPermissionField(
+        lastPermissionRequest.process,
+        lastPermissionRequestFromMemory?.process,
+      ),
+      scopeKey: pickPermissionField(
+        lastPermissionRequest.scopeKey,
+        lastPermissionRequestFromMemory?.scopeKey,
+      ),
+      scopeLabel: pickPermissionField(
+        lastPermissionRequest.scopeLabel,
+        lastPermissionRequestFromMemory?.scopeLabel,
+      ),
+      cacheKey: pickPermissionField(
+        lastPermissionRequest.cacheKey,
+        lastPermissionRequestFromMemory?.cacheKey,
+      ),
+      projectRoot: pickPermissionField(
+        lastPermissionRequest.projectRoot,
+        lastPermissionRequestFromMemory?.projectRoot,
+      ),
+      source: pickPermissionField(
+        lastPermissionRequest.source,
+        lastPermissionRequestFromMemory?.source,
+      ),
+      lineage: pickPermissionField(
+        lastPermissionRequest.lineage,
+        lastPermissionRequestFromMemory?.lineage,
+      ),
+    };
+    const evidenceScopeRoot =
+      lastRequestScope.projectRoot &&
+      this.normalizeOptionalString(lastRequestScope.projectRoot);
+    const memoryScopeRoot =
+      lastRequestScopeFromMemory?.projectRoot &&
+      this.normalizeOptionalString(lastRequestScopeFromMemory.projectRoot);
+    const evidenceScopeRootFromCacheKey = inferRootFromCacheKey(
+      lastRequestScope.cacheKey,
+    );
+    const memoryScopeRootFromCacheKey = inferRootFromCacheKey(
+      lastRequestScopeFromMemory?.cacheKey,
+    );
+    const evidenceScopeRootCandidate = evidenceScopeRoot ?? evidenceScopeRootFromCacheKey;
+    const memoryScopeRootCandidate = memoryScopeRoot ?? memoryScopeRootFromCacheKey;
+    const preferMemoryRequestScope =
+      Boolean(memoryScopeRootCandidate) &&
+      path.resolve(memoryScopeRootCandidate!) === normalizedSessionRoot &&
+      Boolean(evidenceScopeRootCandidate) &&
+      path.resolve(evidenceScopeRootCandidate!) !== normalizedSessionRoot;
+    const pickRequestScopeField = <T,>(
+      evidenceValue: T | undefined,
+      memoryValue: T | undefined,
+    ): T | undefined =>
+      preferMemoryRequestScope
+        ? (memoryValue ?? evidenceValue)
+        : (evidenceValue ?? memoryValue);
+    const resolvedLastRequestScope: RequestScopeMemoryState = {
+      cacheKey: pickRequestScopeField(
+        lastRequestScope.cacheKey,
+        lastRequestScopeFromMemory?.cacheKey,
+      ),
+      scopeLabel: pickRequestScopeField(
+        lastRequestScope.scopeLabel,
+        lastRequestScopeFromMemory?.scopeLabel,
+      ),
+      projectRoot: pickRequestScopeField(
+        lastRequestScope.projectRoot,
+        lastRequestScopeFromMemory?.projectRoot,
+      ),
+      source: pickRequestScopeField(
+        lastRequestScope.source,
+        lastRequestScopeFromMemory?.source,
+      ),
+    };
+    const lastApprovalAudit = this.extractApprovalAuditMemoryState(
+      stateSnapshot?.workingMemory,
+    );
+    const lastApprovalHistory = this.extractApprovalAuditHistoryMemoryState(
+      stateSnapshot?.workingMemory,
+    );
     const lastAnswerDefect =
       this.extractLastAnswerDefect(lastCodingResult) ?? undefined;
     const continuityTerminalSource =
@@ -1873,12 +2304,9 @@ export class SessionManager {
       lastCodingCompletion.event.result.terminalClassification !== "success"
         ? lastCodingCompletion
         : lastQueryCompletion;
-    const rawLastUserIntent =
+    const lastUserIntent =
       recoverySnapshot.lastUserMessage?.content ??
       this.findLastTurnContent(session.turns, "user");
-    const lastUserIntent = rawLastUserIntent
-      ? this.stripContinuityContextBlock(rawLastUserIntent)
-      : undefined;
     const recentTargetFilesFromHistory = recentCodingResults.flatMap((result) => [
       ...(result.changeSet.attemptedFiles ?? []),
       ...(result.changedFiles ?? []),
@@ -1891,9 +2319,6 @@ export class SessionManager {
         ...this.extractPathLikeTargets(lastUserIntent),
       ]),
     ).slice(0, 12);
-    const continuationFamilyAnchor =
-      this.extractContinuationFamilyAnchor(continuityEvidence) ??
-      recentTargetFiles[0];
 
     const recentFailedByPath = new Map<string, string>();
     for (const result of recentCodingResults) {
@@ -1975,30 +2400,19 @@ export class SessionManager {
       (lastCodingResult?.continuation.evidence.length ?? 0) +
       unresolvedItems.length;
 
-    const baseSnapshot: SessionContinuitySnapshot = {
+    return {
       sessionId: session.id,
       projectRoot: session.projectRoot,
-      continuationFamilyId,
-      continuationEpoch,
-      ...(continuationFamilyAnchor
-        ? { continuationFamilyAnchor }
-        : {}),
       lastUserIntent,
       lastAssistantOutput:
         recoverySnapshot.lastAssistantMessage?.content ??
         this.findLastTurnContent(session.turns, "assistant"),
       lastTerminalClassification:
         continuityTerminalSource?.event.result.terminalClassification ??
-        recoverySnapshot.terminalClassification ??
-        this.deriveTerminalClassificationFromDurableStatus(
-          recoverySnapshot.durableStatus,
-        ),
+        recoverySnapshot.terminalClassification,
       lastTerminalReason:
         continuityTerminalSource?.event.result.terminalReason ??
-        recoverySnapshot.terminalReason ??
-        this.deriveTerminalReasonFromDurableStatus(recoverySnapshot.durableStatus),
-      lastDurableStatus: recoverySnapshot.durableStatus,
-      lastRecoveryDisposition: recoveryTrustBoundary.disposition,
+        recoverySnapshot.terminalReason,
       lastFailure,
       lastTaskKind: lastCodingResult?.taskKind,
       lastGroundedDeliverableMode,
@@ -2035,18 +2449,6 @@ export class SessionManager {
       ...(lastReadFragment.fingerprint
         ? { lastReadFragmentFingerprint: lastReadFragment.fingerprint }
         : {}),
-      ...(lastReadFragment.structureSignature
-        ? {
-            lastReadFragmentStructureSignature:
-              lastReadFragment.structureSignature,
-          }
-        : {}),
-      ...(lastReadFragment.neighborhoodSignature
-        ? {
-            lastReadFragmentNeighborhoodSignature:
-              lastReadFragment.neighborhoodSignature,
-          }
-        : {}),
       ...(lastReadFragment.filter
         ? { lastReadFilter: lastReadFragment.filter }
         : {}),
@@ -2070,75 +2472,287 @@ export class SessionManager {
       lastVerificationStatus: lastCodingResult?.verification.status,
       lastVerificationCommand: lastCodingResult?.verification.command,
       lastVerificationReason: lastCodingResult?.verification.reason,
+      lastVerificationBlockerKind: lastCodingResult?.verification.blockerKind,
+      lastVerificationNextAction: lastCodingResult?.verification.nextAction,
+      ...(lastCodingResult?.verification.status === "blocked"
+      && lastCodingResult.verification.blockerKind === "approval-denied"
+      && Boolean(lastCodingResult.verification.command?.trim())
+        ? { lastVerificationResumeEligible: true }
+        : {}),
+      ...(lastApprovalAudit
+        ? {
+            lastApprovalDecision: lastApprovalAudit.decision,
+            lastApprovalDecisionSource: lastApprovalAudit.decisionSource,
+            lastApprovalPersistent: lastApprovalAudit.persistent,
+            lastApprovalCacheEffect: lastApprovalAudit.cacheEffect,
+            lastApprovalProjectRoot: lastApprovalAudit.projectRoot,
+            lastApprovalCacheKey: lastApprovalAudit.cacheKey,
+            lastApprovalScope: lastApprovalAudit.scopeLabel,
+            ...(lastApprovalAudit.lineage
+              ? { lastApprovalLineage: lastApprovalAudit.lineage }
+              : {}),
+            ...(lastApprovalAudit.stopReason
+              ? { lastApprovalStopReason: lastApprovalAudit.stopReason }
+              : {}),
+            ...(lastApprovalAudit.channel
+              ? { lastApprovalChannel: lastApprovalAudit.channel }
+              : {}),
+            ...(lastApprovalAudit.inputKey
+              ? { lastApprovalInputKey: lastApprovalAudit.inputKey }
+              : {}),
+            ...(lastApprovalAudit.recordedAt
+              ? { lastApprovalRecordedAt: lastApprovalAudit.recordedAt }
+              : {}),
+          }
+        : {}),
+      ...(lastApprovalHistory.length > 0
+        ? { lastApprovalHistory }
+        : {}),
+      ...(resolvedLastPermissionRequest.toolName
+        ? { lastPermissionRequestToolName: resolvedLastPermissionRequest.toolName }
+        : {}),
+      ...(resolvedLastPermissionRequest.operation
+        ? { lastPermissionRequestOperation: resolvedLastPermissionRequest.operation }
+        : {}),
+      ...(resolvedLastPermissionRequest.target
+        ? { lastPermissionRequestTarget: resolvedLastPermissionRequest.target }
+        : {}),
+      ...(resolvedLastPermissionRequest.process
+        ? { lastPermissionRequestProcess: resolvedLastPermissionRequest.process }
+        : {}),
+      ...(resolvedLastPermissionRequest.scopeKey
+        ? { lastPermissionRequestScopeKey: resolvedLastPermissionRequest.scopeKey }
+        : {}),
+      ...(resolvedLastPermissionRequest.scopeLabel
+        ? { lastPermissionRequestScopeLabel: resolvedLastPermissionRequest.scopeLabel }
+        : {}),
+      ...(resolvedLastPermissionRequest.cacheKey
+        ? { lastPermissionRequestCacheKey: resolvedLastPermissionRequest.cacheKey }
+        : {}),
+      ...(resolvedLastPermissionRequest.projectRoot
+        ? {
+            lastPermissionRequestProjectRoot:
+              resolvedLastPermissionRequest.projectRoot,
+          }
+        : {}),
+      ...(resolvedLastPermissionRequest.source
+        ? { lastPermissionRequestSource: resolvedLastPermissionRequest.source }
+        : {}),
+      ...(resolvedLastPermissionRequest.lineage
+        ? { lastPermissionRequestLineage: resolvedLastPermissionRequest.lineage }
+        : {}),
+      ...(resolvedLastRequestScope.cacheKey
+        ? { lastRequestScopeCacheKey: resolvedLastRequestScope.cacheKey }
+        : {}),
+      ...(resolvedLastRequestScope.scopeLabel
+        ? { lastRequestScopeLabel: resolvedLastRequestScope.scopeLabel }
+        : {}),
+      ...(resolvedLastRequestScope.projectRoot
+        ? { lastRequestScopeProjectRoot: resolvedLastRequestScope.projectRoot }
+        : {}),
+      ...(resolvedLastRequestScope.source
+        ? { lastRequestScopeSource: resolvedLastRequestScope.source }
+        : {}),
       lastRepairStatus: lastCodingResult?.repair.status,
       lastRepairNotes: (lastCodingResult?.repair.notes ?? []).slice(0, 6),
       lastContinuationStatus: lastCodingResult?.continuation.status,
-      lastContinuationEvidence: continuityEvidence,
+      lastContinuationEvidence: this.selectContinuationEvidenceForSnapshot(
+        lastCodingResult?.continuation.evidence ?? [],
+      ),
       lastTaskSatisfactionVerdict: lastCodingResult?.taskSatisfaction.verdict,
       lastTaskSatisfactionReasons: (
         lastCodingResult?.taskSatisfaction.reasons ?? []
       ).slice(0, 6),
       unresolvedItems,
       ...(freshnessHistoryCount > 0 ? { freshnessHistoryCount } : {}),
-      ...(freshnessAgeTurnDistance !== undefined
-        ? { freshnessAgeTurnDistance }
-        : {}),
-      ...(freshnessAgeTurnDistance !== undefined
-        ? { freshnessAgeNotConsumedTurns: freshnessAgeTurnDistance }
-        : {}),
-    };
-    const structuredNextStep = this.deriveStructuredNextStep(baseSnapshot);
-    const derivedNextStepPlan =
-      this.deriveStructuredNextStepPlan(baseSnapshot);
-    const persistedNextStepPlan =
-      this.readStateSnapshotSafely(this.getStatePath(sessionId)).workingMemory
-        ?.continuity?.lastStructuredNextStepPlan;
-    const structuredNextStepPlan = this.mergeStructuredNextStepPlan(
-      persistedNextStepPlan,
-      derivedNextStepPlan,
-    );
-    return {
-      ...baseSnapshot,
-      ...(structuredNextStep ? { lastStructuredNextStep: structuredNextStep } : {}),
-      ...(structuredNextStepPlan
-        ? { lastStructuredNextStepPlan: structuredNextStepPlan }
-        : {}),
     };
   }
 
-  private mergeStructuredNextStepPlan(
-    persistedPlan: SessionStructuredNextStepPlan | undefined,
-    derivedPlan: SessionStructuredNextStepPlan | undefined,
-  ): SessionStructuredNextStepPlan | undefined {
-    if (!persistedPlan) {
-      return derivedPlan;
+  private normalizeLegacyPermissionStateForSession(
+    session: Session,
+    snapshot: SessionStateSnapshot | undefined,
+  ): SessionStateSnapshot | undefined {
+    if (!snapshot?.workingMemory) {
+      return snapshot;
     }
-    if (!derivedPlan) {
-      return persistedPlan;
+    const normalizedWorkingMemory = this.normalizeLegacyPermissionWorkingMemory(
+      snapshot.workingMemory,
+      session.projectRoot,
+    );
+    if (normalizedWorkingMemory === snapshot.workingMemory) {
+      return snapshot;
     }
-    if (persistedPlan.planId !== derivedPlan.planId) {
-      return derivedPlan;
-    }
-    const mergedCurrentIndex = Math.max(
-      derivedPlan.currentStepIndex,
-      persistedPlan.currentStepIndex,
-    );
-    const safeIndex = Math.max(
-      0,
-      Math.min(derivedPlan.steps.length, mergedCurrentIndex),
-    );
-    const completed = Math.max(
-      derivedPlan.completedStepCount,
-      persistedPlan.completedStepCount,
-      safeIndex,
-    );
-    const activeStep = derivedPlan.steps[safeIndex];
-    return {
-      ...derivedPlan,
-      currentStepIndex: safeIndex,
-      completedStepCount: Math.min(derivedPlan.steps.length, completed),
-      executableNow: Boolean(activeStep?.executableNow),
+
+    let normalizedSnapshot: SessionStateSnapshot = {
+      ...snapshot,
+      projectRoot: session.projectRoot,
+      workingMemory: normalizedWorkingMemory,
     };
+
+    this.withSessionStateLock(session.id, () => {
+      const statePath = this.getStatePath(session.id);
+      const latest = this.readStateSnapshotSafely(statePath);
+      if (!latest?.workingMemory) {
+        this.writeJsonFileAtomic(statePath, normalizedSnapshot);
+        return;
+      }
+      const rebasedLatestWorkingMemory = this.normalizeLegacyPermissionWorkingMemory(
+        latest.workingMemory,
+        session.projectRoot,
+      );
+      if (rebasedLatestWorkingMemory === latest.workingMemory) {
+        normalizedSnapshot = {
+          ...latest,
+          projectRoot: session.projectRoot,
+        };
+        return;
+      }
+      normalizedSnapshot = {
+        ...latest,
+        projectRoot: session.projectRoot,
+        workingMemory: rebasedLatestWorkingMemory,
+      };
+      this.writeJsonFileAtomic(statePath, normalizedSnapshot);
+    });
+
+    return normalizedSnapshot;
+  }
+
+  private normalizeLegacyPermissionWorkingMemory(
+    workingMemory: unknown,
+    sessionProjectRoot: string,
+  ): unknown {
+    const normalizedProjectRoot = path.resolve(sessionProjectRoot);
+    const legacyRootCandidate = this.detectLegacyPermissionRootCandidate(
+      workingMemory,
+      normalizedProjectRoot,
+    );
+
+    let nextWorkingMemory = workingMemory;
+    if (legacyRootCandidate) {
+      nextWorkingMemory = this.rebaseProjectRootInValue(
+        nextWorkingMemory,
+        legacyRootCandidate,
+        normalizedProjectRoot,
+      );
+    }
+    return this.rebaseApprovalAuditCacheKeyRoot(
+      nextWorkingMemory,
+      normalizedProjectRoot,
+    );
+  }
+
+  private detectLegacyPermissionRootCandidate(
+    workingMemory: unknown,
+    sessionProjectRoot: string,
+  ): string | undefined {
+    if (!workingMemory || typeof workingMemory !== "object" || Array.isArray(workingMemory)) {
+      return undefined;
+    }
+
+    const root = workingMemory as Record<string, unknown>;
+    const continuity =
+      root.continuity && typeof root.continuity === "object" && !Array.isArray(root.continuity)
+        ? (root.continuity as Record<string, unknown>)
+        : undefined;
+
+    const summaryEntries = Array.isArray(root.summary)
+      ? root.summary.filter((entry): entry is string => typeof entry === "string")
+      : [];
+
+    const candidates = new Map<string, string>();
+    const addRootCandidate = (value: unknown): void => {
+      if (typeof value !== "string") {
+        return;
+      }
+      const trimmed = value.trim();
+      if (!trimmed || trimmed.toLowerCase() === "unknown") {
+        return;
+      }
+      if (!trimmed.includes(path.sep) && !/^[a-zA-Z]:[\\/]/.test(trimmed)) {
+        return;
+      }
+      const resolved = this.normalizeProjectRootKey(trimmed);
+      if (!resolved || resolved === this.normalizeProjectRootKey(sessionProjectRoot)) {
+        return;
+      }
+      if (!candidates.has(resolved)) {
+        candidates.set(resolved, path.resolve(trimmed));
+      }
+    };
+    const addCacheKeyCandidate = (value: unknown): void => {
+      if (typeof value !== "string") {
+        return;
+      }
+      const cacheKey = value.trim();
+      const divider = cacheKey.indexOf("|");
+      if (divider <= 0) {
+        return;
+      }
+      addRootCandidate(cacheKey.slice(0, divider));
+    };
+
+    const approvalAudit =
+      root.approvalAudit &&
+      typeof root.approvalAudit === "object" &&
+      !Array.isArray(root.approvalAudit)
+        ? (root.approvalAudit as Record<string, unknown>)
+        : undefined;
+    if (approvalAudit) {
+      addRootCandidate(approvalAudit.projectRoot);
+      addCacheKeyCandidate(approvalAudit.cacheKey);
+    }
+
+    if (Array.isArray(root.approvalAuditHistory)) {
+      for (const entry of root.approvalAuditHistory) {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+          continue;
+        }
+        const record = entry as Record<string, unknown>;
+        addRootCandidate(record.projectRoot);
+        addCacheKeyCandidate(record.cacheKey);
+      }
+    }
+
+    if (continuity) {
+      addRootCandidate(continuity.lastApprovalProjectRoot);
+      addRootCandidate(continuity.lastRequestScopeProjectRoot);
+      addRootCandidate(continuity.lastPermissionRequestProjectRoot);
+      addCacheKeyCandidate(continuity.lastApprovalCacheKey);
+      addCacheKeyCandidate(continuity.lastRequestScopeCacheKey);
+      addCacheKeyCandidate(continuity.lastPermissionRequestCacheKey);
+    }
+
+    for (const line of summaryEntries) {
+      const parsed = line.match(/^-?\s*([^:]+):\s*(.+)$/);
+      if (!parsed) {
+        continue;
+      }
+      const key = parsed[1]?.trim().toLowerCase();
+      const value = parsed[2]?.trim();
+      if (!key || !value) {
+        continue;
+      }
+      if (
+        key === "last-approval-project-root" ||
+        key === "last-request-scope-project-root" ||
+        key === "last-permission-request-project-root"
+      ) {
+        addRootCandidate(value);
+      }
+      if (
+        key === "last-approval-cache-key" ||
+        key === "last-request-scope-cache-key" ||
+        key === "last-permission-request-cache-key"
+      ) {
+        addCacheKeyCandidate(value);
+      }
+    }
+
+    if (candidates.size !== 1) {
+      return undefined;
+    }
+    return [...candidates.values()][0];
   }
 
   buildPromptContinuityContext(
@@ -2149,31 +2763,11 @@ export class SessionManager {
       return undefined;
     }
 
-    const snapshot = this.ensureWorkingMemory(sessionId).continuity;
+    const snapshot = this.buildContinuitySnapshot(sessionId);
     const lines: string[] = ["Session continuity context:"];
-    if (snapshot.workingMemoryCompacted) {
-      lines.push("- working-memory: compacted");
-      if (snapshot.workingMemorySummary?.length) {
-        lines.push(
-          `- working-memory-summary: ${snapshot.workingMemorySummary
-            .map((item) => this.compactText(item, 120))
-            .join(" | ")}`,
-        );
-      }
-    }
 
     if (snapshot.lastTaskKind) {
       lines.push(`- last-task-kind: ${snapshot.lastTaskKind}`);
-    }
-    if (snapshot.lastStructuredNextStep) {
-      lines.push(
-        `- last-structured-next-step: ${this.describeStructuredNextStep(snapshot.lastStructuredNextStep)}`,
-      );
-    }
-    if (snapshot.lastStructuredNextStepPlan) {
-      lines.push(
-        `- last-structured-next-step-plan: ${this.describeStructuredNextStepPlan(snapshot.lastStructuredNextStepPlan)}`,
-      );
     }
     if (snapshot.lastGroundedDeliverableMode) {
       lines.push(
@@ -2201,13 +2795,19 @@ export class SessionManager {
       lines.push(`- last-read-fragment-end: ${snapshot.lastReadFragmentEnd}`);
     }
     if ((snapshot.lastReadFragmentLineIndexes?.length ?? 0) > 0) {
-      lines.push(
-        `- last-read-fragment-line-indexes: ${snapshot.lastReadFragmentLineIndexes?.slice(0, 32).join(",")}`,
-      );
+      const indexCount = snapshot.lastReadFragmentLineIndexes?.length ?? 0;
+      lines.push(`- last-read-fragment-line-index-count: ${indexCount}`);
+      if (indexCount <= 128) {
+        lines.push(
+          `- last-read-fragment-line-indexes: ${snapshot.lastReadFragmentLineIndexes?.join(",")}`,
+        );
+      }
     }
     if ((snapshot.lastReadFragmentRanges?.length ?? 0) > 0) {
+      const rangeCount = snapshot.lastReadFragmentRanges?.length ?? 0;
+      lines.push(`- last-read-fragment-range-count: ${rangeCount}`);
       lines.push(
-        `- last-read-fragment-ranges: ${snapshot.lastReadFragmentRanges?.slice(0, 64).join(";")}`,
+        `- last-read-fragment-ranges: ${snapshot.lastReadFragmentRanges?.join(";")}`,
       );
     }
     if (snapshot.lastReadFragmentSourceWindowStart !== undefined) {
@@ -2226,16 +2826,6 @@ export class SessionManager {
     if (snapshot.lastReadFragmentFingerprint) {
       lines.push(
         `- last-read-fragment-fingerprint: ${snapshot.lastReadFragmentFingerprint}`,
-      );
-    }
-    if (snapshot.lastReadFragmentStructureSignature) {
-      lines.push(
-        `- last-read-fragment-structure-signature: ${snapshot.lastReadFragmentStructureSignature}`,
-      );
-    }
-    if (snapshot.lastReadFragmentNeighborhoodSignature) {
-      lines.push(
-        `- last-read-fragment-neighborhood-signature: ${snapshot.lastReadFragmentNeighborhoodSignature}`,
       );
     }
     if (snapshot.lastStagedRepairStepCount !== undefined) {
@@ -2262,27 +2852,6 @@ export class SessionManager {
     if (snapshot.lastTerminalClassification || snapshot.lastTerminalReason) {
       lines.push(
         `- last-terminal: ${snapshot.lastTerminalClassification ?? "unknown"} (${snapshot.lastTerminalReason ?? "unknown"})`,
-      );
-    }
-    if (snapshot.continuationFamilyId) {
-      lines.push(`- continuation-family: ${snapshot.continuationFamilyId}`);
-    }
-    if (snapshot.continuationEpoch !== undefined) {
-      lines.push(`- continuation-epoch: ${snapshot.continuationEpoch}`);
-    }
-    if (snapshot.continuationFamilyAnchor) {
-      lines.push(
-        `- continuation-family-anchor: ${snapshot.continuationFamilyAnchor}`,
-      );
-    }
-    if (snapshot.freshnessAgeTurnDistance !== undefined) {
-      lines.push(
-        `- freshness-age-turn-distance: ${snapshot.freshnessAgeTurnDistance}`,
-      );
-    }
-    if (snapshot.freshnessAgeNotConsumedTurns !== undefined) {
-      lines.push(
-        `- freshness-age-not-consumed-turns: ${snapshot.freshnessAgeNotConsumedTurns}`,
       );
     }
     if (snapshot.lastFailure) {
@@ -2322,6 +2891,127 @@ export class SessionManager {
           `- last-verification-reason: ${this.compactText(snapshot.lastVerificationReason)}`,
         );
       }
+      if (snapshot.lastVerificationBlockerKind) {
+        lines.push(
+          `- last-verification-blocker-kind: ${snapshot.lastVerificationBlockerKind}`,
+        );
+      }
+      if (snapshot.lastVerificationNextAction) {
+        lines.push(
+          `- last-verification-next-action: ${this.compactText(snapshot.lastVerificationNextAction)}`,
+        );
+      }
+      if (snapshot.lastVerificationResumeEligible !== undefined) {
+        lines.push(
+          `- last-verification-resume-eligible: ${snapshot.lastVerificationResumeEligible ? "yes" : "no"}`,
+        );
+      }
+    }
+    if (snapshot.lastApprovalDecision) {
+      lines.push(`- last-approval-decision: ${snapshot.lastApprovalDecision}`);
+      if (snapshot.lastApprovalDecisionSource) {
+        lines.push(
+          `- last-approval-decision-source: ${snapshot.lastApprovalDecisionSource}`,
+        );
+      }
+      if (snapshot.lastApprovalPersistent !== undefined) {
+        lines.push(
+          `- last-approval-persistent: ${snapshot.lastApprovalPersistent ? "yes" : "no"}`,
+        );
+      }
+      if (snapshot.lastApprovalCacheEffect) {
+        lines.push(`- last-approval-cache-effect: ${snapshot.lastApprovalCacheEffect}`);
+      }
+      if (snapshot.lastApprovalProjectRoot) {
+        lines.push(`- last-approval-project-root: ${snapshot.lastApprovalProjectRoot}`);
+      }
+      if (snapshot.lastApprovalCacheKey) {
+        lines.push(`- last-approval-cache-key: ${snapshot.lastApprovalCacheKey}`);
+      }
+      if (snapshot.lastApprovalScope) {
+        lines.push(`- last-approval-scope: ${snapshot.lastApprovalScope}`);
+      }
+      if (snapshot.lastApprovalLineage) {
+        lines.push(`- last-approval-lineage: ${snapshot.lastApprovalLineage}`);
+      }
+      if (snapshot.lastApprovalChannel) {
+        lines.push(`- last-approval-channel: ${snapshot.lastApprovalChannel}`);
+      }
+      if (snapshot.lastApprovalInputKey) {
+        lines.push(`- last-approval-input-key: ${snapshot.lastApprovalInputKey}`);
+      }
+      if (snapshot.lastApprovalStopReason) {
+        lines.push(
+          `- last-approval-stop-reason: ${this.compactText(snapshot.lastApprovalStopReason)}`,
+        );
+      }
+      if (snapshot.lastApprovalRecordedAt) {
+        lines.push(`- last-approval-recorded-at: ${snapshot.lastApprovalRecordedAt}`);
+      }
+    }
+    if (snapshot.lastRequestScopeCacheKey) {
+      lines.push(`- last-request-scope-cache-key: ${snapshot.lastRequestScopeCacheKey}`);
+    }
+    if (snapshot.lastRequestScopeLabel) {
+      lines.push(`- last-request-scope-label: ${snapshot.lastRequestScopeLabel}`);
+    }
+    if (snapshot.lastRequestScopeProjectRoot) {
+      lines.push(
+        `- last-request-scope-project-root: ${snapshot.lastRequestScopeProjectRoot}`,
+      );
+    }
+    if (snapshot.lastRequestScopeSource) {
+      lines.push(`- last-request-scope-source: ${snapshot.lastRequestScopeSource}`);
+    }
+    if (snapshot.lastPermissionRequestToolName) {
+      lines.push(
+        `- last-permission-request-tool: ${snapshot.lastPermissionRequestToolName}`,
+      );
+    }
+    if (snapshot.lastPermissionRequestOperation) {
+      lines.push(
+        `- last-permission-request-operation: ${snapshot.lastPermissionRequestOperation}`,
+      );
+    }
+    if (snapshot.lastPermissionRequestTarget) {
+      lines.push(
+        `- last-permission-request-target: ${snapshot.lastPermissionRequestTarget}`,
+      );
+    }
+    if (snapshot.lastPermissionRequestProcess) {
+      lines.push(
+        `- last-permission-request-process: ${snapshot.lastPermissionRequestProcess}`,
+      );
+    }
+    if (snapshot.lastPermissionRequestScopeKey) {
+      lines.push(
+        `- last-permission-request-scope-key: ${snapshot.lastPermissionRequestScopeKey}`,
+      );
+    }
+    if (snapshot.lastPermissionRequestScopeLabel) {
+      lines.push(
+        `- last-permission-request-scope-label: ${snapshot.lastPermissionRequestScopeLabel}`,
+      );
+    }
+    if (snapshot.lastPermissionRequestCacheKey) {
+      lines.push(
+        `- last-permission-request-cache-key: ${snapshot.lastPermissionRequestCacheKey}`,
+      );
+    }
+    if (snapshot.lastPermissionRequestProjectRoot) {
+      lines.push(
+        `- last-permission-request-project-root: ${snapshot.lastPermissionRequestProjectRoot}`,
+      );
+    }
+    if (snapshot.lastPermissionRequestSource) {
+      lines.push(
+        `- last-permission-request-source: ${snapshot.lastPermissionRequestSource}`,
+      );
+    }
+    if (snapshot.lastPermissionRequestLineage) {
+      lines.push(
+        `- last-permission-request-lineage: ${snapshot.lastPermissionRequestLineage}`,
+      );
     }
     if (snapshot.lastRepairStatus) {
       lines.push(`- last-repair-status: ${snapshot.lastRepairStatus}`);
@@ -2365,1170 +3055,15 @@ export class SessionManager {
     return lines.join("\n");
   }
 
-  buildBudgetedPromptWithContinuityContext(
-    sessionId: string,
-    currentPrompt: string,
-    options: PromptContextAssemblyOptions = {},
-  ): string {
-    const prompt = currentPrompt.trim();
-    if (!prompt) {
-      return currentPrompt;
-    }
-    if (prompt.startsWith("/")) {
-      return currentPrompt;
-    }
-    if (
-      /\[FOLLOW-UP CONTINUITY CONTEXT\][\s\S]*?\[END CONTINUITY CONTEXT\]/i.test(
-        currentPrompt,
-      )
-    ) {
-      return currentPrompt;
-    }
-
-    const maxChars = Math.max(900, options.maxChars ?? 2200);
-    const recentTurnLimit = Math.max(0, options.recentTurnLimit ?? 4);
-    const memory = this.ensureWorkingMemory(sessionId);
-    const snapshot = memory.continuity;
-
-    if (!this.shouldAttachCompactAwareContext(prompt, snapshot)) {
-      return currentPrompt;
-    }
-
-    const sections: string[] = [];
-    sections.push("Session continuity context:");
-    sections.push(
-      `- context-policy: compact-aware (budget=${maxChars} chars; source-events=${memory.sourceEventCount}; source-turns=${memory.sourceTurnCount})`,
-    );
-    if (snapshot.workingMemoryCompacted) {
-      sections.push("- working-memory: compacted");
-    }
-    if (snapshot.lastTaskKind) {
-      sections.push(`- last-task-kind: ${snapshot.lastTaskKind}`);
-    }
-    if (snapshot.lastStructuredNextStep) {
-      sections.push(
-        `- last-structured-next-step: ${this.describeStructuredNextStep(snapshot.lastStructuredNextStep)}`,
-      );
-    }
-    if (snapshot.lastStructuredNextStepPlan) {
-      sections.push(
-        `- last-structured-next-step-plan: ${this.describeStructuredNextStepPlan(snapshot.lastStructuredNextStepPlan)}`,
-      );
-    }
-    if (snapshot.lastGroundedDeliverableMode) {
-      sections.push(
-        `- last-grounded-deliverable-mode: ${snapshot.lastGroundedDeliverableMode}`,
-      );
-    }
-    if (snapshot.recentTargetFiles.length > 0) {
-      sections.push(
-        `- recent-target-files: ${snapshot.recentTargetFiles
-          .slice(0, SessionManager.WORKING_MEMORY_RECENT_FILE_LIMIT)
-          .join(", ")}`,
-      );
-    }
-    if (snapshot.lastReadWindowStart !== undefined) {
-      sections.push(`- last-read-window-start: ${snapshot.lastReadWindowStart}`);
-    }
-    if (snapshot.lastReadWindowEnd !== undefined) {
-      sections.push(`- last-read-window-end: ${snapshot.lastReadWindowEnd}`);
-    }
-    if (snapshot.lastReadWindowSize !== undefined) {
-      sections.push(`- last-read-window-size: ${snapshot.lastReadWindowSize}`);
-    }
-    if (snapshot.lastReadFilter) {
-      sections.push(`- last-read-filter: ${snapshot.lastReadFilter}`);
-    }
-    if (snapshot.lastReadFragmentRanges?.length) {
-      sections.push(
-        `- last-read-fragment-ranges: ${snapshot.lastReadFragmentRanges
-          .slice(0, 16)
-          .join(";")}`,
-      );
-    }
-    if (snapshot.lastStagedRepairStepCount !== undefined) {
-      sections.push(
-        `- last-staged-repair-steps: ${snapshot.lastStagedRepairStepCount}`,
-      );
-    }
-    if (snapshot.lastStagedRepairCompletedStep !== undefined) {
-      sections.push(
-        `- last-staged-repair-completed-step: ${snapshot.lastStagedRepairCompletedStep}`,
-      );
-    }
-    if (snapshot.lastStagedRepairNextStep !== undefined) {
-      sections.push(`- last-staged-repair-next-step: ${snapshot.lastStagedRepairNextStep}`);
-    }
-    if (snapshot.lastFailure) {
-      sections.push(`- last-failure: ${this.compactText(snapshot.lastFailure, 180)}`);
-    }
-    if (snapshot.unresolvedItems.length > 0) {
-      sections.push(
-        `- unresolved-items: ${snapshot.unresolvedItems
-          .slice(0, 4)
-          .map((item) => this.compactText(item, 120))
-          .join(" | ")}`,
-      );
-    }
-
-    if (memory.summary.length > 0) {
-      sections.push(
-        `- compact-summary: ${memory.summary
-          .slice(0, SessionManager.WORKING_MEMORY_SUMMARY_ITEM_LIMIT)
-          .map((item) => this.compactText(item, 140))
-          .join(" | ")}`,
-      );
-    }
-
-    if (snapshot.lastContinuationEvidence.length > 0) {
-      sections.push(
-        `- last-continuation-evidence: ${snapshot.lastContinuationEvidence
-          .slice(0, SessionManager.WORKING_MEMORY_EVIDENCE_LIMIT)
-          .map((entry) => this.compactText(entry, 120))
-          .join(" | ")}`,
-      );
-    }
-
-    if (recentTurnLimit > 0) {
-      const session = this.load(sessionId);
-      const recentTurns = session.turns
-        .slice(-recentTurnLimit)
-        .map((turn) => {
-          const content =
-            turn.role === "user"
-              ? this.stripContinuityContextBlock(turn.content)
-              : turn.content;
-          return `[${turn.role}] ${this.compactText(content, 220)}`;
-        });
-      if (recentTurns.length > 0) {
-        sections.push(`- recent-raw-turns: ${recentTurns.join(" || ")}`);
-      }
-    }
-
-    sections.push(
-      "- instruction: prioritize active task continuity using this structured context before older transcript noise.",
-    );
-
-    const budgeted = this.packContextLinesWithinBudget(sections, maxChars);
-    const block = `[FOLLOW-UP CONTINUITY CONTEXT]\n${budgeted.join("\n")}\n[END CONTINUITY CONTEXT]`;
-    return `${block}\n\n${currentPrompt}`;
-  }
-
-  resolveReflectiveStatusQuery(
-    sessionId: string,
-    prompt: string,
-  ): string | undefined {
-    return this.resolveReflectiveStatusHandoff(sessionId, prompt)?.answer;
-  }
-
-  resolveReflectiveStatusHandoff(
-    sessionId: string,
-    prompt: string,
-  ): { answer: string; continuationPrompt?: string } | undefined {
-    const normalized = prompt.trim().toLowerCase();
-    if (!normalized) {
-      return undefined;
-    }
-    const asksStopReason =
-      /\b(why did it stop|why stop|what failed|where did we stop|why did it fail|last failure)\b/i.test(
-        normalized,
-      ) ||
-      /(?:\u4e3a\u4ec0\u4e48\u505c|\u521a\u624d\u4e3a\u4ec0\u4e48\u505c|\u521a\u624d\u5931\u8d25\u662f\u4ec0\u4e48|\u5361\u5728\u54ea|\u4e0a\u4e00\u8f6e\u5361\u5728\u54ea)/u.test(
-        prompt,
-      );
-    const asksProgress =
-      /\b(progress|which step|what step|staged)\b/i.test(normalized) ||
-      /(?:\u505a\u5230\u54ea\u4e00\u6b65|\u505a\u5230\u54ea\u91cc|\u5230\u7b2c\u51e0\u6b65|\u54ea\u4e00\u6b65)/u.test(
-        prompt,
-      );
-    const asksNext =
-      /\b(next step|what should we do next|how should we continue|what now)\b/i.test(
-        normalized,
-      ) ||
-      /(?:\u73b0\u5728\u5e94\u8be5\u7ee7\u7eed\u4ec0\u4e48|\u63a5\u4e0b\u6765\u505a\u4ec0\u4e48|\u4e0b\u4e00\u6b65\u662f\u4ec0\u4e48)/u.test(
-        prompt,
-      );
-    const asksReadState =
-      /\b(where did we read|which lines|what part did you explain|which part did you explain|where was that part)\b/i.test(
-        normalized,
-      ) ||
-      /(?:\u521a\u624d\u8bfb\u5230\u54ea\u91cc|\u521a\u624d\u89e3\u91ca\u7684\u662f\u54ea\u4e00\u6bb5|\u521a\u624d\u5c55\u793a\u7684\u662f\u54ea\u4e00\u6bb5|\u8fd9\u90e8\u5206\u662f\u54ea\u4e00\u6bb5)/u.test(
-        prompt,
-      );
-
-    if (!asksStopReason && !asksProgress && !asksNext && !asksReadState) {
-      return undefined;
-    }
-
-    const memory = this.ensureWorkingMemory(sessionId);
-    const snapshot = memory.continuity;
-    const lines: string[] = ["Session status (working memory):"];
-    lines.push(
-      `- terminal: ${snapshot.lastTerminalClassification ?? "unknown"} (${snapshot.lastTerminalReason ?? "unknown"})`,
-    );
-    if (snapshot.lastDurableStatus) {
-      lines.push(`- durable-status: ${snapshot.lastDurableStatus}`);
-    }
-    if (snapshot.lastRecoveryDisposition) {
-      lines.push(`- recovery-disposition: ${snapshot.lastRecoveryDisposition}`);
-    }
-    if (snapshot.workingMemoryCompacted) {
-      lines.push(
-        `- context: compacted memory (events=${snapshot.workingMemorySourceEventCount ?? memory.sourceEventCount}, turns=${snapshot.workingMemorySourceTurnCount ?? memory.sourceTurnCount})`,
-      );
-    }
-
-    if (asksStopReason) {
-      lines.push(
-        `- stop/failure: ${snapshot.lastFailure ?? snapshot.unresolvedItems[0] ?? "No explicit stop/failure captured in working memory."}`,
-      );
-    }
-
-    if (asksProgress) {
-      if (snapshot.lastStagedRepairStepCount !== undefined) {
-        lines.push(
-          `- staged-progress: step ${snapshot.lastStagedRepairCompletedStep ?? 0}/${snapshot.lastStagedRepairStepCount}` +
-            (snapshot.lastStagedRepairNextStep !== undefined
-              ? `, next=${snapshot.lastStagedRepairNextStep}`
-              : ""),
-        );
-      } else if (snapshot.lastStructuredNextStepPlan) {
-        const displayStep = Math.min(
-          snapshot.lastStructuredNextStepPlan.steps.length,
-          snapshot.lastStructuredNextStepPlan.currentStepIndex + 1,
-        );
-        lines.push(
-          `- staged-progress: step ${displayStep}/${snapshot.lastStructuredNextStepPlan.steps.length}`,
-        );
-      } else {
-        lines.push("- staged-progress: no active staged-repair checkpoint.");
-      }
-    }
-
-    if (asksReadState) {
-      if (
-        snapshot.lastReadWindowStart !== undefined &&
-        snapshot.lastReadWindowEnd !== undefined
-      ) {
-        lines.push(
-          `- last-read-window: ${snapshot.lastReadWindowStart}-${snapshot.lastReadWindowEnd}`,
-        );
-      } else if (snapshot.lastReadDeliveredLines !== undefined) {
-        lines.push(
-          `- last-read-window: delivered ${snapshot.lastReadDeliveredLines} line(s)`,
-        );
-      } else if (
-        snapshot.lastGroundedDeliverableMode === "explain" &&
-        snapshot.recentTargetFiles[0]
-      ) {
-        lines.push(
-          `- last-read-window: explain-over-target (${snapshot.recentTargetFiles[0]})`,
-        );
-      } else {
-        lines.push("- last-read-window: not available.");
-      }
-      if (snapshot.lastReadFragmentRanges?.length) {
-        lines.push(
-          `- last-fragment: ${snapshot.lastReadFragmentRanges.slice(0, 8).join(";")}`,
-        );
-      } else if (
-        snapshot.lastReadFragmentStart !== undefined &&
-        snapshot.lastReadFragmentEnd !== undefined
-      ) {
-        lines.push(
-          `- last-fragment: ${snapshot.lastReadFragmentStart}-${snapshot.lastReadFragmentEnd}`,
-        );
-      } else if (snapshot.recentTargetFiles[0]) {
-        lines.push(`- last-fragment-target: ${snapshot.recentTargetFiles[0]}`);
-      }
-    }
-
-    if (asksNext) {
-      lines.push(`- next-step: ${this.deriveReflectiveNextStep(snapshot)}`);
-    }
-
-    const answer = lines.join("\n");
-    const continuationPrompt = this.extractReflectiveActionContinuation(
-      prompt,
-      snapshot,
-    );
-    return continuationPrompt
-      ? { answer, continuationPrompt }
-      : { answer };
-  }
-
-  resolveConversationalActionHandoff(
-    sessionId: string,
-    prompt: string,
-  ): { answer: string; continuationPrompt?: string } | undefined {
-    const trimmed = prompt.trim();
-    if (!trimmed) {
-      return undefined;
-    }
-    const normalized = trimmed.toLowerCase();
-    const asksPlanFirst =
-      /\b(don't execute yet|do not execute yet|tell me (the )?plan|plan first|before executing|did you understand)\b/i.test(
-        normalized,
-      ) ||
-      /(?:鍏堝埆鎵ц|涓嶈鍏堟墽琛寍鍏堝憡璇夋垜.*鎬庝箞鍋殀鍏堣.*璁″垝|浣犳槸涓嶆槸娌＄悊瑙杩欐槸涓嶆槸璇存槑涓婁笅鏂囨病鎺ヤ綇)/u.test(
-        trimmed,
-      );
-    if (!asksPlanFirst) {
-      return undefined;
-    }
-
-    const explicitRepoTask =
-      /\b(read|inspect|open|show|summari[sz]e|explain|edit|write|modify|fix|patch|test|build|lint)\b/i.test(
-        normalized,
-      ) ||
-      /(?:璇诲彇|鏌ョ湅|妫€鏌鎬荤粨|瑙ｉ噴|淇敼|缂栬緫|鍐檤淇|娴嬭瘯|鏋勫缓|缂栬瘧)/u.test(
-        trimmed,
-      ) ||
-      /(?:[A-Za-z]:\\|\.{0,2}\/|\\|\/).+\.\w+/u.test(trimmed);
-    if (explicitRepoTask) {
-      return undefined;
-    }
-
-    const memory = this.ensureWorkingMemory(sessionId);
-    const snapshot = memory.continuity;
-    const lines: string[] = ["Execution plan (working memory):"];
-    lines.push(
-      `- active-task: ${snapshot.lastTaskKind ?? "unknown"}${snapshot.recentTargetFiles[0] ? ` on ${snapshot.recentTargetFiles[0]}` : ""}`,
-    );
-    lines.push(
-      `- current-status: ${snapshot.lastTerminalClassification ?? "unknown"} (${snapshot.lastTerminalReason ?? "unknown"})`,
-    );
-    if (snapshot.lastFailure) {
-      lines.push(`- blocker/failure: ${snapshot.lastFailure}`);
-    }
-    lines.push(`- recommended-next: ${this.deriveReflectiveNextStep(snapshot)}`);
-
-    const continuationPrompt = this.extractReflectiveActionContinuation(
-      prompt,
-      snapshot,
-    );
-    return continuationPrompt
-      ? { answer: lines.join("\n"), continuationPrompt }
-      : { answer: lines.join("\n") };
-  }
-
-  materializeContinuationFromActionClause(
-    sessionId: string,
-    clause: string,
-  ):
-    | { prompt?: string; blockedReason?: string; stepHint?: SessionMaterializedStepHint }
-    | undefined {
-    if (!this.isGenericContinuationClause(clause)) {
-      return undefined;
-    }
-    const snapshot = this.ensureWorkingMemory(sessionId).continuity;
-    const plan =
-      snapshot.lastStructuredNextStepPlan ??
-      this.deriveStructuredNextStepPlan(snapshot);
-    if (plan) {
-      const activeStep = plan.steps[plan.currentStepIndex];
-      if (!activeStep) {
-        return {
-          blockedReason:
-            "Task not completed: staged next-step plan has no remaining executable step.",
-        };
-      }
-      const prompt = this.materializeStructuredNextStep(activeStep);
-      if (prompt) {
-        this.persistStagedNextStepPlanProgress(
-          sessionId,
-          plan,
-          plan.currentStepIndex,
-        );
-        return { prompt, stepHint: this.toMaterializedStepHint(activeStep) };
-      }
-      const missing =
-        activeStep.missingFields && activeStep.missingFields.length > 0
-          ? ` Missing: ${activeStep.missingFields.join(", ")}.`
-          : "";
-      return {
-        blockedReason: `Task not completed: staged next-step step ${plan.currentStepIndex + 1}/${plan.steps.length} is not executable yet (${activeStep.reason}).${missing}`,
-      };
-    }
-    const step =
-      snapshot.lastStructuredNextStep ??
-      this.deriveStructuredNextStep(snapshot);
-    if (!step) {
-      return {
-        blockedReason:
-          "Task not completed: no structured next-step recommendation is available in working memory.",
-      };
-    }
-    const prompt = this.materializeStructuredNextStep(step);
-    if (prompt) {
-      return { prompt, stepHint: this.toMaterializedStepHint(step) };
-    }
-    const missing =
-      step.missingFields && step.missingFields.length > 0
-        ? ` Missing: ${step.missingFields.join(", ")}.`
-        : "";
-    return {
-      blockedReason: `Task not completed: next-step recommendation is not executable yet (${step.reason}).${missing}`,
-    };
-  }
-
-  private deriveReflectiveNextStep(snapshot: SessionContinuitySnapshot): string {
-    const nextStepPlan =
-      snapshot.lastStructuredNextStepPlan ??
-      this.deriveStructuredNextStepPlan(snapshot);
-    if (nextStepPlan) {
-      const activeStep = nextStepPlan.steps[nextStepPlan.currentStepIndex];
-      if (activeStep) {
-        return `Step ${nextStepPlan.currentStepIndex + 1}/${nextStepPlan.steps.length}: ${this.describeStructuredNextStep(activeStep)}`;
-      }
-      return this.describeStructuredNextStepPlan(nextStepPlan);
-    }
-    const structuredNextStep =
-      snapshot.lastStructuredNextStep ??
-      this.deriveStructuredNextStep(snapshot);
-    if (structuredNextStep) {
-      return this.describeStructuredNextStep(structuredNextStep);
-    }
-
-    if (snapshot.lastVerificationStatus === "blocked") {
-      return (
-        `Resolve blocker (${snapshot.lastVerificationReason ?? "verification blocked"})` +
-        (snapshot.lastVerificationCommand
-          ? `, then rerun: ${snapshot.lastVerificationCommand}`
-          : ".")
-      );
-    }
-    if (snapshot.lastVerificationStatus === "failed") {
-      return (
-        `Fix failing target${snapshot.recentTargetFiles[0] ? ` (${snapshot.recentTargetFiles[0]})` : ""}` +
-        (snapshot.lastVerificationCommand
-          ? `, then rerun: ${snapshot.lastVerificationCommand}`
-          : ".")
-      );
-    }
-    if (
-      snapshot.lastGroundedDeliverableMode === "read" &&
-      snapshot.recentTargetFiles[0]
-    ) {
-      const startFrom =
-        snapshot.lastReadWindowEnd !== undefined
-          ? snapshot.lastReadWindowEnd + 1
-          : undefined;
-      return startFrom
-        ? `Continue reading ${snapshot.recentTargetFiles[0]} from line ${startFrom}.`
-        : `Continue reading ${snapshot.recentTargetFiles[0]} using the same mode.`;
-    }
-    if (snapshot.lastTaskKind && snapshot.lastTaskKind !== "chat") {
-      return `Continue previous ${snapshot.lastTaskKind}` +
-        (snapshot.recentTargetFiles[0]
-          ? ` on ${snapshot.recentTargetFiles[0]}.`
-          : " with an explicit target.");
-    }
-    return "Provide an explicit next task or target path to continue.";
-  }
-
-  private toMaterializedStepHint(
-    step: SessionStructuredNextStep,
-  ): SessionMaterializedStepHint {
-    return {
-      kind: step.kind,
-      targetPath: step.targetPath,
-      command: step.command,
-      replaceFrom: step.replaceFrom,
-      replaceTo: step.replaceTo,
-      readLineCount: step.readLineCount,
-      readFilter: step.readFilter,
-      readFragmentStart: step.readFragmentStart,
-      readFragmentEnd: step.readFragmentEnd,
-      readFragmentLineIndexes: step.readFragmentLineIndexes,
-      readFragmentRanges: step.readFragmentRanges,
-      readFragmentSourceWindowStart: step.readFragmentSourceWindowStart,
-      readFragmentSourceWindowEnd: step.readFragmentSourceWindowEnd,
-      readFragmentFingerprint: step.readFragmentFingerprint,
-      readFragmentStructureSignature: step.readFragmentStructureSignature,
-      readFragmentNeighborhoodSignature: step.readFragmentNeighborhoodSignature,
-      continuationPrompt: step.continuationPrompt,
-      confidence: step.confidence,
-    };
-  }
-
-  private extractReflectiveActionContinuation(
-    prompt: string,
-    snapshot: SessionContinuitySnapshot,
-  ): string | undefined {
-    const trimmed = prompt.trim();
-    if (!trimmed) {
-      return undefined;
-    }
-
-    const clauses = trimmed
-      .split(
-        /[?？！。;；]\s*|(?:,|，)\s*(?=(?:then|and then|and|so|continue|go on|然后|接着|那就|直接|继续))/i,
-      )
-      .map((part) => part.trim())
-      .filter((part) => part.length > 0);
-    if (clauses.length <= 1) {
-      return undefined;
-    }
-    const tail = clauses.slice(1).join(" ").trim();
-    if (!tail) {
-      return undefined;
-    }
-
-    const canonicalTail = tail
-      .replace(/^(?:then|and then|and|so)\s+/i, "")
-      .replace(/^(?:閭ｅ氨|閭鐒跺悗|鎺ョ潃)\s*/u, "")
-      .trim();
-    if (!canonicalTail) {
-      return undefined;
-    }
-
-    const genericContinue =
-      /^(?:continue|go on|keep going|proceed|do that|fix it|resume)\b/i.test(
-        canonicalTail,
-      ) ||
-      /^(?:那就|然后|接着|再)?\s*(?:继续|继续修|继续做|继续处理|按这个继续|继续读取|继续解释|继续总结)(?:吧|一下)?$/u.test(
-        canonicalTail,
-      );
-
-    if (genericContinue) {
-      return this.deriveRecommendationBackedContinuationPrompt(snapshot);
-    }
-
-    const explicitAction =
-      /\b(continue|fix|repair|rerun|run|read|explain|summarize|summarise|test|build)\b/i.test(
-        canonicalTail,
-      ) ||
-      /(?:缁х画|淇畖淇|閲嶈窇|璺憒璇粅璇诲彇|瑙ｉ噴|鎬荤粨|鐪媆s*test|鍒玕s*build|鍏圽s*鐪媆s*test)/u.test(
-        canonicalTail,
-      );
-    if (!explicitAction) {
-      return undefined;
-    }
-    return canonicalTail;
-  }
-
-  private isGenericContinuationClause(clause: string): boolean {
-    const trimmed = clause.trim();
-    if (!trimmed) {
-      return false;
-    }
-    return (
-      /^(?:then\s+)?(?:continue|go on|keep going|resume|proceed|fix it|do that|then continue|then fix)\b/i.test(
-        trimmed,
-      ) ||
-      /^(?:那就|然后|接着|再)?\s*(?:继续|继续修|继续做|继续处理|按这个继续|继续读取|继续解释|继续总结)(?:吧|一下)?$/u.test(
-        trimmed,
-      )
-    );
-  }
-
-  private deriveRecommendationBackedContinuationPrompt(
-    snapshot: SessionContinuitySnapshot,
-  ): string | undefined {
-    const stagedPlan =
-      snapshot.lastStructuredNextStepPlan ??
-      this.deriveStructuredNextStepPlan(snapshot);
-    if (stagedPlan) {
-      const activeStep = stagedPlan.steps[stagedPlan.currentStepIndex];
-      const stagedPrompt = activeStep
-        ? this.materializeStructuredNextStep(activeStep)
-        : undefined;
-      if (stagedPrompt) {
-        return stagedPrompt;
-      }
-    }
-    const step =
-      snapshot.lastStructuredNextStep ??
-      this.deriveStructuredNextStep(snapshot);
-    const materialized = step ? this.materializeStructuredNextStep(step) : undefined;
-    return materialized ?? this.deriveImplicitContinuationPrompt(snapshot);
-  }
-
-  private deriveStructuredNextStep(
-    snapshot: SessionContinuitySnapshot,
-  ): SessionStructuredNextStep | undefined {
-    const target = snapshot.recentTargetFiles[0];
-    const promptTarget = target ? this.formatTargetForPrompt(target) : undefined;
-    if (snapshot.lastVerificationStatus === "blocked") {
-      if (snapshot.lastVerificationCommand) {
-        return {
-          kind: "run-command",
-          executableNow: true,
-          confidence: "high",
-          reason: snapshot.lastVerificationReason ?? "verification blocked",
-          command: snapshot.lastVerificationCommand,
-          continuationPrompt: `run ${snapshot.lastVerificationCommand}`,
-        };
-      }
-      return {
-        kind: "run-command",
-        executableNow: false,
-        confidence: "low",
-        reason: snapshot.lastVerificationReason ?? "verification blocked",
-        missingFields: ["command"],
-      };
-    }
-
-    if (snapshot.lastVerificationStatus === "failed") {
-      if (snapshot.lastVerificationCommand) {
-        return {
-          kind: "run-command",
-          executableNow: true,
-          confidence: "high",
-          reason: snapshot.lastVerificationReason ?? "verification failed",
-          command: snapshot.lastVerificationCommand,
-          continuationPrompt: `run ${snapshot.lastVerificationCommand}`,
-        };
-      }
-      const transform = this.extractLatestTransformDirective(snapshot, target);
-      if (transform && target) {
-        return {
-          kind: "edit-fix",
-          executableNow: true,
-          confidence: "medium",
-            reason: "continue mutation/fix on failed target",
-            targetPath: target,
-            replaceFrom: transform.from,
-            replaceTo: transform.to,
-            continuationPrompt: `continue fixing previous failure in ${promptTarget} by replacing ${this.quoteForDirective(transform.from)} with ${this.quoteForDirective(transform.to)}`,
-          };
-        }
-      return {
-        kind: "edit-fix",
-        executableNow: false,
-        confidence: "low",
-        reason: "failed verification lacks executable fix transform",
-        targetPath: target,
-        missingFields: target ? ["replace-from", "replace-to"] : ["target", "replace-from", "replace-to"],
-      };
-    }
-
-    if (snapshot.lastGroundedDeliverableMode === "read" && target) {
-      const count = snapshot.lastReadWindowSize ?? snapshot.lastReadDeliveredLines ?? 2;
-      const boundedCount = Math.max(1, Math.min(count, 20));
-      return {
-        kind: "read-continuation",
-        executableNow: true,
-        confidence: "high",
-        reason: "continue grounded read window",
-        targetPath: target,
-        readLineCount: boundedCount,
-        readFilter: snapshot.lastReadFilter ?? "none",
-        continuationPrompt: `continue reading next ${boundedCount} lines of ${promptTarget}`,
-      };
-    }
-
-    if (snapshot.lastGroundedDeliverableMode === "explain" && target) {
-      return {
-        kind: "explain-continuation",
-        executableNow: true,
-        confidence: "medium",
-        reason: "continue grounded explain",
-        targetPath: target,
-        continuationPrompt: `continue explaining ${promptTarget}`,
-      };
-    }
-
-    if (snapshot.lastGroundedDeliverableMode === "summary" && target) {
-      return {
-        kind: "summary-continuation",
-        executableNow: true,
-        confidence: "medium",
-        reason: "continue grounded summary",
-        targetPath: target,
-        continuationPrompt: `continue summarizing ${promptTarget}`,
-      };
-    }
-
-    if (
-      (snapshot.lastTaskKind === "edit-file" ||
-        snapshot.lastTaskKind === "write-file") &&
-      snapshot.lastTerminalClassification !== "success" &&
-      target
-    ) {
-      const transform = this.extractLatestTransformDirective(snapshot, target);
-      if (transform) {
-        return {
-          kind: "edit-fix",
-          executableNow: true,
-          confidence: "medium",
-          reason: "continue pending mutation task",
-          targetPath: target,
-          replaceFrom: transform.from,
-          replaceTo: transform.to,
-          continuationPrompt: `continue editing ${target} by replacing ${this.quoteForDirective(transform.from)} with ${this.quoteForDirective(transform.to)}`,
-        };
-      }
-      return {
-        kind: "edit-fix",
-        executableNow: false,
-        confidence: "low",
-        reason: "mutation continuation lacks explicit transform",
-        targetPath: target,
-        missingFields: ["replace-from", "replace-to"],
-      };
-    }
-
-    if (snapshot.lastTaskKind && snapshot.lastTaskKind !== "chat") {
-      return {
-        kind: "task-continuation",
-        executableNow: Boolean(target),
-        confidence: target ? "medium" : "low",
-        reason: "continue previous task",
-        targetPath: target,
-        continuationPrompt: target
-          ? `continue previous ${snapshot.lastTaskKind} on ${target}`
-          : undefined,
-        ...(target ? {} : { missingFields: ["target"] }),
-      };
-    }
-
-    return undefined;
-  }
-
-  private deriveStructuredNextStepPlan(
-    snapshot: SessionContinuitySnapshot,
-  ): SessionStructuredNextStepPlan | undefined {
-    const target = snapshot.recentTargetFiles[0];
-    const promptTarget = target ? this.formatTargetForPrompt(target) : undefined;
-    const steps: SessionStructuredNextStepPlanStep[] = [];
-    let planReason = "";
-    let planConfidence: "high" | "medium" | "low" = "medium";
-
-    const transform = this.extractLatestTransformDirective(snapshot, target);
-    if (
-      snapshot.lastVerificationStatus === "failed" &&
-      target &&
-      transform &&
-      snapshot.lastVerificationCommand
-    ) {
-      planReason = "verification failed; continue fix then rerun verification";
-      planConfidence = "high";
-      steps.push({
-        id: "fix-target",
-        title: "Apply fix transform",
-        kind: "edit-fix",
-        executableNow: true,
-        confidence: "high",
-        reason: "continue mutation/fix on failed target",
-        targetPath: target,
-        replaceFrom: transform.from,
-        replaceTo: transform.to,
-        continuationPrompt: `continue editing ${promptTarget} by replacing ${this.quoteForDirective(transform.from)} with ${this.quoteForDirective(transform.to)}`,
-      });
-      steps.push({
-        id: "rerun-verify",
-        title: "Rerun verification",
-        kind: "run-command",
-        executableNow: true,
-        confidence: "high",
-        reason: snapshot.lastVerificationReason ?? "rerun verification",
-        command: snapshot.lastVerificationCommand,
-        continuationPrompt: `run ${snapshot.lastVerificationCommand}`,
-      });
-    } else if (
-      snapshot.lastVerificationStatus === "blocked" &&
-      target &&
-      transform &&
-      snapshot.lastVerificationCommand
-    ) {
-      planReason = "verification blocked; resolve command step then continue fix";
-      planConfidence = "medium";
-      steps.push({
-        id: "resolve-verify",
-        title: "Run verification command",
-        kind: "run-command",
-        executableNow: true,
-        confidence: "high",
-        reason: snapshot.lastVerificationReason ?? "verification blocked",
-        command: snapshot.lastVerificationCommand,
-        continuationPrompt: `run ${snapshot.lastVerificationCommand}`,
-      });
-      steps.push({
-        id: "continue-fix",
-        title: "Continue target fix",
-        kind: "edit-fix",
-        executableNow: true,
-        confidence: "medium",
-        reason: "continue pending target fix",
-        targetPath: target,
-        replaceFrom: transform.from,
-        replaceTo: transform.to,
-        continuationPrompt: `continue fixing previous failure in ${promptTarget} by replacing ${this.quoteForDirective(transform.from)} with ${this.quoteForDirective(transform.to)}`,
-      });
-    } else if (snapshot.lastGroundedDeliverableMode === "read" && target) {
-      const count =
-        snapshot.lastReadWindowSize ?? snapshot.lastReadDeliveredLines ?? 2;
-      const boundedCount = Math.max(1, Math.min(count, 20));
-      planReason = "continue grounded read, then explain the same slice";
-      planConfidence = "medium";
-      steps.push({
-        id: "continue-read",
-        title: "Continue read window",
-        kind: "read-continuation",
-        executableNow: true,
-        confidence: "high",
-        reason: "continue grounded read window",
-        targetPath: target,
-        readLineCount: boundedCount,
-        readFilter: snapshot.lastReadFilter ?? "none",
-        ...(snapshot.lastReadFragmentStart !== undefined
-          ? { readFragmentStart: snapshot.lastReadFragmentStart }
-          : {}),
-        ...(snapshot.lastReadFragmentEnd !== undefined
-          ? { readFragmentEnd: snapshot.lastReadFragmentEnd }
-          : {}),
-        ...(snapshot.lastReadFragmentLineIndexes?.length
-          ? { readFragmentLineIndexes: snapshot.lastReadFragmentLineIndexes }
-          : {}),
-        ...(snapshot.lastReadFragmentRanges?.length
-          ? { readFragmentRanges: snapshot.lastReadFragmentRanges }
-          : {}),
-        ...(snapshot.lastReadFragmentSourceWindowStart !== undefined
-          ? {
-              readFragmentSourceWindowStart:
-                snapshot.lastReadFragmentSourceWindowStart,
-            }
-          : {}),
-        ...(snapshot.lastReadFragmentSourceWindowEnd !== undefined
-          ? {
-              readFragmentSourceWindowEnd:
-                snapshot.lastReadFragmentSourceWindowEnd,
-            }
-          : {}),
-        ...(snapshot.lastReadFragmentFingerprint
-          ? { readFragmentFingerprint: snapshot.lastReadFragmentFingerprint }
-          : {}),
-        ...(snapshot.lastReadFragmentStructureSignature
-          ? {
-              readFragmentStructureSignature:
-                snapshot.lastReadFragmentStructureSignature,
-            }
-          : {}),
-        ...(snapshot.lastReadFragmentNeighborhoodSignature
-          ? {
-              readFragmentNeighborhoodSignature:
-                snapshot.lastReadFragmentNeighborhoodSignature,
-            }
-          : {}),
-        continuationPrompt: `continue reading next ${boundedCount} lines of ${promptTarget}`,
-      });
-      steps.push({
-        id: "explain-read-slice",
-        title: "Explain delivered read slice",
-        kind: "explain-continuation",
-        executableNow: true,
-        confidence: "medium",
-        reason: "explain the recently delivered fragment",
-        targetPath: target,
-        ...(snapshot.lastReadFragmentStart !== undefined
-          ? { readFragmentStart: snapshot.lastReadFragmentStart }
-          : {}),
-        ...(snapshot.lastReadFragmentEnd !== undefined
-          ? { readFragmentEnd: snapshot.lastReadFragmentEnd }
-          : {}),
-        ...(snapshot.lastReadFragmentLineIndexes?.length
-          ? { readFragmentLineIndexes: snapshot.lastReadFragmentLineIndexes }
-          : {}),
-        ...(snapshot.lastReadFragmentRanges?.length
-          ? { readFragmentRanges: snapshot.lastReadFragmentRanges }
-          : {}),
-        ...(snapshot.lastReadFragmentSourceWindowStart !== undefined
-          ? {
-              readFragmentSourceWindowStart:
-                snapshot.lastReadFragmentSourceWindowStart,
-            }
-          : {}),
-        ...(snapshot.lastReadFragmentSourceWindowEnd !== undefined
-          ? {
-              readFragmentSourceWindowEnd:
-                snapshot.lastReadFragmentSourceWindowEnd,
-            }
-          : {}),
-        ...(snapshot.lastReadFragmentFingerprint
-          ? { readFragmentFingerprint: snapshot.lastReadFragmentFingerprint }
-          : {}),
-        ...(snapshot.lastReadFragmentStructureSignature
-          ? {
-              readFragmentStructureSignature:
-                snapshot.lastReadFragmentStructureSignature,
-            }
-          : {}),
-        ...(snapshot.lastReadFragmentNeighborhoodSignature
-          ? {
-              readFragmentNeighborhoodSignature:
-                snapshot.lastReadFragmentNeighborhoodSignature,
-            }
-          : {}),
-        continuationPrompt: "continue explaining this part",
-      });
-    }
-
-    if (steps.length <= 1) {
-      return undefined;
-    }
-
-    const maxIndex = steps.length - 1;
-    const completedFromSnapshot =
-      snapshot.lastStagedRepairCompletedStep !== undefined
-        ? Math.max(0, snapshot.lastStagedRepairCompletedStep)
-        : 0;
-    const inferredCurrentIndex = Math.max(
-      0,
-      Math.min(maxIndex, completedFromSnapshot),
-    );
-    const activeStep = steps[inferredCurrentIndex];
-    return {
-      planId: `${steps.map((step) => step.id).join("->")}:${target ?? "no-target"}`,
-      reason: planReason,
-      confidence: planConfidence,
-      executableNow: Boolean(activeStep?.executableNow),
-      currentStepIndex: inferredCurrentIndex,
-      completedStepCount: Math.min(inferredCurrentIndex, steps.length),
-      steps,
-    };
-  }
-
-  private materializeStructuredNextStep(
-    step: SessionStructuredNextStep,
-  ): string | undefined {
-    if (!step.executableNow) {
-      return undefined;
-    }
-    return step.continuationPrompt;
-  }
-
-  private describeStructuredNextStep(step: SessionStructuredNextStep): string {
-    const suffix = step.targetPath ? ` (target: ${step.targetPath})` : "";
-    if (step.executableNow && step.continuationPrompt) {
-      return `${step.reason}${suffix}.`;
-    }
-    const missing =
-      step.missingFields && step.missingFields.length > 0
-        ? ` Missing: ${step.missingFields.join(", ")}.`
-        : "";
-    return `${step.reason}${suffix}.${missing}`.trim();
-  }
-
-  private describeStructuredNextStepPlan(
-    plan: SessionStructuredNextStepPlan,
-  ): string {
-    const activeStep = plan.steps[plan.currentStepIndex];
-    if (!activeStep) {
-      if (plan.steps.length > 0 && plan.completedStepCount >= plan.steps.length) {
-        return `${plan.reason}. All ${plan.steps.length} steps completed.`;
-      }
-      return `${plan.reason} (no remaining step).`;
-    }
-    return `${plan.reason}. Step ${plan.currentStepIndex + 1}/${plan.steps.length}: ${activeStep.title}.`;
-  }
-
-  private persistStagedNextStepPlanProgress(
-    sessionId: string,
-    plan: SessionStructuredNextStepPlan,
-    consumedStepIndex: number,
-  ): void {
-    const nextCursor = Math.min(plan.steps.length, consumedStepIndex + 1);
-    const now = new Date().toISOString();
-    this.withSessionStateLock(sessionId, () => {
-      const statePath = this.getStatePath(sessionId);
-      const currentState = this.readStateSnapshotSafely(statePath);
-      const fallbackMemory = this.buildWorkingMemorySnapshot(sessionId);
-      const currentMemory = currentState.workingMemory ?? fallbackMemory;
-      const currentContinuity = currentMemory.continuity;
-      const continuityPlan =
-        currentContinuity.lastStructuredNextStepPlan?.planId === plan.planId
-          ? currentContinuity.lastStructuredNextStepPlan
-          : plan;
-      const rebasedPlan: SessionStructuredNextStepPlan = {
-        ...continuityPlan,
-        currentStepIndex: Math.max(
-          continuityPlan.currentStepIndex,
-          Math.min(continuityPlan.steps.length, nextCursor),
-        ),
-        completedStepCount: Math.max(
-          continuityPlan.completedStepCount,
-          Math.min(continuityPlan.steps.length, consumedStepIndex + 1),
-        ),
-      };
-      const activeStep = rebasedPlan.steps[rebasedPlan.currentStepIndex];
-      const normalizedPlan: SessionStructuredNextStepPlan = {
-        ...rebasedPlan,
-        executableNow: Boolean(activeStep?.executableNow),
-      };
-      const nextContinuity: SessionContinuitySnapshot = {
-        ...currentContinuity,
-        lastStructuredNextStepPlan: normalizedPlan,
-        workingMemoryUpdatedAt: now,
-      };
-      const nextSummary = this.buildWorkingMemorySummary(
-        nextContinuity,
-        currentMemory.compactReason ?? "none",
-      );
-      const nextMemory: SessionWorkingMemory = {
-        ...currentMemory,
-        updatedAt: now,
-        continuity: {
-          ...nextContinuity,
-          workingMemorySummary: nextSummary,
-        },
-        summary: nextSummary,
-      };
-      const session = this.load(sessionId);
-      const nextState = this.buildSessionStateSnapshot(session, currentState, {
-        workingMemory: nextMemory,
-      });
-      this.writeJsonFileAtomic(statePath, nextState);
-    });
-  }
-
-  private deriveImplicitContinuationPrompt(
-    snapshot: SessionContinuitySnapshot,
-  ): string | undefined {
-    const target = snapshot.recentTargetFiles[0];
-    const promptTarget = target ? this.formatTargetForPrompt(target) : undefined;
-    if (
-      snapshot.lastGroundedDeliverableMode === "read" &&
-      target
-    ) {
-      const count = snapshot.lastReadWindowSize ?? snapshot.lastReadDeliveredLines ?? 2;
-      return `continue reading next ${Math.max(1, Math.min(count, 20))} lines of ${promptTarget}`;
-    }
-    if (snapshot.lastGroundedDeliverableMode === "explain" && target) {
-      return `continue explaining ${promptTarget}`;
-    }
-    if (snapshot.lastGroundedDeliverableMode === "summary" && target) {
-      return `continue summarizing ${promptTarget}`;
-    }
-    if (snapshot.lastVerificationStatus === "failed") {
-      if (target) {
-        return `continue fixing previous failure in ${promptTarget}`;
-      }
-      return "continue fixing the previous failure";
-    }
-    if (snapshot.lastVerificationStatus === "blocked") {
-      if (snapshot.lastVerificationCommand) {
-        return `resolve blocker then rerun ${snapshot.lastVerificationCommand}`;
-      }
-      return "resolve previous blocker and continue";
-    }
-    if (snapshot.lastTaskKind && snapshot.lastTaskKind !== "chat") {
-      return target
-        ? `continue previous ${snapshot.lastTaskKind} on ${promptTarget}`
-        : `continue previous ${snapshot.lastTaskKind}`;
-    }
-    return undefined;
-  }
-
-  private formatTargetForPrompt(target: string): string {
-    const trimmed = target.trim();
-    if (!trimmed) {
-      return trimmed;
-    }
-    if (/^(?:\.{1,2}[\\/]|[A-Za-z]:[\\/]|\/)/.test(trimmed)) {
-      return trimmed;
-    }
-    return `./${trimmed}`;
-  }
-
-  private extractLatestTransformDirective(
-    snapshot: SessionContinuitySnapshot,
-    preferredTarget?: string,
-  ): { from: string; to: string } | undefined {
-    const preferred = this.normalizePathLikeForTransform(preferredTarget);
-    const evidence = snapshot.lastContinuationEvidence ?? [];
-    for (let index = evidence.length - 1; index >= 0; index -= 1) {
-      const parsed = this.parseTransformEvidenceForContinuation(
-        evidence[index] ?? "",
-      );
-      if (!parsed) {
-        continue;
-      }
-      if (
-        preferred &&
-        this.normalizePathLikeForTransform(parsed.path) !== preferred
-      ) {
-        continue;
-      }
-      return { from: parsed.from, to: parsed.to };
-    }
-    return undefined;
-  }
-
-  private parseTransformEvidenceForContinuation(
-    evidence: string,
-  ): { path: string; from: string; to: string } | undefined {
-    const match = evidence.match(/^transform:([^:]+):(.+)=>(.+)$/i);
-    if (!match?.[1] || !match?.[2] || !match?.[3]) {
-      return undefined;
-    }
-    return {
-      path: match[1].trim(),
-      from: match[2].trim(),
-      to: match[3].trim(),
-    };
-  }
-
-  private quoteForDirective(value: string): string {
-    return `"${value.replace(/"/g, '\\"')}"`;
-  }
-
-  private normalizePathLikeForTransform(
-    candidate: string | undefined,
-  ): string {
-    return (candidate ?? "").trim().replace(/\\/g, "/").toLowerCase();
-  }
-
-  private shouldAttachCompactAwareContext(
-    prompt: string,
-    snapshot: SessionContinuitySnapshot,
-  ): boolean {
-    if (this.isContinuationPrompt(prompt)) {
-      return true;
-    }
-    if (snapshot.workingMemoryCompacted) {
-      return true;
-    }
-    if (snapshot.unresolvedItems.length > 0) {
-      return true;
-    }
-    if (snapshot.lastTaskKind && snapshot.lastTaskKind !== "chat") {
-      return true;
-    }
-    return false;
-  }
-
-  private packContextLinesWithinBudget(
-    lines: readonly string[],
-    maxChars: number,
-  ): string[] {
-    const output: string[] = [];
-    let remaining = maxChars;
-    for (const line of lines) {
-      if (remaining <= 0) {
-        break;
-      }
-      if (line.length <= remaining) {
-        output.push(line);
-        remaining -= line.length + 1;
-        continue;
-      }
-      if (remaining > 32) {
-        output.push(`${line.slice(0, remaining - 3)}...`);
-        remaining = 0;
-      }
-      break;
-    }
-    return output;
-  }
-
   buildPromptContinuitySnapshot(
     sessionId: string,
     currentPrompt: string,
   ): SessionContinuitySnapshot | undefined {
-    const snapshot = this.ensureWorkingMemory(sessionId).continuity;
-    if (this.isContinuationPrompt(currentPrompt)) {
+    const snapshot = this.buildContinuitySnapshot(sessionId);
+    if (
+      this.isContinuationPrompt(currentPrompt) ||
+      this.isReflectiveStateQueryPrompt(currentPrompt)
+    ) {
       return snapshot;
     }
     if (this.shouldAutoAttachPathlessContinuation(currentPrompt, snapshot)) {
@@ -3546,302 +3081,139 @@ export class SessionManager {
     return {
       sessionId: snapshot.sessionId,
       projectRoot: snapshot.projectRoot,
-      continuationFamilyId: snapshot.continuationFamilyId,
-      continuationEpoch: snapshot.continuationEpoch,
-      ...(snapshot.continuationFamilyAnchor
-        ? { continuationFamilyAnchor: snapshot.continuationFamilyAnchor }
+      ...(snapshot.lastUserIntent
+        ? { lastUserIntent: snapshot.lastUserIntent }
         : {}),
+      ...(snapshot.lastAssistantOutput
+        ? { lastAssistantOutput: snapshot.lastAssistantOutput }
+        : {}),
+      ...(snapshot.lastFailure ? { lastFailure: snapshot.lastFailure } : {}),
       lastTaskKind: snapshot.lastTaskKind,
-      lastGroundedDeliverableMode: snapshot.lastGroundedDeliverableMode,
-      ...(snapshot.lastReadDeliveredLines !== undefined
-        ? { lastReadDeliveredLines: snapshot.lastReadDeliveredLines }
-        : {}),
-      ...(snapshot.lastReadWindowStart !== undefined
-        ? { lastReadWindowStart: snapshot.lastReadWindowStart }
-        : {}),
-      ...(snapshot.lastReadWindowEnd !== undefined
-        ? { lastReadWindowEnd: snapshot.lastReadWindowEnd }
-        : {}),
-      ...(snapshot.lastReadWindowSize !== undefined
-        ? { lastReadWindowSize: snapshot.lastReadWindowSize }
-        : {}),
-      ...(snapshot.lastReadFragmentStart !== undefined
-        ? { lastReadFragmentStart: snapshot.lastReadFragmentStart }
-        : {}),
-      ...(snapshot.lastReadFragmentEnd !== undefined
-        ? { lastReadFragmentEnd: snapshot.lastReadFragmentEnd }
-        : {}),
-      ...(snapshot.lastReadFragmentSourceWindowStart !== undefined
-        ? {
-            lastReadFragmentSourceWindowStart:
-              snapshot.lastReadFragmentSourceWindowStart,
-          }
-        : {}),
-      ...(snapshot.lastReadFragmentSourceWindowEnd !== undefined
-        ? {
-            lastReadFragmentSourceWindowEnd:
-              snapshot.lastReadFragmentSourceWindowEnd,
-          }
-        : {}),
-      ...(snapshot.lastReadFragmentLineIndexes?.length
-        ? { lastReadFragmentLineIndexes: snapshot.lastReadFragmentLineIndexes }
-        : {}),
-      ...(snapshot.lastReadFragmentRanges?.length
-        ? { lastReadFragmentRanges: snapshot.lastReadFragmentRanges }
-        : {}),
-      ...(snapshot.lastReadFilter
-        ? { lastReadFilter: snapshot.lastReadFilter }
-        : {}),
-      ...(snapshot.lastDurableStatus
-        ? { lastDurableStatus: snapshot.lastDurableStatus }
-        : {}),
-      ...(snapshot.lastRecoveryDisposition
-        ? { lastRecoveryDisposition: snapshot.lastRecoveryDisposition }
-        : {}),
-      ...(snapshot.lastReadFragmentFingerprint
-        ? { lastReadFragmentFingerprint: snapshot.lastReadFragmentFingerprint }
-        : {}),
-      ...(snapshot.lastReadFragmentStructureSignature
-        ? {
-            lastReadFragmentStructureSignature:
-              snapshot.lastReadFragmentStructureSignature,
-          }
-        : {}),
-      ...(snapshot.lastReadFragmentNeighborhoodSignature
-        ? {
-            lastReadFragmentNeighborhoodSignature:
-              snapshot.lastReadFragmentNeighborhoodSignature,
-          }
-        : {}),
-      ...(snapshot.lastStructuredNextStep
-        ? { lastStructuredNextStep: snapshot.lastStructuredNextStep }
-        : {}),
-      ...(snapshot.lastStructuredNextStepPlan
-        ? { lastStructuredNextStepPlan: snapshot.lastStructuredNextStepPlan }
-        : {}),
       lastTerminalClassification: snapshot.lastTerminalClassification,
       lastTerminalReason: snapshot.lastTerminalReason,
+      ...(snapshot.lastContinuationStatus
+        ? { lastContinuationStatus: snapshot.lastContinuationStatus }
+        : {}),
+      ...(snapshot.lastTaskSatisfactionVerdict
+        ? { lastTaskSatisfactionVerdict: snapshot.lastTaskSatisfactionVerdict }
+        : {}),
       recentChangedFiles: [],
       recentTargetFiles: [],
       recentFailedFiles: [],
       recentVerifiedFiles: [],
       lastRepairNotes: [],
       lastContinuationEvidence: [],
-      lastTaskSatisfactionReasons: [],
+      lastTaskSatisfactionReasons: snapshot.lastTaskSatisfactionReasons.slice(0, 3),
       unresolvedItems: [],
+      ...(snapshot.lastApprovalDecision
+        ? { lastApprovalDecision: snapshot.lastApprovalDecision }
+        : {}),
+      ...(snapshot.lastApprovalDecisionSource
+        ? { lastApprovalDecisionSource: snapshot.lastApprovalDecisionSource }
+        : {}),
+      ...(snapshot.lastApprovalPersistent !== undefined
+        ? { lastApprovalPersistent: snapshot.lastApprovalPersistent }
+        : {}),
+      ...(snapshot.lastApprovalCacheEffect
+        ? { lastApprovalCacheEffect: snapshot.lastApprovalCacheEffect }
+        : {}),
+      ...(snapshot.lastApprovalProjectRoot
+        ? { lastApprovalProjectRoot: snapshot.lastApprovalProjectRoot }
+        : {}),
+      ...(snapshot.lastApprovalCacheKey
+        ? { lastApprovalCacheKey: snapshot.lastApprovalCacheKey }
+        : {}),
+      ...(snapshot.lastApprovalScope
+        ? { lastApprovalScope: snapshot.lastApprovalScope }
+        : {}),
+      ...(snapshot.lastApprovalLineage
+        ? { lastApprovalLineage: snapshot.lastApprovalLineage }
+        : {}),
+      ...(snapshot.lastApprovalStopReason
+        ? { lastApprovalStopReason: snapshot.lastApprovalStopReason }
+        : {}),
+      ...(snapshot.lastApprovalChannel
+        ? { lastApprovalChannel: snapshot.lastApprovalChannel }
+        : {}),
+      ...(snapshot.lastApprovalInputKey
+        ? { lastApprovalInputKey: snapshot.lastApprovalInputKey }
+        : {}),
+      ...(snapshot.lastApprovalRecordedAt
+        ? { lastApprovalRecordedAt: snapshot.lastApprovalRecordedAt }
+        : {}),
+      ...(snapshot.lastApprovalHistory?.length
+        ? { lastApprovalHistory: snapshot.lastApprovalHistory }
+        : {}),
+      ...(snapshot.lastRequestScopeCacheKey
+        ? { lastRequestScopeCacheKey: snapshot.lastRequestScopeCacheKey }
+        : {}),
+      ...(snapshot.lastRequestScopeLabel
+        ? { lastRequestScopeLabel: snapshot.lastRequestScopeLabel }
+        : {}),
+      ...(snapshot.lastRequestScopeProjectRoot
+        ? { lastRequestScopeProjectRoot: snapshot.lastRequestScopeProjectRoot }
+        : {}),
+      ...(snapshot.lastRequestScopeSource
+        ? { lastRequestScopeSource: snapshot.lastRequestScopeSource }
+        : {}),
+      ...(snapshot.lastPermissionRequestToolName
+        ? {
+            lastPermissionRequestToolName:
+              snapshot.lastPermissionRequestToolName,
+          }
+        : {}),
+      ...(snapshot.lastPermissionRequestOperation
+        ? {
+            lastPermissionRequestOperation:
+              snapshot.lastPermissionRequestOperation,
+          }
+        : {}),
+      ...(snapshot.lastPermissionRequestTarget
+        ? { lastPermissionRequestTarget: snapshot.lastPermissionRequestTarget }
+        : {}),
+      ...(snapshot.lastPermissionRequestProcess
+        ? { lastPermissionRequestProcess: snapshot.lastPermissionRequestProcess }
+        : {}),
+      ...(snapshot.lastPermissionRequestScopeKey
+        ? {
+            lastPermissionRequestScopeKey:
+              snapshot.lastPermissionRequestScopeKey,
+          }
+        : {}),
+      ...(snapshot.lastPermissionRequestScopeLabel
+        ? {
+            lastPermissionRequestScopeLabel:
+              snapshot.lastPermissionRequestScopeLabel,
+          }
+        : {}),
+      ...(snapshot.lastPermissionRequestCacheKey
+        ? {
+            lastPermissionRequestCacheKey:
+              snapshot.lastPermissionRequestCacheKey,
+          }
+        : {}),
+      ...(snapshot.lastPermissionRequestProjectRoot
+        ? {
+            lastPermissionRequestProjectRoot:
+              snapshot.lastPermissionRequestProjectRoot,
+          }
+        : {}),
+      ...(snapshot.lastPermissionRequestSource
+        ? {
+            lastPermissionRequestSource:
+              snapshot.lastPermissionRequestSource,
+          }
+        : {}),
+      ...(snapshot.lastPermissionRequestLineage
+        ? {
+            lastPermissionRequestLineage:
+              snapshot.lastPermissionRequestLineage,
+          }
+        : {}),
       ...(snapshot.freshnessHistoryCount
         ? { freshnessHistoryCount: snapshot.freshnessHistoryCount }
         : {}),
-      ...(snapshot.freshnessAgeTurnDistance !== undefined
-        ? { freshnessAgeTurnDistance: snapshot.freshnessAgeTurnDistance }
-        : {}),
-      ...(snapshot.freshnessAgeNotConsumedTurns !== undefined
-        ? { freshnessAgeNotConsumedTurns: snapshot.freshnessAgeNotConsumedTurns }
-        : {}),
     };
-  }
-
-  private shouldCompactWorkingMemory(input: {
-    eventCount: number;
-    turnCount: number;
-  }): { compacted: boolean; reason: "event-budget" | "turn-budget" | "none" } {
-    if (
-      input.eventCount >= SessionManager.WORKING_MEMORY_EVENT_COMPACT_THRESHOLD
-    ) {
-      return { compacted: true, reason: "event-budget" };
-    }
-    if (
-      input.turnCount >= SessionManager.WORKING_MEMORY_TURN_COMPACT_THRESHOLD
-    ) {
-      return { compacted: true, reason: "turn-budget" };
-    }
-    return { compacted: false, reason: "none" };
-  }
-
-  private compactContinuitySnapshot(
-    snapshot: SessionContinuitySnapshot,
-  ): SessionContinuitySnapshot {
-    return {
-      ...snapshot,
-      recentChangedFiles: snapshot.recentChangedFiles.slice(
-        0,
-        SessionManager.WORKING_MEMORY_RECENT_FILE_LIMIT,
-      ),
-      recentTargetFiles: snapshot.recentTargetFiles.slice(
-        0,
-        SessionManager.WORKING_MEMORY_RECENT_FILE_LIMIT,
-      ),
-      recentVerifiedFiles: snapshot.recentVerifiedFiles.slice(
-        0,
-        SessionManager.WORKING_MEMORY_RECENT_FILE_LIMIT,
-      ),
-      recentFailedFiles: snapshot.recentFailedFiles.slice(
-        0,
-        SessionManager.WORKING_MEMORY_RECENT_FAILURE_LIMIT,
-      ),
-      lastRepairNotes: snapshot.lastRepairNotes.slice(
-        0,
-        SessionManager.WORKING_MEMORY_REPAIR_NOTE_LIMIT,
-      ),
-      lastContinuationEvidence: snapshot.lastContinuationEvidence.slice(
-        0,
-        SessionManager.WORKING_MEMORY_EVIDENCE_LIMIT,
-      ),
-      lastTaskSatisfactionReasons: snapshot.lastTaskSatisfactionReasons.slice(
-        0,
-        SessionManager.WORKING_MEMORY_EVIDENCE_LIMIT,
-      ),
-      unresolvedItems: snapshot.unresolvedItems.slice(
-        0,
-        SessionManager.WORKING_MEMORY_EVIDENCE_LIMIT,
-      ),
-      ...(snapshot.lastReadFragmentLineIndexes?.length
-        ? {
-            lastReadFragmentLineIndexes: snapshot.lastReadFragmentLineIndexes.slice(
-              0,
-              128,
-            ),
-          }
-        : {}),
-      ...(snapshot.lastReadFragmentRanges?.length
-        ? { lastReadFragmentRanges: snapshot.lastReadFragmentRanges.slice(0, 128) }
-        : {}),
-    };
-  }
-
-  private buildWorkingMemorySummary(
-    snapshot: SessionContinuitySnapshot,
-    compactReason: "event-budget" | "turn-budget" | "none",
-  ): string[] {
-    const summary: string[] = [];
-    if (compactReason !== "none") {
-      summary.push(`compacted:${compactReason}`);
-    }
-    if (snapshot.lastTaskKind) {
-      summary.push(`active-task:${snapshot.lastTaskKind}`);
-    }
-    if (snapshot.lastGroundedDeliverableMode) {
-      summary.push(`deliverable:${snapshot.lastGroundedDeliverableMode}`);
-    }
-    if (snapshot.lastStructuredNextStep) {
-      summary.push(
-        `next-step:${snapshot.lastStructuredNextStep.kind}:${snapshot.lastStructuredNextStep.executableNow ? "ready" : "blocked"}`,
-      );
-    }
-    if (snapshot.lastStructuredNextStepPlan) {
-      const activeStep =
-        snapshot.lastStructuredNextStepPlan.steps[
-          snapshot.lastStructuredNextStepPlan.currentStepIndex
-        ];
-      summary.push(
-        `next-step-plan:${snapshot.lastStructuredNextStepPlan.currentStepIndex + 1}/${snapshot.lastStructuredNextStepPlan.steps.length}:${activeStep?.kind ?? "unknown"}`,
-      );
-    }
-    if (snapshot.recentTargetFiles.length > 0) {
-      summary.push(`target:${snapshot.recentTargetFiles[0]}`);
-    }
-    if (
-      snapshot.lastReadWindowStart !== undefined &&
-      snapshot.lastReadWindowEnd !== undefined
-    ) {
-      summary.push(
-        `read-window:${snapshot.lastReadWindowStart}-${snapshot.lastReadWindowEnd}`,
-      );
-    }
-    if (snapshot.lastStagedRepairNextStep !== undefined) {
-      summary.push(`staged-next-step:${snapshot.lastStagedRepairNextStep}`);
-    }
-    if (snapshot.lastFailure) {
-      summary.push(`last-failure:${this.compactText(snapshot.lastFailure, 120)}`);
-    }
-    if (snapshot.unresolvedItems.length > 0) {
-      summary.push(
-        `unresolved:${snapshot.unresolvedItems
-          .slice(0, 2)
-          .map((item) => this.compactText(item, 80))
-          .join(" | ")}`,
-      );
-    }
-    return summary.slice(0, SessionManager.WORKING_MEMORY_SUMMARY_ITEM_LIMIT);
-  }
-
-  private buildWorkingMemorySnapshot(sessionId: string): SessionWorkingMemory {
-    const session = this.load(sessionId);
-    const transcriptEvents = this.getTranscriptEvents(sessionId);
-    const continuity = this.buildContinuitySnapshot(sessionId);
-    const compactPolicy = this.shouldCompactWorkingMemory({
-      eventCount: transcriptEvents.length,
-      turnCount: session.turns.length,
-    });
-    const compactedContinuity = compactPolicy.compacted
-      ? this.compactContinuitySnapshot(continuity)
-      : continuity;
-    const summary = this.buildWorkingMemorySummary(
-      compactedContinuity,
-      compactPolicy.reason,
-    );
-    const updatedAt = new Date().toISOString();
-    return {
-      schemaVersion: 1,
-      updatedAt,
-      sourceEventCount: transcriptEvents.length,
-      sourceTurnCount: session.turns.length,
-      compacted: compactPolicy.compacted,
-      compactReason: compactPolicy.reason,
-      continuity: {
-        ...compactedContinuity,
-        workingMemoryCompacted: compactPolicy.compacted,
-        workingMemorySourceEventCount: transcriptEvents.length,
-        workingMemorySourceTurnCount: session.turns.length,
-        workingMemorySummary: summary,
-        workingMemoryUpdatedAt: updatedAt,
-      },
-      summary,
-    };
-  }
-
-  private persistWorkingMemory(
-    sessionId: string,
-    memory: SessionWorkingMemory,
-  ): void {
-    const session = this.load(sessionId);
-    this.withSessionStateLock(sessionId, () => {
-      const statePath = this.getStatePath(sessionId);
-      const current = this.readStateSnapshotSafely(statePath);
-      const snapshot = this.buildSessionStateSnapshot(session, current, {
-        workingMemory: memory,
-      });
-      this.writeJsonFileAtomic(statePath, snapshot);
-    });
-  }
-
-  private refreshWorkingMemory(sessionId: string): void {
-    try {
-      const nextMemory = this.buildWorkingMemorySnapshot(sessionId);
-      this.persistWorkingMemory(sessionId, nextMemory);
-    } catch {
-      // Working-memory refresh is best-effort and must not break primary flow.
-    }
-  }
-
-  private ensureWorkingMemory(sessionId: string): SessionWorkingMemory {
-    const statePath = this.getStatePath(sessionId);
-    const currentState = this.readStateSnapshotRequired(statePath);
-    const session = this.load(sessionId);
-    const transcriptEvents = this.getTranscriptEvents(sessionId);
-    const sourceEventCount = transcriptEvents.length;
-    const sourceTurnCount = session.turns.length;
-    const currentMemory = currentState.workingMemory;
-    if (
-      currentMemory &&
-      currentMemory.sourceEventCount === sourceEventCount &&
-      currentMemory.sourceTurnCount === sourceTurnCount
-    ) {
-      return currentMemory;
-    }
-    const rebuilt = this.buildWorkingMemorySnapshot(sessionId);
-    this.persistWorkingMemory(sessionId, rebuilt);
-    return rebuilt;
   }
 
   private shouldAutoAttachPathlessContinuation(
@@ -3855,9 +3227,20 @@ export class SessionManager {
     if (this.extractPathLikeTargets(prompt).length > 0) {
       return false;
     }
-    if (snapshot.recentTargetFiles.length === 0) {
+    const hasTaskTruthAnchor = Boolean(
+      snapshot.lastUserIntent?.trim() ||
+        snapshot.lastAssistantOutput?.trim() ||
+        snapshot.lastTaskSatisfactionVerdict ||
+        snapshot.lastContinuationStatus ||
+        snapshot.lastFailure,
+    );
+    if (snapshot.recentTargetFiles.length === 0 && !hasTaskTruthAnchor) {
       return false;
     }
+
+    const hasTemporalSuccessorIntent =
+      /^(?:next|then|what\s+next|after\s+that)(?:[?.!]+)?$/i.test(normalized) ||
+      /^(?:下一步|然后呢|接下来)(?:[，。?!！？]+)?$/u.test(prompt.trim());
 
     const hasActionIntent =
       /\b(read|inspect|open|show|explain|summari[sz]e|edit|modify|fix|repair|replace|continue|verify|test|build|same)\b/i.test(
@@ -3865,7 +3248,8 @@ export class SessionManager {
       ) ||
       /(?:\u7ee7\u7eed|\u63a5\u7740|\u4fee|\u6539|\u8bfb|\u770b|\u89e3\u91ca|\u603b\u7ed3|\u8865\u9f50|\u540c\u6837)/u.test(
         prompt,
-      );
+      ) ||
+      hasTemporalSuccessorIntent;
     if (!hasActionIntent) {
       return false;
     }
@@ -3967,70 +3351,6 @@ export class SessionManager {
     return { start, end, size };
   }
 
-  private hasReadStateEvidence(evidence: readonly string[] | undefined): boolean {
-    if (!evidence?.length) {
-      return false;
-    }
-    const window = this.extractLastReadWindow(evidence);
-    if (
-      window.start !== undefined ||
-      window.end !== undefined ||
-      window.size !== undefined
-    ) {
-      return true;
-    }
-    const fragment = this.extractLastReadFragment(evidence);
-    return (
-      fragment.start !== undefined ||
-      fragment.end !== undefined ||
-      (fragment.ranges?.length ?? 0) > 0 ||
-      (fragment.lineIndexes?.length ?? 0) > 0
-    );
-  }
-
-  private hasStagedProgressEvidence(
-    evidence: readonly string[] | undefined,
-  ): boolean {
-    if (!evidence?.length) {
-      return false;
-    }
-    const staged = this.extractStagedRepairProgress(evidence);
-    return (
-      staged.stepCount !== undefined ||
-      staged.completedStep !== undefined ||
-      staged.blockedStep !== undefined ||
-      staged.nextStep !== undefined
-    );
-  }
-
-  private deriveTerminalClassificationFromDurableStatus(
-    durableStatus: "success" | "stopped" | "error" | undefined,
-  ): TerminalClassification | undefined {
-    if (!durableStatus) {
-      return undefined;
-    }
-    return durableStatus === "success"
-      ? "success"
-      : durableStatus === "stopped"
-        ? "stopped"
-        : "error";
-  }
-
-  private deriveTerminalReasonFromDurableStatus(
-    durableStatus: "success" | "stopped" | "error" | undefined,
-  ): TerminalReason | undefined {
-    if (!durableStatus) {
-      return undefined;
-    }
-    if (durableStatus === "success") {
-      return "completed";
-    }
-    if (durableStatus === "stopped") {
-      return "stopped_error";
-    }
-    return "stopped_error";
-  }
-
   private extractLastReadFragment(
     evidence: readonly string[] | undefined,
   ): {
@@ -4041,8 +3361,6 @@ export class SessionManager {
     sourceWindowStart?: number;
     sourceWindowEnd?: number;
     fingerprint?: string;
-    structureSignature?: string;
-    neighborhoodSignature?: string;
     filter?: "none" | "function-definitions";
   } {
     if (!evidence?.length) {
@@ -4055,8 +3373,6 @@ export class SessionManager {
     let sourceWindowStart: number | undefined;
     let sourceWindowEnd: number | undefined;
     let fingerprint: string | undefined;
-    let structureSignature: string | undefined;
-    let neighborhoodSignature: string | undefined;
     let filter: "none" | "function-definitions" | undefined;
     for (let index = evidence.length - 1; index >= 0; index -= 1) {
       const item = evidence[index]?.trim().toLowerCase();
@@ -4136,22 +3452,6 @@ export class SessionManager {
           fingerprint = match[1];
         }
       }
-      if (structureSignature === undefined) {
-        const match = item.match(
-          /^read-fragment-structure-signature:([0-9a-f]{64})$/,
-        );
-        if (match?.[1]) {
-          structureSignature = match[1];
-        }
-      }
-      if (neighborhoodSignature === undefined) {
-        const match = item.match(
-          /^read-fragment-neighborhood-signature:([0-9a-f]{64})$/,
-        );
-        if (match?.[1]) {
-          neighborhoodSignature = match[1];
-        }
-      }
       if (
         start !== undefined &&
         end !== undefined &&
@@ -4169,8 +3469,6 @@ export class SessionManager {
       ...(sourceWindowStart !== undefined ? { sourceWindowStart } : {}),
       ...(sourceWindowEnd !== undefined ? { sourceWindowEnd } : {}),
       ...(fingerprint ? { fingerprint } : {}),
-      ...(structureSignature ? { structureSignature } : {}),
-      ...(neighborhoodSignature ? { neighborhoodSignature } : {}),
       ...(filter ? { filter } : {}),
     };
   }
@@ -4245,6 +3543,196 @@ export class SessionManager {
     }
 
     return { stepCount, completedStep, blockedStep, nextStep };
+  }
+
+  private extractLastRequestScopeFromEvidence(
+    evidence: readonly string[] | undefined,
+  ): {
+    cacheKey?: string;
+    scopeLabel?: string;
+    projectRoot?: string;
+    source?: "verification-command" | "approval-request";
+  } {
+    if (!evidence?.length) {
+      return {};
+    }
+    let cacheKey: string | undefined;
+    let scopeLabel: string | undefined;
+    let projectRoot: string | undefined;
+    let source: "verification-command" | "approval-request" | undefined;
+    for (let index = evidence.length - 1; index >= 0; index -= 1) {
+      const item = evidence[index]?.trim();
+      if (!item) {
+        continue;
+      }
+      if (!cacheKey) {
+        const match = item.match(/^current-request-scope-cache-key:(.+)$/i);
+        const value = match?.[1]?.trim();
+        if (value) {
+          cacheKey = value;
+        }
+      }
+      if (!scopeLabel) {
+        const match = item.match(/^current-request-scope-label:(.+)$/i);
+        const value = match?.[1]?.trim();
+        if (value) {
+          scopeLabel = value;
+        }
+      }
+      if (!projectRoot) {
+        const match = item.match(/^current-request-scope-project-root:(.+)$/i);
+        const value = match?.[1]?.trim();
+        if (value) {
+          projectRoot = value;
+        }
+      }
+      if (!source) {
+        const match = item.match(/^current-request-scope-source:(.+)$/i);
+        const value = match?.[1]?.trim().toLowerCase();
+        if (value === "verification-command" || value === "approval-request") {
+          source = value;
+        }
+      }
+      if (cacheKey && scopeLabel && projectRoot && source) {
+        break;
+      }
+    }
+    return {
+      ...(cacheKey ? { cacheKey } : {}),
+      ...(scopeLabel ? { scopeLabel } : {}),
+      ...(projectRoot ? { projectRoot } : {}),
+      ...(source ? { source } : {}),
+    };
+  }
+
+  private extractLastPermissionRequestFromEvidence(
+    evidence: readonly string[] | undefined,
+  ): {
+    toolName?: string;
+    operation?: string;
+    target?: string;
+    process?: string;
+    scopeKey?: string;
+    scopeLabel?: string;
+    cacheKey?: string;
+    projectRoot?: string;
+    source?: "verification-command" | "approval-request";
+    lineage?: string;
+  } {
+    if (!evidence?.length) {
+      return {};
+    }
+    let toolName: string | undefined;
+    let operation: string | undefined;
+    let target: string | undefined;
+    let process: string | undefined;
+    let scopeKey: string | undefined;
+    let scopeLabel: string | undefined;
+    let cacheKey: string | undefined;
+    let projectRoot: string | undefined;
+    let source: "verification-command" | "approval-request" | undefined;
+    let lineage: string | undefined;
+    for (let index = evidence.length - 1; index >= 0; index -= 1) {
+      const item = evidence[index]?.trim();
+      if (!item) {
+        continue;
+      }
+      if (!toolName) {
+        const match = item.match(/^current-permission-request-tool:(.+)$/i);
+        const value = match?.[1]?.trim().toLowerCase();
+        if (value) {
+          toolName = value;
+        }
+      }
+      if (!operation) {
+        const match = item.match(/^current-permission-request-operation:(.+)$/i);
+        const value = match?.[1]?.trim().toLowerCase();
+        if (value) {
+          operation = value;
+        }
+      }
+      if (!target) {
+        const match = item.match(/^current-permission-request-target:(.+)$/i);
+        const value = match?.[1]?.trim();
+        if (value) {
+          target = value;
+        }
+      }
+      if (!process) {
+        const match = item.match(/^current-permission-request-process:(.+)$/i);
+        const value = match?.[1]?.trim().toLowerCase();
+        if (value) {
+          process = value;
+        }
+      }
+      if (!scopeKey) {
+        const match = item.match(/^current-permission-request-scope-key:(.+)$/i);
+        const value = match?.[1]?.trim().toLowerCase();
+        if (value) {
+          scopeKey = value;
+        }
+      }
+      if (!scopeLabel) {
+        const match = item.match(/^current-permission-request-scope-label:(.+)$/i);
+        const value = match?.[1]?.trim();
+        if (value) {
+          scopeLabel = value;
+        }
+      }
+      if (!cacheKey) {
+        const match = item.match(/^current-permission-request-cache-key:(.+)$/i);
+        const value = match?.[1]?.trim();
+        if (value) {
+          cacheKey = value;
+        }
+      }
+      if (!projectRoot) {
+        const match = item.match(/^current-permission-request-project-root:(.+)$/i);
+        const value = match?.[1]?.trim();
+        if (value) {
+          projectRoot = value;
+        }
+      }
+      if (!source) {
+        const match = item.match(/^current-permission-request-source:(.+)$/i);
+        const value = match?.[1]?.trim().toLowerCase();
+        if (value === "verification-command" || value === "approval-request") {
+          source = value;
+        }
+      }
+      if (!lineage) {
+        const match = item.match(/^current-permission-request-lineage:(.+)$/i);
+        const value = match?.[1]?.trim();
+        if (value) {
+          lineage = value;
+        }
+      }
+      if (
+        toolName &&
+        operation &&
+        target &&
+        scopeKey &&
+        scopeLabel &&
+        cacheKey &&
+        projectRoot &&
+        source
+      ) {
+        break;
+      }
+    }
+
+    return {
+      ...(toolName ? { toolName } : {}),
+      ...(operation ? { operation } : {}),
+      ...(target ? { target } : {}),
+      ...(process ? { process } : {}),
+      ...(scopeKey ? { scopeKey } : {}),
+      ...(scopeLabel ? { scopeLabel } : {}),
+      ...(cacheKey ? { cacheKey } : {}),
+      ...(projectRoot ? { projectRoot } : {}),
+      ...(source ? { source } : {}),
+      ...(lineage ? { lineage } : {}),
+    };
   }
 
   private extractLastAnswerDefect(
@@ -4378,33 +3866,6 @@ export class SessionManager {
     return fallback;
   }
 
-  private findLastNonChatCodingCompletionEvent(
-    transcriptEvents: readonly TranscriptEvent[],
-  ):
-    | (Extract<TranscriptEvent, { type: "query-event" }> & {
-        event: Extract<QueryEvent, { type: "query.completed" }>;
-      })
-    | undefined {
-    for (let index = transcriptEvents.length - 1; index >= 0; index -= 1) {
-      const event = transcriptEvents[index];
-      if (event?.type !== "query-event") {
-        continue;
-      }
-      if (event.event.type !== "query.completed") {
-        continue;
-      }
-      if (
-        event.event.result.codingResult &&
-        event.event.result.codingResult.taskKind !== "chat"
-      ) {
-        return event as Extract<TranscriptEvent, { type: "query-event" }> & {
-          event: Extract<QueryEvent, { type: "query.completed" }>;
-        };
-      }
-    }
-    return undefined;
-  }
-
   private collectRecentCodingResults(
     transcriptEvents: readonly TranscriptEvent[],
     limit: number,
@@ -4452,60 +3913,605 @@ export class SessionManager {
     return `${normalized.slice(0, max)}...`;
   }
 
-  private stripContinuityContextBlock(input: string): string {
-    return input
-      .replace(
-        /\[FOLLOW-UP CONTINUITY CONTEXT\][\s\S]*?\[END CONTINUITY CONTEXT\]/gi,
-        "",
-      )
-      .replace(/\s+/g, " ")
-      .trim();
+  private extractApprovalAuditMemoryState(
+    workingMemory: unknown,
+  ): ApprovalAuditMemoryState | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    const fromStructured = this.parseApprovalAuditFromStructuredObject(
+      root.approvalAudit,
+    );
+    if (fromStructured) {
+      return fromStructured;
+    }
+
+    const fromContinuity = this.parseApprovalAuditFromContinuityState(
+      root.continuity,
+    );
+    if (fromContinuity) {
+      return fromContinuity;
+    }
+
+    const fromSummary = this.parseApprovalAuditFromSummary(root.summary);
+    if (fromSummary) {
+      return fromSummary;
+    }
+
+    return undefined;
+  }
+
+  private extractPermissionRequestMemoryState(
+    workingMemory: unknown,
+  ): PermissionRequestMemoryState | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    const fromContinuity = this.parsePermissionRequestFromContinuityState(
+      root.continuity,
+    );
+    if (fromContinuity) {
+      return fromContinuity;
+    }
+    const fromSummary = this.parsePermissionRequestFromSummary(root.summary);
+    if (fromSummary) {
+      return fromSummary;
+    }
+    return undefined;
+  }
+
+  private extractRequestScopeMemoryState(
+    workingMemory: unknown,
+  ): RequestScopeMemoryState | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    if (
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+    ) {
+      const continuity = root.continuity as Record<string, unknown>;
+      const sourceRaw = this.normalizeOptionalString(
+        continuity.lastRequestScopeSource,
+      )?.toLowerCase();
+      const source =
+        sourceRaw === "verification-command" || sourceRaw === "approval-request"
+          ? sourceRaw
+          : undefined;
+      const fromContinuity: RequestScopeMemoryState = {
+        ...(this.normalizeOptionalString(continuity.lastRequestScopeCacheKey)
+          ? {
+              cacheKey: this.normalizeOptionalString(
+                continuity.lastRequestScopeCacheKey,
+              )!,
+            }
+          : {}),
+        ...(this.normalizeOptionalString(continuity.lastRequestScopeLabel)
+          ? {
+              scopeLabel: this.normalizeOptionalString(
+                continuity.lastRequestScopeLabel,
+              )!,
+            }
+          : {}),
+        ...(this.normalizeOptionalString(continuity.lastRequestScopeProjectRoot)
+          ? {
+              projectRoot: this.normalizeOptionalString(
+                continuity.lastRequestScopeProjectRoot,
+              )!,
+            }
+          : {}),
+        ...(source ? { source } : {}),
+      };
+      if (Object.keys(fromContinuity).length > 0) {
+        return fromContinuity;
+      }
+    }
+    if (Array.isArray(root.summary)) {
+      const fields = new Map<string, string>();
+      for (const raw of root.summary) {
+        if (typeof raw !== "string") {
+          continue;
+        }
+        const line =
+          raw.startsWith("- ") || raw.startsWith("* ")
+            ? raw.slice(2).trim()
+            : raw.trim();
+        const idx = line.indexOf(":");
+        if (idx <= 0) {
+          continue;
+        }
+        const key = line.slice(0, idx).trim().toLowerCase();
+        if (!key.startsWith("last-request-scope-")) {
+          continue;
+        }
+        const value = line.slice(idx + 1).trim();
+        if (!value || fields.has(key)) {
+          continue;
+        }
+        fields.set(key, value);
+      }
+      const sourceRaw = fields.get("last-request-scope-source")?.toLowerCase();
+      const source =
+        sourceRaw === "verification-command" || sourceRaw === "approval-request"
+          ? sourceRaw
+          : undefined;
+      const fromSummary: RequestScopeMemoryState = {
+        ...(fields.get("last-request-scope-cache-key")
+          ? { cacheKey: fields.get("last-request-scope-cache-key")! }
+          : {}),
+        ...(fields.get("last-request-scope-label")
+          ? { scopeLabel: fields.get("last-request-scope-label")! }
+          : {}),
+        ...(fields.get("last-request-scope-project-root")
+          ? { projectRoot: fields.get("last-request-scope-project-root")! }
+          : {}),
+        ...(source ? { source } : {}),
+      };
+      if (Object.keys(fromSummary).length > 0) {
+        return fromSummary;
+      }
+    }
+    return undefined;
+  }
+
+  private extractApprovalAuditHistoryMemoryState(
+    workingMemory: unknown,
+  ): readonly ApprovalAuditMemoryState[] {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return [];
+    }
+    const root = workingMemory as Record<string, unknown>;
+    const historyCandidates: unknown[] = [root.approvalAuditHistory];
+    if (
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+    ) {
+      historyCandidates.push(
+        (root.continuity as Record<string, unknown>).lastApprovalHistory,
+      );
+    }
+    for (const candidate of historyCandidates) {
+      if (!Array.isArray(candidate)) {
+        continue;
+      }
+      const parsed: ApprovalAuditMemoryState[] = [];
+      for (const entry of candidate) {
+        const normalized = this.parseApprovalAuditFromStructuredObject(entry);
+        if (normalized) {
+          parsed.push(normalized);
+        }
+      }
+      if (parsed.length > 0) {
+        return parsed.slice(-SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT);
+      }
+    }
+    return [];
+  }
+
+  private parseApprovalAuditFromStructuredObject(
+    value: unknown,
+  ): ApprovalAuditMemoryState | undefined {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return undefined;
+    }
+    const approval = value as Record<string, unknown>;
+    const decision = this.normalizeApprovalDecision(approval.decision);
+    if (!decision) {
+      return undefined;
+    }
+    const decisionSource = this.normalizeOptionalString(approval.decisionSource);
+    const persistent =
+      typeof approval.persistent === "boolean"
+        ? approval.persistent
+        : decision === "allow-always";
+    const cacheEffect = this.normalizeOptionalString(approval.cacheEffect);
+    const projectRoot = this.normalizeOptionalString(approval.projectRoot);
+    const cacheKey = this.normalizeOptionalString(approval.cacheKey);
+    const scopeLabel = this.normalizeOptionalString(approval.scopeLabel);
+    const recordedAt = this.normalizeOptionalString(approval.recordedAt);
+    return {
+      decision,
+      decisionSource: decisionSource ?? "unknown",
+      persistent,
+      cacheEffect: cacheEffect ?? "none",
+      projectRoot: projectRoot ?? "unknown",
+      cacheKey: cacheKey ?? "unknown",
+      scopeLabel: scopeLabel ?? "unknown",
+      ...(typeof approval.lineage === "string" && approval.lineage.trim().length > 0
+        ? { lineage: approval.lineage.trim() }
+        : {}),
+      ...(typeof approval.stopReason === "string" &&
+      approval.stopReason.trim().length > 0
+        ? { stopReason: approval.stopReason.trim() }
+        : {}),
+      ...(approval.channel === "interactive" || approval.channel === "non-interactive"
+        ? { channel: approval.channel }
+        : {}),
+      ...(approval.inputKey === "y" ||
+      approval.inputKey === "a" ||
+      approval.inputKey === "n" ||
+      approval.inputKey === "other"
+        ? { inputKey: approval.inputKey }
+        : {}),
+      recordedAt: recordedAt ?? new Date(0).toISOString(),
+    };
+  }
+
+  private parseApprovalAuditFromContinuityState(
+    value: unknown,
+  ): ApprovalAuditMemoryState | undefined {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return undefined;
+    }
+    const continuity = value as Record<string, unknown>;
+    const decision = this.normalizeApprovalDecision(continuity.lastApprovalDecision);
+    if (!decision) {
+      return undefined;
+    }
+    const decisionSource = this.normalizeOptionalString(
+      continuity.lastApprovalDecisionSource,
+    );
+    const persistent =
+      typeof continuity.lastApprovalPersistent === "boolean"
+        ? continuity.lastApprovalPersistent
+        : decision === "allow-always";
+    const cacheEffect = this.normalizeOptionalString(
+      continuity.lastApprovalCacheEffect,
+    );
+    const projectRoot = this.normalizeOptionalString(
+      continuity.lastApprovalProjectRoot,
+    );
+    const cacheKey = this.normalizeOptionalString(continuity.lastApprovalCacheKey);
+    const scopeLabel = this.normalizeOptionalString(continuity.lastApprovalScope);
+    const lineage = this.normalizeOptionalString(continuity.lastApprovalLineage);
+    const stopReason = this.normalizeOptionalString(
+      continuity.lastApprovalStopReason,
+    );
+    const recordedAt = this.normalizeOptionalString(
+      continuity.lastApprovalRecordedAt,
+    );
+    return {
+      decision,
+      decisionSource: decisionSource ?? "unknown",
+      persistent,
+      cacheEffect: cacheEffect ?? "none",
+      projectRoot: projectRoot ?? "unknown",
+      cacheKey: cacheKey ?? "unknown",
+      scopeLabel: scopeLabel ?? "unknown",
+      ...(lineage ? { lineage } : {}),
+      ...(stopReason ? { stopReason } : {}),
+      ...(continuity.lastApprovalChannel === "interactive" ||
+      continuity.lastApprovalChannel === "non-interactive"
+        ? { channel: continuity.lastApprovalChannel }
+        : {}),
+      ...(continuity.lastApprovalInputKey === "y" ||
+      continuity.lastApprovalInputKey === "a" ||
+      continuity.lastApprovalInputKey === "n" ||
+      continuity.lastApprovalInputKey === "other"
+        ? { inputKey: continuity.lastApprovalInputKey }
+        : {}),
+      recordedAt: recordedAt ?? new Date(0).toISOString(),
+    };
+  }
+
+  private parseApprovalAuditFromSummary(
+    value: unknown,
+  ): ApprovalAuditMemoryState | undefined {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+    const summaryEntries = value
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+    if (summaryEntries.length === 0) {
+      return undefined;
+    }
+
+    const fields = new Map<string, string>();
+    const capture = (key: string, raw: string): void => {
+      const normalized = raw.trim();
+      if (!normalized || fields.has(key)) {
+        return;
+      }
+      fields.set(key, normalized);
+    };
+    for (const entry of summaryEntries) {
+      const line =
+        entry.startsWith("- ") || entry.startsWith("* ")
+          ? entry.slice(2).trim()
+          : entry;
+      const colonIndex = line.indexOf(":");
+      if (colonIndex > 0) {
+        const key = line.slice(0, colonIndex).trim().toLowerCase();
+        const rawValue = line.slice(colonIndex + 1);
+        if (
+          key.startsWith("last-approval-") ||
+          key.startsWith("last-request-scope-") ||
+          key.startsWith("last-permission-request-")
+        ) {
+          capture(key, rawValue);
+        }
+      }
+      const auditMatch = line.match(/^approval-audit:([a-z-]+)=(.+)$/i);
+      if (auditMatch?.[1] && auditMatch[2]) {
+        capture(`last-approval-${auditMatch[1].toLowerCase()}`, auditMatch[2]);
+      }
+    }
+
+    const decision = this.normalizeApprovalDecision(
+      fields.get("last-approval-decision"),
+    );
+    if (!decision) {
+      return undefined;
+    }
+    const persistentRaw = fields.get("last-approval-persistent");
+    const persistent =
+      persistentRaw !== undefined
+        ? ["yes", "true", "1"].includes(persistentRaw.toLowerCase())
+        : decision === "allow-always";
+    const channelRaw = fields.get("last-approval-channel")?.toLowerCase();
+    const inputKeyRaw = fields.get("last-approval-input-key")?.toLowerCase();
+    const decisionSource = fields.get("last-approval-decision-source");
+    const cacheEffect = fields.get("last-approval-cache-effect");
+    const projectRoot = fields.get("last-approval-project-root");
+    const cacheKey = fields.get("last-approval-cache-key");
+    const scopeLabel = fields.get("last-approval-scope");
+    const recordedAt = fields.get("last-approval-recorded-at");
+    return {
+      decision,
+      decisionSource: decisionSource ?? "unknown",
+      persistent,
+      cacheEffect: cacheEffect ?? "none",
+      projectRoot: projectRoot ?? "unknown",
+      cacheKey: cacheKey ?? "unknown",
+      scopeLabel: scopeLabel ?? "unknown",
+      ...(fields.get("last-approval-lineage")
+        ? { lineage: fields.get("last-approval-lineage")! }
+        : {}),
+      ...(fields.get("last-approval-stop-reason")
+        ? { stopReason: fields.get("last-approval-stop-reason")! }
+        : {}),
+      ...(channelRaw === "interactive" || channelRaw === "non-interactive"
+        ? { channel: channelRaw }
+        : {}),
+      ...(inputKeyRaw === "y" ||
+      inputKeyRaw === "a" ||
+      inputKeyRaw === "n" ||
+      inputKeyRaw === "other"
+        ? { inputKey: inputKeyRaw }
+        : {}),
+      recordedAt: recordedAt ?? new Date(0).toISOString(),
+    };
+  }
+
+  private parsePermissionRequestFromContinuityState(
+    value: unknown,
+  ): PermissionRequestMemoryState | undefined {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return undefined;
+    }
+    const continuity = value as Record<string, unknown>;
+    const sourceRaw = this.normalizeOptionalString(
+      continuity.lastPermissionRequestSource,
+    )?.toLowerCase();
+    const source =
+      sourceRaw === "verification-command" || sourceRaw === "approval-request"
+        ? sourceRaw
+        : undefined;
+    const result: PermissionRequestMemoryState = {
+      ...(this.normalizeOptionalString(continuity.lastPermissionRequestToolName)
+        ? {
+            toolName: this.normalizeOptionalString(
+              continuity.lastPermissionRequestToolName,
+            )!,
+          }
+        : {}),
+      ...(this.normalizeOptionalString(continuity.lastPermissionRequestOperation)
+        ? {
+            operation: this.normalizeOptionalString(
+              continuity.lastPermissionRequestOperation,
+            )!,
+          }
+        : {}),
+      ...(this.normalizeOptionalString(continuity.lastPermissionRequestTarget)
+        ? {
+            target: this.normalizeOptionalString(
+              continuity.lastPermissionRequestTarget,
+            )!,
+          }
+        : {}),
+      ...(this.normalizeOptionalString(continuity.lastPermissionRequestProcess)
+        ? {
+            process: this.normalizeOptionalString(
+              continuity.lastPermissionRequestProcess,
+            )!,
+          }
+        : {}),
+      ...(this.normalizeOptionalString(continuity.lastPermissionRequestScopeKey)
+        ? {
+            scopeKey: this.normalizeOptionalString(
+              continuity.lastPermissionRequestScopeKey,
+            )!,
+          }
+        : {}),
+      ...(this.normalizeOptionalString(continuity.lastPermissionRequestScopeLabel)
+        ? {
+            scopeLabel: this.normalizeOptionalString(
+              continuity.lastPermissionRequestScopeLabel,
+            )!,
+          }
+        : {}),
+      ...(this.normalizeOptionalString(continuity.lastPermissionRequestCacheKey)
+        ? {
+            cacheKey: this.normalizeOptionalString(
+              continuity.lastPermissionRequestCacheKey,
+            )!,
+          }
+        : {}),
+      ...(this.normalizeOptionalString(continuity.lastPermissionRequestProjectRoot)
+        ? {
+            projectRoot: this.normalizeOptionalString(
+              continuity.lastPermissionRequestProjectRoot,
+            )!,
+          }
+        : {}),
+      ...(source ? { source } : {}),
+      ...(this.normalizeOptionalString(continuity.lastPermissionRequestLineage)
+        ? {
+            lineage: this.normalizeOptionalString(
+              continuity.lastPermissionRequestLineage,
+            )!,
+          }
+        : {}),
+    };
+    return Object.keys(result).length > 0 ? result : undefined;
+  }
+
+  private parsePermissionRequestFromSummary(
+    value: unknown,
+  ): PermissionRequestMemoryState | undefined {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+    const summaryEntries = value
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+    if (summaryEntries.length === 0) {
+      return undefined;
+    }
+    const fields = new Map<string, string>();
+    for (const entry of summaryEntries) {
+      const line =
+        entry.startsWith("- ") || entry.startsWith("* ")
+          ? entry.slice(2).trim()
+          : entry;
+      const colonIndex = line.indexOf(":");
+      if (colonIndex <= 0) {
+        continue;
+      }
+      const key = line.slice(0, colonIndex).trim().toLowerCase();
+      if (!key.startsWith("last-permission-request-")) {
+        continue;
+      }
+      const valuePart = line.slice(colonIndex + 1).trim();
+      if (!valuePart || fields.has(key)) {
+        continue;
+      }
+      fields.set(key, valuePart);
+    }
+    const sourceRaw = fields.get("last-permission-request-source")?.toLowerCase();
+    const source =
+      sourceRaw === "verification-command" || sourceRaw === "approval-request"
+        ? sourceRaw
+        : undefined;
+    const result: PermissionRequestMemoryState = {
+      ...(fields.get("last-permission-request-tool")
+        ? { toolName: fields.get("last-permission-request-tool")! }
+        : {}),
+      ...(fields.get("last-permission-request-operation")
+        ? { operation: fields.get("last-permission-request-operation")! }
+        : {}),
+      ...(fields.get("last-permission-request-target")
+        ? { target: fields.get("last-permission-request-target")! }
+        : {}),
+      ...(fields.get("last-permission-request-process")
+        ? { process: fields.get("last-permission-request-process")! }
+        : {}),
+      ...(fields.get("last-permission-request-scope-key")
+        ? { scopeKey: fields.get("last-permission-request-scope-key")! }
+        : {}),
+      ...(fields.get("last-permission-request-scope-label")
+        ? { scopeLabel: fields.get("last-permission-request-scope-label")! }
+        : {}),
+      ...(fields.get("last-permission-request-cache-key")
+        ? { cacheKey: fields.get("last-permission-request-cache-key")! }
+        : {}),
+      ...(fields.get("last-permission-request-project-root")
+        ? { projectRoot: fields.get("last-permission-request-project-root")! }
+        : {}),
+      ...(source ? { source } : {}),
+      ...(fields.get("last-permission-request-lineage")
+        ? { lineage: fields.get("last-permission-request-lineage")! }
+        : {}),
+    };
+    return Object.keys(result).length > 0 ? result : undefined;
+  }
+
+  private normalizeApprovalDecision(
+    value: unknown,
+  ): "deny" | "allow-once" | "allow-always" | undefined {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (
+      normalized === "deny" ||
+      normalized === "allow-once" ||
+      normalized === "allow-always"
+    ) {
+      return normalized;
+    }
+    return undefined;
+  }
+
+  private normalizeOptionalString(value: unknown): string | undefined {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : undefined;
   }
 
   private selectContinuationEvidenceForSnapshot(
     evidence: readonly string[],
   ): string[] {
-    const resumeMarkerPattern =
-      /^session-resume-(?:source|requested|resolved|rebind-from-missing):/i;
-    const canonicalResumeMarkers = this.canonicalizeResumeProvenanceMarkers(
-      evidence.filter((entry) => resumeMarkerPattern.test(entry)),
-    );
-    const evidenceWithoutResume = evidence.filter(
-      (entry) => !resumeMarkerPattern.test(entry),
-    );
-
-    if (evidenceWithoutResume.length <= 8) {
-      return [...canonicalResumeMarkers, ...evidenceWithoutResume];
+    if (evidence.length <= 8) {
+      return [...evidence];
     }
 
-    const keep = evidenceWithoutResume.slice(0, 8);
+    const keep = evidence.slice(0, 8);
     const criticalPrefixes = [
-      "session-resume-source:",
-      "session-resume-requested:",
-      "session-resume-resolved:",
-      "session-resume-rebind-from-missing:",
-      "continuation-family:",
-      "continuation-epoch:",
-      "continuation-family-anchor:",
-      "continuation-family-reset:",
-      "continuation-epoch-bump:",
-      "continuation-family-consumption:",
-      "continuation-family-mismatch-pruned",
-      "continuation-lineage-match:",
-      "continuation-lineage-cut:",
-      "continuation-lineage-mismatch-pruned",
-      "continuation-lineage-active:",
-      "continuation-lineage-slot:",
       "repair-remaining-files:",
       "repair-failed-files:",
       "repair-processed-files:",
       "repair-skipped-files:",
       "repair-outcome:",
+      "transform:",
+      "replan-transform:",
+      "rebind-transform:",
+      "rebind-blocker:",
+      "verify-command-hint:",
+      "verify-target-hint:",
+      "verify-cwd-hint:",
+      "verify-resume-eligible:",
+      "verify-blocker-kind:",
+      "verify-next-action:",
       "reopen-candidates:",
       "why-not-auto-select:",
       "blocked-disambiguation",
       "reopen-target:",
       "reopen-reason:",
+      "current-request-scope-cache-key:",
+      "current-request-scope-label:",
+      "current-request-scope-project-root:",
+      "current-request-scope-source:",
+      "current-permission-request-tool:",
+      "current-permission-request-operation:",
+      "current-permission-request-target:",
+      "current-permission-request-process:",
+      "current-permission-request-scope-key:",
+      "current-permission-request-scope-label:",
+      "current-permission-request-cache-key:",
+      "current-permission-request-project-root:",
+      "current-permission-request-source:",
+      "current-permission-request-lineage:",
     ];
 
     for (const entry of evidence) {
@@ -4518,97 +4524,7 @@ export class SessionManager {
       }
     }
 
-    const prioritizedPrefixes = [
-      "session-resume-source:",
-      "session-resume-requested:",
-      "session-resume-resolved:",
-      "session-resume-rebind-from-missing:",
-      "continuation-lineage-active:",
-      "continuation-lineage-slot:",
-      "continuation-family:",
-      "continuation-epoch:",
-      "continuation-family-anchor:",
-    ];
-    const prioritized = keep.filter((entry) =>
-      prioritizedPrefixes.some((prefix) =>
-        entry.toLowerCase().startsWith(prefix),
-      ),
-    );
-    const remainder = keep.filter((entry) => !prioritized.includes(entry));
-    return Array.from(
-      new Set([...canonicalResumeMarkers, ...prioritized, ...remainder]),
-    ).slice(0, 16);
-  }
-
-  private canonicalizeResumeProvenanceMarkers(
-    markers: readonly string[],
-  ): string[] {
-    if (markers.length === 0) {
-      return [];
-    }
-
-    const takeLast = (prefix: string): string | undefined => {
-      for (let index = markers.length - 1; index >= 0; index -= 1) {
-        const marker = markers[index];
-        if (marker.toLowerCase().startsWith(prefix)) {
-          return marker;
-        }
-      }
-      return undefined;
-    };
-
-    const source = takeLast("session-resume-source:");
-    const requested = takeLast("session-resume-requested:");
-    const resolved = takeLast("session-resume-resolved:");
-    const rebindFromMissing = takeLast("session-resume-rebind-from-missing:");
-    return [source, requested, resolved, rebindFromMissing].filter(
-      (entry): entry is string => Boolean(entry),
-    );
-  }
-
-  private extractContinuationFamilyId(
-    evidence: readonly string[],
-  ): string | undefined {
-    const marker = evidence.find((entry) =>
-      entry.toLowerCase().startsWith("continuation-family:"),
-    );
-    if (!marker) {
-      return undefined;
-    }
-    const value = marker.slice("continuation-family:".length).trim();
-    return value.length > 0 ? value : undefined;
-  }
-
-  private extractContinuationEpoch(
-    evidence: readonly string[],
-  ): number | undefined {
-    const marker = evidence.find((entry) =>
-      entry.toLowerCase().startsWith("continuation-epoch:"),
-    );
-    if (!marker) {
-      return undefined;
-    }
-    const value = Number.parseInt(
-      marker.slice("continuation-epoch:".length).trim(),
-      10,
-    );
-    return Number.isFinite(value) && value >= 0 ? value : undefined;
-  }
-
-  private extractContinuationFamilyAnchor(
-    evidence: readonly string[],
-  ): string | undefined {
-    const marker = evidence.find((entry) =>
-      entry.toLowerCase().startsWith("continuation-family-anchor:"),
-    );
-    if (!marker) {
-      return undefined;
-    }
-    const value = marker
-      .slice("continuation-family-anchor:".length)
-      .trim();
-    const normalized = this.normalizePathLikeTarget(value);
-    return normalized && normalized.length > 0 ? normalized : undefined;
+    return keep.slice(0, 16);
   }
 
   private extractPathLikeTargets(input?: string): string[] {
@@ -4664,16 +4580,6 @@ export class SessionManager {
     if (normalized.length === 0) {
       return false;
     }
-    const normalizedCompact = normalized
-      .replace(/[。！？?.\s]+$/gu, "")
-      .replace(/\s+/g, " ");
-    const hasTerseContinuationCue =
-      /^(then|go on|so|continue|and then)\??$/i.test(normalizedCompact) ||
-      /^(继续|然后|接着|接下来呢|继续呢)$/u.test(normalizedCompact);
-    if (hasTerseContinuationCue) {
-      return true;
-    }
-
     const hasExplicitTarget = this.extractPathLikeTargets(prompt).length > 0;
     const hasStagedFollowUpConnector =
       /\b(first|then|and then)\b/i.test(normalized) ||
@@ -4706,6 +4612,32 @@ export class SessionManager {
         prompt,
       );
     if (hasCorrectionCue) {
+      return true;
+    }
+
+    const hasExplainToMutationCue =
+      /\b(?:(?:change|fix|update|replace|modify)\s+(?:that|this)\s+(?:part|section)|(?:change|fix|update|replace|modify).+\s+in\s+(?:that|this)\s+(?:part|section)|fix the part you just explained|change the part you just explained)\b/i.test(
+        normalized,
+      ) ||
+      /(?:改(?:这部分|这一段|这段|刚才那段)|修(?:这部分|这一段|这段|刚才那段)|把刚才解释的那段(?:里|中的)?.*(?:改成|改为|替换为)|就改这部分)/u.test(
+        prompt,
+      );
+    if (hasExplainToMutationCue) {
+      return true;
+    }
+
+    const hasRecommendationHandoffCue =
+      /\b(?:what should we do next|what should i do next|do that|continue with that|do it)\b/i.test(
+        normalized,
+      ) ||
+      /(?:现在应该继续什么|下一步做什么|接下来该做什么|那就按这个继续|按这个继续|那就这么做)/u.test(
+        prompt,
+      );
+    if (hasRecommendationHandoffCue) {
+      return true;
+    }
+
+    if (this.isReflectiveStateQueryPrompt(prompt)) {
       return true;
     }
 
@@ -4760,6 +4692,33 @@ export class SessionManager {
     ];
 
     return continuationSignals.some((signal) => normalized.includes(signal));
+  }
+
+  private isReflectiveStateQueryPrompt(prompt: string): boolean {
+    const normalized = prompt.toLowerCase().trim();
+    if (!normalized) {
+      return false;
+    }
+
+    const hasEnglishPermissionReflectiveQuery =
+      /\b(?:what did i just approve|what did i approve|was that allow-once or allow-always|was that cached or one-shot|why is it asking again|did that get persisted|was that persisted)\b/i.test(
+        normalized,
+      );
+    const hasChinesePermissionReflectiveQuery =
+      /(?:刚才我批准了什么|刚才那个是一次性还是永久授权|为什么这次又要问审批|刚才那个授权有没有落盘|刚才那个授权是缓存还是一次性)/u.test(
+        prompt,
+      );
+
+    return (
+      /\b(?:why did it stop|why did we stop|what failed|where did we stop|where did we stop reading|where did i stop reading|what should we do next|what should i do next|what part did you just explain|which part did you just explain)\b/i.test(
+        normalized,
+      ) ||
+      /(?:刚才为什么停了|为什么停了|刚才失败的是哪一步|上一步失败在哪|刚才卡在哪|刚才解释的是哪一段|你刚才解释的是哪个片段|刚才读到哪里了|读到哪了|现在应该继续什么|下一步做什么|接下来该做什么)/u.test(
+        prompt,
+      ) ||
+      hasEnglishPermissionReflectiveQuery ||
+      hasChinesePermissionReflectiveQuery
+    );
   }
 
   private evaluateRecoveryTrustBoundary(
@@ -5000,7 +4959,6 @@ export class SessionManager {
         | "terminalClassification"
         | "lastContinuationReason"
         | "pendingLifecycle"
-        | "workingMemory"
       >
     >,
   ): void {
@@ -5065,14 +5023,230 @@ export class SessionManager {
     this.withSessionStateLock(sessionId, () => {
       const statePath = this.getStatePath(sessionId);
       const current = this.readStateSnapshotSafely(statePath);
+      const nextWorkingMemory = this.applyAutoCompactRetention(
+        current?.workingMemory,
+        event,
+      );
       const snapshot = this.buildSessionStateSnapshot(session, current, {
         pendingLifecycle: applyLifecycleEventToIndex(
           current?.pendingLifecycle ?? createEmptyLifecycleIndex(),
           event,
         ),
       });
+      if (nextWorkingMemory !== undefined) {
+        snapshot.workingMemory = nextWorkingMemory;
+      }
       this.writeJsonFileAtomic(statePath, snapshot);
     });
+  }
+
+  private applyAutoCompactRetention(
+    workingMemory: unknown,
+    event: QueryEvent,
+  ): unknown {
+    if (!workingMemory || typeof workingMemory !== "object" || Array.isArray(workingMemory)) {
+      return workingMemory;
+    }
+    const root = { ...(workingMemory as Record<string, unknown>) };
+    const now = new Date().toISOString();
+    const previousEventCount =
+      typeof root.sourceEventCount === "number" &&
+      Number.isFinite(root.sourceEventCount)
+        ? Math.max(0, Math.floor(root.sourceEventCount))
+        : 0;
+    const previousTurnCount =
+      typeof root.sourceTurnCount === "number" &&
+      Number.isFinite(root.sourceTurnCount)
+        ? Math.max(0, Math.floor(root.sourceTurnCount))
+        : 0;
+    const turnCompleted = event.type === "query.completed";
+    const nextEventCount = previousEventCount + 1;
+    const nextTurnCount = previousTurnCount + (turnCompleted ? 1 : 0);
+    root.sourceEventCount = nextEventCount;
+    root.sourceTurnCount = nextTurnCount;
+    root.updatedAt = now;
+
+    if (
+      !turnCompleted ||
+      root.compacted === true ||
+      nextTurnCount < SessionManager.AUTO_COMPACT_TURN_THRESHOLD
+    ) {
+      return root;
+    }
+
+    const approvalAudit = this.extractApprovalAuditMemoryState(root);
+    const approvalAuditHistory = this.extractApprovalAuditHistoryMemoryState(root);
+    const continuity =
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+        ? { ...(root.continuity as Record<string, unknown>) }
+        : {};
+
+    if (approvalAudit) {
+      continuity.lastApprovalDecision = approvalAudit.decision;
+      continuity.lastApprovalDecisionSource = approvalAudit.decisionSource;
+      continuity.lastApprovalPersistent = approvalAudit.persistent;
+      continuity.lastApprovalCacheEffect = approvalAudit.cacheEffect;
+      continuity.lastApprovalProjectRoot = approvalAudit.projectRoot;
+      continuity.lastApprovalCacheKey = approvalAudit.cacheKey;
+      continuity.lastApprovalScope = approvalAudit.scopeLabel;
+      continuity.lastApprovalRecordedAt = approvalAudit.recordedAt;
+      if (approvalAudit.lineage) {
+        continuity.lastApprovalLineage = approvalAudit.lineage;
+      }
+      if (approvalAudit.stopReason) {
+        continuity.lastApprovalStopReason = approvalAudit.stopReason;
+      }
+      if (approvalAudit.channel) {
+        continuity.lastApprovalChannel = approvalAudit.channel;
+      }
+      if (approvalAudit.inputKey) {
+        continuity.lastApprovalInputKey = approvalAudit.inputKey;
+      }
+      if (!continuity.lastRequestScopeCacheKey) {
+        continuity.lastRequestScopeCacheKey = approvalAudit.cacheKey;
+      }
+      if (!continuity.lastRequestScopeLabel) {
+        continuity.lastRequestScopeLabel = approvalAudit.scopeLabel;
+      }
+      if (!continuity.lastRequestScopeProjectRoot) {
+        continuity.lastRequestScopeProjectRoot = approvalAudit.projectRoot;
+      }
+      if (!continuity.lastRequestScopeSource) {
+        continuity.lastRequestScopeSource = "approval-request";
+      }
+      if (!continuity.lastPermissionRequestScopeLabel) {
+        continuity.lastPermissionRequestScopeLabel = approvalAudit.scopeLabel;
+      }
+      if (!continuity.lastPermissionRequestCacheKey) {
+        continuity.lastPermissionRequestCacheKey = approvalAudit.cacheKey;
+      }
+      if (!continuity.lastPermissionRequestProjectRoot) {
+        continuity.lastPermissionRequestProjectRoot = approvalAudit.projectRoot;
+      }
+      if (!continuity.lastPermissionRequestSource) {
+        continuity.lastPermissionRequestSource = "approval-request";
+      }
+      if (!continuity.lastPermissionRequestLineage && approvalAudit.lineage) {
+        continuity.lastPermissionRequestLineage = approvalAudit.lineage;
+      }
+    }
+    if (approvalAuditHistory.length > 0) {
+      continuity.lastApprovalHistory = approvalAuditHistory;
+      root.approvalAuditHistory = approvalAuditHistory;
+    }
+
+    root.continuity = continuity;
+    root.summary = this.mergeApprovalSummaryEntries(root.summary, continuity);
+    root.compacted = true;
+    root.compactReason = "auto-threshold";
+    root.compactedAt = now;
+    return root;
+  }
+
+  private mergeApprovalSummaryEntries(
+    summaryValue: unknown,
+    continuity: Record<string, unknown>,
+  ): readonly string[] {
+    const existingEntries = Array.isArray(summaryValue)
+      ? summaryValue.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    const preservedEntries = existingEntries.filter((entry) => {
+      const trimmed = entry.trim();
+      if (!trimmed) {
+        return false;
+      }
+      const normalized = trimmed.startsWith("- ")
+        ? trimmed.slice(2).trim()
+        : trimmed;
+      const separator = normalized.indexOf(":");
+      if (separator <= 0) {
+        return true;
+      }
+      const key = normalized.slice(0, separator).trim().toLowerCase();
+      return (
+        !key.startsWith("last-approval-") &&
+        !key.startsWith("last-request-scope-") &&
+        !key.startsWith("last-permission-request-")
+      );
+    });
+    const approvalPairs: Array<[string, string]> = [];
+    const addPair = (key: string, value: unknown): void => {
+      if (typeof value !== "string" || value.trim().length === 0) {
+        return;
+      }
+      approvalPairs.push([key, value.trim()]);
+    };
+    addPair("last-approval-decision", continuity.lastApprovalDecision);
+    addPair("last-approval-decision-source", continuity.lastApprovalDecisionSource);
+    if (typeof continuity.lastApprovalPersistent === "boolean") {
+      approvalPairs.push([
+        "last-approval-persistent",
+        continuity.lastApprovalPersistent ? "yes" : "no",
+      ]);
+    }
+    addPair("last-approval-cache-effect", continuity.lastApprovalCacheEffect);
+    addPair("last-approval-project-root", continuity.lastApprovalProjectRoot);
+    addPair("last-approval-cache-key", continuity.lastApprovalCacheKey);
+    addPair("last-approval-scope", continuity.lastApprovalScope);
+    addPair("last-approval-lineage", continuity.lastApprovalLineage);
+    addPair("last-approval-stop-reason", continuity.lastApprovalStopReason);
+    addPair("last-approval-channel", continuity.lastApprovalChannel);
+    addPair("last-approval-input-key", continuity.lastApprovalInputKey);
+    addPair("last-approval-recorded-at", continuity.lastApprovalRecordedAt);
+    addPair("last-request-scope-cache-key", continuity.lastRequestScopeCacheKey);
+    addPair("last-request-scope-label", continuity.lastRequestScopeLabel);
+    addPair(
+      "last-request-scope-project-root",
+      continuity.lastRequestScopeProjectRoot,
+    );
+    addPair("last-request-scope-source", continuity.lastRequestScopeSource);
+    addPair(
+      "last-permission-request-tool",
+      continuity.lastPermissionRequestToolName,
+    );
+    addPair(
+      "last-permission-request-operation",
+      continuity.lastPermissionRequestOperation,
+    );
+    addPair(
+      "last-permission-request-target",
+      continuity.lastPermissionRequestTarget,
+    );
+    addPair(
+      "last-permission-request-process",
+      continuity.lastPermissionRequestProcess,
+    );
+    addPair(
+      "last-permission-request-scope-key",
+      continuity.lastPermissionRequestScopeKey,
+    );
+    addPair(
+      "last-permission-request-scope-label",
+      continuity.lastPermissionRequestScopeLabel,
+    );
+    addPair(
+      "last-permission-request-cache-key",
+      continuity.lastPermissionRequestCacheKey,
+    );
+    addPair(
+      "last-permission-request-project-root",
+      continuity.lastPermissionRequestProjectRoot,
+    );
+    addPair(
+      "last-permission-request-source",
+      continuity.lastPermissionRequestSource,
+    );
+    addPair(
+      "last-permission-request-lineage",
+      continuity.lastPermissionRequestLineage,
+    );
+
+    return [
+      ...preservedEntries,
+      ...approvalPairs.map(([key, value]) => `- ${key}: ${value}`),
+    ];
   }
 
   private load(sessionId: string): Session {
@@ -5214,7 +5388,6 @@ export class SessionManager {
         | "terminalClassification"
         | "lastContinuationReason"
         | "pendingLifecycle"
-        | "workingMemory"
       >
     >,
   ): SessionStateSnapshot {
@@ -5268,11 +5441,7 @@ export class SessionManager {
         Object.prototype.hasOwnProperty.call(overrides, "pendingLifecycle")
           ? overrides.pendingLifecycle
           : (current?.pendingLifecycle ?? createEmptyLifecycleIndex()),
-      workingMemory:
-        overrides &&
-        Object.prototype.hasOwnProperty.call(overrides, "workingMemory")
-          ? overrides.workingMemory
-          : current?.workingMemory,
+      workingMemory: current?.workingMemory,
     };
   }
 
@@ -5295,7 +5464,10 @@ export class SessionManager {
         try {
           return action();
         } finally {
-          fs.closeSync(fd);
+          if (fd !== undefined) {
+            fs.closeSync(fd);
+            fd = undefined;
+          }
           try {
             fs.rmSync(lockPath, { force: true });
           } catch {
@@ -5383,4 +5555,5 @@ export class SessionManager {
     }
   }
 }
+
 

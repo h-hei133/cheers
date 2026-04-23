@@ -5,6 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { EscalationPrompt } from "../../sandbox/index.js";
 import { ApprovalTrustPolicy } from "./approvalTrustPolicy.js";
 
+function normalizeExpectedProjectRoot(root: string): string {
+  const resolved = path.resolve(root);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
 function buildPrompt(target: string): EscalationPrompt {
   return {
     id: "esc_test",
@@ -122,7 +127,18 @@ describe("ApprovalTrustPolicy", () => {
     });
     const lastHit = policy.getLastHit();
     expect(lastHit?.source).toBe("allow-always-policy");
-    expect(lastHit?.projectRoot).toBe(path.resolve(project));
+    expect(lastHit?.projectRoot).toBe(normalizeExpectedProjectRoot(project));
     expect(lastHit?.scopeLabel).toContain("process(node)");
+  });
+
+  it("supports one-shot allow-once cache consumption", () => {
+    const policy = new ApprovalTrustPolicy(policyPath);
+    const cacheKey = "project|bash:spawn:process:node";
+    policy.rememberAllowOnce(cacheKey);
+
+    expect(policy.hasAllowOnce(cacheKey)).toBe(true);
+    expect(policy.consumeAllowOnce(cacheKey)).toBe(true);
+    expect(policy.hasAllowOnce(cacheKey)).toBe(false);
+    expect(policy.consumeAllowOnce(cacheKey)).toBe(false);
   });
 });

@@ -69,6 +69,21 @@ describe("slash router (W4)", () => {
     expect(result?.kind).toBe("local");
     if (result?.kind === "local") {
       expect(result.output).toContain("Unknown slash command");
+      expect(result.output).toContain("Quick actions:");
+      expect(result.output).toContain("/help");
+    }
+  });
+
+  it("returns discovery guidance for bare slash input", async () => {
+    const result = await routeSlashCommand("/", {
+      cwd: workspaceRoot,
+    });
+    expect(result).toBeTruthy();
+    expect(result?.kind).toBe("local");
+    if (result?.kind === "local") {
+      expect(result.output).toContain("Slash command required");
+      expect(result.output).toContain("Quick actions:");
+      expect(result.output).toContain("/sessions");
     }
   });
 
@@ -90,6 +105,8 @@ describe("slash router (W4)", () => {
       ["/sessions list", "list-sessions"],
       ["/sessions current", "list-sessions"],
       ["/sessions switch sess_abc", "list-sessions"],
+      ["/sessions help", "list-sessions"],
+      ["/sessions unknown-mode", "list-sessions"],
       ["/workspace", "show-workspace"],
       ["/workspace status", "show-workspace"],
       ["/workspace recent", "show-workspace"],
@@ -131,6 +148,12 @@ describe("slash router (W4)", () => {
         if (command === "/sessions switch sess_abc") {
           expect(result.sessionAction).toBe("switch");
           expect(result.sessionId).toBe("sess_abc");
+        }
+        if (command === "/sessions help") {
+          expect(result.sessionAction).toBe("help");
+        }
+        if (command === "/sessions unknown-mode") {
+          expect(result.sessionAction).toBe("help");
         }
         if (command === "/permissions explain") {
           expect(result.permissionAction).toBe("explain");

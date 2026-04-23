@@ -10,7 +10,6 @@ import type { SessionContinuitySnapshot } from "../../session/SessionManager.js"
 import type { QueryEvent } from "../query/events.js";
 import type { QueryRuntimeStateSeed } from "../query/runtimeState.js";
 import { ShellStateMachine } from "./stateMachine.js";
-import type { SessionResumeProvenance } from "./runtimeContext.js";
 
 export interface SessionRuntimeDependencies {
   readonly sessionManager: SessionManager;
@@ -65,7 +64,6 @@ export class ShellSessionRuntime {
       runtimeSeed?: QueryRuntimeStateSeed;
       continuityState?: SessionContinuitySnapshot;
       outputMode?: "interactive" | "print";
-      resumeProvenance?: SessionResumeProvenance;
     },
   ): Promise<string> {
     this.currentRunController = new AbortController();
@@ -116,16 +114,6 @@ export class ShellSessionRuntime {
               ? continuityBuilder.call(this.deps.sessionManager, sessionId, prompt)
               : undefined;
       }
-      if (!continuityState && options?.resumeProvenance) {
-        continuityState = buildMinimalContinuitySnapshotForProvenance(
-          sessionId,
-          this.deps.sessionManager.getSessionProjectRoot(sessionId),
-        );
-      }
-      continuityState = applyResumeProvenanceToContinuityState(
-        continuityState,
-        options?.resumeProvenance,
-      );
 
       if (!options?.runtimeSeed) {
         this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt);
@@ -453,66 +441,6 @@ export class ShellSessionRuntime {
     this.stateMachine.terminate();
     this.deps.sessionManager.saveTerminated(sessionId);
   }
-}
-
-function applyResumeProvenanceToContinuityState(
-  continuityState: SessionContinuitySnapshot | undefined,
-  resumeProvenance: SessionResumeProvenance | undefined,
-): SessionContinuitySnapshot | undefined {
-  if (!continuityState || !resumeProvenance) {
-    return continuityState;
-  }
-
-  const nextEvidence = (continuityState.lastContinuationEvidence ?? []).filter(
-    (entry) =>
-      !/^session-resume-(?:source|requested|resolved|rebind-from-missing):/i.test(
-        entry,
-      ),
-  );
-  const pushUnique = (marker: string | undefined): void => {
-    if (!marker?.trim()) {
-      return;
-    }
-    if (!nextEvidence.includes(marker)) {
-      nextEvidence.push(marker);
-    }
-  };
-
-  pushUnique(`session-resume-source:${resumeProvenance.source}`);
-  pushUnique(
-    `session-resume-requested:${resumeProvenance.requestedSessionId ?? "(none)"}`,
-  );
-  pushUnique(
-    `session-resume-resolved:${resumeProvenance.resolvedSessionId ?? continuityState.sessionId}`,
-  );
-  if (resumeProvenance.rebindFromMissingSessionId?.trim()) {
-    pushUnique(
-      `session-resume-rebind-from-missing:${resumeProvenance.rebindFromMissingSessionId}`,
-    );
-  }
-
-  return {
-    ...continuityState,
-    lastContinuationEvidence: nextEvidence,
-  };
-}
-
-function buildMinimalContinuitySnapshotForProvenance(
-  sessionId: string,
-  projectRoot: string,
-): SessionContinuitySnapshot {
-  return {
-    sessionId,
-    projectRoot,
-    recentChangedFiles: [],
-    recentTargetFiles: [],
-    recentFailedFiles: [],
-    recentVerifiedFiles: [],
-    lastRepairNotes: [],
-    lastContinuationEvidence: [],
-    lastTaskSatisfactionReasons: [],
-    unresolvedItems: [],
-  };
 }
 
 function parseRunCommandAllowlistBlockContext(

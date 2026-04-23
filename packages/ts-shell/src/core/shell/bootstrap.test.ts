@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getRuntimeConfig } from '../../config/runtimeConfig.js'
 import { StreamingRenderer } from '../../renderer/StreamingRenderer.js'
 import { SessionManager } from '../../session/SessionManager.js'
@@ -112,6 +112,32 @@ describe('shell bootstrap', () => {
     expect(result.context.session.id).toBe(session.id)
   })
 
+  it('explicitly rebinds compatible roots when migration flag is set', () => {
+    const sessionManager = new SessionManager()
+    const sessionRoot = fs.mkdtempSync(path.join(fakeHome, 'session-root-rebind-'))
+    const nestedEntry = path.join(sessionRoot, 'nested', 'entry')
+    fs.mkdirSync(nestedEntry, { recursive: true })
+    const session = sessionManager.createNew(sessionRoot)
+
+    const result = bootstrapShellRuntime({
+      cwd: nestedEntry,
+      launchCwd: nestedEntry,
+      runtimeConfig: getRuntimeConfig(nestedEntry),
+      gitContext: getWorkflowGitContext(nestedEntry),
+      sessionManager,
+      renderer: new StreamingRenderer(),
+      requestedSessionId: session.id,
+      allowSessionRootMigration: true,
+    })
+
+    expect(result.context.session.id).toBe(session.id)
+    expect(path.resolve(result.context.projectRoot)).toBe(path.resolve(nestedEntry))
+    expect(path.resolve(result.context.session.projectRoot)).toBe(path.resolve(nestedEntry))
+    expect(path.resolve(sessionManager.resume(session.id).projectRoot)).toBe(
+      path.resolve(nestedEntry),
+    )
+  })
+
   it('blocks explicit session reuse when requested root is a different project root', () => {
     const sessionManager = new SessionManager()
     const projectA = fs.mkdtempSync(path.join(fakeHome, 'project-a-'))
@@ -154,5 +180,104 @@ describe('shell bootstrap', () => {
     expect(path.resolve(sessionManager.resume(session.id).projectRoot)).toBe(
       path.resolve(projectB),
     )
+  })
+
+  it('resumes project current session by default when no --session-id is provided', () => {
+    const sessionManager = new SessionManager()
+    const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-current-'))
+    const oldSession = sessionManager.createNew(projectRoot)
+    const newerSession = sessionManager.createNew(projectRoot)
+
+    // Simulate `/sessions switch <id>` selecting an older session as current.
+    sessionManager.resume(oldSession.id)
+
+    const result = bootstrapShellRuntime({
+      cwd: projectRoot,
+      launchCwd: projectRoot,
+      runtimeConfig: getRuntimeConfig(projectRoot),
+      gitContext: getWorkflowGitContext(projectRoot),
+      sessionManager,
+      renderer: new StreamingRenderer(),
+    })
+
+    expect(result.context.session.id).toBe(oldSession.id)
+    expect(result.context.session.id).not.toBe(newerSession.id)
+  })
+
+  it('falls back to fresh session when persisted current session cannot be resumed', () => {
+    const sessionManager = new SessionManager()
+    const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-stale-current-'))
+    const current = sessionManager.createNew(projectRoot)
+    const originalResume = sessionManager.resume.bind(sessionManager)
+    const resumeSpy = vi
+      .spyOn(sessionManager, 'resume')
+      .mockImplementation((sessionId: string, projectRootArg?: string) => {
+        if (sessionId === current.id) {
+          throw new Error('simulated-resume-failure')
+        }
+        return originalResume(sessionId, projectRootArg)
+      })
+
+    const result = bootstrapShellRuntime({
+      cwd: projectRoot,
+      launchCwd: projectRoot,
+      runtimeConfig: getRuntimeConfig(projectRoot),
+      gitContext: getWorkflowGitContext(projectRoot),
+      sessionManager,
+      renderer: new StreamingRenderer(),
+    })
+
+    expect(result.context.session.id).not.toBe(current.id)
+    expect(sessionManager.getCurrentSessionForProject(projectRoot)?.id).toBe(
+      result.context.session.id,
+    )
+    resumeSpy.mockRestore()
+  })
+
+  it('keeps explicit --session-id precedence over persisted current session pointer', () => {
+    const sessionManager = new SessionManager()
+    const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-explicit-priority-'))
+    const persistedCurrent = sessionManager.createNew(projectRoot)
+    const explicitTarget = sessionManager.createNew(projectRoot)
+
+    // Re-point current pointer away from explicit target.
+    sessionManager.resume(persistedCurrent.id)
+
+    const result = bootstrapShellRuntime({
+      cwd: projectRoot,
+      launchCwd: projectRoot,
+      runtimeConfig: getRuntimeConfig(projectRoot),
+      gitContext: getWorkflowGitContext(projectRoot),
+      sessionManager,
+      renderer: new StreamingRenderer(),
+      requestedSessionId: explicitTarget.id,
+    })
+
+    expect(result.context.session.id).toBe(explicitTarget.id)
+  })
+
+  it('captures lifecycle notices without printing when emitLifecycleMessages is false', () => {
+    const sessionManager = new SessionManager()
+    const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-lifecycle-notice-'))
+    const selected = sessionManager.createNew(projectRoot)
+    sessionManager.resume(selected.id)
+    const renderer = new StreamingRenderer()
+    const renderSpy = vi.spyOn(renderer, 'renderLine').mockImplementation(() => {})
+
+    const result = bootstrapShellRuntime({
+      cwd: projectRoot,
+      launchCwd: projectRoot,
+      runtimeConfig: getRuntimeConfig(projectRoot),
+      gitContext: getWorkflowGitContext(projectRoot),
+      sessionManager,
+      renderer,
+      emitLifecycleMessages: false,
+    })
+
+    expect(result.context.session.id).toBe(selected.id)
+    expect(result.lifecycleNotices.length).toBeGreaterThan(0)
+    expect(result.lifecycleNotices.at(-1)).toContain(`Resumed session ${selected.id}`)
+    expect(renderSpy).not.toHaveBeenCalled()
+    renderSpy.mockRestore()
   })
 })
