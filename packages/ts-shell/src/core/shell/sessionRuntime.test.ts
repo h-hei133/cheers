@@ -71,13 +71,15 @@ describe("shell session runtime (W5)", () => {
 
   it("builds follow-up continuity context before persisting the current prompt barrier", async () => {
     const calls: string[] = [];
-    let continuitySeenByRunner: string | undefined;
-
     const runtime = new ShellSessionRuntime({
       sessionManager: {
-        buildPromptContinuityContext(sessionId: string, prompt: string) {
+        buildPromptContinuitySnapshot(sessionId: string, prompt: string) {
           calls.push(`continuity:${sessionId}:${prompt}`);
-          return "recent-target-files: ./continuity_demo.py";
+          return {
+            projectRoot: "D:/Test/continuity",
+            trustBoundary: "session-boundary",
+            sessionFocusSummary: "recent-target-files: ./continuity_demo.py",
+          };
         },
         markRunStarted() {},
         persistUserPromptBarrier(sessionId: string, prompt: string) {
@@ -99,8 +101,7 @@ describe("shell session runtime (W5)", () => {
         renderLine() {},
         renderChunk() {},
       } as never,
-      runPrompt: async function* (_prompt, _signal, _seed, continuityContext) {
-        continuitySeenByRunner = continuityContext;
+      runPrompt: async function* () {
         yield {
           type: "query.completed",
           result: {
@@ -126,7 +127,6 @@ describe("shell session runtime (W5)", () => {
     );
 
     expect(output).toBe("ok");
-    expect(continuitySeenByRunner).toContain("recent-target-files");
     expect(calls.slice(0, 2)).toEqual([
       "continuity:sess_followup:continue previous issue and read first 2 lines",
       "barrier:sess_followup:continue previous issue and read first 2 lines",
@@ -251,9 +251,6 @@ describe("shell session runtime (W5)", () => {
       renderedLines.some((line) => line.includes("[tool:start]")),
     ).toBe(false);
     expect(
-      renderedLines.some((line) => line.includes("Tool running: bash")),
-    ).toBe(true);
-    expect(
       renderedLines.some((line) => line.includes("[approval] requested")),
     ).toBe(false);
     expect(
@@ -266,41 +263,29 @@ describe("shell session runtime (W5)", () => {
     ).toBe(true);
     expect(
       renderedLines.some((line) =>
-        line.includes(
-          "Run summary: approvals 0/1 approved | tools 1 run | retries 1 | mcp clients=0 tools=0",
-        ),
+        line.includes("Execution summary"),
       ),
     ).toBe(true);
-    expect(renderedLines).toContain("Final result");
     expect(
-      renderedLines.some((line) => line.includes("- Classification: success")),
+      renderedLines.some((line) =>
+        line.includes("- Actions: bash (1 run)"),
+      ),
     ).toBe(true);
-    expect(renderedLines).toContain("Coding result");
     expect(
-      renderedLines.some((line) => line.includes("- Changed files: src/app.ts")),
+      renderedLines.some((line) =>
+        line.includes("- Approvals: 0/1 approved"),
+      ),
+    ).toBe(true);
+    expect(renderedLines).toContain("Result");
+    expect(
+      renderedLines.some((line) => line.includes("- Outcome: success")),
+    ).toBe(true);
+    expect(renderedLines).toContain("Action result");
+    expect(
+      renderedLines.some((line) => line.includes("- Changed: 1 file(s)")),
     ).toBe(true);
     expect(
       renderedLines.some((line) => line.includes("- Verification: passed")),
-    ).toBe(true);
-    expect(
-      renderedLines.some((line) =>
-        line.includes("- Continuation: first-pass-success"),
-      ),
-    ).toBe(true);
-    expect(
-      renderedLines.some((line) =>
-        line.includes("- Change set (git-aware): yes"),
-      ),
-    ).toBe(true);
-    expect(
-      renderedLines.some((line) =>
-        line.includes("- Task satisfaction: satisfied"),
-      ),
-    ).toBe(true);
-    expect(
-      renderedLines.some((line) =>
-        line.includes("- Patch results: src/app.ts [replace] applied"),
-      ),
     ).toBe(true);
   });
 
@@ -371,8 +356,8 @@ describe("shell session runtime (W5)", () => {
       renderedLines.some((line) => line.includes("[tool:start] bash")),
     ).toBe(true);
     expect(
-      renderedLines.some((line) => line.includes("Run summary:")),
-    ).toBe(false);
+      renderedLines.some((line) => line.includes("Execution trace summary")),
+    ).toBe(true);
     expect(renderedLines).toContain("Final result");
     expect(renderedLines).toContain("\nAssistant:");
   });
@@ -531,9 +516,10 @@ describe("shell session runtime (W5)", () => {
     ]);
     expect(
       renderedLines.some((line) =>
-        line.includes("Run stopped: Retry budget exhausted"),
+        line.includes("- Detail: Retry budget exhausted"),
       ),
     ).toBe(true);
+    expect(renderedLines).toContain("Next steps");
   });
 
   it("prints actionable hint when real provider key is missing", async () => {
@@ -583,12 +569,12 @@ describe("shell session runtime (W5)", () => {
     expect(
       renderedLines.some((line) =>
         line.includes(
-          "Run failed: OPENAI_API_KEY is required for the real provider path",
+          "- Detail: OPENAI_API_KEY is required for the real provider path",
         ),
       ),
     ).toBe(true);
     expect(renderedLines).toContain(
-            "Hint: configure credential via /connect set <provider> <api-key> (or export env var), then submit another prompt.",
+      "- Configure credential via /connect set <provider> <api-key> (or export env var).",
     );
   });
 
@@ -645,19 +631,18 @@ describe("shell session runtime (W5)", () => {
 
     expect(
       renderedLines.some((line) =>
-        line.includes(
-          "Run failed: Run-command intent is not allowed in the MVP allowlist",
-        ),
+        line.includes("Run-command intent is not allowed in the MVP allowlist"),
       ),
     ).toBe(true);
+    expect(renderedLines).toContain("Next steps");
     expect(renderedLines).toContain(
-      "Why not executed: run-command intent was blocked by the MVP allowlist.",
+      "- Run-command intent was blocked by the MVP allowlist.",
     );
     expect(renderedLines).toContain(
-      "Allowed commands: node --version, npm test -- --help, npm run build -- --help",
+      "- Allowed commands: node --version, npm test -- --help, npm run build -- --help",
     );
     expect(renderedLines).toContain(
-      'Hint: rephrase your prompt to request one allowed command, for example: "Run node --version".',
+      '- Rephrase with one allowed command, for example: "Run node --version".',
     );
     expect(calls).toContain(`error:sess_blocked:${blockedReason}`);
   });
@@ -729,10 +714,18 @@ describe("shell session runtime (W5)", () => {
 
       expect(
         renderedLines.some((line) =>
-          line.includes("Run failed: Provider readiness failed"),
+          line.includes("- Detail: Provider readiness failed"),
         ),
       ).toBe(true);
-      expect(renderedLines).toContain(scenario.expectedHint);
+      const expectedHintCore = scenario.expectedHint
+        .replace(/^Hint:\s*/i, "")
+        .replace(/, then submit another prompt\.$/i, "")
+        .toLowerCase();
+      expect(
+        renderedLines.some((line) =>
+          line.toLowerCase().includes(expectedHintCore),
+        ),
+      ).toBe(true);
       expect(calls).toContain(
         `error:${scenario.sessionId}:${scenario.stopReason}`,
       );

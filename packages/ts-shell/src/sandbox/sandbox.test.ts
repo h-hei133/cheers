@@ -28,6 +28,28 @@ describe('sandbox policy and escalation workflow', () => {
     })
   })
 
+  it('normalizes traversal and sibling-prefix paths before workspace boundary checks', () => {
+    const policy = new SandboxPolicy(workspaceRoot)
+    const insideTarget = path.join(workspaceRoot, 'src', 'inside.txt')
+    const traversalTarget = path.join(workspaceRoot, '..', 'outside.txt')
+    const siblingPrefixTarget = `${workspaceRoot}-sibling/file.txt`
+
+    expect(policy.checkFilesystemPermission('write', insideTarget)).toMatchObject({
+      allowed: true,
+      requiresEscalation: false,
+    })
+    expect(policy.checkFilesystemPermission('write', traversalTarget)).toMatchObject({
+      allowed: false,
+      requiresEscalation: true,
+      policyRule: 'default-deny-out-of-workspace',
+    })
+    expect(policy.checkFilesystemPermission('write', siblingPrefixTarget)).toMatchObject({
+      allowed: false,
+      requiresEscalation: true,
+      policyRule: 'default-deny-out-of-workspace',
+    })
+  })
+
   it('requires explicit denial/approval and logs audit entries', async () => {
     const enforcer = new SandboxEnforcer({
       workspaceRoot,

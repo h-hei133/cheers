@@ -91,6 +91,10 @@ function deriveTruthfulTerminal(input: {
   }
 
   if (verification.status === 'blocked') {
+    if (hasSuccessfulMutationWithVerificationCaveat(codingResult)) {
+      return base
+    }
+
     return {
       terminalReason: 'stopped_error',
       terminalClassification: 'stopped',
@@ -114,6 +118,10 @@ function deriveTruthfulTerminal(input: {
     taskVerdict === 'insufficient-evidence' ||
     taskVerdict === 'completed-with-caveats'
   ) {
+    if (hasSuccessfulMutationWithVerificationCaveat(codingResult)) {
+      return base
+    }
+
     return {
       terminalReason: 'stopped_error',
       terminalClassification: 'stopped',
@@ -125,6 +133,16 @@ function deriveTruthfulTerminal(input: {
   }
 
   return base
+}
+
+function hasSuccessfulMutationWithVerificationCaveat(
+  codingResult: CodingResultSummary,
+): boolean {
+  return (
+    codingResult.changedFiles.length > 0 &&
+    codingResult.failedFiles.length === 0 &&
+    codingResult.verification.status === 'blocked'
+  )
 }
 
 function hasHardFailureSignal(codingResult: CodingResultSummary): boolean {

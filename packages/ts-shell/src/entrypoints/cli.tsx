@@ -1831,7 +1831,7 @@ async function runNonTtyPromptStream(options: {
     `Non-TTY stdin mode ${contextTag()}: waiting for newline-delimited prompts.`,
   );
   options.renderer.renderLine(
-    "Send one prompt per line. Close stdin to finish.\n",
+    "Send one prompt per line, or paste fenced/multiline content. Close stdin to finish.\n",
   );
   options.logger.info("CLI non-TTY stdin stream mode started", {
     sessionId: options.runtimeContext.session.id,
@@ -1845,40 +1845,100 @@ async function runNonTtyPromptStream(options: {
 
   let processedCount = 0;
   let turnChain = Promise.resolve();
+  let pendingPrompt: {
+    lines: string[];
+    inFence: boolean;
+    multilineLiteral: boolean;
+  } | null = null;
+
+  const enqueuePrompt = (prompt: string) => {
+    turnChain = turnChain
+      .then(async () => {
+        processedCount += 1;
+        options.renderer.renderLine(`${contextTag()} > ${prompt}`);
+        await runNonInteractivePrompt({
+          prompt,
+          sessionManager: options.sessionManager,
+          runtimeContext: options.runtimeContext,
+          renderer: options.renderer,
+          sessionRuntime: options.sessionRuntime,
+          logger: options.logger,
+          printMode: false,
+          fallbackSessionId: options.fallbackSessionId,
+          setActiveNonInteractiveApprovalMode:
+            options.setActiveNonInteractiveApprovalMode,
+          nonInteractiveCliApprovalMode:
+            options.nonInteractiveCliApprovalMode,
+        });
+      })
+      .catch((error) => {
+        options.renderer.renderLine(
+          `Run failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+  };
+
+  const flushPendingPrompt = () => {
+    if (!pendingPrompt) {
+      return;
+    }
+    const prompt = pendingPrompt.lines.join("\n").trim();
+    pendingPrompt = null;
+    if (prompt.length > 0) {
+      enqueuePrompt(prompt);
+    }
+  };
 
   stdinReader.on("line", (line) => {
-    const prompts = parseTransportPrompts(line, { allowComments: false });
-    for (const prompt of prompts) {
-      turnChain = turnChain
-        .then(async () => {
-          processedCount += 1;
-          options.renderer.renderLine(`${contextTag()} > ${prompt}`);
-          await runNonInteractivePrompt({
-            prompt,
-            sessionManager: options.sessionManager,
-            runtimeContext: options.runtimeContext,
-            renderer: options.renderer,
-            sessionRuntime: options.sessionRuntime,
-            logger: options.logger,
-            printMode: false,
-            fallbackSessionId: options.fallbackSessionId,
-            setActiveNonInteractiveApprovalMode:
-              options.setActiveNonInteractiveApprovalMode,
-            nonInteractiveCliApprovalMode:
-              options.nonInteractiveCliApprovalMode,
-          });
-        })
-        .catch((error) => {
-          options.renderer.renderLine(
-            `Run failed: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        });
+    const normalizedLine = line.replace(/^\uFEFF/, "");
+    if (pendingPrompt) {
+      if (
+        pendingPrompt.multilineLiteral &&
+        !pendingPrompt.inFence &&
+        normalizedLine.trim().length === 0
+      ) {
+        flushPendingPrompt();
+        return;
+      }
+      pendingPrompt.lines.push(normalizedLine);
+      pendingPrompt.inFence = updateFenceState(
+        pendingPrompt.inFence,
+        normalizedLine,
+      );
+      if (!pendingPrompt.inFence && pendingPrompt.lines.some(isFenceLine)) {
+        flushPendingPrompt();
+      }
+      return;
+    }
+
+    if (normalizedLine.trim().length === 0) {
+      return;
+    }
+
+    const startsFence = isFenceLine(normalizedLine);
+    if (startsFence || opensMultilineLiteralPrompt(normalizedLine)) {
+      pendingPrompt = {
+        lines: [normalizedLine],
+        inFence: updateFenceState(false, normalizedLine),
+        multilineLiteral: opensMultilineLiteralPrompt(normalizedLine),
+      };
+      if (!pendingPrompt.inFence && startsFence) {
+        flushPendingPrompt();
+      }
+      return;
+    }
+
+    for (const prompt of parseTransportPrompts(normalizedLine, {
+      allowComments: false,
+    })) {
+      enqueuePrompt(prompt);
     }
   });
 
   await new Promise<void>((resolve) => {
     stdinReader.once("close", () => resolve());
   });
+  flushPendingPrompt();
   await turnChain;
   options.renderer.renderLine(
     `\nStdin stream closed. Processed ${processedCount} prompt(s).\n`,
@@ -2234,6 +2294,15 @@ async function executeResolvedPromptTurn(options: {
       promptLength: options.effectivePrompt.length,
     },
   );
+  if (!options.printMode) {
+    const startLabel =
+      turnOrigin === "resumed"
+        ? "Execution started (resumed context)"
+        : turnOrigin === "continued"
+          ? "Execution started (continued context)"
+          : "Execution started";
+    options.renderer.renderLine(`${startLabel}...`);
+  }
   const continuitySnapshot =
     options.continuityState ??
     options.sessionManager.buildPromptContinuitySnapshot(
@@ -2385,6 +2454,25 @@ function parseTransportPrompts(
       }
       return true;
     });
+}
+
+function isFenceLine(line: string): boolean {
+  return line.trim().startsWith("```");
+}
+
+function updateFenceState(current: boolean, line: string): boolean {
+  const fenceCount = line.match(/```/g)?.length ?? 0;
+  return fenceCount % 2 === 0 ? current : !current;
+}
+
+function opensMultilineLiteralPrompt(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed.endsWith(":")) {
+    return false;
+  }
+  return /(?:create|write|append|edit|modify|update).*(?:content|exactly)|(?:content|exactly).*(?:create|write|append|edit|modify|update)/i.test(
+    trimmed,
+  );
 }
 
 function resolveStdinTransportMode(input: {

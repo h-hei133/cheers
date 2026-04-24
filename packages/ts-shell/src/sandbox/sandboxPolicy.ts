@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 /**
  * Sandbox Policy - Default-deny permission enforcement for TS execution path
  * 
@@ -161,19 +163,27 @@ export class SandboxPolicy {
   /**
    * Normalize path for consistent comparison (Windows-aware)
    */
-  private normalizePath(path: string): string {
+  private normalizePath(inputPath: string): string {
+    const resolved = path.resolve(inputPath).replace(/\\/g, '/');
     // Convert to lowercase on Windows for case-insensitive comparison
     if (process.platform === 'win32') {
-      return path.toLowerCase().replace(/\\/g, '/');
+      return resolved.toLowerCase();
     }
-    return path;
+    return resolved;
   }
 
   /**
    * Check if a path is within the workspace boundary
    */
   private isWithinWorkspace(normalizedPath: string): boolean {
-    return normalizedPath.startsWith(this.workspaceRoot);
+    if (normalizedPath === this.workspaceRoot) {
+      return true;
+    }
+
+    const workspaceWithSeparator = this.workspaceRoot.endsWith('/')
+      ? this.workspaceRoot
+      : `${this.workspaceRoot}/`;
+    return normalizedPath.startsWith(workspaceWithSeparator);
   }
 
   /**

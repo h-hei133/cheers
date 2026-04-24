@@ -1791,15 +1791,25 @@ export class SessionManager {
     previousRoot: string,
     nextRoot: string,
   ): string {
-    const variants = new Set<string>([
-      previousRoot,
-      previousRoot.replaceAll("\\", "/"),
-      previousRoot.replaceAll("/", "\\"),
-    ]);
+    const previousForward = previousRoot.replaceAll("\\", "/");
+    const previousBackward = previousRoot.replaceAll("/", "\\");
+    const nextForward = nextRoot.replaceAll("\\", "/");
+    const nextBackward = nextRoot.replaceAll("/", "\\");
+    const variants: Array<[pattern: string, replacement: string]> = [
+      [previousRoot, nextRoot],
+      [previousRoot.toLowerCase(), nextRoot.toLowerCase()],
+      [previousRoot.toUpperCase(), nextRoot.toUpperCase()],
+      [previousForward, nextForward],
+      [previousForward.toLowerCase(), nextForward.toLowerCase()],
+      [previousForward.toUpperCase(), nextForward.toUpperCase()],
+      [previousBackward, nextBackward],
+      [previousBackward.toLowerCase(), nextBackward.toLowerCase()],
+      [previousBackward.toUpperCase(), nextBackward.toUpperCase()],
+    ];
     let output = input;
-    for (const variant of variants) {
-      if (!variant) continue;
-      output = output.split(variant).join(nextRoot);
+    for (const [pattern, replacement] of variants) {
+      if (!pattern) continue;
+      output = output.split(pattern).join(replacement);
     }
     return output;
   }

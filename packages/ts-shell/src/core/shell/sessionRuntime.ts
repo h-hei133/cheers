@@ -291,12 +291,11 @@ export class ShellSessionRuntime {
           this.deps.renderer.renderLine("");
         }
 
-        if (this.viewMode === "verbose") {
-          const compactSummary = buildCompactRunSummary(eventDigest);
-          if (compactSummary) {
-            this.deps.renderer.renderLine(compactSummary);
-          }
-        }
+        renderExecutionSummaryBlock(
+          this.deps.renderer,
+          eventDigest,
+          this.viewMode === "verbose" ? "verbose" : "minimal",
+        );
 
         renderTerminalResultBlock(this.deps.renderer, {
           status: terminalStatus,
@@ -311,60 +310,11 @@ export class ShellSessionRuntime {
 
         if (terminalStatus !== "completed") {
           const terminalDetail = terminalStopReason ?? terminalStatus;
-          const terminalLabel =
-            terminalClassification === "stopped"
-              ? "Run stopped"
-              : "Run failed";
-
-          this.deps.renderer.renderLine(`\n${terminalLabel}: ${terminalDetail}`);
-
-          const runCommandBlockContext =
-            parseRunCommandAllowlistBlockContext(terminalDetail);
-          if (runCommandBlockContext) {
-            this.deps.renderer.renderLine(
-              "Why not executed: run-command intent was blocked by the MVP allowlist.",
-            );
-            this.deps.renderer.renderLine(
-              `Allowed commands: ${runCommandBlockContext.allowedCommands}`,
-            );
-            this.deps.renderer.renderLine(
-              'Hint: rephrase your prompt to request one allowed command, for example: "Run node --version".',
-            );
+          const nextSteps = buildTerminalNextSteps(terminalDetail);
+          this.deps.renderer.renderLine("Next steps");
+          for (const step of nextSteps) {
+            this.deps.renderer.renderLine(`- ${step}`);
           }
-
-          if (terminalDetail.includes("provider-readiness:network")) {
-            this.deps.renderer.renderLine(
-              "Hint: check network/proxy/firewall reachability to the provider endpoint, then submit another prompt.",
-            );
-          } else if (
-            terminalDetail.includes("provider-readiness:unsupported-provider")
-          ) {
-            this.deps.renderer.renderLine(
-              "Hint: switch to supported provider with /connect use openai, then submit another prompt.",
-            );
-          } else if (
-            terminalDetail.includes("provider-readiness:missing-config")
-          ) {
-            this.deps.renderer.renderLine(
-              "Hint: configure provider base URL and model via /connect set <provider> <api-key> <base-url> <model>, then submit another prompt.",
-            );
-          } else if (terminalDetail.includes("provider-readiness:auth")) {
-            this.deps.renderer.renderLine(
-              "Hint: check provider API key validity/permissions, then submit another prompt.",
-            );
-          } else if (
-            terminalDetail.includes("provider-readiness:missing-key") ||
-            terminalDetail.includes("OPENAI_API_KEY")
-          ) {
-            this.deps.renderer.renderLine(
-              "Hint: configure credential via /connect set <provider> <api-key> (or export env var), then submit another prompt.",
-            );
-          } else if (terminalDetail.includes("Approval denied by user")) {
-            this.deps.renderer.renderLine(
-              "Hint: submit another prompt and approve escalation when asked.",
-            );
-          }
-
           this.deps.renderer.renderLine("");
         }
       }
@@ -469,6 +419,7 @@ interface RuntimeEventDigest {
   mcpTools: number;
   retries: number;
   toolsStarted: number;
+  toolNames: string[];
   toolsFailed: number;
   approvalsRequested: number;
   approvalsApproved: number;
@@ -483,6 +434,7 @@ function createRuntimeEventDigest(): RuntimeEventDigest {
     mcpTools: 0,
     retries: 0,
     toolsStarted: 0,
+    toolNames: [],
     toolsFailed: 0,
     approvalsRequested: 0,
     approvalsApproved: 0,
@@ -506,6 +458,9 @@ function updateRuntimeEventDigest(
       break;
     case "tool.started":
       digest.toolsStarted += 1;
+      if (!digest.toolNames.includes(event.toolName)) {
+        digest.toolNames.push(event.toolName);
+      }
       break;
     case "tool.result":
       if (!event.success) {
@@ -538,33 +493,46 @@ function renderCompactRetryNotice(
   renderer.renderLine("\nWorking through a temporary provider retry...");
 }
 
-function buildCompactRunSummary(digest: RuntimeEventDigest): string | null {
-  const summaryParts: string[] = [];
-
-  if (digest.approvalsRequested > 0) {
-    summaryParts.push(
-      `approvals ${digest.approvalsApproved}/${digest.approvalsRequested} approved`,
+function renderExecutionSummaryBlock(
+  renderer: StreamingRenderer,
+  digest: RuntimeEventDigest,
+  mode: "minimal" | "verbose",
+): void {
+  const summaryLines: string[] = [];
+  if (digest.toolsStarted > 0) {
+    const toolLabel =
+      digest.toolNames.length > 0
+        ? digest.toolNames.slice(0, 3).join(", ")
+        : "tooling";
+    summaryLines.push(
+      digest.toolsFailed > 0
+        ? `Actions: ${toolLabel} (${digest.toolsStarted} run, ${digest.toolsFailed} failed)`
+        : `Actions: ${toolLabel} (${digest.toolsStarted} run)`,
     );
   }
-  if (digest.toolsStarted > 0) {
-    summaryParts.push(
-      digest.toolsFailed > 0
-        ? `tools ${digest.toolsStarted} run (${digest.toolsFailed} failed)`
-        : `tools ${digest.toolsStarted} run`,
+  if (digest.approvalsRequested > 0) {
+    summaryLines.push(
+      `Approvals: ${digest.approvalsApproved}/${digest.approvalsRequested} approved`,
     );
   }
   if (digest.retries > 0) {
-    summaryParts.push(`retries ${digest.retries}`);
+    summaryLines.push(`Provider retries: ${digest.retries}`);
   }
   if (digest.mcpSnapshots > 0) {
-    summaryParts.push(`mcp clients=${digest.mcpClients} tools=${digest.mcpTools}`);
+    summaryLines.push(`MCP: clients=${digest.mcpClients}, tools=${digest.mcpTools}`);
   }
 
-  if (summaryParts.length === 0) {
-    return null;
+  if (summaryLines.length === 0) {
+    return;
   }
 
-  return `Run summary: ${summaryParts.join(" | ")}\n`;
+  renderer.renderLine(
+    mode === "verbose" ? "\nExecution trace summary" : "\nExecution summary",
+  );
+  for (const line of summaryLines) {
+    renderer.renderLine(`- ${line}`);
+  }
+  renderer.renderLine("");
 }
 
 function renderTerminalResultBlock(
@@ -588,7 +556,9 @@ function renderTerminalResultBlock(
       input.status === "completed"
         ? "completed"
         : input.terminalStopReason ?? input.status;
-    renderer.renderLine(`Result: ${statusLabel} (${detail})`);
+    renderer.renderLine("Result");
+    renderer.renderLine(`- Outcome: ${statusLabel}`);
+    renderer.renderLine(`- Detail: ${detail}`);
     renderer.renderLine("");
     return;
   }
@@ -625,15 +595,14 @@ function renderCodingResultContract(
       codingResult.changedFiles.length > 0
         ? `${codingResult.changedFiles.length} file(s)`
         : "none";
-    renderer.renderLine(
-      `Task: ${codingResult.taskKind} | Changed: ${changedFilesSummary} | Verify: ${verificationStatus}`,
-    );
+    renderer.renderLine("Action result");
+    renderer.renderLine(`- Task: ${codingResult.taskKind}`);
+    renderer.renderLine(`- Changed: ${changedFilesSummary}`);
+    renderer.renderLine(`- Verification: ${verificationStatus}`);
     if (codingResult.verification.nextAction) {
-      renderer.renderLine(`Next: ${codingResult.verification.nextAction}`);
+      renderer.renderLine(`- Next action: ${codingResult.verification.nextAction}`);
     } else if (codingResult.taskSatisfaction.reasons.length > 0) {
-      renderer.renderLine(
-        `Notes: ${codingResult.taskSatisfaction.reasons[0]}`,
-      );
+      renderer.renderLine(`- Note: ${codingResult.taskSatisfaction.reasons[0]}`);
     }
     renderer.renderLine("");
     return;
@@ -788,4 +757,58 @@ function renderCodingResultContract(
     renderer.renderLine(`- Evidence: ${codingResult.evidence.join(" | ")}`);
   }
   renderer.renderLine("");
+}
+
+function buildTerminalNextSteps(terminalDetail: string): string[] {
+  const runCommandBlockContext =
+    parseRunCommandAllowlistBlockContext(terminalDetail);
+  if (runCommandBlockContext) {
+    return [
+      "Run-command intent was blocked by the MVP allowlist.",
+      `Allowed commands: ${runCommandBlockContext.allowedCommands}`,
+      'Rephrase with one allowed command, for example: "Run node --version".',
+    ];
+  }
+
+  if (terminalDetail.includes("provider-readiness:network")) {
+    return [
+      "Check network/proxy/firewall reachability to the provider endpoint.",
+      "Submit the prompt again after connectivity recovers.",
+    ];
+  }
+  if (terminalDetail.includes("provider-readiness:unsupported-provider")) {
+    return [
+      "Switch to a supported provider with /connect use openai.",
+      "Retry the request.",
+    ];
+  }
+  if (terminalDetail.includes("provider-readiness:missing-config")) {
+    return [
+      "Configure provider base URL and model via /connect set <provider> <api-key> <base-url> <model>.",
+      "Retry the request.",
+    ];
+  }
+  if (terminalDetail.includes("provider-readiness:auth")) {
+    return [
+      "Check provider API key validity/permissions.",
+      "Retry the request.",
+    ];
+  }
+  if (
+    terminalDetail.includes("provider-readiness:missing-key") ||
+    terminalDetail.includes("OPENAI_API_KEY")
+  ) {
+    return [
+      "Configure credential via /connect set <provider> <api-key> (or export env var).",
+      "Retry the request.",
+    ];
+  }
+  if (terminalDetail.includes("Approval denied by user")) {
+    return [
+      "Submit the prompt again and approve escalation when requested.",
+    ];
+  }
+  return [
+    "Inspect the stop reason and rerun with an explicit command or next action.",
+  ];
 }

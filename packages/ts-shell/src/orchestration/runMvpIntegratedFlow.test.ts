@@ -1449,6 +1449,515 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
   }, 20000);
 
+  it("runs low-risk content verification after a file edit", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_low_risk_content_verify",
+      prompt:
+        "Create file verify_note.txt with exactly:\n```text\nalpha\nbeta\n```\nVerify the file contains beta.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.terminalClassification).toBe("success");
+    expect(result.codingResult?.taskKind).toBe("write-file");
+    expect(result.codingResult?.changedFiles).toContain("verify_note.txt");
+    expect(result.codingResult?.verification.status).toBe("passed");
+    expect(result.codingResult?.verification.reason).toContain(
+      "content verification passed",
+    );
+    expect(result.codingResult?.verifiedFiles).toContain("verify_note.txt");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "verify_note.txt"), "utf8"),
+    ).resolves.toContain("beta");
+  }, 15000);
+
+  it("runs low-risk multi-file consistency verification after a file edit", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "todo.txt"),
+      "ship minimal CLI smoke\ndocument one follow-up\nverify multi-file follow-up\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "plan.txt"),
+      "Plan\n1. ship minimal CLI smoke\n2. document one follow-up\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_low_risk_multifile_verify",
+      prompt:
+        "Update plan.txt with exactly:\n```text\nPlan\n1. ship minimal CLI smoke\n2. document one follow-up\n3. verify multi-file follow-up\n```\nVerify todo.txt and plan.txt stay consistent.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.terminalClassification).toBe("success");
+    expect(result.codingResult?.taskKind).toBe("edit-file");
+    expect(result.codingResult?.changedFiles).toContain("plan.txt");
+    expect(result.codingResult?.verification.status).toBe("passed");
+    expect(result.codingResult?.verification.reason).toContain(
+      "multi-file consistency verification passed",
+    );
+    expect(result.codingResult?.verifiedFiles).toEqual(
+      expect.arrayContaining(["todo.txt", "plan.txt"]),
+    );
+  }, 15000);
+
+  it("keeps multi-file consistency source separate from append target", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "todo.txt"),
+      "ship minimal CLI smoke\ndocument one follow-up\nverify multi-file follow-up\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "plan.txt"),
+      "Plan\n1. ship minimal CLI smoke\n2. document one follow-up\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_low_risk_multifile_append_target",
+      prompt:
+        "Append to plan.txt with content: verify multi-file follow-up. Verify todo.txt and plan.txt stay consistent.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.terminalClassification).toBe("success");
+    expect(result.codingResult?.changedFiles).toContain("plan.txt");
+    expect(result.codingResult?.changedFiles).not.toContain("todo.txt");
+    expect(result.codingResult?.verification.status).toBe("passed");
+    expect(result.codingResult?.verifiedFiles).toEqual(
+      expect.arrayContaining(["todo.txt", "plan.txt"]),
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "plan.txt"), "utf8"),
+    ).resolves.toContain("verify multi-file follow-up");
+  }, 15000);
+
+  it("verifies constrained multi-file code edits preserve protected files", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    const initialUtils = [
+      'export function greet(name = "world") {',
+      '  return "Hello, " + name;',
+      '}',
+      '',
+    ].join("\n");
+    const initialReadme = "Use greet() to say hello.\n";
+    await fs.writeFile(path.join(workspaceRoot, "utils.js"), initialUtils, "utf8");
+    await fs.writeFile(path.join(workspaceRoot, "README.md"), initialReadme, "utf8");
+
+    const readmeTurn = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_constrained_code_readme",
+      prompt:
+        'Only modify README.md. Do NOT change utils.js. Add a Usage section showing: greet() and greet("Ada"). Then verify README.md contains greet() and README.md contains greet("Ada") and utils.js is unchanged.',
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(readmeTurn.status).toBe("completed");
+    expect(readmeTurn.codingResult?.changedFiles).toContain("README.md");
+    expect(readmeTurn.codingResult?.changedFiles).not.toContain("utils.js");
+    expect(readmeTurn.codingResult?.verification.status).toBe("passed");
+    expect(readmeTurn.codingResult?.verification.reason).toContain(
+      "utils.js unchanged",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "utils.js"), "utf8"),
+    ).resolves.toBe(initialUtils);
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "README.md"), "utf8"),
+    ).resolves.toEqual(expect.stringContaining('greet("Ada")'));
+
+    const readmeAfterTurn = await fs.readFile(
+      path.join(workspaceRoot, "README.md"),
+      "utf8",
+    );
+    const utilsTurn = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_constrained_code_utils",
+      prompt:
+        "Now only modify utils.js. Do NOT change README.md. Add a new exported function: shout(message) returns message.toUpperCase(). Then verify utils.js contains shout and README.md is unchanged.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(utilsTurn.status).toBe("completed");
+    expect(utilsTurn.codingResult?.changedFiles).toContain("utils.js");
+    expect(utilsTurn.codingResult?.changedFiles).not.toContain("README.md");
+    expect(utilsTurn.codingResult?.verification.status).toBe("passed");
+    expect(utilsTurn.codingResult?.verification.reason).toContain(
+      "README.md unchanged",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "README.md"), "utf8"),
+    ).resolves.toBe(readmeAfterTurn);
+    const utilsAfterTurn = await fs.readFile(
+      path.join(workspaceRoot, "utils.js"),
+      "utf8",
+    );
+    expect(utilsAfterTurn).toContain("export function shout(message)");
+    expect(utilsAfterTurn).toContain("message.toUpperCase()");
+  }, 15000);
+
+  it("runs a constrained small refactor and keeps usage/protected files in sync", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    const initialLocked = "Do not modify this file.\n";
+    await fs.writeFile(
+      path.join(workspaceRoot, "utils.js"),
+      [
+        'export function greet(name = "world") {',
+        '  return "Hello, " + name;',
+        '}',
+        '',
+      ].join("\n"),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "app.js"),
+      'import { greet } from "./utils.js";\n\nexport const message = greet("Ada");\n',
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "README.md"),
+      'Use greet("Ada") to say hello.\n',
+      "utf8",
+    );
+    await fs.writeFile(path.join(workspaceRoot, "LOCKED.md"), initialLocked, "utf8");
+
+    const refactorTurn = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_constrained_refactor_turn1",
+      prompt:
+        'Rename exported function greet to welcome. Update utils.js, app.js, and README.md so they consistently use welcome. Do NOT modify LOCKED.md. Verify utils.js contains export function welcome and app.js contains welcome and README.md contains welcome("Ada") and LOCKED.md is unchanged.',
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(refactorTurn.status).toBe("completed");
+    expect(refactorTurn.codingResult?.changedFiles).toEqual(
+      expect.arrayContaining(["utils.js", "app.js", "README.md"]),
+    );
+    expect(refactorTurn.codingResult?.changedFiles).not.toContain("LOCKED.md");
+    expect(refactorTurn.codingResult?.verification.status).toBe("passed");
+    expect(refactorTurn.codingResult?.verification.reason).toContain(
+      "LOCKED.md unchanged",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "LOCKED.md"), "utf8"),
+    ).resolves.toBe(initialLocked);
+    const utilsAfterRefactor = await fs.readFile(
+      path.join(workspaceRoot, "utils.js"),
+      "utf8",
+    );
+    const appAfterRefactor = await fs.readFile(
+      path.join(workspaceRoot, "app.js"),
+      "utf8",
+    );
+    expect(utilsAfterRefactor).toContain("export function welcome");
+    expect(utilsAfterRefactor).not.toContain("greet");
+    expect(appAfterRefactor).toContain("import { welcome }");
+    expect(appAfterRefactor).toContain('welcome("Ada")');
+
+    const utilsSnapshot = utilsAfterRefactor;
+    const appSnapshot = appAfterRefactor;
+    const correctionTurn = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_constrained_refactor_turn2",
+      prompt:
+        'Correction: README.md should show welcome() as the primary example, but keep welcome("Ada") as a second example. Only modify README.md. Verify README.md contains welcome() and README.md contains welcome("Ada") and utils.js is unchanged and app.js is unchanged and LOCKED.md is unchanged.',
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(correctionTurn.status).toBe("completed");
+    expect(correctionTurn.codingResult?.changedFiles).toContain("README.md");
+    expect(correctionTurn.codingResult?.changedFiles).not.toContain("utils.js");
+    expect(correctionTurn.codingResult?.changedFiles).not.toContain("app.js");
+    expect(correctionTurn.codingResult?.changedFiles).not.toContain("LOCKED.md");
+    expect(correctionTurn.codingResult?.verification.status).toBe("passed");
+    expect(correctionTurn.codingResult?.verification.reason).toContain(
+      "utils.js unchanged",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "utils.js"), "utf8"),
+    ).resolves.toBe(utilsSnapshot);
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "app.js"), "utf8"),
+    ).resolves.toBe(appSnapshot);
+    const readmeAfterCorrection = await fs.readFile(
+      path.join(workspaceRoot, "README.md"),
+      "utf8",
+    );
+    expect(readmeAfterCorrection).toContain("welcome()");
+    expect(readmeAfterCorrection).toContain('welcome("Ada")');
+  }, 15000);
+
+  it("runs a constrained small bugfix and comment correction with protected files", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    const readme = "double(3) should return 6.\n";
+    const locked = "Do not modify this file.\n";
+    await fs.writeFile(
+      path.join(workspaceRoot, "math.js"),
+      "export function double(n) {\n  return n + 2;\n}\n",
+      "utf8",
+    );
+    await fs.writeFile(path.join(workspaceRoot, "README.md"), readme, "utf8");
+    await fs.writeFile(path.join(workspaceRoot, "LOCKED.md"), locked, "utf8");
+
+    const fixTurn = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_small_bugfix_turn1",
+      prompt:
+        "There is a bug in math.js: double(3) should return 6, but the implementation is wrong. Fix the bug in math.js. Do NOT modify README.md. Do NOT modify LOCKED.md. Verify math.js contains n * 2 and README.md is unchanged and LOCKED.md is unchanged.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(fixTurn.status).toBe("completed");
+    expect(fixTurn.codingResult?.changedFiles).toContain("math.js");
+    expect(fixTurn.codingResult?.changedFiles).not.toContain("README.md");
+    expect(fixTurn.codingResult?.changedFiles).not.toContain("LOCKED.md");
+    expect(fixTurn.codingResult?.verification.status).toBe("passed");
+    expect(fixTurn.codingResult?.verification.reason).toContain(
+      "README.md unchanged",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "README.md"), "utf8"),
+    ).resolves.toBe(readme);
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "LOCKED.md"), "utf8"),
+    ).resolves.toBe(locked);
+    const mathAfterFix = await fs.readFile(
+      path.join(workspaceRoot, "math.js"),
+      "utf8",
+    );
+    expect(mathAfterFix).toContain("return n * 2;");
+
+    const commentTurn = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_small_bugfix_turn2",
+      prompt:
+        "Correction: add a short comment above double explaining that it doubles a number. Only modify math.js. Verify math.js contains doubles a number and math.js contains n * 2 and README.md is unchanged and LOCKED.md is unchanged.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(commentTurn.status).toBe("completed");
+    expect(commentTurn.codingResult?.changedFiles).toContain("math.js");
+    expect(commentTurn.codingResult?.changedFiles).not.toContain("README.md");
+    expect(commentTurn.codingResult?.changedFiles).not.toContain("LOCKED.md");
+    expect(commentTurn.codingResult?.verification.status).toBe("passed");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "README.md"), "utf8"),
+    ).resolves.toBe(readme);
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "LOCKED.md"), "utf8"),
+    ).resolves.toBe(locked);
+    const mathAfterComment = await fs.readFile(
+      path.join(workspaceRoot, "math.js"),
+      "utf8",
+    );
+    expect(mathAfterComment).toContain("// doubles a number");
+    expect(mathAfterComment).toContain("return n * 2;");
+  }, 15000);
+
+  it("creates and corrects a usage example file while preserving source files", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    const math = [
+      "export function double(n) {",
+      "  return n * 2;",
+      "}",
+      "",
+      "export function square(n) {",
+      "  return n * n;",
+      "}",
+      "",
+    ].join("\n");
+    const locked = "Do not modify this file.\n";
+    await fs.writeFile(path.join(workspaceRoot, "math.js"), math, "utf8");
+    await fs.writeFile(path.join(workspaceRoot, "LOCKED.md"), locked, "utf8");
+
+    const createTurn = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_example_generation_turn1",
+      prompt:
+        "Read math.js and create examples.md with simple usage examples for double and square. Do NOT modify math.js. Do NOT modify LOCKED.md. Verify examples.md contains double(3) and examples.md contains square(4) and math.js is unchanged and LOCKED.md is unchanged.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(createTurn.status).toBe("completed");
+    expect(createTurn.codingResult?.changedFiles).toContain("examples.md");
+    expect(createTurn.codingResult?.changedFiles).not.toContain("math.js");
+    expect(createTurn.codingResult?.changedFiles).not.toContain("LOCKED.md");
+    expect(createTurn.codingResult?.verification.status).toBe("passed");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "math.js"), "utf8"),
+    ).resolves.toBe(math);
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "LOCKED.md"), "utf8"),
+    ).resolves.toBe(locked);
+
+    const correctionTurn = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_example_generation_turn2",
+      prompt:
+        "Correction: examples.md should include expected outputs for both examples. Only modify examples.md. Verify examples.md contains double(3) and examples.md contains 6 and examples.md contains square(4) and examples.md contains 16 and math.js is unchanged and LOCKED.md is unchanged.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(correctionTurn.status).toBe("completed");
+    expect(correctionTurn.codingResult?.changedFiles).toContain("examples.md");
+    expect(correctionTurn.codingResult?.changedFiles).not.toContain("math.js");
+    expect(correctionTurn.codingResult?.changedFiles).not.toContain("LOCKED.md");
+    expect(correctionTurn.codingResult?.verification.status).toBe("passed");
+    const examples = await fs.readFile(
+      path.join(workspaceRoot, "examples.md"),
+      "utf8",
+    );
+    expect(examples).toContain("double(3)");
+    expect(examples).toContain("6");
+    expect(examples).toContain("square(4)");
+    expect(examples).toContain("16");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "math.js"), "utf8"),
+    ).resolves.toBe(math);
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "LOCKED.md"), "utf8"),
+    ).resolves.toBe(locked);
+  }, 15000);
+
+  it("fails low-risk multi-file consistency verification when target misses source item", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "todo.txt"),
+      "ship minimal CLI smoke\ndocument one follow-up\nverify multi-file follow-up\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "plan.txt"),
+      "Plan\n1. ship minimal CLI smoke\n2. document one follow-up\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_low_risk_multifile_verify_failed",
+      prompt:
+        "Append to plan.txt with content: unrelated follow-up. Verify todo.txt and plan.txt stay consistent.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("error");
+    expect(result.codingResult?.changedFiles).toContain("plan.txt");
+    expect(result.codingResult?.verification.status).toBe("failed");
+    expect(result.codingResult?.verification.reason).toContain(
+      "missing source item",
+    );
+    expect(result.codingResult?.unverifiedFiles).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: "plan.txt" }),
+      ]),
+    );
+  }, 15000);
+
+  it("applies a user correction to the derived file and re-verifies consistency", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    const todoContent =
+      "ship minimal CLI smoke\ndocument one follow-up\nverify multi-file follow-up\n";
+    await fs.writeFile(path.join(workspaceRoot, "todo.txt"), todoContent, "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "plan.txt"),
+      "Plan ship minimal CLI smoke document one follow-up verify multi-file follow-up\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_low_risk_correction_multifile_verify",
+      prompt:
+        "Not right: every item in plan.txt must start with '- [ ] '. Replace plan.txt with content: - [ ] ship minimal CLI smoke - [ ] document one follow-up - [ ] verify multi-file follow-up. Only modify plan.txt, do not change todo.txt, then verify todo.txt and plan.txt stay consistent.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.terminalClassification).toBe("success");
+    expect(result.codingResult?.changedFiles).toContain("plan.txt");
+    expect(result.codingResult?.changedFiles).not.toContain("todo.txt");
+    expect(result.codingResult?.verification.status).toBe("passed");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "todo.txt"), "utf8"),
+    ).resolves.toBe(todoContent);
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "plan.txt"), "utf8"),
+    ).resolves.toContain("- [ ] verify multi-file follow-up");
+  }, 15000);
+
+  it("runs a small code edit plus README correction with low-risk file verification", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "utils.js"),
+      'export function greet(name) {\n  return "Hello, " + name;\n}\n',
+      "utf8",
+    );
+
+    const turn1 = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_low_risk_code_readme_turn1",
+      prompt:
+        "Update utils.js with content: export function greet(name = 'world') { return 'Hello, ' + name; }. Create README.md with content: Usage: greet('world') returns Hello, world. Do not run npm or tests; verify utils.js contains name = 'world' and README.md contains greet('world').",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(turn1.status).toBe("completed");
+    expect(turn1.terminalClassification).toBe("success");
+    expect(turn1.codingResult?.changedFiles).toEqual(
+      expect.arrayContaining(["utils.js", "README.md"]),
+    );
+    expect(turn1.codingResult?.verification.status).toBe("passed");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "utils.js"), "utf8"),
+    ).resolves.toBe("export function greet(name = 'world') { return 'Hello, ' + name; }");
+
+    const turn2 = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_low_risk_code_readme_turn2",
+      prompt:
+        "Not right: README example must use greet() instead of greet('world'). Only modify README.md, do not change utils.js. Replace README.md with content: Usage: greet() returns Hello, world. Verify utils.js contains name = 'world' and README.md contains greet().",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(turn2.status).toBe("completed");
+    expect(turn2.terminalClassification).toBe("success");
+    expect(turn2.codingResult?.changedFiles).toContain("README.md");
+    expect(turn2.codingResult?.changedFiles).not.toContain("utils.js");
+    expect(turn2.codingResult?.verification.status).toBe("passed");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "utils.js"), "utf8"),
+    ).resolves.toBe("export function greet(name = 'world') { return 'Hello, ' + name; }");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "README.md"), "utf8"),
+    ).resolves.toContain("greet()");
+  }, 15000);
+
   it("returns deterministic failure boundary for partial batch edit failure", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
@@ -3552,12 +4061,58 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("completed");
     expect(result.finalOutput).toContain("Subject permission request: edit/write.");
-    expect(result.finalOutput).toContain(
-      `Subject permission scope: edit/write/target(${target}).`,
-    );
+    expect(result.finalOutput).toContain("Subject permission scope: edit/write/target(");
+    expect(result.finalOutput).toContain("coherent-subject.txt");
     expect(result.finalOutput).toContain("Subject permission cacheKey:");
     expect(result.finalOutput).toContain("edit:write:target:");
     expect(result.finalOutput).not.toContain("Subject permission request: edit/write/process(node).");
+  }, 15000);
+
+  it("rebases migrated subject target text to the current root when legacy target residue is detected", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const normalizedRoot = workspaceRoot.replace(/\\/g, "/");
+    const legacyRoot = "D:/legacy-root";
+    const legacyTarget = `${legacyRoot}/src/permission-cross-tool.txt`;
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "permission-cross-tool.txt"),
+      "ok\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_reflective_permission_migration_target_cleanup",
+      prompt: "what did I just approve and why is it asking again",
+      workspaceRoot,
+      continuityState: {
+        projectRoot: normalizedRoot,
+        lastTaskKind: "chat",
+        lastPermissionRequestToolName: "edit",
+        lastPermissionRequestOperation: "write",
+        lastPermissionRequestTarget: legacyTarget,
+        lastPermissionRequestScopeLabel: `edit/write/target(${legacyTarget})`,
+        lastPermissionRequestCacheKey: `${normalizedRoot.toLowerCase()}|edit:write:target:${legacyTarget.toLowerCase()}`,
+        lastPermissionRequestProjectRoot: normalizedRoot,
+        lastApprovalDecision: "allow-once",
+        lastApprovalDecisionSource: "cli-policy",
+        lastApprovalPersistent: false,
+        lastApprovalCacheEffect: "none",
+        lastApprovalProjectRoot: normalizedRoot,
+        lastApprovalCacheKey: `${normalizedRoot.toLowerCase()}|bash:spawn:process:node`,
+        lastApprovalScope: "bash/spawn/process(node)",
+        lastApprovalRecordedAt: "2026-04-24T01:00:00.000Z",
+        compacted: true,
+        compactReason: "auto-threshold",
+        sourceTurnCount: 18,
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.finalOutput).toContain("Subject permission request: edit/write.");
+    expect(result.finalOutput).toContain("Subject permission target:");
+    expect(result.finalOutput).toContain("permission-cross-tool.txt");
+    expect(result.finalOutput).toContain("Subject permission scope: edit/write/target(");
+    expect(result.finalOutput).not.toContain(legacyRoot);
   }, 15000);
 
   it("materializes migration-rebased next-step reflective handoff into continuation execution", async () => {

@@ -551,7 +551,7 @@ describe("SessionManager", () => {
     );
     const legacyRoot = "D:\\legacy-old-root";
     const legacyCacheKey = `${legacyRoot.toLowerCase()}|edit:write:target:d:\\legacy-old-root\\a.txt`;
-    const expectedCacheKey = `${projectRoot.toLowerCase()}|edit:write:target:d:\\legacy-old-root\\a.txt`;
+    const expectedCacheKey = `${projectRoot.toLowerCase()}|edit:write:target:${projectRoot.toLowerCase()}\\a.txt`;
     const legacyScope = `edit/write/target(${legacyRoot}\\a.txt)`;
     const expectedScope = `edit/write/target(${projectRoot}\\a.txt)`;
     fs.writeFileSync(
@@ -617,8 +617,12 @@ describe("SessionManager", () => {
     expect(snapshot.lastPermissionRequestCacheKey).toBe(expectedCacheKey);
     expect(snapshot.lastRequestScopeCacheKey).toBe(expectedCacheKey);
     expect(snapshot.lastApprovalScope).toBe(expectedScope);
-    expect(snapshot.lastPermissionRequestScopeLabel).toBe(expectedScope);
-    expect(snapshot.lastPermissionRequestTarget).toBe(`${projectRoot}\\a.txt`);
+    expect(snapshot.lastPermissionRequestScopeLabel?.toLowerCase()).toBe(
+      expectedScope.toLowerCase(),
+    );
+    expect(snapshot.lastPermissionRequestTarget?.toLowerCase()).toBe(
+      `${projectRoot}\\a.txt`.toLowerCase(),
+    );
 
     const afterState = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
       workingMemory?: {
@@ -647,8 +651,108 @@ describe("SessionManager", () => {
     expect(
       afterState.workingMemory?.continuity?.lastPermissionRequestProjectRoot,
     ).toBe(projectRoot);
-    expect(afterState.workingMemory?.continuity?.lastPermissionRequestTarget).toBe(
-      `${projectRoot}\\a.txt`,
+    expect(
+      afterState.workingMemory?.continuity?.lastPermissionRequestTarget?.toLowerCase(),
+    ).toBe(`${projectRoot}\\a.txt`.toLowerCase());
+  });
+
+  it("normalizes lowercase legacy-root target residues during project-root migration", () => {
+    const manager = new SessionManager();
+    const projectRoot = path.join(fakeHome, "proj-current-root-rebase-lowercase");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const session = manager.createNew(projectRoot);
+    const statePath = path.join(
+      fakeHome,
+      ".private-agents",
+      "sessions",
+      session.id,
+      "state.json",
+    );
+    const legacyRoot = "D:\\legacy-old-root-lower";
+    const legacyRootLower = legacyRoot.toLowerCase();
+    const legacyTargetLower = `${legacyRootLower}\\a.txt`;
+    const legacyCacheKey = `${legacyRootLower}|edit:write:target:${legacyTargetLower}`;
+    const expectedCacheKey = `${projectRoot.toLowerCase()}|edit:write:target:${projectRoot.toLowerCase()}\\a.txt`;
+    const legacyScope = `edit/write/target(${legacyTargetLower})`;
+    const expectedScope = `edit/write/target(${projectRoot}\\a.txt)`;
+
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify(
+        {
+          status: "completed",
+          projectRoot,
+          runPhase: "idle",
+          durableStatus: "success",
+          terminalReason: "completed",
+          terminalClassification: "success",
+          pendingLifecycle: {
+            pendingApprovals: {},
+            pendingTools: {},
+            taskStates: {},
+          },
+          workingMemory: {
+            approvalAudit: {
+              decision: "allow-always",
+              decisionSource: "cli-policy",
+              persistent: true,
+              cacheEffect: "allow-always-persisted",
+              projectRoot: legacyRoot,
+              cacheKey: legacyCacheKey,
+              scopeLabel: legacyScope,
+            },
+            continuity: {
+              lastApprovalProjectRoot: legacyRoot,
+              lastApprovalCacheKey: legacyCacheKey,
+              lastApprovalScope: legacyScope,
+              lastRequestScopeProjectRoot: legacyRoot,
+              lastRequestScopeCacheKey: legacyCacheKey,
+              lastRequestScopeLabel: legacyScope,
+              lastPermissionRequestProjectRoot: legacyRoot,
+              lastPermissionRequestCacheKey: legacyCacheKey,
+              lastPermissionRequestScopeLabel: legacyScope,
+              lastPermissionRequestTarget: legacyTargetLower,
+            },
+            summary: [
+              `- last-approval-project-root: ${legacyRoot}`,
+              `- last-approval-cache-key: ${legacyCacheKey}`,
+              `- last-approval-scope: ${legacyScope}`,
+              `- last-permission-request-target: ${legacyTargetLower}`,
+            ],
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const snapshot = manager.buildContinuitySnapshot(session.id);
+    expect(snapshot.lastPermissionRequestTarget?.toLowerCase()).toBe(
+      `${projectRoot}\\a.txt`.toLowerCase(),
+    );
+    expect(snapshot.lastPermissionRequestScopeLabel?.toLowerCase()).toBe(
+      expectedScope.toLowerCase(),
+    );
+    expect(snapshot.lastPermissionRequestCacheKey).toBe(expectedCacheKey);
+
+    const afterState = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+      workingMemory?: {
+        continuity?: {
+          lastPermissionRequestTarget?: string;
+          lastPermissionRequestScopeLabel?: string;
+          lastPermissionRequestCacheKey?: string;
+        };
+      };
+    };
+    expect(
+      afterState.workingMemory?.continuity?.lastPermissionRequestTarget?.toLowerCase(),
+    ).toBe(`${projectRoot}\\a.txt`.toLowerCase());
+    expect(
+      afterState.workingMemory?.continuity?.lastPermissionRequestScopeLabel?.toLowerCase(),
+    ).toBe(expectedScope.toLowerCase());
+    expect(afterState.workingMemory?.continuity?.lastPermissionRequestCacheKey).toBe(
+      expectedCacheKey,
     );
   });
 
