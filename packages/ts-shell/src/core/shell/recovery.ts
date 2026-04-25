@@ -1,10 +1,10 @@
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type {
   ResumeResult,
-  SessionResumeEligibility,
   SessionContinuitySnapshot,
   SessionManager,
   SessionReentrySummary,
+  SessionResumeEligibility,
 } from "../../session/SessionManager.js";
 import { getWorkflowGitContext } from "../../workflow/gitContext.js";
 import { CONTINUATION_SAFETY_POLICY } from "../query/runtimeState.js";
@@ -12,6 +12,72 @@ import {
   applyShellSubstrateTransition,
   type ShellRuntimeContext,
 } from "./runtimeContext.js";
+
+interface SessionReferenceResolution {
+  readonly ok: boolean;
+  readonly sessionId?: string;
+  readonly reason?: "not-found" | "ambiguous";
+  readonly candidates?: readonly SessionReentrySummary[];
+}
+
+export function resolveSessionReference(input: {
+  readonly reference?: string;
+  readonly sessionManager: SessionManager;
+  readonly preferredProjectRoot?: string;
+}): SessionReferenceResolution {
+  const reference = input.reference?.trim();
+  if (!reference) {
+    return { ok: false, reason: "not-found", candidates: [] };
+  }
+
+  const lowerReference = reference.toLowerCase();
+  const summaries =
+    typeof input.sessionManager.listReentrySummaries === "function"
+      ? input.sessionManager.listReentrySummaries({
+          limit: 24,
+          preferredProjectRoot: input.preferredProjectRoot,
+        })
+      : [];
+
+  if (lowerReference === "last" || lowerReference === "latest") {
+    return summaries[0]
+      ? { ok: true, sessionId: summaries[0].id }
+      : { ok: false, reason: "not-found", candidates: [] };
+  }
+
+  if (input.sessionManager.sessionExists(reference)) {
+    return { ok: true, sessionId: reference };
+  }
+
+  const exactMatches = summaries.filter(
+    (summary) => summary.id.toLowerCase() === lowerReference,
+  );
+  if (exactMatches.length === 1) {
+    return { ok: true, sessionId: exactMatches[0].id };
+  }
+
+  const prefixMatches = summaries.filter((summary) =>
+    summary.id.toLowerCase().startsWith(lowerReference),
+  );
+  if (prefixMatches.length === 1) {
+    return { ok: true, sessionId: prefixMatches[0].id };
+  }
+  if (prefixMatches.length > 1) {
+    return { ok: false, reason: "ambiguous", candidates: prefixMatches };
+  }
+
+  const titleMatches = summaries.filter((summary) =>
+    summary.title?.trim().toLowerCase().includes(lowerReference),
+  );
+  if (titleMatches.length === 1) {
+    return { ok: true, sessionId: titleMatches[0].id };
+  }
+  if (titleMatches.length > 1) {
+    return { ok: false, reason: "ambiguous", candidates: titleMatches };
+  }
+
+  return { ok: false, reason: "not-found", candidates: summaries.slice(0, 5) };
+}
 
 function isFailedResume(
   result: ResumeResult,
@@ -66,13 +132,11 @@ export async function resumeShellSession(input: {
   | { resumed: false }
   | {
       resumed: true;
-      autoResume:
-        | {
-            prompt: string;
-            runtimeSeed: ReturnType<SessionManager["buildRuntimeStateSeed"]>;
-            continuityState?: SessionContinuitySnapshot;
-          }
-        | null;
+      autoResume: {
+        prompt: string;
+        runtimeSeed: ReturnType<SessionManager["buildRuntimeStateSeed"]>;
+        continuityState?: SessionContinuitySnapshot;
+      } | null;
       disposition: SessionResumeEligibility["disposition"];
     }
 > {
@@ -83,7 +147,9 @@ export async function resumeShellSession(input: {
           preferredProjectRoot: input.runtimeContext.projectRoot,
         })
       : [];
-  const preferredSummary = reentrySummaries.find((summary) => summary.recoverable);
+  const preferredSummary = reentrySummaries.find(
+    (summary) => summary.recoverable,
+  );
   if (!input.requestedSessionId && reentrySummaries.length > 0) {
     input.renderer.renderLine("\nResume candidates:");
     for (const summary of reentrySummaries) {
@@ -94,11 +160,45 @@ export async function resumeShellSession(input: {
     input.renderer.renderLine("");
   }
 
-  const requestedSessionId =
+  let requestedSessionId =
     input.requestedSessionId ??
     input.fallbackSessionId ??
     preferredSummary?.id ??
     input.sessionManager.getSuggestedRecoverySession()?.id;
+
+  if (input.requestedSessionId?.trim()) {
+    const resolved = resolveSessionReference({
+      reference: input.requestedSessionId,
+      sessionManager: input.sessionManager,
+      preferredProjectRoot: input.runtimeContext.projectRoot,
+    });
+    if (!resolved.ok) {
+      if (resolved.reason === "ambiguous") {
+        const hintItems = (resolved.candidates ?? []).slice(0, 3);
+        input.renderer.renderLine(
+          `\nResume target '${input.requestedSessionId}' is ambiguous.`,
+        );
+        for (const candidate of hintItems) {
+          const title = candidate.title?.trim() || "(untitled)";
+          input.renderer.renderLine(
+            `- ${candidate.id} [${candidate.status}] ${title}`,
+          );
+        }
+        input.renderer.renderLine(
+          "Hint: use a longer session id prefix or exact session id from /sessions list.\n",
+        );
+      } else {
+        input.renderer.renderLine(
+          `\nResume target '${input.requestedSessionId}' was not found.`,
+        );
+        input.renderer.renderLine(
+          "Hint: run /sessions list, then /resume <session-id|prefix|title|last>.\n",
+        );
+      }
+      return { resumed: false };
+    }
+    requestedSessionId = resolved.sessionId;
+  }
 
   if (!requestedSessionId) {
     const recoveryBlock = input.sessionManager.getRecoveryTrustBoundaryBlock();
@@ -179,7 +279,10 @@ export async function resumeShellSession(input: {
   }
 
   const canAutoResume = resumeEligibility?.autoResumeReady === true;
-  if (canAutoResume && (pendingPrompt || recoverySnapshot.runPhase === "turn-active")) {
+  if (
+    canAutoResume &&
+    (pendingPrompt || recoverySnapshot.runPhase === "turn-active")
+  ) {
     const continuitySnapshot =
       typeof input.sessionManager.buildContinuitySnapshot === "function"
         ? input.sessionManager.buildContinuitySnapshot(
@@ -191,9 +294,7 @@ export async function resumeShellSession(input: {
       { maxTurns: input.runtimeContext.runtimeConfig.maxTurns },
     );
     const guardedRuntimeSeed = guardRuntimeSeedForRecovery(runtimeSeed);
-    if (
-      guardedRuntimeSeed.recoveryBoundary !== runtimeSeed.recoveryBoundary
-    ) {
+    if (guardedRuntimeSeed.recoveryBoundary !== runtimeSeed.recoveryBoundary) {
       input.renderer.renderLine(
         `\nRecovery guardrail downgraded continuation to ${guardedRuntimeSeed.recoveryBoundary}.`,
       );
@@ -257,7 +358,9 @@ function renderResumedContextSummary(
     renderLine(`Session title: ${summary.title.trim()}`);
   }
   if (summary.pendingPrompt?.trim()) {
-    renderLine(`Pending prompt: ${truncate(summary.pendingPrompt.trim(), 160)}`);
+    renderLine(
+      `Pending prompt: ${truncate(summary.pendingPrompt.trim(), 160)}`,
+    );
   } else if (summary.lastUserMessage?.trim()) {
     renderLine(
       `Last user request: ${truncate(summary.lastUserMessage.trim(), 160)}`,

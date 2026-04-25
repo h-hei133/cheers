@@ -13,6 +13,105 @@ D:\LenovoSoftstore\pyproject\source-claudecode
 The target repo is the only place where code may be modified.
 The reference repo is used only to recover ClaudeCode’s load-bearing runtime semantics, responsibility boundaries, and migration truth.
 
+## RTK Command Discipline for Windows Native Codex Sessions
+
+This project is used from native Windows, not WSL2.
+
+Codex must minimize shell-output token usage by explicitly using `rtk` for repository inspection, file reads, searches, git inspection, builds, tests, and command output that may be large.
+
+### Mandatory RTK Usage
+
+Before producing or running any shell command, check whether the command:
+
+- reads file content
+- lists directories
+- searches files
+- inspects git state or diffs
+- runs tests
+- runs builds
+- emits logs or potentially large output
+
+If yes, use `rtk` explicitly.
+
+Required patterns:
+
+```powershell
+rtk read <path>
+rtk ls <path>
+rtk grep "<pattern>" <path>
+rtk find "<pattern>" <path>
+rtk git status
+rtk git diff
+rtk git log -n 10
+rtk npm run build
+rtk npm test
+rtk pnpm test
+rtk cargo test
+rtk pytest
+```
+
+### Forbidden Raw Commands Unless Explicitly Justified
+
+Do not use raw Windows or Unix-style commands for repository inspection when an RTK equivalent can be used.
+
+Avoid:
+
+```powershell
+type <file>
+cat <file>
+Get-Content <file>
+dir
+ls
+findstr
+grep
+git status
+git diff
+git log
+npm run build
+npm test
+cargo test
+pytest
+```
+
+Use the RTK-prefixed equivalent instead.
+
+### Raw Output Escape Hatch
+
+Use raw commands only when RTK cannot perform the required action or when exact unfiltered output is required for debugging.
+
+In that case, prefer:
+
+```powershell
+rtk proxy <command>
+```
+
+When using a raw non-RTK command, state why RTK was not sufficient.
+
+### Session Self-Check
+
+At the start of each implementation round, confirm that RTK command discipline is active.
+
+If you accidentally propose a non-RTK command where RTK should be used, rewrite it before execution.
+
+### Windows Path Rules
+
+Use Windows-native paths when needed.
+
+The writable target repository remains:
+
+```text
+D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents
+```
+
+The read-only reference repository remains:
+
+```text
+D:\LenovoSoftstore\pyproject\source-claudecode
+```
+
+Do not assume WSL paths such as `/mnt/c/...`.
+Do not instruct the user to switch to WSL2.
+
 ## Repository Boundaries
 
 - Default to editing only files under this repository.

@@ -50,6 +50,24 @@ describe('sandbox policy and escalation workflow', () => {
     })
   })
 
+  it('keeps Windows drive, case, and slash variants inside the same normalized boundary', () => {
+    if (process.platform !== 'win32') {
+      return
+    }
+
+    const policy = new SandboxPolicy('D:/Test/Workspace-Safety-Gate')
+
+    expect(policy.checkFilesystemPermission('write', 'd:\\test\\workspace-safety-gate\\src\\inside.txt')).toMatchObject({
+      allowed: true,
+      requiresEscalation: false,
+    })
+    expect(policy.checkFilesystemPermission('write', 'D:/Test/Workspace-Safety-Gate-Sibling/src/outside.txt')).toMatchObject({
+      allowed: false,
+      requiresEscalation: true,
+      policyRule: 'default-deny-out-of-workspace',
+    })
+  })
+
   it('requires explicit denial/approval and logs audit entries', async () => {
     const enforcer = new SandboxEnforcer({
       workspaceRoot,

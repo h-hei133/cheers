@@ -18,6 +18,8 @@ const requiredCommands = [
   'verify:cli-entry',
   'verify:mcp-routing',
   'verify:result-contract',
+  'evidence:inspect',
+  'verify:evidence-inspector',
   'verify:provider-readiness',
   'verify:release:core',
   'verify:release:smoke',
@@ -235,6 +237,9 @@ function checkReleaseCommands(packageJson) {
     return false
   }
   printStep('release-commands', 'pass', requiredCommands.join(', '))
+  console.log(`triage-command= npm run evidence:inspect -- --home ${syntheticHome} --latest`)
+  console.log('triage-command-project= npm run evidence:inspect -- --home <home> --project <project-root>')
+  console.log('triage-note=Use evidence:inspect after release gate failures to correlate transcript-path, state-path, tool-result, approval-event, and changed-file evidence.')
   return true
 }
 

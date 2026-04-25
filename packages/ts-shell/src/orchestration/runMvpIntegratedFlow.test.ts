@@ -1704,6 +1704,78 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(readmeAfterCorrection).toContain('welcome("Ada")');
   }, 15000);
 
+  it("verifies README-only correction while nested code paths stay unchanged", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const utilsSnapshot = [
+      'export function welcome(name = "world") {',
+      '  return "Hello, " + name;',
+      '}',
+      '',
+    ].join("\n");
+    const appSnapshot =
+      'import { welcome } from "./utils.js";\n\nexport const message = welcome("Ada");\n';
+    const projectSnapshot = JSON.stringify(
+      { name: "contract-smoke", private: true },
+      null,
+      2,
+    );
+    const lockedSnapshot = "Do not modify this file.\n";
+    await fs.writeFile(path.join(workspaceRoot, "src", "utils.js"), utilsSnapshot, "utf8");
+    await fs.writeFile(path.join(workspaceRoot, "src", "app.js"), appSnapshot, "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "README.md"),
+      'Use welcome("Ada") to say hello.\n',
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "project.json"),
+      projectSnapshot,
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "LOCKED.md"),
+      lockedSnapshot,
+      "utf8",
+    );
+
+    const correctionTurn = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_readme_only_nested_unchanged",
+      prompt:
+        'Correction: README.md should show welcome() as the primary example, but keep welcome("Ada") as a second example. Only modify README.md. Verify README.md contains welcome() and README.md contains welcome("Ada") and src/utils.js is unchanged and src/app.js is unchanged and project.json is unchanged and LOCKED.md is unchanged.',
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(correctionTurn.status).toBe("completed");
+    expect(correctionTurn.codingResult?.changedFiles).toEqual(["README.md"]);
+    expect(correctionTurn.codingResult?.verification.status).toBe("passed");
+    expect(correctionTurn.codingResult?.verification.reason).toContain(
+      "src/utils.js unchanged",
+    );
+    expect(correctionTurn.codingResult?.verification.reason).toContain(
+      "src/app.js unchanged",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "utils.js"), "utf8"),
+    ).resolves.toBe(utilsSnapshot);
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "app.js"), "utf8"),
+    ).resolves.toBe(appSnapshot);
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "project.json"), "utf8"),
+    ).resolves.toBe(projectSnapshot);
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "LOCKED.md"), "utf8"),
+    ).resolves.toBe(lockedSnapshot);
+    const readmeAfterCorrection = await fs.readFile(
+      path.join(workspaceRoot, "README.md"),
+      "utf8",
+    );
+    expect(readmeAfterCorrection).toContain("welcome()");
+    expect(readmeAfterCorrection).toContain('welcome("Ada")');
+  }, 15000);
+
   it("runs a constrained small bugfix and comment correction with protected files", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     const readme = "double(3) should return 6.\n";

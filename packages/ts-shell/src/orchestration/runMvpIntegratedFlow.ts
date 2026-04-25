@@ -3542,6 +3542,7 @@ async function executeWorkflowTaskPlan(input: {
   const unverifiedFiles: Array<{ path: string; reason: string }> = [];
   const repairNotes: string[] = [];
   const evidence: string[] = [];
+  const appliedContentByPath = new Map<string, string>();
   notes.push(...input.freshnessObservability.notes);
   evidence.push(...input.freshnessObservability.evidence);
   let crossFileRemainingTargets: string[] = [];
@@ -4332,6 +4333,10 @@ async function executeWorkflowTaskPlan(input: {
         });
         notes.push(`mutation applied: ${targetPath}`);
         evidence.push(`edit/write applied on ${targetPath}`);
+        appliedContentByPath.set(
+          normalizePathLike(targetPath),
+          successfulMutationInstruction.content,
+        );
       }
     }
 
@@ -4408,6 +4413,7 @@ async function executeWorkflowTaskPlan(input: {
           evidence.push(
             `rename-refactor:${renamePath}:${lowRiskRenameRefactor.from}->${lowRiskRenameRefactor.to}`,
           );
+          appliedContentByPath.set(normalizePathLike(renamePath), renameContent);
         }
       }
 
@@ -4448,6 +4454,10 @@ async function executeWorkflowTaskPlan(input: {
         });
         notes.push(`secondary write applied: ${secondary.path}`);
         evidence.push(`secondary write applied on ${secondary.path}`);
+        appliedContentByPath.set(
+          normalizePathLike(secondary.path),
+          secondary.content,
+        );
       }
     }
 
@@ -4916,23 +4926,33 @@ async function executeWorkflowTaskPlan(input: {
               (assertion) => assertion.path === assertionPath,
             ),
           }));
+          const verifyReadPlan = planLowRiskFileAssertionReads({
+            fileContentAssertions,
+            unchangedAssertions,
+            appliedContentByPath,
+            protectedSnapshots,
+            patches,
+          });
           const verifyReadResults = await Promise.all(
-            uniqueStable([
-              ...fileContentAssertions.map((assertion) => assertion.path),
-              ...unchangedAssertions.map((assertion) => assertion.path),
-            ]).map(async (path) => {
+            verifyReadPlan.map(async (entry) => {
+              if (entry.source !== "read-tool") {
+                return {
+                  path: entry.path,
+                  result: { success: true, output: entry.output },
+                };
+              }
               const readResult = await dispatchToolWithLifecycle({
                 dispatcher: input.dispatcher,
                 events,
                 toolName: "read",
-                taskId: `task_${input.sessionId}_${input.turn}_verify_read_${hashStableId(path)}`,
-                args: { path },
+                taskId: `task_${input.sessionId}_${input.turn}_verify_read_${hashStableId(entry.path)}`,
+                args: { path: entry.path },
                 workspaceRoot: input.workspaceRoot,
                 sessionId: input.sessionId,
                 abortSignal: input.abortSignal,
                 requireApprovalEvent: false,
               });
-              return { path, result: readResult };
+              return { path: entry.path, result: readResult };
             }),
           );
           const unreadable = verifyReadResults.find((entry) => !entry.result.success);
@@ -9180,7 +9200,7 @@ function extractLowRiskFileContentVerifications(
 ): Array<{ path: string; expectedText: string }> {
   const assertions: Array<{ path: string; expectedText: string }> = [];
   const matches = prompt.matchAll(
-    /([\w.-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))\s+\b(?:contains|includes|has)\b\s*[:=]?\s*[`"“”']?(.+?)[`"“”']?(?=(?:\s+\band\s+[\w.-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html)\s+\b(?:contains|includes|has|(?:is|stays?|remains?)\s+unchanged)\b)|[.。]|$)/gi,
+    /([\w./\\-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))\s+\b(?:contains|includes|has)\b\s*[:=]?\s*[`"“”']?(.+?)[`"“”']?(?=(?:\s+\band\s+[\w./\\-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html)\s+\b(?:contains|includes|has|(?:is|stays?|remains?)\s+unchanged)\b)|[.。]|$)/gi,
   );
   for (const match of matches) {
     const path = match[1]?.trim();
@@ -9200,7 +9220,7 @@ function extractLowRiskUnchangedVerifications(
 ): Array<{ path: string }> {
   const assertions: Array<{ path: string }> = [];
   const matches = prompt.matchAll(
-    /([\w.-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))\s+\b(?:is|stays?|remains?)\s+unchanged\b/gi,
+    /([\w./\\-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))\s+\b(?:is|stays?|remains?)\s+unchanged\b/gi,
   );
   for (const match of matches) {
     const path = match[1]?.trim();
@@ -9211,6 +9231,47 @@ function extractLowRiskUnchangedVerifications(
   return uniqueStable(assertions.map((assertion) => assertion.path)).map(
     (path) => ({ path }),
   );
+}
+
+type LowRiskFileAssertionReadPlanEntry =
+  | { path: string; source: "applied-content"; output: string }
+  | { path: string; source: "protected-snapshot"; output: string }
+  | { path: string; source: "read-tool" };
+
+function planLowRiskFileAssertionReads(input: {
+  fileContentAssertions: ReadonlyArray<{ path: string; expectedText: string }>;
+  unchangedAssertions: ReadonlyArray<{ path: string }>;
+  appliedContentByPath: ReadonlyMap<string, string>;
+  protectedSnapshots: ReadonlyMap<string, string>;
+  patches: ReadonlyArray<CodingPatchRecord>;
+}): LowRiskFileAssertionReadPlanEntry[] {
+  return uniqueStable([
+    ...input.fileContentAssertions.map((assertion) => assertion.path),
+    ...input.unchangedAssertions.map((assertion) => assertion.path),
+  ]).map((path) => {
+    const normalizedPath = normalizePathLike(path);
+    const appliedContent = input.appliedContentByPath.get(normalizedPath);
+    if (appliedContent !== undefined) {
+      return { path, source: "applied-content", output: appliedContent };
+    }
+    const protectedSnapshot = input.protectedSnapshots.get(path);
+    const protectedExpectedUnchanged = input.unchangedAssertions.some(
+      (assertion) => normalizePathLike(assertion.path) === normalizedPath,
+    );
+    const protectedWasMutated = input.patches.some(
+      (patch) =>
+        patch.status === "applied" &&
+        normalizePathLike(patch.path) === normalizedPath,
+    );
+    if (
+      protectedExpectedUnchanged &&
+      protectedSnapshot !== undefined &&
+      !protectedWasMutated
+    ) {
+      return { path, source: "protected-snapshot", output: protectedSnapshot };
+    }
+    return { path, source: "read-tool" };
+  });
 }
 
 function extractLowRiskRenameRefactor(
@@ -10157,7 +10218,7 @@ function extractProtectedMutationPaths(prompt: string): string[] {
     (assertion) => assertion.path,
   );
   const matches = prompt.matchAll(
-    /\b(?:do\s+not|don't|only)\s+(?:modify|change|edit|touch)\s+([\w.-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))/gi,
+    /\b(?:do\s+not|don't)\s+(?:modify|change|edit|touch)\s+([\w.-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))/gi,
   );
   for (const match of matches) {
     const path = match[1]?.trim();

@@ -1,12 +1,14 @@
 import type {
-  ContinuationReason,
   CodingResultSummary,
+  ContinuationReason,
   OrchestrationStatus,
   TerminalReason,
 } from "../../orchestration/types.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
-import type { SessionManager } from "../../session/SessionManager.js";
-import type { SessionContinuitySnapshot } from "../../session/SessionManager.js";
+import type {
+  SessionContinuitySnapshot,
+  SessionManager,
+} from "../../session/SessionManager.js";
 import type { QueryEvent } from "../query/events.js";
 import type { QueryRuntimeStateSeed } from "../query/runtimeState.js";
 import { ShellStateMachine } from "./stateMachine.js";
@@ -75,11 +77,11 @@ export class ShellSessionRuntime {
     let terminalReason: TerminalReason = "completed";
     let terminalClassification: "success" | "stopped" | "error" = "success";
     let lastContinuationReason: ContinuationReason | undefined;
-      let terminalCodingResult: CodingResultSummary | undefined;
-      let startedRendering = false;
-      const printMode = options?.outputMode === "print";
-      let enteredQueryPhase = false;
-      const eventDigest: RuntimeEventDigest = createRuntimeEventDigest();
+    let terminalCodingResult: CodingResultSummary | undefined;
+    let startedRendering = false;
+    const printMode = options?.outputMode === "print";
+    let enteredQueryPhase = false;
+    const eventDigest: RuntimeEventDigest = createRuntimeEventDigest();
 
     try {
       const continuityBuilder = (
@@ -106,12 +108,23 @@ export class ShellSessionRuntime {
         continuityState =
           !options?.runtimeSeed && outputMode === "interactive"
             ? typeof activeContinuityBuilder === "function"
-              ? activeContinuityBuilder.call(this.deps.sessionManager, sessionId)
+              ? activeContinuityBuilder.call(
+                  this.deps.sessionManager,
+                  sessionId,
+                )
               : typeof continuityBuilder === "function"
-                ? continuityBuilder.call(this.deps.sessionManager, sessionId, prompt)
+                ? continuityBuilder.call(
+                    this.deps.sessionManager,
+                    sessionId,
+                    prompt,
+                  )
                 : undefined
             : !options?.runtimeSeed && typeof continuityBuilder === "function"
-              ? continuityBuilder.call(this.deps.sessionManager, sessionId, prompt)
+              ? continuityBuilder.call(
+                  this.deps.sessionManager,
+                  sessionId,
+                  prompt,
+                )
               : undefined;
       }
 
@@ -262,14 +275,13 @@ export class ShellSessionRuntime {
       }
 
       if (printMode) {
+        renderExecutionSummaryBlock(this.deps.renderer, eventDigest, "minimal");
         if (terminalStatus === "completed") {
           if (finalOutput.length > 0) {
             this.deps.renderer.renderLine(finalOutput);
           }
         } else {
-          this.deps.renderer.renderLine(
-            terminalStopReason ?? terminalStatus,
-          );
+          this.deps.renderer.renderLine(terminalStopReason ?? terminalStatus);
         }
         renderTerminalResultBlock(this.deps.renderer, {
           status: terminalStatus,
@@ -281,8 +293,24 @@ export class ShellSessionRuntime {
         renderCodingResultContract(this.deps.renderer, terminalCodingResult, {
           mode: "minimal",
         });
+        if (terminalStatus !== "completed") {
+          const terminalDetail = terminalStopReason ?? terminalStatus;
+          const nextSteps = buildTerminalNextSteps(
+            terminalDetail,
+            terminalCodingResult,
+          );
+          this.deps.renderer.renderLine("Next steps");
+          for (const step of nextSteps) {
+            this.deps.renderer.renderLine(`- ${step}`);
+          }
+          this.deps.renderer.renderLine("");
+        }
       } else {
-        if (!startedRendering && finalOutput.length > 0 && terminalStatus === "completed") {
+        if (
+          !startedRendering &&
+          finalOutput.length > 0 &&
+          terminalStatus === "completed"
+        ) {
           this.deps.renderer.renderLine("\nAssistant:");
           this.deps.renderer.renderLine(finalOutput);
         }
@@ -310,7 +338,10 @@ export class ShellSessionRuntime {
 
         if (terminalStatus !== "completed") {
           const terminalDetail = terminalStopReason ?? terminalStatus;
-          const nextSteps = buildTerminalNextSteps(terminalDetail);
+          const nextSteps = buildTerminalNextSteps(
+            terminalDetail,
+            terminalCodingResult,
+          );
           this.deps.renderer.renderLine("Next steps");
           for (const step of nextSteps) {
             this.deps.renderer.renderLine(`- ${step}`);
@@ -519,7 +550,9 @@ function renderExecutionSummaryBlock(
     summaryLines.push(`Provider retries: ${digest.retries}`);
   }
   if (digest.mcpSnapshots > 0) {
-    summaryLines.push(`MCP: clients=${digest.mcpClients}, tools=${digest.mcpTools}`);
+    summaryLines.push(
+      `MCP: clients=${digest.mcpClients}, tools=${digest.mcpTools}`,
+    );
   }
 
   if (summaryLines.length === 0) {
@@ -555,7 +588,7 @@ function renderTerminalResultBlock(
     const detail =
       input.status === "completed"
         ? "completed"
-        : input.terminalStopReason ?? input.status;
+        : (input.terminalStopReason ?? input.status);
     renderer.renderLine("Result");
     renderer.renderLine(`- Outcome: ${statusLabel}`);
     renderer.renderLine(`- Detail: ${detail}`);
@@ -566,7 +599,9 @@ function renderTerminalResultBlock(
   renderer.renderLine(`- Classification: ${statusLabel}`);
   renderer.renderLine(`- Terminal reason: ${input.terminalReason}`);
   if (input.status !== "completed") {
-    renderer.renderLine(`- Stop detail: ${input.terminalStopReason ?? input.status}`);
+    renderer.renderLine(
+      `- Stop detail: ${input.terminalStopReason ?? input.status}`,
+    );
   }
   renderer.renderLine("");
 }
@@ -598,11 +633,20 @@ function renderCodingResultContract(
     renderer.renderLine("Action result");
     renderer.renderLine(`- Task: ${codingResult.taskKind}`);
     renderer.renderLine(`- Changed: ${changedFilesSummary}`);
+    const failureSummary = buildCodingFailureSummary(codingResult);
+    if (failureSummary) {
+      renderer.renderLine(`- Failure reason: ${failureSummary}`);
+    }
     renderer.renderLine(`- Verification: ${verificationStatus}`);
-    if (codingResult.verification.nextAction) {
-      renderer.renderLine(`- Next action: ${codingResult.verification.nextAction}`);
+    const nextAction =
+      codingResult.verification.nextAction ??
+      buildCodingResultNextAction(codingResult);
+    if (nextAction) {
+      renderer.renderLine(`- Next action: ${nextAction}`);
     } else if (codingResult.taskSatisfaction.reasons.length > 0) {
-      renderer.renderLine(`- Note: ${codingResult.taskSatisfaction.reasons[0]}`);
+      renderer.renderLine(
+        `- Note: ${codingResult.taskSatisfaction.reasons[0]}`,
+      );
     }
     renderer.renderLine("");
     return;
@@ -611,7 +655,9 @@ function renderCodingResultContract(
   renderer.renderLine("Coding result");
   renderer.renderLine(`- Task kind: ${codingResult.taskKind}`);
   if (codingResult.changedFiles.length > 0) {
-    renderer.renderLine(`- Changed files: ${codingResult.changedFiles.join(", ")}`);
+    renderer.renderLine(
+      `- Changed files: ${codingResult.changedFiles.join(", ")}`,
+    );
   } else {
     renderer.renderLine("- Changed files: none");
   }
@@ -621,7 +667,9 @@ function renderCodingResultContract(
     );
   }
   if (codingResult.verifiedFiles.length > 0) {
-    renderer.renderLine(`- Verified files: ${codingResult.verifiedFiles.join(", ")}`);
+    renderer.renderLine(
+      `- Verified files: ${codingResult.verifiedFiles.join(", ")}`,
+    );
   }
   if (codingResult.unverifiedFiles.length > 0) {
     renderer.renderLine(
@@ -667,12 +715,14 @@ function renderCodingResultContract(
         ? "failed"
         : codingResult.verification.status === "blocked"
           ? "blocked"
-        : codingResult.verification.status === "skipped"
-          ? "skipped"
-          : "not-requested";
+          : codingResult.verification.status === "skipped"
+            ? "skipped"
+            : "not-requested";
   renderer.renderLine(`- Verification: ${verificationStatus}`);
   if (codingResult.verification.command) {
-    renderer.renderLine(`- Verify command: ${codingResult.verification.command}`);
+    renderer.renderLine(
+      `- Verify command: ${codingResult.verification.command}`,
+    );
   }
   if (codingResult.verification.selectionScope) {
     renderer.renderLine(
@@ -719,7 +769,9 @@ function renderCodingResultContract(
     );
   }
   if (codingResult.repair.notes.length > 0) {
-    renderer.renderLine(`- Repair notes: ${codingResult.repair.notes.join(" | ")}`);
+    renderer.renderLine(
+      `- Repair notes: ${codingResult.repair.notes.join(" | ")}`,
+    );
   }
   renderer.renderLine(
     `- Change set (git-aware): ${codingResult.changeSet.gitAware ? "yes" : "no"}`,
@@ -759,7 +811,74 @@ function renderCodingResultContract(
   renderer.renderLine("");
 }
 
-function buildTerminalNextSteps(terminalDetail: string): string[] {
+function buildCodingFailureSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const failedFile = codingResult.failedFiles.find((entry) =>
+    entry.reason.trim(),
+  );
+  if (failedFile) {
+    return `${failedFile.path}: ${failedFile.reason}`;
+  }
+  const failedPatch = codingResult.patches?.find(
+    (record) => record.status === "failed" && record.reason?.trim(),
+  );
+  if (failedPatch?.reason) {
+    return `${failedPatch.path}: ${failedPatch.reason}`;
+  }
+  if (codingResult.verification.status === "failed") {
+    return codingResult.verification.reason ?? "Verification failed";
+  }
+  return undefined;
+}
+
+function buildCodingResultNextAction(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const candidateText = [
+    ...codingResult.failedFiles.map((entry) => entry.reason),
+    ...(codingResult.patches ?? []).map((record) => record.reason ?? ""),
+    codingResult.verification.reason ?? "",
+    ...codingResult.taskSatisfaction.reasons,
+    codingResult.failureBoundary ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (
+    /fenced replacement content|replace-from\/replace-to|replace-from/i.test(
+      candidateText,
+    )
+  ) {
+    return "Rerun with fenced replacement content or an explicit replace-from/replace-to instruction.";
+  }
+
+  if (/approval|approve escalation/i.test(candidateText)) {
+    return "Rerun with --non-interactive-approval allow-once, or use an interactive shell and approve the request.";
+  }
+
+  if (codingResult.verification.status === "failed") {
+    return "Inspect the verification failure, adjust the requested edit, and rerun.";
+  }
+
+  if (codingResult.failedFiles.length > 0) {
+    return "Inspect the failed file operation and rerun with a more explicit target or content.";
+  }
+
+  return undefined;
+}
+
+function buildTerminalNextSteps(
+  terminalDetail: string,
+  codingResult?: CodingResultSummary,
+): string[] {
+  const codingNextAction = codingResult
+    ? buildCodingResultNextAction(codingResult)
+    : undefined;
+  if (codingNextAction) {
+    return [codingNextAction];
+  }
+
   const runCommandBlockContext =
     parseRunCommandAllowlistBlockContext(terminalDetail);
   if (runCommandBlockContext) {
@@ -804,8 +923,20 @@ function buildTerminalNextSteps(terminalDetail: string): string[] {
     ];
   }
   if (terminalDetail.includes("Approval denied by user")) {
+    return ["Submit the prompt again and approve escalation when requested."];
+  }
+  if (/approve escalation/i.test(terminalDetail)) {
     return [
-      "Submit the prompt again and approve escalation when requested.",
+      "Rerun with --non-interactive-approval allow-once for this command, or use an interactive shell and approve the request.",
+    ];
+  }
+  if (
+    /fenced replacement content|replace-from\/replace-to|replace-from/i.test(
+      terminalDetail,
+    )
+  ) {
+    return [
+      "Rerun with fenced replacement content, or provide an explicit replace-from/replace-to instruction.",
     ];
   }
   return [

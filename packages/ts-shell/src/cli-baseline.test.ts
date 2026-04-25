@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -186,6 +186,46 @@ describe("CLI streaming baseline (T3)", () => {
     fs.mkdirSync(sessionDir, { recursive: true });
     fs.writeFileSync(path.join(sessionDir, "metadata.json"), "{broken", "utf8");
     fs.writeFileSync(path.join(sessionDir, "state.json"), "{}", "utf8");
+    fs.writeFileSync(path.join(sessionDir, "transcript.jsonl"), "", "utf8");
+  }
+
+  function seedSessionWithTitle(input: {
+    sessionId: string;
+    projectRoot: string;
+    title: string;
+    status?: "active" | "interrupted" | "completed" | "error" | "terminated";
+  }): void {
+    const sessionDir = path.join(sessionsDir, input.sessionId);
+    fs.mkdirSync(sessionDir, { recursive: true });
+    const now = new Date().toISOString();
+    fs.writeFileSync(
+      path.join(sessionDir, "metadata.json"),
+      JSON.stringify(
+        {
+          id: input.sessionId,
+          projectRoot: input.projectRoot,
+          title: input.title,
+          createdAt: now,
+          updatedAt: now,
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(sessionDir, "state.json"),
+      JSON.stringify(
+        {
+          status: input.status ?? "interrupted",
+          projectRoot: input.projectRoot,
+          runPhase: "idle",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
     fs.writeFileSync(path.join(sessionDir, "transcript.jsonl"), "", "utf8");
   }
 
@@ -427,9 +467,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
         cli.kill();
         try {
           expect(output.length).toBeGreaterThan(0);
-          expect(output).toContain(
-            "Private Coding Agents Shell",
-          );
+          expect(output).toContain("Private Coding Agents Shell");
           expect(output).toContain("Session: sess_");
           expect(output).toContain(
             "Ctrl+C cancels the current run. Ctrl+D exits.",
@@ -588,9 +626,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
         if (
           !promptSent &&
-          output.includes(
-            "Ctrl+C cancels the current run. Ctrl+D exits.",
-          )
+          output.includes("Ctrl+C cancels the current run. Ctrl+D exits.")
         ) {
           promptSent = true;
           cli.stdin?.write("Run a real provider task without API key\n");
@@ -649,12 +685,16 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
               lastError?: string;
             };
 
-            expect(state.status === "active" || state.status === "error").toBe(true);
+            expect(state.status === "active" || state.status === "error").toBe(
+              true,
+            );
             if (state.status === "error") {
               expect(state.terminalReason).toBe("stopped_error");
               expect(state.terminalClassification).toBe("error");
               expect(state.durableStatus).toBe("error");
-              expect(state.lastError).toContain("provider-readiness:missing-key");
+              expect(state.lastError).toContain(
+                "provider-readiness:missing-key",
+              );
             }
           });
         }
@@ -740,9 +780,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
         if (
           !firstPromptSent &&
-          (output.includes(
-            "Ctrl+C cancels the current run. Ctrl+D exits.",
-          ) ||
+          (output.includes("Ctrl+C cancels the current run. Ctrl+D exits.") ||
             output.includes("\n> "))
         ) {
           firstPromptSent = true;
@@ -814,13 +852,16 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             ).toBe(true);
             expect(
               queryCompleted.every(
-                (entry) => entry.event?.result?.terminalClassification === "stopped",
+                (entry) =>
+                  entry.event?.result?.terminalClassification === "stopped",
               ),
             ).toBe(true);
 
             const latestTerminal = queryCompleted.at(-1);
             expect(latestTerminal?.event?.result?.status).toMatch(/^stopped/);
-            expect(latestTerminal?.event?.result?.terminalClassification).toBe("stopped");
+            expect(latestTerminal?.event?.result?.terminalClassification).toBe(
+              "stopped",
+            );
 
             const state = JSON.parse(
               fs.readFileSync(path.join(sessionDir, "state.json"), "utf8"),
@@ -832,8 +873,14 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             };
 
             expect(["active", "error"].includes(state.status ?? "")).toBe(true);
-            expect(state.terminalClassification === "stopped" || state.terminalClassification === "error").toBe(true);
-            expect(state.durableStatus === "stopped" || state.durableStatus === "error").toBe(true);
+            expect(
+              state.terminalClassification === "stopped" ||
+                state.terminalClassification === "error",
+            ).toBe(true);
+            expect(
+              state.durableStatus === "stopped" ||
+                state.durableStatus === "error",
+            ).toBe(true);
           });
         }
 
@@ -891,9 +938,9 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
         fakeHomeDir,
         ["--non-interactive-approval", "allow-once"],
         {
-        PRIVATE_AGENTS_PROVIDER_MODE: "real",
-        OPENAI_API_KEY: "test-real-cli-key",
-        NODE_OPTIONS: nodeOptionsParts.join(" "),
+          PRIVATE_AGENTS_PROVIDER_MODE: "real",
+          OPENAI_API_KEY: "test-real-cli-key",
+          NODE_OPTIONS: nodeOptionsParts.join(" "),
         },
       );
       let output = "";
@@ -945,13 +992,13 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
         if (
           !promptSent &&
-          (output.includes(
-            "Ctrl+C cancels the current run. Ctrl+D exits.",
-          ) ||
+          (output.includes("Ctrl+C cancels the current run. Ctrl+D exits.") ||
             output.includes("\n> "))
         ) {
           promptSent = true;
-          cli.stdin?.write("Run node version after one transient provider failure\n");
+          cli.stdin?.write(
+            "Run node version after one transient provider failure\n",
+          );
         }
 
         if (
@@ -1004,7 +1051,8 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             ).toBe(true);
             expect(
               ["success", "stopped", "error"].includes(
-                queryCompleted.at(-1)?.event?.result?.terminalClassification ?? "",
+                queryCompleted.at(-1)?.event?.result?.terminalClassification ??
+                  "",
               ),
             ).toBe(true);
 
@@ -1165,11 +1213,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
         const completionCount = output.match(/Execution summary/g)?.length ?? 0;
 
-        if (
-          completionCount >= 1 &&
-          !secondPromptSent &&
-          sessionId
-        ) {
+        if (completionCount >= 1 && !secondPromptSent && sessionId) {
           const sessionDir = path.join(sessionsDir, sessionId);
           const firstStatePath = path.join(sessionDir, "state.json");
           const firstMetadataPath = path.join(sessionDir, "metadata.json");
@@ -1184,8 +1228,9 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             };
           }
           if (fs.existsSync(firstMetadataPath)) {
-            const metadata =
-              readJsonFileEventually<{ updatedAt?: string }>(firstMetadataPath);
+            const metadata = readJsonFileEventually<{ updatedAt?: string }>(
+              firstMetadataPath,
+            );
             firstRoundMetadataUpdatedAt = metadata.updatedAt ?? "";
           }
           secondPromptSent = true;
@@ -1197,7 +1242,11 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
           ? path.join(sessionDir, "transcript.jsonl")
           : "";
         let persistedCompletionCount = 0;
-        if (secondPromptSent && transcriptPath && fs.existsSync(transcriptPath)) {
+        if (
+          secondPromptSent &&
+          transcriptPath &&
+          fs.existsSync(transcriptPath)
+        ) {
           try {
             persistedCompletionCount = parseTranscriptJsonl(
               transcriptPath,
@@ -1285,7 +1334,8 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             expect(
               queryCompletedEntries.every(
                 (entry) =>
-                  (entry.event?.result?.terminalClassification ?? "").length > 0,
+                  (entry.event?.result?.terminalClassification ?? "").length >
+                  0,
               ),
             ).toBe(true);
             const runStartedCount = transcriptEntriesRaw.filter(
@@ -1311,7 +1361,9 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
               path.join(sessionDir, "metadata.json"),
             );
 
-            expect(["active", "completed", "error"].includes(state.status ?? "")).toBe(true);
+            expect(
+              ["active", "completed", "error"].includes(state.status ?? ""),
+            ).toBe(true);
             expect(
               state.durableStatus === undefined ||
                 ["active", "success", "stopped", "error"].includes(
@@ -1451,7 +1503,9 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
           sessionId &&
           output.includes("approval-audit:decision=deny") &&
           output.includes("Result") &&
-          isReadableJsonFile(path.join(sessionsDir, sessionId, "metadata.json")) &&
+          isReadableJsonFile(
+            path.join(sessionsDir, sessionId, "metadata.json"),
+          ) &&
           !closingAfterTurn
         ) {
           closingAfterTurn = true;
@@ -1578,8 +1632,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       .split("\n")
       .filter((line) => line.trim().length > 0)
       .map(
-        (line) =>
-          JSON.parse(line) as { url: string; authorization: string },
+        (line) => JSON.parse(line) as { url: string; authorization: string },
       );
     expect(
       fetchLogs.every(
@@ -1870,18 +1923,13 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
         if (
           !resumeSent &&
-          output.includes(
-            "Ctrl+C cancels the current run. Ctrl+D exits.",
-          )
+          output.includes("Ctrl+C cancels the current run. Ctrl+D exits.")
         ) {
           resumeSent = true;
           cli.stdin?.write(`/resume ${sessionId}\n`);
         }
 
-        if (
-          output.includes("Execution summary") &&
-          output.includes("Result")
-        ) {
+        if (output.includes("Execution summary") && output.includes("Result")) {
           finish(() => {
             expect(output).toContain(`Session: ${sessionId}`);
             expect(output.includes("approval> ")).toBe(false);
@@ -1998,17 +2046,11 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
       const onData = (chunk: Buffer) => {
         output += chunk.toString();
-        if (
-          output.includes(
-            "Ctrl+C cancels the current run. Ctrl+D exits.",
-          )
-        ) {
+        if (output.includes("Ctrl+C cancels the current run. Ctrl+D exits.")) {
           clearTimeout(timeout);
           cli.kill();
           try {
-            expect(output).toContain(
-              "Private Coding Agents Shell",
-            );
+            expect(output).toContain("Private Coding Agents Shell");
             expect(output).toContain("Session: sess_");
             expect(output).toContain("Next actions:");
             expect(output).toContain(
@@ -2039,6 +2081,289 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       });
     });
   }, 30000);
+
+  it("surfaces unified switch reference guidance for not-found session targets", async () => {
+    const projectRoot = path.join(fakeHomeDir, "switch-guidance-project");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const result = spawnSync(
+      nodeExe,
+      [
+        tsxCliPath,
+        cliPath,
+        "--project",
+        projectRoot,
+        "--print",
+        "/sessions switch definitely-missing-target",
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 20000,
+      },
+    );
+
+    expect(result.error).toBeUndefined();
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    expect(output).toContain(
+      "Switch target 'definitely-missing-target' was not found.",
+    );
+    expect(output).toContain(
+      "Hint: run /sessions list, then /sessions switch <id|prefix|title|last>.",
+    );
+  }, 35000);
+
+  it("switches session by unique title keyword through real CLI path", async () => {
+    const projectRoot = path.join(fakeHomeDir, "switch-title-project");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const targetSessionId = "sess_switch_title_target";
+    const targetTitle = "Switch Title Unique Needle";
+    seedSessionWithTitle({
+      sessionId: targetSessionId,
+      projectRoot,
+      title: targetTitle,
+      status: "interrupted",
+    });
+    seedSessionWithTitle({
+      sessionId: "sess_switch_title_noise",
+      projectRoot,
+      title: "General Maintenance",
+      status: "completed",
+    });
+
+    const result = spawnSync(
+      nodeExe,
+      [
+        tsxCliPath,
+        cliPath,
+        "--project",
+        projectRoot,
+        "--print",
+        "/sessions switch unique needle",
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 20000,
+      },
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    expect(output).toContain("Switched session:");
+    expect(output).toContain(`-> ${targetSessionId}`);
+    expect(output).toContain(`Session summary: ${targetTitle}`);
+    expect(output).not.toContain("was not found");
+    expect(output).not.toContain("is ambiguous");
+  }, 35000);
+
+  it("shows structured execution result surface for synthetic print success path", async () => {
+    const projectRoot = path.join(fakeHomeDir, "execution-surface-success");
+    fs.mkdirSync(projectRoot, { recursive: true });
+
+    const result = spawnSync(
+      nodeExe,
+      [
+        tsxCliPath,
+        cliPath,
+        "--project",
+        projectRoot,
+        "--print",
+        "Create file note.txt with content: hello execution surface.",
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 30000,
+      },
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    expect(output).toContain("Execution summary");
+    expect(output).toContain("Result");
+    expect(output).toContain("- Outcome: success");
+    expect(output).toContain("Action result");
+    expect(output).toContain("- Verification:");
+  }, 35000);
+
+  it("shows failure reason and actionable next steps for synthetic print blocked execution", async () => {
+    const projectRoot = path.join(fakeHomeDir, "execution-surface-blocked");
+    fs.mkdirSync(projectRoot, { recursive: true });
+
+    const result = spawnSync(
+      nodeExe,
+      [
+        tsxCliPath,
+        cliPath,
+        "--project",
+        projectRoot,
+        "--non-interactive-approval",
+        "allow-once",
+        "--print",
+        "Run npm publish and report the result.",
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 30000,
+      },
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    expect(output).toContain("Result");
+    expect(output).toContain(
+      "Run-command intent is not allowed in the MVP allowlist",
+    );
+    expect(output).toContain("Next steps");
+    expect(output).toContain(
+      "- Run-command intent was blocked by the MVP allowlist.",
+    );
+    expect(output).toContain("- Allowed commands:");
+    expect(output).toContain(
+      'Rephrase with one allowed command, for example: "Run node --version".',
+    );
+  }, 35000);
+
+  it("keeps workspace project context consistent across attach, current, and switch surfaces", async () => {
+    const baseProject = path.join(fakeHomeDir, "workspace-base-project");
+    const attachedProject = path.join(
+      fakeHomeDir,
+      "workspace-attached-project",
+    );
+    fs.mkdirSync(baseProject, { recursive: true });
+    fs.mkdirSync(attachedProject, { recursive: true });
+
+    const switchTargetSessionId = "sess_workspace_switch_target";
+    seedSessionWithTitle({
+      sessionId: switchTargetSessionId,
+      projectRoot: attachedProject,
+      title: "Workspace Switch Target",
+      status: "completed",
+    });
+
+    const attachResult = spawnSync(
+      nodeExe,
+      [
+        tsxCliPath,
+        cliPath,
+        "--project",
+        baseProject,
+        "--print",
+        `/workspace attach ${attachedProject}`,
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 20000,
+      },
+    );
+    expect(attachResult.error).toBeUndefined();
+    expect(attachResult.status).toBe(0);
+    const attachOutput = `${attachResult.stdout ?? ""}${attachResult.stderr ?? ""}`;
+
+    expect(attachOutput).toContain("Attached project context:");
+    expect(attachOutput).toContain(`-> ${attachedProject}`);
+    expect(attachOutput).toContain(
+      `- Session project binding: ${attachedProject}`,
+    );
+    const attachedSessionMatch = attachOutput.match(
+      /New project session:\s*(sess_[^\s\r\n]+)/,
+    );
+    expect(attachedSessionMatch?.[1]).toBeTruthy();
+    const attachedSessionId = attachedSessionMatch![1];
+
+    const currentResult = spawnSync(
+      nodeExe,
+      [
+        tsxCliPath,
+        cliPath,
+        "--project",
+        attachedProject,
+        "--print",
+        "/sessions current",
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 20000,
+      },
+    );
+    expect(currentResult.error).toBeUndefined();
+    expect(currentResult.status).toBe(0);
+    const currentOutput = `${currentResult.stdout ?? ""}${currentResult.stderr ?? ""}`;
+    expect(currentOutput).toContain("Current session");
+    expect(currentOutput).toContain(`- ID: ${attachedSessionId}`);
+    expect(currentOutput).toContain(`- Project binding: ${attachedProject}`);
+
+    const switchResult = spawnSync(
+      nodeExe,
+      [
+        tsxCliPath,
+        cliPath,
+        "--project",
+        baseProject,
+        "--print",
+        `/sessions switch ${switchTargetSessionId}`,
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 20000,
+      },
+    );
+    expect(switchResult.error).toBeUndefined();
+    expect(switchResult.status).toBe(0);
+    const switchOutput = `${switchResult.stdout ?? ""}${switchResult.stderr ?? ""}`;
+    expect(switchOutput).toContain("Switched session:");
+    expect(switchOutput).toContain(`-> ${switchTargetSessionId}`);
+    expect(switchOutput).toContain(`Project context: ${attachedProject}`);
+  }, 35000);
 
   it("GOLDEN_MAIN_PATH: user-minimal real main path unified gate", async () => {
     const recoverableSessionId = "sess_recoverable_golden";
@@ -2102,9 +2427,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
         if (
           !promptSent &&
-          output.includes(
-            "Ctrl+C cancels the current run. Ctrl+D exits.",
-          )
+          output.includes("Ctrl+C cancels the current run. Ctrl+D exits.")
         ) {
           promptSent = true;
           cli.stdin?.write(
@@ -2157,9 +2480,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             expect(noisyWarnings).toBe(0);
             expect(aggregatedWarnings).toBe(1);
 
-            const transcriptEntries = parseTranscriptJsonl(
-              transcriptPath,
-            );
+            const transcriptEntries = parseTranscriptJsonl(transcriptPath);
 
             const queryStartedCount = transcriptEntries.filter(
               (entry) =>
@@ -2283,9 +2604,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
         if (
           !promptSent &&
-          output.includes(
-            "Ctrl+C cancels the current run. Ctrl+D exits.",
-          )
+          output.includes("Ctrl+C cancels the current run. Ctrl+D exits.")
         ) {
           promptSent = true;
           cli.stdin?.write(
@@ -2305,70 +2624,66 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
       cli.on("close", () => {
         finish(() => {
-            expect(output).toContain(
-              "Non-interactive approval policy: allow-once (explicit CLI)",
-            );
-            expect(output).toContain("approval-audit:decision=allow-once");
-            expect(output).toContain("Result");
-            expect(output.includes("approval> ")).toBe(false);
-            expect(output).toContain(
-              "Execution summary",
-            );
+          expect(output).toContain(
+            "Non-interactive approval policy: allow-once (explicit CLI)",
+          );
+          expect(output).toContain("approval-audit:decision=allow-once");
+          expect(output).toContain("Result");
+          expect(output.includes("approval> ")).toBe(false);
+          expect(output).toContain("Execution summary");
 
-            const sessionDirs = fs
-              .readdirSync(sessionsDir)
-              .filter((file) => file.startsWith("sess_"));
-            expect(sessionDirs.length).toBeGreaterThan(0);
+          const sessionDirs = fs
+            .readdirSync(sessionsDir)
+            .filter((file) => file.startsWith("sess_"));
+          expect(sessionDirs.length).toBeGreaterThan(0);
 
-            const latestSessionDir = path.join(
-              sessionsDir,
-              sessionId || (sessionDirs.sort().at(-1) as string),
-            );
-            const transcriptPath = path.join(
-              latestSessionDir,
-              "transcript.jsonl",
-            );
-            const statePath = path.join(latestSessionDir, "state.json");
+          const latestSessionDir = path.join(
+            sessionsDir,
+            sessionId || (sessionDirs.sort().at(-1) as string),
+          );
+          const transcriptPath = path.join(
+            latestSessionDir,
+            "transcript.jsonl",
+          );
+          const statePath = path.join(latestSessionDir, "state.json");
 
-            const transcriptEntries = parseTranscriptJsonl(transcriptPath);
+          const transcriptEntries = parseTranscriptJsonl(transcriptPath);
 
-            const queryStarted = transcriptEntries.some(
-              (entry) =>
-                entry.type === "query-event" &&
-                entry.event?.type === "query.started",
-            );
-            const queryCompleted = transcriptEntries.find(
-              (entry) =>
-                entry.type === "query-event" &&
-                entry.event?.type === "query.completed",
-            );
-            const approvalResolved = transcriptEntries.find(
-              (entry) =>
-                entry.type === "query-event" &&
-                entry.event?.type === "approval.resolved",
-            );
+          const queryStarted = transcriptEntries.some(
+            (entry) =>
+              entry.type === "query-event" &&
+              entry.event?.type === "query.started",
+          );
+          const queryCompleted = transcriptEntries.find(
+            (entry) =>
+              entry.type === "query-event" &&
+              entry.event?.type === "query.completed",
+          );
+          const approvalResolved = transcriptEntries.find(
+            (entry) =>
+              entry.type === "query-event" &&
+              entry.event?.type === "approval.resolved",
+          );
 
-            expect(queryStarted).toBe(true);
-            expect(queryCompleted).toBeDefined();
-            expect(approvalResolved).toBeDefined();
+          expect(queryStarted).toBe(true);
+          expect(queryCompleted).toBeDefined();
+          expect(approvalResolved).toBeDefined();
 
-            const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
-              terminalReason?: string;
-              terminalClassification?: string;
-              durableStatus?: string;
-            };
-            expect(typeof state.terminalReason).toBe("string");
-            expect(
-              ["success", "stopped", "error"].includes(
-                state.terminalClassification ?? "",
-              ),
-            ).toBe(true);
-            expect(
-              ["success", "stopped", "error"].includes(
-                state.durableStatus ?? "",
-              ),
-            ).toBe(true);
-          });
+          const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+            terminalReason?: string;
+            terminalClassification?: string;
+            durableStatus?: string;
+          };
+          expect(typeof state.terminalReason).toBe("string");
+          expect(
+            ["success", "stopped", "error"].includes(
+              state.terminalClassification ?? "",
+            ),
+          ).toBe(true);
+          expect(
+            ["success", "stopped", "error"].includes(state.durableStatus ?? ""),
+          ).toBe(true);
+        });
       });
 
       cli.on("error", (error) => {
@@ -2430,12 +2745,12 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
         if (
           !promptSent &&
-          output.includes(
-            "Ctrl+C cancels the current run. Ctrl+D exits.",
-          )
+          output.includes("Ctrl+C cancels the current run. Ctrl+D exits.")
         ) {
           promptSent = true;
-          cli.stdin?.write("Run node version with explicit approval deny path\n");
+          cli.stdin?.write(
+            "Run node version with explicit approval deny path\n",
+          );
         }
 
         if (
@@ -2454,58 +2769,62 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       });
 
       cli.on("close", () => {
-            finish(() => {
-              expect(output).toContain(
-                "Non-interactive approval policy: deny (default deny)",
-              );
-              expect(output).toContain("approval-audit:decision=deny");
-              expect(output).toContain("Result");
-              expect(output.includes("approval> ")).toBe(false);
-              expect(output.includes("Response complete")).toBe(false);
+        finish(() => {
+          expect(output).toContain(
+            "Non-interactive approval policy: deny (default deny)",
+          );
+          expect(output).toContain("approval-audit:decision=deny");
+          expect(output).toContain("Result");
+          expect(output.includes("approval> ")).toBe(false);
+          expect(output.includes("Response complete")).toBe(false);
 
-              const sessionDir = path.join(sessionsDir, sessionId);
-              const transcriptEntries = parseTranscriptJsonl(
-                path.join(sessionDir, "transcript.jsonl"),
-              );
+          const sessionDir = path.join(sessionsDir, sessionId);
+          const transcriptEntries = parseTranscriptJsonl(
+            path.join(sessionDir, "transcript.jsonl"),
+          );
 
-              const queryCompleted = transcriptEntries.find(
-                (entry) =>
-                  entry.type === "query-event" &&
-                  entry.event?.type === "query.completed",
-              );
-              if (queryCompleted) {
-                expect(
-                  queryCompleted.event?.result?.status?.startsWith("stopped"),
-                ).toBe(true);
-                expect(
-                  ["stopped", "error"].includes(
-                    queryCompleted.event?.result?.terminalClassification ?? "",
-                  ),
-                ).toBe(true);
-              }
+          const queryCompleted = transcriptEntries.find(
+            (entry) =>
+              entry.type === "query-event" &&
+              entry.event?.type === "query.completed",
+          );
+          if (queryCompleted) {
+            expect(
+              queryCompleted.event?.result?.status?.startsWith("stopped"),
+            ).toBe(true);
+            expect(
+              ["stopped", "error"].includes(
+                queryCompleted.event?.result?.terminalClassification ?? "",
+              ),
+            ).toBe(true);
+          }
 
-              const terminalState = JSON.parse(
-                fs.readFileSync(path.join(sessionDir, "state.json"), "utf8"),
-              ) as {
-                status?: string;
-                terminalReason?: string;
-                terminalClassification?: string;
-                durableStatus?: string;
-                lastError?: string;
-              };
+          const terminalState = JSON.parse(
+            fs.readFileSync(path.join(sessionDir, "state.json"), "utf8"),
+          ) as {
+            status?: string;
+            terminalReason?: string;
+            terminalClassification?: string;
+            durableStatus?: string;
+            lastError?: string;
+          };
 
-              expect(["active", "error"].includes(terminalState.status ?? "")).toBe(true);
-              expect(terminalState.terminalReason?.startsWith("stopped")).toBe(true);
-              expect(
-                ["stopped", "error"].includes(
-                  terminalState.terminalClassification ?? "",
-                ),
-              ).toBe(true);
-              expect(
-                ["stopped", "error"].includes(terminalState.durableStatus ?? ""),
-              ).toBe(true);
-              expect(output).toContain("Escalation denied");
-            });
+          expect(["active", "error"].includes(terminalState.status ?? "")).toBe(
+            true,
+          );
+          expect(terminalState.terminalReason?.startsWith("stopped")).toBe(
+            true,
+          );
+          expect(
+            ["stopped", "error"].includes(
+              terminalState.terminalClassification ?? "",
+            ),
+          ).toBe(true);
+          expect(
+            ["stopped", "error"].includes(terminalState.durableStatus ?? ""),
+          ).toBe(true);
+          expect(output).toContain("Escalation denied");
+        });
       });
 
       cli.on("error", (error) => {
@@ -2658,9 +2977,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
         if (
           !resumeSent &&
-          output.includes(
-            "Ctrl+C cancels the current run. Ctrl+D exits.",
-          )
+          output.includes("Ctrl+C cancels the current run. Ctrl+D exits.")
         ) {
           resumeSent = true;
           cli.stdin?.write(`/resume ${interruptedSessionId}\n`);
@@ -2750,4 +3067,3 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     });
   }, 50000);
 });
-

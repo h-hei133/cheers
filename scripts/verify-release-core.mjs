@@ -87,5 +87,19 @@ if (resultContractCode !== 0) {
   process.exit(resultContractCode)
 }
 
+const workspaceSafetyCode = await runNodeScript('verify-workspace-safety.mjs')
+if (workspaceSafetyCode !== 0) {
+  const status = workspaceSafetyCode === 3 ? 'config-failure' : 'product-regression'
+  console.log(`[${status}] release-core - workspace safety exited ${workspaceSafetyCode}`)
+  process.exit(workspaceSafetyCode)
+}
+
+const evidenceArtifactsCode = await runNodeScript('verify-evidence-artifacts.mjs')
+if (evidenceArtifactsCode !== 0) {
+  const status = evidenceArtifactsCode === 3 ? 'config-failure' : 'product-regression'
+  console.log(`[${status}] release-core - evidence artifacts exited ${evidenceArtifactsCode}`)
+  process.exit(evidenceArtifactsCode)
+}
+
 console.log('[pass] release-core')
 process.exit(0)

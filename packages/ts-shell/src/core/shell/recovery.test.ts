@@ -6,7 +6,7 @@ import type { AgentRunner } from "../../orchestration/types.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { QueryEngine } from "../query/QueryEngine.js";
 import { createQueryRuntimeStateFromSeed } from "../query/runtimeState.js";
-import { resumeShellSession } from "./recovery.js";
+import { resolveSessionReference, resumeShellSession } from "./recovery.js";
 import type { ShellRuntimeContext } from "./runtimeContext.js";
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
@@ -36,6 +36,66 @@ function createRuntimeContext(): ShellRuntimeContext {
 }
 
 describe("shell recovery helpers", () => {
+  it("resolves session reference by unique id prefix", () => {
+    const resolved = resolveSessionReference({
+      reference: "sess_fix_auth",
+      preferredProjectRoot: "D:/repo",
+      sessionManager: {
+        listReentrySummaries: () => [
+          {
+            id: "sess_fix_auth_123",
+            title: "Fix auth flow",
+            status: "interrupted",
+            projectRoot: "D:/repo",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T01:00:00.000Z",
+            recoverable: true,
+          },
+        ],
+        sessionExists: () => false,
+      } as never,
+    });
+
+    expect(resolved).toEqual({
+      ok: true,
+      sessionId: "sess_fix_auth_123",
+    });
+  });
+
+  it("returns ambiguous when reference matches multiple sessions", () => {
+    const resolved = resolveSessionReference({
+      reference: "fix",
+      preferredProjectRoot: "D:/repo",
+      sessionManager: {
+        listReentrySummaries: () => [
+          {
+            id: "sess_a",
+            title: "Fix auth flow",
+            status: "interrupted",
+            projectRoot: "D:/repo",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T01:00:00.000Z",
+            recoverable: true,
+          },
+          {
+            id: "sess_b",
+            title: "Fix lint warnings",
+            status: "interrupted",
+            projectRoot: "D:/repo",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T01:00:00.000Z",
+            recoverable: true,
+          },
+        ],
+        sessionExists: () => false,
+      } as never,
+    });
+
+    expect(resolved.ok).toBe(false);
+    expect(resolved.reason).toBe("ambiguous");
+    expect(resolved.candidates?.length).toBe(2);
+  });
+
   it("returns resumed false when no recoverable session exists", async () => {
     const lines: string[] = [];
     const result = await resumeShellSession({
@@ -197,6 +257,50 @@ describe("shell recovery helpers", () => {
       sessionProjectDir: "D:/repo",
     });
     expect(lines.join("\n")).toContain("resume failed");
+  });
+
+  it("prints disambiguation guidance when requested resume target is ambiguous", async () => {
+    const lines: string[] = [];
+    const result = await resumeShellSession({
+      requestedSessionId: "fix",
+      sessionManager: {
+        listReentrySummaries: () => [
+          {
+            id: "sess_fix_auth_1",
+            title: "Fix auth flow",
+            status: "interrupted",
+            projectRoot: "D:/repo",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T01:00:00.000Z",
+            recoverable: true,
+            resumeDisposition: "fully-resumable",
+            autoResumeReady: true,
+            resumeDetail: "ready",
+          },
+          {
+            id: "sess_fix_lint_2",
+            title: "Fix lint",
+            status: "interrupted",
+            projectRoot: "D:/repo",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T01:00:00.000Z",
+            recoverable: true,
+            resumeDisposition: "fully-resumable",
+            autoResumeReady: true,
+            resumeDetail: "ready",
+          },
+        ],
+        sessionExists: () => false,
+      } as never,
+      runtimeContext: createRuntimeContext(),
+      sessionRuntime: {} as never,
+      renderer: { renderLine: (line: string) => lines.push(line) } as never,
+    });
+
+    expect(result).toEqual({ resumed: false });
+    expect(lines.join("\n")).toContain("ambiguous");
+    expect(lines.join("\n")).toContain("sess_fix_auth_1");
+    expect(lines.join("\n")).toContain("Hint: use a longer session id prefix");
   });
 
   it("passes a replay-built runtime seed into resumed prompt execution", async () => {

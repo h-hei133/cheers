@@ -647,6 +647,107 @@ describe("shell session runtime (W5)", () => {
     expect(calls).toContain(`error:sess_blocked:${blockedReason}`);
   });
 
+  it("prints coding failure reason and next action for unexecutable edit results", async () => {
+    const renderedLines: string[] = [];
+    const stopReason =
+      "Edit task needs either a fenced replacement content or an explicit replace-from/replace-to instruction.";
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield {
+          type: "query.completed",
+          result: {
+            status: "stopped_error",
+            terminalReason: "stopped_error",
+            terminalClassification: "stopped",
+            stopReason,
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_edit_blocked",
+              initialPrompt: "update plan",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: stopReason,
+            codingResult: {
+              taskKind: "edit-file",
+              changedFiles: [],
+              failedFiles: [{ path: "plan.txt", reason: stopReason }],
+              patches: [],
+              repair: {
+                status: "failed",
+                attempts: 0,
+                recoveredItems: [],
+                failedItems: ["plan.txt"],
+                notes: [],
+              },
+              continuation: {
+                status: "failed-after-bounded-continuation",
+                attempts: 0,
+                evidence: [],
+              },
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: [],
+                attemptedFiles: ["plan.txt"],
+                changedFiles: [],
+                unchangedAttemptedFiles: ["plan.txt"],
+              },
+              taskSatisfaction: {
+                verdict: "insufficient-evidence",
+                reasons: [stopReason],
+                requiredEvidence: ["changed-files"],
+                observedEvidence: [],
+              },
+              verifiedFiles: [],
+              unverifiedFiles: [{ path: "plan.txt", reason: stopReason }],
+              verification: {
+                status: "skipped",
+                reason: stopReason,
+              },
+              evidence: [],
+              failureBoundary: stopReason,
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_edit_blocked", "update plan");
+
+    expect(renderedLines).toContain("Action result");
+    expect(
+      renderedLines.some((line) =>
+        line.includes("- Failure reason: plan.txt: Edit task needs"),
+      ),
+    ).toBe(true);
+    expect(renderedLines).toContain(
+      "- Next action: Rerun with fenced replacement content or an explicit replace-from/replace-to instruction.",
+    );
+    expect(renderedLines).toContain("Next steps");
+    expect(renderedLines).toContain(
+      "- Rerun with fenced replacement content or an explicit replace-from/replace-to instruction.",
+    );
+  });
+
   it("prints actionable hints for provider readiness auth/network failures and keeps error persistence", async () => {
     for (const scenario of [
       {

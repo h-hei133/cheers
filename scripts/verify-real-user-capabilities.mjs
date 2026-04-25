@@ -14,6 +14,62 @@ const syntheticHome = 'D:/Test/pca-home-synth'
 const realHome = 'D:/Test/home-sf'
 const reportPath = 'D:/Test/test-results/real-user-capabilities-report.json'
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
+const includeCandidates = process.argv.includes('--include-candidates')
+
+const failureCategories = [
+  'none',
+  'provider-readiness',
+  'task-execution-failure',
+  'verification-failed',
+  'verification-blocked',
+  'protected-file-changed',
+  'assertion-mismatch',
+  'environment-filesystem-issue',
+]
+
+const futureGateCandidates = [
+  {
+    id: 'real-small-project-smoke',
+    status: 'candidate-not-run',
+    provider: 'real',
+    projectShape: {
+      requiredFiles: ['src/utils.js', 'src/app.js', 'README.md', 'project.json', 'LOCKED.md'],
+      roles: {
+        code: ['src/utils.js', 'src/app.js'],
+        docs: ['README.md'],
+        configLike: ['project.json'],
+        protected: ['project.json', 'LOCKED.md'],
+      },
+    },
+    contract: [
+      'turn1 multi-file sync: greet -> welcome across src/utils.js, src/app.js, README.md',
+      'turn1 protected unchanged: project.json and LOCKED.md',
+      'turn1 low-risk contains/unchanged verification passed',
+      'turn2 README-only correction changes README.md only',
+      'turn2 protected unchanged: src/utils.js, src/app.js, project.json, LOCKED.md',
+      'turn2 README contains welcome() and welcome("Ada")',
+      'turn2 low-risk contains/unchanged verification passed',
+    ],
+    requiredReportFields: [
+      'capability',
+      'projectDir',
+      'sessionId',
+      'changedFiles',
+      'protectedFiles',
+      'verification',
+      'failureCategory',
+      'failureReason',
+      'reportPath',
+    ],
+    promotionCriteria: [
+      'real-provider path remains stable for repeated manual runs',
+      'failure categories stay actionable without parsing output tails',
+      'runtime remains low enough for explicit real release gate',
+      'no new verification type or provider/auth behavior is required',
+    ],
+    releaseRealDecision: 'deferred: keep out of verify:release:real until the candidate has repeated stability evidence',
+  },
+]
 
 const scenarios = [
   {
@@ -77,6 +133,42 @@ const scenarios = [
         expectChanged: ['plan.txt'],
         expectContains: {
           'plan.txt': ['ship minimal CLI smoke', 'document one follow-up', 'verify multi-file follow-up'],
+        },
+      },
+    ],
+  },
+]
+
+const candidateScenarios = [
+  {
+    id: 'real-small-project-smoke',
+    provider: 'real',
+    projectDir: `D:/Test/pca-candidate-real-small-project-${runId}`,
+    files: {
+      'src/utils.js': 'export function greet(name = "world") {\n  return "Hello, " + name;\n}\n',
+      'src/app.js': 'import { greet } from "./utils.js";\n\nexport const message = greet("Ada");\n',
+      'README.md': 'Use greet("Ada") to say hello.\n',
+      'project.json': '{"name":"candidate-smoke","private":true}\n',
+      'LOCKED.md': 'Do not modify this file.\n',
+    },
+    protectedFiles: ['src/utils.js', 'src/app.js', 'project.json', 'LOCKED.md'],
+    turns: [
+      {
+        prompt: 'Rename exported function greet to welcome. Update src/utils.js, src/app.js, and README.md so they consistently use welcome. Do NOT modify project.json. Do NOT modify LOCKED.md. Verify src/utils.js contains export function welcome and src/app.js contains welcome and README.md contains welcome("Ada") and project.json is unchanged and LOCKED.md is unchanged.',
+        protectedFiles: ['project.json', 'LOCKED.md'],
+        expectChanged: ['README.md', 'src/app.js', 'src/utils.js'],
+        expectContains: {
+          'src/utils.js': ['export function welcome'],
+          'src/app.js': ['welcome'],
+          'README.md': ['welcome("Ada")'],
+        },
+      },
+      {
+        prompt: 'Correction: README.md should show welcome() as the primary example, but keep welcome("Ada") as a second example. Only modify README.md. Verify README.md contains welcome() and README.md contains welcome("Ada") and src/utils.js is unchanged and src/app.js is unchanged and project.json is unchanged and LOCKED.md is unchanged.',
+        protectedFiles: ['src/utils.js', 'src/app.js', 'project.json', 'LOCKED.md'],
+        expectChanged: ['README.md'],
+        expectContains: {
+          'README.md': ['welcome()', 'welcome("Ada")'],
         },
       },
     ],
@@ -228,7 +320,8 @@ function assertScenarioState(scenario, turn, beforeTurn, afterTurn, output) {
     failures.push(`expected changed files not changed: ${missingChanges.join(', ')}`)
   }
 
-  for (const protectedFile of scenario.protectedFiles) {
+  const protectedFiles = turn.protectedFiles ?? scenario.protectedFiles
+  for (const protectedFile of protectedFiles) {
     if (beforeTurn.get(protectedFile) !== afterTurn.get(protectedFile)) {
       failures.push(`protected file changed: ${protectedFile}`)
     }
@@ -260,6 +353,47 @@ function assertScenarioState(scenario, turn, beforeTurn, afterTurn, output) {
   }
 }
 
+function categorizeFailure(failureReason) {
+  const normalized = String(failureReason ?? '').toLowerCase()
+  if (!normalized.trim()) return 'none'
+  if (
+    normalized.includes('home is missing') ||
+    normalized.includes('provider') ||
+    normalized.includes('auth') ||
+    normalized.includes('credential')
+  ) {
+    return 'provider-readiness'
+  }
+  if (
+    normalized.includes('timed out') ||
+    normalized.includes('enoent') ||
+    normalized.includes('eacces') ||
+    normalized.includes('filesystem')
+  ) {
+    return 'environment-filesystem-issue'
+  }
+  if (normalized.includes('protected file changed')) {
+    return 'protected-file-changed'
+  }
+  if (
+    normalized.includes('verification did not report passed') ||
+    normalized.includes('verification blocked')
+  ) {
+    return 'verification-blocked'
+  }
+  if (normalized.includes('verification failed')) {
+    return 'verification-failed'
+  }
+  if (
+    normalized.includes('missing marker') ||
+    normalized.includes('expected file missing') ||
+    normalized.includes('expected changed files not changed')
+  ) {
+    return 'assertion-mismatch'
+  }
+  return 'task-execution-failure'
+}
+
 async function runScenario(scenario) {
   prepareProject(scenario)
   let previousSnapshot = snapshot(scenario.projectDir)
@@ -276,7 +410,12 @@ async function runScenario(scenario) {
         projectDir: scenario.projectDir,
         sessionId,
         changedFiles: [],
+        protectedFiles: scenario.protectedFiles,
+        reportPath,
         verification: 'blocked',
+        failureCategory: categorizeFailure(
+          runResult.timedOut ? `turn ${index + 1} timed out` : `turn ${index + 1} exited ${runResult.code}`,
+        ),
         failureReason: runResult.timedOut ? `turn ${index + 1} timed out` : `turn ${index + 1} exited ${runResult.code}`,
         outputTail: summarizeOutput(runResult.output),
         turns: turnResults,
@@ -301,7 +440,10 @@ async function runScenario(scenario) {
         projectDir: scenario.projectDir,
         sessionId,
         changedFiles: assertion.changedFiles,
+        protectedFiles: scenario.protectedFiles,
+        reportPath,
         verification: assertion.verification,
+        failureCategory: categorizeFailure(assertion.failures.join('; ')),
         failureReason: assertion.failures.join('; '),
         outputTail: summarizeOutput(runResult.output),
         turns: turnResults,
@@ -318,7 +460,10 @@ async function runScenario(scenario) {
     projectDir: scenario.projectDir,
     sessionId,
     changedFiles: allChangedFiles,
+    protectedFiles: scenario.protectedFiles,
+    reportPath,
     verification: 'passed',
+    failureCategory: 'none',
     failureReason: '',
     turns: turnResults,
   }
@@ -329,6 +474,26 @@ function writeReport(report) {
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8')
 }
 
+function buildCandidateMetadata(candidateResults) {
+  return futureGateCandidates.map((candidate) => {
+    const result = candidateResults.find((entry) => entry.capability === candidate.id)
+    if (!result) return candidate
+    return {
+      ...candidate,
+      status: result.status === 'PASS' ? 'candidate-pass' : 'candidate-fail',
+      dryRun: {
+        projectDir: result.projectDir,
+        sessionId: result.sessionId,
+        changedFiles: result.changedFiles,
+        protectedFiles: result.protectedFiles,
+        verification: result.verification,
+        failureCategory: result.failureCategory,
+        failureReason: result.failureReason,
+      },
+    }
+  })
+}
+
 async function main() {
   console.log('gate name=real-user-capabilities')
   console.log('status taxonomy: PASS=0 FAIL=1 CONFIG=3')
@@ -336,6 +501,7 @@ async function main() {
   console.log(`synthetic HOME=${syntheticHome}`)
   console.log(`real HOME=${realHome}`)
   console.log('homeCreated=false')
+  console.log(`candidateMode=${includeCandidates ? 'include-candidates' : 'off'}`)
 
   try {
     ensureHome(syntheticHome, 'synthetic')
@@ -345,7 +511,11 @@ async function main() {
       generatedAt: new Date().toISOString(),
       status: 'CONFIG',
       reportPath,
+      failureCategory: 'provider-readiness',
       failureReason: error.message,
+      failureCategories,
+      futureGateCandidates,
+      candidates: [],
       capabilities: [],
     }
     writeReport(report)
@@ -362,12 +532,27 @@ async function main() {
     console.log(`[${result.status}] ${scenario.id} - provider=${scenario.provider} project=${scenario.projectDir} session=${result.sessionId} ${suffix}`)
   }
 
-  const ok = capabilities.every((capability) => capability.status === 'PASS')
+  const candidates = []
+  if (includeCandidates) {
+    for (const scenario of candidateScenarios) {
+      const result = await runScenario(scenario)
+      candidates.push(result)
+      const suffix = result.status === 'PASS' ? `verification=${result.verification}` : result.failureReason
+      console.log(`[${result.status}] candidate:${scenario.id} - provider=${scenario.provider} project=${scenario.projectDir} session=${result.sessionId} ${suffix}`)
+    }
+  }
+
+  const ok =
+    capabilities.every((capability) => capability.status === 'PASS') &&
+    candidates.every((candidate) => candidate.status === 'PASS')
   const report = {
     generatedAt: new Date().toISOString(),
     status: ok ? 'PASS' : 'FAIL',
     reportPath,
+    failureCategories,
+    futureGateCandidates: buildCandidateMetadata(candidates),
     capabilities,
+    candidates,
   }
   writeReport(report)
   console.log(`report=${reportPath}`)
@@ -379,7 +564,11 @@ main().catch((error) => {
     generatedAt: new Date().toISOString(),
     status: 'FAIL',
     reportPath,
+    failureCategory: categorizeFailure(error.message),
     failureReason: error.stack ?? error.message,
+    failureCategories,
+    futureGateCandidates,
+    candidates: [],
     capabilities: [],
   }
   writeReport(report)

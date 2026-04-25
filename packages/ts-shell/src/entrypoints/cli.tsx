@@ -1,30 +1,33 @@
 #!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
 import process from "node:process";
 import * as readline from "node:readline";
-import path from "node:path";
-import fs from "node:fs";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
 import type { ShellActionResult } from "../core/commands/types.js";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
 import type { McpClientSnapshot } from "../core/mcp/types.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
+import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import {
   bootstrapShellRuntime,
   SessionBootstrapError,
 } from "../core/shell/bootstrap.js";
+import { applyInteractiveApprovalDecisionWiring } from "../core/shell/interactiveApprovalWiring.js";
 import {
   resolveProviderCredential,
   type ProviderCredentialResolution,
 } from "../core/shell/providerCredentials.js";
-import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
 import {
   checkRealProviderReadiness,
   createProviderReadinessTerminalEvent,
 } from "../core/shell/providerReadiness.js";
-import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
-import { applyInteractiveApprovalDecisionWiring } from "../core/shell/interactiveApprovalWiring.js";
-import { resumeShellSession } from "../core/shell/recovery.js";
+import {
+  resolveSessionReference,
+  resumeShellSession,
+} from "../core/shell/recovery.js";
+import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
 import { switchActiveSession } from "../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
 import {
@@ -41,13 +44,13 @@ import {
 import { streamMvpIntegratedFlow } from "../orchestration/runMvpIntegratedFlow.js";
 import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
-import { SessionManager } from "../session/SessionManager.js";
 import type {
   ApprovalAuditMemoryState,
   RecoveryTrustBoundaryBlock,
-  SessionReentrySummary,
   SessionContinuitySnapshot,
+  SessionReentrySummary,
 } from "../session/SessionManager.js";
+import { SessionManager } from "../session/SessionManager.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import { openSessionsPanel } from "./sessionsPanel.js";
 
@@ -77,7 +80,10 @@ type ResumeLikeShellAction = ShellActionResult & {
 };
 type TurnInputResolution =
   | { kind: "handled" }
-  | { kind: "shell-action"; slashResult: Extract<SlashRouteResult, { kind: "shell-action" }> }
+  | {
+      kind: "shell-action";
+      slashResult: Extract<SlashRouteResult, { kind: "shell-action" }>;
+    }
   | { kind: "execute"; effectivePrompt: string };
 
 interface ApprovalModeObject {
@@ -162,7 +168,9 @@ function renderApprovalAuditRecord(
   renderer.renderLine("approval-audit:event=decision");
   renderer.renderLine(`approval-audit:channel=${record.channel}`);
   renderer.renderLine(`approval-audit:decision=${record.decision}`);
-  renderer.renderLine(`approval-audit:decision-source=${record.decisionSource}`);
+  renderer.renderLine(
+    `approval-audit:decision-source=${record.decisionSource}`,
+  );
   renderer.renderLine(
     `approval-audit:persistent=${record.persistent ? "true" : "false"}`,
   );
@@ -219,9 +227,7 @@ async function main(): Promise<void> {
     // npm start can parse unknown --project/--attach flags as npm configs and
     // forward only the value as a positional arg. Accept that positional path
     // so end users can keep using `npm start -- --project <path>`.
-    const positionalProject = positionalArgs.find((arg) =>
-      /[\\/]/.test(arg),
-    );
+    const positionalProject = positionalArgs.find((arg) => /[\\/]/.test(arg));
     if (positionalProject) {
       options.projectPath = positionalProject;
     }
@@ -271,7 +277,9 @@ async function main(): Promise<void> {
   if (replayIdx !== -1) {
     const replayPath = args[replayIdx + 1];
     if (!replayPath) {
-      console.error("Missing value for --replay-file. Example: --replay-file .\\replay.txt");
+      console.error(
+        "Missing value for --replay-file. Example: --replay-file .\\replay.txt",
+      );
       process.exit(1);
     }
     options.replayFile = replayPath;
@@ -384,9 +392,7 @@ async function main(): Promise<void> {
         approvalTrustPolicy,
         () => runtimeContext.projectRoot,
         () =>
-          !process.stdin.isTTY
-            ? options.nonInteractiveApproval
-            : undefined,
+          !process.stdin.isTTY ? options.nonInteractiveApproval : undefined,
         () => activeNonInteractiveApprovalMode,
         (record) => {
           const payload: Omit<ApprovalAuditMemoryState, "recordedAt"> = {
@@ -473,7 +479,11 @@ async function main(): Promise<void> {
       }
       return;
     }
-    if (pipedInput !== null && nonInteractivePrompts.length > 1 && !options.printMode) {
+    if (
+      pipedInput !== null &&
+      nonInteractivePrompts.length > 1 &&
+      !options.printMode
+    ) {
       renderer.renderLine(
         `Stdin batch mode: running ${nonInteractivePrompts.length} prompt(s) sequentially in session ${runtimeContext.session.id}.`,
       );
@@ -551,9 +561,7 @@ async function main(): Promise<void> {
     try {
       if (isWorkspaceInfoPromptStrict(trimmed)) {
         renderer.renderLine("");
-        renderer.renderLine(
-          `Current working directory: ${runtimeContext.cwd}`,
-        );
+        renderer.renderLine(`Current working directory: ${runtimeContext.cwd}`);
         renderer.renderLine(`Project root: ${runtimeContext.projectRoot}`);
         renderer.renderLine(
           "Use /cd <path> (or /workspace attach <path>) to switch target project.",
@@ -574,7 +582,8 @@ async function main(): Promise<void> {
         rl.prompt();
         return;
       }
-      const slashResult = resolved.kind === "shell-action" ? resolved.slashResult : null;
+      const slashResult =
+        resolved.kind === "shell-action" ? resolved.slashResult : null;
 
       if (
         slashResult?.kind === "shell-action" &&
@@ -604,374 +613,393 @@ async function main(): Promise<void> {
         return;
       }
 
-    if (
-      slashResult?.kind === "shell-action" &&
-      slashResult.action === "cancel-run"
-    ) {
-      sessionRuntime.cancelCurrentRun();
-      renderer.renderLine("\nRequested cancellation for the current run.\n");
-      rl.prompt();
-      return;
-    }
-
-    if (
-      slashResult?.kind === "shell-action" &&
-      slashResult.action === "list-sessions"
-    ) {
-      const sessionAction = slashResult.sessionAction ?? "panel";
-      if (sessionAction === "list") {
-        renderSessionList(
-          renderer,
-          sessionManager,
-          runtimeContext.session.id,
-          runtimeContext.projectRoot,
-        );
+      if (
+        slashResult?.kind === "shell-action" &&
+        slashResult.action === "cancel-run"
+      ) {
+        sessionRuntime.cancelCurrentRun();
+        renderer.renderLine("\nRequested cancellation for the current run.\n");
         rl.prompt();
         return;
       }
 
-      if (sessionAction === "current") {
-        renderCurrentSession(renderer, sessionManager, runtimeContext);
-        renderSessionCommandMap(renderer, { compact: true });
-        rl.prompt();
-        return;
-      }
-
-      if (sessionAction === "switch") {
-        const targetSessionId = slashResult.sessionId?.trim();
-        if (!targetSessionId) {
-          renderer.renderLine(
-            "\nUsage: /sessions switch <session-id>\n",
-          );
-          rl.prompt();
-          return;
-        }
-
-        try {
-          const resumed = sessionManager.resume(targetSessionId);
-          const previousSessionId = runtimeContext.session.id;
-          switchRuntimeSessionProjectContext(runtimeContext, resumed);
-          mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
-          renderer.renderLine(
-            `\nSwitched session: ${previousSessionId} -> ${resumed.id}\n`,
-          );
-          renderer.renderLine(`Project context: ${runtimeContext.projectRoot}`);
-          renderSwitchedSessionContext(renderer, sessionManager, resumed.id);
-          renderSessionCommandMap(renderer, { compact: true });
-          renderer.renderLine("");
-          refreshInteractivePromptChrome();
-        } catch (error) {
-          renderer.renderLine(
-            `\nFailed to switch session: ${error instanceof Error ? error.message : String(error)}\n`,
-          );
-        }
-        rl.prompt();
-        return;
-      }
-
-      if (sessionAction === "help") {
-        renderSessionCommandMap(renderer);
-        rl.prompt();
-        return;
-      }
-
-      try {
-        const sessions = sessionManager.listRecentSessions(5);
-        if (sessions.length === 0) {
-          renderer.renderLine("\nNo sessions found.\n");
-          rl.prompt();
-          return;
-        }
-        const panelResult = await openSessionsPanel({
-          rl,
-          sessionManager,
-          runtimeContext,
-        });
-        if (panelResult.switchedSessionId) {
-          const resumed = sessionManager.resume(panelResult.switchedSessionId);
-          switchRuntimeSessionProjectContext(runtimeContext, resumed);
-          mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
-          renderer.renderLine(
-            `\nSwitched to session ${panelResult.switchedSessionId}.\n`,
-          );
-          renderer.renderLine(`Project context: ${runtimeContext.projectRoot}`);
-          renderSwitchedSessionContext(
+      if (
+        slashResult?.kind === "shell-action" &&
+        slashResult.action === "list-sessions"
+      ) {
+        const sessionAction = slashResult.sessionAction ?? "panel";
+        if (sessionAction === "list") {
+          renderSessionList(
             renderer,
             sessionManager,
-            panelResult.switchedSessionId,
-          );
-          renderer.renderLine("");
-          refreshInteractivePromptChrome();
-        } else {
-          renderer.renderLine("\nSessions panel closed.\n");
-        }
-      } catch (error) {
-        renderer.renderLine(
-          `\nSessions panel failed: ${error instanceof Error ? error.message : String(error)}\n`,
-        );
-      }
-      rl.prompt();
-      return;
-    }
-
-    if (
-      slashResult?.kind === "shell-action" &&
-      slashResult.action === "show-workspace"
-    ) {
-      const workspaceAction = slashResult.workspaceAction ?? "status";
-      if (workspaceAction === "recent") {
-        renderRecentProjectContexts(renderer, sessionManager);
-        rl.prompt();
-        return;
-      }
-
-      if (workspaceAction === "attach") {
-        const attachTarget = slashResult.workspaceTarget?.trim();
-        if (!attachTarget) {
-          renderer.renderLine(
-            "\nUsage: /workspace attach <path>\n",
+            runtimeContext.session.id,
+            runtimeContext.projectRoot,
           );
           rl.prompt();
           return;
         }
 
-        try {
-          const attached = resolveRuntimeProjectRoot(runtimeContext.cwd, attachTarget);
-          const previousProjectRoot = runtimeContext.projectRoot;
-          if (
-            normalizePathForCompare(previousProjectRoot) ===
-            normalizePathForCompare(attached.projectRoot)
-          ) {
+        if (sessionAction === "current") {
+          renderCurrentSession(renderer, sessionManager, runtimeContext);
+          renderSessionCommandMap(renderer, { compact: true });
+          rl.prompt();
+          return;
+        }
+
+        if (sessionAction === "switch") {
+          const targetSessionReference = slashResult.sessionId?.trim();
+          if (!targetSessionReference) {
             renderer.renderLine(
-              `\nAlready attached to ${attached.projectRoot}.`,
+              "\nUsage: /sessions switch <id|prefix|title|last>\n",
             );
-            renderWorkspaceSummary(renderer, runtimeContext);
             rl.prompt();
             return;
           }
 
-          const attachedSession = sessionManager.createNew(attached.projectRoot);
-          switchActiveSession(
-            runtimeContext as never,
-            attachedSession as never,
-            attached.projectRoot,
-            {
-              cwd: attached.projectRoot,
-              projectRoot: attached.projectRoot,
-              gitContext: attached.gitContext,
-            },
-          );
-          mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+          const resolvedSessionId = resolveSwitchSessionReference({
+            renderer,
+            sessionManager,
+            preferredProjectRoot: runtimeContext.projectRoot,
+            reference: targetSessionReference,
+            printMode: false,
+          });
+          if (!resolvedSessionId) {
+            rl.prompt();
+            return;
+          }
 
-          renderer.renderLine(
-            `\nAttached project context: ${previousProjectRoot} -> ${attached.projectRoot}`,
-          );
-          renderer.renderLine(`New project session: ${attachedSession.id}`);
-          renderWorkspaceSummary(renderer, runtimeContext);
-          renderRecentProjectContexts(renderer, sessionManager);
-          refreshInteractivePromptChrome();
+          try {
+            const resumed = sessionManager.resume(resolvedSessionId);
+            const previousSessionId = runtimeContext.session.id;
+            switchRuntimeSessionProjectContext(runtimeContext, resumed);
+            mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+            renderer.renderLine(
+              `\nSwitched session: ${previousSessionId} -> ${resumed.id}\n`,
+            );
+            renderer.renderLine(
+              `Project context: ${runtimeContext.projectRoot}`,
+            );
+            renderSwitchedSessionContext(renderer, sessionManager, resumed.id);
+            renderSessionCommandMap(renderer, { compact: true });
+            renderer.renderLine("");
+            refreshInteractivePromptChrome();
+          } catch (error) {
+            renderer.renderLine(
+              `\nFailed to switch session: ${error instanceof Error ? error.message : String(error)}\n`,
+            );
+          }
+          rl.prompt();
+          return;
+        }
+
+        if (sessionAction === "help") {
+          renderSessionCommandMap(renderer);
+          rl.prompt();
+          return;
+        }
+
+        try {
+          const sessions = sessionManager.listRecentSessions(5);
+          if (sessions.length === 0) {
+            renderer.renderLine("\nNo sessions found.\n");
+            rl.prompt();
+            return;
+          }
+          const panelResult = await openSessionsPanel({
+            rl,
+            sessionManager,
+            runtimeContext,
+          });
+          if (panelResult.switchedSessionId) {
+            const resumed = sessionManager.resume(
+              panelResult.switchedSessionId,
+            );
+            switchRuntimeSessionProjectContext(runtimeContext, resumed);
+            mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+            renderer.renderLine(
+              `\nSwitched to session ${panelResult.switchedSessionId}.\n`,
+            );
+            renderer.renderLine(
+              `Project context: ${runtimeContext.projectRoot}`,
+            );
+            renderSwitchedSessionContext(
+              renderer,
+              sessionManager,
+              panelResult.switchedSessionId,
+            );
+            renderer.renderLine("");
+            refreshInteractivePromptChrome();
+          } else {
+            renderer.renderLine("\nSessions panel closed.\n");
+          }
         } catch (error) {
           renderer.renderLine(
-            `\nFailed to attach project: ${error instanceof Error ? error.message : String(error)}\n`,
+            `\nSessions panel failed: ${error instanceof Error ? error.message : String(error)}\n`,
           );
         }
         rl.prompt();
         return;
       }
-
-      renderWorkspaceSummary(renderer, runtimeContext);
-      rl.prompt();
-      return;
-    }
-
-    if (
-      slashResult?.kind === "shell-action" &&
-      slashResult.action === "show-mcp"
-    ) {
-      const mcpAction = slashResult.mcpAction ?? "status";
-      const mcpTarget = slashResult.mcpTarget?.trim();
-      try {
-        if (mcpAction === "refresh") {
-          const refreshTarget =
-            !mcpTarget || mcpTarget.toLowerCase() === "all"
-              ? "all"
-              : mcpTarget;
-          const snapshot = await mcpGateway.refresh(refreshTarget);
-          renderer.renderLine(
-            `\nMCP refresh complete (${refreshTarget === "all" ? "all servers" : refreshTarget}).`,
-          );
-          renderMcpStatusControlPlane(renderer, snapshot);
-          rl.prompt();
-          return;
-        }
-
-        const snapshot = await mcpGateway.snapshot();
-        if (mcpAction === "tools") {
-          renderMcpToolsControlPlane(renderer, snapshot, mcpTarget);
-          rl.prompt();
-          return;
-        }
-        if (mcpAction === "doctor") {
-          renderMcpDoctorControlPlane(renderer, snapshot);
-          rl.prompt();
-          return;
-        }
-        renderMcpStatusControlPlane(renderer, snapshot);
-      } catch (error) {
-        renderer.renderLine(
-          `\nMCP control plane failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        renderer.renderLine("Try /mcp refresh all to reload server connections.\n");
-      }
-      rl.prompt();
-      return;
-    }
-
-    if (
-      slashResult?.kind === "shell-action" &&
-      slashResult.action === "show-help"
-    ) {
-      renderUserHelp(renderer);
-      rl.prompt();
-      return;
-    }
-
-    if (
-      slashResult?.kind === "shell-action" &&
-      slashResult.action === "show-view"
-    ) {
-      const activeMode =
-        sessionRuntime.getViewMode() === "compact" ? "user" : "developer";
-      renderer.renderLine(
-        `\nCurrent view mode: ${activeMode} (${sessionRuntime.getViewMode()})`,
-      );
-      renderer.renderLine(
-        "Use /view user for product-style output, or /view developer for runtime-level diagnostics.\n",
-      );
-      rl.prompt();
-      return;
-    }
-
-    if (
-      slashResult?.kind === "shell-action" &&
-      slashResult.action === "set-view"
-    ) {
-      const nextMode = slashResult.viewMode ?? "compact";
-      sessionRuntime.setViewMode(nextMode);
-      const activeMode = nextMode === "compact" ? "user" : "developer";
-      renderer.renderLine(
-        `\nView mode updated to ${activeMode} (${nextMode}). Use /view status to inspect current mode.\n`,
-      );
-      rl.prompt();
-      return;
-    }
-
-    if (
-      slashResult?.kind === "shell-action" &&
-      slashResult.action === "show-agent-mode"
-    ) {
-      const activeMode = sessionRuntime.getAgentMode();
-      renderer.renderLine(
-        `\nCurrent agent mode: ${activeMode}`,
-      );
-      renderer.renderLine(
-        "Use /plan for planning-oriented reasoning, or /build for coding/build execution (default).\n",
-      );
-      rl.prompt();
-      return;
-    }
 
       if (
-      slashResult?.kind === "shell-action" &&
-      slashResult.action === "set-agent-mode"
-    ) {
-      const nextMode = slashResult.agentMode ?? "build";
-      sessionRuntime.setAgentMode(nextMode);
-      refreshInteractivePromptChrome();
-      renderer.renderLine(
-        `\nAgent mode updated to ${nextMode}.`,
-      );
-      renderer.renderLine(
-        nextMode === "plan"
-          ? "Plan mode prioritizes planning and diagnosis over direct edits/tool execution."
-          : "Build mode prioritizes direct coding workflow (read/search/edit/verify).",
-      );
-      renderer.renderLine("");
-      rl.prompt();
-      return;
-    }
-
-    if (
-      slashResult?.kind === "shell-action" &&
-      slashResult.action === "manage-permissions"
-    ) {
-      const permissionAction = slashResult.permissionAction ?? "list";
-      if (permissionAction === "list") {
-        renderPermissionsList(
-          renderer,
-          approvalTrustPolicy,
-          runtimeContext.projectRoot,
-        );
-        rl.prompt();
-        return;
-      }
-
-      if (permissionAction === "explain") {
-        renderPermissionExplain(
-          renderer,
-          approvalTrustPolicy,
-          runtimeContext.projectRoot,
-        );
-        rl.prompt();
-        return;
-      }
-
-      if (permissionAction === "revoke") {
-        const selector = slashResult.permissionSelector?.trim();
-        if (!selector) {
-          renderer.renderLine(
-            "\nUsage: /permissions revoke <index|scope-key>\n",
-          );
+        slashResult?.kind === "shell-action" &&
+        slashResult.action === "show-workspace"
+      ) {
+        const workspaceAction = slashResult.workspaceAction ?? "status";
+        if (workspaceAction === "recent") {
+          renderRecentProjectContexts(renderer, sessionManager);
           rl.prompt();
           return;
         }
-        const revokeResult = approvalTrustPolicy.revokeGrant(
-          runtimeContext.projectRoot,
-          selector,
-        );
-        if (revokeResult.removed > 0) {
+
+        if (workspaceAction === "attach") {
+          const attachTarget = slashResult.workspaceTarget?.trim();
+          if (!attachTarget) {
+            renderer.renderLine("\nUsage: /workspace attach <path>\n");
+            rl.prompt();
+            return;
+          }
+
+          try {
+            const attached = resolveRuntimeProjectRoot(
+              runtimeContext.cwd,
+              attachTarget,
+            );
+            const previousProjectRoot = runtimeContext.projectRoot;
+            if (
+              normalizePathForCompare(previousProjectRoot) ===
+              normalizePathForCompare(attached.projectRoot)
+            ) {
+              renderer.renderLine(
+                `\nAlready attached to ${attached.projectRoot}.`,
+              );
+              renderWorkspaceSummary(renderer, runtimeContext);
+              rl.prompt();
+              return;
+            }
+
+            const attachedSession = sessionManager.createNew(
+              attached.projectRoot,
+            );
+            switchActiveSession(
+              runtimeContext as never,
+              attachedSession as never,
+              attached.projectRoot,
+              {
+                cwd: attached.projectRoot,
+                projectRoot: attached.projectRoot,
+                gitContext: attached.gitContext,
+              },
+            );
+            mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+
+            renderer.renderLine(
+              `\nAttached project context: ${previousProjectRoot} -> ${attached.projectRoot}`,
+            );
+            renderer.renderLine(`New project session: ${attachedSession.id}`);
+            renderWorkspaceSummary(renderer, runtimeContext);
+            renderRecentProjectContexts(renderer, sessionManager);
+            refreshInteractivePromptChrome();
+          } catch (error) {
+            renderer.renderLine(
+              `\nFailed to attach project: ${error instanceof Error ? error.message : String(error)}\n`,
+            );
+          }
+          rl.prompt();
+          return;
+        }
+
+        renderWorkspaceSummary(renderer, runtimeContext);
+        rl.prompt();
+        return;
+      }
+
+      if (
+        slashResult?.kind === "shell-action" &&
+        slashResult.action === "show-mcp"
+      ) {
+        const mcpAction = slashResult.mcpAction ?? "status";
+        const mcpTarget = slashResult.mcpTarget?.trim();
+        try {
+          if (mcpAction === "refresh") {
+            const refreshTarget =
+              !mcpTarget || mcpTarget.toLowerCase() === "all"
+                ? "all"
+                : mcpTarget;
+            const snapshot = await mcpGateway.refresh(refreshTarget);
+            renderer.renderLine(
+              `\nMCP refresh complete (${refreshTarget === "all" ? "all servers" : refreshTarget}).`,
+            );
+            renderMcpStatusControlPlane(renderer, snapshot);
+            rl.prompt();
+            return;
+          }
+
+          const snapshot = await mcpGateway.snapshot();
+          if (mcpAction === "tools") {
+            renderMcpToolsControlPlane(renderer, snapshot, mcpTarget);
+            rl.prompt();
+            return;
+          }
+          if (mcpAction === "doctor") {
+            renderMcpDoctorControlPlane(renderer, snapshot);
+            rl.prompt();
+            return;
+          }
+          renderMcpStatusControlPlane(renderer, snapshot);
+        } catch (error) {
           renderer.renderLine(
-            `\nRemoved trust grant: ${revokeResult.removedGrant?.scopeLabel ?? selector}\n`,
+            `\nMCP control plane failed: ${error instanceof Error ? error.message : String(error)}`,
           );
-        } else {
           renderer.renderLine(
-            `\nNo trust grant matched selector "${selector}" in current project.\n`,
+            "Try /mcp refresh all to reload server connections.\n",
           );
         }
         rl.prompt();
         return;
       }
 
-      if (permissionAction === "reset") {
-        const selector = slashResult.permissionSelector?.trim().toLowerCase();
-        if (selector === "all") {
-          const resetAll = approvalTrustPolicy.resetAll();
-          renderer.renderLine(
-            `\nReset all persisted trust grants (${resetAll.removed} removed).\n`,
-          );
-          rl.prompt();
-          return;
-        }
-        const resetProject = approvalTrustPolicy.resetProject(
-          runtimeContext.projectRoot,
+      if (
+        slashResult?.kind === "shell-action" &&
+        slashResult.action === "show-help"
+      ) {
+        renderUserHelp(renderer);
+        rl.prompt();
+        return;
+      }
+
+      if (
+        slashResult?.kind === "shell-action" &&
+        slashResult.action === "show-view"
+      ) {
+        const activeMode =
+          sessionRuntime.getViewMode() === "compact" ? "user" : "developer";
+        renderer.renderLine(
+          `\nCurrent view mode: ${activeMode} (${sessionRuntime.getViewMode()})`,
         );
         renderer.renderLine(
-          `\nReset current project trust grants (${resetProject.removed} removed).\n`,
+          "Use /view user for product-style output, or /view developer for runtime-level diagnostics.\n",
         );
         rl.prompt();
         return;
       }
-    }
+
+      if (
+        slashResult?.kind === "shell-action" &&
+        slashResult.action === "set-view"
+      ) {
+        const nextMode = slashResult.viewMode ?? "compact";
+        sessionRuntime.setViewMode(nextMode);
+        const activeMode = nextMode === "compact" ? "user" : "developer";
+        renderer.renderLine(
+          `\nView mode updated to ${activeMode} (${nextMode}). Use /view status to inspect current mode.\n`,
+        );
+        rl.prompt();
+        return;
+      }
+
+      if (
+        slashResult?.kind === "shell-action" &&
+        slashResult.action === "show-agent-mode"
+      ) {
+        const activeMode = sessionRuntime.getAgentMode();
+        renderer.renderLine(`\nCurrent agent mode: ${activeMode}`);
+        renderer.renderLine(
+          "Use /plan for planning-oriented reasoning, or /build for coding/build execution (default).\n",
+        );
+        rl.prompt();
+        return;
+      }
+
+      if (
+        slashResult?.kind === "shell-action" &&
+        slashResult.action === "set-agent-mode"
+      ) {
+        const nextMode = slashResult.agentMode ?? "build";
+        sessionRuntime.setAgentMode(nextMode);
+        refreshInteractivePromptChrome();
+        renderer.renderLine(`\nAgent mode updated to ${nextMode}.`);
+        renderer.renderLine(
+          nextMode === "plan"
+            ? "Plan mode prioritizes planning and diagnosis over direct edits/tool execution."
+            : "Build mode prioritizes direct coding workflow (read/search/edit/verify).",
+        );
+        renderer.renderLine("");
+        rl.prompt();
+        return;
+      }
+
+      if (
+        slashResult?.kind === "shell-action" &&
+        slashResult.action === "manage-permissions"
+      ) {
+        const permissionAction = slashResult.permissionAction ?? "list";
+        if (permissionAction === "list") {
+          renderPermissionsList(
+            renderer,
+            approvalTrustPolicy,
+            runtimeContext.projectRoot,
+          );
+          rl.prompt();
+          return;
+        }
+
+        if (permissionAction === "explain") {
+          renderPermissionExplain(
+            renderer,
+            approvalTrustPolicy,
+            runtimeContext.projectRoot,
+          );
+          rl.prompt();
+          return;
+        }
+
+        if (permissionAction === "revoke") {
+          const selector = slashResult.permissionSelector?.trim();
+          if (!selector) {
+            renderer.renderLine(
+              "\nUsage: /permissions revoke <index|scope-key>\n",
+            );
+            rl.prompt();
+            return;
+          }
+          const revokeResult = approvalTrustPolicy.revokeGrant(
+            runtimeContext.projectRoot,
+            selector,
+          );
+          if (revokeResult.removed > 0) {
+            renderer.renderLine(
+              `\nRemoved trust grant: ${revokeResult.removedGrant?.scopeLabel ?? selector}\n`,
+            );
+          } else {
+            renderer.renderLine(
+              `\nNo trust grant matched selector "${selector}" in current project.\n`,
+            );
+          }
+          rl.prompt();
+          return;
+        }
+
+        if (permissionAction === "reset") {
+          const selector = slashResult.permissionSelector?.trim().toLowerCase();
+          if (selector === "all") {
+            const resetAll = approvalTrustPolicy.resetAll();
+            renderer.renderLine(
+              `\nReset all persisted trust grants (${resetAll.removed} removed).\n`,
+            );
+            rl.prompt();
+            return;
+          }
+          const resetProject = approvalTrustPolicy.resetProject(
+            runtimeContext.projectRoot,
+          );
+          renderer.renderLine(
+            `\nReset current project trust grants (${resetProject.removed} removed).\n`,
+          );
+          rl.prompt();
+          return;
+        }
+      }
 
       try {
         if (resolved.kind !== "execute") {
@@ -1185,7 +1213,8 @@ function createCliEscalationPromptHandler(
       }
       if (
         input.approvalModeObject &&
-        (input.approvalModeObject.source === "prompt-ambiguous-verify-lineage" ||
+        (input.approvalModeObject.source ===
+          "prompt-ambiguous-verify-lineage" ||
           !input.approvalModeObject.executableNow)
       ) {
         overrideNotes.push(
@@ -1245,8 +1274,9 @@ function createCliEscalationPromptHandler(
     const projectRoot = getProjectRoot();
     const evaluation = trustPolicy.evaluate(prompt, projectRoot);
     const isNonInteractive = rl === null;
-    const cliNonInteractiveDecision =
-      isNonInteractive ? getNonInteractiveDecision?.() : undefined;
+    const cliNonInteractiveDecision = isNonInteractive
+      ? getNonInteractiveDecision?.()
+      : undefined;
     const approvalModeObject = getApprovalModeObject?.();
     const hasAllowOnceCache = trustPolicy.hasAllowOnce(evaluation.cacheKey);
     const hasAllowAlwaysGrant = Boolean(evaluation.matchedGrant);
@@ -1277,7 +1307,8 @@ function createCliEscalationPromptHandler(
       }
       if (nonInteractiveDecisionPlan.source === "ambiguous-stop") {
         const stopReason =
-          nonInteractiveDecisionPlan.stopReason ?? "Approval mode is ambiguous.";
+          nonInteractiveDecisionPlan.stopReason ??
+          "Approval mode is ambiguous.";
         renderer.renderLine(stopReason);
         renderer.renderLine(
           "Resolve approval conflict explicitly with --non-interactive-approval deny|allow-once|allow-always.",
@@ -1375,7 +1406,9 @@ function createCliEscalationPromptHandler(
         renderer.renderLine(`- Action: ${prompt.context.operation}`);
         renderer.renderLine(`- Target: ${prompt.context.target}`);
         renderer.renderLine(`- Risk: ${prompt.severity}`);
-        renderer.renderLine(`- Decision source: ${interactiveDecisionPlan.source}`);
+        renderer.renderLine(
+          `- Decision source: ${interactiveDecisionPlan.source}`,
+        );
         renderer.renderLine(stopReason);
         emitApprovalAudit({
           channel: "interactive",
@@ -1404,7 +1437,9 @@ function createCliEscalationPromptHandler(
         renderer.renderLine(`- Action: ${prompt.context.operation}`);
         renderer.renderLine(`- Target: ${prompt.context.target}`);
         renderer.renderLine(`- Risk: ${prompt.severity}`);
-        renderer.renderLine(`- Decision source: ${interactiveDecisionPlan.source}`);
+        renderer.renderLine(
+          `- Decision source: ${interactiveDecisionPlan.source}`,
+        );
         for (const note of interactiveDecisionPlan.overrideNotes) {
           renderer.renderLine(`- ${note}`);
         }
@@ -1417,7 +1452,10 @@ function createCliEscalationPromptHandler(
           );
         }
         if (resolvedDecision === "allow-always") {
-          const persisted = trustPolicy.rememberAllowAlways(prompt, projectRoot);
+          const persisted = trustPolicy.rememberAllowAlways(
+            prompt,
+            projectRoot,
+          );
           renderer.renderLine(
             `Trust policy updated: ${persisted.scopeLabel} @ ${path.basename(projectRoot) || projectRoot}`,
           );
@@ -1459,7 +1497,9 @@ function createCliEscalationPromptHandler(
       renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
       renderer.renderLine(`- Action: ${prompt.context.operation}`);
       renderer.renderLine(`- Target: ${prompt.context.target}`);
-      renderer.renderLine("- Decision: allow-once (cached in current shell run)");
+      renderer.renderLine(
+        "- Decision: allow-once (cached in current shell run)",
+      );
       emitApprovalAudit({
         channel: isNonInteractive ? "non-interactive" : "interactive",
         decision: "allow-once",
@@ -1532,7 +1572,9 @@ function createCliEscalationPromptHandler(
         "- Tip: use /view developer to see policy and full escalation details.",
       );
     }
-    renderer.renderLine("Decision: y=allow-once, a=allow-always, n=deny (default n)");
+    renderer.renderLine(
+      "Decision: y=allow-once, a=allow-always, n=deny (default n)",
+    );
 
     let decision: "deny" | "allow-once" | "allow-always";
     let decisionInputKey: "y" | "a" | "n" | "other" | undefined;
@@ -1587,12 +1629,12 @@ function createCliEscalationPromptHandler(
     emitApprovalAudit({
       channel: isNonInteractive ? "non-interactive" : "interactive",
       decision,
-      decisionSource: isNonInteractive ? "default-deny" : "interactive-keypress",
+      decisionSource: isNonInteractive
+        ? "default-deny"
+        : "interactive-keypress",
       persistent: decision === "allow-always",
       cacheEffect:
-        decision === "allow-always"
-          ? "allow-always-persisted"
-          : "none",
+        decision === "allow-always" ? "allow-always-persisted" : "none",
       projectRoot,
       cacheKey: evaluation.cacheKey,
       scopeLabel: evaluation.scopeLabel,
@@ -1723,9 +1765,9 @@ function materializeApprovalModeObject(input: {
   };
 }
 
-function detectApprovalModeCue(prompt: string):
-  | { mode?: "allow-once" | "allow-always"; ambiguous: boolean }
-  | undefined {
+function detectApprovalModeCue(
+  prompt: string,
+): { mode?: "allow-once" | "allow-always"; ambiguous: boolean } | undefined {
   const normalized = prompt.toLowerCase();
   const hasVerifyContinuationCue =
     /(?:\b(?:continue|rerun|re-run|retry|run|execute|do that)\b.*\b(?:verify|verification|test|tests|build|lint|check)\b|\b(?:verify|verification|test|tests|build|lint|check)\b.*\b(?:again|retry|rerun|re-run|continue)\b|继续.*(?:验证|测试|构建|编译|检查)|重跑.*(?:测试|构建|编译)|再跑一次.*(?:测试|构建|编译)|继续刚才那个验证)/iu.test(
@@ -1773,8 +1815,7 @@ function hasBlockedVerifyResumeLineage(
   return (
     (continuity.lastContinuationEvidence ?? []).some((entry) =>
       /^verify-resume-eligible:(?:1|true|yes)$/i.test(entry.trim()),
-    ) &&
-    Boolean(continuity.lastVerificationCommand?.trim())
+    ) && Boolean(continuity.lastVerificationCommand?.trim())
   );
 }
 
@@ -1867,8 +1908,7 @@ async function runNonTtyPromptStream(options: {
           fallbackSessionId: options.fallbackSessionId,
           setActiveNonInteractiveApprovalMode:
             options.setActiveNonInteractiveApprovalMode,
-          nonInteractiveCliApprovalMode:
-            options.nonInteractiveCliApprovalMode,
+          nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
         });
       })
       .catch((error) => {
@@ -2011,14 +2051,27 @@ async function runNonInteractivePrompt(options: {
       }
 
       if (sessionAction === "switch") {
-        const targetSessionId = resolved.slashResult.sessionId?.trim();
-        if (!targetSessionId) {
-          options.renderer.renderLine("Usage: /sessions switch <session-id>");
+        const targetSessionReference = resolved.slashResult.sessionId?.trim();
+        if (!targetSessionReference) {
+          options.renderer.renderLine(
+            "Usage: /sessions switch <id|prefix|title|last>",
+          );
+          return;
+        }
+
+        const resolvedSessionId = resolveSwitchSessionReference({
+          renderer: options.renderer,
+          sessionManager: options.sessionManager,
+          preferredProjectRoot: options.runtimeContext.projectRoot,
+          reference: targetSessionReference,
+          printMode: options.printMode,
+        });
+        if (!resolvedSessionId) {
           return;
         }
 
         try {
-          const resumed = options.sessionManager.resume(targetSessionId);
+          const resumed = options.sessionManager.resume(resolvedSessionId);
           const previousSessionId = options.runtimeContext.session.id;
           switchRuntimeSessionProjectContext(
             options.runtimeContext as never,
@@ -2055,6 +2108,71 @@ async function runNonInteractivePrompt(options: {
         options.sessionManager,
         options.runtimeContext as never,
       );
+      return;
+    }
+
+    if (resolved.slashResult.action === "show-workspace") {
+      const workspaceAction = resolved.slashResult.workspaceAction ?? "status";
+      if (workspaceAction === "recent") {
+        renderRecentProjectContexts(options.renderer, options.sessionManager);
+        return;
+      }
+
+      if (workspaceAction === "attach") {
+        const attachTarget = resolved.slashResult.workspaceTarget?.trim();
+        if (!attachTarget) {
+          options.renderer.renderLine("Usage: /workspace attach <path>");
+          return;
+        }
+
+        try {
+          const attached = resolveRuntimeProjectRoot(
+            options.runtimeContext.cwd,
+            attachTarget,
+          );
+          const previousProjectRoot = options.runtimeContext.projectRoot;
+          if (
+            normalizePathForCompare(previousProjectRoot) ===
+            normalizePathForCompare(attached.projectRoot)
+          ) {
+            options.renderer.renderLine(
+              `Already attached to ${attached.projectRoot}.`,
+            );
+            renderWorkspaceSummary(options.renderer, options.runtimeContext);
+            return;
+          }
+
+          const attachedSession = options.sessionManager.createNew(
+            attached.projectRoot,
+          );
+          switchActiveSession(
+            options.runtimeContext as never,
+            attachedSession as never,
+            attached.projectRoot,
+            {
+              cwd: attached.projectRoot,
+              projectRoot: attached.projectRoot,
+              gitContext: attached.gitContext,
+            },
+          );
+          options.renderer.renderLine(
+            `Attached project context: ${previousProjectRoot} -> ${attached.projectRoot}`,
+          );
+          options.renderer.renderLine(
+            `New project session: ${attachedSession.id}`,
+          );
+          renderWorkspaceSummary(options.renderer, options.runtimeContext);
+          renderRecentProjectContexts(options.renderer, options.sessionManager);
+          return;
+        } catch (error) {
+          options.renderer.renderLine(
+            `Failed to attach project: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          return;
+        }
+      }
+
+      renderWorkspaceSummary(options.renderer, options.runtimeContext);
       return;
     }
 
@@ -2140,7 +2258,10 @@ async function resolveTurnInputForExecution(options: {
   }
   const rawPrompt =
     slashResult?.kind === "prompt" ? slashResult.prompt : options.prompt;
-  return { kind: "execute", effectivePrompt: normalizePromptForExecution(rawPrompt) };
+  return {
+    kind: "execute",
+    effectivePrompt: normalizePromptForExecution(rawPrompt),
+  };
 }
 
 async function runResumeLikeShellAction(options: {
@@ -2329,9 +2450,7 @@ async function executeResolvedPromptTurn(options: {
   recordCount("cli.prompts", 1, {
     sessionId: options.runtimeContext.session.id,
   });
-  options.setActiveNonInteractiveApprovalMode(
-    approvalModeObject,
-  );
+  options.setActiveNonInteractiveApprovalMode(approvalModeObject);
   try {
     await options.sessionRuntime.executePrompt(
       options.runtimeContext.session.id,
@@ -2425,7 +2544,9 @@ function buildNonInteractivePrompts(
     return prompt.length > 0 ? [prompt] : [];
   }
 
-  const pipedPrompts = parseTransportPrompts(pipedInput, { allowComments: false });
+  const pipedPrompts = parseTransportPrompts(pipedInput, {
+    allowComments: false,
+  });
   if (pipedPrompts.length === 0) {
     return prompt.length > 0 ? [prompt] : [];
   }
@@ -2577,22 +2698,36 @@ function renderWorkspaceSummary(
   },
 ): void {
   renderer.renderLine("\nWorkspace");
-  renderer.renderLine(`- Project: ${path.basename(runtimeContext.projectRoot) || runtimeContext.projectRoot}`);
+  renderer.renderLine(
+    `- Project: ${path.basename(runtimeContext.projectRoot) || runtimeContext.projectRoot}`,
+  );
   renderer.renderLine(`- Project root: ${runtimeContext.projectRoot}`);
   renderer.renderLine(`- Working directory: ${runtimeContext.cwd}`);
-  renderer.renderLine(`- Original launch directory: ${runtimeContext.originalCwd}`);
+  renderer.renderLine(
+    `- Original launch directory: ${runtimeContext.originalCwd}`,
+  );
   if (runtimeContext.gitContext.insideGit) {
-    renderer.renderLine(`- Git root: ${runtimeContext.gitContext.root ?? "unknown"}`);
-    renderer.renderLine(`- Branch: ${runtimeContext.gitContext.branch ?? "unknown"}`);
+    renderer.renderLine(
+      `- Git root: ${runtimeContext.gitContext.root ?? "unknown"}`,
+    );
+    renderer.renderLine(
+      `- Branch: ${runtimeContext.gitContext.branch ?? "unknown"}`,
+    );
     renderer.renderLine(
       `- Workspace clean: ${runtimeContext.gitContext.isClean ? "yes" : "no"}`,
     );
   } else {
     renderer.renderLine("- Git: not inside a git workspace");
   }
-  renderer.renderLine(`- Active session: ${runtimeContext.session.id} [${runtimeContext.session.status}]`);
-  renderer.renderLine(`- Session project binding: ${runtimeContext.session.projectRoot}`);
-  renderer.renderLine("Next actions: /workspace recent, /workspace attach <path>, /sessions");
+  renderer.renderLine(
+    `- Active session: ${runtimeContext.session.id} [${runtimeContext.session.status}]`,
+  );
+  renderer.renderLine(
+    `- Session project binding: ${runtimeContext.session.projectRoot}`,
+  );
+  renderer.renderLine(
+    "Next actions: /workspace recent, /workspace attach <path>, /sessions",
+  );
   renderer.renderLine("");
 }
 
@@ -2636,7 +2771,9 @@ function renderStartupSurface(
     path.resolve(input.runtimeContext.originalCwd) !==
     path.resolve(input.runtimeContext.projectRoot)
   ) {
-    renderer.renderLine(`- Launch directory: ${input.runtimeContext.originalCwd}`);
+    renderer.renderLine(
+      `- Launch directory: ${input.runtimeContext.originalCwd}`,
+    );
   }
   renderer.renderLine(`- Session: ${summary.id} [${summary.status}]`);
   renderer.renderLine(
@@ -2687,7 +2824,9 @@ function renderRecentProjectContexts(
   renderer.renderLine("\nRecent project contexts");
   if (projectContexts.length === 0) {
     renderer.renderLine("- No project contexts found yet.");
-    renderer.renderLine("- Start with /workspace attach <path> to bind a target project.");
+    renderer.renderLine(
+      "- Start with /workspace attach <path> to bind a target project.",
+    );
     renderer.renderLine("");
     return;
   }
@@ -2726,7 +2865,7 @@ function renderSessionList(
 
   renderer.renderLine("\nRe-entry sessions");
   renderer.renderLine(
-    "Use /sessions switch <session-id> to jump directly, /resume to continue recoverable work, or /sessions current for active-session details.",
+    "Use /sessions switch <id|prefix|title|last> to jump directly, /resume [id|prefix|title|last] to continue recoverable work, or /sessions current for active-session details.",
   );
   for (const summary of summaries) {
     const activeMarker = summary.id === activeSessionId ? "*" : " ";
@@ -2737,7 +2876,8 @@ function renderSessionList(
           ? "partially-resumable"
           : "blocked";
     const title = summary.title?.trim() || "(untitled)";
-    const projectLabel = path.basename(summary.projectRoot) || summary.projectRoot;
+    const projectLabel =
+      path.basename(summary.projectRoot) || summary.projectRoot;
     const terminalLabel = summary.terminalClassification
       ? ` terminal=${summary.terminalClassification}`
       : "";
@@ -2766,7 +2906,9 @@ function renderCurrentSession(
     };
   },
 ): void {
-  const summary = sessionManager.describeSessionReentry(runtimeContext.session.id);
+  const summary = sessionManager.describeSessionReentry(
+    runtimeContext.session.id,
+  );
   const title = summary.title?.trim() || "(untitled)";
   renderer.renderLine("\nCurrent session");
   renderer.renderLine(`- ID: ${summary.id}`);
@@ -2782,7 +2924,9 @@ function renderCurrentSession(
     );
   }
   renderer.renderLine(`- Project binding: ${summary.projectRoot}`);
-  renderer.renderLine(`- Updated: ${summary.updatedAt} (${toRelativeTime(summary.updatedAt)})`);
+  renderer.renderLine(
+    `- Updated: ${summary.updatedAt} (${toRelativeTime(summary.updatedAt)})`,
+  );
   if (summary.pendingPrompt?.trim()) {
     renderer.renderLine(
       `- Pending prompt: ${truncate(summary.pendingPrompt.trim(), 180)}`,
@@ -2841,14 +2985,22 @@ function renderSessionCommandMap(
 ): void {
   const compact = options?.compact === true;
   const includeHelpHint = options?.includeHelpHint !== false;
-  renderer.renderLine(compact ? "Session command map:" : "\nSession command map");
+  renderer.renderLine(
+    compact ? "Session command map:" : "\nSession command map",
+  );
   renderer.renderLine(
     "- /sessions            open the session surface (interactive panel in TTY; overview in print/non-TTY).",
   );
   renderer.renderLine("- /sessions current    inspect the active session.");
-  renderer.renderLine("- /sessions list       inspect recent sessions for this project.");
-  renderer.renderLine("- /sessions switch <id> switch active session and project context.");
-  renderer.renderLine("- /resume [id]         resume the best recoverable context.");
+  renderer.renderLine(
+    "- /sessions list       inspect recent sessions for this project.",
+  );
+  renderer.renderLine(
+    "- /sessions switch <id|prefix|title|last> switch active session and project context.",
+  );
+  renderer.renderLine(
+    "- /resume [id|prefix|title|last] resume the best recoverable context.",
+  );
   if (includeHelpHint) {
     renderer.renderLine("- /help                show full command guide.");
   }
@@ -2857,49 +3009,93 @@ function renderSessionCommandMap(
 function renderUserHelp(renderer: StreamingRenderer): void {
   renderer.renderLine("\nSlash command guide");
   renderer.renderLine("Next actions (start here):");
-  renderer.renderLine("- /sessions               inspect active + recent sessions.");
-  renderer.renderLine("- /resume                 continue best recoverable context.");
-  renderer.renderLine("- /workspace status       confirm project/workdir binding.");
-  renderer.renderLine("- /diagnose               get actionable repo next step.");
+  renderer.renderLine(
+    "- /sessions               inspect active + recent sessions.",
+  );
+  renderer.renderLine(
+    "- /resume                 continue best recoverable context.",
+  );
+  renderer.renderLine(
+    "- /workspace status       confirm project/workdir binding.",
+  );
+  renderer.renderLine(
+    "- /diagnose               get actionable repo next step.",
+  );
   renderer.renderLine("");
 
   renderer.renderLine("Command groups:");
   renderer.renderLine("1) Session & Continuation");
-  renderer.renderLine("- /sessions               session surface entrypoint (TTY: panel, non-TTY/print: overview).");
-  renderer.renderLine("- /sessions current       active session identity and resume readiness.");
-  renderer.renderLine("- /sessions list          recent sessions for current project context.");
-  renderer.renderLine("- /sessions switch <id>   switch active session + project context.");
-  renderer.renderLine("- /resume [id]            resume recoverable context (latest or explicit id).");
-  renderer.renderLine("- /continue [id] [text]   resume context and optionally run immediate follow-up.");
+  renderer.renderLine(
+    "- /sessions               session surface entrypoint (TTY: panel, non-TTY/print: overview).",
+  );
+  renderer.renderLine(
+    "- /sessions current       active session identity and resume readiness.",
+  );
+  renderer.renderLine(
+    "- /sessions list          recent sessions for current project context.",
+  );
+  renderer.renderLine(
+    "- /sessions switch <id|prefix|title|last>   switch active session + project context.",
+  );
+  renderer.renderLine(
+    "- /resume [id|prefix|title|last] resume recoverable context by reference.",
+  );
+  renderer.renderLine(
+    "- /continue [id] [text]   resume context and optionally run immediate follow-up.",
+  );
   renderer.renderLine("");
 
   renderer.renderLine("2) Workspace & Navigation");
-  renderer.renderLine("- /workspace status       show current project/workdir binding.");
-  renderer.renderLine("- /workspace attach <path> attach/switch active project target.");
-  renderer.renderLine("- /workspace recent       list recently attached project contexts.");
+  renderer.renderLine(
+    "- /workspace status       show current project/workdir binding.",
+  );
+  renderer.renderLine(
+    "- /workspace attach <path> attach/switch active project target.",
+  );
+  renderer.renderLine(
+    "- /workspace recent       list recently attached project contexts.",
+  );
   renderer.renderLine("- /cd <path>              quick attach by path.");
-  renderer.renderLine("- /pwd                    print current workspace status.");
+  renderer.renderLine(
+    "- /pwd                    print current workspace status.",
+  );
   renderer.renderLine("");
 
   renderer.renderLine("3) Workflow & Runtime");
   renderer.renderLine("- /cancel                 stop only the current run.");
   renderer.renderLine("- /build                  switch to build mode.");
   renderer.renderLine("- /plan                   switch to plan mode.");
-  renderer.renderLine("- /mode [status|plan|build] inspect or switch agent mode.");
+  renderer.renderLine(
+    "- /mode [status|plan|build] inspect or switch agent mode.",
+  );
   renderer.renderLine("- /view user|developer    switch output verbosity.");
   renderer.renderLine("");
 
   renderer.renderLine("4) Diagnostics & Integrations");
-  renderer.renderLine("- /diagnose               repo-aware diagnosis and next action.");
-  renderer.renderLine("- /model status|list|use  inspect and switch active model.");
-  renderer.renderLine("- /mcp status|tools|doctor|refresh [server] inspect and recover MCP state.");
-  renderer.renderLine("- /permissions list|explain|revoke|reset inspect trust policy state.");
-  renderer.renderLine("- /connect status|login|use|logout|set ... provider connection management.");
+  renderer.renderLine(
+    "- /diagnose               repo-aware diagnosis and next action.",
+  );
+  renderer.renderLine(
+    "- /model status|list|use  inspect and switch active model.",
+  );
+  renderer.renderLine(
+    "- /mcp status|tools|doctor|refresh [server] inspect and recover MCP state.",
+  );
+  renderer.renderLine(
+    "- /permissions list|explain|revoke|reset inspect trust policy state.",
+  );
+  renderer.renderLine(
+    "- /connect status|login|use|logout|set ... provider connection management.",
+  );
   renderer.renderLine("");
 
   renderer.renderLine("Discovery tips:");
-  renderer.renderLine("- Unknown slash commands now return this guide path with quick actions.");
-  renderer.renderLine("- Use /help any time to get back to grouped command navigation.");
+  renderer.renderLine(
+    "- Unknown slash commands now return this guide path with quick actions.",
+  );
+  renderer.renderLine(
+    "- Use /help any time to get back to grouped command navigation.",
+  );
   renderer.renderLine("");
 }
 
@@ -2907,11 +3103,19 @@ function renderMcpStatusControlPlane(
   renderer: StreamingRenderer,
   snapshot: McpClientSnapshot,
 ): void {
-  const connected = snapshot.clients.filter((client) => client.type === "connected");
-  const needsAuth = snapshot.clients.filter((client) => client.type === "needs-auth");
+  const connected = snapshot.clients.filter(
+    (client) => client.type === "connected",
+  );
+  const needsAuth = snapshot.clients.filter(
+    (client) => client.type === "needs-auth",
+  );
   const failed = snapshot.clients.filter((client) => client.type === "failed");
-  const disabled = snapshot.clients.filter((client) => client.type === "disabled");
-  const pending = snapshot.clients.filter((client) => client.type === "pending");
+  const disabled = snapshot.clients.filter(
+    (client) => client.type === "disabled",
+  );
+  const pending = snapshot.clients.filter(
+    (client) => client.type === "pending",
+  );
 
   renderer.renderLine("\nMCP control plane");
   renderer.renderLine(
@@ -2920,7 +3124,9 @@ function renderMcpStatusControlPlane(
   renderer.renderLine(`- Exposed tools: ${snapshot.tools.length}`);
   if (snapshot.clients.length === 0) {
     renderer.renderLine("- No MCP servers configured for this project.");
-    renderer.renderLine("- Add project servers in .private-agents.mcp.json or user servers in ~/.private-agents/mcp.json.");
+    renderer.renderLine(
+      "- Add project servers in .private-agents.mcp.json or user servers in ~/.private-agents/mcp.json.",
+    );
     renderer.renderLine("");
     return;
   }
@@ -2941,7 +3147,9 @@ function renderMcpStatusControlPlane(
 
   renderer.renderLine("Next actions:");
   renderer.renderLine("- /mcp tools [server]    inspect available MCP tools.");
-  renderer.renderLine("- /mcp doctor            diagnose auth/connection failures.");
+  renderer.renderLine(
+    "- /mcp doctor            diagnose auth/connection failures.",
+  );
   renderer.renderLine("- /mcp refresh [server]  reconnect all or one server.");
   renderer.renderLine("");
 }
@@ -2957,7 +3165,9 @@ function renderMcpToolsControlPlane(
     : snapshot.clients;
   if (normalizedTarget && targetClients.length === 0) {
     renderer.renderLine(`\nUnknown MCP server: ${normalizedTarget}`);
-    renderer.renderLine("Run /mcp status to inspect configured server names.\n");
+    renderer.renderLine(
+      "Run /mcp status to inspect configured server names.\n",
+    );
     return;
   }
 
@@ -2974,7 +3184,9 @@ function renderMcpToolsControlPlane(
       (client) => client.type !== "connected",
     );
     if (unresolved.length > 0) {
-      renderer.renderLine("- At least one selected server is not connected. Use /mcp doctor or /mcp refresh.");
+      renderer.renderLine(
+        "- At least one selected server is not connected. Use /mcp doctor or /mcp refresh.",
+      );
     }
     renderer.renderLine("");
     return;
@@ -2993,10 +3205,16 @@ function renderMcpDoctorControlPlane(
   renderer: StreamingRenderer,
   snapshot: McpClientSnapshot,
 ): void {
-  const needsAuth = snapshot.clients.filter((client) => client.type === "needs-auth");
+  const needsAuth = snapshot.clients.filter(
+    (client) => client.type === "needs-auth",
+  );
   const failed = snapshot.clients.filter((client) => client.type === "failed");
-  const pending = snapshot.clients.filter((client) => client.type === "pending");
-  const disabled = snapshot.clients.filter((client) => client.type === "disabled");
+  const pending = snapshot.clients.filter(
+    (client) => client.type === "pending",
+  );
+  const disabled = snapshot.clients.filter(
+    (client) => client.type === "disabled",
+  );
 
   renderer.renderLine("\nMCP doctor");
   if (
@@ -3006,7 +3224,9 @@ function renderMcpDoctorControlPlane(
     disabled.length === 0
   ) {
     renderer.renderLine("- No blocking MCP issues detected.");
-    renderer.renderLine("- All configured servers are connected and serving tools.");
+    renderer.renderLine(
+      "- All configured servers are connected and serving tools.",
+    );
     renderer.renderLine("");
     return;
   }
@@ -3022,9 +3242,7 @@ function renderMcpDoctorControlPlane(
   if (failed.length > 0) {
     renderer.renderLine("- Failed connections:");
     for (const client of failed) {
-      renderer.renderLine(
-        `  ${client.name}: ${truncate(client.error, 140)}`,
-      );
+      renderer.renderLine(`  ${client.name}: ${truncate(client.error, 140)}`);
     }
   }
   if (pending.length > 0) {
@@ -3042,7 +3260,9 @@ function renderMcpDoctorControlPlane(
 
   renderer.renderLine("Suggested recovery flow:");
   renderer.renderLine("- /mcp refresh all");
-  renderer.renderLine("- /connect status (if auth-backed MCP providers are involved)");
+  renderer.renderLine(
+    "- /connect status (if auth-backed MCP providers are involved)",
+  );
   renderer.renderLine("- Re-check with /mcp status");
   renderer.renderLine("");
 }
@@ -3068,6 +3288,47 @@ function switchRuntimeSessionProjectContext(
       gitContext: getWorkflowGitContext(nextProjectRoot),
     },
   );
+}
+
+function resolveSwitchSessionReference(input: {
+  renderer: StreamingRenderer;
+  sessionManager: SessionManager;
+  preferredProjectRoot: string;
+  reference: string;
+  printMode: boolean;
+}): string | null {
+  const resolved = resolveSessionReference({
+    reference: input.reference,
+    sessionManager: input.sessionManager,
+    preferredProjectRoot: input.preferredProjectRoot,
+  });
+  if (resolved.ok && resolved.sessionId) {
+    return resolved.sessionId;
+  }
+
+  if (resolved.reason === "ambiguous") {
+    const lines: string[] = [
+      `Switch target '${input.reference}' is ambiguous.`,
+    ];
+    for (const candidate of (resolved.candidates ?? []).slice(0, 3)) {
+      const title = candidate.title?.trim() || "(untitled)";
+      lines.push(`- ${candidate.id} [${candidate.status}] ${title}`);
+    }
+    lines.push(
+      "Hint: use a longer session id prefix or exact session id from /sessions list.",
+    );
+    input.renderer.renderLine(
+      input.printMode ? lines.join("\n") : `\n${lines.join("\n")}\n`,
+    );
+    return null;
+  }
+
+  input.renderer.renderLine(
+    input.printMode
+      ? `Switch target '${input.reference}' was not found.\nHint: run /sessions list, then /sessions switch <id|prefix|title|last>.`
+      : `\nSwitch target '${input.reference}' was not found.\nHint: run /sessions list, then /sessions switch <id|prefix|title|last>.\n`,
+  );
+  return null;
 }
 
 function renderSwitchedSessionContext(
@@ -3104,7 +3365,9 @@ function renderPermissionsList(
   renderer.renderLine(`\nTrust policy grants @ ${projectLabel}`);
   if (grants.length === 0) {
     renderer.renderLine("- No persisted allow-always grants for this project.");
-    renderer.renderLine("- Use /permissions reset all to clear global grants if needed.");
+    renderer.renderLine(
+      "- Use /permissions reset all to clear global grants if needed.",
+    );
     renderer.renderLine("");
     return;
   }
@@ -3254,10 +3517,12 @@ function normalizePromptForExecution(prompt: string): string {
     );
   const pythonCue =
     /\bpython\b/i.test(normalized) &&
-    (/script|file|py/i.test(normalized) ||
-      /(?:脚本|目录|文件)/u.test(prompt));
+    (/script|file|py/i.test(normalized) || /(?:脚本|目录|文件)/u.test(prompt));
 
-  if ((!pythonCue || !currentDirCue) && !(likelyMojibake && /\bpython\b/i.test(normalized))) {
+  if (
+    (!pythonCue || !currentDirCue) &&
+    !(likelyMojibake && /\bpython\b/i.test(normalized))
+  ) {
     return prompt;
   }
 
@@ -3356,4 +3621,3 @@ main().catch((error) => {
   console.error("Fatal error:", error);
   process.exit(1);
 });
-
