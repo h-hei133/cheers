@@ -1322,6 +1322,82 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
   }, 15000);
 
+  it("shows repair context abandoned when failed target candidates are not unique", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "multi-failed-a.ts"),
+      "export const first = duplicate;\nexport const second = duplicate;\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "multi-failed-b.ts"),
+      "export const other = duplicate;\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_repair_context_abandoned_multiple_failed_targets",
+      prompt:
+        "In src/multi-failed-a.ts, replace first = duplicate with first = fixed.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+      continuityState: {
+        lastTaskKind: "edit-file",
+        lastFailure:
+          "patch-ambiguous: Patch source text matched 2 times in the target file.",
+        recentTargetFiles: ["src/multi-failed-a.ts", "src/multi-failed-b.ts"],
+        recentChangedFiles: [],
+        recentFailedFiles: [
+          {
+            path: "src/multi-failed-a.ts",
+            reason:
+              "patch-ambiguous: Patch source text matched 2 times in the target file.",
+          },
+          {
+            path: "src/multi-failed-b.ts",
+            reason:
+              "patch-from-not-found: Patch source text was not found in the target file.",
+          },
+        ],
+        recentVerifiedFiles: [],
+        lastContinuationEvidence: [],
+        lastTerminalClassification: "stopped",
+        lastTerminalReason: "stopped_error",
+        lastTaskSatisfactionVerdict: "insufficient-evidence",
+        lastTaskSatisfactionReasons: [
+          "patch-ambiguous: Patch source text matched 2 times in the target file.",
+        ],
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.changedFiles).toEqual(["src/multi-failed-a.ts"]);
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "repairContextUsed:false",
+        "repairContextAbandoned:true",
+        "repairContextAbandonedReason:multiple-failed-targets",
+        "repairContextAbandonedFailureReason:patch-ambiguous",
+        "repairContextAbandonedTargetCount:2",
+      ]),
+    );
+    expect(result.codingResult?.evidence).not.toContain(
+      "repairContextUsed:true",
+    );
+    expect(result.codingResult?.evidence).not.toContain(
+      "repairedFailureReason:patch-ambiguous",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "multi-failed-a.ts"), "utf8"),
+    ).resolves.toBe(
+      "export const first = fixed;\nexport const second = duplicate;\n",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "multi-failed-b.ts"), "utf8"),
+    ).resolves.toBe("export const other = duplicate;\n");
+  }, 15000);
+
   it("repairs target missing follow-up when the user supplies path and transform", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
@@ -1814,6 +1890,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
       "patch-from-not-found",
     );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining(["actionable-blocker-kind:patch-from-not-found"]),
+    );
     await expect(
       fs.readFile(path.join(workspaceRoot, "patch_note.txt"), "utf8"),
     ).resolves.toBe(original);
@@ -1857,6 +1936,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.terminalClassification).toBe("stopped");
     expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
       "patch-target-missing",
+    );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining(["actionable-blocker-kind:patch-target-missing"]),
     );
     await expect(
       fs.readFile(path.join(workspaceRoot, "missing_patch_note.txt"), "utf8"),
@@ -5089,13 +5171,24 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.terminalClassification).toBe("error");
+    expect(result.terminalClassification).toBe("stopped");
     expect(result.stopReason).toContain(
       "Run-command intent is not allowed in the MVP allowlist",
     );
     expect(result.stopReason).toContain("Allowed commands:");
+    expect(result.finalOutput).toContain("Outcome: blocked");
+    expect(result.finalOutput).toContain(
+      "BlockerKind: command-not-allowlisted",
+    );
+    expect(result.finalOutput).toContain("DoNext:");
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "actionable-blocker-kind:command-not-allowlisted",
+      ]),
+    );
 
-    // Blocked command should terminate before coder output is committed.
-    expect(result.transcript.map((turn) => turn.role)).toEqual(["planner"]);
+    const roles = result.transcript.map((turn) => turn.role);
+    expect(roles[0]).toBe("planner");
+    expect(roles.includes("reviewer")).toBe(false);
   }, 15000);
 });

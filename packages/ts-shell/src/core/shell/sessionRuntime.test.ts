@@ -424,6 +424,125 @@ describe("shell session runtime (W5)", () => {
     );
   });
 
+  it("prints repair context abandoned diagnostics without marking repair success", async () => {
+    const renderedLines: string[] = [];
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_repair_abandoned",
+              initialPrompt: "replace first = duplicate with first = fixed",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "Edit completed for src/a.ts.",
+            codingResult: {
+              taskKind: "edit-file",
+              changedFiles: ["src/a.ts"],
+              failedFiles: [],
+              patches: [
+                {
+                  path: "src/a.ts",
+                  operation: "replace",
+                  status: "applied",
+                  changedLines: 1,
+                  addedLines: 0,
+                  removedLines: 0,
+                },
+              ],
+              repair: {
+                status: "not-needed",
+                attempts: 1,
+                recoveredItems: [],
+                failedItems: [],
+                notes: [],
+              },
+              continuation: {
+                status: "first-pass-success",
+                attempts: 1,
+                evidence: [],
+              },
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: [],
+                attemptedFiles: ["src/a.ts"],
+                changedFiles: ["src/a.ts"],
+                unchangedAttemptedFiles: [],
+              },
+              taskSatisfaction: {
+                verdict: "satisfied",
+                reasons: [],
+                requiredEvidence: ["changed-files"],
+                observedEvidence: [],
+              },
+              verifiedFiles: [],
+              unverifiedFiles: [],
+              verification: {
+                status: "not-requested",
+                reason: "mutation completed without explicit verify intent",
+              },
+              evidence: [
+                "repairContextUsed:false",
+                "repairContextAbandoned:true",
+                "repairContextAbandonedReason:multiple-failed-targets",
+                "repairContextAbandonedFailureReason:patch-ambiguous",
+                "repairContextAbandonedTargetCount:2",
+                "transform:src/a.ts:first = duplicate=>first = fixed",
+              ],
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_repair_abandoned", "repair it");
+
+    expect(renderedLines).toContain("- Repair context: repairContextUsed:false");
+    expect(renderedLines).toContain(
+      "- Repair context abandoned: repairContextAbandoned:true",
+    );
+    expect(renderedLines).toContain(
+      "- Repair context abandoned reason: repairContextAbandonedReason:multiple-failed-targets",
+    );
+    expect(renderedLines).toContain(
+      "- Repair context abandoned failure reason: repairContextAbandonedFailureReason:patch-ambiguous",
+    );
+    expect(renderedLines).toContain(
+      "- Repair context failed target candidates: 2",
+    );
+    expect(renderedLines).toContain(
+      "- Repair context next action: specify the exact target file, or rerun as a fresh single-file edit.",
+    );
+    expect(renderedLines).not.toContain(
+      "- Repair context: repairContextUsed:true",
+    );
+  });
+
   it("distinguishes changed-but-not-requested verification from blocked verification", async () => {
     const renderedLines: string[] = [];
 
@@ -971,6 +1090,15 @@ describe("shell session runtime (W5)", () => {
     );
     expect(renderedLines).toContain(
       '- Rephrase with one allowed command, for example: "Run node --version".',
+    );
+    expect(renderedLines).toContain(
+      "- BlockerKind: command-not-allowlisted",
+    );
+    expect(renderedLines).toContain(
+      "- Reason: Run-command intent is not allowed in the MVP allowlist: npm publish Allowed commands: node --version, npm test -- --help, npm run build -- --help Please rephrase your request to one of the allowed command intents.",
+    );
+    expect(renderedLines).toContain(
+      "- DoNext: Rephrase the request with an allowlisted command: node --version, npm test -- --help, or npm run build -- --help.",
     );
     expect(calls).toContain(`error:sess_blocked:${blockedReason}`);
   });

@@ -114,7 +114,7 @@ describe('mapTerminalToOrchestrationResult', () => {
     )
   })
 
-  it('maps verification failure to an error terminal result', () => {
+  it('maps verification failure to a stopped terminal result with actionable retry', () => {
     const fakeState = {
       transcript: [
         {
@@ -141,7 +141,7 @@ describe('mapTerminalToOrchestrationResult', () => {
       stopReason: undefined,
     } as never)
 
-    expect(result.terminalClassification).toBe('error')
+    expect(result.terminalClassification).toBe('stopped')
     expect(result.status).toBe('stopped_error')
     expect(result.stopReason).toBe('Unit tests failed after the edit.')
     expect(result.codingResult?.verification.status).toBe('failed')

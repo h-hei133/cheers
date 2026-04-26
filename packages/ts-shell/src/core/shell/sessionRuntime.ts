@@ -288,6 +288,7 @@ export class ShellSessionRuntime {
           terminalClassification,
           terminalStopReason,
           terminalReason,
+          codingResult: terminalCodingResult,
           mode: "minimal",
         });
         renderCodingResultContract(this.deps.renderer, terminalCodingResult, {
@@ -327,6 +328,7 @@ export class ShellSessionRuntime {
           terminalClassification,
           terminalStopReason,
           terminalReason,
+          codingResult: terminalCodingResult,
           mode: this.viewMode === "verbose" ? "verbose" : "minimal",
         });
         renderCodingResultContract(this.deps.renderer, terminalCodingResult, {
@@ -569,6 +571,7 @@ function renderTerminalResultBlock(
     terminalClassification: "success" | "stopped" | "error";
     terminalStopReason?: string;
     terminalReason: TerminalReason;
+    codingResult?: CodingResultSummary;
     mode: "minimal" | "verbose";
   },
 ): void {
@@ -583,12 +586,25 @@ function renderTerminalResultBlock(
       input.status === "completed"
         ? "completed"
         : (input.terminalStopReason ?? input.status);
+    const actionableBlocker = deriveActionableBlockerContract({
+      stopReason: input.terminalStopReason,
+      codingResult: input.codingResult,
+    });
     renderer.renderLine("Result");
     renderer.renderLine(`- Outcome: ${statusLabel}`);
     renderer.renderLine(`- Detail: ${detail}`);
+    if (actionableBlocker) {
+      renderer.renderLine(`- BlockerKind: ${actionableBlocker.kind}`);
+      renderer.renderLine(`- Reason: ${actionableBlocker.reason}`);
+      renderer.renderLine(`- DoNext: ${actionableBlocker.doNext}`);
+    }
     renderer.renderLine("");
     return;
   }
+  const actionableBlocker = deriveActionableBlockerContract({
+    stopReason: input.terminalStopReason,
+    codingResult: input.codingResult,
+  });
   renderer.renderLine("Final result");
   renderer.renderLine(`- Classification: ${statusLabel}`);
   renderer.renderLine(`- Terminal reason: ${input.terminalReason}`);
@@ -597,7 +613,133 @@ function renderTerminalResultBlock(
       `- Stop detail: ${input.terminalStopReason ?? input.status}`,
     );
   }
+  if (actionableBlocker) {
+    renderer.renderLine(`- Blocker kind: ${actionableBlocker.kind}`);
+    renderer.renderLine(`- Blocker reason: ${actionableBlocker.reason}`);
+    renderer.renderLine(`- Blocker do next: ${actionableBlocker.doNext}`);
+  }
   renderer.renderLine("");
+}
+
+type ActionableBlockerKind =
+  | "ambiguous-target"
+  | "patch-from-not-found"
+  | "patch-target-missing"
+  | "verification-failed"
+  | "command-not-allowlisted";
+
+function deriveActionableBlockerContract(input: {
+  stopReason?: string;
+  codingResult?: CodingResultSummary;
+}):
+  | { kind: ActionableBlockerKind; reason: string; doNext: string }
+  | undefined {
+  const evidenceKind = findActionableBlockerKindInEvidence(
+    input.codingResult?.evidence,
+  );
+  const reason =
+    input.stopReason?.trim() ||
+    input.codingResult?.verification.reason?.trim() ||
+    input.codingResult?.failedFiles.find((entry) => entry.reason.trim().length > 0)
+      ?.reason ||
+    input.codingResult?.taskSatisfaction.reasons.find(
+      (entry) => entry.trim().length > 0,
+    );
+
+  if (!reason) {
+    return undefined;
+  }
+
+  const kind =
+    evidenceKind ??
+    classifyActionableBlockerKind(
+      reason,
+      input.codingResult?.verification.status === "failed",
+    );
+  if (!kind) {
+    return undefined;
+  }
+
+  return {
+    kind,
+    reason,
+    doNext: actionableBlockerNextAction(kind),
+  };
+}
+
+function findActionableBlockerKindInEvidence(
+  evidence: readonly string[] | undefined,
+): ActionableBlockerKind | undefined {
+  if (!evidence) {
+    return undefined;
+  }
+  const marker = evidence
+    .find((entry) => entry.startsWith("actionable-blocker-kind:"))
+    ?.slice("actionable-blocker-kind:".length)
+    .trim();
+  if (
+    marker === "ambiguous-target" ||
+    marker === "patch-from-not-found" ||
+    marker === "patch-target-missing" ||
+    marker === "verification-failed" ||
+    marker === "command-not-allowlisted"
+  ) {
+    return marker;
+  }
+  return undefined;
+}
+
+function classifyActionableBlockerKind(
+  reason: string,
+  verificationFailed: boolean,
+): ActionableBlockerKind | undefined {
+  const normalizedReason = reason.toLowerCase();
+  if (verificationFailed || normalizedReason.includes("verification failed")) {
+    return "verification-failed";
+  }
+  if (normalizedReason.includes("not allowed in the mvp allowlist")) {
+    return "command-not-allowlisted";
+  }
+  if (
+    normalizedReason.includes("patch-target-missing") ||
+    normalizedReason.includes("edit-target-missing")
+  ) {
+    return "patch-target-missing";
+  }
+  if (
+    normalizedReason.includes("patch-from-not-found") ||
+    normalizedReason.includes("replace source text not found")
+  ) {
+    return "patch-from-not-found";
+  }
+  if (
+    normalizedReason.includes("patch-ambiguous") ||
+    normalizedReason.includes("target-not-unique") ||
+    normalizedReason.includes("relocation is ambiguous") ||
+    normalizedReason.includes("follow-up is ambiguous") ||
+    (normalizedReason.includes("ambiguous") &&
+      !normalizedReason.includes("allowlist"))
+  ) {
+    return "ambiguous-target";
+  }
+  return undefined;
+}
+
+function actionableBlockerNextAction(kind: ActionableBlockerKind): string {
+  switch (kind) {
+    case "command-not-allowlisted":
+      return "Rephrase the request with an allowlisted command: node --version, npm test -- --help, or npm run build -- --help.";
+    case "patch-from-not-found":
+      return "Provide the exact current source text from the target file, then rerun the patch.";
+    case "patch-target-missing":
+      return "Create or confirm the target file path first, then rerun the patch.";
+    case "ambiguous-target":
+      return "Specify one exact target file/path (and exact from/to text if editing), then rerun.";
+    case "verification-failed":
+      return "Fix the verification failure, then rerun the verification step.";
+    default:
+      return "Clarify the blocking condition and rerun.";
+  }
 }
 
 function renderCodingResultContract(
@@ -859,6 +1001,37 @@ function buildCodingSuccessEvidenceLines(
 }
 
 function buildRepairContextEvidenceLines(evidence: readonly string[]): string[] {
+  if (evidence.includes("repairContextAbandoned:true")) {
+    const abandonedReason = findEvidenceValue(
+      evidence,
+      "repairContextAbandonedReason:",
+    );
+    const abandonedFailureReason = findEvidenceValue(
+      evidence,
+      "repairContextAbandonedFailureReason:",
+    );
+    const abandonedTargetCount = findEvidenceValue(
+      evidence,
+      "repairContextAbandonedTargetCount:",
+    );
+    return [
+      "- Repair context: repairContextUsed:false",
+      "- Repair context abandoned: repairContextAbandoned:true",
+      ...(abandonedReason
+        ? [`- Repair context abandoned reason: repairContextAbandonedReason:${abandonedReason}`]
+        : []),
+      ...(abandonedFailureReason
+        ? [
+            `- Repair context abandoned failure reason: repairContextAbandonedFailureReason:${abandonedFailureReason}`,
+          ]
+        : []),
+      ...(abandonedTargetCount
+        ? [`- Repair context failed target candidates: ${abandonedTargetCount}`]
+        : []),
+      "- Repair context next action: specify the exact target file, or rerun as a fresh single-file edit.",
+    ];
+  }
+
   if (!evidence.includes("repairContextUsed:true")) {
     return [];
   }
@@ -1022,6 +1195,14 @@ function buildCodingResultNextAction(
     )
   ) {
     return "Rerun with an explicit replace-from/to instruction or a fenced replacement; include the exact current text, desired text, and target file.";
+  }
+
+  if (/patch-from-not-found/i.test(candidateText)) {
+    return "Re-read the target file, then rerun with the exact current text to replace and the desired replacement.";
+  }
+
+  if (/patch-ambiguous/i.test(candidateText)) {
+    return "Rerun with a more specific replace-from snippet that uniquely identifies the intended occurrence, plus the desired replacement.";
   }
 
   if (/approval|approve escalation/i.test(candidateText)) {

@@ -41,6 +41,13 @@ export function mapTerminalToOrchestrationResult(
   }
 }
 
+type ActionableBlockerKind =
+  | 'ambiguous-target'
+  | 'patch-from-not-found'
+  | 'patch-target-missing'
+  | 'verification-failed'
+  | 'command-not-allowlisted'
+
 function deriveTruthfulTerminal(input: {
   terminal: QueryTerminal
   codingResult?: CodingResultSummary
@@ -62,6 +69,22 @@ function deriveTruthfulTerminal(input: {
     stopReason: input.terminal.stopReason,
   }
 
+  const baseActionableBlocker = deriveActionableBlockerContract({
+    stopReason: input.terminal.stopReason,
+    codingResult: input.codingResult,
+  })
+  if (
+    input.terminal.terminalReason !== 'completed' &&
+    baseActionableBlocker &&
+    baseClassification === 'error'
+  ) {
+    return {
+      terminalReason: input.terminal.terminalReason,
+      terminalClassification: 'stopped',
+      stopReason: baseActionableBlocker.reason,
+    }
+  }
+
   if (
     input.terminal.terminalReason !== 'completed' ||
     !input.codingResult
@@ -77,6 +100,18 @@ function deriveTruthfulTerminal(input: {
   const failedReason = firstTruthy(
     codingResult.failedFiles.map(entry => entry.reason),
   )
+  const actionableBlocker = deriveActionableBlockerContract({
+    stopReason: verificationReason ?? taskReason ?? failedReason,
+    codingResult,
+  })
+
+  if (actionableBlocker && !hasSuccessfulMutationWithVerificationCaveat(codingResult)) {
+    return {
+      terminalReason: 'stopped_error',
+      terminalClassification: 'stopped',
+      stopReason: actionableBlocker.reason,
+    }
+  }
 
   if (verification.status === 'failed') {
     return {
@@ -160,6 +195,88 @@ function hasHardFailureSignal(codingResult: CodingResultSummary): boolean {
 
 function firstTruthy(values: readonly string[]): string | undefined {
   return values.find(value => value.trim().length > 0)
+}
+
+function deriveActionableBlockerContract(input: {
+  stopReason?: string
+  codingResult?: CodingResultSummary
+}): { kind: ActionableBlockerKind; reason: string } | undefined {
+  const evidenceKind = findActionableKindFromEvidence(input.codingResult?.evidence)
+  const reason =
+    input.stopReason?.trim() ||
+    firstTruthy(input.codingResult?.failedFiles.map(entry => entry.reason) ?? []) ||
+    input.codingResult?.verification.reason?.trim() ||
+    firstTruthy(input.codingResult?.taskSatisfaction.reasons ?? [])
+
+  if (!reason) {
+    return undefined
+  }
+
+  const kind =
+    evidenceKind ??
+    classifyActionableKind(reason, input.codingResult?.verification.status === 'failed')
+  if (!kind) {
+    return undefined
+  }
+
+  return { kind, reason }
+}
+
+function findActionableKindFromEvidence(
+  evidence: readonly string[] | undefined,
+): ActionableBlockerKind | undefined {
+  if (!evidence) {
+    return undefined
+  }
+  const marker = evidence
+    .find(entry => entry.startsWith('actionable-blocker-kind:'))
+    ?.slice('actionable-blocker-kind:'.length)
+    .trim()
+  if (
+    marker === 'ambiguous-target' ||
+    marker === 'patch-from-not-found' ||
+    marker === 'patch-target-missing' ||
+    marker === 'verification-failed' ||
+    marker === 'command-not-allowlisted'
+  ) {
+    return marker
+  }
+  return undefined
+}
+
+function classifyActionableKind(
+  reason: string,
+  verificationFailed: boolean,
+): ActionableBlockerKind | undefined {
+  const normalized = reason.toLowerCase()
+  if (verificationFailed || normalized.includes('verification failed')) {
+    return 'verification-failed'
+  }
+  if (normalized.includes('not allowed in the mvp allowlist')) {
+    return 'command-not-allowlisted'
+  }
+  if (
+    normalized.includes('patch-target-missing') ||
+    normalized.includes('edit-target-missing')
+  ) {
+    return 'patch-target-missing'
+  }
+  if (
+    normalized.includes('patch-from-not-found') ||
+    normalized.includes('replace source text not found')
+  ) {
+    return 'patch-from-not-found'
+  }
+  if (
+    normalized.includes('patch-ambiguous') ||
+    normalized.includes('target-not-unique') ||
+    normalized.includes('relocation is ambiguous') ||
+    normalized.includes('follow-up is ambiguous') ||
+    (normalized.includes('ambiguous') && !normalized.includes('allowlist'))
+  ) {
+    return 'ambiguous-target'
+  }
+  return undefined
 }
 
 export function classifyTerminalReason(
