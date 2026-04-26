@@ -169,6 +169,8 @@ function renderConnectionStatus(): string {
     lines.push(
       "Use /connect login openai --account, /connect login google --account, or /connect login <provider> --api-key <key>.",
     );
+    lines.push("");
+    lines.push(...renderReadinessGuidance({ connections, activeId }));
     return lines.join("\n");
   }
 
@@ -196,7 +198,97 @@ function renderConnectionStatus(): string {
   lines.push(
     "Use /connect use <connection-id> to switch runtime provider context.",
   );
+  lines.push("");
+  lines.push(...renderReadinessGuidance({ connections, activeId }));
   return lines.join("\n");
+}
+
+function renderReadinessGuidance(input: {
+  readonly connections: readonly ProviderConnectionConfig[];
+  readonly activeId?: string;
+}): string[] {
+  const activeConnection = input.connections.find(
+    (connection) => connection.id === input.activeId,
+  );
+  const lines = ["Provider readiness"];
+
+  if (input.connections.length === 0) {
+    lines.push("- Config status: not configured.");
+    lines.push(
+      "- Next: run /connect login <provider> --api-key <key> or /connect login openai --account.",
+    );
+    return lines;
+  }
+
+  if (!input.activeId) {
+    lines.push("- Config status: no active connection selected.");
+    lines.push("- Next: run /connect use <connection-id|provider>.");
+    return lines;
+  }
+
+  if (!activeConnection) {
+    lines.push(
+      `- Config status: active connection not found (${input.activeId}).`,
+    );
+    lines.push("- Next: run /connect status, then /connect use <connection-id>.");
+    return lines;
+  }
+
+  const missingCredential =
+    activeConnection.authType !== "account-auth" &&
+    !activeConnection.apiKey?.trim();
+  const missingBaseUrl =
+    isOpenAICompatibleStyleProvider(activeConnection.provider) &&
+    !activeConnection.baseUrl?.trim();
+  const missingModel =
+    isOpenAICompatibleStyleProvider(activeConnection.provider) &&
+    !activeConnection.model?.trim();
+
+  if (activeConnection.status === "pending") {
+    lines.push("- Config status: connection setup is pending.");
+    lines.push("- Next: finish the login/browser flow or rerun /connect login.");
+    return lines;
+  }
+
+  if (activeConnection.status === "error") {
+    lines.push("- Config status: connection setup is in error state.");
+    lines.push("- Next: rerun /connect login for this provider.");
+    return lines;
+  }
+
+  if (missingCredential) {
+    lines.push("- Config status: credential missing for active connection.");
+    lines.push(
+      `- Next: run /connect login ${activeConnection.provider} --api-key <key>.`,
+    );
+    return lines;
+  }
+
+  if (missingBaseUrl || missingModel) {
+    lines.push(
+      `- Config status: ${activeConnection.provider} requires ${[
+        missingBaseUrl ? "base URL" : null,
+        missingModel ? "model" : null,
+      ]
+        .filter(Boolean)
+        .join(" and ")}.`,
+    );
+    lines.push(
+      `- Next: run /connect login ${activeConnection.provider} --api-key <key> --base-url <url> --model <model>.`,
+    );
+    return lines;
+  }
+
+  lines.push(
+    "- Config status: configured. Credentials are redacted; live endpoint was not checked by /connect status.",
+  );
+  lines.push(
+    "- Live check: run npm run verify:provider-readiness from the project root.",
+  );
+  lines.push(
+    "- If the live check reports provider-network-inconclusive: retry later or check proxy/firewall/network; do not treat it as a coding capability failure.",
+  );
+  return lines;
 }
 
 function renderApiKeyCredentialSummary(apiKey?: string): string {

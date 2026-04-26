@@ -5,6 +5,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { handleSigint } from "./entrypoints/handleSigint.js";
+import {
+  createGitRepoFixture,
+  normalizeCliOutput,
+  runCliCommandToClose,
+} from "./test-utils/cliHarness.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, "..", "..", "..");
@@ -575,6 +580,91 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       cli.on("error", reject);
     });
   }, 10000);
+
+  it("guards root binding diagnostics for CLI /sessions switch and /workspace attach", async () => {
+    const repoA = path.join(fakeHomeDir, "repo-a");
+    const repoB = path.join(fakeHomeDir, "repo-b");
+    createGitRepoFixture(repoA);
+    createGitRepoFixture(repoB);
+    fs.mkdirSync(path.join(repoA, "packages", "app"), { recursive: true });
+    const runRootDiagnosticsCli = (args: string[]) =>
+      runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args,
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+
+    const targetSessionId = "sess_root_diag_target";
+    seedSessionWithTitle({
+      sessionId: targetSessionId,
+      projectRoot: repoB,
+      title: "target repo b",
+      status: "active",
+    });
+
+    const switchResult = await runRootDiagnosticsCli([
+      "--project",
+      repoA,
+      "--print",
+      `/sessions switch ${targetSessionId}`,
+    ]);
+    const switchOutput = normalizeCliOutput(switchResult.output);
+    expect(switchResult.code).toBe(0);
+    expect(switchOutput).toContain(
+      "Session switch blocked by root binding diagnostics.",
+    );
+    expect(switchOutput).toContain(
+      "blocked:root-binding-session-mismatch",
+    );
+    expect(switchOutput).toContain("nextAction:");
+    expect(switchOutput).not.toContain("Switched session:");
+    expect(switchOutput).not.toContain(`Project context: ${repoB.replace(/\\/g, "/")}`);
+
+    const currentSessionStorePath = path.join(
+      fakeHomeDir,
+      ".private-agents",
+      "current-session.json",
+    );
+    const currentSessionStore = JSON.parse(
+      fs.readFileSync(currentSessionStorePath, "utf8"),
+    ) as { byProjectRoot?: Record<string, { sessionId?: string }> };
+    const repoASelection =
+      currentSessionStore.byProjectRoot?.[repoA.toLowerCase()];
+    expect(repoASelection?.sessionId).toBeDefined();
+    expect(repoASelection?.sessionId).not.toBe(targetSessionId);
+
+    const subdirAttach = await runRootDiagnosticsCli([
+      "--project",
+      repoA,
+      "--print",
+      "/workspace attach packages/app",
+    ]);
+    const subdirOutput = normalizeCliOutput(subdirAttach.output);
+    const normalizedRepoA = repoA.replace(/\\/g, "/");
+    expect(subdirAttach.code).toBe(0);
+    expect(subdirOutput).toContain("info:root-binding-git-auto-upgrade");
+    expect(subdirOutput).toContain("nextAction:");
+    expect(subdirOutput).toContain(`- Project root: ${normalizedRepoA}`);
+    expect(subdirOutput).toContain(`- Target path base: ${normalizedRepoA}`);
+
+    const crossRootAttach = await runRootDiagnosticsCli([
+      "--project",
+      repoA,
+      "--print",
+      `/workspace attach ${repoB}`,
+    ]);
+    const crossRootOutput = normalizeCliOutput(crossRootAttach.output);
+    expect(crossRootAttach.code).toBe(0);
+    expect(crossRootOutput).toContain(
+      "warning:root-binding-workspace-switch",
+    );
+    expect(crossRootOutput).toContain("nextAction:");
+    expect(crossRootOutput).toContain("Attached project context:");
+    expect(crossRootOutput).toContain("New project session: sess_");
+  }, 45000);
 
   it("gates real-provider missing key at CLI entry before query loop starts", async () => {
     await new Promise<void>((resolve, reject) => {

@@ -36,6 +36,7 @@ console.log('real HOME=D:/Test/home-sf')
 console.log('synthetic HOME=D:/Test/pca-home-synth')
 console.log('homeCreated=false')
 console.log('layering=not part of release-core; run this command explicitly for real-provider release evidence')
+console.log('flow=verify-provider-readiness preflight first; run real-user capabilities only after readiness pass')
 
 const providerCode = await runNodeScript('verify-provider-readiness.mjs')
 if (providerCode !== 0) {

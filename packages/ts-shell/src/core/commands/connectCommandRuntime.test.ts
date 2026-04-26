@@ -2,7 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getUserRuntimeConfigPath } from "../../config/runtimeConfig.js";
+import {
+  getUserRuntimeConfigPath,
+  writeUserRuntimeConfigFile,
+} from "../../config/runtimeConfig.js";
 import {
   __setConnectBrowserFlowRunnerForTest,
   __setOpenAIAccountAuthRunnerForTest,
@@ -71,6 +74,144 @@ describe("connect command runtime", () => {
     expect(stored.providerConnections?.[0]?.baseUrl).toBe(
       "https://api.siliconflow.cn/v1",
     );
+  });
+
+  it("explains config status versus live provider readiness", async () => {
+    await runConnectCommand(
+      ["login", "siliconflow", "--api-key", "sk-siliconflow-test"],
+      {
+        cwd: workspaceRoot,
+      },
+    );
+
+    const result = await runConnectCommand(["status"], { cwd: workspaceRoot });
+
+    expect(result.kind).toBe("local");
+    expect(result.output).toContain("Provider readiness");
+    expect(result.output).toContain("Config status: configured");
+    expect(result.output).toContain("npm run verify:provider-readiness");
+    expect(result.output).toContain("provider-network-inconclusive");
+  });
+
+  it("explains no-connection status with an actionable login path", async () => {
+    const result = await runConnectCommand(["status"], { cwd: workspaceRoot });
+
+    expect(result.kind).toBe("local");
+    expect(result.output).toContain("No saved connections.");
+    expect(result.output).toContain("Config status: not configured");
+    expect(result.output).toContain("/connect login <provider>");
+  });
+
+  it("explains missing active connection selection", async () => {
+    writeUserRuntimeConfigFile({
+      provider: "openai",
+      providerConnections: [
+        {
+          id: "openai-test",
+          provider: "openai",
+          authType: "api-key",
+          apiKey: "sk-test",
+          model: "gpt-4.1-mini",
+          status: "connected",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const result = await runConnectCommand(["status"], { cwd: workspaceRoot });
+
+    expect(result.output).toContain("Config status: no active connection selected");
+    expect(result.output).toContain("/connect use <connection-id|provider>");
+  });
+
+  it("explains incomplete openai-compatible connection config", async () => {
+    writeUserRuntimeConfigFile({
+      provider: "openai-compatible",
+      activeProviderConnectionId: "sf-test",
+      providerConnections: [
+        {
+          id: "sf-test",
+          provider: "openai-compatible",
+          authType: "api-key",
+          apiKey: "sk-test",
+          status: "connected",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const result = await runConnectCommand(["status"], { cwd: workspaceRoot });
+
+    expect(result.output).toContain(
+      "Config status: openai-compatible requires base URL and model",
+    );
+    expect(result.output).toContain("--base-url <url> --model <model>");
+  });
+
+  it("explains missing credential for active connection", async () => {
+    writeUserRuntimeConfigFile({
+      provider: "openai",
+      activeProviderConnectionId: "openai-test",
+      providerConnections: [
+        {
+          id: "openai-test",
+          provider: "openai",
+          authType: "api-key",
+          status: "connected",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const result = await runConnectCommand(["status"], { cwd: workspaceRoot });
+
+    expect(result.output).toContain(
+      "Config status: credential missing for active connection",
+    );
+    expect(result.output).toContain("/connect login openai --api-key <key>");
+  });
+
+  it("explains pending and error connection states", async () => {
+    writeUserRuntimeConfigFile({
+      provider: "openai",
+      activeProviderConnectionId: "pending-test",
+      providerConnections: [
+        {
+          id: "pending-test",
+          provider: "openai",
+          authType: "browser-assisted-capture",
+          status: "pending",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const pending = await runConnectCommand(["status"], { cwd: workspaceRoot });
+    expect(pending.output).toContain("connection setup is pending");
+    expect(pending.output).toContain("finish the login/browser flow");
+
+    writeUserRuntimeConfigFile({
+      provider: "openai",
+      activeProviderConnectionId: "error-test",
+      providerConnections: [
+        {
+          id: "error-test",
+          provider: "openai",
+          authType: "browser-assisted-capture",
+          status: "error",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const error = await runConnectCommand(["status"], { cwd: workspaceRoot });
+    expect(error.output).toContain("connection setup is in error state");
+    expect(error.output).toContain("rerun /connect login");
   });
 
   it("supports legacy /auth set semantics via /connect set", async () => {

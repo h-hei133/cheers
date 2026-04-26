@@ -295,10 +295,7 @@ export class ShellSessionRuntime {
         });
         if (terminalStatus !== "completed") {
           const terminalDetail = terminalStopReason ?? terminalStatus;
-          const nextSteps = buildTerminalNextSteps(
-            terminalDetail,
-            terminalCodingResult,
-          );
+          const nextSteps = buildTerminalNextSteps(terminalDetail);
           this.deps.renderer.renderLine("Next steps");
           for (const step of nextSteps) {
             this.deps.renderer.renderLine(`- ${step}`);
@@ -338,10 +335,7 @@ export class ShellSessionRuntime {
 
         if (terminalStatus !== "completed") {
           const terminalDetail = terminalStopReason ?? terminalStatus;
-          const nextSteps = buildTerminalNextSteps(
-            terminalDetail,
-            terminalCodingResult,
-          );
+          const nextSteps = buildTerminalNextSteps(terminalDetail);
           this.deps.renderer.renderLine("Next steps");
           for (const step of nextSteps) {
             this.deps.renderer.renderLine(`- ${step}`);
@@ -633,19 +627,28 @@ function renderCodingResultContract(
     renderer.renderLine("Action result");
     renderer.renderLine(`- Task: ${codingResult.taskKind}`);
     renderer.renderLine(`- Changed: ${changedFilesSummary}`);
+    for (const line of buildCodingSuccessEvidenceLines(codingResult)) {
+      renderer.renderLine(line);
+    }
     const failureSummary = buildCodingFailureSummary(codingResult);
     if (failureSummary) {
       renderer.renderLine(`- Failure reason: ${failureSummary}`);
     }
     renderer.renderLine(`- Verification: ${verificationStatus}`);
+    const verificationDetail = buildVerificationStatusDetail(codingResult);
+    if (verificationDetail) {
+      renderer.renderLine(`- Verification detail: ${verificationDetail}`);
+    }
     const nextAction =
       codingResult.verification.nextAction ??
       buildCodingResultNextAction(codingResult);
     if (nextAction) {
       renderer.renderLine(`- Next action: ${nextAction}`);
-    } else if (codingResult.taskSatisfaction.reasons.length > 0) {
+    }
+    const note = codingResult.taskSatisfaction.reasons[0];
+    if (note && (!failureSummary || !failureSummary.includes(note))) {
       renderer.renderLine(
-        `- Note: ${codingResult.taskSatisfaction.reasons[0]}`,
+        `- Note: ${note}`,
       );
     }
     renderer.renderLine("");
@@ -811,6 +814,146 @@ function renderCodingResultContract(
   renderer.renderLine("");
 }
 
+function buildCodingSuccessEvidenceLines(
+  codingResult: CodingResultSummary,
+): string[] {
+  const lines: string[] = [];
+  if (codingResult.changedFiles.length > 0) {
+    lines.push(`- Changed files: ${codingResult.changedFiles.join(", ")}`);
+  }
+  const readFiles = extractReadFiles(codingResult.evidence);
+  if (readFiles.length > 0) {
+    lines.push(`- Read files: ${readFiles.join(", ")}`);
+  }
+  if (
+    readFiles.length > 0 &&
+    codingResult.changedFiles.length === 0 &&
+    codingResult.failedFiles.length === 0
+  ) {
+    const deliveredLines = extractReadDeliveredLines(codingResult.evidence);
+    lines.push(
+      `- Observed context: ${deliveredLines ? `delivered ${deliveredLines} line(s)` : "delivered read output"} from ${readFiles.join(", ")}.`,
+    );
+    lines.push("- No files changed: read/inspect only.");
+  }
+  const changeSummary = buildChangeSummary(codingResult.evidence);
+  if (changeSummary && codingResult.changedFiles.length > 0) {
+    lines.push(`- Change summary: ${changeSummary}`);
+  }
+  lines.push(...buildRepairContextEvidenceLines(codingResult.evidence));
+  if (
+    codingResult.verification.status === "passed" &&
+    codingResult.verification.reason
+  ) {
+    lines.push(`- Verification evidence: ${codingResult.verification.reason}`);
+  }
+  const unchangedFiles = extractVerifiedUnchangedFiles(codingResult.evidence);
+  if (unchangedFiles.length > 0) {
+    lines.push(`- Confirmed unchanged: ${unchangedFiles.join(", ")}`);
+  } else if (codingResult.changeSet.unchangedAttemptedFiles.length > 0) {
+    lines.push(
+      `- Unchanged attempted files: ${codingResult.changeSet.unchangedAttemptedFiles.join(", ")}`,
+    );
+  }
+  return lines;
+}
+
+function buildRepairContextEvidenceLines(evidence: readonly string[]): string[] {
+  if (!evidence.includes("repairContextUsed:true")) {
+    return [];
+  }
+
+  const repairedFailureReason = findEvidenceValue(
+    evidence,
+    "repairedFailureReason:",
+  );
+  const repairedTargetFile = findEvidenceValue(evidence, "repairedTargetFile:");
+  const repairPayloadKind = findEvidenceValue(evidence, "repairPayloadKind:");
+
+  return [
+    "- Repair context: repairContextUsed:true",
+    ...(repairedFailureReason
+      ? [`- Repaired failure reason: repairedFailureReason:${repairedFailureReason}`]
+      : []),
+    ...(repairedTargetFile
+      ? [`- Repaired target file: repairedTargetFile:${repairedTargetFile}`]
+      : []),
+    ...(repairPayloadKind
+      ? [`- Repair payload kind: repairPayloadKind:${repairPayloadKind}`]
+      : []),
+  ];
+}
+
+function findEvidenceValue(
+  evidence: readonly string[],
+  prefix: string,
+): string | undefined {
+  return evidence
+    .find((entry) => entry.startsWith(prefix))
+    ?.slice(prefix.length)
+    .trim();
+}
+
+function extractReadFiles(evidence: readonly string[]): string[] {
+  const files: string[] = [];
+  for (const entry of evidence) {
+    const match = entry.match(/^inspect: read (.+)$/i);
+    if (!match?.[1]) {
+      continue;
+    }
+    const file = match[1].trim();
+    if (file && !files.includes(file)) {
+      files.push(file);
+    }
+  }
+  return files;
+}
+
+function extractReadDeliveredLines(evidence: readonly string[]): string | undefined {
+  const marker = evidence
+    .map((entry) => entry.match(/^read-delivered-lines:(\d+)$/i)?.[1])
+    .find((value): value is string => Boolean(value));
+  return marker;
+}
+
+function buildChangeSummary(evidence: readonly string[]): string | undefined {
+  const summaries = evidence
+    .map((entry) => {
+      const transform = entry.match(/^transform:([^:]+):(.+)=>(.+)$/i);
+      if (!transform) {
+        return undefined;
+      }
+      const [, file, from, to] = transform;
+      return `${file}: replaced ${formatInlineEvidence(from)} with ${formatInlineEvidence(to)}`;
+    })
+    .filter((entry): entry is string => Boolean(entry));
+  return summaries.length > 0 ? summaries.join("; ") : undefined;
+}
+
+function extractVerifiedUnchangedFiles(evidence: readonly string[]): string[] {
+  const files: string[] = [];
+  for (const entry of evidence) {
+    const match = entry.match(/^verify-unchanged:(.+)$/i);
+    if (!match?.[1]) {
+      continue;
+    }
+    for (const file of match[1].split("|")) {
+      const trimmed = file.trim();
+      if (trimmed && !files.includes(trimmed)) {
+        files.push(trimmed);
+      }
+    }
+  }
+  return files;
+}
+
+function formatInlineEvidence(value: string | undefined): string {
+  const normalized = (value ?? "").replace(/\s+/g, " ").trim();
+  const clipped =
+    normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
+  return `\`${clipped}\``;
+}
+
 function buildCodingFailureSummary(
   codingResult: CodingResultSummary,
 ): string | undefined {
@@ -832,6 +975,34 @@ function buildCodingFailureSummary(
   return undefined;
 }
 
+function buildVerificationStatusDetail(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const reason = codingResult.verification.reason?.trim();
+  const reasonSuffix = reason ? ` Reason: ${reason}` : "";
+  if (codingResult.verification.status === "not-requested") {
+    if (codingResult.changedFiles.length > 0) {
+      return `No verification was requested; changed files were not checked.${reasonSuffix}`;
+    }
+    return `No verification was requested for this turn.${reasonSuffix}`;
+  }
+
+  if (codingResult.verification.status === "blocked") {
+    const blocker = codingResult.verification.blockerKind
+      ? ` (${codingResult.verification.blockerKind})`
+      : "";
+    if (
+      codingResult.changedFiles.length > 0 &&
+      codingResult.failedFiles.length === 0
+    ) {
+      return `Edit succeeded, but verification could not run${blocker}.${reasonSuffix}`;
+    }
+    return `Verification could not run${blocker}.${reasonSuffix}`;
+  }
+
+  return undefined;
+}
+
 function buildCodingResultNextAction(
   codingResult: CodingResultSummary,
 ): string | undefined {
@@ -846,11 +1017,11 @@ function buildCodingResultNextAction(
     .join(" ");
 
   if (
-    /fenced replacement content|replace-from\/replace-to|replace-from/i.test(
+    /replacement not safely derivable|edit instruction is ambiguous|fenced replacement content|replace-from\/replace-to|replace-from/i.test(
       candidateText,
     )
   ) {
-    return "Rerun with fenced replacement content or an explicit replace-from/replace-to instruction.";
+    return "Rerun with an explicit replace-from/to instruction or a fenced replacement; include the exact current text, desired text, and target file.";
   }
 
   if (/approval|approve escalation/i.test(candidateText)) {
@@ -861,24 +1032,36 @@ function buildCodingResultNextAction(
     return "Inspect the verification failure, adjust the requested edit, and rerun.";
   }
 
+  if (
+    codingResult.changedFiles.length > 0 &&
+    codingResult.verification.status === "not-requested"
+  ) {
+    return "Ask for an explicit low-risk verification if you want the changed files checked.";
+  }
+
   if (codingResult.failedFiles.length > 0) {
     return "Inspect the failed file operation and rerun with a more explicit target or content.";
+  }
+
+  if (
+    codingResult.changedFiles.length === 0 &&
+    (codingResult.taskKind === "read-file" ||
+      codingResult.taskKind === "inspect-files")
+  ) {
+    return "Use the observed file context to request a specific edit, ask for more lines, or run an explicit verification.";
+  }
+
+  if (
+    codingResult.changedFiles.length > 0 &&
+    codingResult.verification.status === "passed"
+  ) {
+    return "Review the changed file, then run the project test suite before committing if one exists.";
   }
 
   return undefined;
 }
 
-function buildTerminalNextSteps(
-  terminalDetail: string,
-  codingResult?: CodingResultSummary,
-): string[] {
-  const codingNextAction = codingResult
-    ? buildCodingResultNextAction(codingResult)
-    : undefined;
-  if (codingNextAction) {
-    return [codingNextAction];
-  }
-
+function buildTerminalNextSteps(terminalDetail: string): string[] {
   const runCommandBlockContext =
     parseRunCommandAllowlistBlockContext(terminalDetail);
   if (runCommandBlockContext) {
@@ -925,18 +1108,13 @@ function buildTerminalNextSteps(
   if (terminalDetail.includes("Approval denied by user")) {
     return ["Submit the prompt again and approve escalation when requested."];
   }
-  if (/approve escalation/i.test(terminalDetail)) {
-    return [
-      "Rerun with --non-interactive-approval allow-once for this command, or use an interactive shell and approve the request.",
-    ];
-  }
   if (
-    /fenced replacement content|replace-from\/replace-to|replace-from/i.test(
+    /replacement not safely derivable|edit instruction is ambiguous|fenced replacement content|replace-from\/replace-to|replace-from/i.test(
       terminalDetail,
     )
   ) {
     return [
-      "Rerun with fenced replacement content, or provide an explicit replace-from/replace-to instruction.",
+      "Rerun with an explicit replace-from/to instruction or fenced replacement, including the exact current text, desired text, and target file.",
     ];
   }
   return [

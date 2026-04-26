@@ -40,6 +40,49 @@ describe("SessionManager", () => {
     expect(resumed.session.turns).toHaveLength(1);
   });
 
+  it("persists workspace root mode and requested workspace metadata", () => {
+    const manager = new SessionManager();
+    const projectRoot = path.join(fakeHome, "repo-root");
+    const requestedWorkspaceRoot = path.join(projectRoot, "packages", "app");
+    const session = manager.createNew(projectRoot, {
+      rootMode: "git-root",
+      requestedWorkspaceRoot,
+      targetPathBase: projectRoot,
+      gitRoot: projectRoot,
+    });
+
+    const resumed = manager.resume(session.id);
+
+    expect(resumed.projectRoot).toBe(projectRoot);
+    expect(resumed.rootMode).toBe("git-root");
+    expect(resumed.requestedWorkspaceRoot).toBe(requestedWorkspaceRoot);
+    expect(resumed.targetPathBase).toBe(projectRoot);
+    expect(resumed.gitRoot).toBe(projectRoot);
+  });
+
+  it("updates workspace binding metadata without changing the session id", () => {
+    const manager = new SessionManager();
+    const projectRoot = path.join(fakeHome, "workspace");
+    const requestedWorkspaceRoot = path.join(fakeHome, "workspace");
+    const session = manager.createNew(projectRoot);
+
+    const updated = manager.updateSessionWorkspaceBinding(session.id, {
+      projectRoot,
+      rootMode: "direct",
+      requestedWorkspaceRoot,
+      targetPathBase: projectRoot,
+      gitRoot: null,
+    });
+    const resumed = manager.resume(session.id);
+
+    expect(updated.id).toBe(session.id);
+    expect(resumed.id).toBe(session.id);
+    expect(resumed.rootMode).toBe("direct");
+    expect(resumed.requestedWorkspaceRoot).toBe(requestedWorkspaceRoot);
+    expect(resumed.targetPathBase).toBe(projectRoot);
+    expect(resumed.gitRoot).toBeNull();
+  });
+
   it("preserves interrupted durable state for runtime seed construction after tryResume", () => {
     const manager = new SessionManager();
     const session = manager.createNew();

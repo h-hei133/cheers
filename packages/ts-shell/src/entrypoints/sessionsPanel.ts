@@ -38,6 +38,8 @@ export async function openSessionsPanel(input: {
 
   readline.emitKeypressEvents(stdin);
   const previousRawMode = stdin.isRaw;
+  rl.pause();
+  stdin.resume();
   stdin.setRawMode(true);
 
   const redraw = () => {
@@ -86,6 +88,8 @@ export async function openSessionsPanel(input: {
     new Promise((resolve) => {
       stdin.setRawMode(false);
       rl.question(question, (answer) => {
+        rl.pause();
+        stdin.resume();
         stdin.setRawMode(true);
         resolve(answer);
       });
@@ -99,6 +103,19 @@ export async function openSessionsPanel(input: {
   redraw();
 
   await new Promise<void>((resolve) => {
+    let closed = false;
+
+    const teardown = () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      stdin.removeListener("keypress", onKeypress);
+      stdin.setRawMode(previousRawMode);
+      rl.resume();
+      stdout.write("\x1b[2J\x1b[H");
+    };
+
     const onKeypress = async (_str: string, key: readline.Key) => {
       if (key.name === "up") {
         selected = Math.max(0, selected - 1);
@@ -164,13 +181,8 @@ export async function openSessionsPanel(input: {
       if (key.name === "escape" || key.name === "q") {
         teardown();
         resolve();
+        return;
       }
-    };
-
-    const teardown = () => {
-      stdin.removeListener("keypress", onKeypress);
-      stdin.setRawMode(previousRawMode);
-      stdout.write("\x1b[2J\x1b[H");
     };
 
     stdin.on("keypress", onKeypress);

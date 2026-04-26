@@ -78,9 +78,90 @@ function renderModelStatus(): string {
     `Active connection: ${activeId ?? "none"}`,
     `Model: ${model ?? "unset"}`,
     "",
+    ...renderProviderReadinessLines({
+      activeConnectionId: activeId,
+      activeConnection,
+      model,
+    }),
+    "",
     "Use /model list to inspect available models.",
     "Use /model use <model-id> to switch active model.",
   ].join("\n");
+}
+
+function renderProviderReadinessLines(input: {
+  readonly activeConnectionId?: string;
+  readonly activeConnection?: ProviderConnectionConfig;
+  readonly model?: string;
+}): string[] {
+  if (!input.activeConnectionId) {
+    return [
+      "Provider readiness",
+      "- Config status: no active connection selected.",
+      "- Next: run /connect status, then /connect login or /connect use.",
+    ];
+  }
+
+  if (!input.activeConnection) {
+    return [
+      "Provider readiness",
+      `- Config status: active connection not found (${input.activeConnectionId}).`,
+      "- Next: run /connect status, then /connect use <connection-id>.",
+    ];
+  }
+
+  if (input.activeConnection.status === "pending") {
+    return [
+      "Provider readiness",
+      "- Config status: connection setup is pending.",
+      "- Next: finish the login/browser flow or rerun /connect login.",
+    ];
+  }
+
+  if (input.activeConnection.status === "error") {
+    return [
+      "Provider readiness",
+      "- Config status: connection setup is in error state.",
+      "- Next: rerun /connect login for this provider.",
+    ];
+  }
+
+  if (
+    input.activeConnection.authType !== "account-auth" &&
+    !input.activeConnection.apiKey?.trim()
+  ) {
+    return [
+      "Provider readiness",
+      "- Config status: credential missing for active connection.",
+      `- Next: run /connect login ${input.activeConnection.provider} --api-key <key>.`,
+    ];
+  }
+
+  if (
+    isOpenAICompatibleStyleProvider(input.activeConnection.provider) &&
+    !input.activeConnection.baseUrl?.trim()
+  ) {
+    return [
+      "Provider readiness",
+      `- Config status: ${input.activeConnection.provider} requires base URL.`,
+      `- Next: run /connect login ${input.activeConnection.provider} --api-key <key> --base-url <url> --model <model>.`,
+    ];
+  }
+
+  if (!input.model) {
+    return [
+      "Provider readiness",
+      "- Config status: active connection exists, but no model is selected.",
+      "- Next: run /model list, then /model use <model-id>.",
+    ];
+  }
+
+  return [
+    "Provider readiness",
+    "- Config status: active connection and model are configured.",
+    "- Live check: run npm run verify:provider-readiness from the project root.",
+    "- If the live check reports provider-network-inconclusive, retry later or check proxy/firewall/network.",
+  ];
 }
 
 async function listModels(args: string[]): Promise<string> {

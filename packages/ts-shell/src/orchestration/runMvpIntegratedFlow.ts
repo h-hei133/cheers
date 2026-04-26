@@ -21,7 +21,23 @@ import {
 } from "../sandbox/index.js";
 import { ToolDispatcher } from "../tools/dispatcher.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
+import {
+  extractConsistencyItems,
+  findMissingConsistencyItems,
+  normalizeComparableText,
+  planLowRiskVerification,
+} from "./lowRiskVerificationPlanning.js";
+import {
+  extractFileConstraintAssertions,
+  extractLowRiskUnchangedVerifications,
+  type FileConstraintAssertions,
+} from "./fileConstraintAssertions.js";
 import { MultiAgentOrchestrator } from "./MultiAgentOrchestrator.js";
+import {
+  applySingleFileReplacePatch,
+  formatPatchFailureReason,
+} from "./patchMutationLane.js";
+import { executeFileMutationBranch } from "./mutationExecution.js";
 import { resolveTaskTargets } from "./targetResolution.js";
 import type {
   AgentExecutionInput,
@@ -357,6 +373,10 @@ interface WorkflowTaskPlan {
   readonly targetPath?: string;
   readonly replaceFrom?: string;
   readonly replaceTo?: string;
+  readonly repairContextUsed?: boolean;
+  readonly repairedFailureReason?: SingleFileEditFailureReason;
+  readonly repairedTargetFile?: string;
+  readonly repairPayloadKind?: SingleFileEditRepairPayloadKind;
   readonly mutationScopeLineIndexes?: readonly number[];
   readonly mutationScopeRanges?: readonly string[];
   readonly mutationScopeSourceWindowStart?: number;
@@ -397,6 +417,47 @@ type ReflectiveStateQueryKind =
   | "approval-memory"
   | "task-continuity";
 
+interface WorkflowTaskIntentSignals {
+  readonly normalized: string;
+  readonly intentPrompt: string;
+  readonly groundedIntentPrompt: string;
+  readonly hasContextSeedPrefix: boolean;
+  readonly hasExplicitBoundaryResetPrompt: boolean;
+  readonly hasFileReadIntent: boolean;
+  readonly hasSummarizeIntent: boolean;
+  readonly hasExplainIntent: boolean;
+  readonly hasReflectiveExplainStateQuestion: boolean;
+  readonly hasReflectiveExplainContinuation: boolean;
+  readonly hasReflectiveExplainQuery: boolean;
+  readonly detectedReflectiveStateQueryKind?: ReflectiveStateQueryKind;
+  readonly reflectiveStateQueryKind?: ReflectiveStateQueryKind;
+  readonly hasReflectiveActionCue: boolean;
+  readonly hasPriorLocalExplainEvidence: boolean;
+  readonly hasRecoverableReadFragmentEvidence: boolean;
+  readonly hasLocalExplainCue: boolean;
+  readonly hasGroundedReadLikeIntent: boolean;
+  readonly hasGroundedConstraintCue: boolean;
+  readonly hasCreateIntent: boolean;
+  readonly hasEditIntentRaw: boolean;
+  readonly hasEditIntent: boolean;
+  readonly hasVerifyIntent: boolean;
+  readonly hasCorrectionCue: boolean;
+  readonly hasExecutionCorrectionCue: boolean;
+  readonly hasAnswerRepairCue: boolean;
+  readonly isAmbiguousRepairFollowUp: boolean;
+  readonly hasDiagnosisIntent: boolean;
+  readonly hasWeakRepairFollowUp: boolean;
+  readonly avoidPreviousDirection: boolean;
+  readonly hasCrossFileCue: boolean;
+  readonly hasVerifyContinuationCue: boolean;
+  readonly verifyCommand?: string;
+  readonly preferTestOverBuild: boolean;
+  readonly effectiveVerifyCommand?: string;
+  readonly effectiveReplaceDirectiveFromPrompt?: { from: string; to: string };
+  readonly hasExecutionIntent: boolean;
+  readonly unsupportedCommand?: string;
+}
+
 interface FreshnessObservability {
   readonly notes: readonly string[];
   readonly evidence: readonly string[];
@@ -407,6 +468,27 @@ interface WorkflowExecutionResult {
   readonly notes: string[];
   readonly codingResult: CodingResultSummary;
   readonly userFacingOutput: string;
+}
+
+interface ActionResultContractInput {
+  readonly taskKind: CodingTaskKind;
+  readonly changedFiles: string[];
+  readonly failedFiles: Array<{ path: string; reason: string }>;
+  readonly patches: CodingPatchRecord[];
+  readonly verifiedFiles: string[];
+  readonly unverifiedFiles: Array<{ path: string; reason: string }>;
+  readonly verification: CodingVerificationSummary;
+  readonly repairNotes: string[];
+  readonly evidence: string[];
+  readonly crossFileDegradationReason?: string;
+  readonly degradedCrossFileTargets: string[];
+  readonly crossFileRemainingTargets: string[];
+  readonly crossFileFailedByReason: Array<{
+    path: string;
+    failureCode: string;
+    reason: string;
+  }>;
+  readonly crossFileSkippedFiles: Array<{ path: string; reason: string }>;
 }
 
 interface ToolLifecycleResult {
@@ -507,6 +589,18 @@ interface ContinuationTransform {
   readonly to: string;
 }
 
+type SingleFileEditFailureReason =
+  | "edit-target-missing"
+  | "edit-transform-unclear"
+  | "patch-from-not-found"
+  | "patch-ambiguous"
+  | "patch-target-missing";
+
+type SingleFileEditRepairPayloadKind =
+  | "replace-directive"
+  | "fenced-content"
+  | "target-path-with-transform";
+
 interface RepairContinuationObject {
   readonly kind: "edit-fix";
   readonly targetPath?: string;
@@ -583,83 +677,58 @@ function buildWorkflowTaskPlan(
   workspaceRoot: string,
   continuityState?: unknown,
 ): WorkflowTaskPlan {
-  const normalized = prompt.toLowerCase();
-  const intentPrompt = stripPathTokensForIntent(prompt);
-  const groundedIntentPrompt = intentPrompt.length > 0 ? intentPrompt : prompt;
-  const hasContextSeedPrefix =
-    /^\s*(?:previous|prior|last)\s+task\s+context\s*:/i.test(prompt);
-  const hasExplicitBoundaryResetPrompt =
-    /\b(?:do\s+not|don't|not)\s+continue\s+(?:the\s+)?old\s+edit\b/i.test(
-      prompt,
-    ) || /\bboundary\s+reset\b/i.test(prompt);
-  const targetResolution = resolveTaskTargets(prompt, workspaceRoot);
   const continuity = continuityStateAsObject(continuityState);
+  const {
+    normalized,
+    intentPrompt,
+    groundedIntentPrompt,
+    hasContextSeedPrefix,
+    hasExplicitBoundaryResetPrompt,
+    hasFileReadIntent,
+    hasSummarizeIntent,
+    hasExplainIntent,
+    hasReflectiveExplainStateQuestion,
+    hasReflectiveExplainContinuation,
+    hasReflectiveExplainQuery,
+    detectedReflectiveStateQueryKind,
+    reflectiveStateQueryKind,
+    hasReflectiveActionCue,
+    hasPriorLocalExplainEvidence,
+    hasRecoverableReadFragmentEvidence,
+    hasLocalExplainCue,
+    hasGroundedReadLikeIntent,
+    hasGroundedConstraintCue,
+    hasCreateIntent,
+    hasEditIntentRaw,
+    hasEditIntent,
+    hasVerifyIntent,
+    hasCorrectionCue,
+    hasExecutionCorrectionCue,
+    hasAnswerRepairCue,
+    isAmbiguousRepairFollowUp,
+    hasDiagnosisIntent,
+    hasWeakRepairFollowUp,
+    avoidPreviousDirection,
+    hasCrossFileCue,
+    hasVerifyContinuationCue,
+    verifyCommand,
+    preferTestOverBuild,
+    effectiveVerifyCommand,
+    effectiveReplaceDirectiveFromPrompt,
+    hasExecutionIntent,
+    unsupportedCommand,
+  } = extractWorkflowTaskIntentSignals(prompt, continuity);
+  const targetResolution = resolveTaskTargets(prompt, workspaceRoot);
   const rawContinuityTargetPath = deriveContinuationTargetPath(
     continuity,
     workspaceRoot,
   );
   const promptPathTarget = derivePromptPathTarget(prompt, workspaceRoot);
   const explicitPrimaryTarget = targetResolution.primaryTarget;
-  const hasFileReadIntent = /(?:read|inspect|open|show|print|\u67e5\u770b|\u8bfb\u53d6|\u770b\u770b|\u5206\u6790|\u524d\s*\d+\s*\u884c)/i.test(
-    groundedIntentPrompt,
-  );
-  const hasSummarizeIntent = /(?:summari[sz]e|summary|\u603b\u7ed3|\u6458\u8981|\u6982\u8ff0)/i.test(
-    groundedIntentPrompt,
-  );
-  const hasExplainIntent = /(?:\bexplain\b|what .* does|\u89e3\u91ca|\u5728\u505a\u4ec0\u4e48)/i.test(
-    groundedIntentPrompt,
-  );
-  const hasReflectiveExplainStateQuestion = isReflectiveExplainStateQuestion(
-    groundedIntentPrompt,
-  );
-  const hasReflectiveExplainContinuation = isReflectiveExplainContinuationPrompt(
-    groundedIntentPrompt,
-  );
-  const hasReflectiveExplainQuery =
-    hasReflectiveExplainStateQuestion || hasReflectiveExplainContinuation;
-  const detectedReflectiveStateQueryKind = detectReflectiveStateQueryKind(
-    groundedIntentPrompt,
-  );
-  const reflectiveStateQueryKind =
-    detectedReflectiveStateQueryKind ??
-    (hasStructuredApprovalMemoryInContinuity(continuity) &&
-    hasPermissionExplanationIntent(groundedIntentPrompt)
-      ? "approval-memory"
-      : undefined);
-  const hasReflectiveActionCue = hasReflectiveStateQueryActionCue(
-    groundedIntentPrompt,
-  );
-  const hasPriorLocalExplainEvidence = hasLocalExplainEvidenceInContinuity(
-    continuity,
-  );
-  const hasRecoverableReadFragmentEvidence =
-    hasReadFragmentEvidenceInContinuity(continuity);
-  const hasLocalExplainCue =
-    hasExplainIntent &&
-    (hasLocalSliceExplainCue(groundedIntentPrompt) ||
-      (hasReflectiveExplainContinuation &&
-        (hasPriorLocalExplainEvidence || hasRecoverableReadFragmentEvidence)));
-  const hasGroundedReadLikeIntent =
-    hasFileReadIntent || hasSummarizeIntent || hasExplainIntent;
-  const hasGroundedConstraintCue =
-    parseGroundedRepairConstraints(groundedIntentPrompt) !== undefined;
   const hasExplicitPathReference =
     Boolean(promptPathTarget || explicitPrimaryTarget) ||
     targetResolution.targets.length > 0 ||
     hasPathLikeReference(prompt);
-  const hasCreateIntent = /(?:create|new file|\u65b0\u589e|\u521b\u5efa|\u65b0\u5efa|\u5199\u4e00\u4e2a)/i.test(intentPrompt);
-  const hasEditIntentRaw = /(?:\bedit\b|modify|update|fix|change|repair|replace|swap|\bappend\b|continue fixing|continue repairing|\u4fee\u6539|\u4fee\u590d|\u6539\u4e00\u4e0b|\u6539\u6210|\u6539\u4e3a|\u66ff\u6362|\u66ff\u6362\u4e3a|\u7ee7\u7eed\u4fee)/i.test(
-    intentPrompt,
-  );
-  const hasEditIntent =
-    hasEditIntentRaw && !hasContextSeedPrefix && !hasExplicitBoundaryResetPrompt;
-  const hasVerifyIntent = /(?:verify|test|build|lint|check|\u9a8c\u8bc1|\u6d4b\u8bd5|\u6784\u5efa|\u7f16\u8bd1|\u68c0\u67e5)/i.test(
-    intentPrompt,
-  );
-  const hasCorrectionCue = isCorrectionFollowUpPrompt(prompt);
-  const hasExecutionCorrectionCue = isExecutionCorrectionFollowUpPrompt(prompt);
-  const hasAnswerRepairCue = isAnswerRepairFollowUpPrompt(prompt);
-  const isAmbiguousRepairFollowUp = isAmbiguousGroundedRepairFollowUp(prompt);
   const lastTaskWasReadLike =
     continuity.lastTaskKind === "read-file" ||
     continuity.lastTaskKind === "repo-explain" ||
@@ -675,26 +744,6 @@ function buildWorkflowTaskPlan(
       entry.toLowerCase().startsWith("verify:") &&
       !entry.toLowerCase().includes("not-requested"),
     );
-  const hasDiagnosisIntent =
-    /(?:why|how|where|which file|implemented|\u4e3a\u4ec0\u4e48|\u600e\u4e48|\u5728\u54ea|\u54ea\u4e2a\u6587\u4ef6|\u5b9e\u73b0)/i.test(
-      groundedIntentPrompt,
-    );
-  const hasWeakRepairFollowUp = isWeakRepairFollowUpPrompt(prompt);
-  const avoidPreviousDirection = isAvoidPreviousDirectionPrompt(prompt);
-  const hasCrossFileCue = isCrossFileRepairFollowUpPrompt(prompt);
-  const hasVerifyContinuationCue = isVerifyContinuationFollowUpPrompt(prompt);
-  const verifyCommand = hasExternalVerifyOptOut(prompt)
-    ? undefined
-    : detectVerifyCommand(normalized);
-  const preferTestOverBuild = prefersTestOverBuildInFollowUp(prompt);
-  const effectiveVerifyCommand =
-    preferTestOverBuild && hasVerifyIntent
-      ? "npm test -- --help"
-      : verifyCommand;
-  const promptReplaceDirective = extractReplaceDirective(prompt);
-  const effectiveReplaceDirectiveFromPrompt = promptReplaceDirective;
-  const hasExecutionIntent = hasExplicitExecutionIntent(prompt, normalized);
-  const unsupportedCommand = detectUnsupportedCommandIntent(normalized);
   const previousRemainingTargets = extractCrossFileStateListFromContinuityEvidence(
     continuity,
     "repair-remaining-files:",
@@ -719,6 +768,34 @@ function buildWorkflowTaskPlan(
     (continuity.recentFailedFiles?.length ?? 0) > 0 ||
     (continuity.lastContinuationEvidence?.length ?? 0) > 0 ||
     hasTaskTruthAnchor;
+  const editFailureRepairContext = resolveSingleFileEditFailureRepairContext(
+    continuity,
+    workspaceRoot,
+  );
+  const hasEditFailureRepairPayload = Boolean(
+    editFailureRepairContext &&
+      !hasGroundedReadLikeIntent &&
+      !hasVerifyIntent &&
+      !hasDiagnosisIntent &&
+      !hasExecutionIntent &&
+      (effectiveReplaceDirectiveFromPrompt ||
+        extractFencedContent(prompt) ||
+        (editFailureRepairContext.failureReason === "edit-target-missing" &&
+          hasPathLikeReference(prompt) &&
+          (hasEditIntent ||
+            Boolean(effectiveReplaceDirectiveFromPrompt) ||
+            Boolean(extractFencedContent(prompt))))),
+  );
+  const editFailureRepairPayloadKind =
+    hasEditFailureRepairPayload && editFailureRepairContext
+      ? resolveSingleFileEditRepairPayloadKind({
+          failureReason: editFailureRepairContext.failureReason,
+          prompt,
+          hasEditIntent,
+          replaceDirective: effectiveReplaceDirectiveFromPrompt,
+          fencedContent: extractFencedContent(prompt),
+        })
+      : undefined;
   const hasTemporalSuccessorContextSignal =
     hasContinuationStateSignals ||
     hasContextSeedPrefix ||
@@ -799,6 +876,7 @@ function buildWorkflowTaskPlan(
   });
   const hasContinuationExecutionIntent =
     hasContinuationCue ||
+    hasEditFailureRepairPayload ||
     hasEditIntent ||
     hasCreateIntent ||
     (continuationReopenDecision.enabled &&
@@ -812,6 +890,7 @@ function buildWorkflowTaskPlan(
         hasExecutionCorrectionCue ||
         hasAnswerRepairCue ||
         hasGroundedConstraintCue ||
+        hasEditFailureRepairPayload ||
         isAmbiguousRepairFollowUp ||
         hasWeakRepairFollowUp ||
         (hasGroundedReadLikeIntent && lastTaskWasReadLike) ||
@@ -849,6 +928,7 @@ function buildWorkflowTaskPlan(
     !explicitPrimaryTarget &&
     (Boolean(continuityTargetPath) ||
       ((hasContinuationCue ||
+        hasEditFailureRepairPayload ||
         hasTemporalSuccessorCue ||
         hasResumeTaskContinuityCue) &&
         hasTaskTruthAnchor));
@@ -1800,6 +1880,8 @@ function buildWorkflowTaskPlan(
       taskKind: hasCreateIntent ? "write-file" : "edit-file",
       reason: allowCrossFileUltraWeakAutoContinuation
         ? "cross-file ultra-weak follow-up auto-activated from single recoverable continuation target"
+        : hasEditFailureRepairPayload && editFailureRepairContext
+          ? `single-file edit failure follow-up reused ${editFailureRepairContext.failureReason} context`
         : usedRestoredState
           ? "continuation edit/write target resolved from restored session state"
           : hasCreateIntent
@@ -1826,6 +1908,16 @@ function buildWorkflowTaskPlan(
         ? {
             replaceFrom: effectiveReplaceDirective.from,
             replaceTo: effectiveReplaceDirective.to,
+          }
+        : {}),
+      ...(hasEditFailureRepairPayload &&
+      editFailureRepairContext &&
+      editFailureRepairPayloadKind
+        ? {
+            repairContextUsed: true,
+            repairedFailureReason: editFailureRepairContext.failureReason,
+            repairedTargetFile: primaryTarget.cleaned,
+            repairPayloadKind: editFailureRepairPayloadKind,
           }
         : {}),
       ...(!hasCreateIntent ? mutationScopeFields : {}),
@@ -1904,7 +1996,15 @@ function buildWorkflowTaskPlan(
         verifyAfterEdit: hasVerifyIntent,
         ...(effectiveVerifyCommand ? { verifyCommand: effectiveVerifyCommand } : {}),
         blockedReason:
-          "Target file is required for write/edit task. Provide an explicit file path.",
+          hasCreateIntent
+            ? "Target file is required for write task. Provide an explicit file path."
+            : formatEditExecutionFailure({
+                failureReason: "edit-target-missing",
+                explanation:
+                  "The edit request did not identify one unique in-workspace target file.",
+                nextAction:
+                  "Rerun with exactly one target file path, for example: Edit src/example.ts and replace '<current text>' with '<desired text>'.",
+              }),
         targetMissing: true,
         ...(effectiveReplaceDirective
           ? {
@@ -2022,6 +2122,150 @@ function buildWorkflowTaskPlan(
     inspectFirst: false,
     verifyAfterEdit: false,
     usedRestoredState,
+  };
+}
+
+function removeNegatedMutationInstructions(prompt: string): string {
+  return prompt
+    .replace(
+      /\b(?:do\s+not|don't|dont|never)\s+(?:edit|modify|change|touch|update|write|replace|fix)\b[^.!?\n]*(?:[.!?]|$)/gi,
+      " ",
+    )
+    .replace(
+      /\bno\s+(?:edits?|modifications?|changes?|writes?|replacements?|fixes?)\b[^.!?\n]*(?:[.!?]|$)/gi,
+      " ",
+    );
+}
+
+function extractWorkflowTaskIntentSignals(
+  prompt: string,
+  continuity: ContinuityStateLike,
+): WorkflowTaskIntentSignals {
+  const normalized = prompt.toLowerCase();
+  const intentPrompt = stripPathTokensForIntent(prompt);
+  const groundedIntentPrompt = intentPrompt.length > 0 ? intentPrompt : prompt;
+  const hasContextSeedPrefix =
+    /^\s*(?:previous|prior|last)\s+task\s+context\s*:/i.test(prompt);
+  const hasExplicitBoundaryResetPrompt =
+    /\b(?:do\s+not|don't|not)\s+continue\s+(?:the\s+)?old\s+edit\b/i.test(
+      prompt,
+    ) || /\bboundary\s+reset\b/i.test(prompt);
+  const hasFileReadIntent = /(?:read|inspect|open|show|print|\u67e5\u770b|\u8bfb\u53d6|\u770b\u770b|\u5206\u6790|\u524d\s*\d+\s*\u884c)/i.test(
+    groundedIntentPrompt,
+  );
+  const hasSummarizeIntent = /(?:summari[sz]e|summary|\u603b\u7ed3|\u6458\u8981|\u6982\u8ff0)/i.test(
+    groundedIntentPrompt,
+  );
+  const hasExplainIntent = /(?:\bexplain\b|what .* does|\u89e3\u91ca|\u5728\u505a\u4ec0\u4e48)/i.test(
+    groundedIntentPrompt,
+  );
+  const hasReflectiveExplainStateQuestion = isReflectiveExplainStateQuestion(
+    groundedIntentPrompt,
+  );
+  const hasReflectiveExplainContinuation = isReflectiveExplainContinuationPrompt(
+    groundedIntentPrompt,
+  );
+  const hasReflectiveExplainQuery =
+    hasReflectiveExplainStateQuestion || hasReflectiveExplainContinuation;
+  const detectedReflectiveStateQueryKind = detectReflectiveStateQueryKind(
+    groundedIntentPrompt,
+  );
+  const reflectiveStateQueryKind =
+    detectedReflectiveStateQueryKind ??
+    (hasStructuredApprovalMemoryInContinuity(continuity) &&
+    hasPermissionExplanationIntent(groundedIntentPrompt)
+      ? "approval-memory"
+      : undefined);
+  const hasReflectiveActionCue = hasReflectiveStateQueryActionCue(
+    groundedIntentPrompt,
+  );
+  const hasPriorLocalExplainEvidence = hasLocalExplainEvidenceInContinuity(
+    continuity,
+  );
+  const hasRecoverableReadFragmentEvidence =
+    hasReadFragmentEvidenceInContinuity(continuity);
+  const hasLocalExplainCue =
+    hasExplainIntent &&
+    (hasLocalSliceExplainCue(groundedIntentPrompt) ||
+      (hasReflectiveExplainContinuation &&
+        (hasPriorLocalExplainEvidence || hasRecoverableReadFragmentEvidence)));
+  const hasGroundedReadLikeIntent =
+    hasFileReadIntent || hasSummarizeIntent || hasExplainIntent;
+  const hasGroundedConstraintCue =
+    parseGroundedRepairConstraints(groundedIntentPrompt) !== undefined;
+  const hasCreateIntent = /(?:create|new file|\u65b0\u589e|\u521b\u5efa|\u65b0\u5efa|\u5199\u4e00\u4e2a)/i.test(intentPrompt);
+  const mutationIntentPrompt = removeNegatedMutationInstructions(intentPrompt);
+  const hasEditIntentRaw = /(?:\bedit\b|modify|update|fix|change|repair|replace|swap|\bappend\b|continue fixing|continue repairing|\u4fee\u6539|\u4fee\u590d|\u6539\u4e00\u4e0b|\u6539\u6210|\u6539\u4e3a|\u66ff\u6362|\u66ff\u6362\u4e3a|\u7ee7\u7eed\u4fee)/i.test(
+    mutationIntentPrompt,
+  );
+  const hasEditIntent =
+    hasEditIntentRaw && !hasContextSeedPrefix && !hasExplicitBoundaryResetPrompt;
+  const hasVerifyIntent = /(?:verify|test|build|lint|check|\u9a8c\u8bc1|\u6d4b\u8bd5|\u6784\u5efa|\u7f16\u8bd1|\u68c0\u67e5)/i.test(
+    intentPrompt,
+  );
+  const hasCorrectionCue = isCorrectionFollowUpPrompt(prompt);
+  const hasExecutionCorrectionCue = isExecutionCorrectionFollowUpPrompt(prompt);
+  const hasAnswerRepairCue = isAnswerRepairFollowUpPrompt(prompt);
+  const isAmbiguousRepairFollowUp = isAmbiguousGroundedRepairFollowUp(prompt);
+  const hasDiagnosisIntent =
+    /(?:why|how|where|which file|implemented|\u4e3a\u4ec0\u4e48|\u600e\u4e48|\u5728\u54ea|\u54ea\u4e2a\u6587\u4ef6|\u5b9e\u73b0)/i.test(
+      groundedIntentPrompt,
+    );
+  const hasWeakRepairFollowUp = isWeakRepairFollowUpPrompt(prompt);
+  const avoidPreviousDirection = isAvoidPreviousDirectionPrompt(prompt);
+  const hasCrossFileCue = isCrossFileRepairFollowUpPrompt(prompt);
+  const hasVerifyContinuationCue = isVerifyContinuationFollowUpPrompt(prompt);
+  const verifyCommand = hasExternalVerifyOptOut(prompt)
+    ? undefined
+    : detectVerifyCommand(normalized);
+  const preferTestOverBuild = prefersTestOverBuildInFollowUp(prompt);
+  const effectiveVerifyCommand =
+    preferTestOverBuild && hasVerifyIntent
+      ? "npm test -- --help"
+      : verifyCommand;
+  const effectiveReplaceDirectiveFromPrompt = extractReplaceDirective(prompt);
+  const hasExecutionIntent = hasExplicitExecutionIntent(prompt, normalized);
+  const unsupportedCommand = detectUnsupportedCommandIntent(normalized);
+
+  return {
+    normalized,
+    intentPrompt,
+    groundedIntentPrompt,
+    hasContextSeedPrefix,
+    hasExplicitBoundaryResetPrompt,
+    hasFileReadIntent,
+    hasSummarizeIntent,
+    hasExplainIntent,
+    hasReflectiveExplainStateQuestion,
+    hasReflectiveExplainContinuation,
+    hasReflectiveExplainQuery,
+    detectedReflectiveStateQueryKind,
+    reflectiveStateQueryKind,
+    hasReflectiveActionCue,
+    hasPriorLocalExplainEvidence,
+    hasRecoverableReadFragmentEvidence,
+    hasLocalExplainCue,
+    hasGroundedReadLikeIntent,
+    hasGroundedConstraintCue,
+    hasCreateIntent,
+    hasEditIntentRaw,
+    hasEditIntent,
+    hasVerifyIntent,
+    hasCorrectionCue,
+    hasExecutionCorrectionCue,
+    hasAnswerRepairCue,
+    isAmbiguousRepairFollowUp,
+    hasDiagnosisIntent,
+    hasWeakRepairFollowUp,
+    avoidPreviousDirection,
+    hasCrossFileCue,
+    hasVerifyContinuationCue,
+    verifyCommand,
+    preferTestOverBuild,
+    effectiveVerifyCommand,
+    effectiveReplaceDirectiveFromPrompt,
+    hasExecutionIntent,
+    unsupportedCommand,
   };
 }
 
@@ -2886,6 +3130,99 @@ function deriveContinuationTargetPath(
   return undefined;
 }
 
+function resolveSingleFileEditFailureRepairContext(
+  continuity: ContinuityStateLike,
+  workspaceRoot: string,
+): { failureReason: SingleFileEditFailureReason; targetPath?: string } | undefined {
+  if (continuity.lastTaskKind !== "edit-file") {
+    return undefined;
+  }
+
+  const failureReason = extractSingleFileEditFailureReason(continuity);
+  if (!failureReason) {
+    return undefined;
+  }
+
+  const targetCandidates = new Set<string>();
+  const addCandidate = (rawCandidate: string | undefined): void => {
+    const candidate = normalizePathLike(rawCandidate ?? "");
+    if (!isUsableContinuationTargetPath(candidate)) {
+      return;
+    }
+    const rebound = rebindContinuationTargetToWorkspace(candidate, workspaceRoot);
+    if (rebound) {
+      targetCandidates.add(rebound);
+    }
+  };
+
+  addCandidate(deriveContinuationTargetPath(continuity, workspaceRoot));
+  for (const entry of continuity.recentFailedFiles ?? []) {
+    addCandidate(entry.path);
+  }
+  for (const entry of continuity.recentTargetFiles ?? []) {
+    addCandidate(entry);
+  }
+
+  if (failureReason === "edit-target-missing") {
+    return {
+      failureReason,
+      ...(targetCandidates.size === 1
+        ? { targetPath: [...targetCandidates][0] }
+        : {}),
+    };
+  }
+
+  if (targetCandidates.size !== 1) {
+    return undefined;
+  }
+
+  return {
+    failureReason,
+    targetPath: [...targetCandidates][0],
+  };
+}
+
+function extractSingleFileEditFailureReason(
+  continuity: ContinuityStateLike,
+): SingleFileEditFailureReason | undefined {
+  const evidence = [
+    continuity.lastFailure ?? "",
+    ...(continuity.recentFailedFiles ?? []).flatMap((entry) => [
+      entry.path,
+      entry.reason,
+    ]),
+    ...(continuity.lastContinuationEvidence ?? []),
+    ...(continuity.unresolvedItems ?? []),
+  ].join("\n");
+  const match = evidence.match(
+    /\b(edit-target-missing|edit-transform-unclear|patch-from-not-found|patch-ambiguous|patch-target-missing)\b/i,
+  );
+  return match?.[1]?.toLowerCase() as SingleFileEditFailureReason | undefined;
+}
+
+function resolveSingleFileEditRepairPayloadKind(input: {
+  failureReason: SingleFileEditFailureReason;
+  prompt: string;
+  hasEditIntent: boolean;
+  replaceDirective?: { from: string; to: string };
+  fencedContent?: string;
+}): SingleFileEditRepairPayloadKind | undefined {
+  if (
+    input.failureReason === "edit-target-missing" &&
+    hasPathLikeReference(input.prompt) &&
+    (input.hasEditIntent || input.replaceDirective || input.fencedContent)
+  ) {
+    return "target-path-with-transform";
+  }
+  if (input.replaceDirective) {
+    return "replace-directive";
+  }
+  if (input.fencedContent) {
+    return "fenced-content";
+  }
+  return undefined;
+}
+
 function rebindContinuationTargetToWorkspace(
   candidatePath: string,
   workspaceRoot: string,
@@ -3523,6 +3860,25 @@ function shouldRetainCrossFileFailureInRemaining(
   return true;
 }
 
+function appendSingleFileEditRepairObservability(
+  evidence: string[],
+  plan: WorkflowTaskPlan,
+): void {
+  if (!plan.repairContextUsed) {
+    return;
+  }
+  evidence.push("repairContextUsed:true");
+  if (plan.repairedFailureReason) {
+    evidence.push(`repairedFailureReason:${plan.repairedFailureReason}`);
+  }
+  if (plan.repairedTargetFile) {
+    evidence.push(`repairedTargetFile:${plan.repairedTargetFile}`);
+  }
+  if (plan.repairPayloadKind) {
+    evidence.push(`repairPayloadKind:${plan.repairPayloadKind}`);
+  }
+}
+
 async function executeWorkflowTaskPlan(input: {
   readonly plan: WorkflowTaskPlan;
   readonly freshnessObservability: FreshnessObservability;
@@ -3545,6 +3901,7 @@ async function executeWorkflowTaskPlan(input: {
   const appliedContentByPath = new Map<string, string>();
   notes.push(...input.freshnessObservability.notes);
   evidence.push(...input.freshnessObservability.evidence);
+  appendSingleFileEditRepairObservability(evidence, input.plan);
   let crossFileRemainingTargets: string[] = [];
   let crossFileFailedByReason: Array<{
     path: string;
@@ -3694,7 +4051,8 @@ async function executeWorkflowTaskPlan(input: {
   }
 
   let originalContent: string | undefined;
-  const unchangedAssertions = extractLowRiskUnchangedVerifications(input.prompt);
+  const fileConstraints = extractFileConstraintAssertions(input.prompt);
+  const unchangedAssertions = fileConstraints.unchangedAssertions;
   const protectedSnapshots = new Map<string, string>();
   if (
     input.plan.inspectFirst &&
@@ -3713,9 +4071,28 @@ async function executeWorkflowTaskPlan(input: {
       requireApprovalEvent: false,
     });
     if (!readStep.success) {
-      const reason = readStep.error ?? "read failed";
+      const rawReason = readStep.error ?? "read failed";
+      const reason =
+        input.plan.replaceFrom && input.plan.replaceTo
+          ? formatPatchFailureReason({
+              ok: false,
+              failureCode: "patch-target-missing",
+              failureReason: "patch-target-missing",
+              explanation:
+                "Patch target could not be read before applying replace.",
+              reason:
+                "Patch target could not be read before applying replace.",
+              matchedCount: 0,
+              nextAction:
+                "Check that the target file exists and rerun with an explicit in-workspace path.",
+            })
+          : rawReason;
       notes.push(`inspect failed: ${reason}`);
       failedFiles.push({ path: input.plan.targetPath, reason });
+      const inspectFailureTaskReason =
+        input.plan.taskKind === "read-file"
+          ? "Read/inspect step failed; no files changed."
+          : "Inspect step failed; mutation skipped.";
       return {
         events,
         notes,
@@ -3734,7 +4111,7 @@ async function executeWorkflowTaskPlan(input: {
           repairNotes: ["inspect step failed before edit"],
           evidence: [`read failed: ${reason}`],
           taskVerdict: "insufficient-evidence",
-          taskReasons: ["Inspect step failed; mutation skipped."],
+          taskReasons: [inspectFailureTaskReason],
         }),
         userFacingOutput: `Task not completed: failed to read ${input.plan.targetPath}. Reason: ${reason}`,
       };
@@ -4282,6 +4659,16 @@ async function executeWorkflowTaskPlan(input: {
     >;
 
     if (!primarySkippedForCrossFile) {
+      const transformKind =
+        input.plan.taskKind === "write-file"
+          ? "write"
+          : fenced
+            ? "fenced-replacement"
+            : replaceDirective
+              ? "replace"
+              : "rewrite";
+      notes.push(`mutation transform: ${transformKind}`);
+      evidence.push(`edit-transform-kind:${targetPath}:${transformKind}`);
       const primaryMutationToolName =
         input.plan.taskKind === "write-file" ? "write" : "edit";
       const primaryMutationTarget = path.isAbsolute(targetPath)
@@ -4299,43 +4686,49 @@ async function executeWorkflowTaskPlan(input: {
             : "edit-file-primary",
       });
       appendCurrentRequestScopeEvidence(evidence, currentMutationScope);
-      const mutation = await dispatchToolWithLifecycle({
-        dispatcher: input.dispatcher,
-        events,
-        toolName: primaryMutationToolName,
-        taskId: `task_${input.sessionId}_${input.turn}_${primaryMutationToolName}`,
-        args: { path: targetPath, content: successfulMutationInstruction.content },
-        workspaceRoot: input.workspaceRoot,
-        sessionId: input.sessionId,
-        abortSignal: input.abortSignal,
-        requireApprovalEvent: true,
+      const mutation = await executeFileMutationBranch({
+        path: targetPath,
+        content: successfulMutationInstruction.content,
+        operation: input.plan.taskKind === "write-file" ? "append" : "replace",
+        changedLines: successfulMutationInstruction.changedLines,
+        addedLines: successfulMutationInstruction.addedLines,
+        removedLines: successfulMutationInstruction.removedLines,
+        failureReason: "mutation failed",
+        appliedNote: `mutation applied: ${targetPath}`,
+        appliedEvidence: `edit/write applied on ${targetPath}`,
+        dispatch: () =>
+          dispatchToolWithLifecycle({
+            dispatcher: input.dispatcher,
+            events,
+            toolName: primaryMutationToolName,
+            taskId: `task_${input.sessionId}_${input.turn}_${primaryMutationToolName}`,
+            args: {
+              path: targetPath,
+              content: successfulMutationInstruction.content,
+            },
+            workspaceRoot: input.workspaceRoot,
+            sessionId: input.sessionId,
+            abortSignal: input.abortSignal,
+            requireApprovalEvent: true,
+          }),
       });
-
-      if (!mutation.success) {
-        const reason = mutation.error ?? "mutation failed";
-        failedFiles.push({ path: targetPath, reason });
-        patches.push({
-          path: targetPath,
-          operation: input.plan.taskKind === "write-file" ? "append" : "replace",
-          status: "failed",
-          failureCode: "write-failed",
-          reason,
-        });
-      } else {
-        changedFiles.push(targetPath);
-        patches.push({
-          path: targetPath,
-          operation: input.plan.taskKind === "write-file" ? "append" : "replace",
-          status: "applied",
-          changedLines: successfulMutationInstruction.changedLines,
-          addedLines: successfulMutationInstruction.addedLines,
-          removedLines: successfulMutationInstruction.removedLines,
-        });
-        notes.push(`mutation applied: ${targetPath}`);
-        evidence.push(`edit/write applied on ${targetPath}`);
+      if (mutation.failedFile) {
+        failedFiles.push(mutation.failedFile);
+      }
+      if (mutation.changedFile) {
+        changedFiles.push(mutation.changedFile);
+      }
+      patches.push(mutation.patch);
+      if (mutation.note) {
+        notes.push(mutation.note);
+      }
+      if (mutation.evidence) {
+        evidence.push(mutation.evidence);
+      }
+      if (mutation.appliedContent) {
         appliedContentByPath.set(
-          normalizePathLike(targetPath),
-          successfulMutationInstruction.content,
+          mutation.appliedContent.normalizedPath,
+          mutation.appliedContent.content,
         );
       }
     }
@@ -4379,85 +4772,101 @@ async function executeWorkflowTaskPlan(input: {
           if (renameContent === (renameRead.output ?? "")) {
             continue;
           }
-          const renameMutation = await dispatchToolWithLifecycle({
-            dispatcher: input.dispatcher,
-            events,
-            toolName: "edit",
-            taskId: `task_${input.sessionId}_${input.turn}_rename_edit_${hashStableId(renamePath)}`,
-            args: { path: renamePath, content: renameContent },
-            workspaceRoot: input.workspaceRoot,
-            sessionId: input.sessionId,
-            abortSignal: input.abortSignal,
-            requireApprovalEvent: true,
+          const lineDelta = computeLineDelta(renameRead.output ?? "", renameContent);
+          const renameMutation = await executeFileMutationBranch({
+            path: renamePath,
+            content: renameContent,
+            operation: "replace",
+            changedLines: lineDelta.changedLines,
+            addedLines: lineDelta.addedLines,
+            removedLines: lineDelta.removedLines,
+            failureReason: "rename target edit failed",
+            appliedNote: `low-risk rename applied: ${renamePath}`,
+            appliedEvidence: `rename-refactor:${renamePath}:${lowRiskRenameRefactor.from}->${lowRiskRenameRefactor.to}`,
+            dispatch: () =>
+              dispatchToolWithLifecycle({
+                dispatcher: input.dispatcher,
+                events,
+                toolName: "edit",
+                taskId: `task_${input.sessionId}_${input.turn}_rename_edit_${hashStableId(renamePath)}`,
+                args: { path: renamePath, content: renameContent },
+                workspaceRoot: input.workspaceRoot,
+                sessionId: input.sessionId,
+                abortSignal: input.abortSignal,
+                requireApprovalEvent: true,
+              }),
           });
-          if (!renameMutation.success) {
-            const reason = renameMutation.error ?? "rename target edit failed";
-            failedFiles.push({ path: renamePath, reason });
-            patches.push({
-              path: renamePath,
-              operation: "replace",
-              status: "failed",
-              failureCode: "write-failed",
-              reason,
-            });
+          if (renameMutation.failedFile) {
+            failedFiles.push(renameMutation.failedFile);
+            patches.push(renameMutation.patch);
             continue;
           }
-          changedFiles.push(renamePath);
-          patches.push({
-            path: renamePath,
-            operation: "replace",
-            status: "applied",
-            ...computeLineDelta(renameRead.output ?? "", renameContent),
-          });
-          notes.push(`low-risk rename applied: ${renamePath}`);
-          evidence.push(
-            `rename-refactor:${renamePath}:${lowRiskRenameRefactor.from}->${lowRiskRenameRefactor.to}`,
-          );
-          appliedContentByPath.set(normalizePathLike(renamePath), renameContent);
+          if (renameMutation.changedFile) {
+            changedFiles.push(renameMutation.changedFile);
+          }
+          patches.push(renameMutation.patch);
+          if (renameMutation.note) {
+            notes.push(renameMutation.note);
+          }
+          if (renameMutation.evidence) {
+            evidence.push(renameMutation.evidence);
+          }
+          if (renameMutation.appliedContent) {
+            appliedContentByPath.set(
+              renameMutation.appliedContent.normalizedPath,
+              renameMutation.appliedContent.content,
+            );
+          }
         }
       }
 
       const secondaryWrites = extractSecondaryFileWrites(input.prompt, targetPath);
       for (const secondary of secondaryWrites) {
-        const secondaryMutation = await dispatchToolWithLifecycle({
-          dispatcher: input.dispatcher,
-          events,
-          toolName: "write",
-          taskId: `task_${input.sessionId}_${input.turn}_write_${hashStableId(secondary.path)}`,
-          args: { path: secondary.path, content: secondary.content },
-          workspaceRoot: input.workspaceRoot,
-          sessionId: input.sessionId,
-          abortSignal: input.abortSignal,
-          requireApprovalEvent: true,
-        });
-        if (!secondaryMutation.success) {
-          const reason = secondaryMutation.error ?? "secondary write failed";
-          failedFiles.push({ path: secondary.path, reason });
-          patches.push({
-            path: secondary.path,
-            operation: "append",
-            status: "failed",
-            failureCode: "write-failed",
-            reason,
-          });
-          continue;
-        }
-        changedFiles.push(secondary.path);
         const lineCount = secondary.content.split("\n").length;
-        patches.push({
+        const secondaryMutation = await executeFileMutationBranch({
           path: secondary.path,
+          content: secondary.content,
           operation: "append",
-          status: "applied",
           changedLines: lineCount,
           addedLines: lineCount,
           removedLines: 0,
+          failureReason: "secondary write failed",
+          appliedNote: `secondary write applied: ${secondary.path}`,
+          appliedEvidence: `secondary write applied on ${secondary.path}`,
+          dispatch: () =>
+            dispatchToolWithLifecycle({
+              dispatcher: input.dispatcher,
+              events,
+              toolName: "write",
+              taskId: `task_${input.sessionId}_${input.turn}_write_${hashStableId(secondary.path)}`,
+              args: { path: secondary.path, content: secondary.content },
+              workspaceRoot: input.workspaceRoot,
+              sessionId: input.sessionId,
+              abortSignal: input.abortSignal,
+              requireApprovalEvent: true,
+            }),
         });
-        notes.push(`secondary write applied: ${secondary.path}`);
-        evidence.push(`secondary write applied on ${secondary.path}`);
-        appliedContentByPath.set(
-          normalizePathLike(secondary.path),
-          secondary.content,
-        );
+        if (secondaryMutation.failedFile) {
+          failedFiles.push(secondaryMutation.failedFile);
+          patches.push(secondaryMutation.patch);
+          continue;
+        }
+        if (secondaryMutation.changedFile) {
+          changedFiles.push(secondaryMutation.changedFile);
+        }
+        patches.push(secondaryMutation.patch);
+        if (secondaryMutation.note) {
+          notes.push(secondaryMutation.note);
+        }
+        if (secondaryMutation.evidence) {
+          evidence.push(secondaryMutation.evidence);
+        }
+        if (secondaryMutation.appliedContent) {
+          appliedContentByPath.set(
+            secondaryMutation.appliedContent.normalizedPath,
+            secondaryMutation.appliedContent.content,
+          );
+        }
       }
     }
 
@@ -4599,51 +5008,61 @@ async function executeWorkflowTaskPlan(input: {
           },
         );
         appendCurrentRequestScopeEvidence(evidence, currentLinkedMutationScope);
-        const linkedMutation = await dispatchToolWithLifecycle({
-          dispatcher: input.dispatcher,
-          events,
-          toolName: "edit",
-          taskId: `task_${input.sessionId}_${input.turn}_cross_edit_${linkedPath.replace(/[^\w.-]+/g, "_")}`,
-          args: { path: linkedPath, content: linkedInstruction.content },
-          workspaceRoot: input.workspaceRoot,
-          sessionId: input.sessionId,
-          abortSignal: input.abortSignal,
-          requireApprovalEvent: true,
+        const linkedMutation = await executeFileMutationBranch({
+          path: linkedPath,
+          content: linkedInstruction.content,
+          operation: "replace",
+          changedLines: linkedInstruction.changedLines,
+          addedLines: linkedInstruction.addedLines,
+          removedLines: linkedInstruction.removedLines,
+          failureReason: "cross-file mutation failed",
+          appliedNote: `repair: cross-file coordinated mutation applied on ${linkedPath}`,
+          appliedEvidence: `repair-cross-file applied on ${linkedPath}`,
+          recordAppliedContent: false,
+          dispatch: () =>
+            dispatchToolWithLifecycle({
+              dispatcher: input.dispatcher,
+              events,
+              toolName: "edit",
+              taskId: `task_${input.sessionId}_${input.turn}_cross_edit_${linkedPath.replace(/[^\w.-]+/g, "_")}`,
+              args: { path: linkedPath, content: linkedInstruction.content },
+              workspaceRoot: input.workspaceRoot,
+              sessionId: input.sessionId,
+              abortSignal: input.abortSignal,
+              requireApprovalEvent: true,
+            }),
         });
-        if (!linkedMutation.success) {
-          const reason = linkedMutation.error ?? "cross-file mutation failed";
-          failedFiles.push({ path: linkedPath, reason });
+        if (linkedMutation.failedFile) {
+          failedFiles.push(linkedMutation.failedFile);
           failedEntries.push({
             path: linkedPath,
             failureCode: "write-failed",
-            reason,
+            reason: linkedMutation.failedFile.reason,
           });
-          if (shouldRetainCrossFileFailureInRemaining("write-failed", reason)) {
+          if (
+            shouldRetainCrossFileFailureInRemaining(
+              "write-failed",
+              linkedMutation.failedFile.reason,
+            )
+          ) {
             remainingCrossFilePaths.add(linkedPath);
           } else {
             processedCrossFilePaths.add(linkedPath);
           }
-          patches.push({
-            path: linkedPath,
-            operation: "replace",
-            status: "failed",
-            failureCode: "write-failed",
-            reason,
-          });
+          patches.push(linkedMutation.patch);
           continue;
         }
-        changedFiles.push(linkedPath);
+        if (linkedMutation.changedFile) {
+          changedFiles.push(linkedMutation.changedFile);
+        }
         processedCrossFilePaths.add(linkedPath);
-        patches.push({
-          path: linkedPath,
-          operation: "replace",
-          status: "applied",
-          changedLines: linkedInstruction.changedLines,
-          addedLines: linkedInstruction.addedLines,
-          removedLines: linkedInstruction.removedLines,
-        });
-        notes.push(`repair: cross-file coordinated mutation applied on ${linkedPath}`);
-        evidence.push(`repair-cross-file applied on ${linkedPath}`);
+        patches.push(linkedMutation.patch);
+        if (linkedMutation.note) {
+          notes.push(linkedMutation.note);
+        }
+        if (linkedMutation.evidence) {
+          evidence.push(linkedMutation.evidence);
+        }
       }
       const remainingCrossFileTargets = coordinatedTargets.filter((candidate) =>
         remainingCrossFilePaths.has(candidate),
@@ -4812,15 +5231,21 @@ async function executeWorkflowTaskPlan(input: {
   if (input.plan.verifyAfterEdit && changedFiles.length > 0) {
     const verifyCommand = input.plan.verifyCommand;
     if (!verifyCommand) {
-      const fileContentAssertions = extractLowRiskFileContentVerifications(
-        input.prompt,
-      );
-      const contentAssertion = extractLowRiskContentVerification(input.prompt);
-      const hasExplicitFileAssertions =
-        fileContentAssertions.length > 0 || unchangedAssertions.length > 0;
-      const consistencyAssertion = hasExplicitFileAssertions
-        ? undefined
-        : extractLowRiskConsistencyVerification(input.prompt, changedFiles);
+      const lowRiskVerificationPlan = planLowRiskVerification({
+        prompt: input.prompt,
+        changedFiles,
+        unchangedAssertions,
+        appliedContentByPath,
+        protectedSnapshots,
+        patches,
+      });
+      const {
+        fileContentAssertions,
+        contentAssertion,
+        consistencyAssertion,
+        uniqueContentAssertions,
+        fileAssertionReadPlan,
+      } = lowRiskVerificationPlan;
       if (consistencyAssertion) {
         const verifyReadResults = await Promise.all(
           consistencyAssertion.paths.map(async (targetPath) => {
@@ -4918,23 +5343,8 @@ async function executeWorkflowTaskPlan(input: {
         }
       } else {
         if (fileContentAssertions.length > 0 || unchangedAssertions.length > 0) {
-          const uniqueContentAssertions = uniqueStable(
-            fileContentAssertions.map((assertion) => assertion.path),
-          ).map((assertionPath) => ({
-            path: assertionPath,
-            expected: fileContentAssertions.filter(
-              (assertion) => assertion.path === assertionPath,
-            ),
-          }));
-          const verifyReadPlan = planLowRiskFileAssertionReads({
-            fileContentAssertions,
-            unchangedAssertions,
-            appliedContentByPath,
-            protectedSnapshots,
-            patches,
-          });
           const verifyReadResults = await Promise.all(
-            verifyReadPlan.map(async (entry) => {
+            fileAssertionReadPlan.map(async (entry) => {
               if (entry.source !== "read-tool") {
                 return {
                   path: entry.path,
@@ -5267,108 +5677,145 @@ async function executeWorkflowTaskPlan(input: {
     repairNotes.push("operation failed; inspect failed items and rerun with clearer target/instruction");
   }
 
-  const mutationTaskDelivery = (() => {
-    if (crossFileDegradationReason && degradedCrossFileTargets.length > 0) {
-      return `Task stopped: unrecoverable remaining targets detected (${degradedCrossFileTargets.join(", ")}). ${crossFileDegradationReason}`;
-    }
-    if (crossFileRemainingTargets.length > 0) {
-      const changed = changedFiles.length > 0 ? changedFiles.join(", ") : "none";
-      const failedSummary =
-        crossFileFailedByReason.length > 0
-          ? ` Failed this turn: ${crossFileFailedByReason
-              .map((item) => `${item.path} (${item.failureCode})`)
-              .join(", ")}.`
-          : "";
-      const skippedSummary =
-        crossFileSkippedFiles.length > 0
-          ? ` Skipped this turn: ${crossFileSkippedFiles
-              .map((item) => `${item.path} (${item.reason})`)
-              .join(", ")}.`
-          : "";
-      return `Edit partially completed for ${changed}. Remaining cross-file targets: ${crossFileRemainingTargets.join(", ")}.${failedSummary}${skippedSummary}`;
-    }
-    if (failedFiles.length > 0) {
-      const first = failedFiles[0];
-      return `Task not completed: ${first?.path ?? "(unknown)"} failed (${first?.reason ?? "unknown reason"}).`;
-    }
-    if (changedFiles.length === 0) {
-      return "Task not completed: no file mutation was applied.";
-    }
-    const changed = changedFiles.join(", ");
-    const verificationNote =
-      verification.status === "passed"
-        ? "Verification passed."
-        : verification.status === "blocked"
-          ? `Verification blocked (${verification.blockerKind ?? "unknown"}). ${verification.nextAction ?? ""}`.trim()
-          : verification.status === "failed"
-            ? `Verification failed: ${verification.reason ?? "command failed"}.`
-            : verification.status === "not-requested"
-              ? "Verification was not requested."
-              : "Verification skipped.";
-    return `${input.plan.taskKind === "write-file" ? "Write completed" : "Edit completed"} for ${changed}. ${verificationNote}`;
-  })();
+  const resultContract = assembleActionResultContract({
+    taskKind: input.plan.taskKind,
+    changedFiles,
+    failedFiles,
+    patches,
+    verifiedFiles,
+    unverifiedFiles,
+    verification,
+    repairNotes,
+    evidence,
+    crossFileDegradationReason,
+    degradedCrossFileTargets,
+    crossFileRemainingTargets,
+    crossFileFailedByReason,
+    crossFileSkippedFiles,
+  });
 
   return {
     events,
     notes,
-    codingResult: buildCodingResult(input.plan.taskKind, {
-      changedFiles,
-      failedFiles,
-      patches,
-      verifiedFiles,
-      unverifiedFiles,
-      verification,
-      repairNotes,
-      evidence,
-      taskVerdict:
-        crossFileDegradationReason
-          ? "insufficient-evidence"
-          : crossFileRemainingTargets.length > 0
-          ? "completed-with-caveats"
-          : failedFiles.length > 0
-          ? "insufficient-evidence"
-          : verification.status === "failed" || verification.status === "blocked"
-            ? "completed-with-caveats"
-            : "satisfied",
-      taskReasons:
-        crossFileDegradationReason
-          ? [
-              `Cross-file continuation degraded to terminal due to unrecoverable remaining targets: ${degradedCrossFileTargets.join(", ")}`,
-              `degradation-reason: ${crossFileDegradationReason}`,
-            ]
-          : crossFileRemainingTargets.length > 0
-          ? [
-              `Cross-file repair partially completed; remaining targets: ${crossFileRemainingTargets.join(", ")}`,
-              ...(crossFileFailedByReason.length > 0
-                ? [
-                    `Failed-by-reason: ${crossFileFailedByReason
-                      .map(
-                        (item) =>
-                          `${item.path}=>${item.failureCode} (${item.reason})`,
-                      )
-                      .join("; ")}`,
-                  ]
-                : []),
-              ...(crossFileSkippedFiles.length > 0
-                ? [
-                    `Skipped files: ${crossFileSkippedFiles
-                      .map((item) => `${item.path} (${item.reason})`)
-                      .join("; ")}`,
-                  ]
-                : []),
-            ]
-          : failedFiles.length > 0
-          ? ["Workflow stopped on blocker/failure."]
-          : verification.status === "failed"
-            ? ["Edit applied but verify failed; repair required."]
-            : verification.status === "blocked"
-              ? [
-                  `Edit applied but verify was blocked (${verification.blockerKind ?? "unknown"}); follow next action before continuing.`,
-                ]
-            : ["Workflow completed under inspect/edit/verify contract."],
-    }),
-    userFacingOutput: mutationTaskDelivery,
+    codingResult: resultContract.codingResult,
+    userFacingOutput: resultContract.userFacingOutput,
   };
+}
+
+function assembleActionResultContract(
+  input: ActionResultContractInput,
+): Pick<WorkflowExecutionResult, "codingResult" | "userFacingOutput"> {
+  const userFacingOutput = buildActionResultDelivery(input);
+  const taskVerdict =
+    input.crossFileDegradationReason
+      ? "insufficient-evidence"
+      : input.crossFileRemainingTargets.length > 0
+        ? "completed-with-caveats"
+        : input.failedFiles.length > 0
+          ? "insufficient-evidence"
+          : input.verification.status === "failed" ||
+              input.verification.status === "blocked"
+            ? "completed-with-caveats"
+            : "satisfied";
+  const taskReasons =
+    input.crossFileDegradationReason
+      ? [
+          `Cross-file continuation degraded to terminal due to unrecoverable remaining targets: ${input.degradedCrossFileTargets.join(", ")}`,
+          `degradation-reason: ${input.crossFileDegradationReason}`,
+        ]
+      : input.crossFileRemainingTargets.length > 0
+        ? [
+            `Cross-file repair partially completed; remaining targets: ${input.crossFileRemainingTargets.join(", ")}`,
+            ...(input.crossFileFailedByReason.length > 0
+              ? [
+                  `Failed-by-reason: ${input.crossFileFailedByReason
+                    .map(
+                      (item) =>
+                        `${item.path}=>${item.failureCode} (${item.reason})`,
+                    )
+                    .join("; ")}`,
+                ]
+              : []),
+            ...(input.crossFileSkippedFiles.length > 0
+              ? [
+                  `Skipped files: ${input.crossFileSkippedFiles
+                    .map((item) => `${item.path} (${item.reason})`)
+                    .join("; ")}`,
+                ]
+              : []),
+          ]
+        : input.failedFiles.length > 0
+          ? ["Workflow stopped on blocker/failure."]
+          : input.verification.status === "failed"
+            ? ["Edit applied but verify failed; repair required."]
+            : input.verification.status === "blocked"
+              ? [
+                  `Edit applied but verify was blocked (${input.verification.blockerKind ?? "unknown"}); follow next action before continuing.`,
+                ]
+              : ["Workflow completed under inspect/edit/verify contract."];
+
+  return {
+    codingResult: buildCodingResult(input.taskKind, {
+      changedFiles: input.changedFiles,
+      failedFiles: input.failedFiles,
+      patches: input.patches,
+      verifiedFiles: input.verifiedFiles,
+      unverifiedFiles: input.unverifiedFiles,
+      verification: input.verification,
+      repairNotes: input.repairNotes,
+      evidence: input.evidence,
+      taskVerdict,
+      taskReasons,
+    }),
+    userFacingOutput,
+  };
+}
+
+function buildActionResultDelivery(
+  input: ActionResultContractInput,
+): string {
+  if (
+    input.crossFileDegradationReason &&
+    input.degradedCrossFileTargets.length > 0
+  ) {
+    return `Task stopped: unrecoverable remaining targets detected (${input.degradedCrossFileTargets.join(", ")}). ${input.crossFileDegradationReason}`;
+  }
+  if (input.crossFileRemainingTargets.length > 0) {
+    const changed =
+      input.changedFiles.length > 0 ? input.changedFiles.join(", ") : "none";
+    const failedSummary =
+      input.crossFileFailedByReason.length > 0
+        ? ` Failed this turn: ${input.crossFileFailedByReason
+            .map((item) => `${item.path} (${item.failureCode})`)
+            .join(", ")}.`
+        : "";
+    const skippedSummary =
+      input.crossFileSkippedFiles.length > 0
+        ? ` Skipped this turn: ${input.crossFileSkippedFiles
+            .map((item) => `${item.path} (${item.reason})`)
+            .join(", ")}.`
+        : "";
+    return `Edit partially completed for ${changed}. Remaining cross-file targets: ${input.crossFileRemainingTargets.join(", ")}.${failedSummary}${skippedSummary}`;
+  }
+  if (input.failedFiles.length > 0) {
+    const first = input.failedFiles[0];
+    return `Task not completed: ${first?.path ?? "(unknown)"} failed (${first?.reason ?? "unknown reason"}).`;
+  }
+  if (input.changedFiles.length === 0) {
+    return "Task not completed: no file mutation was applied.";
+  }
+  const changed = input.changedFiles.join(", ");
+  const verificationNote =
+    input.verification.status === "passed"
+      ? "Verification passed."
+      : input.verification.status === "blocked"
+        ? `Verification blocked (${input.verification.blockerKind ?? "unknown"}). ${input.verification.nextAction ?? ""}`.trim()
+        : input.verification.status === "failed"
+          ? `Verification failed: ${input.verification.reason ?? "command failed"}.`
+          : input.verification.status === "not-requested"
+            ? "Verification was not requested."
+            : "Verification skipped.";
+  return `${input.taskKind === "write-file" ? "Write completed" : "Edit completed"} for ${changed}. ${verificationNote}`;
 }
 
 function renderExecutionSummary(
@@ -9182,98 +9629,6 @@ function hasExternalVerifyOptOut(prompt: string): boolean {
   );
 }
 
-function extractLowRiskContentVerification(
-  prompt: string,
-): { expectedText: string } | undefined {
-  const match = prompt.match(
-    /(?:verify|confirm|ensure|check|\u9a8c\u8bc1|\u786e\u8ba4|\u68c0\u67e5)[\s\S]{0,160}?\b(?:contains|includes|has)\b\s*[:=]?\s*[`"“”']?([^\r\n`"“”']{1,200}?)[`"“”']?(?:[.。]|$)/i,
-  );
-  const expectedText = match?.[1]?.trim();
-  if (!expectedText) {
-    return undefined;
-  }
-  return { expectedText };
-}
-
-function extractLowRiskFileContentVerifications(
-  prompt: string,
-): Array<{ path: string; expectedText: string }> {
-  const assertions: Array<{ path: string; expectedText: string }> = [];
-  const matches = prompt.matchAll(
-    /([\w./\\-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))\s+\b(?:contains|includes|has)\b\s*[:=]?\s*[`"“”']?(.+?)[`"“”']?(?=(?:\s+\band\s+[\w./\\-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html)\s+\b(?:contains|includes|has|(?:is|stays?|remains?)\s+unchanged)\b)|[.。]|$)/gi,
-  );
-  for (const match of matches) {
-    const path = match[1]?.trim();
-    const expectedText = match[2]?.trim();
-    if (path && expectedText) {
-      assertions.push({
-        path: path.replace(/\\/g, "/"),
-        expectedText,
-      });
-    }
-  }
-  return assertions;
-}
-
-function extractLowRiskUnchangedVerifications(
-  prompt: string,
-): Array<{ path: string }> {
-  const assertions: Array<{ path: string }> = [];
-  const matches = prompt.matchAll(
-    /([\w./\\-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))\s+\b(?:is|stays?|remains?)\s+unchanged\b/gi,
-  );
-  for (const match of matches) {
-    const path = match[1]?.trim();
-    if (path) {
-      assertions.push({ path: path.replace(/\\/g, "/") });
-    }
-  }
-  return uniqueStable(assertions.map((assertion) => assertion.path)).map(
-    (path) => ({ path }),
-  );
-}
-
-type LowRiskFileAssertionReadPlanEntry =
-  | { path: string; source: "applied-content"; output: string }
-  | { path: string; source: "protected-snapshot"; output: string }
-  | { path: string; source: "read-tool" };
-
-function planLowRiskFileAssertionReads(input: {
-  fileContentAssertions: ReadonlyArray<{ path: string; expectedText: string }>;
-  unchangedAssertions: ReadonlyArray<{ path: string }>;
-  appliedContentByPath: ReadonlyMap<string, string>;
-  protectedSnapshots: ReadonlyMap<string, string>;
-  patches: ReadonlyArray<CodingPatchRecord>;
-}): LowRiskFileAssertionReadPlanEntry[] {
-  return uniqueStable([
-    ...input.fileContentAssertions.map((assertion) => assertion.path),
-    ...input.unchangedAssertions.map((assertion) => assertion.path),
-  ]).map((path) => {
-    const normalizedPath = normalizePathLike(path);
-    const appliedContent = input.appliedContentByPath.get(normalizedPath);
-    if (appliedContent !== undefined) {
-      return { path, source: "applied-content", output: appliedContent };
-    }
-    const protectedSnapshot = input.protectedSnapshots.get(path);
-    const protectedExpectedUnchanged = input.unchangedAssertions.some(
-      (assertion) => normalizePathLike(assertion.path) === normalizedPath,
-    );
-    const protectedWasMutated = input.patches.some(
-      (patch) =>
-        patch.status === "applied" &&
-        normalizePathLike(patch.path) === normalizedPath,
-    );
-    if (
-      protectedExpectedUnchanged &&
-      protectedSnapshot !== undefined &&
-      !protectedWasMutated
-    ) {
-      return { path, source: "protected-snapshot", output: protectedSnapshot };
-    }
-    return { path, source: "read-tool" };
-  });
-}
-
 function extractLowRiskRenameRefactor(
   prompt: string,
 ): { from: string; to: string; paths: string[] } | undefined {
@@ -9304,33 +9659,6 @@ function applyWholeWordRename(content: string, from: string, to: string): string
     new RegExp(`\\b${escapeRegExp(from)}\\b`, "g"),
     to,
   );
-}
-
-function extractLowRiskConsistencyVerification(
-  prompt: string,
-  changedFiles: readonly string[],
-): { paths: string[]; sourcePath: string } | undefined {
-  if (
-    !/(?:verify|confirm|ensure|check|\u9a8c\u8bc1|\u786e\u8ba4|\u68c0\u67e5)/i.test(prompt) ||
-    !/(?:consistent|sync(?:ed|hronized)?|aligned|match|reflect|keep.+same|\u4e00\u81f4|\u540c\u6b65)/i.test(prompt)
-  ) {
-    return undefined;
-  }
-  const verificationTail = extractVerificationTailForFileAssertion(prompt);
-  const verificationPaths = extractPromptFileReferences(verificationTail);
-  const paths =
-    verificationPaths.length >= 2 ? verificationPaths : extractPromptFileReferences(prompt);
-  const merged = uniqueStable([
-    ...paths,
-    ...changedFiles.filter((file) => paths.includes(file)),
-  ]);
-  if (merged.length < 2) {
-    return undefined;
-  }
-  const changedSet = new Set(changedFiles.map((file) => normalizePathLike(file)));
-  const sourcePath =
-    merged.find((file) => !changedSet.has(normalizePathLike(file))) ?? merged[0]!;
-  return { paths: merged, sourcePath };
 }
 
 function extractSecondaryFileWrites(
@@ -9367,19 +9695,6 @@ function extractPromptFileReferences(prompt: string): string[] {
   return uniqueStable(paths);
 }
 
-function extractVerificationTailForFileAssertion(prompt: string): string {
-  const matches = Array.from(
-    prompt.matchAll(
-      /(?:verify|confirm|ensure|check|\u9a8c\u8bc1|\u786e\u8ba4|\u68c0\u67e5)[\s\S]*?(?:[\w.-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html)|consistent|sync(?:ed|hronized)?|aligned|match|reflect|keep.+same|contains|includes|has)[\s\S]*$/gi,
-    ),
-  );
-  const last = matches.at(-1);
-  if (last?.index !== undefined) {
-    return prompt.slice(last.index);
-  }
-  return prompt;
-}
-
 function uniqueStable(values: readonly string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -9392,44 +9707,6 @@ function uniqueStable(values: readonly string[]): string[] {
     result.push(value);
   }
   return result;
-}
-
-function extractConsistencyItems(content: string): string[] {
-  return uniqueStable(
-    content
-      .split(/\r?\n/)
-      .map((line) =>
-        line
-          .trim()
-          .replace(/^(?:[-*]\s+|\d+[.)]\s+)/, "")
-          .trim(),
-      )
-      .filter((line) => line.length > 0 && !/^(?:plan|todo|tasks?)$/i.test(line)),
-  );
-}
-
-function findMissingConsistencyItems(input: {
-  sourceItems: readonly string[];
-  targets: ReadonlyArray<{ readonly path: string; readonly result: ToolLifecycleResult }>;
-}): { targetPath: string; item: string } | undefined {
-  for (const target of input.targets) {
-    const normalizedTargetContent = normalizeComparableText(target.result.output ?? "");
-    for (const item of input.sourceItems) {
-      if (!normalizedTargetContent.includes(normalizeComparableText(item))) {
-        return { targetPath: target.path, item };
-      }
-    }
-  }
-  return undefined;
-}
-
-function normalizeComparableText(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/\r/g, "\n")
-    .replace(/^(?:[-*]\s+|\d+[.)]\s+)/gm, "")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function hashStableId(value: string): string {
@@ -10177,21 +10454,47 @@ function selectMutationTargetFromPrompt(
   prompt: string,
   targets: readonly { readonly cleaned: string }[],
 ): (typeof targets)[number] | undefined {
+  const selectionPlan = planMutationTargetSelection(prompt, targets);
+  return rankMutationTargetCandidates(selectionPlan);
+}
+
+interface MutationTargetSelectionPlan<TTarget extends { readonly cleaned: string }> {
+  lowerPrompt: string;
+  candidateTargets: readonly TTarget[];
+  targetNames: readonly string[];
+  fileConstraints: FileConstraintAssertions;
+}
+
+function planMutationTargetSelection<TTarget extends { readonly cleaned: string }>(
+  prompt: string,
+  targets: readonly TTarget[],
+): MutationTargetSelectionPlan<TTarget> {
+  const fileConstraints = extractFileConstraintAssertions(prompt);
   const protectedPaths = new Set(
-    extractProtectedMutationPaths(prompt).map((item) => normalizePathLike(item)),
+    fileConstraints.protectedMutationPaths.map((item) => normalizePathLike(item)),
   );
   const mutationTargets = targets.filter(
     (target) => !protectedPaths.has(normalizePathLike(target.cleaned)),
   );
   const candidateTargets = mutationTargets.length > 0 ? mutationTargets : targets;
+  return {
+    lowerPrompt: prompt.toLowerCase(),
+    candidateTargets,
+    targetNames: candidateTargets.map((target) => target.cleaned.toLowerCase()),
+    fileConstraints,
+  };
+}
+
+function rankMutationTargetCandidates<TTarget extends { readonly cleaned: string }>(
+  selectionPlan: MutationTargetSelectionPlan<TTarget>,
+): TTarget | undefined {
+  const { candidateTargets, lowerPrompt, targetNames } = selectionPlan;
   if (candidateTargets.length <= 1) {
     return candidateTargets[0];
   }
-  const lowerPrompt = prompt.toLowerCase();
-  const targetNames = candidateTargets.map((target) => target.cleaned.toLowerCase());
   let best:
     | {
-        target: (typeof candidateTargets)[number];
+        target: TTarget;
         score: number;
       }
     | undefined;
@@ -10211,22 +10514,6 @@ function selectMutationTargetFromPrompt(
     }
   }
   return best?.target;
-}
-
-function extractProtectedMutationPaths(prompt: string): string[] {
-  const paths = extractLowRiskUnchangedVerifications(prompt).map(
-    (assertion) => assertion.path,
-  );
-  const matches = prompt.matchAll(
-    /\b(?:do\s+not|don't)\s+(?:modify|change|edit|touch)\s+([\w.-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))/gi,
-  );
-  for (const match of matches) {
-    const path = match[1]?.trim();
-    if (path) {
-      paths.push(path.replace(/\\/g, "/"));
-    }
-  }
-  return uniqueStable(paths);
 }
 
 function scoreMutationTargetOccurrence(
@@ -10377,6 +10664,37 @@ function resolveMutationInstruction(
     };
   }
 
+  const explicitPromptReplaceDirective = extractReplaceDirective(rawPrompt);
+  const shouldUsePatchFirstReplaceLane = Boolean(
+    plan.targetPath &&
+      plan.replaceFrom &&
+      plan.replaceTo &&
+      replaceDirective &&
+      explicitPromptReplaceDirective &&
+      explicitPromptReplaceDirective.from === replaceDirective.from &&
+      explicitPromptReplaceDirective.to === replaceDirective.to,
+  );
+  if (shouldUsePatchFirstReplaceLane && replaceDirective) {
+    const patchResult = applySingleFileReplacePatch({
+      targetPath: plan.targetPath,
+      originalContent,
+      replaceDirective,
+    });
+    if (patchResult.ok) {
+      return {
+        ok: true,
+        content: patchResult.content,
+        changedLines: patchResult.changedLines,
+        addedLines: patchResult.addedLines,
+        removedLines: patchResult.removedLines,
+      };
+    }
+    return {
+      ok: false,
+      reason: formatPatchFailureReason(patchResult),
+    };
+  }
+
   if (fencedContent) {
     const previous = originalContent ?? "";
     const delta = computeLineDelta(previous, fencedContent);
@@ -10461,21 +10779,31 @@ function resolveMutationInstruction(
     if (plan.mutationScopeRequired) {
       return {
         ok: false,
-        reason:
-          "Local-slice edit requires a concrete transform for the explained fragment. Specify an explicit change such as 'replace X with Y in that part'.",
+        reason: formatEditExecutionFailure({
+          failureReason: "edit-transform-unclear",
+          explanation:
+            "Local-slice edit requires a concrete transform for the explained fragment.",
+          nextAction:
+            "Specify an explicit change such as: replace X with Y in that part.",
+        }),
       };
     }
     return {
       ok: false,
-      reason:
-        "Edit task needs either a fenced replacement content or an explicit replace-from/replace-to instruction.",
+      reason: buildAmbiguousEditInstructionReason(plan.targetPath),
     };
   }
 
   if (typeof originalContent !== "string") {
     return {
       ok: false,
-      reason: "Edit task requires inspect/read result before applying replace.",
+      reason: formatEditExecutionFailure({
+        failureReason: "edit-target-missing",
+        explanation:
+          "The target file content was not available before applying the edit.",
+        nextAction:
+          "Check that the target file exists, ask to read it first, then rerun with an explicit replace instruction.",
+      }),
     };
   }
 
@@ -10515,25 +10843,24 @@ function resolveMutationInstruction(
     // Scope was optional and could not be reconstructed; fall back to file-level replace.
   }
 
-  if (!originalContent.includes(replaceDirective.from)) {
+  const patchResult = applySingleFileReplacePatch({
+    targetPath: plan.targetPath,
+    originalContent,
+    replaceDirective,
+  });
+  if (!patchResult.ok) {
     return {
       ok: false,
-      reason: "Replace source text not found in target file.",
-    };
-  }
-
-  const updated = originalContent.replace(replaceDirective.from, replaceDirective.to);
-  if (updated === originalContent) {
-    return {
-      ok: false,
-      reason: "Replace operation produced no effective change.",
+      reason: formatPatchFailureReason(patchResult),
     };
   }
 
   return {
     ok: true,
-    content: updated,
-    ...computeLineDelta(originalContent, updated),
+    content: patchResult.content,
+    changedLines: patchResult.changedLines,
+    addedLines: patchResult.addedLines,
+    removedLines: patchResult.removedLines,
   };
 }
 
@@ -10920,6 +11247,30 @@ function isMutationInstructionFailure(
   return instruction.ok === false;
 }
 
+function buildAmbiguousEditInstructionReason(targetPath?: string): string {
+  const target = targetPath?.trim() || "the target file";
+  const promptRewrite = /(^|[\\/])math\.js$/i.test(target)
+    ? `For this request, rerun with a safe explicit rewrite such as: "In ${target}, replace 'return n + 2;' with 'return n * 2;'. Only modify ${target}."`
+    : `Rerun with a safe explicit rewrite such as: "In ${target}, replace '<current text>' with '<desired text>'. Only modify ${target}."`;
+  return formatEditExecutionFailure({
+    failureReason: "edit-transform-unclear",
+    explanation:
+      "Edit instruction is ambiguous: replacement not safely derivable from the prompt. No files were changed and unrelated files were not modified.",
+    nextAction: `${promptRewrite} Alternatively, provide a fenced full replacement for the target file.`,
+  });
+}
+
+function formatEditExecutionFailure(input: {
+  readonly failureReason:
+    | "edit-target-missing"
+    | "edit-transform-unclear"
+    | "patch-from-not-found";
+  readonly explanation: string;
+  readonly nextAction: string;
+}): string {
+  return `${input.failureReason}: ${input.explanation} Next action: ${input.nextAction}`;
+}
+
 function computeLineDelta(
   previous: string,
   next: string,
@@ -10952,7 +11303,11 @@ function buildCodingResult(
   const recoveredByContinuation =
     input.failedFiles.length === 0 &&
     input.changedFiles.length > 0 &&
-    input.evidence.some((entry) => entry.startsWith("replan-transform:"));
+    input.evidence.some(
+      (entry) =>
+        entry.startsWith("replan-transform:") ||
+        entry === "repairContextUsed:true",
+    );
   const attemptedFromEvidence = extractAttemptedFilesFromEvidence(input.evidence);
   const attemptedFiles = Array.from(
     new Set([

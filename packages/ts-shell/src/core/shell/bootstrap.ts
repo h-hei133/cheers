@@ -1,9 +1,16 @@
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ResumeResult } from "../../session/SessionManager.js";
+import type { WorkspaceRootMode } from "../../session/SessionManager.js";
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import type { WorkflowGitContext } from "../../workflow/gitContext.js";
-import { createShellRuntimeContext, type ShellRuntimeContext } from "./runtimeContext.js";
+import {
+  createShellRuntimeContext,
+  createSessionRootMismatchDiagnostic,
+  resolveRootBindingDiagnostics,
+  type RootBindingDiagnostic,
+  type ShellRuntimeContext,
+} from "./runtimeContext.js";
 import { getWorkflowGitContext } from "../../workflow/gitContext.js";
 import path from "node:path";
 
@@ -25,16 +32,19 @@ export class SessionBootstrapError extends Error {
     | "session-not-found"
     | "session-root-mismatch";
   readonly recoveryHint: string;
+  readonly rootBindingDiagnostics: readonly RootBindingDiagnostic[];
 
   constructor(input: {
     code: "session-not-found" | "session-root-mismatch";
     message: string;
     recoveryHint: string;
+    rootBindingDiagnostics?: readonly RootBindingDiagnostic[];
   }) {
     super(input.message);
     this.name = "SessionBootstrapError";
     this.code = input.code;
     this.recoveryHint = input.recoveryHint;
+    this.rootBindingDiagnostics = input.rootBindingDiagnostics ?? [];
   }
 }
 
@@ -73,11 +83,16 @@ function areProjectRootsEqual(
   );
 }
 
+function resolveWorkspaceRootMode(gitContext: WorkflowGitContext): WorkspaceRootMode {
+  return gitContext.insideGit && gitContext.root ? "git-root" : "direct";
+}
+
 export function bootstrapShellRuntime(input: {
   cwd: string;
   launchCwd?: string;
   runtimeConfig: RuntimeConfig;
   gitContext: WorkflowGitContext;
+  requestedWorkspaceRoot?: string;
   sessionManager: SessionManager;
   renderer: StreamingRenderer;
   requestedSessionId?: string;
@@ -94,6 +109,7 @@ export function bootstrapShellRuntime(input: {
   };
   const originalCwd = input.launchCwd ?? input.cwd;
   const requestedProjectRoot = input.gitContext.root ?? input.cwd;
+  const requestedRootMode = resolveWorkspaceRootMode(input.gitContext);
 
   const session = (() => {
     if (!input.requestedSessionId) {
@@ -115,7 +131,12 @@ export function bootstrapShellRuntime(input: {
           );
         }
       }
-      return input.sessionManager.createNew(requestedProjectRoot);
+      return input.sessionManager.createNew(requestedProjectRoot, {
+        rootMode: requestedRootMode,
+        requestedWorkspaceRoot: input.requestedWorkspaceRoot ?? input.cwd,
+        targetPathBase: requestedProjectRoot,
+        gitRoot: input.gitContext.root ?? null,
+      });
     }
 
     if (!input.sessionManager.sessionExists(input.requestedSessionId)) {
@@ -169,12 +190,17 @@ export function bootstrapShellRuntime(input: {
     }
 
     if (!input.allowSessionRootMigration) {
+      const diagnostic = createSessionRootMismatchDiagnostic({
+        sessionId: resumedSession.id,
+        sessionProjectRoot,
+        requestedWorkspaceRoot: input.requestedWorkspaceRoot ?? input.cwd,
+        resolvedProjectRoot: requestedProjectRoot,
+      });
       throw new SessionBootstrapError({
         code: "session-root-mismatch",
-        message:
-          `Session ${resumedSession.id} is bound to ${sessionProjectRoot}, but current project root is ${requestedProjectRoot}.`,
-        recoveryHint:
-          "Rerun with --migrate-session-root to explicitly rebind this session, or omit --session-id to start a fresh session.",
+        message: diagnostic.explanation,
+        recoveryHint: diagnostic.nextAction,
+        rootBindingDiagnostics: [diagnostic],
       });
     }
 
@@ -189,6 +215,43 @@ export function bootstrapShellRuntime(input: {
   })();
   const boundProjectRoot = session.projectRoot || requestedProjectRoot;
   const boundGitContext = getWorkflowGitContext(boundProjectRoot);
+  const boundRootMode = session.rootMode ?? resolveWorkspaceRootMode(boundGitContext);
+  const boundRequestedWorkspaceRoot =
+    input.requestedWorkspaceRoot ?? session.requestedWorkspaceRoot ?? input.cwd;
+  const boundTargetPathBase = session.targetPathBase ?? boundProjectRoot;
+  const boundGitRoot =
+    Object.prototype.hasOwnProperty.call(session, "gitRoot")
+      ? (session.gitRoot ?? null)
+      : (boundGitContext.root ?? null);
+  const legacyFieldsBackfilled =
+    !session.rootMode ||
+    !session.requestedWorkspaceRoot ||
+    !session.targetPathBase ||
+    !Object.prototype.hasOwnProperty.call(session, "gitRoot");
+  if (
+    legacyFieldsBackfilled
+  ) {
+    input.sessionManager.updateSessionWorkspaceBinding(session.id, {
+      projectRoot: boundProjectRoot,
+      rootMode: boundRootMode,
+      requestedWorkspaceRoot: boundRequestedWorkspaceRoot,
+      targetPathBase: boundTargetPathBase,
+      gitRoot: boundGitRoot,
+    });
+  }
+  session.rootMode = boundRootMode;
+  session.requestedWorkspaceRoot = boundRequestedWorkspaceRoot;
+  session.targetPathBase = boundTargetPathBase;
+  session.gitRoot = boundGitRoot;
+  const rootBindingDiagnostics = resolveRootBindingDiagnostics({
+    projectRoot: boundProjectRoot,
+    rootMode: boundRootMode,
+    requestedWorkspaceRoot: boundRequestedWorkspaceRoot,
+    targetPathBase: boundTargetPathBase,
+    gitRoot: boundGitRoot,
+    gitContext: boundGitContext,
+    legacyFieldsBackfilled,
+  });
 
   phases.push(
     "workspace-session-resolution",
@@ -203,6 +266,11 @@ export function bootstrapShellRuntime(input: {
       cwd: boundProjectRoot,
       originalCwd,
       projectRoot: boundProjectRoot,
+      rootMode: boundRootMode,
+      requestedWorkspaceRoot: boundRequestedWorkspaceRoot,
+      targetPathBase: boundTargetPathBase,
+      gitRoot: boundGitRoot,
+      rootBindingDiagnostics,
       runtimeConfig: input.runtimeConfig,
       gitContext: boundGitContext,
       session,

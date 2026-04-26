@@ -212,6 +212,30 @@ function run(command, args, options = {}) {
   })
 }
 
+function providerReadinessStatusForCode(code) {
+  if (code === 0) return 'pass'
+  if (code === 2) return 'provider-network-inconclusive'
+  if (code === 3) return 'config-failure'
+  return 'provider-readiness-failed'
+}
+
+async function runProviderReadinessPreflight() {
+  const result = await run(process.execPath, [
+    path.join(repoRoot, 'scripts', 'verify-provider-readiness.mjs'),
+  ], {
+    cwd: repoRoot,
+    timeoutMs: 660000,
+  })
+  return {
+    ok: result.code === 0 && !result.timedOut,
+    code: result.timedOut ? 2 : result.code,
+    status: result.timedOut
+      ? 'provider-network-inconclusive'
+      : providerReadinessStatusForCode(result.code),
+    outputTail: summarizeOutput(result.output),
+  }
+}
+
 function ensureHome(home, provider) {
   if (!fs.existsSync(home)) {
     throw Object.assign(new Error(`${provider} home is missing: ${home}`), { configFailure: true })
@@ -353,8 +377,17 @@ function assertScenarioState(scenario, turn, beforeTurn, afterTurn, output) {
   }
 }
 
-function categorizeFailure(failureReason) {
-  const normalized = String(failureReason ?? '').toLowerCase()
+function isProviderReadinessOutput(output) {
+  const normalized = String(output ?? '').toLowerCase()
+  return (
+    normalized.includes('provider readiness failed') ||
+    normalized.includes('provider-readiness') ||
+    normalized.includes('unable to reach the openai-compatible endpoint')
+  )
+}
+
+function categorizeFailure(failureReason, output) {
+  const normalized = `${String(failureReason ?? '')}\n${String(output ?? '')}`.toLowerCase()
   if (!normalized.trim()) return 'none'
   if (
     normalized.includes('home is missing') ||
@@ -394,6 +427,13 @@ function categorizeFailure(failureReason) {
   return 'task-execution-failure'
 }
 
+function normalizeFailureReason(failureReason, output) {
+  if (!isProviderReadinessOutput(output)) {
+    return failureReason
+  }
+  return 'provider-readiness:network: provider endpoint was unreachable during this turn'
+}
+
 async function runScenario(scenario) {
   prepareProject(scenario)
   let previousSnapshot = snapshot(scenario.projectDir)
@@ -415,8 +455,12 @@ async function runScenario(scenario) {
         verification: 'blocked',
         failureCategory: categorizeFailure(
           runResult.timedOut ? `turn ${index + 1} timed out` : `turn ${index + 1} exited ${runResult.code}`,
+          runResult.output,
         ),
-        failureReason: runResult.timedOut ? `turn ${index + 1} timed out` : `turn ${index + 1} exited ${runResult.code}`,
+        failureReason: normalizeFailureReason(
+          runResult.timedOut ? `turn ${index + 1} timed out` : `turn ${index + 1} exited ${runResult.code}`,
+          runResult.output,
+        ),
         outputTail: summarizeOutput(runResult.output),
         turns: turnResults,
       }
@@ -443,8 +487,8 @@ async function runScenario(scenario) {
         protectedFiles: scenario.protectedFiles,
         reportPath,
         verification: assertion.verification,
-        failureCategory: categorizeFailure(assertion.failures.join('; ')),
-        failureReason: assertion.failures.join('; '),
+        failureCategory: categorizeFailure(assertion.failures.join('; '), runResult.output),
+        failureReason: normalizeFailureReason(assertion.failures.join('; '), runResult.output),
         outputTail: summarizeOutput(runResult.output),
         turns: turnResults,
       }
@@ -497,6 +541,7 @@ function buildCandidateMetadata(candidateResults) {
 async function main() {
   console.log('gate name=real-user-capabilities')
   console.log('status taxonomy: PASS=0 FAIL=1 CONFIG=3')
+  console.log('state semantics: provider preflight inconclusive skips capability execution; mid-turn provider readiness stays provider-readiness, not coding failure')
   console.log(`repo=${repoRoot}`)
   console.log(`synthetic HOME=${syntheticHome}`)
   console.log(`real HOME=${realHome}`)
@@ -524,6 +569,36 @@ async function main() {
     process.exit(3)
   }
 
+  const providerPreflight = await runProviderReadinessPreflight()
+  if (!providerPreflight.ok) {
+    const isConfig = providerPreflight.status === 'config-failure'
+    const report = {
+      generatedAt: new Date().toISOString(),
+      status: 'FAIL',
+      statusDetail: providerPreflight.status,
+      reportPath,
+      failureCategory: 'provider-readiness',
+      failureReason:
+        providerPreflight.status === 'provider-network-inconclusive'
+          ? 'provider-network-inconclusive: provider endpoint remained unreachable after readiness retry'
+          : providerPreflight.status,
+      providerReadiness: providerPreflight,
+      capabilitySkipped: true,
+      codingCapabilityNotEvaluated: true,
+      failureCategories,
+      futureGateCandidates,
+      capabilities: [],
+      candidates: [],
+    }
+    writeReport(report)
+    console.log(
+      `[${isConfig ? 'CONFIG' : 'FAIL'}] provider-readiness-preflight - ${report.failureReason}`,
+    )
+    console.log(`report=${reportPath}`)
+    process.exit(isConfig ? 3 : 1)
+  }
+  console.log('[PASS] provider-readiness-preflight - real provider reachable')
+
   const capabilities = []
   for (const scenario of scenarios) {
     const result = await runScenario(scenario)
@@ -548,7 +623,11 @@ async function main() {
   const report = {
     generatedAt: new Date().toISOString(),
     status: ok ? 'PASS' : 'FAIL',
+    statusDetail: ok ? 'passed' : 'failed',
     reportPath,
+    providerReadiness: providerPreflight,
+    capabilitySkipped: false,
+    codingCapabilityNotEvaluated: false,
     failureCategories,
     futureGateCandidates: buildCandidateMetadata(candidates),
     capabilities,

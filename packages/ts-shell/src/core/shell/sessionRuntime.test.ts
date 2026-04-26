@@ -234,7 +234,14 @@ describe("shell session runtime (W5)", () => {
                 command: "node --version",
                 reason: "verify request mapped to allowlisted command",
               },
-              evidence: ["readback:export const ok = true;"],
+              evidence: [
+                "repairContextUsed:true",
+                "repairedFailureReason:patch-from-not-found",
+                "repairedTargetFile:src/app.ts",
+                "repairPayloadKind:replace-directive",
+                "transform:src/app.ts:return false;=>return true;",
+                "verify-unchanged:README.md|LOCKED.md",
+              ],
             },
           },
         };
@@ -284,9 +291,330 @@ describe("shell session runtime (W5)", () => {
     expect(
       renderedLines.some((line) => line.includes("- Changed: 1 file(s)")),
     ).toBe(true);
+    expect(renderedLines).toContain("- Changed files: src/app.ts");
+    expect(renderedLines).toContain(
+      "- Change summary: src/app.ts: replaced `return false;` with `return true;`",
+    );
+    expect(renderedLines).toContain(
+      "- Repair context: repairContextUsed:true",
+    );
+    expect(renderedLines).toContain(
+      "- Repaired failure reason: repairedFailureReason:patch-from-not-found",
+    );
+    expect(renderedLines).toContain(
+      "- Repaired target file: repairedTargetFile:src/app.ts",
+    );
+    expect(renderedLines).toContain(
+      "- Repair payload kind: repairPayloadKind:replace-directive",
+    );
+    expect(renderedLines).toContain(
+      "- Verification evidence: verify request mapped to allowlisted command",
+    );
+    expect(renderedLines).toContain(
+      "- Confirmed unchanged: README.md, LOCKED.md",
+    );
     expect(
       renderedLines.some((line) => line.includes("- Verification: passed")),
     ).toBe(true);
+    expect(renderedLines).toContain(
+      "- Next action: Review the changed file, then run the project test suite before committing if one exists.",
+    );
+  });
+
+  it("prints read-only file context evidence in compact output", async () => {
+    const renderedLines: string[] = [];
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_read",
+              initialPrompt: "inspect math.js",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput:
+              "Read result for math.js:\n```text\nreturn n + 2;\n```",
+            codingResult: {
+              taskKind: "read-file",
+              changedFiles: [],
+              failedFiles: [],
+              patches: [],
+              repair: {
+                status: "not-needed",
+                attempts: 0,
+                recoveredItems: [],
+                failedItems: [],
+                notes: [],
+              },
+              continuation: {
+                status: "not-needed",
+                attempts: 0,
+                evidence: [],
+              },
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: [],
+                attemptedFiles: ["math.js"],
+                changedFiles: [],
+                unchangedAttemptedFiles: ["math.js"],
+              },
+              taskSatisfaction: {
+                verdict: "satisfied",
+                reasons: ["Read/summarize task delivered requested content."],
+                requiredEvidence: ["read-file"],
+                observedEvidence: ["inspect: read math.js"],
+              },
+              verifiedFiles: [],
+              unverifiedFiles: [],
+              verification: {
+                status: "not-requested",
+                reason: "read-only task",
+              },
+              evidence: [
+                "inspect: read math.js",
+                "deliverable-mode:read",
+                "read-delivered-lines:3",
+              ],
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_read", "inspect math.js");
+
+    expect(renderedLines).toContain("Action result");
+    expect(renderedLines).toContain("- Task: read-file");
+    expect(renderedLines).toContain("- Changed: none");
+    expect(renderedLines).toContain("- Read files: math.js");
+    expect(renderedLines).toContain(
+      "- Observed context: delivered 3 line(s) from math.js.",
+    );
+    expect(renderedLines).toContain("- No files changed: read/inspect only.");
+    expect(renderedLines).toContain(
+      "- Verification detail: No verification was requested for this turn. Reason: read-only task",
+    );
+    expect(renderedLines).toContain(
+      "- Next action: Use the observed file context to request a specific edit, ask for more lines, or run an explicit verification.",
+    );
+  });
+
+  it("distinguishes changed-but-not-requested verification from blocked verification", async () => {
+    const renderedLines: string[] = [];
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_write_no_verify",
+              initialPrompt: "create notes",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "Write completed for notes.txt.",
+            codingResult: {
+              taskKind: "write-file",
+              changedFiles: ["notes.txt"],
+              failedFiles: [],
+              patches: [],
+              repair: {
+                status: "not-needed",
+                attempts: 0,
+                recoveredItems: [],
+                failedItems: [],
+                notes: [],
+              },
+              continuation: {
+                status: "first-pass-success",
+                attempts: 0,
+                evidence: [],
+              },
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: ["notes.txt"],
+                attemptedFiles: ["notes.txt"],
+                changedFiles: ["notes.txt"],
+                unchangedAttemptedFiles: [],
+              },
+              taskSatisfaction: {
+                verdict: "satisfied",
+                reasons: [],
+                requiredEvidence: ["changed-files"],
+                observedEvidence: ["changed-files:notes.txt"],
+              },
+              verifiedFiles: [],
+              unverifiedFiles: [],
+              verification: {
+                status: "not-requested",
+                reason: "mutation completed without explicit verify intent",
+              },
+              evidence: [],
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_write_no_verify", "create notes");
+
+    expect(renderedLines).toContain("- Verification: not-requested");
+    expect(renderedLines).toContain(
+      "- Verification detail: No verification was requested; changed files were not checked. Reason: mutation completed without explicit verify intent",
+    );
+    expect(renderedLines).toContain(
+      "- Next action: Ask for an explicit low-risk verification if you want the changed files checked.",
+    );
+  });
+
+  it("explains successful edits with blocked verification as a caveat", async () => {
+    const renderedLines: string[] = [];
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_write_verify_blocked",
+              initialPrompt: "create notes and verify",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput:
+              "Write completed for notes.txt. Verification blocked (no-verify-strategy).",
+            codingResult: {
+              taskKind: "write-file",
+              changedFiles: ["notes.txt"],
+              failedFiles: [],
+              patches: [],
+              repair: {
+                status: "not-needed",
+                attempts: 0,
+                recoveredItems: [],
+                failedItems: [],
+                notes: [],
+              },
+              continuation: {
+                status: "first-pass-success",
+                attempts: 0,
+                evidence: [],
+              },
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: ["notes.txt"],
+                attemptedFiles: ["notes.txt"],
+                changedFiles: ["notes.txt"],
+                unchangedAttemptedFiles: [],
+              },
+              taskSatisfaction: {
+                verdict: "completed-with-caveats",
+                reasons: [
+                  "Edit applied but verify was blocked (no-verify-strategy); follow next action before continuing.",
+                ],
+                requiredEvidence: ["changed-files", "verification"],
+                observedEvidence: ["changed-files:notes.txt"],
+              },
+              verifiedFiles: [],
+              unverifiedFiles: [
+                {
+                  path: "notes.txt",
+                  reason: "Verify intent was detected, but no verify strategy could be resolved from the prompt.",
+                },
+              ],
+              verification: {
+                status: "blocked",
+                reason: "Verify intent was detected, but no verify strategy could be resolved from the prompt.",
+                blockerKind: "no-verify-strategy",
+                nextAction:
+                  "Specify verify intent explicitly with test/build/check keywords so a concrete verify command can be selected.",
+              },
+              evidence: [],
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_write_verify_blocked", "create notes and verify");
+
+    expect(renderedLines).toContain("- Verification: blocked");
+    expect(renderedLines).toContain(
+      "- Verification detail: Edit succeeded, but verification could not run (no-verify-strategy). Reason: Verify intent was detected, but no verify strategy could be resolved from the prompt.",
+    );
+    expect(renderedLines).toContain(
+      "- Next action: Specify verify intent explicitly with test/build/check keywords so a concrete verify command can be selected.",
+    );
   });
 
   it("prints streaming details in verbose mode", async () => {
@@ -650,7 +978,7 @@ describe("shell session runtime (W5)", () => {
   it("prints coding failure reason and next action for unexecutable edit results", async () => {
     const renderedLines: string[] = [];
     const stopReason =
-      "Edit task needs either a fenced replacement content or an explicit replace-from/replace-to instruction.";
+      "Edit instruction is ambiguous: replacement not safely derivable from the prompt. No files were changed and unrelated files were not modified. Rerun with a safe explicit rewrite such as: \"In plan.txt, replace '<current text>' with '<desired text>'. Only modify plan.txt.\" Alternatively, provide a fenced full replacement for the target file.";
 
     const runtime = new ShellSessionRuntime({
       sessionManager: {
@@ -723,7 +1051,10 @@ describe("shell session runtime (W5)", () => {
                 status: "skipped",
                 reason: stopReason,
               },
-              evidence: [],
+              evidence: [
+                "inspect: read plan.txt",
+                "transform:plan.txt:missing text=>desired text",
+              ],
               failureBoundary: stopReason,
             },
           },
@@ -735,16 +1066,21 @@ describe("shell session runtime (W5)", () => {
 
     expect(renderedLines).toContain("Action result");
     expect(
+      renderedLines.some((line) => line.startsWith("- Change summary:")),
+    ).toBe(false);
+    expect(
       renderedLines.some((line) =>
-        line.includes("- Failure reason: plan.txt: Edit task needs"),
+        line.includes(
+          "- Failure reason: plan.txt: Edit instruction is ambiguous",
+        ),
       ),
     ).toBe(true);
     expect(renderedLines).toContain(
-      "- Next action: Rerun with fenced replacement content or an explicit replace-from/replace-to instruction.",
+      "- Next action: Rerun with an explicit replace-from/to instruction or a fenced replacement; include the exact current text, desired text, and target file.",
     );
     expect(renderedLines).toContain("Next steps");
     expect(renderedLines).toContain(
-      "- Rerun with fenced replacement content or an explicit replace-from/replace-to instruction.",
+      "- Rerun with an explicit replace-from/to instruction or fenced replacement, including the exact current text, desired text, and target file.",
     );
   });
 

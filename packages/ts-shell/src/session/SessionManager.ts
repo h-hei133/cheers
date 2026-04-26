@@ -45,9 +45,15 @@ export interface SessionMessage {
   timestamp?: string;
 }
 
+export type WorkspaceRootMode = "git-root" | "direct";
+
 export interface Session {
   id: string;
   projectRoot: string;
+  rootMode?: WorkspaceRootMode;
+  requestedWorkspaceRoot?: string;
+  targetPathBase?: string;
+  gitRoot?: string | null;
   title?: string;
   createdAt: string;
   updatedAt: string;
@@ -207,6 +213,10 @@ interface RequestScopeMemoryState {
 interface SessionMetadata {
   id: string;
   projectRoot: string;
+  rootMode?: WorkspaceRootMode;
+  requestedWorkspaceRoot?: string;
+  targetPathBase?: string;
+  gitRoot?: string | null;
   title?: string;
   createdAt: string;
   updatedAt: string;
@@ -492,7 +502,16 @@ export class SessionManager {
     this.removeCurrentSessionSelection(normalizedProjectRoot);
   }
 
-  createNewWithId(sessionId: string, projectRoot: string = process.cwd()): Session {
+  createNewWithId(
+    sessionId: string,
+    projectRoot: string = process.cwd(),
+    options?: {
+      readonly rootMode?: WorkspaceRootMode;
+      readonly requestedWorkspaceRoot?: string;
+      readonly targetPathBase?: string;
+      readonly gitRoot?: string | null;
+    },
+  ): Session {
     const normalizedId = sessionId.trim();
     if (!normalizedId) {
       throw new Error("Session id is required");
@@ -509,6 +528,16 @@ export class SessionManager {
     const session: Session = {
       id: normalizedId,
       projectRoot,
+      ...(options?.rootMode ? { rootMode: options.rootMode } : {}),
+      ...(options?.requestedWorkspaceRoot
+        ? { requestedWorkspaceRoot: options.requestedWorkspaceRoot }
+        : {}),
+      ...(options?.targetPathBase
+        ? { targetPathBase: options.targetPathBase }
+        : {}),
+      ...(options && Object.prototype.hasOwnProperty.call(options, "gitRoot")
+        ? { gitRoot: options.gitRoot ?? null }
+        : {}),
       title: undefined,
       createdAt: now,
       updatedAt: now,
@@ -520,11 +549,29 @@ export class SessionManager {
     return session;
   }
 
-  createNew(projectRoot: string = process.cwd()): Session {
+  createNew(
+    projectRoot: string = process.cwd(),
+    options?: {
+      readonly rootMode?: WorkspaceRootMode;
+      readonly requestedWorkspaceRoot?: string;
+      readonly targetPathBase?: string;
+      readonly gitRoot?: string | null;
+    },
+  ): Session {
     const now = new Date().toISOString();
     const session: Session = {
       id: this.generateSessionId(),
       projectRoot,
+      ...(options?.rootMode ? { rootMode: options.rootMode } : {}),
+      ...(options?.requestedWorkspaceRoot
+        ? { requestedWorkspaceRoot: options.requestedWorkspaceRoot }
+        : {}),
+      ...(options?.targetPathBase
+        ? { targetPathBase: options.targetPathBase }
+        : {}),
+      ...(options && Object.prototype.hasOwnProperty.call(options, "gitRoot")
+        ? { gitRoot: options.gitRoot ?? null }
+        : {}),
       title: undefined,
       createdAt: now,
       updatedAt: now,
@@ -1689,6 +1736,40 @@ export class SessionManager {
       } satisfies SessionStateSnapshot);
     });
     this.setCurrentSessionForProject(normalizedRoot, session.id);
+    return session;
+  }
+
+  updateSessionWorkspaceBinding(
+    sessionId: string,
+    binding: {
+      readonly projectRoot?: string;
+      readonly rootMode?: WorkspaceRootMode;
+      readonly requestedWorkspaceRoot?: string;
+      readonly targetPathBase?: string;
+      readonly gitRoot?: string | null;
+    },
+  ): Session {
+    const session = this.load(sessionId);
+    const projectRoot = binding.projectRoot?.trim();
+    if (projectRoot) {
+      session.projectRoot = projectRoot;
+    }
+    if (binding.rootMode) {
+      session.rootMode = binding.rootMode;
+    }
+    if (binding.requestedWorkspaceRoot?.trim()) {
+      session.requestedWorkspaceRoot = binding.requestedWorkspaceRoot.trim();
+    }
+    if (binding.targetPathBase?.trim()) {
+      session.targetPathBase = binding.targetPathBase.trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(binding, "gitRoot")) {
+      session.gitRoot = binding.gitRoot?.trim() || null;
+    }
+    session.updatedAt = new Date().toISOString();
+    this.writeSessionMetadata(session);
+    this.writeSessionState(session);
+    this.setCurrentSessionForProject(session.projectRoot, session.id);
     return session;
   }
 
@@ -4947,6 +5028,10 @@ export class SessionManager {
     const metadata: SessionMetadata = {
       id: session.id,
       projectRoot: session.projectRoot,
+      rootMode: session.rootMode,
+      requestedWorkspaceRoot: session.requestedWorkspaceRoot,
+      targetPathBase: session.targetPathBase,
+      gitRoot: session.gitRoot,
       title: session.title,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
@@ -5306,6 +5391,16 @@ export class SessionManager {
           metadata.projectRoot?.trim() ||
           state.projectRoot?.trim() ||
           process.cwd(),
+        ...(metadata.rootMode ? { rootMode: metadata.rootMode } : {}),
+        ...(metadata.requestedWorkspaceRoot?.trim()
+          ? { requestedWorkspaceRoot: metadata.requestedWorkspaceRoot.trim() }
+          : {}),
+        ...(metadata.targetPathBase?.trim()
+          ? { targetPathBase: metadata.targetPathBase.trim() }
+          : {}),
+        ...(Object.prototype.hasOwnProperty.call(metadata, "gitRoot")
+          ? { gitRoot: metadata.gitRoot?.trim() || null }
+          : {}),
         title: metadata.title,
         createdAt: metadata.createdAt,
         updatedAt: metadata.updatedAt,

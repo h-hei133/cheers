@@ -28,7 +28,13 @@ import {
   resumeShellSession,
 } from "../core/shell/recovery.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
-import { switchActiveSession } from "../core/shell/runtimeContext.js";
+import {
+  createSessionRootMismatchDiagnostic,
+  createWorkspaceAttachSwitchDiagnostic,
+  resolveRootBindingDiagnostics,
+  switchActiveSession,
+} from "../core/shell/runtimeContext.js";
+import type { RootBindingDiagnostic } from "../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
 import {
   handleShellClose,
@@ -49,6 +55,7 @@ import type {
   RecoveryTrustBoundaryBlock,
   SessionContinuitySnapshot,
   SessionReentrySummary,
+  WorkspaceRootMode,
 } from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
@@ -320,6 +327,7 @@ async function main(): Promise<void> {
         launchCwd,
         runtimeConfig,
         gitContext,
+        requestedWorkspaceRoot: runtimeBaseDir,
         sessionManager,
         renderer,
         requestedSessionId: options.sessionId,
@@ -328,8 +336,13 @@ async function main(): Promise<void> {
       });
     } catch (error) {
       if (error instanceof SessionBootstrapError) {
-        console.error(error.message);
-        console.error(error.recoveryHint);
+        if (error.rootBindingDiagnostics.length > 0) {
+          renderer.renderLine("Session bootstrap blocked by root binding diagnostics.");
+          renderRootBindingDiagnostics(renderer, error.rootBindingDiagnostics);
+        } else {
+          console.error(error.message);
+          console.error(error.recoveryHint);
+        }
         process.exit(1);
       }
       throw error;
@@ -669,6 +682,19 @@ async function main(): Promise<void> {
           }
 
           try {
+            const switchDiagnostics = resolveSessionSwitchDiagnostics(
+              runtimeContext,
+              sessionManager.describeSessionReentry(resolvedSessionId),
+            );
+            if (hasBlockedRootBindingDiagnostic(switchDiagnostics)) {
+              renderer.renderLine(
+                "\nSession switch blocked by root binding diagnostics.",
+              );
+              renderRootBindingDiagnostics(renderer, switchDiagnostics);
+              renderer.renderLine("");
+              rl.prompt();
+              return;
+            }
             const resumed = sessionManager.resume(resolvedSessionId);
             const previousSessionId = runtimeContext.session.id;
             switchRuntimeSessionProjectContext(runtimeContext, resumed);
@@ -711,6 +737,21 @@ async function main(): Promise<void> {
             runtimeContext,
           });
           if (panelResult.switchedSessionId) {
+            const switchDiagnostics = resolveSessionSwitchDiagnostics(
+              runtimeContext,
+              sessionManager.describeSessionReentry(
+                panelResult.switchedSessionId,
+              ),
+            );
+            if (hasBlockedRootBindingDiagnostic(switchDiagnostics)) {
+              renderer.renderLine(
+                "\nSession switch blocked by root binding diagnostics.",
+              );
+              renderRootBindingDiagnostics(renderer, switchDiagnostics);
+              renderer.renderLine("");
+              rl.prompt();
+              return;
+            }
             const resumed = sessionManager.resume(
               panelResult.switchedSessionId,
             );
@@ -766,21 +807,66 @@ async function main(): Promise<void> {
               attachTarget,
             );
             const previousProjectRoot = runtimeContext.projectRoot;
+            const attachDiagnostics =
+              normalizePathForCompare(previousProjectRoot) ===
+              normalizePathForCompare(attached.projectRoot)
+                ? attached.rootBindingDiagnostics
+                : [
+                    ...attached.rootBindingDiagnostics,
+                    createWorkspaceAttachSwitchDiagnostic({
+                      currentProjectRoot: previousProjectRoot,
+                      requestedWorkspaceRoot: attached.requestedRoot,
+                      resolvedProjectRoot: attached.projectRoot,
+                    }),
+                  ];
             if (
               normalizePathForCompare(previousProjectRoot) ===
               normalizePathForCompare(attached.projectRoot)
             ) {
+              sessionManager.updateSessionWorkspaceBinding(
+                runtimeContext.session.id,
+                {
+                  projectRoot: attached.projectRoot,
+                  rootMode: attached.rootMode,
+                  requestedWorkspaceRoot: attached.requestedRoot,
+                  targetPathBase: attached.targetPathBase,
+                  gitRoot: attached.gitRoot,
+                },
+              );
+              runtimeContext.session.rootMode = attached.rootMode;
+              runtimeContext.session.requestedWorkspaceRoot =
+                attached.requestedRoot;
+              runtimeContext.session.targetPathBase = attached.targetPathBase;
+              runtimeContext.session.gitRoot = attached.gitRoot;
+              switchActiveSession(
+                runtimeContext as never,
+                runtimeContext.session as never,
+                attached.projectRoot,
+                {
+                  cwd: attached.projectRoot,
+                  projectRoot: attached.projectRoot,
+                  rootMode: attached.rootMode,
+                  requestedWorkspaceRoot: attached.requestedRoot,
+                  targetPathBase: attached.targetPathBase,
+                  gitRoot: attached.gitRoot,
+                  rootBindingDiagnostics: attachDiagnostics,
+                  gitContext: attached.gitContext,
+                },
+              );
               renderer.renderLine(
-                `\nAlready attached to ${attached.projectRoot}.`,
+                `\nAlready attached to ${attached.projectRoot}; requested path resolves to this project root.`,
               );
               renderWorkspaceSummary(renderer, runtimeContext);
               rl.prompt();
               return;
             }
 
-            const attachedSession = sessionManager.createNew(
-              attached.projectRoot,
-            );
+            const attachedSession = sessionManager.createNew(attached.projectRoot, {
+              rootMode: attached.rootMode,
+              requestedWorkspaceRoot: attached.requestedRoot,
+              targetPathBase: attached.targetPathBase,
+              gitRoot: attached.gitRoot,
+            });
             switchActiveSession(
               runtimeContext as never,
               attachedSession as never,
@@ -788,6 +874,11 @@ async function main(): Promise<void> {
               {
                 cwd: attached.projectRoot,
                 projectRoot: attached.projectRoot,
+                rootMode: attached.rootMode,
+                requestedWorkspaceRoot: attached.requestedRoot,
+                targetPathBase: attached.targetPathBase,
+                gitRoot: attached.gitRoot,
+                rootBindingDiagnostics: attachDiagnostics,
                 gitContext: attached.gitContext,
               },
             );
@@ -2071,6 +2162,17 @@ async function runNonInteractivePrompt(options: {
         }
 
         try {
+          const switchDiagnostics = resolveSessionSwitchDiagnostics(
+            options.runtimeContext as never,
+            options.sessionManager.describeSessionReentry(resolvedSessionId),
+          );
+          if (hasBlockedRootBindingDiagnostic(switchDiagnostics)) {
+            options.renderer.renderLine(
+              "Session switch blocked by root binding diagnostics.",
+            );
+            renderRootBindingDiagnostics(options.renderer, switchDiagnostics);
+            return;
+          }
           const resumed = options.sessionManager.resume(resolvedSessionId);
           const previousSessionId = options.runtimeContext.session.id;
           switchRuntimeSessionProjectContext(
@@ -2131,12 +2233,55 @@ async function runNonInteractivePrompt(options: {
             attachTarget,
           );
           const previousProjectRoot = options.runtimeContext.projectRoot;
+          const attachDiagnostics =
+            normalizePathForCompare(previousProjectRoot) ===
+            normalizePathForCompare(attached.projectRoot)
+              ? attached.rootBindingDiagnostics
+              : [
+                  ...attached.rootBindingDiagnostics,
+                  createWorkspaceAttachSwitchDiagnostic({
+                    currentProjectRoot: previousProjectRoot,
+                    requestedWorkspaceRoot: attached.requestedRoot,
+                    resolvedProjectRoot: attached.projectRoot,
+                  }),
+                ];
           if (
             normalizePathForCompare(previousProjectRoot) ===
             normalizePathForCompare(attached.projectRoot)
           ) {
+            options.sessionManager.updateSessionWorkspaceBinding(
+              options.runtimeContext.session.id,
+              {
+                projectRoot: attached.projectRoot,
+                rootMode: attached.rootMode,
+                requestedWorkspaceRoot: attached.requestedRoot,
+                targetPathBase: attached.targetPathBase,
+                gitRoot: attached.gitRoot,
+              },
+            );
+            options.runtimeContext.session.rootMode = attached.rootMode;
+            options.runtimeContext.session.requestedWorkspaceRoot =
+              attached.requestedRoot;
+            options.runtimeContext.session.targetPathBase =
+              attached.targetPathBase;
+            options.runtimeContext.session.gitRoot = attached.gitRoot;
+            switchActiveSession(
+              options.runtimeContext as never,
+              options.runtimeContext.session as never,
+              attached.projectRoot,
+              {
+                cwd: attached.projectRoot,
+                projectRoot: attached.projectRoot,
+                rootMode: attached.rootMode,
+                requestedWorkspaceRoot: attached.requestedRoot,
+                targetPathBase: attached.targetPathBase,
+                gitRoot: attached.gitRoot,
+                rootBindingDiagnostics: attachDiagnostics,
+                gitContext: attached.gitContext,
+              },
+            );
             options.renderer.renderLine(
-              `Already attached to ${attached.projectRoot}.`,
+              `Already attached to ${attached.projectRoot}; requested path resolves to this project root.`,
             );
             renderWorkspaceSummary(options.renderer, options.runtimeContext);
             return;
@@ -2144,6 +2289,12 @@ async function runNonInteractivePrompt(options: {
 
           const attachedSession = options.sessionManager.createNew(
             attached.projectRoot,
+            {
+              rootMode: attached.rootMode,
+              requestedWorkspaceRoot: attached.requestedRoot,
+              targetPathBase: attached.targetPathBase,
+              gitRoot: attached.gitRoot,
+            },
           );
           switchActiveSession(
             options.runtimeContext as never,
@@ -2152,6 +2303,11 @@ async function runNonInteractivePrompt(options: {
             {
               cwd: attached.projectRoot,
               projectRoot: attached.projectRoot,
+              rootMode: attached.rootMode,
+              requestedWorkspaceRoot: attached.requestedRoot,
+              targetPathBase: attached.targetPathBase,
+              gitRoot: attached.gitRoot,
+              rootBindingDiagnostics: attachDiagnostics,
               gitContext: attached.gitContext,
             },
           );
@@ -2688,6 +2844,11 @@ function renderWorkspaceSummary(
     cwd: string;
     originalCwd: string;
     projectRoot: string;
+    rootMode: WorkspaceRootMode;
+    requestedWorkspaceRoot?: string;
+    targetPathBase: string;
+    gitRoot: string | null;
+    rootBindingDiagnostics?: readonly RootBindingDiagnostic[];
     gitContext: {
       insideGit: boolean;
       branch: string | null;
@@ -2706,6 +2867,15 @@ function renderWorkspaceSummary(
   renderer.renderLine(
     `- Original launch directory: ${runtimeContext.originalCwd}`,
   );
+  renderWorkspaceBindingLines(renderer, {
+    requestedWorkspaceRoot: runtimeContext.requestedWorkspaceRoot,
+    projectRoot: runtimeContext.projectRoot,
+    rootMode: runtimeContext.rootMode,
+    targetPathBase: runtimeContext.targetPathBase,
+    gitRoot: runtimeContext.gitRoot,
+    diagnostics: runtimeContext.rootBindingDiagnostics,
+    gitContext: runtimeContext.gitContext,
+  });
   if (runtimeContext.gitContext.insideGit) {
     renderer.renderLine(
       `- Git root: ${runtimeContext.gitContext.root ?? "unknown"}`,
@@ -2731,6 +2901,75 @@ function renderWorkspaceSummary(
   renderer.renderLine("");
 }
 
+function renderWorkspaceBindingLines(
+  renderer: StreamingRenderer,
+  input: {
+    requestedWorkspaceRoot?: string;
+    projectRoot: string;
+    rootMode: WorkspaceRootMode;
+    targetPathBase: string;
+    gitRoot: string | null;
+    diagnostics?: readonly RootBindingDiagnostic[];
+    gitContext: {
+      insideGit: boolean;
+      root: string | null;
+    };
+  },
+): void {
+  const requestedWorkspaceRoot =
+    input.requestedWorkspaceRoot?.trim() || input.projectRoot;
+  renderer.renderLine(`- Requested workspace: ${requestedWorkspaceRoot}`);
+  renderer.renderLine(`- Target path base: ${input.targetPathBase}`);
+  renderer.renderLine(`- Git root binding: ${input.gitRoot ?? "null"}`);
+  renderer.renderLine(`- Root mode: ${input.rootMode}`);
+  renderRootBindingDiagnostics(renderer, input.diagnostics ?? []);
+
+  const requestedDiffersFromProject =
+    normalizePathForCompare(requestedWorkspaceRoot) !==
+    normalizePathForCompare(input.projectRoot);
+  if (
+    input.gitContext.insideGit &&
+    input.gitContext.root &&
+    requestedDiffersFromProject
+  ) {
+    renderer.renderLine(
+      `- Root resolution: git-root auto-upgrade (${requestedWorkspaceRoot} -> ${input.projectRoot})`,
+    );
+    renderer.renderLine(
+      "- Workspace note: relative file targets are resolved from the project root above, not from the requested subdirectory.",
+    );
+    renderer.renderLine(
+      "- Workspace policy: repo subdirectories are not treated as independent project roots by default.",
+    );
+    renderer.renderLine(
+      "- Workspace next action: use a path relative to the project root, attach a directory outside this git repo, or use a future explicit subdir workspace mode when available.",
+    );
+    return;
+  }
+
+  renderer.renderLine(
+    input.gitContext.insideGit
+      ? "- Root resolution: requested workspace is the git project root"
+      : "- Root resolution: requested workspace is used directly (not inside git)",
+  );
+}
+
+function renderRootBindingDiagnostics(
+  renderer: StreamingRenderer,
+  diagnostics: readonly RootBindingDiagnostic[],
+): void {
+  if (diagnostics.length === 0) {
+    return;
+  }
+  renderer.renderLine("- Root binding diagnostics:");
+  for (const diagnostic of diagnostics) {
+    renderer.renderLine(
+      `  - ${diagnostic.severity}:${diagnostic.code}: ${diagnostic.explanation}`,
+    );
+    renderer.renderLine(`    nextAction: ${diagnostic.nextAction}`);
+  }
+}
+
 function renderStartupSurface(
   renderer: StreamingRenderer,
   input: {
@@ -2739,10 +2978,16 @@ function renderStartupSurface(
       cwd: string;
       originalCwd: string;
       projectRoot: string;
+      rootMode: WorkspaceRootMode;
+      requestedWorkspaceRoot?: string;
+      targetPathBase: string;
+      gitRoot: string | null;
+      rootBindingDiagnostics?: readonly RootBindingDiagnostic[];
       gitContext: {
         insideGit: boolean;
         branch: string | null;
         isClean: boolean | null;
+        root: string | null;
       };
     };
     sessionManager: SessionManager;
@@ -2767,6 +3012,15 @@ function renderStartupSurface(
   renderer.renderLine("\nPrivate Coding Agents Shell");
   renderer.renderLine(`- Project: ${projectLabel}`);
   renderer.renderLine(`- Project root: ${input.runtimeContext.projectRoot}`);
+  renderWorkspaceBindingLines(renderer, {
+    requestedWorkspaceRoot: input.runtimeContext.requestedWorkspaceRoot,
+    projectRoot: input.runtimeContext.projectRoot,
+    rootMode: input.runtimeContext.rootMode,
+    targetPathBase: input.runtimeContext.targetPathBase,
+    gitRoot: input.runtimeContext.gitRoot,
+    diagnostics: input.runtimeContext.rootBindingDiagnostics,
+    gitContext: input.runtimeContext.gitContext,
+  });
   if (
     path.resolve(input.runtimeContext.originalCwd) !==
     path.resolve(input.runtimeContext.projectRoot)
@@ -3272,12 +3526,43 @@ function switchRuntimeSessionProjectContext(
     cwd: string;
     originalCwd: string;
     projectRoot: string;
+    rootMode: WorkspaceRootMode;
+    requestedWorkspaceRoot?: string;
+    targetPathBase: string;
+    gitRoot: string | null;
+    rootBindingDiagnostics?: readonly RootBindingDiagnostic[];
     gitContext: ReturnType<typeof getWorkflowGitContext>;
   },
-  resumedSession: { projectRoot: string },
+  resumedSession: {
+    projectRoot: string;
+    rootMode?: WorkspaceRootMode;
+    requestedWorkspaceRoot?: string;
+    targetPathBase?: string;
+    gitRoot?: string | null;
+  },
 ): void {
   const nextProjectRoot =
     resumedSession.projectRoot?.trim() || runtimeContext.projectRoot;
+  const nextGitContext = getWorkflowGitContext(nextProjectRoot);
+  const nextRootMode =
+    resumedSession.rootMode ?? resolveWorkspaceRootMode(nextGitContext);
+  const nextTargetPathBase = resumedSession.targetPathBase ?? nextProjectRoot;
+  const nextGitRoot =
+    Object.prototype.hasOwnProperty.call(resumedSession, "gitRoot")
+      ? (resumedSession.gitRoot ?? null)
+      : (nextGitContext.root ?? null);
+  const nextRequestedWorkspaceRoot =
+    resumedSession.requestedWorkspaceRoot ??
+    runtimeContext.requestedWorkspaceRoot ??
+    nextProjectRoot;
+  const nextRootBindingDiagnostics = resolveRootBindingDiagnostics({
+    projectRoot: nextProjectRoot,
+    rootMode: nextRootMode,
+    requestedWorkspaceRoot: nextRequestedWorkspaceRoot,
+    targetPathBase: nextTargetPathBase,
+    gitRoot: nextGitRoot,
+    gitContext: nextGitContext,
+  });
   switchActiveSession(
     runtimeContext as never,
     resumedSession as never,
@@ -3285,9 +3570,45 @@ function switchRuntimeSessionProjectContext(
     {
       cwd: nextProjectRoot,
       projectRoot: nextProjectRoot,
-      gitContext: getWorkflowGitContext(nextProjectRoot),
+      rootMode: nextRootMode,
+      requestedWorkspaceRoot: nextRequestedWorkspaceRoot,
+      targetPathBase: nextTargetPathBase,
+      gitRoot: nextGitRoot,
+      rootBindingDiagnostics: nextRootBindingDiagnostics,
+      gitContext: nextGitContext,
     },
   );
+}
+
+function resolveSessionSwitchDiagnostics(
+  runtimeContext: {
+    projectRoot: string;
+    requestedWorkspaceRoot?: string;
+  },
+  targetSession: Pick<SessionReentrySummary, "id" | "projectRoot">,
+): readonly RootBindingDiagnostic[] {
+  if (
+    normalizePathForCompare(targetSession.projectRoot) ===
+    normalizePathForCompare(runtimeContext.projectRoot)
+  ) {
+    return [];
+  }
+
+  return [
+    createSessionRootMismatchDiagnostic({
+      sessionId: targetSession.id,
+      sessionProjectRoot: targetSession.projectRoot,
+      requestedWorkspaceRoot:
+        runtimeContext.requestedWorkspaceRoot ?? runtimeContext.projectRoot,
+      resolvedProjectRoot: runtimeContext.projectRoot,
+    }),
+  ];
+}
+
+function hasBlockedRootBindingDiagnostic(
+  diagnostics: readonly RootBindingDiagnostic[],
+): boolean {
+  return diagnostics.some((diagnostic) => diagnostic.severity === "blocked");
 }
 
 function resolveSwitchSessionReference(input: {
@@ -3568,7 +3889,12 @@ function resolveRuntimeProjectRoot(
   baseCwd: string,
   requestedProjectPath: string,
 ): {
+  requestedRoot: string;
   projectRoot: string;
+  rootMode: WorkspaceRootMode;
+  targetPathBase: string;
+  gitRoot: string | null;
+  rootBindingDiagnostics: readonly RootBindingDiagnostic[];
   gitContext: ReturnType<typeof getWorkflowGitContext>;
 } {
   const requestedPath = requestedProjectPath.trim();
@@ -3588,10 +3914,31 @@ function resolveRuntimeProjectRoot(
 
   const gitContext = getWorkflowGitContext(resolvedPath);
   const projectRoot = gitContext.root ?? resolvedPath;
+  const rootMode = resolveWorkspaceRootMode(gitContext);
+  const targetPathBase = projectRoot;
+  const gitRoot = gitContext.root ?? null;
   return {
+    requestedRoot: resolvedPath,
     projectRoot,
+    rootMode,
+    targetPathBase,
+    gitRoot,
+    rootBindingDiagnostics: resolveRootBindingDiagnostics({
+      projectRoot,
+      rootMode,
+      requestedWorkspaceRoot: resolvedPath,
+      targetPathBase,
+      gitRoot,
+      gitContext,
+    }),
     gitContext,
   };
+}
+
+function resolveWorkspaceRootMode(
+  gitContext: ReturnType<typeof getWorkflowGitContext>,
+): WorkspaceRootMode {
+  return gitContext.insideGit && gitContext.root ? "git-root" : "direct";
 }
 
 function resolveTargetProjectRoot(

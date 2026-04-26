@@ -18,6 +18,10 @@ const networkFailurePattern =
 const configFailurePattern =
   /(provider-readiness:(missing-key|missing-config|auth|unsupported-provider)|missing.*config|api key|apikey|not connected|connect first|credentials|authentication was rejected|401|403)/i
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 function run(command, args, options = {}) {
   return new Promise((resolve) => {
     const env = {}
@@ -221,6 +225,7 @@ async function main() {
   console.log('gate name=provider-readiness')
   console.log('mode=smoke')
   console.log('status taxonomy: pass=0 product-regression=1 provider-network-inconclusive=2 config-failure=3')
+  console.log('exit semantics: 0=ready, 1=provider reachable but smoke contract regressed, 2=network inconclusive after retry, 3=config/auth/unsupported/misconfigured')
   console.log(`repo=${repoRoot}`)
   console.log(`HOME used=${realHome}`)
   console.log(`USERPROFILE used=${realHome}`)
@@ -247,7 +252,12 @@ async function main() {
   }
   printStep('real-provider-credential', 'pass', 'credential present (redacted)')
 
-  const smoke = await runRealProviderSmoke()
+  let smoke = await runRealProviderSmoke()
+  if (smoke.code === 2) {
+    printStep('provider-readiness-retry', 'provider-network-inconclusive', 'retrying once after transient network classification')
+    await sleep(1500)
+    smoke = await runRealProviderSmoke()
+  }
   printStep('provider-readiness-smoke-gate', smoke.status)
   process.exit(smoke.code)
 }

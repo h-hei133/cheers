@@ -56,6 +56,11 @@ export type CodingVerificationBlockerKind =
   | 'unknown'
 
 export type CodingPatchFailureCode =
+  | 'edit-target-missing'
+  | 'edit-transform-unclear'
+  | 'patch-target-missing'
+  | 'patch-from-not-found'
+  | 'patch-ambiguous'
   | 'read-failed'
   | 'target-not-found'
   | 'target-not-unique'

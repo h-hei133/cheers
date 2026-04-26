@@ -18,6 +18,26 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     await safeRemoveDir(workspaceRoot);
   });
 
+  function continuityFromResult(
+    result: Awaited<ReturnType<typeof runMvpIntegratedFlow>>,
+  ) {
+    return {
+      lastTaskKind: result.codingResult?.taskKind,
+      lastFailure: result.stopReason,
+      recentTargetFiles: result.codingResult?.changeSet.attemptedFiles ?? [],
+      recentChangedFiles: result.codingResult?.changedFiles ?? [],
+      recentFailedFiles: result.codingResult?.failedFiles ?? [],
+      recentVerifiedFiles: result.codingResult?.verifiedFiles ?? [],
+      lastContinuationEvidence: result.codingResult?.continuation.evidence ?? [],
+      lastTerminalClassification: result.terminalClassification,
+      lastTerminalReason: result.terminalReason,
+      lastTaskSatisfactionVerdict:
+        result.codingResult?.taskSatisfaction.verdict,
+      lastTaskSatisfactionReasons:
+        result.codingResult?.taskSatisfaction.reasons ?? [],
+    };
+  }
+
   it("covers prompt -> handoff -> tool approval -> streamed result", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     await fs.writeFile(
@@ -1023,11 +1043,77 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.terminalClassification).toBe("error");
-    expect(result.stopReason).toContain("patch failed (target-not-found)");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "patch-from-not-found",
+    );
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "Next action: Re-read the target and rerun with the exact current text to replace.",
+    );
   }, 15000);
 
-  it("recovers ambiguous replace target via bounded repair in the same coding contract", async () => {
+  it("applies a fenced single-file replacement as an explicit transform", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "fenced.txt"),
+      "old line\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_fenced_replacement_contract",
+      prompt: [
+        "Edit src/fenced.txt with this exact replacement:",
+        "```",
+        "new line",
+        "```",
+      ].join("\n"),
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.changedFiles).toEqual(["src/fenced.txt"]);
+    expect(result.codingResult?.patches?.[0]?.status).toBe("applied");
+    expect(result.codingResult?.taskSatisfaction.verdict).toBe("satisfied");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "fenced.txt"), "utf8"),
+    ).resolves.toBe("new line");
+  }, 15000);
+
+  it("stops a single-file edit when the transform is unclear", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const original = "stable content\n";
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "unclear.txt"),
+      original,
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_edit_transform_unclear_contract",
+      prompt: "Edit src/unclear.txt and make it better",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "edit-transform-unclear",
+    );
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "Next action:",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "unclear.txt"), "utf8"),
+    ).resolves.toBe(original);
+  }, 15000);
+
+  it("stops ambiguous replace target without writing the file", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
@@ -1051,29 +1137,238 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
-    expect(result.terminalClassification).toBe("success");
-    expect(result.codingResult?.repair.status).toBe("recovered");
-    expect(result.codingResult?.repair.attempts).toBeGreaterThan(0);
-    expect(result.codingResult?.continuation.status).toBe(
-      "recovered-after-continuation",
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "patch-ambiguous",
     );
-    expect(result.codingResult?.continuation.attempts).toBeGreaterThan(0);
-    expect(
-      result.codingResult?.continuation.evidence.some((entry) =>
-        entry.includes("target-not-unique"),
-      ),
-    ).toBe(true);
-    expect(result.codingResult?.repair.recoveredItems).toContain(
-      "src/ambiguous.ts",
-    );
-    expect(result.codingResult?.changedFiles).toContain("src/ambiguous.ts");
+    expect(result.codingResult?.changedFiles).not.toContain("src/ambiguous.ts");
     const updated = await fs.readFile(
       path.join(workspaceRoot, "src", "ambiguous.ts"),
       "utf8",
     );
-    expect(updated).toContain("markerA = 'v2'");
+    expect(updated).toContain("markerA = 'v1'");
     expect(updated).toContain("markerB = 'v1'");
+  }, 15000);
+
+  it("repairs patch-from-not-found follow-up by reusing the failed edit target", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "follow-not-found.txt"),
+      "stable content\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "other-follow.txt"),
+      "stable content\n",
+      "utf8",
+    );
+
+    const first = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_repair_patch_not_found_first",
+      prompt:
+        "Edit src/follow-not-found.txt and replace missing-token with fixed content",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(first.status).toBe("stopped_error");
+    expect(first.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "patch-from-not-found",
+    );
+
+    const repaired = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_repair_patch_not_found_second",
+      prompt: "Replace stable content with fixed content.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+      continuityState: continuityFromResult(first),
+    });
+
+    expect(repaired.status).toBe("completed");
+    expect(repaired.codingResult?.changedFiles).toEqual([
+      "src/follow-not-found.txt",
+    ]);
+    expect(repaired.codingResult?.repair.status).toBe("recovered");
+    expect(repaired.codingResult?.continuation.status).toBe(
+      "recovered-after-continuation",
+    );
+    expect(repaired.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "repairContextUsed:true",
+        "repairedFailureReason:patch-from-not-found",
+        "repairedTargetFile:src/follow-not-found.txt",
+        "repairPayloadKind:replace-directive",
+      ]),
+    );
+    expect(repaired.codingResult?.patches?.[0]?.status).toBe("applied");
+    expect(repaired.codingResult?.taskSatisfaction.verdict).toBe("satisfied");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "follow-not-found.txt"), "utf8"),
+    ).resolves.toBe("fixed content\n");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "other-follow.txt"), "utf8"),
+    ).resolves.toBe("stable content\n");
+  }, 15000);
+
+  it("repairs edit-transform-unclear follow-up by reusing the target for fenced replacement", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "follow-unclear.txt"),
+      "old line\n",
+      "utf8",
+    );
+
+    const first = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_repair_transform_unclear_first",
+      prompt: "Edit src/follow-unclear.txt and make it better",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(first.status).toBe("stopped_error");
+    expect(first.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "edit-transform-unclear",
+    );
+
+    const repaired = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_repair_transform_unclear_second",
+      prompt: ["Use this fenced replacement:", "```", "new line", "```"].join(
+        "\n",
+      ),
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+      continuityState: continuityFromResult(first),
+    });
+
+    expect(repaired.status).toBe("completed");
+    expect(repaired.codingResult?.changedFiles).toEqual([
+      "src/follow-unclear.txt",
+    ]);
+    expect(repaired.codingResult?.repair.status).toBe("recovered");
+    expect(repaired.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "repairContextUsed:true",
+        "repairedFailureReason:edit-transform-unclear",
+        "repairedTargetFile:src/follow-unclear.txt",
+        "repairPayloadKind:fenced-content",
+      ]),
+    );
+    expect(repaired.codingResult?.patches?.[0]?.status).toBe("applied");
+    expect(repaired.codingResult?.taskSatisfaction.verdict).toBe("satisfied");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "follow-unclear.txt"), "utf8"),
+    ).resolves.toBe("new line");
+  }, 15000);
+
+  it("repairs patch ambiguous follow-up when longer context uniquely matches", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const target = [
+      "export const markerA = 'v1';",
+      "export const markerB = 'v1';",
+    ].join("\n");
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "follow-ambiguous.ts"),
+      target,
+      "utf8",
+    );
+
+    const first = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_repair_patch_ambiguous_first",
+      prompt: "Edit src/follow-ambiguous.ts and replace v1 with v2",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(first.status).toBe("stopped_error");
+    expect(first.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "patch-ambiguous",
+    );
+
+    const repaired = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_repair_patch_ambiguous_second",
+      prompt:
+        "Replace \"export const markerA = 'v1';\" with \"export const markerA = 'v2';\".",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+      continuityState: continuityFromResult(first),
+    });
+
+    expect(repaired.status).toBe("completed");
+    expect(repaired.codingResult?.changedFiles).toEqual([
+      "src/follow-ambiguous.ts",
+    ]);
+    expect(repaired.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "repairContextUsed:true",
+        "repairedFailureReason:patch-ambiguous",
+        "repairedTargetFile:src/follow-ambiguous.ts",
+        "repairPayloadKind:replace-directive",
+      ]),
+    );
+    expect(repaired.codingResult?.patches?.[0]?.status).toBe("applied");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "follow-ambiguous.ts"), "utf8"),
+    ).resolves.toBe(
+      ["export const markerA = 'v2';", "export const markerB = 'v1';"].join(
+        "\n",
+      ),
+    );
+  }, 15000);
+
+  it("repairs target missing follow-up when the user supplies path and transform", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "follow-target.txt"),
+      "alpha\n",
+      "utf8",
+    );
+
+    const first = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_repair_target_missing_first",
+      prompt: "Replace alpha with beta.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(first.status).toBe("stopped_error");
+    expect(first.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "edit-target-missing",
+    );
+
+    const repaired = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_repair_target_missing_second",
+      prompt: "In src/follow-target.txt, replace alpha with beta.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+      continuityState: continuityFromResult(first),
+    });
+
+    expect(repaired.status).toBe("completed");
+    expect(repaired.codingResult?.changedFiles).toEqual([
+      "src/follow-target.txt",
+    ]);
+    expect(repaired.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "repairContextUsed:true",
+        "repairedFailureReason:edit-target-missing",
+        "repairedTargetFile:src/follow-target.txt",
+        "repairPayloadKind:target-path-with-transform",
+      ]),
+    );
+    expect(repaired.codingResult?.patches?.[0]?.status).toBe("applied");
+    expect(repaired.codingResult?.taskSatisfaction.verdict).toBe("satisfied");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "follow-target.txt"), "utf8"),
+    ).resolves.toBe("beta\n");
   }, 15000);
 
   it("replans continuation repair from prior failure evidence instead of replaying the same patch", async () => {
@@ -1473,6 +1768,99 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     await expect(
       fs.readFile(path.join(workspaceRoot, "verify_note.txt"), "utf8"),
     ).resolves.toContain("beta");
+  }, 15000);
+
+  it("applies explicit single-file replace patches when the source matches once", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "patch_note.txt"),
+      "alpha\nbeta\ngamma\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_patch_lane_success",
+      prompt:
+        'In patch_note.txt, change "beta" to "BETA". Verify patch_note.txt contains BETA.',
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.terminalClassification).toBe("success");
+    expect(result.codingResult?.changedFiles).toContain("patch_note.txt");
+    expect(result.codingResult?.verification.status).toBe("passed");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "patch_note.txt"), "utf8"),
+    ).resolves.toBe("alpha\nBETA\ngamma\n");
+  }, 15000);
+
+  it("keeps the target unchanged when an explicit replace patch source is missing", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    const original = "alpha\nbeta\ngamma\n";
+    await fs.writeFile(path.join(workspaceRoot, "patch_note.txt"), original, "utf8");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_patch_lane_not_found",
+      prompt:
+        'In patch_note.txt, change "delta" to "DELTA". Verify patch_note.txt contains DELTA.',
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "patch-from-not-found",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "patch_note.txt"), "utf8"),
+    ).resolves.toBe(original);
+  }, 15000);
+
+  it("keeps the target unchanged when an explicit replace patch source is ambiguous", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    const original = "alpha\nbeta\nbeta\n";
+    await fs.writeFile(path.join(workspaceRoot, "patch_note.txt"), original, "utf8");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_patch_lane_ambiguous",
+      prompt:
+        'In patch_note.txt, change "beta" to "BETA". Verify patch_note.txt contains BETA.',
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "patch-ambiguous",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "patch_note.txt"), "utf8"),
+    ).resolves.toBe(original);
+  }, 15000);
+
+  it("reports a stable patch target missing reason for explicit replace patches", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_patch_lane_target_missing",
+      prompt:
+        'In missing_patch_note.txt, change "beta" to "BETA". Verify missing_patch_note.txt contains BETA.',
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "patch-target-missing",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "missing_patch_note.txt"), "utf8"),
+    ).rejects.toThrow();
   }, 15000);
 
   it("runs low-risk multi-file consistency verification after a file edit", async () => {

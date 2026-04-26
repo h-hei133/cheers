@@ -60,6 +60,10 @@ export async function runDiagnoseCommand(context: CommandContext): Promise<Local
     'Repository diagnosis',
     `Execution path: ${runtimeConfig.daemonEnabled ? 'rust-daemon' : 'ts-local'}`,
     `Provider: ${runtimeConfig.provider}`,
+    `Active connection: ${runtimeConfig.activeProviderConnectionId ?? 'none'}`,
+    `Provider config: ${summarizeProviderConfig(runtimeConfig)}`,
+    'Provider readiness: not checked by /diagnose.',
+    'Provider next: /connect status for saved config; npm run verify:provider-readiness for live endpoint readiness.',
     `Workspace: ${context.cwd}`,
   ]
 
@@ -111,6 +115,51 @@ export async function runDiagnoseCommand(context: CommandContext): Promise<Local
     kind: 'local',
     output: lines.join('\n'),
   }
+}
+
+function summarizeProviderConfig(runtimeConfig: ReturnType<typeof getRuntimeConfig>): string {
+  const activeId = runtimeConfig.activeProviderConnectionId
+  if (!activeId) {
+    return 'no active connection; run /connect login or /connect use'
+  }
+
+  const activeConnection = runtimeConfig.providerConnections.find(
+    connection => connection.id === activeId,
+  )
+  if (!activeConnection) {
+    return 'active connection not found; run /connect status then /connect use <connection-id>'
+  }
+
+  if (activeConnection.status === 'pending') {
+    return 'connection setup pending; finish login/browser flow or rerun /connect login'
+  }
+
+  if (activeConnection.status === 'error') {
+    return 'connection setup error; rerun /connect login for this provider'
+  }
+
+  if (activeConnection.authType !== 'account-auth' && !activeConnection.apiKey?.trim()) {
+    return 'credential missing; run /connect login <provider> --api-key <key>'
+  }
+
+  if (isOpenAICompatibleStyleProvider(activeConnection.provider) && !activeConnection.baseUrl?.trim()) {
+    return 'base URL missing; rerun /connect login with --base-url <url>'
+  }
+
+  if (isOpenAICompatibleStyleProvider(activeConnection.provider) && !activeConnection.model?.trim()) {
+    return 'model missing; run /model use <model-id> or rerun /connect login with --model <model>'
+  }
+
+  return 'configured; live endpoint readiness not checked'
+}
+
+function isOpenAICompatibleStyleProvider(provider: string): boolean {
+  return (
+    provider === 'openai-compatible' ||
+    provider === 'google' ||
+    provider === 'antigravity' ||
+    provider === 'claudecode'
+  )
 }
 
 function summarizeHotspotDirs(paths: readonly string[], limit: number): string[] {
