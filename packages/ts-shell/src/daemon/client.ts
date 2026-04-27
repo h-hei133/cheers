@@ -1,5 +1,4 @@
 import { execFile, execFileSync, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { once } from 'node:events'
 import path from 'node:path'
 import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
@@ -87,6 +86,27 @@ type DaemonServeResponse =
   | DaemonCancelResponse
   | DaemonErrorResponse
 
+type DaemonServeResponseType = DaemonServeResponse['type']
+type DaemonRequestPhase =
+  | 'daemon readiness'
+  | 'execution start request'
+  | 'execution status request'
+  | 'execution cancel request'
+  | 'remote cancel request'
+
+const daemonServeResponseTypes = new Set<DaemonServeResponseType>([
+  'health',
+  'exec',
+  'exec_started',
+  'execution_status',
+  'cancel',
+  'error',
+])
+
+interface UnrefableResource {
+  unref: () => void
+}
+
 interface ResidentDaemonState {
   readonly process: ChildProcessWithoutNullStreams
   readonly stdoutReader: readline.Interface
@@ -106,6 +126,21 @@ export interface RemoteCancelResult {
 let residentDaemonState: ResidentDaemonState | null = null
 let daemonRequestQueue: Promise<void> = Promise.resolve()
 let daemonShutdownHooksInstalled = false
+
+function isDaemonServeResponseType(value: unknown): value is DaemonServeResponseType {
+  return typeof value === 'string' && daemonServeResponseTypes.has(value as DaemonServeResponseType)
+}
+
+function unrefIfSupported(resource: unknown): void {
+  if (
+    typeof resource === 'object'
+    && resource !== null
+    && 'unref' in resource
+    && typeof (resource as UnrefableResource).unref === 'function'
+  ) {
+    ;(resource as UnrefableResource).unref()
+  }
+}
 
 function parseDaemonExecutionResult(raw: string): DaemonExecutionResult {
   const parsed = JSON.parse(raw) as Partial<DaemonExecutionResult>
@@ -152,14 +187,7 @@ function parseDaemonServeResponse(raw: string): DaemonServeResponse {
   if (!parsed || typeof parsed !== 'object') {
     throw new Error('Invalid daemon response: expected object payload')
   }
-  if (
-    parsed.type !== 'health'
-    && parsed.type !== 'exec'
-    && parsed.type !== 'exec_started'
-    && parsed.type !== 'execution_status'
-    && parsed.type !== 'cancel'
-    && parsed.type !== 'error'
-  ) {
+  if (!isDaemonServeResponseType(parsed.type)) {
     throw new Error(`Invalid daemon response type: ${String(parsed.type)}`)
   }
 
@@ -201,13 +229,17 @@ function parseDaemonServeResponse(raw: string): DaemonServeResponse {
     ) {
       throw new Error('Invalid daemon execution_status response: terminalOutcome invalid')
     }
-    if (statusPayload.result !== undefined && statusPayload.result !== null) {
-      statusPayload.result = parseDaemonExecutionResult(JSON.stringify(statusPayload.result))
-    }
-    if (statusPayload.state === 'finished' && !statusPayload.result) {
+    const normalizedResult =
+      statusPayload.result !== undefined && statusPayload.result !== null
+        ? parseDaemonExecutionResult(JSON.stringify(statusPayload.result))
+        : undefined
+    if (statusPayload.state === 'finished' && !normalizedResult) {
       throw new Error('Invalid daemon execution_status response: finished state requires result payload')
     }
-    return statusPayload as DaemonExecutionStatusResponse
+    return {
+      ...(statusPayload as Omit<DaemonExecutionStatusResponse, 'result'>),
+      ...(normalizedResult ? { result: normalizedResult } : {}),
+    }
   }
 
   if (parsed.type === 'cancel') {
@@ -327,10 +359,10 @@ function createResidentDaemonState(cargo: string, workspaceRoot: string): Reside
   processHandle.stdin.on('error', () => {
     // Transport write errors are handled per-request; suppress process-level unhandled events.
   })
-  processHandle.unref()
-  processHandle.stdin.unref()
-  processHandle.stdout.unref()
-  processHandle.stderr.unref()
+  unrefIfSupported(processHandle)
+  unrefIfSupported(processHandle.stdin)
+  unrefIfSupported(processHandle.stdout)
+  unrefIfSupported(processHandle.stderr)
   const stdoutReader = readline.createInterface({
     input: processHandle.stdout,
     crlfDelay: Infinity,
@@ -349,21 +381,40 @@ async function requestDaemonResponse(
   state: ResidentDaemonState,
   request: unknown,
   timeoutMs: number = 15_000,
+  phase: DaemonRequestPhase = 'execution status request',
 ): Promise<DaemonServeResponse> {
-  const linePromise = once(state.stdoutReader, 'line').then(([line]) => String(line))
-  const exitPromise = once(state.process, 'exit').then(([code, signal]) => {
-    throw new Error(`Rust daemon exited before responding (code=${String(code)}, signal=${String(signal)})`)
-  })
-  const timeoutPromise = new Promise<string>((_resolve, reject) => {
-    const handle = setTimeout(() => {
-      reject(new Error(`Rust daemon response timed out after ${timeoutMs} ms`))
+  let cleanupResponseListeners = () => {}
+  const responsePromise = new Promise<string>((resolve, reject) => {
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+    const cleanup = () => {
+      state.stdoutReader.off('line', onLine)
+      state.process.off('exit', onExit)
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle)
+        timeoutHandle = undefined
+      }
+    }
+    const onLine = (line: string) => {
+      cleanup()
+      resolve(String(line))
+    }
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      cleanup()
+      reject(new Error(`Rust daemon exited before responding (code=${String(code)}, signal=${String(signal)})`))
+    }
+    timeoutHandle = setTimeout(() => {
+      cleanup()
+      reject(new Error(`Rust daemon ${phase} timed out after ${timeoutMs} ms`))
     }, timeoutMs)
-    exitPromise.finally(() => clearTimeout(handle)).catch(() => clearTimeout(handle))
-    linePromise.finally(() => clearTimeout(handle)).catch(() => clearTimeout(handle))
+
+    cleanupResponseListeners = cleanup
+    state.stdoutReader.once('line', onLine)
+    state.process.once('exit', onExit)
   })
   const serialized = `${JSON.stringify(request)}\n`
   await new Promise<void>((resolve, reject) => {
     const onError = (error: Error) => {
+      cleanupResponseListeners()
       state.process.stdin.off('error', onError)
       reject(error)
     }
@@ -372,18 +423,20 @@ async function requestDaemonResponse(
       state.process.stdin.write(serialized, (error) => {
         state.process.stdin.off('error', onError)
         if (error) {
+          cleanupResponseListeners()
           reject(error)
           return
         }
         resolve()
       })
     } catch (error) {
+      cleanupResponseListeners()
       state.process.stdin.off('error', onError)
       reject(error instanceof Error ? error : new Error(String(error)))
     }
   })
 
-  const line = await Promise.race([linePromise, exitPromise, timeoutPromise]) as string
+  const line = await responsePromise
   return parseDaemonServeResponse(line)
 }
 
@@ -419,7 +472,7 @@ async function executeViaResidentDaemon(options: {
   abortSignal?: AbortSignal
 }): Promise<DaemonExecutionResult> {
   const state = await ensureResidentDaemon(options.workspaceRoot)
-  const health = await requestDaemonResponse(state, { type: 'health' }, 5_000)
+  const health = await requestDaemonResponse(state, { type: 'health' }, 5_000, 'daemon readiness')
   if (health.type !== 'health') {
     throw new Error(`Unexpected daemon response type for health request: ${health.type}`)
   }
@@ -432,7 +485,7 @@ async function executeViaResidentDaemon(options: {
       workspaceRoot: options.workspaceRoot,
       timeoutMs: options.timeoutMs ?? 30_000,
     },
-  }, 5_000)
+  }, 5_000, 'execution start request')
 
   if (startResponse.type === 'error') {
     throw new Error(startResponse.error)
@@ -448,7 +501,7 @@ async function executeViaResidentDaemon(options: {
       const cancelResult = await requestDaemonResponse(state, {
         type: 'cancel',
         execution_id: startResponse.executionId,
-      }, 5_000)
+      }, 5_000, 'execution cancel request')
       if (cancelResult.type === 'error') {
         throw new Error(cancelResult.error)
       }
@@ -461,7 +514,7 @@ async function executeViaResidentDaemon(options: {
     const statusResponse = await requestDaemonResponse(state, {
       type: 'execution_status',
       execution_id: startResponse.executionId,
-    }, 5_000)
+    }, 5_000, 'execution status request')
     if (statusResponse.type === 'error') {
       throw new Error(statusResponse.error)
     }
@@ -527,7 +580,7 @@ export async function cancelRustExecution(options: {
     const response = await requestDaemonResponse(state, {
       type: 'cancel',
       execution_id: options.executionId,
-    }, 5_000)
+    }, 5_000, 'remote cancel request')
 
     if (response.type === 'error') {
       throw new Error(response.error)

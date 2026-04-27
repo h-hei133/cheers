@@ -3,6 +3,27 @@ import { CoreMcpClient } from './client.js'
 import { CoreMcpConnectionManager } from './connectionManager.js'
 import type { McpClientSnapshot, McpConnectionState, McpToolCallResult, ScopedMcpServerConfig } from './types.js'
 
+export type McpGatewayBlockerKind =
+  | 'command-not-allowlisted'
+  | 'environment-not-ready'
+  | 'unknown'
+
+export class McpGatewayBlockedError extends Error {
+  readonly blockerKind: McpGatewayBlockerKind
+  readonly doNext: string
+
+  constructor(input: {
+    message: string
+    blockerKind: McpGatewayBlockerKind
+    doNext: string
+  }) {
+    super(input.message)
+    this.name = 'McpGatewayBlockedError'
+    this.blockerKind = input.blockerKind
+    this.doNext = input.doNext
+  }
+}
+
 export class CoreMcpGateway {
   private readonly workspaceRoot: string
   private readonly connectionManager = new CoreMcpConnectionManager()
@@ -52,7 +73,11 @@ export class CoreMcpGateway {
       normalizedTarget.toLowerCase() !== 'all' &&
       !configs[normalizedTarget]
     ) {
-      throw new Error(`Unknown MCP server: ${normalizedTarget}`)
+      throw new McpGatewayBlockedError({
+        message: `Unknown MCP server: ${normalizedTarget}`,
+        blockerKind: 'unknown',
+        doNext: 'Run /mcp status to list configured servers, then retry with a valid server name.',
+      })
     }
 
     if (!normalizedTarget || normalizedTarget.toLowerCase() === 'all') {
@@ -69,7 +94,11 @@ export class CoreMcpGateway {
     const config = configs[serverName]
     if (!config) {
       this.clientCache.delete(serverName)
-      throw new Error(`Unknown MCP server: ${serverName}`)
+      throw new McpGatewayBlockedError({
+        message: `Unknown MCP server: ${serverName}`,
+        blockerKind: 'unknown',
+        doNext: 'Run /mcp status to list configured servers, then retry with a valid server name.',
+      })
     }
 
     const candidate = this.clientCache.get(serverName)
@@ -80,7 +109,7 @@ export class CoreMcpGateway {
     const connectionState = await client.connect()
     if (connectionState.type !== 'connected') {
       this.clientCache.delete(serverName)
-      throw new Error(this.describeUnavailableServer(connectionState))
+      throw this.createUnavailableServerBlockedError(connectionState)
     }
 
     this.clientCache.set(serverName, client)
@@ -117,5 +146,23 @@ export class CoreMcpGateway {
       case 'pending':
         return `MCP server ${state.name} is pending connection`
     }
+  }
+
+  private createUnavailableServerBlockedError(
+    state: Exclude<McpConnectionState, { type: 'connected' }>,
+  ): McpGatewayBlockedError {
+    if (state.type === 'needs-auth') {
+      return new McpGatewayBlockedError({
+        message: this.describeUnavailableServer(state),
+        blockerKind: 'environment-not-ready',
+        doNext: `Authenticate server '${state.name}' and rerun /mcp refresh ${state.name}.`,
+      })
+    }
+
+    return new McpGatewayBlockedError({
+      message: this.describeUnavailableServer(state),
+      blockerKind: 'environment-not-ready',
+      doNext: `Run /mcp refresh ${state.name} and verify server connectivity before retrying.`,
+    })
   }
 }

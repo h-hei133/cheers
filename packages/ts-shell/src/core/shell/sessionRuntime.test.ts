@@ -69,6 +69,92 @@ describe("shell session runtime (W5)", () => {
     ]);
   });
 
+  it("renders print mode answer before compact result boundary", async () => {
+    const renderedLines: string[] = [];
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield { type: "tool.started", toolName: "read" };
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_print",
+              initialPrompt: "inspect sample.txt",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "Read result for sample.txt:\n```text\nstatus_new\n```",
+            codingResult: {
+              taskKind: "read-file",
+              changedFiles: [],
+              failedFiles: [],
+              patches: [],
+              repair: { contextUsed: false },
+              verification: {
+                status: "not-requested",
+                reason: "read-only task",
+                nextAction:
+                  "Use the observed file context to request a specific edit.",
+              },
+              taskSatisfaction: {
+                verdict: "completed",
+                reasons: ["Read/summarize task delivered requested content."],
+              },
+              evidence: ["read:sample.txt:1"],
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: [],
+                attemptedFiles: ["sample.txt"],
+                changedFiles: [],
+                unchangedAttemptedFiles: ["sample.txt"],
+              },
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_print", "inspect sample.txt", {
+      outputMode: "print",
+    });
+
+    const answerIndex = renderedLines.findIndex((line) =>
+      line.includes("Read result for sample.txt"),
+    );
+    const resultIndex = renderedLines.indexOf("Result");
+    const actionResultIndex = renderedLines.indexOf("Action result");
+    const summaryIndex = renderedLines.findIndex((line) =>
+      line.includes("Execution summary"),
+    );
+
+    expect(answerIndex).toBeGreaterThanOrEqual(0);
+    expect(resultIndex).toBeGreaterThan(answerIndex);
+    expect(actionResultIndex).toBeGreaterThan(resultIndex);
+    expect(summaryIndex).toBeGreaterThan(actionResultIndex);
+  });
+
   it("builds follow-up continuity context before persisting the current prompt barrier", async () => {
     const calls: string[] = [];
     const runtime = new ShellSessionRuntime({
@@ -172,7 +258,11 @@ describe("shell session runtime (W5)", () => {
           attempt: 1,
           reason: "network-failure",
         };
-        yield { type: "message.delta", role: "reviewer", delta: "final answer" };
+        yield {
+          type: "message.delta",
+          role: "reviewer",
+          delta: "final answer",
+        };
         yield {
           type: "query.completed",
           result: {
@@ -254,34 +344,28 @@ describe("shell session runtime (W5)", () => {
     expect(renderedChunks).toEqual(["final answer"]);
     expect(renderedLines).toContain("\nAssistant:");
     expect(renderedLines).not.toContain("final answer");
-    expect(
-      renderedLines.some((line) => line.includes("[tool:start]")),
-    ).toBe(false);
+    expect(renderedLines.some((line) => line.includes("[tool:start]"))).toBe(
+      false,
+    );
     expect(
       renderedLines.some((line) => line.includes("[approval] requested")),
     ).toBe(false);
-    expect(
-      renderedLines.some((line) => line.includes("[query:retry]")),
-    ).toBe(false);
+    expect(renderedLines.some((line) => line.includes("[query:retry]"))).toBe(
+      false,
+    );
     expect(
       renderedLines.some((line) =>
         line.includes("Working through a temporary provider retry"),
       ),
     ).toBe(true);
     expect(
-      renderedLines.some((line) =>
-        line.includes("Execution summary"),
-      ),
+      renderedLines.some((line) => line.includes("Execution summary")),
     ).toBe(true);
     expect(
-      renderedLines.some((line) =>
-        line.includes("- Actions: bash (1 run)"),
-      ),
+      renderedLines.some((line) => line.includes("- Actions: bash (1 run)")),
     ).toBe(true);
     expect(
-      renderedLines.some((line) =>
-        line.includes("- Approvals: 0/1 approved"),
-      ),
+      renderedLines.some((line) => line.includes("- Approvals: 0/1 approved")),
     ).toBe(true);
     expect(renderedLines).toContain("Result");
     expect(
@@ -295,9 +379,7 @@ describe("shell session runtime (W5)", () => {
     expect(renderedLines).toContain(
       "- Change summary: src/app.ts: replaced `return false;` with `return true;`",
     );
-    expect(renderedLines).toContain(
-      "- Repair context: repairContextUsed:true",
-    );
+    expect(renderedLines).toContain("- Repair context: repairContextUsed:true");
     expect(renderedLines).toContain(
       "- Repaired failure reason: repairedFailureReason:patch-from-not-found",
     );
@@ -371,7 +453,7 @@ describe("shell session runtime (W5)", () => {
                 notes: [],
               },
               continuation: {
-                status: "not-needed",
+                status: "first-pass-success",
                 attempts: 0,
                 evidence: [],
               },
@@ -522,7 +604,9 @@ describe("shell session runtime (W5)", () => {
 
     await runtime.executePrompt("sess_repair_abandoned", "repair it");
 
-    expect(renderedLines).toContain("- Repair context: repairContextUsed:false");
+    expect(renderedLines).toContain(
+      "- Repair context: repairContextUsed:false",
+    );
     expect(renderedLines).toContain(
       "- Repair context abandoned: repairContextAbandoned:true",
     );
@@ -708,12 +792,14 @@ describe("shell session runtime (W5)", () => {
               unverifiedFiles: [
                 {
                   path: "notes.txt",
-                  reason: "Verify intent was detected, but no verify strategy could be resolved from the prompt.",
+                  reason:
+                    "Verify intent was detected, but no verify strategy could be resolved from the prompt.",
                 },
               ],
               verification: {
                 status: "blocked",
-                reason: "Verify intent was detected, but no verify strategy could be resolved from the prompt.",
+                reason:
+                  "Verify intent was detected, but no verify strategy could be resolved from the prompt.",
                 blockerKind: "no-verify-strategy",
                 nextAction:
                   "Specify verify intent explicitly with test/build/check keywords so a concrete verify command can be selected.",
@@ -725,7 +811,10 @@ describe("shell session runtime (W5)", () => {
       },
     });
 
-    await runtime.executePrompt("sess_write_verify_blocked", "create notes and verify");
+    await runtime.executePrompt(
+      "sess_write_verify_blocked",
+      "create notes and verify",
+    );
 
     expect(renderedLines).toContain("- Verification: blocked");
     expect(renderedLines).toContain(
@@ -1091,9 +1180,7 @@ describe("shell session runtime (W5)", () => {
     expect(renderedLines).toContain(
       '- Rephrase with one allowed command, for example: "Run node --version".',
     );
-    expect(renderedLines).toContain(
-      "- BlockerKind: command-not-allowlisted",
-    );
+    expect(renderedLines).toContain("- BlockerKind: command-not-allowlisted");
     expect(renderedLines).toContain(
       "- Reason: Run-command intent is not allowed in the MVP allowlist: npm publish Allowed commands: node --version, npm test -- --help, npm run build -- --help Please rephrase your request to one of the allowed command intents.",
     );

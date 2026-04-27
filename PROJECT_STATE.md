@@ -67,7 +67,7 @@ The primary user-visible mainline is now:
 5. Result block stays minimal and actionable in compact mode
 6. Session remains ready for next turn with clear boundaries
 
-## 5. Latest Implemented Delta (2026-04-19)
+## 5. Latest Implemented Delta (2026-04-26)
 
 ### A. Transport-unified turn execution (already landed)
 
@@ -87,6 +87,28 @@ The primary user-visible mainline is now:
 - interactive turn boundary markers:
   - `=== Turn N ===`
   - `=== End Turn N ===`
+
+### D. Single-file edit repair acceptance (stage closeout)
+
+Real-provider CLI acceptance now covers the two core single-file edit repair chains:
+
+| Scenario | Provider acceptance | Status | Key evidence marker | Regression guard |
+| --- | --- | --- | --- | --- |
+| replace success | synthetic | pass | changedFiles / change summary | `runMvpIntegratedFlow.test.ts` focused edit coverage |
+| patch-from-not-found failure | real-provider + synthetic | pass | `failureReason:patch-from-not-found`, actionable nextAction | `runMvpIntegratedFlow.test.ts` patch-from-not-found coverage |
+| patch-from-not-found follow-up repair | real-provider + synthetic | pass | `repairContextUsed:true`, `repairedFailureReason:patch-from-not-found`, `repairPayloadKind:replace-directive` | `runMvpIntegratedFlow.test.ts` repair follow-up coverage |
+| patch-ambiguous failure | real-provider + synthetic | pass | `failureReason:patch-ambiguous`, matched-count explanation, actionable nextAction | `runMvpIntegratedFlow.test.ts` patch ambiguous coverage |
+| patch-ambiguous follow-up repair | real-provider + synthetic | pass | `repairContextUsed:true`, `repairedFailureReason:patch-ambiguous`, `repairPayloadKind:replace-directive` | `runMvpIntegratedFlow.test.ts -t "repairs patch ambiguous"` |
+| repair evidence visible in CLI surface | real-provider + synthetic | pass | repaired failure reason / target file / payload kind visible in Action result | `sessionRuntime.test.ts` repair context rendering |
+| multi failed target abandoned diagnostic | synthetic + real CLI acceptance | pass | `repairContextUsed:false`, `repairContextAbandoned:true`, `multiple-failed-targets`, candidate count | `runMvpIntegratedFlow.test.ts -t "failed target candidates"` and `sessionRuntime.test.ts` |
+
+Explicitly unsupported in this stage:
+
+- fuzzy replace matching
+- AST edit
+- multi-file edit repair expansion
+- multi failed target automatic repair
+- implicit workspace/root mode changes as part of edit repair
 
 ## 6. Confirmed Baseline Facts
 

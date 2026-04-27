@@ -1,16 +1,16 @@
-﻿import fs from "node:fs";
+﻿import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
-import crypto from "node:crypto";
 import type { SchemaVersion } from "../../../../contracts/typescript/types.js";
-import { getRuntimeConfig } from "../config/runtimeConfig.js";
-import { CoreMcpGateway } from "../core/mcp/gateway.js";
-import type { QueryEvent } from "../core/query/events.js";
-import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import type {
   GoogleAccountAuthConfig,
   OpenAIAccountAuthConfig,
   RuntimeProvider,
 } from "../config/runtimeConfig.js";
+import { getRuntimeConfig } from "../config/runtimeConfig.js";
+import { CoreMcpGateway } from "../core/mcp/gateway.js";
+import type { QueryEvent } from "../core/query/events.js";
+import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { OpenAIModelAdapter } from "../model-adapters/providers/openai/OpenAIModelAdapter.js";
 import { createComponentLogger, recordCount } from "../observability/index.js";
 import {
@@ -22,23 +22,25 @@ import {
 import { ToolDispatcher } from "../tools/dispatcher.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import {
+  extractFileConstraintAssertions,
+  extractLowRiskUnchangedVerifications,
+  type FileConstraintAssertions,
+} from "./fileConstraintAssertions.js";
+import {
   extractConsistencyItems,
   findMissingConsistencyItems,
   normalizeComparableText,
   planLowRiskVerification,
 } from "./lowRiskVerificationPlanning.js";
-import {
-  extractFileConstraintAssertions,
-  extractLowRiskUnchangedVerifications,
-  type FileConstraintAssertions,
-} from "./fileConstraintAssertions.js";
 import { MultiAgentOrchestrator } from "./MultiAgentOrchestrator.js";
+import { executeFileMutationBranch } from "./mutationExecution.js";
 import {
   applySingleFileReplacePatch,
   formatPatchFailureReason,
 } from "./patchMutationLane.js";
-import { executeFileMutationBranch } from "./mutationExecution.js";
 import { resolveTaskTargets } from "./targetResolution.js";
+import type { ResolvedTarget } from "./targetResolution.js";
+import type { SingleFileReplacePatchResult } from "./patchMutationLane.js";
 import type {
   AgentExecutionInput,
   AgentExecutionOutput,
@@ -47,9 +49,9 @@ import type {
   CodingTaskKind,
   CodingVerificationBlockerKind,
   CodingVerificationSummary,
+  OrchestrationResult,
   TerminalClassification,
   TerminalReason,
-  OrchestrationResult,
 } from "./types.js";
 
 const CONTRACT_VERSION: SchemaVersion = "1.0.0";
@@ -521,6 +523,7 @@ interface ContinuityStateLike {
   projectRoot?: string;
   lastTaskKind?: CodingTaskKind;
   lastFailure?: string;
+  lastTaskSatisfactionVerdict?: string;
   lastGroundedDeliverableMode?: GroundedDeliverableMode;
   lastReadDeliveredLines?: number;
   lastReadWindowStart?: number;
@@ -740,6 +743,15 @@ function buildWorkflowTaskPlan(
   const lastTaskWasMutationLike =
     continuity.lastTaskKind === "edit-file" ||
     continuity.lastTaskKind === "write-file";
+  const hasPostEditReadOnlyVerifyPrompt =
+    isPostEditReadOnlyVerifyFollowUp(prompt);
+  const hasPostEditReadOnlyVerifyCue =
+    hasPostEditReadOnlyVerifyPrompt &&
+    lastTaskWasMutationLike &&
+    !hasCreateIntent &&
+    !hasExecutionIntent &&
+    !effectiveReplaceDirectiveFromPrompt &&
+    !extractFencedContent(prompt);
   const lastTaskHadVerifySignal =
     continuity.lastVerificationStatus === "failed" ||
     continuity.lastVerificationStatus === "blocked" ||
@@ -907,6 +919,7 @@ function buildWorkflowTaskPlan(
       hasEditFailureRepairPayload ||
       isAmbiguousRepairFollowUp ||
       hasWeakRepairFollowUp ||
+      hasPostEditReadOnlyVerifyCue ||
       (hasGroundedReadLikeIntent && lastTaskWasReadLike) ||
       hasEditIntent ||
       hasCreateIntent ||
@@ -1666,6 +1679,20 @@ function buildWorkflowTaskPlan(
       groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
       ...(readLineCount !== undefined ? { readLineCount } : {}),
       ...(readLineOffset !== undefined ? { readLineOffset } : {}),
+      inspectFirst: true,
+      verifyAfterEdit: false,
+      usedRestoredState,
+      repairInstruction: normalizedRepairInstruction,
+    };
+  }
+
+  if (hasPostEditReadOnlyVerifyCue && primaryTarget?.inWorkspace) {
+    return {
+      taskKind: "read-file",
+      reason:
+        "post-edit verify/check follow-up resolved as read-only continuation",
+      targetPath: primaryTarget.cleaned,
+      groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
       inspectFirst: true,
       verifyAfterEdit: false,
       usedRestoredState,
@@ -6793,6 +6820,38 @@ function isVerifyContinuationFollowUpPrompt(prompt: string): boolean {
   );
 }
 
+function isPostEditReadOnlyVerifyFollowUp(prompt: string): boolean {
+  const normalized = prompt.toLowerCase();
+  const hasVerifyOrCheck =
+    /\b(?:verify|verification|check|confirm|ensure|make sure)\b/i.test(
+      normalized,
+    ) || /(?:\u9a8c\u8bc1|\u68c0\u67e5|\u786e\u8ba4)/i.test(normalized);
+  if (!hasVerifyOrCheck) {
+    return false;
+  }
+  const referencesPriorEdit =
+    /\b(?:last|previous|prior|recent)\s+(?:change|edit|modification|update)\b/i.test(
+      normalized,
+    ) ||
+    /\b(?:changed file|changed files|the change|the edit)\b/i.test(
+      normalized,
+    ) ||
+    /(?:\u4e0a\u4e00\u6b21|\u521a\u624d|\u4e0a\u8f6e).*(?:\u4fee\u6539|\u6539\u52a8)/i.test(
+      normalized,
+    );
+  const readOnlyCheck =
+    /\b(?:contains|include|includes|has|matches|stays|remains)\b/i.test(
+      normalized,
+    ) ||
+    /\b(?:do not|don't|dont|without)\s+(?:edit|modify|change|touch|write|replace|fix)\b/i.test(
+      normalized,
+    ) ||
+    /(?:\u5305\u542b|\u4e0d\u8981\s*(?:\u4fee\u6539|\u5199\u5165|\u66ff\u6362))/i.test(
+      normalized,
+    );
+  return referencesPriorEdit || readOnlyCheck;
+}
+
 function isWeakRepairFollowUpPrompt(prompt: string): boolean {
   return /(?:use the failure above|same file.*not that fix|not the right fix|wrong direction|fix the real issue|continue repairing it|continue fixing it|不要再走刚才那个错误方向|同一个文件.*不是那个修法|基于上一次失败继续修复)/i.test(
     prompt,
@@ -10568,10 +10627,16 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function isSingleFileReplacePatchFailure(
+  result: SingleFileReplacePatchResult,
+): result is Extract<SingleFileReplacePatchResult, { ok: false }> {
+  return result.ok === false;
+}
+
 function selectMutationTargetFromPrompt(
   prompt: string,
-  targets: readonly { readonly cleaned: string }[],
-): (typeof targets)[number] | undefined {
+  targets: readonly ResolvedTarget[],
+): ResolvedTarget | undefined {
   const selectionPlan = planMutationTargetSelection(prompt, targets);
   return rankMutationTargetCandidates(selectionPlan);
 }
@@ -10832,10 +10897,12 @@ function resolveMutationInstruction(
         removedLines: patchResult.removedLines,
       };
     }
-    return {
-      ok: false,
-      reason: formatPatchFailureReason(patchResult),
-    };
+    if (isSingleFileReplacePatchFailure(patchResult)) {
+      return {
+        ok: false,
+        reason: formatPatchFailureReason(patchResult),
+      };
+    }
   }
 
   if (fencedContent) {
@@ -10991,7 +11058,7 @@ function resolveMutationInstruction(
     originalContent,
     replaceDirective,
   });
-  if (!patchResult.ok) {
+  if (isSingleFileReplacePatchFailure(patchResult)) {
     return {
       ok: false,
       reason: formatPatchFailureReason(patchResult),
@@ -11575,11 +11642,14 @@ function deriveActionableBlockerContract(input: {
       doNext: string;
     }
   | undefined {
-  const evidenceKind = findActionableBlockerKindInEvidence(input.evidence ?? []);
+  const evidenceKind = findActionableBlockerKindInEvidence(
+    input.evidence ?? [],
+  );
   const candidateReason =
     input.reason?.trim() ||
     input.verification?.reason?.trim() ||
-    input.failedFiles?.find((entry) => entry.reason.trim().length > 0)?.reason ||
+    input.failedFiles?.find((entry) => entry.reason.trim().length > 0)
+      ?.reason ||
     input.taskReasons?.find((entry) => entry.trim().length > 0);
 
   if (!candidateReason) {

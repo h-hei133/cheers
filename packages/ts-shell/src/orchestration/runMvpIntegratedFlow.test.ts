@@ -1,7 +1,7 @@
+import { spawnSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { QueryEvent } from "../core/query/events.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
@@ -28,7 +28,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       recentChangedFiles: result.codingResult?.changedFiles ?? [],
       recentFailedFiles: result.codingResult?.failedFiles ?? [],
       recentVerifiedFiles: result.codingResult?.verifiedFiles ?? [],
-      lastContinuationEvidence: result.codingResult?.continuation.evidence ?? [],
+      lastContinuationEvidence:
+        result.codingResult?.continuation.evidence ?? [],
       lastTerminalClassification: result.terminalClassification,
       lastTerminalReason: result.terminalReason,
       lastTaskSatisfactionVerdict:
@@ -48,7 +49,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_happy",
-      prompt: "Run node --version and continue with tool-assisted implementation",
+      prompt:
+        "Run node --version and continue with tool-assisted implementation",
       workspaceRoot,
       escalationDecision: "allow-once",
       maxTurns: 6,
@@ -478,11 +480,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
     await fs.writeFile(
       path.join(workspaceRoot, "src", "panel.test.tsx"),
-      [
-        "export function panelLogic() {",
-        "  return 'panel';",
-        "}",
-      ].join("\n"),
+      ["export function panelLogic() {", "  return 'panel';", "}"].join("\n"),
       "utf8",
     );
 
@@ -565,7 +563,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_write_python_mojibake",
-      prompt: "写一锟斤拷 python 锟脚憋拷 helloworld 锟斤拷锟节碉拷前目录锟斤拷",
+      prompt:
+        "写一锟斤拷 python 锟脚憋拷 helloworld 锟斤拷锟节碉拷前目录锟斤拷",
       workspaceRoot,
       escalationDecision: "allow-once",
       maxTurns: 6,
@@ -633,7 +632,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.status).toBe("completed");
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=read-file");
-    expect(mergedNotes).toContain("tool: read file src/continuation-target.tsx");
+    expect(mergedNotes).toContain(
+      "tool: read file src/continuation-target.tsx",
+    );
     expect(result.finalOutput).toContain("line1");
   }, 15000);
 
@@ -641,7 +642,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     await fs.mkdir(path.join(workspaceRoot, "src", "new"), { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
-      JSON.stringify({ name: "t10-continuation-relocation-single-candidate" }, null, 2),
+      JSON.stringify(
+        { name: "t10-continuation-relocation-single-candidate" },
+        null,
+        2,
+      ),
       "utf8",
     );
     await fs.writeFile(
@@ -683,7 +688,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     await fs.mkdir(path.join(workspaceRoot, "src", "b"), { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
-      JSON.stringify({ name: "t10-continuation-relocation-ambiguous" }, null, 2),
+      JSON.stringify(
+        { name: "t10-continuation-relocation-ambiguous" },
+        null,
+        2,
+      ),
       "utf8",
     );
     await fs.writeFile(
@@ -757,7 +766,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("completed");
     expect(result.finalOutput).toContain("Task not completed");
-    expect(result.finalOutput).toContain("no high-confidence relocation candidate was found");
+    expect(result.finalOutput).toContain(
+      "no high-confidence relocation candidate was found",
+    );
   }, 15000);
 
   it("defaults to grounded read when prompt provides a file path but lacks explicit read verb", async () => {
@@ -799,11 +810,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
     await fs.writeFile(
       path.join(workspaceRoot, "src", "flow.ts"),
-      [
-        "export function runFlow() {",
-        "  return 'ok';",
-        "}",
-      ].join("\n"),
+      ["export function runFlow() {", "  return 'ok';", "}"].join("\n"),
       "utf8",
     );
 
@@ -893,7 +900,10 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.codingResult?.taskKind).toBe("write-file");
     expect(result.codingResult?.changedFiles).toContain("helloworld.py");
 
-    const created = await fs.readFile(path.join(workspaceRoot, "helloworld.py"), "utf8");
+    const created = await fs.readFile(
+      path.join(workspaceRoot, "helloworld.py"),
+      "utf8",
+    );
     expect(created.length).toBeGreaterThan(0);
   }, 15000);
 
@@ -961,11 +971,17 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.codingResult?.taskKind).toBe("write-file");
     expect(result.codingResult?.changedFiles).toContain("scripts/verify.py");
     expect(result.codingResult?.verification.status).toBe("not-requested");
-    expect(result.codingResult?.evidence).toContain("current-permission-request-tool:write");
-    expect(result.codingResult?.evidence).toContain("current-permission-request-operation:write");
+    expect(result.codingResult?.evidence).toContain(
+      "current-permission-request-tool:write",
+    );
+    expect(result.codingResult?.evidence).toContain(
+      "current-permission-request-operation:write",
+    );
     expect(
       result.codingResult?.evidence.some((entry) =>
-        entry.startsWith("current-permission-request-scope-label:write/write/target("),
+        entry.startsWith(
+          "current-permission-request-scope-label:write/write/target(",
+        ),
       ),
     ).toBe(true);
   }, 15000);
@@ -1006,8 +1022,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.codingResult?.verification.command).toBe("node --version");
     expect(result.codingResult?.taskSatisfaction.verdict).toBe("satisfied");
     expect(result.codingResult?.evidence.length).toBeGreaterThan(0);
-    expect(result.codingResult?.evidence).toContain("current-permission-request-tool:edit");
-    expect(result.codingResult?.evidence).toContain("current-permission-request-operation:write");
+    expect(result.codingResult?.evidence).toContain(
+      "current-permission-request-tool:edit",
+    );
+    expect(result.codingResult?.evidence).toContain(
+      "current-permission-request-operation:write",
+    );
     expect(
       result.codingResult?.evidence.some((entry) =>
         entry.startsWith("patch:src/edit-target.ts"),
@@ -1122,10 +1142,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
     await fs.writeFile(
       path.join(workspaceRoot, "src", "ambiguous.ts"),
-      [
-        "export const markerA = 'v1';",
-        "export const markerB = 'v1';",
-      ].join("\n"),
+      ["export const markerA = 'v1';", "export const markerB = 'v1';"].join(
+        "\n",
+      ),
       "utf8",
     );
 
@@ -1206,7 +1225,10 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(repaired.codingResult?.patches?.[0]?.status).toBe("applied");
     expect(repaired.codingResult?.taskSatisfaction.verdict).toBe("satisfied");
     await expect(
-      fs.readFile(path.join(workspaceRoot, "src", "follow-not-found.txt"), "utf8"),
+      fs.readFile(
+        path.join(workspaceRoot, "src", "follow-not-found.txt"),
+        "utf8",
+      ),
     ).resolves.toBe("fixed content\n");
     await expect(
       fs.readFile(path.join(workspaceRoot, "src", "other-follow.txt"), "utf8"),
@@ -1261,7 +1283,10 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(repaired.codingResult?.patches?.[0]?.status).toBe("applied");
     expect(repaired.codingResult?.taskSatisfaction.verdict).toBe("satisfied");
     await expect(
-      fs.readFile(path.join(workspaceRoot, "src", "follow-unclear.txt"), "utf8"),
+      fs.readFile(
+        path.join(workspaceRoot, "src", "follow-unclear.txt"),
+        "utf8",
+      ),
     ).resolves.toBe("new line");
   }, 15000);
 
@@ -1314,7 +1339,10 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
     expect(repaired.codingResult?.patches?.[0]?.status).toBe("applied");
     await expect(
-      fs.readFile(path.join(workspaceRoot, "src", "follow-ambiguous.ts"), "utf8"),
+      fs.readFile(
+        path.join(workspaceRoot, "src", "follow-ambiguous.ts"),
+        "utf8",
+      ),
     ).resolves.toBe(
       ["export const markerA = 'v2';", "export const markerB = 'v1';"].join(
         "\n",
@@ -1372,7 +1400,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.codingResult?.changedFiles).toEqual(["src/multi-failed-a.ts"]);
+    expect(result.codingResult?.changedFiles).toEqual([
+      "src/multi-failed-a.ts",
+    ]);
     expect(result.codingResult?.evidence).toEqual(
       expect.arrayContaining([
         "repairContextUsed:false",
@@ -1451,7 +1481,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
-      JSON.stringify({ name: "t10-continuation-replan-from-evidence" }, null, 2),
+      JSON.stringify(
+        { name: "t10-continuation-replan-from-evidence" },
+        null,
+        2,
+      ),
       "utf8",
     );
     await fs.writeFile(
@@ -1493,6 +1527,96 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
     expect(updated).toContain("'modern'");
     expect(updated).not.toContain("'legacy'");
+  }, 15000);
+
+  it("routes post-edit verify last change follow-up to read-check instead of edit mutation", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-post-edit-verify-followup" }, null, 2),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "verify-target.txt"),
+      ["status_new", "marker_keep"].join("\n"),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_post_edit_verify_followup",
+      prompt:
+        "Verify the last change by checking src/verify-target.txt contains status_new and marker_keep.",
+      workspaceRoot,
+      continuityState: {
+        recentTargetFiles: ["src/verify-target.txt"],
+        recentChangedFiles: ["src/verify-target.txt"],
+        lastTaskKind: "edit-file",
+        lastTerminalClassification: "success",
+        lastTerminalReason: "completed",
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("read-file");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.stopReason ?? "").not.toContain("edit-transform-unclear");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "post-edit verify/check follow-up resolved as read-only continuation",
+    );
+    expect(result.finalOutput).toContain("status_new");
+    expect(result.finalOutput).toContain("marker_keep");
+
+    const unchanged = await fs.readFile(
+      path.join(workspaceRoot, "src", "verify-target.txt"),
+      "utf8",
+    );
+    expect(unchanged).toBe(["status_new", "marker_keep"].join("\n"));
+  }, 15000);
+
+  it("routes post-edit make sure contains do-not-edit wording to read-check", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-post-edit-make-sure-followup" }, null, 2),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "make-sure-target.txt"),
+      ["status_new", "marker_keep"].join("\n"),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_post_edit_make_sure_followup",
+      prompt:
+        "Make sure it contains status_new and marker_keep. Do not edit files.",
+      workspaceRoot,
+      continuityState: {
+        recentTargetFiles: ["src/make-sure-target.txt"],
+        recentChangedFiles: ["src/make-sure-target.txt"],
+        lastTaskKind: "edit-file",
+        lastTerminalClassification: "success",
+        lastTerminalReason: "completed",
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("read-file");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.stopReason ?? "").not.toContain("edit-transform-unclear");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "post-edit verify/check follow-up resolved as read-only continuation",
+    );
+    expect(result.finalOutput).toContain("status_new");
+    expect(result.finalOutput).toContain("marker_keep");
+
+    const unchanged = await fs.readFile(
+      path.join(workspaceRoot, "src", "make-sure-target.txt"),
+      "utf8",
+    );
+    expect(unchanged).toBe(["status_new", "marker_keep"].join("\n"));
   }, 15000);
 
   it("supports batch edit across multiple files with aggregated verify result", async () => {
@@ -1548,8 +1672,14 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       ]),
     );
 
-    const aContent = await fs.readFile(path.join(workspaceRoot, "src", "a.ts"), "utf8");
-    const bContent = await fs.readFile(path.join(workspaceRoot, "src", "b.ts"), "utf8");
+    const aContent = await fs.readFile(
+      path.join(workspaceRoot, "src", "a.ts"),
+      "utf8",
+    );
+    const bContent = await fs.readFile(
+      path.join(workspaceRoot, "src", "b.ts"),
+      "utf8",
+    );
     expect(aContent).toContain("v2");
     expect(bContent).toContain("v2");
   }, 15000);
@@ -1723,16 +1853,18 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
 
     expect(approvalResolves.length).toBeGreaterThanOrEqual(2);
-    expect(approvalResolves.every((event) => event.outcome === "approved")).toBe(
-      true,
-    );
+    expect(
+      approvalResolves.every((event) => event.outcome === "approved"),
+    ).toBe(true);
     expect(failedToolResults.length).toBeGreaterThanOrEqual(2);
     expect(completed?.result.status).toBe("stopped_error");
     expect(completed?.result.terminalClassification).toBe("error");
     expect(completed?.result.stopReason).toContain(
       "Verification command failed after 2 attempts",
     );
-    expect(completed?.result.stopReason).not.toContain("Approval denied by user");
+    expect(completed?.result.stopReason).not.toContain(
+      "Approval denied by user",
+    );
   }, 15000);
 
   it("skips targeted verify with explicit reason when changed files do not map to allowlisted verify commands", async () => {
@@ -1769,9 +1901,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       "completed-with-caveats",
     );
     expect(result.codingResult?.unverifiedFiles).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ path: "README.md" }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ path: "README.md" })]),
     );
   }, 15000);
 
@@ -1875,7 +2005,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
   it("keeps the target unchanged when an explicit replace patch source is missing", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     const original = "alpha\nbeta\ngamma\n";
-    await fs.writeFile(path.join(workspaceRoot, "patch_note.txt"), original, "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "patch_note.txt"),
+      original,
+      "utf8",
+    );
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_patch_lane_not_found",
@@ -1901,7 +2035,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
   it("keeps the target unchanged when an explicit replace patch source is ambiguous", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     const original = "alpha\nbeta\nbeta\n";
-    await fs.writeFile(path.join(workspaceRoot, "patch_note.txt"), original, "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "patch_note.txt"),
+      original,
+      "utf8",
+    );
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_patch_lane_ambiguous",
@@ -2020,12 +2158,20 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     const initialUtils = [
       'export function greet(name = "world") {',
       '  return "Hello, " + name;',
-      '}',
-      '',
+      "}",
+      "",
     ].join("\n");
     const initialReadme = "Use greet() to say hello.\n";
-    await fs.writeFile(path.join(workspaceRoot, "utils.js"), initialUtils, "utf8");
-    await fs.writeFile(path.join(workspaceRoot, "README.md"), initialReadme, "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "utils.js"),
+      initialUtils,
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "README.md"),
+      initialReadme,
+      "utf8",
+    );
 
     const readmeTurn = await runMvpIntegratedFlow({
       sessionId: "sess_t10_constrained_code_readme",
@@ -2089,8 +2235,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       [
         'export function greet(name = "world") {',
         '  return "Hello, " + name;',
-        '}',
-        '',
+        "}",
+        "",
       ].join("\n"),
       "utf8",
     );
@@ -2104,7 +2250,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       'Use greet("Ada") to say hello.\n',
       "utf8",
     );
-    await fs.writeFile(path.join(workspaceRoot, "LOCKED.md"), initialLocked, "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "LOCKED.md"),
+      initialLocked,
+      "utf8",
+    );
 
     const refactorTurn = await runMvpIntegratedFlow({
       sessionId: "sess_t10_constrained_refactor_turn1",
@@ -2155,7 +2305,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(correctionTurn.codingResult?.changedFiles).toContain("README.md");
     expect(correctionTurn.codingResult?.changedFiles).not.toContain("utils.js");
     expect(correctionTurn.codingResult?.changedFiles).not.toContain("app.js");
-    expect(correctionTurn.codingResult?.changedFiles).not.toContain("LOCKED.md");
+    expect(correctionTurn.codingResult?.changedFiles).not.toContain(
+      "LOCKED.md",
+    );
     expect(correctionTurn.codingResult?.verification.status).toBe("passed");
     expect(correctionTurn.codingResult?.verification.reason).toContain(
       "utils.js unchanged",
@@ -2179,8 +2331,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     const utilsSnapshot = [
       'export function welcome(name = "world") {',
       '  return "Hello, " + name;',
-      '}',
-      '',
+      "}",
+      "",
     ].join("\n");
     const appSnapshot =
       'import { welcome } from "./utils.js";\n\nexport const message = welcome("Ada");\n';
@@ -2190,8 +2342,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       2,
     );
     const lockedSnapshot = "Do not modify this file.\n";
-    await fs.writeFile(path.join(workspaceRoot, "src", "utils.js"), utilsSnapshot, "utf8");
-    await fs.writeFile(path.join(workspaceRoot, "src", "app.js"), appSnapshot, "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "utils.js"),
+      utilsSnapshot,
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "app.js"),
+      appSnapshot,
+      "utf8",
+    );
     await fs.writeFile(
       path.join(workspaceRoot, "README.md"),
       'Use welcome("Ada") to say hello.\n',
@@ -2364,7 +2524,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(correctionTurn.status).toBe("completed");
     expect(correctionTurn.codingResult?.changedFiles).toContain("examples.md");
     expect(correctionTurn.codingResult?.changedFiles).not.toContain("math.js");
-    expect(correctionTurn.codingResult?.changedFiles).not.toContain("LOCKED.md");
+    expect(correctionTurn.codingResult?.changedFiles).not.toContain(
+      "LOCKED.md",
+    );
     expect(correctionTurn.codingResult?.verification.status).toBe("passed");
     const examples = await fs.readFile(
       path.join(workspaceRoot, "examples.md"),
@@ -2412,9 +2574,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       "missing source item",
     );
     expect(result.codingResult?.unverifiedFiles).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ path: "plan.txt" }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ path: "plan.txt" })]),
     );
   }, 15000);
 
@@ -2422,7 +2582,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     const todoContent =
       "ship minimal CLI smoke\ndocument one follow-up\nverify multi-file follow-up\n";
-    await fs.writeFile(path.join(workspaceRoot, "todo.txt"), todoContent, "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "todo.txt"),
+      todoContent,
+      "utf8",
+    );
     await fs.writeFile(
       path.join(workspaceRoot, "plan.txt"),
       "Plan ship minimal CLI smoke document one follow-up verify multi-file follow-up\n",
@@ -2476,7 +2640,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(turn1.codingResult?.verification.status).toBe("passed");
     await expect(
       fs.readFile(path.join(workspaceRoot, "utils.js"), "utf8"),
-    ).resolves.toBe("export function greet(name = 'world') { return 'Hello, ' + name; }");
+    ).resolves.toBe(
+      "export function greet(name = 'world') { return 'Hello, ' + name; }",
+    );
 
     const turn2 = await runMvpIntegratedFlow({
       sessionId: "sess_t10_low_risk_code_readme_turn2",
@@ -2494,7 +2660,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(turn2.codingResult?.verification.status).toBe("passed");
     await expect(
       fs.readFile(path.join(workspaceRoot, "utils.js"), "utf8"),
-    ).resolves.toBe("export function greet(name = 'world') { return 'Hello, ' + name; }");
+    ).resolves.toBe(
+      "export function greet(name = 'world') { return 'Hello, ' + name; }",
+    );
     await expect(
       fs.readFile(path.join(workspaceRoot, "README.md"), "utf8"),
     ).resolves.toContain("greet()");
@@ -2515,8 +2683,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_batch_edit_partial_failure",
-      prompt:
-        "Edit src/ok.ts src/missing.ts and replace v1 with v2",
+      prompt: "Edit src/ok.ts src/missing.ts and replace v1 with v2",
       workspaceRoot,
       maxTurns: 6,
     });
@@ -2553,7 +2720,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_discovery_edit_success",
-      prompt: "Edit this repository and replace v1 with v2, then run node --version to verify",
+      prompt:
+        "Edit this repository and replace v1 with v2, then run node --version to verify",
       workspaceRoot,
       escalationDecision: "allow-once",
       maxTurns: 6,
@@ -2561,7 +2729,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("completed");
     expect(result.codingResult?.taskKind).toBe("edit-file");
-    expect(result.codingResult?.changedFiles.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(
+      result.codingResult?.changedFiles.length ?? 0,
+    ).toBeGreaterThanOrEqual(2);
     expect(result.codingResult?.verification.status).toBe("passed");
     expect(result.sharedContext.notes.join("\n")).toContain(
       "discovery: selected",
@@ -2948,7 +3118,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         const body =
           `data: ${JSON.stringify({
             model: "deepseek-ai/DeepSeek-V3",
-            choices: [{ delta: { content: `COMPATIBLE_CALL_${chatCallCount}` } }],
+            choices: [
+              { delta: { content: `COMPATIBLE_CALL_${chatCallCount}` } },
+            ],
           })}\n\n` +
           `data: ${JSON.stringify({
             model: "deepseek-ai/DeepSeek-V3",
@@ -2993,9 +3165,10 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       expect(modelsCallCount).toBe(0);
       expect(chatCallCount).toBe(4);
       expect(
-        requestUrls.every((url) =>
-          url === "https://api.siliconflow.cn/v1/chat/completions" ||
-          url === "https://api.siliconflow.cn/v1/models",
+        requestUrls.every(
+          (url) =>
+            url === "https://api.siliconflow.cn/v1/chat/completions" ||
+            url === "https://api.siliconflow.cn/v1/models",
         ),
       ).toBe(true);
       expect(
@@ -3019,11 +3192,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       "utf8",
     );
     const targetPath = path.join(workspaceRoot, "src", "fix-target.md");
-    await fs.writeFile(
-      targetPath,
-      "mode=legacy\n",
-      "utf8",
-    );
+    await fs.writeFile(targetPath, "mode=legacy\n", "utf8");
 
     const prompt = [
       "That is not the right fix. Continue and fix the real issue.",
@@ -3058,11 +3227,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       "utf8",
     );
     const targetPath = path.join(workspaceRoot, "src", "repair-target.md");
-    await fs.writeFile(
-      targetPath,
-      "mode=legacy\n",
-      "utf8",
-    );
+    await fs.writeFile(targetPath, "mode=legacy\n", "utf8");
 
     const prompt = [
       "Same file, but not that change. Continue and fix the real issue.",
@@ -3136,7 +3301,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       '{"name":"t10-weak-slot-clarify"}\n',
       "utf8",
     );
-    const targetPath = path.join(workspaceRoot, "src", "weak-slot-ambiguous.txt");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "weak-slot-ambiguous.txt",
+    );
     await fs.writeFile(targetPath, "value=one\n", "utf8");
 
     const prompt = [
@@ -3156,7 +3325,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.stopReason).toContain("ambiguous across multiple subtask slots");
+    expect(result.stopReason).toContain(
+      "ambiguous across multiple subtask slots",
+    );
     expect(result.codingResult?.evidence).toContain(
       "continuation-lineage-activation-clarify:same-file-slot",
     );
@@ -3192,7 +3363,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=chat",
+    );
     expect(await fs.readFile(targetPath, "utf8")).toBe("value=one\n");
   }, 15000);
 
@@ -3242,8 +3415,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       '{"name":"t10-weak-cross-file-blocker"}\n',
       "utf8",
     );
-    await fs.writeFile(path.join(workspaceRoot, "src", "cross-a.txt"), "value=a\n", "utf8");
-    await fs.writeFile(path.join(workspaceRoot, "src", "cross-b.txt"), "value=b\n", "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "cross-a.txt"),
+      "value=a\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "cross-b.txt"),
+      "value=b\n",
+      "utf8",
+    );
 
     const prompt = [
       "do it",
@@ -3278,8 +3459,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       '{"name":"t10-weak-cross-file-variant-normalization"}\n',
       "utf8",
     );
-    await fs.writeFile(path.join(workspaceRoot, "src", "variant-a.txt"), "value=a\n", "utf8");
-    await fs.writeFile(path.join(workspaceRoot, "src", "variant-b.txt"), "value=b\n", "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "variant-a.txt"),
+      "value=a\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "variant-b.txt"),
+      "value=b\n",
+      "utf8",
+    );
 
     const prompt = [
       "and then?",
@@ -3299,7 +3488,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("stopped_error");
     expect(result.stopReason ?? "").toContain("missing transform evidence");
-    expect(result.stopReason ?? "").not.toContain("no active file could be inherited");
+    expect(result.stopReason ?? "").not.toContain(
+      "no active file could be inherited",
+    );
     expect(result.codingResult?.taskKind).toBe("edit-file");
   }, 15000);
 
@@ -3310,8 +3501,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       '{"name":"t10-weak-cross-file-temporal-next"}\n',
       "utf8",
     );
-    await fs.writeFile(path.join(workspaceRoot, "src", "temporal-a.txt"), "value=a\n", "utf8");
-    await fs.writeFile(path.join(workspaceRoot, "src", "temporal-b.txt"), "value=b\n", "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "temporal-a.txt"),
+      "value=a\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "temporal-b.txt"),
+      "value=b\n",
+      "utf8",
+    );
 
     const prompt = [
       "next",
@@ -3332,7 +3531,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("stopped_error");
     expect(result.stopReason ?? "").toContain("missing transform evidence");
-    expect(result.stopReason ?? "").not.toContain("no active file could be inherited");
+    expect(result.stopReason ?? "").not.toContain(
+      "no active file could be inherited",
+    );
     expect(result.codingResult?.taskKind).toBe("edit-file");
   }, 15000);
 
@@ -3343,8 +3544,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       '{"name":"t10-weak-cross-file-temporal-what-next"}\n',
       "utf8",
     );
-    await fs.writeFile(path.join(workspaceRoot, "src", "temporal-c.txt"), "value=c\n", "utf8");
-    await fs.writeFile(path.join(workspaceRoot, "src", "temporal-d.txt"), "value=d\n", "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "temporal-c.txt"),
+      "value=c\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "temporal-d.txt"),
+      "value=d\n",
+      "utf8",
+    );
 
     const prompt = [
       "what next",
@@ -3365,7 +3574,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("stopped_error");
     expect(result.stopReason ?? "").toContain("missing transform evidence");
-    expect(result.stopReason ?? "").not.toContain("no active file could be inherited");
+    expect(result.stopReason ?? "").not.toContain(
+      "no active file could be inherited",
+    );
     expect(result.codingResult?.taskKind).toBe("edit-file");
   }, 15000);
 
@@ -3376,7 +3587,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       '{"name":"t10-weak-cross-file-temporal-next-auto"}\n',
       "utf8",
     );
-    const targetPath = path.join(workspaceRoot, "src", "temporal-next-auto.txt");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "temporal-next-auto.txt",
+    );
     await fs.writeFile(targetPath, "status=pending\n", "utf8");
 
     const prompt = [
@@ -3414,7 +3629,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       '{"name":"t10-weak-cross-file-temporal-what-next-auto"}\n',
       "utf8",
     );
-    const targetPath = path.join(workspaceRoot, "src", "temporal-what-next-auto.txt");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "temporal-what-next-auto.txt",
+    );
     await fs.writeFile(targetPath, "mode=legacy\n", "utf8");
 
     const prompt = [
@@ -3447,7 +3666,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
   it("rolls temporal continuation evidence across multi-hop successor cues", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
-    const targetPath = path.join(workspaceRoot, "src", "temporal-multihop-rollover.txt");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "temporal-multihop-rollover.txt",
+    );
     await fs.writeFile(targetPath, "status=pending\n", "utf8");
 
     const firstPrompt = [
@@ -3486,17 +3709,20 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         lastTerminalReason: first.terminalReason,
         recentChangedFiles: firstCodingResult.changedFiles ?? [],
         recentTargetFiles: firstCodingResult.changeSet?.attemptedFiles ?? [],
-        recentFailedFiles: (firstCodingResult.failedFiles ?? []).map((entry) => ({
-          path: entry.path,
-          reason: entry.reason,
-        })),
+        recentFailedFiles: (firstCodingResult.failedFiles ?? []).map(
+          (entry) => ({
+            path: entry.path,
+            reason: entry.reason,
+          }),
+        ),
         recentVerifiedFiles: firstCodingResult.verifiedFiles ?? [],
         lastRepairStatus: firstCodingResult.repair.status,
         lastRepairNotes: firstCodingResult.repair.notes ?? [],
         lastContinuationStatus: firstCodingResult.continuation.status,
         lastContinuationEvidence: firstCodingResult.continuation.evidence ?? [],
         lastTaskSatisfactionVerdict: firstCodingResult.taskSatisfaction.verdict,
-        lastTaskSatisfactionReasons: firstCodingResult.taskSatisfaction.reasons ?? [],
+        lastTaskSatisfactionReasons:
+          firstCodingResult.taskSatisfaction.reasons ?? [],
         unresolvedItems: [],
       },
       maxTurns: 6,
@@ -3508,14 +3734,20 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       expect(second.codingResult?.failedFiles?.[0]?.path).toBe(
         "src/temporal-multihop-rollover.txt",
       );
-      expect(second.stopReason ?? "").not.toContain("no active file could be inherited");
+      expect(second.stopReason ?? "").not.toContain(
+        "no active file could be inherited",
+      );
     }
     expect(second.finalOutput.toLowerCase()).not.toContain("i'm here to chat");
   }, 15000);
 
   it("prevents inverse stale-transform rebound across temporal successor hops after rollover", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
-    const targetPath = path.join(workspaceRoot, "src", "temporal-multihop-exhaustion.txt");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "temporal-multihop-exhaustion.txt",
+    );
     await fs.writeFile(targetPath, "status=modern\n", "utf8");
 
     const first = await runMvpIntegratedFlow({
@@ -3559,31 +3791,40 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         lastTerminalReason: first.terminalReason,
         recentChangedFiles: firstCodingResult.changedFiles ?? [],
         recentTargetFiles: firstCodingResult.changeSet?.attemptedFiles ?? [],
-        recentFailedFiles: (firstCodingResult.failedFiles ?? []).map((entry) => ({
-          path: entry.path,
-          reason: entry.reason,
-        })),
+        recentFailedFiles: (firstCodingResult.failedFiles ?? []).map(
+          (entry) => ({
+            path: entry.path,
+            reason: entry.reason,
+          }),
+        ),
         recentVerifiedFiles: firstCodingResult.verifiedFiles ?? [],
         lastRepairStatus: firstCodingResult.repair.status,
         lastRepairNotes: firstCodingResult.repair.notes ?? [],
         lastContinuationStatus: firstCodingResult.continuation.status,
         lastContinuationEvidence: firstCodingResult.continuation.evidence ?? [],
         lastTaskSatisfactionVerdict: firstCodingResult.taskSatisfaction.verdict,
-        lastTaskSatisfactionReasons: firstCodingResult.taskSatisfaction.reasons ?? [],
+        lastTaskSatisfactionReasons:
+          firstCodingResult.taskSatisfaction.reasons ?? [],
         unresolvedItems: [],
       },
       maxTurns: 6,
     });
 
     expect(second.status).toBe("stopped_error");
-    expect(second.stopReason ?? "").toContain("stale against current file content");
+    expect(second.stopReason ?? "").toContain(
+      "stale against current file content",
+    );
     expect(second.finalOutput.toLowerCase()).not.toContain("i'm here to chat");
     expect(await fs.readFile(targetPath, "utf8")).toBe("status=right\n");
   }, 15000);
 
   it("retires stale blocker evidence for generic temporal re-entry while allowing explicit transform override", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
-    const targetPath = path.join(workspaceRoot, "src", "temporal-post-exhaustion.txt");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "temporal-post-exhaustion.txt",
+    );
     await fs.writeFile(targetPath, "status=modern\n", "utf8");
 
     const first = await runMvpIntegratedFlow({
@@ -3626,24 +3867,29 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         lastTerminalReason: first.terminalReason,
         recentChangedFiles: firstCodingResult.changedFiles ?? [],
         recentTargetFiles: firstCodingResult.changeSet?.attemptedFiles ?? [],
-        recentFailedFiles: (firstCodingResult.failedFiles ?? []).map((entry) => ({
-          path: entry.path,
-          reason: entry.reason,
-        })),
+        recentFailedFiles: (firstCodingResult.failedFiles ?? []).map(
+          (entry) => ({
+            path: entry.path,
+            reason: entry.reason,
+          }),
+        ),
         recentVerifiedFiles: firstCodingResult.verifiedFiles ?? [],
         lastRepairStatus: firstCodingResult.repair.status,
         lastRepairNotes: firstCodingResult.repair.notes ?? [],
         lastContinuationStatus: firstCodingResult.continuation.status,
         lastContinuationEvidence: firstCodingResult.continuation.evidence ?? [],
         lastTaskSatisfactionVerdict: firstCodingResult.taskSatisfaction.verdict,
-        lastTaskSatisfactionReasons: firstCodingResult.taskSatisfaction.reasons ?? [],
+        lastTaskSatisfactionReasons:
+          firstCodingResult.taskSatisfaction.reasons ?? [],
         unresolvedItems: [],
       },
       maxTurns: 6,
     });
 
     expect(second.status).toBe("stopped_error");
-    expect(second.stopReason ?? "").toContain("stale against current file content");
+    expect(second.stopReason ?? "").toContain(
+      "stale against current file content",
+    );
     const secondCodingResult = second.codingResult;
     if (!secondCodingResult) {
       throw new Error("Expected second hop coding result");
@@ -3660,24 +3906,31 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         lastTerminalReason: second.terminalReason,
         recentChangedFiles: secondCodingResult.changedFiles ?? [],
         recentTargetFiles: secondCodingResult.changeSet?.attemptedFiles ?? [],
-        recentFailedFiles: (secondCodingResult.failedFiles ?? []).map((entry) => ({
-          path: entry.path,
-          reason: entry.reason,
-        })),
+        recentFailedFiles: (secondCodingResult.failedFiles ?? []).map(
+          (entry) => ({
+            path: entry.path,
+            reason: entry.reason,
+          }),
+        ),
         recentVerifiedFiles: secondCodingResult.verifiedFiles ?? [],
         lastRepairStatus: secondCodingResult.repair.status,
         lastRepairNotes: secondCodingResult.repair.notes ?? [],
         lastContinuationStatus: secondCodingResult.continuation.status,
-        lastContinuationEvidence: secondCodingResult.continuation.evidence ?? [],
-        lastTaskSatisfactionVerdict: secondCodingResult.taskSatisfaction.verdict,
-        lastTaskSatisfactionReasons: secondCodingResult.taskSatisfaction.reasons ?? [],
+        lastContinuationEvidence:
+          secondCodingResult.continuation.evidence ?? [],
+        lastTaskSatisfactionVerdict:
+          secondCodingResult.taskSatisfaction.verdict,
+        lastTaskSatisfactionReasons:
+          secondCodingResult.taskSatisfaction.reasons ?? [],
         unresolvedItems: [],
       },
       maxTurns: 6,
     });
 
     expect(third.status).toBe("stopped_error");
-    expect(third.stopReason ?? "").not.toContain("stale against current file content");
+    expect(third.stopReason ?? "").not.toContain(
+      "stale against current file content",
+    );
     expect(third.stopReason ?? "").toContain("missing transform evidence");
     expect(await fs.readFile(targetPath, "utf8")).toBe("status=right\n");
 
@@ -3688,7 +3941,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     const fourth = await runMvpIntegratedFlow({
       sessionId: "sess_t10_temporal_post_exhaustion_4",
-      prompt: "replace status=right with status=final in src/temporal-post-exhaustion.txt",
+      prompt:
+        "replace status=right with status=final in src/temporal-post-exhaustion.txt",
       workspaceRoot,
       continuityState: {
         projectRoot: workspaceRoot,
@@ -3697,17 +3951,20 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         lastTerminalReason: third.terminalReason,
         recentChangedFiles: thirdCodingResult.changedFiles ?? [],
         recentTargetFiles: thirdCodingResult.changeSet?.attemptedFiles ?? [],
-        recentFailedFiles: (thirdCodingResult.failedFiles ?? []).map((entry) => ({
-          path: entry.path,
-          reason: entry.reason,
-        })),
+        recentFailedFiles: (thirdCodingResult.failedFiles ?? []).map(
+          (entry) => ({
+            path: entry.path,
+            reason: entry.reason,
+          }),
+        ),
         recentVerifiedFiles: thirdCodingResult.verifiedFiles ?? [],
         lastRepairStatus: thirdCodingResult.repair.status,
         lastRepairNotes: thirdCodingResult.repair.notes ?? [],
         lastContinuationStatus: thirdCodingResult.continuation.status,
         lastContinuationEvidence: thirdCodingResult.continuation.evidence ?? [],
         lastTaskSatisfactionVerdict: thirdCodingResult.taskSatisfaction.verdict,
-        lastTaskSatisfactionReasons: thirdCodingResult.taskSatisfaction.reasons ?? [],
+        lastTaskSatisfactionReasons:
+          thirdCodingResult.taskSatisfaction.reasons ?? [],
         unresolvedItems: [],
       },
       maxTurns: 6,
@@ -3719,7 +3976,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
   it("unifies post-exhaustion cross-file ultra-weak cues to a single missing-transform blocker surface", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
-    const targetPath = path.join(workspaceRoot, "src", "temporal-surface-unify.txt");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "temporal-surface-unify.txt",
+    );
     await fs.writeFile(targetPath, "status=right\n", "utf8");
 
     const cues = [
@@ -3759,8 +4020,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
       expect(result.status).toBe("stopped_error");
       expect(result.stopReason ?? "").toContain("missing transform evidence");
-      expect(result.stopReason ?? "").not.toContain("stale against current file content");
-      expect(result.finalOutput.toLowerCase()).not.toContain("i'm here to chat");
+      expect(result.stopReason ?? "").not.toContain(
+        "stale against current file content",
+      );
+      expect(result.finalOutput.toLowerCase()).not.toContain(
+        "i'm here to chat",
+      );
     }
   }, 15000);
 
@@ -3791,7 +4056,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=chat",
+    );
     expect(await fs.readFile(targetPath, "utf8")).toBe("value=keep\n");
   }, 15000);
 
@@ -3818,18 +4085,24 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=chat",
+    );
     expect(result.sharedContext.notes.join("\n")).toContain(
       "reflective-state-query: stop-reason",
     );
-    expect(result.sharedContext.notes.join("\n")).not.toContain("plan: intent=repo-explain");
+    expect(result.sharedContext.notes.join("\n")).not.toContain(
+      "plan: intent=repo-explain",
+    );
     expect(result.finalOutput).toContain("Last run status:");
     expect(result.finalOutput).toContain("verify failed");
     expect(result.finalOutput).toContain("src/reflective-stop.ts");
   }, 15000);
 
   it("answers reflective explain scope from rebased explain object after migration-like root change", async () => {
-    await fs.mkdir(path.join(workspaceRoot, "src", "nested"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "src", "nested"), {
+      recursive: true,
+    });
     await fs.writeFile(
       path.join(workspaceRoot, "src", "nested", "reflective-explain.ts"),
       ["gamma", "delta", "epsilon"].join("\n"),
@@ -3860,7 +4133,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
   }, 15000);
 
   it("answers reflective read-position query from rebased session state after migration-like root change", async () => {
-    await fs.mkdir(path.join(workspaceRoot, "src", "nested"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "src", "nested"), {
+      recursive: true,
+    });
     await fs.writeFile(
       path.join(workspaceRoot, "src", "nested", "reflective-read.ts"),
       ["l1", "l2", "l3", "l4", "l5"].join("\n"),
@@ -3922,11 +4197,15 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=chat",
+    );
     expect(result.sharedContext.notes.join("\n")).toContain(
       "reflective-state-query: approval-memory",
     );
-    expect(result.sharedContext.notes.join("\n")).not.toContain("plan: intent=repo-explain");
+    expect(result.sharedContext.notes.join("\n")).not.toContain(
+      "plan: intent=repo-explain",
+    );
     expect(result.finalOutput).toContain("Last approval decision: allow-once.");
     expect(result.finalOutput).toContain("Why asking again:");
   }, 15000);
@@ -3941,7 +4220,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_reflective_permission_compact_zh",
-      prompt: "\u521A\u624D\u90A3\u4E2A\u6388\u6743\u4E3A\u4EC0\u4E48\u8FD9\u6B21\u53C8\u6CA1\u76F4\u63A5\u751F\u6548",
+      prompt:
+        "\u521A\u624D\u90A3\u4E2A\u6388\u6743\u4E3A\u4EC0\u4E48\u8FD9\u6B21\u53C8\u6CA1\u76F4\u63A5\u751F\u6548",
       workspaceRoot,
       continuityState: {
         projectRoot: workspaceRoot,
@@ -3963,11 +4243,15 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=chat",
+    );
     expect(result.sharedContext.notes.join("\n")).toContain(
       "reflective-state-query: approval-memory",
     );
-    expect(result.sharedContext.notes.join("\n")).not.toContain("plan: intent=repo-explain");
+    expect(result.sharedContext.notes.join("\n")).not.toContain(
+      "plan: intent=repo-explain",
+    );
     expect(result.finalOutput).toContain("Last approval decision: allow-once.");
     expect(result.finalOutput).toContain("Why asking again:");
   }, 15000);
@@ -4032,14 +4316,20 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.sharedContext.notes.join("\n")).toContain(
       "reflective-state-query: approval-memory",
     );
-    expect(result.finalOutput).toContain("Authoritative approval now: allow-once");
+    expect(result.finalOutput).toContain(
+      "Authoritative approval now: allow-once",
+    );
     expect(result.finalOutput).toContain("rebased authority root");
   }, 15000);
 
   it("explains same-root authority override after compact using approval history", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
-      path.join(workspaceRoot, "src", "reflective-approval-authority-override.txt"),
+      path.join(
+        workspaceRoot,
+        "src",
+        "reflective-approval-authority-override.txt",
+      ),
       "approval-memory\n",
       "utf8",
     );
@@ -4165,10 +4455,10 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.sharedContext.notes.join("\n")).toContain(
       "reflective-state-query: approval-memory",
     );
-    expect(result.finalOutput).toContain("Authoritative approval now: allow-always");
     expect(result.finalOutput).toContain(
-      "different scope/cacheKey",
+      "Authoritative approval now: allow-always",
     );
+    expect(result.finalOutput).toContain("different scope/cacheKey");
   }, 15000);
 
   it("prioritizes explicit current request scope over command-derived scope inference", async () => {
@@ -4316,8 +4606,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.sharedContext.notes.join("\n")).toContain(
       "reflective-state-query: approval-memory",
     );
-    expect(result.finalOutput).toContain("Authoritative approval now: allow-always");
-    expect(result.finalOutput).toContain("Subject permission request: write/write.");
+    expect(result.finalOutput).toContain(
+      "Authoritative approval now: allow-always",
+    );
+    expect(result.finalOutput).toContain(
+      "Subject permission request: write/write.",
+    );
     expect(result.finalOutput).toContain(
       "Current request context scope: bash/spawn/process(npm).",
     );
@@ -4367,8 +4661,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.sharedContext.notes.join("\n")).toContain(
       "reflective-state-query: approval-memory",
     );
-    expect(result.finalOutput).toContain("Subject permission request: write/write.");
-    expect(result.finalOutput).not.toContain("Subject permission scope: bash/spawn/process(npm).");
+    expect(result.finalOutput).toContain(
+      "Subject permission request: write/write.",
+    );
+    expect(result.finalOutput).not.toContain(
+      "Subject permission scope: bash/spawn/process(npm).",
+    );
     expect(result.finalOutput).toContain(
       "Subject permission scope details are incomplete in compacted/recovered memory; using current context for why-asking-again reasoning.",
     );
@@ -4439,7 +4737,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.sharedContext.notes.join("\n")).toContain(
       "reflective-state-query: approval-memory",
     );
-    expect(result.finalOutput).toContain("Subject permission request: bash/spawn/process(npm).");
+    expect(result.finalOutput).toContain(
+      "Subject permission request: bash/spawn/process(npm).",
+    );
     expect(result.finalOutput).toContain(
       "Subject reconstruction source: approval-history.",
     );
@@ -4456,7 +4756,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     const bashCacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:npm`;
 
     const result = await runMvpIntegratedFlow({
-      sessionId: "sess_t10_reflective_permission_cross_tool_subject_current_compact",
+      sessionId:
+        "sess_t10_reflective_permission_cross_tool_subject_current_compact",
       prompt: "what did I just approve and why is it asking again",
       workspaceRoot,
       continuityState: {
@@ -4511,7 +4812,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.sharedContext.notes.join("\n")).toContain(
       "reflective-state-query: approval-memory",
     );
-    expect(result.finalOutput).toContain("Subject permission request: write/write.");
+    expect(result.finalOutput).toContain(
+      "Subject permission request: write/write.",
+    );
     expect(result.finalOutput).toContain(
       `Subject permission target: ${writeTarget}.`,
     );
@@ -4532,7 +4835,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     const bashCacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:node`;
 
     const result = await runMvpIntegratedFlow({
-      sessionId: "sess_t10_reflective_permission_subject_last_approval_reconstruct",
+      sessionId:
+        "sess_t10_reflective_permission_subject_last_approval_reconstruct",
       prompt: "what did I just approve and why is it asking again",
       workspaceRoot,
       continuityState: {
@@ -4557,7 +4861,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.sharedContext.notes.join("\n")).toContain(
       "reflective-state-query: approval-memory",
     );
-    expect(result.finalOutput).toContain("Subject permission request: bash/spawn/process(node).");
+    expect(result.finalOutput).toContain(
+      "Subject permission request: bash/spawn/process(node).",
+    );
     expect(result.finalOutput).toContain(
       "Subject permission scope details are incomplete in compacted/recovered memory; using current context for why-asking-again reasoning.",
     );
@@ -4602,12 +4908,18 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.finalOutput).toContain("Subject permission request: edit/write.");
-    expect(result.finalOutput).toContain("Subject permission scope: edit/write/target(");
+    expect(result.finalOutput).toContain(
+      "Subject permission request: edit/write.",
+    );
+    expect(result.finalOutput).toContain(
+      "Subject permission scope: edit/write/target(",
+    );
     expect(result.finalOutput).toContain("coherent-subject.txt");
     expect(result.finalOutput).toContain("Subject permission cacheKey:");
     expect(result.finalOutput).toContain("edit:write:target:");
-    expect(result.finalOutput).not.toContain("Subject permission request: edit/write/process(node).");
+    expect(result.finalOutput).not.toContain(
+      "Subject permission request: edit/write/process(node).",
+    );
   }, 15000);
 
   it("rebases migrated subject target text to the current root when legacy target residue is detected", async () => {
@@ -4650,15 +4962,21 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.finalOutput).toContain("Subject permission request: edit/write.");
+    expect(result.finalOutput).toContain(
+      "Subject permission request: edit/write.",
+    );
     expect(result.finalOutput).toContain("Subject permission target:");
     expect(result.finalOutput).toContain("permission-cross-tool.txt");
-    expect(result.finalOutput).toContain("Subject permission scope: edit/write/target(");
+    expect(result.finalOutput).toContain(
+      "Subject permission scope: edit/write/target(",
+    );
     expect(result.finalOutput).not.toContain(legacyRoot);
   }, 15000);
 
   it("materializes migration-rebased next-step reflective handoff into continuation execution", async () => {
-    await fs.mkdir(path.join(workspaceRoot, "src", "nested"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "src", "nested"), {
+      recursive: true,
+    });
     await fs.writeFile(
       path.join(workspaceRoot, "src", "nested", "reflective-next-step.txt"),
       ["a1", "a2", "a3", "a4"].join("\n"),
@@ -4673,7 +4991,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         projectRoot: "D:/legacy-root",
         lastTaskKind: "read-file",
         lastGroundedDeliverableMode: "read",
-        recentTargetFiles: ["D:/legacy-root/src/nested/reflective-next-step.txt"],
+        recentTargetFiles: [
+          "D:/legacy-root/src/nested/reflective-next-step.txt",
+        ],
         lastReadWindowStart: 0,
         lastReadWindowEnd: 2,
         lastReadWindowSize: 2,
@@ -4682,7 +5002,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=read-file");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=read-file",
+    );
     expect(result.sharedContext.notes.join("\n")).toContain(
       "continuation: restored-session-state-consumed",
     );
@@ -4690,7 +5012,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
   }, 15000);
 
   it("keeps reflective read-position plus action handoff on rebased read continuity", async () => {
-    await fs.mkdir(path.join(workspaceRoot, "src", "nested"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "src", "nested"), {
+      recursive: true,
+    });
     await fs.writeFile(
       path.join(workspaceRoot, "src", "nested", "reflective-read-handoff.txt"),
       ["r1", "r2", "r3", "r4", "r5"].join("\n"),
@@ -4705,7 +5029,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         projectRoot: "D:/legacy-root",
         lastTaskKind: "read-file",
         lastGroundedDeliverableMode: "read",
-        recentTargetFiles: ["D:/legacy-root/src/nested/reflective-read-handoff.txt"],
+        recentTargetFiles: [
+          "D:/legacy-root/src/nested/reflective-read-handoff.txt",
+        ],
         lastReadWindowStart: 1,
         lastReadWindowEnd: 3,
         lastReadWindowSize: 2,
@@ -4714,7 +5040,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=read-file");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=read-file",
+    );
     expect(result.sharedContext.notes.join("\n")).toContain(
       "continuation: restored-session-state-consumed",
     );
@@ -4744,7 +5072,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=chat",
+    );
     expect(result.sharedContext.notes.join("\n")).not.toContain(
       "freshness-reset:new-task",
     );
@@ -4779,7 +5109,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=chat",
+    );
     expect(result.sharedContext.notes.join("\n")).not.toContain(
       "freshness-reset:new-task",
     );
@@ -4791,8 +5123,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
   it("continues blocker->fix on rebased target after migration-like root change (English)", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
-    const targetPath = path.join(workspaceRoot, "src", "reflective-fix-rebased-en.txt");
-    await fs.writeFile(targetPath, ["alpha", "gamma", "omega"].join("\n"), "utf8");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "reflective-fix-rebased-en.txt",
+    );
+    await fs.writeFile(
+      targetPath,
+      ["alpha", "gamma", "omega"].join("\n"),
+      "utf8",
+    );
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_reflective_fix_rebased_en",
@@ -4819,7 +5159,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=edit-file");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=edit-file",
+    );
     expect(result.sharedContext.notes.join("\n")).toContain(
       "continuation: restored-session-state-consumed",
     );
@@ -4828,8 +5170,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
   it("continues blocker->fix on rebased target after migration-like root change (Chinese)", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
-    const targetPath = path.join(workspaceRoot, "src", "reflective-fix-rebased-zh.txt");
-    await fs.writeFile(targetPath, ["left", "gamma", "right"].join("\n"), "utf8");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "reflective-fix-rebased-zh.txt",
+    );
+    await fs.writeFile(
+      targetPath,
+      ["left", "gamma", "right"].join("\n"),
+      "utf8",
+    );
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_reflective_fix_rebased_zh",
@@ -4856,7 +5206,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=edit-file");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=edit-file",
+    );
     expect(result.sharedContext.notes.join("\n")).toContain(
       "continuation: restored-session-state-consumed",
     );
@@ -4892,7 +5244,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(["completed", "stopped_error"]).toContain(result.status);
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=run-command");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=run-command",
+    );
     expect(result.sharedContext.notes.join("\n")).toContain(
       "continuation: restored-session-state-consumed",
     );
@@ -4907,8 +5261,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
   it("persists verify command hint after blocker->fix continuation for verify closure", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
-    const targetPath = path.join(workspaceRoot, "src", "repair-verify-hint.txt");
-    await fs.writeFile(targetPath, ["alpha", "gamma", "omega"].join("\n"), "utf8");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "repair-verify-hint.txt",
+    );
+    await fs.writeFile(
+      targetPath,
+      ["alpha", "gamma", "omega"].join("\n"),
+      "utf8",
+    );
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_repair_verify_hint",
@@ -4937,7 +5299,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=edit-file");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=edit-file",
+    );
     expect(result.codingResult?.evidence).toContain(
       "verify-command-hint:npm test -- --help",
     );
@@ -4948,7 +5312,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
   it("truthfully blocks verify continuation when structured verify object misses command evidence", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
-    const targetPath = path.join(workspaceRoot, "src", "verify-missing-command.txt");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "verify-missing-command.txt",
+    );
     await fs.writeFile(targetPath, "value=delta\n", "utf8");
 
     const result = await runMvpIntegratedFlow({
@@ -4965,7 +5333,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.stopReason).toContain("Verify continuation is unavailable: missing command.");
+    expect(result.stopReason).toContain(
+      "Verify continuation is unavailable: missing command.",
+    );
   }, 15000);
 
   it("persists blocked verify lineage when approval is denied for verify continuation", async () => {
@@ -4978,7 +5348,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       }),
       "utf8",
     );
-    const targetPath = path.join(workspaceRoot, "src", "verify-approval-lineage.txt");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "verify-approval-lineage.txt",
+    );
     await fs.writeFile(targetPath, "value=delta\n", "utf8");
 
     const events: QueryEvent[] = [];
@@ -5013,7 +5387,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(completed?.result.codingResult?.verification.blockerKind).toBe(
       "approval-denied",
     );
-    expect(completed?.result.codingResult?.verification.command).toBe("node --version");
+    expect(completed?.result.codingResult?.verification.command).toBe(
+      "node --version",
+    );
     expect(completed?.result.codingResult?.evidence).toContain(
       "verify-blocker-kind:approval-denied",
     );
@@ -5026,7 +5402,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
   it("keeps blocked verify next-step recommendation resumable via structured verify object", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
-    const targetPath = path.join(workspaceRoot, "src", "verify-next-step-blocked.txt");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "verify-next-step-blocked.txt",
+    );
     await fs.writeFile(targetPath, "value=delta\n", "utf8");
 
     const recommendation = await runMvpIntegratedFlow({
@@ -5075,7 +5455,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(["completed", "stopped_error"]).toContain(resumed.status);
-    expect(resumed.sharedContext.notes.join("\n")).toContain("plan: intent=run-command");
+    expect(resumed.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=run-command",
+    );
     if (resumed.codingResult) {
       expect(resumed.codingResult.verification.command).toBe("node --version");
     }
@@ -5083,7 +5465,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
   it("resumes blocked verify via the same verify object after approval is granted", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
-    const targetPath = path.join(workspaceRoot, "src", "verify-resume-granted.txt");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "verify-resume-granted.txt",
+    );
     await fs.writeFile(targetPath, "value=delta\n", "utf8");
 
     const resumed = await runMvpIntegratedFlow({
@@ -5113,14 +5499,20 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(resumed.status).toBe("completed");
-    expect(resumed.sharedContext.notes.join("\n")).toContain("plan: intent=run-command");
+    expect(resumed.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=run-command",
+    );
     expect(resumed.codingResult?.verification.status).toBe("passed");
     expect(resumed.codingResult?.verification.command).toBe("node --version");
   }, 15000);
 
   it("truthfully blocks verify resume when verify object cwd authority mismatches workspace root", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
-    const targetPath = path.join(workspaceRoot, "src", "verify-resume-mismatch.txt");
+    const targetPath = path.join(
+      workspaceRoot,
+      "src",
+      "verify-resume-mismatch.txt",
+    );
     await fs.writeFile(targetPath, "value=delta\n", "utf8");
 
     const resumed = await runMvpIntegratedFlow({

@@ -55,6 +55,12 @@ function buildUnknownSlashOutput(
       : `Try /help to view grouped commands.`
 
   return [
+    'Result',
+    '- Outcome: blocked',
+    '- BlockerKind: command-not-allowlisted',
+    `- Reason: Unknown slash command: /${rawName}`,
+    '- DoNext: Use /help to view available commands and retry with a supported slash command.',
+    '',
     `Unknown slash command: /${rawName}`,
     hintLine,
     '',
@@ -64,6 +70,12 @@ function buildUnknownSlashOutput(
 
 function buildSlashDiscoveryMessage(): string {
   return [
+    'Result',
+    '- Outcome: blocked',
+    '- BlockerKind: command-not-allowlisted',
+    `- Reason: Slash command required after '/'.`,
+    '- DoNext: Enter a valid slash command such as /help or /sessions.',
+    '',
     `Slash command required after '/'.`,
     `Try /help to view grouped commands.`,
     '',

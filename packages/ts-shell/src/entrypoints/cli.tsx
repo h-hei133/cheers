@@ -6,7 +6,7 @@ import * as readline from "node:readline";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
 import type { ShellActionResult } from "../core/commands/types.js";
-import { CoreMcpGateway } from "../core/mcp/gateway.js";
+import { CoreMcpGateway, McpGatewayBlockedError } from "../core/mcp/gateway.js";
 import type { McpClientSnapshot } from "../core/mcp/types.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
@@ -34,7 +34,10 @@ import {
   resolveRootBindingDiagnostics,
   switchActiveSession,
 } from "../core/shell/runtimeContext.js";
-import type { RootBindingDiagnostic } from "../core/shell/runtimeContext.js";
+import type {
+  RootBindingDiagnostic,
+  ShellRuntimeContext,
+} from "../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
 import {
   handleShellClose,
@@ -53,6 +56,7 @@ import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type {
   ApprovalAuditMemoryState,
   RecoveryTrustBoundaryBlock,
+  Session,
   SessionContinuitySnapshot,
   SessionReentrySummary,
   WorkspaceRootMode,
@@ -372,7 +376,7 @@ async function main(): Promise<void> {
 
   if (showStartupSurface) {
     renderStartupSurface(renderer, {
-      runtimeContext: runtimeContext as never,
+      runtimeContext,
       sessionManager,
       lifecycleNotices: bootstrap.lifecycleNotices,
       recoveryCandidate,
@@ -839,8 +843,8 @@ async function main(): Promise<void> {
               runtimeContext.session.targetPathBase = attached.targetPathBase;
               runtimeContext.session.gitRoot = attached.gitRoot;
               switchActiveSession(
-                runtimeContext as never,
-                runtimeContext.session as never,
+                runtimeContext,
+                runtimeContext.session,
                 attached.projectRoot,
                 {
                   cwd: attached.projectRoot,
@@ -868,8 +872,8 @@ async function main(): Promise<void> {
               gitRoot: attached.gitRoot,
             });
             switchActiveSession(
-              runtimeContext as never,
-              attachedSession as never,
+              runtimeContext,
+              attachedSession,
               attached.projectRoot,
               {
                 cwd: attached.projectRoot,
@@ -939,12 +943,23 @@ async function main(): Promise<void> {
           }
           renderMcpStatusControlPlane(renderer, snapshot);
         } catch (error) {
-          renderer.renderLine(
-            `\nMCP control plane failed: ${error instanceof Error ? error.message : String(error)}`,
-          );
-          renderer.renderLine(
-            "Try /mcp refresh all to reload server connections.\n",
-          );
+          if (error instanceof McpGatewayBlockedError) {
+            renderBlockedContract(renderer, {
+              blockerKind: error.blockerKind,
+              reason: error.message,
+              doNext: error.doNext,
+            });
+          } else {
+            renderBlockedContract(renderer, {
+              blockerKind: "unknown",
+              reason:
+                error instanceof Error
+                  ? `MCP control plane failed: ${error.message}`
+                  : `MCP control plane failed: ${String(error)}`,
+              doNext:
+                "Run /mcp refresh all to reload server connections, then retry your MCP command.",
+            });
+          }
         }
         rl.prompt();
         return;
@@ -1942,12 +1957,7 @@ async function readStdinToEnd(): Promise<string | null> {
 
 async function runNonTtyPromptStream(options: {
   sessionManager: SessionManager;
-  runtimeContext: {
-    session: { id: string };
-    cwd: string;
-    projectRoot: string;
-    runtimeConfig: { maxTurns: number };
-  };
+  runtimeContext: ShellRuntimeContext;
   renderer: StreamingRenderer;
   sessionRuntime: ShellSessionRuntime;
   logger: ReturnType<typeof createComponentLogger>;
@@ -2083,12 +2093,7 @@ async function runNonTtyPromptStream(options: {
 async function runNonInteractivePrompt(options: {
   prompt: string;
   sessionManager: SessionManager;
-  runtimeContext: {
-    session: { id: string };
-    cwd: string;
-    projectRoot: string;
-    runtimeConfig: { maxTurns: number };
-  };
+  runtimeContext: ShellRuntimeContext;
   renderer: StreamingRenderer;
   sessionRuntime: ShellSessionRuntime;
   logger: ReturnType<typeof createComponentLogger>;
@@ -2135,7 +2140,7 @@ async function runNonInteractivePrompt(options: {
         renderCurrentSession(
           options.renderer,
           options.sessionManager,
-          options.runtimeContext as never,
+          options.runtimeContext,
         );
         renderSessionCommandMap(options.renderer, { compact: true });
         return;
@@ -2163,7 +2168,7 @@ async function runNonInteractivePrompt(options: {
 
         try {
           const switchDiagnostics = resolveSessionSwitchDiagnostics(
-            options.runtimeContext as never,
+            options.runtimeContext,
             options.sessionManager.describeSessionReentry(resolvedSessionId),
           );
           if (hasBlockedRootBindingDiagnostic(switchDiagnostics)) {
@@ -2176,7 +2181,7 @@ async function runNonInteractivePrompt(options: {
           const resumed = options.sessionManager.resume(resolvedSessionId);
           const previousSessionId = options.runtimeContext.session.id;
           switchRuntimeSessionProjectContext(
-            options.runtimeContext as never,
+            options.runtimeContext,
             resumed,
           );
           options.renderer.renderLine(
@@ -2208,7 +2213,7 @@ async function runNonInteractivePrompt(options: {
       renderSessionSurfaceOverview(
         options.renderer,
         options.sessionManager,
-        options.runtimeContext as never,
+        options.runtimeContext,
       );
       return;
     }
@@ -2266,8 +2271,8 @@ async function runNonInteractivePrompt(options: {
               attached.targetPathBase;
             options.runtimeContext.session.gitRoot = attached.gitRoot;
             switchActiveSession(
-              options.runtimeContext as never,
-              options.runtimeContext.session as never,
+              options.runtimeContext,
+              options.runtimeContext.session,
               attached.projectRoot,
               {
                 cwd: attached.projectRoot,
@@ -2297,8 +2302,8 @@ async function runNonInteractivePrompt(options: {
             },
           );
           switchActiveSession(
-            options.runtimeContext as never,
-            attachedSession as never,
+            options.runtimeContext,
+            attachedSession,
             attached.projectRoot,
             {
               cwd: attached.projectRoot,
@@ -2354,10 +2359,19 @@ async function runNonInteractivePrompt(options: {
       return;
     }
     options.renderer.renderLine(
-      options.printMode
-        ? "This shell action is interactive-only."
-        : "\nThis shell action is interactive-only.\n",
+      options.printMode ? "Result" : "\nResult",
     );
+    options.renderer.renderLine("- Outcome: blocked");
+    options.renderer.renderLine("- BlockerKind: command-not-allowlisted");
+    options.renderer.renderLine(
+      "- Reason: This shell action is interactive-only.",
+    );
+    options.renderer.renderLine(
+      "- DoNext: Run this command in interactive shell mode or use /help for non-interactive-safe alternatives.",
+    );
+    if (!options.printMode) {
+      options.renderer.renderLine("");
+    }
     return;
   }
   await executeResolvedPromptTurn({
@@ -2420,18 +2434,30 @@ async function resolveTurnInputForExecution(options: {
   };
 }
 
+function renderBlockedContract(
+  renderer: StreamingRenderer,
+  input: {
+    blockerKind: "command-not-allowlisted" | "environment-not-ready" | "unknown";
+    reason: string;
+    doNext: string;
+  },
+): void {
+  renderer.renderLine("");
+  renderer.renderLine("Result");
+  renderer.renderLine("- Outcome: blocked");
+  renderer.renderLine(`- BlockerKind: ${input.blockerKind}`);
+  renderer.renderLine(`- Reason: ${input.reason}`);
+  renderer.renderLine(`- DoNext: ${input.doNext}`);
+  renderer.renderLine("");
+}
+
 async function runResumeLikeShellAction(options: {
   slashResult: ResumeLikeShellAction;
   source: "interactive" | "non-interactive";
   printMode: boolean;
   fallbackSessionId?: string;
   sessionManager: SessionManager;
-  runtimeContext: {
-    session: { id: string };
-    cwd: string;
-    projectRoot: string;
-    runtimeConfig: { maxTurns: number };
-  };
+  runtimeContext: ShellRuntimeContext;
   sessionRuntime: ShellSessionRuntime;
   logger: ReturnType<typeof createComponentLogger>;
   renderer: StreamingRenderer;
@@ -2445,7 +2471,7 @@ async function runResumeLikeShellAction(options: {
     requestedSessionId: options.slashResult.sessionId,
     fallbackSessionId: options.fallbackSessionId,
     sessionManager: options.sessionManager,
-    runtimeContext: options.runtimeContext as never,
+    runtimeContext: options.runtimeContext,
     renderer: options.renderer,
   });
   if (!resumed.resumed) {
@@ -2538,7 +2564,7 @@ async function executeResolvedPromptTurn(options: {
     mode: ApprovalModeObject | undefined,
   ) => void;
   nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
-  runtimeContext: { session: { id: string } };
+  runtimeContext: ShellRuntimeContext;
   sessionRuntime: ShellSessionRuntime;
   logger: ReturnType<typeof createComponentLogger>;
   printMode: boolean;
@@ -2639,12 +2665,7 @@ async function executeResolvedPromptTurn(options: {
 async function runReplayPromptScript(options: {
   replayFile: string;
   sessionManager: SessionManager;
-  runtimeContext: {
-    session: { id: string };
-    cwd: string;
-    projectRoot: string;
-    runtimeConfig: { maxTurns: number };
-  };
+  runtimeContext: ShellRuntimeContext;
   renderer: StreamingRenderer;
   sessionRuntime: ShellSessionRuntime;
   logger: ReturnType<typeof createComponentLogger>;
@@ -2840,23 +2861,7 @@ function derivePromptArgument(
 
 function renderWorkspaceSummary(
   renderer: StreamingRenderer,
-  runtimeContext: {
-    cwd: string;
-    originalCwd: string;
-    projectRoot: string;
-    rootMode: WorkspaceRootMode;
-    requestedWorkspaceRoot?: string;
-    targetPathBase: string;
-    gitRoot: string | null;
-    rootBindingDiagnostics?: readonly RootBindingDiagnostic[];
-    gitContext: {
-      insideGit: boolean;
-      branch: string | null;
-      isClean: boolean | null;
-      root: string | null;
-    };
-    session: { id: string; status: string; projectRoot: string };
-  },
+  runtimeContext: ShellRuntimeContext,
 ): void {
   renderer.renderLine("\nWorkspace");
   renderer.renderLine(
@@ -2973,23 +2978,7 @@ function renderRootBindingDiagnostics(
 function renderStartupSurface(
   renderer: StreamingRenderer,
   input: {
-    runtimeContext: {
-      session: { id: string; status: string };
-      cwd: string;
-      originalCwd: string;
-      projectRoot: string;
-      rootMode: WorkspaceRootMode;
-      requestedWorkspaceRoot?: string;
-      targetPathBase: string;
-      gitRoot: string | null;
-      rootBindingDiagnostics?: readonly RootBindingDiagnostic[];
-      gitContext: {
-        insideGit: boolean;
-        branch: string | null;
-        isClean: boolean | null;
-        root: string | null;
-      };
-    };
+    runtimeContext: ShellRuntimeContext;
     sessionManager: SessionManager;
     lifecycleNotices: readonly string[];
     recoveryCandidate?: { id: string } | null;
@@ -3150,15 +3139,7 @@ function renderSessionList(
 function renderCurrentSession(
   renderer: StreamingRenderer,
   sessionManager: SessionManager,
-  runtimeContext: {
-    session: {
-      id: string;
-      status: string;
-      updatedAt: string;
-      title?: string;
-      projectRoot: string;
-    };
-  },
+  runtimeContext: ShellRuntimeContext,
 ): void {
   const summary = sessionManager.describeSessionReentry(
     runtimeContext.session.id,
@@ -3211,16 +3192,7 @@ function renderCurrentSession(
 function renderSessionSurfaceOverview(
   renderer: StreamingRenderer,
   sessionManager: SessionManager,
-  runtimeContext: {
-    session: {
-      id: string;
-      status: string;
-      updatedAt: string;
-      title?: string;
-      projectRoot: string;
-    };
-    projectRoot: string;
-  },
+  runtimeContext: ShellRuntimeContext,
 ): void {
   renderer.renderLine("\n/sessions (session surface)");
   renderCurrentSession(renderer, sessionManager, runtimeContext);
@@ -3522,24 +3494,8 @@ function renderMcpDoctorControlPlane(
 }
 
 function switchRuntimeSessionProjectContext(
-  runtimeContext: {
-    cwd: string;
-    originalCwd: string;
-    projectRoot: string;
-    rootMode: WorkspaceRootMode;
-    requestedWorkspaceRoot?: string;
-    targetPathBase: string;
-    gitRoot: string | null;
-    rootBindingDiagnostics?: readonly RootBindingDiagnostic[];
-    gitContext: ReturnType<typeof getWorkflowGitContext>;
-  },
-  resumedSession: {
-    projectRoot: string;
-    rootMode?: WorkspaceRootMode;
-    requestedWorkspaceRoot?: string;
-    targetPathBase?: string;
-    gitRoot?: string | null;
-  },
+  runtimeContext: ShellRuntimeContext,
+  resumedSession: Session,
 ): void {
   const nextProjectRoot =
     resumedSession.projectRoot?.trim() || runtimeContext.projectRoot;
@@ -3564,8 +3520,8 @@ function switchRuntimeSessionProjectContext(
     gitContext: nextGitContext,
   });
   switchActiveSession(
-    runtimeContext as never,
-    resumedSession as never,
+    runtimeContext,
+    resumedSession,
     nextProjectRoot,
     {
       cwd: nextProjectRoot,

@@ -7,14 +7,25 @@ import { routeSlashCommand } from "./slashRouter.js";
 
 describe("slash router (W4)", () => {
   let workspaceRoot = "";
+  let fakeHomeDir = "";
+  const originalUserProfile = process.env.USERPROFILE;
+  const originalHome = process.env.HOME;
 
   beforeEach(() => {
+    fakeHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "private-agents-slash-router-home-"),
+    );
+    process.env.USERPROFILE = fakeHomeDir;
+    process.env.HOME = fakeHomeDir;
     workspaceRoot = fs.mkdtempSync(
       path.join(os.tmpdir(), "private-agents-command-registry-"),
     );
   });
 
   afterEach(() => {
+    process.env.USERPROFILE = originalUserProfile;
+    process.env.HOME = originalHome;
+    fs.rmSync(fakeHomeDir, { recursive: true, force: true });
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   });
 
@@ -68,6 +79,11 @@ describe("slash router (W4)", () => {
     expect(result).toBeTruthy();
     expect(result?.kind).toBe("local");
     if (result?.kind === "local") {
+      expect(result.output).toContain("- Outcome: blocked");
+      expect(result.output).toContain(
+        "- BlockerKind: command-not-allowlisted",
+      );
+      expect(result.output).toContain("- DoNext:");
       expect(result.output).toContain("Unknown slash command");
       expect(result.output).toContain("Quick actions:");
       expect(result.output).toContain("/help");
@@ -81,6 +97,11 @@ describe("slash router (W4)", () => {
     expect(result).toBeTruthy();
     expect(result?.kind).toBe("local");
     if (result?.kind === "local") {
+      expect(result.output).toContain("- Outcome: blocked");
+      expect(result.output).toContain(
+        "- BlockerKind: command-not-allowlisted",
+      );
+      expect(result.output).toContain("- DoNext:");
       expect(result.output).toContain("Slash command required");
       expect(result.output).toContain("Quick actions:");
       expect(result.output).toContain("/sessions");

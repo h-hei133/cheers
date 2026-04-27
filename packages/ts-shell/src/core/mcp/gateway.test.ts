@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { loadMcpConfigs } from './config.js'
 import { CoreMcpClient } from './client.js'
-import { CoreMcpGateway } from './gateway.js'
+import { CoreMcpGateway, McpGatewayBlockedError } from './gateway.js'
 
 describe('core MCP gateway (W3)', () => {
   let fakeHomeDir = ''
@@ -198,6 +198,10 @@ describe('core MCP gateway (W3)', () => {
     expect(snapshot.clients[0]).toMatchObject({ type: 'needs-auth', name: 'localSdk' })
     expect(snapshot.tools).toEqual([])
     await expect(gateway.invokeTool('localSdk', 'search', {})).rejects.toThrow('MCP server localSdk requires authentication')
+    await expect(gateway.invokeTool('localSdk', 'search', {})).rejects.toMatchObject({
+      blockerKind: 'environment-not-ready',
+      doNext: "Authenticate server 'localSdk' and rerun /mcp refresh localSdk.",
+    })
   })
 
   it('refresh supports target/all and rejects unknown server targets', async () => {
@@ -224,5 +228,10 @@ describe('core MCP gateway (W3)', () => {
       clients: [{ type: 'connected', name: 'localSdk' }],
     })
     await expect(gateway.refresh('missing-server')).rejects.toThrow('Unknown MCP server: missing-server')
+    await expect(gateway.refresh('missing-server')).rejects.toBeInstanceOf(McpGatewayBlockedError)
+    await expect(gateway.refresh('missing-server')).rejects.toMatchObject({
+      blockerKind: 'unknown',
+      doNext: 'Run /mcp status to list configured servers, then retry with a valid server name.',
+    })
   })
 })

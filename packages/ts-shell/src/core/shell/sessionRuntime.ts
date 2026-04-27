@@ -275,7 +275,6 @@ export class ShellSessionRuntime {
       }
 
       if (printMode) {
-        renderExecutionSummaryBlock(this.deps.renderer, eventDigest, "minimal");
         if (terminalStatus === "completed") {
           if (finalOutput.length > 0) {
             this.deps.renderer.renderLine(finalOutput);
@@ -303,6 +302,7 @@ export class ShellSessionRuntime {
           }
           this.deps.renderer.renderLine("");
         }
+        renderExecutionSummaryBlock(this.deps.renderer, eventDigest, "minimal");
       } else {
         if (
           !startedRendering &&
@@ -640,8 +640,9 @@ function deriveActionableBlockerContract(input: {
   const reason =
     input.stopReason?.trim() ||
     input.codingResult?.verification.reason?.trim() ||
-    input.codingResult?.failedFiles.find((entry) => entry.reason.trim().length > 0)
-      ?.reason ||
+    input.codingResult?.failedFiles.find(
+      (entry) => entry.reason.trim().length > 0,
+    )?.reason ||
     input.codingResult?.taskSatisfaction.reasons.find(
       (entry) => entry.trim().length > 0,
     );
@@ -789,9 +790,7 @@ function renderCodingResultContract(
     }
     const note = codingResult.taskSatisfaction.reasons[0];
     if (note && (!failureSummary || !failureSummary.includes(note))) {
-      renderer.renderLine(
-        `- Note: ${note}`,
-      );
+      renderer.renderLine(`- Note: ${note}`);
     }
     renderer.renderLine("");
     return;
@@ -1000,7 +999,9 @@ function buildCodingSuccessEvidenceLines(
   return lines;
 }
 
-function buildRepairContextEvidenceLines(evidence: readonly string[]): string[] {
+function buildRepairContextEvidenceLines(
+  evidence: readonly string[],
+): string[] {
   if (evidence.includes("repairContextAbandoned:true")) {
     const abandonedReason = findEvidenceValue(
       evidence,
@@ -1018,7 +1019,9 @@ function buildRepairContextEvidenceLines(evidence: readonly string[]): string[] 
       "- Repair context: repairContextUsed:false",
       "- Repair context abandoned: repairContextAbandoned:true",
       ...(abandonedReason
-        ? [`- Repair context abandoned reason: repairContextAbandonedReason:${abandonedReason}`]
+        ? [
+            `- Repair context abandoned reason: repairContextAbandonedReason:${abandonedReason}`,
+          ]
         : []),
       ...(abandonedFailureReason
         ? [
@@ -1046,7 +1049,9 @@ function buildRepairContextEvidenceLines(evidence: readonly string[]): string[] 
   return [
     "- Repair context: repairContextUsed:true",
     ...(repairedFailureReason
-      ? [`- Repaired failure reason: repairedFailureReason:${repairedFailureReason}`]
+      ? [
+          `- Repaired failure reason: repairedFailureReason:${repairedFailureReason}`,
+        ]
       : []),
     ...(repairedTargetFile
       ? [`- Repaired target file: repairedTargetFile:${repairedTargetFile}`]
@@ -1082,7 +1087,9 @@ function extractReadFiles(evidence: readonly string[]): string[] {
   return files;
 }
 
-function extractReadDeliveredLines(evidence: readonly string[]): string | undefined {
+function extractReadDeliveredLines(
+  evidence: readonly string[],
+): string | undefined {
   const marker = evidence
     .map((entry) => entry.match(/^read-delivered-lines:(\d+)$/i)?.[1])
     .find((value): value is string => Boolean(value));
