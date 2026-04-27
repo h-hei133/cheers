@@ -1183,6 +1183,48 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(updated).toContain("markerB = 'v1'");
   }, 15000);
 
+  it("applies explicit replace only to the selected target when sibling files share the source text", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-edit-target-precision" }, null, 2),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "target.txt"),
+      "stable content\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "sibling.txt"),
+      "stable content\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_edit_target_precision",
+      prompt:
+        'In src/target.txt, change "stable content" to "fixed content". Do NOT modify src/sibling.txt. Verify src/target.txt contains fixed content and src/sibling.txt is unchanged.',
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.changedFiles).toEqual(["src/target.txt"]);
+    expect(result.codingResult?.changedFiles).not.toContain("src/sibling.txt");
+    expect(result.codingResult?.verification.status).toBe("passed");
+    expect(result.codingResult?.verification.reason).toContain(
+      "src/sibling.txt unchanged",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "target.txt"), "utf8"),
+    ).resolves.toBe("fixed content\n");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "sibling.txt"), "utf8"),
+    ).resolves.toBe("stable content\n");
+  }, 15000);
+
   it("repairs patch-from-not-found follow-up by reusing the failed edit target", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(

@@ -1180,6 +1180,13 @@ function buildVerificationStatusDetail(
     return `Verification could not run${blocker}.${reasonSuffix}`;
   }
 
+  if (codingResult.verification.status === "failed") {
+    const command = codingResult.verification.command
+      ? ` (${codingResult.verification.command})`
+      : "";
+    return `Verification failed${command}.${reasonSuffix}`;
+  }
+
   return undefined;
 }
 

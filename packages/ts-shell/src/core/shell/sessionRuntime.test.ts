@@ -718,6 +718,110 @@ describe("shell session runtime (W5)", () => {
     );
   });
 
+  it("renders verification failure detail with command and reason in compact output", async () => {
+    const renderedLines: string[] = [];
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield {
+          type: "query.completed",
+          result: {
+            status: "stopped_error",
+            terminalReason: "stopped_error",
+            terminalClassification: "error",
+            stopReason: "npm test failed with exit code 1",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_write_verify_failed",
+              initialPrompt: "edit notes and verify",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput:
+              "Edit completed for notes.txt. Verification failed.",
+            codingResult: {
+              taskKind: "edit-file",
+              changedFiles: ["notes.txt"],
+              failedFiles: [],
+              patches: [],
+              repair: {
+                status: "not-needed",
+                attempts: 0,
+                recoveredItems: [],
+                failedItems: [],
+                notes: [],
+              },
+              continuation: {
+                status: "first-pass-success",
+                attempts: 0,
+                evidence: [],
+              },
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: ["notes.txt"],
+                attemptedFiles: ["notes.txt"],
+                changedFiles: ["notes.txt"],
+                unchangedAttemptedFiles: [],
+              },
+              taskSatisfaction: {
+                verdict: "insufficient-evidence",
+                reasons: ["Verification failed after edit."],
+                requiredEvidence: ["changed-files", "verification"],
+                observedEvidence: ["changed-files:notes.txt"],
+              },
+              verifiedFiles: [],
+              unverifiedFiles: [
+                {
+                  path: "notes.txt",
+                  reason: "npm test failed with exit code 1",
+                },
+              ],
+              verification: {
+                status: "failed",
+                command: "npm test -- --help",
+                reason: "npm test failed with exit code 1",
+              },
+              evidence: [],
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt(
+      "sess_write_verify_failed",
+      "edit notes and verify",
+    );
+
+    expect(renderedLines).toContain("- Changed files: notes.txt");
+    expect(renderedLines).toContain("- Verification: failed");
+    expect(renderedLines).toContain(
+      "- Verification detail: Verification failed (npm test -- --help). Reason: npm test failed with exit code 1",
+    );
+    expect(renderedLines).toContain(
+      "- Next action: Inspect the verification failure, adjust the requested edit, and rerun.",
+    );
+    expect(renderedLines).not.toContain("- Verification evidence: passed");
+  });
+
   it("explains successful edits with blocked verification as a caveat", async () => {
     const renderedLines: string[] = [];
 
