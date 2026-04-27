@@ -148,10 +148,10 @@ describe("mapTerminalToOrchestrationResult", () => {
             changedFiles: ["plan.txt"],
             verification: {
               status: "failed",
-              reason: "Unit tests failed after the edit.",
+              reason: "Unit tests did not pass after the edit.",
             },
             verdict: "completed-with-caveats",
-            reasons: ["Verification failed after the edit."],
+            reasons: ["Verification did not pass after the edit."],
           }),
         },
       ],
@@ -172,8 +172,100 @@ describe("mapTerminalToOrchestrationResult", () => {
 
     expect(result.terminalClassification).toBe("stopped");
     expect(result.status).toBe("stopped_error");
-    expect(result.stopReason).toBe("Unit tests failed after the edit.");
+    expect(result.stopReason).toBe("Unit tests did not pass after the edit.");
     expect(result.codingResult?.verification.status).toBe("failed");
+  });
+
+  it("lets verification failure with a hard execution failure classify as error", () => {
+    const fakeState = {
+      transcript: [
+        {
+          role: "assistant",
+          content: "Build execution failed after approval.",
+          codingResult: buildCodingResult({
+            changedFiles: [],
+            failedFiles: [
+              {
+                path: "(command)",
+                reason: "npm run build failed with exit code 1",
+              },
+            ],
+            verification: {
+              status: "failed",
+              reason: "Verification failed: npm run build failed.",
+            },
+            verdict: "completed-with-caveats",
+            reasons: ["bash execution failed after approval."],
+            evidence: ["current-permission-request-tool:bash"],
+          }),
+        },
+      ],
+      sharedContext: {
+        sessionId: "sess_mapper",
+        initialPrompt: "prompt",
+        notes: [],
+        handoffs: [],
+      },
+      lastContinuationReason: undefined,
+    } as never;
+
+    const result = mapTerminalToOrchestrationResult(fakeState, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+      stopReason: undefined,
+    } as never);
+
+    expect(result.terminalClassification).toBe("error");
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason).toBe(
+      "Bash execution failed after approval: npm run build failed with exit code 1",
+    );
+  });
+
+  it("keeps non-verification actionable blockers stopped even with hard failure text", () => {
+    const fakeState = {
+      transcript: [
+        {
+          role: "assistant",
+          content: "Target file missing.",
+          codingResult: buildCodingResult({
+            changedFiles: [],
+            failedFiles: [
+              {
+                path: "missing.txt",
+                reason: "patch-target-missing: read failed for missing.txt",
+              },
+            ],
+            verification: {
+              status: "not-run",
+              reason: "Patch target was missing.",
+            },
+            verdict: "completed-with-caveats",
+            reasons: ["patch-target-missing: read failed for missing.txt"],
+            evidence: ["actionable-blocker-kind:patch-target-missing"],
+          }),
+        },
+      ],
+      sharedContext: {
+        sessionId: "sess_mapper",
+        initialPrompt: "prompt",
+        notes: [],
+        handoffs: [],
+      },
+      lastContinuationReason: undefined,
+    } as never;
+
+    const result = mapTerminalToOrchestrationResult(fakeState, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+      stopReason: undefined,
+    } as never);
+
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason).toBe(
+      "Patch target was missing.",
+    );
   });
 
   it("maps hard tool failures to an error terminal result", () => {
@@ -269,6 +361,7 @@ function buildCodingResult(input: {
   };
   verdict: "completed-with-caveats" | "failed" | "insufficient-evidence";
   reasons: string[];
+  evidence?: string[];
 }) {
   return {
     taskKind: "edit-file",
@@ -310,6 +403,6 @@ function buildCodingResult(input: {
       reason: input.verification.reason,
     })),
     verification: input.verification,
-    evidence: [],
+    evidence: input.evidence ?? [],
   };
 }

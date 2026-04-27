@@ -180,4 +180,35 @@ describe("runtime config", () => {
       "deepseek-ai/DeepSeek-V3",
     );
   });
+
+  it("tolerates UTF-8 BOM in config file", () => {
+    const configPath = path.join(fakeRoot, ".private-agents.json");
+    fs.writeFileSync(
+      configPath,
+      "\uFEFF" + JSON.stringify({ maxTurns: 10 }),
+      "utf8",
+    );
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.maxTurns).toBe(10);
+  });
+
+  it("tolerates UTF-8 BOM in user config file", () => {
+    const configPath = getUserRuntimeConfigPath();
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      "\uFEFF" + JSON.stringify({ maxTurns: 15 }),
+      "utf8",
+    );
+    const loaded = readUserRuntimeConfigFile();
+    expect(loaded.maxTurns).toBe(15);
+  });
+
+  it("includes config path in parse error for invalid JSON", () => {
+    const configPath = path.join(fakeRoot, ".private-agents.json");
+    fs.writeFileSync(configPath, "{ invalid_json }", "utf8");
+    expect(() => getRuntimeConfig(fakeRoot)).toThrowError(
+      new RegExp(`Failed to read runtime config at .*\\.private-agents\\.json:.*`)
+    );
+  });
 });

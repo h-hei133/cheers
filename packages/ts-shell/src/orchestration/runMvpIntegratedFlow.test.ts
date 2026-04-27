@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { QueryEvent } from "../core/query/events.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { safeRemoveDir } from "../test-utils/cleanup.js";
@@ -12,10 +12,23 @@ import {
 } from "./runMvpIntegratedFlow.js";
 
 describe("MVP integrated end-to-end flow (T10)", () => {
-  const workspaceRoot = path.join(os.tmpdir(), "private-agents-t10-workspace");
+  let workspaceRoot = "";
+  const originalDaemonEnabled = process.env.DAEMON_ENABLED;
+
+  beforeEach(async () => {
+    workspaceRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "private-agents-t10-workspace-"),
+    );
+    process.env.DAEMON_ENABLED = "0";
+  });
 
   afterEach(async () => {
     await safeRemoveDir(workspaceRoot);
+    if (originalDaemonEnabled === undefined) {
+      delete process.env.DAEMON_ENABLED;
+    } else {
+      process.env.DAEMON_ENABLED = originalDaemonEnabled;
+    }
   });
 
   function continuityFromResult(

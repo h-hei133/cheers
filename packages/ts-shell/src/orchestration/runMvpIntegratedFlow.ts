@@ -1,4 +1,4 @@
-﻿import crypto from "node:crypto";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { SchemaVersion } from "../../../../contracts/typescript/types.js";
@@ -9925,7 +9925,7 @@ async function dispatchToolWithLifecycle(input: {
       type: "approval.resolved",
       toolName: input.toolName,
       taskId: input.taskId,
-      outcome: result.success ? "approved" : "denied",
+      outcome: (result.success || !result.error || !/approval denied|escalation denied|not in the mvp allowlist|is not registered/i.test(result.error)) ? "approved" : "denied",
     });
   }
   input.events.push({
@@ -10006,7 +10006,7 @@ function inferVerificationBlockerKind(
     return "environment-not-ready";
   }
 
-  return "unknown";
+  return undefined;
 }
 
 function blockerNextAction(kind: CodingVerificationBlockerKind): string {

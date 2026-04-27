@@ -112,9 +112,9 @@ export function getRuntimeConfig(
     }
 
     try {
-      const parsed = JSON.parse(
-        fs.readFileSync(candidate, "utf8"),
-      ) as RuntimeConfigFile;
+      const rawContent = fs.readFileSync(candidate, "utf8");
+      const content = rawContent.startsWith("\uFEFF") ? rawContent.slice(1) : rawContent;
+      const parsed = JSON.parse(content) as RuntimeConfigFile;
       merged = {
         ...merged,
         ...parsed,
@@ -183,7 +183,9 @@ export function readUserRuntimeConfigFile(): RuntimeConfigFile {
   }
 
   try {
-    return JSON.parse(fs.readFileSync(configPath, "utf8")) as RuntimeConfigFile;
+    const rawContent = fs.readFileSync(configPath, "utf8");
+    const content = rawContent.startsWith("\uFEFF") ? rawContent.slice(1) : rawContent;
+    return JSON.parse(content) as RuntimeConfigFile;
   } catch (error) {
     throw new Error(
       `Failed to read user runtime config at ${configPath}: ${error instanceof Error ? error.message : String(error)}`,

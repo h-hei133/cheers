@@ -104,10 +104,12 @@ function deriveTruthfulTerminal(input: {
     stopReason: verificationReason ?? taskReason ?? failedReason,
     codingResult,
   });
+  const hasHardFailure = hasHardFailureSignal(codingResult);
 
   if (
     actionableBlocker &&
-    !hasSuccessfulMutationWithVerificationCaveat(codingResult)
+    !hasSuccessfulMutationWithVerificationCaveat(codingResult) &&
+    !(actionableBlocker.kind === "verification-failed" && hasHardFailure)
   ) {
     return {
       terminalReason: "stopped_error",
@@ -116,7 +118,7 @@ function deriveTruthfulTerminal(input: {
     };
   }
 
-  if (verification.status === "failed") {
+  if (verification.status === "failed" && !hasHardFailure) {
     return {
       terminalReason: "stopped_error",
       terminalClassification: "error",
@@ -144,11 +146,16 @@ function deriveTruthfulTerminal(input: {
     };
   }
 
-  if (hasHardFailureSignal(codingResult)) {
+  if (hasHardFailure) {
     return {
       terminalReason: "stopped_error",
       terminalClassification: "error",
-      stopReason: failedReason ?? taskReason ?? "Task failed",
+      stopReason: buildHardFailureStopReason({
+        codingResult,
+        taskReason,
+        failedReason,
+        verificationReason,
+      }),
     };
   }
 
@@ -184,16 +191,67 @@ function hasSuccessfulMutationWithVerificationCaveat(
 }
 
 function hasHardFailureSignal(codingResult: CodingResultSummary): boolean {
-  if (codingResult.failedFiles.length === 0) {
+  if (
+    codingResult.failedFiles.length === 0 &&
+    codingResult.taskSatisfaction.reasons.length === 0
+  ) {
     return false;
   }
 
-  return codingResult.failedFiles.some((entry) => {
-    const normalized = entry.reason.toLowerCase();
-    return /(failed|error|exception|timeout|denied|write failed|read failed|mutation failed)/.test(
-      normalized,
-    );
-  });
+  const reasons = [
+    ...codingResult.failedFiles.map((entry) => entry.reason),
+    ...codingResult.taskSatisfaction.reasons,
+  ];
+
+  return reasons.some(isHardFailureReason);
+}
+
+function buildHardFailureStopReason(input: {
+  codingResult: CodingResultSummary;
+  taskReason?: string;
+  failedReason?: string;
+  verificationReason?: string;
+}): string {
+  if (isBashExecutionFailure(input.codingResult) && input.failedReason) {
+    return `Bash execution failed after approval: ${input.failedReason}`;
+  }
+
+  const explicitReason = [
+    input.taskReason,
+    input.failedReason,
+    input.verificationReason,
+  ].find(
+    (reason): reason is string =>
+      Boolean(reason) &&
+      !reason.toLowerCase().startsWith("workflow stopped on blocker") &&
+      isHardFailureReason(reason),
+  );
+
+  return (
+    explicitReason ??
+    input.taskReason ??
+    input.failedReason ??
+    input.verificationReason ??
+    "Task failed"
+  );
+}
+
+function isHardFailureReason(reason: string): boolean {
+  const normalized = reason.toLowerCase();
+  return /(failed|error|exception|timeout|denied|write failed|read failed|mutation failed)/.test(
+    normalized,
+  );
+}
+
+function isBashExecutionFailure(codingResult: CodingResultSummary): boolean {
+  return (
+    codingResult.failedFiles.some((entry) => entry.path === "(command)") &&
+    codingResult.evidence.some(
+      (entry) =>
+        entry === "current-permission-request-tool:bash" ||
+        entry.startsWith("current-permission-request-process:"),
+    )
+  );
 }
 
 function firstTruthy(values: readonly string[]): string | undefined {
