@@ -28,15 +28,15 @@ import {
   resumeShellSession,
 } from "../core/shell/recovery.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
+import type {
+  RootBindingDiagnostic,
+  ShellRuntimeContext,
+} from "../core/shell/runtimeContext.js";
 import {
   createSessionRootMismatchDiagnostic,
   createWorkspaceAttachSwitchDiagnostic,
   resolveRootBindingDiagnostics,
   switchActiveSession,
-} from "../core/shell/runtimeContext.js";
-import type {
-  RootBindingDiagnostic,
-  ShellRuntimeContext,
 } from "../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
 import {
@@ -341,7 +341,9 @@ async function main(): Promise<void> {
     } catch (error) {
       if (error instanceof SessionBootstrapError) {
         if (error.rootBindingDiagnostics.length > 0) {
-          renderer.renderLine("Session bootstrap blocked by root binding diagnostics.");
+          renderer.renderLine(
+            "Session bootstrap blocked by root binding diagnostics.",
+          );
           renderRootBindingDiagnostics(renderer, error.rootBindingDiagnostics);
         } else {
           console.error(error.message);
@@ -865,12 +867,15 @@ async function main(): Promise<void> {
               return;
             }
 
-            const attachedSession = sessionManager.createNew(attached.projectRoot, {
-              rootMode: attached.rootMode,
-              requestedWorkspaceRoot: attached.requestedRoot,
-              targetPathBase: attached.targetPathBase,
-              gitRoot: attached.gitRoot,
-            });
+            const attachedSession = sessionManager.createNew(
+              attached.projectRoot,
+              {
+                rootMode: attached.rootMode,
+                requestedWorkspaceRoot: attached.requestedRoot,
+                targetPathBase: attached.targetPathBase,
+                gitRoot: attached.gitRoot,
+              },
+            );
             switchActiveSession(
               runtimeContext,
               attachedSession,
@@ -2180,10 +2185,7 @@ async function runNonInteractivePrompt(options: {
           }
           const resumed = options.sessionManager.resume(resolvedSessionId);
           const previousSessionId = options.runtimeContext.session.id;
-          switchRuntimeSessionProjectContext(
-            options.runtimeContext,
-            resumed,
-          );
+          switchRuntimeSessionProjectContext(options.runtimeContext, resumed);
           options.renderer.renderLine(
             `Switched session: ${previousSessionId} -> ${resumed.id}`,
           );
@@ -2337,6 +2339,54 @@ async function runNonInteractivePrompt(options: {
       return;
     }
 
+    if (resolved.slashResult.action === "show-mcp") {
+      const mcpAction = resolved.slashResult.mcpAction ?? "status";
+      const mcpTarget = resolved.slashResult.mcpTarget?.trim();
+      const mcpGateway = new CoreMcpGateway(options.runtimeContext.cwd);
+      try {
+        if (mcpAction === "refresh") {
+          const refreshTarget =
+            !mcpTarget || mcpTarget.toLowerCase() === "all" ? "all" : mcpTarget;
+          const snapshot = await mcpGateway.refresh(refreshTarget);
+          options.renderer.renderLine(
+            `MCP refresh complete (${refreshTarget === "all" ? "all servers" : refreshTarget}).`,
+          );
+          renderMcpStatusControlPlane(options.renderer, snapshot);
+          return;
+        }
+
+        const snapshot = await mcpGateway.snapshot();
+        if (mcpAction === "tools") {
+          renderMcpToolsControlPlane(options.renderer, snapshot, mcpTarget);
+          return;
+        }
+        if (mcpAction === "doctor") {
+          renderMcpDoctorControlPlane(options.renderer, snapshot);
+          return;
+        }
+        renderMcpStatusControlPlane(options.renderer, snapshot);
+      } catch (error) {
+        if (error instanceof McpGatewayBlockedError) {
+          renderBlockedContract(options.renderer, {
+            blockerKind: error.blockerKind,
+            reason: error.message,
+            doNext: error.doNext,
+          });
+        } else {
+          renderBlockedContract(options.renderer, {
+            blockerKind: "unknown",
+            reason:
+              error instanceof Error
+                ? `MCP control plane failed: ${error.message}`
+                : `MCP control plane failed: ${String(error)}`,
+            doNext:
+              "Run /mcp refresh all to reload server connections, then retry your MCP command.",
+          });
+        }
+      }
+      return;
+    }
+
     if (
       resolved.slashResult.action === "resume-session" ||
       resolved.slashResult.action === "continue-session"
@@ -2358,9 +2408,7 @@ async function runNonInteractivePrompt(options: {
       });
       return;
     }
-    options.renderer.renderLine(
-      options.printMode ? "Result" : "\nResult",
-    );
+    options.renderer.renderLine(options.printMode ? "Result" : "\nResult");
     options.renderer.renderLine("- Outcome: blocked");
     options.renderer.renderLine("- BlockerKind: command-not-allowlisted");
     options.renderer.renderLine(
@@ -2437,7 +2485,10 @@ async function resolveTurnInputForExecution(options: {
 function renderBlockedContract(
   renderer: StreamingRenderer,
   input: {
-    blockerKind: "command-not-allowlisted" | "environment-not-ready" | "unknown";
+    blockerKind:
+      | "command-not-allowlisted"
+      | "environment-not-ready"
+      | "unknown";
     reason: string;
     doNext: string;
   },
@@ -3503,10 +3554,12 @@ function switchRuntimeSessionProjectContext(
   const nextRootMode =
     resumedSession.rootMode ?? resolveWorkspaceRootMode(nextGitContext);
   const nextTargetPathBase = resumedSession.targetPathBase ?? nextProjectRoot;
-  const nextGitRoot =
-    Object.prototype.hasOwnProperty.call(resumedSession, "gitRoot")
-      ? (resumedSession.gitRoot ?? null)
-      : (nextGitContext.root ?? null);
+  const nextGitRoot = Object.prototype.hasOwnProperty.call(
+    resumedSession,
+    "gitRoot",
+  )
+    ? (resumedSession.gitRoot ?? null)
+    : (nextGitContext.root ?? null);
   const nextRequestedWorkspaceRoot =
     resumedSession.requestedWorkspaceRoot ??
     runtimeContext.requestedWorkspaceRoot ??
@@ -3519,21 +3572,16 @@ function switchRuntimeSessionProjectContext(
     gitRoot: nextGitRoot,
     gitContext: nextGitContext,
   });
-  switchActiveSession(
-    runtimeContext,
-    resumedSession,
-    nextProjectRoot,
-    {
-      cwd: nextProjectRoot,
-      projectRoot: nextProjectRoot,
-      rootMode: nextRootMode,
-      requestedWorkspaceRoot: nextRequestedWorkspaceRoot,
-      targetPathBase: nextTargetPathBase,
-      gitRoot: nextGitRoot,
-      rootBindingDiagnostics: nextRootBindingDiagnostics,
-      gitContext: nextGitContext,
-    },
-  );
+  switchActiveSession(runtimeContext, resumedSession, nextProjectRoot, {
+    cwd: nextProjectRoot,
+    projectRoot: nextProjectRoot,
+    rootMode: nextRootMode,
+    requestedWorkspaceRoot: nextRequestedWorkspaceRoot,
+    targetPathBase: nextTargetPathBase,
+    gitRoot: nextGitRoot,
+    rootBindingDiagnostics: nextRootBindingDiagnostics,
+    gitContext: nextGitContext,
+  });
 }
 
 function resolveSessionSwitchDiagnostics(

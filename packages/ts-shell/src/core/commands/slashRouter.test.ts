@@ -80,9 +80,7 @@ describe("slash router (W4)", () => {
     expect(result?.kind).toBe("local");
     if (result?.kind === "local") {
       expect(result.output).toContain("- Outcome: blocked");
-      expect(result.output).toContain(
-        "- BlockerKind: command-not-allowlisted",
-      );
+      expect(result.output).toContain("- BlockerKind: command-not-allowlisted");
       expect(result.output).toContain("- DoNext:");
       expect(result.output).toContain("Unknown slash command");
       expect(result.output).toContain("Quick actions:");
@@ -98,9 +96,7 @@ describe("slash router (W4)", () => {
     expect(result?.kind).toBe("local");
     if (result?.kind === "local") {
       expect(result.output).toContain("- Outcome: blocked");
-      expect(result.output).toContain(
-        "- BlockerKind: command-not-allowlisted",
-      );
+      expect(result.output).toContain("- BlockerKind: command-not-allowlisted");
       expect(result.output).toContain("- DoNext:");
       expect(result.output).toContain("Slash command required");
       expect(result.output).toContain("Quick actions:");
