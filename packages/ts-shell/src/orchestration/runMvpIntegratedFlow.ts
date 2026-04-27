@@ -748,6 +748,7 @@ function buildWorkflowTaskPlan(
   const hasPostEditReadOnlyVerifyCue =
     hasPostEditReadOnlyVerifyPrompt &&
     lastTaskWasMutationLike &&
+    !hasCorrectionCue &&
     !hasCreateIntent &&
     !hasExecutionIntent &&
     !effectiveReplaceDirectiveFromPrompt &&
@@ -2068,7 +2069,7 @@ function extractWorkflowTaskIntentSignals(
     );
   const mutationIntentPrompt = removeNegatedMutationInstructions(intentPrompt);
   const hasEditIntentRaw =
-    /(?:\bedit\b|modify|update|fix|change|repair|replace|swap|\bappend\b|continue fixing|continue repairing|\u4fee\u6539|\u4fee\u590d|\u6539\u4e00\u4e0b|\u6539\u6210|\u6539\u4e3a|\u66ff\u6362|\u66ff\u6362\u4e3a|\u7ee7\u7eed\u4fee)/i.test(
+    /(?:\bedit\b|modify|update|fix|change|repair|replace|swap|\badd\b|\binsert\b|\bappend\b|continue fixing|continue repairing|\u4fee\u6539|\u4fee\u590d|\u6539\u4e00\u4e0b|\u6539\u6210|\u6539\u4e3a|\u66ff\u6362|\u66ff\u6362\u4e3a|\u7ee7\u7eed\u4fee)/i.test(
       mutationIntentPrompt,
     );
   const hasEditIntent =
@@ -6778,7 +6779,7 @@ function prefersDirectTextSummary(prompt: string): boolean {
 }
 
 function isCorrectionFollowUpPrompt(prompt: string): boolean {
-  return /(?:\u4e0d\u662f\u8fd9\u4e2a\u610f\u601d|\u6211\u8981\u7684\u662f|\u4e0d\u662f.*\u800c\u662f|\u4e0d\u662f\u8fd9\u4e48\u6539|\u4fdd\u7559.*\u4e0d\u52a8|\u53ea\u6539\u7b2c[\u4e00\u4e8c\u4e09\u56db\d]+\u884c|\u91cd\u7b54\u4e0a\u4e00\u9898|\u7ee7\u7eed\u521a\u624d\u90a3\u4e2a\u6587\u4ef6|\u4e0d\u662f\u65b9\u6cd5|directly summarize|not this meaning|redo previous answer|revise last answer|not that edit)/i.test(
+  return /(?:\u4e0d\u662f\u8fd9\u4e2a\u610f\u601d|\u6211\u8981\u7684\u662f|\u4e0d\u662f.*\u800c\u662f|\u4e0d\u662f\u8fd9\u4e48\u6539|\u4fdd\u7559.*\u4e0d\u52a8|\u53ea\u6539\u7b2c[\u4e00\u4e8c\u4e09\u56db\d]+\u884c|\u91cd\u7b54\u4e0a\u4e00\u9898|\u7ee7\u7eed\u521a\u624d\u90a3\u4e2a\u6587\u4ef6|\u4e0d\u662f\u65b9\u6cd5|correction:|directly summarize|not this meaning|redo previous answer|revise last answer|not that edit)/i.test(
     prompt,
   );
 }

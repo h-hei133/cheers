@@ -1587,6 +1587,59 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(unchanged).toBe(["status_new", "marker_keep"].join("\n"));
   }, 15000);
 
+  it("keeps corrective post-edit follow-up as edit even when it also asks to verify", async () => {
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-post-edit-corrective-verify" }, null, 2),
+      "utf8",
+    );
+    const targetPath = path.join(workspaceRoot, "math.js");
+    await fs.writeFile(
+      targetPath,
+      ["export function double(n) {", "  return n * 2;", "}"].join("\n"),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "README.md"),
+      "double(3) should return 6.\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "LOCKED.md"),
+      "Do not modify this file.\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_post_edit_corrective_verify",
+      prompt:
+        "Correction: add a short comment above double explaining that it doubles a number. Only modify math.js. Verify math.js contains doubles a number and math.js contains n * 2 and README.md is unchanged and LOCKED.md is unchanged.",
+      workspaceRoot,
+      continuityState: {
+        recentTargetFiles: ["math.js"],
+        recentChangedFiles: ["math.js"],
+        recentVerifiedFiles: ["math.js", "README.md", "LOCKED.md"],
+        lastTaskKind: "edit-file",
+        lastTerminalClassification: "success",
+        lastTerminalReason: "completed",
+        lastVerificationStatus: "passed",
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("edit-file");
+    expect(result.codingResult?.changedFiles).toEqual(["math.js"]);
+    expect(result.codingResult?.verification.status).toBe("passed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "plan: intent=edit-file",
+    );
+    expect(result.sharedContext.notes.join("\n")).not.toContain(
+      "post-edit verify/check follow-up resolved as read-only continuation",
+    );
+    expect(await fs.readFile(targetPath, "utf8")).toContain("doubles a number");
+  }, 15000);
+
   it("routes post-edit make sure contains do-not-edit wording to read-check", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
