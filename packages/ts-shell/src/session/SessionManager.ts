@@ -33,6 +33,7 @@ import {
 import type {
   AgentExecutionOutput,
   AgentRole,
+  CodingActionResultSeed,
   CodingTaskKind,
   ContinuationReason,
   TerminalClassification,
@@ -128,6 +129,7 @@ export interface SessionContinuitySnapshot {
   readonly lastStagedRepairBlockedStep?: number;
   readonly lastStagedRepairNextStep?: number;
   readonly lastAnswerDefect?: string;
+  readonly lastActionResultSeed?: CodingActionResultSeed;
   readonly recentChangedFiles: readonly string[];
   readonly recentTargetFiles: readonly string[];
   readonly recentFailedFiles: ReadonlyArray<{ path: string; reason: string }>;
@@ -2558,6 +2560,9 @@ export class SessionManager {
         recoverySnapshot.terminalReason,
       lastFailure,
       lastTaskKind: lastCodingResult?.taskKind,
+      ...(lastCodingResult?.lastActionResultSeed
+        ? { lastActionResultSeed: lastCodingResult.lastActionResultSeed }
+        : {}),
       lastGroundedDeliverableMode,
       ...(lastReadDeliveredLines !== undefined
         ? { lastReadDeliveredLines }

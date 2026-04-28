@@ -49,6 +49,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         result.codingResult?.taskSatisfaction.verdict,
       lastTaskSatisfactionReasons:
         result.codingResult?.taskSatisfaction.reasons ?? [],
+      lastActionResultSeed: result.codingResult?.lastActionResultSeed,
     };
   }
 
@@ -1804,6 +1805,66 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(notes).toContain("seedVerifyCommandInherited=yes");
     expect(notes).not.toContain("last-continuation-evidence:");
     expect(result.finalOutput).toContain("seed_verified");
+  }, 15000);
+
+  it("writes action result seed from execution result for next-turn continuity", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-action-result-seed-source" }, null, 2),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "auto-action-result-seed.txt"),
+      ["status_old", "auto_seed_verified"].join("\n"),
+      "utf8",
+    );
+
+    const first = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_action_result_seed_source_first",
+      prompt:
+        "Edit src/auto-action-result-seed.txt and replace status_old with status_new, then run node --version to verify",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(first.status).toBe("completed");
+    expect(first.codingResult?.lastActionResultSeed).toMatchObject({
+      actionKind: "edit-file",
+      target: "src/auto-action-result-seed.txt",
+      changedFiles: ["src/auto-action-result-seed.txt"],
+      verifiedFiles: [],
+      verification: {
+        status: "blocked",
+        blockerKind: "no-verify-strategy",
+      },
+    });
+
+    const second = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_action_result_seed_source_second",
+      prompt: "Check the last changed file and confirm the verification result.",
+      workspaceRoot,
+      continuityState: continuityFromResult(first),
+      maxTurns: 6,
+    });
+
+    expect(second.status).toBe("completed");
+    expect(second.codingResult?.taskKind).toBe("read-file");
+    expect(second.codingResult?.changedFiles).toEqual([]);
+
+    const notes = second.sharedContext.notes.join("\n");
+    expect(notes).toContain(
+      "decision-trace: task=read-file target=src/auto-action-result-seed.txt",
+    );
+    expect(notes).toContain("lineage=mutation-verification");
+    expect(notes).toContain("seed=action-result");
+    expect(notes).toContain("seedAction=edit-file");
+    expect(notes).toContain("seedTarget=src/auto-action-result-seed.txt");
+    expect(notes).toContain("seedVerifyStatus=blocked");
+    expect(notes).toContain("seedBlocker=no-verify-strategy");
+    expect(notes).not.toContain("last-continuation-evidence:");
+    expect(second.finalOutput).toContain("auto_seed_verified");
   }, 15000);
 
   it("keeps multi-step continuation coherence after mutation verification read-check", async () => {

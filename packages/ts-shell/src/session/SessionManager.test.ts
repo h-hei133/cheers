@@ -1490,6 +1490,17 @@ describe("SessionManager", () => {
             selectionScope: "focused",
             selectionSource: "auto-from-changes",
           },
+          lastActionResultSeed: {
+            actionKind: "edit-file",
+            target: "src/app.ts",
+            changedFiles: ["src/app.ts"],
+            verifiedFiles: ["src/app.ts"],
+            verification: {
+              status: "passed",
+              command: "npm test -- src/app.test.ts",
+              reason: "Focused test passed.",
+            },
+          },
           evidence: ["transform:src/app.ts:bug=>fix"],
         },
       },
@@ -1568,6 +1579,17 @@ describe("SessionManager", () => {
             selectionSource: "auto-from-changes",
             nextAction: "Inspect the failing test and continue the fix.",
           },
+          lastActionResultSeed: {
+            actionKind: "edit-file",
+            target: "src/broken.ts",
+            changedFiles: ["src/broken.ts"],
+            verifiedFiles: [],
+            verification: {
+              status: "failed",
+              command: "npm test -- src/broken.test.ts",
+              reason: "npm test failed with exit code 1",
+            },
+          },
           evidence: ["transform:src/broken.ts:old=>new"],
           failureBoundary: "verification",
         },
@@ -1595,6 +1617,29 @@ describe("SessionManager", () => {
     expect(completedSnapshot.lastVerificationCommand).toBe(
       "npm test -- src/app.test.ts",
     );
+    expect(completedSnapshot.lastActionResultSeed).toMatchObject({
+      actionKind: "edit-file",
+      target: "src/app.ts",
+      changedFiles: ["src/app.ts"],
+      verifiedFiles: ["src/app.ts"],
+      verification: {
+        status: "passed",
+        command: "npm test -- src/app.test.ts",
+      },
+    });
+    expect(
+      restoredManager.buildPromptContinuitySnapshot(
+        completed.id,
+        "continue with the same task",
+      )?.lastActionResultSeed,
+    ).toMatchObject({
+      actionKind: "edit-file",
+      target: "src/app.ts",
+      verification: {
+        status: "passed",
+        command: "npm test -- src/app.test.ts",
+      },
+    });
     expect(
       restoredManager.buildPromptContinuityContext(
         completed.id,
@@ -1613,6 +1658,15 @@ describe("SessionManager", () => {
     expect(failedSnapshot.lastVerificationReason).toBe(
       "npm test failed with exit code 1",
     );
+    expect(failedSnapshot.lastActionResultSeed).toMatchObject({
+      actionKind: "edit-file",
+      target: "src/broken.ts",
+      changedFiles: ["src/broken.ts"],
+      verification: {
+        status: "failed",
+        command: "npm test -- src/broken.test.ts",
+      },
+    });
     expect(failedSnapshot.unresolvedItems).toContain("verify:failed");
     const failedContext = restoredManager.buildPromptContinuityContext(
       failed.id,

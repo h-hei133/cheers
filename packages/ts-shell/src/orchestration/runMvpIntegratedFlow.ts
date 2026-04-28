@@ -44,6 +44,7 @@ import type { SingleFileReplacePatchResult } from "./patchMutationLane.js";
 import type {
   AgentExecutionInput,
   AgentExecutionOutput,
+  CodingActionResultSeed,
   CodingPatchRecord,
   CodingResultSummary,
   CodingTaskKind,
@@ -637,21 +638,6 @@ interface MutationVerificationContinuityLineage {
   };
 }
 
-interface ActionResultContinuitySeed {
-  readonly actionKind?: CodingTaskKind;
-  readonly target?: string;
-  readonly changedFiles?: readonly string[];
-  readonly verifiedFiles?: readonly string[];
-  readonly verification?: {
-    readonly status?: string;
-    readonly command?: string;
-    readonly reason?: string;
-    readonly blockerKind?: string;
-  };
-  readonly reason?: string;
-  readonly blockerKind?: string;
-}
-
 interface FreshnessObservability {
   readonly notes: readonly string[];
   readonly evidence: readonly string[];
@@ -737,7 +723,7 @@ interface ContinuityStateLike {
   recentFailedFiles?: ReadonlyArray<{ path: string; reason: string }>;
   recentVerifiedFiles?: readonly string[];
   lastMutationVerificationLineage?: MutationVerificationContinuityLineage;
-  lastActionResultSeed?: ActionResultContinuitySeed;
+  lastActionResultSeed?: CodingActionResultSeed;
   lastVerificationStatus?: string;
   lastVerificationCommand?: string;
   lastVerificationReason?: string;
@@ -3167,7 +3153,7 @@ function mergeContinuationState(
 }
 
 function actionResultSeedToMutationVerificationLineage(
-  seed: ActionResultContinuitySeed | undefined,
+  seed: CodingActionResultSeed | undefined,
 ): MutationVerificationContinuityLineage | undefined {
   if (
     !seed ||
@@ -11929,6 +11915,16 @@ function buildCodingResult(
       ...input.failedFiles.map((item) => item.path),
     ]),
   );
+  const lastActionResultSeed = buildActionResultSeedFromCodingResult(
+    taskKind,
+    {
+      attemptedFiles,
+      changedFiles: input.changedFiles,
+      verifiedFiles: input.verifiedFiles,
+      verification: verificationWithActionableBlocker,
+      reason: input.failedFiles[0]?.reason,
+    },
+  );
 
   return {
     taskKind,
@@ -11977,9 +11973,49 @@ function buildCodingResult(
     unverifiedFiles: input.unverifiedFiles,
     verification: verificationWithActionableBlocker,
     evidence: evidenceWithActionableBlocker,
+    ...(lastActionResultSeed ? { lastActionResultSeed } : {}),
     ...(input.failedFiles.length > 0
       ? { failureBoundary: input.failedFiles[0]?.reason ?? "workflow failed" }
       : {}),
+  };
+}
+
+function buildActionResultSeedFromCodingResult(
+  taskKind: CodingTaskKind,
+  input: {
+    readonly attemptedFiles: readonly string[];
+    readonly changedFiles: readonly string[];
+    readonly verifiedFiles: readonly string[];
+    readonly verification: CodingVerificationSummary;
+    readonly reason?: string;
+  },
+): CodingActionResultSeed | undefined {
+  if (taskKind !== "edit-file" && taskKind !== "write-file") {
+    return undefined;
+  }
+
+  const target =
+    input.changedFiles[0] ?? input.verifiedFiles[0] ?? input.attemptedFiles[0];
+  if (!target) {
+    return undefined;
+  }
+
+  return {
+    actionKind: taskKind,
+    target: normalizePathLike(target),
+    changedFiles: input.changedFiles.map(normalizePathLike),
+    verifiedFiles: input.verifiedFiles.map(normalizePathLike),
+    verification: {
+      status: input.verification.status,
+      ...(input.verification.command
+        ? { command: input.verification.command }
+        : {}),
+      ...(input.verification.reason ? { reason: input.verification.reason } : {}),
+      ...(input.verification.blockerKind
+        ? { blockerKind: input.verification.blockerKind }
+        : {}),
+    },
+    ...(input.reason ? { reason: input.reason } : {}),
   };
 }
 

@@ -173,6 +173,21 @@ export interface CodingVerificationSummary {
   readonly nextAction?: string
 }
 
+export interface CodingActionResultSeed {
+  readonly actionKind?: CodingTaskKind
+  readonly target?: string
+  readonly changedFiles?: readonly string[]
+  readonly verifiedFiles?: readonly string[]
+  readonly verification?: {
+    readonly status?: CodingVerificationStatus
+    readonly command?: string
+    readonly reason?: string
+    readonly blockerKind?: CodingVerificationBlockerKind
+  }
+  readonly reason?: string
+  readonly blockerKind?: CodingVerificationBlockerKind
+}
+
 export interface CodingResultSummary {
   readonly taskKind: CodingTaskKind
   diagnosis?: CodingDiagnosisSummary
@@ -187,6 +202,7 @@ export interface CodingResultSummary {
   unverifiedFiles: Array<{ path: string; reason: string }>
   verification: CodingVerificationSummary
   evidence: string[]
+  readonly lastActionResultSeed?: CodingActionResultSeed
   readonly failureBoundary?: string
 }
 
