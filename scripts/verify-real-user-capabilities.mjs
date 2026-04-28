@@ -15,6 +15,7 @@ const realHome = 'D:/Test/home-sf'
 const reportPath = 'D:/Test/test-results/real-user-capabilities-report.json'
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const includeCandidates = process.argv.includes('--include-candidates')
+const includeContinueSmoke = process.argv.includes('--include-continue-smoke')
 
 const failureCategories = [
   'none',
@@ -68,6 +69,44 @@ const futureGateCandidates = [
       'no new verification type or provider/auth behavior is required',
     ],
     releaseRealDecision: 'deferred: keep out of verify:release:real until the candidate has repeated stability evidence',
+  },
+  {
+    id: 'real-completed-continue-followup-verify',
+    status: 'candidate-not-run',
+    provider: 'real',
+    projectShape: {
+      requiredFiles: ['math.js', 'README.md', 'LOCKED.md'],
+      roles: {
+        code: ['math.js'],
+        docs: ['README.md'],
+        protected: ['README.md', 'LOCKED.md'],
+      },
+    },
+    contract: [
+      'turn1 completed session: exact math.js replacement and verification passed',
+      'turn2 bare /continue <follow-up> stays on the same session id',
+      'turn2 changed files remain limited to math.js',
+      'turn2 transcript/output exposes changed files and verification evidence',
+      'protected unchanged: README.md and LOCKED.md',
+    ],
+    requiredReportFields: [
+      'capability',
+      'projectDir',
+      'sessionId',
+      'turns[].sessionId',
+      'turns[].mode',
+      'turns[].changedFiles',
+      'turns[].transcriptEvidence',
+      'verification',
+      'failureCategory',
+      'failureReason',
+    ],
+    promotionCriteria: [
+      'same-session /continue behavior passes repeatedly under real provider',
+      'provider/network failures remain distinguishable from product failures',
+      'transcript evidence stays stable without parsing long output tails',
+    ],
+    releaseRealDecision: 'deferred: keep out of default verify-real-user-capabilities until repeated real-provider stability is observed',
   },
 ]
 
@@ -170,6 +209,36 @@ const candidateScenarios = [
         expectContains: {
           'README.md': ['welcome()', 'welcome("Ada")'],
         },
+      },
+    ],
+  },
+  {
+    id: 'real-completed-continue-followup-verify',
+    provider: 'real',
+    projectDir: `D:/Test/pca-candidate-real-continue-${runId}`,
+    files: {
+      'math.js': 'export function double(n) {\n  return n + 2;\n}\n',
+      'README.md': 'double(3) should return 6.\n',
+      'LOCKED.md': 'Do not modify this file.\n',
+    },
+    protectedFiles: ['README.md', 'LOCKED.md'],
+    turns: [
+      {
+        prompt: 'There is a bug in math.js: double(3) should return 6, but the implementation is wrong. Fix the bug in math.js. Do NOT modify README.md. Do NOT modify LOCKED.md. Verify math.js contains n * 2 and README.md is unchanged and LOCKED.md is unchanged.',
+        expectChanged: ['math.js'],
+        expectContains: {
+          'math.js': ['n * 2'],
+        },
+      },
+      {
+        prompt: 'Correction: add a short comment above double explaining that it doubles a number. Only modify math.js. Verify math.js contains doubles a number and math.js contains n * 2 and README.md is unchanged and LOCKED.md is unchanged.',
+        continueCompletedSession: true,
+        expectSameSession: true,
+        expectChanged: ['math.js'],
+        expectContains: {
+          'math.js': ['doubles a number', 'n * 2'],
+        },
+        expectTranscriptContains: ['math.js', 'Verification: passed'],
       },
     ],
   },
@@ -297,6 +366,9 @@ function providerEnv(provider) {
 }
 
 async function runCliTurn(scenario, turnIndex, prompt) {
+  const cliPrompt = scenario.turns[turnIndex]?.continueCompletedSession
+    ? `/continue ${prompt}`
+    : prompt
   return run(process.execPath, [
     tsxCliPath,
     cliEntryPath,
@@ -305,7 +377,7 @@ async function runCliTurn(scenario, turnIndex, prompt) {
     '--non-interactive-approval',
     'allow-once',
     '--print',
-    prompt,
+    cliPrompt,
   ], {
     cwd: tsShellRoot,
     env: providerEnv(scenario.provider),
@@ -328,6 +400,16 @@ async function readCurrentSessionId(scenario) {
   })
   const match = result.output.match(/- ID:\s*(\S+)/)
   return match?.[1] ?? '(unknown)'
+}
+
+function readSessionTranscript(scenario, sessionId) {
+  const home = scenario.provider === 'real' ? realHome : syntheticHome
+  const transcriptPath = path.join(home, '.private-agents', 'sessions', sessionId, 'transcript.jsonl')
+  try {
+    return fs.readFileSync(transcriptPath, 'utf8')
+  } catch {
+    return ''
+  }
 }
 
 function assertScenarioState(scenario, turn, beforeTurn, afterTurn, output) {
@@ -441,6 +523,7 @@ async function runScenario(scenario) {
   let sessionId = '(pending)'
 
   for (const [index, turn] of scenario.turns.entries()) {
+    const previousSessionId = sessionId
     const runResult = await runCliTurn(scenario, index, turn.prompt)
     if (runResult.code !== 0 || runResult.timedOut) {
       return {
@@ -470,10 +553,30 @@ async function runScenario(scenario) {
 
     const nextSnapshot = snapshot(scenario.projectDir)
     const assertion = assertScenarioState(scenario, turn, previousSnapshot, nextSnapshot, runResult.output)
+    if (
+      turn.expectSameSession &&
+      previousSessionId !== '(pending)' &&
+      sessionId !== previousSessionId
+    ) {
+      assertion.ok = false
+      assertion.failures.push(`session id changed during completed /continue: before=${previousSessionId} after=${sessionId}`)
+    }
+    const transcript = readSessionTranscript(scenario, sessionId)
+    for (const marker of turn.expectTranscriptContains ?? []) {
+      if (!transcript.includes(marker) && !runResult.output.includes(marker)) {
+        assertion.ok = false
+        assertion.failures.push(`continuation transcript missing marker: ${marker}`)
+      }
+    }
     turnResults.push({
       turn: index + 1,
+      mode: turn.continueCompletedSession ? 'continue-completed-session' : 'prompt',
+      sessionId,
       changedFiles: assertion.changedFiles,
       verification: assertion.verification,
+      transcriptEvidence: (turn.expectTranscriptContains ?? []).filter(
+        (marker) => transcript.includes(marker) || runResult.output.includes(marker),
+      ),
       outputTail: summarizeOutput(runResult.output),
     })
     if (!assertion.ok) {
@@ -546,7 +649,7 @@ async function main() {
   console.log(`synthetic HOME=${syntheticHome}`)
   console.log(`real HOME=${realHome}`)
   console.log('homeCreated=false')
-  console.log(`candidateMode=${includeCandidates ? 'include-candidates' : 'off'}`)
+  console.log(`candidateMode=${includeCandidates ? 'include-candidates' : includeContinueSmoke ? 'include-continue-smoke' : 'off'}`)
 
   try {
     ensureHome(syntheticHome, 'synthetic')
@@ -608,8 +711,15 @@ async function main() {
   }
 
   const candidates = []
-  if (includeCandidates) {
-    for (const scenario of candidateScenarios) {
+  const selectedCandidateScenarios = includeCandidates
+    ? candidateScenarios
+    : includeContinueSmoke
+      ? candidateScenarios.filter(
+          (scenario) => scenario.id === 'real-completed-continue-followup-verify',
+        )
+      : []
+  if (selectedCandidateScenarios.length > 0) {
+    for (const scenario of selectedCandidateScenarios) {
       const result = await runScenario(scenario)
       candidates.push(result)
       const suffix = result.status === 'PASS' ? `verification=${result.verification}` : result.failureReason

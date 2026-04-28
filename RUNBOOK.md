@@ -92,6 +92,49 @@ failure is product code, provider/network, or local environment.
 
 Real-provider smoke is intentionally not part of release core.
 
+### Current main-path gate layering
+
+Use these commands as the current default verification stack for main-path
+work:
+
+| Layer | Command | Gate status | Purpose |
+| --- | --- | --- | --- |
+| Golden CLI main path | `npm run test:gate:golden-main-path` | Required stable gate | Fast synthetic CLI baseline for the user-visible main path. |
+| Real user capabilities | `npm run verify:real-user-capabilities` | Required stable gate when real-provider behavior is touched | Real-provider smoke for small bugfix, follow-up, protected-file, and multi-file consistency behavior. Uses `D:\Test\home-sf`. |
+| Focused regression guard | `npm run test -w packages/ts-shell -- <file> -t "<case>"` | Required when the current bounded slice added or changed a focused guard | Proves the exact behavior being closed without treating legacy wide tests as release blockers. |
+| Release core | `npm run verify:release:core` | Broader deterministic release gate | Runs the hard gate set listed above; use before release handoff or when changing shared CLI/runtime contracts. |
+
+`packages/ts-shell/src/orchestration/runMvpIntegratedFlow.test.ts` full-suite
+is not a current main-path gate. It is a broad historical contract corpus used
+for attribution and targeted focused guards. Running it in full is allowed for
+triage, but a red full-suite result must be classified before it is treated as a
+product regression.
+
+Current known full-suite status for `runMvpIntegratedFlow.test.ts`:
+
+- 121 total tests
+- 69 failing legacy or wide-contract assertions
+- focused interrupted goal persistence guard passes:
+  - `npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "keeps original bugfix goal through interrupted continue verification evidence"`
+
+Known failure buckets in that full suite:
+
+| Bucket | Count | Classification |
+| --- | ---: | --- |
+| Provider role, approval, stream, and terminal old-contract assertions | 10 | Historical contract debt, not a current gate by itself. |
+| Read/write/repo/chat intent routing assertions | 19 | Wide orchestration contract debt; use focused tests for changed behavior. |
+| Edit, mutation, verification, and patch precision assertions | 14 | Historical mutation/verification contract debt; do not repair opportunistically from unrelated rounds. |
+| Weak/no-cue follow-up lineage assertions | 4 | Follow-up lineage contract debt; only touch during a bounded follow-up slice. |
+| Reflective, approval-memory, and migration rebasing assertions | 17 | Session/reflective recovery contract debt; not part of the default main-path gate. |
+| Explicit session-id, blocker-to-fix, and verify next-step continuation assertions | 5 | Continuation contract debt; use focused guards for current work. |
+
+When a future change touches `runMvpIntegratedFlow.ts`, prefer this order:
+
+1. Run the focused guard for the changed behavior.
+2. Run `npm run verify:real-user-capabilities` when the behavior affects real task completion.
+3. Run `npm run test:gate:golden-main-path`.
+4. Run the full `runMvpIntegratedFlow.test.ts` only for attribution or when intentionally working down that legacy corpus.
+
 ### Exit code taxonomy
 
 | Exit code | Class | Meaning | Next action |

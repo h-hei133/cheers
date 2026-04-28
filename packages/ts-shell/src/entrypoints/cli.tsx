@@ -2528,6 +2528,66 @@ async function runResumeLikeShellAction(options: {
   ) => void;
   nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
 }): Promise<{ turnNumber: number }> {
+  const continuationPrompt =
+    options.slashResult.action === "continue-session"
+      ? options.slashResult.continuationPrompt?.trim()
+      : undefined;
+
+  if (continuationPrompt) {
+    const targetSessionId =
+      options.slashResult.sessionId ?? options.runtimeContext.session.id;
+    const targetSummary = (() => {
+      try {
+        return options.sessionManager.describeSessionReentry(targetSessionId);
+      } catch {
+        return null;
+      }
+    })();
+
+    if (targetSummary?.status === "completed") {
+      const resumeResult = options.sessionManager.tryResume(
+        targetSessionId,
+        options.runtimeContext.projectRoot,
+        { mode: "continuity-only" },
+      );
+      if (!resumeResult.ok) {
+        options.renderer.renderLine(
+          options.printMode
+            ? `Continue failed: ${resumeResult.error}\nHint: ${resumeResult.recoveryHint}`
+            : `\nContinue failed: ${resumeResult.error}\nHint: ${resumeResult.recoveryHint}\n`,
+        );
+        return { turnNumber: options.turnNumber ?? 0 };
+      }
+
+      switchRuntimeSessionProjectContext(
+        options.runtimeContext,
+        resumeResult.session,
+      );
+
+      const nextTurn = (options.turnNumber ?? 0) + 1;
+      const effectiveFollowUp = normalizePromptForExecution(continuationPrompt);
+      await executeResolvedPromptTurn({
+        source: options.source,
+        effectivePrompt: effectiveFollowUp,
+        continuityState: options.sessionManager.buildContinuitySnapshot(
+          resumeResult.session.id,
+        ),
+        sessionManager: options.sessionManager,
+        setActiveNonInteractiveApprovalMode:
+          options.setActiveNonInteractiveApprovalMode,
+        nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
+        runtimeContext: options.runtimeContext,
+        sessionRuntime: options.sessionRuntime,
+        logger: options.logger,
+        printMode: options.printMode,
+        turnNumber: options.source === "interactive" ? nextTurn : undefined,
+        renderer: options.renderer,
+        turnOrigin: "continued",
+      });
+      return { turnNumber: nextTurn };
+    }
+  }
+
   const resumed = await resumeShellSession({
     requestedSessionId: options.slashResult.sessionId,
     fallbackSessionId: options.fallbackSessionId,
@@ -2538,11 +2598,6 @@ async function runResumeLikeShellAction(options: {
   if (!resumed.resumed) {
     return { turnNumber: options.turnNumber ?? 0 };
   }
-
-  const continuationPrompt =
-    options.slashResult.action === "continue-session"
-      ? options.slashResult.continuationPrompt?.trim()
-      : undefined;
 
   if (continuationPrompt) {
     const nextTurn = (options.turnNumber ?? 0) + 1;

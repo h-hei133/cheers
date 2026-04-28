@@ -2538,6 +2538,215 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(transcript).toContain("\"type\":\"query.completed\"");
   }, 45000);
 
+  it("prefers completed current session for /continue follow-up over recovery fallback", async () => {
+    const projectRoot = path.join(
+      fakeHomeDir,
+      "completed-continue-current-project",
+    );
+    const fallbackProjectRoot = path.join(
+      fakeHomeDir,
+      "completed-continue-fallback-project",
+    );
+    fs.mkdirSync(projectRoot, { recursive: true });
+    fs.mkdirSync(fallbackProjectRoot, { recursive: true });
+    const completedSessionId = "sess_completed_continue_current";
+    const fallbackSessionId = "sess_completed_continue_fallback";
+
+    seedSessionWithTitle({
+      sessionId: completedSessionId,
+      projectRoot,
+      title: "Completed Continue Current",
+      status: "completed",
+    });
+    seedSessionWithTitle({
+      sessionId: fallbackSessionId,
+      projectRoot: fallbackProjectRoot,
+      title: "Wrong Recovery Fallback",
+      status: "interrupted",
+    });
+    writeCurrentSessionPointer({ projectRoot, sessionId: completedSessionId });
+
+    const now = new Date().toISOString();
+    const completedSessionDir = path.join(sessionsDir, completedSessionId);
+    fs.writeFileSync(
+      path.join(completedSessionDir, "state.json"),
+      JSON.stringify(
+        {
+          status: "completed",
+          projectRoot,
+          runPhase: "idle",
+          terminalReason: "completed",
+          terminalClassification: "success",
+          durableStatus: "success",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(completedSessionDir, "transcript.jsonl"),
+      [
+        {
+          type: "message",
+          role: "user",
+          content: "fix src/app.ts and verify",
+          timestamp: now,
+        },
+        {
+          type: "query-event",
+          event: {
+            type: "query.completed",
+            result: {
+              status: "completed",
+              terminalReason: "completed",
+              terminalClassification: "success",
+              transcript: [],
+              sharedContext: {
+                sessionId: completedSessionId,
+                initialPrompt: "fix src/app.ts and verify",
+                notes: [],
+                handoffs: [],
+              },
+              finalOutput: "Fixed src/app.ts and verified it.",
+              codingResult: {
+                taskKind: "edit-file",
+                changedFiles: ["src/app.ts"],
+                failedFiles: [],
+                patches: [],
+                repair: {
+                  status: "not-needed",
+                  attempts: 1,
+                  recoveredItems: [],
+                  failedItems: [],
+                  notes: [],
+                },
+                continuation: {
+                  status: "first-pass-success",
+                  attempts: 1,
+                  evidence: [
+                    "transform:src/app.ts:bug=>fix",
+                    "verify-command-hint:npm test -- src/app.test.ts",
+                  ],
+                },
+                changeSet: {
+                  gitAware: false,
+                  preExistingDirtyFiles: [],
+                  postRunDirtyFiles: [],
+                  attemptedFiles: ["src/app.ts"],
+                  changedFiles: ["src/app.ts"],
+                  unchangedAttemptedFiles: [],
+                },
+                taskSatisfaction: {
+                  verdict: "satisfied",
+                  reasons: ["Edit and verification completed."],
+                  requiredEvidence: ["changed-files", "verification"],
+                  observedEvidence: [
+                    "src/app.ts",
+                    "npm test -- src/app.test.ts",
+                  ],
+                },
+                verifiedFiles: ["src/app.ts"],
+                unverifiedFiles: [],
+                verification: {
+                  status: "passed",
+                  command: "npm test -- src/app.test.ts",
+                  reason: "Focused test passed.",
+                  selectionScope: "focused",
+                  selectionSource: "auto-from-changes",
+                },
+                evidence: ["transform:src/app.ts:bug=>fix"],
+              },
+            },
+          },
+          timestamp: now,
+        },
+      ]
+        .map((entry) => JSON.stringify(entry))
+        .join("\n") + "\n",
+      "utf8",
+    );
+
+    const runPrint = (prompt: string) =>
+      spawnSync(nodeExe, [tsxCliPath, cliPath, "--project", projectRoot, "--print", prompt], {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 30000,
+      });
+
+    const followUpPrompt =
+      "continue completed current session smoke and mention src/app.ts evidence";
+    const continueResult = runPrint(`/continue ${followUpPrompt}`);
+    expect(continueResult.error).toBeUndefined();
+    expect(continueResult.status).toBe(0);
+    const continueOutput = `${continueResult.stdout ?? ""}${continueResult.stderr ?? ""}`;
+    expect(continueOutput).not.toContain(fallbackSessionId);
+    expect(continueOutput).not.toContain("not recoverable");
+    expect(continueOutput).not.toContain("No recoverable session found");
+
+    fs.writeFileSync(
+      path.join(completedSessionDir, "state.json"),
+      JSON.stringify(
+        {
+          status: "completed",
+          projectRoot,
+          runPhase: "idle",
+          terminalReason: "completed",
+          terminalClassification: "success",
+          durableStatus: "success",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const explicitPrompt =
+      "explicit completed session follow-up should keep the same session";
+    const explicitResult = runPrint(
+      `/continue ${completedSessionId} ${explicitPrompt}`,
+    );
+    expect(explicitResult.error).toBeUndefined();
+    expect(explicitResult.status).toBe(0);
+    const explicitOutput = `${explicitResult.stdout ?? ""}${explicitResult.stderr ?? ""}`;
+    expect(explicitOutput).not.toContain("not recoverable");
+
+    const completedTranscript = fs.readFileSync(
+      path.join(completedSessionDir, "transcript.jsonl"),
+      "utf8",
+    );
+    expect(completedTranscript).toContain(followUpPrompt);
+    expect(completedTranscript).toContain(explicitPrompt);
+    expect(completedTranscript).toContain("src/app.ts");
+    expect(completedTranscript).toContain("npm test -- src/app.test.ts");
+
+    const fallbackTranscript = fs.readFileSync(
+      path.join(sessionsDir, fallbackSessionId, "transcript.jsonl"),
+      "utf8",
+    );
+    expect(fallbackTranscript).not.toContain(followUpPrompt);
+    expect(fallbackTranscript).not.toContain(explicitPrompt);
+
+    const currentStore = JSON.parse(
+      fs.readFileSync(
+        path.join(fakeHomeDir, ".private-agents", "current-session.json"),
+        "utf8",
+      ),
+    ) as {
+      byProjectRoot?: Record<string, { sessionId?: string }>;
+    };
+    expect(
+      currentStore.byProjectRoot?.[path.resolve(projectRoot).toLowerCase()]
+        ?.sessionId,
+    ).toBe(completedSessionId);
+  }, 60000);
+
   it("shows structured execution result surface for synthetic print success path", async () => {
     const projectRoot = path.join(fakeHomeDir, "execution-surface-success");
     fs.mkdirSync(projectRoot, { recursive: true });
