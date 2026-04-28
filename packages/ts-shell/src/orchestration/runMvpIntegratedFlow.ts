@@ -1741,6 +1741,31 @@ function buildWorkflowTaskPlan(
     };
   }
 
+  if (
+    reflectiveStateQueryKind === "next-step" &&
+    hasReflectiveActionCue &&
+    lastTaskWasReadLike &&
+    primaryTarget?.inWorkspace &&
+    !hasEditIntent &&
+    !hasCreateIntent &&
+    !hasRepairContinuationCue &&
+    !hasVerifyIntent &&
+    !effectiveReplaceDirective
+  ) {
+    return {
+      taskKind: "read-file",
+      reason: "reflective next-step handoff reused read continuity target",
+      targetPath: primaryTarget.cleaned,
+      groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
+      ...(readLineCount !== undefined ? { readLineCount } : {}),
+      ...(readLineOffset !== undefined ? { readLineOffset } : {}),
+      inspectFirst: true,
+      verifyAfterEdit: false,
+      usedRestoredState,
+      repairInstruction: normalizedRepairInstruction,
+    };
+  }
+
   if (hasContinuationExecutionIntent && primaryTarget?.inWorkspace) {
     if (shouldReturnCrossFileConvergedNoop) {
       return {
