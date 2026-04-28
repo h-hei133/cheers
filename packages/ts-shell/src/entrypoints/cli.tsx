@@ -60,6 +60,7 @@ import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type {
   ApprovalAuditMemoryState,
   RecoveryTrustBoundaryBlock,
+  ResumeResult,
   Session,
   SessionContinuitySnapshot,
   SessionReentrySummary,
@@ -93,6 +94,13 @@ type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
 type ResumeLikeShellAction = ShellActionResult & {
   action: "resume-session" | "continue-session";
 };
+
+function isFailedResumeResult(
+  result: ResumeResult,
+): result is Extract<ResumeResult, { ok: false }> {
+  return result.ok === false;
+}
+
 type TurnInputResolution =
   | { kind: "handled" }
   | {
@@ -2552,7 +2560,7 @@ async function runResumeLikeShellAction(options: {
         options.runtimeContext.projectRoot,
         { mode: "continuity-only" },
       );
-      if (!resumeResult.ok) {
+      if (isFailedResumeResult(resumeResult)) {
         options.renderer.renderLine(
           options.printMode
             ? `Continue failed: ${resumeResult.error}\nHint: ${resumeResult.recoveryHint}`

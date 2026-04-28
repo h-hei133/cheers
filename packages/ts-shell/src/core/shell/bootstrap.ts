@@ -130,7 +130,10 @@ export function bootstrapShellRuntime(input: {
             `Current session pointer ${currentSelection.session.id} could not be resumed for ${requestedProjectRoot}; starting a fresh session.`,
           );
         }
-      } else if (currentSelection.reason !== "none") {
+      } else if (
+        currentSelection.ok === false &&
+        currentSelection.reason !== "none"
+      ) {
         emitLifecycleMessage(
           `Current session pointer ignored: ${currentSelection.detail} Starting a fresh session.`,
         );
