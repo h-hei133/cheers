@@ -116,6 +116,37 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(mergedNotes).not.toContain("bash(");
   }, 15000);
 
+  it("emits planner decision trace for target and verification choice", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "trace-target.txt"),
+      "trace_old\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_decision_trace",
+      prompt:
+        "In src/trace-target.txt, replace trace_old with trace_new, then verify",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      continuityState: {
+        lastTaskKind: "edit-file",
+        recentTargetFiles: ["src/trace-target.txt"],
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    const mergedNotes = result.sharedContext.notes.join("\n");
+    expect(mergedNotes).toContain(
+      "decision-trace: task=edit-file target=src/trace-target.txt",
+    );
+    expect(mergedNotes).toContain("inspect=yes");
+    expect(mergedNotes).toContain("verify=yes");
+    expect(mergedNotes).toContain("restored=no");
+  }, 15000);
+
   it("denies escalation and terminates with explicit stopped_error terminal", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(

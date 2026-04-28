@@ -253,6 +253,7 @@ function createIntegratedRunner(
         continuity: mergedContinuityState,
         plan: workflowPlan,
       });
+      const decisionTrace = buildWorkflowDecisionTrace(workflowPlan);
       if (workflowPlan.taskKind === "chat") {
         const reflectiveOutput = workflowPlan.reflectiveStateQueryKind
           ? buildReflectiveStateQueryResponse({
@@ -278,6 +279,7 @@ function createIntegratedRunner(
             handoffReason: "Chat response drafted; reviewer final pass",
             notes: [
               `plan: intent=${workflowPlan.taskKind} reason=${workflowPlan.reason}`,
+              ...decisionTrace,
               ...(workflowPlan.reflectiveStateQueryKind
                 ? [
                     `reflective-state-query: ${workflowPlan.reflectiveStateQueryKind}`,
@@ -293,6 +295,7 @@ function createIntegratedRunner(
           content,
           notes: [
             `plan: intent=${workflowPlan.taskKind} reason=${workflowPlan.reason}`,
+            ...decisionTrace,
             ...(workflowPlan.reflectiveStateQueryKind
               ? [
                   `reflective-state-query: ${workflowPlan.reflectiveStateQueryKind}`,
@@ -314,6 +317,7 @@ function createIntegratedRunner(
       });
       const notes = [
         `plan: intent=${workflowPlan.taskKind} reason=${workflowPlan.reason}`,
+        ...decisionTrace,
         ...execution.notes,
       ];
       const content = execution.userFacingOutput;
@@ -413,6 +417,34 @@ interface WorkflowTaskPlan {
   readonly blockedReason?: string;
   readonly targetMissing?: boolean;
   readonly usedRestoredState?: boolean;
+}
+
+function buildWorkflowDecisionTrace(plan: WorkflowTaskPlan): string[] {
+  const parts = [
+    `task=${plan.taskKind}`,
+    `target=${plan.targetPath ?? "none"}`,
+    `inspect=${plan.inspectFirst ? "yes" : "no"}`,
+    `verify=${plan.verifyAfterEdit ? "yes" : "no"}`,
+    `restored=${plan.usedRestoredState ? "yes" : "no"}`,
+  ];
+
+  if (plan.reflectiveStateQueryKind) {
+    parts.push(`reflective=${plan.reflectiveStateQueryKind}`);
+  }
+  if (plan.verifyCommand) {
+    parts.push(`verifyCommand=${plan.verifyCommand}`);
+  }
+  if (plan.repairContextUsed !== undefined) {
+    parts.push(`repairContext=${plan.repairContextUsed ? "used" : "not-used"}`);
+  }
+  if (plan.previousRemainingTargets?.length) {
+    parts.push(`remainingTargets=${plan.previousRemainingTargets.length}`);
+  }
+  if (plan.previousFailedEntries?.length) {
+    parts.push(`failedEntries=${plan.previousFailedEntries.length}`);
+  }
+
+  return [`decision-trace: ${parts.join(" ")}`];
 }
 
 type ReflectiveStateQueryKind =
