@@ -9,6 +9,9 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
+const packagedCliEntryPath = path.join(repoRoot, 'dist', 'cli.js')
+const builtTsShellCliPath = path.join(tsShellRoot, 'dist', 'packages', 'ts-shell', 'src', 'entrypoints', 'cli.js')
+const buildCliBinScriptPath = path.join(repoRoot, 'scripts', 'build-cli-bin.mjs')
 const syntheticHome = 'D:/Test/pca-home-synth'
 const realProviderHome = 'D:/Test/home-sf'
 const projectRoot = 'D:/Test/cli-entry-gate'
@@ -193,6 +196,56 @@ async function runCli(args, options = {}) {
   })
 }
 
+async function ensurePackagedCliEntry() {
+  if (!fs.existsSync(builtTsShellCliPath)) {
+    printStep(
+      'cli-entry-packaged-build-artifact',
+      'product-regression',
+      `missing built ts-shell CLI: ${builtTsShellCliPath}`,
+    )
+    return false
+  }
+
+  const result = await run(process.execPath, [buildCliBinScriptPath], {
+    cwd: repoRoot,
+    timeoutMs: 120000,
+  })
+  if (result.code !== 0 || result.timedOut) {
+    printStep(
+      'cli-entry-packaged-bin-generation',
+      'product-regression',
+      result.timedOut ? 'timed out' : `exit=${result.code}`,
+    )
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  if (!fs.existsSync(packagedCliEntryPath)) {
+    printStep(
+      'cli-entry-packaged-bin-generation',
+      'product-regression',
+      `missing root dist CLI: ${packagedCliEntryPath}`,
+    )
+    return false
+  }
+  printStep('cli-entry-packaged-bin-generation', 'pass')
+  return true
+}
+
+async function runPackagedCli(args, options = {}) {
+  const env = {
+    HOME: syntheticHome,
+    USERPROFILE: syntheticHome,
+    PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+    ...(options.env ?? {}),
+  }
+  return run(process.execPath, [packagedCliEntryPath, ...args], {
+    cwd: repoRoot,
+    env,
+    stdin: options.stdin,
+    timeoutMs: options.timeoutMs ?? 240000,
+  })
+}
+
 async function assertSuccessfulCliRun(name, args, markers, options = {}) {
   const result = await runCli(args, options)
   if (result.code !== 0 || result.timedOut) {
@@ -201,6 +254,16 @@ async function assertSuccessfulCliRun(name, args, markers, options = {}) {
     return false
   }
   return assertMarkers(result.output, [...commonResultMarkers, ...markers], name)
+}
+
+async function assertSuccessfulPackagedCliRun(name, args, markers, options = {}) {
+  const result = await runPackagedCli(args, options)
+  if (result.code !== 0 || result.timedOut) {
+    printStep(name, 'product-regression', result.timedOut ? 'timed out' : `exit=${result.code}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  return assertMarkers(result.output, markers, name)
 }
 
 async function runPrintReplayBoundary() {
@@ -282,6 +345,44 @@ async function runInvalidArgumentBoundary() {
   return true
 }
 
+async function runPackagedEntryBoundary() {
+  const packagedReady = await ensurePackagedCliEntry()
+  if (!packagedReady) return false
+
+  const versionResult = await runPackagedCli(['--version'])
+  if (versionResult.code !== 0 || versionResult.timedOut) {
+    printStep(
+      'cli-entry-packaged-version',
+      'product-regression',
+      versionResult.timedOut ? 'timed out' : `exit=${versionResult.code}`,
+    )
+    console.log(summarizeOutput(versionResult.output))
+    return false
+  }
+  if (!versionResult.output.includes('0.1.0')) {
+    printStep('cli-entry-packaged-version', 'product-regression', 'missing version marker')
+    console.log(summarizeOutput(versionResult.output))
+    return false
+  }
+  printStep('cli-entry-packaged-version', 'pass')
+
+  const slashOk = await assertSuccessfulPackagedCliRun(
+    'cli-entry-packaged-slash-current-session',
+    ['--project', projectRoot, '--print', '/sessions current'],
+    ['Current session', '- ID:'],
+  )
+  const printOk = await assertSuccessfulPackagedCliRun(
+    'cli-entry-packaged-print-mode',
+    ['--project', projectRoot, '--print', `read the first line from ${fixturePath}`],
+    [
+      ...commonResultMarkers,
+      'Read result for D:/Test/cli-entry-gate/fixture.txt:',
+      'cli entry fixture line 1',
+    ],
+  )
+  return slashOk && printOk
+}
+
 async function main() {
   console.log('gate name=cli-entry')
   console.log('mode=hard')
@@ -307,6 +408,7 @@ async function main() {
   checks.push(await runStdinPromptBoundary())
   checks.push(await runSessionMigrationBoundary())
   checks.push(await runInvalidArgumentBoundary())
+  checks.push(await runPackagedEntryBoundary())
 
   const ok = checks.every(Boolean)
   printStep('cli-entry-hard-gate', ok ? 'pass' : 'product-regression')
