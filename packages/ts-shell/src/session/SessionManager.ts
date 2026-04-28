@@ -247,6 +247,20 @@ interface CurrentSessionSelectionStore {
   readonly byProjectRoot: Record<string, CurrentSessionSelectionRecord>;
 }
 
+export type CurrentSessionSelectionResolution =
+  | { readonly ok: true; readonly session: Session }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "none"
+        | "store-invalid"
+        | "missing-session"
+        | "load-failed"
+        | "project-root-mismatch";
+      readonly sessionId?: string;
+      readonly detail: string;
+    };
+
 interface TranscriptRepairContext {
   readonly sessionId: string;
   readonly state: SessionStateSnapshot;
@@ -385,6 +399,7 @@ export class SessionManager {
   private static readonly APPROVAL_AUDIT_HISTORY_LIMIT = 16;
   private sessionsDir: string;
   private readonly currentSessionStorePath: string;
+  private lastCurrentSessionStoreReadError: string | null = null;
   private readonly warnedUnreadableSessionDirs = new Set<string>();
   private didWarnListSessionsFailure = false;
 
@@ -445,31 +460,62 @@ export class SessionManager {
   }
 
   getCurrentSessionForProject(projectRoot: string): Session | null {
+    const resolution = this.resolveCurrentSessionForProject(projectRoot);
+    return resolution.ok ? resolution.session : null;
+  }
+
+  resolveCurrentSessionForProject(
+    projectRoot: string,
+  ): CurrentSessionSelectionResolution {
     const normalizedProjectRoot = this.normalizeProjectRootKey(projectRoot);
     const store = this.readCurrentSessionStore();
+    const storeReadError = this.lastCurrentSessionStoreReadError;
     const selection = store.byProjectRoot[normalizedProjectRoot];
     if (!selection?.sessionId?.trim()) {
-      return null;
+      if (storeReadError) {
+        return {
+          ok: false,
+          reason: "store-invalid",
+          detail: `Current session selection store could not be read for ${projectRoot}: ${storeReadError}.`,
+        };
+      }
+      return {
+        ok: false,
+        reason: "none",
+        detail: `No current session is selected for ${projectRoot}.`,
+      };
     }
     if (!this.sessionExists(selection.sessionId)) {
       this.removeCurrentSessionSelection(normalizedProjectRoot);
-      return null;
+      return {
+        ok: false,
+        reason: "missing-session",
+        sessionId: selection.sessionId,
+        detail: `Current session ${selection.sessionId} no longer exists for ${projectRoot}.`,
+      };
     }
 
     try {
       const session = this.load(selection.sessionId);
-      if (
-        this.normalizeProjectRootKey(
-          session.projectRoot || normalizedProjectRoot,
-        ) !== normalizedProjectRoot
-      ) {
+      const sessionProjectRoot = session.projectRoot || normalizedProjectRoot;
+      if (this.normalizeProjectRootKey(sessionProjectRoot) !== normalizedProjectRoot) {
         this.removeCurrentSessionSelection(normalizedProjectRoot);
-        return null;
+        return {
+          ok: false,
+          reason: "project-root-mismatch",
+          sessionId: selection.sessionId,
+          detail: `Current session ${selection.sessionId} is bound to ${sessionProjectRoot}, not ${projectRoot}.`,
+        };
       }
-      return session;
-    } catch {
+      return { ok: true, session };
+    } catch (error) {
       this.removeCurrentSessionSelection(normalizedProjectRoot);
-      return null;
+      return {
+        ok: false,
+        reason: "load-failed",
+        sessionId: selection.sessionId,
+        detail: `Current session ${selection.sessionId} could not be loaded for ${projectRoot}: ${error instanceof Error ? error.message : String(error)}.`,
+      };
     }
   }
 
@@ -1783,6 +1829,7 @@ export class SessionManager {
 
   private readCurrentSessionStore(): CurrentSessionSelectionStore {
     if (!fs.existsSync(this.currentSessionStorePath)) {
+      this.lastCurrentSessionStoreReadError = null;
       return {
         schemaVersion: 1,
         byProjectRoot: {},
@@ -1798,16 +1845,21 @@ export class SessionManager {
         !parsed.byProjectRoot ||
         typeof parsed.byProjectRoot !== "object"
       ) {
+        this.lastCurrentSessionStoreReadError =
+          `Invalid current session selection store at ${this.currentSessionStorePath}`;
         return {
           schemaVersion: 1,
           byProjectRoot: {},
         };
       }
+      this.lastCurrentSessionStoreReadError = null;
       return {
         schemaVersion: 1,
         byProjectRoot: parsed.byProjectRoot,
       };
-    } catch {
+    } catch (error) {
+      this.lastCurrentSessionStoreReadError =
+        error instanceof Error ? error.message : String(error);
       return {
         schemaVersion: 1,
         byProjectRoot: {},

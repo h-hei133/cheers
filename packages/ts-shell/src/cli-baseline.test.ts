@@ -244,6 +244,133 @@ describe("CLI streaming baseline (T3)", () => {
     fs.writeFileSync(path.join(sessionDir, "transcript.jsonl"), "", "utf8");
   }
 
+  function seedInterruptedCurrentSession(input: {
+    sessionId: string;
+    projectRoot: string;
+    title: string;
+    pendingPrompt: string;
+  }): void {
+    const sessionDir = path.join(sessionsDir, input.sessionId);
+    fs.mkdirSync(sessionDir, { recursive: true });
+    const now = new Date().toISOString();
+    fs.writeFileSync(
+      path.join(sessionDir, "metadata.json"),
+      JSON.stringify(
+        {
+          id: input.sessionId,
+          projectRoot: input.projectRoot,
+          rootMode: "direct",
+          requestedWorkspaceRoot: input.projectRoot,
+          targetPathBase: input.projectRoot,
+          gitRoot: null,
+          title: input.title,
+          createdAt: now,
+          updatedAt: now,
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(sessionDir, "state.json"),
+      JSON.stringify(
+        {
+          status: "interrupted",
+          projectRoot: input.projectRoot,
+          pendingPrompt: input.pendingPrompt,
+          runPhase: "prompt-persisted",
+          interruptedKind: "prompt",
+          pendingLifecycle: {
+            pendingApprovals: {},
+            pendingTools: {},
+            taskStates: {},
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(sessionDir, "transcript.jsonl"),
+      [
+        {
+          type: "lifecycle",
+          event: "run-started",
+          timestamp: now,
+          detail: input.pendingPrompt,
+        },
+        {
+          type: "message",
+          role: "user",
+          content: input.pendingPrompt,
+          timestamp: now,
+        },
+        {
+          type: "lifecycle",
+          event: "run-interrupted",
+          timestamp: now,
+          detail: input.pendingPrompt,
+        },
+      ].map((entry) => JSON.stringify(entry)).join("\n") + "\n",
+      "utf8",
+    );
+
+    const currentStorePath = path.join(
+      fakeHomeDir,
+      ".private-agents",
+      "current-session.json",
+    );
+    fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });
+    fs.writeFileSync(
+      currentStorePath,
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          byProjectRoot: {
+            [path.resolve(input.projectRoot).toLowerCase()]: {
+              sessionId: input.sessionId,
+              updatedAt: now,
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+  }
+
+  function writeCurrentSessionPointer(input: {
+    projectRoot: string;
+    sessionId: string;
+  }): void {
+    const currentStorePath = path.join(
+      fakeHomeDir,
+      ".private-agents",
+      "current-session.json",
+    );
+    fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });
+    fs.writeFileSync(
+      currentStorePath,
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          byProjectRoot: {
+            [path.resolve(input.projectRoot).toLowerCase()]: {
+              sessionId: input.sessionId,
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+  }
+
   function createOpenAiFetchMockModule(fakeHome: string): {
     modulePath: string;
     logPath: string;
@@ -591,6 +718,85 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     });
   }, 10000);
 
+  it("shows why a cross-root current session pointer was ignored", async () => {
+    const projectRoot = path.join(fakeHomeDir, "current-project");
+    const otherRoot = path.join(fakeHomeDir, "other-project");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    fs.mkdirSync(otherRoot, { recursive: true });
+    const crossRootSessionId = "sess_cross_root_current";
+    seedSessionWithTitle({
+      sessionId: crossRootSessionId,
+      projectRoot: otherRoot,
+      title: "other project current",
+      status: "active",
+    });
+    writeCurrentSessionPointer({
+      projectRoot,
+      sessionId: crossRootSessionId,
+    });
+
+    const result = await runCliCommandToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot, "--print", "/sessions current"],
+      envOverrides: {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      },
+    });
+    const output = normalizeCliOutput(result.output);
+
+    expect(result.code).toBe(0);
+    expect(output).toContain("Session lifecycle: Current session pointer ignored:");
+    expect(output).toContain(crossRootSessionId);
+    expect(output).toContain("is bound to");
+    expect(output).toContain("Starting a fresh session.");
+    expect(output).toContain("Current session");
+    expect(output).not.toContain(`- ID: ${crossRootSessionId}`);
+    expect(output).toContain(`- Project binding: ${projectRoot.replace(/\\/g, "/")}`);
+
+    const currentSessionStore = JSON.parse(
+      fs.readFileSync(
+        path.join(fakeHomeDir, ".private-agents", "current-session.json"),
+        "utf8",
+      ),
+    ) as { byProjectRoot?: Record<string, { sessionId?: string }> };
+    const selection =
+      currentSessionStore.byProjectRoot?.[path.resolve(projectRoot).toLowerCase()];
+    expect(selection?.sessionId).toBeDefined();
+    expect(selection?.sessionId).not.toBe(crossRootSessionId);
+  }, 15000);
+
+  it("shows why a damaged current session pointer store was ignored", async () => {
+    const projectRoot = path.join(fakeHomeDir, "damaged-current-project");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const currentStorePath = path.join(
+      fakeHomeDir,
+      ".private-agents",
+      "current-session.json",
+    );
+    fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });
+    fs.writeFileSync(currentStorePath, "{broken", "utf8");
+
+    const result = await runCliCommandToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot, "--print", "/sessions current"],
+      envOverrides: {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      },
+    });
+    const output = normalizeCliOutput(result.output);
+
+    expect(result.code).toBe(0);
+    expect(output).toContain("Session lifecycle: Current session pointer ignored:");
+    expect(output).toContain(
+      "Current session selection store could not be read",
+    );
+    expect(output).toContain("Starting a fresh session.");
+    expect(output).toContain("Current session");
+    expect(output).toContain(`- Project binding: ${projectRoot.replace(/\\/g, "/")}`);
+  }, 15000);
+
   it("guards root binding diagnostics for CLI /sessions switch and /workspace attach", async () => {
     const repoA = path.join(fakeHomeDir, "repo-a");
     const repoB = path.join(fakeHomeDir, "repo-b");
@@ -679,6 +885,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
   it("gates real-provider missing key at CLI entry before query loop starts", async () => {
     await new Promise<void>((resolve, reject) => {
       const cli = spawnCli(fakeHomeDir, [], {
+        PRIVATE_AGENTS_PROVIDER_MODE: "real",
         OPENAI_API_KEY: "",
       });
       let output = "";
@@ -2268,6 +2475,68 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(output).not.toContain("was not found");
     expect(output).not.toContain("is ambiguous");
   }, 35000);
+
+  it("proves CLI current, switch last, and continue share the current session store", async () => {
+    const projectRoot = path.join(fakeHomeDir, "cli-continuity-smoke-project");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const sessionId = "sess_cli_continuity_smoke";
+    const pendingPrompt = "CLI continuity smoke pending task";
+    seedInterruptedCurrentSession({
+      sessionId,
+      projectRoot,
+      title: "CLI Continuity Smoke",
+      pendingPrompt,
+    });
+
+    const runPrint = (prompt: string) =>
+      spawnSync(nodeExe, [tsxCliPath, cliPath, "--project", projectRoot, "--print", prompt], {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 30000,
+      });
+
+    const currentResult = runPrint("/sessions current");
+    expect(currentResult.error).toBeUndefined();
+    expect(currentResult.status).toBe(0);
+    const currentOutput = `${currentResult.stdout ?? ""}${currentResult.stderr ?? ""}`;
+    expect(currentOutput).toContain("Current session");
+    expect(currentOutput).toContain(`- ID: ${sessionId}`);
+    expect(currentOutput).toContain("- Title: CLI Continuity Smoke");
+    expect(currentOutput).toContain(`- Project binding: ${projectRoot}`);
+    expect(currentOutput).toContain(`- Pending prompt: ${pendingPrompt}`);
+
+    const switchResult = runPrint("/sessions switch last");
+    expect(switchResult.error).toBeUndefined();
+    expect(switchResult.status).toBe(0);
+    const switchOutput = `${switchResult.stdout ?? ""}${switchResult.stderr ?? ""}`;
+    expect(switchOutput).toContain("Switched session:");
+    expect(switchOutput).toContain(`-> ${sessionId}`);
+    expect(switchOutput).toContain("Session summary: CLI Continuity Smoke");
+    expect(switchOutput).toContain(`Resume cue: pending prompt \"${pendingPrompt}\"`);
+
+    const continuePrompt = "continue the same CLI continuity smoke task";
+    const continueResult = runPrint(`/continue ${continuePrompt}`);
+    expect(continueResult.error).toBeUndefined();
+    expect(continueResult.status).toBe(0);
+    const continueOutput = `${continueResult.stdout ?? ""}${continueResult.stderr ?? ""}`;
+    expect(continueOutput).toContain(`Resumed session ${sessionId}`);
+    expect(continueOutput).toContain(`Project context: ${projectRoot}`);
+    expect(continueOutput).not.toContain("No recoverable session found");
+    expect(continueOutput).not.toContain("starting a fresh session");
+
+    const transcript = fs.readFileSync(
+      path.join(sessionsDir, sessionId, "transcript.jsonl"),
+      "utf8",
+    );
+    expect(transcript).toContain(continuePrompt);
+    expect(transcript).toContain("\"type\":\"query.completed\"");
+  }, 45000);
 
   it("shows structured execution result surface for synthetic print success path", async () => {
     const projectRoot = path.join(fakeHomeDir, "execution-surface-success");

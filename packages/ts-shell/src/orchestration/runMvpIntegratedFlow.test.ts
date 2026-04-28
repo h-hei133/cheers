@@ -2583,6 +2583,77 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(mathAfterComment).toContain("return n * 2;");
   }, 15000);
 
+  it("keeps original bugfix goal through interrupted continue verification evidence", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-interrupted-goal-continuity" }, null, 2),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "math.js"),
+      "export function double(n) {\n  return n + 2;\n}\n",
+      "utf8",
+    );
+
+    const prompt = [
+      "Continue the interrupted task using the recovery evidence below.",
+      "Original user request: Fix math.js so double(3) returns 6. Verify math.js contains n * 2.",
+      "",
+      "Interrupted turn context:",
+      "- interrupted-kind: turn",
+      "- run-phase: turn-active",
+      "- recovery-boundary: mid-turn-reentry",
+      "- continuation-safety: mid-turn-safe",
+      "- interruption-reason: user interrupted during verification",
+      "",
+      "Completed action evidence:",
+      "- planner: Identified math.js as the active target.",
+      "",
+      "Recovery evidence:",
+      "- last-task-kind: edit-file",
+      "- changed-files: math.js",
+      "- verification-status: failed",
+      "- verification-command: node --version",
+      "- verification-reason: expected double(3) to return 6",
+      "",
+      "Next step:",
+      "- Inspect the verification failure, adjust the changed files, and rerun the verification command.",
+      "- Continue the same edit/verify flow from this evidence; do not restart with a generic summary or read-only inspection unless the evidence is missing.",
+    ].join("\n");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_interrupted_goal_continuity",
+      prompt,
+      workspaceRoot,
+      continuityState: {
+        lastTaskKind: "edit-file",
+        lastUserIntent:
+          "Fix math.js so double(3) returns 6. Verify math.js contains n * 2.",
+        recentTargetFiles: ["math.js"],
+        recentChangedFiles: ["math.js"],
+        lastVerificationStatus: "failed",
+        lastVerificationCommand: "node --version",
+        lastVerificationReason: "expected double(3) to return 6",
+        lastContinuationEvidence: ["transform:math.js:return n + 2;=>return n * 2;"],
+        unresolvedItems: ["verify:failed"],
+      },
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("edit-file");
+    expect(result.codingResult?.changedFiles).toContain("math.js");
+    expect(result.codingResult?.verification.status).toBe("passed");
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      "continuation: restored-session-state-consumed",
+    );
+    expect(await fs.readFile(path.join(workspaceRoot, "math.js"), "utf8")).toContain(
+      "return n * 2;",
+    );
+  }, 15000);
+
   it("creates and corrects a usage example file while preserving source files", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     const math = [

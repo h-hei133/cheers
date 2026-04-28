@@ -1426,6 +1426,208 @@ describe("SessionManager", () => {
     expect(manager.getCurrentSessionForProject(projectB)?.id).toBe(b1.id);
   });
 
+  it("restores current session evidence across manager instances after terminal turns", () => {
+    const manager = new SessionManager();
+    const completedProject = path.join(fakeHome, "workspace-completed-current");
+    const completed = manager.createNew(completedProject);
+
+    manager.persistUserPromptBarrier(completed.id, "fix src/app.ts and verify");
+    manager.appendQueryEvent(completed.id, {
+      type: "query.completed",
+      result: {
+        status: "completed",
+        terminalReason: "completed",
+        terminalClassification: "success",
+        transcript: [],
+        sharedContext: {
+          sessionId: completed.id,
+          initialPrompt: "fix src/app.ts and verify",
+          notes: [],
+          handoffs: [],
+        },
+        finalOutput: "Fixed src/app.ts and verified it.",
+        codingResult: {
+          taskKind: "edit-file",
+          changedFiles: ["src/app.ts"],
+          failedFiles: [],
+          patches: [],
+          repair: {
+            status: "not-needed",
+            attempts: 1,
+            recoveredItems: [],
+            failedItems: [],
+            notes: [],
+          },
+          continuation: {
+            status: "first-pass-success",
+            attempts: 1,
+            evidence: [
+              "inspect: read src/app.ts",
+              "transform:src/app.ts:bug=>fix",
+              "verify-command-hint:npm test -- src/app.test.ts",
+            ],
+          },
+          changeSet: {
+            gitAware: false,
+            preExistingDirtyFiles: [],
+            postRunDirtyFiles: [],
+            attemptedFiles: ["src/app.ts"],
+            changedFiles: ["src/app.ts"],
+            unchangedAttemptedFiles: [],
+          },
+          taskSatisfaction: {
+            verdict: "satisfied",
+            reasons: ["Edit and verification completed."],
+            requiredEvidence: ["changed-files", "verification"],
+            observedEvidence: ["src/app.ts", "npm test -- src/app.test.ts"],
+          },
+          verifiedFiles: ["src/app.ts"],
+          unverifiedFiles: [],
+          verification: {
+            status: "passed",
+            command: "npm test -- src/app.test.ts",
+            reason: "Focused test passed.",
+            selectionScope: "focused",
+            selectionSource: "auto-from-changes",
+          },
+          evidence: ["transform:src/app.ts:bug=>fix"],
+        },
+      },
+    });
+    manager.addTurn(completed.id, {
+      role: "assistant",
+      content: "Fixed src/app.ts and verified it.",
+    });
+    manager.saveCompleted(completed.id, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+    });
+
+    const failedProject = path.join(fakeHome, "workspace-error-current");
+    const failed = manager.createNew(failedProject);
+    manager.persistUserPromptBarrier(failed.id, "fix src/broken.ts and verify");
+    manager.appendQueryEvent(failed.id, {
+      type: "query.completed",
+      result: {
+        status: "stopped_error",
+        terminalReason: "stopped_error",
+        terminalClassification: "error",
+        stopReason: "npm test failed with exit code 1",
+        transcript: [],
+        sharedContext: {
+          sessionId: failed.id,
+          initialPrompt: "fix src/broken.ts and verify",
+          notes: [],
+          handoffs: [],
+        },
+        finalOutput: "Edited src/broken.ts, but verification failed.",
+        codingResult: {
+          taskKind: "edit-file",
+          changedFiles: ["src/broken.ts"],
+          failedFiles: [],
+          patches: [],
+          repair: {
+            status: "not-needed",
+            attempts: 1,
+            recoveredItems: [],
+            failedItems: [],
+            notes: [],
+          },
+          continuation: {
+            status: "failed-after-bounded-continuation",
+            attempts: 1,
+            evidence: [
+              "inspect: read src/broken.ts",
+              "transform:src/broken.ts:old=>new",
+              "verify-command-hint:npm test -- src/broken.test.ts",
+            ],
+          },
+          changeSet: {
+            gitAware: false,
+            preExistingDirtyFiles: [],
+            postRunDirtyFiles: [],
+            attemptedFiles: ["src/broken.ts"],
+            changedFiles: ["src/broken.ts"],
+            unchangedAttemptedFiles: [],
+          },
+          taskSatisfaction: {
+            verdict: "completed-with-caveats",
+            reasons: ["Verification failed after the edit."],
+            requiredEvidence: ["changed-files", "verification"],
+            observedEvidence: ["src/broken.ts"],
+          },
+          verifiedFiles: [],
+          unverifiedFiles: [
+            { path: "src/broken.ts", reason: "npm test failed" },
+          ],
+          verification: {
+            status: "failed",
+            command: "npm test -- src/broken.test.ts",
+            reason: "npm test failed with exit code 1",
+            selectionScope: "focused",
+            selectionSource: "auto-from-changes",
+            nextAction: "Inspect the failing test and continue the fix.",
+          },
+          evidence: ["transform:src/broken.ts:old=>new"],
+          failureBoundary: "verification",
+        },
+      },
+    });
+    manager.addTurn(failed.id, {
+      role: "assistant",
+      content: "Edited src/broken.ts, but verification failed.",
+    });
+    manager.saveError(failed.id, "npm test failed with exit code 1", {
+      terminalReason: "stopped_error",
+      terminalClassification: "error",
+    });
+
+    const restoredManager = new SessionManager();
+
+    expect(
+      restoredManager.getCurrentSessionForProject(completedProject)?.id,
+    ).toBe(completed.id);
+    const completedSnapshot =
+      restoredManager.buildContinuitySnapshot(completed.id);
+    expect(completedSnapshot.recentChangedFiles).toEqual(["src/app.ts"]);
+    expect(completedSnapshot.recentVerifiedFiles).toEqual(["src/app.ts"]);
+    expect(completedSnapshot.lastVerificationStatus).toBe("passed");
+    expect(completedSnapshot.lastVerificationCommand).toBe(
+      "npm test -- src/app.test.ts",
+    );
+    expect(
+      restoredManager.buildPromptContinuityContext(
+        completed.id,
+        "continue with the same task",
+      ),
+    ).toContain("- recent-changed-files: src/app.ts");
+
+    expect(restoredManager.getCurrentSessionForProject(failedProject)?.id).toBe(
+      failed.id,
+    );
+    const failedSnapshot = restoredManager.buildContinuitySnapshot(failed.id);
+    expect(failedSnapshot.lastTerminalClassification).toBe("error");
+    expect(failedSnapshot.lastFailure).toBe("npm test failed with exit code 1");
+    expect(failedSnapshot.recentChangedFiles).toEqual(["src/broken.ts"]);
+    expect(failedSnapshot.lastVerificationStatus).toBe("failed");
+    expect(failedSnapshot.lastVerificationReason).toBe(
+      "npm test failed with exit code 1",
+    );
+    expect(failedSnapshot.unresolvedItems).toContain("verify:failed");
+    const failedContext = restoredManager.buildPromptContinuityContext(
+      failed.id,
+      "continue with the same task",
+    );
+    expect(failedContext).toContain("- recent-changed-files: src/broken.ts");
+    expect(failedContext).toContain("- last-verification-status: failed");
+    expect(failedContext).toContain(
+      "- last-verification-command: npm test -- src/broken.test.ts",
+    );
+    expect(failedContext).toContain(
+      "- unresolved-items: last-error:npm test failed with exit code 1",
+    );
+  });
+
   it("persists append-before-model-call barrier before query events begin", () => {
     const manager = new SessionManager();
     const session = manager.createNew();

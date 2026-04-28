@@ -15,6 +15,10 @@ function createRuntimeContext(): ShellRuntimeContext {
     cwd: "D:/repo",
     originalCwd: "D:/repo",
     projectRoot: "D:/repo",
+    rootMode: "git-root",
+    requestedWorkspaceRoot: "D:/repo",
+    targetPathBase: "D:/repo",
+    gitRoot: "D:/repo",
     runtimeConfig: {
       provider: "openai",
       daemonEnabled: true,
@@ -213,6 +217,10 @@ describe("shell recovery helpers", () => {
       cwd: "D:/repo",
       originalCwd: "D:/repo",
       projectRoot: "D:/repo",
+      rootMode: "git-root",
+      requestedWorkspaceRoot: "D:/repo",
+      targetPathBase: "D:/repo",
+      gitRoot: "D:/repo",
       runtimeConfig: {
         provider: "openai",
         daemonEnabled: true,
@@ -305,16 +313,14 @@ describe("shell recovery helpers", () => {
 
   it("passes a replay-built runtime seed into resumed prompt execution", async () => {
     const lines: string[] = [];
-    const executeCalls: Array<{
-      sessionId: string;
-      prompt: string;
-      recoveryBoundary?: string;
-      repairInsertedPromptMessage?: boolean;
-    }> = [];
     const runtimeContext: ShellRuntimeContext = {
       cwd: "D:/repo",
       originalCwd: "D:/repo",
       projectRoot: "D:/repo",
+      rootMode: "git-root",
+      requestedWorkspaceRoot: "D:/repo",
+      targetPathBase: "D:/repo",
+      gitRoot: "D:/repo",
       runtimeConfig: {
         provider: "openai",
         daemonEnabled: true,
@@ -340,10 +346,13 @@ describe("shell recovery helpers", () => {
     const result = await resumeShellSession({
       requestedSessionId: "sess_resume",
       sessionManager: {
+        sessionExists: () => true,
         tryResume: () => ({
           ok: true,
           session: {
             id: "sess_resume",
+            projectRoot: "D:/repo",
+            status: "active",
             pendingPrompt: "continue me",
           },
         }),
@@ -381,7 +390,13 @@ describe("shell recovery helpers", () => {
             openTurn: { role: "coder", turn: 2 },
           },
           derivedState: {
-            transcript: [],
+            transcript: [
+              {
+                role: "planner",
+                content: "Identified src/app.ts as the likely edit target.",
+                notes: ["target selected"],
+              },
+            ],
           },
         }),
         getRecoverySnapshot: () => ({
@@ -402,7 +417,43 @@ describe("shell recovery helpers", () => {
             ignoredUnpairedTurnCompletions: 0,
             ignoredRoleMismatchedTurnCompletions: 0,
           },
-          transcriptEvents: [],
+          transcriptEvents: [
+            {
+              type: "query-event",
+              event: {
+                type: "lifecycle.cancelled",
+                reason: "AbortSignal triggered during shell session runtime",
+              },
+              timestamp: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+        }),
+        buildContinuitySnapshot: () => ({
+          sessionId: "sess_resume",
+          projectRoot: "D:/repo",
+          lastUserIntent: "continue me",
+          lastTaskKind: "edit-file",
+          recentChangedFiles: ["src/app.ts"],
+          recentTargetFiles: ["src/app.ts"],
+          recentFailedFiles: [],
+          recentVerifiedFiles: [],
+          lastVerificationStatus: "failed",
+          lastVerificationCommand: "npm test -- src/app.test.ts",
+          lastVerificationReason: "expected true to be false",
+          lastVerificationNextAction:
+            "Fix src/app.ts and rerun npm test -- src/app.test.ts",
+          lastRepairNotes: [],
+          lastContinuationStatus: "needs-follow-up",
+          lastContinuationEvidence: ["transform:src/app.ts:false=>true"],
+          lastTaskSatisfactionReasons: [],
+          unresolvedItems: ["verify:failed"],
+        }),
+        getSessionResumeEligibility: () => ({
+          disposition: "fully-resumable",
+          autoResumeReady: true,
+          reason: "pending-prompt",
+          detail: "pending prompt is ready to resume",
+          blocked: false,
         }),
         reconcilePendingLifecycle: () => ({
           pendingApprovals: {},
@@ -411,42 +462,45 @@ describe("shell recovery helpers", () => {
         }),
       } as never,
       runtimeContext,
-      sessionRuntime: {
-        executePrompt: async (
-          sessionId: string,
-          prompt: string,
-          options?: {
-            runtimeSeed?: {
-              recoveryBoundary?: string;
-              truthBoundary?: {
-                repairSummary?: { insertedPromptMessage: boolean };
-              };
-            };
-          },
-        ) => {
-          executeCalls.push({
-            sessionId,
-            prompt,
-            recoveryBoundary: options?.runtimeSeed?.recoveryBoundary,
-            repairInsertedPromptMessage:
-              options?.runtimeSeed?.truthBoundary?.repairSummary
-                ?.insertedPromptMessage,
-          });
-          return "ok";
-        },
-      } as never,
       renderer: { renderLine: (line: string) => lines.push(line) } as never,
     });
 
-    expect(result).toEqual({ resumed: true });
-    expect(executeCalls).toEqual([
-      {
-        sessionId: "sess_resume",
-        prompt: "continue me",
-        recoveryBoundary: "mid-turn-reentry",
-        repairInsertedPromptMessage: false,
-      },
-    ]);
+    expect(result.resumed).toBe(true);
+    if (!result.resumed || !result.autoResume) {
+      throw new Error("Expected auto-resume payload");
+    }
+    expect(result.autoResume.runtimeSeed.recoveryBoundary).toBe(
+      "mid-turn-reentry",
+    );
+    expect(
+      result.autoResume.runtimeSeed.truthBoundary.repairSummary
+        .insertedPromptMessage,
+    ).toBe(false);
+    expect(result.autoResume.prompt).toContain(
+      "Continue the interrupted task using the recovery evidence below.",
+    );
+    expect(result.autoResume.prompt).toContain(
+      "Original user request: continue me",
+    );
+    expect(result.autoResume.prompt).toContain(
+      "- interruption-reason: AbortSignal triggered during shell session runtime",
+    );
+    expect(result.autoResume.prompt).toContain(
+      "- planner: Identified src/app.ts as the likely edit target.",
+    );
+    expect(result.autoResume.prompt).toContain("- changed-files: src/app.ts");
+    expect(result.autoResume.prompt).toContain(
+      "- verification-status: failed",
+    );
+    expect(result.autoResume.prompt).toContain(
+      "- verification-command: npm test -- src/app.test.ts",
+    );
+    expect(result.autoResume.prompt).toContain(
+      "- Fix src/app.ts and rerun npm test -- src/app.test.ts",
+    );
+    expect(result.autoResume.prompt).toContain(
+      "do not restart with a generic summary or read-only inspection",
+    );
     expect(lines.join("\n")).toContain("Resumed session sess_resume");
   });
 

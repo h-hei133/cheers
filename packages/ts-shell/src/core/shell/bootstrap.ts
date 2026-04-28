@@ -113,13 +113,13 @@ export function bootstrapShellRuntime(input: {
 
   const session = (() => {
     if (!input.requestedSessionId) {
-      const currentSession = input.sessionManager.getCurrentSessionForProject(
+      const currentSelection = input.sessionManager.resolveCurrentSessionForProject(
         requestedProjectRoot,
       );
-      if (currentSession) {
+      if (currentSelection.ok) {
         try {
           const resumed = input.sessionManager.resume(
-            currentSession.id,
+            currentSelection.session.id,
             requestedProjectRoot,
           );
           emitLifecycleMessage(`Resumed session ${resumed.id}`);
@@ -127,9 +127,13 @@ export function bootstrapShellRuntime(input: {
         } catch {
           input.sessionManager.clearCurrentSessionForProject(requestedProjectRoot);
           emitLifecycleMessage(
-            `Current session pointer stale for ${requestedProjectRoot}; starting a fresh session.`,
+            `Current session pointer ${currentSelection.session.id} could not be resumed for ${requestedProjectRoot}; starting a fresh session.`,
           );
         }
+      } else if (currentSelection.reason !== "none") {
+        emitLifecycleMessage(
+          `Current session pointer ignored: ${currentSelection.detail} Starting a fresh session.`,
+        );
       }
       return input.sessionManager.createNew(requestedProjectRoot, {
         rootMode: requestedRootMode,

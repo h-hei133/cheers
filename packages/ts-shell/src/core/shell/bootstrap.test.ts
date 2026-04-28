@@ -234,6 +234,66 @@ describe('shell bootstrap', () => {
     resumeSpy.mockRestore()
   })
 
+  it('isolates cross-root current session pointers and explains the trust boundary', () => {
+    const sessionManager = new SessionManager()
+    const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-current-root-'))
+    const otherRoot = fs.mkdtempSync(path.join(fakeHome, 'project-current-other-'))
+    const crossRootSession = sessionManager.createNew(otherRoot)
+    sessionManager.setCurrentSessionForProject(projectRoot, crossRootSession.id)
+
+    const result = bootstrapShellRuntime({
+      cwd: projectRoot,
+      launchCwd: projectRoot,
+      runtimeConfig: getRuntimeConfig(projectRoot),
+      gitContext: getWorkflowGitContext(projectRoot),
+      sessionManager,
+      renderer: new StreamingRenderer(),
+      emitLifecycleMessages: false,
+    })
+
+    expect(result.context.session.id).not.toBe(crossRootSession.id)
+    expect(path.resolve(result.context.projectRoot)).toBe(path.resolve(projectRoot))
+    expect(path.resolve(result.context.session.projectRoot)).toBe(path.resolve(projectRoot))
+    expect(sessionManager.getCurrentSessionForProject(projectRoot)?.id).toBe(
+      result.context.session.id,
+    )
+    expect(path.resolve(sessionManager.resume(crossRootSession.id).projectRoot)).toBe(
+      path.resolve(otherRoot),
+    )
+    expect(result.lifecycleNotices.at(-1)).toContain('Current session pointer ignored:')
+    expect(result.lifecycleNotices.at(-1)).toContain(crossRootSession.id)
+    expect(result.lifecycleNotices.at(-1)).toContain('is bound to')
+    expect(result.lifecycleNotices.at(-1)).toContain('Starting a fresh session.')
+  })
+
+  it('explains damaged current session pointer stores without restoring stale state', () => {
+    const sessionManager = new SessionManager()
+    const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-current-damaged-'))
+    const currentStorePath = path.join(fakeHome, '.private-agents', 'current-session.json')
+    fs.mkdirSync(path.dirname(currentStorePath), { recursive: true })
+    fs.writeFileSync(currentStorePath, '{broken', 'utf8')
+
+    const result = bootstrapShellRuntime({
+      cwd: projectRoot,
+      launchCwd: projectRoot,
+      runtimeConfig: getRuntimeConfig(projectRoot),
+      gitContext: getWorkflowGitContext(projectRoot),
+      sessionManager,
+      renderer: new StreamingRenderer(),
+      emitLifecycleMessages: false,
+    })
+
+    expect(path.resolve(result.context.projectRoot)).toBe(path.resolve(projectRoot))
+    expect(sessionManager.getCurrentSessionForProject(projectRoot)?.id).toBe(
+      result.context.session.id,
+    )
+    expect(result.lifecycleNotices.at(-1)).toContain('Current session pointer ignored:')
+    expect(result.lifecycleNotices.at(-1)).toContain(
+      'Current session selection store could not be read',
+    )
+    expect(result.lifecycleNotices.at(-1)).toContain('Starting a fresh session.')
+  })
+
   it('keeps explicit --session-id precedence over persisted current session pointer', () => {
     const sessionManager = new SessionManager()
     const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-explicit-priority-'))

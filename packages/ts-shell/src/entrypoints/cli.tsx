@@ -464,6 +464,7 @@ async function main(): Promise<void> {
       logger,
       printMode: Boolean(options.printMode),
       fallbackSessionId: recoveryCandidate?.id,
+      lifecycleNotices: bootstrap.lifecycleNotices,
       setActiveNonInteractiveApprovalMode: (mode) => {
         activeNonInteractiveApprovalMode = mode;
       },
@@ -480,6 +481,7 @@ async function main(): Promise<void> {
       sessionRuntime,
       logger,
       fallbackSessionId: recoveryCandidate?.id,
+      lifecycleNotices: bootstrap.lifecycleNotices,
       setActiveNonInteractiveApprovalMode: (mode) => {
         activeNonInteractiveApprovalMode = mode;
       },
@@ -517,6 +519,7 @@ async function main(): Promise<void> {
         logger,
         printMode: Boolean(options.printMode),
         fallbackSessionId: recoveryCandidate?.id,
+        lifecycleNotices: bootstrap.lifecycleNotices,
         setActiveNonInteractiveApprovalMode: (mode) => {
           activeNonInteractiveApprovalMode = mode;
         },
@@ -1967,6 +1970,7 @@ async function runNonTtyPromptStream(options: {
   sessionRuntime: ShellSessionRuntime;
   logger: ReturnType<typeof createComponentLogger>;
   fallbackSessionId?: string;
+  lifecycleNotices?: readonly string[];
   setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
   ) => void;
@@ -2012,6 +2016,7 @@ async function runNonTtyPromptStream(options: {
           logger: options.logger,
           printMode: false,
           fallbackSessionId: options.fallbackSessionId,
+          lifecycleNotices: options.lifecycleNotices,
           setActiveNonInteractiveApprovalMode:
             options.setActiveNonInteractiveApprovalMode,
           nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
@@ -2104,6 +2109,7 @@ async function runNonInteractivePrompt(options: {
   logger: ReturnType<typeof createComponentLogger>;
   printMode: boolean;
   fallbackSessionId?: string;
+  lifecycleNotices?: readonly string[];
   setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
   ) => void;
@@ -2142,6 +2148,10 @@ async function runNonInteractivePrompt(options: {
       }
 
       if (sessionAction === "current") {
+        renderLatestSessionLifecycleNotice(
+          options.renderer,
+          options.lifecycleNotices,
+        );
         renderCurrentSession(
           options.renderer,
           options.sessionManager,
@@ -2722,6 +2732,7 @@ async function runReplayPromptScript(options: {
   logger: ReturnType<typeof createComponentLogger>;
   printMode: boolean;
   fallbackSessionId?: string;
+  lifecycleNotices?: readonly string[];
   setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
   ) => void;
@@ -2756,6 +2767,7 @@ async function runReplayPromptScript(options: {
       logger: options.logger,
       printMode: options.printMode,
       fallbackSessionId: options.fallbackSessionId,
+      lifecycleNotices: options.lifecycleNotices,
       setActiveNonInteractiveApprovalMode:
         options.setActiveNonInteractiveApprovalMode,
       nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
@@ -3108,6 +3120,16 @@ function renderStartupSurface(
     );
   }
   renderer.renderLine("Ctrl+C cancels the current run. Ctrl+D exits.\n");
+}
+
+function renderLatestSessionLifecycleNotice(
+  renderer: StreamingRenderer,
+  lifecycleNotices?: readonly string[],
+): void {
+  const lifecycleNotice = lifecycleNotices?.at(-1);
+  if (lifecycleNotice) {
+    renderer.renderLine(`Session lifecycle: ${lifecycleNotice}`);
+  }
 }
 
 function renderRecentProjectContexts(

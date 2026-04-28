@@ -1,6 +1,7 @@
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type {
   ResumeResult,
+  RecoverySnapshot,
   SessionContinuitySnapshot,
   SessionManager,
   SessionReentrySummary,
@@ -321,10 +322,16 @@ export async function resumeShellSession(input: {
       input.renderer.renderLine(
         `Continuation ready: resuming pending turn for prompt: ${effectivePrompt}\n`,
       );
+      const continuationPrompt = buildInterruptedContinuationPrompt({
+        originalPrompt: effectivePrompt,
+        recoverySnapshot,
+        runtimeSeed: guardedRuntimeSeed,
+        continuitySnapshot,
+      });
       return {
         resumed: true,
         autoResume: {
-          prompt: effectivePrompt,
+          prompt: continuationPrompt,
           runtimeSeed: guardedRuntimeSeed,
           continuityState: continuitySnapshot,
         },
@@ -347,6 +354,179 @@ export async function resumeShellSession(input: {
     autoResume: null,
     disposition: resumeEligibility?.disposition ?? "partially-resumable",
   };
+}
+
+function buildInterruptedContinuationPrompt(input: {
+  readonly originalPrompt: string;
+  readonly recoverySnapshot: RecoverySnapshot;
+  readonly runtimeSeed: ReturnType<SessionManager["buildRuntimeStateSeed"]>;
+  readonly continuitySnapshot?: SessionContinuitySnapshot;
+}): string {
+  const interrupted =
+    input.recoverySnapshot.interruptedKind === "turn" ||
+    input.recoverySnapshot.interruptedKind === "prompt" ||
+    input.recoverySnapshot.runPhase === "turn-active" ||
+    input.recoverySnapshot.runPhase === "prompt-persisted";
+  if (!interrupted) {
+    return input.originalPrompt;
+  }
+
+  const lines: string[] = [
+    "Continue the interrupted task using the recovery evidence below.",
+    `Original user request: ${input.originalPrompt}`,
+    "",
+    "Interrupted turn context:",
+    `- interrupted-kind: ${input.recoverySnapshot.interruptedKind ?? "unknown"}`,
+    `- run-phase: ${input.recoverySnapshot.runPhase ?? "unknown"}`,
+    `- recovery-boundary: ${input.runtimeSeed.recoveryBoundary}`,
+    `- continuation-safety: ${input.runtimeSeed.truthBoundary.continuationSafety}`,
+  ];
+  const interruptionReason = deriveInterruptionReason(input.recoverySnapshot);
+  if (interruptionReason) {
+    lines.push(`- interruption-reason: ${truncate(interruptionReason, 180)}`);
+  }
+  if (input.recoverySnapshot.repairSummary.insertedPromptMessage) {
+    lines.push("- replay-repair: inserted missing prompt message");
+  }
+  if (input.recoverySnapshot.repairSummary.insertedQueryStarted) {
+    lines.push("- replay-repair: inserted missing query.started event");
+  }
+  if (input.recoverySnapshot.repairSummary.strippedInterruptedTerminalEvents > 0) {
+    lines.push(
+      `- replay-repair: stripped ${input.recoverySnapshot.repairSummary.strippedInterruptedTerminalEvents} interrupted terminal event(s)`,
+    );
+  }
+
+  const completedActions = input.runtimeSeed.derivedState.transcript.slice(-3);
+  if (completedActions.length > 0) {
+    lines.push("", "Completed action evidence:");
+    for (const action of completedActions) {
+      lines.push(`- ${action.role}: ${truncate(action.content, 160)}`);
+      for (const note of (action.notes ?? []).slice(0, 3)) {
+        lines.push(`  note: ${truncate(note, 140)}`);
+      }
+      if (action.handoffTo) {
+        lines.push(
+          `  handoff: ${action.role} -> ${action.handoffTo}${action.handoffReason ? ` (${truncate(action.handoffReason, 100)})` : ""}`,
+        );
+      }
+    }
+  }
+
+  const continuity = input.continuitySnapshot;
+  if (continuity) {
+    lines.push("", "Recovery evidence:");
+    if (continuity.lastTaskKind) {
+      lines.push(`- last-task-kind: ${continuity.lastTaskKind}`);
+    }
+    if (continuity.recentChangedFiles.length > 0) {
+      lines.push(
+        `- changed-files: ${continuity.recentChangedFiles.join(", ")}`,
+      );
+    }
+    if (continuity.recentVerifiedFiles.length > 0) {
+      lines.push(
+        `- verified-files: ${continuity.recentVerifiedFiles.join(", ")}`,
+      );
+    }
+    if (continuity.recentFailedFiles.length > 0) {
+      lines.push(
+        `- failed-files: ${continuity.recentFailedFiles
+          .map((entry) => `${entry.path} (${truncate(entry.reason, 100)})`)
+          .join(", ")}`,
+      );
+    }
+    if (continuity.lastVerificationStatus) {
+      lines.push(`- verification-status: ${continuity.lastVerificationStatus}`);
+      if (continuity.lastVerificationCommand) {
+        lines.push(`- verification-command: ${continuity.lastVerificationCommand}`);
+      }
+      if (continuity.lastVerificationReason) {
+        lines.push(
+          `- verification-reason: ${truncate(continuity.lastVerificationReason, 180)}`,
+        );
+      }
+      if (continuity.lastVerificationBlockerKind) {
+        lines.push(
+          `- verification-blocker-kind: ${continuity.lastVerificationBlockerKind}`,
+        );
+      }
+    }
+    if (continuity.lastContinuationEvidence.length > 0) {
+      lines.push(
+        `- continuation-evidence: ${continuity.lastContinuationEvidence
+          .slice(0, 5)
+          .map((entry) => truncate(entry, 140))
+          .join(" | ")}`,
+      );
+    }
+    if (continuity.unresolvedItems.length > 0) {
+      lines.push(
+        `- unresolved-items: ${continuity.unresolvedItems
+          .slice(0, 5)
+          .map((entry) => truncate(entry, 140))
+          .join(" | ")}`,
+      );
+    }
+  }
+
+  lines.push(
+    "",
+    "Next step:",
+    `- ${deriveContinuationNextAction(input.continuitySnapshot)}`,
+    "- Continue the same edit/verify flow from this evidence; do not restart with a generic summary or read-only inspection unless the evidence is missing.",
+  );
+
+  return lines.join("\n");
+}
+
+function deriveInterruptionReason(
+  recoverySnapshot: RecoverySnapshot,
+): string | undefined {
+  for (const event of [...recoverySnapshot.transcriptEvents].reverse()) {
+    if (event.type === "query-event") {
+      if (event.event.type === "lifecycle.cancelled") {
+        return event.event.reason;
+      }
+      if (event.event.type === "lifecycle.error") {
+        return event.event.error;
+      }
+    }
+    if (event.type === "lifecycle" && event.event === "run-interrupted") {
+      return event.detail ?? "run-interrupted";
+    }
+  }
+  return undefined;
+}
+
+function deriveContinuationNextAction(
+  continuitySnapshot: SessionContinuitySnapshot | undefined,
+): string {
+  if (!continuitySnapshot) {
+    return "Resume from the interrupted turn and continue the pending task.";
+  }
+  if (continuitySnapshot.lastVerificationNextAction) {
+    return continuitySnapshot.lastVerificationNextAction;
+  }
+  if (continuitySnapshot.lastVerificationStatus === "failed") {
+    return "Inspect the verification failure, adjust the changed files, and rerun the verification command.";
+  }
+  if (continuitySnapshot.lastVerificationStatus === "blocked") {
+    return "Resolve the verification blocker, then rerun the intended verification.";
+  }
+  if (
+    continuitySnapshot.recentChangedFiles.length > 0 &&
+    continuitySnapshot.lastVerificationStatus !== "passed"
+  ) {
+    return "Continue from the changed files and complete or rerun verification for the same task.";
+  }
+  if (continuitySnapshot.recentFailedFiles.length > 0) {
+    return "Continue by fixing the failed file operation using the recorded failed-file evidence.";
+  }
+  if (continuitySnapshot.lastTaskKind) {
+    return `Continue the interrupted ${continuitySnapshot.lastTaskKind} task from the recorded evidence.`;
+  }
+  return "Continue from the interrupted turn and preserve the existing task intent.";
 }
 
 function renderResumedContextSummary(

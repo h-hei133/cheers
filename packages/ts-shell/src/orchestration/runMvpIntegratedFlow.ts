@@ -1121,7 +1121,24 @@ function buildWorkflowTaskPlan(
           to: failedTransforms[failedTransforms.length - 1]!.to,
         }
       : undefined;
+  const interruptedGoalRepairDirective =
+    effectiveReplaceDirectiveFromPrompt ??
+    continuityReplaceDirectiveForExecution ??
+    inferredTransformDirective ??
+    inferReplaceDirectiveFromContinuity({
+      continuity,
+      workspaceRoot,
+    });
+  const hasInterruptedGoalRepairCue = Boolean(
+    /continue the interrupted task/i.test(prompt) &&
+      lastTaskWasMutationLike &&
+      continuity.lastVerificationStatus === "failed" &&
+      (primaryTarget?.inWorkspace || rawContinuityTargetPath) &&
+      interruptedGoalRepairDirective &&
+      !hasExplicitBoundaryResetPrompt,
+  );
   const hasRepairContinuationCue =
+    hasInterruptedGoalRepairCue ||
     isRepairContinuationFollowUpPrompt(prompt) ||
     (reflectiveStateQueryKind === "stop-reason" && hasReflectiveActionCue) ||
     (reflectiveStateQueryKind === "next-step" &&
@@ -1131,13 +1148,17 @@ function buildWorkflowTaskPlan(
   const repairObject = hasRepairContinuationCue
     ? buildRepairContinuationObject({
         continuity,
-        targetPath: primaryTarget?.inWorkspace
-          ? primaryTarget.cleaned
-          : undefined,
+        targetPath:
+          primaryTarget?.inWorkspace
+            ? primaryTarget.cleaned
+            : hasInterruptedGoalRepairCue
+              ? rawContinuityTargetPath
+              : undefined,
         replaceDirective:
           effectiveReplaceDirectiveFromPrompt ??
           continuityReplaceDirectiveForExecution ??
-          inferredTransformDirective,
+          inferredTransformDirective ??
+          interruptedGoalRepairDirective,
       })
     : undefined;
   const hasVerifyObjectCue =
@@ -1208,12 +1229,20 @@ function buildWorkflowTaskPlan(
     return {
       taskKind: "edit-file",
       reason:
-        "repair continuation resolved from structured blocker/failure lineage",
+        hasInterruptedGoalRepairCue
+          ? "interrupted verification failure continuation resumed original edit goal before rerunning verification"
+          : "repair continuation resolved from structured blocker/failure lineage",
       targetPath: repairObject.targetPath,
       inspectFirst: true,
-      verifyAfterEdit: false,
-      ...(repairObject.verifyCommand
-        ? { verifyCommand: repairObject.verifyCommand }
+      verifyAfterEdit: hasInterruptedGoalRepairCue,
+      ...(repairObject.verifyCommand || hasInterruptedGoalRepairCue
+        ? {
+            verifyCommand:
+              repairObject.verifyCommand ??
+              effectiveVerifyCommand ??
+              inferVerifyCommandFromContinuity(continuity) ??
+              continuity.lastVerificationCommand,
+          }
         : {}),
       ...(repairObject.replaceFrom && repairObject.replaceTo
         ? {
@@ -1222,7 +1251,7 @@ function buildWorkflowTaskPlan(
           }
         : {}),
       ...(failedTransforms.length > 0 ? { failedTransforms } : {}),
-      usedRestoredState,
+      usedRestoredState: hasInterruptedGoalRepairCue ? true : usedRestoredState,
     };
   }
 
