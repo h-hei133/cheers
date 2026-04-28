@@ -344,7 +344,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.finalOutput).not.toContain("REVIEWER:");
   }, 15000);
 
-  it("normalizes legacy resume runtime seed roles into single-assistant continuation contract", async () => {
+  it("normalizes legacy resume runtime roles into single-assistant continuation contract", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
@@ -1706,6 +1706,104 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(notes).toContain("verifyCommandInherited=yes");
     expect(result.finalOutput).toContain("status_new");
     expect(result.finalOutput).toContain("verified_marker");
+  }, 15000);
+
+  it("reads structured mutation verification lineage without notes evidence", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-structured-lineage" }, null, 2),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "structured-lineage.txt"),
+      ["status_new", "structured_verified"].join("\n"),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_structured_lineage",
+      prompt: "Check the last changed file and confirm the verification result.",
+      workspaceRoot,
+      continuityState: {
+        lastMutationVerificationLineage: {
+          actionKind: "edit-file",
+          changedFiles: ["src/structured-lineage.txt"],
+          verifiedFiles: ["src/structured-lineage.txt"],
+          verification: {
+            status: "passed",
+            command: "npm test -- --runInBand",
+          },
+        },
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("read-file");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+
+    const notes = result.sharedContext.notes.join("\n");
+    expect(notes).toContain(
+      "decision-trace: task=read-file target=src/structured-lineage.txt",
+    );
+    expect(notes).toContain("lineage=mutation-verification");
+    expect(notes).toContain("changedFiles=1");
+    expect(notes).toContain("verifiedFiles=1");
+    expect(notes).toContain("verifyStatus=passed");
+    expect(notes).toContain("verifyCommandInherited=yes");
+    expect(notes).not.toContain("last-continuation-evidence:");
+    expect(result.finalOutput).toContain("structured_verified");
+  }, 15000);
+
+  it("reads structured action result seed without notes evidence", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-action-result-seed" }, null, 2),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "action-result-seed.txt"),
+      ["status_new", "seed_verified"].join("\n"),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_action_result_seed",
+      prompt: "Check the last changed file and confirm the verification result.",
+      workspaceRoot,
+      continuityState: {
+        lastActionResultSeed: {
+          actionKind: "edit-file",
+          target: "src/action-result-seed.txt",
+          changedFiles: ["src/action-result-seed.txt"],
+          verifiedFiles: ["src/action-result-seed.txt"],
+          verification: {
+            status: "passed",
+            command: "npm test -- --runInBand",
+          },
+        },
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("read-file");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+
+    const notes = result.sharedContext.notes.join("\n");
+    expect(notes).toContain(
+      "decision-trace: task=read-file target=src/action-result-seed.txt",
+    );
+    expect(notes).toContain("lineage=mutation-verification");
+    expect(notes).toContain("seed=action-result");
+    expect(notes).toContain("seedAction=edit-file");
+    expect(notes).toContain("seedTarget=src/action-result-seed.txt");
+    expect(notes).toContain("seedVerifyStatus=passed");
+    expect(notes).toContain("seedVerifyCommandInherited=yes");
+    expect(notes).not.toContain("last-continuation-evidence:");
+    expect(result.finalOutput).toContain("seed_verified");
   }, 15000);
 
   it("keeps multi-step continuation coherence after mutation verification read-check", async () => {
@@ -3566,7 +3664,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(content).not.toContain("mode=wrong");
   }, 15000);
 
-  it("activates same-file edit lineage slot for weak/no-cue follow-up when slot confidence is high", async () => {
+  it("activates same-file edit active slot for weak/no-cue follow-up when slot confidence is high", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),

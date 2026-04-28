@@ -253,7 +253,10 @@ function createIntegratedRunner(
         continuity: mergedContinuityState,
         plan: workflowPlan,
       });
-      const decisionTrace = buildWorkflowDecisionTrace(workflowPlan);
+      const decisionTrace = [
+        ...buildWorkflowDecisionTrace(workflowPlan),
+        ...buildActionResultSeedDecisionTrace(mergedContinuityState),
+      ];
       if (workflowPlan.taskKind === "chat") {
         const reflectiveOutput = workflowPlan.reflectiveStateQueryKind
           ? buildReflectiveStateQueryResponse({
@@ -451,21 +454,66 @@ function buildWorkflowDecisionTrace(plan: WorkflowTaskPlan): string[] {
   return [`decision-trace: ${parts.join(" ")}`];
 }
 
+function buildActionResultSeedDecisionTrace(
+  continuity: ContinuityStateLike,
+): string[] {
+  const seed = continuity.lastActionResultSeed;
+  if (!seed) {
+    return [];
+  }
+
+  const parts = ["seed=action-result"];
+  if (seed.actionKind) {
+    parts.push(`seedAction=${seed.actionKind}`);
+  }
+  if (seed.target?.trim()) {
+    parts.push(`seedTarget=${normalizePathLike(seed.target)}`);
+  }
+  if (seed.changedFiles?.length) {
+    parts.push(`seedChangedFiles=${seed.changedFiles.length}`);
+  }
+  if (seed.verifiedFiles?.length) {
+    parts.push(`seedVerifiedFiles=${seed.verifiedFiles.length}`);
+  }
+  const verificationStatus = seed.verification?.status?.trim();
+  if (verificationStatus) {
+    parts.push(
+      `seedVerifyStatus=${verificationStatus
+        .toLowerCase()
+        .replace(/\s+/g, "-")}`,
+    );
+  }
+  if (seed.verification?.command?.trim()) {
+    parts.push("seedVerifyCommandInherited=yes");
+  }
+  const blockerKind =
+    seed.blockerKind?.trim() || seed.verification?.blockerKind?.trim();
+  if (blockerKind) {
+    parts.push(`seedBlocker=${blockerKind}`);
+  }
+  if (seed.reason?.trim() || seed.verification?.reason?.trim()) {
+    parts.push("seedReason=yes");
+  }
+
+  return [`decision-trace: ${parts.join(" ")}`];
+}
+
 function buildPostEditVerifyContinuationLineage(
   continuity: ContinuityStateLike,
 ): string[] | undefined {
-  const changedFileCount = continuity.recentChangedFiles?.length ?? 0;
+  const lineageFacts = getMutationVerificationLineageFacts(continuity);
+  const changedFileCount = lineageFacts.changedFiles.length;
   if (changedFileCount <= 0) {
     return undefined;
   }
 
-  const verifiedFileCount = continuity.recentVerifiedFiles?.length ?? 0;
-  const verificationStatus = continuity.lastVerificationStatus?.trim();
+  const verifiedFileCount = lineageFacts.verifiedFiles.length;
+  const verificationStatus = lineageFacts.verificationStatus?.trim();
   const hasVerificationEvidence = Boolean(
     verificationStatus ||
-      continuity.lastVerificationCommand?.trim() ||
-      continuity.lastVerificationReason?.trim() ||
-      continuity.lastVerificationBlockerKind?.trim() ||
+      lineageFacts.verificationCommand?.trim() ||
+      lineageFacts.verificationReason?.trim() ||
+      lineageFacts.verificationBlockerKind?.trim() ||
       verifiedFileCount > 0,
   );
   if (!hasVerificationEvidence) {
@@ -484,19 +532,48 @@ function buildPostEditVerifyContinuationLineage(
       `verifyStatus=${verificationStatus.toLowerCase().replace(/\s+/g, "-")}`,
     );
   }
-  if (continuity.lastVerificationCommand?.trim()) {
+  if (lineageFacts.verificationCommand?.trim()) {
     lineage.push("verifyCommandInherited=yes");
   }
   return lineage;
 }
 
 function hasPassedVerificationLineage(continuity: ContinuityStateLike): boolean {
-  if (continuity.lastVerificationStatus?.trim().toLowerCase() === "passed") {
+  const lineageFacts = getMutationVerificationLineageFacts(continuity);
+  if (lineageFacts.verificationStatus?.trim().toLowerCase() === "passed") {
     return true;
   }
   return (continuity.lastContinuationEvidence ?? []).some((entry) =>
     /(?:verifyStatus=passed|verify-status:passed|verify=passed)/i.test(entry),
   );
+}
+
+function getMutationVerificationLineageFacts(continuity: ContinuityStateLike): {
+  readonly changedFiles: readonly string[];
+  readonly verifiedFiles: readonly string[];
+  readonly verificationStatus?: string;
+  readonly verificationCommand?: string;
+  readonly verificationReason?: string;
+  readonly verificationBlockerKind?: string;
+} {
+  const lineage = continuity.lastMutationVerificationLineage;
+  return {
+    changedFiles: lineage?.changedFiles?.length
+      ? lineage.changedFiles
+      : (continuity.recentChangedFiles ?? []),
+    verifiedFiles: lineage?.verifiedFiles?.length
+      ? lineage.verifiedFiles
+      : (continuity.recentVerifiedFiles ?? []),
+    verificationStatus:
+      lineage?.verification?.status ?? continuity.lastVerificationStatus,
+    verificationCommand:
+      lineage?.verification?.command ?? continuity.lastVerificationCommand,
+    verificationReason:
+      lineage?.verification?.reason ?? continuity.lastVerificationReason,
+    verificationBlockerKind:
+      lineage?.verification?.blockerKind ??
+      continuity.lastVerificationBlockerKind,
+  };
 }
 
 type ReflectiveStateQueryKind =
@@ -546,6 +623,33 @@ interface WorkflowTaskIntentSignals {
   readonly effectiveReplaceDirectiveFromPrompt?: { from: string; to: string };
   readonly hasExecutionIntent: boolean;
   readonly unsupportedCommand?: string;
+}
+
+interface MutationVerificationContinuityLineage {
+  readonly actionKind?: "edit-file" | "write-file";
+  readonly changedFiles?: readonly string[];
+  readonly verifiedFiles?: readonly string[];
+  readonly verification?: {
+    readonly status?: string;
+    readonly command?: string;
+    readonly reason?: string;
+    readonly blockerKind?: string;
+  };
+}
+
+interface ActionResultContinuitySeed {
+  readonly actionKind?: CodingTaskKind;
+  readonly target?: string;
+  readonly changedFiles?: readonly string[];
+  readonly verifiedFiles?: readonly string[];
+  readonly verification?: {
+    readonly status?: string;
+    readonly command?: string;
+    readonly reason?: string;
+    readonly blockerKind?: string;
+  };
+  readonly reason?: string;
+  readonly blockerKind?: string;
 }
 
 interface FreshnessObservability {
@@ -632,6 +736,8 @@ interface ContinuityStateLike {
   recentChangedFiles?: readonly string[];
   recentFailedFiles?: ReadonlyArray<{ path: string; reason: string }>;
   recentVerifiedFiles?: readonly string[];
+  lastMutationVerificationLineage?: MutationVerificationContinuityLineage;
+  lastActionResultSeed?: ActionResultContinuitySeed;
   lastVerificationStatus?: string;
   lastVerificationCommand?: string;
   lastVerificationReason?: string;
@@ -826,7 +932,9 @@ function buildWorkflowTaskPlan(
     continuity.lastTaskKind === "inspect-files";
   const lastTaskWasMutationLike =
     continuity.lastTaskKind === "edit-file" ||
-    continuity.lastTaskKind === "write-file";
+    continuity.lastTaskKind === "write-file" ||
+    continuity.lastMutationVerificationLineage?.actionKind === "edit-file" ||
+    continuity.lastMutationVerificationLineage?.actionKind === "write-file";
   const hasPostEditReadOnlyVerifyPrompt =
     isPostEditReadOnlyVerifyFollowUp(prompt);
   const hasPostEditReadOnlyVerifyCue =
@@ -2861,6 +2969,15 @@ function mergeContinuationState(
   inlineState: ContinuityStateLike,
 ): ContinuityStateLike {
   const structured = continuityStateAsObject(structuredState);
+  const actionResultSeed =
+    structured.lastActionResultSeed ?? inlineState.lastActionResultSeed;
+  const mutationVerificationLineage =
+    structured.lastMutationVerificationLineage ??
+    inlineState.lastMutationVerificationLineage ??
+    actionResultSeedToMutationVerificationLineage(actionResultSeed);
+  const actionResultTargetFiles = actionResultSeed?.target?.trim()
+    ? [normalizePathLike(actionResultSeed.target)]
+    : undefined;
   return {
     projectRoot: structured.projectRoot ?? inlineState.projectRoot,
     lastTaskKind: structured.lastTaskKind ?? inlineState.lastTaskKind,
@@ -2870,25 +2987,46 @@ function mergeContinuationState(
     lastFailure: structured.lastFailure ?? inlineState.lastFailure,
     recentTargetFiles: structured.recentTargetFiles?.length
       ? structured.recentTargetFiles
-      : inlineState.recentTargetFiles,
+      : inlineState.recentTargetFiles?.length
+        ? inlineState.recentTargetFiles
+        : actionResultTargetFiles,
     recentChangedFiles: structured.recentChangedFiles?.length
       ? structured.recentChangedFiles
-      : inlineState.recentChangedFiles,
+      : inlineState.recentChangedFiles?.length
+        ? inlineState.recentChangedFiles
+        : mutationVerificationLineage?.changedFiles,
     recentFailedFiles: structured.recentFailedFiles?.length
       ? structured.recentFailedFiles
       : inlineState.recentFailedFiles,
     recentVerifiedFiles: structured.recentVerifiedFiles?.length
       ? structured.recentVerifiedFiles
-      : inlineState.recentVerifiedFiles,
+      : inlineState.recentVerifiedFiles?.length
+        ? inlineState.recentVerifiedFiles
+        : mutationVerificationLineage?.verifiedFiles,
+    lastMutationVerificationLineage: mutationVerificationLineage,
+    lastActionResultSeed: actionResultSeed,
     lastVerificationStatus:
-      structured.lastVerificationStatus ?? inlineState.lastVerificationStatus,
+      structured.lastVerificationStatus ??
+      inlineState.lastVerificationStatus ??
+      mutationVerificationLineage?.verification?.status ??
+      actionResultSeed?.verification?.status,
     lastVerificationCommand:
-      structured.lastVerificationCommand ?? inlineState.lastVerificationCommand,
+      structured.lastVerificationCommand ??
+      inlineState.lastVerificationCommand ??
+      mutationVerificationLineage?.verification?.command ??
+      actionResultSeed?.verification?.command,
     lastVerificationReason:
-      structured.lastVerificationReason ?? inlineState.lastVerificationReason,
+      structured.lastVerificationReason ??
+      inlineState.lastVerificationReason ??
+      mutationVerificationLineage?.verification?.reason ??
+      actionResultSeed?.verification?.reason ??
+      actionResultSeed?.reason,
     lastVerificationBlockerKind:
       structured.lastVerificationBlockerKind ??
-      inlineState.lastVerificationBlockerKind,
+      inlineState.lastVerificationBlockerKind ??
+      mutationVerificationLineage?.verification?.blockerKind ??
+      actionResultSeed?.verification?.blockerKind ??
+      actionResultSeed?.blockerKind,
     lastVerificationNextAction:
       structured.lastVerificationNextAction ??
       inlineState.lastVerificationNextAction,
@@ -3025,6 +3163,40 @@ function mergeContinuationState(
       : inlineState.unresolvedItems,
     freshnessHistoryCount:
       structured.freshnessHistoryCount ?? inlineState.freshnessHistoryCount,
+  };
+}
+
+function actionResultSeedToMutationVerificationLineage(
+  seed: ActionResultContinuitySeed | undefined,
+): MutationVerificationContinuityLineage | undefined {
+  if (
+    !seed ||
+    (seed.actionKind !== "edit-file" && seed.actionKind !== "write-file")
+  ) {
+    return undefined;
+  }
+
+  const changedFiles = seed.changedFiles?.length
+    ? seed.changedFiles
+    : seed.target?.trim()
+      ? [normalizePathLike(seed.target)]
+      : [];
+  const hasVerificationEvidence = Boolean(
+    seed.verification?.status?.trim() ||
+      seed.verification?.command?.trim() ||
+      seed.verification?.reason?.trim() ||
+      seed.verification?.blockerKind?.trim() ||
+      seed.verifiedFiles?.length,
+  );
+  if (changedFiles.length <= 0 || !hasVerificationEvidence) {
+    return undefined;
+  }
+
+  return {
+    actionKind: seed.actionKind,
+    changedFiles,
+    verifiedFiles: seed.verifiedFiles,
+    verification: seed.verification,
   };
 }
 
