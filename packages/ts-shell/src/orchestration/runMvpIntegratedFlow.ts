@@ -405,6 +405,7 @@ interface WorkflowTaskPlan {
     failureCode: "read-failed" | "patch-generation-failed" | "write-failed";
     reason: string;
   }>;
+  readonly continuationLineage?: readonly string[];
   readonly degradedReopen?: boolean;
   readonly degradedReopenReason?: string;
   readonly degradedReopenCandidates?: readonly string[];
@@ -443,8 +444,59 @@ function buildWorkflowDecisionTrace(plan: WorkflowTaskPlan): string[] {
   if (plan.previousFailedEntries?.length) {
     parts.push(`failedEntries=${plan.previousFailedEntries.length}`);
   }
+  if (plan.continuationLineage?.length) {
+    parts.push(...plan.continuationLineage);
+  }
 
   return [`decision-trace: ${parts.join(" ")}`];
+}
+
+function buildPostEditVerifyContinuationLineage(
+  continuity: ContinuityStateLike,
+): string[] | undefined {
+  const changedFileCount = continuity.recentChangedFiles?.length ?? 0;
+  if (changedFileCount <= 0) {
+    return undefined;
+  }
+
+  const verifiedFileCount = continuity.recentVerifiedFiles?.length ?? 0;
+  const verificationStatus = continuity.lastVerificationStatus?.trim();
+  const hasVerificationEvidence = Boolean(
+    verificationStatus ||
+      continuity.lastVerificationCommand?.trim() ||
+      continuity.lastVerificationReason?.trim() ||
+      continuity.lastVerificationBlockerKind?.trim() ||
+      verifiedFileCount > 0,
+  );
+  if (!hasVerificationEvidence) {
+    return undefined;
+  }
+
+  const lineage = [
+    "lineage=mutation-verification",
+    `changedFiles=${changedFileCount}`,
+  ];
+  if (verifiedFileCount > 0) {
+    lineage.push(`verifiedFiles=${verifiedFileCount}`);
+  }
+  if (verificationStatus) {
+    lineage.push(
+      `verifyStatus=${verificationStatus.toLowerCase().replace(/\s+/g, "-")}`,
+    );
+  }
+  if (continuity.lastVerificationCommand?.trim()) {
+    lineage.push("verifyCommandInherited=yes");
+  }
+  return lineage;
+}
+
+function hasPassedVerificationLineage(continuity: ContinuityStateLike): boolean {
+  if (continuity.lastVerificationStatus?.trim().toLowerCase() === "passed") {
+    return true;
+  }
+  return (continuity.lastContinuationEvidence ?? []).some((entry) =>
+    /(?:verifyStatus=passed|verify-status:passed|verify=passed)/i.test(entry),
+  );
 }
 
 type ReflectiveStateQueryKind =
@@ -794,6 +846,8 @@ function buildWorkflowTaskPlan(
         entry.toLowerCase().startsWith("verify:") &&
         !entry.toLowerCase().includes("not-requested"),
     );
+  const mutationVerificationLineage =
+    buildPostEditVerifyContinuationLineage(continuity);
   const previousRemainingTargets =
     extractCrossFileStateListFromContinuityEvidence(
       continuity,
@@ -915,6 +969,11 @@ function buildWorkflowTaskPlan(
     hasContinuationCueRaw &&
     !hasExplicitBoundaryResetPrompt &&
     !hasContextSeedPrefix;
+  const hasWeakNextStepContinuationCue =
+    hasUltraWeakContinuationEquivalentCue ||
+    /\b(?:now\s+)?(?:continue|proceed|do\s+(?:the\s+)?next\s+step)\b/i.test(
+      prompt,
+    );
   const hasDegradedContinuationEvidence =
     hasDegradedContinuationEvidenceInState(continuity);
   const hasDegradedReopenCue = isDegradedReopenFollowUpPrompt(prompt);
@@ -956,7 +1015,10 @@ function buildWorkflowTaskPlan(
       (hasGroundedReadLikeIntent && lastTaskWasReadLike) ||
       hasEditIntent ||
       hasCreateIntent ||
-      (hasVerifyIntent && lastTaskHadVerifySignal)),
+      (hasVerifyIntent && lastTaskHadVerifySignal) ||
+      (hasWeakNextStepContinuationCue &&
+        Boolean(mutationVerificationLineage?.length) &&
+        hasPassedVerificationLineage(continuity))),
   );
   const continuityTargetPath =
     continuationReopenDecision.selectedTarget ??
@@ -1223,6 +1285,20 @@ function buildWorkflowTaskPlan(
     (hasWeakRepairFollowUp && !allowWeakFollowUpInheritedTransform
       ? undefined
       : continuityReplaceDirectiveForExecution);
+  const shouldKeepVerifiedMutationNextStep =
+    Boolean(mutationVerificationLineage?.length) &&
+    hasPassedVerificationLineage(continuity) &&
+    hasWeakNextStepContinuationCue &&
+    primaryTarget?.inWorkspace === true &&
+    !hasReflectiveActionCue &&
+    !hasEditIntent &&
+    !hasCreateIntent &&
+    !hasRepairContinuationCue &&
+    !hasVerifyIntent &&
+    !hasExecutionIntent &&
+    !hasGroundedReadLikeIntent &&
+    !effectiveReplaceDirective &&
+    !extractFencedContent(prompt);
   const shouldCoordinateCrossFileRepair =
     !hasCreateIntent &&
     !effectiveReplaceDirectiveFromPrompt &&
@@ -1485,6 +1561,20 @@ function buildWorkflowTaskPlan(
         "Boundary reset applied. Prior mutation lineage was not consumed; provide a new explicit task or target to proceed.",
       targetMissing: true,
       usedRestoredState,
+    };
+  }
+
+  if (shouldKeepVerifiedMutationNextStep && primaryTarget?.inWorkspace) {
+    return {
+      taskKind: "chat",
+      reason:
+        "verified mutation weak follow-up preserved target and next-step lineage",
+      reflectiveStateQueryKind: "next-step",
+      targetPath: primaryTarget.cleaned,
+      inspectFirst: false,
+      verifyAfterEdit: false,
+      usedRestoredState: true,
+      continuationLineage: mutationVerificationLineage,
     };
   }
 
@@ -1770,6 +1860,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
+      continuationLineage: mutationVerificationLineage,
     };
   }
 

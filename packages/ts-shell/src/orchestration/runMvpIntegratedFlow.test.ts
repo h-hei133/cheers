@@ -1660,6 +1660,107 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(unchanged).toBe(["status_new", "marker_keep"].join("\n"));
   }, 15000);
 
+  it("keeps mutation verification lineage visible for post-edit continuation", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-post-edit-verify-lineage" }, null, 2),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "lineage-target.txt"),
+      ["status_new", "verified_marker"].join("\n"),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_post_edit_verify_lineage",
+      prompt:
+        "Verify the last change by checking the changed file contains status_new and verified_marker.",
+      workspaceRoot,
+      continuityState: {
+        recentTargetFiles: ["src/lineage-target.txt"],
+        recentChangedFiles: ["src/lineage-target.txt"],
+        recentVerifiedFiles: ["src/lineage-target.txt"],
+        lastTaskKind: "edit-file",
+        lastTerminalClassification: "success",
+        lastTerminalReason: "completed",
+        lastVerificationStatus: "passed",
+        lastVerificationCommand: "npm test -- --runInBand",
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("read-file");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+
+    const notes = result.sharedContext.notes.join("\n");
+    expect(notes).toContain(
+      "decision-trace: task=read-file target=src/lineage-target.txt",
+    );
+    expect(notes).toContain("lineage=mutation-verification");
+    expect(notes).toContain("changedFiles=1");
+    expect(notes).toContain("verifiedFiles=1");
+    expect(notes).toContain("verifyStatus=passed");
+    expect(notes).toContain("verifyCommandInherited=yes");
+    expect(result.finalOutput).toContain("status_new");
+    expect(result.finalOutput).toContain("verified_marker");
+  }, 15000);
+
+  it("keeps multi-step continuation coherence after mutation verification read-check", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-multistep-continuation-coherence" }, null, 2),
+      "utf8",
+    );
+    const target = path.join(workspaceRoot, "src", "coherence-target.txt");
+    const original = ["status_new", "verified_marker"].join("\n");
+    await fs.writeFile(target, original, "utf8");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_multistep_continuation_coherence",
+      prompt: "proceed",
+      workspaceRoot,
+      continuityState: {
+        recentTargetFiles: ["src/coherence-target.txt"],
+        recentChangedFiles: ["src/coherence-target.txt"],
+        recentVerifiedFiles: ["src/coherence-target.txt"],
+        lastTaskKind: "read-file",
+        lastGroundedDeliverableMode: "read",
+        lastTerminalClassification: "success",
+        lastTerminalReason: "completed",
+        lastVerificationStatus: "passed",
+        lastVerificationCommand: "npm test -- --runInBand",
+        lastContinuationEvidence: [
+          "lineage=mutation-verification",
+          "changedFiles=1",
+          "verifiedFiles=1",
+          "verifyStatus=passed",
+        ],
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    const notes = result.sharedContext.notes.join("\n");
+    expect(notes).toContain(
+      "plan: intent=chat reason=verified mutation weak follow-up preserved target and next-step lineage",
+    );
+    expect(notes).toContain(
+      "decision-trace: task=chat target=src/coherence-target.txt",
+    );
+    expect(notes).toContain("reflective=next-step");
+    expect(notes).toContain("lineage=mutation-verification");
+    expect(notes).toContain("verifyStatus=passed");
+    expect(notes).toContain("reflective-state-query: next-step");
+    expect(notes).not.toContain("plan: intent=edit-file");
+    expect(notes).not.toContain("plan: intent=inspect-files");
+    expect(result.finalOutput).toContain("src/coherence-target.txt");
+    await expect(fs.readFile(target, "utf8")).resolves.toBe(original);
+  }, 15000);
+
   it("keeps corrective post-edit follow-up as edit even when it also asks to verify", async () => {
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
