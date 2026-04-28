@@ -177,6 +177,162 @@ describe('core tool runtime stale reconnect consistency', () => {
     })
   })
 
+  it('hides stale descriptors after server deletion or disable and rejects stale execution', async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true })
+    const configPath = path.join(workspaceRoot, '.private-agents.mcp.json')
+    await fs.writeFile(
+      configPath,
+      JSON.stringify({
+        mcpServers: {
+          localSdk: {
+            transport: 'sdk',
+            mockTools: [{
+              serverName: 'localSdk',
+              toolName: 'search',
+              qualifiedName: 'mcp__localSdk__search',
+              description: 'Search MCP',
+            }],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const gateway = new CoreMcpGateway(workspaceRoot)
+    const initialSnapshot = await gateway.snapshot()
+    const runtime = new ToolRuntime(new SandboxEnforcer({ workspaceRoot, auditLogPath }), {
+      mcpTools: initialSnapshot.tools,
+      mcpGateway: gateway,
+      runtimeConfig: {
+        provider: 'openai',
+        daemonEnabled: true,
+        maxTurns: 6,
+        disabledTools: [],
+        hiddenToolPrefixes: [],
+        enableMcpTools: true,
+        configSources: [],
+      },
+    })
+
+    expect(runtime.listTools()).toContain('mcp__localSdk__search')
+    expect(runtime.listVisibleTools()).toContain('mcp__localSdk__search')
+
+    await fs.writeFile(configPath, JSON.stringify({ mcpServers: {} }), 'utf8')
+    const deletedSnapshot = await gateway.refresh('all')
+    expect(deletedSnapshot.clients).toEqual([])
+    expect(deletedSnapshot.tools).toEqual([])
+    expect(runtime.listVisibleTools()).not.toContain('mcp__localSdk__search')
+
+    const deletedResult = await runtime.execute(
+      'mcp__localSdk__search',
+      {},
+      { taskId: 'task_mcp_deleted_descriptor', workspaceRoot },
+    )
+    expect(deletedResult.success).toBe(false)
+    expect(deletedResult.error).toBe('Unknown MCP server: localSdk')
+    expect(deletedResult.metadata).toMatchObject({
+      blockerKind: 'unknown',
+      reason: 'Unknown MCP server: localSdk',
+      doNext: 'Run /mcp status to list configured servers, then retry with a valid server name.',
+    })
+
+    await fs.writeFile(
+      configPath,
+      JSON.stringify({
+        mcpServers: {
+          localSdk: {
+            transport: 'sdk',
+            enabled: false,
+            mockTools: [{
+              serverName: 'localSdk',
+              toolName: 'search',
+              qualifiedName: 'mcp__localSdk__search',
+              description: 'Search MCP',
+            }],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const disabledSnapshot = await gateway.refresh('all')
+    expect(disabledSnapshot.clients).toHaveLength(1)
+    expect(disabledSnapshot.clients[0]).toMatchObject({ type: 'disabled', name: 'localSdk' })
+    expect(disabledSnapshot.tools).toEqual([])
+    expect(runtime.listVisibleTools()).not.toContain('mcp__localSdk__search')
+
+    const disabledResult = await runtime.execute(
+      'mcp__localSdk__search',
+      {},
+      { taskId: 'task_mcp_disabled_descriptor', workspaceRoot },
+    )
+    expect(disabledResult.success).toBe(false)
+    expect(disabledResult.error).toBe('MCP server localSdk is disabled')
+    expect(disabledResult.metadata).toMatchObject({
+      blockerKind: 'environment-not-ready',
+      reason: 'MCP server localSdk is disabled',
+      doNext: "Enable server 'localSdk' in MCP config, then rerun /mcp refresh localSdk.",
+    })
+  })
+
+  it('hides stale descriptors and rejects stale execution when MCP config becomes malformed', async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true })
+    const configPath = path.join(workspaceRoot, '.private-agents.mcp.json')
+    await fs.writeFile(
+      configPath,
+      JSON.stringify({
+        mcpServers: {
+          localSdk: {
+            transport: 'sdk',
+            mockTools: [{
+              serverName: 'localSdk',
+              toolName: 'search',
+              qualifiedName: 'mcp__localSdk__search',
+              description: 'Search MCP',
+            }],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const gateway = new CoreMcpGateway(workspaceRoot)
+    const initialSnapshot = await gateway.snapshot()
+    const runtime = new ToolRuntime(new SandboxEnforcer({ workspaceRoot, auditLogPath }), {
+      mcpTools: initialSnapshot.tools,
+      mcpGateway: gateway,
+      runtimeConfig: {
+        provider: 'openai',
+        daemonEnabled: true,
+        maxTurns: 6,
+        disabledTools: [],
+        hiddenToolPrefixes: [],
+        enableMcpTools: true,
+        configSources: [],
+      },
+    })
+
+    expect(runtime.listVisibleTools()).toContain('mcp__localSdk__search')
+
+    await fs.writeFile(configPath, '{broken', 'utf8')
+
+    expect(runtime.listTools()).toContain('mcp__localSdk__search')
+    expect(runtime.listVisibleTools()).not.toContain('mcp__localSdk__search')
+
+    const result = await runtime.execute(
+      'mcp__localSdk__search',
+      {},
+      { taskId: 'task_mcp_malformed_config_descriptor', workspaceRoot },
+    )
+    expect(result.success).toBe(false)
+    expect(result.error).toContain(`MCP config is invalid at ${configPath}`)
+    expect(result.metadata).toMatchObject({
+      blockerKind: 'environment-not-ready',
+      reason: expect.stringContaining(`MCP config is invalid at ${configPath}`),
+      doNext: `Fix or remove ${configPath}, then run /mcp refresh all.`,
+    })
+  })
+
   it('returns a clear blocker for unknown MCP tool execution', async () => {
     await fs.mkdir(workspaceRoot, { recursive: true })
     const runtime = new ToolRuntime(new SandboxEnforcer({ workspaceRoot, auditLogPath }))

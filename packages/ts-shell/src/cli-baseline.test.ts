@@ -1211,6 +1211,42 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     }
   }, 25000);
 
+  it("shows MCP malformed config blockers across user-visible MCP commands", async () => {
+    const projectRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), "private-agents-cli-mcp-malformed-"),
+    );
+    try {
+      const configPath = path.join(projectRoot, ".private-agents.mcp.json");
+      fs.writeFileSync(configPath, "{broken", "utf8");
+
+      for (const command of [
+        "/mcp status",
+        "/mcp tools",
+        "/mcp refresh all",
+        "/mcp doctor",
+      ]) {
+        const result = await runCliCommandToClose({
+          spawnCli,
+          fakeHome: fakeHomeDir,
+          args: ["--project", projectRoot, "--print", command],
+          envOverrides: {
+            PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          },
+        });
+        const output = normalizeCliOutput(result.output);
+        expect(result.code).toBe(0);
+        expect(output).toContain("- Outcome: blocked");
+        expect(output).toContain("- BlockerKind: environment-not-ready");
+        expect(output).toContain("MCP config is invalid at");
+        expect(output).toContain(".private-agents.mcp.json");
+        expect(output).toContain("Fix or remove");
+        expect(output).toContain("then run /mcp refresh all.");
+      }
+    } finally {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
+  }, 25000);
+
   it("guards root binding diagnostics for CLI /sessions switch and /workspace attach", async () => {
     const repoA = path.join(fakeHomeDir, "repo-a");
     const repoB = path.join(fakeHomeDir, "repo-b");

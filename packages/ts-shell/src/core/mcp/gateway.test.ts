@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CoreMcpClient } from "./client.js";
-import { loadMcpConfigs } from "./config.js";
+import { McpConfigLoadError, loadMcpConfigs } from "./config.js";
 import {
   CoreMcpGateway,
   McpGatewayBlockedError,
@@ -67,6 +67,22 @@ describe("core MCP gateway (W3)", () => {
     const configs = loadMcpConfigs(workspaceRoot);
     expect(configs.userServer.scope).toBe("user");
     expect(configs.projectServer.scope).toBe("project");
+  });
+
+  it("fails closed with a recoverable blocker when MCP config is malformed", async () => {
+    const configPath = path.join(workspaceRoot, ".private-agents.mcp.json");
+    fs.writeFileSync(configPath, "{broken", "utf8");
+
+    expect(() => loadMcpConfigs(workspaceRoot)).toThrow(McpConfigLoadError);
+
+    const gateway = new CoreMcpGateway(workspaceRoot);
+    await expect(gateway.snapshot()).rejects.toMatchObject({
+      blockerKind: "environment-not-ready",
+      doNext: `Fix or remove ${configPath}, then run /mcp refresh all.`,
+    });
+    await expect(gateway.snapshot()).rejects.toThrow(
+      `MCP config is invalid at ${configPath}`,
+    );
   });
 
   it("maps auth-required and invalid transport configs into explicit client states", async () => {

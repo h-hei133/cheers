@@ -1,5 +1,9 @@
 import { CoreMcpClient } from "./client.js";
-import { loadMcpConfigs } from "./config.js";
+import {
+  type McpConfigLoadError,
+  isMcpConfigLoadError,
+  loadMcpConfigs,
+} from "./config.js";
 import { CoreMcpConnectionManager } from "./connectionManager.js";
 import type {
   McpClientSnapshot,
@@ -94,7 +98,7 @@ export class CoreMcpGateway {
   }
 
   async snapshot(): Promise<McpClientSnapshot> {
-    const configs = this.loadConfigs();
+    const configs = this.loadConfigsOrBlock();
     const clients = await this.connectionManager.connectAll(configs);
     this.pruneClientCache(clients);
     const tools = [];
@@ -129,7 +133,7 @@ export class CoreMcpGateway {
 
   async refresh(target: string = "all"): Promise<McpClientSnapshot> {
     const normalizedTarget = target.trim();
-    const configs = this.loadConfigs();
+    const configs = this.loadConfigsOrBlock();
     if (
       normalizedTarget &&
       normalizedTarget.toLowerCase() !== "all" &&
@@ -157,7 +161,7 @@ export class CoreMcpGateway {
     toolName: string,
     args: Record<string, unknown>,
   ): Promise<McpToolCallResult> {
-    const configs = this.loadConfigs();
+    const configs = this.loadConfigsOrBlock();
     const config = configs[serverName];
     if (!config) {
       this.clientCache.delete(serverName);
@@ -220,6 +224,26 @@ export class CoreMcpGateway {
       message: description.reason ?? `MCP server ${state.name} is unavailable`,
       blockerKind: "environment-not-ready",
       doNext: description.doNext,
+    });
+  }
+
+  private loadConfigsOrBlock(): Record<string, ScopedMcpServerConfig> {
+    try {
+      return this.loadConfigs();
+    } catch (error) {
+      if (isMcpConfigLoadError(error)) {
+        this.clientCache.clear();
+        throw this.createConfigBlockedError(error);
+      }
+      throw error;
+    }
+  }
+
+  private createConfigBlockedError(error: McpConfigLoadError): McpGatewayBlockedError {
+    return new McpGatewayBlockedError({
+      message: error.message,
+      blockerKind: "environment-not-ready",
+      doNext: error.doNext,
     });
   }
 }

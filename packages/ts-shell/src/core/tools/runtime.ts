@@ -7,6 +7,7 @@ import {
   type ToolExecutionContext,
   type ToolExecutionResult,
 } from '../../tools/types.js'
+import { isMcpConfigLoadError } from '../mcp/config.js'
 import type { CoreMcpGateway } from '../mcp/gateway.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import { ToolApprovalFlow } from './approvalFlow.js'
@@ -79,8 +80,11 @@ export class ToolRuntime {
 
           return true
         })
-      } catch {
-        // Keep previously computed visibility when config loading fails.
+      } catch (error) {
+        if (isMcpConfigLoadError(error)) {
+          visible = visible.filter(name => !name.startsWith('mcp__'))
+        }
+        // Keep previously computed visibility for unrelated config loading failures.
       }
     }
 
