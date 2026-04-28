@@ -6,7 +6,11 @@ import * as readline from "node:readline";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
 import type { ShellActionResult } from "../core/commands/types.js";
-import { CoreMcpGateway, McpGatewayBlockedError } from "../core/mcp/gateway.js";
+import {
+  CoreMcpGateway,
+  McpGatewayBlockedError,
+  describeMcpConnectionState,
+} from "../core/mcp/gateway.js";
 import type { McpClientSnapshot } from "../core/mcp/types.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
@@ -930,10 +934,7 @@ async function main(): Promise<void> {
                 ? "all"
                 : mcpTarget;
             const snapshot = await mcpGateway.refresh(refreshTarget);
-            renderer.renderLine(
-              `\nMCP refresh complete (${refreshTarget === "all" ? "all servers" : refreshTarget}).`,
-            );
-            renderMcpStatusControlPlane(renderer, snapshot);
+            renderMcpRefreshControlPlane(renderer, snapshot, refreshTarget);
             rl.prompt();
             return;
           }
@@ -945,7 +946,7 @@ async function main(): Promise<void> {
             return;
           }
           if (mcpAction === "doctor") {
-            renderMcpDoctorControlPlane(renderer, snapshot);
+            renderMcpDoctorControlPlane(renderer, snapshot, mcpTarget);
             rl.prompt();
             return;
           }
@@ -2358,10 +2359,11 @@ async function runNonInteractivePrompt(options: {
           const refreshTarget =
             !mcpTarget || mcpTarget.toLowerCase() === "all" ? "all" : mcpTarget;
           const snapshot = await mcpGateway.refresh(refreshTarget);
-          options.renderer.renderLine(
-            `MCP refresh complete (${refreshTarget === "all" ? "all servers" : refreshTarget}).`,
+          renderMcpRefreshControlPlane(
+            options.renderer,
+            snapshot,
+            refreshTarget,
           );
-          renderMcpStatusControlPlane(options.renderer, snapshot);
           return;
         }
 
@@ -2371,7 +2373,7 @@ async function runNonInteractivePrompt(options: {
           return;
         }
         if (mcpAction === "doctor") {
-          renderMcpDoctorControlPlane(options.renderer, snapshot);
+          renderMcpDoctorControlPlane(options.renderer, snapshot, mcpTarget);
           return;
         }
         renderMcpStatusControlPlane(options.renderer, snapshot);
@@ -3491,12 +3493,18 @@ function renderMcpStatusControlPlane(
     ).length;
     const scope = client.config.scope;
     const transport = client.config.transport;
+    const stateDescription = describeMcpConnectionState(client);
+    const executable = stateDescription.executable && toolCount > 0;
     renderer.renderLine(
-      `- ${client.name}: ${client.type} (scope=${scope}, transport=${transport}, tools=${toolCount})`,
+      `- ${client.name}: ${client.type} (scope=${scope}, transport=${transport}, tools=${toolCount}, executable=${executable ? "yes" : "no"})`,
     );
-    if (client.type === "failed") {
-      renderer.renderLine(`  reason: ${truncate(client.error, 140)}`);
+    if (stateDescription.reason) {
+      renderer.renderLine(`  reason: ${truncate(stateDescription.reason, 140)}`);
     }
+    if (client.type === "connected" && toolCount === 0) {
+      renderer.renderLine("  reason: MCP server is connected but exposes no tools.");
+    }
+    renderer.renderLine(`  do-next: ${stateDescription.doNext}`);
   }
 
   renderer.renderLine("Next actions:");
@@ -3506,6 +3514,34 @@ function renderMcpStatusControlPlane(
   );
   renderer.renderLine("- /mcp refresh [server]  reconnect all or one server.");
   renderer.renderLine("");
+}
+
+function renderMcpRefreshControlPlane(
+  renderer: StreamingRenderer,
+  snapshot: McpClientSnapshot,
+  refreshTarget: string,
+): void {
+  if (refreshTarget !== "all") {
+    const refreshedClient = snapshot.clients.find(
+      (client) => client.name === refreshTarget,
+    );
+    if (refreshedClient && refreshedClient.type !== "connected") {
+      const stateDescription = describeMcpConnectionState(refreshedClient);
+      renderBlockedContract(renderer, {
+        blockerKind: "environment-not-ready",
+        reason:
+          stateDescription.reason ??
+          `MCP server ${refreshedClient.name} is not executable after refresh.`,
+        doNext: stateDescription.doNext,
+      });
+      return;
+    }
+  }
+
+  renderer.renderLine(
+    `\nMCP refresh complete (${refreshTarget === "all" ? "all servers" : refreshTarget}).`,
+  );
+  renderMcpStatusControlPlane(renderer, snapshot);
 }
 
 function renderMcpToolsControlPlane(
@@ -3538,9 +3574,17 @@ function renderMcpToolsControlPlane(
       (client) => client.type !== "connected",
     );
     if (unresolved.length > 0) {
-      renderer.renderLine(
-        "- At least one selected server is not connected. Use /mcp doctor or /mcp refresh.",
-      );
+      renderer.renderLine("- Unavailable selected servers:");
+      for (const client of unresolved) {
+        const stateDescription = describeMcpConnectionState(client);
+        renderer.renderLine(
+          `  ${client.name}: ${client.type} (executable=no)`,
+        );
+        if (stateDescription.reason) {
+          renderer.renderLine(`    reason: ${truncate(stateDescription.reason, 140)}`);
+        }
+        renderer.renderLine(`    do-next: ${stateDescription.doNext}`);
+      }
     }
     renderer.renderLine("");
     return;
@@ -3558,19 +3602,37 @@ function renderMcpToolsControlPlane(
 function renderMcpDoctorControlPlane(
   renderer: StreamingRenderer,
   snapshot: McpClientSnapshot,
+  targetServer?: string,
 ): void {
-  const needsAuth = snapshot.clients.filter(
+  const normalizedTarget = targetServer?.trim();
+  const targetClients = normalizedTarget
+    ? snapshot.clients.filter((client) => client.name === normalizedTarget)
+    : snapshot.clients;
+
+  renderer.renderLine(
+    `\nMCP doctor${normalizedTarget ? ` @ ${normalizedTarget}` : ""}`,
+  );
+  if (normalizedTarget && targetClients.length === 0) {
+    renderer.renderLine("- Unknown server:");
+    renderer.renderLine(`  reason: Unknown MCP server: ${normalizedTarget}`);
+    renderer.renderLine(
+      "  do-next: Run /mcp status to list configured servers, then retry with a valid server name.",
+    );
+    renderer.renderLine("");
+    return;
+  }
+
+  const needsAuth = targetClients.filter(
     (client) => client.type === "needs-auth",
   );
-  const failed = snapshot.clients.filter((client) => client.type === "failed");
-  const pending = snapshot.clients.filter(
+  const failed = targetClients.filter((client) => client.type === "failed");
+  const pending = targetClients.filter(
     (client) => client.type === "pending",
   );
-  const disabled = snapshot.clients.filter(
+  const disabled = targetClients.filter(
     (client) => client.type === "disabled",
   );
 
-  renderer.renderLine("\nMCP doctor");
   if (
     needsAuth.length === 0 &&
     failed.length === 0 &&
@@ -3579,37 +3641,45 @@ function renderMcpDoctorControlPlane(
   ) {
     renderer.renderLine("- No blocking MCP issues detected.");
     renderer.renderLine(
-      "- All configured servers are connected and serving tools.",
+      normalizedTarget
+        ? "- Selected server is connected and serving tools."
+        : "- All configured servers are connected and serving tools.",
     );
     renderer.renderLine("");
     return;
   }
 
-  if (needsAuth.length > 0) {
-    renderer.renderLine("- Needs auth:");
-    for (const client of needsAuth) {
-      renderer.renderLine(
-        `  ${client.name} requires credentials before tools can be used.`,
-      );
+  const renderUnavailableClients = (
+    label: string,
+    clients: typeof targetClients,
+  ): void => {
+    if (clients.length === 0) {
+      return;
     }
+    renderer.renderLine(label);
+    for (const client of clients) {
+      const stateDescription = describeMcpConnectionState(client);
+      renderer.renderLine(`  ${client.name}: ${client.type} (executable=no)`);
+      if (stateDescription.reason) {
+        renderer.renderLine(
+          `    reason: ${truncate(stateDescription.reason, 140)}`,
+        );
+      }
+      renderer.renderLine(`    do-next: ${stateDescription.doNext}`);
+    }
+  };
+
+  if (needsAuth.length > 0) {
+    renderUnavailableClients("- Needs auth:", needsAuth);
   }
   if (failed.length > 0) {
-    renderer.renderLine("- Failed connections:");
-    for (const client of failed) {
-      renderer.renderLine(`  ${client.name}: ${truncate(client.error, 140)}`);
-    }
+    renderUnavailableClients("- Failed connections:", failed);
   }
   if (pending.length > 0) {
-    renderer.renderLine("- Pending connections:");
-    for (const client of pending) {
-      renderer.renderLine(`  ${client.name} is still initializing.`);
-    }
+    renderUnavailableClients("- Pending connections:", pending);
   }
   if (disabled.length > 0) {
-    renderer.renderLine("- Disabled servers:");
-    for (const client of disabled) {
-      renderer.renderLine(`  ${client.name} is disabled in MCP config.`);
-    }
+    renderUnavailableClients("- Disabled servers:", disabled);
   }
 
   renderer.renderLine("Suggested recovery flow:");

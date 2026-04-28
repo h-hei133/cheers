@@ -8,11 +8,11 @@ import {
   executeViaRustDaemon,
   isRustDaemonEnabled,
 } from '../../daemon/client.js'
-import type { CoreMcpGateway } from '../mcp/gateway.js'
+import { McpGatewayBlockedError, type CoreMcpGateway } from '../mcp/gateway.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
-import { approvedResult } from './toolResultLifecycle.js'
+import { approvedResult, deniedResult } from './toolResultLifecycle.js'
 
 const exec = promisify(execCallback)
 
@@ -262,12 +262,26 @@ export function createCoreToolRegistry(options?: {
           throw new Error(`Missing MCP gateway for ${tool.qualifiedName}`)
         }
 
-        const result = await options.mcpGateway.invokeTool(tool.serverName, tool.toolName, args)
-        return approvedResult(result.content, {
-          executionPath: 'mcp-stdio',
-          serverName: tool.serverName,
-          toolName: tool.toolName,
-        })
+        try {
+          const result = await options.mcpGateway.invokeTool(tool.serverName, tool.toolName, args)
+          return approvedResult(result.content, {
+            executionPath: 'mcp-stdio',
+            serverName: tool.serverName,
+            toolName: tool.toolName,
+          })
+        } catch (error) {
+          if (error instanceof McpGatewayBlockedError) {
+            return deniedResult(error.message, {
+              executionPath: 'mcp-stdio',
+              serverName: tool.serverName,
+              toolName: tool.toolName,
+              blockerKind: error.blockerKind,
+              reason: error.message,
+              doNext: error.doNext,
+            })
+          }
+          throw error
+        }
       },
     })
   }

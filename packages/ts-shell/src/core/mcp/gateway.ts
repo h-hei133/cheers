@@ -29,6 +29,57 @@ export class McpGatewayBlockedError extends Error {
   }
 }
 
+export function describeMcpConnectionState(state: McpConnectionState): {
+  readonly executable: boolean;
+  readonly reason?: string;
+  readonly doNext: string;
+} {
+  if (state.type === "connected") {
+    return {
+      executable: true,
+      doNext: `Run /mcp tools ${state.name} to inspect exposed tools.`,
+    };
+  }
+
+  const reason = describeUnavailableServer(state);
+  if (state.type === "needs-auth") {
+    return {
+      executable: false,
+      reason,
+      doNext: `Authenticate server '${state.name}' and rerun /mcp refresh ${state.name}.`,
+    };
+  }
+
+  if (state.type === "disabled") {
+    return {
+      executable: false,
+      reason,
+      doNext: `Enable server '${state.name}' in MCP config, then rerun /mcp refresh ${state.name}.`,
+    };
+  }
+
+  return {
+    executable: false,
+    reason,
+    doNext: `Run /mcp refresh ${state.name} and verify server connectivity before retrying.`,
+  };
+}
+
+function describeUnavailableServer(
+  state: Exclude<McpConnectionState, { type: "connected" }>,
+): string {
+  switch (state.type) {
+    case "disabled":
+      return `MCP server ${state.name} is disabled`;
+    case "needs-auth":
+      return `MCP server ${state.name} requires authentication`;
+    case "failed":
+      return `MCP server ${state.name} is unavailable: ${state.error}`;
+    case "pending":
+      return `MCP server ${state.name} is pending connection`;
+  }
+}
+
 export class CoreMcpGateway {
   private readonly workspaceRoot: string;
   private readonly connectionManager = new CoreMcpConnectionManager();
@@ -161,36 +212,14 @@ export class CoreMcpGateway {
     return JSON.stringify(left) === JSON.stringify(right);
   }
 
-  private describeUnavailableServer(
-    state: Exclude<McpConnectionState, { type: "connected" }>,
-  ): string {
-    switch (state.type) {
-      case "disabled":
-        return `MCP server ${state.name} is disabled`;
-      case "needs-auth":
-        return `MCP server ${state.name} requires authentication`;
-      case "failed":
-        return `MCP server ${state.name} is unavailable: ${state.error}`;
-      case "pending":
-        return `MCP server ${state.name} is pending connection`;
-    }
-  }
-
   private createUnavailableServerBlockedError(
     state: Exclude<McpConnectionState, { type: "connected" }>,
   ): McpGatewayBlockedError {
-    if (state.type === "needs-auth") {
-      return new McpGatewayBlockedError({
-        message: this.describeUnavailableServer(state),
-        blockerKind: "environment-not-ready",
-        doNext: `Authenticate server '${state.name}' and rerun /mcp refresh ${state.name}.`,
-      });
-    }
-
+    const description = describeMcpConnectionState(state);
     return new McpGatewayBlockedError({
-      message: this.describeUnavailableServer(state),
+      message: description.reason ?? `MCP server ${state.name} is unavailable`,
       blockerKind: "environment-not-ready",
-      doNext: `Run /mcp refresh ${state.name} and verify server connectivity before retrying.`,
+      doNext: description.doNext,
     });
   }
 }

@@ -4,7 +4,11 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CoreMcpClient } from "./client.js";
 import { loadMcpConfigs } from "./config.js";
-import { CoreMcpGateway, McpGatewayBlockedError } from "./gateway.js";
+import {
+  CoreMcpGateway,
+  McpGatewayBlockedError,
+  describeMcpConnectionState,
+} from "./gateway.js";
 
 describe("core MCP gateway (W3)", () => {
   let fakeHomeDir = "";
@@ -123,7 +127,7 @@ describe("core MCP gateway (W3)", () => {
   it("supports real stdio list and invoke with server-scoped MCP tool identity", async () => {
     const serverPath = path.resolve(
       process.cwd(),
-      "packages/ts-shell/src/core/mcp/fixtures/mockMcpServer.mjs",
+      "src/core/mcp/fixtures/mockMcpServer.mjs",
     );
 
     fs.writeFileSync(
@@ -296,6 +300,49 @@ describe("core MCP gateway (W3)", () => {
       blockerKind: "unknown",
       doNext:
         "Run /mcp status to list configured servers, then retry with a valid server name.",
+    });
+  });
+
+  it("describes non-connected states with the same reason and do-next used by execute blockers", () => {
+    const needsAuth = describeMcpConnectionState({
+      type: "needs-auth",
+      name: "authServer",
+      config: {
+        transport: "http",
+        url: "https://example.com",
+        scope: "project",
+        authRequired: true,
+      },
+    });
+    expect(needsAuth).toMatchObject({
+      executable: false,
+      reason: "MCP server authServer requires authentication",
+      doNext: "Authenticate server 'authServer' and rerun /mcp refresh authServer.",
+    });
+
+    const failed = describeMcpConnectionState({
+      type: "failed",
+      name: "brokenServer",
+      config: { transport: "stdio", scope: "project" },
+      error: "Missing stdio command",
+    });
+    expect(failed).toMatchObject({
+      executable: false,
+      reason: "MCP server brokenServer is unavailable: Missing stdio command",
+      doNext:
+        "Run /mcp refresh brokenServer and verify server connectivity before retrying.",
+    });
+
+    const disabled = describeMcpConnectionState({
+      type: "disabled",
+      name: "disabledServer",
+      config: { transport: "sdk", scope: "project", enabled: false },
+    });
+    expect(disabled).toMatchObject({
+      executable: false,
+      reason: "MCP server disabledServer is disabled",
+      doNext:
+        "Enable server 'disabledServer' in MCP config, then rerun /mcp refresh disabledServer.",
     });
   });
 });

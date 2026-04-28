@@ -91,5 +91,109 @@ describe('core tool runtime stale reconnect consistency', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('MCP server localSdk requires authentication')
+    expect(result.metadata).toMatchObject({
+      blockerKind: 'environment-not-ready',
+      reason: 'MCP server localSdk requires authentication',
+      doNext: "Authenticate server 'localSdk' and rerun /mcp refresh localSdk.",
+    })
+  })
+
+  it('hides stale descriptors and preserves blocker evidence when reconnect finds an unavailable server', async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true })
+    await fs.writeFile(
+      path.join(workspaceRoot, '.private-agents.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          localSdk: {
+            transport: 'sdk',
+            mockTools: [{
+              serverName: 'localSdk',
+              toolName: 'search',
+              qualifiedName: 'mcp__localSdk__search',
+              description: 'Search MCP',
+            }],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const gateway = new CoreMcpGateway(workspaceRoot)
+    const initialSnapshot = await gateway.snapshot()
+    const runtime = new ToolRuntime(new SandboxEnforcer({ workspaceRoot, auditLogPath }), {
+      mcpTools: initialSnapshot.tools,
+      mcpGateway: gateway,
+      runtimeConfig: {
+        provider: 'openai',
+        daemonEnabled: true,
+        maxTurns: 6,
+        disabledTools: [],
+        hiddenToolPrefixes: [],
+        enableMcpTools: true,
+        configSources: [],
+      },
+    })
+
+    expect(runtime.listVisibleTools()).toContain('mcp__localSdk__search')
+
+    await fs.writeFile(
+      path.join(workspaceRoot, '.private-agents.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          localSdk: {
+            transport: 'stdio',
+            mockTools: [{
+              serverName: 'localSdk',
+              toolName: 'search',
+              qualifiedName: 'mcp__localSdk__search',
+              description: 'Search MCP',
+            }],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const reconnectedSnapshot = await gateway.snapshot()
+    expect(reconnectedSnapshot.clients[0]).toMatchObject({
+      type: 'failed',
+      name: 'localSdk',
+    })
+    expect(reconnectedSnapshot.tools).toEqual([])
+    expect(runtime.listVisibleTools()).not.toContain('mcp__localSdk__search')
+
+    const result = await runtime.execute(
+      'mcp__localSdk__search',
+      {},
+      { taskId: 'task_mcp_unavailable_consistency', workspaceRoot },
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('MCP server localSdk is unavailable: Missing stdio command')
+    expect(result.metadata).toMatchObject({
+      blockerKind: 'environment-not-ready',
+      reason: 'MCP server localSdk is unavailable: Missing stdio command',
+      doNext: 'Run /mcp refresh localSdk and verify server connectivity before retrying.',
+    })
+  })
+
+  it('returns a clear blocker for unknown MCP tool execution', async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true })
+    const runtime = new ToolRuntime(new SandboxEnforcer({ workspaceRoot, auditLogPath }))
+
+    const result = await runtime.execute(
+      'mcp__missingServer__search',
+      {},
+      { taskId: 'task_mcp_unknown_tool', workspaceRoot },
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe("MCP tool 'mcp__missingServer__search' is not registered")
+    expect(result.metadata).toMatchObject({
+      blockerKind: 'unknown',
+      serverName: 'missingServer',
+      reason: "MCP tool 'mcp__missingServer__search' is not registered",
+      doNext: 'Run /mcp status and /mcp refresh to list available MCP tools, then retry with a visible tool name.',
+    })
   })
 })

@@ -797,6 +797,420 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(output).toContain(`- Project binding: ${projectRoot.replace(/\\/g, "/")}`);
   }, 15000);
 
+  it("shows MCP status reasons and do-next for unavailable capabilities", async () => {
+    const projectRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), "private-agents-cli-mcp-status-"),
+    );
+    try {
+      fs.writeFileSync(
+        path.join(projectRoot, ".private-agents.mcp.json"),
+        JSON.stringify({
+          mcpServers: {
+            connectedSdk: {
+              transport: "sdk",
+              mockTools: [
+                {
+                  serverName: "connectedSdk",
+                  toolName: "search",
+                  qualifiedName: "mcp__connectedSdk__search",
+                  description: "Search MCP",
+                },
+              ],
+            },
+            needsAuth: {
+              transport: "http",
+              url: "https://example.com/mcp",
+              authRequired: true,
+            },
+            brokenStdio: {
+              transport: "stdio",
+            },
+            disabledSdk: {
+              transport: "sdk",
+              enabled: false,
+              mockTools: [
+                {
+                  serverName: "disabledSdk",
+                  toolName: "hidden",
+                  qualifiedName: "mcp__disabledSdk__hidden",
+                  description: "Hidden MCP",
+                },
+              ],
+            },
+          },
+        }),
+        "utf8",
+      );
+
+      const result = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp status"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const output = normalizeCliOutput(result.output);
+
+      expect(result.code).toBe(0);
+      expect(output).toContain("connectedSdk: connected");
+      expect(output).toContain("tools=1, executable=yes");
+      expect(output).toContain("needsAuth: needs-auth");
+      expect(output).toContain("MCP server needsAuth requires authentication");
+      expect(output).toContain(
+        "Authenticate server 'needsAuth' and rerun /mcp refresh needsAuth.",
+      );
+      expect(output).toContain("brokenStdio: failed");
+      expect(output).toContain(
+        "MCP server brokenStdio is unavailable: Missing stdio command",
+      );
+      expect(output).toContain(
+        "Run /mcp refresh brokenStdio and verify server connectivity before retrying.",
+      );
+      expect(output).toContain("disabledSdk: disabled");
+      expect(output).toContain("MCP server disabledSdk is disabled");
+      expect(output).toContain("tools=0, executable=no");
+    } finally {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it("shows MCP tools unavailable-server guidance without hiding connected tools", async () => {
+    const projectRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), "private-agents-cli-mcp-tools-"),
+    );
+    try {
+      fs.writeFileSync(
+        path.join(projectRoot, ".private-agents.mcp.json"),
+        JSON.stringify({
+          mcpServers: {
+            connectedSdk: {
+              transport: "sdk",
+              mockTools: [
+                {
+                  serverName: "connectedSdk",
+                  toolName: "search",
+                  qualifiedName: "mcp__connectedSdk__search",
+                  description: "Search MCP",
+                },
+              ],
+            },
+            needsAuth: {
+              transport: "http",
+              url: "https://example.com/mcp",
+              authRequired: true,
+            },
+            brokenStdio: {
+              transport: "stdio",
+            },
+            disabledSdk: {
+              transport: "sdk",
+              enabled: false,
+              mockTools: [
+                {
+                  serverName: "disabledSdk",
+                  toolName: "hidden",
+                  qualifiedName: "mcp__disabledSdk__hidden",
+                  description: "Hidden MCP",
+                },
+              ],
+            },
+          },
+        }),
+        "utf8",
+      );
+
+      const connectedResult = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp tools connectedSdk"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const connectedOutput = normalizeCliOutput(connectedResult.output);
+      expect(connectedResult.code).toBe(0);
+      expect(connectedOutput).toContain("MCP tools @ connectedSdk");
+      expect(connectedOutput).toContain("mcp__connectedSdk__search");
+      expect(connectedOutput).not.toContain("Unavailable selected servers");
+
+      const authResult = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp tools needsAuth"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const authOutput = normalizeCliOutput(authResult.output);
+      expect(authResult.code).toBe(0);
+      expect(authOutput).toContain("MCP tools @ needsAuth");
+      expect(authOutput).toContain("- No tools currently exposed.");
+      expect(authOutput).toContain("needsAuth: needs-auth (executable=no)");
+      expect(authOutput).toContain("MCP server needsAuth requires authentication");
+      expect(authOutput).toContain(
+        "Authenticate server 'needsAuth' and rerun /mcp refresh needsAuth.",
+      );
+
+      const failedResult = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp tools brokenStdio"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const failedOutput = normalizeCliOutput(failedResult.output);
+      expect(failedResult.code).toBe(0);
+      expect(failedOutput).toContain("brokenStdio: failed (executable=no)");
+      expect(failedOutput).toContain(
+        "MCP server brokenStdio is unavailable: Missing stdio command",
+      );
+      expect(failedOutput).toContain(
+        "Run /mcp refresh brokenStdio and verify server connectivity before retrying.",
+      );
+
+      const disabledResult = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp tools disabledSdk"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const disabledOutput = normalizeCliOutput(disabledResult.output);
+      expect(disabledResult.code).toBe(0);
+      expect(disabledOutput).toContain("disabledSdk: disabled (executable=no)");
+      expect(disabledOutput).toContain("MCP server disabledSdk is disabled");
+      expect(disabledOutput).not.toContain("mcp__disabledSdk__hidden");
+    } finally {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
+  }, 20000);
+
+  it("shows MCP refresh unavailable-server guidance without masking connected refresh", async () => {
+    const projectRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), "private-agents-cli-mcp-refresh-"),
+    );
+    try {
+      fs.writeFileSync(
+        path.join(projectRoot, ".private-agents.mcp.json"),
+        JSON.stringify({
+          mcpServers: {
+            connectedSdk: {
+              transport: "sdk",
+              mockTools: [
+                {
+                  serverName: "connectedSdk",
+                  toolName: "search",
+                  qualifiedName: "mcp__connectedSdk__search",
+                  description: "Search MCP",
+                },
+              ],
+            },
+            needsAuth: {
+              transport: "http",
+              url: "https://example.com/mcp",
+              authRequired: true,
+            },
+            brokenStdio: {
+              transport: "stdio",
+            },
+            disabledSdk: {
+              transport: "sdk",
+              enabled: false,
+            },
+          },
+        }),
+        "utf8",
+      );
+
+      const connectedResult = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp refresh connectedSdk"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const connectedOutput = normalizeCliOutput(connectedResult.output);
+      expect(connectedResult.code).toBe(0);
+      expect(connectedOutput).toContain("MCP refresh complete (connectedSdk).");
+      expect(connectedOutput).toContain("connectedSdk: connected");
+      expect(connectedOutput).toContain("tools=1, executable=yes");
+
+      const authResult = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp refresh needsAuth"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const authOutput = normalizeCliOutput(authResult.output);
+      expect(authResult.code).toBe(0);
+      expect(authOutput).toContain("- Outcome: blocked");
+      expect(authOutput).toContain("- BlockerKind: environment-not-ready");
+      expect(authOutput).toContain("MCP server needsAuth requires authentication");
+      expect(authOutput).toContain(
+        "Authenticate server 'needsAuth' and rerun /mcp refresh needsAuth.",
+      );
+      expect(authOutput).not.toContain("MCP refresh complete (needsAuth).");
+
+      const failedResult = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp refresh brokenStdio"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const failedOutput = normalizeCliOutput(failedResult.output);
+      expect(failedResult.code).toBe(0);
+      expect(failedOutput).toContain(
+        "MCP server brokenStdio is unavailable: Missing stdio command",
+      );
+      expect(failedOutput).toContain(
+        "Run /mcp refresh brokenStdio and verify server connectivity before retrying.",
+      );
+      expect(failedOutput).not.toContain("MCP refresh complete (brokenStdio).");
+
+      const disabledResult = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp refresh disabledSdk"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const disabledOutput = normalizeCliOutput(disabledResult.output);
+      expect(disabledResult.code).toBe(0);
+      expect(disabledOutput).toContain("MCP server disabledSdk is disabled");
+      expect(disabledOutput).toContain(
+        "Enable server 'disabledSdk' in MCP config, then rerun /mcp refresh disabledSdk.",
+      );
+
+      const unknownResult = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp refresh missingServer"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const unknownOutput = normalizeCliOutput(unknownResult.output);
+      expect(unknownResult.code).toBe(0);
+      expect(unknownOutput).toContain("Unknown MCP server: missingServer");
+      expect(unknownOutput).toContain(
+        "Run /mcp status to list configured servers, then retry with a valid server name.",
+      );
+    } finally {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
+  }, 25000);
+
+  it("shows MCP doctor diagnostics with shared unavailable-server guidance", async () => {
+    const projectRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), "private-agents-cli-mcp-doctor-"),
+    );
+    try {
+      fs.writeFileSync(
+        path.join(projectRoot, ".private-agents.mcp.json"),
+        JSON.stringify({
+          mcpServers: {
+            connectedSdk: {
+              transport: "sdk",
+              mockTools: [
+                {
+                  serverName: "connectedSdk",
+                  toolName: "search",
+                  qualifiedName: "mcp__connectedSdk__search",
+                  description: "Search MCP",
+                },
+              ],
+            },
+            needsAuth: {
+              transport: "http",
+              url: "https://example.com/mcp",
+              authRequired: true,
+            },
+            brokenStdio: {
+              transport: "stdio",
+            },
+            disabledSdk: {
+              transport: "sdk",
+              enabled: false,
+            },
+          },
+        }),
+        "utf8",
+      );
+
+      const result = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp doctor"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const output = normalizeCliOutput(result.output);
+      expect(result.code).toBe(0);
+      expect(output).toContain("MCP doctor");
+      expect(output).toContain("needsAuth: needs-auth (executable=no)");
+      expect(output).toContain("MCP server needsAuth requires authentication");
+      expect(output).toContain(
+        "Authenticate server 'needsAuth' and rerun /mcp refresh needsAuth.",
+      );
+      expect(output).toContain("brokenStdio: failed (executable=no)");
+      expect(output).toContain(
+        "MCP server brokenStdio is unavailable: Missing stdio command",
+      );
+      expect(output).toContain(
+        "Run /mcp refresh brokenStdio and verify server connectivity before retrying.",
+      );
+      expect(output).toContain("disabledSdk: disabled (executable=no)");
+      expect(output).toContain("MCP server disabledSdk is disabled");
+      expect(output).toContain(
+        "Enable server 'disabledSdk' in MCP config, then rerun /mcp refresh disabledSdk.",
+      );
+
+      const connectedResult = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp doctor connectedSdk"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const connectedOutput = normalizeCliOutput(connectedResult.output);
+      expect(connectedResult.code).toBe(0);
+      expect(connectedOutput).toContain("MCP doctor @ connectedSdk");
+      expect(connectedOutput).toContain("- No blocking MCP issues detected.");
+      expect(connectedOutput).toContain(
+        "- Selected server is connected and serving tools.",
+      );
+
+      const unknownResult = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp doctor missingServer"],
+        envOverrides: {
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+      });
+      const unknownOutput = normalizeCliOutput(unknownResult.output);
+      expect(unknownResult.code).toBe(0);
+      expect(unknownOutput).toContain("MCP doctor @ missingServer");
+      expect(unknownOutput).toContain("Unknown MCP server: missingServer");
+      expect(unknownOutput).toContain(
+        "Run /mcp status to list configured servers, then retry with a valid server name.",
+      );
+    } finally {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
+  }, 25000);
+
   it("guards root binding diagnostics for CLI /sessions switch and /workspace attach", async () => {
     const repoA = path.join(fakeHomeDir, "repo-a");
     const repoB = path.join(fakeHomeDir, "repo-b");

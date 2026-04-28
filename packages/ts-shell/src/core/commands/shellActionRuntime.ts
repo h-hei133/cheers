@@ -145,6 +145,7 @@ export async function runMcpShellAction(_args: string[], _context: CommandContex
       kind: 'shell-action',
       action: 'show-mcp',
       mcpAction: 'doctor',
+      mcpTarget: target,
     }
   }
 

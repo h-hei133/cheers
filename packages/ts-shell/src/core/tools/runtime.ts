@@ -69,6 +69,14 @@ export class ToolRuntime {
             return false
           }
 
+          if (config.transport === 'stdio' && !config.command) {
+            return false
+          }
+
+          if ((config.transport === 'http' || config.transport === 'ws') && !config.url) {
+            return false
+          }
+
           return true
         })
       } catch {
@@ -93,6 +101,17 @@ export class ToolRuntime {
 
     const tool = this.registry.get(toolName)
     if (!tool) {
+      if (isMcpTool) {
+        const [, serverName = 'unknown'] = toolName.split('__')
+        return deniedResult(`MCP tool '${toolName}' is not registered`, {
+          executionPath: 'mcp-stdio',
+          serverName,
+          blockerKind: 'unknown',
+          reason: `MCP tool '${toolName}' is not registered`,
+          doNext: 'Run /mcp status and /mcp refresh to list available MCP tools, then retry with a visible tool name.',
+        })
+      }
+
       return deniedResult(`Tool '${toolName}' is not registered`)
     }
 
