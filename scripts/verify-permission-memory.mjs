@@ -22,11 +22,10 @@ const requiredExplanationMarkers = [
   'Lifecycle: one-shot (allow-once/deny).',
   'Cache effect: none.',
   'Authority root: D:\\Test\\real-fresh-editwrite-compact-rebased.',
-  'Subject permission request: edit/write.',
-  'Subject permission target: D:\\Test\\real-fresh-editwrite-compact-rebased\\src\\permission-cross-tool.txt.',
+  'Subject permission request: bash/spawn/process(node).',
+  'Subject permission scope: bash/spawn/process(node).',
   'Subject permission root: D:\\Test\\real-fresh-editwrite-compact-rebased.',
   'Current request context scope: bash/spawn/process(node).',
-  'Subject/current disambiguation:',
   'Why asking again: allow-once grants are consumed',
 ]
 

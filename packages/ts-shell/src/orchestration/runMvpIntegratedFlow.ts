@@ -1456,6 +1456,17 @@ function buildWorkflowTaskPlan(
     };
   }
 
+  if (reflectiveStateQueryKind && !hasReflectiveActionCue) {
+    return {
+      taskKind: "chat",
+      reason: "reflective state query requested without execution cue",
+      inspectFirst: false,
+      verifyAfterEdit: false,
+      reflectiveStateQueryKind,
+      usedRestoredState,
+    };
+  }
+
   if (
     lastTaskWasReadLike &&
     normalizedRepairInstruction.operation !== "continue" &&
