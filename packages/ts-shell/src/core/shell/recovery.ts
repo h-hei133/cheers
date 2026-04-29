@@ -419,6 +419,10 @@ function buildInterruptedContinuationPrompt(input: {
     if (continuity.lastTaskKind) {
       lines.push(`- last-task-kind: ${continuity.lastTaskKind}`);
     }
+    const actionResultSeedLine = formatActionResultSeedEvidenceLine(continuity);
+    if (actionResultSeedLine) {
+      lines.push(actionResultSeedLine);
+    }
     if (continuity.recentChangedFiles.length > 0) {
       lines.push(
         `- changed-files: ${continuity.recentChangedFiles.join(", ")}`,
@@ -478,6 +482,43 @@ function buildInterruptedContinuationPrompt(input: {
   );
 
   return lines.join("\n");
+}
+
+function formatActionResultSeedEvidenceLine(
+  continuity: SessionContinuitySnapshot,
+): string | undefined {
+  const seed = continuity.lastActionResultSeed;
+  if (!seed) {
+    return undefined;
+  }
+
+  const parts = ["seed=action-result"];
+  if (seed.actionKind) {
+    parts.push(`action=${seed.actionKind}`);
+  }
+  if (seed.target) {
+    parts.push(`target=${truncate(seed.target, 140)}`);
+  }
+  const verificationStatus =
+    seed.verification?.status ?? continuity.lastVerificationStatus;
+  if (verificationStatus) {
+    parts.push(`verifyStatus=${verificationStatus}`);
+  }
+  if (seed.verification?.command) {
+    parts.push("verifyCommandInherited=yes");
+  }
+  const blockerKind = seed.verification?.blockerKind ?? seed.blockerKind;
+  if (blockerKind) {
+    parts.push(`blocker=${blockerKind}`);
+  }
+  if (seed.changedFiles?.length) {
+    parts.push(`changedFiles=${seed.changedFiles.length}`);
+  }
+  if (seed.verifiedFiles?.length) {
+    parts.push(`verifiedFiles=${seed.verifiedFiles.length}`);
+  }
+
+  return `- action-result-seed: ${parts.join(" ")}`;
 }
 
 function deriveInterruptionReason(

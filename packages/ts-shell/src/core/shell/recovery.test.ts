@@ -433,6 +433,17 @@ describe("shell recovery helpers", () => {
           projectRoot: "D:/repo",
           lastUserIntent: "continue me",
           lastTaskKind: "edit-file",
+          lastActionResultSeed: {
+            actionKind: "edit-file",
+            target: "src/app.ts",
+            changedFiles: ["src/app.ts"],
+            verifiedFiles: [],
+            verification: {
+              status: "failed",
+              command: "npm test -- src/app.test.ts",
+              reason: "expected true to be false",
+            },
+          },
           recentChangedFiles: ["src/app.ts"],
           recentTargetFiles: ["src/app.ts"],
           recentFailedFiles: [],
@@ -489,6 +500,9 @@ describe("shell recovery helpers", () => {
       "- planner: Identified src/app.ts as the likely edit target.",
     );
     expect(result.autoResume.prompt).toContain("- changed-files: src/app.ts");
+    expect(result.autoResume.prompt).toContain(
+      "- action-result-seed: seed=action-result action=edit-file target=src/app.ts verifyStatus=failed verifyCommandInherited=yes changedFiles=1",
+    );
     expect(result.autoResume.prompt).toContain(
       "- verification-status: failed",
     );
