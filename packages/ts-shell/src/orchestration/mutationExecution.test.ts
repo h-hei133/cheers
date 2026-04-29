@@ -105,4 +105,45 @@ describe("mutationExecution", () => {
       expect(summary.blocker.nextAction).toContain("retry only");
     }
   });
+
+  it("treats failed patch records as blocker evidence even without failedFile", () => {
+    const summary = summarizeFileMutationResults([
+      {
+        changedFile: "src/app.ts",
+        patch: {
+          path: "src/app.ts",
+          operation: "replace",
+          status: "applied",
+          changedLines: 1,
+          addedLines: 0,
+          removedLines: 0,
+        },
+      },
+      {
+        patch: {
+          path: "src/config.ts",
+          operation: "replace",
+          status: "failed",
+          failureCode: "patch-from-not-found",
+          reason: "Patch source text was not found in the target file.",
+        },
+      },
+    ]);
+
+    expect(summary.ok).toBe(false);
+    if (!summary.ok) {
+      expect(summary.blocker.code).toBe("partial-mutation-failed");
+      expect(summary.changedFiles).toEqual(["src/app.ts"]);
+      expect(summary.failedFiles).toEqual([
+        {
+          path: "src/config.ts",
+          reason: "Patch source text was not found in the target file.",
+        },
+      ]);
+      expect(summary.patches.map((patch) => patch.failureCode)).toEqual([
+        undefined,
+        "patch-from-not-found",
+      ]);
+    }
+  });
 });
