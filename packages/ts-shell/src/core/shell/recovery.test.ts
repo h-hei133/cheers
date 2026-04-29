@@ -444,6 +444,8 @@ describe("shell recovery helpers", () => {
               reason: "expected true to be false",
             },
           },
+          lastActionHandoffSummary:
+            "Resumed from edit-file on src/app.ts; verification status: failed; next focus is the same target.",
           recentChangedFiles: ["src/app.ts"],
           recentTargetFiles: ["src/app.ts"],
           recentFailedFiles: [],
@@ -502,6 +504,9 @@ describe("shell recovery helpers", () => {
     expect(result.autoResume.prompt).toContain("- changed-files: src/app.ts");
     expect(result.autoResume.prompt).toContain(
       "- action-result-seed: seed=action-result action=edit-file target=src/app.ts verifyStatus=failed verifyCommandInherited=yes changedFiles=1",
+    );
+    expect(result.autoResume.prompt).toContain(
+      "- action-handoff-summary: Resumed from edit-file on src/app.ts; verification status: failed; next focus is the same target.",
     );
     expect(result.autoResume.prompt).toContain(
       "- verification-status: failed",

@@ -298,6 +298,10 @@ export class ShellSessionRuntime {
         renderContinuationSeedSummary(this.deps.renderer, {
           codingResult: terminalCodingResult,
           notes: terminalNotes,
+          handoffSummary:
+            options?.runtimeSeed && continuityState?.lastActionHandoffSummary
+              ? continuityState.lastActionHandoffSummary
+              : undefined,
         });
         if (terminalStatus !== "completed") {
           const terminalDetail = terminalStopReason ?? terminalStatus;
@@ -343,6 +347,10 @@ export class ShellSessionRuntime {
         renderContinuationSeedSummary(this.deps.renderer, {
           codingResult: terminalCodingResult,
           notes: terminalNotes,
+          handoffSummary:
+            options?.runtimeSeed && continuityState?.lastActionHandoffSummary
+              ? continuityState.lastActionHandoffSummary
+              : undefined,
         });
 
         if (terminalStatus !== "completed") {
@@ -970,6 +978,7 @@ function renderContinuationSeedSummary(
   input: {
     codingResult: CodingResultSummary | undefined;
     notes: readonly string[];
+    handoffSummary?: string;
   },
 ): void {
   const summary = buildContinuationSeedSummary(input);
@@ -984,7 +993,11 @@ function renderContinuationSeedSummary(
 function buildContinuationSeedSummary(input: {
   codingResult: CodingResultSummary | undefined;
   notes: readonly string[];
+  handoffSummary?: string;
 }): string | undefined {
+  if (input.handoffSummary?.trim()) {
+    return input.handoffSummary.trim();
+  }
   if (!input.notes.some((note) => note.includes("seed=action-result"))) {
     return undefined;
   }

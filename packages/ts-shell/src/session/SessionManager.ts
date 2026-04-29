@@ -130,6 +130,7 @@ export interface SessionContinuitySnapshot {
   readonly lastStagedRepairNextStep?: number;
   readonly lastAnswerDefect?: string;
   readonly lastActionResultSeed?: CodingActionResultSeed;
+  readonly lastActionHandoffSummary?: string;
   readonly recentChangedFiles: readonly string[];
   readonly recentTargetFiles: readonly string[];
   readonly recentFailedFiles: ReadonlyArray<{ path: string; reason: string }>;
@@ -2443,6 +2444,9 @@ export class SessionManager {
     );
     const lastAnswerDefect =
       this.extractLastAnswerDefect(lastCodingResult) ?? undefined;
+    const lastActionHandoffSummary =
+      this.buildActionHandoffSummary(lastCodingResult?.lastActionResultSeed) ??
+      this.extractActionHandoffSummaryFromMemory(stateSnapshot?.workingMemory);
     const continuityTerminalSource =
       lastQueryCompletion?.event.result.terminalClassification === "success" &&
       lastCodingCompletion?.event.result.terminalClassification &&
@@ -2563,6 +2567,7 @@ export class SessionManager {
       ...(lastCodingResult?.lastActionResultSeed
         ? { lastActionResultSeed: lastCodingResult.lastActionResultSeed }
         : {}),
+      ...(lastActionHandoffSummary ? { lastActionHandoffSummary } : {}),
       lastGroundedDeliverableMode,
       ...(lastReadDeliveredLines !== undefined
         ? { lastReadDeliveredLines }
@@ -2996,6 +3001,11 @@ export class SessionManager {
     }
     if (snapshot.lastAnswerDefect) {
       lines.push(`- last-answer-defect: ${this.compactText(snapshot.lastAnswerDefect, 120)}`);
+    }
+    if (snapshot.lastActionHandoffSummary) {
+      lines.push(
+        `- last-action-handoff-summary: ${this.compactText(snapshot.lastActionHandoffSummary, 180)}`,
+      );
     }
     if (snapshot.lastTerminalClassification || snapshot.lastTerminalReason) {
       lines.push(
@@ -5288,16 +5298,22 @@ export class SessionManager {
       continuity.lastApprovalHistory = approvalAuditHistory;
       root.approvalAuditHistory = approvalAuditHistory;
     }
+    const actionHandoffSummary = this.buildActionHandoffSummary(
+      event.result.codingResult?.lastActionResultSeed,
+    );
+    if (actionHandoffSummary) {
+      continuity.lastActionHandoffSummary = actionHandoffSummary;
+    }
 
     root.continuity = continuity;
-    root.summary = this.mergeApprovalSummaryEntries(root.summary, continuity);
+    root.summary = this.mergeContinuitySummaryEntries(root.summary, continuity);
     root.compacted = true;
     root.compactReason = "auto-threshold";
     root.compactedAt = now;
     return root;
   }
 
-  private mergeApprovalSummaryEntries(
+  private mergeContinuitySummaryEntries(
     summaryValue: unknown,
     continuity: Record<string, unknown>,
   ): readonly string[] {
@@ -5320,7 +5336,8 @@ export class SessionManager {
       return (
         !key.startsWith("last-approval-") &&
         !key.startsWith("last-request-scope-") &&
-        !key.startsWith("last-permission-request-")
+        !key.startsWith("last-permission-request-") &&
+        key !== "last-action-handoff-summary"
       );
     });
     const approvalPairs: Array<[string, string]> = [];
@@ -5394,11 +5411,68 @@ export class SessionManager {
       "last-permission-request-lineage",
       continuity.lastPermissionRequestLineage,
     );
+    addPair("last-action-handoff-summary", continuity.lastActionHandoffSummary);
 
     return [
       ...preservedEntries,
       ...approvalPairs.map(([key, value]) => `- ${key}: ${value}`),
     ];
+  }
+
+  private buildActionHandoffSummary(
+    seed: CodingActionResultSeed | undefined,
+  ): string | undefined {
+    if (!seed) {
+      return undefined;
+    }
+    const action = seed.actionKind || "previous action";
+    const target =
+      seed.target ?? seed.changedFiles?.[0] ?? seed.verifiedFiles?.[0];
+    const verificationStatus = seed.verification?.status;
+    const targetLabel = target ? ` on ${target}` : "";
+    const focusLabel = target ? "the same target" : "the same task";
+    const verificationLabel = verificationStatus
+      ? `; verification status: ${verificationStatus}`
+      : "";
+    return `Resumed from ${action}${targetLabel}${verificationLabel}; next focus is ${focusLabel}.`;
+  }
+
+  private extractActionHandoffSummaryFromMemory(
+    workingMemory: unknown,
+  ): string | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    if (
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+    ) {
+      const continuity = root.continuity as Record<string, unknown>;
+      const candidate = this.normalizeOptionalString(
+        continuity.lastActionHandoffSummary,
+      );
+      if (candidate) {
+        return candidate;
+      }
+    }
+    const summaryEntries = Array.isArray(root.summary)
+      ? root.summary.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    for (const entry of summaryEntries) {
+      const normalized = entry.trim().startsWith("- ")
+        ? entry.trim().slice(2).trim()
+        : entry.trim();
+      const prefix = "last-action-handoff-summary:";
+      if (normalized.toLowerCase().startsWith(prefix)) {
+        const value = normalized.slice(prefix.length).trim();
+        if (value) {
+          return value;
+        }
+      }
+    }
+    return undefined;
   }
 
   private load(sessionId: string): Session {

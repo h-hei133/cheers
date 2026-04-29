@@ -423,6 +423,11 @@ function buildInterruptedContinuationPrompt(input: {
     if (actionResultSeedLine) {
       lines.push(actionResultSeedLine);
     }
+    if (continuity.lastActionHandoffSummary) {
+      lines.push(
+        `- action-handoff-summary: ${truncate(continuity.lastActionHandoffSummary, 180)}`,
+      );
+    }
     if (continuity.recentChangedFiles.length > 0) {
       lines.push(
         `- changed-files: ${continuity.recentChangedFiles.join(", ")}`,

@@ -257,7 +257,10 @@ describe("SessionManager", () => {
     const oldRoot = fs.mkdtempSync(path.join(fakeHome, "approval-old-"));
     const newRoot = fs.mkdtempSync(path.join(fakeHome, "approval-new-"));
     const session = manager.createNew(oldRoot);
-    const statePath = path.join(manager.getSessionDirPath(session.id), "state.json");
+    const statePath = path.join(
+      manager.getSessionDirPath(session.id),
+      "state.json",
+    );
 
     fs.writeFileSync(
       statePath,
@@ -1627,6 +1630,9 @@ describe("SessionManager", () => {
         command: "npm test -- src/app.test.ts",
       },
     });
+    expect(completedSnapshot.lastActionHandoffSummary).toBe(
+      "Resumed from edit-file on src/app.ts; verification status: passed; next focus is the same target.",
+    );
     expect(
       restoredManager.buildPromptContinuitySnapshot(
         completed.id,
@@ -1646,6 +1652,14 @@ describe("SessionManager", () => {
         "continue with the same task",
       ),
     ).toContain("- recent-changed-files: src/app.ts");
+    expect(
+      restoredManager.buildPromptContinuityContext(
+        completed.id,
+        "continue with the same task",
+      ),
+    ).toContain(
+      "- last-action-handoff-summary: Resumed from edit-file on src/app.ts; verification status: passed; next focus is the same target.",
+    );
 
     expect(restoredManager.getCurrentSessionForProject(failedProject)?.id).toBe(
       failed.id,
@@ -1667,6 +1681,9 @@ describe("SessionManager", () => {
         command: "npm test -- src/broken.test.ts",
       },
     });
+    expect(failedSnapshot.lastActionHandoffSummary).toBe(
+      "Resumed from edit-file on src/broken.ts; verification status: failed; next focus is the same target.",
+    );
     expect(failedSnapshot.unresolvedItems).toContain("verify:failed");
     const failedContext = restoredManager.buildPromptContinuityContext(
       failed.id,
@@ -1679,6 +1696,107 @@ describe("SessionManager", () => {
     );
     expect(failedContext).toContain(
       "- unresolved-items: last-error:npm test failed with exit code 1",
+    );
+  });
+
+  it("persists action result seed handoff summary through auto-compact continuity", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    manager.recordApprovalAuditDecision(session.id, {
+      decision: "allow-once",
+      decisionSource: "cli-policy",
+      persistent: false,
+      cacheEffect: "none",
+      projectRoot: session.projectRoot,
+      cacheKey: `${session.projectRoot.toLowerCase()}|bash:spawn:process:node`,
+      scopeLabel: "bash/spawn/process(node)",
+      channel: "non-interactive",
+      inputKey: "y",
+    });
+    const statePath = path.join(manager.getSessionDirPath(session.id), "state.json");
+    const result = {
+      status: "completed",
+      terminalReason: "completed",
+      terminalClassification: "success",
+      transcript: [],
+      sharedContext: {
+        sessionId: session.id,
+        initialPrompt: "fix src/compact.ts and verify",
+        notes: [],
+        handoffs: [],
+      },
+      finalOutput: "Fixed src/compact.ts and verified it.",
+      codingResult: {
+        taskKind: "edit-file",
+        changedFiles: ["src/compact.ts"],
+        failedFiles: [],
+        patches: [],
+        repair: {
+          status: "not-needed",
+          attempts: 0,
+          recoveredItems: [],
+          failedItems: [],
+          notes: [],
+        },
+        continuation: {
+          status: "first-pass-success",
+          attempts: 0,
+          evidence: [],
+        },
+        changeSet: {
+          gitAware: false,
+          preExistingDirtyFiles: [],
+          postRunDirtyFiles: ["src/compact.ts"],
+          attemptedFiles: ["src/compact.ts"],
+          changedFiles: ["src/compact.ts"],
+          unchangedAttemptedFiles: [],
+        },
+        taskSatisfaction: {
+          verdict: "satisfied",
+          reasons: [],
+          requiredEvidence: ["changed-files", "verification"],
+          observedEvidence: ["src/compact.ts"],
+        },
+        verifiedFiles: ["src/compact.ts"],
+        unverifiedFiles: [],
+        verification: {
+          status: "passed",
+          command: "npm test -- src/compact.test.ts",
+        },
+        lastActionResultSeed: {
+          actionKind: "edit-file",
+          target: "src/compact.ts",
+          changedFiles: ["src/compact.ts"],
+          verifiedFiles: ["src/compact.ts"],
+          verification: {
+            status: "passed",
+            command: "npm test -- src/compact.test.ts",
+          },
+        },
+        evidence: [],
+      },
+    } as const;
+
+    for (let index = 0; index < 12; index += 1) {
+      manager.appendQueryEvent(session.id, {
+        type: "query.completed",
+        result,
+      });
+    }
+
+    const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+      workingMemory?: {
+        compacted?: boolean;
+        continuity?: { lastActionHandoffSummary?: string };
+        summary?: string[];
+      };
+    };
+    expect(state.workingMemory?.compacted).toBe(true);
+    expect(state.workingMemory?.continuity?.lastActionHandoffSummary).toBe(
+      "Resumed from edit-file on src/compact.ts; verification status: passed; next focus is the same target.",
+    );
+    expect(state.workingMemory?.summary).toContain(
+      "- last-action-handoff-summary: Resumed from edit-file on src/compact.ts; verification status: passed; next focus is the same target.",
     );
   });
 

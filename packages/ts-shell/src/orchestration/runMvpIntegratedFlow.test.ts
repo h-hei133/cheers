@@ -486,6 +486,153 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(mergedNotes).toContain("tool: read file test.log first 5 lines");
   }, 15000);
 
+  it("normalizes read-only action result seed without changed files", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-read-only-seed" }, null, 2),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "test.log"),
+      ["line1", "line2", "line3"].join("\n"),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_read_only_seed",
+      prompt: "Read test.log",
+      workspaceRoot,
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.lastActionResultSeed).toMatchObject({
+      actionKind: "read-file",
+      target: "test.log",
+      changedFiles: [],
+      verification: {
+        status: "not-requested",
+      },
+    });
+    expect(result.codingResult?.lastActionResultSeed?.changedFiles).toEqual([]);
+  }, 15000);
+
+  it("normalizes verify-only action result seed without mutation evidence", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-verify-only-seed" }, null, 2),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_verify_only_seed",
+      prompt: "Run node --version",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.lastActionResultSeed).toMatchObject({
+      actionKind: "run-command",
+      target: "node --version",
+      changedFiles: [],
+      verification: {
+        status: "passed",
+        command: "node --version",
+      },
+    });
+    expect(result.codingResult?.changedFiles).toEqual([]);
+  }, 15000);
+
+  it("carries read-only action result seed target across weak follow-up target carryover", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-read-only-seed-carryover" }, null, 2),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "test.log"),
+      ["seed carryover marker", "line2"].join("\n"),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_read_only_seed_carryover",
+      prompt: "check it",
+      workspaceRoot,
+      continuityState: {
+        lastActionResultSeed: {
+          actionKind: "read-file",
+          target: "test.log",
+          changedFiles: [],
+          verifiedFiles: [],
+          verification: {
+            status: "not-requested",
+          },
+        },
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("read-file");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+
+    const notes = result.sharedContext.notes.join("\n");
+    expect(notes).toContain("decision-trace: task=read-file target=test.log");
+    expect(notes).toContain("seed=action-result");
+    expect(notes).toContain("seedAction=read-file");
+    expect(notes).toContain("seedTarget=test.log");
+    expect(result.finalOutput).toContain("seed carryover marker");
+  }, 15000);
+
+  it("carries verify-only action result seed target and command across weak follow-up target carryover", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-verify-only-seed-carryover" }, null, 2),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_verify_only_seed_carryover",
+      prompt: "verify again",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      continuityState: {
+        lastActionResultSeed: {
+          actionKind: "run-command",
+          target: "package.json",
+          changedFiles: [],
+          verifiedFiles: ["package.json"],
+          verification: {
+            status: "passed",
+            command: "node --version",
+          },
+        },
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("run-command");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+
+    const notes = result.sharedContext.notes.join("\n");
+    expect(notes).toContain(
+      "decision-trace: task=run-command target=package.json",
+    );
+    expect(notes).toContain("seed=action-result");
+    expect(notes).toContain("seedAction=run-command");
+    expect(notes).toContain("seedTarget=package.json");
+    expect(notes).toContain("seedVerifyStatus=passed");
+    expect(notes).toContain("seedVerifyCommandInherited=yes");
+  }, 15000);
+
   it("keeps multi-suffix targets stable for read tasks (.tsx is not truncated to .ts)", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(

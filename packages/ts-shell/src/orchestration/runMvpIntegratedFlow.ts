@@ -912,10 +912,16 @@ function buildWorkflowTaskPlan(
     Boolean(promptPathTarget || explicitPrimaryTarget) ||
     targetResolution.targets.length > 0 ||
     hasPathLikeReference(prompt);
+  const seedActionKind = continuity.lastActionResultSeed?.actionKind;
+  const seedWasReadLike =
+    seedActionKind === "read-file" ||
+    seedActionKind === "repo-explain" ||
+    seedActionKind === "inspect-files";
   const lastTaskWasReadLike =
     continuity.lastTaskKind === "read-file" ||
     continuity.lastTaskKind === "repo-explain" ||
-    continuity.lastTaskKind === "inspect-files";
+    continuity.lastTaskKind === "inspect-files" ||
+    seedWasReadLike;
   const lastTaskWasMutationLike =
     continuity.lastTaskKind === "edit-file" ||
     continuity.lastTaskKind === "write-file" ||
@@ -923,6 +929,8 @@ function buildWorkflowTaskPlan(
     continuity.lastMutationVerificationLineage?.actionKind === "write-file";
   const hasPostEditReadOnlyVerifyPrompt =
     isPostEditReadOnlyVerifyFollowUp(prompt);
+  const hasWeakSeedTargetCarryoverCue =
+    isWeakSeedTargetCarryoverPrompt(prompt) && !hasExplicitPathReference;
   const hasPostEditReadOnlyVerifyCue =
     hasPostEditReadOnlyVerifyPrompt &&
     lastTaskWasMutationLike &&
@@ -931,10 +939,22 @@ function buildWorkflowTaskPlan(
     !hasExecutionIntent &&
     !effectiveReplaceDirectiveFromPrompt &&
     !extractFencedContent(prompt);
+  const hasSeedReadOnlyCheckCue =
+    (hasPostEditReadOnlyVerifyPrompt || hasWeakSeedTargetCarryoverCue) &&
+    seedWasReadLike &&
+    !hasEditIntent &&
+    !hasCorrectionCue &&
+    !hasCreateIntent &&
+    !hasExecutionIntent &&
+    !effectiveReplaceDirectiveFromPrompt &&
+    !extractFencedContent(prompt);
+  const seedVerificationStatus =
+    continuity.lastActionResultSeed?.verification?.status?.trim().toLowerCase();
   const lastTaskHadVerifySignal =
     continuity.lastVerificationStatus === "failed" ||
     continuity.lastVerificationStatus === "blocked" ||
     continuity.lastVerificationStatus === "skipped" ||
+    Boolean(seedVerificationStatus && seedVerificationStatus !== "not-requested") ||
     (continuity.unresolvedItems ?? []).some(
       (entry) =>
         entry.toLowerCase().startsWith("verify:") &&
@@ -1106,6 +1126,7 @@ function buildWorkflowTaskPlan(
       isAmbiguousRepairFollowUp ||
       hasWeakRepairFollowUp ||
       hasPostEditReadOnlyVerifyCue ||
+      hasSeedReadOnlyCheckCue ||
       (hasGroundedReadLikeIntent && lastTaskWasReadLike) ||
       hasEditIntent ||
       hasCreateIntent ||
@@ -1955,6 +1976,20 @@ function buildWorkflowTaskPlan(
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
       continuationLineage: mutationVerificationLineage,
+    };
+  }
+
+  if (hasSeedReadOnlyCheckCue && primaryTarget?.inWorkspace) {
+    return {
+      taskKind: "read-file",
+      reason:
+        "seed-driven read-only check follow-up reused action result target",
+      targetPath: primaryTarget.cleaned,
+      groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
+      inspectFirst: true,
+      verifyAfterEdit: false,
+      usedRestoredState,
+      repairInstruction: normalizedRepairInstruction,
     };
   }
 
@@ -7199,6 +7234,16 @@ function isPostEditReadOnlyVerifyFollowUp(prompt: string): boolean {
   return referencesPriorEdit || readOnlyCheck;
 }
 
+function isWeakSeedTargetCarryoverPrompt(prompt: string): boolean {
+  const normalized = prompt.trim().toLowerCase();
+  if (!normalized || normalized.length > 80) {
+    return false;
+  }
+  return /^(?:check it|verify again|what next|what's next|fix it|continue|go on|proceed|do the next step)$/i.test(
+    normalized,
+  );
+}
+
 function isWeakRepairFollowUpPrompt(prompt: string): boolean {
   return /(?:use the failure above|same file.*not that fix|not the right fix|wrong direction|fix the real issue|continue repairing it|continue fixing it|不要再走刚才那个错误方向|同一个文件.*不是那个修法|基于上一次失败继续修复)/i.test(
     prompt,
@@ -11990,12 +12035,23 @@ function buildActionResultSeedFromCodingResult(
     readonly reason?: string;
   },
 ): CodingActionResultSeed | undefined {
-  if (taskKind !== "edit-file" && taskKind !== "write-file") {
+  if (
+    taskKind !== "edit-file" &&
+    taskKind !== "write-file" &&
+    taskKind !== "read-file" &&
+    taskKind !== "repo-explain" &&
+    taskKind !== "inspect-files" &&
+    taskKind !== "run-command"
+  ) {
     return undefined;
   }
 
   const target =
-    input.changedFiles[0] ?? input.verifiedFiles[0] ?? input.attemptedFiles[0];
+    input.changedFiles[0] ??
+    input.verifiedFiles[0] ??
+    input.attemptedFiles[0] ??
+    (taskKind === "run-command" ? input.verification.command : undefined) ??
+    (taskKind === "inspect-files" ? "(workspace)" : undefined);
   if (!target) {
     return undefined;
   }
@@ -12175,6 +12231,7 @@ function extractAttemptedFilesFromEvidence(
   const markerPatterns = [
     /^inspect:\s*read\s+(.+)$/i,
     /^repo-explain:\s*read\s+(.+)$/i,
+    /^verify-target-hint:\s*(.+)$/i,
     /^edit\/write applied on\s+(.+)$/i,
     /^mutation skipped due inspect failure on\s+(.+)$/i,
     /^repair-replan:blocker:([^:]+):/i,
