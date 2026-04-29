@@ -3105,6 +3105,17 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
                   selectionScope: "focused",
                   selectionSource: "auto-from-changes",
                 },
+                lastActionResultSeed: {
+                  actionKind: "edit-file",
+                  target: "src/app.ts",
+                  changedFiles: ["src/app.ts"],
+                  verifiedFiles: ["src/app.ts"],
+                  verification: {
+                    status: "passed",
+                    command: "npm test -- src/app.test.ts",
+                    reason: "Focused test passed.",
+                  },
+                },
                 evidence: ["transform:src/app.ts:bug=>fix"],
               },
             },
@@ -3175,6 +3186,24 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(completedTranscript).toContain(explicitPrompt);
     expect(completedTranscript).toContain("src/app.ts");
     expect(completedTranscript).toContain("npm test -- src/app.test.ts");
+    const completedEntries = parseTranscriptJsonl(
+      path.join(completedSessionDir, "transcript.jsonl"),
+    );
+    const completedNotes = completedEntries
+      .filter(
+        (entry) =>
+          entry.type === "query-event" && entry.event?.type === "query.completed",
+      )
+      .flatMap((entry) => entry.event?.result?.sharedContext?.notes ?? []);
+    expect(completedNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("seed=action-result"),
+        expect.stringContaining("seedAction=edit-file"),
+        expect.stringContaining("seedTarget=src/app.ts"),
+        expect.stringContaining("seedVerifyStatus=passed"),
+        expect.stringContaining("seedVerifyCommandInherited=yes"),
+      ]),
+    );
 
     const fallbackTranscript = fs.readFileSync(
       path.join(sessionsDir, fallbackSessionId, "transcript.jsonl"),
