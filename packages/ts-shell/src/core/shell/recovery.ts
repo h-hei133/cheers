@@ -428,6 +428,16 @@ function buildInterruptedContinuationPrompt(input: {
         `- action-handoff-summary: ${truncate(continuity.lastActionHandoffSummary, 180)}`,
       );
     }
+    if (continuity.lastSeedInfluenceHandoffSummary) {
+      lines.push(
+        `- seed-influence-handoff-summary: ${truncate(continuity.lastSeedInfluenceHandoffSummary, 180)}`,
+      );
+    }
+    if (continuity.lastFailureHandoffDiagnostic) {
+      lines.push(
+        `- failure-handoff-diagnostic: ${truncate(continuity.lastFailureHandoffDiagnostic, 220)}`,
+      );
+    }
     if (continuity.recentChangedFiles.length > 0) {
       lines.push(
         `- changed-files: ${continuity.recentChangedFiles.join(", ")}`,

@@ -1445,7 +1445,9 @@ describe("SessionManager", () => {
         sharedContext: {
           sessionId: completed.id,
           initialPrompt: "fix src/app.ts and verify",
-          notes: [],
+          notes: [
+            "decision-trace: seed=action-result seedInfluence=target-carryover",
+          ],
           handoffs: [],
         },
         finalOutput: "Fixed src/app.ts and verified it.",
@@ -1531,7 +1533,9 @@ describe("SessionManager", () => {
         sharedContext: {
           sessionId: failed.id,
           initialPrompt: "fix src/broken.ts and verify",
-          notes: [],
+          notes: [
+            "decision-trace: seed=action-result seedInfluence=verify-signal",
+          ],
           handoffs: [],
         },
         finalOutput: "Edited src/broken.ts, but verification failed.",
@@ -1633,6 +1637,10 @@ describe("SessionManager", () => {
     expect(completedSnapshot.lastActionHandoffSummary).toBe(
       "Resumed from edit-file on src/app.ts; verification status: passed; next focus is the same target.",
     );
+    expect(completedSnapshot.lastSeedInfluence).toBe("target-carryover");
+    expect(completedSnapshot.lastSeedInfluenceHandoffSummary).toBe(
+      "Seed influence: target-carryover from edit-file on src/app.ts.",
+    );
     expect(
       restoredManager.buildPromptContinuitySnapshot(
         completed.id,
@@ -1660,6 +1668,14 @@ describe("SessionManager", () => {
     ).toContain(
       "- last-action-handoff-summary: Resumed from edit-file on src/app.ts; verification status: passed; next focus is the same target.",
     );
+    expect(
+      restoredManager.buildPromptContinuityContext(
+        completed.id,
+        "continue with the same task",
+      ),
+    ).toContain(
+      "- last-seed-influence-handoff-summary: Seed influence: target-carryover from edit-file on src/app.ts.",
+    );
 
     expect(restoredManager.getCurrentSessionForProject(failedProject)?.id).toBe(
       failed.id,
@@ -1684,6 +1700,13 @@ describe("SessionManager", () => {
     expect(failedSnapshot.lastActionHandoffSummary).toBe(
       "Resumed from edit-file on src/broken.ts; verification status: failed; next focus is the same target.",
     );
+    expect(failedSnapshot.lastSeedInfluence).toBe("verify-signal");
+    expect(failedSnapshot.lastSeedInfluenceHandoffSummary).toBe(
+      "Seed influence: verify-signal from edit-file on src/broken.ts.",
+    );
+    expect(failedSnapshot.lastFailureHandoffDiagnostic).toBe(
+      "Failure handoff: status=failed; target=src/broken.ts; command=npm test -- src/broken.test.ts; reason=npm test failed with exit code 1; next=Inspect the failing test and continue the fix.",
+    );
     expect(failedSnapshot.unresolvedItems).toContain("verify:failed");
     const failedContext = restoredManager.buildPromptContinuityContext(
       failed.id,
@@ -1696,6 +1719,9 @@ describe("SessionManager", () => {
     );
     expect(failedContext).toContain(
       "- unresolved-items: last-error:npm test failed with exit code 1",
+    );
+    expect(failedContext).toContain(
+      "- last-failure-handoff-diagnostic: Failure handoff: status=failed; target=src/broken.ts; command=npm test -- src/broken.test.ts; reason=npm test failed with exit code 1; next=Inspect the failing test and continue the fix.",
     );
   });
 
@@ -1722,7 +1748,9 @@ describe("SessionManager", () => {
       sharedContext: {
         sessionId: session.id,
         initialPrompt: "fix src/compact.ts and verify",
-        notes: [],
+        notes: [
+          "decision-trace: seed=action-result seedInfluence=ignored-explicit-target",
+        ],
         handoffs: [],
       },
       finalOutput: "Fixed src/compact.ts and verified it.",
@@ -1787,7 +1815,12 @@ describe("SessionManager", () => {
     const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
       workingMemory?: {
         compacted?: boolean;
-        continuity?: { lastActionHandoffSummary?: string };
+        continuity?: {
+          lastActionHandoffSummary?: string;
+          lastSeedInfluence?: string;
+          lastSeedInfluenceHandoffSummary?: string;
+          lastFailureHandoffDiagnostic?: string;
+        };
         summary?: string[];
       };
     };
@@ -1798,6 +1831,23 @@ describe("SessionManager", () => {
     expect(state.workingMemory?.summary).toContain(
       "- last-action-handoff-summary: Resumed from edit-file on src/compact.ts; verification status: passed; next focus is the same target.",
     );
+    expect(state.workingMemory?.continuity?.lastSeedInfluence).toBe(
+      "ignored-explicit-target",
+    );
+    expect(
+      state.workingMemory?.continuity?.lastSeedInfluenceHandoffSummary,
+    ).toBe(
+      "Seed influence: ignored-explicit-target from edit-file on src/compact.ts.",
+    );
+    expect(state.workingMemory?.summary).toContain(
+      "- last-seed-influence: ignored-explicit-target",
+    );
+    expect(state.workingMemory?.summary).toContain(
+      "- last-seed-influence-handoff-summary: Seed influence: ignored-explicit-target from edit-file on src/compact.ts.",
+    );
+    expect(
+      state.workingMemory?.continuity?.lastFailureHandoffDiagnostic,
+    ).toBeUndefined();
   });
 
   it("persists append-before-model-call barrier before query events begin", () => {

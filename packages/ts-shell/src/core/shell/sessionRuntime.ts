@@ -302,6 +302,16 @@ export class ShellSessionRuntime {
             options?.runtimeSeed && continuityState?.lastActionHandoffSummary
               ? continuityState.lastActionHandoffSummary
               : undefined,
+          seedInfluenceHandoffSummary:
+            options?.runtimeSeed &&
+            continuityState?.lastSeedInfluenceHandoffSummary
+              ? continuityState.lastSeedInfluenceHandoffSummary
+              : undefined,
+          failureHandoffDiagnostic:
+            options?.runtimeSeed &&
+            continuityState?.lastFailureHandoffDiagnostic
+              ? continuityState.lastFailureHandoffDiagnostic
+              : undefined,
         });
         if (terminalStatus !== "completed") {
           const terminalDetail = terminalStopReason ?? terminalStatus;
@@ -350,6 +360,16 @@ export class ShellSessionRuntime {
           handoffSummary:
             options?.runtimeSeed && continuityState?.lastActionHandoffSummary
               ? continuityState.lastActionHandoffSummary
+              : undefined,
+          seedInfluenceHandoffSummary:
+            options?.runtimeSeed &&
+            continuityState?.lastSeedInfluenceHandoffSummary
+              ? continuityState.lastSeedInfluenceHandoffSummary
+              : undefined,
+          failureHandoffDiagnostic:
+            options?.runtimeSeed &&
+            continuityState?.lastFailureHandoffDiagnostic
+              ? continuityState.lastFailureHandoffDiagnostic
               : undefined,
         });
 
@@ -979,6 +999,8 @@ function renderContinuationSeedSummary(
     codingResult: CodingResultSummary | undefined;
     notes: readonly string[];
     handoffSummary?: string;
+    seedInfluenceHandoffSummary?: string;
+    failureHandoffDiagnostic?: string;
   },
 ): void {
   const summary = buildContinuationSeedSummary(input);
@@ -994,9 +1016,23 @@ function buildContinuationSeedSummary(input: {
   codingResult: CodingResultSummary | undefined;
   notes: readonly string[];
   handoffSummary?: string;
+  seedInfluenceHandoffSummary?: string;
+  failureHandoffDiagnostic?: string;
 }): string | undefined {
+  const failureDiagnostic = input.failureHandoffDiagnostic?.trim();
+  if (input.seedInfluenceHandoffSummary?.trim()) {
+    const summary = input.handoffSummary?.trim()
+      ? `${input.handoffSummary.trim()} ${input.seedInfluenceHandoffSummary.trim()}`
+      : input.seedInfluenceHandoffSummary.trim();
+    return failureDiagnostic ? `${summary} ${failureDiagnostic}` : summary;
+  }
   if (input.handoffSummary?.trim()) {
-    return input.handoffSummary.trim();
+    return failureDiagnostic
+      ? `${input.handoffSummary.trim()} ${failureDiagnostic}`
+      : input.handoffSummary.trim();
+  }
+  if (failureDiagnostic) {
+    return failureDiagnostic;
   }
   if (!input.notes.some((note) => note.includes("seed=action-result"))) {
     return undefined;

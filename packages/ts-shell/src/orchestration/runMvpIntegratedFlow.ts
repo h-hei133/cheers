@@ -913,6 +913,11 @@ function buildWorkflowTaskPlan(
     targetResolution.targets.length > 0 ||
     hasPathLikeReference(prompt);
   const seedActionKind = continuity.lastActionResultSeed?.actionKind;
+  const hasActionResultSeed = Boolean(continuity.lastActionResultSeed);
+  const seedIgnoredExplicitTargetLineage =
+    hasActionResultSeed && hasExplicitPathReference
+      ? ["seedInfluence=ignored-explicit-target"]
+      : undefined;
   const seedWasReadLike =
     seedActionKind === "read-file" ||
     seedActionKind === "repo-explain" ||
@@ -950,6 +955,10 @@ function buildWorkflowTaskPlan(
     !extractFencedContent(prompt);
   const seedVerificationStatus =
     continuity.lastActionResultSeed?.verification?.status?.trim().toLowerCase();
+  const seedVerifySignalLineage =
+    seedVerificationStatus && seedVerificationStatus !== "not-requested"
+      ? ["seedInfluence=verify-signal"]
+      : undefined;
   const lastTaskHadVerifySignal =
     continuity.lastVerificationStatus === "failed" ||
     continuity.lastVerificationStatus === "blocked" ||
@@ -1546,6 +1555,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       directCommand: verifyObject.command,
       usedRestoredState,
+      continuationLineage: seedVerifySignalLineage,
     };
   }
 
@@ -1778,6 +1788,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
+      continuationLineage: seedIgnoredExplicitTargetLineage,
     };
   }
 
@@ -1844,6 +1855,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
+      continuationLineage: seedIgnoredExplicitTargetLineage,
     };
   }
 
@@ -1961,6 +1973,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
+      continuationLineage: seedIgnoredExplicitTargetLineage,
     };
   }
 
@@ -1990,6 +2003,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
+      continuationLineage: ["seedInfluence=target-carryover"],
     };
   }
 
@@ -2015,6 +2029,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
+      continuationLineage: seedIgnoredExplicitTargetLineage,
     };
   }
 
@@ -2234,6 +2249,7 @@ function buildWorkflowTaskPlan(
       ...(!hasCreateIntent ? mutationScopeFields : {}),
       ...(!hasCreateIntent ? mutationScopeRequiredFields : {}),
       usedRestoredState,
+      continuationLineage: seedIgnoredExplicitTargetLineage,
     };
   }
 
@@ -2249,6 +2265,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
+      continuationLineage: seedIgnoredExplicitTargetLineage,
     };
   }
 

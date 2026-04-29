@@ -40,6 +40,11 @@ import type {
   TerminalReason,
 } from "../orchestration/types.js";
 
+type SeedInfluenceDiagnostic =
+  | "target-carryover"
+  | "verify-signal"
+  | "ignored-explicit-target";
+
 export interface SessionMessage {
   role: "user" | "assistant";
   content: string;
@@ -131,6 +136,9 @@ export interface SessionContinuitySnapshot {
   readonly lastAnswerDefect?: string;
   readonly lastActionResultSeed?: CodingActionResultSeed;
   readonly lastActionHandoffSummary?: string;
+  readonly lastSeedInfluence?: SeedInfluenceDiagnostic;
+  readonly lastSeedInfluenceHandoffSummary?: string;
+  readonly lastFailureHandoffDiagnostic?: string;
   readonly recentChangedFiles: readonly string[];
   readonly recentTargetFiles: readonly string[];
   readonly recentFailedFiles: ReadonlyArray<{ path: string; reason: string }>;
@@ -2447,6 +2455,22 @@ export class SessionManager {
     const lastActionHandoffSummary =
       this.buildActionHandoffSummary(lastCodingResult?.lastActionResultSeed) ??
       this.extractActionHandoffSummaryFromMemory(stateSnapshot?.workingMemory);
+    const lastSeedInfluence =
+      this.extractSeedInfluenceFromQueryResult(lastQueryCompletion?.event.result) ??
+      this.extractSeedInfluenceFromMemory(stateSnapshot?.workingMemory);
+    const lastSeedInfluenceHandoffSummary =
+      this.buildSeedInfluenceHandoffSummary(
+        lastCodingResult?.lastActionResultSeed,
+        lastSeedInfluence,
+      ) ??
+      this.extractSeedInfluenceHandoffSummaryFromMemory(
+        stateSnapshot?.workingMemory,
+      );
+    const lastFailureHandoffDiagnostic =
+      this.buildFailureHandoffDiagnostic(lastCodingResult) ??
+      this.extractFailureHandoffDiagnosticFromMemory(
+        stateSnapshot?.workingMemory,
+      );
     const continuityTerminalSource =
       lastQueryCompletion?.event.result.terminalClassification === "success" &&
       lastCodingCompletion?.event.result.terminalClassification &&
@@ -2568,6 +2592,13 @@ export class SessionManager {
         ? { lastActionResultSeed: lastCodingResult.lastActionResultSeed }
         : {}),
       ...(lastActionHandoffSummary ? { lastActionHandoffSummary } : {}),
+      ...(lastSeedInfluence ? { lastSeedInfluence } : {}),
+      ...(lastSeedInfluenceHandoffSummary
+        ? { lastSeedInfluenceHandoffSummary }
+        : {}),
+      ...(lastFailureHandoffDiagnostic
+        ? { lastFailureHandoffDiagnostic }
+        : {}),
       lastGroundedDeliverableMode,
       ...(lastReadDeliveredLines !== undefined
         ? { lastReadDeliveredLines }
@@ -3007,6 +3038,16 @@ export class SessionManager {
         `- last-action-handoff-summary: ${this.compactText(snapshot.lastActionHandoffSummary, 180)}`,
       );
     }
+    if (snapshot.lastSeedInfluenceHandoffSummary) {
+      lines.push(
+        `- last-seed-influence-handoff-summary: ${this.compactText(snapshot.lastSeedInfluenceHandoffSummary, 180)}`,
+      );
+    }
+    if (snapshot.lastFailureHandoffDiagnostic) {
+      lines.push(
+        `- last-failure-handoff-diagnostic: ${this.compactText(snapshot.lastFailureHandoffDiagnostic, 220)}`,
+      );
+    }
     if (snapshot.lastTerminalClassification || snapshot.lastTerminalReason) {
       lines.push(
         `- last-terminal: ${snapshot.lastTerminalClassification ?? "unknown"} (${snapshot.lastTerminalReason ?? "unknown"})`,
@@ -3249,6 +3290,18 @@ export class SessionManager {
       lastTaskKind: snapshot.lastTaskKind,
       lastTerminalClassification: snapshot.lastTerminalClassification,
       lastTerminalReason: snapshot.lastTerminalReason,
+      ...(snapshot.lastSeedInfluence
+        ? { lastSeedInfluence: snapshot.lastSeedInfluence }
+        : {}),
+      ...(snapshot.lastSeedInfluenceHandoffSummary
+        ? {
+            lastSeedInfluenceHandoffSummary:
+              snapshot.lastSeedInfluenceHandoffSummary,
+          }
+        : {}),
+      ...(snapshot.lastFailureHandoffDiagnostic
+        ? { lastFailureHandoffDiagnostic: snapshot.lastFailureHandoffDiagnostic }
+        : {}),
       ...(snapshot.lastContinuationStatus
         ? { lastContinuationStatus: snapshot.lastContinuationStatus }
         : {}),
@@ -5304,6 +5357,24 @@ export class SessionManager {
     if (actionHandoffSummary) {
       continuity.lastActionHandoffSummary = actionHandoffSummary;
     }
+    const seedInfluence = this.extractSeedInfluenceFromQueryResult(event.result);
+    const seedInfluenceHandoffSummary = this.buildSeedInfluenceHandoffSummary(
+      event.result.codingResult?.lastActionResultSeed,
+      seedInfluence,
+    );
+    if (seedInfluence) {
+      continuity.lastSeedInfluence = seedInfluence;
+    }
+    if (seedInfluenceHandoffSummary) {
+      continuity.lastSeedInfluenceHandoffSummary =
+        seedInfluenceHandoffSummary;
+    }
+    const failureHandoffDiagnostic = this.buildFailureHandoffDiagnostic(
+      event.result.codingResult,
+    );
+    if (failureHandoffDiagnostic) {
+      continuity.lastFailureHandoffDiagnostic = failureHandoffDiagnostic;
+    }
 
     root.continuity = continuity;
     root.summary = this.mergeContinuitySummaryEntries(root.summary, continuity);
@@ -5337,7 +5408,10 @@ export class SessionManager {
         !key.startsWith("last-approval-") &&
         !key.startsWith("last-request-scope-") &&
         !key.startsWith("last-permission-request-") &&
-        key !== "last-action-handoff-summary"
+        key !== "last-action-handoff-summary" &&
+        key !== "last-seed-influence" &&
+        key !== "last-seed-influence-handoff-summary" &&
+        key !== "last-failure-handoff-diagnostic"
       );
     });
     const approvalPairs: Array<[string, string]> = [];
@@ -5412,6 +5486,15 @@ export class SessionManager {
       continuity.lastPermissionRequestLineage,
     );
     addPair("last-action-handoff-summary", continuity.lastActionHandoffSummary);
+    addPair("last-seed-influence", continuity.lastSeedInfluence);
+    addPair(
+      "last-seed-influence-handoff-summary",
+      continuity.lastSeedInfluenceHandoffSummary,
+    );
+    addPair(
+      "last-failure-handoff-diagnostic",
+      continuity.lastFailureHandoffDiagnostic,
+    );
 
     return [
       ...preservedEntries,
@@ -5435,6 +5518,152 @@ export class SessionManager {
       ? `; verification status: ${verificationStatus}`
       : "";
     return `Resumed from ${action}${targetLabel}${verificationLabel}; next focus is ${focusLabel}.`;
+  }
+
+  private buildSeedInfluenceHandoffSummary(
+    seed: CodingActionResultSeed | undefined,
+    influence: SeedInfluenceDiagnostic | undefined,
+  ): string | undefined {
+    if (!seed || !influence) {
+      return undefined;
+    }
+    const action = seed.actionKind || "previous action";
+    const target =
+      seed.target ?? seed.changedFiles?.[0] ?? seed.verifiedFiles?.[0];
+    const targetLabel = target ? ` on ${target}` : "";
+    return `Seed influence: ${influence} from ${action}${targetLabel}.`;
+  }
+
+  private buildFailureHandoffDiagnostic(
+    codingResult:
+      | NonNullable<Extract<QueryEvent, { type: "query.completed" }>["result"]["codingResult"]>
+      | undefined,
+  ): string | undefined {
+    if (!codingResult) {
+      return undefined;
+    }
+    const seed = codingResult.lastActionResultSeed;
+    const status =
+      seed?.verification?.status ?? codingResult.verification.status;
+    const isFailureStatus = status === "failed" || status === "blocked";
+    const failedFile = codingResult.failedFiles.find((entry) =>
+      entry.reason.trim(),
+    );
+    const blockerKind =
+      seed?.verification?.blockerKind ??
+      seed?.blockerKind ??
+      codingResult.verification.blockerKind;
+    if (!isFailureStatus && !failedFile && !blockerKind) {
+      return undefined;
+    }
+
+    const command =
+      seed?.verification?.command ?? codingResult.verification.command;
+    const target =
+      seed?.target ??
+      failedFile?.path ??
+      codingResult.changedFiles[0] ??
+      codingResult.verifiedFiles[0] ??
+      codingResult.unverifiedFiles[0]?.path;
+    const reason =
+      seed?.verification?.reason ??
+      seed?.reason ??
+      codingResult.verification.reason ??
+      failedFile?.reason ??
+      codingResult.taskSatisfaction.reasons[0] ??
+      codingResult.failureBoundary;
+    const nextFocus =
+      codingResult.verification.nextAction ??
+      (status === "blocked"
+        ? "resolve the blocker and rerun the intended verification"
+        : "inspect the failure and rerun verification");
+    const parts = [`Failure handoff: status=${status ?? "failed"}`];
+    if (target) {
+      parts.push(`target=${target}`);
+    }
+    if (command) {
+      parts.push(`command=${command}`);
+    }
+    if (reason) {
+      parts.push(`reason=${this.compactText(reason, 140)}`);
+    }
+    if (blockerKind) {
+      parts.push(`blocker=${blockerKind}`);
+    }
+    parts.push(`next=${this.compactText(nextFocus, 140).replace(/[.]+$/, "")}`);
+    return `${parts.join("; ")}.`;
+  }
+
+  private extractSeedInfluenceFromQueryResult(
+    result: Extract<QueryEvent, { type: "query.completed" }>["result"] | undefined,
+  ): SeedInfluenceDiagnostic | undefined {
+    if (!result) {
+      return undefined;
+    }
+    return this.extractSeedInfluenceFromStrings([
+      ...(result.sharedContext.notes ?? []),
+      ...(result.codingResult?.evidence ?? []),
+      ...(result.codingResult?.continuation.evidence ?? []),
+      ...(result.codingResult?.repair.notes ?? []),
+    ]);
+  }
+
+  private extractSeedInfluenceFromMemory(
+    workingMemory: unknown,
+  ): SeedInfluenceDiagnostic | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    if (
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+    ) {
+      const continuity = root.continuity as Record<string, unknown>;
+      const fromContinuity = this.parseSeedInfluence(
+        this.normalizeOptionalString(continuity.lastSeedInfluence),
+      );
+      if (fromContinuity) {
+        return fromContinuity;
+      }
+    }
+    const summaryEntries = Array.isArray(root.summary)
+      ? root.summary.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    return this.extractSeedInfluenceFromStrings(summaryEntries);
+  }
+
+  private extractSeedInfluenceFromStrings(
+    entries: readonly string[],
+  ): SeedInfluenceDiagnostic | undefined {
+    for (const entry of entries) {
+      const influence = this.parseSeedInfluence(entry);
+      if (influence) {
+        return influence;
+      }
+    }
+    return undefined;
+  }
+
+  private parseSeedInfluence(
+    raw: string | undefined,
+  ): SeedInfluenceDiagnostic | undefined {
+    if (!raw) {
+      return undefined;
+    }
+    const direct = raw.trim().toLowerCase();
+    if (
+      direct === "target-carryover" ||
+      direct === "verify-signal" ||
+      direct === "ignored-explicit-target"
+    ) {
+      return direct;
+    }
+    const match = direct.match(
+      /\bseedInfluence=(target-carryover|verify-signal|ignored-explicit-target)\b/i,
+    );
+    return match?.[1] as SeedInfluenceDiagnostic | undefined;
   }
 
   private extractActionHandoffSummaryFromMemory(
@@ -5465,6 +5694,82 @@ export class SessionManager {
         ? entry.trim().slice(2).trim()
         : entry.trim();
       const prefix = "last-action-handoff-summary:";
+      if (normalized.toLowerCase().startsWith(prefix)) {
+        const value = normalized.slice(prefix.length).trim();
+        if (value) {
+          return value;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private extractSeedInfluenceHandoffSummaryFromMemory(
+    workingMemory: unknown,
+  ): string | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    if (
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+    ) {
+      const continuity = root.continuity as Record<string, unknown>;
+      const candidate = this.normalizeOptionalString(
+        continuity.lastSeedInfluenceHandoffSummary,
+      );
+      if (candidate) {
+        return candidate;
+      }
+    }
+    const summaryEntries = Array.isArray(root.summary)
+      ? root.summary.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    for (const entry of summaryEntries) {
+      const normalized = entry.trim().startsWith("- ")
+        ? entry.trim().slice(2).trim()
+        : entry.trim();
+      const prefix = "last-seed-influence-handoff-summary:";
+      if (normalized.toLowerCase().startsWith(prefix)) {
+        const value = normalized.slice(prefix.length).trim();
+        if (value) {
+          return value;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private extractFailureHandoffDiagnosticFromMemory(
+    workingMemory: unknown,
+  ): string | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    if (
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+    ) {
+      const continuity = root.continuity as Record<string, unknown>;
+      const candidate = this.normalizeOptionalString(
+        continuity.lastFailureHandoffDiagnostic,
+      );
+      if (candidate) {
+        return candidate;
+      }
+    }
+    const summaryEntries = Array.isArray(root.summary)
+      ? root.summary.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    for (const entry of summaryEntries) {
+      const normalized = entry.trim().startsWith("- ")
+        ? entry.trim().slice(2).trim()
+        : entry.trim();
+      const prefix = "last-failure-handoff-diagnostic:";
       if (normalized.toLowerCase().startsWith(prefix)) {
         const value = normalized.slice(prefix.length).trim();
         if (value) {

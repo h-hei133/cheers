@@ -584,6 +584,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     const notes = result.sharedContext.notes.join("\n");
     expect(notes).toContain("decision-trace: task=read-file target=test.log");
+    expect(notes).toContain("seedInfluence=target-carryover");
     expect(notes).toContain("seed=action-result");
     expect(notes).toContain("seedAction=read-file");
     expect(notes).toContain("seedTarget=test.log");
@@ -626,11 +627,57 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(notes).toContain(
       "decision-trace: task=run-command target=package.json",
     );
+    expect(notes).toContain("seedInfluence=verify-signal");
     expect(notes).toContain("seed=action-result");
     expect(notes).toContain("seedAction=run-command");
     expect(notes).toContain("seedTarget=package.json");
     expect(notes).toContain("seedVerifyStatus=passed");
     expect(notes).toContain("seedVerifyCommandInherited=yes");
+  }, 15000);
+
+  it("keeps explicit new target ahead of read-only seed target carryover", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-seed-explicit-target-boundary" }, null, 2),
+      "utf8",
+    );
+    await fs.writeFile(path.join(workspaceRoot, "old.log"), "old seed", "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "new.log"),
+      "new explicit target",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_seed_explicit_target_boundary",
+      prompt: "Read new.log",
+      workspaceRoot,
+      continuityState: {
+        lastActionResultSeed: {
+          actionKind: "read-file",
+          target: "old.log",
+          changedFiles: [],
+          verifiedFiles: [],
+          verification: {
+            status: "not-requested",
+          },
+        },
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("read-file");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+
+    const notes = result.sharedContext.notes.join("\n");
+    expect(notes).toContain("decision-trace: task=read-file target=new.log");
+    expect(notes).toContain("seedInfluence=ignored-explicit-target");
+    expect(notes).toContain("seed=action-result");
+    expect(notes).toContain("seedTarget=old.log");
+    expect(result.finalOutput).toContain("new explicit target");
+    expect(result.finalOutput).not.toContain("old seed");
   }, 15000);
 
   it("keeps multi-suffix targets stable for read tasks (.tsx is not truncated to .ts)", async () => {

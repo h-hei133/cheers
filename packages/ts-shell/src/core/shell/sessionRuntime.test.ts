@@ -240,14 +240,65 @@ describe("shell session runtime (W5)", () => {
     await runtime.executePrompt(
       "sess_seed_summary",
       "continue and check the previous change",
-      { outputMode: "print" },
+      {
+        outputMode: "print",
+        runtimeSeed: {
+          config: {
+            sessionId: "sess_seed_summary",
+            initialPrompt: "continue and check the previous change",
+            maxTurns: 6,
+            startingRole: "planner",
+          },
+          currentRole: "planner",
+          turn: 1,
+          pendingLifecycle: {
+            pendingApprovals: {},
+            pendingTools: {},
+            taskStates: {},
+          },
+          recoveryBoundary: "fresh-entry",
+          truthBoundary: {
+            source: "durable-replay",
+            normalizedEventCount: 0,
+            pairedTurnCount: 0,
+            policyEvidence: new Set(),
+            repairSummary: {
+              insertedPromptMessage: false,
+              insertedQueryStarted: false,
+              strippedInterruptedTerminalEvents: 0,
+              insertedRunInterrupted: false,
+              ignoredDuplicateTurnStarts: 0,
+              ignoredUnpairedTurnCompletions: 0,
+              ignoredRoleMismatchedTurnCompletions: 0,
+            },
+            continuationSafety: "fresh-only",
+          },
+          derivedState: { transcript: [] },
+        },
+        continuityState: {
+          sessionId: "sess_seed_summary",
+          projectRoot: "D:/Test/seed-summary",
+          lastActionHandoffSummary:
+            "Resumed from edit-file on src/app.ts; verification status: passed; next focus is the same target.",
+          lastFailureHandoffDiagnostic:
+            "Failure handoff: status=failed; target=src/app.ts; command=npm test -- src/app.test.ts; reason=assertion failed; next=rerun the focused verification.",
+          recentChangedFiles: [],
+          recentTargetFiles: [],
+          recentFailedFiles: [],
+          recentVerifiedFiles: [],
+          lastRepairNotes: [],
+          lastContinuationEvidence: [],
+          lastTaskSatisfactionReasons: [],
+          unresolvedItems: [],
+        },
+      },
     );
 
     expect(renderedLines).toContain("Result");
     expect(renderedLines).toContain("Action result");
     expect(renderedLines).toContain("Continuation");
     expect(renderedLines).toContain(
-      "- Resumed from edit-file on src/app.ts; verification status: passed; next focus is the same target.",
+      "- Resumed from edit-file on src/app.ts; verification status: passed; next focus is the same target. Failure handoff: status=failed; target=src/app.ts; command=npm test -- src/app.test.ts; reason=assertion failed; next=rerun the focused verification.",
     );
   });
 
