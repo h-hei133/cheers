@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
-import { extractPromptTargets, resolveTaskTargets } from "./targetResolution.js";
+import {
+  extractPromptTargets,
+  pickPrimaryTarget,
+  resolveTaskTargets,
+} from "./targetResolution.js";
 
 describe("targetResolution", () => {
   const workspaceRoot = "D:\\repo\\project";
@@ -42,5 +46,25 @@ describe("targetResolution", () => {
     ]);
     expect(resolution.workspacePaths).toEqual(["./src/main.ts"]);
     expect(resolution.externalPaths).toEqual(["C:\\outside\\tmp\\notes.md"]);
+    expect(resolution.blocker).toBeNull();
+  });
+
+  it("blocks sibling target ambiguity instead of silently choosing the first file", () => {
+    const resolution = resolveTaskTargets(
+      "replace the shared TOKEN in src/alpha.ts or src/beta.ts",
+      workspaceRoot,
+    );
+
+    expect(resolution.cleanedPaths).toEqual(["src/alpha.ts", "src/beta.ts"]);
+    expect(resolution.primaryTarget).toBeNull();
+    expect(resolution.blocker).toEqual({
+      code: "ambiguous-target",
+      reason:
+        "Multiple sibling target files were mentioned, so a single edit target cannot be chosen safely.",
+      nextAction:
+        "Rerun with exactly one explicit target file for this edit, or split the request into separate edits.",
+      candidates: ["src/alpha.ts", "src/beta.ts"],
+    });
+    expect(pickPrimaryTarget(resolution.prompt, workspaceRoot)).toBeNull();
   });
 });

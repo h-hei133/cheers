@@ -21,6 +21,29 @@ export interface FileMutationExecutionResult {
   readonly evidence?: string;
 }
 
+export type FileMutationExecutionSummary =
+  | {
+      readonly ok: true;
+      readonly status: "applied";
+      readonly changedFiles: readonly string[];
+      readonly failedFiles: readonly [];
+      readonly patches: readonly CodingPatchRecord[];
+      readonly evidence: readonly string[];
+    }
+  | {
+      readonly ok: false;
+      readonly status: "failed";
+      readonly blocker: {
+        readonly code: "partial-mutation-failed";
+        readonly reason: string;
+        readonly nextAction: string;
+      };
+      readonly changedFiles: readonly string[];
+      readonly failedFiles: readonly { readonly path: string; readonly reason: string }[];
+      readonly patches: readonly CodingPatchRecord[];
+      readonly evidence: readonly string[];
+    };
+
 export async function executeFileMutationBranch(input: {
   readonly path: string;
   readonly content: string;
@@ -69,6 +92,58 @@ export async function executeFileMutationBranch(input: {
           },
     note: input.appliedNote,
     evidence: input.appliedEvidence,
+  };
+}
+
+export function summarizeFileMutationResults(
+  results: readonly FileMutationExecutionResult[],
+): FileMutationExecutionSummary {
+  const changedFiles = results
+    .map((result) => result.changedFile)
+    .filter((path): path is string => Boolean(path));
+  const failedFiles = results.flatMap((result) => {
+    const failures: Array<{ path: string; reason: string }> = [];
+    if (result.failedFile) {
+      failures.push(result.failedFile);
+    }
+    if (result.patch.status === "failed" && !result.failedFile) {
+      failures.push({
+        path: result.patch.path,
+        reason: result.patch.reason ?? "Mutation patch failed.",
+      });
+    }
+    return failures;
+  });
+  const patches = results.map((result) => result.patch);
+  const evidence = results
+    .map((result) => result.evidence)
+    .filter((item): item is string => Boolean(item));
+
+  if (failedFiles.length > 0) {
+    return {
+      ok: false,
+      status: "failed",
+      blocker: {
+        code: "partial-mutation-failed",
+        reason:
+          "One or more file mutations failed, so the mutation set cannot be reported as successfully applied.",
+        nextAction:
+          "Review the failed files, re-read current content, and retry only the unresolved mutation.",
+      },
+      changedFiles,
+      failedFiles,
+      patches,
+      evidence,
+    };
+  }
+
+  return {
+    ok: true,
+    status: "applied",
+    changedFiles,
+    failedFiles: [],
+    patches,
+    evidence,
   };
 }
 

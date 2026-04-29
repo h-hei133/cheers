@@ -124,4 +124,23 @@ describe("patchMutationLane", () => {
       expect(result.explanation).toContain("unified diff");
     }
   });
+
+  it("rejects multi-file target intent instead of applying one file silently", () => {
+    const result = applySingleFileReplacePatch({
+      targetPath: "src/app.ts, src/config.ts",
+      originalContent: "export const value = 1;\n",
+      replaceDirective: {
+        from: "value = 1",
+        to: "value = 2",
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failureCode).toBe("patch-generation-failed");
+      expect(result.reason).toContain("multiple files");
+      expect(result.nextAction).toContain("one single-file edit per target");
+      expect(result.matchedCount).toBe(0);
+    }
+  });
 });

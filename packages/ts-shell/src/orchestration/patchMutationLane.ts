@@ -49,6 +49,21 @@ export function applySingleFileReplacePatch(input: {
     };
   }
 
+  if (looksLikeMultipleTargetPath(input.targetPath)) {
+    return {
+      ok: false,
+      failureCode: "patch-generation-failed",
+      failureReason: "patch-generation-failed",
+      explanation:
+        "Patch target implies multiple files, but this lane only supports one explicit single-file text replacement.",
+      reason:
+        "Patch target implies multiple files, but this lane only supports one explicit single-file text replacement.",
+      matchedCount: 0,
+      nextAction:
+        "Split the request into one single-file edit per target, or route it through a dedicated multi-file patch tool when available.",
+    };
+  }
+
   if (!input.targetPath || typeof input.originalContent !== "string") {
     return {
       ok: false,
@@ -103,6 +118,22 @@ export function applySingleFileReplacePatch(input: {
     matchedCount: 1,
     ...computeLineDelta(input.originalContent, updated),
   };
+}
+
+function looksLikeMultipleTargetPath(targetPath: string | undefined): boolean {
+  if (!targetPath?.trim()) {
+    return false;
+  }
+
+  const pathLikeTokens =
+    targetPath.match(
+      /[A-Za-z]:[\\/][^\s"',;<>|?*]+|\.{1,2}[\\/][^\s"',;<>|?*]+|\/[^\s"',;<>|?*]+|[A-Za-z0-9_-]+(?:[\\/][A-Za-z0-9._-]+)*\.(?:test\.)?(?:spec\.)?(?:d\.)?(?:tsx|ts|jsx|js|py|go|rs|md|txt|json|yaml|yml|toml)/g,
+    ) ?? [];
+
+  const uniqueTargets = new Set(
+    pathLikeTokens.map((token) => token.replace(/\\/g, "/").toLowerCase()),
+  );
+  return uniqueTargets.size > 1;
 }
 
 function looksLikeUnsupportedPatchShape(input: {

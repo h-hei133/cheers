@@ -12,9 +12,17 @@ export interface TaskTargetResolution {
   readonly workspaceRoot: string;
   readonly targets: readonly ResolvedTarget[];
   readonly primaryTarget: ResolvedTarget | null;
+  readonly blocker: TargetResolutionBlocker | null;
   readonly cleanedPaths: readonly string[];
   readonly workspacePaths: readonly string[];
   readonly externalPaths: readonly string[];
+}
+
+export interface TargetResolutionBlocker {
+  readonly code: "ambiguous-target";
+  readonly reason: string;
+  readonly nextAction: string;
+  readonly candidates: readonly string[];
 }
 
 export function extractPromptTargets(
@@ -54,8 +62,7 @@ export function pickPrimaryTarget(
   prompt: string,
   workspaceRoot: string,
 ): ResolvedTarget | null {
-  const targets = extractPromptTargets(prompt, workspaceRoot);
-  return targets[0] ?? null;
+  return resolveTaskTargets(prompt, workspaceRoot).primaryTarget;
 }
 
 export function resolveTaskTargets(
@@ -63,7 +70,8 @@ export function resolveTaskTargets(
   workspaceRoot: string,
 ): TaskTargetResolution {
   const targets = extractPromptTargets(prompt, workspaceRoot);
-  const primaryTarget = targets[0] ?? null;
+  const blocker = findAmbiguousSiblingTargetBlocker(targets);
+  const primaryTarget = blocker ? null : (targets[0] ?? null);
   const cleanedPaths = targets.map((target) => target.cleaned);
   const workspacePaths = targets
     .filter((target) => target.inWorkspace)
@@ -77,10 +85,41 @@ export function resolveTaskTargets(
     workspaceRoot,
     targets,
     primaryTarget,
+    blocker,
     cleanedPaths,
     workspacePaths,
     externalPaths,
   };
+}
+
+function findAmbiguousSiblingTargetBlocker(
+  targets: readonly ResolvedTarget[],
+): TargetResolutionBlocker | null {
+  const workspaceTargets = targets.filter((target) => target.inWorkspace);
+  const byParent = new Map<string, ResolvedTarget[]>();
+
+  for (const target of workspaceTargets) {
+    const parent = normalizeForCompare(path.dirname(target.absolutePath));
+    const siblings = byParent.get(parent) ?? [];
+    siblings.push(target);
+    byParent.set(parent, siblings);
+  }
+
+  for (const siblings of byParent.values()) {
+    if (siblings.length > 1) {
+      const candidates = siblings.map((target) => target.cleaned);
+      return {
+        code: "ambiguous-target",
+        reason:
+          "Multiple sibling target files were mentioned, so a single edit target cannot be chosen safely.",
+        nextAction:
+          "Rerun with exactly one explicit target file for this edit, or split the request into separate edits.",
+        candidates,
+      };
+    }
+  }
+
+  return null;
 }
 
 function collectCandidateTokens(prompt: string): string[] {

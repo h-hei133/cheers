@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { executeFileMutationBranch } from "./mutationExecution.js";
+import {
+  executeFileMutationBranch,
+  summarizeFileMutationResults,
+} from "./mutationExecution.js";
 
 describe("mutationExecution", () => {
   it("reports changed file and applied patch when dispatch succeeds", async () => {
@@ -60,5 +63,46 @@ describe("mutationExecution", () => {
       failureCode: "write-failed",
       reason: "disk denied",
     });
+  });
+
+  it("summarizes partial mutation failure as failed instead of success", async () => {
+    const changed = await executeFileMutationBranch({
+      path: "src/app.ts",
+      content: "export const value = 2;\n",
+      operation: "replace",
+      changedLines: 1,
+      addedLines: 0,
+      removedLines: 0,
+      failureReason: "fallback write failure",
+      appliedEvidence: "transform:src/app.ts:1=>2",
+      dispatch: async () => ({ success: true }),
+    });
+    const failed = await executeFileMutationBranch({
+      path: "src/config.ts",
+      content: "export const enabled = true;\n",
+      operation: "replace",
+      changedLines: 1,
+      addedLines: 0,
+      removedLines: 0,
+      failureReason: "fallback write failure",
+      dispatch: async () => ({ success: false, error: "disk denied" }),
+    });
+
+    const summary = summarizeFileMutationResults([changed, failed]);
+
+    expect(summary.ok).toBe(false);
+    expect(summary.status).toBe("failed");
+    expect(summary.changedFiles).toEqual(["src/app.ts"]);
+    expect(summary.failedFiles).toEqual([
+      { path: "src/config.ts", reason: "disk denied" },
+    ]);
+    expect(summary.patches.map((patch) => patch.status)).toEqual([
+      "applied",
+      "failed",
+    ]);
+    if (!summary.ok) {
+      expect(summary.blocker.code).toBe("partial-mutation-failed");
+      expect(summary.blocker.nextAction).toContain("retry only");
+    }
   });
 });
