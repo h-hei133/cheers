@@ -106,6 +106,188 @@ function printStep(name, status, detail = '') {
   console.log(`[${status}] ${name}${suffix}`)
 }
 
+function assertPathInside(parent, child) {
+  const normalizedParent = path.resolve(parent)
+  const normalizedChild = path.resolve(child)
+  if (
+    normalizedChild !== normalizedParent &&
+    !normalizedChild.startsWith(`${normalizedParent}${path.sep}`)
+  ) {
+    throw new Error(`Refusing to touch path outside ${normalizedParent}: ${normalizedChild}`)
+  }
+}
+
+function writeJson(filePath, payload) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
+}
+
+function writeText(filePath, content) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  fs.writeFileSync(filePath, content, 'utf8')
+}
+
+function ensureSyntheticPermissionMemoryFixture() {
+  const sessionsRoot = path.join(syntheticHome, '.private-agents', 'sessions')
+  const sessionDir = path.join(sessionsRoot, syntheticSessionId)
+  assertPathInside(sessionsRoot, sessionDir)
+
+  fs.mkdirSync(sessionsRoot, { recursive: true })
+  if (fs.existsSync(sessionDir)) {
+    fs.rmSync(sessionDir, { recursive: true, force: true })
+  }
+  fs.mkdirSync(sessionDir, { recursive: true })
+  fs.mkdirSync(path.join(projectRoot, 'src'), { recursive: true })
+  writeText(path.join(projectRoot, 'src', 'permission-memory-fixture.txt'), 'permission memory fixture\n')
+
+  const now = new Date().toISOString()
+  const authorityRoot = projectRoot.replaceAll('/', '\\')
+  const rebasedRoot = projectRoot.replaceAll('\\', '/')
+  const cacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:node`
+  const continuity = {
+    lastTaskKind: 'chat',
+    lastApprovalDecision: 'allow-once',
+    lastApprovalDecisionSource: 'cli-policy',
+    lastApprovalPersistent: false,
+    lastApprovalCacheEffect: 'none',
+    lastApprovalProjectRoot: authorityRoot,
+    lastApprovalCacheKey: cacheKey,
+    lastApprovalScope: 'bash/spawn/process(node)',
+    lastApprovalLineage: 'verify:node --version',
+    lastApprovalChannel: 'interactive',
+    lastApprovalInputKey: 'y',
+    lastApprovalRecordedAt: now,
+    lastPermissionRequestToolName: 'bash',
+    lastPermissionRequestOperation: 'spawn',
+    lastPermissionRequestProcess: 'node',
+    lastPermissionRequestScopeLabel: 'bash/spawn/process(node)',
+    lastPermissionRequestCacheKey: cacheKey,
+    lastPermissionRequestProjectRoot: authorityRoot,
+    lastPermissionRequestSource: 'verification-command',
+    lastPermissionRequestLineage: 'verify:node --version',
+    lastRequestScopeLabel: 'bash/spawn/process(node)',
+    lastRequestScopeCacheKey: cacheKey,
+    lastRequestScopeProjectRoot: authorityRoot,
+    lastRequestScopeSource: 'verification-command',
+  }
+
+  writeJson(path.join(sessionDir, 'metadata.json'), {
+    id: syntheticSessionId,
+    projectRoot,
+    rootMode: 'direct',
+    requestedWorkspaceRoot: projectRoot,
+    targetPathBase: projectRoot,
+    gitRoot: null,
+    title: 'Permission Memory Synthetic Fixture',
+    createdAt: now,
+    updatedAt: now,
+  })
+  writeJson(path.join(sessionDir, 'state.json'), {
+    status: 'completed',
+    projectRoot,
+    runPhase: 'idle',
+    terminalReason: 'completed',
+    terminalClassification: 'success',
+    durableStatus: 'success',
+    workingMemory: {
+      compacted: true,
+      compactReason: 'auto-threshold',
+      sourceTurnCount: 33,
+      continuity,
+      approvalAudit: {
+        decision: 'allow-once',
+        decisionSource: 'cli-policy',
+        persistent: false,
+        cacheEffect: 'none',
+        projectRoot: authorityRoot,
+        cacheKey,
+        scopeLabel: 'bash/spawn/process(node)',
+        lineage: 'verify:node --version',
+        channel: 'interactive',
+        inputKey: 'y',
+        recordedAt: now,
+      },
+      approvalAuditHistory: [
+        {
+          decision: 'allow-once',
+          decisionSource: 'cli-policy',
+          persistent: false,
+          cacheEffect: 'none',
+          projectRoot: authorityRoot,
+          cacheKey,
+          scopeLabel: 'bash/spawn/process(node)',
+          lineage: 'verify:node --version',
+          channel: 'interactive',
+          inputKey: 'y',
+          recordedAt: now,
+        },
+      ],
+      summary: [
+        'last-approval-decision: allow-once',
+        'last-approval-persistent: false',
+        'last-approval-cache-effect: none',
+        `last-approval-project-root: ${authorityRoot}`,
+        `last-approval-cache-key: ${cacheKey}`,
+        'last-approval-scope: bash/spawn/process(node)',
+        'last-permission-request-tool-name: bash',
+        'last-permission-request-operation: spawn',
+        'last-permission-request-process: node',
+        'last-permission-request-scope-label: bash/spawn/process(node)',
+        `last-permission-request-cache-key: ${cacheKey}`,
+        `last-permission-request-project-root: ${authorityRoot}`,
+        'last-request-scope-label: bash/spawn/process(node)',
+        `last-request-scope-cache-key: ${cacheKey}`,
+        `last-request-scope-project-root: ${authorityRoot}`,
+      ],
+    },
+  })
+  writeText(
+    path.join(sessionDir, 'transcript.jsonl'),
+    [
+      {
+        type: 'message',
+        role: 'user',
+        content: 'run node --version with approval',
+        timestamp: now,
+      },
+      {
+        type: 'message',
+        role: 'assistant',
+        content: 'Approval was granted once for bash/spawn/process(node).',
+        timestamp: now,
+      },
+    ].map((entry) => JSON.stringify(entry)).join('\n') + '\n',
+  )
+
+  const currentSessionPath = path.join(syntheticHome, '.private-agents', 'current-session.json')
+  let currentSessionStore = { schemaVersion: 1, byProjectRoot: {} }
+  if (fs.existsSync(currentSessionPath)) {
+    try {
+      currentSessionStore = JSON.parse(fs.readFileSync(currentSessionPath, 'utf8'))
+    } catch {
+      currentSessionStore = { schemaVersion: 1, byProjectRoot: {} }
+    }
+  }
+  const byProjectRoot =
+    currentSessionStore && typeof currentSessionStore.byProjectRoot === 'object'
+      ? currentSessionStore.byProjectRoot
+      : {}
+  byProjectRoot[path.resolve(projectRoot).toLowerCase()] = {
+    sessionId: syntheticSessionId,
+    updatedAt: now,
+  }
+  writeJson(currentSessionPath, {
+    schemaVersion: 1,
+    byProjectRoot,
+  })
+
+  const state = JSON.parse(fs.readFileSync(path.join(sessionDir, 'state.json'), 'utf8'))
+  if (state.projectRoot !== projectRoot || state.status !== 'completed') {
+    throw new Error(`Synthetic permission-memory fixture failed validation for ${syntheticSessionId}`)
+  }
+  printStep('synthetic-permission-memory-fixture', 'pass', syntheticSessionId)
+}
+
 async function runCli(args, env, timeoutMs = 240000) {
   return run(process.execPath, [tsxCliPath, cliEntryPath, ...args], {
     cwd: tsShellRoot,
@@ -133,6 +315,7 @@ async function runSyntheticExplanationGate() {
     printStep('synthetic-home', 'fail', `${syntheticHome} missing`)
     return false
   }
+  ensureSyntheticPermissionMemoryFixture()
   const env = {
     HOME: syntheticHome,
     USERPROFILE: syntheticHome,

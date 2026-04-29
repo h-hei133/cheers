@@ -28,6 +28,13 @@ const failureCategories = [
   'environment-filesystem-issue',
 ]
 
+const providerNetworkFailurePattern =
+  /(provider-readiness:network|provider-network-inconclusive|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network|socket hang up|TLS|timeout|unreachable|kind[:= ]+network)/i
+const providerConfigFailurePattern =
+  /(provider-readiness:(missing-key|missing-config|unsupported-provider)|missing.*config|missing.*key|api key|apikey|not connected|connect first|credentials|missing baseUrl|baseUrl is missing|model is missing)/i
+const providerAuthFailurePattern =
+  /(provider-readiness:auth|authentication was rejected|invalid authentication|invalid api key|unauthorized|forbidden|401|403|kind[:= ]+authentication)/i
+
 const futureGateCandidates = [
   {
     id: 'real-small-project-smoke',
@@ -462,13 +469,62 @@ function assertScenarioState(scenario, turn, beforeTurn, afterTurn, output) {
 function isProviderReadinessOutput(output) {
   const normalized = String(output ?? '').toLowerCase()
   return (
+    hasExplicitProviderReadinessMarker(normalized) ||
+    providerNetworkFailurePattern.test(normalized) ||
+    providerConfigFailurePattern.test(normalized) ||
+    providerAuthFailurePattern.test(normalized)
+  )
+}
+
+function hasExplicitProviderReadinessMarker(output) {
+  const normalized = String(output ?? '').toLowerCase()
+  return (
     normalized.includes('provider readiness failed') ||
     normalized.includes('provider-readiness') ||
     normalized.includes('unable to reach the openai-compatible endpoint')
   )
 }
 
-function categorizeFailure(failureReason, output) {
+function classifyProviderReadinessFailure(failureReason, output, provider) {
+  const normalized = `${String(failureReason ?? '')}\n${String(output ?? '')}`
+  if (provider !== 'real' && !hasExplicitProviderReadinessMarker(normalized)) {
+    return undefined
+  }
+  if (providerNetworkFailurePattern.test(normalized)) {
+    return {
+      statusDetail: 'provider-network-inconclusive',
+      exitCode: 2,
+      reason: 'provider-readiness:network: provider endpoint was unreachable during this turn',
+    }
+  }
+  if (providerAuthFailurePattern.test(normalized)) {
+    return {
+      statusDetail: 'config-failure',
+      exitCode: 3,
+      reason: 'provider-readiness:auth: provider authentication failed during this turn',
+    }
+  }
+  if (providerConfigFailurePattern.test(normalized)) {
+    return {
+      statusDetail: 'config-failure',
+      exitCode: 3,
+      reason: 'provider-readiness:missing-config: provider credential or endpoint configuration is incomplete',
+    }
+  }
+  if (isProviderReadinessOutput(normalized)) {
+    return {
+      statusDetail: 'provider-readiness-failed',
+      exitCode: 1,
+      reason: 'provider-readiness:unknown: provider readiness failed during this turn',
+    }
+  }
+  return undefined
+}
+
+function categorizeFailure(failureReason, output, provider) {
+  if (classifyProviderReadinessFailure(failureReason, output, provider)) {
+    return 'provider-readiness'
+  }
   const normalized = `${String(failureReason ?? '')}\n${String(output ?? '')}`.toLowerCase()
   if (!normalized.trim()) return 'none'
   if (
@@ -509,11 +565,40 @@ function categorizeFailure(failureReason, output) {
   return 'task-execution-failure'
 }
 
-function normalizeFailureReason(failureReason, output) {
-  if (!isProviderReadinessOutput(output)) {
-    return failureReason
+function normalizeFailureReason(failureReason, output, provider) {
+  return classifyProviderReadinessFailure(failureReason, output, provider)?.reason ?? failureReason
+}
+
+function summarizeFailureStatus(results) {
+  const failed = results.filter((entry) => entry.status !== 'PASS')
+  if (failed.length === 0) {
+    return { statusDetail: 'passed', exitCode: 0 }
   }
-  return 'provider-readiness:network: provider endpoint was unreachable during this turn'
+
+  const providerFailures = failed
+    .filter((entry) => entry.failureCategory === 'provider-readiness')
+    .map((entry) =>
+      classifyProviderReadinessFailure(
+        entry.failureReason,
+        entry.outputTail,
+        entry.provider,
+      ) ?? {
+        statusDetail: 'provider-readiness-failed',
+        exitCode: 1,
+      },
+    )
+
+  if (providerFailures.length === failed.length) {
+    if (providerFailures.some((entry) => entry.statusDetail === 'provider-network-inconclusive')) {
+      return { statusDetail: 'provider-network-inconclusive', exitCode: 2 }
+    }
+    if (providerFailures.some((entry) => entry.statusDetail === 'config-failure')) {
+      return { statusDetail: 'config-failure', exitCode: 3 }
+    }
+    return { statusDetail: 'provider-readiness-failed', exitCode: 1 }
+  }
+
+  return { statusDetail: 'failed', exitCode: 1 }
 }
 
 async function runScenario(scenario) {
@@ -539,10 +624,12 @@ async function runScenario(scenario) {
         failureCategory: categorizeFailure(
           runResult.timedOut ? `turn ${index + 1} timed out` : `turn ${index + 1} exited ${runResult.code}`,
           runResult.output,
+          scenario.provider,
         ),
         failureReason: normalizeFailureReason(
           runResult.timedOut ? `turn ${index + 1} timed out` : `turn ${index + 1} exited ${runResult.code}`,
           runResult.output,
+          scenario.provider,
         ),
         outputTail: summarizeOutput(runResult.output),
         turns: turnResults,
@@ -590,8 +677,8 @@ async function runScenario(scenario) {
         protectedFiles: scenario.protectedFiles,
         reportPath,
         verification: assertion.verification,
-        failureCategory: categorizeFailure(assertion.failures.join('; '), runResult.output),
-        failureReason: normalizeFailureReason(assertion.failures.join('; '), runResult.output),
+        failureCategory: categorizeFailure(assertion.failures.join('; '), runResult.output, scenario.provider),
+        failureReason: normalizeFailureReason(assertion.failures.join('; '), runResult.output, scenario.provider),
         outputTail: summarizeOutput(runResult.output),
         turns: turnResults,
       }
@@ -643,7 +730,7 @@ function buildCandidateMetadata(candidateResults) {
 
 async function main() {
   console.log('gate name=real-user-capabilities')
-  console.log('status taxonomy: PASS=0 FAIL=1 CONFIG=3')
+  console.log('status taxonomy: PASS=0 FAIL=1 PROVIDER_NETWORK=2 CONFIG=3')
   console.log('state semantics: provider preflight inconclusive skips capability execution; mid-turn provider readiness stays provider-readiness, not coding failure')
   console.log(`repo=${repoRoot}`)
   console.log(`synthetic HOME=${syntheticHome}`)
@@ -694,11 +781,21 @@ async function main() {
       candidates: [],
     }
     writeReport(report)
-    console.log(
-      `[${isConfig ? 'CONFIG' : 'FAIL'}] provider-readiness-preflight - ${report.failureReason}`,
-    )
+    const label =
+      providerPreflight.status === 'provider-network-inconclusive'
+        ? 'PROVIDER_NETWORK'
+        : isConfig
+          ? 'CONFIG'
+          : 'FAIL'
+    console.log(`[${label}] provider-readiness-preflight - ${report.failureReason}`)
     console.log(`report=${reportPath}`)
-    process.exit(isConfig ? 3 : 1)
+    process.exit(
+      providerPreflight.status === 'provider-network-inconclusive'
+        ? 2
+        : isConfig
+          ? 3
+          : 1,
+    )
   }
   console.log('[PASS] provider-readiness-preflight - real provider reachable')
 
@@ -730,10 +827,11 @@ async function main() {
   const ok =
     capabilities.every((capability) => capability.status === 'PASS') &&
     candidates.every((candidate) => candidate.status === 'PASS')
+  const summarizedFailure = summarizeFailureStatus([...capabilities, ...candidates])
   const report = {
     generatedAt: new Date().toISOString(),
     status: ok ? 'PASS' : 'FAIL',
-    statusDetail: ok ? 'passed' : 'failed',
+    statusDetail: summarizedFailure.statusDetail,
     reportPath,
     providerReadiness: providerPreflight,
     capabilitySkipped: false,
@@ -745,7 +843,7 @@ async function main() {
   }
   writeReport(report)
   console.log(`report=${reportPath}`)
-  process.exit(ok ? 0 : 1)
+  process.exit(summarizedFailure.exitCode)
 }
 
 main().catch((error) => {

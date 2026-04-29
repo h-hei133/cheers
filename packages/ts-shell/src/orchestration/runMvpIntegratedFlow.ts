@@ -283,6 +283,7 @@ function createIntegratedRunner(
             handoffReason: "Chat response drafted; reviewer final pass",
             notes: [
               `plan: intent=${workflowPlan.taskKind} reason=${workflowPlan.reason}`,
+              "tool: skipped (chat intent)",
               ...decisionTrace,
               ...(workflowPlan.reflectiveStateQueryKind
                 ? [
@@ -299,6 +300,7 @@ function createIntegratedRunner(
           content,
           notes: [
             `plan: intent=${workflowPlan.taskKind} reason=${workflowPlan.reason}`,
+            "tool: skipped (chat intent)",
             ...decisionTrace,
             ...(workflowPlan.reflectiveStateQueryKind
               ? [

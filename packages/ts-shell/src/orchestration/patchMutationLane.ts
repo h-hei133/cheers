@@ -1,7 +1,8 @@
 export type SingleFileReplacePatchFailureCode =
   | "patch-target-missing"
   | "patch-from-not-found"
-  | "patch-ambiguous";
+  | "patch-ambiguous"
+  | "patch-generation-failed";
 
 export type SingleFileReplacePatchResult =
   | {
@@ -33,6 +34,21 @@ export function applySingleFileReplacePatch(input: {
   readonly originalContent: string | undefined;
   readonly replaceDirective: { from: string; to: string };
 }): SingleFileReplacePatchResult {
+  if (looksLikeUnsupportedPatchShape(input.replaceDirective)) {
+    return {
+      ok: false,
+      failureCode: "patch-generation-failed",
+      failureReason: "patch-generation-failed",
+      explanation:
+        "Patch payload looks like unified diff or apply_patch input, but this lane only supports one explicit single-file text replacement.",
+      reason:
+        "Patch payload looks like unified diff or apply_patch input, but this lane only supports one explicit single-file text replacement.",
+      matchedCount: 0,
+      nextAction:
+        "Rerun with a target file plus exact replace-from and replace-to text for one file; do not pass unified diff or apply_patch syntax.",
+    };
+  }
+
   if (!input.targetPath || typeof input.originalContent !== "string") {
     return {
       ok: false,
@@ -87,6 +103,26 @@ export function applySingleFileReplacePatch(input: {
     matchedCount: 1,
     ...computeLineDelta(input.originalContent, updated),
   };
+}
+
+function looksLikeUnsupportedPatchShape(input: {
+  readonly from: string;
+  readonly to: string;
+}): boolean {
+  return [input.from, input.to].some((value) => {
+    const normalized = value.replace(/\r\n/g, "\n").trim();
+    if (!normalized) {
+      return false;
+    }
+    return (
+      /^\*\*\* Begin Patch\b/m.test(normalized) ||
+      /^\*\*\* (?:Add|Update|Delete) File:/m.test(normalized) ||
+      /^diff --git\s+/m.test(normalized) ||
+      /^---\s+(?:a\/|\S+)/m.test(normalized) ||
+      /^\+\+\+\s+(?:b\/|\S+)/m.test(normalized) ||
+      /^@@\s+-\d+(?:,\d+)?\s+\+\d+(?:,\d+)?\s+@@/m.test(normalized)
+    );
+  });
 }
 
 function countExactOccurrences(content: string, needle: string): number {

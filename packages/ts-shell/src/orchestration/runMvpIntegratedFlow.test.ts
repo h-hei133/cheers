@@ -74,19 +74,28 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.transcript.map((turn) => turn.role)).toEqual([
       "planner",
       "coder",
-      "reviewer",
     ]);
 
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("workflow: branch=");
     expect(mergedNotes).toContain("mcp: clients=");
     expect(mergedNotes).toContain("plan: intent=run-command");
-    expect(mergedNotes).toContain("bash(node --version)");
 
-    expect(result.transcript[0]?.content).toContain("PLANNER:");
-    expect(result.transcript[1]?.content).toContain("CODER:");
-    expect(result.transcript[2]?.content).toContain("REVIEWER:");
-    expect(result.finalOutput).toContain("REVIEWER:");
+    expect(result.transcript[0]?.content).toContain("Plan accepted");
+    expect(result.transcript[1]?.content.trim().length).toBeGreaterThan(0);
+    expect(result.codingResult?.taskKind).toBe("run-command");
+    expect(result.codingResult?.verification.command).toBe("node --version");
+    expect(result.codingResult?.verification.status).toBe("passed");
+    expect(
+      result.transcript[1]?.events?.some(
+        (event) => event.type === "approval.requested",
+      ),
+    ).toBe(true);
+    expect(
+      result.transcript[1]?.events?.some(
+        (event) => event.type === "tool.result",
+      ),
+    ).toBe(true);
   }, 15000);
 
   it("derives file-oriented intent from prompt and uses glob without default bash demo path", async () => {

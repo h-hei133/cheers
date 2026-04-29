@@ -2999,6 +2999,11 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     );
     fs.mkdirSync(projectRoot, { recursive: true });
     fs.mkdirSync(fallbackProjectRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, "package.json"),
+      JSON.stringify({ name: "completed-continue-diagnostic-smoke" }, null, 2),
+      "utf8",
+    );
     const completedSessionId = "sess_completed_continue_current";
     const fallbackSessionId = "sess_completed_continue_fallback";
 
@@ -3141,8 +3146,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
         timeout: 30000,
       });
 
-    const followUpPrompt =
-      "continue completed current session smoke and mention src/app.ts evidence";
+    const followUpPrompt = "verify again";
     const continueResult = runPrint(`/continue ${followUpPrompt}`);
     expect(continueResult.error).toBeUndefined();
     expect(continueResult.status).toBe(0);
@@ -3154,6 +3158,9 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(continueOutput).toContain(
       "Resumed from edit-file on src/app.ts; verification status: passed; next focus is the same target.",
     );
+    expect(continueOutput).toContain("Success handoff: status=passed");
+    expect(continueOutput).toContain("target=src/app.ts");
+    expect(continueOutput).toContain("command=npm test -- src/app.test.ts");
 
     fs.writeFileSync(
       path.join(completedSessionDir, "state.json"),
@@ -3173,7 +3180,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     );
 
     const explicitPrompt =
-      "explicit completed session follow-up should keep the same session";
+      "Read package.json for explicit completed session follow-up";
     const explicitResult = runPrint(
       `/continue ${completedSessionId} ${explicitPrompt}`,
     );
@@ -3206,6 +3213,11 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
         expect.stringContaining("seedTarget=src/app.ts"),
         expect.stringContaining("seedVerifyStatus=passed"),
         expect.stringContaining("seedVerifyCommandInherited=yes"),
+        expect.stringContaining("diagnosticHandoff=success"),
+        expect.stringContaining("diagnosticTarget=src/app.ts"),
+        expect.stringContaining("diagnosticCommandInherited=yes"),
+        expect.stringContaining("diagnosticReason=yes"),
+        expect.stringContaining("diagnosticHandoff=ignored-explicit-target"),
       ]),
     );
 
@@ -3228,6 +3240,251 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       currentStore.byProjectRoot?.[path.resolve(projectRoot).toLowerCase()]
         ?.sessionId,
     ).toBe(completedSessionId);
+  }, 60000);
+
+  it("carries completed-session failure diagnostic through /continue follow-up", async () => {
+    const projectRoot = path.join(
+      fakeHomeDir,
+      "completed-continue-failure-diagnostic-project",
+    );
+    fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, "src", "app.ts"),
+      "export function value() { return 1; }\n",
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(projectRoot, "package.json"),
+      JSON.stringify({ name: "completed-continue-failure-diagnostic-smoke" }, null, 2),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(projectRoot, "package.js"),
+      "export const packageName = 'completed-continue-failure-diagnostic-smoke';\n",
+      "utf8",
+    );
+
+    const completedSessionId = "sess_completed_continue_failure";
+    seedSessionWithTitle({
+      sessionId: completedSessionId,
+      projectRoot,
+      title: "Completed Continue Failure Diagnostic",
+      status: "completed",
+    });
+    writeCurrentSessionPointer({ projectRoot, sessionId: completedSessionId });
+
+    const now = new Date().toISOString();
+    const completedSessionDir = path.join(sessionsDir, completedSessionId);
+    fs.writeFileSync(
+      path.join(completedSessionDir, "state.json"),
+      JSON.stringify(
+        {
+          status: "completed",
+          projectRoot,
+          runPhase: "idle",
+          terminalReason: "completed",
+          terminalClassification: "success",
+          durableStatus: "success",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(completedSessionDir, "transcript.jsonl"),
+      [
+        {
+          type: "message",
+          role: "user",
+          content: "fix src/app.ts and verify",
+          timestamp: now,
+        },
+        {
+          type: "query-event",
+          event: {
+            type: "query.completed",
+            result: {
+              status: "completed",
+              terminalReason: "completed",
+              terminalClassification: "success",
+              transcript: [],
+              sharedContext: {
+                sessionId: completedSessionId,
+                initialPrompt: "fix src/app.ts and verify",
+                notes: [],
+                handoffs: [],
+              },
+              finalOutput: "Edited src/app.ts but verification failed.",
+              codingResult: {
+                taskKind: "edit-file",
+                changedFiles: ["src/app.ts"],
+                failedFiles: [],
+                patches: [],
+                repair: {
+                  status: "not-needed",
+                  attempts: 1,
+                  recoveredItems: [],
+                  failedItems: [],
+                  notes: [],
+                },
+                continuation: {
+                  status: "first-pass-success",
+                  attempts: 1,
+                  evidence: [
+                    "transform:src/app.ts:bug=>fix",
+                    "actionable-blocker-kind:verification-failed",
+                  ],
+                },
+                changeSet: {
+                  gitAware: false,
+                  preExistingDirtyFiles: [],
+                  postRunDirtyFiles: [],
+                  attemptedFiles: ["src/app.ts"],
+                  changedFiles: ["src/app.ts"],
+                  unchangedAttemptedFiles: [],
+                },
+                taskSatisfaction: {
+                  verdict: "completed-with-caveats",
+                  reasons: ["Verification failed after the edit."],
+                  requiredEvidence: ["changed-files", "verification"],
+                  observedEvidence: [
+                    "src/app.ts",
+                    "npm test -- src/app.test.ts",
+                    "verification failed",
+                  ],
+                },
+                verifiedFiles: [],
+                unverifiedFiles: [
+                  {
+                    path: "src/app.ts",
+                    reason: "Verification failed.",
+                  },
+                ],
+                verification: {
+                  status: "failed",
+                  command: "npm test -- src/app.test.ts",
+                  reason: "Expected 2 but received 1.",
+                  blockerKind: "verification-failed",
+                  selectionScope: "focused",
+                  selectionSource: "auto-from-changes",
+                  nextAction:
+                    "Inspect the failing assertion, fix src/app.ts, then rerun npm test -- src/app.test.ts.",
+                },
+                lastActionResultSeed: {
+                  actionKind: "edit-file",
+                  target: "src/app.ts",
+                  changedFiles: ["src/app.ts"],
+                  verifiedFiles: [],
+                  verification: {
+                    status: "failed",
+                    command: "npm test -- src/app.test.ts",
+                    reason: "Expected 2 but received 1.",
+                    blockerKind: "verification-failed",
+                  },
+                  blockerKind: "verification-failed",
+                  reason: "Expected 2 but received 1.",
+                },
+                evidence: ["transform:src/app.ts:bug=>fix"],
+              },
+            },
+          },
+          timestamp: now,
+        },
+      ]
+        .map((entry) => JSON.stringify(entry))
+        .join("\n") + "\n",
+      "utf8",
+    );
+
+    const runPrint = (prompt: string) =>
+      spawnSync(nodeExe, [tsxCliPath, cliPath, "--project", projectRoot, "--print", prompt], {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 30000,
+      });
+
+    const followUpPrompt = "what next";
+    const continueResult = runPrint(`/continue ${followUpPrompt}`);
+    expect(continueResult.error).toBeUndefined();
+    expect(continueResult.status).toBe(0);
+    const continueOutput = `${continueResult.stdout ?? ""}${continueResult.stderr ?? ""}`;
+    expect(continueOutput).toContain("Continuation");
+    expect(continueOutput).toContain("Failure handoff: status=failed");
+    expect(continueOutput).toContain("target=src/app.ts");
+    expect(continueOutput).toContain("command=npm test -- src/app.test.ts");
+    expect(continueOutput).toContain("reason=Expected 2 but received 1.");
+    expect(continueOutput).toContain("blocker=verification-failed");
+    expect(continueOutput).not.toContain("Success handoff: status=passed");
+
+    const completedEntries = parseTranscriptJsonl(
+      path.join(completedSessionDir, "transcript.jsonl"),
+    );
+    const completedNotes = completedEntries
+      .filter(
+        (entry) =>
+          entry.type === "query-event" && entry.event?.type === "query.completed",
+      )
+      .flatMap((entry) => entry.event?.result?.sharedContext?.notes ?? []);
+    expect(completedNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("seed=action-result"),
+        expect.stringContaining("seedAction=edit-file"),
+        expect.stringContaining("seedTarget=src/app.ts"),
+        expect.stringContaining("seedVerifyStatus=failed"),
+        expect.stringContaining("seedVerifyCommandInherited=yes"),
+        expect.stringContaining("seedBlocker=verification-failed"),
+        expect.stringContaining("diagnosticHandoff=failure"),
+        expect.stringContaining("diagnosticTarget=src/app.ts"),
+        expect.stringContaining("diagnosticCommandInherited=yes"),
+        expect.stringContaining("diagnosticReason=yes"),
+        expect.stringContaining("diagnosticBlocker=verification-failed"),
+      ]),
+    );
+
+    fs.writeFileSync(
+      path.join(completedSessionDir, "state.json"),
+      JSON.stringify(
+        {
+          status: "completed",
+          projectRoot,
+          runPhase: "idle",
+          terminalReason: "completed",
+          terminalClassification: "success",
+          durableStatus: "success",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const explicitResult = runPrint(
+      `/continue ${completedSessionId} Read package.js for explicit target guard`,
+    );
+    expect(explicitResult.error).toBeUndefined();
+    expect(explicitResult.status).toBe(0);
+    const explicitEntries = parseTranscriptJsonl(
+      path.join(completedSessionDir, "transcript.jsonl"),
+    );
+    const explicitNotes = explicitEntries
+      .filter(
+        (entry) =>
+          entry.type === "query-event" && entry.event?.type === "query.completed",
+      )
+      .flatMap((entry) => entry.event?.result?.sharedContext?.notes ?? []);
+    expect(explicitNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("target=package.js"),
+        expect.stringContaining("seedInfluence=ignored-explicit-target"),
+      ]),
+    );
   }, 60000);
 
   it("shows structured execution result surface for synthetic print success path", async () => {

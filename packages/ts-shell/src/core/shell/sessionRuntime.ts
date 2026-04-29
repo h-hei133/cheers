@@ -299,21 +299,18 @@ export class ShellSessionRuntime {
           codingResult: terminalCodingResult,
           notes: terminalNotes,
           handoffSummary:
-            options?.runtimeSeed && continuityState?.lastActionHandoffSummary
+            continuityState?.lastActionHandoffSummary
               ? continuityState.lastActionHandoffSummary
               : undefined,
           seedInfluenceHandoffSummary:
-            options?.runtimeSeed &&
             continuityState?.lastSeedInfluenceHandoffSummary
               ? continuityState.lastSeedInfluenceHandoffSummary
               : undefined,
           failureHandoffDiagnostic:
-            options?.runtimeSeed &&
             continuityState?.lastFailureHandoffDiagnostic
               ? continuityState.lastFailureHandoffDiagnostic
               : undefined,
           successHandoffDiagnostic:
-            options?.runtimeSeed &&
             continuityState?.lastSuccessHandoffDiagnostic
               ? continuityState.lastSuccessHandoffDiagnostic
               : undefined,
@@ -363,21 +360,18 @@ export class ShellSessionRuntime {
           codingResult: terminalCodingResult,
           notes: terminalNotes,
           handoffSummary:
-            options?.runtimeSeed && continuityState?.lastActionHandoffSummary
+            continuityState?.lastActionHandoffSummary
               ? continuityState.lastActionHandoffSummary
               : undefined,
           seedInfluenceHandoffSummary:
-            options?.runtimeSeed &&
             continuityState?.lastSeedInfluenceHandoffSummary
               ? continuityState.lastSeedInfluenceHandoffSummary
               : undefined,
           failureHandoffDiagnostic:
-            options?.runtimeSeed &&
             continuityState?.lastFailureHandoffDiagnostic
               ? continuityState.lastFailureHandoffDiagnostic
               : undefined,
           successHandoffDiagnostic:
-            options?.runtimeSeed &&
             continuityState?.lastSuccessHandoffDiagnostic
               ? continuityState.lastSuccessHandoffDiagnostic
               : undefined,
