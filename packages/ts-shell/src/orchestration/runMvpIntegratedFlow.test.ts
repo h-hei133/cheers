@@ -1564,6 +1564,48 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     await expect(fs.readFile(secondPath, "utf8")).resolves.toBe(original);
   }, 15000);
 
+  it("partial failure summary blocks applied plus failed mutation result", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "docs"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "partial-ok.txt");
+    const deniedPath = path.join(workspaceRoot, "docs", "partial-denied.txt");
+    await fs.writeFile(targetPath, "stable content\n", "utf8");
+    await fs.mkdir(deniedPath, { recursive: true });
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_partial_failure_summary_guard",
+      prompt: [
+        "Edit src/partial-ok.txt with this exact replacement:",
+        "```",
+        "fixed content",
+        "```",
+        "Write docs/partial-denied.txt with content: should-not-write.",
+      ].join("\n"),
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("error");
+    expect(result.codingResult?.changedFiles).toContain("src/partial-ok.txt");
+    expect(result.codingResult?.failedFiles.map((entry) => entry.path)).toContain(
+      "docs/partial-denied.txt",
+    );
+    expect(result.codingResult?.evidence).toContain(
+      "mutation-summary-blocker:partial-mutation-failed",
+    );
+    expect(result.codingResult?.repair.notes.join("\n")).toContain(
+      "partial-mutation-failed",
+    );
+    expect(result.finalOutput).toContain("Task not completed:");
+    await expect(fs.readFile(targetPath, "utf8")).resolves.toBe(
+      "fixed content",
+    );
+    const deniedStats = await fs.stat(deniedPath);
+    expect(deniedStats.isDirectory()).toBe(true);
+  }, 15000);
+
   it("applies explicit replace only to the selected target when sibling files share the source text", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(

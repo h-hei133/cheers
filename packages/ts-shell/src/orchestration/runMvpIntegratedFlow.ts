@@ -33,7 +33,11 @@ import {
   planLowRiskVerification,
 } from "./lowRiskVerificationPlanning.js";
 import { MultiAgentOrchestrator } from "./MultiAgentOrchestrator.js";
-import { executeFileMutationBranch } from "./mutationExecution.js";
+import {
+  executeFileMutationBranch,
+  summarizeFileMutationResults,
+} from "./mutationExecution.js";
+import type { FileMutationExecutionResult } from "./mutationExecution.js";
 import {
   applySingleFileReplacePatch,
   formatPatchFailureReason,
@@ -4441,6 +4445,7 @@ async function executeWorkflowTaskPlan(input: {
   const repairNotes: string[] = [];
   const evidence: string[] = [];
   const appliedContentByPath = new Map<string, string>();
+  const mutationResults: FileMutationExecutionResult[] = [];
   notes.push(...input.freshnessObservability.notes);
   evidence.push(...input.freshnessObservability.evidence);
   appendSingleFileEditRepairObservability(evidence, input.plan);
@@ -5283,6 +5288,7 @@ async function executeWorkflowTaskPlan(input: {
             requireApprovalEvent: true,
           }),
       });
+      mutationResults.push(mutation);
       if (mutation.failedFile) {
         failedFiles.push(mutation.failedFile);
       }
@@ -5370,6 +5376,7 @@ async function executeWorkflowTaskPlan(input: {
                 requireApprovalEvent: true,
               }),
           });
+          mutationResults.push(renameMutation);
           if (renameMutation.failedFile) {
             failedFiles.push(renameMutation.failedFile);
             patches.push(renameMutation.patch);
@@ -5423,6 +5430,7 @@ async function executeWorkflowTaskPlan(input: {
               requireApprovalEvent: true,
             }),
         });
+        mutationResults.push(secondaryMutation);
         if (secondaryMutation.failedFile) {
           failedFiles.push(secondaryMutation.failedFile);
           patches.push(secondaryMutation.patch);
@@ -5609,6 +5617,7 @@ async function executeWorkflowTaskPlan(input: {
               requireApprovalEvent: true,
             }),
         });
+        mutationResults.push(linkedMutation);
         if (linkedMutation.failedFile) {
           failedFiles.push(linkedMutation.failedFile);
           failedEntries.push({
@@ -5720,6 +5729,19 @@ async function executeWorkflowTaskPlan(input: {
         }`,
       );
     }
+  }
+
+  if (mutationResults.length > 0) {
+    reconcileFileMutationSummary(
+      summarizeFileMutationResults(mutationResults),
+      {
+        changedFiles,
+        failedFiles,
+        patches,
+        evidence,
+        repairNotes,
+      },
+    );
   }
 
   if (input.plan.taskKind === "run-command") {
@@ -6373,6 +6395,63 @@ function assembleActionResultContract(
     }),
     userFacingOutput,
   };
+}
+
+function reconcileFileMutationSummary(
+  summary: ReturnType<typeof summarizeFileMutationResults>,
+  aggregate: {
+    readonly changedFiles: string[];
+    readonly failedFiles: Array<{ path: string; reason: string }>;
+    readonly patches: CodingPatchRecord[];
+    readonly evidence: string[];
+    readonly repairNotes: string[];
+  },
+): void {
+  for (const changedFile of summary.changedFiles) {
+    if (!aggregate.changedFiles.includes(changedFile)) {
+      aggregate.changedFiles.push(changedFile);
+    }
+  }
+
+  for (const failedFile of summary.failedFiles) {
+    const alreadyRecorded = aggregate.failedFiles.some(
+      (entry) =>
+        normalizePathLike(entry.path) === normalizePathLike(failedFile.path) &&
+        entry.reason === failedFile.reason,
+    );
+    if (!alreadyRecorded) {
+      aggregate.failedFiles.push(failedFile);
+    }
+  }
+
+  for (const patch of summary.patches) {
+    if (!aggregate.patches.includes(patch)) {
+      aggregate.patches.push(patch);
+    }
+  }
+
+  for (const evidence of summary.evidence) {
+    if (!aggregate.evidence.includes(evidence)) {
+      aggregate.evidence.push(evidence);
+    }
+  }
+
+  if (!("blocker" in summary)) {
+    return;
+  }
+
+  const blockerReason = `${summary.blocker.code}: ${summary.blocker.reason} Next action: ${summary.blocker.nextAction}`;
+  if (!aggregate.repairNotes.includes(blockerReason)) {
+    aggregate.repairNotes.push(blockerReason);
+  }
+  const blockerEvidence = `mutation-summary-blocker:${summary.blocker.code}`;
+  if (!aggregate.evidence.includes(blockerEvidence)) {
+    aggregate.evidence.push(blockerEvidence);
+  }
+  const nextActionEvidence = `mutation-summary-next-action:${summary.blocker.nextAction}`;
+  if (!aggregate.evidence.includes(nextActionEvidence)) {
+    aggregate.evidence.push(nextActionEvidence);
+  }
 }
 
 function buildActionResultDelivery(input: ActionResultContractInput): string {
