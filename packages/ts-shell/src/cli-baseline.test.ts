@@ -3150,6 +3150,10 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(continueOutput).not.toContain(fallbackSessionId);
     expect(continueOutput).not.toContain("not recoverable");
     expect(continueOutput).not.toContain("No recoverable session found");
+    expect(continueOutput).toContain("Continuation");
+    expect(continueOutput).toContain(
+      "Resumed from edit-file on src/app.ts; verification status: passed; next focus is the same target.",
+    );
 
     fs.writeFileSync(
       path.join(completedSessionDir, "state.json"),

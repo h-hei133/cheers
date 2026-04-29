@@ -153,6 +153,102 @@ describe("shell session runtime (W5)", () => {
     expect(resultIndex).toBeGreaterThan(answerIndex);
     expect(actionResultIndex).toBeGreaterThan(resultIndex);
     expect(summaryIndex).toBeGreaterThan(actionResultIndex);
+    expect(renderedLines).not.toContain("Continuation");
+  });
+
+  it("renders a seed-driven continuation summary without changing the result boundary", async () => {
+    const renderedLines: string[] = [];
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_seed_summary",
+              initialPrompt: "continue and check the previous change",
+              notes: [
+                "decision-trace: seed=action-result seedAction=edit-file seedTarget=src/app.ts seedVerifyStatus=passed seedVerifyCommandInherited=yes",
+              ],
+              handoffs: [],
+            },
+            finalOutput: "Checked the previous change.",
+            codingResult: {
+              taskKind: "read-file",
+              changedFiles: [],
+              failedFiles: [],
+              patches: [],
+              repair: {
+                status: "not-needed",
+                attempts: 0,
+                recoveredItems: [],
+                failedItems: [],
+                notes: [],
+              },
+              continuation: {
+                status: "not-needed",
+                attempts: 0,
+                evidence: [],
+              },
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: [],
+                attemptedFiles: ["src/app.ts"],
+                changedFiles: [],
+                unchangedAttemptedFiles: ["src/app.ts"],
+              },
+              taskSatisfaction: {
+                verdict: "satisfied",
+                reasons: ["Continuation checked the previous target."],
+                requiredEvidence: ["read-file"],
+                observedEvidence: ["seed=action-result"],
+              },
+              verifiedFiles: ["src/app.ts"],
+              unverifiedFiles: [],
+              verification: {
+                status: "not-requested",
+                reason: "read-only continuation",
+              },
+              evidence: ["inspect: read src/app.ts"],
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt(
+      "sess_seed_summary",
+      "continue and check the previous change",
+      { outputMode: "print" },
+    );
+
+    expect(renderedLines).toContain("Result");
+    expect(renderedLines).toContain("Action result");
+    expect(renderedLines).toContain("Continuation");
+    expect(renderedLines).toContain(
+      "- Resumed from edit-file on src/app.ts; verification status: passed; next focus is the same target.",
+    );
   });
 
   it("builds follow-up continuity context before persisting the current prompt barrier", async () => {

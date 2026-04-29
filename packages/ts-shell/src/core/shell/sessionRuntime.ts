@@ -78,6 +78,7 @@ export class ShellSessionRuntime {
     let terminalClassification: "success" | "stopped" | "error" = "success";
     let lastContinuationReason: ContinuationReason | undefined;
     let terminalCodingResult: CodingResultSummary | undefined;
+    let terminalNotes: readonly string[] = [];
     let startedRendering = false;
     const printMode = options?.outputMode === "print";
     let enteredQueryPhase = false;
@@ -265,6 +266,7 @@ export class ShellSessionRuntime {
             terminalClassification = event.result.terminalClassification;
             lastContinuationReason = event.result.lastContinuationReason;
             terminalCodingResult = event.result.codingResult;
+            terminalNotes = event.result.sharedContext.notes;
             break;
           case "query.failed":
             sawTerminalEvent = true;
@@ -292,6 +294,10 @@ export class ShellSessionRuntime {
         });
         renderCodingResultContract(this.deps.renderer, terminalCodingResult, {
           mode: "minimal",
+        });
+        renderContinuationSeedSummary(this.deps.renderer, {
+          codingResult: terminalCodingResult,
+          notes: terminalNotes,
         });
         if (terminalStatus !== "completed") {
           const terminalDetail = terminalStopReason ?? terminalStatus;
@@ -333,6 +339,10 @@ export class ShellSessionRuntime {
         });
         renderCodingResultContract(this.deps.renderer, terminalCodingResult, {
           mode: this.viewMode === "verbose" ? "verbose" : "minimal",
+        });
+        renderContinuationSeedSummary(this.deps.renderer, {
+          codingResult: terminalCodingResult,
+          notes: terminalNotes,
         });
 
         if (terminalStatus !== "completed") {
@@ -953,6 +963,69 @@ function renderCodingResultContract(
     renderer.renderLine(`- Evidence: ${codingResult.evidence.join(" | ")}`);
   }
   renderer.renderLine("");
+}
+
+function renderContinuationSeedSummary(
+  renderer: StreamingRenderer,
+  input: {
+    codingResult: CodingResultSummary | undefined;
+    notes: readonly string[];
+  },
+): void {
+  const summary = buildContinuationSeedSummary(input);
+  if (!summary) {
+    return;
+  }
+  renderer.renderLine("Continuation");
+  renderer.renderLine(`- ${summary}`);
+  renderer.renderLine("");
+}
+
+function buildContinuationSeedSummary(input: {
+  codingResult: CodingResultSummary | undefined;
+  notes: readonly string[];
+}): string | undefined {
+  if (!input.notes.some((note) => note.includes("seed=action-result"))) {
+    return undefined;
+  }
+
+  const seed = input.codingResult?.lastActionResultSeed;
+  const action =
+    readDecisionTraceValue(input.notes, "seedAction") ??
+    seed?.actionKind ??
+    input.codingResult?.taskKind ??
+    "previous action";
+  const target =
+    readDecisionTraceValue(input.notes, "seedTarget") ??
+    seed?.target ??
+    input.codingResult?.changedFiles[0] ??
+    input.codingResult?.verifiedFiles[0];
+  const verificationStatus =
+    readDecisionTraceValue(input.notes, "seedVerifyStatus") ??
+    seed?.verification?.status ??
+    input.codingResult?.verification.status;
+  const targetLabel = target ? ` on ${target}` : "";
+  const focusLabel = target ? "the same target" : "the same task";
+  const verificationLabel = verificationStatus
+    ? `; verification status: ${verificationStatus}`
+    : "";
+
+  return `Resumed from ${action}${targetLabel}${verificationLabel}; next focus is ${focusLabel}.`;
+}
+
+function readDecisionTraceValue(
+  notes: readonly string[],
+  key: string,
+): string | undefined {
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(?:^|\\s)${escapedKey}=([^\\s]+)`);
+  for (const note of notes) {
+    const value = note.match(pattern)?.[1]?.trim();
+    if (value) {
+      return value;
+    }
+  }
+  return undefined;
 }
 
 function buildCodingSuccessEvidenceLines(
