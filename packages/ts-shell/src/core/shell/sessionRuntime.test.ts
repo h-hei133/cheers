@@ -282,6 +282,8 @@ describe("shell session runtime (W5)", () => {
             "Resumed from edit-file on src/app.ts; verification status: passed; next focus is the same target.",
           lastFailureHandoffDiagnostic:
             "Failure handoff: status=failed; target=src/app.ts; command=npm test -- src/app.test.ts; reason=assertion failed; next=rerun the focused verification.",
+          lastSuccessHandoffDiagnostic:
+            "Success handoff: status=passed; target=src/app.ts; command=npm test -- src/app.test.ts; verified=src/app.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
           recentChangedFiles: [],
           recentTargetFiles: [],
           recentFailedFiles: [],
@@ -299,6 +301,106 @@ describe("shell session runtime (W5)", () => {
     expect(renderedLines).toContain("Continuation");
     expect(renderedLines).toContain(
       "- Resumed from edit-file on src/app.ts; verification status: passed; next focus is the same target. Failure handoff: status=failed; target=src/app.ts; command=npm test -- src/app.test.ts; reason=assertion failed; next=rerun the focused verification.",
+    );
+    expect(
+      renderedLines.some((line) => line.includes("Success handoff")),
+    ).toBe(false);
+  });
+
+  it("renders success provenance continuation summary when no failure is present", async () => {
+    const renderedLines: string[] = [];
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_success_provenance",
+              initialPrompt: "continue from verified target",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "Continued from the verified target.",
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_success_provenance", "continue", {
+      outputMode: "print",
+      runtimeSeed: {
+        config: {
+          sessionId: "sess_success_provenance",
+          initialPrompt: "continue",
+          maxTurns: 6,
+          startingRole: "planner",
+        },
+        currentRole: "planner",
+        turn: 1,
+        pendingLifecycle: {
+          pendingApprovals: {},
+          pendingTools: {},
+          taskStates: {},
+        },
+        recoveryBoundary: "fresh-entry",
+        truthBoundary: {
+          source: "durable-replay",
+          normalizedEventCount: 0,
+          pairedTurnCount: 0,
+          policyEvidence: new Set(),
+          repairSummary: {
+            insertedPromptMessage: false,
+            insertedQueryStarted: false,
+            strippedInterruptedTerminalEvents: 0,
+            insertedRunInterrupted: false,
+            ignoredDuplicateTurnStarts: 0,
+            ignoredUnpairedTurnCompletions: 0,
+            ignoredRoleMismatchedTurnCompletions: 0,
+          },
+          continuationSafety: "fresh-only",
+        },
+        derivedState: { transcript: [] },
+      },
+      continuityState: {
+        sessionId: "sess_success_provenance",
+        projectRoot: "D:/Test/success-provenance",
+        lastSuccessHandoffDiagnostic:
+          "Success handoff: status=passed; target=src/app.ts; command=npm test -- src/app.test.ts; verified=src/app.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
+        recentChangedFiles: [],
+        recentTargetFiles: [],
+        recentFailedFiles: [],
+        recentVerifiedFiles: [],
+        lastRepairNotes: [],
+        lastContinuationEvidence: [],
+        lastTaskSatisfactionReasons: [],
+        unresolvedItems: [],
+      },
+    });
+
+    expect(renderedLines).toContain("Continuation");
+    expect(renderedLines).toContain(
+      "- Success handoff: status=passed; target=src/app.ts; command=npm test -- src/app.test.ts; verified=src/app.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
     );
   });
 

@@ -523,6 +523,117 @@ describe("shell recovery helpers", () => {
     expect(lines.join("\n")).toContain("Resumed session sess_resume");
   });
 
+  it("includes success provenance in interrupted recovery prompt", async () => {
+    const lines: string[] = [];
+    const runtimeContext = createRuntimeContext();
+    const result = await resumeShellSession({
+      fallbackSessionId: "sess_success_resume",
+      sessionManager: {
+        listReentrySummaries: () => [],
+        tryResume: () => ({
+          ok: true,
+          session: {
+            id: "sess_success_resume",
+            projectRoot: "D:/repo",
+            status: "active",
+            pendingPrompt: "continue verified task",
+          },
+        }),
+        describeSessionReentry: () => undefined,
+        getRecoverySnapshot: () => ({
+          pendingPrompt: "continue verified task",
+          runPhase: "turn-active",
+          interruptedKind: "turn",
+          pendingLifecycle: {
+            pendingApprovals: {},
+            pendingTools: {},
+            taskStates: {},
+          },
+          repairSummary: {
+            insertedPromptMessage: false,
+            insertedQueryStarted: false,
+            strippedInterruptedTerminalEvents: 0,
+            insertedRunInterrupted: false,
+            ignoredDuplicateTurnStarts: 0,
+            ignoredUnpairedTurnCompletions: 0,
+            ignoredRoleMismatchedTurnCompletions: 0,
+          },
+          transcriptEvents: [],
+        }),
+        buildContinuitySnapshot: () => ({
+          sessionId: "sess_success_resume",
+          projectRoot: "D:/repo",
+          lastTaskKind: "edit-file",
+          lastSuccessHandoffDiagnostic:
+            "Success handoff: status=passed; target=src/app.ts; command=npm test -- src/app.test.ts; verified=src/app.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
+          recentChangedFiles: ["src/app.ts"],
+          recentTargetFiles: ["src/app.ts"],
+          recentFailedFiles: [],
+          recentVerifiedFiles: ["src/app.ts"],
+          lastVerificationStatus: "passed",
+          lastVerificationCommand: "npm test -- src/app.test.ts",
+          lastRepairNotes: [],
+          lastContinuationEvidence: [],
+          lastTaskSatisfactionReasons: [],
+          unresolvedItems: [],
+        }),
+        getSessionResumeEligibility: () => ({
+          disposition: "fully-resumable",
+          autoResumeReady: true,
+          detail: "pending prompt is ready to resume",
+        }),
+        reconcilePendingLifecycle: () => ({
+          pendingApprovals: {},
+          pendingTools: {},
+          taskStates: {},
+        }),
+        buildRuntimeStateSeed: () => ({
+          config: {
+            sessionId: "sess_success_resume",
+            initialPrompt: "continue verified task",
+            maxTurns: 6,
+            startingRole: "planner",
+          },
+          currentRole: "planner",
+          turn: 1,
+          pendingLifecycle: {
+            pendingApprovals: {},
+            pendingTools: {},
+            taskStates: {},
+          },
+          recoveryBoundary: "mid-turn-reentry",
+          truthBoundary: {
+            source: "durable-replay",
+            normalizedEventCount: 0,
+            pairedTurnCount: 0,
+            policyEvidence: new Set(),
+            repairSummary: {
+              insertedPromptMessage: false,
+              insertedQueryStarted: false,
+              strippedInterruptedTerminalEvents: 0,
+              insertedRunInterrupted: false,
+              ignoredDuplicateTurnStarts: 0,
+              ignoredUnpairedTurnCompletions: 0,
+              ignoredRoleMismatchedTurnCompletions: 0,
+            },
+            continuationSafety: "mid-turn-safe",
+          },
+          derivedState: { transcript: [] },
+        }),
+      } as never,
+      runtimeContext,
+      renderer: { renderLine: (line: string) => lines.push(line) } as never,
+    });
+
+    expect(result.resumed).toBe(true);
+    if (!result.resumed || !result.autoResume) {
+      throw new Error("Expected auto-resume payload");
+    }
+    expect(result.autoResume.prompt).toContain(
+      "- success-handoff-diagnostic: Success handoff: status=passed; target=src/app.ts; command=npm test -- src/app.test.ts; verified=src/app.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
+    );
+  });
+
   it("does not duplicate persisted prompt barrier when resuming with an existing runtime seed", async () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;

@@ -1641,6 +1641,9 @@ describe("SessionManager", () => {
     expect(completedSnapshot.lastSeedInfluenceHandoffSummary).toBe(
       "Seed influence: target-carryover from edit-file on src/app.ts.",
     );
+    expect(completedSnapshot.lastSuccessHandoffDiagnostic).toBe(
+      "Success handoff: status=passed; target=src/app.ts; command=npm test -- src/app.test.ts; verified=src/app.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
+    );
     expect(
       restoredManager.buildPromptContinuitySnapshot(
         completed.id,
@@ -1676,6 +1679,14 @@ describe("SessionManager", () => {
     ).toContain(
       "- last-seed-influence-handoff-summary: Seed influence: target-carryover from edit-file on src/app.ts.",
     );
+    expect(
+      restoredManager.buildPromptContinuityContext(
+        completed.id,
+        "continue with the same task",
+      ),
+    ).toContain(
+      "- last-success-handoff-diagnostic: Success handoff: status=passed; target=src/app.ts; command=npm test -- src/app.test.ts; verified=src/app.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
+    );
 
     expect(restoredManager.getCurrentSessionForProject(failedProject)?.id).toBe(
       failed.id,
@@ -1707,6 +1718,7 @@ describe("SessionManager", () => {
     expect(failedSnapshot.lastFailureHandoffDiagnostic).toBe(
       "Failure handoff: status=failed; target=src/broken.ts; command=npm test -- src/broken.test.ts; reason=npm test failed with exit code 1; next=Inspect the failing test and continue the fix.",
     );
+    expect(failedSnapshot.lastSuccessHandoffDiagnostic).toBeUndefined();
     expect(failedSnapshot.unresolvedItems).toContain("verify:failed");
     const failedContext = restoredManager.buildPromptContinuityContext(
       failed.id,
@@ -1820,6 +1832,7 @@ describe("SessionManager", () => {
           lastSeedInfluence?: string;
           lastSeedInfluenceHandoffSummary?: string;
           lastFailureHandoffDiagnostic?: string;
+          lastSuccessHandoffDiagnostic?: string;
         };
         summary?: string[];
       };
@@ -1848,6 +1861,14 @@ describe("SessionManager", () => {
     expect(
       state.workingMemory?.continuity?.lastFailureHandoffDiagnostic,
     ).toBeUndefined();
+    expect(
+      state.workingMemory?.continuity?.lastSuccessHandoffDiagnostic,
+    ).toBe(
+      "Success handoff: status=passed; target=src/compact.ts; command=npm test -- src/compact.test.ts; verified=src/compact.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
+    );
+    expect(state.workingMemory?.summary).toContain(
+      "- last-success-handoff-diagnostic: Success handoff: status=passed; target=src/compact.ts; command=npm test -- src/compact.test.ts; verified=src/compact.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
+    );
   });
 
   it("persists append-before-model-call barrier before query events begin", () => {

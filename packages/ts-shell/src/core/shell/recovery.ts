@@ -438,6 +438,11 @@ function buildInterruptedContinuationPrompt(input: {
         `- failure-handoff-diagnostic: ${truncate(continuity.lastFailureHandoffDiagnostic, 220)}`,
       );
     }
+    if (continuity.lastSuccessHandoffDiagnostic) {
+      lines.push(
+        `- success-handoff-diagnostic: ${truncate(continuity.lastSuccessHandoffDiagnostic, 220)}`,
+      );
+    }
     if (continuity.recentChangedFiles.length > 0) {
       lines.push(
         `- changed-files: ${continuity.recentChangedFiles.join(", ")}`,

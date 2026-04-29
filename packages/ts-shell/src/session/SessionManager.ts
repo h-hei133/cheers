@@ -139,6 +139,7 @@ export interface SessionContinuitySnapshot {
   readonly lastSeedInfluence?: SeedInfluenceDiagnostic;
   readonly lastSeedInfluenceHandoffSummary?: string;
   readonly lastFailureHandoffDiagnostic?: string;
+  readonly lastSuccessHandoffDiagnostic?: string;
   readonly recentChangedFiles: readonly string[];
   readonly recentTargetFiles: readonly string[];
   readonly recentFailedFiles: ReadonlyArray<{ path: string; reason: string }>;
@@ -2471,6 +2472,11 @@ export class SessionManager {
       this.extractFailureHandoffDiagnosticFromMemory(
         stateSnapshot?.workingMemory,
       );
+    const lastSuccessHandoffDiagnostic =
+      this.buildSuccessHandoffDiagnostic(lastCodingResult) ??
+      this.extractSuccessHandoffDiagnosticFromMemory(
+        stateSnapshot?.workingMemory,
+      );
     const continuityTerminalSource =
       lastQueryCompletion?.event.result.terminalClassification === "success" &&
       lastCodingCompletion?.event.result.terminalClassification &&
@@ -2598,6 +2604,9 @@ export class SessionManager {
         : {}),
       ...(lastFailureHandoffDiagnostic
         ? { lastFailureHandoffDiagnostic }
+        : {}),
+      ...(lastSuccessHandoffDiagnostic
+        ? { lastSuccessHandoffDiagnostic }
         : {}),
       lastGroundedDeliverableMode,
       ...(lastReadDeliveredLines !== undefined
@@ -3048,6 +3057,11 @@ export class SessionManager {
         `- last-failure-handoff-diagnostic: ${this.compactText(snapshot.lastFailureHandoffDiagnostic, 220)}`,
       );
     }
+    if (snapshot.lastSuccessHandoffDiagnostic) {
+      lines.push(
+        `- last-success-handoff-diagnostic: ${this.compactText(snapshot.lastSuccessHandoffDiagnostic, 220)}`,
+      );
+    }
     if (snapshot.lastTerminalClassification || snapshot.lastTerminalReason) {
       lines.push(
         `- last-terminal: ${snapshot.lastTerminalClassification ?? "unknown"} (${snapshot.lastTerminalReason ?? "unknown"})`,
@@ -3301,6 +3315,9 @@ export class SessionManager {
         : {}),
       ...(snapshot.lastFailureHandoffDiagnostic
         ? { lastFailureHandoffDiagnostic: snapshot.lastFailureHandoffDiagnostic }
+        : {}),
+      ...(snapshot.lastSuccessHandoffDiagnostic
+        ? { lastSuccessHandoffDiagnostic: snapshot.lastSuccessHandoffDiagnostic }
         : {}),
       ...(snapshot.lastContinuationStatus
         ? { lastContinuationStatus: snapshot.lastContinuationStatus }
@@ -5375,6 +5392,12 @@ export class SessionManager {
     if (failureHandoffDiagnostic) {
       continuity.lastFailureHandoffDiagnostic = failureHandoffDiagnostic;
     }
+    const successHandoffDiagnostic = this.buildSuccessHandoffDiagnostic(
+      event.result.codingResult,
+    );
+    if (successHandoffDiagnostic) {
+      continuity.lastSuccessHandoffDiagnostic = successHandoffDiagnostic;
+    }
 
     root.continuity = continuity;
     root.summary = this.mergeContinuitySummaryEntries(root.summary, continuity);
@@ -5411,7 +5434,8 @@ export class SessionManager {
         key !== "last-action-handoff-summary" &&
         key !== "last-seed-influence" &&
         key !== "last-seed-influence-handoff-summary" &&
-        key !== "last-failure-handoff-diagnostic"
+        key !== "last-failure-handoff-diagnostic" &&
+        key !== "last-success-handoff-diagnostic"
       );
     });
     const approvalPairs: Array<[string, string]> = [];
@@ -5494,6 +5518,10 @@ export class SessionManager {
     addPair(
       "last-failure-handoff-diagnostic",
       continuity.lastFailureHandoffDiagnostic,
+    );
+    addPair(
+      "last-success-handoff-diagnostic",
+      continuity.lastSuccessHandoffDiagnostic,
     );
 
     return [
@@ -5591,6 +5619,61 @@ export class SessionManager {
       parts.push(`blocker=${blockerKind}`);
     }
     parts.push(`next=${this.compactText(nextFocus, 140).replace(/[.]+$/, "")}`);
+    return `${parts.join("; ")}.`;
+  }
+
+  private buildSuccessHandoffDiagnostic(
+    codingResult:
+      | NonNullable<Extract<QueryEvent, { type: "query.completed" }>["result"]["codingResult"]>
+      | undefined,
+  ): string | undefined {
+    if (!codingResult) {
+      return undefined;
+    }
+    if (this.buildFailureHandoffDiagnostic(codingResult)) {
+      return undefined;
+    }
+
+    const seed = codingResult.lastActionResultSeed;
+    const status =
+      seed?.verification?.status ?? codingResult.verification.status;
+    if (status !== "passed") {
+      return undefined;
+    }
+
+    const command =
+      seed?.verification?.command ?? codingResult.verification.command;
+    const verifiedFiles = Array.from(
+      new Set([...(seed?.verifiedFiles ?? []), ...codingResult.verifiedFiles]),
+    );
+    const target =
+      seed?.target ??
+      verifiedFiles[0] ??
+      codingResult.changedFiles[0] ??
+      codingResult.changeSet.attemptedFiles[0];
+    if (!command && !target && verifiedFiles.length === 0) {
+      return undefined;
+    }
+
+    const reason =
+      seed?.verification?.reason ?? codingResult.verification.reason;
+    const nextFocus = target
+      ? "keep the next turn focused on the same target; do not repeat this verification unless the target changes"
+      : "do not repeat this verification unless the verification scope changes";
+    const parts = ["Success handoff: status=passed"];
+    if (target) {
+      parts.push(`target=${target}`);
+    }
+    if (command) {
+      parts.push(`command=${command}`);
+    }
+    if (verifiedFiles.length > 0) {
+      parts.push(`verified=${verifiedFiles.slice(0, 4).join(",")}`);
+    }
+    if (reason) {
+      parts.push(`reason=${this.compactText(reason, 140)}`);
+    }
+    parts.push(`next=${nextFocus}`);
     return `${parts.join("; ")}.`;
   }
 
@@ -5770,6 +5853,44 @@ export class SessionManager {
         ? entry.trim().slice(2).trim()
         : entry.trim();
       const prefix = "last-failure-handoff-diagnostic:";
+      if (normalized.toLowerCase().startsWith(prefix)) {
+        const value = normalized.slice(prefix.length).trim();
+        if (value) {
+          return value;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private extractSuccessHandoffDiagnosticFromMemory(
+    workingMemory: unknown,
+  ): string | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    if (
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+    ) {
+      const continuity = root.continuity as Record<string, unknown>;
+      const candidate = this.normalizeOptionalString(
+        continuity.lastSuccessHandoffDiagnostic,
+      );
+      if (candidate) {
+        return candidate;
+      }
+    }
+    const summaryEntries = Array.isArray(root.summary)
+      ? root.summary.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    for (const entry of summaryEntries) {
+      const normalized = entry.trim().startsWith("- ")
+        ? entry.trim().slice(2).trim()
+        : entry.trim();
+      const prefix = "last-success-handoff-diagnostic:";
       if (normalized.toLowerCase().startsWith(prefix)) {
         const value = normalized.slice(prefix.length).trim();
         if (value) {

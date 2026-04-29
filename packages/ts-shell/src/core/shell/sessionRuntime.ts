@@ -312,6 +312,11 @@ export class ShellSessionRuntime {
             continuityState?.lastFailureHandoffDiagnostic
               ? continuityState.lastFailureHandoffDiagnostic
               : undefined,
+          successHandoffDiagnostic:
+            options?.runtimeSeed &&
+            continuityState?.lastSuccessHandoffDiagnostic
+              ? continuityState.lastSuccessHandoffDiagnostic
+              : undefined,
         });
         if (terminalStatus !== "completed") {
           const terminalDetail = terminalStopReason ?? terminalStatus;
@@ -370,6 +375,11 @@ export class ShellSessionRuntime {
             options?.runtimeSeed &&
             continuityState?.lastFailureHandoffDiagnostic
               ? continuityState.lastFailureHandoffDiagnostic
+              : undefined,
+          successHandoffDiagnostic:
+            options?.runtimeSeed &&
+            continuityState?.lastSuccessHandoffDiagnostic
+              ? continuityState.lastSuccessHandoffDiagnostic
               : undefined,
         });
 
@@ -1001,6 +1011,7 @@ function renderContinuationSeedSummary(
     handoffSummary?: string;
     seedInfluenceHandoffSummary?: string;
     failureHandoffDiagnostic?: string;
+    successHandoffDiagnostic?: string;
   },
 ): void {
   const summary = buildContinuationSeedSummary(input);
@@ -1018,21 +1029,34 @@ function buildContinuationSeedSummary(input: {
   handoffSummary?: string;
   seedInfluenceHandoffSummary?: string;
   failureHandoffDiagnostic?: string;
+  successHandoffDiagnostic?: string;
 }): string | undefined {
   const failureDiagnostic = input.failureHandoffDiagnostic?.trim();
+  const successDiagnostic = failureDiagnostic
+    ? undefined
+    : input.successHandoffDiagnostic?.trim();
   if (input.seedInfluenceHandoffSummary?.trim()) {
     const summary = input.handoffSummary?.trim()
       ? `${input.handoffSummary.trim()} ${input.seedInfluenceHandoffSummary.trim()}`
       : input.seedInfluenceHandoffSummary.trim();
-    return failureDiagnostic ? `${summary} ${failureDiagnostic}` : summary;
+    if (failureDiagnostic) {
+      return `${summary} ${failureDiagnostic}`;
+    }
+    return successDiagnostic ? `${summary} ${successDiagnostic}` : summary;
   }
   if (input.handoffSummary?.trim()) {
-    return failureDiagnostic
-      ? `${input.handoffSummary.trim()} ${failureDiagnostic}`
+    if (failureDiagnostic) {
+      return `${input.handoffSummary.trim()} ${failureDiagnostic}`;
+    }
+    return successDiagnostic
+      ? `${input.handoffSummary.trim()} ${successDiagnostic}`
       : input.handoffSummary.trim();
   }
   if (failureDiagnostic) {
     return failureDiagnostic;
+  }
+  if (successDiagnostic) {
+    return successDiagnostic;
   }
   if (!input.notes.some((note) => note.includes("seed=action-result"))) {
     return undefined;
