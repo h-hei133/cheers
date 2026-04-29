@@ -724,6 +724,8 @@ interface ContinuityStateLike {
   recentVerifiedFiles?: readonly string[];
   lastMutationVerificationLineage?: MutationVerificationContinuityLineage;
   lastActionResultSeed?: CodingActionResultSeed;
+  lastFailureHandoffDiagnostic?: string;
+  lastSuccessHandoffDiagnostic?: string;
   lastVerificationStatus?: string;
   lastVerificationCommand?: string;
   lastVerificationReason?: string;
@@ -918,6 +920,30 @@ function buildWorkflowTaskPlan(
     hasActionResultSeed && hasExplicitPathReference
       ? ["seedInfluence=ignored-explicit-target"]
       : undefined;
+  const diagnosticHandoffEvidence = getDiagnosticHandoffEvidence(continuity);
+  const hasDiagnosticVerifyHandoffCue =
+    Boolean(diagnosticHandoffEvidence?.command) &&
+    hasVerifyIntent &&
+    !hasExplicitPathReference;
+  const hasWeakDiagnosticHandoffCue =
+    Boolean(diagnosticHandoffEvidence) &&
+    isWeakSeedTargetCarryoverPrompt(prompt) &&
+    !hasExplicitPathReference;
+  const diagnosticHandoffLineage =
+    (hasWeakDiagnosticHandoffCue || hasDiagnosticVerifyHandoffCue) &&
+    diagnosticHandoffEvidence
+      ? buildDiagnosticHandoffLineage(diagnosticHandoffEvidence)
+      : undefined;
+  const ignoredExplicitTargetLineage = [
+    ...(seedIgnoredExplicitTargetLineage ?? []),
+    ...(diagnosticHandoffEvidence && hasExplicitPathReference
+      ? ["diagnosticHandoff=ignored-explicit-target"]
+      : []),
+  ];
+  const ignoredExplicitTargetLineageOrUndefined =
+    ignoredExplicitTargetLineage.length > 0
+      ? ignoredExplicitTargetLineage
+      : undefined;
   const seedWasReadLike =
     seedActionKind === "read-file" ||
     seedActionKind === "repo-explain" ||
@@ -959,11 +985,27 @@ function buildWorkflowTaskPlan(
     seedVerificationStatus && seedVerificationStatus !== "not-requested"
       ? ["seedInfluence=verify-signal"]
       : undefined;
+  const diagnosticVerifyStatus =
+    diagnosticHandoffEvidence?.status?.trim().toLowerCase();
+  const diagnosticHasVerifySignal = Boolean(
+    diagnosticHandoffEvidence?.command &&
+      diagnosticVerifyStatus &&
+      diagnosticVerifyStatus !== "not-requested",
+  );
+  const verifyContinuationLineage = [
+    ...(seedVerifySignalLineage ?? []),
+    ...(diagnosticHandoffLineage ?? []),
+  ];
+  const verifyContinuationLineageOrUndefined =
+    verifyContinuationLineage.length > 0
+      ? verifyContinuationLineage
+      : undefined;
   const lastTaskHadVerifySignal =
     continuity.lastVerificationStatus === "failed" ||
     continuity.lastVerificationStatus === "blocked" ||
     continuity.lastVerificationStatus === "skipped" ||
     Boolean(seedVerificationStatus && seedVerificationStatus !== "not-requested") ||
+    diagnosticHasVerifySignal ||
     (continuity.unresolvedItems ?? []).some(
       (entry) =>
         entry.toLowerCase().startsWith("verify:") &&
@@ -994,6 +1036,7 @@ function buildWorkflowTaskPlan(
     (continuity.recentTargetFiles?.length ?? 0) > 0 ||
     (continuity.recentFailedFiles?.length ?? 0) > 0 ||
     (continuity.lastContinuationEvidence?.length ?? 0) > 0 ||
+    Boolean(diagnosticHandoffEvidence) ||
     hasTaskTruthAnchor;
   const editFailureRepairContext = resolveSingleFileEditFailureRepairContext(
     continuity,
@@ -1136,6 +1179,8 @@ function buildWorkflowTaskPlan(
       hasWeakRepairFollowUp ||
       hasPostEditReadOnlyVerifyCue ||
       hasSeedReadOnlyCheckCue ||
+      hasWeakDiagnosticHandoffCue ||
+      hasDiagnosticVerifyHandoffCue ||
       (hasGroundedReadLikeIntent && lastTaskWasReadLike) ||
       hasEditIntent ||
       hasCreateIntent ||
@@ -1173,6 +1218,8 @@ function buildWorkflowTaskPlan(
   const usedRestoredState =
     !explicitPrimaryTarget &&
     (Boolean(continuityTargetPath) ||
+      hasWeakDiagnosticHandoffCue ||
+      hasDiagnosticVerifyHandoffCue ||
       ((hasContinuationCue ||
         hasEditFailureRepairPayload ||
         hasTemporalSuccessorCue ||
@@ -1381,6 +1428,7 @@ function buildWorkflowTaskPlan(
     : undefined;
   const hasVerifyObjectCue =
     (hasVerifyContinuationCue ||
+      hasDiagnosticVerifyHandoffCue ||
       (reflectiveStateQueryKind === "next-step" &&
         hasReflectiveActionCue &&
         (hasVerifyIntent || hasBlockedVerifyResumeContext))) &&
@@ -1555,7 +1603,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       directCommand: verifyObject.command,
       usedRestoredState,
-      continuationLineage: seedVerifySignalLineage,
+      continuationLineage: verifyContinuationLineageOrUndefined,
     };
   }
 
@@ -1788,7 +1836,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
-      continuationLineage: seedIgnoredExplicitTargetLineage,
+      continuationLineage: ignoredExplicitTargetLineageOrUndefined,
     };
   }
 
@@ -1855,7 +1903,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
-      continuationLineage: seedIgnoredExplicitTargetLineage,
+      continuationLineage: ignoredExplicitTargetLineageOrUndefined,
     };
   }
 
@@ -1973,7 +2021,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
-      continuationLineage: seedIgnoredExplicitTargetLineage,
+      continuationLineage: ignoredExplicitTargetLineageOrUndefined,
     };
   }
 
@@ -2008,6 +2056,30 @@ function buildWorkflowTaskPlan(
   }
 
   if (
+    hasWeakDiagnosticHandoffCue &&
+    primaryTarget?.inWorkspace &&
+    !hasEditIntent &&
+    !hasCorrectionCue &&
+    !hasCreateIntent &&
+    !hasExecutionIntent &&
+    !hasVerifyIntent &&
+    !effectiveReplaceDirectiveFromPrompt &&
+    !extractFencedContent(prompt)
+  ) {
+    return {
+      taskKind: "read-file",
+      reason: "diagnostic-driven weak follow-up reused handoff target",
+      targetPath: primaryTarget.cleaned,
+      groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
+      inspectFirst: true,
+      verifyAfterEdit: false,
+      usedRestoredState,
+      repairInstruction: normalizedRepairInstruction,
+      continuationLineage: diagnosticHandoffLineage,
+    };
+  }
+
+  if (
     reflectiveStateQueryKind === "next-step" &&
     hasReflectiveActionCue &&
     lastTaskWasReadLike &&
@@ -2029,7 +2101,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
-      continuationLineage: seedIgnoredExplicitTargetLineage,
+      continuationLineage: ignoredExplicitTargetLineageOrUndefined,
     };
   }
 
@@ -2249,7 +2321,7 @@ function buildWorkflowTaskPlan(
       ...(!hasCreateIntent ? mutationScopeFields : {}),
       ...(!hasCreateIntent ? mutationScopeRequiredFields : {}),
       usedRestoredState,
-      continuationLineage: seedIgnoredExplicitTargetLineage,
+      continuationLineage: ignoredExplicitTargetLineageOrUndefined,
     };
   }
 
@@ -2265,7 +2337,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
-      continuationLineage: seedIgnoredExplicitTargetLineage,
+      continuationLineage: ignoredExplicitTargetLineageOrUndefined,
     };
   }
 
@@ -3043,6 +3115,12 @@ function mergeContinuationState(
         : mutationVerificationLineage?.verifiedFiles,
     lastMutationVerificationLineage: mutationVerificationLineage,
     lastActionResultSeed: actionResultSeed,
+    lastFailureHandoffDiagnostic:
+      structured.lastFailureHandoffDiagnostic ??
+      inlineState.lastFailureHandoffDiagnostic,
+    lastSuccessHandoffDiagnostic:
+      structured.lastSuccessHandoffDiagnostic ??
+      inlineState.lastSuccessHandoffDiagnostic,
     lastVerificationStatus:
       structured.lastVerificationStatus ??
       inlineState.lastVerificationStatus ??
@@ -3349,6 +3427,88 @@ function buildFreshnessObservability(input: {
   };
 }
 
+interface DiagnosticHandoffEvidence {
+  readonly kind: "failure" | "success";
+  readonly status?: string;
+  readonly target?: string;
+  readonly command?: string;
+  readonly reason?: string;
+  readonly blockerKind?: string;
+}
+
+function parseDiagnosticHandoffEvidence(
+  raw: string | undefined,
+  kind: "failure" | "success",
+): DiagnosticHandoffEvidence | undefined {
+  const text = raw?.trim();
+  if (!text) {
+    return undefined;
+  }
+  const fields = new Map<string, string>();
+  const body = text.includes(":") ? text.slice(text.indexOf(":") + 1) : text;
+  for (const chunk of body.split(";")) {
+    const separatorIndex = chunk.indexOf("=");
+    if (separatorIndex < 1) {
+      continue;
+    }
+    const key = chunk.slice(0, separatorIndex).trim().toLowerCase();
+    const value = chunk.slice(separatorIndex + 1).trim();
+    if (key && value) {
+      fields.set(key, value);
+    }
+  }
+  const target = fields.get("target") ?? fields.get("file");
+  const command = fields.get("command");
+  const status = fields.get("status");
+  const reason = fields.get("reason") ?? fields.get("summary");
+  const blockerKind = fields.get("blocker") ?? fields.get("blockerkind");
+  if (!target && !command && !status && !reason && !blockerKind) {
+    return undefined;
+  }
+  return {
+    kind,
+    ...(status ? { status } : {}),
+    ...(target ? { target } : {}),
+    ...(command ? { command } : {}),
+    ...(reason ? { reason } : {}),
+    ...(blockerKind ? { blockerKind } : {}),
+  };
+}
+
+function getDiagnosticHandoffEvidence(
+  continuity: ContinuityStateLike,
+): DiagnosticHandoffEvidence | undefined {
+  return (
+    parseDiagnosticHandoffEvidence(
+      continuity.lastFailureHandoffDiagnostic,
+      "failure",
+    ) ??
+    parseDiagnosticHandoffEvidence(
+      continuity.lastSuccessHandoffDiagnostic,
+      "success",
+    )
+  );
+}
+
+function buildDiagnosticHandoffLineage(
+  evidence: DiagnosticHandoffEvidence,
+): string[] {
+  return [
+    `diagnosticHandoff=${evidence.kind}`,
+    ...(evidence.status
+      ? [`diagnosticStatus=${evidence.status.trim().toLowerCase()}`]
+      : []),
+    ...(evidence.target
+      ? [`diagnosticTarget=${normalizePathLike(evidence.target)}`]
+      : []),
+    ...(evidence.command ? ["diagnosticCommandInherited=yes"] : []),
+    ...(evidence.reason ? ["diagnosticReason=yes"] : []),
+    ...(evidence.blockerKind
+      ? [`diagnosticBlocker=${evidence.blockerKind.trim().toLowerCase()}`]
+      : []),
+  ];
+}
+
 function deriveContinuationTargetPath(
   continuity: ContinuityStateLike,
   workspaceRoot: string,
@@ -3369,14 +3529,17 @@ function deriveContinuationTargetPath(
     continuity.lastTaskKind === "read-file" ||
     continuity.lastTaskKind === "repo-explain" ||
     continuity.lastTaskKind === "inspect-files";
+  const diagnosticTarget = getDiagnosticHandoffEvidence(continuity)?.target;
   const preferredOrder = readLikeTask
     ? [
+        ...(diagnosticTarget ? [diagnosticTarget] : []),
         ...(continuity.recentTargetFiles ?? []),
         ...(continuity.recentFailedFiles ?? []).map((entry) => entry.path),
         ...(continuity.recentChangedFiles ?? []),
         ...(continuity.recentVerifiedFiles ?? []),
       ]
     : [
+        ...(diagnosticTarget ? [diagnosticTarget] : []),
         ...(continuity.recentTargetFiles ?? []),
         ...(continuity.recentChangedFiles ?? []),
         ...(continuity.recentFailedFiles ?? []).map((entry) => entry.path),
@@ -10596,6 +10759,12 @@ function inferVerifyCommandFromContinuity(
 ): string | undefined {
   if (continuity.lastVerificationCommand?.trim()) {
     return continuity.lastVerificationCommand.trim();
+  }
+  const diagnosticCommand = getDiagnosticHandoffEvidence(
+    continuity,
+  )?.command?.trim();
+  if (diagnosticCommand) {
+    return diagnosticCommand;
   }
   for (const entry of continuity.lastContinuationEvidence ?? []) {
     const hintMatch = entry.match(/^verify-command-hint:(.+)$/i);

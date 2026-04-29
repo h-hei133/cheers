@@ -680,6 +680,110 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.finalOutput).not.toContain("old seed");
   }, 15000);
 
+  it("carries success diagnostic into weak follow-up next-step handoff", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-success-diagnostic-handoff" }, null, 2),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_success_diagnostic_handoff",
+      prompt: "verify again",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      continuityState: {
+        lastSuccessHandoffDiagnostic:
+          "Success handoff: status=passed; target=package.json; command=node --version; verified=package.json; reason=verification passed; next=same target",
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("run-command");
+
+    const notes = result.sharedContext.notes.join("\n");
+    expect(notes).toContain(
+      "decision-trace: task=run-command target=package.json",
+    );
+    expect(notes).toContain("diagnosticHandoff=success");
+    expect(notes).toContain("diagnosticStatus=passed");
+    expect(notes).toContain("diagnosticTarget=package.json");
+    expect(notes).toContain("diagnosticCommandInherited=yes");
+    expect(notes).toContain("diagnosticReason=yes");
+  }, 15000);
+
+  it("carries failure diagnostic into weak follow-up next-step handoff", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-failure-diagnostic-handoff" }, null, 2),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_failure_diagnostic_handoff",
+      prompt: "verify again",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      continuityState: {
+        lastFailureHandoffDiagnostic:
+          "Failure handoff: status=failed; target=package.json; command=node --version; reason=assertion failed; blocker=verification-failed; next=rerun verification",
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("run-command");
+
+    const notes = result.sharedContext.notes.join("\n");
+    expect(notes).toContain(
+      "decision-trace: task=run-command target=package.json",
+    );
+    expect(notes).toContain("diagnosticHandoff=failure");
+    expect(notes).toContain("diagnosticStatus=failed");
+    expect(notes).toContain("diagnosticTarget=package.json");
+    expect(notes).toContain("diagnosticCommandInherited=yes");
+    expect(notes).toContain("diagnosticReason=yes");
+    expect(notes).toContain("diagnosticBlocker=verification-failed");
+  }, 15000);
+
+  it("keeps explicit new target ahead of diagnostic handoff target", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "t10-diagnostic-explicit-target-boundary" }, null, 2),
+      "utf8",
+    );
+    await fs.writeFile(path.join(workspaceRoot, "old.log"), "old diagnostic", "utf8");
+    await fs.writeFile(
+      path.join(workspaceRoot, "new.log"),
+      "new explicit diagnostic target",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_diagnostic_explicit_target_boundary",
+      prompt: "Read new.log",
+      workspaceRoot,
+      continuityState: {
+        lastSuccessHandoffDiagnostic:
+          "Success handoff: status=passed; target=old.log; command=node --version; reason=verified old target; next=same target",
+      },
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("read-file");
+
+    const notes = result.sharedContext.notes.join("\n");
+    expect(notes).toContain("decision-trace: task=read-file target=new.log");
+    expect(notes).toContain("diagnosticHandoff=ignored-explicit-target");
+    expect(result.finalOutput).toContain("new explicit diagnostic target");
+    expect(result.finalOutput).not.toContain("old diagnostic");
+  }, 15000);
+
   it("keeps multi-suffix targets stable for read tasks (.tsx is not truncated to .ts)", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
