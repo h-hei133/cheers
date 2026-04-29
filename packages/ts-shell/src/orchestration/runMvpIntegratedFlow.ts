@@ -39,7 +39,10 @@ import {
   formatPatchFailureReason,
 } from "./patchMutationLane.js";
 import { resolveTaskTargets } from "./targetResolution.js";
-import type { ResolvedTarget } from "./targetResolution.js";
+import type {
+  ResolvedTarget,
+  TargetResolutionBlocker,
+} from "./targetResolution.js";
 import type { SingleFileReplacePatchResult } from "./patchMutationLane.js";
 import type {
   AgentExecutionInput,
@@ -906,6 +909,29 @@ function buildWorkflowTaskPlan(
     unsupportedCommand,
   } = extractWorkflowTaskIntentSignals(prompt, continuity);
   const targetResolution = resolveTaskTargets(prompt, workspaceRoot);
+  if (
+    targetResolution.blocker &&
+    shouldBlockMutationForTargetResolution({
+      blocker: targetResolution.blocker,
+      hasCorrectionCue,
+      hasCreateIntent,
+      hasEditIntent,
+      hasExecutionCorrectionCue,
+      hasFencedContent: Boolean(extractFencedContent(prompt)),
+      hasReplaceDirective: Boolean(effectiveReplaceDirectiveFromPrompt),
+    })
+  ) {
+    return {
+      taskKind: "edit-file",
+      reason: "target resolution blocked mutation planning",
+      inspectFirst: false,
+      verifyAfterEdit: false,
+      blockedReason: formatTargetResolutionBlockerReason(
+        targetResolution.blocker,
+      ),
+      targetMissing: true,
+    };
+  }
   const rawContinuityTargetPath = deriveContinuationTargetPath(
     continuity,
     workspaceRoot,
@@ -12076,6 +12102,36 @@ function formatEditExecutionFailure(input: {
   readonly nextAction: string;
 }): string {
   return `${input.failureReason}: ${input.explanation} Next action: ${input.nextAction}`;
+}
+
+function shouldBlockMutationForTargetResolution(input: {
+  readonly blocker: TargetResolutionBlocker;
+  readonly hasCorrectionCue: boolean;
+  readonly hasCreateIntent: boolean;
+  readonly hasEditIntent: boolean;
+  readonly hasExecutionCorrectionCue: boolean;
+  readonly hasFencedContent: boolean;
+  readonly hasReplaceDirective: boolean;
+}): boolean {
+  return (
+    input.blocker.code === "ambiguous-target" &&
+    (input.hasCorrectionCue ||
+      input.hasCreateIntent ||
+      input.hasEditIntent ||
+      input.hasExecutionCorrectionCue ||
+      input.hasFencedContent ||
+      input.hasReplaceDirective)
+  );
+}
+
+function formatTargetResolutionBlockerReason(
+  blocker: TargetResolutionBlocker,
+): string {
+  const candidates =
+    blocker.candidates.length > 0
+      ? ` Candidates: ${blocker.candidates.join(", ")}.`
+      : "";
+  return `${blocker.code}: ${blocker.reason}${candidates} Next action: ${blocker.nextAction}`;
 }
 
 function computeLineDelta(

@@ -1522,6 +1522,48 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(updated).toContain("markerB = 'v1'");
   }, 15000);
 
+  it("targetResolution blocker stops ambiguous sibling edit before mutation", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const firstPath = path.join(workspaceRoot, "src", "ambiguous-a.txt");
+    const secondPath = path.join(workspaceRoot, "src", "ambiguous-b.txt");
+    const original = "stable content\n";
+    await fs.writeFile(firstPath, original, "utf8");
+    await fs.writeFile(secondPath, original, "utf8");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_target_resolution_blocker_ambiguous_sibling",
+      prompt:
+        "Edit src/ambiguous-a.txt and src/ambiguous-b.txt and replace stable content with fixed content.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.finalOutput).toContain("Outcome: blocked");
+    expect(result.finalOutput).toContain("BlockerKind: ambiguous-target");
+    expect(result.finalOutput).toContain("DoNext:");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "ambiguous-target",
+    );
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "Multiple sibling target files were mentioned",
+    );
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "Next action:",
+    );
+    expect(result.codingResult?.evidence).toContain(
+      "workflow blocked before mutation",
+    );
+    expect(result.codingResult?.evidence).toContain(
+      "actionable-blocker-kind:ambiguous-target",
+    );
+    await expect(fs.readFile(firstPath, "utf8")).resolves.toBe(original);
+    await expect(fs.readFile(secondPath, "utf8")).resolves.toBe(original);
+  }, 15000);
+
   it("applies explicit replace only to the selected target when sibling files share the source text", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
