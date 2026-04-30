@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { QueryEvent } from "../core/query/events.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
+import { ToolDispatcher } from "../tools/dispatcher.js";
 import { safeRemoveDir } from "../test-utils/cleanup.js";
 import {
   runMvpIntegratedFlow,
@@ -330,6 +331,88 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
     expect(injectedCompleted?.result.status).toBe("completed");
     expect(injectedCompleted?.result.terminalClassification).toBe("success");
+  }, 15000);
+
+  it("keeps approval approved when approved tool execution failed", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      '{"name":"t10-approved-execution-failure"}\n',
+      "utf8",
+    );
+
+    const executionError =
+      "Approval denied by user appeared in stderr after execution";
+    const dispatchSpy = vi
+      .spyOn(ToolDispatcher.prototype, "dispatch")
+      .mockResolvedValue({
+        success: false,
+        error: executionError,
+        metadata: {
+          executionPath: "ts-local",
+          status: "failed",
+          failureKind: "execution_failure",
+        },
+      });
+
+    try {
+      const events: QueryEvent[] = [];
+      for await (const event of streamMvpIntegratedFlow({
+        sessionId: "sess_t10_approved_execution_failed_provenance",
+        prompt: "Run node --version and continue implementation",
+        workspaceRoot,
+        escalationDecision: "allow-once",
+        maxTurns: 6,
+      })) {
+        events.push(event);
+      }
+
+      const approval = events.find(
+        (event): event is Extract<QueryEvent, { type: "approval.resolved" }> =>
+          event.type === "approval.resolved",
+      );
+      expect(approval?.outcome).toBe("approved");
+
+      const toolResult = events.find(
+        (event): event is Extract<QueryEvent, { type: "tool.result" }> =>
+          event.type === "tool.result",
+      );
+      expect(toolResult?.success).toBe(false);
+
+      const completed = events.find(
+        (event): event is Extract<QueryEvent, { type: "query.completed" }> =>
+          event.type === "query.completed",
+      );
+      expect(completed?.result.status).toBe("stopped_error");
+      expect(completed?.result.terminalClassification).toBe("error");
+      expect(completed?.result.stopReason).toContain(
+        "Bash execution failed after approval",
+      );
+      expect(completed?.result.stopReason).toContain(executionError);
+      expect(completed?.result.codingResult?.verification.blockerKind).not.toBe(
+        "approval-denied",
+      );
+      expect(completed?.result.codingResult?.failedFiles).toEqual([
+        expect.objectContaining({
+          path: "(command)",
+          reason: executionError,
+        }),
+      ]);
+      expect(
+        completed?.result.codingResult?.evidence.includes(
+          "verify-blocker-kind:approval-denied",
+        ),
+      ).toBe(false);
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        "bash",
+        { command: "node --version" },
+        expect.objectContaining({
+          sessionId: "sess_t10_approved_execution_failed_provenance",
+        }),
+      );
+    } finally {
+      dispatchSpy.mockRestore();
+    }
   }, 15000);
 
   it("uses default single-assistant task contract without visible role labels", async () => {

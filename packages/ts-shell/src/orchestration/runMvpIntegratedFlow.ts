@@ -10663,7 +10663,7 @@ async function dispatchToolWithLifecycle(input: {
       type: "approval.resolved",
       toolName: input.toolName,
       taskId: input.taskId,
-      outcome: (result.success || !result.error || !/approval denied|escalation denied|not in the mvp allowlist|is not registered/i.test(result.error)) ? "approved" : "denied",
+      outcome: resolveApprovalOutcomeFromToolResult(result),
     });
   }
   input.events.push({
@@ -10678,6 +10678,12 @@ async function dispatchToolWithLifecycle(input: {
     error: result.error,
     metadata: result.metadata,
   };
+}
+
+function resolveApprovalOutcomeFromToolResult(
+  result: ToolLifecycleResult,
+): "approved" | "denied" {
+  return result.metadata?.wasEscalated === true ? "denied" : "approved";
 }
 
 function classifyVerificationFailure(input: ToolLifecycleResult): {
@@ -10708,17 +10714,13 @@ function inferVerificationBlockerKind(
 ): CodingVerificationBlockerKind | undefined {
   const normalizedReason = reason.toLowerCase();
   const wasEscalated = input.metadata?.wasEscalated === true;
-  if (
-    wasEscalated ||
-    normalizedReason.includes("escalation denied by user") ||
-    normalizedReason.includes("approval denied by user")
-  ) {
+  if (wasEscalated) {
     return "approval-denied";
   }
 
   const failureKind = String(input.metadata?.failureKind ?? "").toLowerCase();
   if (failureKind === "sandbox_preflight") {
-    return "approval-denied";
+    return "environment-not-ready";
   }
   if (failureKind === "timeout" || failureKind === "cancelled") {
     return "environment-not-ready";
