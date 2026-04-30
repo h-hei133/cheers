@@ -66,6 +66,7 @@ export type CodingPatchFailureCode =
   | 'target-not-unique'
   | 'patch-generation-failed'
   | 'write-failed'
+  | 'stale-read'
   | 'readback-failed'
   | 'readback-mismatch'
 

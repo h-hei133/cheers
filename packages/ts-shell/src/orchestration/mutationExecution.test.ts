@@ -65,6 +65,45 @@ describe("mutationExecution", () => {
     });
   });
 
+  it("blocks stale single-file mutation before dispatch", async () => {
+    let dispatched = false;
+    const result = await executeFileMutationBranch({
+      path: "src/app.ts",
+      content: "export const value = 2;\n",
+      operation: "replace",
+      changedLines: 1,
+      addedLines: 0,
+      removedLines: 0,
+      failureReason: "fallback write failure",
+      expectedContentBeforeWrite: "export const value = 1;\n",
+      readContentBeforeWrite: async () => ({
+        success: true,
+        content: "export const value = 1;\n// user change\n",
+      }),
+      dispatch: async () => {
+        dispatched = true;
+        return { success: true };
+      },
+    });
+
+    expect(dispatched).toBe(false);
+    expect(result.changedFile).toBeUndefined();
+    expect(result.failedFile).toEqual({
+      path: "src/app.ts",
+      reason:
+        "stale-read: Target file changed since it was read for this edit. Re-read the latest file content and rerun the mutation.",
+    });
+    expect(result.patch).toEqual({
+      path: "src/app.ts",
+      operation: "replace",
+      status: "failed",
+      failureCode: "stale-read",
+      reason:
+        "stale-read: Target file changed since it was read for this edit. Re-read the latest file content and rerun the mutation.",
+    });
+    expect(result.evidence).toBe("stale-read-blocker:src/app.ts");
+  });
+
   it("summarizes partial mutation failure as failed instead of success", async () => {
     const changed = await executeFileMutationBranch({
       path: "src/app.ts",

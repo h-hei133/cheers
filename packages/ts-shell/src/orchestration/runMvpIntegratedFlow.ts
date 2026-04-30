@@ -5272,6 +5272,34 @@ async function executeWorkflowTaskPlan(input: {
         failureReason: "mutation failed",
         appliedNote: `mutation applied: ${targetPath}`,
         appliedEvidence: `edit/write applied on ${targetPath}`,
+        expectedContentBeforeWrite:
+          input.plan.taskKind === "edit-file" &&
+          typeof originalContent === "string"
+            ? originalContent
+            : undefined,
+        readContentBeforeWrite:
+          input.plan.taskKind === "edit-file" &&
+          typeof originalContent === "string"
+            ? async () => {
+                try {
+                  const absoluteTargetPath = path.isAbsolute(targetPath)
+                    ? targetPath
+                    : path.join(input.workspaceRoot, targetPath);
+                  return {
+                    success: true,
+                    content: fs.readFileSync(absoluteTargetPath, "utf8"),
+                  };
+                } catch (error) {
+                  return {
+                    success: false,
+                    error:
+                      error instanceof Error
+                        ? `stale-read: ${error.message}`
+                        : "stale-read: Could not verify the current file content before writing.",
+                  };
+                }
+              }
+            : undefined,
         dispatch: () =>
           dispatchToolWithLifecycle({
             dispatcher: input.dispatcher,

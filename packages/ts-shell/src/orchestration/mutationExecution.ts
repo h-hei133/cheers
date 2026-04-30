@@ -8,6 +8,12 @@ export interface FileMutationDispatchResult {
   readonly error?: string;
 }
 
+export interface FileMutationReadCurrentContentResult {
+  readonly success: boolean;
+  readonly content?: string;
+  readonly error?: string;
+}
+
 export interface FileMutationExecutionResult {
   readonly changedFile?: string;
   readonly failedFile?: { readonly path: string; readonly reason: string };
@@ -55,8 +61,48 @@ export async function executeFileMutationBranch(input: {
   readonly appliedNote?: string;
   readonly appliedEvidence?: string;
   readonly recordAppliedContent?: boolean;
+  readonly expectedContentBeforeWrite?: string;
+  readonly readContentBeforeWrite?: () => Promise<FileMutationReadCurrentContentResult>;
   readonly dispatch: () => Promise<FileMutationDispatchResult>;
 }): Promise<FileMutationExecutionResult> {
+  if (
+    input.expectedContentBeforeWrite !== undefined &&
+    input.readContentBeforeWrite
+  ) {
+    const current = await input.readContentBeforeWrite();
+    if (!current.success) {
+      const reason =
+        current.error ??
+        "stale-read: Could not verify the current file content before writing.";
+      return {
+        failedFile: { path: input.path, reason },
+        patch: {
+          path: input.path,
+          operation: input.operation,
+          status: "failed",
+          failureCode: "stale-read",
+          reason,
+        },
+        evidence: `stale-read-blocker:${normalizePathLike(input.path)}`,
+      };
+    }
+    if (current.content !== input.expectedContentBeforeWrite) {
+      const reason =
+        "stale-read: Target file changed since it was read for this edit. Re-read the latest file content and rerun the mutation.";
+      return {
+        failedFile: { path: input.path, reason },
+        patch: {
+          path: input.path,
+          operation: input.operation,
+          status: "failed",
+          failureCode: "stale-read",
+          reason,
+        },
+        evidence: `stale-read-blocker:${normalizePathLike(input.path)}`,
+      };
+    }
+  }
+
   const mutation = await input.dispatch();
   if (!mutation.success) {
     const reason = mutation.error ?? input.failureReason;
