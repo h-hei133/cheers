@@ -468,6 +468,180 @@ describe("shell session runtime (W5)", () => {
     ]);
   });
 
+  it("passes edit patch stopped recovery context into the next prompt run", async () => {
+    const originalUserProfile = process.env.USERPROFILE;
+    const originalHome = process.env.HOME;
+    const fakeHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), "private-agents-edit-patch-continuity-"),
+    );
+    process.env.USERPROFILE = fakeHome;
+    process.env.HOME = fakeHome;
+
+    try {
+      const manager = new SessionManager();
+      const session = manager.createNew();
+      const stopReason =
+        "patch-from-not-found: Source text was not found in docs/failed-edit.md.";
+      const nextAction =
+        "Re-read docs/failed-edit.md, then rerun with the exact current text to replace.";
+      let capturedContinuity:
+        | import("../../session/SessionManager.js").SessionContinuitySnapshot
+        | undefined;
+
+      manager.markRunStarted(session.id, "replace old text");
+      manager.addTurn(session.id, {
+        role: "user",
+        content: "replace old text in docs/failed-edit.md",
+      });
+      manager.appendQueryEvent(session.id, {
+        type: "query.completed",
+        result: {
+          status: "stopped_error",
+          terminalReason: "stopped_error",
+          terminalClassification: "stopped",
+          stopReason,
+          transcript: [],
+          sharedContext: {
+            sessionId: session.id,
+            initialPrompt: "replace old text in docs/failed-edit.md",
+            notes: [],
+            handoffs: [],
+          },
+          finalOutput: "",
+          codingResult: {
+            taskKind: "edit-file",
+            changedFiles: [],
+            failedFiles: [
+              {
+                path: "docs/failed-edit.md",
+                reason: stopReason,
+              },
+            ],
+            patches: [
+              {
+                path: "docs/failed-edit.md",
+                operation: "replace",
+                status: "failed",
+                failureCode: "patch-from-not-found",
+                reason: stopReason,
+              },
+            ],
+            repair: {
+              status: "failed",
+              attempts: 1,
+              recoveredItems: [],
+              failedItems: ["docs/failed-edit.md"],
+              notes: [`${stopReason} Next action: ${nextAction}`],
+            },
+            continuation: {
+              status: "failed-after-bounded-continuation",
+              attempts: 1,
+              evidence: ["actionable-blocker-kind:patch-from-not-found"],
+            },
+            changeSet: {
+              gitAware: false,
+              preExistingDirtyFiles: [],
+              postRunDirtyFiles: [],
+              attemptedFiles: ["docs/failed-edit.md"],
+              changedFiles: [],
+              unchangedAttemptedFiles: ["docs/failed-edit.md"],
+            },
+            taskSatisfaction: {
+              verdict: "completed-with-caveats",
+              reasons: [stopReason],
+              requiredEvidence: ["inspect->edit->verify contract execution"],
+              observedEvidence: [
+                "actionable-blocker-kind:patch-from-not-found",
+              ],
+            },
+            verifiedFiles: [],
+            unverifiedFiles: [
+              {
+                path: "docs/failed-edit.md",
+                reason: stopReason,
+              },
+            ],
+            verification: {
+              status: "blocked",
+              reason: stopReason,
+              blockerKind: "patch-from-not-found",
+              nextAction,
+            },
+            evidence: [
+              "actionable-blocker-kind:patch-from-not-found",
+              `mutation-summary-next-action:${nextAction}`,
+            ],
+            failureBoundary: stopReason,
+          },
+        },
+      });
+      manager.saveError(session.id, stopReason, {
+        terminalReason: "stopped_error",
+        terminalClassification: "stopped",
+      });
+
+      const runtime = new ShellSessionRuntime({
+        sessionManager: manager,
+        renderer: {
+          renderLine() {},
+          renderChunk() {},
+        } as never,
+        runPrompt: async function* (_prompt, _signal, _runtimeSeed, continuityState) {
+          capturedContinuity = continuityState;
+          yield {
+            type: "query.completed",
+            result: {
+              status: "completed",
+              terminalReason: "completed",
+              terminalClassification: "success",
+              transcript: [],
+              sharedContext: {
+                sessionId: session.id,
+                initialPrompt: "continue with the same failed edit",
+                notes: [],
+                handoffs: [],
+              },
+              finalOutput: "continued",
+            },
+          };
+        },
+      });
+
+      await runtime.executePrompt(
+        session.id,
+        "continue with the same failed edit",
+      );
+
+      expect(capturedContinuity?.lastTerminalClassification).toBe("stopped");
+      expect(capturedContinuity?.lastFailure).toBe(stopReason);
+      expect(capturedContinuity?.recentChangedFiles).toEqual([]);
+      expect(capturedContinuity?.recentFailedFiles).toEqual([
+        {
+          path: "docs/failed-edit.md",
+          reason: stopReason,
+        },
+      ]);
+      expect(capturedContinuity?.lastVerificationBlockerKind).toBe(
+        "patch-from-not-found",
+      );
+      expect(capturedContinuity?.lastVerificationReason).toBe(stopReason);
+      expect(capturedContinuity?.lastVerificationNextAction).toBe(nextAction);
+      expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
+        "Failure handoff: status=blocked; target=docs/failed-edit.md;",
+      );
+      expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
+        "blocker=patch-from-not-found",
+      );
+      expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
+        `next=${nextAction.replace(/[.]+$/, "")}.`,
+      );
+    } finally {
+      process.env.USERPROFILE = originalUserProfile;
+      process.env.HOME = originalHome;
+      fs.rmSync(fakeHome, { recursive: true, force: true });
+    }
+  });
+
   it("uses compact mode by default and only prints final assistant output", async () => {
     const renderedLines: string[] = [];
     const renderedChunks: string[] = [];
