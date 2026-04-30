@@ -667,6 +667,9 @@ type ActionableBlockerKind =
   | "ambiguous-target"
   | "patch-from-not-found"
   | "patch-target-missing"
+  | "patch-generation-failed"
+  | "stale-read"
+  | "partial-mutation-failed"
   | "verification-failed"
   | "command-not-allowlisted";
 
@@ -720,14 +723,22 @@ function findActionableBlockerKindInEvidence(
     .find((entry) => entry.startsWith("actionable-blocker-kind:"))
     ?.slice("actionable-blocker-kind:".length)
     .trim();
+  const mutationSummaryMarker = evidence
+    .find((entry) => entry.startsWith("mutation-summary-blocker:"))
+    ?.slice("mutation-summary-blocker:".length)
+    .trim();
+  const actionableMarker = marker ?? mutationSummaryMarker;
   if (
-    marker === "ambiguous-target" ||
-    marker === "patch-from-not-found" ||
-    marker === "patch-target-missing" ||
-    marker === "verification-failed" ||
-    marker === "command-not-allowlisted"
+    actionableMarker === "ambiguous-target" ||
+    actionableMarker === "patch-from-not-found" ||
+    actionableMarker === "patch-target-missing" ||
+    actionableMarker === "patch-generation-failed" ||
+    actionableMarker === "stale-read" ||
+    actionableMarker === "partial-mutation-failed" ||
+    actionableMarker === "verification-failed" ||
+    actionableMarker === "command-not-allowlisted"
   ) {
-    return marker;
+    return actionableMarker;
   }
   return undefined;
 }
@@ -748,6 +759,28 @@ function classifyActionableBlockerKind(
     normalizedReason.includes("edit-target-missing")
   ) {
     return "patch-target-missing";
+  }
+  if (
+    normalizedReason.includes("patch-generation-failed") ||
+    normalizedReason.includes("unified diff") ||
+    normalizedReason.includes("apply_patch")
+  ) {
+    return "patch-generation-failed";
+  }
+  if (
+    normalizedReason.includes("stale-read") ||
+    normalizedReason.includes("stale read") ||
+    normalizedReason.includes("changed since it was read") ||
+    normalizedReason.includes("read it again before")
+  ) {
+    return "stale-read";
+  }
+  if (
+    normalizedReason.includes("partial-mutation-failed") ||
+    normalizedReason.includes("mutation-summary-blocker") ||
+    normalizedReason.includes("one or more file mutations failed")
+  ) {
+    return "partial-mutation-failed";
   }
   if (
     normalizedReason.includes("patch-from-not-found") ||
@@ -776,6 +809,12 @@ function actionableBlockerNextAction(kind: ActionableBlockerKind): string {
       return "Provide the exact current source text from the target file, then rerun the patch.";
     case "patch-target-missing":
       return "Create or confirm the target file path first, then rerun the patch.";
+    case "patch-generation-failed":
+      return "Rerun with one explicit target file plus exact replace-from and replace-to text; do not pass unified diff or apply_patch syntax.";
+    case "stale-read":
+      return "Re-read the latest target file content, then rerun the edit against that current content.";
+    case "partial-mutation-failed":
+      return "Review the failed files, re-read current content, and retry only the unresolved mutation.";
     case "ambiguous-target":
       return "Specify one exact target file/path (and exact from/to text if editing), then rerun.";
     case "verification-failed":
