@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { promises as fs } from "node:fs";
+import fsSync, { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -1392,6 +1392,77 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
     expect(edited).toContain("v2");
     expect(edited).not.toContain("v1");
+  }, 15000);
+
+  it("stale-read blocks single-file edit before writing stale planned content", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "stale-read.txt");
+    const original = "stable content\n";
+    const externalChange = "stable content\nexternal change\n";
+    await fs.writeFile(targetPath, original, "utf8");
+
+    let staleInjected = false;
+    const originalReadFileSync = fsSync.readFileSync.bind(fsSync);
+    const originalWriteFileSync = fsSync.writeFileSync.bind(fsSync);
+    const readFileSyncSpy = vi
+      .spyOn(fsSync, "readFileSync")
+      .mockImplementation(
+        ((...args: Parameters<typeof fsSync.readFileSync>) => {
+          const [filePath] = args;
+          if (
+            !staleInjected &&
+            typeof filePath === "string" &&
+            path.resolve(filePath) === targetPath
+          ) {
+            staleInjected = true;
+            originalWriteFileSync(targetPath, externalChange, "utf8");
+          }
+          return originalReadFileSync(...args);
+        }) as typeof fsSync.readFileSync,
+      );
+
+    try {
+      const result = await runMvpIntegratedFlow({
+        sessionId: "sess_t10_stale_read_blocks_edit",
+        prompt:
+          "Edit src/stale-read.txt and replace stable content with fixed content.",
+        workspaceRoot,
+        escalationDecision: "allow-once",
+        maxTurns: 6,
+      });
+
+      expect(staleInjected).toBe(true);
+      expect(result.status).toBe("stopped_error");
+      expect(result.terminalClassification).not.toBe("success");
+      expect(result.codingResult?.changedFiles).toEqual([]);
+      expect(result.codingResult?.failedFiles).toEqual([
+        expect.objectContaining({
+          path: "src/stale-read.txt",
+          reason: expect.stringContaining("stale-read"),
+        }),
+      ]);
+      expect(result.codingResult?.patches).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "src/stale-read.txt",
+            status: "failed",
+            failureCode: "stale-read",
+          }),
+        ]),
+      );
+      expect(result.codingResult?.evidence).toContain(
+        "stale-read-blocker:src/stale-read.txt",
+      );
+      expect(result.codingResult?.repair.notes.join("\n")).toContain(
+        "partial-mutation-failed",
+      );
+      expect(result.finalOutput).toContain("Task not completed:");
+      await expect(fs.readFile(targetPath, "utf8")).resolves.toBe(
+        externalChange,
+      );
+    } finally {
+      readFileSyncSpy.mockRestore();
+    }
   }, 15000);
 
   it("fails edit workflow with explicit patch failure code when target fragment is missing", async () => {
