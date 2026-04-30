@@ -462,6 +462,103 @@ describe("mapTerminalToOrchestrationResult", () => {
     );
   });
 
+  it.each([
+    {
+      name: "patch-target-missing",
+      reason:
+        "patch-target-missing: Patch target is missing or was not readable before applying replace.",
+      evidence: ["actionable-blocker-kind:patch-target-missing"],
+    },
+    {
+      name: "patch-from-not-found",
+      reason:
+        "patch-from-not-found: Patch source text was not found in the target file.",
+      evidence: ["actionable-blocker-kind:patch-from-not-found"],
+    },
+    {
+      name: "patch-ambiguous",
+      reason: "patch-ambiguous: Patch source text matched 2 times.",
+      evidence: ["actionable-blocker-kind:ambiguous-target"],
+    },
+    {
+      name: "patch-generation-failed",
+      reason:
+        "patch-generation-failed: unified diff/apply_patch syntax is not supported.",
+      evidence: ["actionable-blocker-kind:patch-generation-failed"],
+    },
+    {
+      name: "stale-read",
+      reason:
+        "stale-read: Target file changed since it was read for this edit.",
+      evidence: [
+        "stale-read-blocker:src/edit-target.txt",
+        "actionable-blocker-kind:stale-read",
+      ],
+    },
+    {
+      name: "partial-mutation-failed",
+      reason:
+        "partial-mutation-failed: One or more file mutations failed, so the mutation set cannot be reported as successfully applied.",
+      evidence: ["mutation-summary-blocker:partial-mutation-failed"],
+    },
+  ])(
+    "maps edit/patch failure evidence matrix item $name to stopped",
+    ({ reason, evidence }) => {
+      const fakeState = {
+        transcript: [
+          {
+            role: "assistant",
+            content: "Recoverable edit failure.",
+            codingResult: buildCodingResult({
+              changedFiles: [],
+              failedFiles: [
+                {
+                  path: "src/edit-target.txt",
+                  reason,
+                },
+              ],
+              patches: [
+                {
+                  path: "src/edit-target.txt",
+                  operation: "replace",
+                  status: "failed",
+                  reason,
+                },
+              ],
+              verification: {
+                status: "not-run",
+                reason,
+              },
+              verdict: "completed-with-caveats",
+              reasons: [reason],
+              evidence,
+            }),
+          },
+        ],
+        sharedContext: {
+          sessionId: "sess_mapper_edit_patch_failure_matrix",
+          initialPrompt: "prompt",
+          notes: [],
+          handoffs: [],
+        },
+        lastContinuationReason: undefined,
+      } as never;
+
+      const result = mapTerminalToOrchestrationResult(fakeState, {
+        terminalReason: "completed",
+        terminalClassification: "success",
+        stopReason: undefined,
+      } as never);
+
+      expect(result.terminalClassification).toBe("stopped");
+      expect(result.status).toBe("stopped_error");
+      expect(result.stopReason).toBe(reason);
+      expect(result.codingResult?.evidence).toEqual(
+        expect.arrayContaining(evidence),
+      );
+    },
+  );
+
   it("maps hard tool failures to an error terminal result", () => {
     const fakeState = {
       transcript: [
