@@ -2422,13 +2422,15 @@ describe("shell session runtime (W5)", () => {
           "Provider readiness failed (provider-readiness:auth): OpenAI authentication was rejected (401/403). Verify OPENAI_API_KEY validity and access scope, then retry.",
         expectedHint:
           "Hint: check provider API key validity/permissions, then submit another prompt.",
+        unexpectedDetail: "reconnecting",
       },
       {
         sessionId: "sess_provider_network",
         stopReason:
-          "Provider readiness failed (provider-readiness:network): Unable to reach the OpenAI endpoint. Check network/proxy/firewall settings and retry.",
+          "Provider readiness failed (provider-readiness:network): Unable to reach the OpenAI endpoint after 5 reconnect attempts (reconnecting 1/5; reconnecting 2/5; reconnecting 3/5; reconnecting 4/5; reconnecting 5/5). Check network/proxy/firewall settings and retry.",
         expectedHint:
           "Hint: check network/proxy/firewall reachability to the provider endpoint, then submit another prompt.",
+        expectedDetail: "reconnecting 1/5; reconnecting 2/5; reconnecting 3/5; reconnecting 4/5; reconnecting 5/5",
       },
     ]) {
       const renderedLines: string[] = [];
@@ -2484,6 +2486,18 @@ describe("shell session runtime (W5)", () => {
           line.includes("- Detail: Provider readiness failed"),
         ),
       ).toBe(true);
+      if (scenario.expectedDetail) {
+        expect(
+          renderedLines.some((line) => line.includes(scenario.expectedDetail)),
+        ).toBe(true);
+      }
+      if (scenario.unexpectedDetail) {
+        expect(
+          renderedLines.some((line) =>
+            line.includes(scenario.unexpectedDetail),
+          ),
+        ).toBe(false);
+      }
       const expectedHintCore = scenario.expectedHint
         .replace(/^Hint:\s*/i, "")
         .replace(/, then submit another prompt\.$/i, "")
