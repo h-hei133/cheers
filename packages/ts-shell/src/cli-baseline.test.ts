@@ -3912,7 +3912,19 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(output).toContain("Result");
     expect(output).toContain("- Outcome: success");
     expect(output).toContain("Action result");
+    expect(output).toContain("- Task: write-file");
+    expect(output).toContain("- Changed: 1 file(s)");
+    expect(output).toContain("- Changed files: note.txt");
     expect(output).toContain("- Verification:");
+    expect(output).toContain(
+      "- Verification detail: No verification was requested; changed files were not checked.",
+    );
+    expect(output).toContain(
+      "- Next action: Ask for an explicit low-risk verification if you want the changed files checked.",
+    );
+    expect(fs.readFileSync(path.join(projectRoot, "note.txt"), "utf8")).toContain(
+      "hello execution surface",
+    );
   }, 35000);
 
   it("shows failure reason and actionable next steps for synthetic print blocked execution", async () => {
