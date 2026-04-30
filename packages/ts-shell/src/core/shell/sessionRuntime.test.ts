@@ -2140,6 +2140,147 @@ describe("shell session runtime (W5)", () => {
     );
   });
 
+  it("renders approved execution failures as command failures in compact output", async () => {
+    const renderedLines: string[] = [];
+    const executionError =
+      "Approval denied by user appeared in stderr after execution";
+    const stopReason = `Bash execution failed after approval: ${executionError}`;
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield { type: "tool.started", toolName: "bash", taskId: "task_1" };
+        yield {
+          type: "approval.requested",
+          toolName: "bash",
+          taskId: "task_1",
+        };
+        yield {
+          type: "approval.resolved",
+          toolName: "bash",
+          taskId: "task_1",
+          outcome: "approved",
+        };
+        yield {
+          type: "tool.result",
+          toolName: "bash",
+          taskId: "task_1",
+          success: false,
+        };
+        yield {
+          type: "query.completed",
+          result: {
+            status: "stopped_error",
+            terminalReason: "stopped_error",
+            terminalClassification: "error",
+            stopReason,
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_approved_execution_failure_surface",
+              initialPrompt: "run node --version",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "",
+            codingResult: {
+              taskKind: "run-command",
+              changedFiles: [],
+              failedFiles: [{ path: "(command)", reason: executionError }],
+              patches: [],
+              repair: {
+                status: "failed",
+                attempts: 1,
+                recoveredItems: [],
+                failedItems: ["(command)"],
+                notes: [stopReason],
+              },
+              continuation: {
+                status: "failed-after-bounded-continuation",
+                attempts: 1,
+                evidence: ["current-permission-request-tool:bash"],
+              },
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: [],
+                attemptedFiles: ["(command)"],
+                changedFiles: [],
+                unchangedAttemptedFiles: ["(command)"],
+              },
+              taskSatisfaction: {
+                verdict: "not-completed",
+                reasons: [stopReason],
+                requiredEvidence: ["approved tool execution result"],
+                observedEvidence: ["current-permission-request-tool:bash"],
+              },
+              verifiedFiles: [],
+              unverifiedFiles: [{ path: "(command)", reason: executionError }],
+              verification: {
+                status: "failed",
+                reason: executionError,
+                command: "node --version",
+                nextAction: undefined,
+              },
+              evidence: ["current-permission-request-tool:bash"],
+              failureBoundary: stopReason,
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt(
+      "sess_approved_execution_failure_surface",
+      "run node --version",
+    );
+
+    expect(
+      renderedLines.some((line) => line.includes("Execution summary")),
+    ).toBe(true);
+    expect(renderedLines.some((line) => line.includes("- Actions: bash"))).toBe(
+      true,
+    );
+    expect(
+      renderedLines.some((line) => line.includes("1 failed")),
+    ).toBe(true);
+    expect(renderedLines).toContain("- Approvals: 1/1 approved");
+    expect(renderedLines).toContain("Result");
+    expect(renderedLines).toContain("- Outcome: error");
+    expect(renderedLines).toContain("Action result");
+    expect(renderedLines).toContain(
+      `- Failed files: (command) (${executionError})`,
+    );
+    expect(renderedLines).toContain(
+      "- Next action: Inspect the command output/error, fix the execution failure, and rerun the command after approval if still needed.",
+    );
+    expect(renderedLines).toContain("Next steps");
+    expect(renderedLines).toContain(
+      "- Tool execution failed after approval; inspect the command output/error.",
+    );
+    expect(renderedLines).toContain(
+      "- Fix the command or environment issue, then rerun the command if still needed.",
+    );
+    expect(renderedLines).not.toContain(
+      "- Submit the prompt again and approve escalation when requested.",
+    );
+  });
+
   it("prints actionable hints for provider readiness auth/network failures and keeps error persistence", async () => {
     for (const scenario of [
       {

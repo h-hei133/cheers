@@ -317,7 +317,10 @@ export class ShellSessionRuntime {
         });
         if (terminalStatus !== "completed") {
           const terminalDetail = terminalStopReason ?? terminalStatus;
-          const nextSteps = buildTerminalNextSteps(terminalDetail);
+          const nextSteps = buildTerminalNextSteps(
+            terminalDetail,
+            terminalCodingResult,
+          );
           this.deps.renderer.renderLine("Next steps");
           for (const step of nextSteps) {
             this.deps.renderer.renderLine(`- ${step}`);
@@ -379,7 +382,10 @@ export class ShellSessionRuntime {
 
         if (terminalStatus !== "completed") {
           const terminalDetail = terminalStopReason ?? terminalStatus;
-          const nextSteps = buildTerminalNextSteps(terminalDetail);
+          const nextSteps = buildTerminalNextSteps(
+            terminalDetail,
+            terminalCodingResult,
+          );
           this.deps.renderer.renderLine("Next steps");
           for (const step of nextSteps) {
             this.deps.renderer.renderLine(`- ${step}`);
@@ -1377,6 +1383,10 @@ function buildVerificationStatusDetail(
 function buildCodingResultNextAction(
   codingResult: CodingResultSummary,
 ): string | undefined {
+  if (isApprovedToolExecutionFailure(codingResult)) {
+    return "Inspect the command output/error, fix the execution failure, and rerun the command after approval if still needed.";
+  }
+
   const candidateText = [
     ...codingResult.failedFiles.map((entry) => entry.reason),
     ...(codingResult.patches ?? []).map((record) => record.reason ?? ""),
@@ -1440,7 +1450,17 @@ function buildCodingResultNextAction(
   return undefined;
 }
 
-function buildTerminalNextSteps(terminalDetail: string): string[] {
+function buildTerminalNextSteps(
+  terminalDetail: string,
+  codingResult?: CodingResultSummary,
+): string[] {
+  if (isApprovedToolExecutionFailure(codingResult)) {
+    return [
+      "Tool execution failed after approval; inspect the command output/error.",
+      "Fix the command or environment issue, then rerun the command if still needed.",
+    ];
+  }
+
   const runCommandBlockContext =
     parseRunCommandAllowlistBlockContext(terminalDetail);
   if (runCommandBlockContext) {
@@ -1499,4 +1519,23 @@ function buildTerminalNextSteps(terminalDetail: string): string[] {
   return [
     "Inspect the stop reason and rerun with an explicit command or next action.",
   ];
+}
+
+function isApprovedToolExecutionFailure(
+  codingResult: CodingResultSummary | undefined,
+): boolean {
+  if (!codingResult) {
+    return false;
+  }
+  const commandFailed = codingResult.failedFiles.some(
+    (entry) => entry.path === "(command)",
+  );
+  if (!commandFailed) {
+    return false;
+  }
+  return codingResult.evidence.some(
+    (entry) =>
+      entry === "current-permission-request-tool:bash" ||
+      entry.startsWith("current-permission-request-process:"),
+  );
 }
