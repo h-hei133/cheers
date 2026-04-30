@@ -5,7 +5,6 @@ import process from "node:process";
 import * as readline from "node:readline";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
-import type { ShellActionResult } from "../core/commands/types.js";
 import {
   CoreMcpGateway,
   McpGatewayBlockedError,
@@ -20,6 +19,10 @@ import {
 } from "../core/shell/bootstrap.js";
 import { applyInteractiveApprovalDecisionWiring } from "../core/shell/interactiveApprovalWiring.js";
 import {
+  runResumeLikeShellAction,
+  type ResumeLikeShellAction,
+} from "../core/shell/continueShellActionRuntime.js";
+import {
   resolveProviderCredential,
   type ProviderCredentialResolution,
 } from "../core/shell/providerCredentials.js";
@@ -27,10 +30,7 @@ import {
   checkRealProviderReadiness,
   createProviderReadinessTerminalEvent,
 } from "../core/shell/providerReadiness.js";
-import {
-  resolveSessionReference,
-  resumeShellSession,
-} from "../core/shell/recovery.js";
+import { resolveSessionReference } from "../core/shell/recovery.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
 import type {
   RootBindingDiagnostic,
@@ -60,7 +60,6 @@ import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type {
   ApprovalAuditMemoryState,
   RecoveryTrustBoundaryBlock,
-  ResumeResult,
   Session,
   SessionContinuitySnapshot,
   SessionReentrySummary,
@@ -91,15 +90,6 @@ interface CliOptions {
 type StdinTransportMode = "none" | "capture-batch" | "stream-live";
 
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
-type ResumeLikeShellAction = ShellActionResult & {
-  action: "resume-session" | "continue-session";
-};
-
-function isFailedResumeResult(
-  result: ResumeResult,
-): result is Extract<ResumeResult, { ok: false }> {
-  return result.ok === false;
-}
 
 type TurnInputResolution =
   | { kind: "handled" }
@@ -632,12 +622,29 @@ async function main(): Promise<void> {
           fallbackSessionId: recoveryCandidate?.id,
           sessionManager,
           runtimeContext,
-          sessionRuntime,
-          logger,
           renderer,
           turnNumber: interactiveTurnNumber,
-          setActiveNonInteractiveApprovalMode: (mode) => {
-            activeNonInteractiveApprovalMode = mode;
+          normalizePromptForExecution,
+          switchRuntimeSessionProjectContext,
+          renderSessionCommandMap,
+          executeResolvedPromptTurn: (turnInput) => {
+            return executeResolvedPromptTurn({
+              source: "interactive",
+              effectivePrompt: turnInput.effectivePrompt,
+              runtimeSeed: turnInput.runtimeSeed,
+              continuityState: turnInput.continuityState,
+              sessionManager,
+              setActiveNonInteractiveApprovalMode: (mode) => {
+                activeNonInteractiveApprovalMode = mode;
+              },
+              runtimeContext,
+              sessionRuntime,
+              logger,
+              printMode: false,
+              turnNumber: turnInput.turnNumber,
+              renderer,
+              turnOrigin: turnInput.turnOrigin,
+            });
           },
         });
         interactiveTurnNumber = resumeBridge.turnNumber;
@@ -2419,12 +2426,29 @@ async function runNonInteractivePrompt(options: {
         fallbackSessionId: options.fallbackSessionId,
         sessionManager: options.sessionManager,
         runtimeContext: options.runtimeContext,
-        sessionRuntime: options.sessionRuntime,
-        logger: options.logger,
         renderer: options.renderer,
-        setActiveNonInteractiveApprovalMode:
-          options.setActiveNonInteractiveApprovalMode,
-        nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
+        normalizePromptForExecution,
+        switchRuntimeSessionProjectContext,
+        renderSessionCommandMap,
+        executeResolvedPromptTurn: (turnInput) => {
+          return executeResolvedPromptTurn({
+            source: "non-interactive",
+            effectivePrompt: turnInput.effectivePrompt,
+            runtimeSeed: turnInput.runtimeSeed,
+            continuityState: turnInput.continuityState,
+            sessionManager: options.sessionManager,
+            setActiveNonInteractiveApprovalMode:
+              options.setActiveNonInteractiveApprovalMode,
+            nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
+            runtimeContext: options.runtimeContext,
+            sessionRuntime: options.sessionRuntime,
+            logger: options.logger,
+            printMode: options.printMode,
+            turnNumber: turnInput.turnNumber,
+            renderer: options.renderer,
+            turnOrigin: turnInput.turnOrigin,
+          });
+        },
       });
       return;
     }
@@ -2520,228 +2544,6 @@ function renderBlockedContract(
   renderer.renderLine(`- Reason: ${input.reason}`);
   renderer.renderLine(`- DoNext: ${input.doNext}`);
   renderer.renderLine("");
-}
-
-function renderStoppedContinueGuidance(input: {
-  renderer: StreamingRenderer;
-  printMode: boolean;
-  sessionId: string;
-  summary: SessionReentrySummary;
-  snapshot: SessionContinuitySnapshot;
-}): void {
-  const failedFiles = input.snapshot.recentFailedFiles
-    .map((entry) => `${entry.path}${entry.reason ? ` (${entry.reason})` : ""}`)
-    .join(", ");
-  const reason =
-    input.snapshot.lastVerificationReason ??
-    input.snapshot.lastFailure ??
-    input.summary.blockedDetail ??
-    input.summary.resumeDetail ??
-    "The previous run stopped before the task could continue automatically.";
-  const blockerKind =
-    input.snapshot.lastVerificationBlockerKind ??
-    input.summary.blockedReason ??
-    "stopped-result";
-  const doNext =
-    input.snapshot.lastVerificationNextAction ??
-    `Use /continue <follow-up prompt> with a concrete repair instruction for session ${input.sessionId}.`;
-
-  if (!input.printMode) {
-    input.renderer.renderLine("");
-  }
-  input.renderer.renderLine("Result");
-  input.renderer.renderLine("- Outcome: stopped");
-  input.renderer.renderLine("- TerminalState: stopped");
-  input.renderer.renderLine(`- BlockerKind: ${blockerKind}`);
-  input.renderer.renderLine(`- Reason: ${reason}`);
-  if (failedFiles) {
-    input.renderer.renderLine(`- Failed files: ${failedFiles}`);
-  }
-  input.renderer.renderLine(`- DoNext: ${doNext}`);
-  input.renderer.renderLine(
-    `- Next action: Use /continue <follow-up prompt> or provide a concrete repair instruction to continue session ${input.sessionId}.`,
-  );
-  if (!input.printMode) {
-    input.renderer.renderLine("");
-  }
-}
-
-async function runResumeLikeShellAction(options: {
-  slashResult: ResumeLikeShellAction;
-  source: "interactive" | "non-interactive";
-  printMode: boolean;
-  fallbackSessionId?: string;
-  sessionManager: SessionManager;
-  runtimeContext: ShellRuntimeContext;
-  sessionRuntime: ShellSessionRuntime;
-  logger: ReturnType<typeof createComponentLogger>;
-  renderer: StreamingRenderer;
-  turnNumber?: number;
-  setActiveNonInteractiveApprovalMode: (
-    mode: ApprovalModeObject | undefined,
-  ) => void;
-  nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
-}): Promise<{ turnNumber: number }> {
-  const continuationPrompt =
-    options.slashResult.action === "continue-session"
-      ? options.slashResult.continuationPrompt?.trim()
-      : undefined;
-  const targetSessionId =
-    options.slashResult.sessionId ?? options.runtimeContext.session.id;
-
-  if (continuationPrompt) {
-    const targetSummary = (() => {
-      try {
-        return options.sessionManager.describeSessionReentry(targetSessionId);
-      } catch {
-        return null;
-      }
-    })();
-
-    if (targetSummary?.status === "completed") {
-      const resumeResult = options.sessionManager.tryResume(
-        targetSessionId,
-        options.runtimeContext.projectRoot,
-        { mode: "continuity-only" },
-      );
-      if (isFailedResumeResult(resumeResult)) {
-        options.renderer.renderLine(
-          options.printMode
-            ? `Continue failed: ${resumeResult.error}\nHint: ${resumeResult.recoveryHint}`
-            : `\nContinue failed: ${resumeResult.error}\nHint: ${resumeResult.recoveryHint}\n`,
-        );
-        return { turnNumber: options.turnNumber ?? 0 };
-      }
-
-      switchRuntimeSessionProjectContext(
-        options.runtimeContext,
-        resumeResult.session,
-      );
-
-      const nextTurn = (options.turnNumber ?? 0) + 1;
-      const effectiveFollowUp = normalizePromptForExecution(continuationPrompt);
-      await executeResolvedPromptTurn({
-        source: options.source,
-        effectivePrompt: effectiveFollowUp,
-        continuityState: options.sessionManager.buildContinuitySnapshot(
-          resumeResult.session.id,
-        ),
-        sessionManager: options.sessionManager,
-        setActiveNonInteractiveApprovalMode:
-          options.setActiveNonInteractiveApprovalMode,
-        nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
-        runtimeContext: options.runtimeContext,
-        sessionRuntime: options.sessionRuntime,
-        logger: options.logger,
-        printMode: options.printMode,
-        turnNumber: options.source === "interactive" ? nextTurn : undefined,
-        renderer: options.renderer,
-        turnOrigin: "continued",
-      });
-      return { turnNumber: nextTurn };
-    }
-  }
-
-  if (options.slashResult.action === "continue-session") {
-    const targetSummary = (() => {
-      try {
-        return options.sessionManager.describeSessionReentry(targetSessionId);
-      } catch {
-        return null;
-      }
-    })();
-    if (targetSummary?.terminalClassification === "stopped") {
-      renderStoppedContinueGuidance({
-        renderer: options.renderer,
-        printMode: options.printMode,
-        sessionId: targetSessionId,
-        summary: targetSummary,
-        snapshot: options.sessionManager.buildContinuitySnapshot(targetSessionId),
-      });
-      return { turnNumber: options.turnNumber ?? 0 };
-    }
-  }
-
-  const resumed = await resumeShellSession({
-    requestedSessionId: options.slashResult.sessionId,
-    fallbackSessionId: options.fallbackSessionId,
-    sessionManager: options.sessionManager,
-    runtimeContext: options.runtimeContext,
-    renderer: options.renderer,
-  });
-  if (!resumed.resumed) {
-    return { turnNumber: options.turnNumber ?? 0 };
-  }
-
-  if (continuationPrompt) {
-    const nextTurn = (options.turnNumber ?? 0) + 1;
-    const effectiveFollowUp = normalizePromptForExecution(continuationPrompt);
-    await executeResolvedPromptTurn({
-      source: options.source,
-      effectivePrompt: effectiveFollowUp,
-      sessionManager: options.sessionManager,
-      setActiveNonInteractiveApprovalMode:
-        options.setActiveNonInteractiveApprovalMode,
-      nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
-      runtimeContext: options.runtimeContext,
-      sessionRuntime: options.sessionRuntime,
-      logger: options.logger,
-      printMode: options.printMode,
-      turnNumber: options.source === "interactive" ? nextTurn : undefined,
-      renderer: options.renderer,
-      turnOrigin: "continued",
-    });
-    return { turnNumber: nextTurn };
-  }
-
-  if (resumed.autoResume) {
-    const nextTurn = (options.turnNumber ?? 0) + 1;
-    await executeResolvedPromptTurn({
-      source: options.source,
-      effectivePrompt: resumed.autoResume.prompt,
-      runtimeSeed: resumed.autoResume.runtimeSeed,
-      continuityState: resumed.autoResume.continuityState,
-      sessionManager: options.sessionManager,
-      setActiveNonInteractiveApprovalMode:
-        options.setActiveNonInteractiveApprovalMode,
-      nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
-      runtimeContext: options.runtimeContext,
-      sessionRuntime: options.sessionRuntime,
-      logger: options.logger,
-      printMode: options.printMode,
-      turnNumber: options.source === "interactive" ? nextTurn : undefined,
-      renderer: options.renderer,
-      turnOrigin: "resumed",
-    });
-    return { turnNumber: nextTurn };
-  }
-
-  if (options.slashResult.action === "continue-session") {
-    options.renderer.renderLine(
-      options.printMode
-        ? "Session continuation ready. Submit an explicit follow-up prompt."
-        : "Session continuation ready. Enter your next instruction, or use /continue <follow-up prompt>.\n",
-    );
-    renderSessionCommandMap(options.renderer, {
-      compact: options.printMode,
-      includeHelpHint: false,
-    });
-    if (!options.printMode) {
-      options.renderer.renderLine("");
-    }
-  }
-
-  if (options.slashResult.action === "resume-session") {
-    renderSessionCommandMap(options.renderer, {
-      compact: options.printMode,
-      includeHelpHint: false,
-    });
-    if (!options.printMode) {
-      options.renderer.renderLine("");
-    }
-  }
-
-  return { turnNumber: options.turnNumber ?? 0 };
 }
 
 async function executeResolvedPromptTurn(options: {
