@@ -50,6 +50,7 @@ type ActionableBlockerKind =
   | "patch-target-missing"
   | "patch-generation-failed"
   | "stale-read"
+  | "partial-mutation-failed"
   | "verification-failed"
   | "command-not-allowlisted";
 
@@ -302,16 +303,22 @@ function findActionableKindFromEvidence(
     .find((entry) => entry.startsWith("actionable-blocker-kind:"))
     ?.slice("actionable-blocker-kind:".length)
     .trim();
+  const mutationSummaryMarker = evidence
+    .find((entry) => entry.startsWith("mutation-summary-blocker:"))
+    ?.slice("mutation-summary-blocker:".length)
+    .trim();
+  const actionableMarker = marker ?? mutationSummaryMarker;
   if (
-    marker === "ambiguous-target" ||
-    marker === "patch-from-not-found" ||
-    marker === "patch-target-missing" ||
-    marker === "patch-generation-failed" ||
-    marker === "stale-read" ||
-    marker === "verification-failed" ||
-    marker === "command-not-allowlisted"
+    actionableMarker === "ambiguous-target" ||
+    actionableMarker === "patch-from-not-found" ||
+    actionableMarker === "patch-target-missing" ||
+    actionableMarker === "patch-generation-failed" ||
+    actionableMarker === "stale-read" ||
+    actionableMarker === "partial-mutation-failed" ||
+    actionableMarker === "verification-failed" ||
+    actionableMarker === "command-not-allowlisted"
   ) {
-    return marker;
+    return actionableMarker;
   }
   return undefined;
 }
@@ -347,6 +354,13 @@ function classifyActionableKind(
     normalized.includes("read it again before")
   ) {
     return "stale-read";
+  }
+  if (
+    normalized.includes("partial-mutation-failed") ||
+    normalized.includes("mutation-summary-blocker") ||
+    normalized.includes("one or more file mutations failed")
+  ) {
+    return "partial-mutation-failed";
   }
   if (
     normalized.includes("patch-from-not-found") ||

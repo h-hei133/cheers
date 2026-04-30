@@ -377,6 +377,91 @@ describe("mapTerminalToOrchestrationResult", () => {
     );
   });
 
+  it("maps partial mutation blockers to a stopped terminal result", () => {
+    const reason =
+      "partial-mutation-failed: One or more file mutations failed, so the mutation set cannot be reported as successfully applied. Next action: Review the failed files, re-read current content, and retry only the unresolved mutation.";
+    const fakeState = {
+      transcript: [
+        {
+          role: "assistant",
+          content: "Partial mutation failed.",
+          codingResult: buildCodingResult({
+            changedFiles: ["src/partial-ok.txt"],
+            failedFiles: [
+              {
+                path: "docs/partial-denied.txt",
+                reason: "write failed: EISDIR",
+              },
+            ],
+            patches: [
+              {
+                path: "src/partial-ok.txt",
+                operation: "replace",
+                status: "applied",
+              },
+              {
+                path: "docs/partial-denied.txt",
+                operation: "append",
+                status: "failed",
+                failureCode: "write-failed",
+                reason: "write failed: EISDIR",
+              },
+            ],
+            verification: {
+              status: "not-run",
+              reason,
+            },
+            verdict: "completed-with-caveats",
+            reasons: [reason],
+            evidence: [
+              "mutation-summary-blocker:partial-mutation-failed",
+              "mutation-summary-next-action:Review the failed files, re-read current content, and retry only the unresolved mutation.",
+              "edit/write applied on src/partial-ok.txt",
+            ],
+          }),
+        },
+      ],
+      sharedContext: {
+        sessionId: "sess_mapper_partial_mutation_failed",
+        initialPrompt: "prompt",
+        notes: [],
+        handoffs: [],
+      },
+      lastContinuationReason: undefined,
+    } as never;
+
+    const result = mapTerminalToOrchestrationResult(fakeState, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+      stopReason: undefined,
+    } as never);
+
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason).toBe(reason);
+    expect(result.codingResult?.changedFiles).toEqual(["src/partial-ok.txt"]);
+    expect(result.codingResult?.failedFiles).toEqual([
+      expect.objectContaining({ path: "docs/partial-denied.txt" }),
+    ]);
+    expect(result.codingResult?.patches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "src/partial-ok.txt",
+          status: "applied",
+        }),
+        expect.objectContaining({
+          path: "docs/partial-denied.txt",
+          status: "failed",
+        }),
+      ]),
+    );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "mutation-summary-blocker:partial-mutation-failed",
+      ]),
+    );
+  });
+
   it("maps hard tool failures to an error terminal result", () => {
     const fakeState = {
       transcript: [
@@ -462,6 +547,7 @@ describe("mapTerminalToOrchestrationResult", () => {
 function buildCodingResult(input: {
   changedFiles: string[];
   failedFiles?: { path: string; reason: string }[];
+  patches?: Array<Record<string, unknown>>;
   verification: {
     status: "blocked" | "failed" | "not-run";
     reason: string;
@@ -476,7 +562,7 @@ function buildCodingResult(input: {
     taskKind: "edit-file",
     changedFiles: input.changedFiles,
     failedFiles: input.failedFiles ?? [],
-    patches: [],
+    patches: input.patches ?? [],
     repair: {
       status: "not-needed",
       attempts: 1,

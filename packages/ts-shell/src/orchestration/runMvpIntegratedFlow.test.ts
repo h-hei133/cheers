@@ -1693,7 +1693,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.terminalClassification).toBe("error");
+    expect(result.terminalClassification).toBe("stopped");
     expect(result.codingResult?.changedFiles).toEqual(["src/partial-ok.txt"]);
     expect(result.codingResult?.changedFiles).not.toContain(
       "docs/partial-denied.txt",
