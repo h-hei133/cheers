@@ -1465,18 +1465,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     }
   }, 15000);
 
-  it("fails edit workflow with explicit patch failure code when target fragment is missing", async () => {
+  it("from-not-found stops single-file edit without writing planned content", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "failure-target.ts");
+    const original = "export const value = 'stable';\n";
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
       JSON.stringify({ name: "t10-edit-failure-contract" }, null, 2),
       "utf8",
     );
-    await fs.writeFile(
-      path.join(workspaceRoot, "src", "failure-target.ts"),
-      "export const value = 'stable';\n",
-      "utf8",
-    );
+    await fs.writeFile(targetPath, original, "utf8");
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_edit_failure_contract",
@@ -1487,12 +1485,35 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("stopped_error");
     expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.changedFiles).not.toContain(
+      "src/failure-target.ts",
+    );
     expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
       "patch-from-not-found",
     );
     expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
       "Next action: Re-read the target and rerun with the exact current text to replace.",
     );
+    expect(result.codingResult?.patches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "src/failure-target.ts",
+          status: "failed",
+          failureCode: "patch-from-not-found",
+        }),
+      ]),
+    );
+    expect(result.codingResult?.repair.notes.join("\n")).toContain(
+      "patch-from-not-found",
+    );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "actionable-blocker-kind:patch-from-not-found",
+      ]),
+    );
+    expect(result.finalOutput).toContain("Task not completed:");
+    await expect(fs.readFile(targetPath, "utf8")).resolves.toBe(original);
   }, 15000);
 
   it("applies a fenced single-file replacement as an explicit transform", async () => {
@@ -1558,18 +1579,17 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
   it("stops ambiguous replace target without writing the file", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "ambiguous.ts");
+    const original = [
+      "export const markerA = 'v1';",
+      "export const markerB = 'v1';",
+    ].join("\n");
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
       JSON.stringify({ name: "t10-edit-ambiguous-target" }, null, 2),
       "utf8",
     );
-    await fs.writeFile(
-      path.join(workspaceRoot, "src", "ambiguous.ts"),
-      ["export const markerA = 'v1';", "export const markerB = 'v1';"].join(
-        "\n",
-      ),
-      "utf8",
-    );
+    await fs.writeFile(targetPath, original, "utf8");
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_edit_ambiguous_target",
@@ -1581,16 +1601,31 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("stopped_error");
     expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.changedFiles).not.toContain("src/ambiguous.ts");
     expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
       "patch-ambiguous",
     );
-    expect(result.codingResult?.changedFiles).not.toContain("src/ambiguous.ts");
-    const updated = await fs.readFile(
-      path.join(workspaceRoot, "src", "ambiguous.ts"),
-      "utf8",
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "Next action: Provide a more specific replaceFrom snippet that uniquely identifies the intended occurrence.",
     );
-    expect(updated).toContain("markerA = 'v1'");
-    expect(updated).toContain("markerB = 'v1'");
+    expect(result.codingResult?.patches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "src/ambiguous.ts",
+          status: "failed",
+          failureCode: "patch-ambiguous",
+        }),
+      ]),
+    );
+    expect(result.codingResult?.repair.notes.join("\n")).toContain(
+      "patch-ambiguous",
+    );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining(["actionable-blocker-kind:ambiguous-target"]),
+    );
+    expect(result.finalOutput).toContain("Task not completed:");
+    await expect(fs.readFile(targetPath, "utf8")).resolves.toBe(original);
   }, 15000);
 
   it("targetResolution blocker stops ambiguous sibling edit before mutation", async () => {

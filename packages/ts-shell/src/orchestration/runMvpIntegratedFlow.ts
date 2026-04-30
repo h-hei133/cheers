@@ -5200,6 +5200,22 @@ async function executeWorkflowTaskPlan(input: {
           `repair-cross-file primary-skip:${targetPath}:anchor-not-found`,
         );
       } else {
+        const patchFailureCode = mutationInstruction.reason.includes(
+          "patch-from-not-found",
+        )
+          ? "patch-from-not-found"
+          : mutationInstruction.reason.includes("patch-ambiguous")
+            ? "patch-ambiguous"
+            : undefined;
+        if (patchFailureCode) {
+          patches.push({
+            path: targetPath,
+            operation: "replace",
+            status: "failed",
+            failureCode: patchFailureCode,
+            reason: mutationInstruction.reason,
+          });
+        }
         failedFiles.push({
           path: targetPath,
           reason: mutationInstruction.reason,
