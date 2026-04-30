@@ -34,6 +34,7 @@ import {
 } from "./lowRiskVerificationPlanning.js";
 import { MultiAgentOrchestrator } from "./MultiAgentOrchestrator.js";
 import {
+  buildFileMutationSummaryContract,
   executeFileMutationBranch,
   summarizeFileMutationResults,
 } from "./mutationExecution.js";
@@ -6489,27 +6490,18 @@ function reconcileFileMutationSummary(
     }
   }
 
-  for (const evidence of summary.evidence) {
+  const summaryContract = buildFileMutationSummaryContract(summary);
+
+  for (const evidence of summaryContract.evidence) {
     if (!aggregate.evidence.includes(evidence)) {
       aggregate.evidence.push(evidence);
     }
   }
 
-  if (!("blocker" in summary)) {
-    return;
-  }
-
-  const blockerReason = `${summary.blocker.code}: ${summary.blocker.reason} Next action: ${summary.blocker.nextAction}`;
-  if (!aggregate.repairNotes.includes(blockerReason)) {
-    aggregate.repairNotes.push(blockerReason);
-  }
-  const blockerEvidence = `mutation-summary-blocker:${summary.blocker.code}`;
-  if (!aggregate.evidence.includes(blockerEvidence)) {
-    aggregate.evidence.push(blockerEvidence);
-  }
-  const nextActionEvidence = `mutation-summary-next-action:${summary.blocker.nextAction}`;
-  if (!aggregate.evidence.includes(nextActionEvidence)) {
-    aggregate.evidence.push(nextActionEvidence);
+  for (const repairNote of summaryContract.repairNotes) {
+    if (!aggregate.repairNotes.includes(repairNote)) {
+      aggregate.repairNotes.push(repairNote);
+    }
   }
 }
 

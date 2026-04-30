@@ -50,6 +50,11 @@ export type FileMutationExecutionSummary =
       readonly evidence: readonly string[];
     };
 
+export interface FileMutationSummaryContract {
+  readonly repairNotes: readonly string[];
+  readonly evidence: readonly string[];
+}
+
 export async function executeFileMutationBranch(input: {
   readonly path: string;
   readonly content: string;
@@ -190,6 +195,27 @@ export function summarizeFileMutationResults(
     failedFiles: [],
     patches,
     evidence,
+  };
+}
+
+export function buildFileMutationSummaryContract(
+  summary: FileMutationExecutionSummary,
+): FileMutationSummaryContract {
+  if (!("blocker" in summary)) {
+    return {
+      repairNotes: [],
+      evidence: summary.evidence,
+    };
+  }
+
+  const blockerReason = `${summary.blocker.code}: ${summary.blocker.reason} Next action: ${summary.blocker.nextAction}`;
+  return {
+    repairNotes: [blockerReason],
+    evidence: [
+      ...summary.evidence,
+      `mutation-summary-blocker:${summary.blocker.code}`,
+      `mutation-summary-next-action:${summary.blocker.nextAction}`,
+    ],
   };
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildFileMutationSummaryContract,
   executeFileMutationBranch,
   summarizeFileMutationResults,
 } from "./mutationExecution.js";
@@ -184,5 +185,41 @@ describe("mutationExecution", () => {
         "patch-from-not-found",
       ]);
     }
+  });
+
+  it("owns partial mutation blocker repair notes and evidence markers", async () => {
+    const changed = await executeFileMutationBranch({
+      path: "src/app.ts",
+      content: "export const value = 2;\n",
+      operation: "replace",
+      changedLines: 1,
+      addedLines: 0,
+      removedLines: 0,
+      failureReason: "fallback write failure",
+      appliedEvidence: "transform:src/app.ts:1=>2",
+      dispatch: async () => ({ success: true }),
+    });
+    const failed = await executeFileMutationBranch({
+      path: "src/config.ts",
+      content: "export const enabled = true;\n",
+      operation: "replace",
+      changedLines: 1,
+      addedLines: 0,
+      removedLines: 0,
+      failureReason: "fallback write failure",
+      dispatch: async () => ({ success: false, error: "disk denied" }),
+    });
+
+    const summary = summarizeFileMutationResults([changed, failed]);
+    const contract = buildFileMutationSummaryContract(summary);
+
+    expect(contract.repairNotes).toEqual([
+      "partial-mutation-failed: One or more file mutations failed, so the mutation set cannot be reported as successfully applied. Next action: Review the failed files, re-read current content, and retry only the unresolved mutation.",
+    ]);
+    expect(contract.evidence).toEqual([
+      "transform:src/app.ts:1=>2",
+      "mutation-summary-blocker:partial-mutation-failed",
+      "mutation-summary-next-action:Review the failed files, re-read current content, and retry only the unresolved mutation.",
+    ]);
   });
 });
