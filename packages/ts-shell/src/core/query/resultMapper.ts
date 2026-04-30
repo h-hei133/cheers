@@ -48,6 +48,7 @@ type ActionableBlockerKind =
   | "ambiguous-target"
   | "patch-from-not-found"
   | "patch-target-missing"
+  | "patch-generation-failed"
   | "verification-failed"
   | "command-not-allowlisted";
 
@@ -304,6 +305,7 @@ function findActionableKindFromEvidence(
     marker === "ambiguous-target" ||
     marker === "patch-from-not-found" ||
     marker === "patch-target-missing" ||
+    marker === "patch-generation-failed" ||
     marker === "verification-failed" ||
     marker === "command-not-allowlisted"
   ) {
@@ -328,6 +330,13 @@ function classifyActionableKind(
     normalized.includes("edit-target-missing")
   ) {
     return "patch-target-missing";
+  }
+  if (
+    normalized.includes("patch-generation-failed") ||
+    normalized.includes("unified diff") ||
+    normalized.includes("apply_patch")
+  ) {
+    return "patch-generation-failed";
   }
   if (
     normalized.includes("patch-from-not-found") ||

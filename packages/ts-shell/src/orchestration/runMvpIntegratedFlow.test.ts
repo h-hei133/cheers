@@ -3044,7 +3044,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.terminalClassification).not.toBe("success");
+    expect(result.terminalClassification).toBe("stopped");
     expect(result.codingResult?.changedFiles).toEqual([]);
     expect(result.codingResult?.changedFiles).not.toContain(
       "patch_shape_note.txt",

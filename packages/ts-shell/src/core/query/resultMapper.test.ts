@@ -268,6 +268,60 @@ describe("mapTerminalToOrchestrationResult", () => {
     );
   });
 
+  it("maps unsupported patch shape failures to a stopped terminal result", () => {
+    const reason =
+      "patch-generation-failed: unsupported patch shape; unified diff/apply_patch syntax is not supported. Next action: rerun with exact replace-from and replace-to text.";
+    const fakeState = {
+      transcript: [
+        {
+          role: "assistant",
+          content: "Patch generation failed.",
+          codingResult: buildCodingResult({
+            changedFiles: [],
+            failedFiles: [
+              {
+                path: "patch_shape_note.txt",
+                reason,
+              },
+            ],
+            verification: {
+              status: "not-run",
+              reason,
+            },
+            verdict: "completed-with-caveats",
+            reasons: [reason],
+            evidence: [
+              "actionable-blocker-kind:patch-generation-failed",
+              "actionable-blocker-next:Rerun with one explicit target file plus exact replace-from and replace-to text; do not pass unified diff or apply_patch syntax.",
+            ],
+          }),
+        },
+      ],
+      sharedContext: {
+        sessionId: "sess_mapper_patch_generation_failed",
+        initialPrompt: "prompt",
+        notes: [],
+        handoffs: [],
+      },
+      lastContinuationReason: undefined,
+    } as never;
+
+    const result = mapTerminalToOrchestrationResult(fakeState, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+      stopReason: undefined,
+    } as never);
+
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason).toBe(reason);
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "actionable-blocker-kind:patch-generation-failed",
+      ]),
+    );
+  });
+
   it("maps hard tool failures to an error terminal result", () => {
     const fakeState = {
       transcript: [
