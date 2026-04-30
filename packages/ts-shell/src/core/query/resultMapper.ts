@@ -49,6 +49,7 @@ type ActionableBlockerKind =
   | "patch-from-not-found"
   | "patch-target-missing"
   | "patch-generation-failed"
+  | "stale-read"
   | "verification-failed"
   | "command-not-allowlisted";
 
@@ -306,6 +307,7 @@ function findActionableKindFromEvidence(
     marker === "patch-from-not-found" ||
     marker === "patch-target-missing" ||
     marker === "patch-generation-failed" ||
+    marker === "stale-read" ||
     marker === "verification-failed" ||
     marker === "command-not-allowlisted"
   ) {
@@ -337,6 +339,14 @@ function classifyActionableKind(
     normalized.includes("apply_patch")
   ) {
     return "patch-generation-failed";
+  }
+  if (
+    normalized.includes("stale-read") ||
+    normalized.includes("stale read") ||
+    normalized.includes("changed since it was read") ||
+    normalized.includes("read it again before")
+  ) {
+    return "stale-read";
   }
   if (
     normalized.includes("patch-from-not-found") ||

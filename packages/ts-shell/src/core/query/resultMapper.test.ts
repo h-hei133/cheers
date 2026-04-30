@@ -322,6 +322,61 @@ describe("mapTerminalToOrchestrationResult", () => {
     );
   });
 
+  it("maps stale-read edit blockers to a stopped terminal result", () => {
+    const reason =
+      "stale-read: Target file changed since it was read for this edit. Re-read the latest file content and rerun the mutation.";
+    const fakeState = {
+      transcript: [
+        {
+          role: "assistant",
+          content: "Edit blocked by stale read.",
+          codingResult: buildCodingResult({
+            changedFiles: [],
+            failedFiles: [
+              {
+                path: "src/stale-read.txt",
+                reason,
+              },
+            ],
+            verification: {
+              status: "not-run",
+              reason,
+            },
+            verdict: "completed-with-caveats",
+            reasons: [reason],
+            evidence: [
+              "stale-read-blocker:src/stale-read.txt",
+              "actionable-blocker-kind:stale-read",
+            ],
+          }),
+        },
+      ],
+      sharedContext: {
+        sessionId: "sess_mapper_stale_read",
+        initialPrompt: "prompt",
+        notes: [],
+        handoffs: [],
+      },
+      lastContinuationReason: undefined,
+    } as never;
+
+    const result = mapTerminalToOrchestrationResult(fakeState, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+      stopReason: undefined,
+    } as never);
+
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason).toBe(reason);
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "stale-read-blocker:src/stale-read.txt",
+        "actionable-blocker-kind:stale-read",
+      ]),
+    );
+  });
+
   it("maps hard tool failures to an error terminal result", () => {
     const fakeState = {
       transcript: [
