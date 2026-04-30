@@ -78,6 +78,14 @@ export class ToolRuntime {
             return false
           }
 
+          if (config.mockTools) {
+            const [, , toolName] = name.split('__')
+            return config.mockTools.some(tool => {
+              const qualifiedName = tool.qualifiedName ?? `mcp__${serverName}__${tool.toolName}`
+              return qualifiedName === name || tool.toolName === toolName
+            })
+          }
+
           return true
         })
       } catch (error) {

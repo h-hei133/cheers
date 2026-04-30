@@ -275,6 +275,81 @@ describe('core tool runtime stale reconnect consistency', () => {
     })
   })
 
+  it('rejects stale execution when a connected server no longer exposes the descriptor tool', async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true })
+    const configPath = path.join(workspaceRoot, '.private-agents.mcp.json')
+    await fs.writeFile(
+      configPath,
+      JSON.stringify({
+        mcpServers: {
+          localSdk: {
+            transport: 'sdk',
+            mockTools: [{
+              serverName: 'localSdk',
+              toolName: 'search',
+              qualifiedName: 'mcp__localSdk__search',
+              description: 'Search MCP',
+            }],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const gateway = new CoreMcpGateway(workspaceRoot)
+    const initialSnapshot = await gateway.snapshot()
+    const runtime = new ToolRuntime(new SandboxEnforcer({ workspaceRoot, auditLogPath }), {
+      mcpTools: initialSnapshot.tools,
+      mcpGateway: gateway,
+      runtimeConfig: {
+        provider: 'openai',
+        daemonEnabled: true,
+        maxTurns: 6,
+        disabledTools: [],
+        hiddenToolPrefixes: [],
+        enableMcpTools: true,
+        configSources: [],
+      },
+    })
+
+    expect(runtime.listVisibleTools()).toContain('mcp__localSdk__search')
+
+    await fs.writeFile(
+      configPath,
+      JSON.stringify({
+        mcpServers: {
+          localSdk: {
+            transport: 'sdk',
+            mockTools: [],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const refreshedSnapshot = await gateway.refresh('all')
+    expect(refreshedSnapshot.clients[0]).toMatchObject({
+      type: 'connected',
+      name: 'localSdk',
+    })
+    expect(refreshedSnapshot.tools).toEqual([])
+    expect(runtime.listVisibleTools()).not.toContain('mcp__localSdk__search')
+
+    const result = await runtime.execute(
+      'mcp__localSdk__search',
+      {},
+      { taskId: 'task_mcp_removed_tool_descriptor', workspaceRoot },
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('MCP tool search is unavailable on server localSdk')
+    expect(result.metadata).toMatchObject({
+      blockerKind: 'unknown',
+      reason: 'MCP tool search is unavailable on server localSdk',
+      doNext: 'Run /mcp refresh localSdk and retry with a visible MCP tool.',
+    })
+  })
+
   it('hides stale descriptors and rejects stale execution when MCP config becomes malformed', async () => {
     await fs.mkdir(workspaceRoot, { recursive: true })
     const configPath = path.join(workspaceRoot, '.private-agents.mcp.json')

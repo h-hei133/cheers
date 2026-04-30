@@ -186,6 +186,14 @@ export class CoreMcpGateway {
     }
 
     this.clientCache.set(serverName, client);
+    const liveTools = await client.listTools();
+    if (!liveTools.some((tool) => tool.toolName === toolName)) {
+      throw new McpGatewayBlockedError({
+        message: `MCP tool ${toolName} is unavailable on server ${serverName}`,
+        blockerKind: "unknown",
+        doNext: `Run /mcp refresh ${serverName} and retry with a visible MCP tool.`,
+      });
+    }
 
     return client.invokeTool(toolName, args);
   }
