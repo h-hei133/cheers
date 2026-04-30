@@ -1811,6 +1811,161 @@ describe("shell session runtime (W5)", () => {
     );
   });
 
+  it("renders edit patch stopped failures with recovery hints in compact output", async () => {
+    const renderedLines: string[] = [];
+    const stopReason =
+      "partial-mutation-failed: One or more file mutations failed, so the mutation set cannot be reported as successfully applied.";
+    const nextAction =
+      "Review the failed files, re-read current content, and retry only the unresolved mutation.";
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield {
+          type: "query.completed",
+          result: {
+            status: "stopped_error",
+            terminalReason: "stopped_error",
+            terminalClassification: "stopped",
+            stopReason,
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_edit_patch_stopped_compact_surface",
+              initialPrompt: "edit two files",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "",
+            codingResult: {
+              taskKind: "edit-file",
+              changedFiles: ["src/partial-ok.txt"],
+              failedFiles: [
+                {
+                  path: "docs/partial-denied.txt",
+                  reason: "write failed: EISDIR",
+                },
+              ],
+              patches: [
+                {
+                  path: "src/partial-ok.txt",
+                  operation: "replace",
+                  status: "applied",
+                  changedLines: 1,
+                  addedLines: 0,
+                  removedLines: 0,
+                },
+                {
+                  path: "docs/partial-denied.txt",
+                  operation: "append",
+                  status: "failed",
+                  failureCode: "write-failed",
+                  reason: "write failed: EISDIR",
+                },
+              ],
+              repair: {
+                status: "failed",
+                attempts: 1,
+                recoveredItems: [],
+                failedItems: ["docs/partial-denied.txt"],
+                notes: [`${stopReason} Next action: ${nextAction}`],
+              },
+              continuation: {
+                status: "failed-after-bounded-continuation",
+                attempts: 1,
+                evidence: ["mutation-summary-blocker:partial-mutation-failed"],
+              },
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: ["src/partial-ok.txt"],
+                attemptedFiles: [
+                  "src/partial-ok.txt",
+                  "docs/partial-denied.txt",
+                ],
+                changedFiles: ["src/partial-ok.txt"],
+                unchangedAttemptedFiles: ["docs/partial-denied.txt"],
+              },
+              taskSatisfaction: {
+                verdict: "completed-with-caveats",
+                reasons: [stopReason],
+                requiredEvidence: ["inspect->edit->verify contract execution"],
+                observedEvidence: [
+                  "mutation-summary-blocker:partial-mutation-failed",
+                  `mutation-summary-next-action:${nextAction}`,
+                ],
+              },
+              verifiedFiles: [],
+              unverifiedFiles: [
+                {
+                  path: "src/partial-ok.txt",
+                  reason: stopReason,
+                },
+                {
+                  path: "docs/partial-denied.txt",
+                  reason: "write failed: EISDIR",
+                },
+              ],
+              verification: {
+                status: "not-requested",
+                reason: stopReason,
+                nextAction,
+              },
+              evidence: [
+                "mutation-summary-blocker:partial-mutation-failed",
+                `mutation-summary-next-action:${nextAction}`,
+                "edit/write applied on src/partial-ok.txt",
+              ],
+              failureBoundary: stopReason,
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt(
+      "sess_edit_patch_stopped_compact_surface",
+      "edit two files",
+    );
+
+    expect(renderedLines).toContain("Result");
+    expect(renderedLines).toContain("- Outcome: stopped");
+    expect(renderedLines).not.toContain("- Outcome: success");
+    expect(renderedLines).not.toContain("- Detail: completed");
+    expect(renderedLines).toContain(
+      "- BlockerKind: partial-mutation-failed",
+    );
+    expect(renderedLines).toContain(`- Reason: ${stopReason}`);
+    expect(renderedLines).toContain(`- DoNext: ${nextAction}`);
+    expect(renderedLines).toContain("Action result");
+    expect(renderedLines).toContain("- Changed: 1 file(s)");
+    expect(renderedLines).toContain(
+      "- Failed files: docs/partial-denied.txt (write failed: EISDIR)",
+    );
+    expect(renderedLines).toContain(
+      "- Failure reason: docs/partial-denied.txt: write failed: EISDIR",
+    );
+    expect(renderedLines).toContain(`- Next action: ${nextAction}`);
+    expect(renderedLines.some((line) => line.startsWith("- Evidence:"))).toBe(
+      false,
+    );
+  });
+
   it("prints actionable hints for provider readiness auth/network failures and keeps error persistence", async () => {
     for (const scenario of [
       {

@@ -851,6 +851,11 @@ function renderCodingResultContract(
     renderer.renderLine("Action result");
     renderer.renderLine(`- Task: ${codingResult.taskKind}`);
     renderer.renderLine(`- Changed: ${changedFilesSummary}`);
+    if (codingResult.failedFiles.length > 0) {
+      renderer.renderLine(
+        `- Failed files: ${codingResult.failedFiles.map((entry) => `${entry.path} (${entry.reason})`).join("; ")}`,
+      );
+    }
     for (const line of buildCodingSuccessEvidenceLines(codingResult)) {
       renderer.renderLine(line);
     }
