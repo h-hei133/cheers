@@ -1141,7 +1141,7 @@ describe("shell session runtime (W5)", () => {
     );
   });
 
-  it("renders verification failure detail with command and reason in compact output", async () => {
+  it("renders verification failure as stopped recovery guidance in compact output", async () => {
     const renderedLines: string[] = [];
 
     const runtime = new ShellSessionRuntime({
@@ -1168,7 +1168,7 @@ describe("shell session runtime (W5)", () => {
           result: {
             status: "stopped_error",
             terminalReason: "stopped_error",
-            terminalClassification: "error",
+            terminalClassification: "stopped",
             stopReason: "npm test failed with exit code 1",
             transcript: [],
             sharedContext: {
@@ -1234,6 +1234,18 @@ describe("shell session runtime (W5)", () => {
       "edit notes and verify",
     );
 
+    expect(renderedLines).toContain("Result");
+    expect(renderedLines).toContain("- Outcome: stopped");
+    expect(renderedLines).not.toContain("- Outcome: success");
+    expect(renderedLines).not.toContain("- Detail: completed");
+    expect(renderedLines).toContain("- BlockerKind: verification-failed");
+    expect(renderedLines).toContain(
+      "- Reason: npm test failed with exit code 1",
+    );
+    expect(renderedLines).toContain(
+      "- DoNext: Fix the verification failure, then rerun the verification step.",
+    );
+    expect(renderedLines).toContain("Action result");
     expect(renderedLines).toContain("- Changed files: notes.txt");
     expect(renderedLines).toContain("- Verification: failed");
     expect(renderedLines).toContain(
