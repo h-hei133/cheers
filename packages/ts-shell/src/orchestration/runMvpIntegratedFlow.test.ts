@@ -1588,12 +1588,41 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("stopped_error");
     expect(result.terminalClassification).toBe("error");
-    expect(result.codingResult?.changedFiles).toContain("src/partial-ok.txt");
-    expect(result.codingResult?.failedFiles.map((entry) => entry.path)).toContain(
+    expect(result.codingResult?.changedFiles).toEqual(["src/partial-ok.txt"]);
+    expect(result.codingResult?.changedFiles).not.toContain(
       "docs/partial-denied.txt",
+    );
+    expect(result.codingResult?.failedFiles).toEqual([
+      expect.objectContaining({
+        path: "docs/partial-denied.txt",
+        reason: expect.stringContaining("EISDIR"),
+      }),
+    ]);
+    expect(result.codingResult?.patches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "src/partial-ok.txt",
+          operation: "replace",
+          status: "applied",
+        }),
+        expect.objectContaining({
+          path: "docs/partial-denied.txt",
+          operation: "append",
+          status: "failed",
+          failureCode: "write-failed",
+        }),
+      ]),
     );
     expect(result.codingResult?.evidence).toContain(
       "mutation-summary-blocker:partial-mutation-failed",
+    );
+    expect(result.codingResult?.evidence).toContain(
+      "edit/write applied on src/partial-ok.txt",
+    );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.not.arrayContaining([
+        "secondary write applied on docs/partial-denied.txt",
+      ]),
     );
     expect(result.codingResult?.repair.notes.join("\n")).toContain(
       "partial-mutation-failed",

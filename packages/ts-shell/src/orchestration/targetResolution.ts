@@ -131,7 +131,7 @@ function collectCandidateTokens(prompt: string): string[] {
     .filter((candidate): candidate is string => Boolean(candidate));
   const inline =
     prompt.match(
-      /([A-Za-z]:[\\/][^\s"'`<>|?*]+|(?:\.\.?[\\/][^\s"'`<>|?*]+)|(?:\/[^\s"'`<>|?*]+)|(?:[A-Za-z0-9_-]+(?:[\\/][A-Za-z0-9._-]+)*\.(?:d\.ts|test\.(?:ts|tsx|js|jsx)|spec\.(?:ts|tsx|js|jsx)|tsx|jsx|ts|js|py|go|rs|md|txt|json|log|yaml|yml|toml)))/g,
+      /([A-Za-z]:[\\/][^\s"'`<>|?*]+|(?:\.\.?[\\/][^\s"'`<>|?*]+)|(?:\/[^\s"'`<>|?*]+)|(?:[A-Za-z0-9._-]+(?:[\\/][A-Za-z0-9._-]+)*\.(?:d\.ts|test\.(?:ts|tsx|jsx|js)|spec\.(?:ts|tsx|jsx|js)|json|tsx|jsx|ts|js|py|go|rs|md|txt|log|yaml|yml|toml)))/g,
     ) ?? [];
 
   return [...quoted, ...markdownCode, ...inline];
