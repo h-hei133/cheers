@@ -2986,6 +2986,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
   it("reports a stable patch target missing reason for explicit replace patches", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
+    const targetPath = path.join(workspaceRoot, "missing_patch_note.txt");
 
     const result = await runMvpIntegratedFlow({
       sessionId: "sess_t10_patch_lane_target_missing",
@@ -2996,16 +2997,35 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
+    expect(result.status).toBe("stopped_error");
     expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.changedFiles).not.toContain(
+      "missing_patch_note.txt",
+    );
     expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "patch-target-missing",
+    );
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "Next action: Check that the target file exists and rerun with an explicit in-workspace path.",
+    );
+    expect(result.codingResult?.patches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "missing_patch_note.txt",
+          status: "failed",
+          failureCode: "patch-target-missing",
+        }),
+      ]),
+    );
+    expect(result.codingResult?.repair.notes.join("\n")).toContain(
       "patch-target-missing",
     );
     expect(result.codingResult?.evidence).toEqual(
       expect.arrayContaining(["actionable-blocker-kind:patch-target-missing"]),
     );
-    await expect(
-      fs.readFile(path.join(workspaceRoot, "missing_patch_note.txt"), "utf8"),
-    ).rejects.toThrow();
+    expect(result.finalOutput).toContain("Task not completed:");
+    await expect(fs.readFile(targetPath, "utf8")).rejects.toThrow();
   }, 15000);
 
   it("runs low-risk multi-file consistency verification after a file edit", async () => {

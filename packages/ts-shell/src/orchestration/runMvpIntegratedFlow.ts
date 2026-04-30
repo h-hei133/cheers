@@ -4652,11 +4652,24 @@ async function executeWorkflowTaskPlan(input: {
             })
           : rawReason;
       notes.push(`inspect failed: ${reason}`);
+      if (input.plan.replaceFrom && input.plan.replaceTo) {
+        patches.push({
+          path: input.plan.targetPath,
+          operation: "replace",
+          status: "failed",
+          failureCode: "patch-target-missing",
+          reason,
+        });
+      }
       failedFiles.push({ path: input.plan.targetPath, reason });
       const inspectFailureTaskReason =
         input.plan.taskKind === "read-file"
           ? "Read/inspect step failed; no files changed."
           : "Inspect step failed; mutation skipped.";
+      const inspectFailureRepairNotes =
+        input.plan.replaceFrom && input.plan.replaceTo
+          ? [reason]
+          : ["inspect step failed before edit"];
       return {
         events,
         notes,
@@ -4672,7 +4685,7 @@ async function executeWorkflowTaskPlan(input: {
             selectionScope: "none",
             selectionSource: "not-requested",
           },
-          repairNotes: ["inspect step failed before edit"],
+          repairNotes: inspectFailureRepairNotes,
           evidence: [`read failed: ${reason}`],
           taskVerdict: "insufficient-evidence",
           taskReasons: [inspectFailureTaskReason],
