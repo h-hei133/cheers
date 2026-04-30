@@ -2281,6 +2281,139 @@ describe("shell session runtime (W5)", () => {
     );
   });
 
+  it("renders explicit approval denial as user-declined in compact output", async () => {
+    const renderedLines: string[] = [];
+    const stopReason = "Approval denied by user for bash";
+    const nextAction =
+      "Re-run and approve escalation for verify command execution.";
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield { type: "tool.started", toolName: "bash", taskId: "task_1" };
+        yield {
+          type: "approval.requested",
+          toolName: "bash",
+          taskId: "task_1",
+        };
+        yield {
+          type: "approval.resolved",
+          toolName: "bash",
+          taskId: "task_1",
+          outcome: "denied",
+        };
+        yield {
+          type: "query.completed",
+          result: {
+            status: "stopped_error",
+            terminalReason: "stopped_error",
+            terminalClassification: "stopped",
+            stopReason,
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_explicit_approval_denied_surface",
+              initialPrompt: "run node --version",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "",
+            codingResult: {
+              taskKind: "run-command",
+              changedFiles: [],
+              failedFiles: [],
+              patches: [],
+              repair: {
+                status: "failed",
+                attempts: 1,
+                recoveredItems: [],
+                failedItems: [],
+                notes: [stopReason],
+              },
+              continuation: {
+                status: "failed-after-bounded-continuation",
+                attempts: 1,
+                evidence: ["verify-blocker-kind:approval-denied"],
+              },
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: [],
+                attemptedFiles: [],
+                changedFiles: [],
+                unchangedAttemptedFiles: [],
+              },
+              taskSatisfaction: {
+                verdict: "not-completed",
+                reasons: [stopReason],
+                requiredEvidence: ["explicit approval result"],
+                observedEvidence: ["verify-blocker-kind:approval-denied"],
+              },
+              verifiedFiles: [],
+              unverifiedFiles: [],
+              verification: {
+                status: "blocked",
+                reason: stopReason,
+                blockerKind: "approval-denied",
+                command: "node --version",
+                nextAction,
+              },
+              evidence: [
+                "verify-blocker-kind:approval-denied",
+                `verify-next-action:${nextAction}`,
+              ],
+              failureBoundary: stopReason,
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt(
+      "sess_explicit_approval_denied_surface",
+      "run node --version",
+    );
+
+    expect(renderedLines).toContain("- Approvals: 0/1 approved");
+    expect(renderedLines).toContain("Result");
+    expect(renderedLines).toContain("- Outcome: stopped");
+    expect(renderedLines).toContain("- BlockerKind: approval-denied");
+    expect(renderedLines).toContain(`- Reason: ${stopReason}`);
+    expect(renderedLines).toContain(`- DoNext: ${nextAction}`);
+    expect(renderedLines).toContain("Action result");
+    expect(renderedLines).toContain(`- Next action: ${nextAction}`);
+    expect(renderedLines).toContain("Next steps");
+    expect(renderedLines).toContain(
+      "- Submit the prompt again and approve escalation when requested.",
+    );
+    expect(renderedLines).not.toContain(
+      "- Tool execution failed after approval; inspect the command output/error.",
+    );
+    expect(renderedLines).not.toContain(
+      "- Fix the command or environment issue, then rerun the command if still needed.",
+    );
+    expect(
+      renderedLines.some((line) =>
+        line.includes("Bash execution failed after approval"),
+      ),
+    ).toBe(false);
+  });
+
   it("prints actionable hints for provider readiness auth/network failures and keeps error persistence", async () => {
     for (const scenario of [
       {

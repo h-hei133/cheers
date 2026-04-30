@@ -677,7 +677,8 @@ type ActionableBlockerKind =
   | "stale-read"
   | "partial-mutation-failed"
   | "verification-failed"
-  | "command-not-allowlisted";
+  | "command-not-allowlisted"
+  | "approval-denied";
 
 function deriveActionableBlockerContract(input: {
   stopReason?: string;
@@ -733,7 +734,11 @@ function findActionableBlockerKindInEvidence(
     .find((entry) => entry.startsWith("mutation-summary-blocker:"))
     ?.slice("mutation-summary-blocker:".length)
     .trim();
-  const actionableMarker = marker ?? mutationSummaryMarker;
+  const verifyBlockerMarker = evidence
+    .find((entry) => entry.startsWith("verify-blocker-kind:"))
+    ?.slice("verify-blocker-kind:".length)
+    .trim();
+  const actionableMarker = marker ?? mutationSummaryMarker ?? verifyBlockerMarker;
   if (
     actionableMarker === "ambiguous-target" ||
     actionableMarker === "patch-from-not-found" ||
@@ -742,7 +747,8 @@ function findActionableBlockerKindInEvidence(
     actionableMarker === "stale-read" ||
     actionableMarker === "partial-mutation-failed" ||
     actionableMarker === "verification-failed" ||
-    actionableMarker === "command-not-allowlisted"
+    actionableMarker === "command-not-allowlisted" ||
+    actionableMarker === "approval-denied"
   ) {
     return actionableMarker;
   }
@@ -811,6 +817,8 @@ function actionableBlockerNextAction(kind: ActionableBlockerKind): string {
   switch (kind) {
     case "command-not-allowlisted":
       return "Rephrase the request with an allowlisted command: node --version, npm test -- --help, or npm run build -- --help.";
+    case "approval-denied":
+      return "Re-run and approve escalation for verify command execution.";
     case "patch-from-not-found":
       return "Provide the exact current source text from the target file, then rerun the patch.";
     case "patch-target-missing":
