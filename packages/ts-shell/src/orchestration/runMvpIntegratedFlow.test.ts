@@ -3028,6 +3028,54 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     await expect(fs.readFile(targetPath, "utf8")).rejects.toThrow();
   }, 15000);
 
+  it("rejects apply_patch-shaped replace payload without writing the file", async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true });
+    const targetPath = path.join(workspaceRoot, "patch_shape_note.txt");
+    const original = "alpha\nbeta\ngamma\n";
+    await fs.writeFile(targetPath, original, "utf8");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_patch_lane_apply_patch_shape",
+      prompt:
+        'In patch_shape_note.txt, replace "*** Begin Patch" with "BETA". Verify patch_shape_note.txt contains BETA.',
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).not.toBe("success");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.changedFiles).not.toContain(
+      "patch_shape_note.txt",
+    );
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "patch-generation-failed",
+    );
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "Next action: Rerun with a target file plus exact replace-from and replace-to text for one file; do not pass unified diff or apply_patch syntax.",
+    );
+    expect(result.codingResult?.patches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "patch_shape_note.txt",
+          status: "failed",
+          failureCode: "patch-generation-failed",
+        }),
+      ]),
+    );
+    expect(result.codingResult?.repair.notes.join("\n")).toContain(
+      "patch-generation-failed",
+    );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "actionable-blocker-kind:patch-generation-failed",
+      ]),
+    );
+    expect(result.finalOutput).toContain("Task not completed:");
+    await expect(fs.readFile(targetPath, "utf8")).resolves.toBe(original);
+  }, 15000);
+
   it("runs low-risk multi-file consistency verification after a file edit", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     await fs.writeFile(

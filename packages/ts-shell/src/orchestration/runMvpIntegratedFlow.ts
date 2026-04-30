@@ -5219,7 +5219,9 @@ async function executeWorkflowTaskPlan(input: {
           ? "patch-from-not-found"
           : mutationInstruction.reason.includes("patch-ambiguous")
             ? "patch-ambiguous"
-            : undefined;
+            : mutationInstruction.reason.includes("patch-generation-failed")
+              ? "patch-generation-failed"
+              : undefined;
         if (patchFailureCode) {
           patches.push({
             path: targetPath,
@@ -12459,6 +12461,7 @@ type ActionableBlockerKind =
   | "ambiguous-target"
   | "patch-from-not-found"
   | "patch-target-missing"
+  | "patch-generation-failed"
   | "verification-failed"
   | "command-not-allowlisted";
 
@@ -12520,6 +12523,7 @@ function findActionableBlockerKindInEvidence(
     marker === "ambiguous-target" ||
     marker === "patch-from-not-found" ||
     marker === "patch-target-missing" ||
+    marker === "patch-generation-failed" ||
     marker === "verification-failed" ||
     marker === "command-not-allowlisted"
   ) {
@@ -12544,6 +12548,14 @@ function classifyActionableBlockerKind(
     normalizedReason.includes("edit-target-missing")
   ) {
     return "patch-target-missing";
+  }
+  if (
+    normalizedReason.includes("patch-generation-failed") ||
+    normalizedReason.includes("unified diff") ||
+    normalizedReason.includes("apply_patch") ||
+    normalizedReason.includes("only supports one explicit single-file")
+  ) {
+    return "patch-generation-failed";
   }
   if (
     normalizedReason.includes("patch-from-not-found") ||
@@ -12572,6 +12584,8 @@ function actionableBlockerNextAction(kind: ActionableBlockerKind): string {
       return "Provide the exact current source text from the target file, then rerun the patch.";
     case "patch-target-missing":
       return "Create or confirm the target file path first, then rerun the patch.";
+    case "patch-generation-failed":
+      return "Rerun with one explicit target file plus exact replace-from and replace-to text; do not pass unified diff or apply_patch syntax.";
     case "ambiguous-target":
       return "Specify one exact target file/path (and exact from/to text if editing), then rerun.";
     case "verification-failed":
