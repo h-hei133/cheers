@@ -1642,7 +1642,7 @@ describe("SessionManager", () => {
       "Seed influence: target-carryover from edit-file on src/app.ts.",
     );
     expect(completedSnapshot.lastSuccessHandoffDiagnostic).toBe(
-      "Success handoff: status=passed; target=src/app.ts; command=npm test -- src/app.test.ts; verified=src/app.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
+      "Success handoff: status=passed; target=src/app.ts; command=npm test -- src/app.test.ts; verified=src/app.ts; reason=Focused test passed.; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
     );
     expect(
       restoredManager.buildPromptContinuitySnapshot(
@@ -1685,7 +1685,7 @@ describe("SessionManager", () => {
         "continue with the same task",
       ),
     ).toContain(
-      "- last-success-handoff-diagnostic: Success handoff: status=passed; target=src/app.ts; command=npm test -- src/app.test.ts; verified=src/app.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
+      "- last-success-handoff-diagnostic: Success handoff: status=passed; target=src/app.ts; command=npm test -- src/app.test.ts; verified=src/app.ts; reason=Focused test passed.;",
     );
 
     expect(restoredManager.getCurrentSessionForProject(failedProject)?.id).toBe(
@@ -3136,6 +3136,139 @@ describe("SessionManager", () => {
         taskId: "task_append_tool",
       },
     );
+  });
+
+  it("preserves edit patch stopped failure recovery details in continuity context", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    const stopReason =
+      "patch-from-not-found: Source text was not found in docs/failed-edit.md.";
+    const nextAction =
+      "Re-read docs/failed-edit.md, then rerun with the exact current text to replace.";
+
+    manager.markRunStarted(session.id, "continue failed edit");
+    manager.addTurn(session.id, {
+      role: "user",
+      content: "replace old text in docs/failed-edit.md",
+    });
+    manager.appendQueryEvent(session.id, {
+      type: "query.completed",
+      result: {
+        status: "stopped_error",
+        terminalReason: "stopped_error",
+        terminalClassification: "stopped",
+        stopReason,
+        transcript: [],
+        sharedContext: {
+          sessionId: session.id,
+          initialPrompt: "replace old text in docs/failed-edit.md",
+          notes: [],
+          handoffs: [],
+        },
+        finalOutput: "",
+        codingResult: {
+          taskKind: "edit-file",
+          changedFiles: [],
+          failedFiles: [
+            {
+              path: "docs/failed-edit.md",
+              reason: stopReason,
+            },
+          ],
+          patches: [
+            {
+              path: "docs/failed-edit.md",
+              operation: "replace",
+              status: "failed",
+              failureCode: "patch-from-not-found",
+              reason: stopReason,
+            },
+          ],
+          repair: {
+            status: "failed",
+            attempts: 1,
+            recoveredItems: [],
+            failedItems: ["docs/failed-edit.md"],
+            notes: [`${stopReason} Next action: ${nextAction}`],
+          },
+          continuation: {
+            status: "failed-after-bounded-continuation",
+            attempts: 1,
+            evidence: ["actionable-blocker-kind:patch-from-not-found"],
+          },
+          changeSet: {
+            gitAware: false,
+            preExistingDirtyFiles: [],
+            postRunDirtyFiles: [],
+            attemptedFiles: ["docs/failed-edit.md"],
+            changedFiles: [],
+            unchangedAttemptedFiles: ["docs/failed-edit.md"],
+          },
+          taskSatisfaction: {
+            verdict: "completed-with-caveats",
+            reasons: [stopReason],
+            requiredEvidence: ["inspect->edit->verify contract execution"],
+            observedEvidence: ["actionable-blocker-kind:patch-from-not-found"],
+          },
+          verifiedFiles: [],
+          unverifiedFiles: [
+            {
+              path: "docs/failed-edit.md",
+              reason: stopReason,
+            },
+          ],
+          verification: {
+            status: "blocked",
+            reason: stopReason,
+            blockerKind: "patch-from-not-found",
+            nextAction,
+          },
+          evidence: [
+            "actionable-blocker-kind:patch-from-not-found",
+            `mutation-summary-next-action:${nextAction}`,
+          ],
+          failureBoundary: stopReason,
+        },
+      },
+    });
+    manager.saveError(session.id, stopReason, {
+      terminalReason: "stopped_error",
+      terminalClassification: "stopped",
+    });
+
+    const snapshot = manager.buildContinuitySnapshot(session.id);
+    expect(snapshot.lastTerminalClassification).toBe("stopped");
+    expect(snapshot.lastFailure).toBe(stopReason);
+    expect(snapshot.recentChangedFiles).toEqual([]);
+    expect(snapshot.recentFailedFiles).toEqual([
+      {
+        path: "docs/failed-edit.md",
+        reason: stopReason,
+      },
+    ]);
+    expect(snapshot.lastVerificationStatus).toBe("blocked");
+    expect(snapshot.lastVerificationBlockerKind).toBe("patch-from-not-found");
+    expect(snapshot.lastVerificationReason).toBe(stopReason);
+    expect(snapshot.lastVerificationNextAction).toBe(nextAction);
+    expect(snapshot.lastFailureHandoffDiagnostic).toBe(
+      `Failure handoff: status=blocked; target=docs/failed-edit.md; reason=${stopReason}; blocker=patch-from-not-found; next=${nextAction.replace(/[.]+$/, "")}.`,
+    );
+
+    const context = manager.buildPromptContinuityContext(
+      session.id,
+      "continue with the same task",
+    );
+    expect(context).toContain(
+      "- last-failure-handoff-diagnostic: Failure handoff: status=blocked; target=docs/failed-edit.md;",
+    );
+    expect(context).toContain("blocker=patch-from-not-found");
+    expect(context).toContain(
+      `- recent-failed-files: docs/failed-edit.md (${stopReason})`,
+    );
+    expect(context).toContain(
+      "- last-verification-blocker-kind: patch-from-not-found",
+    );
+    expect(context).toContain(`- last-verification-next-action: ${nextAction}`);
   });
 
   it("retains transform evidence in continuity snapshot for temporal multi-hop rollover", () => {
