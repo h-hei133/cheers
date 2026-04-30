@@ -2522,6 +2522,50 @@ function renderBlockedContract(
   renderer.renderLine("");
 }
 
+function renderStoppedContinueGuidance(input: {
+  renderer: StreamingRenderer;
+  printMode: boolean;
+  sessionId: string;
+  summary: SessionReentrySummary;
+  snapshot: SessionContinuitySnapshot;
+}): void {
+  const failedFiles = input.snapshot.recentFailedFiles
+    .map((entry) => `${entry.path}${entry.reason ? ` (${entry.reason})` : ""}`)
+    .join(", ");
+  const reason =
+    input.snapshot.lastVerificationReason ??
+    input.snapshot.lastFailure ??
+    input.summary.blockedDetail ??
+    input.summary.resumeDetail ??
+    "The previous run stopped before the task could continue automatically.";
+  const blockerKind =
+    input.snapshot.lastVerificationBlockerKind ??
+    input.summary.blockedReason ??
+    "stopped-result";
+  const doNext =
+    input.snapshot.lastVerificationNextAction ??
+    `Use /continue <follow-up prompt> with a concrete repair instruction for session ${input.sessionId}.`;
+
+  if (!input.printMode) {
+    input.renderer.renderLine("");
+  }
+  input.renderer.renderLine("Result");
+  input.renderer.renderLine("- Outcome: stopped");
+  input.renderer.renderLine("- TerminalState: stopped");
+  input.renderer.renderLine(`- BlockerKind: ${blockerKind}`);
+  input.renderer.renderLine(`- Reason: ${reason}`);
+  if (failedFiles) {
+    input.renderer.renderLine(`- Failed files: ${failedFiles}`);
+  }
+  input.renderer.renderLine(`- DoNext: ${doNext}`);
+  input.renderer.renderLine(
+    `- Next action: Use /continue <follow-up prompt> or provide a concrete repair instruction to continue session ${input.sessionId}.`,
+  );
+  if (!input.printMode) {
+    input.renderer.renderLine("");
+  }
+}
+
 async function runResumeLikeShellAction(options: {
   slashResult: ResumeLikeShellAction;
   source: "interactive" | "non-interactive";
@@ -2542,10 +2586,10 @@ async function runResumeLikeShellAction(options: {
     options.slashResult.action === "continue-session"
       ? options.slashResult.continuationPrompt?.trim()
       : undefined;
+  const targetSessionId =
+    options.slashResult.sessionId ?? options.runtimeContext.session.id;
 
   if (continuationPrompt) {
-    const targetSessionId =
-      options.slashResult.sessionId ?? options.runtimeContext.session.id;
     const targetSummary = (() => {
       try {
         return options.sessionManager.describeSessionReentry(targetSessionId);
@@ -2595,6 +2639,26 @@ async function runResumeLikeShellAction(options: {
         turnOrigin: "continued",
       });
       return { turnNumber: nextTurn };
+    }
+  }
+
+  if (options.slashResult.action === "continue-session") {
+    const targetSummary = (() => {
+      try {
+        return options.sessionManager.describeSessionReentry(targetSessionId);
+      } catch {
+        return null;
+      }
+    })();
+    if (targetSummary?.terminalClassification === "stopped") {
+      renderStoppedContinueGuidance({
+        renderer: options.renderer,
+        printMode: options.printMode,
+        sessionId: targetSessionId,
+        summary: targetSummary,
+        snapshot: options.sessionManager.buildContinuitySnapshot(targetSessionId),
+      });
+      return { turnNumber: options.turnNumber ?? 0 };
     }
   }
 

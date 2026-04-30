@@ -3649,7 +3649,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     );
   }, 60000);
 
-  it("carries stopped recoverable result context through /continue follow-up", async () => {
+  it("keeps stopped recoverable result context actionable through bare and follow-up /continue", async () => {
     const projectRoot = path.join(
       fakeHomeDir,
       "continue-stopped-recovery-context-project",
@@ -3807,29 +3807,45 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       "utf8",
     );
 
-    const followUpPrompt = "continue from stopped edit failure";
-    const result = spawnSync(
-      nodeExe,
-      [
-        tsxCliPath,
-        cliPath,
-        "--project",
-        projectRoot,
-        "--print",
-        `/continue ${followUpPrompt}`,
-      ],
-      {
-        cwd: repoRoot,
-        env: {
-          ...process.env,
-          USERPROFILE: fakeHomeDir,
-          HOME: fakeHomeDir,
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+    const runPrint = (prompt: string) =>
+      spawnSync(
+        nodeExe,
+        [
+          tsxCliPath,
+          cliPath,
+          "--project",
+          projectRoot,
+          "--print",
+          prompt,
+        ],
+        {
+          cwd: repoRoot,
+          env: {
+            ...process.env,
+            USERPROFILE: fakeHomeDir,
+            HOME: fakeHomeDir,
+            PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          },
+          encoding: "utf8",
+          timeout: 30000,
         },
-        encoding: "utf8",
-        timeout: 30000,
-      },
-    );
+      );
+
+    const bareResult = runPrint("/continue");
+    expect(bareResult.error).toBeUndefined();
+    expect(bareResult.status).toBe(0);
+    const bareOutput = `${bareResult.stdout ?? ""}${bareResult.stderr ?? ""}`;
+    expect(bareOutput).toContain("TerminalState: stopped");
+    expect(bareOutput).toContain("BlockerKind: patch-from-not-found");
+    expect(bareOutput).toContain(`Reason: ${stopReason}`);
+    expect(bareOutput).toContain("Failed files: docs/failed-edit.md");
+    expect(bareOutput).toContain(`DoNext: ${nextAction}`);
+    expect(bareOutput).toContain("Use /continue <follow-up prompt>");
+    expect(bareOutput).not.toContain("No recoverable session found");
+    expect(bareOutput).not.toContain("manually repair");
+
+    const followUpPrompt = "continue from stopped edit failure";
+    const result = runPrint(`/continue ${followUpPrompt}`);
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(0);
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
