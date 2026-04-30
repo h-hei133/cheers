@@ -28,9 +28,16 @@ type ParsedTranscriptEntry = {
   event?: {
     type?: string;
     prompt?: string;
+    toolName?: string;
+    success?: boolean;
     result?: {
       status?: string;
       terminalClassification?: string;
+      codingResult?: {
+        taskKind?: string;
+        changedFiles?: string[];
+        evidence?: string[];
+      };
       sharedContext?: {
         notes?: string[];
       };
@@ -3925,6 +3932,105 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(fs.readFileSync(path.join(projectRoot, "note.txt"), "utf8")).toContain(
       "hello execution surface",
     );
+  }, 35000);
+
+  it("keeps synthetic print read-only inspect requests from mutating files", async () => {
+    const projectRoot = path.join(fakeHomeDir, "read-only-inspect-surface");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const targetPath = path.join(projectRoot, "note.txt");
+    const originalContent = [
+      "alpha read-only surface",
+      "beta keep unchanged",
+      "gamma no mutation",
+    ].join("\n");
+    fs.writeFileSync(targetPath, originalContent, "utf8");
+
+    const result = spawnSync(
+      nodeExe,
+      [
+        tsxCliPath,
+        cliPath,
+        "--project",
+        projectRoot,
+        "--print",
+        "Inspect ./note.txt and summarize it. Do not edit, modify, write, or change the file.",
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 30000,
+      },
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    expect(output).toContain("Result");
+    expect(output).toContain("Action result");
+    expect(output).toContain("- Task: read-file");
+    expect(output).toContain("- Changed: none");
+    expect(output).toContain("- Read files: ./note.txt");
+    expect(output).toContain("- No files changed: read/inspect only.");
+    expect(output).toContain(
+      "- Verification detail: No verification was requested for this turn.",
+    );
+    expect(output).toContain(
+      "- Next action: Use the observed file context to request a specific edit, ask for more lines, or run an explicit verification.",
+    );
+    expect(output).not.toContain("- Changed files: note.txt");
+    expect(output).not.toContain("approval> ");
+    expect(output).not.toContain("approval-audit:event=decision");
+    expect(output).not.toContain("mutation patch applied");
+    expect(output).not.toContain("edit/write applied");
+    expect(fs.readFileSync(targetPath, "utf8")).toBe(originalContent);
+
+    const sessionDirs = fs
+      .readdirSync(sessionsDir)
+      .filter((file) => file.startsWith("sess_"))
+      .map((file) => ({
+        file,
+        updatedAt: fs.statSync(path.join(sessionsDir, file)).mtimeMs,
+      }))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+    expect(sessionDirs.length).toBeGreaterThan(0);
+    const transcriptPath = path.join(
+      sessionsDir,
+      sessionDirs[0].file,
+      "transcript.jsonl",
+    );
+    const transcriptEntries = parseTranscriptJsonl(transcriptPath);
+    const queryCompleted = transcriptEntries.find(
+      (entry) =>
+        entry.type === "query-event" && entry.event?.type === "query.completed",
+    );
+    const codingResult = queryCompleted?.event?.result?.codingResult;
+    expect(codingResult?.taskKind).toBe("read-file");
+    expect(codingResult?.changedFiles ?? []).toEqual([]);
+    expect(codingResult?.evidence ?? []).toEqual(
+      expect.arrayContaining(["inspect: read ./note.txt"]),
+    );
+    expect(
+      transcriptEntries.some(
+        (entry) =>
+          entry.type === "query-event" &&
+          entry.event?.type === "approval.requested",
+      ),
+    ).toBe(false);
+    expect(
+      transcriptEntries.some(
+        (entry) =>
+          entry.type === "query-event" &&
+          entry.event?.type === "tool.started" &&
+          (entry.event?.toolName === "edit" ||
+            entry.event?.toolName === "write"),
+      ),
+    ).toBe(false);
   }, 35000);
 
   it("shows failure reason and actionable next steps for synthetic print blocked execution", async () => {
