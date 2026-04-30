@@ -91,21 +91,103 @@ describe("provider readiness boundary", () => {
   });
 
   it("classifies network/unreachable into actionable readiness failure", async () => {
+    const requests: string[] = [];
     const result = await checkRealProviderReadiness({
       apiKey: "test-key",
-      fetchImpl: async () => {
+      fetchImpl: async (input) => {
+        requests.push(String(input));
         throw new TypeError("fetch failed");
       },
     });
 
+    expect(requests).toHaveLength(5);
     expect(result.ok).toBe(false);
     if ("failure" in result) {
       expect(result.failure.kind).toBe("network");
       expect(result.failure.stopReason).toContain("provider-readiness:network");
+      expect(result.failure.stopReason).toContain("reconnecting 1/5");
+      expect(result.failure.stopReason).toContain("reconnecting 5/5");
       return;
     }
 
     throw new Error("Expected readiness failure for network issue");
+  });
+
+  it("retries only transient network readiness failures", async () => {
+    const requests: string[] = [];
+    const result = await checkRealProviderReadiness({
+      apiKey: "test-key",
+      fetchImpl: async (input) => {
+        requests.push(String(input));
+        if (requests.length < 3) {
+          throw new TypeError("network timeout");
+        }
+        return new Response("ok", { status: 200 });
+      },
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(requests).toHaveLength(3);
+  });
+
+  it("does not reconnect for auth or configuration hard failures", async () => {
+    const authRequests: string[] = [];
+    const authResult = await checkRealProviderReadiness({
+      apiKey: "test-key",
+      fetchImpl: async (input) => {
+        authRequests.push(String(input));
+        return new Response("unauthorized", { status: 401 });
+      },
+    });
+
+    expect(authResult.ok).toBe(false);
+    expect(authRequests).toHaveLength(1);
+    if ("failure" in authResult) {
+      expect(authResult.failure.kind).toBe("auth");
+      expect(authResult.failure.stopReason).not.toContain("reconnecting");
+    }
+
+    const unsupportedResult = await checkRealProviderReadiness({
+      provider: "anthropic",
+      apiKey: "test-key",
+      fetchImpl: async () => {
+        throw new Error("fetch should not be called");
+      },
+    });
+    expect(unsupportedResult.ok).toBe(false);
+    if ("failure" in unsupportedResult) {
+      expect(unsupportedResult.failure.kind).toBe("unsupported-provider");
+      expect(unsupportedResult.failure.stopReason).not.toContain("reconnecting");
+    }
+
+    const missingKeyResult = await checkRealProviderReadiness({
+      provider: "openai",
+      apiKey: "",
+      fetchImpl: async () => {
+        throw new Error("fetch should not be called");
+      },
+    });
+    expect(missingKeyResult.ok).toBe(false);
+    if ("failure" in missingKeyResult) {
+      expect(missingKeyResult.failure.kind).toBe("missing-key");
+      expect(missingKeyResult.failure.stopReason).not.toContain("reconnecting");
+    }
+
+    const missingConfigResult = await checkRealProviderReadiness({
+      provider: "openai-compatible",
+      apiKey: "test-key",
+      baseUrl: "https://api.siliconflow.cn/v1",
+      fetchImpl: async () => {
+        throw new Error("fetch should not be called");
+      },
+    });
+    expect(missingConfigResult.ok).toBe(false);
+    if ("failure" in missingConfigResult) {
+      expect(missingConfigResult.failure.kind).toBe("missing-config");
+      expect(missingConfigResult.failure.stopReason).not.toContain(
+        "reconnecting",
+      );
+    }
   });
 
   it("maps readiness failure into a unified stopped_error terminal event", () => {

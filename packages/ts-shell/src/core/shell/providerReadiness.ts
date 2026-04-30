@@ -7,6 +7,7 @@ import type { QueryEvent } from "../query/events.js";
 import { getProviderApiKeyEnvVarName } from "./providerCredentials.js";
 
 const DEFAULT_PROVIDER_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_PROVIDER_NETWORK_RECONNECT_ATTEMPTS = 5;
 
 export type ProviderReadinessFailureKind =
   | "missing-key"
@@ -125,67 +126,89 @@ export async function checkRealProviderReadiness(
     }
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const reconnectAttempts: string[] = [];
+  for (
+    let attempt = 1;
+    attempt <= DEFAULT_PROVIDER_NETWORK_RECONNECT_ATTEMPTS;
+    attempt += 1
+  ) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-  try {
-    const response = await fetchImpl(`${baseUrl}/models`, {
-      method: "GET",
-      headers: {
-        authorization: `Bearer ${accountAccess || apiKey}`,
-      },
-      signal: controller.signal,
-    });
-
-    if (response.status === 401 || response.status === 403) {
-      return {
-        ok: false,
-        failure: {
-          kind: "auth",
-          stopReason: `Provider readiness failed (provider-readiness:auth): ${getProviderLabel(provider)} authentication was rejected (401/403). Verify ${provider === "openai" ? "account-auth session or OPENAI_API_KEY" : envVarName} validity and access scope, then retry.`,
+    try {
+      const response = await fetchImpl(`${baseUrl}/models`, {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${accountAccess || apiKey}`,
         },
-      };
-    }
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return {
+          ok: false,
+          failure: {
+            kind: "auth",
+            stopReason: `Provider readiness failed (provider-readiness:auth): ${getProviderLabel(provider)} authentication was rejected (401/403). Verify ${provider === "openai" ? "account-auth session or OPENAI_API_KEY" : envVarName} validity and access scope, then retry.`,
+          },
+        };
+      }
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          failure: {
+            kind: "unknown",
+            stopReason: `Provider readiness failed (provider-readiness:unknown): ${getProviderLabel(provider)} endpoint returned HTTP ${response.status}. Check provider status/config and retry.`,
+          },
+        };
+      }
+
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isAbortError =
+        error instanceof Error && error.name.toLowerCase().includes("abort");
+      const isNetworkError =
+        isAbortError ||
+        /network|fetch|timeout|econn|enotfound|unreachable/i.test(message);
+
+      if (isNetworkError) {
+        reconnectAttempts.push(
+          `reconnecting ${attempt}/${DEFAULT_PROVIDER_NETWORK_RECONNECT_ATTEMPTS}`,
+        );
+        if (attempt < DEFAULT_PROVIDER_NETWORK_RECONNECT_ATTEMPTS) {
+          continue;
+        }
+
+        return {
+          ok: false,
+          failure: {
+            kind: "network",
+            stopReason: `Provider readiness failed (provider-readiness:network): Unable to reach the ${getProviderLabel(provider)} endpoint after ${DEFAULT_PROVIDER_NETWORK_RECONNECT_ATTEMPTS} reconnect attempts (${reconnectAttempts.join("; ")}). Check network/proxy/firewall settings and retry.`,
+          },
+        };
+      }
+
       return {
         ok: false,
         failure: {
           kind: "unknown",
-          stopReason: `Provider readiness failed (provider-readiness:unknown): ${getProviderLabel(provider)} endpoint returned HTTP ${response.status}. Check provider status/config and retry.`,
+          stopReason: `Provider readiness failed (provider-readiness:unknown): ${message}. Check provider status/config and retry.`,
         },
       };
+    } finally {
+      clearTimeout(timeout);
     }
-
-    return { ok: true };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const isAbortError =
-      error instanceof Error && error.name.toLowerCase().includes("abort");
-    const isNetworkError =
-      isAbortError ||
-      /network|fetch|timeout|econn|enotfound|unreachable/i.test(message);
-
-    if (isNetworkError) {
-      return {
-        ok: false,
-        failure: {
-          kind: "network",
-          stopReason: `Provider readiness failed (provider-readiness:network): Unable to reach the ${getProviderLabel(provider)} endpoint. Check network/proxy/firewall settings and retry.`,
-        },
-      };
-    }
-
-    return {
-      ok: false,
-      failure: {
-        kind: "unknown",
-        stopReason: `Provider readiness failed (provider-readiness:unknown): ${message}. Check provider status/config and retry.`,
-      },
-    };
-  } finally {
-    clearTimeout(timeout);
   }
+
+  return {
+    ok: false,
+    failure: {
+      kind: "network",
+      stopReason: `Provider readiness failed (provider-readiness:network): Unable to reach the ${getProviderLabel(provider)} endpoint after ${DEFAULT_PROVIDER_NETWORK_RECONNECT_ATTEMPTS} reconnect attempts (${reconnectAttempts.join("; ")}). Check network/proxy/firewall settings and retry.`,
+    },
+  };
 }
 
 function getProviderLabel(provider: RuntimeProvider): string {
