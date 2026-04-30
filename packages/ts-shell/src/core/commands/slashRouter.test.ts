@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { listVisibleCommands } from "./registry.js";
+import { createCommandRegistry, listVisibleCommands } from "./registry.js";
 import { routeSlashCommand } from "./slashRouter.js";
 
 describe("slash router (W4)", () => {
@@ -57,6 +57,48 @@ describe("slash router (W4)", () => {
     expect(result?.kind).toBe("local");
     if (result?.kind === "local") {
       expect(result.output).toContain("Model selection status");
+    }
+  });
+
+  it("routes every visible registry command name and alias without falling through to unknown", async () => {
+    const registry = createCommandRegistry(workspaceRoot);
+    const visibleCommands = Array.from(registry.values()).filter(
+      (command) => command.availability !== "hidden" && command.enabled !== false,
+    );
+    const commandNames = new Set(visibleCommands.map((command) => command.name));
+    const seenAliases = new Map<string, string>();
+
+    expect(visibleCommands.length).toBeGreaterThan(0);
+
+    for (const command of visibleCommands) {
+      for (const alias of command.aliases ?? []) {
+        expect(
+          commandNames.has(alias),
+          `${command.name} alias ${alias} collides with a command name`,
+        ).toBe(false);
+        expect(
+          seenAliases.get(alias),
+          `${command.name} alias ${alias} collides with ${seenAliases.get(alias)}`,
+        ).toBeUndefined();
+        seenAliases.set(alias, command.name);
+      }
+
+      for (const token of [command.name, ...(command.aliases ?? [])]) {
+        const result = await routeSlashCommand(`/${token}`, {
+          cwd: workspaceRoot,
+        });
+        expect(result, `/${token} should route from registry`).toBeTruthy();
+        if (result?.kind === "local") {
+          expect(
+            result.output,
+            `/${token} should not be treated as unknown`,
+          ).not.toContain("Unknown slash command");
+          expect(
+            result.output,
+            `/${token} should not be treated as malformed slash input`,
+          ).not.toContain("Slash command required");
+        }
+      }
     }
   });
 
