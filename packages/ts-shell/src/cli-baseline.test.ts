@@ -593,6 +593,51 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     return { modulePath, logPath };
   }
 
+  function createNetworkFailureReadinessFetchMockModule(fakeHome: string): {
+    modulePath: string;
+    logPath: string;
+  } {
+    const modulePath = path.join(
+      fakeHome,
+      "openai-fetch-mock-readiness-network-failure.cjs",
+    );
+    const logPath = path.join(
+      fakeHome,
+      "openai-fetch-log-readiness-network-failure.jsonl",
+    );
+    const moduleBody = `
+const fs = require("node:fs");
+const logPath = ${JSON.stringify(logPath)};
+
+globalThis.fetch = async function mockOpenAiFetch(url, init) {
+  const target = String(url);
+  const headers = init && init.headers ? init.headers : {};
+  let authorization = "";
+
+  if (headers && typeof headers.get === "function") {
+    authorization = headers.get("authorization") || "";
+  } else if (headers && typeof headers === "object") {
+    authorization = headers.authorization || headers.Authorization || "";
+  }
+
+  fs.appendFileSync(
+    logPath,
+    JSON.stringify({ url: target, authorization }) + "\\n",
+    "utf8",
+  );
+
+  if (target.endsWith("/models")) {
+    throw new TypeError("fetch failed");
+  }
+
+  return new Response("mock route not expected", { status: 500 });
+};
+`;
+
+    fs.writeFileSync(modulePath, moduleBody, "utf8");
+    return { modulePath, logPath };
+  }
+
   it("streams output incrementally without blocking", async () => {
     await new Promise<void>((resolve, reject) => {
       const cli = spawnCli(fakeHomeDir);
@@ -1466,6 +1511,123 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       });
     });
   }, 40000);
+
+  it("prints provider readiness reconnect attempts in CLI surface", async () => {
+    const { modulePath, logPath } =
+      createNetworkFailureReadinessFetchMockModule(fakeHomeDir);
+    const normalizedModulePath = modulePath.replace(/\\/g, "/");
+    const nodeOptionsParts = [
+      process.env.NODE_OPTIONS ?? "",
+      "--require",
+      `\"${normalizedModulePath}\"`,
+    ].filter((part) => part.trim().length > 0);
+
+    await new Promise<void>((resolve, reject) => {
+      const cli = spawnCli(fakeHomeDir, [], {
+        PRIVATE_AGENTS_PROVIDER_MODE: "real",
+        OPENAI_API_KEY: "test-real-cli-key",
+        NODE_OPTIONS: nodeOptionsParts.join(" "),
+      });
+      let output = "";
+      let settled = false;
+      let promptSent = false;
+
+      const finish = (callback: () => void) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        try {
+          callback();
+          resolve();
+        } catch (error) {
+          reject(error);
+        } finally {
+          cli.kill();
+        }
+      };
+
+      const fail = (error: unknown) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cli.kill();
+        reject(error);
+      };
+
+      const timeout = setTimeout(() => {
+        fail(
+          new Error(
+            `Timed out waiting for provider readiness network CLI surface. Output:\n${output}`,
+          ),
+        );
+      }, 40000);
+
+      const onData = (data: Buffer) => {
+        output += data.toString();
+
+        if (
+          !promptSent &&
+          output.includes("Ctrl+C cancels the current run. Ctrl+D exits.")
+        ) {
+          promptSent = true;
+          cli.stdin?.write("Run a real provider task with network failure\n");
+        }
+
+        if (
+          output.includes("provider-readiness:network") &&
+          output.includes("reconnecting 1/5") &&
+          output.includes("reconnecting 5/5") &&
+          output.includes("network/proxy/firewall") &&
+          output.includes("Submit the prompt again after connectivity recovers.")
+        ) {
+          clearTimeout(timeout);
+          finish(() => {
+            const normalizedOutput = normalizeCliOutput(output);
+            expect(normalizedOutput).toContain("Result");
+            expect(normalizedOutput).toContain("- Outcome: error");
+            expect(normalizedOutput).toContain("provider-readiness:network");
+            expect(normalizedOutput).toContain("reconnecting 1/5");
+            expect(normalizedOutput).toContain("reconnecting 5/5");
+            expect(normalizedOutput).toContain(
+              "- Check network/proxy/firewall reachability to the provider endpoint.",
+            );
+            expect(normalizedOutput).toContain(
+              "- Submit the prompt again after connectivity recovers.",
+            );
+            expect(normalizedOutput).not.toContain(
+              "Configure credential via /connect set",
+            );
+            expect(normalizedOutput).not.toContain(
+              "Check provider API key validity/permissions.",
+            );
+            expect(normalizedOutput.includes("approval> ")).toBe(false);
+
+            const readinessLogLines = fs
+              .readFileSync(logPath, "utf8")
+              .trim()
+              .split("\n")
+              .filter((line) => line.trim().length > 0);
+            expect(readinessLogLines).toHaveLength(5);
+            expect(
+              readinessLogLines.every((line) =>
+                line.includes("https://api.openai.com/v1/models"),
+              ),
+            ).toBe(true);
+          });
+        }
+      };
+
+      cli.stdout?.on("data", onData);
+      cli.stderr?.on("data", onData);
+
+      cli.on("error", (error) => {
+        clearTimeout(timeout);
+        fail(error);
+      });
+    });
+  }, 45000);
 
   it("proves default CLI real-provider chain in non-tty mode stops twice with explicit approval guidance and durable stopped state", async () => {
     const { modulePath, logPath } = createOpenAiFetchMockModule(fakeHomeDir);
