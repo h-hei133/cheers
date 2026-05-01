@@ -41,7 +41,19 @@ import type {
 } from "../orchestration/types.js";
 import { mergeContinuitySummaryEntries } from "./compactSummaryFormatter.js";
 import { formatPromptContinuityContext } from "./continuityFormatter.js";
+import {
+  createEmptyCurrentSessionSelectionStore,
+  parseCurrentSessionSelectionStore,
+  resolveCurrentSessionLoadFailed,
+  resolveMissingCurrentSession,
+  resolveProjectRootMismatch,
+  resolveUnselectedCurrentSession,
+  type CurrentSessionSelectionResolution,
+  type CurrentSessionSelectionStore,
+} from "./currentSessionSelection.js";
 import { buildReplayPlanFromSnapshot } from "./replayPlanBuilder.js";
+
+export type { CurrentSessionSelectionResolution } from "./currentSessionSelection.js";
 
 type SeedInfluenceDiagnostic =
   | "target-carryover"
@@ -251,30 +263,6 @@ interface SessionStateSnapshot {
   lastContinuationReason?: ContinuationReason;
   pendingLifecycle?: DurableLifecycleIndex;
 }
-
-interface CurrentSessionSelectionRecord {
-  readonly sessionId: string;
-  readonly updatedAt: string;
-}
-
-interface CurrentSessionSelectionStore {
-  readonly schemaVersion: 1;
-  readonly byProjectRoot: Record<string, CurrentSessionSelectionRecord>;
-}
-
-export type CurrentSessionSelectionResolution =
-  | { readonly ok: true; readonly session: Session }
-  | {
-      readonly ok: false;
-      readonly reason:
-        | "none"
-        | "store-invalid"
-        | "missing-session"
-        | "load-failed"
-        | "project-root-mismatch";
-      readonly sessionId?: string;
-      readonly detail: string;
-    };
 
 interface TranscriptRepairContext {
   readonly sessionId: string;
@@ -487,27 +475,11 @@ export class SessionManager {
     const storeReadError = this.lastCurrentSessionStoreReadError;
     const selection = store.byProjectRoot[normalizedProjectRoot];
     if (!selection?.sessionId?.trim()) {
-      if (storeReadError) {
-        return {
-          ok: false,
-          reason: "store-invalid",
-          detail: `Current session selection store could not be read for ${projectRoot}: ${storeReadError}.`,
-        };
-      }
-      return {
-        ok: false,
-        reason: "none",
-        detail: `No current session is selected for ${projectRoot}.`,
-      };
+      return resolveUnselectedCurrentSession(projectRoot, storeReadError);
     }
     if (!this.sessionExists(selection.sessionId)) {
       this.removeCurrentSessionSelection(normalizedProjectRoot);
-      return {
-        ok: false,
-        reason: "missing-session",
-        sessionId: selection.sessionId,
-        detail: `Current session ${selection.sessionId} no longer exists for ${projectRoot}.`,
-      };
+      return resolveMissingCurrentSession(projectRoot, selection.sessionId);
     }
 
     try {
@@ -515,22 +487,20 @@ export class SessionManager {
       const sessionProjectRoot = session.projectRoot || normalizedProjectRoot;
       if (this.normalizeProjectRootKey(sessionProjectRoot) !== normalizedProjectRoot) {
         this.removeCurrentSessionSelection(normalizedProjectRoot);
-        return {
-          ok: false,
-          reason: "project-root-mismatch",
-          sessionId: selection.sessionId,
-          detail: `Current session ${selection.sessionId} is bound to ${sessionProjectRoot}, not ${projectRoot}.`,
-        };
+        return resolveProjectRootMismatch(
+          projectRoot,
+          selection.sessionId,
+          sessionProjectRoot,
+        );
       }
       return { ok: true, session };
     } catch (error) {
       this.removeCurrentSessionSelection(normalizedProjectRoot);
-      return {
-        ok: false,
-        reason: "load-failed",
-        sessionId: selection.sessionId,
-        detail: `Current session ${selection.sessionId} could not be loaded for ${projectRoot}: ${error instanceof Error ? error.message : String(error)}.`,
-      };
+      return resolveCurrentSessionLoadFailed(
+        projectRoot,
+        selection.sessionId,
+        error,
+      );
     }
   }
 
@@ -1813,40 +1783,23 @@ export class SessionManager {
   private readCurrentSessionStore(): CurrentSessionSelectionStore {
     if (!fs.existsSync(this.currentSessionStorePath)) {
       this.lastCurrentSessionStoreReadError = null;
-      return {
-        schemaVersion: 1,
-        byProjectRoot: {},
-      };
+      return createEmptyCurrentSessionSelectionStore();
     }
 
     try {
       const parsed = JSON.parse(
         fs.readFileSync(this.currentSessionStorePath, "utf8"),
       ) as Partial<CurrentSessionSelectionStore>;
-      if (
-        parsed.schemaVersion !== 1 ||
-        !parsed.byProjectRoot ||
-        typeof parsed.byProjectRoot !== "object"
-      ) {
-        this.lastCurrentSessionStoreReadError =
-          `Invalid current session selection store at ${this.currentSessionStorePath}`;
-        return {
-          schemaVersion: 1,
-          byProjectRoot: {},
-        };
-      }
-      this.lastCurrentSessionStoreReadError = null;
-      return {
-        schemaVersion: 1,
-        byProjectRoot: parsed.byProjectRoot,
-      };
+      const result = parseCurrentSessionSelectionStore(
+        parsed,
+        this.currentSessionStorePath,
+      );
+      this.lastCurrentSessionStoreReadError = result.readError;
+      return result.store;
     } catch (error) {
       this.lastCurrentSessionStoreReadError =
         error instanceof Error ? error.message : String(error);
-      return {
-        schemaVersion: 1,
-        byProjectRoot: {},
-      };
+      return createEmptyCurrentSessionSelectionStore();
     }
   }
 
