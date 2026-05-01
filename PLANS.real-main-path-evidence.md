@@ -91,13 +91,28 @@ Do not copy reference code mechanically.
 
 Goal: confirm whether existing CLI tests already provide an automatable default/non-print turn boundary smoke, and if not, design the minimum harness.
 
-Status: recommended first checkpoint.
+Status: completed.
+
+Result:
+
+- Existing `packages/ts-shell/src/cli-baseline.test.ts` contains `GOLDEN_MAIN_PATH: user-minimal real main path unified gate`.
+- That gate launches the default CLI, waits for the startup prompt, sends a first prompt, observes persisted query completion in the transcript, sends a follow-up prompt, and verifies terminal state persistence.
+- It is synthetic, live-ish, and non-print, with actual child-process stdin/stdout, session persistence, transcript evidence, startup surface checks, unreadable-session aggregation checks, and follow-up turn evidence.
+- Existing `scripts/live-interactive-runner.mjs` is a manual real TTY launcher, not an automation harness; it intentionally rejects non-TTY and `--print`.
+- Existing `scripts/verify-cli-entry.mjs` covers packaged/print/replay/stdin entry boundaries, but it is non-interactive and does not replace the default live-ish turn gate.
+- Existing default real-provider mock coverage proves provider-readiness and stopped persistence boundaries without touching `D:\Test\home-sf`, but it is not a real-provider coding-flow maturity signal.
+
+Decision:
+
+- Do not add a new live-ish harness in this checkpoint.
+- Reuse `GOLDEN_MAIN_PATH` as the current automated default/live-ish evidence baseline.
+- Move next work to `CLI --print real-ish tool execution smoke`, because `--print` is the safer next real-entry surface for full tool execution -> result block -> next action evidence.
 
 ### B. CLI `--print` real-ish tool execution smoke
 
 Goal: validate the full surface of tool execution -> result block -> next action, not only a single read/write marker.
 
-Status: backlog.
+Status: current.
 
 ### C. Non-interactive approval boundary smoke
 
@@ -275,25 +290,80 @@ Never commit audit residue, real-provider config, temporary homes, or unrelated 
 
 Current checkpoint:
 
-- `Plan real main path evidence track`
+- `CLI --print real-ish tool execution smoke`
 
 Scope:
 
-- Create this plan.
-- Do not implement a smoke harness.
+- Validate the full `--print` tool execution surface through a focused CLI entry smoke.
+- Prefer synthetic mode and temporary test project/home boundaries.
 - Do not run real-provider checks.
-- Do not touch production code.
+- Do not touch provider/auth, MCP, release-core, QueryEngine/queryLoop, or terminalClassification.
 
-Next recommended checkpoint:
+Completed checkpoint:
 
 - `CLI default/live-ish turn smoke planning`
 
-Reason:
+Evidence:
 
 - Existing `GOLDEN_MAIN_PATH` already has synthetic live-ish interactive shape.
-- Existing CLI and verify scripts contain useful pieces, but the evidence is scattered.
-- The next checkpoint should decide whether to reuse existing CLI baseline structure or create a tiny dedicated harness before any real-provider promotion.
+- It covers default child-process launch, startup prompt readiness, stdin-driven first turn, transcript-observed completion, stdin-driven follow-up turn, terminal state persistence, and startup/session surface markers.
+- No new harness was needed for the planning checkpoint.
+
+Next recommended checkpoint:
+
+- `CLI --print real-ish tool execution smoke`
+
+Reason:
+
+- Existing print/replay gates prove entry mechanics, but the next evidence gap is the full user-visible chain: tool execution -> structured result block -> next action.
+- `--print` is deterministic enough for a first implementation checkpoint and avoids real TTY automation complexity.
+- The checkpoint can stay synthetic and avoid `D:\Test\home-sf`.
 
 Default stop condition for the next checkpoint:
 
 - If the work starts requiring provider/auth changes, fake live TTY behavior, broad result taxonomy changes, durable session policy changes, or complete runMvp old-failure cleanup, stop and update this plan instead of implementing.
+
+## 16. Evidence Track Status
+
+### Completed
+
+- `Plan real main path evidence track`
+  - Commit: `fcbf038 Plan real main path evidence track`
+  - Files: `PLANS.real-main-path-evidence.md`
+  - Verification:
+    - `rtk git status --short`
+    - `rtk npm run build -w packages/ts-shell` (sandbox EPERM on first run; elevated RTK rerun passed)
+- `CLI default/live-ish turn smoke planning`
+  - Commit: recorded in final status for this checkpoint.
+  - Files: `PLANS.real-main-path-evidence.md`
+  - Production code changes: none.
+  - Evidence reviewed:
+    - `packages/ts-shell/src/cli-baseline.test.ts` `GOLDEN_MAIN_PATH`
+    - default CLI real-provider mock/stopped persistence smoke
+    - approval allow/deny live-ish synthetic evidence
+    - `scripts/live-interactive-runner.mjs`
+    - `scripts/verify-cli-entry.mjs`
+  - Verification:
+    - `rtk git status --short` passed with only this plan file modified.
+    - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed with the same RTK command outside the sandbox.
+
+### Current
+
+- `CLI --print real-ish tool execution smoke`
+  - Target: prove the full `--print` user-visible chain for tool execution, result block, and next action.
+  - Default scope: synthetic provider mode, temporary fixture project, no real-provider home access.
+  - Preferred starting point: existing `cli-baseline.test.ts` or `verify-cli-entry.mjs` print-mode coverage.
+
+### Backlog
+
+- Non-interactive approval boundary smoke.
+- Failed tool execution follow-up smoke.
+- Provider readiness + real-provider safe smoke.
+- CLI stopped/failure follow-up real path smoke.
+- Compact / long-session smoke design.
+
+### Notes
+
+- `GOLDEN_MAIN_PATH` is the current automated default/live-ish turn baseline. It is not a real TTY proof and should not be oversold as real-provider maturity.
+- `scripts/live-interactive-runner.mjs` remains manual because it requires real stdin/stdout TTY and intentionally rejects `--print`.
+- Real-provider evidence must stay explicit and opt-in; do not read or print credential material from `D:\Test\home-sf`.
