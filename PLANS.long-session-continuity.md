@@ -137,23 +137,50 @@ opencode 参考重点：
 
 ### Current
 
-- A. Compact/replay coverage audit
+- B. Long-session continuity fixture builder
 
 ### Backlog
 
-1. B. Long-session continuity fixture builder
-2. C. Compact preserves stopped recovery context
-3. D. Compact preserves verification-failed repair context
-4. E. Compact preserves approved execution failure provenance
-5. F. Resume after compact uses continuity context
-6. G. Long-session CLI synthetic smoke
-7. H. Continuity summary formatter extraction
+1. C. Compact preserves stopped recovery context
+2. D. Compact preserves verification-failed repair context
+3. E. Compact preserves approved execution failure provenance
+4. F. Resume after compact uses continuity context
+5. G. Long-session CLI synthetic smoke
+6. H. Continuity summary formatter extraction
 
 `H` 只有在审计证明纯 formatter 仍散落且阻碍 compact/resume 主线时才执行；不得为了拆分而拆分。
 
 ### Completed
 
-- None yet on this route.
+- A. Compact/replay coverage audit
+
+### Verification
+
+- A status: completed as a read-only audit / planning checkpoint.
+- Commands run for A:
+  - `rtk git status --short --branch`
+  - `rtk git log --oneline --decorate -n 5`
+  - `rtk read AGENTS.md`
+  - `rtk read PLANS.long-session-continuity.md`
+  - `rtk grep "auto-compact" packages/ts-shell/src/session/SessionManager.test.ts`
+  - `rtk grep "action result seed" packages/ts-shell/src/session/SessionManager.test.ts`
+  - `rtk grep "stopped" packages/ts-shell/src/session/SessionManager.test.ts`
+  - `rtk grep "verification" packages/ts-shell/src/session/SessionManager.test.ts`
+  - `rtk grep "buildPromptContinuityContext" packages/ts-shell/src/core/shell packages/ts-shell/src/entrypoints packages/ts-shell/src/session`
+  - `rtk grep "buildPromptContinuitySnapshot" packages/ts-shell/src/core/shell packages/ts-shell/src/entrypoints packages/ts-shell/src/session`
+  - `rtk grep "compact_boundary" D:\LenovoSoftstore\pyproject\source-claudecode\QueryEngine.ts`
+  - `rtk grep "compaction" D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\session`
+  - `rtk grep "tool_result" D:\LenovoSoftstore\pyproject\source-claudecode\query.ts`
+
+### Notes
+
+- `SessionManager.ts` already has extracted helpers for compact summary, continuity formatting, and replay plan building. The audit confirms this route should not begin with formatter extraction.
+- Existing compact coverage is real but narrow: approval memory survives auto-compact, approval audit history survives auto-compact, and action result seed handoff summary survives auto-compact.
+- Existing stopped coverage verifies immediate `buildContinuitySnapshot` / `buildPromptContinuityContext` behavior for edit patch stopped failure details, but does not yet prove the same stopped recovery context survives auto-compact and manager reload/replay.
+- Existing verification-failed coverage proves continuity context can include failed verification detail and handoff diagnostics, but does not yet provide a reusable long-session fixture that drives the same shape through compact.
+- `sessionRuntime.ts` consumes `buildContinuitySnapshot` / `buildPromptContinuitySnapshot` and renders continuation seed summaries from continuity state, so later resume/continue proof should test the structured continuity consumption path rather than only final text.
+- Claude Code reference keeps compact boundaries as replayable session messages and explicitly handles tool-result continuity; opencode preserves compaction as a session/message part with autocontinue metadata. The semantic takeaway is to keep failed tool/result provenance as structured session history across compact, not as an untyped last-message summary.
+- Current next step is fixture work, not production behavior changes: add a reusable long-session continuity fixture builder outside the three giant files, then use it for stopped / verification-failed / execution-failed compact proofs.
 
 ## 12. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -394,3 +421,13 @@ opencode 参考重点：
 - 该 checkpoint 风险最低，能给后续 fixture builder 和 focused behavior-preserving fixes 提供明确证据。
 
 本 planning checkpoint 不执行 A，只创建路线文件并运行 build。下一轮如果继续本路线，应先读取本文件 Current，再执行 A 并同步更新 Current / Backlog / Completed / Verification / Notes。
+
+## Checkpoint Tracking Update: A Completed
+
+This section supersedes the original "current recommended first checkpoint" text above.
+
+- Completed: A. Compact/replay coverage audit.
+- Current: B. Long-session continuity fixture builder.
+- Backlog: C. Compact preserves stopped recovery context; D. Compact preserves verification-failed repair context; E. Compact preserves approved execution failure provenance; F. Resume after compact uses continuity context; G. Long-session CLI synthetic smoke; H. Continuity summary formatter extraction only if a later audit proves it is needed.
+- Verification for A: read-only RTK inspection of `SessionManager.ts`, `SessionManager.test.ts`, `sessionRuntime.ts`, Claude Code compact/tool-result semantics, and opencode compaction/session semantics; production code and tests were not modified.
+- Notes: A found that existing compact coverage is narrow but real. Approval memory, approval audit history, and action result seed handoff survive auto-compact. Stopped and verification-failed continuity are covered for immediate snapshot/context paths, but not yet through a reusable long-session compact/reload fixture. The next checkpoint should add a fixture builder outside the three giant files before adding behavior proofs.
