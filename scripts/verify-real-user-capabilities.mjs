@@ -16,6 +16,7 @@ const reportPath = 'D:/Test/test-results/real-user-capabilities-report.json'
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const includeCandidates = process.argv.includes('--include-candidates')
 const includeContinueSmoke = process.argv.includes('--include-continue-smoke')
+const turnBoundaryDryRun = process.argv.includes('--turn-boundary-dry-run')
 
 const failureCategories = [
   'none',
@@ -754,7 +755,112 @@ function buildCandidateMetadata(candidateResults) {
   })
 }
 
+function runTurnBoundaryDryRun() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=turn-boundary-dry-run')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('reportWritten=false')
+
+  const cases = [
+    {
+      name: 'provider-network-mid-turn',
+      provider: 'real',
+      failureReason: 'turn 1 exited 1',
+      output:
+        'provider-readiness:network fetch failed while waiting for model turn Authorization: Bearer sk-live-secret',
+      expectedCategory: 'provider-readiness',
+      expectedStatusDetail: 'provider-network-inconclusive',
+      expectedExitCode: 2,
+    },
+    {
+      name: 'provider-auth-mid-turn',
+      provider: 'real',
+      failureReason: 'turn 1 exited 1',
+      output: 'provider-readiness:auth authentication was rejected with api_key=sk-live-secret',
+      expectedCategory: 'provider-readiness',
+      expectedStatusDetail: 'config-failure',
+      expectedExitCode: 3,
+    },
+    {
+      name: 'provider-config-redacted',
+      provider: 'real',
+      failureReason: 'turn 1 exited 1',
+      output:
+        'Failed to parse D:/Test/home-sf/.private-agents/config.json: refresh_token=refresh-secret',
+      expectedCategory: 'provider-readiness',
+      expectedStatusDetail: 'config-failure',
+      expectedExitCode: 3,
+    },
+    {
+      name: 'tool-execution-failure',
+      provider: 'real',
+      failureReason: 'turn 1 exited 1',
+      output: 'Tool execution failed: command exited 1',
+      expectedCategory: 'task-execution-failure',
+      expectedStatusDetail: 'failed',
+      expectedExitCode: 1,
+    },
+    {
+      name: 'verification-failed',
+      provider: 'real',
+      failureReason: 'verification failed: expected marker was not present',
+      output: 'Result\nOutcome: stopped\nVerification failed',
+      expectedCategory: 'verification-failed',
+      expectedStatusDetail: 'failed',
+      expectedExitCode: 1,
+    },
+  ]
+
+  let ok = true
+  for (const item of cases) {
+    const result = {
+      status: 'FAIL',
+      provider: item.provider,
+      failureCategory: categorizeFailure(item.failureReason, item.output, item.provider),
+      failureReason: normalizeFailureReason(item.failureReason, item.output, item.provider),
+      outputTail: summarizeOutput(item.output),
+    }
+    const failureStatus = summarizeFailureStatus([result])
+    const redacted =
+      !result.outputTail.includes('sk-live-secret') &&
+      !result.outputTail.includes('refresh-secret') &&
+      !result.outputTail.includes('.private-agents/config.json')
+    const passed =
+      result.failureCategory === item.expectedCategory &&
+      failureStatus.statusDetail === item.expectedStatusDetail &&
+      failureStatus.exitCode === item.expectedExitCode &&
+      redacted
+    console.log(
+      `[${passed ? 'PASS' : 'FAIL'}] ${item.name} category=${result.failureCategory} status=${failureStatus.statusDetail} exit=${failureStatus.exitCode}`,
+    )
+    ok = ok && passed
+  }
+
+  const passStatus = summarizeFailureStatus([
+    {
+      status: 'PASS',
+      provider: 'real',
+      failureCategory: 'none',
+      failureReason: '',
+      outputTail: 'Result\nOutcome: success',
+    },
+  ])
+  const passOk = passStatus.statusDetail === 'passed' && passStatus.exitCode === 0
+  console.log(
+    `[${passOk ? 'PASS' : 'FAIL'}] model-turn-success-boundary status=${passStatus.statusDetail} exit=${passStatus.exitCode}`,
+  )
+  ok = ok && passOk
+
+  process.exit(ok ? 0 : 1)
+}
+
 async function main() {
+  if (turnBoundaryDryRun) {
+    runTurnBoundaryDryRun()
+    return
+  }
+
   console.log('gate name=real-user-capabilities')
   console.log('status taxonomy: PASS=0 FAIL=1 PROVIDER_NETWORK=2 CONFIG=3')
   console.log('state semantics: provider preflight inconclusive skips capability execution; mid-turn provider readiness stays provider-readiness, not coding failure')
@@ -873,18 +979,20 @@ async function main() {
 }
 
 main().catch((error) => {
+  const rawFailure = error instanceof Error ? error.stack ?? error.message : String(error)
+  const redactedFailure = redactProviderOutput(rawFailure)
   const report = {
     generatedAt: new Date().toISOString(),
     status: 'FAIL',
     reportPath,
-    failureCategory: categorizeFailure(error.message),
-    failureReason: error.stack ?? error.message,
+    failureCategory: categorizeFailure(redactedFailure),
+    failureReason: redactedFailure,
     failureCategories,
     futureGateCandidates,
     candidates: [],
     capabilities: [],
   }
   writeReport(report)
-  console.error(error)
+  console.error(redactedFailure)
   process.exit(1)
 })

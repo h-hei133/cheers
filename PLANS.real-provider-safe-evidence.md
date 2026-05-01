@@ -187,15 +187,14 @@ opencode 参考：
 
 Backlog:
 
-1. D. Real-provider turn boundary dry-run audit
-2. E. Real-provider terminal result surface smoke
-3. F. Tool execution under real-provider planning audit
-4. G. Real-provider failure follow-up context smoke
-5. H. Merge-readiness / route audit
+1. E. Real-provider terminal result surface smoke
+2. F. Tool execution under real-provider planning audit
+3. G. Real-provider failure follow-up context smoke
+4. H. Merge-readiness / route audit
 
 Current:
 
-- D. Real-provider turn boundary dry-run audit
+- E. Real-provider terminal result surface smoke
 
 Completed:
 
@@ -211,6 +210,10 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `scripts/verify-provider-readiness.mjs`, `scripts/verify-real-user-capabilities.mjs`, `PLANS.real-provider-safe-evidence.md`.
   - Result: completed as safe classification/self-test smoke. The smoke path runs with `homeRead=false`, does not read real home, verifies provider readiness attribution categories, and sanitizes output/report tails.
+- D. Real-provider turn boundary dry-run audit
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `scripts/verify-real-user-capabilities.mjs`, `PLANS.real-provider-safe-evidence.md`.
+  - Result: completed. Added `--turn-boundary-dry-run`, a no-real-provider/no-real-home-read audit path that validates model turn success, provider network/auth/config attribution, tool execution failure, verification failure, and output-tail redaction without writing a report.
 
 Verification:
 
@@ -230,6 +233,11 @@ Verification:
   - `rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts`: sandbox run failed with `spawn EPERM`; elevated rerun passed with 13 tests.
   - `rtk npm run test -w packages/ts-shell -- src/config/runtimeConfig.test.ts`: sandbox run failed with `spawn EPERM`; elevated rerun passed with 8 tests.
   - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
+- D turn-boundary dry-run audit round:
+  - `rtk node scripts/verify-real-user-capabilities.mjs --turn-boundary-dry-run`: passed; reported `homeRead=false`, `real-provider execution skipped`, `reportWritten=false`.
+  - `rtk npm run verify:cli-entry`: passed.
+  - `rtk npm run verify:result-contract`: passed.
+  - `rtk npm run build -w packages/ts-shell`: passed.
 
 Notes:
 
@@ -253,6 +261,11 @@ Notes:
   - Provider readiness output tails are sanitized before printing or returning classification summaries.
   - `verify-real-user-capabilities.mjs` now sanitizes output tails before writing provider readiness preflight evidence into its report.
   - `verify-doctor-environment.mjs` still has older verbose real-provider config output and should remain outside this checkpoint; revisit only if the next route requires doctor/release-real safety.
+- D implementation notes:
+  - `verify-real-user-capabilities.mjs --turn-boundary-dry-run` does not call provider readiness preflight, does not ensure or read `D:/Test/home-sf`, does not execute real provider scenarios, and does not write `D:/Test/test-results/real-user-capabilities-report.json`.
+  - The dry-run classifies simulated provider network/auth/config failures as provider-readiness, keeps tool execution failure and verification failure separate, and verifies success boundary reporting through the existing status summarizer.
+  - The script top-level catch now sanitizes failure text before writing a failure report or printing the error, closing a report-tail leakage path for unexpected script failures.
+  - Next selected checkpoint is E because the turn-boundary dry-run/report path is now safe enough to audit terminal result surface semantics; real-provider execution is still not a default gate.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 
