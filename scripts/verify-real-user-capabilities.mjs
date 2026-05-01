@@ -17,6 +17,7 @@ const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const includeCandidates = process.argv.includes('--include-candidates')
 const includeContinueSmoke = process.argv.includes('--include-continue-smoke')
 const turnBoundaryDryRun = process.argv.includes('--turn-boundary-dry-run')
+const terminalResultSurfaceDryRun = process.argv.includes('--terminal-result-surface-dry-run')
 
 const failureCategories = [
   'none',
@@ -628,6 +629,70 @@ function summarizeFailureStatus(results) {
   return { statusDetail: 'failed', exitCode: 1 }
 }
 
+function nextActionForFailureSurface(failureCategory, statusDetail) {
+  if (failureCategory === 'provider-readiness') {
+    if (statusDetail === 'provider-network-inconclusive') {
+      return 'Retry when the provider endpoint is reachable; do not treat this as a product regression.'
+    }
+    if (statusDetail === 'config-failure') {
+      return 'Fix provider configuration or authentication outside this run, then retry the same capability gate.'
+    }
+    return 'Inspect provider readiness output, fix the provider state, then retry the same capability gate.'
+  }
+  if (failureCategory === 'verification-failed' || failureCategory === 'verification-blocked') {
+    return 'Repair the verification failure and rerun the focused check.'
+  }
+  if (failureCategory === 'protected-file-changed') {
+    return 'Restore the protected file, then rerun with a narrower instruction.'
+  }
+  if (failureCategory === 'assertion-mismatch') {
+    return 'Inspect changed files and rerun the scenario after correcting the mismatch.'
+  }
+  if (failureCategory === 'environment-filesystem-issue') {
+    return 'Fix the local filesystem or sandbox permission issue, then rerun the gate.'
+  }
+  return 'Inspect the model/tool execution output, fix the failed step, then retry.'
+}
+
+function buildTerminalResultSurface(result) {
+  const status = summarizeFailureStatus([result])
+  const failureCategory = result.failureCategory ?? 'none'
+  const outputTail = summarizeOutput(result.outputTail ?? '')
+  const failureReason = redactProviderOutput(result.failureReason ?? '')
+  if (result.status === 'PASS') {
+    return {
+      outcome: 'success',
+      statusDetail: status.statusDetail,
+      failureCategory,
+      failureReason: '',
+      nextAction: 'Continue with the next task.',
+      outputTail,
+    }
+  }
+  return {
+    outcome: failureCategory === 'provider-readiness' ? 'provider-failure' : 'stopped',
+    statusDetail: status.statusDetail,
+    failureCategory,
+    failureReason,
+    nextAction: nextActionForFailureSurface(failureCategory, status.statusDetail),
+    outputTail,
+  }
+}
+
+function renderTerminalResultSurface(result) {
+  const surface = buildTerminalResultSurface(result)
+  const parts = [
+    `Outcome: ${surface.outcome}`,
+    `Category: ${surface.failureCategory}`,
+    `Status: ${surface.statusDetail}`,
+  ]
+  if (surface.failureReason) {
+    parts.push(`Reason: ${surface.failureReason}`)
+  }
+  parts.push(`NextAction: ${surface.nextAction}`)
+  return parts.join(' | ')
+}
+
 async function runScenario(scenario) {
   prepareProject(scenario)
   let previousSnapshot = snapshot(scenario.projectDir)
@@ -855,9 +920,84 @@ function runTurnBoundaryDryRun() {
   process.exit(ok ? 0 : 1)
 }
 
+function runTerminalResultSurfaceDryRun() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=terminal-result-surface-dry-run')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('reportWritten=false')
+
+  const cases = [
+    {
+      name: 'provider-network-terminal-result',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'provider-readiness',
+        failureReason: 'provider-readiness:network: provider endpoint was unreachable during this turn',
+        outputTail: 'provider-readiness:network fetch failed Authorization: Bearer sk-live-secret',
+      },
+      expected: ['Outcome: provider-failure', 'Category: provider-readiness', 'Status: provider-network-inconclusive', 'NextAction: Retry when the provider endpoint is reachable'],
+      forbidden: ['sk-live-secret', '.private-agents/config.json'],
+    },
+    {
+      name: 'provider-auth-terminal-result',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'provider-readiness',
+        failureReason: 'provider-readiness:auth: provider authentication failed during this turn',
+        outputTail: 'provider-readiness:auth api_key=sk-live-secret',
+      },
+      expected: ['Outcome: provider-failure', 'Category: provider-readiness', 'Status: config-failure', 'NextAction: Fix provider configuration or authentication'],
+      forbidden: ['sk-live-secret'],
+    },
+    {
+      name: 'model-tool-failure-terminal-result',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'task-execution-failure',
+        failureReason: 'Tool execution failed: command exited 1',
+        outputTail: 'Tool execution failed: command exited 1',
+      },
+      expected: ['Outcome: stopped', 'Category: task-execution-failure', 'Status: failed', 'NextAction: Inspect the model/tool execution output'],
+      forbidden: ['sk-live-secret'],
+    },
+    {
+      name: 'verification-stopped-terminal-result',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'verification-failed',
+        failureReason: 'verification failed: expected marker was not present',
+        outputTail: 'Result\nOutcome: stopped\nVerification failed',
+      },
+      expected: ['Outcome: stopped', 'Category: verification-failed', 'Status: failed', 'NextAction: Repair the verification failure'],
+      forbidden: [],
+    },
+  ]
+
+  let ok = true
+  for (const item of cases) {
+    const line = renderTerminalResultSurface(item.result)
+    const hasExpected = item.expected.every((marker) => line.includes(marker))
+    const avoidsForbidden = item.forbidden.every((marker) => !line.includes(marker))
+    const passed = hasExpected && avoidsForbidden
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] ${item.name} - ${line}`)
+    ok = ok && passed
+  }
+
+  process.exit(ok ? 0 : 1)
+}
+
 async function main() {
   if (turnBoundaryDryRun) {
     runTurnBoundaryDryRun()
+    return
+  }
+  if (terminalResultSurfaceDryRun) {
+    runTerminalResultSurfaceDryRun()
     return
   }
 
@@ -935,7 +1075,7 @@ async function main() {
   for (const scenario of scenarios) {
     const result = await runScenario(scenario)
     capabilities.push(result)
-    const suffix = result.status === 'PASS' ? `verification=${result.verification}` : result.failureReason
+    const suffix = result.status === 'PASS' ? `verification=${result.verification}` : renderTerminalResultSurface(result)
     console.log(`[${result.status}] ${scenario.id} - provider=${scenario.provider} project=${scenario.projectDir} session=${result.sessionId} ${suffix}`)
   }
 
@@ -951,7 +1091,7 @@ async function main() {
     for (const scenario of selectedCandidateScenarios) {
       const result = await runScenario(scenario)
       candidates.push(result)
-      const suffix = result.status === 'PASS' ? `verification=${result.verification}` : result.failureReason
+      const suffix = result.status === 'PASS' ? `verification=${result.verification}` : renderTerminalResultSurface(result)
       console.log(`[${result.status}] candidate:${scenario.id} - provider=${scenario.provider} project=${scenario.projectDir} session=${result.sessionId} ${suffix}`)
     }
   }
