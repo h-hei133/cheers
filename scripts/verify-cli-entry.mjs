@@ -15,6 +15,7 @@ const buildCliBinScriptPath = path.join(repoRoot, 'scripts', 'build-cli-bin.mjs'
 const syntheticHome = 'D:/Test/pca-home-synth'
 const realProviderHome = 'D:/Test/home-sf'
 const projectRoot = 'D:/Test/cli-entry-gate'
+const followupProjectRoot = 'D:/Test/cli-entry-followup-gate'
 const migratedProjectRoot = 'D:/Test/cli-entry-gate-rebased'
 const oldProjectRoot = 'D:/Test/cli-entry-gate-old-root'
 const fixturePath = `${projectRoot}/fixture.txt`
@@ -99,6 +100,7 @@ function assertMarkers(output, markers, label) {
 
 function ensureFixtureData() {
   fs.mkdirSync(projectRoot, { recursive: true })
+  fs.mkdirSync(followupProjectRoot, { recursive: true })
   fs.mkdirSync(migratedProjectRoot, { recursive: true })
   fs.mkdirSync(oldProjectRoot, { recursive: true })
   fs.writeFileSync(
@@ -294,6 +296,294 @@ async function runStdinPromptBoundary() {
   )
 }
 
+async function runPrintToolExecutionSurface() {
+  const targetFile = 'cli-entry-tool-execution.txt'
+  const targetPath = path.join(projectRoot, targetFile)
+  fs.rmSync(targetPath, { force: true })
+
+  const result = await runCli([
+    '--project',
+    projectRoot,
+    '--print',
+    `Create file ${targetFile} with content: cli entry tool execution surface.`,
+  ])
+  if (result.code !== 0 || result.timedOut) {
+    printStep(
+      'cli-entry-print-tool-execution-surface',
+      'product-regression',
+      result.timedOut ? 'timed out' : `exit=${result.code}`,
+    )
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  const requiredMarkers = [
+    'Result',
+    'Outcome: success',
+    'Action result',
+    'Task: write-file',
+    'Changed files: cli-entry-tool-execution.txt',
+    'Verification detail:',
+    'Next action:',
+  ]
+  const missing = requiredMarkers.filter((marker) => !result.output.includes(marker))
+  if (missing.length > 0) {
+    printStep('cli-entry-print-tool-execution-surface', 'product-regression', `missing=${missing.join(' | ')}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  if (!fs.existsSync(targetPath)) {
+    printStep('cli-entry-print-tool-execution-surface', 'product-regression', `missing file=${targetPath}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  const content = fs.readFileSync(targetPath, 'utf8')
+  if (!content.includes('cli entry tool execution surface')) {
+    printStep('cli-entry-print-tool-execution-surface', 'product-regression', 'file content mismatch')
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  printStep('cli-entry-print-tool-execution-surface', 'pass')
+  return true
+}
+
+async function runNonInteractiveApprovalBoundary() {
+  const result = await runCli([
+    '--project',
+    projectRoot,
+    '--print',
+    'Run node --version',
+  ])
+  if (result.code !== 0 || result.timedOut) {
+    printStep(
+      'cli-entry-non-interactive-approval-boundary',
+      'product-regression',
+      result.timedOut ? 'timed out' : `exit=${result.code}`,
+    )
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  const requiredMarkers = [
+    'Approval',
+    'Decision source: default-deny',
+    'Non-interactive approval policy: deny (default deny)',
+    'approval-audit:channel=non-interactive',
+    'approval-audit:decision=deny',
+    'Approval decision: deny',
+    'Result',
+    'Outcome: stopped',
+    'BlockerKind: approval-denied',
+    'Action result',
+    'Task: run-command',
+    'Approvals: 0/1 approved',
+  ]
+  const missing = requiredMarkers.filter((marker) => !result.output.includes(marker))
+  if (missing.length > 0) {
+    printStep('cli-entry-non-interactive-approval-boundary', 'product-regression', `missing=${missing.join(' | ')}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  if (result.output.includes('approval> ')) {
+    printStep('cli-entry-non-interactive-approval-boundary', 'product-regression', 'interactive approval prompt leaked')
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  if (result.output.includes('Outcome: success')) {
+    printStep('cli-entry-non-interactive-approval-boundary', 'product-regression', 'approval-denied command reported success')
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  printStep('cli-entry-non-interactive-approval-boundary', 'pass')
+  return true
+}
+
+async function runFailedToolFollowupSurface() {
+  const result = await runCli([
+    '--project',
+    projectRoot,
+    '--non-interactive-approval',
+    'allow-once',
+    '--print',
+    'Run node missing-script.js',
+  ])
+  if (result.code !== 0 || result.timedOut) {
+    printStep(
+      'cli-entry-failed-tool-followup-surface',
+      'product-regression',
+      result.timedOut ? 'timed out' : `exit=${result.code}`,
+    )
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  const requiredMarkers = [
+    'Approval decision: allow-once',
+    'Result',
+    'Outcome: stopped',
+    'BlockerKind: verification-failed',
+    'Action result',
+    'Task: run-command',
+    'Changed: none',
+    'Failed files: (command)',
+    'Failure reason: (command):',
+    'Verification: failed',
+    'Verification detail:',
+    'Next action:',
+    'Next steps',
+    'Tool execution failed after approval; inspect the command output/error.',
+    'Approvals: 1/1 approved',
+  ]
+  const missing = requiredMarkers.filter((marker) => !result.output.includes(marker))
+  if (missing.length > 0) {
+    printStep('cli-entry-failed-tool-followup-surface', 'product-regression', `missing=${missing.join(' | ')}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  if (result.output.includes('approval> ')) {
+    printStep('cli-entry-failed-tool-followup-surface', 'product-regression', 'interactive approval prompt leaked')
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  if (result.output.includes('Outcome: success')) {
+    printStep('cli-entry-failed-tool-followup-surface', 'product-regression', 'failed tool execution reported success')
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  printStep('cli-entry-failed-tool-followup-surface', 'pass')
+  return true
+}
+
+function extractResultReason(output) {
+  const reasonMatch = output.match(/^- Reason:\s*(.+)$/m)
+  if (reasonMatch?.[1]?.trim()) return reasonMatch[1].trim()
+  const failureReasonMatch = output.match(/^- Failure reason:\s*(.+)$/m)
+  if (failureReasonMatch?.[1]?.trim()) return failureReasonMatch[1].trim()
+  return undefined
+}
+
+async function runStoppedFailureFollowupRealPath() {
+  const failed = await runCli([
+    '--project',
+    followupProjectRoot,
+    '--non-interactive-approval',
+    'allow-once',
+    '--print',
+    'Run node missing-script.js',
+  ])
+  if (failed.code !== 0 || failed.timedOut) {
+    printStep(
+      'cli-entry-stopped-failure-followup-real-path',
+      'product-regression',
+      failed.timedOut ? 'failed turn timed out' : `failed turn exit=${failed.code}`,
+    )
+    console.log(summarizeOutput(failed.output))
+    return false
+  }
+
+  const failureMarkers = [
+    'Approval decision: allow-once',
+    'Result',
+    'Outcome: stopped',
+    'BlockerKind: verification-failed',
+    'Action result',
+    'Task: run-command',
+    'Verification: failed',
+    'Next action:',
+    'Next steps',
+  ]
+  const missingFailureMarkers = failureMarkers.filter((marker) => !failed.output.includes(marker))
+  if (missingFailureMarkers.length > 0) {
+    printStep(
+      'cli-entry-stopped-failure-followup-real-path',
+      'product-regression',
+      `failed turn missing=${missingFailureMarkers.join(' | ')}`,
+    )
+    console.log(summarizeOutput(failed.output))
+    return false
+  }
+  const reason = extractResultReason(failed.output)
+  if (!reason) {
+    printStep('cli-entry-stopped-failure-followup-real-path', 'product-regression', 'failed turn missing reason')
+    console.log(summarizeOutput(failed.output))
+    return false
+  }
+
+  const bare = await runCli([
+    '--project',
+    followupProjectRoot,
+    '--print',
+    '/continue',
+  ])
+  if (bare.code !== 0 || bare.timedOut) {
+    printStep(
+      'cli-entry-stopped-failure-followup-real-path',
+      'product-regression',
+      bare.timedOut ? 'bare /continue timed out' : `bare /continue exit=${bare.code}`,
+    )
+    console.log(summarizeOutput(bare.output))
+    return false
+  }
+
+  const followup = await runCli([
+    '--project',
+    followupProjectRoot,
+    '--print',
+    '/continue what should I do next after the failed command',
+  ])
+  if (followup.code !== 0 || followup.timedOut) {
+    printStep(
+      'cli-entry-stopped-failure-followup-real-path',
+      'product-regression',
+      followup.timedOut ? 'follow-up /continue timed out' : `follow-up /continue exit=${followup.code}`,
+    )
+    console.log(summarizeOutput(followup.output))
+    return false
+  }
+
+  const guidanceMarkers = [
+    'Result',
+    'Outcome: stopped',
+    'TerminalState: stopped',
+    'Reason:',
+    'DoNext:',
+    'Use /continue <follow-up prompt>',
+  ]
+  const missingBareMarkers = guidanceMarkers.filter((marker) => !bare.output.includes(marker))
+  const missingFollowupMarkers = guidanceMarkers.filter((marker) => !followup.output.includes(marker))
+  if (missingBareMarkers.length > 0 || missingFollowupMarkers.length > 0) {
+    printStep(
+      'cli-entry-stopped-failure-followup-real-path',
+      'product-regression',
+      `continue guidance missing bare=${missingBareMarkers.join(' | ') || 'none'} followup=${missingFollowupMarkers.join(' | ') || 'none'}`,
+    )
+    console.log(summarizeOutput(`${bare.output}\n${followup.output}`))
+    return false
+  }
+  if (!bare.output.includes(reason) || !followup.output.includes(reason)) {
+    printStep('cli-entry-stopped-failure-followup-real-path', 'product-regression', 'stopped reason not preserved')
+    console.log(summarizeOutput(`${bare.output}\n${followup.output}`))
+    return false
+  }
+  if (
+    bare.output.includes('No recoverable session found') ||
+    followup.output.includes('No recoverable session found') ||
+    bare.output.includes('starting a fresh session') ||
+    followup.output.includes('starting a fresh session')
+  ) {
+    printStep('cli-entry-stopped-failure-followup-real-path', 'product-regression', 'lost stopped session context')
+    console.log(summarizeOutput(`${bare.output}\n${followup.output}`))
+    return false
+  }
+
+  printStep('cli-entry-stopped-failure-followup-real-path', 'pass')
+  return true
+}
+
 async function runSessionMigrationBoundary() {
   seedSessionForMigration()
   const ok = await assertSuccessfulCliRun(
@@ -406,6 +696,10 @@ async function main() {
   const checks = []
   checks.push(await runPrintReplayBoundary())
   checks.push(await runStdinPromptBoundary())
+  checks.push(await runPrintToolExecutionSurface())
+  checks.push(await runNonInteractiveApprovalBoundary())
+  checks.push(await runFailedToolFollowupSurface())
+  checks.push(await runStoppedFailureFollowupRealPath())
   checks.push(await runSessionMigrationBoundary())
   checks.push(await runInvalidArgumentBoundary())
   checks.push(await runPackagedEntryBoundary())
