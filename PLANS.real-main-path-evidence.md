@@ -167,7 +167,15 @@ Result:
 
 Goal: prove that failed/stopped CLI entry states preserve context for follow-up.
 
-Status: current.
+Status: completed.
+
+Result:
+
+- Added `cli-entry-stopped-failure-followup-real-path` to `scripts/verify-cli-entry.mjs`.
+- The smoke first produces a stopped failed-tool state through the real CLI entry in synthetic `--print` mode.
+- It then runs both bare `/continue` and `/continue <follow-up>` through the CLI entry for the same project.
+- It asserts the stopped terminal guidance keeps the failure reason, next action guidance, and recoverable session context instead of falling back to a fresh session.
+- It records the current product boundary honestly: the real-entry stopped state preserves actionable context, while automatic repair continuation remains a later product capability.
 
 ### G. Compact / long-session smoke design
 
@@ -261,6 +269,7 @@ Run `rtk npm run verify:provider-readiness` only when a checkpoint explicitly op
 Allowed files:
 
 - `packages/ts-shell/src/cli-baseline.test.ts`
+- `scripts/verify-cli-entry.mjs` when implemented as a real CLI entry hard-gate smoke.
 - `PLANS.real-main-path-evidence.md`
 
 Validation:
@@ -268,6 +277,7 @@ Validation:
 ```powershell
 rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"
 rtk npm run verify:result-contract
+rtk npm run verify:cli-entry
 ```
 
 ### G. Compact / long-session smoke design
@@ -323,16 +333,26 @@ Never commit audit residue, real-provider config, temporary homes, or unrelated 
 
 Current checkpoint:
 
-- `CLI stopped/failure follow-up real path smoke`
+- `Compact / long-session smoke design`
 
 Scope:
 
-- Prove that failed/stopped CLI entry states preserve context for follow-up.
-- Prefer existing `continue` focused coverage and result contract checks first.
-- Do not touch provider/auth, MCP, release-core, QueryEngine/queryLoop, terminalClassification, or durable session policy unless a focused regression proves it is required.
+- Design compact -> resume -> continue evidence for a longer chain without promoting it prematurely to default gates.
+- Prefer planning and test-surface review first.
+- Do not add broad long-session infrastructure or durable session policy changes unless a focused gap requires it.
 
 Completed checkpoint:
 
+- `CLI stopped/failure follow-up real path smoke`
+  - Added `cli-entry-stopped-failure-followup-real-path` to `scripts/verify-cli-entry.mjs`.
+  - Proves a real CLI entry stopped failed-tool result is still visible to bare and follow-up `/continue` with preserved reason, next action guidance, and session context.
+  - Records that automatic repair continuation from this real-entry stopped state is not claimed by this checkpoint.
+  - Verification:
+    - `rtk git status --short` showed the plan, `scripts/verify-cli-entry.mjs`, and generated audit residue modified before cleanup.
+    - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` hit sandbox esbuild spawn EPERM, then passed outside the sandbox: 4 passed, 30 skipped.
+    - `rtk npm run verify:result-contract` hit sandbox child-process spawn EPERM, then passed outside the sandbox.
+    - `rtk npm run verify:cli-entry` hit sandbox EPERM writing `D:\Test\cli-entry-gate\fixture.txt`, then passed outside the sandbox, including `[pass] cli-entry-stopped-failure-followup-real-path`.
 - `Provider readiness + real-provider safe smoke`
   - Added `--classification-self-test` to `scripts/verify-provider-readiness.mjs`.
   - Proves provider readiness failure classification for config/auth, network/timeout, and product-regression buckets without reading real-provider home.
@@ -365,13 +385,13 @@ Evidence:
 
 Next recommended checkpoint:
 
-- `CLI stopped/failure follow-up real path smoke`
+- `Compact / long-session smoke design`
 
 Reason:
 
-- Provider readiness classification now has a safe non-real self-test and remains separated from the opt-in real-provider smoke.
-- The next highest real-entry risk is whether stopped/failure states produced through the CLI entry are usable for follow-up without losing context.
-- The checkpoint should reuse existing continue/result contract gates before adding new harness surface.
+- Stopped/failure real-entry follow-up guidance now has a CLI hard-gate smoke.
+- The remaining planned risk is long-chain compact/resume continuity evidence.
+- The next checkpoint should start as design/review unless current code shows a very small existing harness to promote.
 
 Default stop condition for the next checkpoint:
 
@@ -381,6 +401,22 @@ Default stop condition for the next checkpoint:
 
 ### Completed
 
+- `CLI stopped/failure follow-up real path smoke`
+  - Commit: recorded in final status for this checkpoint.
+  - Files:
+    - `scripts/verify-cli-entry.mjs`
+    - `PLANS.real-main-path-evidence.md`
+  - Production shell/runtime changes: none.
+  - Evidence added:
+    - `cli-entry-stopped-failure-followup-real-path` produces a failed tool stopped state via the real CLI entry in synthetic mode.
+    - It checks bare `/continue` and `/continue <follow-up>` preserve the stopped reason, terminal guidance, and session context.
+    - It does not access real-provider home and does not claim automatic repair continuation.
+  - Verification:
+    - `rtk git status --short` passed before cleanup with only checkpoint files plus audit residue modified.
+    - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` hit sandbox esbuild spawn EPERM, then passed outside the sandbox: 4 passed, 30 skipped.
+    - `rtk npm run verify:result-contract` hit sandbox child-process spawn EPERM, then passed outside the sandbox.
+    - `rtk npm run verify:cli-entry` hit sandbox EPERM writing `D:\Test\cli-entry-gate\fixture.txt`, then passed outside the sandbox, including `[pass] cli-entry-stopped-failure-followup-real-path`.
 - `Provider readiness + real-provider safe smoke`
   - Commit: recorded in final status for this checkpoint.
   - Files:
@@ -462,14 +498,14 @@ Default stop condition for the next checkpoint:
 
 ### Current
 
-- `CLI stopped/failure follow-up real path smoke`
-  - Target: prove that failed/stopped CLI entry states preserve context for follow-up.
-  - Default scope: no provider/auth changes and no new durable session policy.
-  - Preferred starting point: existing `continue` focused CLI tests and `verify:result-contract`.
+- `Compact / long-session smoke design`
+  - Target: design compact -> resume -> continue evidence for a longer chain without promoting it prematurely to default gates.
+  - Default scope: planning/review first; no broad long-session infrastructure.
+  - Preferred starting point: existing SessionManager compact/resume tests and `GOLDEN_MAIN_PATH` transcript continuity checks.
 
 ### Backlog
 
-- Compact / long-session smoke design.
+- No additional backlog beyond the current compact / long-session design checkpoint.
 
 ### Notes
 
@@ -477,3 +513,4 @@ Default stop condition for the next checkpoint:
 - `scripts/live-interactive-runner.mjs` remains manual because it requires real stdin/stdout TTY and intentionally rejects `--print`.
 - Real-provider evidence must stay explicit and opt-in; do not read or print credential material from `D:\Test\home-sf`.
 - Provider readiness classification can be validated without real-provider home by running `rtk proxy node scripts/verify-provider-readiness.mjs --classification-self-test`.
+- `cli-entry-stopped-failure-followup-real-path` intentionally verifies preserved stopped guidance rather than automatic repair continuation; promoting true repair continuation from real-entry stopped states would be a separate product checkpoint.
