@@ -91,6 +91,18 @@ This branch directly supports the main-path stage by making these user-facing pa
     - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`
     - `rtk npm run verify:cli-entry`
   - Behavior: shell-action type guards and non-interactive interactive-only blocker surface preserved; sessions/workspace/MCP/help/view/agent/permission action implementations remain in `cli.tsx`.
+- Done: session continuity formatter extraction.
+  - Commit: reported in final status for this checkpoint.
+  - New module: `packages/ts-shell/src/session/continuityFormatter.ts`
+  - Modified files:
+    - `packages/ts-shell/src/session/SessionManager.ts`
+    - `packages/ts-shell/src/session/continuityFormatter.ts`
+    - `PLANS.main-path-boundaries.md`
+  - Validation:
+    - `rtk git status --short`
+    - `rtk npm run build -w packages/ts-shell`
+    - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts`
+  - Behavior: prompt continuity context text formatting preserved; session persistence, current pointer mutation, replay seed construction, and durable lifecycle state remain in `SessionManager.ts`.
 
 ## 5. Three-File Responsibility Map
 
@@ -239,7 +251,7 @@ Keep TypeScript imports ending in `.js`.
 
 ### SessionManager Direction
 
-- Backlog: continuity summary formatter extraction.
+- Done: continuity summary formatter extraction.
 - Backlog: replay plan pure helper extraction.
 - Backlog: compact summary formatter extraction.
 - Backlog: current session pointer validation helper extraction.
@@ -385,15 +397,15 @@ Do not start a second production-code checkpoint in the same commit.
 
 Next implementation checkpoint should be:
 
-- `Extract session continuity formatter`
+- `Extract session replay plan pure helper`
 
 Why:
 
-- The planned low-risk CLI boundary backlog is complete.
-- It starts reducing `SessionManager.ts` density with a pure formatting/summary boundary.
-- It should keep persistence, current pointer mutation, replay state, and durable lifecycle transitions in `SessionManager.ts`.
+- It continues reducing `SessionManager.ts` density after the continuity formatter extraction.
+- It should target pure replay preparation/plan mapping only.
+- It must keep transcript loading, repair, persistence, current pointer mutation, and durable lifecycle transitions in `SessionManager.ts`.
 - It can be validated by build and focused `SessionManager.test.ts`.
 
 Default stop condition for the next checkpoint:
 
-- If continuity formatter extraction requires changing session persistence, current pointer mutation, replay semantics, or durable lifecycle state, stop and choose a smaller formatter-only slice.
+- If replay helper extraction requires changing transcript repair semantics, runtime seed recovery boundaries, session persistence, or durable lifecycle state, stop and choose a smaller pure mapper slice.
