@@ -26,7 +26,6 @@ import {
 import { applyInteractiveApprovalDecisionWiring } from "../core/shell/interactiveApprovalWiring.js";
 import {
   runResumeLikeShellAction,
-  type ResumeLikeShellAction,
 } from "../core/shell/continueShellActionRuntime.js";
 import {
   renderRootBindingDiagnostics,
@@ -63,6 +62,11 @@ import {
   switchActiveSession,
 } from "../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
+import {
+  isResumeLikeShellAction,
+  isShellAction,
+  renderInteractiveOnlyShellActionBlocked,
+} from "../core/shell/shellActionBridge.js";
 import {
   handleShellClose,
   handleShellSigint,
@@ -579,14 +583,9 @@ async function main(): Promise<void> {
       const slashResult =
         resolved.kind === "shell-action" ? resolved.slashResult : null;
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        (slashResult.action === "continue-session" ||
-          slashResult.action === "resume-session")
-      ) {
-        const resumeSlash = slashResult as ResumeLikeShellAction;
+      if (isResumeLikeShellAction(slashResult)) {
         const resumeBridge = await runResumeLikeShellAction({
-          slashResult: resumeSlash,
+          slashResult,
           source: "interactive",
           printMode: false,
           fallbackSessionId: recoveryCandidate?.id,
@@ -624,20 +623,14 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "cancel-run"
-      ) {
+      if (isShellAction(slashResult, "cancel-run")) {
         sessionRuntime.cancelCurrentRun();
         renderer.renderLine("\nRequested cancellation for the current run.\n");
         rl.prompt();
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "list-sessions"
-      ) {
+      if (isShellAction(slashResult, "list-sessions")) {
         const sessionAction = slashResult.sessionAction ?? "panel";
         if (sessionAction === "list") {
           renderSessionList(
@@ -780,10 +773,7 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "show-workspace"
-      ) {
+      if (isShellAction(slashResult, "show-workspace")) {
         const workspaceAction = slashResult.workspaceAction ?? "status";
         if (workspaceAction === "recent") {
           renderRecentProjectContexts(renderer, sessionManager);
@@ -906,10 +896,7 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "show-mcp"
-      ) {
+      if (isShellAction(slashResult, "show-mcp")) {
         const mcpAction = slashResult.mcpAction ?? "status";
         const mcpTarget = slashResult.mcpTarget?.trim();
         try {
@@ -959,19 +946,13 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "show-help"
-      ) {
+      if (isShellAction(slashResult, "show-help")) {
         renderUserHelp(renderer);
         rl.prompt();
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "show-view"
-      ) {
+      if (isShellAction(slashResult, "show-view")) {
         const activeMode =
           sessionRuntime.getViewMode() === "compact" ? "user" : "developer";
         renderer.renderLine(
@@ -984,10 +965,7 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "set-view"
-      ) {
+      if (isShellAction(slashResult, "set-view")) {
         const nextMode = slashResult.viewMode ?? "compact";
         sessionRuntime.setViewMode(nextMode);
         const activeMode = nextMode === "compact" ? "user" : "developer";
@@ -998,10 +976,7 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "show-agent-mode"
-      ) {
+      if (isShellAction(slashResult, "show-agent-mode")) {
         const activeMode = sessionRuntime.getAgentMode();
         renderer.renderLine(`\nCurrent agent mode: ${activeMode}`);
         renderer.renderLine(
@@ -1011,10 +986,7 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "set-agent-mode"
-      ) {
+      if (isShellAction(slashResult, "set-agent-mode")) {
         const nextMode = slashResult.agentMode ?? "build";
         sessionRuntime.setAgentMode(nextMode);
         refreshInteractivePromptChrome();
@@ -1029,10 +1001,7 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "manage-permissions"
-      ) {
+      if (isShellAction(slashResult, "manage-permissions")) {
         const permissionAction = slashResult.permissionAction ?? "list";
         if (permissionAction === "list") {
           renderPermissionsList(
@@ -2358,13 +2327,9 @@ async function runNonInteractivePrompt(options: {
       return;
     }
 
-    if (
-      resolved.slashResult.action === "resume-session" ||
-      resolved.slashResult.action === "continue-session"
-    ) {
-      const resumeSlash = resolved.slashResult as ResumeLikeShellAction;
+    if (isResumeLikeShellAction(resolved.slashResult)) {
       await runResumeLikeShellAction({
-        slashResult: resumeSlash,
+        slashResult: resolved.slashResult,
         source: "non-interactive",
         printMode: options.printMode,
         fallbackSessionId: options.fallbackSessionId,
@@ -2396,18 +2361,9 @@ async function runNonInteractivePrompt(options: {
       });
       return;
     }
-    options.renderer.renderLine(options.printMode ? "Result" : "\nResult");
-    options.renderer.renderLine("- Outcome: blocked");
-    options.renderer.renderLine("- BlockerKind: command-not-allowlisted");
-    options.renderer.renderLine(
-      "- Reason: This shell action is interactive-only.",
-    );
-    options.renderer.renderLine(
-      "- DoNext: Run this command in interactive shell mode or use /help for non-interactive-safe alternatives.",
-    );
-    if (!options.printMode) {
-      options.renderer.renderLine("");
-    }
+    renderInteractiveOnlyShellActionBlocked(options.renderer, {
+      printMode: options.printMode,
+    });
     return;
   }
   await executeResolvedPromptTurn({
