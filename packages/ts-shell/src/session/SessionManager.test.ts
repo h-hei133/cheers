@@ -1980,6 +1980,54 @@ describe("SessionManager", () => {
     );
   });
 
+  it("preserves approved execution failure provenance across auto-compact reload", () => {
+    const manager = new SessionManager();
+    const fixture = createLongSessionContinuityFixture(
+      manager,
+      "approved-tool-failure",
+    );
+    const restoredManager = fixture.restoreManager();
+    const snapshot = restoredManager.buildContinuitySnapshot(fixture.session.id);
+    const context = restoredManager.buildPromptContinuityContext(
+      fixture.session.id,
+      "continue the approved tool failure",
+    );
+
+    expect(fixture.readWorkingMemory()?.compacted).toBe(true);
+    expect(snapshot.lastTerminalClassification).toBe("stopped");
+    expect(snapshot.lastTaskKind).toBe("run-command");
+    expect(snapshot.lastFailure).toBe(fixture.failureReason);
+    expect(snapshot.recentFailedFiles).toEqual([
+      {
+        path: fixture.targetFile,
+        reason: fixture.failureReason,
+      },
+    ]);
+    expect(snapshot.lastApprovalDecision).toBe("allow-once");
+    expect(snapshot.lastApprovalPersistent).toBe(false);
+    expect(snapshot.lastApprovalCacheEffect).toBe("none");
+    expect(snapshot.lastApprovalChannel).toBe("non-interactive");
+    expect(snapshot.lastApprovalInputKey).toBe("y");
+    expect(snapshot.lastVerificationStatus).toBe("blocked");
+    expect(snapshot.lastVerificationCommand).toBe(
+      "npm test -- src/long-session.test.ts",
+    );
+    expect(snapshot.lastVerificationBlockerKind).toBe("unknown");
+    expect(snapshot.lastVerificationReason).toBe(fixture.failureReason);
+    expect(snapshot.lastVerificationNextAction).toBe(fixture.nextAction);
+    expect(snapshot.lastApprovalDecision).not.toBe("deny");
+    expect(snapshot.lastFailure).not.toBe("approval denied");
+    expect(context).toContain("- last-approval-decision: allow-once");
+    expect(context).toContain("- last-approval-persistent: no");
+    expect(context).toContain("- last-approval-cache-effect: none");
+    expect(context).toContain(
+      `- recent-failed-files: ${fixture.targetFile} (${fixture.failureReason})`,
+    );
+    expect(context).toContain(
+      `- last-verification-next-action: ${fixture.nextAction}`,
+    );
+  });
+
   it("persists append-before-model-call barrier before query events begin", () => {
     const manager = new SessionManager();
     const session = manager.createNew();
