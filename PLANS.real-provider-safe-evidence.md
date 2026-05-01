@@ -187,11 +187,11 @@ opencode 参考：
 
 Backlog:
 
-1. H. Merge-readiness / route audit
+- None for this route. The real-provider safe evidence track is sealed.
 
 Current:
 
-- H. Merge-readiness / route audit
+- Sealed. Return to new main path blocker assessment.
 
 Completed:
 
@@ -223,6 +223,10 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `scripts/verify-real-user-capabilities.mjs`, `PLANS.real-provider-safe-evidence.md`.
   - Result: completed as a safe follow-up context dry-run. Added `--failure-followup-context-dry-run` to verify provider network/auth failures, tool execution failures, and verification-stopped failures retain previous outcome, blocker, status, reason, DoNext, and follow-up prompt context without executing real provider or writing a report.
+- H. Merge-readiness / route audit
+  - Commit: merge/closure commit reported in final status.
+  - Files changed: `PLANS.real-provider-safe-evidence.md`.
+  - Result: completed. Merge-readiness and post-merge verification passed; route merged back to `main` with merge commit `b934f1449cac9c30455df73ead53e4b01983a1dc`.
 
 Verification:
 
@@ -262,6 +266,23 @@ Verification:
   - `rtk npm run test -w packages/ts-shell -- src/core/shell/sessionRuntime.test.ts`: passed.
   - `rtk npm run verify:result-contract`: passed.
   - `rtk npm run build -w packages/ts-shell`: passed.
+- H merge-readiness route audit round on `real-provider-safe-evidence`:
+  - `rtk git status --short`: passed; branch clean.
+  - `rtk npm run build -w packages/ts-shell`: passed after elevated rerun for sandbox `EPERM` dist write.
+  - `rtk node scripts/verify-real-user-capabilities.mjs --failure-followup-context-dry-run`: passed; no real-provider execution and `homeRead=false`.
+  - `rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts`: passed after elevated rerun for sandbox `spawn EPERM`.
+  - `rtk npm run test -w packages/ts-shell -- src/config/runtimeConfig.test.ts`: passed after elevated rerun for sandbox `spawn EPERM`.
+  - `rtk npm run test -w packages/ts-shell -- src/core/shell/sessionRuntime.test.ts`: passed after elevated rerun for sandbox `spawn EPERM`.
+  - `rtk npm run verify:result-contract`: passed after elevated rerun for sandbox `spawn EPERM`.
+  - `rtk npm run verify:cli-entry`: passed after elevated rerun for sandbox fixture write `EPERM`.
+  - `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path`: passed after elevated rerun for sandbox `spawn EPERM`.
+- H post-merge verification round on `main`:
+  - `rtk git status --short`: passed before plan closure; branch clean apart from later audit residue.
+  - `rtk npm run build -w packages/ts-shell`: passed elevated due already-established sandbox dist write `EPERM`.
+  - `rtk node scripts/verify-real-user-capabilities.mjs --failure-followup-context-dry-run`: passed; no real-provider execution and `homeRead=false`.
+  - `rtk npm run verify:result-contract`: passed elevated due already-established sandbox `spawn EPERM`.
+  - `rtk npm run verify:cli-entry`: passed elevated due already-established sandbox fixture write `EPERM`.
+  - `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path`: passed elevated due already-established sandbox `spawn EPERM`.
 
 Notes:
 
@@ -305,6 +326,11 @@ Notes:
   - The dry-run uses the same terminal surface helper to construct follow-up context and checks that provider network/auth, task execution, and verification failures preserve previous outcome, blocker, status detail, reason, DoNext, and user follow-up prompt.
   - Provider failure follow-up context remains separated from tool/verification stopped context and redacts provider secrets before rendering.
   - Next selected checkpoint is H merge-readiness / route audit. Do not add more real-provider safe evidence proof unless H validation finds a route regression.
+- H closure notes:
+  - `real-provider-safe-evidence` merged back to `main` using a no-fast-forward merge commit: `b934f1449cac9c30455df73ead53e4b01983a1dc`.
+  - The route is stage-sealed. Do not continue real-provider evidence same-family proof by default.
+  - Next recommended action: return to a fresh main path blocker assessment and only reopen this route if a new real-provider safety regression appears.
+  - No default real-provider smoke was run; all route verification stayed on dry-run, focused tests, result/CLI gates, and synthetic golden main path.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 
