@@ -49,6 +49,20 @@ This branch directly supports the main-path stage by making these user-facing pa
     - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`
     - `rtk npm run verify:cli-entry`
   - Behavior: startup banner, workspace binding lines, root binding diagnostics, recovery hint, runtime line, and startup next actions preserved.
+- Done: CLI print prompt handling extraction.
+  - Commit: reported in final status for this checkpoint.
+  - New module: `packages/ts-shell/src/core/shell/printPromptInput.ts`
+  - Modified files:
+    - `packages/ts-shell/src/entrypoints/cli.tsx`
+    - `packages/ts-shell/src/core/shell/printPromptInput.ts`
+    - `PLANS.main-path-boundaries.md`
+  - Validation:
+    - `rtk git status --short`
+    - `rtk npm run build -w packages/ts-shell`
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "print"`
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`
+    - `rtk npm run verify:cli-entry`
+  - Behavior: stdin transport mode resolution, non-interactive prompt batching, transport prompt parsing, fenced prompt detection, and multiline literal detection preserved.
 
 ## 5. Three-File Responsibility Map
 
@@ -191,7 +205,7 @@ Keep TypeScript imports ending in `.js`.
 
 - Done: continue/resume shell action runtime extraction.
 - Done: startup surface renderer extraction.
-- Backlog: stdin / print prompt handling extraction.
+- Done: stdin / print prompt handling extraction.
 - Backlog: approval prompt rendering extraction.
 - Backlog: slash action shell bridge extraction.
 
@@ -343,15 +357,15 @@ Do not start a second production-code checkpoint in the same commit.
 
 Next implementation checkpoint should be:
 
-- `Extract CLI print prompt handling`
+- `Extract CLI approval prompt renderer`
 
 Why:
 
 - It continues thinning `cli.tsx`.
-- It targets stdin / `--print` prompt batching, which is still concentrated in the entrypoint.
-- It keeps prompt execution and session/runtime wiring in `cli.tsx`.
+- It targets prompt rendering and approval UX formatting without changing approval policy or core auth/provider behavior.
+- It keeps approval decision state and execution wiring in `cli.tsx`.
 - It can be validated by build, `cli-baseline` print focused tests, continue focused tests, and `verify:cli-entry`.
 
 Default stop condition for the next checkpoint:
 
-- If prompt input extraction requires changing prompt execution semantics, approval behavior, session selection, or runtime bootstrapping, stop and choose a smaller parser-only slice.
+- If approval prompt rendering extraction requires changing approval policy, permission provenance, provider/auth behavior, or session/runtime execution, stop and choose a smaller renderer-only slice.
