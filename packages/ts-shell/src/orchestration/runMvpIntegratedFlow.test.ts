@@ -8,9 +8,21 @@ import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { ToolDispatcher } from "../tools/dispatcher.js";
 import { safeRemoveDir } from "../test-utils/cleanup.js";
 import {
+  buildActionResultSeedFromCodingResult,
+  extractAttemptedFilesFromEvidence,
+} from "./actionResultEvidence.js";
+import {
   runMvpIntegratedFlow,
   streamMvpIntegratedFlow,
 } from "./runMvpIntegratedFlow.js";
+import { reconcileFileMutationSummary } from "./mutationResultAggregation.js";
+import {
+  appendApprovalRequestedEvent,
+  appendApprovalResolvedEvent,
+  appendToolResultEvent,
+  appendToolStartedEvent,
+} from "./toolLifecycleEvents.js";
+import { buildMutationTaskDelivery } from "./verificationResultAggregation.js";
 
 describe("MVP integrated end-to-end flow (T10)", () => {
   let workspaceRoot = "";
@@ -53,6 +65,201 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       lastActionResultSeed: result.codingResult?.lastActionResultSeed,
     };
   }
+
+  it("renders mutation verification delivery from aggregated summary", () => {
+    expect(
+      buildMutationTaskDelivery({
+        taskKind: "edit-file",
+        changedFiles: ["src/app.ts"],
+        failedFiles: [],
+        verification: { status: "passed" },
+      }),
+    ).toBe("Edit completed for src/app.ts. Verification passed.");
+    expect(
+      buildMutationTaskDelivery({
+        taskKind: "write-file",
+        changedFiles: ["src/app.ts"],
+        failedFiles: [],
+        verification: {
+          status: "blocked",
+          blockerKind: "approval-denied",
+          nextAction: "approve the command and retry",
+        },
+      }),
+    ).toBe(
+      "Write completed for src/app.ts. Verification blocked (approval-denied). approve the command and retry",
+    );
+    expect(
+      buildMutationTaskDelivery({
+        taskKind: "edit-file",
+        changedFiles: ["src/app.ts"],
+        failedFiles: [],
+        verification: { status: "failed", reason: "tests failed" },
+      }),
+    ).toBe("Edit completed for src/app.ts. Verification failed: tests failed.");
+    expect(
+      buildMutationTaskDelivery({
+        taskKind: "edit-file",
+        changedFiles: ["src/app.ts"],
+        failedFiles: [],
+        verification: { status: "not-requested" },
+      }),
+    ).toBe("Edit completed for src/app.ts. Verification was not requested.");
+    expect(
+      buildMutationTaskDelivery({
+        taskKind: "edit-file",
+        changedFiles: [],
+        failedFiles: [],
+        verification: { status: "skipped" },
+      }),
+    ).toBe("Task not completed: no file mutation was applied.");
+  });
+
+  it("reconciles mutation summary into aggregate without duplicating evidence", () => {
+    const failedPatch = {
+      path: "src/fail.txt",
+      operation: "replace" as const,
+      status: "failed" as const,
+      reason: "write failed",
+    };
+    const aggregate = {
+      changedFiles: ["src/ok.txt"],
+      failedFiles: [{ path: "src/fail.txt", reason: "write failed" }],
+      patches: [],
+      evidence: ["mutation-note"],
+      repairNotes: [],
+    };
+
+    reconcileFileMutationSummary(
+      {
+        ok: false,
+        status: "failed",
+        blocker: {
+          code: "partial-mutation-failed",
+          reason:
+            "One or more file mutations failed, so the mutation set cannot be reported as successfully applied.",
+          nextAction:
+            "Review the failed files, re-read current content, and retry only the unresolved mutation.",
+        },
+        changedFiles: ["src/ok.txt", "src/next.txt"],
+        failedFiles: [{ path: ".\\src\\fail.txt", reason: "write failed" }],
+        patches: [failedPatch],
+        evidence: ["mutation-note"],
+      },
+      aggregate,
+    );
+
+    expect(aggregate.changedFiles).toEqual(["src/ok.txt", "src/next.txt"]);
+    expect(aggregate.failedFiles).toEqual([
+      { path: "src/fail.txt", reason: "write failed" },
+    ]);
+    expect(aggregate.patches).toEqual([failedPatch]);
+    expect(aggregate.evidence).toContain(
+      "mutation-summary-blocker:partial-mutation-failed",
+    );
+    expect(aggregate.evidence.filter((entry) => entry === "mutation-note")).toHaveLength(
+      1,
+    );
+    expect(aggregate.repairNotes[0]).toContain("partial-mutation-failed");
+  });
+
+  it("formats tool lifecycle events without changing dispatch ownership", () => {
+    const events: QueryEvent[] = [];
+    const identity = { toolName: "bash", taskId: "task_tool_lifecycle" };
+
+    appendApprovalRequestedEvent(events, identity);
+    appendToolStartedEvent(events, identity);
+    appendApprovalResolvedEvent(events, identity, {
+      success: false,
+      metadata: { wasEscalated: true },
+    });
+    appendToolResultEvent(events, identity, {
+      success: false,
+      metadata: { wasEscalated: true },
+    });
+
+    expect(events).toEqual([
+      {
+        type: "approval.requested",
+        toolName: "bash",
+        taskId: "task_tool_lifecycle",
+      },
+      {
+        type: "tool.started",
+        toolName: "bash",
+        taskId: "task_tool_lifecycle",
+      },
+      {
+        type: "approval.resolved",
+        toolName: "bash",
+        taskId: "task_tool_lifecycle",
+        outcome: "denied",
+      },
+      {
+        type: "tool.result",
+        toolName: "bash",
+        taskId: "task_tool_lifecycle",
+        success: false,
+      },
+    ]);
+  });
+
+  it("formats action result seed from evidence without changing result taxonomy", () => {
+    expect(
+      extractAttemptedFilesFromEvidence([
+        "inspect: read ./src/readme.md",
+        "verify-target-hint: (unknown)",
+        "replan-transform:src/app.ts:replace",
+        "transform:src/app.ts:replace",
+      ]),
+    ).toEqual(["src/readme.md", "src/app.ts"]);
+
+    expect(
+      buildActionResultSeedFromCodingResult("run-command", {
+        attemptedFiles: [],
+        changedFiles: [],
+        verifiedFiles: [],
+        verification: {
+          status: "passed",
+          command: "node --version",
+        },
+      }),
+    ).toMatchObject({
+      actionKind: "run-command",
+      target: "node --version",
+      changedFiles: [],
+      verifiedFiles: [],
+      verification: {
+        status: "passed",
+        command: "node --version",
+      },
+    });
+
+    expect(
+      buildActionResultSeedFromCodingResult("edit-file", {
+        attemptedFiles: ["src/attempted.ts"],
+        changedFiles: [".\\src\\changed.ts"],
+        verifiedFiles: ["./src/verified.ts"],
+        verification: {
+          status: "blocked",
+          blockerKind: "approval-denied",
+          reason: "approval denied",
+        },
+        reason: "write blocked",
+      }),
+    ).toMatchObject({
+      actionKind: "edit-file",
+      target: "src/changed.ts",
+      changedFiles: ["src/changed.ts"],
+      verifiedFiles: ["src/verified.ts"],
+      verification: {
+        status: "blocked",
+        reason: "approval denied",
+        blockerKind: "approval-denied",
+      },
+      reason: "write blocked",
+    });
+  });
 
   it("covers prompt -> handoff -> tool approval -> streamed result", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });

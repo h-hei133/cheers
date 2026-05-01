@@ -39,6 +39,21 @@ import type {
   TerminalClassification,
   TerminalReason,
 } from "../orchestration/types.js";
+import { mergeContinuitySummaryEntries } from "./compactSummaryFormatter.js";
+import { formatPromptContinuityContext } from "./continuityFormatter.js";
+import {
+  createEmptyCurrentSessionSelectionStore,
+  parseCurrentSessionSelectionStore,
+  resolveCurrentSessionLoadFailed,
+  resolveMissingCurrentSession,
+  resolveProjectRootMismatch,
+  resolveUnselectedCurrentSession,
+  type CurrentSessionSelectionResolution,
+  type CurrentSessionSelectionStore,
+} from "./currentSessionSelection.js";
+import { buildReplayPlanFromSnapshot } from "./replayPlanBuilder.js";
+
+export type { CurrentSessionSelectionResolution } from "./currentSessionSelection.js";
 
 type SeedInfluenceDiagnostic =
   | "target-carryover"
@@ -248,30 +263,6 @@ interface SessionStateSnapshot {
   lastContinuationReason?: ContinuationReason;
   pendingLifecycle?: DurableLifecycleIndex;
 }
-
-interface CurrentSessionSelectionRecord {
-  readonly sessionId: string;
-  readonly updatedAt: string;
-}
-
-interface CurrentSessionSelectionStore {
-  readonly schemaVersion: 1;
-  readonly byProjectRoot: Record<string, CurrentSessionSelectionRecord>;
-}
-
-export type CurrentSessionSelectionResolution =
-  | { readonly ok: true; readonly session: Session }
-  | {
-      readonly ok: false;
-      readonly reason:
-        | "none"
-        | "store-invalid"
-        | "missing-session"
-        | "load-failed"
-        | "project-root-mismatch";
-      readonly sessionId?: string;
-      readonly detail: string;
-    };
 
 interface TranscriptRepairContext {
   readonly sessionId: string;
@@ -484,27 +475,11 @@ export class SessionManager {
     const storeReadError = this.lastCurrentSessionStoreReadError;
     const selection = store.byProjectRoot[normalizedProjectRoot];
     if (!selection?.sessionId?.trim()) {
-      if (storeReadError) {
-        return {
-          ok: false,
-          reason: "store-invalid",
-          detail: `Current session selection store could not be read for ${projectRoot}: ${storeReadError}.`,
-        };
-      }
-      return {
-        ok: false,
-        reason: "none",
-        detail: `No current session is selected for ${projectRoot}.`,
-      };
+      return resolveUnselectedCurrentSession(projectRoot, storeReadError);
     }
     if (!this.sessionExists(selection.sessionId)) {
       this.removeCurrentSessionSelection(normalizedProjectRoot);
-      return {
-        ok: false,
-        reason: "missing-session",
-        sessionId: selection.sessionId,
-        detail: `Current session ${selection.sessionId} no longer exists for ${projectRoot}.`,
-      };
+      return resolveMissingCurrentSession(projectRoot, selection.sessionId);
     }
 
     try {
@@ -512,22 +487,20 @@ export class SessionManager {
       const sessionProjectRoot = session.projectRoot || normalizedProjectRoot;
       if (this.normalizeProjectRootKey(sessionProjectRoot) !== normalizedProjectRoot) {
         this.removeCurrentSessionSelection(normalizedProjectRoot);
-        return {
-          ok: false,
-          reason: "project-root-mismatch",
-          sessionId: selection.sessionId,
-          detail: `Current session ${selection.sessionId} is bound to ${sessionProjectRoot}, not ${projectRoot}.`,
-        };
+        return resolveProjectRootMismatch(
+          projectRoot,
+          selection.sessionId,
+          sessionProjectRoot,
+        );
       }
       return { ok: true, session };
     } catch (error) {
       this.removeCurrentSessionSelection(normalizedProjectRoot);
-      return {
-        ok: false,
-        reason: "load-failed",
-        sessionId: selection.sessionId,
-        detail: `Current session ${selection.sessionId} could not be loaded for ${projectRoot}: ${error instanceof Error ? error.message : String(error)}.`,
-      };
+      return resolveCurrentSessionLoadFailed(
+        projectRoot,
+        selection.sessionId,
+        error,
+      );
     }
   }
 
@@ -1409,39 +1382,7 @@ export class SessionManager {
   getReplayPlan(sessionId: string): ReplayPlan {
     const snapshot = this.getRecoverySnapshot(sessionId);
     const turnPairing = this.buildTurnPairingState(snapshot.transcriptEvents);
-    const replayMessages = snapshot.transcriptEvents
-      .filter(
-        (event): event is Extract<TranscriptEvent, { type: "message" }> =>
-          event.type === "message",
-      )
-      .map((event) => ({
-        role: event.role,
-        content: event.content,
-        timestamp: event.timestamp,
-      }));
-
-    const lastReplayMessage = replayMessages[replayMessages.length - 1];
-    const continuationPrompt =
-      snapshot.interruptedKind === "turn"
-        ? "Continue from where you left off."
-        : snapshot.interruptedKind === "prompt"
-          ? snapshot.pendingPrompt
-          : undefined;
-
-    return {
-      normalizedTranscriptEvents: snapshot.transcriptEvents,
-      replayMessages,
-      continuationPrompt,
-      requiresAssistantSentinel: lastReplayMessage?.role === "user",
-      repairSummary: {
-        ...snapshot.repairSummary,
-        ignoredDuplicateTurnStarts: turnPairing.ignoredDuplicateTurnStarts,
-        ignoredUnpairedTurnCompletions:
-          turnPairing.ignoredUnpairedTurnCompletions,
-        ignoredRoleMismatchedTurnCompletions:
-          turnPairing.ignoredRoleMismatchedTurnCompletions,
-      },
-    };
+    return buildReplayPlanFromSnapshot(snapshot, turnPairing);
   }
 
   buildRuntimeStateSeed(
@@ -1842,40 +1783,23 @@ export class SessionManager {
   private readCurrentSessionStore(): CurrentSessionSelectionStore {
     if (!fs.existsSync(this.currentSessionStorePath)) {
       this.lastCurrentSessionStoreReadError = null;
-      return {
-        schemaVersion: 1,
-        byProjectRoot: {},
-      };
+      return createEmptyCurrentSessionSelectionStore();
     }
 
     try {
       const parsed = JSON.parse(
         fs.readFileSync(this.currentSessionStorePath, "utf8"),
       ) as Partial<CurrentSessionSelectionStore>;
-      if (
-        parsed.schemaVersion !== 1 ||
-        !parsed.byProjectRoot ||
-        typeof parsed.byProjectRoot !== "object"
-      ) {
-        this.lastCurrentSessionStoreReadError =
-          `Invalid current session selection store at ${this.currentSessionStorePath}`;
-        return {
-          schemaVersion: 1,
-          byProjectRoot: {},
-        };
-      }
-      this.lastCurrentSessionStoreReadError = null;
-      return {
-        schemaVersion: 1,
-        byProjectRoot: parsed.byProjectRoot,
-      };
+      const result = parseCurrentSessionSelectionStore(
+        parsed,
+        this.currentSessionStorePath,
+      );
+      this.lastCurrentSessionStoreReadError = result.readError;
+      return result.store;
     } catch (error) {
       this.lastCurrentSessionStoreReadError =
         error instanceof Error ? error.message : String(error);
-      return {
-        schemaVersion: 1,
-        byProjectRoot: {},
-      };
+      return createEmptyCurrentSessionSelectionStore();
     }
   }
 
@@ -2957,315 +2881,7 @@ export class SessionManager {
     }
 
     const snapshot = this.buildContinuitySnapshot(sessionId);
-    const lines: string[] = ["Session continuity context:"];
-
-    if (snapshot.lastTaskKind) {
-      lines.push(`- last-task-kind: ${snapshot.lastTaskKind}`);
-    }
-    if (snapshot.lastGroundedDeliverableMode) {
-      lines.push(
-        `- last-grounded-deliverable-mode: ${snapshot.lastGroundedDeliverableMode}`,
-      );
-    }
-    if (snapshot.lastReadDeliveredLines !== undefined) {
-      lines.push(`- last-read-delivered-lines: ${snapshot.lastReadDeliveredLines}`);
-    }
-    if (snapshot.lastReadWindowStart !== undefined) {
-      lines.push(`- last-read-window-start: ${snapshot.lastReadWindowStart}`);
-    }
-    if (snapshot.lastReadWindowEnd !== undefined) {
-      lines.push(`- last-read-window-end: ${snapshot.lastReadWindowEnd}`);
-    }
-    if (snapshot.lastReadWindowSize !== undefined) {
-      lines.push(`- last-read-window-size: ${snapshot.lastReadWindowSize}`);
-    }
-    if (snapshot.lastReadFragmentStart !== undefined) {
-      lines.push(
-        `- last-read-fragment-start: ${snapshot.lastReadFragmentStart}`,
-      );
-    }
-    if (snapshot.lastReadFragmentEnd !== undefined) {
-      lines.push(`- last-read-fragment-end: ${snapshot.lastReadFragmentEnd}`);
-    }
-    if ((snapshot.lastReadFragmentLineIndexes?.length ?? 0) > 0) {
-      const indexCount = snapshot.lastReadFragmentLineIndexes?.length ?? 0;
-      lines.push(`- last-read-fragment-line-index-count: ${indexCount}`);
-      if (indexCount <= 128) {
-        lines.push(
-          `- last-read-fragment-line-indexes: ${snapshot.lastReadFragmentLineIndexes?.join(",")}`,
-        );
-      }
-    }
-    if ((snapshot.lastReadFragmentRanges?.length ?? 0) > 0) {
-      const rangeCount = snapshot.lastReadFragmentRanges?.length ?? 0;
-      lines.push(`- last-read-fragment-range-count: ${rangeCount}`);
-      lines.push(
-        `- last-read-fragment-ranges: ${snapshot.lastReadFragmentRanges?.join(";")}`,
-      );
-    }
-    if (snapshot.lastReadFragmentSourceWindowStart !== undefined) {
-      lines.push(
-        `- last-read-fragment-source-window-start: ${snapshot.lastReadFragmentSourceWindowStart}`,
-      );
-    }
-    if (snapshot.lastReadFragmentSourceWindowEnd !== undefined) {
-      lines.push(
-        `- last-read-fragment-source-window-end: ${snapshot.lastReadFragmentSourceWindowEnd}`,
-      );
-    }
-    if (snapshot.lastReadFilter) {
-      lines.push(`- last-read-filter: ${snapshot.lastReadFilter}`);
-    }
-    if (snapshot.lastReadFragmentFingerprint) {
-      lines.push(
-        `- last-read-fragment-fingerprint: ${snapshot.lastReadFragmentFingerprint}`,
-      );
-    }
-    if (snapshot.lastStagedRepairStepCount !== undefined) {
-      lines.push(
-        `- last-staged-repair-steps: ${snapshot.lastStagedRepairStepCount}`,
-      );
-    }
-    if (snapshot.lastStagedRepairCompletedStep !== undefined) {
-      lines.push(
-        `- last-staged-repair-completed-step: ${snapshot.lastStagedRepairCompletedStep}`,
-      );
-    }
-    if (snapshot.lastStagedRepairBlockedStep !== undefined) {
-      lines.push(
-        `- last-staged-repair-blocked-step: ${snapshot.lastStagedRepairBlockedStep}`,
-      );
-    }
-    if (snapshot.lastStagedRepairNextStep !== undefined) {
-      lines.push(`- last-staged-repair-next-step: ${snapshot.lastStagedRepairNextStep}`);
-    }
-    if (snapshot.lastAnswerDefect) {
-      lines.push(`- last-answer-defect: ${this.compactText(snapshot.lastAnswerDefect, 120)}`);
-    }
-    if (snapshot.lastActionHandoffSummary) {
-      lines.push(
-        `- last-action-handoff-summary: ${this.compactText(snapshot.lastActionHandoffSummary, 180)}`,
-      );
-    }
-    if (snapshot.lastSeedInfluenceHandoffSummary) {
-      lines.push(
-        `- last-seed-influence-handoff-summary: ${this.compactText(snapshot.lastSeedInfluenceHandoffSummary, 180)}`,
-      );
-    }
-    if (snapshot.lastFailureHandoffDiagnostic) {
-      lines.push(
-        `- last-failure-handoff-diagnostic: ${this.compactText(snapshot.lastFailureHandoffDiagnostic, 220)}`,
-      );
-    }
-    if (snapshot.lastSuccessHandoffDiagnostic) {
-      lines.push(
-        `- last-success-handoff-diagnostic: ${this.compactText(snapshot.lastSuccessHandoffDiagnostic, 220)}`,
-      );
-    }
-    if (snapshot.lastTerminalClassification || snapshot.lastTerminalReason) {
-      lines.push(
-        `- last-terminal: ${snapshot.lastTerminalClassification ?? "unknown"} (${snapshot.lastTerminalReason ?? "unknown"})`,
-      );
-    }
-    if (snapshot.lastFailure) {
-      lines.push(`- last-failure: ${this.compactText(snapshot.lastFailure)}`);
-    }
-    if (snapshot.recentChangedFiles.length > 0) {
-      lines.push(`- recent-changed-files: ${snapshot.recentChangedFiles.join(", ")}`);
-    }
-    const candidateTargetFiles = Array.from(
-      new Set([
-        ...snapshot.recentTargetFiles,
-        ...snapshot.recentChangedFiles,
-        ...snapshot.recentVerifiedFiles,
-        ...snapshot.recentFailedFiles.map((entry) => entry.path),
-      ]),
-    );
-    if (candidateTargetFiles.length > 0) {
-      lines.push(`- recent-target-files: ${candidateTargetFiles.join(", ")}`);
-    }
-    if (snapshot.recentVerifiedFiles.length > 0) {
-      lines.push(`- recent-verified-files: ${snapshot.recentVerifiedFiles.join(", ")}`);
-    }
-    if (snapshot.recentFailedFiles.length > 0) {
-      lines.push(
-        `- recent-failed-files: ${snapshot.recentFailedFiles
-          .map((entry) => `${entry.path} (${entry.reason})`)
-          .join(", ")}`,
-      );
-    }
-    if (snapshot.lastVerificationStatus) {
-      lines.push(`- last-verification-status: ${snapshot.lastVerificationStatus}`);
-      if (snapshot.lastVerificationCommand) {
-        lines.push(`- last-verification-command: ${snapshot.lastVerificationCommand}`);
-      }
-      if (snapshot.lastVerificationReason) {
-        lines.push(
-          `- last-verification-reason: ${this.compactText(snapshot.lastVerificationReason)}`,
-        );
-      }
-      if (snapshot.lastVerificationBlockerKind) {
-        lines.push(
-          `- last-verification-blocker-kind: ${snapshot.lastVerificationBlockerKind}`,
-        );
-      }
-      if (snapshot.lastVerificationNextAction) {
-        lines.push(
-          `- last-verification-next-action: ${this.compactText(snapshot.lastVerificationNextAction)}`,
-        );
-      }
-      if (snapshot.lastVerificationResumeEligible !== undefined) {
-        lines.push(
-          `- last-verification-resume-eligible: ${snapshot.lastVerificationResumeEligible ? "yes" : "no"}`,
-        );
-      }
-    }
-    if (snapshot.lastApprovalDecision) {
-      lines.push(`- last-approval-decision: ${snapshot.lastApprovalDecision}`);
-      if (snapshot.lastApprovalDecisionSource) {
-        lines.push(
-          `- last-approval-decision-source: ${snapshot.lastApprovalDecisionSource}`,
-        );
-      }
-      if (snapshot.lastApprovalPersistent !== undefined) {
-        lines.push(
-          `- last-approval-persistent: ${snapshot.lastApprovalPersistent ? "yes" : "no"}`,
-        );
-      }
-      if (snapshot.lastApprovalCacheEffect) {
-        lines.push(`- last-approval-cache-effect: ${snapshot.lastApprovalCacheEffect}`);
-      }
-      if (snapshot.lastApprovalProjectRoot) {
-        lines.push(`- last-approval-project-root: ${snapshot.lastApprovalProjectRoot}`);
-      }
-      if (snapshot.lastApprovalCacheKey) {
-        lines.push(`- last-approval-cache-key: ${snapshot.lastApprovalCacheKey}`);
-      }
-      if (snapshot.lastApprovalScope) {
-        lines.push(`- last-approval-scope: ${snapshot.lastApprovalScope}`);
-      }
-      if (snapshot.lastApprovalLineage) {
-        lines.push(`- last-approval-lineage: ${snapshot.lastApprovalLineage}`);
-      }
-      if (snapshot.lastApprovalChannel) {
-        lines.push(`- last-approval-channel: ${snapshot.lastApprovalChannel}`);
-      }
-      if (snapshot.lastApprovalInputKey) {
-        lines.push(`- last-approval-input-key: ${snapshot.lastApprovalInputKey}`);
-      }
-      if (snapshot.lastApprovalStopReason) {
-        lines.push(
-          `- last-approval-stop-reason: ${this.compactText(snapshot.lastApprovalStopReason)}`,
-        );
-      }
-      if (snapshot.lastApprovalRecordedAt) {
-        lines.push(`- last-approval-recorded-at: ${snapshot.lastApprovalRecordedAt}`);
-      }
-    }
-    if (snapshot.lastRequestScopeCacheKey) {
-      lines.push(`- last-request-scope-cache-key: ${snapshot.lastRequestScopeCacheKey}`);
-    }
-    if (snapshot.lastRequestScopeLabel) {
-      lines.push(`- last-request-scope-label: ${snapshot.lastRequestScopeLabel}`);
-    }
-    if (snapshot.lastRequestScopeProjectRoot) {
-      lines.push(
-        `- last-request-scope-project-root: ${snapshot.lastRequestScopeProjectRoot}`,
-      );
-    }
-    if (snapshot.lastRequestScopeSource) {
-      lines.push(`- last-request-scope-source: ${snapshot.lastRequestScopeSource}`);
-    }
-    if (snapshot.lastPermissionRequestToolName) {
-      lines.push(
-        `- last-permission-request-tool: ${snapshot.lastPermissionRequestToolName}`,
-      );
-    }
-    if (snapshot.lastPermissionRequestOperation) {
-      lines.push(
-        `- last-permission-request-operation: ${snapshot.lastPermissionRequestOperation}`,
-      );
-    }
-    if (snapshot.lastPermissionRequestTarget) {
-      lines.push(
-        `- last-permission-request-target: ${snapshot.lastPermissionRequestTarget}`,
-      );
-    }
-    if (snapshot.lastPermissionRequestProcess) {
-      lines.push(
-        `- last-permission-request-process: ${snapshot.lastPermissionRequestProcess}`,
-      );
-    }
-    if (snapshot.lastPermissionRequestScopeKey) {
-      lines.push(
-        `- last-permission-request-scope-key: ${snapshot.lastPermissionRequestScopeKey}`,
-      );
-    }
-    if (snapshot.lastPermissionRequestScopeLabel) {
-      lines.push(
-        `- last-permission-request-scope-label: ${snapshot.lastPermissionRequestScopeLabel}`,
-      );
-    }
-    if (snapshot.lastPermissionRequestCacheKey) {
-      lines.push(
-        `- last-permission-request-cache-key: ${snapshot.lastPermissionRequestCacheKey}`,
-      );
-    }
-    if (snapshot.lastPermissionRequestProjectRoot) {
-      lines.push(
-        `- last-permission-request-project-root: ${snapshot.lastPermissionRequestProjectRoot}`,
-      );
-    }
-    if (snapshot.lastPermissionRequestSource) {
-      lines.push(
-        `- last-permission-request-source: ${snapshot.lastPermissionRequestSource}`,
-      );
-    }
-    if (snapshot.lastPermissionRequestLineage) {
-      lines.push(
-        `- last-permission-request-lineage: ${snapshot.lastPermissionRequestLineage}`,
-      );
-    }
-    if (snapshot.lastRepairStatus) {
-      lines.push(`- last-repair-status: ${snapshot.lastRepairStatus}`);
-      if (snapshot.lastRepairNotes.length > 0) {
-        lines.push(
-          `- last-repair-notes: ${snapshot.lastRepairNotes
-            .map((note) => this.compactText(note, 120))
-            .join(" | ")}`,
-        );
-      }
-    }
-    if (snapshot.lastContinuationStatus) {
-      lines.push(`- last-continuation-status: ${snapshot.lastContinuationStatus}`);
-      if (snapshot.lastContinuationEvidence.length > 0) {
-        lines.push(
-          `- last-continuation-evidence: ${snapshot.lastContinuationEvidence
-            .map((entry) => this.compactText(entry, 120))
-            .join(" | ")}`,
-        );
-      }
-    }
-    if (snapshot.lastTaskSatisfactionVerdict) {
-      lines.push(
-        `- last-task-satisfaction: ${snapshot.lastTaskSatisfactionVerdict}`,
-      );
-      if (snapshot.lastTaskSatisfactionReasons.length > 0) {
-        lines.push(
-          `- last-task-satisfaction-reasons: ${snapshot.lastTaskSatisfactionReasons
-            .map((reason) => this.compactText(reason, 120))
-            .join(" | ")}`,
-        );
-      }
-    }
-    if (snapshot.unresolvedItems.length > 0) {
-      lines.push(`- unresolved-items: ${snapshot.unresolvedItems.join(" | ")}`);
-    }
-    lines.push(
-      "- instruction: use this continuity context to continue the same task; do not restart from scratch.",
-    );
-
-    return lines.join("\n");
+    return formatPromptContinuityContext(snapshot);
   }
 
   buildPromptContinuitySnapshot(
@@ -5400,134 +5016,11 @@ export class SessionManager {
     }
 
     root.continuity = continuity;
-    root.summary = this.mergeContinuitySummaryEntries(root.summary, continuity);
+    root.summary = mergeContinuitySummaryEntries(root.summary, continuity);
     root.compacted = true;
     root.compactReason = "auto-threshold";
     root.compactedAt = now;
     return root;
-  }
-
-  private mergeContinuitySummaryEntries(
-    summaryValue: unknown,
-    continuity: Record<string, unknown>,
-  ): readonly string[] {
-    const existingEntries = Array.isArray(summaryValue)
-      ? summaryValue.filter((entry): entry is string => typeof entry === "string")
-      : [];
-    const preservedEntries = existingEntries.filter((entry) => {
-      const trimmed = entry.trim();
-      if (!trimmed) {
-        return false;
-      }
-      const normalized = trimmed.startsWith("- ")
-        ? trimmed.slice(2).trim()
-        : trimmed;
-      const separator = normalized.indexOf(":");
-      if (separator <= 0) {
-        return true;
-      }
-      const key = normalized.slice(0, separator).trim().toLowerCase();
-      return (
-        !key.startsWith("last-approval-") &&
-        !key.startsWith("last-request-scope-") &&
-        !key.startsWith("last-permission-request-") &&
-        key !== "last-action-handoff-summary" &&
-        key !== "last-seed-influence" &&
-        key !== "last-seed-influence-handoff-summary" &&
-        key !== "last-failure-handoff-diagnostic" &&
-        key !== "last-success-handoff-diagnostic"
-      );
-    });
-    const approvalPairs: Array<[string, string]> = [];
-    const addPair = (key: string, value: unknown): void => {
-      if (typeof value !== "string" || value.trim().length === 0) {
-        return;
-      }
-      approvalPairs.push([key, value.trim()]);
-    };
-    addPair("last-approval-decision", continuity.lastApprovalDecision);
-    addPair("last-approval-decision-source", continuity.lastApprovalDecisionSource);
-    if (typeof continuity.lastApprovalPersistent === "boolean") {
-      approvalPairs.push([
-        "last-approval-persistent",
-        continuity.lastApprovalPersistent ? "yes" : "no",
-      ]);
-    }
-    addPair("last-approval-cache-effect", continuity.lastApprovalCacheEffect);
-    addPair("last-approval-project-root", continuity.lastApprovalProjectRoot);
-    addPair("last-approval-cache-key", continuity.lastApprovalCacheKey);
-    addPair("last-approval-scope", continuity.lastApprovalScope);
-    addPair("last-approval-lineage", continuity.lastApprovalLineage);
-    addPair("last-approval-stop-reason", continuity.lastApprovalStopReason);
-    addPair("last-approval-channel", continuity.lastApprovalChannel);
-    addPair("last-approval-input-key", continuity.lastApprovalInputKey);
-    addPair("last-approval-recorded-at", continuity.lastApprovalRecordedAt);
-    addPair("last-request-scope-cache-key", continuity.lastRequestScopeCacheKey);
-    addPair("last-request-scope-label", continuity.lastRequestScopeLabel);
-    addPair(
-      "last-request-scope-project-root",
-      continuity.lastRequestScopeProjectRoot,
-    );
-    addPair("last-request-scope-source", continuity.lastRequestScopeSource);
-    addPair(
-      "last-permission-request-tool",
-      continuity.lastPermissionRequestToolName,
-    );
-    addPair(
-      "last-permission-request-operation",
-      continuity.lastPermissionRequestOperation,
-    );
-    addPair(
-      "last-permission-request-target",
-      continuity.lastPermissionRequestTarget,
-    );
-    addPair(
-      "last-permission-request-process",
-      continuity.lastPermissionRequestProcess,
-    );
-    addPair(
-      "last-permission-request-scope-key",
-      continuity.lastPermissionRequestScopeKey,
-    );
-    addPair(
-      "last-permission-request-scope-label",
-      continuity.lastPermissionRequestScopeLabel,
-    );
-    addPair(
-      "last-permission-request-cache-key",
-      continuity.lastPermissionRequestCacheKey,
-    );
-    addPair(
-      "last-permission-request-project-root",
-      continuity.lastPermissionRequestProjectRoot,
-    );
-    addPair(
-      "last-permission-request-source",
-      continuity.lastPermissionRequestSource,
-    );
-    addPair(
-      "last-permission-request-lineage",
-      continuity.lastPermissionRequestLineage,
-    );
-    addPair("last-action-handoff-summary", continuity.lastActionHandoffSummary);
-    addPair("last-seed-influence", continuity.lastSeedInfluence);
-    addPair(
-      "last-seed-influence-handoff-summary",
-      continuity.lastSeedInfluenceHandoffSummary,
-    );
-    addPair(
-      "last-failure-handoff-diagnostic",
-      continuity.lastFailureHandoffDiagnostic,
-    );
-    addPair(
-      "last-success-handoff-diagnostic",
-      continuity.lastSuccessHandoffDiagnostic,
-    );
-
-    return [
-      ...preservedEntries,
-      ...approvalPairs.map(([key, value]) => `- ${key}: ${value}`),
-    ];
   }
 
   private buildActionHandoffSummary(

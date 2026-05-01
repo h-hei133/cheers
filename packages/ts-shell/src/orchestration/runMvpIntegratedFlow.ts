@@ -22,6 +22,10 @@ import {
 import { ToolDispatcher } from "../tools/dispatcher.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import {
+  buildActionResultSeedFromCodingResult,
+  extractAttemptedFilesFromEvidence,
+} from "./actionResultEvidence.js";
+import {
   extractFileConstraintAssertions,
   extractLowRiskUnchangedVerifications,
   type FileConstraintAssertions,
@@ -34,11 +38,11 @@ import {
 } from "./lowRiskVerificationPlanning.js";
 import { MultiAgentOrchestrator } from "./MultiAgentOrchestrator.js";
 import {
-  buildFileMutationSummaryContract,
   executeFileMutationBranch,
   summarizeFileMutationResults,
 } from "./mutationExecution.js";
 import type { FileMutationExecutionResult } from "./mutationExecution.js";
+import { reconcileFileMutationSummary } from "./mutationResultAggregation.js";
 import {
   applySingleFileReplacePatch,
   formatPatchFailureReason,
@@ -49,6 +53,13 @@ import type {
   TargetResolutionBlocker,
 } from "./targetResolution.js";
 import type { SingleFileReplacePatchResult } from "./patchMutationLane.js";
+import {
+  appendApprovalRequestedEvent,
+  appendApprovalResolvedEvent,
+  appendToolResultEvent,
+  appendToolStartedEvent,
+} from "./toolLifecycleEvents.js";
+import { buildMutationTaskDelivery } from "./verificationResultAggregation.js";
 import type {
   AgentExecutionInput,
   AgentExecutionOutput,
@@ -6457,54 +6468,6 @@ function assembleActionResultContract(
   };
 }
 
-function reconcileFileMutationSummary(
-  summary: ReturnType<typeof summarizeFileMutationResults>,
-  aggregate: {
-    readonly changedFiles: string[];
-    readonly failedFiles: Array<{ path: string; reason: string }>;
-    readonly patches: CodingPatchRecord[];
-    readonly evidence: string[];
-    readonly repairNotes: string[];
-  },
-): void {
-  for (const changedFile of summary.changedFiles) {
-    if (!aggregate.changedFiles.includes(changedFile)) {
-      aggregate.changedFiles.push(changedFile);
-    }
-  }
-
-  for (const failedFile of summary.failedFiles) {
-    const alreadyRecorded = aggregate.failedFiles.some(
-      (entry) =>
-        normalizePathLike(entry.path) === normalizePathLike(failedFile.path) &&
-        entry.reason === failedFile.reason,
-    );
-    if (!alreadyRecorded) {
-      aggregate.failedFiles.push(failedFile);
-    }
-  }
-
-  for (const patch of summary.patches) {
-    if (!aggregate.patches.includes(patch)) {
-      aggregate.patches.push(patch);
-    }
-  }
-
-  const summaryContract = buildFileMutationSummaryContract(summary);
-
-  for (const evidence of summaryContract.evidence) {
-    if (!aggregate.evidence.includes(evidence)) {
-      aggregate.evidence.push(evidence);
-    }
-  }
-
-  for (const repairNote of summaryContract.repairNotes) {
-    if (!aggregate.repairNotes.includes(repairNote)) {
-      aggregate.repairNotes.push(repairNote);
-    }
-  }
-}
-
 function buildActionResultDelivery(input: ActionResultContractInput): string {
   if (
     input.crossFileDegradationReason &&
@@ -6529,25 +6492,7 @@ function buildActionResultDelivery(input: ActionResultContractInput): string {
         : "";
     return `Edit partially completed for ${changed}. Remaining cross-file targets: ${input.crossFileRemainingTargets.join(", ")}.${failedSummary}${skippedSummary}`;
   }
-  if (input.failedFiles.length > 0) {
-    const first = input.failedFiles[0];
-    return `Task not completed: ${first?.path ?? "(unknown)"} failed (${first?.reason ?? "unknown reason"}).`;
-  }
-  if (input.changedFiles.length === 0) {
-    return "Task not completed: no file mutation was applied.";
-  }
-  const changed = input.changedFiles.join(", ");
-  const verificationNote =
-    input.verification.status === "passed"
-      ? "Verification passed."
-      : input.verification.status === "blocked"
-        ? `Verification blocked (${input.verification.blockerKind ?? "unknown"}). ${input.verification.nextAction ?? ""}`.trim()
-        : input.verification.status === "failed"
-          ? `Verification failed: ${input.verification.reason ?? "command failed"}.`
-          : input.verification.status === "not-requested"
-            ? "Verification was not requested."
-            : "Verification skipped.";
-  return `${input.taskKind === "write-file" ? "Write completed" : "Edit completed"} for ${changed}. ${verificationNote}`;
+  return buildMutationTaskDelivery(input);
 }
 
 function renderExecutionSummary(
@@ -10491,33 +10436,6 @@ function countDeliverableModeCues(prompt: string): number {
   return Number(hasRead) + Number(hasSummary) + Number(hasExplain);
 }
 
-function buildMutationTaskDelivery(
-  taskKind: CodingTaskKind,
-  changedFiles: string[],
-  failedFiles: Array<{ path: string; reason: string }>,
-  verification: CodingVerificationSummary,
-): string {
-  if (failedFiles.length > 0) {
-    const first = failedFiles[0];
-    return `Task not completed: ${first?.path ?? "(unknown)"} failed (${first?.reason ?? "unknown reason"}).`;
-  }
-  if (changedFiles.length === 0) {
-    return "Task not completed: no file mutation was applied.";
-  }
-  const changed = changedFiles.join(", ");
-  const verificationNote =
-    verification.status === "passed"
-      ? "Verification passed."
-      : verification.status === "blocked"
-        ? `Verification blocked (${verification.blockerKind ?? "unknown"}). ${verification.nextAction ?? ""}`.trim()
-        : verification.status === "failed"
-          ? `Verification failed: ${verification.reason ?? "command failed"}.`
-          : verification.status === "not-requested"
-            ? "Verification was not requested."
-            : "Verification skipped.";
-  return `${taskKind === "write-file" ? "Write completed" : "Edit completed"} for ${changed}. ${verificationNote}`;
-}
-
 function detectVerifyCommand(normalizedPrompt: string): string | undefined {
   if (/(test|\u6d4b\u8bd5)/i.test(normalizedPrompt)) {
     return "npm test -- --help";
@@ -10632,18 +10550,14 @@ async function dispatchToolWithLifecycle(input: {
   readonly abortSignal?: AbortSignal;
   readonly requireApprovalEvent: boolean;
 }): Promise<ToolLifecycleResult> {
-  if (input.requireApprovalEvent) {
-    input.events.push({
-      type: "approval.requested",
-      toolName: input.toolName,
-      taskId: input.taskId,
-    });
-  }
-  input.events.push({
-    type: "tool.started",
+  const identity = {
     toolName: input.toolName,
     taskId: input.taskId,
-  });
+  };
+  if (input.requireApprovalEvent) {
+    appendApprovalRequestedEvent(input.events, identity);
+  }
+  appendToolStartedEvent(input.events, identity);
   const result = await input.dispatcher.dispatch(input.toolName, input.args, {
     taskId: input.taskId,
     workspaceRoot: input.workspaceRoot,
@@ -10651,31 +10565,15 @@ async function dispatchToolWithLifecycle(input: {
     abortSignal: input.abortSignal,
   });
   if (input.requireApprovalEvent) {
-    input.events.push({
-      type: "approval.resolved",
-      toolName: input.toolName,
-      taskId: input.taskId,
-      outcome: resolveApprovalOutcomeFromToolResult(result),
-    });
+    appendApprovalResolvedEvent(input.events, identity, result);
   }
-  input.events.push({
-    type: "tool.result",
-    toolName: input.toolName,
-    taskId: input.taskId,
-    success: result.success,
-  });
+  appendToolResultEvent(input.events, identity, result);
   return {
     success: result.success,
     output: result.output,
     error: result.error,
     metadata: result.metadata,
   };
-}
-
-function resolveApprovalOutcomeFromToolResult(
-  result: ToolLifecycleResult,
-): "approved" | "denied" {
-  return result.metadata?.wasEscalated === true ? "denied" : "approved";
 }
 
 function classifyVerificationFailure(input: ToolLifecycleResult): {
@@ -12401,56 +12299,6 @@ function buildCodingResult(
   };
 }
 
-function buildActionResultSeedFromCodingResult(
-  taskKind: CodingTaskKind,
-  input: {
-    readonly attemptedFiles: readonly string[];
-    readonly changedFiles: readonly string[];
-    readonly verifiedFiles: readonly string[];
-    readonly verification: CodingVerificationSummary;
-    readonly reason?: string;
-  },
-): CodingActionResultSeed | undefined {
-  if (
-    taskKind !== "edit-file" &&
-    taskKind !== "write-file" &&
-    taskKind !== "read-file" &&
-    taskKind !== "repo-explain" &&
-    taskKind !== "inspect-files" &&
-    taskKind !== "run-command"
-  ) {
-    return undefined;
-  }
-
-  const target =
-    input.changedFiles[0] ??
-    input.verifiedFiles[0] ??
-    input.attemptedFiles[0] ??
-    (taskKind === "run-command" ? input.verification.command : undefined) ??
-    (taskKind === "inspect-files" ? "(workspace)" : undefined);
-  if (!target) {
-    return undefined;
-  }
-
-  return {
-    actionKind: taskKind,
-    target: normalizePathLike(target),
-    changedFiles: input.changedFiles.map(normalizePathLike),
-    verifiedFiles: input.verifiedFiles.map(normalizePathLike),
-    verification: {
-      status: input.verification.status,
-      ...(input.verification.command
-        ? { command: input.verification.command }
-        : {}),
-      ...(input.verification.reason ? { reason: input.verification.reason } : {}),
-      ...(input.verification.blockerKind
-        ? { blockerKind: input.verification.blockerKind }
-        : {}),
-    },
-    ...(input.reason ? { reason: input.reason } : {}),
-  };
-}
-
 type ActionableBlockerKind =
   | "ambiguous-target"
   | "patch-from-not-found"
@@ -12610,41 +12458,6 @@ function appendActionableBlockerEvidence(
   if (!evidence.includes(doNextMarker)) {
     evidence.push(doNextMarker);
   }
-}
-
-function extractAttemptedFilesFromEvidence(
-  evidence: readonly string[],
-): string[] {
-  const extracted = new Set<string>();
-  const markerPatterns = [
-    /^inspect:\s*read\s+(.+)$/i,
-    /^repo-explain:\s*read\s+(.+)$/i,
-    /^verify-target-hint:\s*(.+)$/i,
-    /^edit\/write applied on\s+(.+)$/i,
-    /^mutation skipped due inspect failure on\s+(.+)$/i,
-    /^repair-replan:blocker:([^:]+):/i,
-    /^replan-transform:([^:]+):/i,
-    /^transform:([^:]+):/i,
-  ];
-  for (const token of evidence) {
-    const normalizedToken = token.trim();
-    if (!normalizedToken) {
-      continue;
-    }
-    for (const pattern of markerPatterns) {
-      const match = normalizedToken.match(pattern);
-      const candidate = match?.[1]?.trim();
-      if (
-        candidate &&
-        candidate !== "(unknown)" &&
-        candidate !== "(missing-target)"
-      ) {
-        extracted.add(normalizePathLike(candidate));
-        break;
-      }
-    }
-  }
-  return Array.from(extracted);
 }
 
 function truncate(value: string, maxLength = 220): string {

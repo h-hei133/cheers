@@ -5,7 +5,6 @@ import process from "node:process";
 import * as readline from "node:readline";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
-import type { ShellActionResult } from "../core/commands/types.js";
 import {
   CoreMcpGateway,
   McpGatewayBlockedError,
@@ -15,22 +14,42 @@ import type { McpClientSnapshot } from "../core/mcp/types.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import {
+  renderApprovalAuditRecord,
+  renderApprovalHeader,
+  renderApprovalPromptFacts,
+  type ApprovalAuditRecord,
+} from "../core/shell/approvalPromptRenderer.js";
+import {
   bootstrapShellRuntime,
   SessionBootstrapError,
 } from "../core/shell/bootstrap.js";
 import { applyInteractiveApprovalDecisionWiring } from "../core/shell/interactiveApprovalWiring.js";
 import {
+  runResumeLikeShellAction,
+} from "../core/shell/continueShellActionRuntime.js";
+import {
+  renderRootBindingDiagnostics,
+  renderStartupSurface,
+  renderWorkspaceBindingLines,
+} from "../core/shell/startupSurfaceRenderer.js";
+import {
   resolveProviderCredential,
   type ProviderCredentialResolution,
 } from "../core/shell/providerCredentials.js";
 import {
+  buildNonInteractivePrompts,
+  isFenceLine,
+  opensMultilineLiteralPrompt,
+  parseTransportPrompts,
+  resolveStdinTransportMode,
+  type StdinTransportMode,
+  updateFenceState,
+} from "../core/shell/printPromptInput.js";
+import {
   checkRealProviderReadiness,
   createProviderReadinessTerminalEvent,
 } from "../core/shell/providerReadiness.js";
-import {
-  resolveSessionReference,
-  resumeShellSession,
-} from "../core/shell/recovery.js";
+import { resolveSessionReference } from "../core/shell/recovery.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
 import type {
   RootBindingDiagnostic,
@@ -43,6 +62,11 @@ import {
   switchActiveSession,
 } from "../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
+import {
+  isResumeLikeShellAction,
+  isShellAction,
+  renderInteractiveOnlyShellActionBlocked,
+} from "../core/shell/shellActionBridge.js";
 import {
   handleShellClose,
   handleShellSigint,
@@ -59,8 +83,6 @@ import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type {
   ApprovalAuditMemoryState,
-  RecoveryTrustBoundaryBlock,
-  ResumeResult,
   Session,
   SessionContinuitySnapshot,
   SessionReentrySummary,
@@ -88,18 +110,7 @@ interface CliOptions {
   nonInteractiveApproval?: "deny" | "allow-once" | "allow-always";
 }
 
-type StdinTransportMode = "none" | "capture-batch" | "stream-live";
-
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
-type ResumeLikeShellAction = ShellActionResult & {
-  action: "resume-session" | "continue-session";
-};
-
-function isFailedResumeResult(
-  result: ResumeResult,
-): result is Extract<ResumeResult, { ok: false }> {
-  return result.ok === false;
-}
 
 type TurnInputResolution =
   | { kind: "handled" }
@@ -143,25 +154,6 @@ interface ApprovalModeConflictAnalysis {
   readonly stopReason?: string;
 }
 
-interface ApprovalAuditRecord {
-  readonly channel: "interactive" | "non-interactive";
-  readonly decision: "deny" | "allow-once" | "allow-always";
-  readonly decisionSource: string;
-  readonly persistent: boolean;
-  readonly cacheEffect:
-    | "none"
-    | "allow-once-cache-consumed"
-    | "allow-always-persisted"
-    | "allow-always-cache-hit"
-    | "ambiguous-stop";
-  readonly projectRoot: string;
-  readonly cacheKey: string;
-  readonly scopeLabel: string;
-  readonly lineage?: string;
-  readonly inputKey?: string;
-  readonly stopReason?: string;
-}
-
 function analyzeApprovalModeConflict(
   approvalModeObject?: ApprovalModeObject,
 ): ApprovalModeConflictAnalysis {
@@ -182,34 +174,6 @@ function analyzeApprovalModeConflict(
     };
   }
   return { ambiguousStop: false };
-}
-
-function renderApprovalAuditRecord(
-  renderer: StreamingRenderer,
-  record: ApprovalAuditRecord,
-): void {
-  renderer.renderLine("approval-audit:event=decision");
-  renderer.renderLine(`approval-audit:channel=${record.channel}`);
-  renderer.renderLine(`approval-audit:decision=${record.decision}`);
-  renderer.renderLine(
-    `approval-audit:decision-source=${record.decisionSource}`,
-  );
-  renderer.renderLine(
-    `approval-audit:persistent=${record.persistent ? "true" : "false"}`,
-  );
-  renderer.renderLine(`approval-audit:cache-effect=${record.cacheEffect}`);
-  renderer.renderLine(`approval-audit:project-root=${record.projectRoot}`);
-  renderer.renderLine(`approval-audit:cache-key=${record.cacheKey}`);
-  renderer.renderLine(`approval-audit:scope=${record.scopeLabel}`);
-  if (record.lineage) {
-    renderer.renderLine(`approval-audit:lineage=${record.lineage}`);
-  }
-  if (record.inputKey) {
-    renderer.renderLine(`approval-audit:input-key=${record.inputKey}`);
-  }
-  if (record.stopReason) {
-    renderer.renderLine(`approval-audit:stop-reason=${record.stopReason}`);
-  }
 }
 
 async function main(): Promise<void> {
@@ -619,25 +583,37 @@ async function main(): Promise<void> {
       const slashResult =
         resolved.kind === "shell-action" ? resolved.slashResult : null;
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        (slashResult.action === "continue-session" ||
-          slashResult.action === "resume-session")
-      ) {
-        const resumeSlash = slashResult as ResumeLikeShellAction;
+      if (isResumeLikeShellAction(slashResult)) {
         const resumeBridge = await runResumeLikeShellAction({
-          slashResult: resumeSlash,
+          slashResult,
           source: "interactive",
           printMode: false,
           fallbackSessionId: recoveryCandidate?.id,
           sessionManager,
           runtimeContext,
-          sessionRuntime,
-          logger,
           renderer,
           turnNumber: interactiveTurnNumber,
-          setActiveNonInteractiveApprovalMode: (mode) => {
-            activeNonInteractiveApprovalMode = mode;
+          normalizePromptForExecution,
+          switchRuntimeSessionProjectContext,
+          renderSessionCommandMap,
+          executeResolvedPromptTurn: (turnInput) => {
+            return executeResolvedPromptTurn({
+              source: "interactive",
+              effectivePrompt: turnInput.effectivePrompt,
+              runtimeSeed: turnInput.runtimeSeed,
+              continuityState: turnInput.continuityState,
+              sessionManager,
+              setActiveNonInteractiveApprovalMode: (mode) => {
+                activeNonInteractiveApprovalMode = mode;
+              },
+              runtimeContext,
+              sessionRuntime,
+              logger,
+              printMode: false,
+              turnNumber: turnInput.turnNumber,
+              renderer,
+              turnOrigin: turnInput.turnOrigin,
+            });
           },
         });
         interactiveTurnNumber = resumeBridge.turnNumber;
@@ -647,20 +623,14 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "cancel-run"
-      ) {
+      if (isShellAction(slashResult, "cancel-run")) {
         sessionRuntime.cancelCurrentRun();
         renderer.renderLine("\nRequested cancellation for the current run.\n");
         rl.prompt();
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "list-sessions"
-      ) {
+      if (isShellAction(slashResult, "list-sessions")) {
         const sessionAction = slashResult.sessionAction ?? "panel";
         if (sessionAction === "list") {
           renderSessionList(
@@ -803,10 +773,7 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "show-workspace"
-      ) {
+      if (isShellAction(slashResult, "show-workspace")) {
         const workspaceAction = slashResult.workspaceAction ?? "status";
         if (workspaceAction === "recent") {
           renderRecentProjectContexts(renderer, sessionManager);
@@ -929,10 +896,7 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "show-mcp"
-      ) {
+      if (isShellAction(slashResult, "show-mcp")) {
         const mcpAction = slashResult.mcpAction ?? "status";
         const mcpTarget = slashResult.mcpTarget?.trim();
         try {
@@ -982,19 +946,13 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "show-help"
-      ) {
+      if (isShellAction(slashResult, "show-help")) {
         renderUserHelp(renderer);
         rl.prompt();
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "show-view"
-      ) {
+      if (isShellAction(slashResult, "show-view")) {
         const activeMode =
           sessionRuntime.getViewMode() === "compact" ? "user" : "developer";
         renderer.renderLine(
@@ -1007,10 +965,7 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "set-view"
-      ) {
+      if (isShellAction(slashResult, "set-view")) {
         const nextMode = slashResult.viewMode ?? "compact";
         sessionRuntime.setViewMode(nextMode);
         const activeMode = nextMode === "compact" ? "user" : "developer";
@@ -1021,10 +976,7 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "show-agent-mode"
-      ) {
+      if (isShellAction(slashResult, "show-agent-mode")) {
         const activeMode = sessionRuntime.getAgentMode();
         renderer.renderLine(`\nCurrent agent mode: ${activeMode}`);
         renderer.renderLine(
@@ -1034,10 +986,7 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "set-agent-mode"
-      ) {
+      if (isShellAction(slashResult, "set-agent-mode")) {
         const nextMode = slashResult.agentMode ?? "build";
         sessionRuntime.setAgentMode(nextMode);
         refreshInteractivePromptChrome();
@@ -1052,10 +1001,7 @@ async function main(): Promise<void> {
         return;
       }
 
-      if (
-        slashResult?.kind === "shell-action" &&
-        slashResult.action === "manage-permissions"
-      ) {
+      if (isShellAction(slashResult, "manage-permissions")) {
         const permissionAction = slashResult.permissionAction ?? "list";
         if (permissionAction === "list") {
           renderPermissionsList(
@@ -1413,13 +1359,11 @@ function createCliEscalationPromptHandler(
         hasAllowAlwaysGrant,
       });
       renderApprovalHeader(renderer, "approval-required");
-      renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
-      renderer.renderLine(`- Action: ${prompt.context.operation}`);
-      renderer.renderLine(`- Target: ${prompt.context.target}`);
-      renderer.renderLine(`- Risk: ${prompt.severity}`);
-      renderer.renderLine(
-        `- Decision source: ${nonInteractiveDecisionPlan.source}`,
-      );
+      renderApprovalPromptFacts(renderer, {
+        prompt,
+        includeRisk: true,
+        decisionSource: nonInteractiveDecisionPlan.source,
+      });
       for (const note of nonInteractiveDecisionPlan.overrideNotes) {
         renderer.renderLine(`- ${note}`);
       }
@@ -1525,13 +1469,11 @@ function createCliEscalationPromptHandler(
         const stopReason =
           interactiveDecisionPlan.stopReason ?? "Approval mode is ambiguous.";
         renderApprovalHeader(renderer, "approval-required");
-        renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
-        renderer.renderLine(`- Action: ${prompt.context.operation}`);
-        renderer.renderLine(`- Target: ${prompt.context.target}`);
-        renderer.renderLine(`- Risk: ${prompt.severity}`);
-        renderer.renderLine(
-          `- Decision source: ${interactiveDecisionPlan.source}`,
-        );
+        renderApprovalPromptFacts(renderer, {
+          prompt,
+          includeRisk: true,
+          decisionSource: interactiveDecisionPlan.source,
+        });
         renderer.renderLine(stopReason);
         emitApprovalAudit({
           channel: "interactive",
@@ -1556,13 +1498,11 @@ function createCliEscalationPromptHandler(
       if (interactiveDecisionPlan.source === "approval-mode-object") {
         const resolvedDecision = interactiveDecisionPlan.decision ?? "deny";
         renderApprovalHeader(renderer, "approval-required");
-        renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
-        renderer.renderLine(`- Action: ${prompt.context.operation}`);
-        renderer.renderLine(`- Target: ${prompt.context.target}`);
-        renderer.renderLine(`- Risk: ${prompt.severity}`);
-        renderer.renderLine(
-          `- Decision source: ${interactiveDecisionPlan.source}`,
-        );
+        renderApprovalPromptFacts(renderer, {
+          prompt,
+          includeRisk: true,
+          decisionSource: interactiveDecisionPlan.source,
+        });
         for (const note of interactiveDecisionPlan.overrideNotes) {
           renderer.renderLine(`- ${note}`);
         }
@@ -1617,9 +1557,7 @@ function createCliEscalationPromptHandler(
         cacheKey: evaluation.cacheKey,
       });
       renderApprovalHeader(renderer, "cached-approval");
-      renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
-      renderer.renderLine(`- Action: ${prompt.context.operation}`);
-      renderer.renderLine(`- Target: ${prompt.context.target}`);
+      renderApprovalPromptFacts(renderer, { prompt });
       renderer.renderLine(
         "- Decision: allow-once (cached in current shell run)",
       );
@@ -1649,9 +1587,7 @@ function createCliEscalationPromptHandler(
         cacheKey: evaluation.cacheKey,
       });
       renderApprovalHeader(renderer, "cached-approval");
-      renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
-      renderer.renderLine(`- Action: ${prompt.context.operation}`);
-      renderer.renderLine(`- Target: ${prompt.context.target}`);
+      renderApprovalPromptFacts(renderer, { prompt });
       renderer.renderLine("- Decision: allow-always (project policy match)");
       renderer.renderLine(`- Scope: ${evaluation.scopeLabel}`);
       renderer.renderLine(`- Rule key: ${evaluation.matchedGrant.scopeKey}`);
@@ -1675,10 +1611,7 @@ function createCliEscalationPromptHandler(
     }
 
     renderApprovalHeader(renderer, "approval-required");
-    renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
-    renderer.renderLine(`- Action: ${prompt.context.operation}`);
-    renderer.renderLine(`- Target: ${prompt.context.target}`);
-    renderer.renderLine(`- Risk: ${prompt.severity}`);
+    renderApprovalPromptFacts(renderer, { prompt, includeRisk: true });
     for (const line of trustPolicy.explain(
       evaluation,
       projectRoot,
@@ -1777,19 +1710,6 @@ function createCliEscalationPromptHandler(
       userComment: `CLI explicit approval: ${decision}${getApprovalModeObject?.() ? " (approval-mode-object)" : ""}`,
     };
   };
-}
-
-function renderApprovalHeader(
-  renderer: StreamingRenderer,
-  mode: "approval-required" | "cached-approval",
-): void {
-  if (mode === "cached-approval") {
-    renderer.renderLine("\nApproval");
-    renderer.renderLine("- Mode: cached grant");
-    return;
-  }
-  renderer.renderLine("\nApproval");
-  renderer.renderLine("- Mode: user confirmation required");
 }
 
 function askReadline(
@@ -2407,39 +2327,43 @@ async function runNonInteractivePrompt(options: {
       return;
     }
 
-    if (
-      resolved.slashResult.action === "resume-session" ||
-      resolved.slashResult.action === "continue-session"
-    ) {
-      const resumeSlash = resolved.slashResult as ResumeLikeShellAction;
+    if (isResumeLikeShellAction(resolved.slashResult)) {
       await runResumeLikeShellAction({
-        slashResult: resumeSlash,
+        slashResult: resolved.slashResult,
         source: "non-interactive",
         printMode: options.printMode,
         fallbackSessionId: options.fallbackSessionId,
         sessionManager: options.sessionManager,
         runtimeContext: options.runtimeContext,
-        sessionRuntime: options.sessionRuntime,
-        logger: options.logger,
         renderer: options.renderer,
-        setActiveNonInteractiveApprovalMode:
-          options.setActiveNonInteractiveApprovalMode,
-        nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
+        normalizePromptForExecution,
+        switchRuntimeSessionProjectContext,
+        renderSessionCommandMap,
+        executeResolvedPromptTurn: (turnInput) => {
+          return executeResolvedPromptTurn({
+            source: "non-interactive",
+            effectivePrompt: turnInput.effectivePrompt,
+            runtimeSeed: turnInput.runtimeSeed,
+            continuityState: turnInput.continuityState,
+            sessionManager: options.sessionManager,
+            setActiveNonInteractiveApprovalMode:
+              options.setActiveNonInteractiveApprovalMode,
+            nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
+            runtimeContext: options.runtimeContext,
+            sessionRuntime: options.sessionRuntime,
+            logger: options.logger,
+            printMode: options.printMode,
+            turnNumber: turnInput.turnNumber,
+            renderer: options.renderer,
+            turnOrigin: turnInput.turnOrigin,
+          });
+        },
       });
       return;
     }
-    options.renderer.renderLine(options.printMode ? "Result" : "\nResult");
-    options.renderer.renderLine("- Outcome: blocked");
-    options.renderer.renderLine("- BlockerKind: command-not-allowlisted");
-    options.renderer.renderLine(
-      "- Reason: This shell action is interactive-only.",
-    );
-    options.renderer.renderLine(
-      "- DoNext: Run this command in interactive shell mode or use /help for non-interactive-safe alternatives.",
-    );
-    if (!options.printMode) {
-      options.renderer.renderLine("");
-    }
+    renderInteractiveOnlyShellActionBlocked(options.renderer, {
+      printMode: options.printMode,
+    });
     return;
   }
   await executeResolvedPromptTurn({
@@ -2520,228 +2444,6 @@ function renderBlockedContract(
   renderer.renderLine(`- Reason: ${input.reason}`);
   renderer.renderLine(`- DoNext: ${input.doNext}`);
   renderer.renderLine("");
-}
-
-function renderStoppedContinueGuidance(input: {
-  renderer: StreamingRenderer;
-  printMode: boolean;
-  sessionId: string;
-  summary: SessionReentrySummary;
-  snapshot: SessionContinuitySnapshot;
-}): void {
-  const failedFiles = input.snapshot.recentFailedFiles
-    .map((entry) => `${entry.path}${entry.reason ? ` (${entry.reason})` : ""}`)
-    .join(", ");
-  const reason =
-    input.snapshot.lastVerificationReason ??
-    input.snapshot.lastFailure ??
-    input.summary.blockedDetail ??
-    input.summary.resumeDetail ??
-    "The previous run stopped before the task could continue automatically.";
-  const blockerKind =
-    input.snapshot.lastVerificationBlockerKind ??
-    input.summary.blockedReason ??
-    "stopped-result";
-  const doNext =
-    input.snapshot.lastVerificationNextAction ??
-    `Use /continue <follow-up prompt> with a concrete repair instruction for session ${input.sessionId}.`;
-
-  if (!input.printMode) {
-    input.renderer.renderLine("");
-  }
-  input.renderer.renderLine("Result");
-  input.renderer.renderLine("- Outcome: stopped");
-  input.renderer.renderLine("- TerminalState: stopped");
-  input.renderer.renderLine(`- BlockerKind: ${blockerKind}`);
-  input.renderer.renderLine(`- Reason: ${reason}`);
-  if (failedFiles) {
-    input.renderer.renderLine(`- Failed files: ${failedFiles}`);
-  }
-  input.renderer.renderLine(`- DoNext: ${doNext}`);
-  input.renderer.renderLine(
-    `- Next action: Use /continue <follow-up prompt> or provide a concrete repair instruction to continue session ${input.sessionId}.`,
-  );
-  if (!input.printMode) {
-    input.renderer.renderLine("");
-  }
-}
-
-async function runResumeLikeShellAction(options: {
-  slashResult: ResumeLikeShellAction;
-  source: "interactive" | "non-interactive";
-  printMode: boolean;
-  fallbackSessionId?: string;
-  sessionManager: SessionManager;
-  runtimeContext: ShellRuntimeContext;
-  sessionRuntime: ShellSessionRuntime;
-  logger: ReturnType<typeof createComponentLogger>;
-  renderer: StreamingRenderer;
-  turnNumber?: number;
-  setActiveNonInteractiveApprovalMode: (
-    mode: ApprovalModeObject | undefined,
-  ) => void;
-  nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
-}): Promise<{ turnNumber: number }> {
-  const continuationPrompt =
-    options.slashResult.action === "continue-session"
-      ? options.slashResult.continuationPrompt?.trim()
-      : undefined;
-  const targetSessionId =
-    options.slashResult.sessionId ?? options.runtimeContext.session.id;
-
-  if (continuationPrompt) {
-    const targetSummary = (() => {
-      try {
-        return options.sessionManager.describeSessionReentry(targetSessionId);
-      } catch {
-        return null;
-      }
-    })();
-
-    if (targetSummary?.status === "completed") {
-      const resumeResult = options.sessionManager.tryResume(
-        targetSessionId,
-        options.runtimeContext.projectRoot,
-        { mode: "continuity-only" },
-      );
-      if (isFailedResumeResult(resumeResult)) {
-        options.renderer.renderLine(
-          options.printMode
-            ? `Continue failed: ${resumeResult.error}\nHint: ${resumeResult.recoveryHint}`
-            : `\nContinue failed: ${resumeResult.error}\nHint: ${resumeResult.recoveryHint}\n`,
-        );
-        return { turnNumber: options.turnNumber ?? 0 };
-      }
-
-      switchRuntimeSessionProjectContext(
-        options.runtimeContext,
-        resumeResult.session,
-      );
-
-      const nextTurn = (options.turnNumber ?? 0) + 1;
-      const effectiveFollowUp = normalizePromptForExecution(continuationPrompt);
-      await executeResolvedPromptTurn({
-        source: options.source,
-        effectivePrompt: effectiveFollowUp,
-        continuityState: options.sessionManager.buildContinuitySnapshot(
-          resumeResult.session.id,
-        ),
-        sessionManager: options.sessionManager,
-        setActiveNonInteractiveApprovalMode:
-          options.setActiveNonInteractiveApprovalMode,
-        nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
-        runtimeContext: options.runtimeContext,
-        sessionRuntime: options.sessionRuntime,
-        logger: options.logger,
-        printMode: options.printMode,
-        turnNumber: options.source === "interactive" ? nextTurn : undefined,
-        renderer: options.renderer,
-        turnOrigin: "continued",
-      });
-      return { turnNumber: nextTurn };
-    }
-  }
-
-  if (options.slashResult.action === "continue-session") {
-    const targetSummary = (() => {
-      try {
-        return options.sessionManager.describeSessionReentry(targetSessionId);
-      } catch {
-        return null;
-      }
-    })();
-    if (targetSummary?.terminalClassification === "stopped") {
-      renderStoppedContinueGuidance({
-        renderer: options.renderer,
-        printMode: options.printMode,
-        sessionId: targetSessionId,
-        summary: targetSummary,
-        snapshot: options.sessionManager.buildContinuitySnapshot(targetSessionId),
-      });
-      return { turnNumber: options.turnNumber ?? 0 };
-    }
-  }
-
-  const resumed = await resumeShellSession({
-    requestedSessionId: options.slashResult.sessionId,
-    fallbackSessionId: options.fallbackSessionId,
-    sessionManager: options.sessionManager,
-    runtimeContext: options.runtimeContext,
-    renderer: options.renderer,
-  });
-  if (!resumed.resumed) {
-    return { turnNumber: options.turnNumber ?? 0 };
-  }
-
-  if (continuationPrompt) {
-    const nextTurn = (options.turnNumber ?? 0) + 1;
-    const effectiveFollowUp = normalizePromptForExecution(continuationPrompt);
-    await executeResolvedPromptTurn({
-      source: options.source,
-      effectivePrompt: effectiveFollowUp,
-      sessionManager: options.sessionManager,
-      setActiveNonInteractiveApprovalMode:
-        options.setActiveNonInteractiveApprovalMode,
-      nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
-      runtimeContext: options.runtimeContext,
-      sessionRuntime: options.sessionRuntime,
-      logger: options.logger,
-      printMode: options.printMode,
-      turnNumber: options.source === "interactive" ? nextTurn : undefined,
-      renderer: options.renderer,
-      turnOrigin: "continued",
-    });
-    return { turnNumber: nextTurn };
-  }
-
-  if (resumed.autoResume) {
-    const nextTurn = (options.turnNumber ?? 0) + 1;
-    await executeResolvedPromptTurn({
-      source: options.source,
-      effectivePrompt: resumed.autoResume.prompt,
-      runtimeSeed: resumed.autoResume.runtimeSeed,
-      continuityState: resumed.autoResume.continuityState,
-      sessionManager: options.sessionManager,
-      setActiveNonInteractiveApprovalMode:
-        options.setActiveNonInteractiveApprovalMode,
-      nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
-      runtimeContext: options.runtimeContext,
-      sessionRuntime: options.sessionRuntime,
-      logger: options.logger,
-      printMode: options.printMode,
-      turnNumber: options.source === "interactive" ? nextTurn : undefined,
-      renderer: options.renderer,
-      turnOrigin: "resumed",
-    });
-    return { turnNumber: nextTurn };
-  }
-
-  if (options.slashResult.action === "continue-session") {
-    options.renderer.renderLine(
-      options.printMode
-        ? "Session continuation ready. Submit an explicit follow-up prompt."
-        : "Session continuation ready. Enter your next instruction, or use /continue <follow-up prompt>.\n",
-    );
-    renderSessionCommandMap(options.renderer, {
-      compact: options.printMode,
-      includeHelpHint: false,
-    });
-    if (!options.printMode) {
-      options.renderer.renderLine("");
-    }
-  }
-
-  if (options.slashResult.action === "resume-session") {
-    renderSessionCommandMap(options.renderer, {
-      compact: options.printMode,
-      includeHelpHint: false,
-    });
-    if (!options.printMode) {
-      options.renderer.renderLine("");
-    }
-  }
-
-  return { turnNumber: options.turnNumber ?? 0 };
 }
 
 async function executeResolvedPromptTurn(options: {
@@ -2904,85 +2606,6 @@ async function runReplayPromptScript(options: {
   }
 }
 
-function buildNonInteractivePrompts(
-  promptArg: string | undefined,
-  pipedInput: string | null,
-): string[] {
-  const prompt = promptArg?.trim() ?? "";
-  if (pipedInput === null) {
-    return prompt.length > 0 ? [prompt] : [];
-  }
-
-  const pipedPrompts = parseTransportPrompts(pipedInput, {
-    allowComments: false,
-  });
-  if (pipedPrompts.length === 0) {
-    return prompt.length > 0 ? [prompt] : [];
-  }
-
-  if (!prompt) {
-    return pipedPrompts;
-  }
-
-  return [prompt, ...pipedPrompts];
-}
-
-function parseTransportPrompts(
-  raw: string,
-  options: { allowComments: boolean },
-): string[] {
-  const normalizedRaw = raw.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
-  return normalizedRaw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => {
-      if (line.length === 0) {
-        return false;
-      }
-      if (options.allowComments && line.startsWith("#")) {
-        return false;
-      }
-      return true;
-    });
-}
-
-function isFenceLine(line: string): boolean {
-  return line.trim().startsWith("```");
-}
-
-function updateFenceState(current: boolean, line: string): boolean {
-  const fenceCount = line.match(/```/g)?.length ?? 0;
-  return fenceCount % 2 === 0 ? current : !current;
-}
-
-function opensMultilineLiteralPrompt(line: string): boolean {
-  const trimmed = line.trim();
-  if (!trimmed.endsWith(":")) {
-    return false;
-  }
-  return /(?:create|write|append|edit|modify|update).*(?:content|exactly)|(?:content|exactly).*(?:create|write|append|edit|modify|update)/i.test(
-    trimmed,
-  );
-}
-
-function resolveStdinTransportMode(input: {
-  stdinIsTty: boolean;
-  printMode: boolean;
-  hasReplayFile: boolean;
-  hasPromptArg: boolean;
-}): StdinTransportMode {
-  if (input.stdinIsTty || input.hasReplayFile) {
-    return "none";
-  }
-  if (input.printMode) {
-    return "capture-batch";
-  }
-  if (input.hasPromptArg) {
-    return "none";
-  }
-  return "stream-live";
-}
-
 function toProjectLabel(projectRoot: string): string {
   return path.basename(projectRoot) || projectRoot;
 }
@@ -3096,159 +2719,6 @@ function renderWorkspaceSummary(
     "Next actions: /workspace recent, /workspace attach <path>, /sessions",
   );
   renderer.renderLine("");
-}
-
-function renderWorkspaceBindingLines(
-  renderer: StreamingRenderer,
-  input: {
-    requestedWorkspaceRoot?: string;
-    projectRoot: string;
-    rootMode: WorkspaceRootMode;
-    targetPathBase: string;
-    gitRoot: string | null;
-    diagnostics?: readonly RootBindingDiagnostic[];
-    gitContext: {
-      insideGit: boolean;
-      root: string | null;
-    };
-  },
-): void {
-  const requestedWorkspaceRoot =
-    input.requestedWorkspaceRoot?.trim() || input.projectRoot;
-  renderer.renderLine(`- Requested workspace: ${requestedWorkspaceRoot}`);
-  renderer.renderLine(`- Target path base: ${input.targetPathBase}`);
-  renderer.renderLine(`- Git root binding: ${input.gitRoot ?? "null"}`);
-  renderer.renderLine(`- Root mode: ${input.rootMode}`);
-  renderRootBindingDiagnostics(renderer, input.diagnostics ?? []);
-
-  const requestedDiffersFromProject =
-    normalizePathForCompare(requestedWorkspaceRoot) !==
-    normalizePathForCompare(input.projectRoot);
-  if (
-    input.gitContext.insideGit &&
-    input.gitContext.root &&
-    requestedDiffersFromProject
-  ) {
-    renderer.renderLine(
-      `- Root resolution: git-root auto-upgrade (${requestedWorkspaceRoot} -> ${input.projectRoot})`,
-    );
-    renderer.renderLine(
-      "- Workspace note: relative file targets are resolved from the project root above, not from the requested subdirectory.",
-    );
-    renderer.renderLine(
-      "- Workspace policy: repo subdirectories are not treated as independent project roots by default.",
-    );
-    renderer.renderLine(
-      "- Workspace next action: use a path relative to the project root, attach a directory outside this git repo, or use a future explicit subdir workspace mode when available.",
-    );
-    return;
-  }
-
-  renderer.renderLine(
-    input.gitContext.insideGit
-      ? "- Root resolution: requested workspace is the git project root"
-      : "- Root resolution: requested workspace is used directly (not inside git)",
-  );
-}
-
-function renderRootBindingDiagnostics(
-  renderer: StreamingRenderer,
-  diagnostics: readonly RootBindingDiagnostic[],
-): void {
-  if (diagnostics.length === 0) {
-    return;
-  }
-  renderer.renderLine("- Root binding diagnostics:");
-  for (const diagnostic of diagnostics) {
-    renderer.renderLine(
-      `  - ${diagnostic.severity}:${diagnostic.code}: ${diagnostic.explanation}`,
-    );
-    renderer.renderLine(`    nextAction: ${diagnostic.nextAction}`);
-  }
-}
-
-function renderStartupSurface(
-  renderer: StreamingRenderer,
-  input: {
-    runtimeContext: ShellRuntimeContext;
-    sessionManager: SessionManager;
-    lifecycleNotices: readonly string[];
-    recoveryCandidate?: { id: string } | null;
-    recoveryCandidateSummary?: SessionReentrySummary;
-    recoveryBlockedNotice?: RecoveryTrustBoundaryBlock;
-    provider: string;
-    model?: string;
-    maxTurns: number;
-    executionPath: "rust-daemon" | "ts-local";
-    stdinTransportMode: StdinTransportMode;
-  },
-): void {
-  const summary = input.sessionManager.describeSessionReentry(
-    input.runtimeContext.session.id,
-  );
-  const projectLabel =
-    path.basename(input.runtimeContext.projectRoot) ||
-    input.runtimeContext.projectRoot;
-
-  renderer.renderLine("\nPrivate Coding Agents Shell");
-  renderer.renderLine(`- Project: ${projectLabel}`);
-  renderer.renderLine(`- Project root: ${input.runtimeContext.projectRoot}`);
-  renderWorkspaceBindingLines(renderer, {
-    requestedWorkspaceRoot: input.runtimeContext.requestedWorkspaceRoot,
-    projectRoot: input.runtimeContext.projectRoot,
-    rootMode: input.runtimeContext.rootMode,
-    targetPathBase: input.runtimeContext.targetPathBase,
-    gitRoot: input.runtimeContext.gitRoot,
-    diagnostics: input.runtimeContext.rootBindingDiagnostics,
-    gitContext: input.runtimeContext.gitContext,
-  });
-  if (
-    path.resolve(input.runtimeContext.originalCwd) !==
-    path.resolve(input.runtimeContext.projectRoot)
-  ) {
-    renderer.renderLine(
-      `- Launch directory: ${input.runtimeContext.originalCwd}`,
-    );
-  }
-  renderer.renderLine(`- Session: ${summary.id} [${summary.status}]`);
-  renderer.renderLine(
-    `- Resume state: ${summary.resumeDisposition}${summary.autoResumeReady ? " (auto)" : ""}`,
-  );
-  renderer.renderLine(
-    `- Runtime: ${input.executionPath}; provider=${input.provider}${input.model ? `; model=${input.model}` : ""}; max-turns=${input.maxTurns}`,
-  );
-  if (input.runtimeContext.gitContext.insideGit) {
-    renderer.renderLine(
-      `- Git: ${input.runtimeContext.gitContext.branch ?? "unknown"} (${input.runtimeContext.gitContext.isClean ? "clean" : "dirty"})`,
-    );
-  }
-
-  const lifecycleNotice = input.lifecycleNotices.at(-1);
-  if (lifecycleNotice) {
-    renderer.renderLine(`- Session lifecycle: ${lifecycleNotice}`);
-  }
-  if (input.recoveryCandidate && input.recoveryCandidateSummary) {
-    renderer.renderLine(
-      `- Recovery hint: /resume or --session-id ${input.recoveryCandidate.id} (${input.recoveryCandidateSummary.resumeDisposition})`,
-    );
-  } else if (input.recoveryBlockedNotice) {
-    renderer.renderLine(
-      `- Recovery boundary: ${truncate(input.recoveryBlockedNotice.detail, 180)}`,
-    );
-  }
-
-  renderer.renderLine("Next actions:");
-  renderer.renderLine("- Type a prompt to start work in this project.");
-  renderer.renderLine("- /sessions    inspect active + recent sessions.");
-  renderer.renderLine("- /resume      continue the best recoverable context.");
-  renderer.renderLine("- /workspace status    verify project/workdir binding.");
-  renderer.renderLine("- /help        open grouped command navigation.");
-  if (input.stdinTransportMode === "stream-live") {
-    renderer.renderLine(
-      "- Non-TTY stream mode active: each input line is processed as a sequential turn.",
-    );
-  }
-  renderer.renderLine("Ctrl+C cancels the current run. Ctrl+D exits.\n");
 }
 
 function renderLatestSessionLifecycleNotice(
