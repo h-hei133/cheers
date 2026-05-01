@@ -1943,6 +1943,43 @@ describe("SessionManager", () => {
     );
   });
 
+  it("preserves verification failed repair context across auto-compact reload", () => {
+    const manager = new SessionManager();
+    const fixture = createLongSessionContinuityFixture(
+      manager,
+      "verification-failed",
+    );
+    const restoredManager = fixture.restoreManager();
+    const snapshot = restoredManager.buildContinuitySnapshot(fixture.session.id);
+    const context = restoredManager.buildPromptContinuityContext(
+      fixture.session.id,
+      "continue the verification failure",
+    );
+
+    expect(fixture.readWorkingMemory()?.compacted).toBe(true);
+    expect(snapshot.lastTerminalClassification).toBe("error");
+    expect(snapshot.lastFailure).toBe(fixture.failureReason);
+    expect(snapshot.recentChangedFiles).toEqual([fixture.targetFile]);
+    expect(snapshot.recentVerifiedFiles).toEqual([]);
+    expect(snapshot.lastVerificationStatus).toBe("failed");
+    expect(snapshot.lastVerificationCommand).toBe(
+      "npm test -- src/long-session.test.ts",
+    );
+    expect(snapshot.lastVerificationReason).toBe(fixture.failureReason);
+    expect(snapshot.lastVerificationNextAction).toBe(fixture.nextAction);
+    expect(snapshot.lastFailureHandoffDiagnostic).toBe(
+      `Failure handoff: status=failed; target=${fixture.targetFile}; command=npm test -- src/long-session.test.ts; reason=${fixture.failureReason}; next=${fixture.nextAction.replace(/[.]+$/, "")}.`,
+    );
+    expect(context).toContain(`- recent-changed-files: ${fixture.targetFile}`);
+    expect(context).toContain("- last-verification-status: failed");
+    expect(context).toContain(
+      "- last-verification-command: npm test -- src/long-session.test.ts",
+    );
+    expect(context).toContain(
+      `- last-verification-next-action: ${fixture.nextAction}`,
+    );
+  });
+
   it("persists append-before-model-call barrier before query events begin", () => {
     const manager = new SessionManager();
     const session = manager.createNew();
