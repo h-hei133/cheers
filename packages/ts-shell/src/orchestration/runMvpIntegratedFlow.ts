@@ -49,6 +49,7 @@ import type {
   TargetResolutionBlocker,
 } from "./targetResolution.js";
 import type { SingleFileReplacePatchResult } from "./patchMutationLane.js";
+import { buildMutationTaskDelivery } from "./verificationResultAggregation.js";
 import type {
   AgentExecutionInput,
   AgentExecutionOutput,
@@ -6529,25 +6530,7 @@ function buildActionResultDelivery(input: ActionResultContractInput): string {
         : "";
     return `Edit partially completed for ${changed}. Remaining cross-file targets: ${input.crossFileRemainingTargets.join(", ")}.${failedSummary}${skippedSummary}`;
   }
-  if (input.failedFiles.length > 0) {
-    const first = input.failedFiles[0];
-    return `Task not completed: ${first?.path ?? "(unknown)"} failed (${first?.reason ?? "unknown reason"}).`;
-  }
-  if (input.changedFiles.length === 0) {
-    return "Task not completed: no file mutation was applied.";
-  }
-  const changed = input.changedFiles.join(", ");
-  const verificationNote =
-    input.verification.status === "passed"
-      ? "Verification passed."
-      : input.verification.status === "blocked"
-        ? `Verification blocked (${input.verification.blockerKind ?? "unknown"}). ${input.verification.nextAction ?? ""}`.trim()
-        : input.verification.status === "failed"
-          ? `Verification failed: ${input.verification.reason ?? "command failed"}.`
-          : input.verification.status === "not-requested"
-            ? "Verification was not requested."
-            : "Verification skipped.";
-  return `${input.taskKind === "write-file" ? "Write completed" : "Edit completed"} for ${changed}. ${verificationNote}`;
+  return buildMutationTaskDelivery(input);
 }
 
 function renderExecutionSummary(
@@ -10489,33 +10472,6 @@ function countDeliverableModeCues(prompt: string): number {
     lowered,
   );
   return Number(hasRead) + Number(hasSummary) + Number(hasExplain);
-}
-
-function buildMutationTaskDelivery(
-  taskKind: CodingTaskKind,
-  changedFiles: string[],
-  failedFiles: Array<{ path: string; reason: string }>,
-  verification: CodingVerificationSummary,
-): string {
-  if (failedFiles.length > 0) {
-    const first = failedFiles[0];
-    return `Task not completed: ${first?.path ?? "(unknown)"} failed (${first?.reason ?? "unknown reason"}).`;
-  }
-  if (changedFiles.length === 0) {
-    return "Task not completed: no file mutation was applied.";
-  }
-  const changed = changedFiles.join(", ");
-  const verificationNote =
-    verification.status === "passed"
-      ? "Verification passed."
-      : verification.status === "blocked"
-        ? `Verification blocked (${verification.blockerKind ?? "unknown"}). ${verification.nextAction ?? ""}`.trim()
-        : verification.status === "failed"
-          ? `Verification failed: ${verification.reason ?? "command failed"}.`
-          : verification.status === "not-requested"
-            ? "Verification was not requested."
-            : "Verification skipped.";
-  return `${taskKind === "write-file" ? "Write completed" : "Edit completed"} for ${changed}. ${verificationNote}`;
 }
 
 function detectVerifyCommand(normalizedPrompt: string): string | undefined {

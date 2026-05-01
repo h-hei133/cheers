@@ -139,6 +139,20 @@ This branch directly supports the main-path stage by making these user-facing pa
     - `rtk npm run build -w packages/ts-shell` (sandboxed write hit EPERM, escalated RTK rerun passed)
     - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts` (sandboxed esbuild spawn hit EPERM, escalated RTK rerun passed: 52 tests)
   - Behavior: current-session store shape parsing and resolution detail construction preserved; current pointer persistence, stale pointer cleanup, session loading, project-root normalization, project-root matching, and durable lifecycle state remain in `SessionManager.ts`.
+- Done: verification result aggregation helper extraction.
+  - Commit: reported in final status for this checkpoint.
+  - New module: `packages/ts-shell/src/orchestration/verificationResultAggregation.ts`
+  - Modified files:
+    - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`
+    - `packages/ts-shell/src/orchestration/verificationResultAggregation.ts`
+    - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.test.ts`
+    - `PLANS.main-path-boundaries.md`
+  - Validation:
+    - `rtk git status --short`
+    - `rtk npm run build -w packages/ts-shell` (sandboxed write hit EPERM, escalated RTK rerun passed)
+    - `rtk npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "renders mutation verification delivery"` (sandboxed esbuild spawn hit EPERM, escalated RTK rerun passed: 1 focused test)
+    - Note: broad `-t "verification"` also ran and reached existing T10 old-failure coverage, with 4 unrelated status/classification failures; it was not used as this checkpoint gate because the extracted surface is the delivery helper.
+  - Behavior: mutation delivery text for verification passed, blocked, failed, not-requested, skipped, no-change, and failed-file cases preserved; main orchestration loop, mutation execution, repair sequencing, actionable blocker taxonomy, terminal classification, provider/auth, and release-core wiring remain in `runMvpIntegratedFlow.ts`.
 
 ## 5. Three-File Responsibility Map
 
@@ -294,7 +308,7 @@ Keep TypeScript imports ending in `.js`.
 
 ### runMvpIntegratedFlow Direction
 
-- Backlog: verification result aggregation helper extraction.
+- Done: verification result aggregation helper extraction.
 - Backlog: mutation result aggregation smaller follow-up extraction.
 - Backlog: tool lifecycle event formatter/helper extraction.
 - Backlog: action result seed/evidence formatter extraction.
@@ -433,15 +447,15 @@ Do not start a second production-code checkpoint in the same commit.
 
 Next implementation checkpoint should be:
 
-- `Extract verification result aggregation helper`
+- `Extract mutation result aggregation helper`
 
 Why:
 
-- It starts the runMvp helper backlog after the low-risk CLI and SessionManager helper checkpoints.
-- It should target already-stable verification summary/result aggregation helpers only.
-- It must keep the main orchestration loop, provider/model adapter wiring, mutation execution, repair flow, and tool lifecycle sequencing in `runMvpIntegratedFlow.ts`.
+- It continues the runMvp helper backlog after the verification delivery helper extraction.
+- It should target a smaller stable mutation result summary/adapter helper only.
+- It must keep the main orchestration loop, provider/model adapter wiring, mutation execution, patch/apply behavior, repair flow, and tool lifecycle sequencing in `runMvpIntegratedFlow.ts`.
 - It can be validated by build plus the narrowest related `runMvpIntegratedFlow.test.ts` focused pattern.
 
 Default stop condition for the next checkpoint:
 
-- If verification aggregation extraction requires changing result/failure taxonomy, terminal classification, mutation behavior, repair sequencing, provider/auth behavior, or release-core wiring, stop and choose a smaller pure mapper slice.
+- If mutation result aggregation extraction requires changing patch/apply semantics, edit capability, rollback/batch behavior, repair sequencing, terminal classification, provider/auth behavior, or release-core wiring, stop and choose a smaller pure adapter slice.

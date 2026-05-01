@@ -11,6 +11,7 @@ import {
   runMvpIntegratedFlow,
   streamMvpIntegratedFlow,
 } from "./runMvpIntegratedFlow.js";
+import { buildMutationTaskDelivery } from "./verificationResultAggregation.js";
 
 describe("MVP integrated end-to-end flow (T10)", () => {
   let workspaceRoot = "";
@@ -53,6 +54,55 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       lastActionResultSeed: result.codingResult?.lastActionResultSeed,
     };
   }
+
+  it("renders mutation verification delivery from aggregated summary", () => {
+    expect(
+      buildMutationTaskDelivery({
+        taskKind: "edit-file",
+        changedFiles: ["src/app.ts"],
+        failedFiles: [],
+        verification: { status: "passed" },
+      }),
+    ).toBe("Edit completed for src/app.ts. Verification passed.");
+    expect(
+      buildMutationTaskDelivery({
+        taskKind: "write-file",
+        changedFiles: ["src/app.ts"],
+        failedFiles: [],
+        verification: {
+          status: "blocked",
+          blockerKind: "approval-denied",
+          nextAction: "approve the command and retry",
+        },
+      }),
+    ).toBe(
+      "Write completed for src/app.ts. Verification blocked (approval-denied). approve the command and retry",
+    );
+    expect(
+      buildMutationTaskDelivery({
+        taskKind: "edit-file",
+        changedFiles: ["src/app.ts"],
+        failedFiles: [],
+        verification: { status: "failed", reason: "tests failed" },
+      }),
+    ).toBe("Edit completed for src/app.ts. Verification failed: tests failed.");
+    expect(
+      buildMutationTaskDelivery({
+        taskKind: "edit-file",
+        changedFiles: ["src/app.ts"],
+        failedFiles: [],
+        verification: { status: "not-requested" },
+      }),
+    ).toBe("Edit completed for src/app.ts. Verification was not requested.");
+    expect(
+      buildMutationTaskDelivery({
+        taskKind: "edit-file",
+        changedFiles: [],
+        failedFiles: [],
+        verification: { status: "skipped" },
+      }),
+    ).toBe("Task not completed: no file mutation was applied.");
+  });
 
   it("covers prompt -> handoff -> tool approval -> streamed result", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
