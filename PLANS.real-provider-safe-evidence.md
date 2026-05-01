@@ -187,31 +187,45 @@ opencode 参考：
 
 Backlog:
 
-1. A. Real-provider readiness safety audit
-2. B. Provider failure redaction contract
-3. C. Real-provider readiness attribution smoke
-4. D. Real-provider turn boundary dry-run audit
-5. E. Real-provider terminal result surface smoke
-6. F. Tool execution under real-provider planning audit
-7. G. Real-provider failure follow-up context smoke
-8. H. Merge-readiness / route audit
+1. B. Provider failure redaction contract
+2. C. Real-provider readiness attribution smoke
+3. D. Real-provider turn boundary dry-run audit
+4. E. Real-provider terminal result surface smoke
+5. F. Tool execution under real-provider planning audit
+6. G. Real-provider failure follow-up context smoke
+7. H. Merge-readiness / route audit
 
 Current:
 
-- A. Real-provider readiness safety audit
+- B. Provider failure redaction contract
 
 Completed:
 
-- None yet.
+- A. Real-provider readiness safety audit
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `PLANS.real-provider-safe-evidence.md`.
+  - Result: completed as read-only audit / planning checkpoint; no real-provider smoke run, no real home config content read.
 
 Verification:
 
 - Planning round: `rtk git status --short`, `rtk npm run build -w packages/ts-shell`, `rtk git diff`.
+- A audit round:
+  - `rtk git status --short --branch`: passed; branch `real-provider-safe-evidence`, clean before checkpoint update.
+  - Read-only audit commands: `rtk read AGENTS.md`, `rtk read PLANS.real-provider-safe-evidence.md`, `rtk read scripts/verify-provider-readiness.mjs`, `rtk read scripts/verify-real-user-capabilities.mjs`, `rtk read scripts/verify-doctor-environment.mjs`, `rtk read packages/ts-shell/src/core/shell/providerReadiness.ts`, `rtk read packages/ts-shell/src/config/runtimeConfig.ts`, `rtk read packages/ts-shell/src/core/shell/providerCredentials.ts`, `rtk read packages/ts-shell/src/core/commands/connectCommandRuntime.ts`, `rtk read packages/ts-shell/src/core/commands/authCommandRuntime.ts`.
+  - Search audit commands: `rtk grep "endpoint=" scripts packages/ts-shell/src`, `rtk grep "activeConnection" scripts packages/ts-shell/src`, `rtk grep "configPath" scripts packages/ts-shell/src`, `rtk grep "model=" scripts packages/ts-shell/src`.
+  - `rtk npm run build -w packages/ts-shell`: initial sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
 
 Notes:
 
 - Do not run `verify-real-user-capabilities` by default.
-- Do not run real-provider smoke until A confirms safety/redaction boundaries.
+- Do not run real-provider smoke until B adds or confirms a shared redaction contract.
+- A audit findings:
+  - `scripts/verify-provider-readiness.mjs` reads `D:/Test/home-sf/.private-agents/config.json` when run outside `--classification-self-test`; it prints `real-provider-config` with full config path, `activeConnection`, `endpoint`, and `model`.
+  - `scripts/verify-doctor-environment.mjs` has the same real-provider config read and prints full config path, `activeConnection`, `endpoint`, and `model`.
+  - `scripts/verify-real-user-capabilities.mjs` runs provider readiness preflight before real scenarios and stores `providerReadiness.outputTail` in `D:/Test/test-results/real-user-capabilities-report.json`; if the preflight output includes endpoint/model/path details, those details can be persisted in the report.
+  - `providerReadiness.ts` does not print raw API keys or bearer tokens in normal missing-key/auth/network paths, but its unknown error path includes `error.message`; B should sanitize error text before user-visible/report-visible output.
+  - `/connect status` and legacy `/auth status` already mask API keys, but they expose connection id, base URL, model, account id/email/client id summaries, and stored config path. Those are acceptable for explicit local status commands, but should not leak through automated real-provider gates by default.
+  - Current recommendation: implement B before any real-provider smoke. B should introduce a small redaction/sanitization helper or script-local sanitizer and focused tests for token/header/path/endpoint-bearing error text.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 
@@ -536,4 +550,3 @@ read-only audit / planning checkpoint
 - 但 `verify-provider-readiness.mjs` 会读取 real home config 并输出 provider metadata。
 - 在任何真实 provider smoke 前，必须先确认输出边界、redaction 策略、failure attribution 语义。
 - 该 checkpoint 不需要新增 provider、不需要改 auth、不需要读取真实 secret 内容，风险最低且最贴近 real-provider safe evidence 主线。
-
