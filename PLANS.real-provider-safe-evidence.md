@@ -187,13 +187,12 @@ opencode 参考：
 
 Backlog:
 
-1. F. Tool execution under real-provider planning audit
-2. G. Real-provider failure follow-up context smoke
-3. H. Merge-readiness / route audit
+1. G. Real-provider failure follow-up context smoke
+2. H. Merge-readiness / route audit
 
 Current:
 
-- F. Tool execution under real-provider planning audit
+- G. Real-provider failure follow-up context smoke
 
 Completed:
 
@@ -217,6 +216,10 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `scripts/verify-real-user-capabilities.mjs`, `PLANS.real-provider-safe-evidence.md`.
   - Result: completed as a safe terminal-result surface dry-run. Added `--terminal-result-surface-dry-run` and real-user capability failure-line rendering that exposes Outcome, Category, Status, Reason, and NextAction without executing real provider or reading real home.
+- F. Tool execution under real-provider planning audit
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `scripts/verify-real-user-capabilities.mjs`, `PLANS.real-provider-safe-evidence.md`.
+  - Result: completed as a safe planning dry-run. Added `--tool-execution-planning-dry-run` to audit provider-gated execution, read-only fixture execution, explicit approval for benign commands, command allowlisting, real-home write blocking, and non-test workspace write blocking without executing real provider or tools.
 
 Verification:
 
@@ -245,6 +248,11 @@ Verification:
   - `rtk node scripts/verify-real-user-capabilities.mjs --terminal-result-surface-dry-run`: passed; reported `homeRead=false`, `real-provider execution skipped`, `reportWritten=false`.
   - `rtk npm run verify:result-contract`: passed.
   - `rtk npm run verify:cli-entry`: passed.
+  - `rtk npm run build -w packages/ts-shell`: passed.
+- F tool execution planning audit round:
+  - `rtk node scripts/verify-real-user-capabilities.mjs --tool-execution-planning-dry-run`: passed; reported `homeRead=false`, `real-provider execution skipped`, `toolExecution=false`, `reportWritten=false`.
+  - `rtk npm run verify:cli-entry`: passed.
+  - `rtk npm run verify:result-contract`: passed.
   - `rtk npm run build -w packages/ts-shell`: passed.
 
 Notes:
@@ -279,6 +287,11 @@ Notes:
   - Real-user capability scenario failures now print a compact terminal surface: `Outcome`, `Category`, `Status`, optional sanitized `Reason`, and `NextAction`.
   - Provider failure surfaces are explicitly separated from stopped/model-tool failures, and network/auth/config failures remain attributed to external provider state rather than product regression.
   - Next selected checkpoint is F because terminal-result surface is now safe enough to audit how real-provider planning would cross into tool execution without executing dangerous writes.
+- F implementation notes:
+  - `verify-real-user-capabilities.mjs --tool-execution-planning-dry-run` does not call provider readiness preflight, does not read `D:/Test/home-sf`, does not execute real provider, and does not execute tools.
+  - The dry-run records that provider readiness failure stops before tool execution, benign bash commands still require explicit approval, non-allowlisted commands are blocked, read-only synthetic/test fixture plans are allowed, and real-home or non-test writes are blocked.
+  - This is a planning audit only; it does not prove real model planning quality or real provider maturity.
+  - Next selected checkpoint is G to verify follow-up context after provider failure/stopped surfaces remains visible without requiring real network by default.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 

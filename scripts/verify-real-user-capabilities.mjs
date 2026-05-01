@@ -18,6 +18,7 @@ const includeCandidates = process.argv.includes('--include-candidates')
 const includeContinueSmoke = process.argv.includes('--include-continue-smoke')
 const turnBoundaryDryRun = process.argv.includes('--turn-boundary-dry-run')
 const terminalResultSurfaceDryRun = process.argv.includes('--terminal-result-surface-dry-run')
+const toolExecutionPlanningDryRun = process.argv.includes('--tool-execution-planning-dry-run')
 
 const failureCategories = [
   'none',
@@ -693,6 +694,96 @@ function renderTerminalResultSurface(result) {
   return parts.join(' | ')
 }
 
+const benignCommandAllowlist = new Set(['node --version', 'npm --version'])
+
+function normalizeSlashes(value) {
+  return String(value ?? '').replace(/\\/g, '/')
+}
+
+function isInsideSyntheticOrTempWorkspace(value) {
+  const normalized = normalizeSlashes(value).toLowerCase()
+  return (
+    normalized.startsWith('d:/test/pca-home-synth') ||
+    normalized.startsWith('d:/test/pca-tool-planning-') ||
+    normalized.startsWith('c:/tmp/')
+  )
+}
+
+function isRealProviderHomePath(value) {
+  return normalizeSlashes(value).toLowerCase().startsWith('d:/test/home-sf')
+}
+
+function buildToolExecutionPlanningAudit(plan) {
+  if (plan.providerStatus && plan.providerStatus !== 'ready') {
+    return {
+      decision: 'provider-gated',
+      execute: false,
+      reason: 'provider failure must stop before tool execution',
+      nextAction: 'Fix provider readiness before evaluating tool execution.',
+    }
+  }
+
+  const target = plan.targetPath ?? plan.projectDir ?? ''
+  if (target && isRealProviderHomePath(target)) {
+    return {
+      decision: 'blocked-real-home',
+      execute: false,
+      reason: 'tool plan targets real-provider home',
+      nextAction: 'Use a synthetic/test workspace; never target real-provider configuration files.',
+    }
+  }
+
+  if (plan.writes && !isInsideSyntheticOrTempWorkspace(target)) {
+    return {
+      decision: 'blocked-dangerous-write',
+      execute: false,
+      reason: 'write plan is outside synthetic/test workspace',
+      nextAction: 'Move the fixture into a synthetic/test workspace before allowing execution.',
+    }
+  }
+
+  if (plan.tool === 'bash') {
+    if (!benignCommandAllowlist.has(plan.command ?? '')) {
+      return {
+        decision: 'blocked-command-not-allowlisted',
+        execute: false,
+        reason: 'command is not in the benign dry-run allowlist',
+        nextAction: 'Restrict the audit to allowlisted benign commands.',
+      }
+    }
+    if (plan.approval !== 'explicit-allow') {
+      return {
+        decision: 'approval-required',
+        execute: false,
+        reason: 'tool execution requires explicit approval',
+        nextAction: 'Ask for explicit approval before executing even benign real-provider-planned tools.',
+      }
+    }
+    return {
+      decision: 'allow-benign-command',
+      execute: true,
+      reason: 'allowlisted benign command with explicit approval',
+      nextAction: 'Execute only inside the controlled audit harness.',
+    }
+  }
+
+  if (plan.tool === 'read-file') {
+    return {
+      decision: 'allow-read-only',
+      execute: true,
+      reason: 'read-only tool plan in synthetic/test workspace',
+      nextAction: 'Read only the controlled fixture and preserve sanitized output.',
+    }
+  }
+
+  return {
+    decision: 'blocked-unknown-tool',
+    execute: false,
+    reason: 'tool is outside this audit boundary',
+    nextAction: 'Add a focused audit case before allowing this tool family.',
+  }
+}
+
 async function runScenario(scenario) {
   prepareProject(scenario)
   let previousSnapshot = snapshot(scenario.projectDir)
@@ -991,6 +1082,113 @@ function runTerminalResultSurfaceDryRun() {
   process.exit(ok ? 0 : 1)
 }
 
+function runToolExecutionPlanningDryRun() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=tool-execution-planning-dry-run')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('toolExecution=false')
+  console.log('reportWritten=false')
+
+  const cases = [
+    {
+      name: 'provider-failure-before-tool',
+      plan: {
+        providerStatus: 'provider-network-inconclusive',
+        tool: 'bash',
+        command: 'node --version',
+        approval: 'explicit-allow',
+        projectDir: 'D:/Test/pca-tool-planning-provider-gated',
+      },
+      expectedDecision: 'provider-gated',
+      expectedExecute: false,
+    },
+    {
+      name: 'read-only-synthetic-fixture',
+      plan: {
+        providerStatus: 'ready',
+        tool: 'read-file',
+        targetPath: 'D:/Test/pca-tool-planning-read/fixture.txt',
+        writes: false,
+      },
+      expectedDecision: 'allow-read-only',
+      expectedExecute: true,
+    },
+    {
+      name: 'benign-command-needs-approval',
+      plan: {
+        providerStatus: 'ready',
+        tool: 'bash',
+        command: 'node --version',
+        approval: 'not-requested',
+        projectDir: 'D:/Test/pca-tool-planning-command',
+      },
+      expectedDecision: 'approval-required',
+      expectedExecute: false,
+    },
+    {
+      name: 'benign-command-explicit-allow',
+      plan: {
+        providerStatus: 'ready',
+        tool: 'bash',
+        command: 'node --version',
+        approval: 'explicit-allow',
+        projectDir: 'D:/Test/pca-tool-planning-command',
+      },
+      expectedDecision: 'allow-benign-command',
+      expectedExecute: true,
+    },
+    {
+      name: 'dangerous-command-blocked',
+      plan: {
+        providerStatus: 'ready',
+        tool: 'bash',
+        command: 'del /s /q D:\\Test\\home-sf',
+        approval: 'explicit-allow',
+        projectDir: 'D:/Test/pca-tool-planning-command',
+      },
+      expectedDecision: 'blocked-command-not-allowlisted',
+      expectedExecute: false,
+    },
+    {
+      name: 'real-home-write-blocked',
+      plan: {
+        providerStatus: 'ready',
+        tool: 'write-file',
+        targetPath: 'D:/Test/home-sf/.private-agents/config.json',
+        writes: true,
+      },
+      expectedDecision: 'blocked-real-home',
+      expectedExecute: false,
+    },
+    {
+      name: 'workspace-write-outside-test-blocked',
+      plan: {
+        providerStatus: 'ready',
+        tool: 'write-file',
+        targetPath: 'D:/Users/project/src/app.js',
+        writes: true,
+      },
+      expectedDecision: 'blocked-dangerous-write',
+      expectedExecute: false,
+    },
+  ]
+
+  let ok = true
+  for (const item of cases) {
+    const audit = buildToolExecutionPlanningAudit(item.plan)
+    const line = `decision=${audit.decision} execute=${audit.execute} reason=${audit.reason} nextAction=${audit.nextAction}`
+    const passed =
+      audit.decision === item.expectedDecision &&
+      audit.execute === item.expectedExecute &&
+      !line.includes('.private-agents/config.json')
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] ${item.name} - ${line}`)
+    ok = ok && passed
+  }
+
+  process.exit(ok ? 0 : 1)
+}
+
 async function main() {
   if (turnBoundaryDryRun) {
     runTurnBoundaryDryRun()
@@ -998,6 +1196,10 @@ async function main() {
   }
   if (terminalResultSurfaceDryRun) {
     runTerminalResultSurfaceDryRun()
+    return
+  }
+  if (toolExecutionPlanningDryRun) {
+    runToolExecutionPlanningDryRun()
     return
   }
 
