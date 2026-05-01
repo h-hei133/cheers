@@ -294,6 +294,59 @@ async function runStdinPromptBoundary() {
   )
 }
 
+async function runPrintToolExecutionSurface() {
+  const targetFile = 'cli-entry-tool-execution.txt'
+  const targetPath = path.join(projectRoot, targetFile)
+  fs.rmSync(targetPath, { force: true })
+
+  const result = await runCli([
+    '--project',
+    projectRoot,
+    '--print',
+    `Create file ${targetFile} with content: cli entry tool execution surface.`,
+  ])
+  if (result.code !== 0 || result.timedOut) {
+    printStep(
+      'cli-entry-print-tool-execution-surface',
+      'product-regression',
+      result.timedOut ? 'timed out' : `exit=${result.code}`,
+    )
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  const requiredMarkers = [
+    'Result',
+    'Outcome: success',
+    'Action result',
+    'Task: write-file',
+    'Changed files: cli-entry-tool-execution.txt',
+    'Verification detail:',
+    'Next action:',
+  ]
+  const missing = requiredMarkers.filter((marker) => !result.output.includes(marker))
+  if (missing.length > 0) {
+    printStep('cli-entry-print-tool-execution-surface', 'product-regression', `missing=${missing.join(' | ')}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  if (!fs.existsSync(targetPath)) {
+    printStep('cli-entry-print-tool-execution-surface', 'product-regression', `missing file=${targetPath}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  const content = fs.readFileSync(targetPath, 'utf8')
+  if (!content.includes('cli entry tool execution surface')) {
+    printStep('cli-entry-print-tool-execution-surface', 'product-regression', 'file content mismatch')
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  printStep('cli-entry-print-tool-execution-surface', 'pass')
+  return true
+}
+
 async function runSessionMigrationBoundary() {
   seedSessionForMigration()
   const ok = await assertSuccessfulCliRun(
@@ -406,6 +459,7 @@ async function main() {
   const checks = []
   checks.push(await runPrintReplayBoundary())
   checks.push(await runStdinPromptBoundary())
+  checks.push(await runPrintToolExecutionSurface())
   checks.push(await runSessionMigrationBoundary())
   checks.push(await runInvalidArgumentBoundary())
   checks.push(await runPackagedEntryBoundary())

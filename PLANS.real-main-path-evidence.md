@@ -112,13 +112,20 @@ Decision:
 
 Goal: validate the full surface of tool execution -> result block -> next action, not only a single read/write marker.
 
-Status: current.
+Status: completed.
+
+Result:
+
+- Added `cli-entry-print-tool-execution-surface` to `scripts/verify-cli-entry.mjs`.
+- The smoke runs the real CLI entry in synthetic `--print` mode against the existing fixture project.
+- It creates `cli-entry-tool-execution.txt`, asserts the structured user-visible chain (`Result`, `Outcome: success`, `Action result`, `Task: write-file`, changed-file marker, verification detail, and next action), and checks the file content on disk.
+- It does not access `D:\Test\home-sf` or real-provider configuration.
 
 ### C. Non-interactive approval boundary smoke
 
 Goal: prove approval-required work in non-interactive or print mode does not silently execute and does not emit a misleading terminal state.
 
-Status: backlog.
+Status: current.
 
 ### D. Failed tool execution follow-up smoke
 
@@ -290,17 +297,21 @@ Never commit audit residue, real-provider config, temporary homes, or unrelated 
 
 Current checkpoint:
 
-- `CLI --print real-ish tool execution smoke`
+- `Non-interactive approval boundary smoke`
 
 Scope:
 
-- Validate the full `--print` tool execution surface through a focused CLI entry smoke.
+- Validate that approval-required work in non-interactive or print mode does not silently execute and does not produce a misleading terminal state.
 - Prefer synthetic mode and temporary test project/home boundaries.
 - Do not run real-provider checks.
 - Do not touch provider/auth, MCP, release-core, QueryEngine/queryLoop, or terminalClassification.
 
 Completed checkpoint:
 
+- `CLI --print real-ish tool execution smoke`
+  - Added `cli-entry-print-tool-execution-surface` to `scripts/verify-cli-entry.mjs`.
+  - Proves tool execution -> structured result block -> changed file evidence -> next action via synthetic `--print`.
+  - Does not use real-provider home.
 - `CLI default/live-ish turn smoke planning`
 
 Evidence:
@@ -311,12 +322,12 @@ Evidence:
 
 Next recommended checkpoint:
 
-- `CLI --print real-ish tool execution smoke`
+- `Non-interactive approval boundary smoke`
 
 Reason:
 
-- Existing print/replay gates prove entry mechanics, but the next evidence gap is the full user-visible chain: tool execution -> structured result block -> next action.
-- `--print` is deterministic enough for a first implementation checkpoint and avoids real TTY automation complexity.
+- The print tool execution surface is now covered by `verify-cli-entry`.
+- The next highest real-entry risk is approval-required work in non-interactive/print mode silently executing or surfacing an ambiguous terminal state.
 - The checkpoint can stay synthetic and avoid `D:\Test\home-sf`.
 
 Default stop condition for the next checkpoint:
@@ -346,17 +357,30 @@ Default stop condition for the next checkpoint:
   - Verification:
     - `rtk git status --short` passed with only this plan file modified.
     - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed with the same RTK command outside the sandbox.
+- `CLI --print real-ish tool execution smoke`
+  - Commit: recorded in final status for this checkpoint.
+  - Files:
+    - `scripts/verify-cli-entry.mjs`
+    - `PLANS.real-main-path-evidence.md`
+  - Production shell/runtime changes: none.
+  - Evidence added:
+    - `cli-entry-print-tool-execution-surface` runs CLI `--print` through the real entry script in synthetic mode.
+    - It checks structured output markers and verifies the requested file was actually written.
+  - Verification:
+    - `rtk git status --short` passed with only `scripts/verify-cli-entry.mjs` and this plan modified.
+    - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed with the same RTK command outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "print"` hit sandbox esbuild spawn EPERM, then passed outside the sandbox: 4 passed, 30 skipped.
+    - `rtk npm run verify:cli-entry` hit sandbox EPERM writing `D:\Test\cli-entry-gate\fixture.txt`, then passed outside the sandbox, including `[pass] cli-entry-print-tool-execution-surface`.
 
 ### Current
 
-- `CLI --print real-ish tool execution smoke`
-  - Target: prove the full `--print` user-visible chain for tool execution, result block, and next action.
+- `Non-interactive approval boundary smoke`
+  - Target: prove approval-required work in non-interactive or print mode does not silently execute and does not emit a misleading terminal state.
   - Default scope: synthetic provider mode, temporary fixture project, no real-provider home access.
-  - Preferred starting point: existing `cli-baseline.test.ts` or `verify-cli-entry.mjs` print-mode coverage.
+  - Preferred starting point: existing approval allow/deny evidence in `cli-baseline.test.ts`.
 
 ### Backlog
 
-- Non-interactive approval boundary smoke.
 - Failed tool execution follow-up smoke.
 - Provider readiness + real-provider safe smoke.
 - CLI stopped/failure follow-up real path smoke.
