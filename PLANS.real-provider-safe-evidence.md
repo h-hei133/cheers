@@ -187,17 +187,16 @@ opencode 参考：
 
 Backlog:
 
-1. B. Provider failure redaction contract
-2. C. Real-provider readiness attribution smoke
-3. D. Real-provider turn boundary dry-run audit
-4. E. Real-provider terminal result surface smoke
-5. F. Tool execution under real-provider planning audit
-6. G. Real-provider failure follow-up context smoke
-7. H. Merge-readiness / route audit
+1. C. Real-provider readiness attribution smoke
+2. D. Real-provider turn boundary dry-run audit
+3. E. Real-provider terminal result surface smoke
+4. F. Tool execution under real-provider planning audit
+5. G. Real-provider failure follow-up context smoke
+6. H. Merge-readiness / route audit
 
 Current:
 
-- B. Provider failure redaction contract
+- C. Real-provider readiness attribution smoke
 
 Completed:
 
@@ -205,6 +204,10 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `PLANS.real-provider-safe-evidence.md`.
   - Result: completed as read-only audit / planning checkpoint; no real-provider smoke run, no real home config content read.
+- B. Provider failure redaction contract
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `packages/ts-shell/src/core/shell/providerFailureRedaction.ts`, `packages/ts-shell/src/core/shell/providerReadiness.ts`, `packages/ts-shell/src/core/shell/providerReadiness.test.ts`, `PLANS.real-provider-safe-evidence.md`.
+  - Result: completed. Added focused provider failure detail sanitizer and applied it to unknown provider readiness errors before they become user/report-visible stop reasons.
 
 Verification:
 
@@ -214,11 +217,16 @@ Verification:
   - Read-only audit commands: `rtk read AGENTS.md`, `rtk read PLANS.real-provider-safe-evidence.md`, `rtk read scripts/verify-provider-readiness.mjs`, `rtk read scripts/verify-real-user-capabilities.mjs`, `rtk read scripts/verify-doctor-environment.mjs`, `rtk read packages/ts-shell/src/core/shell/providerReadiness.ts`, `rtk read packages/ts-shell/src/config/runtimeConfig.ts`, `rtk read packages/ts-shell/src/core/shell/providerCredentials.ts`, `rtk read packages/ts-shell/src/core/commands/connectCommandRuntime.ts`, `rtk read packages/ts-shell/src/core/commands/authCommandRuntime.ts`.
   - Search audit commands: `rtk grep "endpoint=" scripts packages/ts-shell/src`, `rtk grep "activeConnection" scripts packages/ts-shell/src`, `rtk grep "configPath" scripts packages/ts-shell/src`, `rtk grep "model=" scripts packages/ts-shell/src`.
   - `rtk npm run build -w packages/ts-shell`: initial sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
+- B redaction contract round:
+  - `rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts`: initial sandbox run failed with `spawn EPERM`; elevated rerun exposed sanitizer ordering issue; after fix, elevated rerun passed with 13 tests.
+  - `rtk npm run test -w packages/ts-shell -- src/config/runtimeConfig.test.ts`: initial sandbox run failed with `spawn EPERM`; elevated rerun passed with 8 tests.
+  - `rtk npm run verify:result-contract`: initial sandbox run failed with `spawn EPERM`; elevated rerun passed all result-contract checks.
+  - `rtk npm run build -w packages/ts-shell`: elevated run passed.
 
 Notes:
 
 - Do not run `verify-real-user-capabilities` by default.
-- Do not run real-provider smoke until B adds or confirms a shared redaction contract.
+- Do not run real-provider smoke until C explicitly designs a safe attribution smoke that does not print or persist raw real-provider config details.
 - A audit findings:
   - `scripts/verify-provider-readiness.mjs` reads `D:/Test/home-sf/.private-agents/config.json` when run outside `--classification-self-test`; it prints `real-provider-config` with full config path, `activeConnection`, `endpoint`, and `model`.
   - `scripts/verify-doctor-environment.mjs` has the same real-provider config read and prints full config path, `activeConnection`, `endpoint`, and `model`.
@@ -226,6 +234,11 @@ Notes:
   - `providerReadiness.ts` does not print raw API keys or bearer tokens in normal missing-key/auth/network paths, but its unknown error path includes `error.message`; B should sanitize error text before user-visible/report-visible output.
   - `/connect status` and legacy `/auth status` already mask API keys, but they expose connection id, base URL, model, account id/email/client id summaries, and stored config path. Those are acceptable for explicit local status commands, but should not leak through automated real-provider gates by default.
   - Current recommendation: implement B before any real-provider smoke. B should introduce a small redaction/sanitization helper or script-local sanitizer and focused tests for token/header/path/endpoint-bearing error text.
+- B implementation notes:
+  - New `redactProviderFailureDetail` redacts bearer tokens, API/access/refresh/id token key-value shapes, OpenAI-style API keys, secret query params, and private-agents real-home config paths.
+  - `checkRealProviderReadiness` now sanitizes unknown exception messages before including them in `provider-readiness:unknown` stop reasons.
+  - Normal missing-key/auth/network/missing-config readiness classifications are behavior-preserving.
+  - This checkpoint does not yet rewrite `verify-provider-readiness.mjs` or `verify-doctor-environment.mjs`; C should apply the contract to safe smoke/report output before any real-provider execution.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 

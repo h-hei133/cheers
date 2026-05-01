@@ -3,6 +3,7 @@ import {
   checkRealProviderReadiness,
   createProviderReadinessTerminalEvent,
 } from "./providerReadiness.js";
+import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
 
 describe("provider readiness boundary", () => {
   it("classifies missing key into actionable readiness failure", async () => {
@@ -256,5 +257,60 @@ describe("provider readiness boundary", () => {
 
     expect(result).toEqual({ ok: true });
     expect(requests[0]).toBe("https://api.siliconflow.cn/v1/models");
+  });
+
+  it("redacts provider failure details before surfacing unknown readiness errors", async () => {
+    const result = await checkRealProviderReadiness({
+      apiKey: "test-key",
+      fetchImpl: async () => {
+        throw new Error(
+          "request failed for D:/Test/home-sf/.private-agents/config.json Authorization: Bearer sk-live-secret api_key=sk-query-secret https://example.test/v1/models?api_key=sk-url-secret",
+        );
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    if ("failure" in result) {
+      expect(result.failure.kind).toBe("unknown");
+      expect(result.failure.stopReason).toContain(
+        "[REAL_PROVIDER_CONFIG_PATH]",
+      );
+      expect(result.failure.stopReason).toContain("Bearer [REDACTED]");
+      expect(result.failure.stopReason).toContain("api_key=[REDACTED]");
+      expect(result.failure.stopReason).toContain("api_key=[REDACTED]");
+      expect(result.failure.stopReason).not.toContain("home-sf/.private-agents");
+      expect(result.failure.stopReason).not.toContain("sk-live-secret");
+      expect(result.failure.stopReason).not.toContain("sk-query-secret");
+      expect(result.failure.stopReason).not.toContain("sk-url-secret");
+      return;
+    }
+
+    throw new Error("Expected readiness failure for unknown provider error");
+  });
+
+  it("redacts standalone provider secret shapes", () => {
+    const redacted = redactProviderFailureDetail(
+      [
+        "Authorization=Bearer acct-access-token",
+        "refresh_token=refresh-secret",
+        "accessToken: acct-token",
+        "x-api-key='sk-header-secret'",
+        "C:\\Test\\home-sf\\.private-agents\\config.json",
+        "https://example.test/v1?token=token-secret&signature=sig-secret",
+      ].join("\n"),
+    );
+
+    expect(redacted).toContain("Bearer [REDACTED]");
+    expect(redacted).toContain("refresh_token=[REDACTED]");
+    expect(redacted).toContain("accessToken: [REDACTED]");
+    expect(redacted).toContain("x-api-key='[REDACTED]");
+    expect(redacted).toContain("[REAL_PROVIDER_CONFIG_PATH]");
+    expect(redacted).toContain("token=[REDACTED]");
+    expect(redacted).toContain("signature=[REDACTED]");
+    expect(redacted).not.toContain("acct-access-token");
+    expect(redacted).not.toContain("refresh-secret");
+    expect(redacted).not.toContain("acct-token");
+    expect(redacted).not.toContain("sk-header-secret");
+    expect(redacted).not.toContain("home-sf\\.private-agents");
   });
 });
