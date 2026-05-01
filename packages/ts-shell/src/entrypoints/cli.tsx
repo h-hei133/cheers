@@ -14,6 +14,12 @@ import type { McpClientSnapshot } from "../core/mcp/types.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import {
+  renderApprovalAuditRecord,
+  renderApprovalHeader,
+  renderApprovalPromptFacts,
+  type ApprovalAuditRecord,
+} from "../core/shell/approvalPromptRenderer.js";
+import {
   bootstrapShellRuntime,
   SessionBootstrapError,
 } from "../core/shell/bootstrap.js";
@@ -144,25 +150,6 @@ interface ApprovalModeConflictAnalysis {
   readonly stopReason?: string;
 }
 
-interface ApprovalAuditRecord {
-  readonly channel: "interactive" | "non-interactive";
-  readonly decision: "deny" | "allow-once" | "allow-always";
-  readonly decisionSource: string;
-  readonly persistent: boolean;
-  readonly cacheEffect:
-    | "none"
-    | "allow-once-cache-consumed"
-    | "allow-always-persisted"
-    | "allow-always-cache-hit"
-    | "ambiguous-stop";
-  readonly projectRoot: string;
-  readonly cacheKey: string;
-  readonly scopeLabel: string;
-  readonly lineage?: string;
-  readonly inputKey?: string;
-  readonly stopReason?: string;
-}
-
 function analyzeApprovalModeConflict(
   approvalModeObject?: ApprovalModeObject,
 ): ApprovalModeConflictAnalysis {
@@ -183,34 +170,6 @@ function analyzeApprovalModeConflict(
     };
   }
   return { ambiguousStop: false };
-}
-
-function renderApprovalAuditRecord(
-  renderer: StreamingRenderer,
-  record: ApprovalAuditRecord,
-): void {
-  renderer.renderLine("approval-audit:event=decision");
-  renderer.renderLine(`approval-audit:channel=${record.channel}`);
-  renderer.renderLine(`approval-audit:decision=${record.decision}`);
-  renderer.renderLine(
-    `approval-audit:decision-source=${record.decisionSource}`,
-  );
-  renderer.renderLine(
-    `approval-audit:persistent=${record.persistent ? "true" : "false"}`,
-  );
-  renderer.renderLine(`approval-audit:cache-effect=${record.cacheEffect}`);
-  renderer.renderLine(`approval-audit:project-root=${record.projectRoot}`);
-  renderer.renderLine(`approval-audit:cache-key=${record.cacheKey}`);
-  renderer.renderLine(`approval-audit:scope=${record.scopeLabel}`);
-  if (record.lineage) {
-    renderer.renderLine(`approval-audit:lineage=${record.lineage}`);
-  }
-  if (record.inputKey) {
-    renderer.renderLine(`approval-audit:input-key=${record.inputKey}`);
-  }
-  if (record.stopReason) {
-    renderer.renderLine(`approval-audit:stop-reason=${record.stopReason}`);
-  }
 }
 
 async function main(): Promise<void> {
@@ -1431,13 +1390,11 @@ function createCliEscalationPromptHandler(
         hasAllowAlwaysGrant,
       });
       renderApprovalHeader(renderer, "approval-required");
-      renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
-      renderer.renderLine(`- Action: ${prompt.context.operation}`);
-      renderer.renderLine(`- Target: ${prompt.context.target}`);
-      renderer.renderLine(`- Risk: ${prompt.severity}`);
-      renderer.renderLine(
-        `- Decision source: ${nonInteractiveDecisionPlan.source}`,
-      );
+      renderApprovalPromptFacts(renderer, {
+        prompt,
+        includeRisk: true,
+        decisionSource: nonInteractiveDecisionPlan.source,
+      });
       for (const note of nonInteractiveDecisionPlan.overrideNotes) {
         renderer.renderLine(`- ${note}`);
       }
@@ -1543,13 +1500,11 @@ function createCliEscalationPromptHandler(
         const stopReason =
           interactiveDecisionPlan.stopReason ?? "Approval mode is ambiguous.";
         renderApprovalHeader(renderer, "approval-required");
-        renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
-        renderer.renderLine(`- Action: ${prompt.context.operation}`);
-        renderer.renderLine(`- Target: ${prompt.context.target}`);
-        renderer.renderLine(`- Risk: ${prompt.severity}`);
-        renderer.renderLine(
-          `- Decision source: ${interactiveDecisionPlan.source}`,
-        );
+        renderApprovalPromptFacts(renderer, {
+          prompt,
+          includeRisk: true,
+          decisionSource: interactiveDecisionPlan.source,
+        });
         renderer.renderLine(stopReason);
         emitApprovalAudit({
           channel: "interactive",
@@ -1574,13 +1529,11 @@ function createCliEscalationPromptHandler(
       if (interactiveDecisionPlan.source === "approval-mode-object") {
         const resolvedDecision = interactiveDecisionPlan.decision ?? "deny";
         renderApprovalHeader(renderer, "approval-required");
-        renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
-        renderer.renderLine(`- Action: ${prompt.context.operation}`);
-        renderer.renderLine(`- Target: ${prompt.context.target}`);
-        renderer.renderLine(`- Risk: ${prompt.severity}`);
-        renderer.renderLine(
-          `- Decision source: ${interactiveDecisionPlan.source}`,
-        );
+        renderApprovalPromptFacts(renderer, {
+          prompt,
+          includeRisk: true,
+          decisionSource: interactiveDecisionPlan.source,
+        });
         for (const note of interactiveDecisionPlan.overrideNotes) {
           renderer.renderLine(`- ${note}`);
         }
@@ -1635,9 +1588,7 @@ function createCliEscalationPromptHandler(
         cacheKey: evaluation.cacheKey,
       });
       renderApprovalHeader(renderer, "cached-approval");
-      renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
-      renderer.renderLine(`- Action: ${prompt.context.operation}`);
-      renderer.renderLine(`- Target: ${prompt.context.target}`);
+      renderApprovalPromptFacts(renderer, { prompt });
       renderer.renderLine(
         "- Decision: allow-once (cached in current shell run)",
       );
@@ -1667,9 +1618,7 @@ function createCliEscalationPromptHandler(
         cacheKey: evaluation.cacheKey,
       });
       renderApprovalHeader(renderer, "cached-approval");
-      renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
-      renderer.renderLine(`- Action: ${prompt.context.operation}`);
-      renderer.renderLine(`- Target: ${prompt.context.target}`);
+      renderApprovalPromptFacts(renderer, { prompt });
       renderer.renderLine("- Decision: allow-always (project policy match)");
       renderer.renderLine(`- Scope: ${evaluation.scopeLabel}`);
       renderer.renderLine(`- Rule key: ${evaluation.matchedGrant.scopeKey}`);
@@ -1693,10 +1642,7 @@ function createCliEscalationPromptHandler(
     }
 
     renderApprovalHeader(renderer, "approval-required");
-    renderer.renderLine(`- Tool: ${prompt.context.toolName}`);
-    renderer.renderLine(`- Action: ${prompt.context.operation}`);
-    renderer.renderLine(`- Target: ${prompt.context.target}`);
-    renderer.renderLine(`- Risk: ${prompt.severity}`);
+    renderApprovalPromptFacts(renderer, { prompt, includeRisk: true });
     for (const line of trustPolicy.explain(
       evaluation,
       projectRoot,
@@ -1795,19 +1741,6 @@ function createCliEscalationPromptHandler(
       userComment: `CLI explicit approval: ${decision}${getApprovalModeObject?.() ? " (approval-mode-object)" : ""}`,
     };
   };
-}
-
-function renderApprovalHeader(
-  renderer: StreamingRenderer,
-  mode: "approval-required" | "cached-approval",
-): void {
-  if (mode === "cached-approval") {
-    renderer.renderLine("\nApproval");
-    renderer.renderLine("- Mode: cached grant");
-    return;
-  }
-  renderer.renderLine("\nApproval");
-  renderer.renderLine("- Mode: user confirmation required");
 }
 
 function askReadline(

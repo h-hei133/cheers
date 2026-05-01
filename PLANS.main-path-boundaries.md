@@ -63,6 +63,20 @@ This branch directly supports the main-path stage by making these user-facing pa
     - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`
     - `rtk npm run verify:cli-entry`
   - Behavior: stdin transport mode resolution, non-interactive prompt batching, transport prompt parsing, fenced prompt detection, and multiline literal detection preserved.
+- Done: CLI approval prompt renderer extraction.
+  - Commit: reported in final status for this checkpoint.
+  - New module: `packages/ts-shell/src/core/shell/approvalPromptRenderer.ts`
+  - Modified files:
+    - `packages/ts-shell/src/entrypoints/cli.tsx`
+    - `packages/ts-shell/src/core/shell/approvalPromptRenderer.ts`
+    - `PLANS.main-path-boundaries.md`
+  - Validation:
+    - `rtk git status --short`
+    - `rtk npm run build -w packages/ts-shell`
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "print"`
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`
+    - `rtk npm run verify:cli-entry`
+  - Behavior: approval header, approval facts, and approval audit evidence rendering preserved; approval policy, trust cache, readline prompt, and persistence decisions remain in `cli.tsx`.
 
 ## 5. Three-File Responsibility Map
 
@@ -206,7 +220,7 @@ Keep TypeScript imports ending in `.js`.
 - Done: continue/resume shell action runtime extraction.
 - Done: startup surface renderer extraction.
 - Done: stdin / print prompt handling extraction.
-- Backlog: approval prompt rendering extraction.
+- Done: approval prompt rendering extraction.
 - Backlog: slash action shell bridge extraction.
 
 ### SessionManager Direction
@@ -357,15 +371,15 @@ Do not start a second production-code checkpoint in the same commit.
 
 Next implementation checkpoint should be:
 
-- `Extract CLI approval prompt renderer`
+- `Extract CLI slash action shell bridge`
 
 Why:
 
 - It continues thinning `cli.tsx`.
-- It targets prompt rendering and approval UX formatting without changing approval policy or core auth/provider behavior.
-- It keeps approval decision state and execution wiring in `cli.tsx`.
+- It targets shell-action dispatch glue after the smaller CLI render/input/continue boundaries have moved out.
+- It keeps slash parsing, prompt execution, session/runtime wiring, and action implementations in their current modules unless the bridge can delegate to existing helpers.
 - It can be validated by build, `cli-baseline` print focused tests, continue focused tests, and `verify:cli-entry`.
 
 Default stop condition for the next checkpoint:
 
-- If approval prompt rendering extraction requires changing approval policy, permission provenance, provider/auth behavior, or session/runtime execution, stop and choose a smaller renderer-only slice.
+- If slash action bridge extraction requires changing slash command semantics, prompt execution, approval behavior, session selection, or MCP control-plane behavior, stop and choose a smaller bridge-only slice.
