@@ -187,12 +187,11 @@ opencode 参考：
 
 Backlog:
 
-1. G. Real-provider failure follow-up context smoke
-2. H. Merge-readiness / route audit
+1. H. Merge-readiness / route audit
 
 Current:
 
-- G. Real-provider failure follow-up context smoke
+- H. Merge-readiness / route audit
 
 Completed:
 
@@ -220,6 +219,10 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `scripts/verify-real-user-capabilities.mjs`, `PLANS.real-provider-safe-evidence.md`.
   - Result: completed as a safe planning dry-run. Added `--tool-execution-planning-dry-run` to audit provider-gated execution, read-only fixture execution, explicit approval for benign commands, command allowlisting, real-home write blocking, and non-test workspace write blocking without executing real provider or tools.
+- G. Real-provider failure follow-up context smoke
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `scripts/verify-real-user-capabilities.mjs`, `PLANS.real-provider-safe-evidence.md`.
+  - Result: completed as a safe follow-up context dry-run. Added `--failure-followup-context-dry-run` to verify provider network/auth failures, tool execution failures, and verification-stopped failures retain previous outcome, blocker, status, reason, DoNext, and follow-up prompt context without executing real provider or writing a report.
 
 Verification:
 
@@ -252,6 +255,11 @@ Verification:
 - F tool execution planning audit round:
   - `rtk node scripts/verify-real-user-capabilities.mjs --tool-execution-planning-dry-run`: passed; reported `homeRead=false`, `real-provider execution skipped`, `toolExecution=false`, `reportWritten=false`.
   - `rtk npm run verify:cli-entry`: passed.
+  - `rtk npm run verify:result-contract`: passed.
+  - `rtk npm run build -w packages/ts-shell`: passed.
+- G failure follow-up context smoke round:
+  - `rtk node scripts/verify-real-user-capabilities.mjs --failure-followup-context-dry-run`: passed; reported `homeRead=false`, `real-provider execution skipped`, `followupExecution=false`, `reportWritten=false`.
+  - `rtk npm run test -w packages/ts-shell -- src/core/shell/sessionRuntime.test.ts`: passed.
   - `rtk npm run verify:result-contract`: passed.
   - `rtk npm run build -w packages/ts-shell`: passed.
 
@@ -292,6 +300,11 @@ Notes:
   - The dry-run records that provider readiness failure stops before tool execution, benign bash commands still require explicit approval, non-allowlisted commands are blocked, read-only synthetic/test fixture plans are allowed, and real-home or non-test writes are blocked.
   - This is a planning audit only; it does not prove real model planning quality or real provider maturity.
   - Next selected checkpoint is G to verify follow-up context after provider failure/stopped surfaces remains visible without requiring real network by default.
+- G implementation notes:
+  - `verify-real-user-capabilities.mjs --failure-followup-context-dry-run` does not call provider readiness preflight, does not read `D:/Test/home-sf`, does not execute real provider, does not execute follow-up turns, and does not write `D:/Test/test-results/real-user-capabilities-report.json`.
+  - The dry-run uses the same terminal surface helper to construct follow-up context and checks that provider network/auth, task execution, and verification failures preserve previous outcome, blocker, status detail, reason, DoNext, and user follow-up prompt.
+  - Provider failure follow-up context remains separated from tool/verification stopped context and redacts provider secrets before rendering.
+  - Next selected checkpoint is H merge-readiness / route audit. Do not add more real-provider safe evidence proof unless H validation finds a route regression.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 

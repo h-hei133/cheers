@@ -19,6 +19,7 @@ const includeContinueSmoke = process.argv.includes('--include-continue-smoke')
 const turnBoundaryDryRun = process.argv.includes('--turn-boundary-dry-run')
 const terminalResultSurfaceDryRun = process.argv.includes('--terminal-result-surface-dry-run')
 const toolExecutionPlanningDryRun = process.argv.includes('--tool-execution-planning-dry-run')
+const failureFollowupContextDryRun = process.argv.includes('--failure-followup-context-dry-run')
 
 const failureCategories = [
   'none',
@@ -680,6 +681,26 @@ function buildTerminalResultSurface(result) {
   }
 }
 
+function buildFailureFollowupContext(result, followupPrompt) {
+  const surface = buildTerminalResultSurface(result)
+  return {
+    previousOutcome: surface.outcome,
+    blocker: surface.failureCategory,
+    statusDetail: surface.statusDetail,
+    reason: surface.failureReason,
+    doNext: surface.nextAction,
+    followupPrompt: redactProviderOutput(followupPrompt),
+    contextLine: [
+      `previousOutcome=${surface.outcome}`,
+      `blocker=${surface.failureCategory}`,
+      `status=${surface.statusDetail}`,
+      surface.failureReason ? `reason=${surface.failureReason}` : '',
+      `DoNext=${surface.nextAction}`,
+      `followup=${redactProviderOutput(followupPrompt)}`,
+    ].filter(Boolean).join(' | '),
+  }
+}
+
 function renderTerminalResultSurface(result) {
   const surface = buildTerminalResultSurface(result)
   const parts = [
@@ -1082,6 +1103,106 @@ function runTerminalResultSurfaceDryRun() {
   process.exit(ok ? 0 : 1)
 }
 
+function runFailureFollowupContextDryRun() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=failure-followup-context-dry-run')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('followupExecution=false')
+  console.log('reportWritten=false')
+
+  const cases = [
+    {
+      name: 'provider-network-followup-context',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'provider-readiness',
+        failureReason: 'provider-readiness:network: provider endpoint was unreachable during this turn',
+        outputTail: 'provider-readiness:network fetch failed Authorization: Bearer sk-live-secret',
+      },
+      followupPrompt: 'retry the same task after network recovers',
+      expected: [
+        'previousOutcome=provider-failure',
+        'blocker=provider-readiness',
+        'status=provider-network-inconclusive',
+        'reason=provider-readiness:network',
+        'DoNext=Retry when the provider endpoint is reachable',
+      ],
+      forbidden: ['sk-live-secret', '.private-agents/config.json'],
+    },
+    {
+      name: 'provider-auth-followup-context',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'provider-readiness',
+        failureReason: 'provider-readiness:auth: provider authentication failed during this turn',
+        outputTail: 'provider-readiness:auth api_key=sk-live-secret',
+      },
+      followupPrompt: 'continue once I fix credentials',
+      expected: [
+        'previousOutcome=provider-failure',
+        'blocker=provider-readiness',
+        'status=config-failure',
+        'reason=provider-readiness:auth',
+        'DoNext=Fix provider configuration or authentication',
+      ],
+      forbidden: ['sk-live-secret'],
+    },
+    {
+      name: 'tool-failure-followup-context',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'task-execution-failure',
+        failureReason: 'Tool execution failed: command exited 1',
+        outputTail: 'Tool execution failed: command exited 1',
+      },
+      followupPrompt: 'try the safe command instead',
+      expected: [
+        'previousOutcome=stopped',
+        'blocker=task-execution-failure',
+        'status=failed',
+        'reason=Tool execution failed',
+        'DoNext=Inspect the model/tool execution output',
+      ],
+      forbidden: [],
+    },
+    {
+      name: 'verification-followup-context',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'verification-failed',
+        failureReason: 'verification failed: expected marker was not present',
+        outputTail: 'Result\nOutcome: stopped\nVerification failed',
+      },
+      followupPrompt: 'repair the missing marker',
+      expected: [
+        'previousOutcome=stopped',
+        'blocker=verification-failed',
+        'status=failed',
+        'reason=verification failed',
+        'DoNext=Repair the verification failure',
+      ],
+      forbidden: [],
+    },
+  ]
+
+  let ok = true
+  for (const item of cases) {
+    const context = buildFailureFollowupContext(item.result, item.followupPrompt)
+    const hasExpected = item.expected.every((marker) => context.contextLine.includes(marker))
+    const avoidsForbidden = item.forbidden.every((marker) => !context.contextLine.includes(marker))
+    const passed = hasExpected && avoidsForbidden
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] ${item.name} - ${context.contextLine}`)
+    ok = ok && passed
+  }
+
+  process.exit(ok ? 0 : 1)
+}
+
 function runToolExecutionPlanningDryRun() {
   console.log('gate name=real-user-capabilities')
   console.log('mode=tool-execution-planning-dry-run')
@@ -1200,6 +1321,10 @@ async function main() {
   }
   if (toolExecutionPlanningDryRun) {
     runToolExecutionPlanningDryRun()
+    return
+  }
+  if (failureFollowupContextDryRun) {
+    runFailureFollowupContextDryRun()
     return
   }
 
