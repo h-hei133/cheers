@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { createLongSessionContinuityFixture } from "../../session/__tests__/longSessionContinuityFixtures.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
@@ -1527,6 +1528,82 @@ describe("shell session runtime (W5)", () => {
       "turn:sess_resume:assistant:done:resume me",
       "completed:sess_resume",
     ]);
+  });
+
+  it("passes compacted continuity state into resumed follow-up prompts", async () => {
+    const originalUserProfile = process.env.USERPROFILE;
+    const originalHome = process.env.HOME;
+    const fakeHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), "private-agents-compact-resume-"),
+    );
+    process.env.USERPROFILE = fakeHome;
+    process.env.HOME = fakeHome;
+
+    try {
+      const manager = new SessionManager();
+      const fixture = createLongSessionContinuityFixture(
+        manager,
+        "verification-failed",
+      );
+      const restoredManager = fixture.restoreManager();
+      const resumed = restoredManager.resume(fixture.session.id);
+      let observedContinuity:
+        | Parameters<
+            ConstructorParameters<typeof ShellSessionRuntime>[0]["runPrompt"]
+          >[3]
+        | undefined;
+
+      const runtime = new ShellSessionRuntime({
+        sessionManager: restoredManager,
+        renderer: {
+          renderLine() {},
+          renderChunk() {},
+        } as never,
+        runPrompt: async function* (_prompt, _signal, _runtimeSeed, continuity) {
+          observedContinuity = continuity;
+          yield {
+            type: "query.completed",
+            result: {
+              status: "completed",
+              terminalReason: "completed",
+              terminalClassification: "success",
+              transcript: [],
+              sharedContext: {
+                sessionId: resumed.id,
+                initialPrompt: "continue after compact",
+                notes: [],
+                handoffs: [],
+              },
+              finalOutput: `continued:${continuity?.lastVerificationNextAction ?? "missing-continuity"}`,
+            },
+          };
+        },
+      });
+
+      const output = await runtime.executePrompt(
+        resumed.id,
+        "continue after compact",
+      );
+
+      expect(fixture.readWorkingMemory()?.compacted).toBe(true);
+      expect(output).toBe(`continued:${fixture.nextAction}`);
+      expect(observedContinuity?.lastTerminalClassification).toBe("error");
+      expect(observedContinuity?.lastFailure).toBe(fixture.failureReason);
+      expect(observedContinuity?.recentChangedFiles).toEqual([
+        fixture.targetFile,
+      ]);
+      expect(observedContinuity?.lastVerificationStatus).toBe("failed");
+      expect(observedContinuity?.lastVerificationCommand).toBe(
+        "npm test -- src/long-session.test.ts",
+      );
+      expect(observedContinuity?.lastVerificationNextAction).toBe(
+        fixture.nextAction,
+      );
+    } finally {
+      process.env.USERPROFILE = originalUserProfile;
+      process.env.HOME = originalHome;
+      fs.rmSync(fakeHome, { recursive: true, force: true });
+    }
   });
 
   it("maps non-completed terminal query results to session error state", async () => {

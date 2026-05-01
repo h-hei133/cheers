@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createLongSessionContinuityFixture } from "./__tests__/longSessionContinuityFixtures.js";
 import { SessionManager } from "./SessionManager.js";
 
 describe("SessionManager", () => {
@@ -1868,6 +1869,162 @@ describe("SessionManager", () => {
     );
     expect(state.workingMemory?.summary).toContain(
       "- last-success-handoff-diagnostic: Success handoff: status=passed; target=src/compact.ts; command=npm test -- src/compact.test.ts; verified=src/compact.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
+    );
+  });
+
+  it("builds reusable long-session compact continuity fixtures", () => {
+    const manager = new SessionManager();
+    const scenarios = [
+      "stopped-edit-failure",
+      "verification-failed",
+      "approved-tool-failure",
+    ] as const;
+
+    for (const scenario of scenarios) {
+      const fixture = createLongSessionContinuityFixture(manager, scenario);
+      const memory = fixture.readWorkingMemory();
+      const restoredManager = fixture.restoreManager();
+      const snapshot = restoredManager.buildContinuitySnapshot(fixture.session.id);
+      const context = restoredManager.buildPromptContinuityContext(
+        fixture.session.id,
+        "continue the same long session task",
+      );
+
+      expect(memory?.compacted).toBe(true);
+      expect(memory?.compactReason).toBe("auto-threshold");
+      expect(memory?.sourceTurnCount).toBe(12);
+      expect(snapshot.lastTaskKind).toBe(
+        scenario === "approved-tool-failure" ? "run-command" : "edit-file",
+      );
+      expect(snapshot.lastFailure).toBe(fixture.failureReason);
+      expect(snapshot.lastVerificationNextAction).toBe(fixture.nextAction);
+      expect(snapshot.recentTargetFiles).toContain(fixture.targetFile);
+      expect(context).toContain(fixture.nextAction);
+    }
+  });
+
+  it("preserves stopped edit patch recovery details across auto-compact reload", () => {
+    const manager = new SessionManager();
+    const fixture = createLongSessionContinuityFixture(
+      manager,
+      "stopped-edit-failure",
+    );
+    const restoredManager = fixture.restoreManager();
+    const snapshot = restoredManager.buildContinuitySnapshot(fixture.session.id);
+    const context = restoredManager.buildPromptContinuityContext(
+      fixture.session.id,
+      "continue the stopped edit",
+    );
+
+    expect(fixture.readWorkingMemory()?.compacted).toBe(true);
+    expect(snapshot.lastTerminalClassification).toBe("stopped");
+    expect(snapshot.lastFailure).toBe(fixture.failureReason);
+    expect(snapshot.recentFailedFiles).toEqual([
+      {
+        path: fixture.targetFile,
+        reason: fixture.failureReason,
+      },
+    ]);
+    expect(snapshot.lastVerificationStatus).toBe("blocked");
+    expect(snapshot.lastVerificationBlockerKind).toBe("patch-from-not-found");
+    expect(snapshot.lastVerificationReason).toBe(fixture.failureReason);
+    expect(snapshot.lastVerificationNextAction).toBe(fixture.nextAction);
+    expect(snapshot.lastFailureHandoffDiagnostic).toContain(
+      "blocker=patch-from-not-found",
+    );
+    expect(context).toContain(
+      `- recent-failed-files: ${fixture.targetFile} (${fixture.failureReason})`,
+    );
+    expect(context).toContain(
+      "- last-verification-blocker-kind: patch-from-not-found",
+    );
+    expect(context).toContain(
+      `- last-verification-next-action: ${fixture.nextAction}`,
+    );
+  });
+
+  it("preserves verification failed repair context across auto-compact reload", () => {
+    const manager = new SessionManager();
+    const fixture = createLongSessionContinuityFixture(
+      manager,
+      "verification-failed",
+    );
+    const restoredManager = fixture.restoreManager();
+    const snapshot = restoredManager.buildContinuitySnapshot(fixture.session.id);
+    const context = restoredManager.buildPromptContinuityContext(
+      fixture.session.id,
+      "continue the verification failure",
+    );
+
+    expect(fixture.readWorkingMemory()?.compacted).toBe(true);
+    expect(snapshot.lastTerminalClassification).toBe("error");
+    expect(snapshot.lastFailure).toBe(fixture.failureReason);
+    expect(snapshot.recentChangedFiles).toEqual([fixture.targetFile]);
+    expect(snapshot.recentVerifiedFiles).toEqual([]);
+    expect(snapshot.lastVerificationStatus).toBe("failed");
+    expect(snapshot.lastVerificationCommand).toBe(
+      "npm test -- src/long-session.test.ts",
+    );
+    expect(snapshot.lastVerificationReason).toBe(fixture.failureReason);
+    expect(snapshot.lastVerificationNextAction).toBe(fixture.nextAction);
+    expect(snapshot.lastFailureHandoffDiagnostic).toBe(
+      `Failure handoff: status=failed; target=${fixture.targetFile}; command=npm test -- src/long-session.test.ts; reason=${fixture.failureReason}; next=${fixture.nextAction.replace(/[.]+$/, "")}.`,
+    );
+    expect(context).toContain(`- recent-changed-files: ${fixture.targetFile}`);
+    expect(context).toContain("- last-verification-status: failed");
+    expect(context).toContain(
+      "- last-verification-command: npm test -- src/long-session.test.ts",
+    );
+    expect(context).toContain(
+      `- last-verification-next-action: ${fixture.nextAction}`,
+    );
+  });
+
+  it("preserves approved execution failure provenance across auto-compact reload", () => {
+    const manager = new SessionManager();
+    const fixture = createLongSessionContinuityFixture(
+      manager,
+      "approved-tool-failure",
+    );
+    const restoredManager = fixture.restoreManager();
+    const snapshot = restoredManager.buildContinuitySnapshot(fixture.session.id);
+    const context = restoredManager.buildPromptContinuityContext(
+      fixture.session.id,
+      "continue the approved tool failure",
+    );
+
+    expect(fixture.readWorkingMemory()?.compacted).toBe(true);
+    expect(snapshot.lastTerminalClassification).toBe("stopped");
+    expect(snapshot.lastTaskKind).toBe("run-command");
+    expect(snapshot.lastFailure).toBe(fixture.failureReason);
+    expect(snapshot.recentFailedFiles).toEqual([
+      {
+        path: fixture.targetFile,
+        reason: fixture.failureReason,
+      },
+    ]);
+    expect(snapshot.lastApprovalDecision).toBe("allow-once");
+    expect(snapshot.lastApprovalPersistent).toBe(false);
+    expect(snapshot.lastApprovalCacheEffect).toBe("none");
+    expect(snapshot.lastApprovalChannel).toBe("non-interactive");
+    expect(snapshot.lastApprovalInputKey).toBe("y");
+    expect(snapshot.lastVerificationStatus).toBe("blocked");
+    expect(snapshot.lastVerificationCommand).toBe(
+      "npm test -- src/long-session.test.ts",
+    );
+    expect(snapshot.lastVerificationBlockerKind).toBe("unknown");
+    expect(snapshot.lastVerificationReason).toBe(fixture.failureReason);
+    expect(snapshot.lastVerificationNextAction).toBe(fixture.nextAction);
+    expect(snapshot.lastApprovalDecision).not.toBe("deny");
+    expect(snapshot.lastFailure).not.toBe("approval denied");
+    expect(context).toContain("- last-approval-decision: allow-once");
+    expect(context).toContain("- last-approval-persistent: no");
+    expect(context).toContain("- last-approval-cache-effect: none");
+    expect(context).toContain(
+      `- recent-failed-files: ${fixture.targetFile} (${fixture.failureReason})`,
+    );
+    expect(context).toContain(
+      `- last-verification-next-action: ${fixture.nextAction}`,
     );
   });
 
