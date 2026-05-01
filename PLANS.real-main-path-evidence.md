@@ -181,7 +181,15 @@ Result:
 
 Goal: design compact -> resume -> continue evidence for a longer chain without promoting it prematurely to default gates.
 
-Status: later backlog.
+Status: completed.
+
+Result:
+
+- Reviewed existing compact/resume evidence and kept this as a design checkpoint, not a new long-session implementation.
+- Existing `SessionManager.test.ts` already proves real auto-compact threshold retention for permission memory, approval audit history, and action-result handoff summaries.
+- Existing `GOLDEN_MAIN_PATH` proves a two-turn live-ish CLI session persists terminal state and transcript continuity, but it does not force auto-compact or prove compact -> resume -> continue.
+- Decision: do not promote compact / long-session smoke to the default gate yet; the next useful step is evidence-track audit / merge readiness unless a real user failure exposes a smaller long-session blocker.
+- Future compact evidence should be added only if it can reuse existing SessionManager state builders or a bounded synthetic CLI harness without broad session policy changes.
 
 ## 11. Checkpoint Targets, Allowed Files, And Validation
 
@@ -333,16 +341,24 @@ Never commit audit residue, real-provider config, temporary homes, or unrelated 
 
 Current checkpoint:
 
-- `Compact / long-session smoke design`
+- `Evidence track audit / merge readiness`
 
 Scope:
 
-- Design compact -> resume -> continue evidence for a longer chain without promoting it prematurely to default gates.
-- Prefer planning and test-surface review first.
-- Do not add broad long-session infrastructure or durable session policy changes unless a focused gap requires it.
+- Review the completed evidence track, rerun the highest-signal gates, and decide whether this branch is ready to merge.
+- Do not add new smoke surface unless an existing completed checkpoint regressed.
+- Do not run real-provider sanity by default.
 
 Completed checkpoint:
 
+- `Compact / long-session smoke design`
+  - Reviewed existing SessionManager compact evidence and CLI live-ish continuity evidence.
+  - Decision: no new long-session implementation in this checkpoint; compact -> resume -> continue should remain a future opt-in smoke unless a real blocker appears.
+  - Recommended next state: evidence track audit / merge readiness.
+  - Verification:
+    - `rtk git status --short` showed only `PLANS.real-main-path-evidence.md` modified.
+    - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts` hit sandbox esbuild spawn EPERM, then passed outside the sandbox: 52 passed.
 - `CLI stopped/failure follow-up real path smoke`
   - Added `cli-entry-stopped-failure-followup-real-path` to `scripts/verify-cli-entry.mjs`.
   - Proves a real CLI entry stopped failed-tool result is still visible to bare and follow-up `/continue` with preserved reason, next action guidance, and session context.
@@ -385,13 +401,13 @@ Evidence:
 
 Next recommended checkpoint:
 
-- `Compact / long-session smoke design`
+- `Evidence track audit / merge readiness`
 
 Reason:
 
-- Stopped/failure real-entry follow-up guidance now has a CLI hard-gate smoke.
-- The remaining planned risk is long-chain compact/resume continuity evidence.
-- The next checkpoint should start as design/review unless current code shows a very small existing harness to promote.
+- The planned evidence backlog is now closed.
+- Compact / long-session evidence has enough local unit-level coverage to avoid forcing a new broad gate in this branch.
+- The best next move is to verify the branch as a whole and prepare it for merge instead of continuing to invent checkpoints.
 
 Default stop condition for the next checkpoint:
 
@@ -401,6 +417,23 @@ Default stop condition for the next checkpoint:
 
 ### Completed
 
+- `Compact / long-session smoke design`
+  - Commit: recorded in final status for this checkpoint.
+  - Files:
+    - `PLANS.real-main-path-evidence.md`
+  - Production shell/runtime changes: none.
+  - Evidence reviewed:
+    - `packages/ts-shell/src/session/SessionManager.test.ts` auto-compact permission memory retention.
+    - `packages/ts-shell/src/session/SessionManager.test.ts` auto-compact approval audit history retention.
+    - `packages/ts-shell/src/session/SessionManager.test.ts` action result seed handoff summary through auto-compact continuity.
+    - `packages/ts-shell/src/cli-baseline.test.ts` `GOLDEN_MAIN_PATH` two-turn live-ish transcript and terminal persistence.
+  - Decision:
+    - Do not add compact -> resume -> continue as a default hard gate yet.
+    - A future compact smoke should stay opt-in and bounded to existing state builders or a narrow synthetic CLI harness.
+  - Verification:
+    - `rtk git status --short` passed with only this plan file modified before audit cleanup.
+    - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts` hit sandbox esbuild spawn EPERM, then passed outside the sandbox: 52 passed.
 - `CLI stopped/failure follow-up real path smoke`
   - Commit: recorded in final status for this checkpoint.
   - Files:
@@ -498,14 +531,14 @@ Default stop condition for the next checkpoint:
 
 ### Current
 
-- `Compact / long-session smoke design`
-  - Target: design compact -> resume -> continue evidence for a longer chain without promoting it prematurely to default gates.
-  - Default scope: planning/review first; no broad long-session infrastructure.
-  - Preferred starting point: existing SessionManager compact/resume tests and `GOLDEN_MAIN_PATH` transcript continuity checks.
+- `Evidence track audit / merge readiness`
+  - Target: review completed checkpoints, rerun the highest-signal gates, and prepare the branch for merge.
+  - Default scope: verification and plan refresh only.
+  - Preferred starting point: `rtk npm run build -w packages/ts-shell`, `rtk npm run verify:cli-entry`, `rtk npm run verify:result-contract`, and focused tests already used by the track.
 
 ### Backlog
 
-- No additional backlog beyond the current compact / long-session design checkpoint.
+- No additional implementation backlog in this track.
 
 ### Notes
 
@@ -514,3 +547,4 @@ Default stop condition for the next checkpoint:
 - Real-provider evidence must stay explicit and opt-in; do not read or print credential material from `D:\Test\home-sf`.
 - Provider readiness classification can be validated without real-provider home by running `rtk proxy node scripts/verify-provider-readiness.mjs --classification-self-test`.
 - `cli-entry-stopped-failure-followup-real-path` intentionally verifies preserved stopped guidance rather than automatic repair continuation; promoting true repair continuation from real-entry stopped states would be a separate product checkpoint.
+- Compact / long-session evidence is intentionally not promoted to a default hard gate in this branch; the current evidence is local/unit-level plus two-turn CLI continuity, not a full compact -> resume -> continue E2E.
