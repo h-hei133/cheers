@@ -137,7 +137,7 @@ opencode 参考重点：
 
 ### Current
 
-- Long-session continuity route audit / merge readiness
+- Completed: Long-session continuity route audit / merge readiness
 
 ### Backlog
 
@@ -515,3 +515,30 @@ This section supersedes the original "current recommended first checkpoint" text
 - Notes: F proves resumed runtime execution receives structured compact continuity through `ShellSessionRuntime.executePrompt`, not only final assistant text. The test uses an isolated temporary home, a compacted verification-failed fixture, a restored/resumed manager, and captures the `continuityState` passed into `runPrompt`. Next checkpoint G should only add a synthetic CLI smoke if it remains tightly scoped to temporary/synthetic home and does not touch real-provider config.
 - Verification for G: `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "LONG_SESSION_CLI_SYNTHETIC"` passed with 1 test after elevated rerun; `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` passed with 5 tests after elevated rerun; `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path` passed with 1 test after elevated rerun; `rtk npm run build -w packages/ts-shell` passed after elevated rerun.
 - Notes: G proves the real CLI print `/continue` path can carry compacted failure continuity in synthetic/test-home scope. The smoke seeds compacted verification-failed continuity, follows up through CLI, and asserts the continuation output plus transcript retain failure handoff, target file, verification command, and next action. H is deferred because no pure formatter extraction blocker was found; the route should move to audit / merge readiness next.
+
+## Route Seal Update: Merge Readiness Completed
+
+- Completed: Long-session continuity route audit / merge readiness.
+- Merge-readiness branch: `long-session-continuity-hardening`.
+- Merge target: `main`.
+- Merge result: `main` merged `long-session-continuity-hardening` with merge commit `a5ad3b3 Merge branch 'long-session-continuity-hardening'`.
+- Backlog: none for this route. `H. Continuity summary formatter extraction` remains deferred / not selected because no formatter extraction blocker was found.
+- Merge-readiness verification:
+  - `rtk git status --short` passed.
+  - `rtk npm run build -w packages/ts-shell` passed after elevated rerun for sandbox `dist` write `EPERM`.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "LONG_SESSION_CLI_SYNTHETIC"` passed with 1 test after elevated rerun for sandbox `spawn EPERM`.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` passed with 5 tests after elevated rerun for sandbox `spawn EPERM`.
+  - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts` passed with 56 tests after elevated rerun for sandbox `spawn EPERM`.
+  - `rtk npm run test -w packages/ts-shell -- src/core/shell/sessionRuntime.test.ts` passed with 30 tests after elevated rerun for sandbox `spawn EPERM`.
+  - `rtk npm run verify:result-contract` passed after elevated rerun for sandbox child-process `spawn EPERM`.
+  - `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path` passed with 1 test after elevated rerun for sandbox `spawn EPERM`.
+  - `rtk npm run verify:cli-entry` passed after elevated rerun for sandbox fixture write `EPERM` under `D:\Test\cli-entry-gate`.
+- Post-merge verification on `main`:
+  - `rtk git status --short` showed `main...origin/main [ahead 9]` after merge.
+  - `rtk npm run build -w packages/ts-shell` passed after elevated rerun for sandbox `dist` write `EPERM`.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "LONG_SESSION_CLI_SYNTHETIC"` passed with 1 test after elevated rerun for sandbox `spawn EPERM`.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` passed with 5 tests after elevated rerun for sandbox `spawn EPERM`.
+  - `rtk npm run verify:result-contract` passed after elevated rerun for sandbox child-process `spawn EPERM`.
+  - `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path` passed with 1 test after elevated rerun for sandbox `spawn EPERM`.
+- Notes: All verification failures during readiness/post-merge were environment/sandbox failures that passed on the same command after elevation. No product regression was found.
+- Route status: stage sealed. Next recommended action is to return to the current main path blocker assessment, not continue long-session / compact-resume same-family proof unless a new real compact/resume regression appears.
