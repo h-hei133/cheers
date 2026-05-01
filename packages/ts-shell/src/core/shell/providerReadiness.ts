@@ -4,6 +4,7 @@ import type {
   OpenAIAccountAuthConfig,
 } from "../../config/runtimeConfig.js";
 import type { QueryEvent } from "../query/events.js";
+import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
 import { getProviderApiKeyEnvVarName } from "./providerCredentials.js";
 
 const DEFAULT_PROVIDER_BASE_URL = "https://api.openai.com/v1";
@@ -194,7 +195,7 @@ export async function checkRealProviderReadiness(
         ok: false,
         failure: {
           kind: "unknown",
-          stopReason: `Provider readiness failed (provider-readiness:unknown): ${message}. Check provider status/config and retry.`,
+          stopReason: `Provider readiness failed (provider-readiness:unknown): ${redactProviderFailureDetail(message)}. Check provider status/config and retry.`,
         },
       };
     } finally {

@@ -16,6 +16,10 @@ const reportPath = 'D:/Test/test-results/real-user-capabilities-report.json'
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const includeCandidates = process.argv.includes('--include-candidates')
 const includeContinueSmoke = process.argv.includes('--include-continue-smoke')
+const turnBoundaryDryRun = process.argv.includes('--turn-boundary-dry-run')
+const terminalResultSurfaceDryRun = process.argv.includes('--terminal-result-surface-dry-run')
+const toolExecutionPlanningDryRun = process.argv.includes('--tool-execution-planning-dry-run')
+const failureFollowupContextDryRun = process.argv.includes('--failure-followup-context-dry-run')
 
 const failureCategories = [
   'none',
@@ -31,9 +35,19 @@ const failureCategories = [
 const providerNetworkFailurePattern =
   /(provider-readiness:network|provider-network-inconclusive|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network|socket hang up|TLS|timeout|unreachable|kind[:= ]+network)/i
 const providerConfigFailurePattern =
-  /(provider-readiness:(missing-key|missing-config|unsupported-provider)|missing.*config|missing.*key|api key|apikey|not connected|connect first|credentials|missing baseUrl|baseUrl is missing|model is missing)/i
+  /(provider-readiness:(missing-key|missing-config|unsupported-provider)|missing.*config|failed to parse.*config|config\.json|missing.*key|api key|apikey|not connected|connect first|credentials|missing baseUrl|baseUrl is missing|model is missing)/i
 const providerAuthFailurePattern =
   /(provider-readiness:auth|authentication was rejected|invalid authentication|invalid api key|unauthorized|forbidden|401|403|kind[:= ]+authentication)/i
+const realHomeConfigPattern =
+  /[A-Za-z]:[\\/]+Test[\\/]+home-sf[\\/]+\.private-agents[\\/]+config\.json/gi
+const bearerTokenPattern = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi
+const authorizationBearerPattern =
+  /\b(authorization\s*[:=]\s*)(["']?)Bearer\s+[A-Za-z0-9._~+/=-]+/gi
+const keyValueSecretPattern =
+  /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|x-api-key)(\s*[:=]\s*)(["']?)[^\s"'`,;]+/gi
+const openAiStyleKeyPattern = /\b(sk-[A-Za-z0-9][A-Za-z0-9._-]{8,})\b/g
+const secretQueryParamPattern =
+  /([?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|key|signature|sig)=)[^&\s"'`<>]+/gi
 
 const futureGateCandidates = [
   {
@@ -351,11 +365,27 @@ function changedFiles(before, after) {
 }
 
 function summarizeOutput(output) {
-  return output
+  return redactProviderOutput(output)
     .split(/\r?\n/)
     .filter(Boolean)
     .slice(-18)
     .join('\n')
+}
+
+function redactProviderOutput(input) {
+  return String(input ?? '')
+    .replace(
+      authorizationBearerPattern,
+      (_match, prefix, quote) => `${prefix}${quote}Bearer [REDACTED]`,
+    )
+    .replace(bearerTokenPattern, 'Bearer [REDACTED]')
+    .replace(
+      keyValueSecretPattern,
+      (_match, key, separator, quote) => `${key}${separator}${quote}[REDACTED]`,
+    )
+    .replace(openAiStyleKeyPattern, '[REDACTED_API_KEY]')
+    .replace(secretQueryParamPattern, '$1[REDACTED]')
+    .replace(realHomeConfigPattern, '[REAL_PROVIDER_CONFIG_PATH]')
 }
 
 function providerEnv(provider) {
@@ -601,6 +631,180 @@ function summarizeFailureStatus(results) {
   return { statusDetail: 'failed', exitCode: 1 }
 }
 
+function nextActionForFailureSurface(failureCategory, statusDetail) {
+  if (failureCategory === 'provider-readiness') {
+    if (statusDetail === 'provider-network-inconclusive') {
+      return 'Retry when the provider endpoint is reachable; do not treat this as a product regression.'
+    }
+    if (statusDetail === 'config-failure') {
+      return 'Fix provider configuration or authentication outside this run, then retry the same capability gate.'
+    }
+    return 'Inspect provider readiness output, fix the provider state, then retry the same capability gate.'
+  }
+  if (failureCategory === 'verification-failed' || failureCategory === 'verification-blocked') {
+    return 'Repair the verification failure and rerun the focused check.'
+  }
+  if (failureCategory === 'protected-file-changed') {
+    return 'Restore the protected file, then rerun with a narrower instruction.'
+  }
+  if (failureCategory === 'assertion-mismatch') {
+    return 'Inspect changed files and rerun the scenario after correcting the mismatch.'
+  }
+  if (failureCategory === 'environment-filesystem-issue') {
+    return 'Fix the local filesystem or sandbox permission issue, then rerun the gate.'
+  }
+  return 'Inspect the model/tool execution output, fix the failed step, then retry.'
+}
+
+function buildTerminalResultSurface(result) {
+  const status = summarizeFailureStatus([result])
+  const failureCategory = result.failureCategory ?? 'none'
+  const outputTail = summarizeOutput(result.outputTail ?? '')
+  const failureReason = redactProviderOutput(result.failureReason ?? '')
+  if (result.status === 'PASS') {
+    return {
+      outcome: 'success',
+      statusDetail: status.statusDetail,
+      failureCategory,
+      failureReason: '',
+      nextAction: 'Continue with the next task.',
+      outputTail,
+    }
+  }
+  return {
+    outcome: failureCategory === 'provider-readiness' ? 'provider-failure' : 'stopped',
+    statusDetail: status.statusDetail,
+    failureCategory,
+    failureReason,
+    nextAction: nextActionForFailureSurface(failureCategory, status.statusDetail),
+    outputTail,
+  }
+}
+
+function buildFailureFollowupContext(result, followupPrompt) {
+  const surface = buildTerminalResultSurface(result)
+  return {
+    previousOutcome: surface.outcome,
+    blocker: surface.failureCategory,
+    statusDetail: surface.statusDetail,
+    reason: surface.failureReason,
+    doNext: surface.nextAction,
+    followupPrompt: redactProviderOutput(followupPrompt),
+    contextLine: [
+      `previousOutcome=${surface.outcome}`,
+      `blocker=${surface.failureCategory}`,
+      `status=${surface.statusDetail}`,
+      surface.failureReason ? `reason=${surface.failureReason}` : '',
+      `DoNext=${surface.nextAction}`,
+      `followup=${redactProviderOutput(followupPrompt)}`,
+    ].filter(Boolean).join(' | '),
+  }
+}
+
+function renderTerminalResultSurface(result) {
+  const surface = buildTerminalResultSurface(result)
+  const parts = [
+    `Outcome: ${surface.outcome}`,
+    `Category: ${surface.failureCategory}`,
+    `Status: ${surface.statusDetail}`,
+  ]
+  if (surface.failureReason) {
+    parts.push(`Reason: ${surface.failureReason}`)
+  }
+  parts.push(`NextAction: ${surface.nextAction}`)
+  return parts.join(' | ')
+}
+
+const benignCommandAllowlist = new Set(['node --version', 'npm --version'])
+
+function normalizeSlashes(value) {
+  return String(value ?? '').replace(/\\/g, '/')
+}
+
+function isInsideSyntheticOrTempWorkspace(value) {
+  const normalized = normalizeSlashes(value).toLowerCase()
+  return (
+    normalized.startsWith('d:/test/pca-home-synth') ||
+    normalized.startsWith('d:/test/pca-tool-planning-') ||
+    normalized.startsWith('c:/tmp/')
+  )
+}
+
+function isRealProviderHomePath(value) {
+  return normalizeSlashes(value).toLowerCase().startsWith('d:/test/home-sf')
+}
+
+function buildToolExecutionPlanningAudit(plan) {
+  if (plan.providerStatus && plan.providerStatus !== 'ready') {
+    return {
+      decision: 'provider-gated',
+      execute: false,
+      reason: 'provider failure must stop before tool execution',
+      nextAction: 'Fix provider readiness before evaluating tool execution.',
+    }
+  }
+
+  const target = plan.targetPath ?? plan.projectDir ?? ''
+  if (target && isRealProviderHomePath(target)) {
+    return {
+      decision: 'blocked-real-home',
+      execute: false,
+      reason: 'tool plan targets real-provider home',
+      nextAction: 'Use a synthetic/test workspace; never target real-provider configuration files.',
+    }
+  }
+
+  if (plan.writes && !isInsideSyntheticOrTempWorkspace(target)) {
+    return {
+      decision: 'blocked-dangerous-write',
+      execute: false,
+      reason: 'write plan is outside synthetic/test workspace',
+      nextAction: 'Move the fixture into a synthetic/test workspace before allowing execution.',
+    }
+  }
+
+  if (plan.tool === 'bash') {
+    if (!benignCommandAllowlist.has(plan.command ?? '')) {
+      return {
+        decision: 'blocked-command-not-allowlisted',
+        execute: false,
+        reason: 'command is not in the benign dry-run allowlist',
+        nextAction: 'Restrict the audit to allowlisted benign commands.',
+      }
+    }
+    if (plan.approval !== 'explicit-allow') {
+      return {
+        decision: 'approval-required',
+        execute: false,
+        reason: 'tool execution requires explicit approval',
+        nextAction: 'Ask for explicit approval before executing even benign real-provider-planned tools.',
+      }
+    }
+    return {
+      decision: 'allow-benign-command',
+      execute: true,
+      reason: 'allowlisted benign command with explicit approval',
+      nextAction: 'Execute only inside the controlled audit harness.',
+    }
+  }
+
+  if (plan.tool === 'read-file') {
+    return {
+      decision: 'allow-read-only',
+      execute: true,
+      reason: 'read-only tool plan in synthetic/test workspace',
+      nextAction: 'Read only the controlled fixture and preserve sanitized output.',
+    }
+  }
+
+  return {
+    decision: 'blocked-unknown-tool',
+    execute: false,
+    reason: 'tool is outside this audit boundary',
+    nextAction: 'Add a focused audit case before allowing this tool family.',
+  }
+}
+
 async function runScenario(scenario) {
   prepareProject(scenario)
   let previousSnapshot = snapshot(scenario.projectDir)
@@ -728,7 +932,402 @@ function buildCandidateMetadata(candidateResults) {
   })
 }
 
+function runTurnBoundaryDryRun() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=turn-boundary-dry-run')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('reportWritten=false')
+
+  const cases = [
+    {
+      name: 'provider-network-mid-turn',
+      provider: 'real',
+      failureReason: 'turn 1 exited 1',
+      output:
+        'provider-readiness:network fetch failed while waiting for model turn Authorization: Bearer sk-live-secret',
+      expectedCategory: 'provider-readiness',
+      expectedStatusDetail: 'provider-network-inconclusive',
+      expectedExitCode: 2,
+    },
+    {
+      name: 'provider-auth-mid-turn',
+      provider: 'real',
+      failureReason: 'turn 1 exited 1',
+      output: 'provider-readiness:auth authentication was rejected with api_key=sk-live-secret',
+      expectedCategory: 'provider-readiness',
+      expectedStatusDetail: 'config-failure',
+      expectedExitCode: 3,
+    },
+    {
+      name: 'provider-config-redacted',
+      provider: 'real',
+      failureReason: 'turn 1 exited 1',
+      output:
+        'Failed to parse D:/Test/home-sf/.private-agents/config.json: refresh_token=refresh-secret',
+      expectedCategory: 'provider-readiness',
+      expectedStatusDetail: 'config-failure',
+      expectedExitCode: 3,
+    },
+    {
+      name: 'tool-execution-failure',
+      provider: 'real',
+      failureReason: 'turn 1 exited 1',
+      output: 'Tool execution failed: command exited 1',
+      expectedCategory: 'task-execution-failure',
+      expectedStatusDetail: 'failed',
+      expectedExitCode: 1,
+    },
+    {
+      name: 'verification-failed',
+      provider: 'real',
+      failureReason: 'verification failed: expected marker was not present',
+      output: 'Result\nOutcome: stopped\nVerification failed',
+      expectedCategory: 'verification-failed',
+      expectedStatusDetail: 'failed',
+      expectedExitCode: 1,
+    },
+  ]
+
+  let ok = true
+  for (const item of cases) {
+    const result = {
+      status: 'FAIL',
+      provider: item.provider,
+      failureCategory: categorizeFailure(item.failureReason, item.output, item.provider),
+      failureReason: normalizeFailureReason(item.failureReason, item.output, item.provider),
+      outputTail: summarizeOutput(item.output),
+    }
+    const failureStatus = summarizeFailureStatus([result])
+    const redacted =
+      !result.outputTail.includes('sk-live-secret') &&
+      !result.outputTail.includes('refresh-secret') &&
+      !result.outputTail.includes('.private-agents/config.json')
+    const passed =
+      result.failureCategory === item.expectedCategory &&
+      failureStatus.statusDetail === item.expectedStatusDetail &&
+      failureStatus.exitCode === item.expectedExitCode &&
+      redacted
+    console.log(
+      `[${passed ? 'PASS' : 'FAIL'}] ${item.name} category=${result.failureCategory} status=${failureStatus.statusDetail} exit=${failureStatus.exitCode}`,
+    )
+    ok = ok && passed
+  }
+
+  const passStatus = summarizeFailureStatus([
+    {
+      status: 'PASS',
+      provider: 'real',
+      failureCategory: 'none',
+      failureReason: '',
+      outputTail: 'Result\nOutcome: success',
+    },
+  ])
+  const passOk = passStatus.statusDetail === 'passed' && passStatus.exitCode === 0
+  console.log(
+    `[${passOk ? 'PASS' : 'FAIL'}] model-turn-success-boundary status=${passStatus.statusDetail} exit=${passStatus.exitCode}`,
+  )
+  ok = ok && passOk
+
+  process.exit(ok ? 0 : 1)
+}
+
+function runTerminalResultSurfaceDryRun() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=terminal-result-surface-dry-run')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('reportWritten=false')
+
+  const cases = [
+    {
+      name: 'provider-network-terminal-result',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'provider-readiness',
+        failureReason: 'provider-readiness:network: provider endpoint was unreachable during this turn',
+        outputTail: 'provider-readiness:network fetch failed Authorization: Bearer sk-live-secret',
+      },
+      expected: ['Outcome: provider-failure', 'Category: provider-readiness', 'Status: provider-network-inconclusive', 'NextAction: Retry when the provider endpoint is reachable'],
+      forbidden: ['sk-live-secret', '.private-agents/config.json'],
+    },
+    {
+      name: 'provider-auth-terminal-result',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'provider-readiness',
+        failureReason: 'provider-readiness:auth: provider authentication failed during this turn',
+        outputTail: 'provider-readiness:auth api_key=sk-live-secret',
+      },
+      expected: ['Outcome: provider-failure', 'Category: provider-readiness', 'Status: config-failure', 'NextAction: Fix provider configuration or authentication'],
+      forbidden: ['sk-live-secret'],
+    },
+    {
+      name: 'model-tool-failure-terminal-result',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'task-execution-failure',
+        failureReason: 'Tool execution failed: command exited 1',
+        outputTail: 'Tool execution failed: command exited 1',
+      },
+      expected: ['Outcome: stopped', 'Category: task-execution-failure', 'Status: failed', 'NextAction: Inspect the model/tool execution output'],
+      forbidden: ['sk-live-secret'],
+    },
+    {
+      name: 'verification-stopped-terminal-result',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'verification-failed',
+        failureReason: 'verification failed: expected marker was not present',
+        outputTail: 'Result\nOutcome: stopped\nVerification failed',
+      },
+      expected: ['Outcome: stopped', 'Category: verification-failed', 'Status: failed', 'NextAction: Repair the verification failure'],
+      forbidden: [],
+    },
+  ]
+
+  let ok = true
+  for (const item of cases) {
+    const line = renderTerminalResultSurface(item.result)
+    const hasExpected = item.expected.every((marker) => line.includes(marker))
+    const avoidsForbidden = item.forbidden.every((marker) => !line.includes(marker))
+    const passed = hasExpected && avoidsForbidden
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] ${item.name} - ${line}`)
+    ok = ok && passed
+  }
+
+  process.exit(ok ? 0 : 1)
+}
+
+function runFailureFollowupContextDryRun() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=failure-followup-context-dry-run')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('followupExecution=false')
+  console.log('reportWritten=false')
+
+  const cases = [
+    {
+      name: 'provider-network-followup-context',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'provider-readiness',
+        failureReason: 'provider-readiness:network: provider endpoint was unreachable during this turn',
+        outputTail: 'provider-readiness:network fetch failed Authorization: Bearer sk-live-secret',
+      },
+      followupPrompt: 'retry the same task after network recovers',
+      expected: [
+        'previousOutcome=provider-failure',
+        'blocker=provider-readiness',
+        'status=provider-network-inconclusive',
+        'reason=provider-readiness:network',
+        'DoNext=Retry when the provider endpoint is reachable',
+      ],
+      forbidden: ['sk-live-secret', '.private-agents/config.json'],
+    },
+    {
+      name: 'provider-auth-followup-context',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'provider-readiness',
+        failureReason: 'provider-readiness:auth: provider authentication failed during this turn',
+        outputTail: 'provider-readiness:auth api_key=sk-live-secret',
+      },
+      followupPrompt: 'continue once I fix credentials',
+      expected: [
+        'previousOutcome=provider-failure',
+        'blocker=provider-readiness',
+        'status=config-failure',
+        'reason=provider-readiness:auth',
+        'DoNext=Fix provider configuration or authentication',
+      ],
+      forbidden: ['sk-live-secret'],
+    },
+    {
+      name: 'tool-failure-followup-context',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'task-execution-failure',
+        failureReason: 'Tool execution failed: command exited 1',
+        outputTail: 'Tool execution failed: command exited 1',
+      },
+      followupPrompt: 'try the safe command instead',
+      expected: [
+        'previousOutcome=stopped',
+        'blocker=task-execution-failure',
+        'status=failed',
+        'reason=Tool execution failed',
+        'DoNext=Inspect the model/tool execution output',
+      ],
+      forbidden: [],
+    },
+    {
+      name: 'verification-followup-context',
+      result: {
+        status: 'FAIL',
+        provider: 'real',
+        failureCategory: 'verification-failed',
+        failureReason: 'verification failed: expected marker was not present',
+        outputTail: 'Result\nOutcome: stopped\nVerification failed',
+      },
+      followupPrompt: 'repair the missing marker',
+      expected: [
+        'previousOutcome=stopped',
+        'blocker=verification-failed',
+        'status=failed',
+        'reason=verification failed',
+        'DoNext=Repair the verification failure',
+      ],
+      forbidden: [],
+    },
+  ]
+
+  let ok = true
+  for (const item of cases) {
+    const context = buildFailureFollowupContext(item.result, item.followupPrompt)
+    const hasExpected = item.expected.every((marker) => context.contextLine.includes(marker))
+    const avoidsForbidden = item.forbidden.every((marker) => !context.contextLine.includes(marker))
+    const passed = hasExpected && avoidsForbidden
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] ${item.name} - ${context.contextLine}`)
+    ok = ok && passed
+  }
+
+  process.exit(ok ? 0 : 1)
+}
+
+function runToolExecutionPlanningDryRun() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=tool-execution-planning-dry-run')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('toolExecution=false')
+  console.log('reportWritten=false')
+
+  const cases = [
+    {
+      name: 'provider-failure-before-tool',
+      plan: {
+        providerStatus: 'provider-network-inconclusive',
+        tool: 'bash',
+        command: 'node --version',
+        approval: 'explicit-allow',
+        projectDir: 'D:/Test/pca-tool-planning-provider-gated',
+      },
+      expectedDecision: 'provider-gated',
+      expectedExecute: false,
+    },
+    {
+      name: 'read-only-synthetic-fixture',
+      plan: {
+        providerStatus: 'ready',
+        tool: 'read-file',
+        targetPath: 'D:/Test/pca-tool-planning-read/fixture.txt',
+        writes: false,
+      },
+      expectedDecision: 'allow-read-only',
+      expectedExecute: true,
+    },
+    {
+      name: 'benign-command-needs-approval',
+      plan: {
+        providerStatus: 'ready',
+        tool: 'bash',
+        command: 'node --version',
+        approval: 'not-requested',
+        projectDir: 'D:/Test/pca-tool-planning-command',
+      },
+      expectedDecision: 'approval-required',
+      expectedExecute: false,
+    },
+    {
+      name: 'benign-command-explicit-allow',
+      plan: {
+        providerStatus: 'ready',
+        tool: 'bash',
+        command: 'node --version',
+        approval: 'explicit-allow',
+        projectDir: 'D:/Test/pca-tool-planning-command',
+      },
+      expectedDecision: 'allow-benign-command',
+      expectedExecute: true,
+    },
+    {
+      name: 'dangerous-command-blocked',
+      plan: {
+        providerStatus: 'ready',
+        tool: 'bash',
+        command: 'del /s /q D:\\Test\\home-sf',
+        approval: 'explicit-allow',
+        projectDir: 'D:/Test/pca-tool-planning-command',
+      },
+      expectedDecision: 'blocked-command-not-allowlisted',
+      expectedExecute: false,
+    },
+    {
+      name: 'real-home-write-blocked',
+      plan: {
+        providerStatus: 'ready',
+        tool: 'write-file',
+        targetPath: 'D:/Test/home-sf/.private-agents/config.json',
+        writes: true,
+      },
+      expectedDecision: 'blocked-real-home',
+      expectedExecute: false,
+    },
+    {
+      name: 'workspace-write-outside-test-blocked',
+      plan: {
+        providerStatus: 'ready',
+        tool: 'write-file',
+        targetPath: 'D:/Users/project/src/app.js',
+        writes: true,
+      },
+      expectedDecision: 'blocked-dangerous-write',
+      expectedExecute: false,
+    },
+  ]
+
+  let ok = true
+  for (const item of cases) {
+    const audit = buildToolExecutionPlanningAudit(item.plan)
+    const line = `decision=${audit.decision} execute=${audit.execute} reason=${audit.reason} nextAction=${audit.nextAction}`
+    const passed =
+      audit.decision === item.expectedDecision &&
+      audit.execute === item.expectedExecute &&
+      !line.includes('.private-agents/config.json')
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] ${item.name} - ${line}`)
+    ok = ok && passed
+  }
+
+  process.exit(ok ? 0 : 1)
+}
+
 async function main() {
+  if (turnBoundaryDryRun) {
+    runTurnBoundaryDryRun()
+    return
+  }
+  if (terminalResultSurfaceDryRun) {
+    runTerminalResultSurfaceDryRun()
+    return
+  }
+  if (toolExecutionPlanningDryRun) {
+    runToolExecutionPlanningDryRun()
+    return
+  }
+  if (failureFollowupContextDryRun) {
+    runFailureFollowupContextDryRun()
+    return
+  }
+
   console.log('gate name=real-user-capabilities')
   console.log('status taxonomy: PASS=0 FAIL=1 PROVIDER_NETWORK=2 CONFIG=3')
   console.log('state semantics: provider preflight inconclusive skips capability execution; mid-turn provider readiness stays provider-readiness, not coding failure')
@@ -803,7 +1402,7 @@ async function main() {
   for (const scenario of scenarios) {
     const result = await runScenario(scenario)
     capabilities.push(result)
-    const suffix = result.status === 'PASS' ? `verification=${result.verification}` : result.failureReason
+    const suffix = result.status === 'PASS' ? `verification=${result.verification}` : renderTerminalResultSurface(result)
     console.log(`[${result.status}] ${scenario.id} - provider=${scenario.provider} project=${scenario.projectDir} session=${result.sessionId} ${suffix}`)
   }
 
@@ -819,7 +1418,7 @@ async function main() {
     for (const scenario of selectedCandidateScenarios) {
       const result = await runScenario(scenario)
       candidates.push(result)
-      const suffix = result.status === 'PASS' ? `verification=${result.verification}` : result.failureReason
+      const suffix = result.status === 'PASS' ? `verification=${result.verification}` : renderTerminalResultSurface(result)
       console.log(`[${result.status}] candidate:${scenario.id} - provider=${scenario.provider} project=${scenario.projectDir} session=${result.sessionId} ${suffix}`)
     }
   }
@@ -847,18 +1446,20 @@ async function main() {
 }
 
 main().catch((error) => {
+  const rawFailure = error instanceof Error ? error.stack ?? error.message : String(error)
+  const redactedFailure = redactProviderOutput(rawFailure)
   const report = {
     generatedAt: new Date().toISOString(),
     status: 'FAIL',
     reportPath,
-    failureCategory: categorizeFailure(error.message),
-    failureReason: error.stack ?? error.message,
+    failureCategory: categorizeFailure(redactedFailure),
+    failureReason: redactedFailure,
     failureCategories,
     futureGateCandidates,
     candidates: [],
     capabilities: [],
   }
   writeReport(report)
-  console.error(error)
+  console.error(redactedFailure)
   process.exit(1)
 })
