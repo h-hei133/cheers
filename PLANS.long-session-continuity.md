@@ -137,15 +137,14 @@ opencode 参考重点：
 
 ### Current
 
-- C. Compact preserves stopped recovery context
+- D. Compact preserves verification-failed repair context
 
 ### Backlog
 
-1. D. Compact preserves verification-failed repair context
-2. E. Compact preserves approved execution failure provenance
-3. F. Resume after compact uses continuity context
-4. G. Long-session CLI synthetic smoke
-5. H. Continuity summary formatter extraction
+1. E. Compact preserves approved execution failure provenance
+2. F. Resume after compact uses continuity context
+3. G. Long-session CLI synthetic smoke
+4. H. Continuity summary formatter extraction
 
 `H` 只有在审计证明纯 formatter 仍散落且阻碍 compact/resume 主线时才执行；不得为了拆分而拆分。
 
@@ -153,6 +152,7 @@ opencode 参考重点：
 
 - A. Compact/replay coverage audit
 - B. Long-session continuity fixture builder
+- C. Compact preserves stopped recovery context
 
 ### Verification
 
@@ -180,6 +180,16 @@ opencode 参考重点：
   - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts`
   - `rtk npm run build -w packages/ts-shell`
 - B result: SessionManager suite passed with 53 tests after elevated rerun for sandbox `spawn EPERM`; build passed after elevated rerun for sandbox `dist` write `EPERM`.
+- C status: completed as a focused stopped recovery continuity checkpoint.
+- Files changed for C:
+  - `packages/ts-shell/src/session/__tests__/longSessionContinuityFixtures.ts`
+  - `packages/ts-shell/src/session/SessionManager.test.ts`
+  - `PLANS.long-session-continuity.md`
+- Commands run for C:
+  - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts -t "stopped"`
+  - `rtk npm run test -w packages/ts-shell -- src/core/shell/sessionRuntime.test.ts`
+  - `rtk npm run build -w packages/ts-shell`
+- C result: stopped focused SessionManager tests passed with 3 tests after elevated rerun for sandbox `spawn EPERM`; `sessionRuntime.test.ts` passed with 29 tests after elevated rerun for sandbox `spawn EPERM`; build passed after elevated rerun for sandbox `dist` write `EPERM`.
 
 ### Notes
 
@@ -194,6 +204,8 @@ opencode 参考重点：
 - The helper can construct auto-compact long-session scenarios for stopped edit failure, verification-failed repair context, and approved tool execution failure provenance.
 - `SessionManager.test.ts` only adds a light smoke around the helper: auto-compact is triggered, source turn count reaches the threshold, restored manager continuity snapshots can read the scenario, target file, failure reason, and next action.
 - Current next step is C: use the fixture to prove stopped edit/patch failure recovery details survive auto-compact plus restored manager continuity context.
+- C tightened the stopped fixture blocker kind to `patch-from-not-found` and added a focused test proving restored continuity keeps stopped terminal classification, failure reason, failed file, verification blocked status, blocker kind, and next action after auto-compact.
+- Current next step is D: reuse the fixture to prove verification-failed changedFiles, verification detail, and next action survive auto-compact plus restored manager continuity context.
 
 ## 12. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -435,14 +447,16 @@ opencode 参考重点：
 
 本 planning checkpoint 不执行 A，只创建路线文件并运行 build。下一轮如果继续本路线，应先读取本文件 Current，再执行 A 并同步更新 Current / Backlog / Completed / Verification / Notes。
 
-## Checkpoint Tracking Update: B Completed
+## Checkpoint Tracking Update: C Completed
 
 This section supersedes the original "current recommended first checkpoint" text above.
 
-- Completed: A. Compact/replay coverage audit; B. Long-session continuity fixture builder.
-- Current: C. Compact preserves stopped recovery context.
-- Backlog: D. Compact preserves verification-failed repair context; E. Compact preserves approved execution failure provenance; F. Resume after compact uses continuity context; G. Long-session CLI synthetic smoke; H. Continuity summary formatter extraction only if a later audit proves it is needed.
+- Completed: A. Compact/replay coverage audit; B. Long-session continuity fixture builder; C. Compact preserves stopped recovery context.
+- Current: D. Compact preserves verification-failed repair context.
+- Backlog: E. Compact preserves approved execution failure provenance; F. Resume after compact uses continuity context; G. Long-session CLI synthetic smoke; H. Continuity summary formatter extraction only if a later audit proves it is needed.
 - Verification for A: read-only RTK inspection of `SessionManager.ts`, `SessionManager.test.ts`, `sessionRuntime.ts`, Claude Code compact/tool-result semantics, and opencode compaction/session semantics; production code and tests were not modified.
 - Notes: A found that existing compact coverage is narrow but real. Approval memory, approval audit history, and action result seed handoff survive auto-compact. Stopped and verification-failed continuity are covered for immediate snapshot/context paths, but not yet through a reusable long-session compact/reload fixture. The next checkpoint should add a fixture builder outside the three giant files before adding behavior proofs.
 - Verification for B: `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts` passed with 53 tests after elevated rerun for sandbox `spawn EPERM`; `rtk npm run build -w packages/ts-shell` passed after elevated rerun for sandbox `dist` write `EPERM`.
 - Notes: B added `packages/ts-shell/src/session/__tests__/longSessionContinuityFixtures.ts` and a light SessionManager smoke. The helper builds stopped edit failure, verification-failed, and approved tool failure long-session scenarios without modifying production code. Next checkpoint C should use it for stopped edit/patch recovery preservation across compact/reload.
+- Verification for C: `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts -t "stopped"` passed with 3 tests after elevated rerun; `rtk npm run test -w packages/ts-shell -- src/core/shell/sessionRuntime.test.ts` passed with 29 tests after elevated rerun; `rtk npm run build -w packages/ts-shell` passed after elevated rerun.
+- Notes: C proves stopped edit patch recovery details survive auto-compact plus restored manager continuity context. The stopped fixture now uses `patch-from-not-found` as the blocker kind, and the focused test asserts failed file, failure reason, blocked verification status, blocker kind, and next action in snapshot/context output.

@@ -1903,6 +1903,46 @@ describe("SessionManager", () => {
     }
   });
 
+  it("preserves stopped edit patch recovery details across auto-compact reload", () => {
+    const manager = new SessionManager();
+    const fixture = createLongSessionContinuityFixture(
+      manager,
+      "stopped-edit-failure",
+    );
+    const restoredManager = fixture.restoreManager();
+    const snapshot = restoredManager.buildContinuitySnapshot(fixture.session.id);
+    const context = restoredManager.buildPromptContinuityContext(
+      fixture.session.id,
+      "continue the stopped edit",
+    );
+
+    expect(fixture.readWorkingMemory()?.compacted).toBe(true);
+    expect(snapshot.lastTerminalClassification).toBe("stopped");
+    expect(snapshot.lastFailure).toBe(fixture.failureReason);
+    expect(snapshot.recentFailedFiles).toEqual([
+      {
+        path: fixture.targetFile,
+        reason: fixture.failureReason,
+      },
+    ]);
+    expect(snapshot.lastVerificationStatus).toBe("blocked");
+    expect(snapshot.lastVerificationBlockerKind).toBe("patch-from-not-found");
+    expect(snapshot.lastVerificationReason).toBe(fixture.failureReason);
+    expect(snapshot.lastVerificationNextAction).toBe(fixture.nextAction);
+    expect(snapshot.lastFailureHandoffDiagnostic).toContain(
+      "blocker=patch-from-not-found",
+    );
+    expect(context).toContain(
+      `- recent-failed-files: ${fixture.targetFile} (${fixture.failureReason})`,
+    );
+    expect(context).toContain(
+      "- last-verification-blocker-kind: patch-from-not-found",
+    );
+    expect(context).toContain(
+      `- last-verification-next-action: ${fixture.nextAction}`,
+    );
+  });
+
   it("persists append-before-model-call barrier before query events begin", () => {
     const manager = new SessionManager();
     const session = manager.createNew();

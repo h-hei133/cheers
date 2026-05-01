@@ -211,6 +211,12 @@ function createScenarioResult(input: {
 }): OrchestrationResult {
   const status =
     input.scenario === "verification-failed" ? "failed" : "blocked";
+  const blockerKind =
+    input.scenario === "stopped-edit-failure"
+      ? "patch-from-not-found"
+      : input.scenario === "approved-tool-failure"
+        ? "unknown"
+        : undefined;
   const changedFiles =
     input.scenario === "verification-failed" ? [input.targetFile] : [];
   const failedFiles =
@@ -301,8 +307,7 @@ function createScenarioResult(input: {
             ? undefined
             : "npm test -- src/long-session.test.ts",
         reason: input.failureReason,
-        blockerKind:
-          input.scenario === "verification-failed" ? undefined : "unknown",
+        blockerKind,
         nextAction: input.nextAction,
       },
       lastActionResultSeed: {
@@ -320,12 +325,10 @@ function createScenarioResult(input: {
               ? undefined
               : "npm test -- src/long-session.test.ts",
           reason: input.failureReason,
-          blockerKind:
-            input.scenario === "verification-failed" ? undefined : "unknown",
+          blockerKind,
         },
         reason: input.failureReason,
-        blockerKind:
-          input.scenario === "verification-failed" ? undefined : "unknown",
+        blockerKind,
       },
       evidence: [`fixture-scenario:${input.scenario}`],
       failureBoundary: input.failureReason,
