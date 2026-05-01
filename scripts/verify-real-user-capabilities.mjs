@@ -31,9 +31,19 @@ const failureCategories = [
 const providerNetworkFailurePattern =
   /(provider-readiness:network|provider-network-inconclusive|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network|socket hang up|TLS|timeout|unreachable|kind[:= ]+network)/i
 const providerConfigFailurePattern =
-  /(provider-readiness:(missing-key|missing-config|unsupported-provider)|missing.*config|missing.*key|api key|apikey|not connected|connect first|credentials|missing baseUrl|baseUrl is missing|model is missing)/i
+  /(provider-readiness:(missing-key|missing-config|unsupported-provider)|missing.*config|failed to parse.*config|config\.json|missing.*key|api key|apikey|not connected|connect first|credentials|missing baseUrl|baseUrl is missing|model is missing)/i
 const providerAuthFailurePattern =
   /(provider-readiness:auth|authentication was rejected|invalid authentication|invalid api key|unauthorized|forbidden|401|403|kind[:= ]+authentication)/i
+const realHomeConfigPattern =
+  /[A-Za-z]:[\\/]+Test[\\/]+home-sf[\\/]+\.private-agents[\\/]+config\.json/gi
+const bearerTokenPattern = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi
+const authorizationBearerPattern =
+  /\b(authorization\s*[:=]\s*)(["']?)Bearer\s+[A-Za-z0-9._~+/=-]+/gi
+const keyValueSecretPattern =
+  /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|x-api-key)(\s*[:=]\s*)(["']?)[^\s"'`,;]+/gi
+const openAiStyleKeyPattern = /\b(sk-[A-Za-z0-9][A-Za-z0-9._-]{8,})\b/g
+const secretQueryParamPattern =
+  /([?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|key|signature|sig)=)[^&\s"'`<>]+/gi
 
 const futureGateCandidates = [
   {
@@ -351,11 +361,27 @@ function changedFiles(before, after) {
 }
 
 function summarizeOutput(output) {
-  return output
+  return redactProviderOutput(output)
     .split(/\r?\n/)
     .filter(Boolean)
     .slice(-18)
     .join('\n')
+}
+
+function redactProviderOutput(input) {
+  return String(input ?? '')
+    .replace(
+      authorizationBearerPattern,
+      (_match, prefix, quote) => `${prefix}${quote}Bearer [REDACTED]`,
+    )
+    .replace(bearerTokenPattern, 'Bearer [REDACTED]')
+    .replace(
+      keyValueSecretPattern,
+      (_match, key, separator, quote) => `${key}${separator}${quote}[REDACTED]`,
+    )
+    .replace(openAiStyleKeyPattern, '[REDACTED_API_KEY]')
+    .replace(secretQueryParamPattern, '$1[REDACTED]')
+    .replace(realHomeConfigPattern, '[REAL_PROVIDER_CONFIG_PATH]')
 }
 
 function providerEnv(provider) {

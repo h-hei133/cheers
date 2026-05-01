@@ -17,7 +17,17 @@ const classificationSelfTest = process.argv.includes('--classification-self-test
 const networkFailurePattern =
   /(provider-readiness:network|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network|socket hang up|TLS|timeout|unreachable)/i
 const configFailurePattern =
-  /(provider-readiness:(missing-key|missing-config|auth|unsupported-provider)|missing.*config|api key|apikey|not connected|connect first|credentials|authentication was rejected|401|403)/i
+  /(provider-readiness:(missing-key|missing-config|auth|unsupported-provider)|missing.*config|failed to parse.*config|config\.json|api key|apikey|not connected|connect first|credentials|authentication was rejected|401|403)/i
+const realHomeConfigPattern =
+  /[A-Za-z]:[\\/]+Test[\\/]+home-sf[\\/]+\.private-agents[\\/]+config\.json/gi
+const bearerTokenPattern = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi
+const authorizationBearerPattern =
+  /\b(authorization\s*[:=]\s*)(["']?)Bearer\s+[A-Za-z0-9._~+/=-]+/gi
+const keyValueSecretPattern =
+  /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|x-api-key)(\s*[:=]\s*)(["']?)[^\s"'`,;]+/gi
+const openAiStyleKeyPattern = /\b(sk-[A-Za-z0-9][A-Za-z0-9._-]{8,})\b/g
+const secretQueryParamPattern =
+  /([?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|key|signature|sig)=)[^&\s"'`<>]+/gi
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -61,16 +71,36 @@ function run(command, args, options = {}) {
 }
 
 function printStep(name, status, detail = '') {
-  const suffix = detail ? ` - ${detail}` : ''
+  const suffix = detail ? ` - ${redactProviderOutput(detail)}` : ''
   console.log(`[${status}] ${name}${suffix}`)
 }
 
 function summarizeOutput(output) {
-  return output
+  return redactProviderOutput(output)
     .split(/\r?\n/)
     .filter(Boolean)
     .slice(-18)
     .join('\n')
+}
+
+function redactProviderOutput(input) {
+  return String(input ?? '')
+    .replace(
+      authorizationBearerPattern,
+      (_match, prefix, quote) => `${prefix}${quote}Bearer [REDACTED]`,
+    )
+    .replace(bearerTokenPattern, 'Bearer [REDACTED]')
+    .replace(
+      keyValueSecretPattern,
+      (_match, key, separator, quote) => `${key}${separator}${quote}[REDACTED]`,
+    )
+    .replace(openAiStyleKeyPattern, '[REDACTED_API_KEY]')
+    .replace(secretQueryParamPattern, '$1[REDACTED]')
+    .replace(realHomeConfigPattern, '[REAL_PROVIDER_CONFIG_PATH]')
+}
+
+function renderPresence(value) {
+  return value ? 'present' : 'none'
 }
 
 function loadConfig() {
@@ -231,6 +261,24 @@ function runClassificationSelfTest() {
       expectedStatus: 'product-regression',
       expectedCode: 1,
     },
+    {
+      name: 'redacted-config',
+      result: {
+        output: 'Failed to parse D:/Test/home-sf/.private-agents/config.json: access_token=acct-secret',
+        timedOut: false,
+      },
+      expectedStatus: 'config-failure',
+      expectedCode: 3,
+    },
+    {
+      name: 'redacted-network',
+      result: {
+        output: 'provider-readiness:network fetch failed Authorization: Bearer sk-live-secret https://example.test/v1?api_key=sk-url-secret',
+        timedOut: false,
+      },
+      expectedStatus: 'provider-network-inconclusive',
+      expectedCode: 2,
+    },
   ]
 
   let ok = true
@@ -248,6 +296,25 @@ function runClassificationSelfTest() {
     )
     ok = ok && passed
   }
+
+  const redactionSample = summarizeOutput(
+    'D:/Test/home-sf/.private-agents/config.json Authorization: Bearer sk-live-secret refresh_token=refresh-secret https://example.test/v1?api_key=sk-url-secret',
+  )
+  const redactionPassed =
+    redactionSample.includes('[REAL_PROVIDER_CONFIG_PATH]') &&
+    redactionSample.includes('Bearer [REDACTED]') &&
+    redactionSample.includes('refresh_token=[REDACTED]') &&
+    redactionSample.includes('api_key=[REDACTED]') &&
+    !redactionSample.includes('sk-live-secret') &&
+    !redactionSample.includes('refresh-secret') &&
+    !redactionSample.includes('sk-url-secret') &&
+    !redactionSample.includes('.private-agents/config.json')
+  printStep(
+    'provider-readiness-redaction-self-test',
+    redactionPassed ? 'pass' : 'product-regression',
+    redactionPassed ? 'sanitized output tail' : redactionSample,
+  )
+  ok = ok && redactionPassed
 
   printStep('provider-readiness-classification-self-test', ok ? 'pass' : 'product-regression')
   process.exit(ok ? 0 : 1)
@@ -316,15 +383,15 @@ async function main() {
     printStep('real-provider-config', loaded.status, loaded.reason)
     process.exit(3)
   }
-  printStep('real-provider-config', 'pass', loaded.configPath)
+  printStep('real-provider-config', 'pass', 'config path redacted')
 
   const resolved = resolveCredential(loaded.config)
   console.log(`provider=${resolved.provider}`)
-  console.log(`activeConnection=${resolved.activeConnectionId}`)
+  console.log(`activeConnection=${resolved.activeConnectionId === 'none' ? 'none' : 'present'}`)
   console.log(`credentialSource=${resolved.credentialSource}`)
   console.log(`authMode=${resolved.authMode}`)
-  console.log(`endpoint=${resolved.baseUrl ?? 'none'}`)
-  console.log(`model=${resolved.model ?? 'none'}`)
+  console.log(`endpoint=${renderPresence(resolved.baseUrl)}`)
+  console.log(`model=${renderPresence(resolved.model)}`)
   const credentialOk = validateCredential(resolved)
   if (!credentialOk.ok) {
     printStep('real-provider-credential', 'config-failure', credentialOk.reason)
@@ -343,6 +410,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error)
+  console.error(redactProviderOutput(error instanceof Error ? error.stack ?? error.message : String(error)))
   process.exit(1)
 })

@@ -187,16 +187,15 @@ opencode 参考：
 
 Backlog:
 
-1. C. Real-provider readiness attribution smoke
-2. D. Real-provider turn boundary dry-run audit
-3. E. Real-provider terminal result surface smoke
-4. F. Tool execution under real-provider planning audit
-5. G. Real-provider failure follow-up context smoke
-6. H. Merge-readiness / route audit
+1. D. Real-provider turn boundary dry-run audit
+2. E. Real-provider terminal result surface smoke
+3. F. Tool execution under real-provider planning audit
+4. G. Real-provider failure follow-up context smoke
+5. H. Merge-readiness / route audit
 
 Current:
 
-- C. Real-provider readiness attribution smoke
+- D. Real-provider turn boundary dry-run audit
 
 Completed:
 
@@ -208,6 +207,10 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `packages/ts-shell/src/core/shell/providerFailureRedaction.ts`, `packages/ts-shell/src/core/shell/providerReadiness.ts`, `packages/ts-shell/src/core/shell/providerReadiness.test.ts`, `PLANS.real-provider-safe-evidence.md`.
   - Result: completed. Added focused provider failure detail sanitizer and applied it to unknown provider readiness errors before they become user/report-visible stop reasons.
+- C. Real-provider readiness attribution smoke
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `scripts/verify-provider-readiness.mjs`, `scripts/verify-real-user-capabilities.mjs`, `PLANS.real-provider-safe-evidence.md`.
+  - Result: completed as safe classification/self-test smoke. The smoke path runs with `homeRead=false`, does not read real home, verifies provider readiness attribution categories, and sanitizes output/report tails.
 
 Verification:
 
@@ -222,11 +225,16 @@ Verification:
   - `rtk npm run test -w packages/ts-shell -- src/config/runtimeConfig.test.ts`: initial sandbox run failed with `spawn EPERM`; elevated rerun passed with 8 tests.
   - `rtk npm run verify:result-contract`: initial sandbox run failed with `spawn EPERM`; elevated rerun passed all result-contract checks.
   - `rtk npm run build -w packages/ts-shell`: elevated run passed.
+- C safe attribution smoke round:
+  - `rtk node scripts/verify-provider-readiness.mjs --classification-self-test`: first run exposed a real attribution gap for config parse failures; after tightening config failure classification, rerun passed and reported `homeRead=false`.
+  - `rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts`: sandbox run failed with `spawn EPERM`; elevated rerun passed with 13 tests.
+  - `rtk npm run test -w packages/ts-shell -- src/config/runtimeConfig.test.ts`: sandbox run failed with `spawn EPERM`; elevated rerun passed with 8 tests.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
 
 Notes:
 
 - Do not run `verify-real-user-capabilities` by default.
-- Do not run real-provider smoke until C explicitly designs a safe attribution smoke that does not print or persist raw real-provider config details.
+- Do not run real-provider smoke until D confirms the turn-boundary dry-run/report path is safe and does not persist raw real-provider config details.
 - A audit findings:
   - `scripts/verify-provider-readiness.mjs` reads `D:/Test/home-sf/.private-agents/config.json` when run outside `--classification-self-test`; it prints `real-provider-config` with full config path, `activeConnection`, `endpoint`, and `model`.
   - `scripts/verify-doctor-environment.mjs` has the same real-provider config read and prints full config path, `activeConnection`, `endpoint`, and `model`.
@@ -239,6 +247,12 @@ Notes:
   - `checkRealProviderReadiness` now sanitizes unknown exception messages before including them in `provider-readiness:unknown` stop reasons.
   - Normal missing-key/auth/network/missing-config readiness classifications are behavior-preserving.
   - This checkpoint does not yet rewrite `verify-provider-readiness.mjs` or `verify-doctor-environment.mjs`; C should apply the contract to safe smoke/report output before any real-provider execution.
+- C implementation notes:
+  - `verify-provider-readiness.mjs --classification-self-test` now covers missing-key, auth, network, timeout, contract-regression, config parse failure, and redacted network failure classification without reading real home.
+  - Real readiness smoke output now redacts config path details, prints active connection as `present`/`none`, and prints endpoint/model as `present`/`none`.
+  - Provider readiness output tails are sanitized before printing or returning classification summaries.
+  - `verify-real-user-capabilities.mjs` now sanitizes output tails before writing provider readiness preflight evidence into its report.
+  - `verify-doctor-environment.mjs` still has older verbose real-provider config output and should remain outside this checkpoint; revisit only if the next route requires doctor/release-real safety.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 
