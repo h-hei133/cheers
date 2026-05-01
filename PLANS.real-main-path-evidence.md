@@ -341,16 +341,39 @@ Never commit audit residue, real-provider config, temporary homes, or unrelated 
 
 Current checkpoint:
 
-- `Evidence track audit / merge readiness`
+- `Track sealed on main`
 
 Scope:
 
-- Review the completed evidence track, rerun the highest-signal gates, and decide whether this branch is ready to merge.
-- Do not add new smoke surface unless an existing completed checkpoint regressed.
-- Do not run real-provider sanity by default.
+- Evidence track backlog is complete and merged to `main`.
+- Do not continue same-family evidence proof by default.
+- Return to the next main-path blocker assessment.
 
 Completed checkpoint:
 
+- `Evidence track audit / merge readiness`
+  - Merge-readiness on `mainpath-real-cli-evidence` passed before merge.
+  - Merged into `main` with merge commit `7796e14 Merge mainpath real CLI evidence`.
+  - Post-merge verification on `main` passed.
+  - Real-provider sanity was intentionally not run.
+  - Verification:
+    - `rtk git status --short` passed on `mainpath-real-cli-evidence` before validation.
+    - `rtk npm run build -w packages/ts-shell` passed outside the sandbox.
+    - `rtk npm run verify:cli-entry` passed outside the sandbox.
+    - `rtk npm run verify:result-contract` passed outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "print"` passed outside the sandbox: 4 passed, 30 skipped.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` passed outside the sandbox: 4 passed, 30 skipped.
+    - `rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts` passed outside the sandbox: 11 passed.
+    - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts` passed outside the sandbox: 52 passed.
+    - `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path` passed outside the sandbox: 1 passed, 33 skipped.
+  - Post-merge verification:
+    - `rtk git status --short` passed on `main` after merge.
+    - `rtk npm run build -w packages/ts-shell` passed outside the sandbox.
+    - `rtk npm run verify:cli-entry` passed outside the sandbox.
+    - `rtk npm run verify:result-contract` passed outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "print"` passed outside the sandbox: 4 passed, 30 skipped.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` passed outside the sandbox: 4 passed, 30 skipped.
+    - `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path` passed outside the sandbox: 1 passed, 33 skipped.
 - `Compact / long-session smoke design`
   - Reviewed existing SessionManager compact evidence and CLI live-ish continuity evidence.
   - Decision: no new long-session implementation in this checkpoint; compact -> resume -> continue should remain a future opt-in smoke unless a real blocker appears.
@@ -401,13 +424,13 @@ Evidence:
 
 Next recommended checkpoint:
 
-- `Evidence track audit / merge readiness`
+- Return to main-path blocker assessment.
 
 Reason:
 
 - The planned evidence backlog is now closed.
-- Compact / long-session evidence has enough local unit-level coverage to avoid forcing a new broad gate in this branch.
-- The best next move is to verify the branch as a whole and prepare it for merge instead of continuing to invent checkpoints.
+- The evidence branch has been merged to `main`.
+- The best next move is to assess the next direct real main-path blocker rather than continuing same-family proof.
 
 Default stop condition for the next checkpoint:
 
@@ -417,6 +440,28 @@ Default stop condition for the next checkpoint:
 
 ### Completed
 
+- `Evidence track audit / merge readiness`
+  - Commit: this plan closeout is recorded in final status.
+  - Merge commit: `7796e14 Merge mainpath real CLI evidence`.
+  - Files:
+    - `PLANS.real-main-path-evidence.md`
+  - Production shell/runtime changes in this closeout: none.
+  - Merge-readiness verification on `mainpath-real-cli-evidence`:
+    - `rtk npm run build -w packages/ts-shell` passed outside the sandbox.
+    - `rtk npm run verify:cli-entry` passed outside the sandbox.
+    - `rtk npm run verify:result-contract` passed outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "print"` passed: 4 passed, 30 skipped.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` passed: 4 passed, 30 skipped.
+    - `rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts` passed: 11 passed.
+    - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts` passed: 52 passed.
+    - Synthetic `rtk npm run test:gate:golden-main-path` passed: 1 passed, 33 skipped.
+  - Post-merge verification on `main`:
+    - `rtk npm run build -w packages/ts-shell` passed outside the sandbox.
+    - `rtk npm run verify:cli-entry` passed outside the sandbox.
+    - `rtk npm run verify:result-contract` passed outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "print"` passed: 4 passed, 30 skipped.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` passed: 4 passed, 30 skipped.
+    - Synthetic `rtk npm run test:gate:golden-main-path` passed: 1 passed, 33 skipped.
 - `Compact / long-session smoke design`
   - Commit: recorded in final status for this checkpoint.
   - Files:
@@ -531,10 +576,10 @@ Default stop condition for the next checkpoint:
 
 ### Current
 
-- `Evidence track audit / merge readiness`
-  - Target: review completed checkpoints, rerun the highest-signal gates, and prepare the branch for merge.
-  - Default scope: verification and plan refresh only.
-  - Preferred starting point: `rtk npm run build -w packages/ts-shell`, `rtk npm run verify:cli-entry`, `rtk npm run verify:result-contract`, and focused tests already used by the track.
+- `Track sealed on main`
+  - Target: no further evidence-track checkpoint by default.
+  - Default scope: return to the next main-path blocker assessment.
+  - Real-provider sanity remains explicit opt-in and was not run during merge readiness.
 
 ### Backlog
 
@@ -548,3 +593,4 @@ Default stop condition for the next checkpoint:
 - Provider readiness classification can be validated without real-provider home by running `rtk proxy node scripts/verify-provider-readiness.mjs --classification-self-test`.
 - `cli-entry-stopped-failure-followup-real-path` intentionally verifies preserved stopped guidance rather than automatic repair continuation; promoting true repair continuation from real-entry stopped states would be a separate product checkpoint.
 - Compact / long-session evidence is intentionally not promoted to a default hard gate in this branch; the current evidence is local/unit-level plus two-turn CLI continuity, not a full compact -> resume -> continue E2E.
+- Evidence track was merged to `main` with merge commit `7796e14`; do not keep adding same-family proof unless a new real-entry failure appears.
