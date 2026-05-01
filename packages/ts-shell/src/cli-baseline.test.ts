@@ -5,6 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { handleSigint } from "./entrypoints/handleSigint.js";
+import { createLongSessionContinuityFixture } from "./session/__tests__/longSessionContinuityFixtures.js";
+import { SessionManager } from "./session/SessionManager.js";
 import {
   createGitRepoFixture,
   normalizeCliOutput,
@@ -3409,6 +3411,102 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       currentStore.byProjectRoot?.[path.resolve(projectRoot).toLowerCase()]
         ?.sessionId,
     ).toBe(completedSessionId);
+  }, 60000);
+
+  it("LONG_SESSION_CLI_SYNTHETIC: continues compacted failure context through CLI print", async () => {
+    const originalUserProfile = process.env.USERPROFILE;
+    const originalHome = process.env.HOME;
+    const projectRoot = path.join(fakeHomeDir, "long-session-cli-smoke-project");
+    const targetFile = "src/cli-long-session.ts";
+    fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, targetFile),
+      "export const broken = true;\n",
+      "utf8",
+    );
+
+    try {
+      process.env.USERPROFILE = fakeHomeDir;
+      process.env.HOME = fakeHomeDir;
+      const manager = new SessionManager();
+      const fixture = createLongSessionContinuityFixture(
+        manager,
+        "verification-failed",
+        {
+          projectRoot,
+          targetFile,
+        },
+      );
+      const compactedState = JSON.parse(
+        fs.readFileSync(fixture.statePath, "utf8"),
+      ) as Record<string, unknown>;
+      fs.writeFileSync(
+        fixture.statePath,
+        JSON.stringify(
+          {
+            ...compactedState,
+            status: "completed",
+            runPhase: "idle",
+            terminalReason: "completed",
+            durableStatus: "success",
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+
+      const followUpPrompt = "what next for the compacted context";
+      const result = spawnSync(
+        nodeExe,
+        [
+          tsxCliPath,
+          cliPath,
+          "--project",
+          projectRoot,
+          "--non-interactive-approval",
+          "allow-once",
+          "--print",
+          `/continue ${followUpPrompt}`,
+        ],
+        {
+          cwd: repoRoot,
+          env: {
+            ...process.env,
+            USERPROFILE: fakeHomeDir,
+            HOME: fakeHomeDir,
+            PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          },
+          encoding: "utf8",
+          timeout: 45000,
+        },
+      );
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+      const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+      expect(output).toContain("Continuation");
+      expect(output).toContain("Failure handoff: status=failed");
+      expect(output).toContain(`target=${targetFile}`);
+      expect(output).toContain("command=npm test -- src/long-session.test.ts");
+      expect(output).toContain(fixture.nextAction.replace(/[.]+$/, ""));
+      expect(output).not.toContain("No recoverable session found");
+      expect(output).not.toContain("starting a fresh session");
+
+      const transcriptPath = path.join(
+        sessionsDir,
+        fixture.session.id,
+        "transcript.jsonl",
+      );
+      const transcript = fs.readFileSync(transcriptPath, "utf8");
+      expect(transcript).toContain(followUpPrompt);
+      expect(transcript).toContain(targetFile);
+      expect(transcript).toContain("npm test -- src/long-session.test.ts");
+      expect(transcript).toContain(fixture.nextAction);
+    } finally {
+      process.env.USERPROFILE = originalUserProfile;
+      process.env.HOME = originalHome;
+    }
   }, 60000);
 
   it("carries completed-session failure diagnostic through /continue follow-up", async () => {

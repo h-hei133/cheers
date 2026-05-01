@@ -137,11 +137,11 @@ opencode 参考重点：
 
 ### Current
 
-- G. Long-session CLI synthetic smoke
+- Long-session continuity route audit / merge readiness
 
 ### Backlog
 
-1. H. Continuity summary formatter extraction
+- None.
 
 `H` 只有在审计证明纯 formatter 仍散落且阻碍 compact/resume 主线时才执行；不得为了拆分而拆分。
 
@@ -153,6 +153,7 @@ opencode 参考重点：
 - D. Compact preserves verification-failed repair context
 - E. Compact preserves approved execution failure provenance
 - F. Resume after compact uses continuity context
+- G. Long-session CLI synthetic smoke
 
 ### Verification
 
@@ -217,6 +218,16 @@ opencode 参考重点：
   - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts`
   - `rtk npm run build -w packages/ts-shell`
 - F result: `sessionRuntime.test.ts` passed with 30 tests after elevated rerun for sandbox `spawn EPERM`; `SessionManager.test.ts` passed with 56 tests after elevated rerun for sandbox `spawn EPERM`; build passed after elevated rerun for sandbox `dist` write `EPERM`.
+- G status: completed as a focused synthetic CLI compact-continuity smoke checkpoint.
+- Files changed for G:
+  - `packages/ts-shell/src/cli-baseline.test.ts`
+  - `PLANS.long-session-continuity.md`
+- Commands run for G:
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "LONG_SESSION_CLI_SYNTHETIC"`
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`
+  - `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path`
+  - `rtk npm run build -w packages/ts-shell`
+- G result: focused long-session CLI synthetic smoke passed with 1 test after elevated rerun for sandbox `spawn EPERM`; CLI continue focused tests passed with 5 tests after elevated rerun for sandbox `spawn EPERM`; synthetic golden main path passed with 1 test after elevated rerun for sandbox `spawn EPERM`; build passed after elevated rerun for sandbox `dist` write `EPERM`.
 
 ### Notes
 
@@ -239,6 +250,9 @@ opencode 参考重点：
 - Current next step is F: prove resume/continue after compact consumes structured continuity context instead of relying only on the last assistant text.
 - F added a focused runtime test using the long-session verification-failed fixture, restored manager, and `ShellSessionRuntime.executePrompt` after `resume`. The test captures the `continuityState` passed into `runPrompt` and proves the resumed follow-up receives structured compact continuity: terminal classification, failure reason, changed file, verification status, command, and next action.
 - Current next step is G: design and run a long-session CLI synthetic smoke only if it can stay synthetic/test-home scoped and avoid real provider access.
+- G added a synthetic CLI print smoke that seeds a compacted verification-failed long-session fixture in the test home, continues it through the real `/continue` CLI path, and verifies the user-visible continuation/failure handoff plus transcript preserve target file, verification command, and next action.
+- During G, explicit resume of an error-status compacted session stayed behind the existing resume trust boundary and printed resume failure/candidates; the smoke was therefore scoped to the supported completed-session follow-up path while preserving compacted failure continuity in working memory/transcript.
+- H is not selected for immediate implementation: current code already has `compactSummaryFormatter`, `continuityFormatter`, and `replayPlanBuilder`, and checkpoints A-G did not reveal a pure formatter extraction blocker. The current next step is route audit / merge readiness rather than opportunistic extraction.
 
 ## 12. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -480,13 +494,13 @@ opencode 参考重点：
 
 本 planning checkpoint 不执行 A，只创建路线文件并运行 build。下一轮如果继续本路线，应先读取本文件 Current，再执行 A 并同步更新 Current / Backlog / Completed / Verification / Notes。
 
-## Checkpoint Tracking Update: F Completed
+## Checkpoint Tracking Update: G Completed
 
 This section supersedes the original "current recommended first checkpoint" text above.
 
-- Completed: A. Compact/replay coverage audit; B. Long-session continuity fixture builder; C. Compact preserves stopped recovery context; D. Compact preserves verification-failed repair context; E. Compact preserves approved execution failure provenance; F. Resume after compact uses continuity context.
-- Current: G. Long-session CLI synthetic smoke.
-- Backlog: H. Continuity summary formatter extraction only if a later audit proves it is needed.
+- Completed: A. Compact/replay coverage audit; B. Long-session continuity fixture builder; C. Compact preserves stopped recovery context; D. Compact preserves verification-failed repair context; E. Compact preserves approved execution failure provenance; F. Resume after compact uses continuity context; G. Long-session CLI synthetic smoke.
+- Current: Long-session continuity route audit / merge readiness.
+- Backlog: none. H. Continuity summary formatter extraction is not selected because no current compact/resume blocker requires it.
 - Verification for A: read-only RTK inspection of `SessionManager.ts`, `SessionManager.test.ts`, `sessionRuntime.ts`, Claude Code compact/tool-result semantics, and opencode compaction/session semantics; production code and tests were not modified.
 - Notes: A found that existing compact coverage is narrow but real. Approval memory, approval audit history, and action result seed handoff survive auto-compact. Stopped and verification-failed continuity are covered for immediate snapshot/context paths, but not yet through a reusable long-session compact/reload fixture. The next checkpoint should add a fixture builder outside the three giant files before adding behavior proofs.
 - Verification for B: `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts` passed with 53 tests after elevated rerun for sandbox `spawn EPERM`; `rtk npm run build -w packages/ts-shell` passed after elevated rerun for sandbox `dist` write `EPERM`.
@@ -499,3 +513,5 @@ This section supersedes the original "current recommended first checkpoint" text
 - Notes: E proves approved execution failure provenance survives auto-compact plus restored manager continuity context. The focused test asserts allow-once approval provenance, non-persistent cache metadata, non-interactive input source, stopped run-command classification, failed file, blocked verification status, blocker kind, reason, and next action. Next checkpoint F should prove resume/continue consumes this structured continuity path after compact.
 - Verification for F: `rtk npm run test -w packages/ts-shell -- src/core/shell/sessionRuntime.test.ts` passed with 30 tests after elevated rerun; `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts` passed with 56 tests after elevated rerun; `rtk npm run build -w packages/ts-shell` passed after elevated rerun.
 - Notes: F proves resumed runtime execution receives structured compact continuity through `ShellSessionRuntime.executePrompt`, not only final assistant text. The test uses an isolated temporary home, a compacted verification-failed fixture, a restored/resumed manager, and captures the `continuityState` passed into `runPrompt`. Next checkpoint G should only add a synthetic CLI smoke if it remains tightly scoped to temporary/synthetic home and does not touch real-provider config.
+- Verification for G: `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "LONG_SESSION_CLI_SYNTHETIC"` passed with 1 test after elevated rerun; `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` passed with 5 tests after elevated rerun; `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path` passed with 1 test after elevated rerun; `rtk npm run build -w packages/ts-shell` passed after elevated rerun.
+- Notes: G proves the real CLI print `/continue` path can carry compacted failure continuity in synthetic/test-home scope. The smoke seeds compacted verification-failed continuity, follows up through CLI, and asserts the continuation output plus transcript retain failure handoff, target file, verification command, and next action. H is deferred because no pure formatter extraction blocker was found; the route should move to audit / merge readiness next.
