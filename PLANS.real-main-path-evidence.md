@@ -153,13 +153,21 @@ Result:
 
 Goal: verify provider readiness failure classification without leaking auth details and keep real-provider sanity clearly separate from synthetic gates.
 
-Status: current; must not run by default.
+Status: completed.
+
+Result:
+
+- Added `--classification-self-test` mode to `scripts/verify-provider-readiness.mjs`.
+- The self-test exercises provider readiness failure classification without reading `D:\Test\home-sf`.
+- It covers config/auth failures, network/timeout inconclusive failures, and product-regression classification.
+- It prints `homeRead=false` and `real-provider HOME not read` so the safe mode is visibly separate from the opt-in real-provider smoke.
+- The normal `verify:provider-readiness` script remains an explicit real-provider smoke and must not be run by default.
 
 ### F. CLI stopped/failure follow-up real path smoke
 
 Goal: prove that failed/stopped CLI entry states preserve context for follow-up.
 
-Status: backlog.
+Status: current.
 
 ### G. Compact / long-session smoke design
 
@@ -243,10 +251,10 @@ Validation:
 
 ```powershell
 rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts
-rtk npm run verify:provider-readiness
+rtk proxy node scripts/verify-provider-readiness.mjs --classification-self-test
 ```
 
-Run real-provider checks only when the checkpoint explicitly requires them and only with `HOME=D:\Test\home-sf` / `USERPROFILE=D:\Test\home-sf`. Do not read or print credential material.
+Run `rtk npm run verify:provider-readiness` only when a checkpoint explicitly opts into real-provider sanity and only with the expected `HOME=D:\Test\home-sf` / `USERPROFILE=D:\Test\home-sf` boundary. Do not read or print credential material.
 
 ### F. CLI stopped/failure follow-up real path smoke
 
@@ -315,16 +323,26 @@ Never commit audit residue, real-provider config, temporary homes, or unrelated 
 
 Current checkpoint:
 
-- `Provider readiness + real-provider safe smoke`
+- `CLI stopped/failure follow-up real path smoke`
 
 Scope:
 
-- Verify provider readiness failure classification without leaking auth details and keep real-provider sanity clearly separate from synthetic gates.
-- Prefer synthetic/provider-readiness unit coverage first; real-provider checks remain explicit and opt-in.
-- Do not touch provider/auth, MCP, release-core, QueryEngine/queryLoop, or terminalClassification.
+- Prove that failed/stopped CLI entry states preserve context for follow-up.
+- Prefer existing `continue` focused coverage and result contract checks first.
+- Do not touch provider/auth, MCP, release-core, QueryEngine/queryLoop, terminalClassification, or durable session policy unless a focused regression proves it is required.
 
 Completed checkpoint:
 
+- `Provider readiness + real-provider safe smoke`
+  - Added `--classification-self-test` to `scripts/verify-provider-readiness.mjs`.
+  - Proves provider readiness failure classification for config/auth, network/timeout, and product-regression buckets without reading real-provider home.
+  - Keeps the real-provider smoke explicit and opt-in.
+  - Verification:
+    - `rtk git status --short` showed only `PLANS.real-main-path-evidence.md` and `scripts/verify-provider-readiness.mjs` modified after tracked audit files were restored.
+    - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed with the same RTK command outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts` hit sandbox esbuild spawn EPERM, then passed outside the sandbox: 11 passed.
+    - `rtk proxy node scripts/verify-provider-readiness.mjs --classification-self-test` passed, including config/auth, network/timeout, and product-regression classification cases.
+    - Normal `rtk npm run verify:provider-readiness` was intentionally not run because it reads the opt-in real-provider home.
 - `Failed tool execution follow-up smoke`
   - Added `cli-entry-failed-tool-followup-surface` to `scripts/verify-cli-entry.mjs`.
   - Proves approved tool execution can still stop with a clear failed result, command failure evidence, verification detail, next action, and next steps.
@@ -347,13 +365,13 @@ Evidence:
 
 Next recommended checkpoint:
 
-- `Provider readiness + real-provider safe smoke`
+- `CLI stopped/failure follow-up real path smoke`
 
 Reason:
 
-- The print tool execution, non-interactive approval boundary, and failed tool result surface are now covered by `verify-cli-entry`.
-- The next highest real-entry risk is provider readiness classification and ensuring real-provider smoke remains explicit, safe, and non-leaky.
-- The checkpoint must not read, print, copy, or mutate real auth/key/provider configuration unless it explicitly runs the existing opt-in real-provider readiness smoke.
+- Provider readiness classification now has a safe non-real self-test and remains separated from the opt-in real-provider smoke.
+- The next highest real-entry risk is whether stopped/failure states produced through the CLI entry are usable for follow-up without losing context.
+- The checkpoint should reuse existing continue/result contract gates before adding new harness surface.
 
 Default stop condition for the next checkpoint:
 
@@ -363,6 +381,21 @@ Default stop condition for the next checkpoint:
 
 ### Completed
 
+- `Provider readiness + real-provider safe smoke`
+  - Commit: recorded in final status for this checkpoint.
+  - Files:
+    - `scripts/verify-provider-readiness.mjs`
+    - `PLANS.real-main-path-evidence.md`
+  - Production provider/auth changes: none.
+  - Evidence added:
+    - `--classification-self-test` verifies provider readiness failure classification without reading `D:\Test\home-sf`.
+    - The self-test covers config/auth, network/timeout, and product-regression taxonomy buckets.
+    - The opt-in real-provider smoke remains separate and was not run.
+  - Verification:
+    - `rtk git status --short` passed with only the plan and readiness script modified after tracked audit files were restored.
+    - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts` hit sandbox esbuild spawn EPERM, then passed outside the sandbox: 11 passed.
+    - `rtk proxy node scripts/verify-provider-readiness.mjs --classification-self-test` passed and printed `homeRead=false`.
 - `Plan real main path evidence track`
   - Commit: `fcbf038 Plan real main path evidence track`
   - Files: `PLANS.real-main-path-evidence.md`
@@ -429,14 +462,13 @@ Default stop condition for the next checkpoint:
 
 ### Current
 
-- `Provider readiness + real-provider safe smoke`
-  - Target: verify provider readiness failure classification without leaking auth details and keep real-provider sanity separate from synthetic gates.
-  - Default scope: no real-provider run unless explicitly selected; prefer provider-readiness tests and script review first.
-  - Preferred starting point: `packages/ts-shell/src/core/shell/providerReadiness.test.ts` and `scripts/verify-provider-readiness.mjs`.
+- `CLI stopped/failure follow-up real path smoke`
+  - Target: prove that failed/stopped CLI entry states preserve context for follow-up.
+  - Default scope: no provider/auth changes and no new durable session policy.
+  - Preferred starting point: existing `continue` focused CLI tests and `verify:result-contract`.
 
 ### Backlog
 
-- CLI stopped/failure follow-up real path smoke.
 - Compact / long-session smoke design.
 
 ### Notes
@@ -444,3 +476,4 @@ Default stop condition for the next checkpoint:
 - `GOLDEN_MAIN_PATH` is the current automated default/live-ish turn baseline. It is not a real TTY proof and should not be oversold as real-provider maturity.
 - `scripts/live-interactive-runner.mjs` remains manual because it requires real stdin/stdout TTY and intentionally rejects `--print`.
 - Real-provider evidence must stay explicit and opt-in; do not read or print credential material from `D:\Test\home-sf`.
+- Provider readiness classification can be validated without real-provider home by running `rtk proxy node scripts/verify-provider-readiness.mjs --classification-self-test`.

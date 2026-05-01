@@ -12,6 +12,7 @@ const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
 const realHome = 'D:/Test/home-sf'
 const projectRoot = 'D:/Test/provider-readiness-smoke'
 const fixturePath = `${projectRoot}/fixture.txt`
+const classificationSelfTest = process.argv.includes('--classification-self-test')
 
 const networkFailurePattern =
   /(provider-readiness:network|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network|socket hang up|TLS|timeout|unreachable)/i
@@ -178,6 +179,80 @@ function classifyCliFailure(result) {
   return { status: 'product-regression', code: 1 }
 }
 
+function runClassificationSelfTest() {
+  console.log('gate name=provider-readiness')
+  console.log('mode=classification-self-test')
+  console.log('homeRead=false')
+  console.log('real-provider HOME not read')
+
+  const cases = [
+    {
+      name: 'missing-key',
+      result: {
+        output: 'Provider readiness failed (provider-readiness:missing-key): OPENAI_API_KEY is not set',
+        timedOut: false,
+      },
+      expectedStatus: 'config-failure',
+      expectedCode: 3,
+    },
+    {
+      name: 'auth',
+      result: {
+        output: 'Provider readiness failed (provider-readiness:auth): authentication was rejected (401/403)',
+        timedOut: false,
+      },
+      expectedStatus: 'config-failure',
+      expectedCode: 3,
+    },
+    {
+      name: 'network',
+      result: {
+        output: 'Provider readiness failed (provider-readiness:network): fetch failed after reconnecting',
+        timedOut: false,
+      },
+      expectedStatus: 'provider-network-inconclusive',
+      expectedCode: 2,
+    },
+    {
+      name: 'timeout',
+      result: {
+        output: '',
+        timedOut: true,
+      },
+      expectedStatus: 'provider-network-inconclusive',
+      expectedCode: 2,
+    },
+    {
+      name: 'contract-regression',
+      result: {
+        output: 'Result block missing after provider check',
+        timedOut: false,
+      },
+      expectedStatus: 'product-regression',
+      expectedCode: 1,
+    },
+  ]
+
+  let ok = true
+  for (const item of cases) {
+    const classified = classifyCliFailure(item.result)
+    const passed =
+      classified.status === item.expectedStatus &&
+      classified.code === item.expectedCode
+    printStep(
+      `provider-readiness-classification-${item.name}`,
+      passed ? 'pass' : 'product-regression',
+      passed
+        ? classified.status
+        : `got=${classified.status}/${classified.code} expected=${item.expectedStatus}/${item.expectedCode}`,
+    )
+    ok = ok && passed
+  }
+
+  printStep('provider-readiness-classification-self-test', ok ? 'pass' : 'product-regression')
+  process.exit(ok ? 0 : 1)
+}
+
 async function runRealProviderSmoke() {
   writeFixture()
   const result = await run(process.execPath, [
@@ -222,6 +297,11 @@ async function runRealProviderSmoke() {
 }
 
 async function main() {
+  if (classificationSelfTest) {
+    runClassificationSelfTest()
+    return
+  }
+
   console.log('gate name=provider-readiness')
   console.log('mode=smoke')
   console.log('status taxonomy: pass=0 product-regression=1 provider-network-inconclusive=2 config-failure=3')
