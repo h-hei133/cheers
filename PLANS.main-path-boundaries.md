@@ -115,6 +115,18 @@ This branch directly supports the main-path stage by making these user-facing pa
     - `rtk npm run build -w packages/ts-shell` (sandboxed write hit EPERM, escalated RTK rerun passed)
     - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts` (sandboxed esbuild spawn hit EPERM, escalated RTK rerun passed: 52 tests)
   - Behavior: replay message mapping, continuation prompt selection, assistant sentinel requirement, and replay repair-summary merge preserved; transcript loading, transcript repair, turn pairing, runtime seed construction, persistence, and current pointer mutation remain in `SessionManager.ts`.
+- Done: session compact summary formatter extraction.
+  - Commit: reported in final status for this checkpoint.
+  - New module: `packages/ts-shell/src/session/compactSummaryFormatter.ts`
+  - Modified files:
+    - `packages/ts-shell/src/session/SessionManager.ts`
+    - `packages/ts-shell/src/session/compactSummaryFormatter.ts`
+    - `PLANS.main-path-boundaries.md`
+  - Validation:
+    - `rtk git status --short`
+    - `rtk npm run build -w packages/ts-shell` (sandboxed write hit EPERM, escalated RTK rerun passed)
+    - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts` (sandboxed esbuild spawn hit EPERM, escalated RTK rerun passed: 52 tests)
+  - Behavior: compacted continuity summary entry preservation, stale continuity key replacement, boolean approval persistence rendering, and handoff diagnostic summary lines preserved; auto-compact thresholding, working-memory mutation, approval memory extraction, handoff diagnostic construction, persistence, and durable lifecycle state remain in `SessionManager.ts`.
 
 ## 5. Three-File Responsibility Map
 
@@ -265,7 +277,7 @@ Keep TypeScript imports ending in `.js`.
 
 - Done: continuity summary formatter extraction.
 - Done: replay plan pure helper extraction.
-- Backlog: compact summary formatter extraction.
+- Done: compact summary formatter extraction.
 - Backlog: current session pointer validation helper extraction.
 
 ### runMvpIntegratedFlow Direction
@@ -409,15 +421,15 @@ Do not start a second production-code checkpoint in the same commit.
 
 Next implementation checkpoint should be:
 
-- `Extract session compact summary formatter`
+- `Extract current session pointer validation helper`
 
 Why:
 
-- It continues reducing `SessionManager.ts` density after the continuity and replay plan helper extractions.
-- It should target pure compact/summary text construction only.
-- It must keep transcript loading, repair, persistence, current pointer mutation, and durable lifecycle transitions in `SessionManager.ts`.
+- It finishes the low-risk SessionManager helper backlog after continuity, replay plan, and compact summary extraction.
+- It should target pure selection-record validation and resolution shaping only.
+- It must keep current pointer persistence, project-root rebinding, session loading, and durable lifecycle transitions in `SessionManager.ts`.
 - It can be validated by build and focused `SessionManager.test.ts`.
 
 Default stop condition for the next checkpoint:
 
-- If compact summary extraction requires changing session persistence, continuity snapshot extraction, recovery policy, transcript repair semantics, or durable lifecycle state, stop and choose a smaller pure formatter slice.
+- If current-session helper extraction requires changing selection persistence, session lifecycle mutation, project-root matching semantics, or durable recoverability policy, stop and choose a smaller validation helper slice.
