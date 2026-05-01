@@ -139,13 +139,21 @@ Result:
 
 Goal: prove failed tool execution produces a clear user-visible result, actionable repair guidance, and stable follow-up semantics.
 
-Status: current.
+Status: completed.
+
+Result:
+
+- Added `cli-entry-failed-tool-followup-surface` to `scripts/verify-cli-entry.mjs`.
+- The smoke runs synthetic CLI `--print` with `--non-interactive-approval allow-once` for a command request that reaches tool execution and fails after approval.
+- It asserts the allowed approval provenance, stopped result, `verification-failed` blocker, run-command action result, failed command evidence, verification detail, next action, next steps, and approval summary.
+- It asserts no `approval> ` interactive prompt leaks and failed execution does not report `Outcome: success`.
+- It does not access `D:\Test\home-sf` or real-provider configuration.
 
 ### E. Provider readiness + real-provider safe smoke
 
 Goal: verify provider readiness failure classification without leaking auth details and keep real-provider sanity clearly separate from synthetic gates.
 
-Status: backlog; must not run by default.
+Status: current; must not run by default.
 
 ### F. CLI stopped/failure follow-up real path smoke
 
@@ -211,6 +219,7 @@ Allowed files:
 
 - `packages/ts-shell/src/cli-baseline.test.ts`
 - `packages/ts-shell/src/core/shell/sessionRuntime.test.ts` only if existing stopped/failure context coverage needs a minimal import/assertion update.
+- `scripts/verify-cli-entry.mjs` when the checkpoint is implemented as a real CLI entry hard-gate smoke.
 - `PLANS.real-main-path-evidence.md`
 
 Validation:
@@ -219,6 +228,7 @@ Validation:
 rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"
 rtk npm run test -w packages/ts-shell -- src/core/shell/sessionRuntime.test.ts
 rtk npm run verify:result-contract
+rtk npm run verify:cli-entry
 ```
 
 ### E. Provider readiness + real-provider safe smoke
@@ -305,17 +315,20 @@ Never commit audit residue, real-provider config, temporary homes, or unrelated 
 
 Current checkpoint:
 
-- `Failed tool execution follow-up smoke`
+- `Provider readiness + real-provider safe smoke`
 
 Scope:
 
-- Validate that failed tool execution produces a clear user-visible result, actionable repair guidance, and stable follow-up semantics.
-- Prefer synthetic mode and temporary test project/home boundaries.
-- Do not run real-provider checks.
+- Verify provider readiness failure classification without leaking auth details and keep real-provider sanity clearly separate from synthetic gates.
+- Prefer synthetic/provider-readiness unit coverage first; real-provider checks remain explicit and opt-in.
 - Do not touch provider/auth, MCP, release-core, QueryEngine/queryLoop, or terminalClassification.
 
 Completed checkpoint:
 
+- `Failed tool execution follow-up smoke`
+  - Added `cli-entry-failed-tool-followup-surface` to `scripts/verify-cli-entry.mjs`.
+  - Proves approved tool execution can still stop with a clear failed result, command failure evidence, verification detail, next action, and next steps.
+  - Does not use real-provider home.
 - `Non-interactive approval boundary smoke`
   - Added `cli-entry-non-interactive-approval-boundary` to `scripts/verify-cli-entry.mjs`.
   - Proves synthetic print-mode approval-required command defaults to deny, emits non-interactive audit, stops with `approval-denied`, and does not leak an interactive prompt.
@@ -334,13 +347,13 @@ Evidence:
 
 Next recommended checkpoint:
 
-- `Failed tool execution follow-up smoke`
+- `Provider readiness + real-provider safe smoke`
 
 Reason:
 
-- The print tool execution surface and non-interactive approval deny boundary are now covered by `verify-cli-entry`.
-- The next highest real-entry risk is failed tool execution clarity and whether follow-up can be taken without losing context.
-- The checkpoint can stay synthetic and avoid `D:\Test\home-sf`.
+- The print tool execution, non-interactive approval boundary, and failed tool result surface are now covered by `verify-cli-entry`.
+- The next highest real-entry risk is provider readiness classification and ensuring real-provider smoke remains explicit, safe, and non-leaky.
+- The checkpoint must not read, print, copy, or mutate real auth/key/provider configuration unless it explicitly runs the existing opt-in real-provider readiness smoke.
 
 Default stop condition for the next checkpoint:
 
@@ -397,17 +410,32 @@ Default stop condition for the next checkpoint:
     - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed with the same RTK command outside the sandbox.
     - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "approval"` hit sandbox esbuild spawn EPERM, then passed outside the sandbox: 4 passed, 30 skipped.
     - `rtk npm run verify:cli-entry` hit sandbox EPERM writing `D:\Test\cli-entry-gate\fixture.txt`, then passed outside the sandbox, including `[pass] cli-entry-non-interactive-approval-boundary`.
+- `Failed tool execution follow-up smoke`
+  - Commit: recorded in final status for this checkpoint.
+  - Files:
+    - `scripts/verify-cli-entry.mjs`
+    - `PLANS.real-main-path-evidence.md`
+  - Production shell/runtime changes: none.
+  - Evidence added:
+    - `cli-entry-failed-tool-followup-surface` runs CLI `--print` through the real entry script in synthetic mode with explicit non-interactive allow-once.
+    - It checks stopped failed-tool result, `verification-failed` blocker, failed command evidence, verification detail, next action, next steps, and absence of success/interactive prompt leakage.
+  - Verification:
+    - `rtk git status --short` passed with `scripts/verify-cli-entry.mjs`, this plan, and generated audit residue modified.
+    - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed with the same RTK command outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` hit sandbox esbuild spawn EPERM, then passed outside the sandbox: 4 passed, 30 skipped.
+    - `rtk npm run test -w packages/ts-shell -- src/core/shell/sessionRuntime.test.ts` hit sandbox esbuild spawn EPERM, then passed outside the sandbox: 29 passed.
+    - `rtk npm run verify:result-contract` passed outside the sandbox.
+    - `rtk npm run verify:cli-entry` passed outside the sandbox, including `[pass] cli-entry-failed-tool-followup-surface`.
 
 ### Current
 
-- `Failed tool execution follow-up smoke`
-  - Target: prove failed tool execution produces clear user-visible result, actionable repair guidance, and stable follow-up semantics.
-  - Default scope: synthetic provider mode, temporary fixture project, no real-provider home access.
-  - Preferred starting point: existing blocked execution and stopped/continue evidence in `cli-baseline.test.ts`.
+- `Provider readiness + real-provider safe smoke`
+  - Target: verify provider readiness failure classification without leaking auth details and keep real-provider sanity separate from synthetic gates.
+  - Default scope: no real-provider run unless explicitly selected; prefer provider-readiness tests and script review first.
+  - Preferred starting point: `packages/ts-shell/src/core/shell/providerReadiness.test.ts` and `scripts/verify-provider-readiness.mjs`.
 
 ### Backlog
 
-- Provider readiness + real-provider safe smoke.
 - CLI stopped/failure follow-up real path smoke.
 - Compact / long-session smoke design.
 

@@ -399,6 +399,63 @@ async function runNonInteractiveApprovalBoundary() {
   return true
 }
 
+async function runFailedToolFollowupSurface() {
+  const result = await runCli([
+    '--project',
+    projectRoot,
+    '--non-interactive-approval',
+    'allow-once',
+    '--print',
+    'Run node missing-script.js',
+  ])
+  if (result.code !== 0 || result.timedOut) {
+    printStep(
+      'cli-entry-failed-tool-followup-surface',
+      'product-regression',
+      result.timedOut ? 'timed out' : `exit=${result.code}`,
+    )
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  const requiredMarkers = [
+    'Approval decision: allow-once',
+    'Result',
+    'Outcome: stopped',
+    'BlockerKind: verification-failed',
+    'Action result',
+    'Task: run-command',
+    'Changed: none',
+    'Failed files: (command)',
+    'Failure reason: (command):',
+    'Verification: failed',
+    'Verification detail:',
+    'Next action:',
+    'Next steps',
+    'Tool execution failed after approval; inspect the command output/error.',
+    'Approvals: 1/1 approved',
+  ]
+  const missing = requiredMarkers.filter((marker) => !result.output.includes(marker))
+  if (missing.length > 0) {
+    printStep('cli-entry-failed-tool-followup-surface', 'product-regression', `missing=${missing.join(' | ')}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  if (result.output.includes('approval> ')) {
+    printStep('cli-entry-failed-tool-followup-surface', 'product-regression', 'interactive approval prompt leaked')
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  if (result.output.includes('Outcome: success')) {
+    printStep('cli-entry-failed-tool-followup-surface', 'product-regression', 'failed tool execution reported success')
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  printStep('cli-entry-failed-tool-followup-surface', 'pass')
+  return true
+}
+
 async function runSessionMigrationBoundary() {
   seedSessionForMigration()
   const ok = await assertSuccessfulCliRun(
@@ -513,6 +570,7 @@ async function main() {
   checks.push(await runStdinPromptBoundary())
   checks.push(await runPrintToolExecutionSurface())
   checks.push(await runNonInteractiveApprovalBoundary())
+  checks.push(await runFailedToolFollowupSurface())
   checks.push(await runSessionMigrationBoundary())
   checks.push(await runInvalidArgumentBoundary())
   checks.push(await runPackagedEntryBoundary())
