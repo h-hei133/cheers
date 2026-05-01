@@ -347,6 +347,58 @@ async function runPrintToolExecutionSurface() {
   return true
 }
 
+async function runNonInteractiveApprovalBoundary() {
+  const result = await runCli([
+    '--project',
+    projectRoot,
+    '--print',
+    'Run node --version',
+  ])
+  if (result.code !== 0 || result.timedOut) {
+    printStep(
+      'cli-entry-non-interactive-approval-boundary',
+      'product-regression',
+      result.timedOut ? 'timed out' : `exit=${result.code}`,
+    )
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  const requiredMarkers = [
+    'Approval',
+    'Decision source: default-deny',
+    'Non-interactive approval policy: deny (default deny)',
+    'approval-audit:channel=non-interactive',
+    'approval-audit:decision=deny',
+    'Approval decision: deny',
+    'Result',
+    'Outcome: stopped',
+    'BlockerKind: approval-denied',
+    'Action result',
+    'Task: run-command',
+    'Approvals: 0/1 approved',
+  ]
+  const missing = requiredMarkers.filter((marker) => !result.output.includes(marker))
+  if (missing.length > 0) {
+    printStep('cli-entry-non-interactive-approval-boundary', 'product-regression', `missing=${missing.join(' | ')}`)
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  if (result.output.includes('approval> ')) {
+    printStep('cli-entry-non-interactive-approval-boundary', 'product-regression', 'interactive approval prompt leaked')
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+  if (result.output.includes('Outcome: success')) {
+    printStep('cli-entry-non-interactive-approval-boundary', 'product-regression', 'approval-denied command reported success')
+    console.log(summarizeOutput(result.output))
+    return false
+  }
+
+  printStep('cli-entry-non-interactive-approval-boundary', 'pass')
+  return true
+}
+
 async function runSessionMigrationBoundary() {
   seedSessionForMigration()
   const ok = await assertSuccessfulCliRun(
@@ -460,6 +512,7 @@ async function main() {
   checks.push(await runPrintReplayBoundary())
   checks.push(await runStdinPromptBoundary())
   checks.push(await runPrintToolExecutionSurface())
+  checks.push(await runNonInteractiveApprovalBoundary())
   checks.push(await runSessionMigrationBoundary())
   checks.push(await runInvalidArgumentBoundary())
   checks.push(await runPackagedEntryBoundary())

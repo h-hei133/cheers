@@ -125,13 +125,21 @@ Result:
 
 Goal: prove approval-required work in non-interactive or print mode does not silently execute and does not emit a misleading terminal state.
 
-Status: current.
+Status: completed.
+
+Result:
+
+- Added `cli-entry-non-interactive-approval-boundary` to `scripts/verify-cli-entry.mjs`.
+- The smoke runs synthetic CLI `--print` for `Run node --version` without `--non-interactive-approval`.
+- It asserts the approval surface, default-deny source, non-interactive audit decision, stopped result, approval-denied blocker, run-command action result, and approval summary.
+- It asserts no `approval> ` interactive prompt leaks and the denied command does not report `Outcome: success`.
+- It does not access `D:\Test\home-sf` or real-provider configuration.
 
 ### D. Failed tool execution follow-up smoke
 
 Goal: prove failed tool execution produces a clear user-visible result, actionable repair guidance, and stable follow-up semantics.
 
-Status: backlog.
+Status: current.
 
 ### E. Provider readiness + real-provider safe smoke
 
@@ -297,17 +305,21 @@ Never commit audit residue, real-provider config, temporary homes, or unrelated 
 
 Current checkpoint:
 
-- `Non-interactive approval boundary smoke`
+- `Failed tool execution follow-up smoke`
 
 Scope:
 
-- Validate that approval-required work in non-interactive or print mode does not silently execute and does not produce a misleading terminal state.
+- Validate that failed tool execution produces a clear user-visible result, actionable repair guidance, and stable follow-up semantics.
 - Prefer synthetic mode and temporary test project/home boundaries.
 - Do not run real-provider checks.
 - Do not touch provider/auth, MCP, release-core, QueryEngine/queryLoop, or terminalClassification.
 
 Completed checkpoint:
 
+- `Non-interactive approval boundary smoke`
+  - Added `cli-entry-non-interactive-approval-boundary` to `scripts/verify-cli-entry.mjs`.
+  - Proves synthetic print-mode approval-required command defaults to deny, emits non-interactive audit, stops with `approval-denied`, and does not leak an interactive prompt.
+  - Does not use real-provider home.
 - `CLI --print real-ish tool execution smoke`
   - Added `cli-entry-print-tool-execution-surface` to `scripts/verify-cli-entry.mjs`.
   - Proves tool execution -> structured result block -> changed file evidence -> next action via synthetic `--print`.
@@ -322,12 +334,12 @@ Evidence:
 
 Next recommended checkpoint:
 
-- `Non-interactive approval boundary smoke`
+- `Failed tool execution follow-up smoke`
 
 Reason:
 
-- The print tool execution surface is now covered by `verify-cli-entry`.
-- The next highest real-entry risk is approval-required work in non-interactive/print mode silently executing or surfacing an ambiguous terminal state.
+- The print tool execution surface and non-interactive approval deny boundary are now covered by `verify-cli-entry`.
+- The next highest real-entry risk is failed tool execution clarity and whether follow-up can be taken without losing context.
 - The checkpoint can stay synthetic and avoid `D:\Test\home-sf`.
 
 Default stop condition for the next checkpoint:
@@ -371,17 +383,30 @@ Default stop condition for the next checkpoint:
     - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed with the same RTK command outside the sandbox.
     - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "print"` hit sandbox esbuild spawn EPERM, then passed outside the sandbox: 4 passed, 30 skipped.
     - `rtk npm run verify:cli-entry` hit sandbox EPERM writing `D:\Test\cli-entry-gate\fixture.txt`, then passed outside the sandbox, including `[pass] cli-entry-print-tool-execution-surface`.
+- `Non-interactive approval boundary smoke`
+  - Commit: recorded in final status for this checkpoint.
+  - Files:
+    - `scripts/verify-cli-entry.mjs`
+    - `PLANS.real-main-path-evidence.md`
+  - Production shell/runtime changes: none.
+  - Evidence added:
+    - `cli-entry-non-interactive-approval-boundary` runs CLI `--print` through the real entry script in synthetic mode.
+    - It checks default-deny approval rendering, non-interactive audit provenance, stopped terminal surface, `approval-denied` blocker, and absence of interactive prompt leakage.
+  - Verification:
+    - `rtk git status --short` passed with `scripts/verify-cli-entry.mjs`, this plan, and generated audit residue modified.
+    - `rtk npm run build -w packages/ts-shell` hit sandbox EPERM writing `dist`, then passed with the same RTK command outside the sandbox.
+    - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "approval"` hit sandbox esbuild spawn EPERM, then passed outside the sandbox: 4 passed, 30 skipped.
+    - `rtk npm run verify:cli-entry` hit sandbox EPERM writing `D:\Test\cli-entry-gate\fixture.txt`, then passed outside the sandbox, including `[pass] cli-entry-non-interactive-approval-boundary`.
 
 ### Current
 
-- `Non-interactive approval boundary smoke`
-  - Target: prove approval-required work in non-interactive or print mode does not silently execute and does not emit a misleading terminal state.
+- `Failed tool execution follow-up smoke`
+  - Target: prove failed tool execution produces clear user-visible result, actionable repair guidance, and stable follow-up semantics.
   - Default scope: synthetic provider mode, temporary fixture project, no real-provider home access.
-  - Preferred starting point: existing approval allow/deny evidence in `cli-baseline.test.ts`.
+  - Preferred starting point: existing blocked execution and stopped/continue evidence in `cli-baseline.test.ts`.
 
 ### Backlog
 
-- Failed tool execution follow-up smoke.
 - Provider readiness + real-provider safe smoke.
 - CLI stopped/failure follow-up real path smoke.
 - Compact / long-session smoke design.
