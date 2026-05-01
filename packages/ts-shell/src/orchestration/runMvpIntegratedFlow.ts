@@ -49,6 +49,12 @@ import type {
   TargetResolutionBlocker,
 } from "./targetResolution.js";
 import type { SingleFileReplacePatchResult } from "./patchMutationLane.js";
+import {
+  appendApprovalRequestedEvent,
+  appendApprovalResolvedEvent,
+  appendToolResultEvent,
+  appendToolStartedEvent,
+} from "./toolLifecycleEvents.js";
 import { buildMutationTaskDelivery } from "./verificationResultAggregation.js";
 import type {
   AgentExecutionInput,
@@ -10540,18 +10546,14 @@ async function dispatchToolWithLifecycle(input: {
   readonly abortSignal?: AbortSignal;
   readonly requireApprovalEvent: boolean;
 }): Promise<ToolLifecycleResult> {
-  if (input.requireApprovalEvent) {
-    input.events.push({
-      type: "approval.requested",
-      toolName: input.toolName,
-      taskId: input.taskId,
-    });
-  }
-  input.events.push({
-    type: "tool.started",
+  const identity = {
     toolName: input.toolName,
     taskId: input.taskId,
-  });
+  };
+  if (input.requireApprovalEvent) {
+    appendApprovalRequestedEvent(input.events, identity);
+  }
+  appendToolStartedEvent(input.events, identity);
   const result = await input.dispatcher.dispatch(input.toolName, input.args, {
     taskId: input.taskId,
     workspaceRoot: input.workspaceRoot,
@@ -10559,31 +10561,15 @@ async function dispatchToolWithLifecycle(input: {
     abortSignal: input.abortSignal,
   });
   if (input.requireApprovalEvent) {
-    input.events.push({
-      type: "approval.resolved",
-      toolName: input.toolName,
-      taskId: input.taskId,
-      outcome: resolveApprovalOutcomeFromToolResult(result),
-    });
+    appendApprovalResolvedEvent(input.events, identity, result);
   }
-  input.events.push({
-    type: "tool.result",
-    toolName: input.toolName,
-    taskId: input.taskId,
-    success: result.success,
-  });
+  appendToolResultEvent(input.events, identity, result);
   return {
     success: result.success,
     output: result.output,
     error: result.error,
     metadata: result.metadata,
   };
-}
-
-function resolveApprovalOutcomeFromToolResult(
-  result: ToolLifecycleResult,
-): "approved" | "denied" {
-  return result.metadata?.wasEscalated === true ? "denied" : "approved";
 }
 
 function classifyVerificationFailure(input: ToolLifecycleResult): {

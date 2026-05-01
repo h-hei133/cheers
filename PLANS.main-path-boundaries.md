@@ -166,6 +166,19 @@ This branch directly supports the main-path stage by making these user-facing pa
     - `rtk npm run build -w packages/ts-shell` (sandboxed write hit EPERM, escalated RTK rerun passed)
     - `rtk npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "reconciles mutation summary"` (sandboxed esbuild spawn hit EPERM, escalated RTK rerun passed: 1 focused test)
   - Behavior: mutation summary changed-file, failed-file, patch, evidence, and repair-note aggregation preserved, including duplicate suppression and partial-mutation blocker evidence; mutation execution, patch/apply behavior, repair sequencing, terminal classification, provider/auth, and release-core wiring remain in `runMvpIntegratedFlow.ts`.
+- Done: tool lifecycle event helper extraction.
+  - Commit: reported in final status for this checkpoint.
+  - New module: `packages/ts-shell/src/orchestration/toolLifecycleEvents.ts`
+  - Modified files:
+    - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`
+    - `packages/ts-shell/src/orchestration/toolLifecycleEvents.ts`
+    - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.test.ts`
+    - `PLANS.main-path-boundaries.md`
+  - Validation:
+    - `rtk git status --short`
+    - `rtk npm run build -w packages/ts-shell` (sandboxed write hit EPERM, escalated RTK rerun passed)
+    - `rtk npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "formats tool lifecycle events"` (sandboxed esbuild spawn hit EPERM, escalated RTK rerun passed: 1 focused test)
+  - Behavior: approval requested, tool started, approval resolved, and tool result event object construction preserved, including escalated-tool denial outcome mapping; tool dispatch ordering, permission behavior, tool execution, terminal classification, provider/auth, and release-core wiring remain in `runMvpIntegratedFlow.ts`.
 
 ## 5. Three-File Responsibility Map
 
@@ -323,7 +336,7 @@ Keep TypeScript imports ending in `.js`.
 
 - Done: verification result aggregation helper extraction.
 - Done: mutation result aggregation smaller follow-up extraction.
-- Backlog: tool lifecycle event formatter/helper extraction.
+- Done: tool lifecycle event formatter/helper extraction.
 - Backlog: action result seed/evidence formatter extraction.
 
 ## 11. Allowed Files Per Checkpoint
@@ -460,15 +473,15 @@ Do not start a second production-code checkpoint in the same commit.
 
 Next implementation checkpoint should be:
 
-- `Extract tool lifecycle event helper`
+- `Extract action result seed evidence helper`
 
 Why:
 
-- It continues the runMvp helper backlog after the verification and mutation aggregation helper extractions.
-- It should target a stable tool lifecycle event formatter/helper only.
-- It must keep the main orchestration loop, provider/model adapter wiring, tool dispatch, mutation execution, patch/apply behavior, repair flow, and permission behavior in `runMvpIntegratedFlow.ts`.
+- It completes the currently planned runMvp helper backlog after verification, mutation, and tool lifecycle helper extractions.
+- It should target a stable action result seed/evidence formatter only.
+- It must keep the main orchestration loop, provider/model adapter wiring, tool dispatch, mutation execution, patch/apply behavior, repair flow, permission behavior, and terminal classification in `runMvpIntegratedFlow.ts`.
 - It can be validated by build plus the narrowest related `runMvpIntegratedFlow.test.ts` focused pattern.
 
 Default stop condition for the next checkpoint:
 
-- If tool lifecycle helper extraction requires changing tool dispatch ordering, permission behavior, lifecycle event taxonomy, terminal classification, provider/auth behavior, or release-core wiring, stop and choose a smaller pure formatter slice.
+- If action result seed/evidence extraction requires changing result/failure taxonomy, terminal classification, continuation policy, mutation behavior, repair sequencing, provider/auth behavior, or release-core wiring, stop and choose a smaller pure formatter slice.

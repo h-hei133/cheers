@@ -12,6 +12,12 @@ import {
   streamMvpIntegratedFlow,
 } from "./runMvpIntegratedFlow.js";
 import { reconcileFileMutationSummary } from "./mutationResultAggregation.js";
+import {
+  appendApprovalRequestedEvent,
+  appendApprovalResolvedEvent,
+  appendToolResultEvent,
+  appendToolStartedEvent,
+} from "./toolLifecycleEvents.js";
 import { buildMutationTaskDelivery } from "./verificationResultAggregation.js";
 
 describe("MVP integrated end-to-end flow (T10)", () => {
@@ -151,6 +157,47 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       1,
     );
     expect(aggregate.repairNotes[0]).toContain("partial-mutation-failed");
+  });
+
+  it("formats tool lifecycle events without changing dispatch ownership", () => {
+    const events: QueryEvent[] = [];
+    const identity = { toolName: "bash", taskId: "task_tool_lifecycle" };
+
+    appendApprovalRequestedEvent(events, identity);
+    appendToolStartedEvent(events, identity);
+    appendApprovalResolvedEvent(events, identity, {
+      success: false,
+      metadata: { wasEscalated: true },
+    });
+    appendToolResultEvent(events, identity, {
+      success: false,
+      metadata: { wasEscalated: true },
+    });
+
+    expect(events).toEqual([
+      {
+        type: "approval.requested",
+        toolName: "bash",
+        taskId: "task_tool_lifecycle",
+      },
+      {
+        type: "tool.started",
+        toolName: "bash",
+        taskId: "task_tool_lifecycle",
+      },
+      {
+        type: "approval.resolved",
+        toolName: "bash",
+        taskId: "task_tool_lifecycle",
+        outcome: "denied",
+      },
+      {
+        type: "tool.result",
+        toolName: "bash",
+        taskId: "task_tool_lifecycle",
+        success: false,
+      },
+    ]);
   });
 
   it("covers prompt -> handoff -> tool approval -> streamed result", async () => {
