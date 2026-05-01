@@ -8,6 +8,10 @@ import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { ToolDispatcher } from "../tools/dispatcher.js";
 import { safeRemoveDir } from "../test-utils/cleanup.js";
 import {
+  buildActionResultSeedFromCodingResult,
+  extractAttemptedFilesFromEvidence,
+} from "./actionResultEvidence.js";
+import {
   runMvpIntegratedFlow,
   streamMvpIntegratedFlow,
 } from "./runMvpIntegratedFlow.js";
@@ -198,6 +202,63 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         success: false,
       },
     ]);
+  });
+
+  it("formats action result seed from evidence without changing result taxonomy", () => {
+    expect(
+      extractAttemptedFilesFromEvidence([
+        "inspect: read ./src/readme.md",
+        "verify-target-hint: (unknown)",
+        "replan-transform:src/app.ts:replace",
+        "transform:src/app.ts:replace",
+      ]),
+    ).toEqual(["src/readme.md", "src/app.ts"]);
+
+    expect(
+      buildActionResultSeedFromCodingResult("run-command", {
+        attemptedFiles: [],
+        changedFiles: [],
+        verifiedFiles: [],
+        verification: {
+          status: "passed",
+          command: "node --version",
+        },
+      }),
+    ).toMatchObject({
+      actionKind: "run-command",
+      target: "node --version",
+      changedFiles: [],
+      verifiedFiles: [],
+      verification: {
+        status: "passed",
+        command: "node --version",
+      },
+    });
+
+    expect(
+      buildActionResultSeedFromCodingResult("edit-file", {
+        attemptedFiles: ["src/attempted.ts"],
+        changedFiles: [".\\src\\changed.ts"],
+        verifiedFiles: ["./src/verified.ts"],
+        verification: {
+          status: "blocked",
+          blockerKind: "approval-denied",
+          reason: "approval denied",
+        },
+        reason: "write blocked",
+      }),
+    ).toMatchObject({
+      actionKind: "edit-file",
+      target: "src/changed.ts",
+      changedFiles: ["src/changed.ts"],
+      verifiedFiles: ["src/verified.ts"],
+      verification: {
+        status: "blocked",
+        reason: "approval denied",
+        blockerKind: "approval-denied",
+      },
+      reason: "write blocked",
+    });
   });
 
   it("covers prompt -> handoff -> tool approval -> streamed result", async () => {

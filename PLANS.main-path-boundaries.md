@@ -179,6 +179,19 @@ This branch directly supports the main-path stage by making these user-facing pa
     - `rtk npm run build -w packages/ts-shell` (sandboxed write hit EPERM, escalated RTK rerun passed)
     - `rtk npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "formats tool lifecycle events"` (sandboxed esbuild spawn hit EPERM, escalated RTK rerun passed: 1 focused test)
   - Behavior: approval requested, tool started, approval resolved, and tool result event object construction preserved, including escalated-tool denial outcome mapping; tool dispatch ordering, permission behavior, tool execution, terminal classification, provider/auth, and release-core wiring remain in `runMvpIntegratedFlow.ts`.
+- Done: action result seed/evidence helper extraction.
+  - Commit: reported in final status for this checkpoint.
+  - New module: `packages/ts-shell/src/orchestration/actionResultEvidence.ts`
+  - Modified files:
+    - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`
+    - `packages/ts-shell/src/orchestration/actionResultEvidence.ts`
+    - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.test.ts`
+    - `PLANS.main-path-boundaries.md`
+  - Validation:
+    - `rtk git status --short`
+    - `rtk npm run build -w packages/ts-shell` (sandboxed write hit EPERM, escalated RTK rerun passed)
+    - `rtk npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "formats action result seed"` (sandboxed esbuild spawn hit EPERM, escalated RTK rerun passed: 1 focused test)
+  - Behavior: attempted-file extraction from evidence markers and action result seed target/changed/verified/verification normalization preserved; actionable blocker taxonomy, result/failure taxonomy, continuation policy, mutation behavior, repair sequencing, terminal classification, provider/auth, and release-core wiring remain in `runMvpIntegratedFlow.ts`.
 
 ## 5. Three-File Responsibility Map
 
@@ -337,7 +350,7 @@ Keep TypeScript imports ending in `.js`.
 - Done: verification result aggregation helper extraction.
 - Done: mutation result aggregation smaller follow-up extraction.
 - Done: tool lifecycle event formatter/helper extraction.
-- Backlog: action result seed/evidence formatter extraction.
+- Done: action result seed/evidence formatter extraction.
 
 ## 11. Allowed Files Per Checkpoint
 
@@ -473,15 +486,15 @@ Do not start a second production-code checkpoint in the same commit.
 
 Next implementation checkpoint should be:
 
-- `Extract action result seed evidence helper`
+- `Reassess main path boundary backlog`
 
 Why:
 
-- It completes the currently planned runMvp helper backlog after verification, mutation, and tool lifecycle helper extractions.
-- It should target a stable action result seed/evidence formatter only.
-- It must keep the main orchestration loop, provider/model adapter wiring, tool dispatch, mutation execution, patch/apply behavior, repair flow, permission behavior, and terminal classification in `runMvpIntegratedFlow.ts`.
-- It can be validated by build plus the narrowest related `runMvpIntegratedFlow.test.ts` focused pattern.
+- The originally planned CLI, SessionManager, and runMvp helper backlog is now complete.
+- Further extraction should start from a fresh code-map review rather than continuing opportunistically.
+- The next checkpoint should either add a new planned backlog item or deliberately stop this branch for review.
+- It should be validated by build plus the narrowest related focused test once a new bounded surface is selected.
 
 Default stop condition for the next checkpoint:
 
-- If action result seed/evidence extraction requires changing result/failure taxonomy, terminal classification, continuation policy, mutation behavior, repair sequencing, provider/auth behavior, or release-core wiring, stop and choose a smaller pure formatter slice.
+- If the next candidate requires changing public behavior, provider/auth, release-core, QueryEngine/queryLoop, terminal classification, mutation/edit capability, or durable session policy, stop and update the plan before implementing.
