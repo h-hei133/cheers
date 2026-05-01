@@ -34,11 +34,11 @@ import {
 } from "./lowRiskVerificationPlanning.js";
 import { MultiAgentOrchestrator } from "./MultiAgentOrchestrator.js";
 import {
-  buildFileMutationSummaryContract,
   executeFileMutationBranch,
   summarizeFileMutationResults,
 } from "./mutationExecution.js";
 import type { FileMutationExecutionResult } from "./mutationExecution.js";
+import { reconcileFileMutationSummary } from "./mutationResultAggregation.js";
 import {
   applySingleFileReplacePatch,
   formatPatchFailureReason,
@@ -6456,54 +6456,6 @@ function assembleActionResultContract(
     }),
     userFacingOutput,
   };
-}
-
-function reconcileFileMutationSummary(
-  summary: ReturnType<typeof summarizeFileMutationResults>,
-  aggregate: {
-    readonly changedFiles: string[];
-    readonly failedFiles: Array<{ path: string; reason: string }>;
-    readonly patches: CodingPatchRecord[];
-    readonly evidence: string[];
-    readonly repairNotes: string[];
-  },
-): void {
-  for (const changedFile of summary.changedFiles) {
-    if (!aggregate.changedFiles.includes(changedFile)) {
-      aggregate.changedFiles.push(changedFile);
-    }
-  }
-
-  for (const failedFile of summary.failedFiles) {
-    const alreadyRecorded = aggregate.failedFiles.some(
-      (entry) =>
-        normalizePathLike(entry.path) === normalizePathLike(failedFile.path) &&
-        entry.reason === failedFile.reason,
-    );
-    if (!alreadyRecorded) {
-      aggregate.failedFiles.push(failedFile);
-    }
-  }
-
-  for (const patch of summary.patches) {
-    if (!aggregate.patches.includes(patch)) {
-      aggregate.patches.push(patch);
-    }
-  }
-
-  const summaryContract = buildFileMutationSummaryContract(summary);
-
-  for (const evidence of summaryContract.evidence) {
-    if (!aggregate.evidence.includes(evidence)) {
-      aggregate.evidence.push(evidence);
-    }
-  }
-
-  for (const repairNote of summaryContract.repairNotes) {
-    if (!aggregate.repairNotes.includes(repairNote)) {
-      aggregate.repairNotes.push(repairNote);
-    }
-  }
 }
 
 function buildActionResultDelivery(input: ActionResultContractInput): string {

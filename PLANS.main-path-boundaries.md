@@ -153,6 +153,19 @@ This branch directly supports the main-path stage by making these user-facing pa
     - `rtk npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "renders mutation verification delivery"` (sandboxed esbuild spawn hit EPERM, escalated RTK rerun passed: 1 focused test)
     - Note: broad `-t "verification"` also ran and reached existing T10 old-failure coverage, with 4 unrelated status/classification failures; it was not used as this checkpoint gate because the extracted surface is the delivery helper.
   - Behavior: mutation delivery text for verification passed, blocked, failed, not-requested, skipped, no-change, and failed-file cases preserved; main orchestration loop, mutation execution, repair sequencing, actionable blocker taxonomy, terminal classification, provider/auth, and release-core wiring remain in `runMvpIntegratedFlow.ts`.
+- Done: mutation result aggregation helper extraction.
+  - Commit: reported in final status for this checkpoint.
+  - New module: `packages/ts-shell/src/orchestration/mutationResultAggregation.ts`
+  - Modified files:
+    - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`
+    - `packages/ts-shell/src/orchestration/mutationResultAggregation.ts`
+    - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.test.ts`
+    - `PLANS.main-path-boundaries.md`
+  - Validation:
+    - `rtk git status --short`
+    - `rtk npm run build -w packages/ts-shell` (sandboxed write hit EPERM, escalated RTK rerun passed)
+    - `rtk npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "reconciles mutation summary"` (sandboxed esbuild spawn hit EPERM, escalated RTK rerun passed: 1 focused test)
+  - Behavior: mutation summary changed-file, failed-file, patch, evidence, and repair-note aggregation preserved, including duplicate suppression and partial-mutation blocker evidence; mutation execution, patch/apply behavior, repair sequencing, terminal classification, provider/auth, and release-core wiring remain in `runMvpIntegratedFlow.ts`.
 
 ## 5. Three-File Responsibility Map
 
@@ -309,7 +322,7 @@ Keep TypeScript imports ending in `.js`.
 ### runMvpIntegratedFlow Direction
 
 - Done: verification result aggregation helper extraction.
-- Backlog: mutation result aggregation smaller follow-up extraction.
+- Done: mutation result aggregation smaller follow-up extraction.
 - Backlog: tool lifecycle event formatter/helper extraction.
 - Backlog: action result seed/evidence formatter extraction.
 
@@ -447,15 +460,15 @@ Do not start a second production-code checkpoint in the same commit.
 
 Next implementation checkpoint should be:
 
-- `Extract mutation result aggregation helper`
+- `Extract tool lifecycle event helper`
 
 Why:
 
-- It continues the runMvp helper backlog after the verification delivery helper extraction.
-- It should target a smaller stable mutation result summary/adapter helper only.
-- It must keep the main orchestration loop, provider/model adapter wiring, mutation execution, patch/apply behavior, repair flow, and tool lifecycle sequencing in `runMvpIntegratedFlow.ts`.
+- It continues the runMvp helper backlog after the verification and mutation aggregation helper extractions.
+- It should target a stable tool lifecycle event formatter/helper only.
+- It must keep the main orchestration loop, provider/model adapter wiring, tool dispatch, mutation execution, patch/apply behavior, repair flow, and permission behavior in `runMvpIntegratedFlow.ts`.
 - It can be validated by build plus the narrowest related `runMvpIntegratedFlow.test.ts` focused pattern.
 
 Default stop condition for the next checkpoint:
 
-- If mutation result aggregation extraction requires changing patch/apply semantics, edit capability, rollback/batch behavior, repair sequencing, terminal classification, provider/auth behavior, or release-core wiring, stop and choose a smaller pure adapter slice.
+- If tool lifecycle helper extraction requires changing tool dispatch ordering, permission behavior, lifecycle event taxonomy, terminal classification, provider/auth behavior, or release-core wiring, stop and choose a smaller pure formatter slice.

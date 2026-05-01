@@ -11,6 +11,7 @@ import {
   runMvpIntegratedFlow,
   streamMvpIntegratedFlow,
 } from "./runMvpIntegratedFlow.js";
+import { reconcileFileMutationSummary } from "./mutationResultAggregation.js";
 import { buildMutationTaskDelivery } from "./verificationResultAggregation.js";
 
 describe("MVP integrated end-to-end flow (T10)", () => {
@@ -102,6 +103,54 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         verification: { status: "skipped" },
       }),
     ).toBe("Task not completed: no file mutation was applied.");
+  });
+
+  it("reconciles mutation summary into aggregate without duplicating evidence", () => {
+    const failedPatch = {
+      path: "src/fail.txt",
+      operation: "replace" as const,
+      status: "failed" as const,
+      reason: "write failed",
+    };
+    const aggregate = {
+      changedFiles: ["src/ok.txt"],
+      failedFiles: [{ path: "src/fail.txt", reason: "write failed" }],
+      patches: [],
+      evidence: ["mutation-note"],
+      repairNotes: [],
+    };
+
+    reconcileFileMutationSummary(
+      {
+        ok: false,
+        status: "failed",
+        blocker: {
+          code: "partial-mutation-failed",
+          reason:
+            "One or more file mutations failed, so the mutation set cannot be reported as successfully applied.",
+          nextAction:
+            "Review the failed files, re-read current content, and retry only the unresolved mutation.",
+        },
+        changedFiles: ["src/ok.txt", "src/next.txt"],
+        failedFiles: [{ path: ".\\src\\fail.txt", reason: "write failed" }],
+        patches: [failedPatch],
+        evidence: ["mutation-note"],
+      },
+      aggregate,
+    );
+
+    expect(aggregate.changedFiles).toEqual(["src/ok.txt", "src/next.txt"]);
+    expect(aggregate.failedFiles).toEqual([
+      { path: "src/fail.txt", reason: "write failed" },
+    ]);
+    expect(aggregate.patches).toEqual([failedPatch]);
+    expect(aggregate.evidence).toContain(
+      "mutation-summary-blocker:partial-mutation-failed",
+    );
+    expect(aggregate.evidence.filter((entry) => entry === "mutation-note")).toHaveLength(
+      1,
+    );
+    expect(aggregate.repairNotes[0]).toContain("partial-mutation-failed");
   });
 
   it("covers prompt -> handoff -> tool approval -> streamed result", async () => {
