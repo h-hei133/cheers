@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createLongSessionContinuityFixture } from "./__tests__/longSessionContinuityFixtures.js";
 import { SessionManager } from "./SessionManager.js";
 
 describe("SessionManager", () => {
@@ -1869,6 +1870,37 @@ describe("SessionManager", () => {
     expect(state.workingMemory?.summary).toContain(
       "- last-success-handoff-diagnostic: Success handoff: status=passed; target=src/compact.ts; command=npm test -- src/compact.test.ts; verified=src/compact.ts; next=keep the next turn focused on the same target; do not repeat this verification unless the target changes.",
     );
+  });
+
+  it("builds reusable long-session compact continuity fixtures", () => {
+    const manager = new SessionManager();
+    const scenarios = [
+      "stopped-edit-failure",
+      "verification-failed",
+      "approved-tool-failure",
+    ] as const;
+
+    for (const scenario of scenarios) {
+      const fixture = createLongSessionContinuityFixture(manager, scenario);
+      const memory = fixture.readWorkingMemory();
+      const restoredManager = fixture.restoreManager();
+      const snapshot = restoredManager.buildContinuitySnapshot(fixture.session.id);
+      const context = restoredManager.buildPromptContinuityContext(
+        fixture.session.id,
+        "continue the same long session task",
+      );
+
+      expect(memory?.compacted).toBe(true);
+      expect(memory?.compactReason).toBe("auto-threshold");
+      expect(memory?.sourceTurnCount).toBe(12);
+      expect(snapshot.lastTaskKind).toBe(
+        scenario === "approved-tool-failure" ? "run-command" : "edit-file",
+      );
+      expect(snapshot.lastFailure).toBe(fixture.failureReason);
+      expect(snapshot.lastVerificationNextAction).toBe(fixture.nextAction);
+      expect(snapshot.recentTargetFiles).toContain(fixture.targetFile);
+      expect(context).toContain(fixture.nextAction);
+    }
   });
 
   it("persists append-before-model-call barrier before query events begin", () => {
