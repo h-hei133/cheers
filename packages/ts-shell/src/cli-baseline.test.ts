@@ -11,7 +11,11 @@ import {
   createGitRepoFixture,
   normalizeCliOutput,
   runCliCommandToClose,
+  runInteractiveEofSmoke,
+  runInteractiveLineSmoke,
+  runInteractiveStartupSmoke,
 } from "./test-utils/cliHarness.js";
+import { seedStoppedRecoveryContextSession } from "./test-utils/stoppedRecoveryFixture.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, "..", "..", "..");
@@ -677,6 +681,79 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       cli.on("error", reject);
     });
   }, 15000);
+
+  it("interactive startup smoke exposes prompt readiness with synthetic home", async () => {
+    const result = await runInteractiveStartupSmoke({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      envOverrides: {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      },
+    });
+
+    expect(result.output).toContain("Private Coding Agents Shell");
+    expect(result.output).toContain("Session: sess_");
+    expect(result.sessionId).toMatch(/^sess_/);
+    expect(result.output).toContain(
+      "Ctrl+C cancels the current run. Ctrl+D exits.",
+    );
+    expect(result.output.includes("approval> ")).toBe(false);
+  }, 20000);
+
+  it("interactive slash command smoke routes sessions current without provider turn", async () => {
+    const result = await runInteractiveLineSmoke({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      line: "/sessions current",
+      waitFor: "Current session",
+      envOverrides: {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      },
+    });
+
+    expect(result.output).toContain("Private Coding Agents Shell");
+    expect(result.output).toContain("Current session");
+    expect(result.output).toContain("- ID:");
+    expect(result.sessionId).toMatch(/^sess_/);
+    expect(result.output.includes("approval> ")).toBe(false);
+    expect(result.output.includes("Result")).toBe(false);
+  }, 20000);
+
+  it("interactive EOF smoke closes stream without false success", async () => {
+    const result = await runInteractiveEofSmoke({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      envOverrides: {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      },
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.output).toContain("Private Coding Agents Shell");
+    expect(result.output).toContain("Session: sess_");
+    expect(result.output).toContain(
+      "Ctrl+C cancels the current run. Ctrl+D exits.",
+    );
+    expect(result.output).toContain(
+      "Stdin stream closed. Processed 0 prompt(s).",
+    );
+    expect(result.output.includes("Result")).toBe(false);
+    expect(result.output.includes("Outcome: success")).toBe(false);
+    expect(result.output.includes("approval> ")).toBe(false);
+
+    expect(result.sessionId).toMatch(/^sess_/);
+    const sessionDir = path.join(sessionsDir, result.sessionId as string);
+    const state = JSON.parse(
+      fs.readFileSync(path.join(sessionDir, "state.json"), "utf8"),
+    ) as {
+      status?: string;
+      terminalClassification?: string;
+      durableStatus?: string;
+    };
+    expect(state.status).toBe("active");
+    expect(state.terminalClassification).toBeUndefined();
+    expect(state.durableStatus).toBeUndefined();
+  }, 20000);
 
   it("persists session metadata to local filesystem", async () => {
     await new Promise<void>((resolve, reject) => {
@@ -3755,162 +3832,12 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
   }, 60000);
 
   it("keeps stopped recoverable result context actionable through bare and follow-up /continue", async () => {
-    const projectRoot = path.join(
-      fakeHomeDir,
-      "continue-stopped-recovery-context-project",
-    );
-    fs.mkdirSync(path.join(projectRoot, "docs"), { recursive: true });
-    fs.writeFileSync(
-      path.join(projectRoot, "docs", "failed-edit.md"),
-      "Current content remains unchanged.\n",
-      "utf8",
-    );
-
-    const stoppedSessionId = "sess_continue_stopped_recovery";
-    seedSessionWithTitle({
-      sessionId: stoppedSessionId,
+    const {
       projectRoot,
-      title: "Stopped Continue Recovery Context",
-      status: "completed",
-    });
-    writeCurrentSessionPointer({ projectRoot, sessionId: stoppedSessionId });
-
-    const now = new Date().toISOString();
-    const stoppedSessionDir = path.join(sessionsDir, stoppedSessionId);
-    const stopReason =
-      "patch-from-not-found: Source text was not found in docs/failed-edit.md.";
-    const nextAction =
-      "Re-read docs/failed-edit.md, then rerun with the exact current text to replace.";
-    fs.writeFileSync(
-      path.join(stoppedSessionDir, "state.json"),
-      JSON.stringify(
-        {
-          status: "completed",
-          projectRoot,
-          runPhase: "idle",
-          terminalReason: "stopped_error",
-          terminalClassification: "stopped",
-          durableStatus: "stopped",
-        },
-        null,
-        2,
-      ),
-      "utf8",
-    );
-    fs.writeFileSync(
-      path.join(stoppedSessionDir, "transcript.jsonl"),
-      [
-        {
-          type: "message",
-          role: "user",
-          content: "replace old text in docs/failed-edit.md",
-          timestamp: now,
-        },
-        {
-          type: "query-event",
-          event: {
-            type: "query.completed",
-            result: {
-              status: "stopped_error",
-              terminalReason: "stopped_error",
-              terminalClassification: "stopped",
-              stopReason,
-              transcript: [],
-              sharedContext: {
-                sessionId: stoppedSessionId,
-                initialPrompt: "replace old text in docs/failed-edit.md",
-                notes: [],
-                handoffs: [],
-              },
-              finalOutput:
-                "Stopped before editing docs/failed-edit.md because the requested source text was missing.",
-              codingResult: {
-                taskKind: "edit-file",
-                changedFiles: [],
-                failedFiles: [
-                  {
-                    path: "docs/failed-edit.md",
-                    reason: stopReason,
-                  },
-                ],
-                patches: [
-                  {
-                    path: "docs/failed-edit.md",
-                    operation: "replace",
-                    status: "failed",
-                    failureCode: "patch-from-not-found",
-                    reason: stopReason,
-                  },
-                ],
-                repair: {
-                  status: "failed",
-                  attempts: 1,
-                  recoveredItems: [],
-                  failedItems: ["docs/failed-edit.md"],
-                  notes: [`${stopReason} Next action: ${nextAction}`],
-                },
-                continuation: {
-                  status: "failed-after-bounded-continuation",
-                  attempts: 1,
-                  evidence: ["actionable-blocker-kind:patch-from-not-found"],
-                },
-                changeSet: {
-                  gitAware: false,
-                  preExistingDirtyFiles: [],
-                  postRunDirtyFiles: [],
-                  attemptedFiles: ["docs/failed-edit.md"],
-                  changedFiles: [],
-                  unchangedAttemptedFiles: ["docs/failed-edit.md"],
-                },
-                taskSatisfaction: {
-                  verdict: "completed-with-caveats",
-                  reasons: [stopReason],
-                  requiredEvidence: ["inspect->edit->verify contract execution"],
-                  observedEvidence: [
-                    "actionable-blocker-kind:patch-from-not-found",
-                  ],
-                },
-                verifiedFiles: [],
-                unverifiedFiles: [
-                  {
-                    path: "docs/failed-edit.md",
-                    reason: stopReason,
-                  },
-                ],
-                verification: {
-                  status: "blocked",
-                  reason: stopReason,
-                  blockerKind: "patch-from-not-found",
-                  nextAction,
-                },
-                lastActionResultSeed: {
-                  actionKind: "edit-file",
-                  target: "docs/failed-edit.md",
-                  changedFiles: [],
-                  failedFiles: ["docs/failed-edit.md"],
-                  verification: {
-                    status: "blocked",
-                    reason: stopReason,
-                    blockerKind: "patch-from-not-found",
-                  },
-                  blockerKind: "patch-from-not-found",
-                  reason: stopReason,
-                },
-                evidence: [
-                  "actionable-blocker-kind:patch-from-not-found",
-                  `mutation-summary-next-action:${nextAction}`,
-                ],
-                failureBoundary: stopReason,
-              },
-            },
-          },
-          timestamp: now,
-        },
-      ]
-        .map((entry) => JSON.stringify(entry))
-        .join("\n") + "\n",
-      "utf8",
-    );
+      sessionDir: stoppedSessionDir,
+      stopReason,
+      nextAction,
+    } = seedStoppedRecoveryContextSession({ fakeHomeDir, sessionsDir });
 
     const runPrint = (prompt: string) =>
       spawnSync(
@@ -3983,6 +3910,43 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(stoppedNoteText).toContain("last-terminal=stopped:stopped_error");
   }, 60000);
 
+  it("interactive stopped follow-up smoke preserves recovery context", async () => {
+    const followUpPrompt = "continue from stopped edit failure";
+    const { projectRoot, stopReason, nextAction } =
+      seedStoppedRecoveryContextSession({
+        fakeHomeDir,
+        sessionsDir,
+        sessionId: "sess_interactive_stopped_recovery",
+        projectName: "interactive-stopped-recovery-context-project",
+      });
+
+    const result = await runInteractiveLineSmoke({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot],
+      line: `/continue ${followUpPrompt}`,
+      waitFor: "Failure handoff: status=blocked",
+      envOverrides: {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      },
+      timeoutMs: 30000,
+    });
+
+    expect(result.output).toContain("Private Coding Agents Shell");
+    expect(result.output).toContain("Continuation");
+    expect(result.output).toContain("Failure handoff: status=blocked");
+    expect(result.output).toContain("target=docs/failed-edit.md");
+    expect(result.output).toContain(`reason=${stopReason}`);
+    expect(result.output).toContain("blocker=patch-from-not-found");
+    expect(result.output).toContain(
+      "next=Re-read docs/failed-edit.md, then rerun with the exact current text to replace",
+    );
+    expect(result.output).not.toContain("No recoverable session found");
+    expect(result.output).not.toContain("Success handoff: status=passed");
+    expect(result.output.includes("approval> ")).toBe(false);
+    expect(nextAction).toContain("Re-read docs/failed-edit.md");
+  }, 35000);
+
   it("shows structured execution result surface for synthetic print success path", async () => {
     const projectRoot = path.join(fakeHomeDir, "execution-surface-success");
     fs.mkdirSync(projectRoot, { recursive: true });
@@ -4030,6 +3994,36 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(fs.readFileSync(path.join(projectRoot, "note.txt"), "utf8")).toContain(
       "hello execution surface",
     );
+  }, 35000);
+
+  it("print approval boundary defaults deny without prompt", async () => {
+    const projectRoot = path.join(fakeHomeDir, "print-approval-boundary");
+    fs.mkdirSync(projectRoot, { recursive: true });
+
+    const result = await runCliCommandToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot, "--print", "Run node --version"],
+      envOverrides: {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      },
+      timeoutMs: 30000,
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.output).toContain("Approval");
+    expect(result.output).toContain("Decision source: default-deny");
+    expect(result.output).toContain(
+      "Non-interactive approval policy: deny (default deny)",
+    );
+    expect(result.output).toContain("approval-audit:channel=non-interactive");
+    expect(result.output).toContain("approval-audit:decision=deny");
+    expect(result.output).toContain("Approval decision: deny");
+    expect(result.output).toContain("Result");
+    expect(result.output).toContain("Outcome: stopped");
+    expect(result.output).toContain("BlockerKind: approval-denied");
+    expect(result.output.includes("approval> ")).toBe(false);
+    expect(result.output.includes("Outcome: success")).toBe(false);
   }, 35000);
 
   it("keeps synthetic print read-only inspect requests from mutating files", async () => {
