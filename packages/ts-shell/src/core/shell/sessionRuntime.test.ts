@@ -2302,7 +2302,7 @@ describe("shell session runtime (W5)", () => {
               continuation: {
                 status: "failed-after-bounded-continuation",
                 attempts: 1,
-                evidence: ["current-permission-request-tool:bash"],
+                evidence: [],
               },
               changeSet: {
                 gitAware: false,
@@ -2316,7 +2316,7 @@ describe("shell session runtime (W5)", () => {
                 verdict: "not-completed",
                 reasons: [stopReason],
                 requiredEvidence: ["approved tool execution result"],
-                observedEvidence: ["current-permission-request-tool:bash"],
+                observedEvidence: [],
               },
               verifiedFiles: [],
               unverifiedFiles: [{ path: "(command)", reason: executionError }],
@@ -2326,8 +2326,29 @@ describe("shell session runtime (W5)", () => {
                 command: "node --version",
                 nextAction: undefined,
               },
-              evidence: ["current-permission-request-tool:bash"],
+              evidence: [],
               failureBoundary: stopReason,
+              provenance: {
+                approvalDecisions: [
+                  {
+                    kind: "approved",
+                    source: "not-required",
+                    legacyOutcome: "approved",
+                    toolName: "bash",
+                    taskId: "task_1",
+                  },
+                ],
+                toolExecutions: [
+                  {
+                    kind: "executed-failed",
+                    source: "tool-runtime",
+                    legacySuccess: false,
+                    toolName: "bash",
+                    taskId: "task_1",
+                    failureBoundary: "tool-execution-failed",
+                  },
+                ],
+              },
             },
           },
         };

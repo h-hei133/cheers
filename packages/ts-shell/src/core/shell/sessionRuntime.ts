@@ -1541,9 +1541,30 @@ function isApprovedToolExecutionFailure(
   if (!commandFailed) {
     return false;
   }
+  if (hasApprovedBashExecutionFailureProvenance(codingResult)) {
+    return true;
+  }
   return codingResult.evidence.some(
     (entry) =>
       entry === "current-permission-request-tool:bash" ||
       entry.startsWith("current-permission-request-process:"),
+  );
+}
+
+function hasApprovedBashExecutionFailureProvenance(
+  codingResult: CodingResultSummary,
+): boolean {
+  return (
+    codingResult.provenance?.toolExecutions?.some(
+      (execution) =>
+        execution.toolName === "bash" &&
+        execution.kind === "executed-failed" &&
+        codingResult.provenance?.approvalDecisions?.some(
+          (approval) =>
+            approval.taskId === execution.taskId &&
+            approval.toolName === execution.toolName &&
+            approval.legacyOutcome === "approved",
+        ),
+    ) ?? false
   );
 }
