@@ -218,14 +218,21 @@ Completed:
   - Updated `packages/ts-shell/src/orchestration/toolLifecycleEvents.ts` to call the helper instead of directly checking `metadata.wasEscalated`.
   - User-visible terminal wording and event wire shape are unchanged.
   - `runMvpIntegratedFlow.ts`, `SessionManager.ts`, and `cli.tsx` were not modified.
+- D. Tool execution provenance helper
+  - Completed in commit pending for this checkpoint.
+  - Scope: added the smallest production helper in `packages/ts-shell/src/core/tools/toolExecutionProvenance.ts` plus focused tests.
+  - Added `deriveToolExecutionProvenance(...)` to classify tool outcomes as `executed-succeeded`, `executed-failed`, `permission-blocked`, `approval-denied`, `sandbox-preflight-blocked`, or `unavailable-tool`.
+  - Added `toLegacyToolSuccess(...)` so existing `QueryEvent.tool.result.success` remains a boolean.
+  - Updated `packages/ts-shell/src/orchestration/toolLifecycleEvents.ts` to call the helper for legacy success mapping.
+  - User-visible terminal wording and event wire shape are unchanged.
+  - `runMvpIntegratedFlow.ts`, `SessionManager.ts`, and `cli.tsx` were not modified.
 
 Current:
 
-- D. Tool execution provenance helper
+- E. runMvp minimal provenance wiring
 
 Backlog:
 
-- E. runMvp minimal provenance wiring
 - F. resultMapper structured consumption
 - G. sessionRuntime structured rendering guard
 - H. continuity preservation guard
@@ -244,6 +251,13 @@ Verification:
   - `rtk npm run test -w packages/ts-shell -- src/core/tools/runtime.test.ts -t "explicit denial"` first failed with Vitest/esbuild `spawn EPERM`, then passed with the same RTK command elevated: 1 test passed, 4 skipped.
   - `rtk npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "approval"` first failed with Vitest/esbuild `spawn EPERM`, then passed with the same RTK command elevated: 14 tests passed, 130 skipped.
   - `rtk npm run build -w packages/ts-shell` first failed with sandbox/dist write `EPERM`, then passed with the same RTK command elevated.
+- D completion:
+  - `rtk npm run test -w packages/ts-shell -- src/core/tools/toolExecutionProvenance.test.ts` first failed with Vitest/esbuild `spawn EPERM`, then passed with the same RTK command elevated: 7 tests passed.
+  - `rtk npm run test -w packages/ts-shell -- src/core/tools/runtime.test.ts` first failed with Vitest/esbuild `spawn EPERM`, then elevated rerun loaded tests but failed two rust-daemon cases because Cargo executable is unavailable in this environment; this is environment/daemon-toolchain related and not introduced by D.
+  - Shrunk runtime validation passed with elevated reruns: `rtk npm run test -w packages/ts-shell -- src/core/tools/runtime.test.ts -t "explicit denial"` passed 1 test, 4 skipped; `rtk npm run test -w packages/ts-shell -- src/core/tools/runtime.test.ts -t "stale visible"` passed 1 test, 4 skipped.
+  - `rtk npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "approval"` first failed with Vitest/esbuild `spawn EPERM`, then passed with the same RTK command elevated: 14 tests passed, 130 skipped.
+  - `rtk npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "formats tool lifecycle events"` passed with elevated rerun: 1 test passed, 143 skipped.
+  - `rtk npm run build -w packages/ts-shell` first failed with sandbox/dist write `EPERM`, then passed with the same RTK command elevated.
 
 Notes:
 
@@ -256,7 +270,10 @@ Notes:
 - C deliberately did not read, copy, modify, or clean `D:\Test\home-sf`.
 - C did not run real-provider smoke or `verify-real-user-capabilities`.
 - C did not modify provider/auth core or any of the three giant files.
-- The next checkpoint should implement tool execution provenance helper boundaries, still before runMvp codingResult wiring.
+- D deliberately did not read, copy, modify, or clean `D:\Test\home-sf`.
+- D did not run real-provider smoke or `verify-real-user-capabilities`.
+- D did not modify provider/auth core or any of the three giant files.
+- The next checkpoint should do the minimal runMvp provenance wiring into a compatible field/adapter without changing terminal behavior.
 
 ## 14. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -536,9 +553,11 @@ Current:
 - Completed: A. Approval/tool provenance contract audit.
 - Completed: B. Provenance type / fixture planning.
 - Completed: C. Approval decision provenance helper.
-- Current: D. Tool execution provenance helper.
-- Backlog: E. runMvp minimal provenance wiring; F. resultMapper structured consumption; G. sessionRuntime structured rendering guard; H. continuity preservation guard; I. route audit / merge readiness.
+- Completed: D. Tool execution provenance helper.
+- Current: E. runMvp minimal provenance wiring.
+- Backlog: F. resultMapper structured consumption; G. sessionRuntime structured rendering guard; H. continuity preservation guard; I. route audit / merge readiness.
 - Verification for A: `rtk git status --short` passed; `rtk npm run build -w packages/ts-shell` passed after elevated rerun for sandbox/dist write EPERM.
 - Verification for B: `rtk npm run build -w packages/ts-shell` passed after elevated rerun for sandbox/dist write EPERM; `rtk npm run test -w packages/ts-shell -- src/core/query/resultMapper.test.ts` passed after elevated rerun for Vitest/esbuild spawn EPERM, 18 tests passed.
 - Verification for C: focused approvalProvenance/runtime/runMvp approval tests and build passed after elevated reruns for Vitest/esbuild spawn EPERM and sandbox/dist write EPERM.
-- Notes: A was a read-only audit plus plan update. B added a test-utils-only provenance fixture/type draft and did not connect it to production wiring. C added a production approval provenance helper in `core/tools` and only rewired lifecycle outcome derivation to preserve the legacy event shape. No provider/auth core, real-provider home, or three-giant-file logic was changed. D should implement tool execution provenance helper boundaries before runMvp codingResult wiring.
+- Verification for D: focused toolExecutionProvenance tests, non-daemon runtime tests, runMvp approval/lifecycle tests, and build passed after elevated reruns for Vitest/esbuild spawn EPERM and sandbox/dist write EPERM. Full runtime test was intentionally shrunk after two rust-daemon cases failed because Cargo executable is unavailable in this environment.
+- Notes: A was a read-only audit plus plan update. B added a test-utils-only provenance fixture/type draft and did not connect it to production wiring. C added a production approval provenance helper in `core/tools` and only rewired lifecycle outcome derivation to preserve the legacy event shape. D added a production tool execution provenance helper in `core/tools` and only rewired lifecycle success derivation to preserve the legacy event shape. No provider/auth core, real-provider home, or three-giant-file logic was changed. E should do minimal runMvp provenance wiring without changing terminal behavior.

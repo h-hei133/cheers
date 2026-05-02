@@ -1,5 +1,6 @@
 import type { QueryEvent } from "../core/query/events.js";
 import { deriveApprovalDecisionProvenance } from "../core/tools/approvalProvenance.js";
+import { deriveToolExecutionProvenance } from "../core/tools/toolExecutionProvenance.js";
 
 export interface ToolLifecycleEventIdentity {
   readonly toolName: string;
@@ -55,7 +56,7 @@ export function appendToolResultEvent(
     type: "tool.result",
     toolName: identity.toolName,
     taskId: identity.taskId,
-    success: result.success,
+    success: deriveToolExecutionProvenance(result).legacySuccess,
   });
 }
 
