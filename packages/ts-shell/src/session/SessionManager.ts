@@ -178,6 +178,15 @@ export interface SessionContinuitySnapshot {
   readonly lastApprovalInputKey?: "y" | "a" | "n" | "other";
   readonly lastApprovalRecordedAt?: string;
   readonly lastApprovalHistory?: readonly ApprovalAuditMemoryState[];
+  readonly lastApprovalProvenanceKind?: string;
+  readonly lastApprovalProvenanceSource?: string;
+  readonly lastApprovalProvenanceToolName?: string;
+  readonly lastApprovalProvenanceTaskId?: string;
+  readonly lastToolExecutionProvenanceKind?: string;
+  readonly lastToolExecutionProvenanceSource?: string;
+  readonly lastToolExecutionProvenanceToolName?: string;
+  readonly lastToolExecutionProvenanceTaskId?: string;
+  readonly lastToolExecutionFailureBoundary?: string;
   readonly lastPermissionRequestToolName?: string;
   readonly lastPermissionRequestOperation?: string;
   readonly lastPermissionRequestTarget?: string;
@@ -2375,6 +2384,14 @@ export class SessionManager {
     const lastApprovalHistory = this.extractApprovalAuditHistoryMemoryState(
       stateSnapshot?.workingMemory,
     );
+    const approvalProvenanceItems =
+      lastCodingResult?.provenance?.approvalDecisions ?? [];
+    const lastApprovalProvenance =
+      approvalProvenanceItems[approvalProvenanceItems.length - 1];
+    const toolExecutionProvenanceItems =
+      lastCodingResult?.provenance?.toolExecutions ?? [];
+    const lastToolExecutionProvenance =
+      toolExecutionProvenanceItems[toolExecutionProvenanceItems.length - 1];
     const lastAnswerDefect =
       this.extractLastAnswerDefect(lastCodingResult) ?? undefined;
     const lastActionHandoffSummary =
@@ -2624,6 +2641,31 @@ export class SessionManager {
         : {}),
       ...(lastApprovalHistory.length > 0
         ? { lastApprovalHistory }
+        : {}),
+      ...(lastApprovalProvenance
+        ? {
+            lastApprovalProvenanceKind: lastApprovalProvenance.kind,
+            lastApprovalProvenanceSource: lastApprovalProvenance.source,
+            lastApprovalProvenanceToolName: lastApprovalProvenance.toolName,
+            lastApprovalProvenanceTaskId: lastApprovalProvenance.taskId,
+          }
+        : {}),
+      ...(lastToolExecutionProvenance
+        ? {
+            lastToolExecutionProvenanceKind: lastToolExecutionProvenance.kind,
+            lastToolExecutionProvenanceSource:
+              lastToolExecutionProvenance.source,
+            lastToolExecutionProvenanceToolName:
+              lastToolExecutionProvenance.toolName,
+            lastToolExecutionProvenanceTaskId:
+              lastToolExecutionProvenance.taskId,
+            ...(lastToolExecutionProvenance.failureBoundary
+              ? {
+                  lastToolExecutionFailureBoundary:
+                    lastToolExecutionProvenance.failureBoundary,
+                }
+              : {}),
+          }
         : {}),
       ...(resolvedLastPermissionRequest.toolName
         ? { lastPermissionRequestToolName: resolvedLastPermissionRequest.toolName }
@@ -2987,6 +3029,51 @@ export class SessionManager {
         : {}),
       ...(snapshot.lastApprovalHistory?.length
         ? { lastApprovalHistory: snapshot.lastApprovalHistory }
+        : {}),
+      ...(snapshot.lastApprovalProvenanceKind
+        ? { lastApprovalProvenanceKind: snapshot.lastApprovalProvenanceKind }
+        : {}),
+      ...(snapshot.lastApprovalProvenanceSource
+        ? { lastApprovalProvenanceSource: snapshot.lastApprovalProvenanceSource }
+        : {}),
+      ...(snapshot.lastApprovalProvenanceToolName
+        ? {
+            lastApprovalProvenanceToolName:
+              snapshot.lastApprovalProvenanceToolName,
+          }
+        : {}),
+      ...(snapshot.lastApprovalProvenanceTaskId
+        ? { lastApprovalProvenanceTaskId: snapshot.lastApprovalProvenanceTaskId }
+        : {}),
+      ...(snapshot.lastToolExecutionProvenanceKind
+        ? {
+            lastToolExecutionProvenanceKind:
+              snapshot.lastToolExecutionProvenanceKind,
+          }
+        : {}),
+      ...(snapshot.lastToolExecutionProvenanceSource
+        ? {
+            lastToolExecutionProvenanceSource:
+              snapshot.lastToolExecutionProvenanceSource,
+          }
+        : {}),
+      ...(snapshot.lastToolExecutionProvenanceToolName
+        ? {
+            lastToolExecutionProvenanceToolName:
+              snapshot.lastToolExecutionProvenanceToolName,
+          }
+        : {}),
+      ...(snapshot.lastToolExecutionProvenanceTaskId
+        ? {
+            lastToolExecutionProvenanceTaskId:
+              snapshot.lastToolExecutionProvenanceTaskId,
+          }
+        : {}),
+      ...(snapshot.lastToolExecutionFailureBoundary
+        ? {
+            lastToolExecutionFailureBoundary:
+              snapshot.lastToolExecutionFailureBoundary,
+          }
         : {}),
       ...(snapshot.lastRequestScopeCacheKey
         ? { lastRequestScopeCacheKey: snapshot.lastRequestScopeCacheKey }

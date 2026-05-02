@@ -3428,6 +3428,128 @@ describe("SessionManager", () => {
     expect(context).toContain(`- last-verification-next-action: ${nextAction}`);
   });
 
+  it("preserves structured approval tool provenance in continuity context", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    const executionError = "npm run build failed with exit code 1";
+    const stopReason = `Bash execution failed after approval: ${executionError}`;
+
+    manager.markRunStarted(session.id, "continue failed command");
+    manager.addTurn(session.id, {
+      role: "user",
+      content: "run npm build",
+    });
+    manager.appendQueryEvent(session.id, {
+      type: "query.completed",
+      result: {
+        status: "stopped_error",
+        terminalReason: "stopped_error",
+        terminalClassification: "error",
+        stopReason,
+        transcript: [],
+        sharedContext: {
+          sessionId: session.id,
+          initialPrompt: "run npm build",
+          notes: [],
+          handoffs: [],
+        },
+        finalOutput: "",
+        codingResult: {
+          taskKind: "run-command",
+          changedFiles: [],
+          failedFiles: [{ path: "(command)", reason: executionError }],
+          patches: [],
+          repair: {
+            status: "failed",
+            attempts: 1,
+            recoveredItems: [],
+            failedItems: ["(command)"],
+            notes: [stopReason],
+          },
+          continuation: {
+            status: "failed-after-bounded-continuation",
+            attempts: 1,
+            evidence: [],
+          },
+          changeSet: {
+            gitAware: false,
+            preExistingDirtyFiles: [],
+            postRunDirtyFiles: [],
+            attemptedFiles: ["(command)"],
+            changedFiles: [],
+            unchangedAttemptedFiles: ["(command)"],
+          },
+          taskSatisfaction: {
+            verdict: "completed-with-caveats",
+            reasons: [stopReason],
+            requiredEvidence: ["approved tool execution result"],
+            observedEvidence: [],
+          },
+          verifiedFiles: [],
+          unverifiedFiles: [{ path: "(command)", reason: executionError }],
+          verification: {
+            status: "failed",
+            reason: executionError,
+            command: "npm run build",
+          },
+          evidence: [],
+          failureBoundary: stopReason,
+          provenance: {
+            approvalDecisions: [
+              {
+                kind: "approved",
+                source: "not-required",
+                legacyOutcome: "approved",
+                toolName: "bash",
+                taskId: "task_command_bash",
+              },
+            ],
+            toolExecutions: [
+              {
+                kind: "executed-failed",
+                source: "tool-runtime",
+                legacySuccess: false,
+                toolName: "bash",
+                taskId: "task_command_bash",
+                failureBoundary: "tool-execution-failed",
+              },
+            ],
+          },
+        },
+      },
+    });
+    manager.saveError(session.id, stopReason, {
+      terminalReason: "stopped_error",
+      terminalClassification: "error",
+    });
+
+    const snapshot = manager.buildContinuitySnapshot(session.id);
+    expect(snapshot.lastApprovalProvenanceKind).toBe("approved");
+    expect(snapshot.lastApprovalProvenanceSource).toBe("not-required");
+    expect(snapshot.lastApprovalProvenanceToolName).toBe("bash");
+    expect(snapshot.lastToolExecutionProvenanceKind).toBe("executed-failed");
+    expect(snapshot.lastToolExecutionProvenanceSource).toBe("tool-runtime");
+    expect(snapshot.lastToolExecutionProvenanceToolName).toBe("bash");
+    expect(snapshot.lastToolExecutionFailureBoundary).toBe(
+      "tool-execution-failed",
+    );
+
+    const context = manager.buildPromptContinuityContext(
+      session.id,
+      "continue after the failed command",
+    );
+    expect(context).toContain("- last-approval-provenance-kind: approved");
+    expect(context).toContain("- last-approval-provenance-tool: bash");
+    expect(context).toContain(
+      "- last-tool-execution-provenance-kind: executed-failed",
+    );
+    expect(context).toContain("- last-tool-execution-provenance-tool: bash");
+    expect(context).toContain(
+      "- last-tool-execution-failure-boundary: tool-execution-failed",
+    );
+    expect(context).not.toContain("current-permission-request-tool:bash");
+  });
+
   it("retains transform evidence in continuity snapshot for temporal multi-hop rollover", () => {
     const manager = new SessionManager();
     const session = manager.createNew();

@@ -208,6 +208,49 @@ export function formatPromptContinuityContext(
       lines.push(`- last-approval-recorded-at: ${snapshot.lastApprovalRecordedAt}`);
     }
   }
+  if (snapshot.lastApprovalProvenanceKind) {
+    lines.push(`- last-approval-provenance-kind: ${snapshot.lastApprovalProvenanceKind}`);
+    if (snapshot.lastApprovalProvenanceSource) {
+      lines.push(
+        `- last-approval-provenance-source: ${snapshot.lastApprovalProvenanceSource}`,
+      );
+    }
+    if (snapshot.lastApprovalProvenanceToolName) {
+      lines.push(
+        `- last-approval-provenance-tool: ${snapshot.lastApprovalProvenanceToolName}`,
+      );
+    }
+    if (snapshot.lastApprovalProvenanceTaskId) {
+      lines.push(
+        `- last-approval-provenance-task-id: ${snapshot.lastApprovalProvenanceTaskId}`,
+      );
+    }
+  }
+  if (snapshot.lastToolExecutionProvenanceKind) {
+    lines.push(
+      `- last-tool-execution-provenance-kind: ${snapshot.lastToolExecutionProvenanceKind}`,
+    );
+    if (snapshot.lastToolExecutionProvenanceSource) {
+      lines.push(
+        `- last-tool-execution-provenance-source: ${snapshot.lastToolExecutionProvenanceSource}`,
+      );
+    }
+    if (snapshot.lastToolExecutionProvenanceToolName) {
+      lines.push(
+        `- last-tool-execution-provenance-tool: ${snapshot.lastToolExecutionProvenanceToolName}`,
+      );
+    }
+    if (snapshot.lastToolExecutionProvenanceTaskId) {
+      lines.push(
+        `- last-tool-execution-provenance-task-id: ${snapshot.lastToolExecutionProvenanceTaskId}`,
+      );
+    }
+    if (snapshot.lastToolExecutionFailureBoundary) {
+      lines.push(
+        `- last-tool-execution-failure-boundary: ${snapshot.lastToolExecutionFailureBoundary}`,
+      );
+    }
+  }
   if (snapshot.lastRequestScopeCacheKey) {
     lines.push(`- last-request-scope-cache-key: ${snapshot.lastRequestScopeCacheKey}`);
   }
