@@ -1,4 +1,5 @@
 import type { QueryEvent } from "../core/query/events.js";
+import { deriveApprovalDecisionProvenance } from "../core/tools/approvalProvenance.js";
 
 export interface ToolLifecycleEventIdentity {
   readonly toolName: string;
@@ -61,5 +62,5 @@ export function appendToolResultEvent(
 export function resolveApprovalOutcomeFromToolResult(
   result: ToolLifecycleOutcomeLike,
 ): "approved" | "denied" {
-  return result.metadata?.wasEscalated === true ? "denied" : "approved";
+  return deriveApprovalDecisionProvenance(result).legacyOutcome;
 }
