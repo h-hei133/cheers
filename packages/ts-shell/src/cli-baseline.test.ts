@@ -97,6 +97,8 @@ function readJsonFileEventually<T>(filePath: string, attempts = 20): T {
     : new Error(`Timed out waiting for readable JSON file: ${filePath}`);
 }
 
+// This helper intentionally drives the CLI through child_process pipes.
+// It is interactive-style coverage, not true PTY / terminal fidelity coverage.
 function spawnCli(
   fakeHome: string,
   args: string[] = [],
@@ -682,7 +684,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     });
   }, 15000);
 
-  it("interactive startup smoke exposes prompt readiness with synthetic home", async () => {
+  it("pipe-spawn interactive startup smoke exposes prompt readiness with synthetic home", async () => {
     const result = await runInteractiveStartupSmoke({
       spawnCli,
       fakeHome: fakeHomeDir,
@@ -700,7 +702,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(result.output.includes("approval> ")).toBe(false);
   }, 20000);
 
-  it("interactive slash command smoke routes sessions current without provider turn", async () => {
+  it("pipe-spawn interactive slash command smoke routes sessions current without provider turn", async () => {
     const result = await runInteractiveLineSmoke({
       spawnCli,
       fakeHome: fakeHomeDir,
@@ -719,7 +721,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(result.output.includes("Result")).toBe(false);
   }, 20000);
 
-  it("interactive EOF smoke closes stream without false success", async () => {
+  it("pipe-spawn interactive EOF smoke closes stream without false success", async () => {
     const result = await runInteractiveEofSmoke({
       spawnCli,
       fakeHome: fakeHomeDir,
@@ -3910,7 +3912,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(stoppedNoteText).toContain("last-terminal=stopped:stopped_error");
   }, 60000);
 
-  it("interactive stopped follow-up smoke preserves recovery context", async () => {
+  it("pipe-spawn interactive stopped follow-up smoke preserves recovery context", async () => {
     const followUpPrompt = "continue from stopped edit failure";
     const { projectRoot, stopReason, nextAction } =
       seedStoppedRecoveryContextSession({

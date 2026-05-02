@@ -213,15 +213,16 @@ opencode 参考：
 
 Current:
 
-- C. Interactive coverage boundary documentation
+- Blocked before D. Minimal PTY harness prototype
+  - Reason: B found no approved PTY dependency/strategy in the current Windows/Node/Vitest environment. D is not selected until an explicit PTY strategy and dependency risk decision is made.
 
 Backlog:
 
-- D. Minimal PTY harness prototype
-- E. PTY startup readiness smoke
-- F. PTY slash command smoke
-- G. PTY approval prompt smoke
-- H. PTY interrupt / Ctrl-C attribution smoke
+- D. Minimal PTY harness prototype (blocked pending explicit PTY strategy/dependency approval)
+- E. PTY startup readiness smoke (blocked on D)
+- F. PTY slash command smoke (blocked on D)
+- G. PTY approval prompt smoke (blocked on D)
+- H. PTY interrupt / Ctrl-C attribution smoke (blocked on D)
 - I. PTY route audit / merge readiness
 
 Completed:
@@ -248,6 +249,14 @@ Completed:
     - No `.github` workflow path was present in this checkout, so CI PTY support cannot be inferred from repository workflow configuration.
     - Prior validation history and this route's build validation show recurring sandbox `EPERM` for `dist` writes and Vitest/esbuild spawn in this Windows native Codex environment; PTY tests must therefore be capability-checked, skippable, and separately attributable.
     - Feasibility conclusion: do not introduce a PTY dependency or prototype yet. The next safest checkpoint is documentation/naming boundary work so pipe evidence is not mislabeled as true TTY coverage.
+- C. Interactive coverage boundary documentation
+  - Result: completed as a minimal documentation/test-name boundary checkpoint.
+  - Files changed: `packages/ts-shell/src/cli-baseline.test.ts`, `PLANS.pty-interactive-harness.md`.
+  - Changes:
+    - Added a short comment above `spawnCli` stating that the helper intentionally drives the CLI through `child_process` pipes and is not true PTY / terminal fidelity coverage.
+    - Renamed current pipe-driven interactive test titles to start with `pipe-spawn interactive ...` while keeping the `interactive` filter usable.
+    - Did not change test behavior, harness behavior, production CLI logic, dependencies, or real-provider config.
+  - Resulting boundary: current focused smokes remain useful for pipe stdin/stdout behavior, but no test name now implies true PTY coverage.
 
 Verification:
 
@@ -272,6 +281,11 @@ Verification:
   - `rtk npm ls node-pty --workspaces`: exited non-zero with `(empty)`, confirming no installed workspace dependency named `node-pty`.
   - `rtk git status --short`: passed with only `PLANS.pty-interactive-harness.md` modified.
   - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `dist` write `EPERM`; elevated rerun of the same RTK command passed.
+- C documentation round:
+  - `rtk git status --short --branch`: passed; branch `pty-interactive-harness-fidelity`, clean before checkpoint edits.
+  - Search commands: `rtk grep "interactive startup smoke" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "interactive slash command smoke" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "interactive EOF" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "interactive stopped" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "pipe" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk grep "true TTY" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts PLANS.pty-interactive-harness.md`, `rtk grep "function spawnCli" packages/ts-shell/src/cli-baseline.test.ts`.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun of the same RTK command passed with 4 selected tests and 36 skipped.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun of the same RTK command passed with 5 selected tests and 35 skipped.
 
 Notes:
 
@@ -286,6 +300,8 @@ Notes:
 - B audit did not read or modify `D:\Test\home-sf`.
 - B audit recommends not starting `D. Minimal PTY harness prototype` yet. Current should move to C so the existing pipe-spawn tests and plan notes make the coverage boundary explicit before dependency work.
 - A future PTY strategy remains possible, but it must be selected after explicit Node/Windows/CI feasibility and dependency risk review; no dependency is approved by this checkpoint.
+- C documentation kept the existing `interactive` test filter intentionally, because route verification uses that filter; the added `pipe-spawn` prefix disambiguates fidelity without breaking focused test selection.
+- D-H are blocked/deferred until a true PTY strategy is explicitly selected. Do not add more pipe-spawn tests as a substitute for PTY evidence.
 
 ## 15. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
