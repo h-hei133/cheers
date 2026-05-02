@@ -222,6 +222,142 @@ describe("mapTerminalToOrchestrationResult", () => {
     );
   });
 
+  it("uses structured provenance before legacy evidence for approved bash execution failures", () => {
+    const fakeState = {
+      transcript: [
+        {
+          role: "assistant",
+          content: "Build execution failed after approval.",
+          codingResult: buildCodingResult({
+            changedFiles: [],
+            failedFiles: [
+              {
+                path: "(command)",
+                reason: "npm run build failed with exit code 1",
+              },
+            ],
+            verification: {
+              status: "failed",
+              reason: "Verification failed: npm run build failed.",
+            },
+            verdict: "completed-with-caveats",
+            reasons: ["bash execution failed after approval."],
+            provenance: {
+              approvalDecisions: [
+                {
+                  kind: "approved",
+                  source: "not-required",
+                  legacyOutcome: "approved",
+                  toolName: "bash",
+                  taskId: "task_mapper_bash",
+                },
+              ],
+              toolExecutions: [
+                {
+                  kind: "executed-failed",
+                  source: "tool-runtime",
+                  legacySuccess: false,
+                  toolName: "bash",
+                  taskId: "task_mapper_bash",
+                  failureBoundary: "tool-execution-failed",
+                },
+              ],
+            },
+          }),
+        },
+      ],
+      sharedContext: {
+        sessionId: "sess_mapper_structured_bash_failure",
+        initialPrompt: "prompt",
+        notes: [],
+        handoffs: [],
+      },
+      lastContinuationReason: undefined,
+    } as never;
+
+    const result = mapTerminalToOrchestrationResult(fakeState, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+      stopReason: undefined,
+    } as never);
+
+    expect(result.terminalClassification).toBe("error");
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason).toBe(
+      "Bash execution failed after approval: npm run build failed with exit code 1",
+    );
+    expect(result.codingResult?.evidence).not.toContain(
+      "current-permission-request-tool:bash",
+    );
+  });
+
+  it("does not treat structured approval denial as approved bash execution failure", () => {
+    const fakeState = {
+      transcript: [
+        {
+          role: "assistant",
+          content: "Bash approval denied.",
+          codingResult: buildCodingResult({
+            changedFiles: [],
+            failedFiles: [
+              {
+                path: "(command)",
+                reason: "Approval denied by user for bash",
+              },
+            ],
+            verification: {
+              status: "blocked",
+              reason: "Approval denied by user for bash",
+              blockerKind: "approval-denied",
+              nextAction: "Re-run and approve escalation.",
+            },
+            verdict: "completed-with-caveats",
+            reasons: ["Workflow stopped on blocker/failure."],
+            provenance: {
+              approvalDecisions: [
+                {
+                  kind: "escalation-denied",
+                  source: "sandbox-enforcer",
+                  legacyOutcome: "denied",
+                  toolName: "bash",
+                  taskId: "task_mapper_bash",
+                  wasEscalated: true,
+                },
+              ],
+              toolExecutions: [
+                {
+                  kind: "approval-denied",
+                  source: "approval-flow",
+                  legacySuccess: false,
+                  toolName: "bash",
+                  taskId: "task_mapper_bash",
+                  failureBoundary: "approval-denied",
+                },
+              ],
+            },
+          }),
+        },
+      ],
+      sharedContext: {
+        sessionId: "sess_mapper_structured_approval_denied",
+        initialPrompt: "prompt",
+        notes: [],
+        handoffs: [],
+      },
+      lastContinuationReason: undefined,
+    } as never;
+
+    const result = mapTerminalToOrchestrationResult(fakeState, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+      stopReason: undefined,
+    } as never);
+
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason).toBe("Re-run and approve escalation.");
+  });
+
   it("keeps non-verification actionable blockers stopped even with hard failure text", () => {
     const fakeState = {
       transcript: [
@@ -654,6 +790,7 @@ function buildCodingResult(input: {
   verdict: "completed-with-caveats" | "failed" | "insufficient-evidence";
   reasons: string[];
   evidence?: string[];
+  provenance?: Record<string, unknown>;
 }) {
   return {
     taskKind: "edit-file",
@@ -696,5 +833,6 @@ function buildCodingResult(input: {
     })),
     verification: input.verification,
     evidence: input.evidence ?? [],
+    ...(input.provenance ? { provenance: input.provenance } : {}),
   };
 }

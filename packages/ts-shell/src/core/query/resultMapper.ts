@@ -247,6 +247,10 @@ function isHardFailureReason(reason: string): boolean {
 }
 
 function isBashExecutionFailure(codingResult: CodingResultSummary): boolean {
+  if (hasApprovedBashExecutionFailureProvenance(codingResult)) {
+    return true;
+  }
+
   return (
     codingResult.failedFiles.some((entry) => entry.path === "(command)") &&
     codingResult.evidence.some(
@@ -254,6 +258,28 @@ function isBashExecutionFailure(codingResult: CodingResultSummary): boolean {
         entry === "current-permission-request-tool:bash" ||
         entry.startsWith("current-permission-request-process:"),
     )
+  );
+}
+
+function hasApprovedBashExecutionFailureProvenance(
+  codingResult: CodingResultSummary,
+): boolean {
+  if (!codingResult.failedFiles.some((entry) => entry.path === "(command)")) {
+    return false;
+  }
+
+  return (
+    codingResult.provenance?.toolExecutions?.some(
+      (execution) =>
+        execution.toolName === "bash" &&
+        execution.kind === "executed-failed" &&
+        codingResult.provenance?.approvalDecisions?.some(
+          (approval) =>
+            approval.taskId === execution.taskId &&
+            approval.toolName === execution.toolName &&
+            approval.legacyOutcome === "approved",
+        ),
+    ) ?? false
   );
 }
 
