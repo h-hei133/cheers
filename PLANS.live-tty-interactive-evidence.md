@@ -183,14 +183,13 @@ opencode 参考：
 
 Backlog:
 
-- E. Interactive approval prompt smoke
 - F. Non-interactive vs interactive approval boundary
 - G. EOF / close / interrupt attribution smoke
 - H. Live TTY route audit / merge readiness
 
 Current:
 
-- E. Interactive approval prompt smoke
+- F. Non-interactive vs interactive approval boundary
 
 Completed:
 
@@ -210,6 +209,13 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts`, `packages/ts-shell/src/cli-baseline.test.ts`, `PLANS.live-tty-interactive-evidence.md`.
   - Result: completed. Extracted the stopped recovery fixture to test-utils and added a focused interactive `/continue <follow-up>` smoke proving stopped edit failure context preserves blocker, target file, reason, and next action after the live prompt accepts user follow-up.
+
+Blocked / Deferred:
+
+- E. Interactive approval prompt smoke
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `PLANS.live-tty-interactive-evidence.md`.
+  - Result: blocked by current harness capability. The existing `spawn(... stdio: "pipe")` helper makes child `process.stdin.isTTY` false, so the CLI correctly takes the non-interactive approval branch and never renders `approval> `. The repo has no `node-pty` or equivalent PTY dependency. Do not fake live TTY approval with an env override; revisit only after choosing a real PTY/TTY automation strategy.
 
 Verification:
 
@@ -231,6 +237,13 @@ Verification:
 - D stopped follow-up smoke round:
   - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 3 selected tests and 35 skipped.
   - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 56 tests.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
+- E approval prompt smoke audit:
+  - `rtk grep "node-pty" package.json packages/ts-shell/package.json packages/ts-shell/src scripts`: no matches.
+  - `rtk grep "pty" package.json packages/ts-shell/package.json packages/ts-shell/src scripts`: no PTY harness/dependency matches.
+  - `rtk read packages/ts-shell/package.json`: confirmed dependencies are empty and dev dependencies are only Vitest, TypeScript, and TSX.
+  - `rtk grep "approval>" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts packages/ts-shell/src/entrypoints/cli.tsx`: found production `approval> ` prompt in `cli.tsx` and only non-leak assertions in current tests.
+  - `rtk proxy powershell -NoProfile -Command "Get-Content packages/ts-shell/src/entrypoints/cli.tsx | Select-Object -Skip 1618 -First 80"`: confirmed approval prompt is rendered only when the CLI does not classify the channel as non-interactive.
   - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
 
 Notes:
@@ -254,7 +267,8 @@ Notes:
 - The stopped recovery fixture now lives in `packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts` and is shared by the existing print-mode `/continue` test and the new interactive `/continue <follow-up>` smoke, avoiding duplicate large transcript/state setup in `cli-baseline.test.ts`.
 - The interactive stopped follow-up smoke uses fake home and `PRIVATE_AGENTS_PROVIDER_MODE=synthetic`; it does not read or modify `D:\Test\home-sf`.
 - Three-file guardrail clarification: `cli.tsx`, `SessionManager.ts`, and `runMvpIntegratedFlow.ts` may be modified when the feature truly belongs to their entry wiring / durable session state / orchestration responsibilities. The guardrail is not a blanket ban; it requires a responsibility check and minimal scoped changes.
-- Next selected checkpoint is E. Interactive approval prompt smoke. It should first verify whether the existing line helper is enough to observe and answer `approval> `, then add the smallest safe synthetic approval requested/denied/approved smoke.
+- E is blocked because current process-pipe tests are intentionally non-TTY. Adding a fake `FORCE_INTERACTIVE_TTY` style switch would make the evidence misleading and violate the route rule against fake live TTY behavior.
+- Next selected checkpoint is F. Non-interactive vs interactive approval boundary. It should strengthen the non-interactive half with current harness evidence and explicitly document the blocked interactive half until a real PTY driver is available.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 
