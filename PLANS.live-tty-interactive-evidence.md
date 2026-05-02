@@ -183,7 +183,6 @@ opencode 参考：
 
 Backlog:
 
-- A. Interactive CLI harness audit
 - B. Minimal interactive startup smoke
 - C. Interactive slash command smoke
 - D. Interactive stopped follow-up smoke
@@ -194,21 +193,37 @@ Backlog:
 
 Current:
 
-- A. Interactive CLI harness audit
+- B. Minimal interactive startup smoke
 
 Completed:
 
-- None yet.
+- A. Interactive CLI harness audit
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `PLANS.live-tty-interactive-evidence.md`.
+  - Result: completed as a read-only audit / planning checkpoint. Existing coverage proves the repo already has interactive-ish spawn patterns, but no small reusable live TTY harness yet.
 
 Verification:
 
 - Planning round: `rtk git status --short`, `rtk npm run build -w packages/ts-shell`, `rtk git diff`.
+- A audit round:
+  - `rtk git status --short --branch`: passed; branch `live-tty-interactive-evidence`, clean before checkpoint update.
+  - Target repo audit commands: `rtk read AGENTS.md`, `rtk read PLANS.live-tty-interactive-evidence.md`, `rtk read packages/ts-shell/src/cli-baseline.test.ts`, `rtk read packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk read scripts/verify-cli-entry.mjs`, `rtk read packages/ts-shell/src/entrypoints/cli.tsx`.
+  - Target search commands: `rtk find "cliHarness" packages/ts-shell/src scripts package.json packages/ts-shell/package.json`, `rtk find "interactive" packages/ts-shell/src scripts`, `rtk find "spawn" packages/ts-shell/src scripts`, `rtk find "readline" packages/ts-shell/src scripts`, `rtk grep "approval>" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk grep "Ctrl+D" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk grep "stdin" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts scripts/verify-cli-entry.mjs`, `rtk grep "/continue" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/entrypoints/cli.tsx scripts/verify-cli-entry.mjs`, `rtk grep "Ctrl+C" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/core/shell`, `rtk grep "rl.on" packages/ts-shell/src/entrypoints/cli.tsx`, `rtk grep "close" packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/core/shell/signalHandlers.ts packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "SIGINT" packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/core/shell/signalHandlers.ts packages/ts-shell/src/cli-baseline.test.ts`.
+  - Reference comparison commands: `rtk grep "readline" D:\LenovoSoftstore\pyproject\source-claudecode\commands.ts D:\LenovoSoftstore\pyproject\source-claudecode\query.ts D:\LenovoSoftstore\pyproject\source-claudecode\QueryEngine.ts`, `rtk grep "approval" D:\LenovoSoftstore\pyproject\source-claudecode\commands.ts D:\LenovoSoftstore\pyproject\source-claudecode\query.ts D:\LenovoSoftstore\pyproject\source-claudecode\QueryEngine.ts`, `rtk grep "isTTY" packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/cli-baseline.test.ts scripts/verify-cli-entry.mjs D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts`, `rtk grep "permission.asked" D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\acp\agent.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\permission\permission.ts`.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
 
 Notes:
 
 - This route starts from `b22f9d7 Seal real provider safe evidence track`.
-- Do not implement an interactive checkpoint in the planning round.
-- First implementation checkpoint should audit existing harness/test utilities before adding a new TTY driver.
+- A audit found that `packages/ts-shell/src/cli-baseline.test.ts` already contains inline `spawn`-based interactive-ish scenarios: startup surface, stdin writes, approval response, `/resume`, SIGINT/kill, close handling, golden multi-turn synthetic smoke, and user-driven approval allow/deny evidence.
+- `packages/ts-shell/src/test-utils/cliHarness.ts` currently exposes `runCliCommandToClose`, `normalizeCliOutput`, and git fixture helpers; it does not yet provide a reusable prompt-readiness driver, multi-turn stdin driver, approval response helper, or EOF/interrupt attribution helper.
+- `scripts/verify-cli-entry.mjs` remains non-interactive / `--print` focused and uses synthetic home. It is useful as a boundary reference but is not a live TTY harness.
+- `packages/ts-shell/src/entrypoints/cli.tsx` already has the production interactive boundary: `readline.createInterface`, `rl.on("line")`, `rl.on("close")`, `process.stdin.isTTY` mode separation, and interactive approval prompt `approval> `.
+- Target search found `approval> ` assertions and stdin writes in `cli-baseline.test.ts`, but no reusable test-utils API for waiting on prompt readiness or for scripted line-by-line interaction.
+- Target search for `Ctrl+D` returned no direct test marker, so EOF/close behavior is indirectly covered through `stdin.end()` / close handling but not named as a live TTY EOF contract.
+- Claude Code reference grep did not reveal a direct `readline`/approval CLI harness in the inspected files; useful alignment is semantic: user input and abort/interrupt are load-bearing query-loop state, not execution-plane shortcuts.
+- opencode reference shows a clear `process.stdin.isTTY` split and event-based `permission.asked` handling, supporting this route's boundary: interactive permission decisions should be explicit and non-interactive stdin should not accidentally enter prompt UX.
+- Next selected checkpoint is B. Minimal interactive startup smoke. It should first move only the smallest reusable harness pieces out of `cli-baseline.test.ts` into `packages/ts-shell/src/test-utils/*`, then add one focused startup prompt-readiness smoke with synthetic/test home.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 
