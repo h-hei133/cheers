@@ -213,8 +213,8 @@ opencode 参考：
 
 Current:
 
-- Blocked before D. Minimal PTY harness prototype
-  - Reason: B found no approved PTY dependency/strategy in the current Windows/Node/Vitest environment. D is not selected until an explicit PTY strategy and dependency risk decision is made.
+- Route sealed on main.
+  - Reason: A/B/C completed the fidelity audit, PTY feasibility audit, and coverage-boundary documentation. D-H remain deferred/blocked pending explicit true PTY strategy and dependency-risk approval.
 
 Backlog:
 
@@ -257,6 +257,11 @@ Completed:
     - Renamed current pipe-driven interactive test titles to start with `pipe-spawn interactive ...` while keeping the `interactive` filter usable.
     - Did not change test behavior, harness behavior, production CLI logic, dependencies, or real-provider config.
   - Resulting boundary: current focused smokes remain useful for pipe stdin/stdout behavior, but no test name now implies true PTY coverage.
+- I. PTY route audit / merge readiness
+  - Result: completed. Route merged back to `main` with no-ff merge commit `3d950a6 Merge PTY interactive harness fidelity track`.
+  - Files changed after merge: `PLANS.pty-interactive-harness.md` closeout notes only.
+  - Seal status: stage-sealed. True PTY coverage remains deferred; pipe-spawn coverage boundary is documented in the plan and in `cli-baseline.test.ts` test names/comments.
+  - Next recommendation: return to a fresh main-path blocker assessment. Do not continue D-H or add more pipe-spawn smokes unless a true PTY strategy/dependency has been explicitly approved.
 
 Verification:
 
@@ -286,6 +291,23 @@ Verification:
   - Search commands: `rtk grep "interactive startup smoke" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "interactive slash command smoke" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "interactive EOF" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "interactive stopped" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "pipe" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk grep "true TTY" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts PLANS.pty-interactive-harness.md`, `rtk grep "function spawnCli" packages/ts-shell/src/cli-baseline.test.ts`.
   - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun of the same RTK command passed with 4 selected tests and 36 skipped.
   - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun of the same RTK command passed with 5 selected tests and 35 skipped.
+- I merge-readiness round on `pty-interactive-harness-fidelity`:
+  - `rtk git status --short`: passed; branch clean.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `dist` write `EPERM`; elevated rerun of the same RTK command passed.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 4 selected tests and 36 skipped.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 5 selected tests and 35 skipped.
+  - `rtk npm run verify:cli-entry`: sandbox run failed writing synthetic `D:\Test\cli-entry-gate\fixture.txt` with `EPERM`; elevated rerun passed all CLI entry checks.
+  - `rtk npm run verify:result-contract`: sandbox run failed with child process `spawn EPERM`; elevated rerun passed all result-contract checks.
+  - `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 1 selected test and 39 skipped.
+- I post-merge round on `main`:
+  - Merge: `git merge --no-ff pty-interactive-harness-fidelity -m "Merge PTY interactive harness fidelity track"` created merge commit `3d950a6`.
+  - `rtk git status --short --branch`: passed after merge; `main...origin/main [ahead 5]`.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `dist` write `EPERM`; elevated rerun of the same RTK command passed.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 4 selected tests and 36 skipped.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 5 selected tests and 35 skipped.
+  - `rtk npm run verify:cli-entry`: sandbox run failed writing synthetic `D:\Test\cli-entry-gate\fixture.txt` with `EPERM`; elevated rerun passed all CLI entry checks.
+  - `rtk npm run verify:result-contract`: sandbox run failed with child process `spawn EPERM`; elevated rerun passed all result-contract checks.
+  - `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 1 selected test and 39 skipped.
 
 Notes:
 
@@ -302,6 +324,9 @@ Notes:
 - A future PTY strategy remains possible, but it must be selected after explicit Node/Windows/CI feasibility and dependency risk review; no dependency is approved by this checkpoint.
 - C documentation kept the existing `interactive` test filter intentionally, because route verification uses that filter; the added `pipe-spawn` prefix disambiguates fidelity without breaking focused test selection.
 - D-H are blocked/deferred until a true PTY strategy is explicitly selected. Do not add more pipe-spawn tests as a substitute for PTY evidence.
+- I merge-readiness and post-merge validation did not run real-provider smoke and did not read or modify `D:\Test\home-sf`.
+- Audit residue generated by validation was restored before merge and before seal work; do not commit `.sisyphus/audit/permissions.jsonl` or `packages/ts-shell/.sisyphus/audit/permissions.jsonl`.
+- This route is stage-sealed. The correct next action is a fresh main-path blocker assessment, not more PTY-fidelity work, unless true PTY strategy/dependency approval is explicitly provided.
 
 ## 15. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
