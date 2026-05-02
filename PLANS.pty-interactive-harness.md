@@ -213,11 +213,10 @@ opencode 参考：
 
 Current:
 
-- B. PTY feasibility / dependency audit
+- C. Interactive coverage boundary documentation
 
 Backlog:
 
-- C. Interactive coverage boundary documentation
 - D. Minimal PTY harness prototype
 - E. PTY startup readiness smoke
 - F. PTY slash command smoke
@@ -238,6 +237,17 @@ Completed:
     - `packages/ts-shell/src/entrypoints/cli.tsx` still contains the production TTY boundary through `process.stdin.isTTY`, readline setup, keypress handling, and `approval> ` prompt wiring.
     - `packages/ts-shell/package.json` has no runtime dependencies and only `vitest`, `typescript`, and `tsx` dev dependencies; repo search found no `node-pty` dependency outside prior plan notes.
     - No current automated test proves `process.stdin.isTTY === true`, terminal raw mode, real Ctrl-C, PTY close, or true interactive approval prompt fidelity.
+- B. PTY feasibility / dependency audit
+  - Result: completed as a read-only audit / planning checkpoint.
+  - Files changed: `PLANS.pty-interactive-harness.md`.
+  - Findings:
+    - Root `package.json` exposes `start:live:interactive`, which runs `scripts/live-interactive-runner.mjs`; that runner requires inherited real TTY handles but is manual/live-runner oriented, not an automated PTY driver.
+    - `packages/ts-shell/package.json` has no runtime dependencies and no PTY-related dev dependency. `npm ls node-pty --workspaces` reported an empty tree.
+    - Targeted search found no `node-pty` in package manifests or lockfile; matches only appear in prior plan notes.
+    - Current Node runtime is `v24.12.0`, while root `engines.node` is `>=20.0.0`; any future PTY dependency must be checked against current Node ABI / Windows support before being accepted.
+    - No `.github` workflow path was present in this checkout, so CI PTY support cannot be inferred from repository workflow configuration.
+    - Prior validation history and this route's build validation show recurring sandbox `EPERM` for `dist` writes and Vitest/esbuild spawn in this Windows native Codex environment; PTY tests must therefore be capability-checked, skippable, and separately attributable.
+    - Feasibility conclusion: do not introduce a PTY dependency or prototype yet. The next safest checkpoint is documentation/naming boundary work so pipe evidence is not mislabeled as true TTY coverage.
 
 Verification:
 
@@ -253,6 +263,15 @@ Verification:
   - `rtk grep "spawn(" ...`: failed because the unescaped parenthesis was parsed as a regex group; reran as `rtk grep "spawn" ...` and completed the audit.
   - `rtk git status --short`: passed with only `PLANS.pty-interactive-harness.md` modified.
   - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `dist` write `EPERM`; elevated rerun of the same RTK command passed.
+- B audit round:
+  - `rtk git status --short --branch`: passed; branch `pty-interactive-harness-fidelity`, clean before checkpoint update. Remote tracking showed the prior A checkpoint at `origin/pty-interactive-harness-fidelity`.
+  - Dependency/config read commands: `rtk read package.json`, `rtk read packages/ts-shell/package.json`.
+  - Dependency and environment commands: `rtk grep "node-pty" package.json package-lock.json packages/ts-shell/package.json packages/ts-shell/package-lock.json PLANS.pty-interactive-harness.md PLANS.live-tty-interactive-evidence.md`, `rtk npm ls node-pty --workspaces`, `rtk node -v`.
+  - Focused search commands: `rtk grep "isTTY" scripts/live-interactive-runner.mjs packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk grep "runs-on" .github scripts package.json`, `rtk grep "start:live:interactive" package.json scripts/live-interactive-runner.mjs PLANS.live-tty-interactive-evidence.md PLANS.pty-interactive-harness.md`, `rtk grep "EPERM" PLANS.live-tty-interactive-evidence.md PLANS.pty-interactive-harness.md scripts packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "process.stdin.isTTY" scripts/live-interactive-runner.mjs packages/ts-shell/src/entrypoints/cli.tsx`.
+  - `rtk grep "runs-on" .github scripts package.json`: returned no matches and reported `.github` missing; this is an environment/repo fact, not a product failure.
+  - `rtk npm ls node-pty --workspaces`: exited non-zero with `(empty)`, confirming no installed workspace dependency named `node-pty`.
+  - `rtk git status --short`: passed with only `PLANS.pty-interactive-harness.md` modified.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `dist` write `EPERM`; elevated rerun of the same RTK command passed.
 
 Notes:
 
@@ -262,7 +281,11 @@ Notes:
 - A audit did not read or modify `D:\Test\home-sf`.
 - opencode reference search showed explicit `process.stdin.isTTY` branching and `permission.asked` event handling, reinforcing that interactive/non-interactive and permission decisions are separate semantic layers.
 - Claude Code targeted grep did not reveal direct `readline` or `SIGINT` matches in the inspected files; no code was copied from references.
-- Next checkpoint B should decide whether a true PTY strategy is feasible in this Windows/Node/Vitest environment before any dependency or harness prototype is introduced.
+- A audit handed off to B to decide whether a true PTY strategy is feasible in this Windows/Node/Vitest environment before any dependency or harness prototype is introduced.
+- B audit did not modify production code, dependency manifests, package lockfiles, test helper code, or the three large files.
+- B audit did not read or modify `D:\Test\home-sf`.
+- B audit recommends not starting `D. Minimal PTY harness prototype` yet. Current should move to C so the existing pipe-spawn tests and plan notes make the coverage boundary explicit before dependency work.
+- A future PTY strategy remains possible, but it must be selected after explicit Node/Windows/CI feasibility and dependency risk review; no dependency is approved by this checkpoint.
 
 ## 15. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
