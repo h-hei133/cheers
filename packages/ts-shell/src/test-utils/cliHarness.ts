@@ -17,6 +17,11 @@ export type InteractiveStartupSmokeResult = {
   sessionId: string | null;
 };
 
+export type InteractiveLineSmokeResult = {
+  output: string;
+  sessionId: string | null;
+};
+
 export function createGitRepoFixture(root: string): void {
   fs.mkdirSync(root, { recursive: true });
   const initialized = spawnSync("git", ["init", "-q"], {
@@ -143,6 +148,83 @@ export async function runInteractiveStartupSmoke(input: {
           sessionId: matched?.[1] ?? null,
         };
       });
+    };
+
+    cli.stdout?.on("data", onData);
+    cli.stderr?.on("data", onData);
+    cli.on("error", fail);
+  });
+}
+
+export async function runInteractiveLineSmoke(input: {
+  spawnCli: SpawnCliForTest;
+  fakeHome: string;
+  line: string;
+  waitFor: string;
+  args?: string[];
+  envOverrides?: Record<string, string>;
+  readyMarker?: string;
+  timeoutMs?: number;
+}): Promise<InteractiveLineSmokeResult> {
+  const {
+    spawnCli,
+    fakeHome,
+    line,
+    waitFor,
+    args = [],
+    envOverrides = {},
+    readyMarker = "Ctrl+C cancels the current run. Ctrl+D exits.",
+    timeoutMs = 20000,
+  } = input;
+
+  return await new Promise((resolve, reject) => {
+    const cli = spawnCli(fakeHome, args, envOverrides);
+    let output = "";
+    let sessionId: string | null = null;
+    let lineSent = false;
+    let settled = false;
+
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      cli.kill();
+      resolve({ output, sessionId });
+    };
+
+    const fail = (error: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      cli.kill();
+      reject(error);
+    };
+
+    const timeout = setTimeout(() => {
+      fail(
+        new Error(
+          `Timed out waiting for interactive line marker: ${waitFor}\nOutput so far:\n${output}`,
+        ),
+      );
+    }, timeoutMs);
+
+    const onData = (data: Buffer) => {
+      output += data.toString();
+      if (!sessionId) {
+        sessionId = output.match(/Session:\s*(sess_[^\s\r\n]+)/)?.[1] ?? null;
+      }
+      if (!lineSent && output.includes(readyMarker)) {
+        lineSent = true;
+        cli.stdin?.write(line.endsWith("\n") ? line : `${line}\n`);
+        return;
+      }
+      if (lineSent && output.includes(waitFor)) {
+        finish();
+      }
     };
 
     cli.stdout?.on("data", onData);

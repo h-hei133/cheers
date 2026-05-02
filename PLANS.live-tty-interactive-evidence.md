@@ -183,7 +183,6 @@ opencode 参考：
 
 Backlog:
 
-- C. Interactive slash command smoke
 - D. Interactive stopped follow-up smoke
 - E. Interactive approval prompt smoke
 - F. Non-interactive vs interactive approval boundary
@@ -192,7 +191,7 @@ Backlog:
 
 Current:
 
-- C. Interactive slash command smoke
+- D. Interactive stopped follow-up smoke
 
 Completed:
 
@@ -204,6 +203,10 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `packages/ts-shell/src/test-utils/cliHarness.ts`, `packages/ts-shell/src/cli-baseline.test.ts`, `PLANS.live-tty-interactive-evidence.md`.
   - Result: completed. Added a small reusable `runInteractiveStartupSmoke` helper and a focused synthetic-home interactive startup smoke that waits for prompt readiness, captures the session id, and confirms no approval prompt leaks during startup.
+- C. Interactive slash command smoke
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `packages/ts-shell/src/test-utils/cliHarness.ts`, `packages/ts-shell/src/cli-baseline.test.ts`, `PLANS.live-tty-interactive-evidence.md`.
+  - Result: completed. Added a minimal `runInteractiveLineSmoke` helper and a focused `/sessions current` smoke that drives one harmless interactive slash command after prompt readiness, confirms current-session output, and verifies no provider turn/result or approval prompt is triggered.
 
 Verification:
 
@@ -217,6 +220,10 @@ Verification:
 - B startup smoke round:
   - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 1 selected test and 35 skipped.
   - `rtk npm run verify:cli-entry`: sandbox run failed creating `D:\Test\cli-entry-gate\fixture.txt` with `EPERM`; elevated rerun passed all CLI entry checks.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
+- C slash command smoke round:
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 2 selected tests and 35 skipped.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 5 selected tests and 32 skipped.
   - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
 
 Notes:
@@ -233,7 +240,10 @@ Notes:
 - B implementation kept production behavior unchanged and did not modify `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
 - `runInteractiveStartupSmoke` intentionally covers only startup readiness and session id capture. It kills the child after the marker, so it is not yet a general multi-turn, slash-command, approval, or EOF harness.
 - The new startup smoke runs with `PRIVATE_AGENTS_PROVIDER_MODE=synthetic`, uses the test fake home, and does not read or modify `D:\Test\home-sf`.
-- Next selected checkpoint is C. Interactive slash command smoke. It should reuse `runInteractiveStartupSmoke` patterns but add only the minimum line-driving capability needed for a harmless slash command such as `/sessions current` or equivalent.
+- C implementation kept production behavior unchanged and did not modify `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
+- `runInteractiveLineSmoke` intentionally supports one scripted line and one expected marker. It is enough for harmless slash-command evidence but is not yet a general multi-turn driver.
+- The `/sessions current` smoke stays within synthetic/test home, does not execute a model/provider turn, does not emit `Result`, and does not enter `approval>`.
+- Next selected checkpoint is D. Interactive stopped follow-up smoke. It should reuse the line-driving helper shape, but may need a focused fixture for stopped session state before starting the interactive shell.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 

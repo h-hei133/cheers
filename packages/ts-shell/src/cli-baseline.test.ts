@@ -11,6 +11,7 @@ import {
   createGitRepoFixture,
   normalizeCliOutput,
   runCliCommandToClose,
+  runInteractiveLineSmoke,
   runInteractiveStartupSmoke,
 } from "./test-utils/cliHarness.js";
 
@@ -695,6 +696,25 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       "Ctrl+C cancels the current run. Ctrl+D exits.",
     );
     expect(result.output.includes("approval> ")).toBe(false);
+  }, 20000);
+
+  it("interactive slash command smoke routes sessions current without provider turn", async () => {
+    const result = await runInteractiveLineSmoke({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      line: "/sessions current",
+      waitFor: "Current session",
+      envOverrides: {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      },
+    });
+
+    expect(result.output).toContain("Private Coding Agents Shell");
+    expect(result.output).toContain("Current session");
+    expect(result.output).toContain("- ID:");
+    expect(result.sessionId).toMatch(/^sess_/);
+    expect(result.output.includes("approval> ")).toBe(false);
+    expect(result.output.includes("Result")).toBe(false);
   }, 20000);
 
   it("persists session metadata to local filesystem", async () => {
