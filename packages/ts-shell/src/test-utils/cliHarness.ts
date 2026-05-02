@@ -22,6 +22,12 @@ export type InteractiveLineSmokeResult = {
   sessionId: string | null;
 };
 
+export type InteractiveEofSmokeResult = {
+  code: number | null;
+  output: string;
+  sessionId: string | null;
+};
+
 export function createGitRepoFixture(root: string): void {
   fs.mkdirSync(root, { recursive: true });
   const initialized = spawnSync("git", ["init", "-q"], {
@@ -229,6 +235,75 @@ export async function runInteractiveLineSmoke(input: {
 
     cli.stdout?.on("data", onData);
     cli.stderr?.on("data", onData);
+    cli.on("error", fail);
+  });
+}
+
+export async function runInteractiveEofSmoke(input: {
+  spawnCli: SpawnCliForTest;
+  fakeHome: string;
+  args?: string[];
+  envOverrides?: Record<string, string>;
+  readyMarker?: string;
+  timeoutMs?: number;
+}): Promise<InteractiveEofSmokeResult> {
+  const {
+    spawnCli,
+    fakeHome,
+    args = [],
+    envOverrides = {},
+    readyMarker = "Ctrl+C cancels the current run. Ctrl+D exits.",
+    timeoutMs = 15000,
+  } = input;
+
+  return await new Promise((resolve, reject) => {
+    const cli = spawnCli(fakeHome, args, envOverrides);
+    let output = "";
+    let sessionId: string | null = null;
+    let eofSent = false;
+    let settled = false;
+
+    const finish = (code: number | null) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      resolve({ code, output, sessionId });
+    };
+
+    const fail = (error: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      cli.kill();
+      reject(error);
+    };
+
+    const timeout = setTimeout(() => {
+      fail(
+        new Error(
+          `Timed out waiting for interactive EOF close\nOutput so far:\n${output}`,
+        ),
+      );
+    }, timeoutMs);
+
+    const onData = (data: Buffer) => {
+      output += data.toString();
+      if (!sessionId) {
+        sessionId = output.match(/Session:\s*(sess_[^\s\r\n]+)/)?.[1] ?? null;
+      }
+      if (!eofSent && output.includes(readyMarker)) {
+        eofSent = true;
+        cli.stdin?.end();
+      }
+    };
+
+    cli.stdout?.on("data", onData);
+    cli.stderr?.on("data", onData);
+    cli.on("close", finish);
     cli.on("error", fail);
   });
 }

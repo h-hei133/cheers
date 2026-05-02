@@ -183,12 +183,11 @@ opencode 参考：
 
 Backlog:
 
-- G. EOF / close / interrupt attribution smoke
 - H. Live TTY route audit / merge readiness
 
 Current:
 
-- G. EOF / close / interrupt attribution smoke
+- H. Live TTY route audit / merge readiness
 
 Completed:
 
@@ -212,6 +211,10 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `packages/ts-shell/src/cli-baseline.test.ts`, `PLANS.live-tty-interactive-evidence.md`.
   - Result: completed. Added a focused `--print` non-interactive approval boundary smoke proving default-deny emits approval audit markers and stopped terminal result, and never renders `approval> `. The interactive approval prompt half remains covered by E's blocked/deferred PTY note rather than faked with an env override.
+- G. EOF / close / interrupt attribution smoke
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `packages/ts-shell/src/test-utils/cliHarness.ts`, `packages/ts-shell/src/cli-baseline.test.ts`, `PLANS.live-tty-interactive-evidence.md`.
+  - Result: completed. Added a reusable `runInteractiveEofSmoke` helper and a focused default CLI EOF/close smoke that waits for prompt readiness, closes stdin, confirms the stream closes with zero processed prompts, and proves no false `Result`, `Outcome: success`, or `approval> ` prompt is emitted while session state remains active and unclassified.
 
 Blocked / Deferred:
 
@@ -253,6 +256,10 @@ Verification:
   - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "print"`: elevated rerun passed with 6 selected tests and 33 skipped.
   - `rtk npm run verify:cli-entry`: elevated rerun passed all CLI entry checks, including `cli-entry-non-interactive-approval-boundary`.
   - `rtk npm run build -w packages/ts-shell`: elevated rerun passed.
+- G EOF / close / interrupt attribution round:
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run hit Vitest/esbuild `spawn EPERM`; elevated rerun passed with 4 selected tests and 36 skipped.
+  - `rtk npm run verify:result-contract`: sandbox run hit child process `spawn EPERM`; elevated rerun passed all result-contract checks.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run hit `dist` write `EPERM`; elevated rerun passed.
 
 Notes:
 
@@ -278,7 +285,8 @@ Notes:
 - E is blocked because current process-pipe tests are intentionally non-TTY. Adding a fake `FORCE_INTERACTIVE_TTY` style switch would make the evidence misleading and violate the route rule against fake live TTY behavior.
 - F implementation intentionally did not modify `cli.tsx`: current production mode separation already belongs there and was sufficient. The new test locks the observable `--print` non-interactive boundary; default pipe-stream approval behavior is not treated as live TTY prompt evidence and remains separate from the deferred PTY prompt work.
 - F validation rejected an overbroad first attempt to assert default pipe-stream approval as `--print` default-deny. The actual pipe-stream default CLI can proceed through synthetic approval and then stop on execution/verification failure, so this checkpoint intentionally scopes the hard gate to `--print` non-interactive approval and leaves pipe-stream approval attribution for a future blocker only if it becomes main-path critical.
-- Next selected checkpoint is G. EOF / close / interrupt attribution smoke. It should stay focused on terminal attribution and session persistence, without reopening approval prompt work unless a real PTY driver is selected.
+- G implementation stayed in test utilities and test orchestration. It did not change `cli.tsx`; production EOF/close behavior was already expressed by the default non-TTY stream close path and this checkpoint locks the user-visible contract.
+- Next selected checkpoint is H. Live TTY route audit / merge readiness. It should verify and seal the route, not add another same-family interactive proof.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 

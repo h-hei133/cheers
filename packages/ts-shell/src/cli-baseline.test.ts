@@ -11,6 +11,7 @@ import {
   createGitRepoFixture,
   normalizeCliOutput,
   runCliCommandToClose,
+  runInteractiveEofSmoke,
   runInteractiveLineSmoke,
   runInteractiveStartupSmoke,
 } from "./test-utils/cliHarness.js";
@@ -716,6 +717,42 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(result.sessionId).toMatch(/^sess_/);
     expect(result.output.includes("approval> ")).toBe(false);
     expect(result.output.includes("Result")).toBe(false);
+  }, 20000);
+
+  it("interactive EOF smoke closes stream without false success", async () => {
+    const result = await runInteractiveEofSmoke({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      envOverrides: {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      },
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.output).toContain("Private Coding Agents Shell");
+    expect(result.output).toContain("Session: sess_");
+    expect(result.output).toContain(
+      "Ctrl+C cancels the current run. Ctrl+D exits.",
+    );
+    expect(result.output).toContain(
+      "Stdin stream closed. Processed 0 prompt(s).",
+    );
+    expect(result.output.includes("Result")).toBe(false);
+    expect(result.output.includes("Outcome: success")).toBe(false);
+    expect(result.output.includes("approval> ")).toBe(false);
+
+    expect(result.sessionId).toMatch(/^sess_/);
+    const sessionDir = path.join(sessionsDir, result.sessionId as string);
+    const state = JSON.parse(
+      fs.readFileSync(path.join(sessionDir, "state.json"), "utf8"),
+    ) as {
+      status?: string;
+      terminalClassification?: string;
+      durableStatus?: string;
+    };
+    expect(state.status).toBe("active");
+    expect(state.terminalClassification).toBeUndefined();
+    expect(state.durableStatus).toBeUndefined();
   }, 20000);
 
   it("persists session metadata to local filesystem", async () => {
