@@ -12,6 +12,11 @@ export type ClosedCliCommandResult = {
   output: string;
 };
 
+export type InteractiveStartupSmokeResult = {
+  output: string;
+  sessionId: string | null;
+};
+
 export function createGitRepoFixture(root: string): void {
   fs.mkdirSync(root, { recursive: true });
   const initialized = spawnSync("git", ["init", "-q"], {
@@ -72,5 +77,76 @@ export async function runCliCommandToClose(input: {
       clearTimeout(timeout);
       reject(error);
     });
+  });
+}
+
+export async function runInteractiveStartupSmoke(input: {
+  spawnCli: SpawnCliForTest;
+  fakeHome: string;
+  args?: string[];
+  envOverrides?: Record<string, string>;
+  readyMarker?: string;
+  timeoutMs?: number;
+}): Promise<InteractiveStartupSmokeResult> {
+  const {
+    spawnCli,
+    fakeHome,
+    args = [],
+    envOverrides = {},
+    readyMarker = "Ctrl+C cancels the current run. Ctrl+D exits.",
+    timeoutMs = 15000,
+  } = input;
+
+  return await new Promise((resolve, reject) => {
+    const cli = spawnCli(fakeHome, args, envOverrides);
+    let output = "";
+    let settled = false;
+
+    const finish = (callback: () => InteractiveStartupSmokeResult) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      const result = callback();
+      cli.kill();
+      resolve(result);
+    };
+
+    const fail = (error: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      cli.kill();
+      reject(error);
+    };
+
+    const timeout = setTimeout(() => {
+      fail(
+        new Error(
+          `Timed out waiting for interactive startup marker: ${readyMarker}\nOutput so far:\n${output}`,
+        ),
+      );
+    }, timeoutMs);
+
+    const onData = (data: Buffer) => {
+      output += data.toString();
+      if (!output.includes(readyMarker)) {
+        return;
+      }
+      finish(() => {
+        const matched = output.match(/Session:\s*(sess_[^\s\r\n]+)/);
+        return {
+          output,
+          sessionId: matched?.[1] ?? null,
+        };
+      });
+    };
+
+    cli.stdout?.on("data", onData);
+    cli.stderr?.on("data", onData);
+    cli.on("error", fail);
   });
 }

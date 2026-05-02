@@ -11,6 +11,7 @@ import {
   createGitRepoFixture,
   normalizeCliOutput,
   runCliCommandToClose,
+  runInteractiveStartupSmoke,
 } from "./test-utils/cliHarness.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -677,6 +678,24 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       cli.on("error", reject);
     });
   }, 15000);
+
+  it("interactive startup smoke exposes prompt readiness with synthetic home", async () => {
+    const result = await runInteractiveStartupSmoke({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      envOverrides: {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      },
+    });
+
+    expect(result.output).toContain("Private Coding Agents Shell");
+    expect(result.output).toContain("Session: sess_");
+    expect(result.sessionId).toMatch(/^sess_/);
+    expect(result.output).toContain(
+      "Ctrl+C cancels the current run. Ctrl+D exits.",
+    );
+    expect(result.output.includes("approval> ")).toBe(false);
+  }, 20000);
 
   it("persists session metadata to local filesystem", async () => {
     await new Promise<void>((resolve, reject) => {

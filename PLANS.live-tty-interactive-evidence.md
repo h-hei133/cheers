@@ -183,7 +183,6 @@ opencode 参考：
 
 Backlog:
 
-- B. Minimal interactive startup smoke
 - C. Interactive slash command smoke
 - D. Interactive stopped follow-up smoke
 - E. Interactive approval prompt smoke
@@ -193,7 +192,7 @@ Backlog:
 
 Current:
 
-- B. Minimal interactive startup smoke
+- C. Interactive slash command smoke
 
 Completed:
 
@@ -201,6 +200,10 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `PLANS.live-tty-interactive-evidence.md`.
   - Result: completed as a read-only audit / planning checkpoint. Existing coverage proves the repo already has interactive-ish spawn patterns, but no small reusable live TTY harness yet.
+- B. Minimal interactive startup smoke
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `packages/ts-shell/src/test-utils/cliHarness.ts`, `packages/ts-shell/src/cli-baseline.test.ts`, `PLANS.live-tty-interactive-evidence.md`.
+  - Result: completed. Added a small reusable `runInteractiveStartupSmoke` helper and a focused synthetic-home interactive startup smoke that waits for prompt readiness, captures the session id, and confirms no approval prompt leaks during startup.
 
 Verification:
 
@@ -210,6 +213,10 @@ Verification:
   - Target repo audit commands: `rtk read AGENTS.md`, `rtk read PLANS.live-tty-interactive-evidence.md`, `rtk read packages/ts-shell/src/cli-baseline.test.ts`, `rtk read packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk read scripts/verify-cli-entry.mjs`, `rtk read packages/ts-shell/src/entrypoints/cli.tsx`.
   - Target search commands: `rtk find "cliHarness" packages/ts-shell/src scripts package.json packages/ts-shell/package.json`, `rtk find "interactive" packages/ts-shell/src scripts`, `rtk find "spawn" packages/ts-shell/src scripts`, `rtk find "readline" packages/ts-shell/src scripts`, `rtk grep "approval>" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk grep "Ctrl+D" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk grep "stdin" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts scripts/verify-cli-entry.mjs`, `rtk grep "/continue" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/entrypoints/cli.tsx scripts/verify-cli-entry.mjs`, `rtk grep "Ctrl+C" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/core/shell`, `rtk grep "rl.on" packages/ts-shell/src/entrypoints/cli.tsx`, `rtk grep "close" packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/core/shell/signalHandlers.ts packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "SIGINT" packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/core/shell/signalHandlers.ts packages/ts-shell/src/cli-baseline.test.ts`.
   - Reference comparison commands: `rtk grep "readline" D:\LenovoSoftstore\pyproject\source-claudecode\commands.ts D:\LenovoSoftstore\pyproject\source-claudecode\query.ts D:\LenovoSoftstore\pyproject\source-claudecode\QueryEngine.ts`, `rtk grep "approval" D:\LenovoSoftstore\pyproject\source-claudecode\commands.ts D:\LenovoSoftstore\pyproject\source-claudecode\query.ts D:\LenovoSoftstore\pyproject\source-claudecode\QueryEngine.ts`, `rtk grep "isTTY" packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/cli-baseline.test.ts scripts/verify-cli-entry.mjs D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts`, `rtk grep "permission.asked" D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\acp\agent.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\permission\permission.ts`.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
+- B startup smoke round:
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 1 selected test and 35 skipped.
+  - `rtk npm run verify:cli-entry`: sandbox run failed creating `D:\Test\cli-entry-gate\fixture.txt` with `EPERM`; elevated rerun passed all CLI entry checks.
   - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
 
 Notes:
@@ -223,7 +230,10 @@ Notes:
 - Target search for `Ctrl+D` returned no direct test marker, so EOF/close behavior is indirectly covered through `stdin.end()` / close handling but not named as a live TTY EOF contract.
 - Claude Code reference grep did not reveal a direct `readline`/approval CLI harness in the inspected files; useful alignment is semantic: user input and abort/interrupt are load-bearing query-loop state, not execution-plane shortcuts.
 - opencode reference shows a clear `process.stdin.isTTY` split and event-based `permission.asked` handling, supporting this route's boundary: interactive permission decisions should be explicit and non-interactive stdin should not accidentally enter prompt UX.
-- Next selected checkpoint is B. Minimal interactive startup smoke. It should first move only the smallest reusable harness pieces out of `cli-baseline.test.ts` into `packages/ts-shell/src/test-utils/*`, then add one focused startup prompt-readiness smoke with synthetic/test home.
+- B implementation kept production behavior unchanged and did not modify `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
+- `runInteractiveStartupSmoke` intentionally covers only startup readiness and session id capture. It kills the child after the marker, so it is not yet a general multi-turn, slash-command, approval, or EOF harness.
+- The new startup smoke runs with `PRIVATE_AGENTS_PROVIDER_MODE=synthetic`, uses the test fake home, and does not read or modify `D:\Test\home-sf`.
+- Next selected checkpoint is C. Interactive slash command smoke. It should reuse `runInteractiveStartupSmoke` patterns but add only the minimum line-driving capability needed for a harmless slash command such as `/sessions current` or equivalent.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 
