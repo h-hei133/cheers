@@ -176,15 +176,34 @@ opencode targeted reference:
 
 Completed:
 
-- None in this route yet.
+- A. Approval/tool provenance contract audit
+  - Completed in commit pending for this checkpoint.
+  - Scope: read-only audit plus plan update; no production or test code changed.
+  - Main-path steps advanced: Step 4 approval/tool provenance clarity, Step 5 terminal failure attribution, Step 6 continuity provenance preservation.
+  - Target audit findings:
+    - `packages/ts-shell/src/core/query/events.ts` is the current event contract source: `approval.resolved` only carries `approved | denied`, and `tool.result` only carries `success`.
+    - `packages/ts-shell/src/orchestration/toolLifecycleEvents.ts` is the current lifecycle adapter source: approval outcome is derived from `ToolExecutionResult.metadata.wasEscalated === true ? "denied" : "approved"`, so approval denial, approval not-required, skipped approval, and execution failure are not separately represented.
+    - `packages/ts-shell/src/core/tools/approvalFlow.ts` returns `deniedResult(...)` with `wasEscalated`, making policy denial visible but not yet a full provenance contract.
+    - `packages/ts-shell/src/core/tools/runtime.ts` emits allowlist denial, unregistered tool denial, approval policy denial, MCP unavailable-tool-style denial, and runtime execution error through the same `ToolExecutionResult` shape.
+    - `packages/ts-shell/src/core/tools/toolResultLifecycle.ts` durable lifecycle index preserves last event and basic outcome/success but not structured execution provenance.
+    - `packages/ts-shell/src/core/query/queryLoop.ts` compensates orphaned approval/tool lifecycle events as `denied` and `success:false`, which is useful durability evidence but not a product-level denial/execution provenance source.
+    - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts` still emits `current-permission-request-*` evidence markers and maps approval-denied / actionable blockers across orchestration-specific result construction.
+    - `packages/ts-shell/src/core/query/resultMapper.ts` still detects bash execution failure from `(command)` failedFiles plus `current-permission-request-*` evidence markers, and derives actionable blocker kind from evidence markers or reason text.
+    - `packages/ts-shell/src/core/shell/sessionRuntime.ts` still renders/reasons over approval and command failure using evidence markers, blockerKind, stopReason, and text fallbacks.
+    - `packages/ts-shell/src/session/SessionManager.ts` parses `current-permission-request-*` evidence markers for continuity and compensates lifecycle events, so continuity currently inherits string-marker provenance.
+  - Reference audit findings:
+    - Claude Code `QueryEngine.ts` tracks permission denials separately from tool execution and carries permission denial evidence into result/output metadata.
+    - Claude Code `query.ts` / tool execution path keeps permission checks in the query/tool boundary rather than terminal rendering.
+    - opencode `permission.ts` exposes `permission.asked` / `permission.replied` events and represents user rejection as a permission-layer result.
+    - opencode `tool.ts` / `bash.ts` keep tool execution result metadata separate from permission decisions, which supports a clean permission-vs-execution boundary.
+  - Decision: B should design the smallest compatible provenance type/fixture first; production wiring should not start in `runMvpIntegratedFlow.ts`.
 
 Current:
 
-- A. Approval/tool provenance contract audit
+- B. Provenance type / fixture planning
 
 Backlog:
 
-- B. Provenance type / fixture planning
 - C. Approval decision provenance helper
 - D. Tool execution provenance helper
 - E. runMvp minimal provenance wiring
@@ -192,6 +211,19 @@ Backlog:
 - G. sessionRuntime structured rendering guard
 - H. continuity preservation guard
 - I. route audit / merge readiness
+
+Verification:
+
+- A completion:
+  - `rtk git status --short` passed; only `PLANS.approval-tool-provenance.md` was modified.
+  - `rtk npm run build -w packages/ts-shell` first failed with sandbox/dist write `EPERM`, then passed with the same RTK command elevated.
+
+Notes:
+
+- A deliberately did not read, copy, modify, or clean `D:\Test\home-sf`.
+- A did not run real-provider smoke or `verify-real-user-capabilities`.
+- A did not modify production code, tests, provider/auth core, or the three giant files.
+- The next checkpoint should be a fixture/type planning checkpoint that can be reviewed independently before any production wiring.
 
 ## 14. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -465,3 +497,11 @@ Current:
 - 直接实现 helper 前，需要先精确标注哪些地方是 source-of-truth、哪些是 derived marker、哪些是 text fallback。
 
 本轮不执行 A，只创建路线计划文件。
+
+## Checkpoint Status Override
+
+- Completed: A. Approval/tool provenance contract audit.
+- Current: B. Provenance type / fixture planning.
+- Backlog: C. Approval decision provenance helper; D. Tool execution provenance helper; E. runMvp minimal provenance wiring; F. resultMapper structured consumption; G. sessionRuntime structured rendering guard; H. continuity preservation guard; I. route audit / merge readiness.
+- Verification for A: `rtk git status --short` passed; `rtk npm run build -w packages/ts-shell` passed after elevated rerun for sandbox/dist write EPERM.
+- Notes: A was a read-only audit plus plan update. No production code, test code, provider/auth core, real-provider home, or three-giant-file logic was changed. B should design the smallest compatible provenance type/fixture outside production wiring before helper or runMvp integration.
