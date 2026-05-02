@@ -213,11 +213,10 @@ opencode 参考：
 
 Current:
 
-- A. Current interactive harness fidelity audit
+- B. PTY feasibility / dependency audit
 
 Backlog:
 
-- B. PTY feasibility / dependency audit
 - C. Interactive coverage boundary documentation
 - D. Minimal PTY harness prototype
 - E. PTY startup readiness smoke
@@ -229,15 +228,41 @@ Backlog:
 Completed:
 
 - Planning: created `PLANS.pty-interactive-harness.md` from clean `main`.
+- A. Current interactive harness fidelity audit
+  - Result: completed as a read-only audit / planning checkpoint.
+  - Files changed: `PLANS.pty-interactive-harness.md`.
+  - Findings:
+    - `packages/ts-shell/src/test-utils/cliHarness.ts` uses `ChildProcess` plus stdin/stdout/stderr pipes; its `runInteractiveStartupSmoke`, `runInteractiveLineSmoke`, and `runInteractiveEofSmoke` helpers are pipe-driven, not true PTY.
+    - `packages/ts-shell/src/cli-baseline.test.ts` creates `spawnCli` with `stdio: ["pipe", "pipe", "pipe"]`; current startup, slash command, EOF close, and stopped follow-up smokes are therefore non-PTY interactive evidence.
+    - `scripts/live-interactive-runner.mjs` uses `stdio: "inherit"` and explicitly requires `process.stdin.isTTY` / `process.stdout.isTTY`; it is useful manual/live runner evidence but not an automated PTY harness.
+    - `packages/ts-shell/src/entrypoints/cli.tsx` still contains the production TTY boundary through `process.stdin.isTTY`, readline setup, keypress handling, and `approval> ` prompt wiring.
+    - `packages/ts-shell/package.json` has no runtime dependencies and only `vitest`, `typescript`, and `tsx` dev dependencies; repo search found no `node-pty` dependency outside prior plan notes.
+    - No current automated test proves `process.stdin.isTTY === true`, terminal raw mode, real Ctrl-C, PTY close, or true interactive approval prompt fidelity.
 
 Verification:
 
-- Planning round validation pending at file creation time.
+- Planning round:
+  - `rtk git status --short`: passed with only `PLANS.pty-interactive-harness.md` changed before commit.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `dist` write `EPERM`; elevated rerun of the same RTK command passed.
+  - `rtk git diff`: no tracked diff before staging because the new plan file was still untracked.
+- A audit round:
+  - `rtk git status --short --branch`: passed; branch `pty-interactive-harness-fidelity`, clean before checkpoint update.
+  - Target repo audit commands: `rtk read PLANS.pty-interactive-harness.md`, `rtk read packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk read packages/ts-shell/package.json`, `rtk read scripts/live-interactive-runner.mjs`.
+  - Target search commands: `rtk grep "interactive" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "isTTY" packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts scripts`, `rtk grep "node-pty" package.json packages/ts-shell/package.json package-lock.json PLANS.live-tty-interactive-evidence.md`, `rtk grep "approval>" packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk grep "spawn" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts scripts`, `rtk grep "runInteractive" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk grep "stdio" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts scripts/live-interactive-runner.mjs`, `rtk grep "readline" packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/core packages/ts-shell/src/cli-baseline.test.ts`.
+  - Reference comparison commands: `rtk grep "isTTY" D:\LenovoSoftstore\pyproject\source-claudecode\commands.ts D:\LenovoSoftstore\pyproject\source-claudecode\query.ts D:\LenovoSoftstore\pyproject\source-claudecode\QueryEngine.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts`, `rtk grep "permission.asked" D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\acp\agent.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\permission\permission.ts`, `rtk grep "readline" D:\LenovoSoftstore\pyproject\source-claudecode\commands.ts D:\LenovoSoftstore\pyproject\source-claudecode\query.ts D:\LenovoSoftstore\pyproject\source-claudecode\QueryEngine.ts`, `rtk grep "SIGINT" D:\LenovoSoftstore\pyproject\source-claudecode\commands.ts D:\LenovoSoftstore\pyproject\source-claudecode\query.ts D:\LenovoSoftstore\pyproject\source-claudecode\QueryEngine.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts`.
+  - `rtk grep "spawn(" ...`: failed because the unescaped parenthesis was parsed as a regex group; reran as `rtk grep "spawn" ...` and completed the audit.
+  - `rtk git status --short`: passed with only `PLANS.pty-interactive-harness.md` modified.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `dist` write `EPERM`; elevated rerun of the same RTK command passed.
 
 Notes:
 
 - Current evidence is pipe-spawn interactive evidence, not true PTY evidence.
 - Do not continue ordinary pipe-spawn smoke under this route unless it is specifically documenting fidelity boundaries or preventing misleading evidence labels.
+- A audit did not modify production code, test helper code, dependencies, or the three large files.
+- A audit did not read or modify `D:\Test\home-sf`.
+- opencode reference search showed explicit `process.stdin.isTTY` branching and `permission.asked` event handling, reinforcing that interactive/non-interactive and permission decisions are separate semantic layers.
+- Claude Code targeted grep did not reveal direct `readline` or `SIGINT` matches in the inspected files; no code was copied from references.
+- Next checkpoint B should decide whether a true PTY strategy is feasible in this Windows/Node/Vitest environment before any dependency or harness prototype is introduced.
 
 ## 15. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
