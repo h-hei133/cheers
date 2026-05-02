@@ -3959,6 +3959,36 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     );
   }, 35000);
 
+  it("print approval boundary defaults deny without prompt", async () => {
+    const projectRoot = path.join(fakeHomeDir, "print-approval-boundary");
+    fs.mkdirSync(projectRoot, { recursive: true });
+
+    const result = await runCliCommandToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot, "--print", "Run node --version"],
+      envOverrides: {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      },
+      timeoutMs: 30000,
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.output).toContain("Approval");
+    expect(result.output).toContain("Decision source: default-deny");
+    expect(result.output).toContain(
+      "Non-interactive approval policy: deny (default deny)",
+    );
+    expect(result.output).toContain("approval-audit:channel=non-interactive");
+    expect(result.output).toContain("approval-audit:decision=deny");
+    expect(result.output).toContain("Approval decision: deny");
+    expect(result.output).toContain("Result");
+    expect(result.output).toContain("Outcome: stopped");
+    expect(result.output).toContain("BlockerKind: approval-denied");
+    expect(result.output.includes("approval> ")).toBe(false);
+    expect(result.output.includes("Outcome: success")).toBe(false);
+  }, 35000);
+
   it("keeps synthetic print read-only inspect requests from mutating files", async () => {
     const projectRoot = path.join(fakeHomeDir, "read-only-inspect-surface");
     fs.mkdirSync(projectRoot, { recursive: true });

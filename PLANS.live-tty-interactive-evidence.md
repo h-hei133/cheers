@@ -183,13 +183,12 @@ opencode 参考：
 
 Backlog:
 
-- F. Non-interactive vs interactive approval boundary
 - G. EOF / close / interrupt attribution smoke
 - H. Live TTY route audit / merge readiness
 
 Current:
 
-- F. Non-interactive vs interactive approval boundary
+- G. EOF / close / interrupt attribution smoke
 
 Completed:
 
@@ -209,6 +208,10 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts`, `packages/ts-shell/src/cli-baseline.test.ts`, `PLANS.live-tty-interactive-evidence.md`.
   - Result: completed. Extracted the stopped recovery fixture to test-utils and added a focused interactive `/continue <follow-up>` smoke proving stopped edit failure context preserves blocker, target file, reason, and next action after the live prompt accepts user follow-up.
+- F. Non-interactive vs interactive approval boundary
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `packages/ts-shell/src/cli-baseline.test.ts`, `PLANS.live-tty-interactive-evidence.md`.
+  - Result: completed. Added a focused `--print` non-interactive approval boundary smoke proving default-deny emits approval audit markers and stopped terminal result, and never renders `approval> `. The interactive approval prompt half remains covered by E's blocked/deferred PTY note rather than faked with an env override.
 
 Blocked / Deferred:
 
@@ -245,6 +248,11 @@ Verification:
   - `rtk grep "approval>" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts packages/ts-shell/src/entrypoints/cli.tsx`: found production `approval> ` prompt in `cli.tsx` and only non-leak assertions in current tests.
   - `rtk proxy powershell -NoProfile -Command "Get-Content packages/ts-shell/src/entrypoints/cli.tsx | Select-Object -Skip 1618 -First 80"`: confirmed approval prompt is rendered only when the CLI does not classify the channel as non-interactive.
   - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
+- F approval boundary round:
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run hit Vitest/esbuild `spawn EPERM`; elevated rerun passed with 3 selected tests and 36 skipped.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "print"`: elevated rerun passed with 6 selected tests and 33 skipped.
+  - `rtk npm run verify:cli-entry`: elevated rerun passed all CLI entry checks, including `cli-entry-non-interactive-approval-boundary`.
+  - `rtk npm run build -w packages/ts-shell`: elevated rerun passed.
 
 Notes:
 
@@ -268,7 +276,9 @@ Notes:
 - The interactive stopped follow-up smoke uses fake home and `PRIVATE_AGENTS_PROVIDER_MODE=synthetic`; it does not read or modify `D:\Test\home-sf`.
 - Three-file guardrail clarification: `cli.tsx`, `SessionManager.ts`, and `runMvpIntegratedFlow.ts` may be modified when the feature truly belongs to their entry wiring / durable session state / orchestration responsibilities. The guardrail is not a blanket ban; it requires a responsibility check and minimal scoped changes.
 - E is blocked because current process-pipe tests are intentionally non-TTY. Adding a fake `FORCE_INTERACTIVE_TTY` style switch would make the evidence misleading and violate the route rule against fake live TTY behavior.
-- Next selected checkpoint is F. Non-interactive vs interactive approval boundary. It should strengthen the non-interactive half with current harness evidence and explicitly document the blocked interactive half until a real PTY driver is available.
+- F implementation intentionally did not modify `cli.tsx`: current production mode separation already belongs there and was sufficient. The new test locks the observable `--print` non-interactive boundary; default pipe-stream approval behavior is not treated as live TTY prompt evidence and remains separate from the deferred PTY prompt work.
+- F validation rejected an overbroad first attempt to assert default pipe-stream approval as `--print` default-deny. The actual pipe-stream default CLI can proceed through synthetic approval and then stop on execution/verification failure, so this checkpoint intentionally scopes the hard gate to `--print` non-interactive approval and leaves pipe-stream approval attribution for a future blocker only if it becomes main-path critical.
+- Next selected checkpoint is G. EOF / close / interrupt attribution smoke. It should stay focused on terminal attribution and session persistence, without reopening approval prompt work unless a real PTY driver is selected.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 
