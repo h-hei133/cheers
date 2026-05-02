@@ -197,14 +197,26 @@ Completed:
     - opencode `permission.ts` exposes `permission.asked` / `permission.replied` events and represents user rejection as a permission-layer result.
     - opencode `tool.ts` / `bash.ts` keep tool execution result metadata separate from permission decisions, which supports a clean permission-vs-execution boundary.
   - Decision: B should design the smallest compatible provenance type/fixture first; production wiring should not start in `runMvpIntegratedFlow.ts`.
+- B. Provenance type / fixture planning
+  - Completed in commit pending for this checkpoint.
+  - Scope: added a test-utils-only fixture/type draft; no production path imports it.
+  - Added `packages/ts-shell/src/test-utils/approvalToolProvenanceFixtures.ts`.
+  - Fixture shape:
+    - `ApprovalDecisionProvenanceFixture` captures approval kind, source, toolName, taskId, escalation, and compensation.
+    - `ToolExecutionProvenanceFixture` captures execution kind, source, toolName, taskId, success, failureBoundary, and compensation.
+    - `LegacyCodingResultCompatibilityFixture` records how the same scenario maps to current `evidence`, `verification`, and `failedFiles`.
+  - Scenario fixtures:
+    - `approvalDeniedProvenanceFixture` keeps approval denial separate from execution failure and maps to legacy `approval-denied` verification blocker evidence.
+    - `approvedExecutionFailedProvenanceFixture` keeps an approved bash command failure as `executed-failed` while preserving the legacy `(command)` failedFile plus `current-permission-request-tool:bash` evidence.
+    - `unavailableToolProvenanceFixture` represents tool registry/MCP unavailability separately from approval denial and runtime execution failure.
+  - Compatibility decision: future production wiring should promote or mirror this shape in a real module only after C/D helpers prove the boundaries; old sessions without these fields must continue to rely on legacy evidence fallback.
 
 Current:
 
-- B. Provenance type / fixture planning
+- C. Approval decision provenance helper
 
 Backlog:
 
-- C. Approval decision provenance helper
 - D. Tool execution provenance helper
 - E. runMvp minimal provenance wiring
 - F. resultMapper structured consumption
@@ -217,13 +229,19 @@ Verification:
 - A completion:
   - `rtk git status --short` passed; only `PLANS.approval-tool-provenance.md` was modified.
   - `rtk npm run build -w packages/ts-shell` first failed with sandbox/dist write `EPERM`, then passed with the same RTK command elevated.
+- B completion:
+  - `rtk npm run build -w packages/ts-shell` first failed with sandbox/dist write `EPERM`, then passed with the same RTK command elevated.
+  - `rtk npm run test -w packages/ts-shell -- src/core/query/resultMapper.test.ts` first failed with Vitest/esbuild `spawn EPERM`, then passed with the same RTK command elevated: 18 tests passed.
 
 Notes:
 
 - A deliberately did not read, copy, modify, or clean `D:\Test\home-sf`.
 - A did not run real-provider smoke or `verify-real-user-capabilities`.
 - A did not modify production code, tests, provider/auth core, or the three giant files.
-- The next checkpoint should be a fixture/type planning checkpoint that can be reviewed independently before any production wiring.
+- B deliberately did not read, copy, modify, or clean `D:\Test\home-sf`.
+- B did not run real-provider smoke or `verify-real-user-capabilities`.
+- B did not modify production code, tests, provider/auth core, or the three giant files.
+- The next checkpoint should implement the approval decision provenance helper independently of terminal rendering and before any runMvp wiring.
 
 ## 14. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -501,7 +519,9 @@ Current:
 ## Checkpoint Status Override
 
 - Completed: A. Approval/tool provenance contract audit.
-- Current: B. Provenance type / fixture planning.
-- Backlog: C. Approval decision provenance helper; D. Tool execution provenance helper; E. runMvp minimal provenance wiring; F. resultMapper structured consumption; G. sessionRuntime structured rendering guard; H. continuity preservation guard; I. route audit / merge readiness.
+- Completed: B. Provenance type / fixture planning.
+- Current: C. Approval decision provenance helper.
+- Backlog: D. Tool execution provenance helper; E. runMvp minimal provenance wiring; F. resultMapper structured consumption; G. sessionRuntime structured rendering guard; H. continuity preservation guard; I. route audit / merge readiness.
 - Verification for A: `rtk git status --short` passed; `rtk npm run build -w packages/ts-shell` passed after elevated rerun for sandbox/dist write EPERM.
-- Notes: A was a read-only audit plus plan update. No production code, test code, provider/auth core, real-provider home, or three-giant-file logic was changed. B should design the smallest compatible provenance type/fixture outside production wiring before helper or runMvp integration.
+- Verification for B: `rtk npm run build -w packages/ts-shell` passed after elevated rerun for sandbox/dist write EPERM; `rtk npm run test -w packages/ts-shell -- src/core/query/resultMapper.test.ts` passed after elevated rerun for Vitest/esbuild spawn EPERM, 18 tests passed.
+- Notes: A was a read-only audit plus plan update. B added a test-utils-only provenance fixture/type draft and did not connect it to production wiring. No provider/auth core, real-provider home, or three-giant-file logic was changed. C should implement an approval decision provenance helper before any runMvp integration.
