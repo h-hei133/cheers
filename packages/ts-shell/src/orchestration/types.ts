@@ -189,6 +189,57 @@ export interface CodingActionResultSeed {
   readonly blockerKind?: CodingVerificationBlockerKind
 }
 
+export type CodingApprovalDecisionProvenanceKind =
+  | 'approved'
+  | 'denied'
+  | 'skipped'
+  | 'not-required'
+  | 'escalation-denied'
+
+export type CodingApprovalDecisionProvenanceSource =
+  | 'tool-result-metadata'
+  | 'sandbox-enforcer'
+  | 'not-required'
+
+export interface CodingApprovalDecisionProvenanceSummary {
+  readonly kind: CodingApprovalDecisionProvenanceKind
+  readonly source: CodingApprovalDecisionProvenanceSource
+  readonly legacyOutcome: 'approved' | 'denied'
+  readonly toolName: string
+  readonly taskId: string
+  readonly wasEscalated?: boolean
+}
+
+export type CodingToolExecutionProvenanceKind =
+  | 'executed-succeeded'
+  | 'executed-failed'
+  | 'permission-blocked'
+  | 'approval-denied'
+  | 'sandbox-preflight-blocked'
+  | 'unavailable-tool'
+
+export type CodingToolExecutionProvenanceSource =
+  | 'tool-result-metadata'
+  | 'tool-runtime'
+  | 'approval-flow'
+  | 'allowlist'
+  | 'mcp-registry'
+  | 'sandbox-enforcer'
+
+export interface CodingToolExecutionProvenanceSummary {
+  readonly kind: CodingToolExecutionProvenanceKind
+  readonly source: CodingToolExecutionProvenanceSource
+  readonly legacySuccess: boolean
+  readonly toolName: string
+  readonly taskId: string
+  readonly failureBoundary?: string
+}
+
+export interface CodingResultProvenanceSummary {
+  readonly approvalDecisions?: readonly CodingApprovalDecisionProvenanceSummary[]
+  readonly toolExecutions?: readonly CodingToolExecutionProvenanceSummary[]
+}
+
 export interface CodingResultSummary {
   readonly taskKind: CodingTaskKind
   diagnosis?: CodingDiagnosisSummary
@@ -205,6 +256,7 @@ export interface CodingResultSummary {
   evidence: string[]
   readonly lastActionResultSeed?: CodingActionResultSeed
   readonly failureBoundary?: string
+  readonly provenance?: CodingResultProvenanceSummary
 }
 
 export interface AgentExecutionOutput {

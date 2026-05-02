@@ -26,6 +26,12 @@ import {
   extractAttemptedFilesFromEvidence,
 } from "./actionResultEvidence.js";
 import {
+  createCodingResultProvenanceCollector,
+  recordToolLifecycleProvenance,
+  summarizeCodingResultProvenance,
+  type CodingResultProvenanceCollector,
+} from "./codingResultProvenance.js";
+import {
   extractFileConstraintAssertions,
   extractLowRiskUnchangedVerifications,
   type FileConstraintAssertions,
@@ -65,6 +71,7 @@ import type {
   AgentExecutionOutput,
   CodingActionResultSeed,
   CodingPatchRecord,
+  CodingResultProvenanceSummary,
   CodingResultSummary,
   CodingTaskKind,
   CodingVerificationBlockerKind,
@@ -690,6 +697,7 @@ interface ActionResultContractInput {
     reason: string;
   }>;
   readonly crossFileSkippedFiles: Array<{ path: string; reason: string }>;
+  readonly provenance?: CodingResultProvenanceSummary;
 }
 
 interface ToolLifecycleResult {
@@ -697,6 +705,7 @@ interface ToolLifecycleResult {
   readonly output?: string;
   readonly error?: string;
   readonly metadata?: Record<string, unknown>;
+  readonly provenance?: CodingResultProvenanceSummary;
 }
 
 interface ApprovalAuditHistoryLike {
@@ -4456,6 +4465,7 @@ async function executeWorkflowTaskPlan(input: {
   const unverifiedFiles: Array<{ path: string; reason: string }> = [];
   const repairNotes: string[] = [];
   const evidence: string[] = [];
+  const provenanceCollector = createCodingResultProvenanceCollector();
   const appliedContentByPath = new Map<string, string>();
   const mutationResults: FileMutationExecutionResult[] = [];
   notes.push(...input.freshnessObservability.notes);
@@ -5846,6 +5856,7 @@ async function executeWorkflowTaskPlan(input: {
         sessionId: input.sessionId,
         abortSignal: input.abortSignal,
         requireApprovalEvent: true,
+        provenanceCollector,
       });
       const commandFailure = commandResult.success
         ? undefined
@@ -6313,6 +6324,7 @@ async function executeWorkflowTaskPlan(input: {
         sessionId: input.sessionId,
         abortSignal: input.abortSignal,
         requireApprovalEvent: true,
+        provenanceCollector,
       });
       if (verifyResult.success) {
         verification = {
@@ -6391,6 +6403,7 @@ async function executeWorkflowTaskPlan(input: {
     crossFileRemainingTargets,
     crossFileFailedByReason,
     crossFileSkippedFiles,
+    provenance: summarizeCodingResultProvenance(provenanceCollector),
   });
 
   return {
@@ -6461,6 +6474,7 @@ function assembleActionResultContract(
       verification: input.verification,
       repairNotes: input.repairNotes,
       evidence: input.evidence,
+      provenance: input.provenance,
       taskVerdict,
       taskReasons,
     }),
@@ -10549,6 +10563,7 @@ async function dispatchToolWithLifecycle(input: {
   readonly sessionId: string;
   readonly abortSignal?: AbortSignal;
   readonly requireApprovalEvent: boolean;
+  readonly provenanceCollector?: CodingResultProvenanceCollector;
 }): Promise<ToolLifecycleResult> {
   const identity = {
     toolName: input.toolName,
@@ -10568,11 +10583,22 @@ async function dispatchToolWithLifecycle(input: {
     appendApprovalResolvedEvent(input.events, identity, result);
   }
   appendToolResultEvent(input.events, identity, result);
+  if (input.provenanceCollector) {
+    recordToolLifecycleProvenance(input.provenanceCollector, {
+      ...identity,
+      result,
+      requireApprovalEvent: input.requireApprovalEvent,
+    });
+  }
+  const provenance = input.provenanceCollector
+    ? summarizeCodingResultProvenance(input.provenanceCollector)
+    : undefined;
   return {
     success: result.success,
     output: result.output,
     error: result.error,
     metadata: result.metadata,
+    ...(provenance ? { provenance } : {}),
   };
 }
 
@@ -12189,6 +12215,7 @@ function buildCodingResult(
     readonly verification: CodingVerificationSummary;
     readonly repairNotes: string[];
     readonly evidence: string[];
+    readonly provenance?: CodingResultProvenanceSummary;
     readonly taskVerdict:
       | "satisfied"
       | "completed-with-caveats"
@@ -12293,6 +12320,7 @@ function buildCodingResult(
     verification: verificationWithActionableBlocker,
     evidence: evidenceWithActionableBlocker,
     ...(lastActionResultSeed ? { lastActionResultSeed } : {}),
+    ...(input.provenance ? { provenance: input.provenance } : {}),
     ...(input.failedFiles.length > 0
       ? { failureBoundary: input.failedFiles[0]?.reason ?? "workflow failed" }
       : {}),

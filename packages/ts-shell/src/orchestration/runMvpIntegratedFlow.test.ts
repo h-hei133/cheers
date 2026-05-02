@@ -389,6 +389,20 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.status).toBe("stopped_error");
     expect(result.terminalClassification).toBe("error");
     expect(result.stopReason).toContain("Approval denied by user for bash");
+    expect(result.codingResult?.provenance?.approvalDecisions).toEqual([
+      expect.objectContaining({
+        kind: "escalation-denied",
+        legacyOutcome: "denied",
+        toolName: "bash",
+      }),
+    ]);
+    expect(result.codingResult?.provenance?.toolExecutions).toEqual([
+      expect.objectContaining({
+        kind: "approval-denied",
+        legacySuccess: false,
+        toolName: "bash",
+      }),
+    ]);
 
     expect(result.transcript.map((turn) => turn.role)).toEqual(["planner"]);
 
@@ -599,6 +613,24 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       expect(completed?.result.codingResult?.verification.blockerKind).not.toBe(
         "approval-denied",
       );
+      expect(
+        completed?.result.codingResult?.provenance?.approvalDecisions,
+      ).toEqual([
+        expect.objectContaining({
+          kind: "approved",
+          legacyOutcome: "approved",
+          toolName: "bash",
+        }),
+      ]);
+      expect(
+        completed?.result.codingResult?.provenance?.toolExecutions,
+      ).toEqual([
+        expect.objectContaining({
+          kind: "executed-failed",
+          legacySuccess: false,
+          toolName: "bash",
+        }),
+      ]);
       expect(completed?.result.codingResult?.failedFiles).toEqual([
         expect.objectContaining({
           path: "(command)",
