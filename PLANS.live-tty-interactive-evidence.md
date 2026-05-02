@@ -183,11 +183,11 @@ opencode 参考：
 
 Backlog:
 
-- H. Live TTY route audit / merge readiness
+- Route stage sealed. Do not continue same-family live TTY / interactive CLI proof unless a new real live TTY regression appears.
 
 Current:
 
-- H. Live TTY route audit / merge readiness
+- Completed / sealed on main after merge-readiness and post-merge validation.
 
 Completed:
 
@@ -215,6 +215,11 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `packages/ts-shell/src/test-utils/cliHarness.ts`, `packages/ts-shell/src/cli-baseline.test.ts`, `PLANS.live-tty-interactive-evidence.md`.
   - Result: completed. Added a reusable `runInteractiveEofSmoke` helper and a focused default CLI EOF/close smoke that waits for prompt readiness, closes stdin, confirms the stream closes with zero processed prompts, and proves no false `Result`, `Outcome: success`, or `approval> ` prompt is emitted while session state remains active and unclassified.
+- H. Live TTY route audit / merge readiness
+  - Commit: closeout commit reported in final status.
+  - Merge commit: `31c2198 Merge live TTY interactive evidence track`.
+  - Files changed: `PLANS.live-tty-interactive-evidence.md`.
+  - Result: completed. Route audit and merge-readiness passed on `live-tty-interactive-evidence`; branch merged back to `main` with a no-ff merge commit; post-merge validation passed on `main`. This live TTY / interactive CLI evidence track is stage-sealed.
 
 Blocked / Deferred:
 
@@ -260,6 +265,25 @@ Verification:
   - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run hit Vitest/esbuild `spawn EPERM`; elevated rerun passed with 4 selected tests and 36 skipped.
   - `rtk npm run verify:result-contract`: sandbox run hit child process `spawn EPERM`; elevated rerun passed all result-contract checks.
   - `rtk npm run build -w packages/ts-shell`: sandbox run hit `dist` write `EPERM`; elevated rerun passed.
+- H merge-readiness round on `live-tty-interactive-evidence`:
+  - `rtk git status --short`: passed; branch clean before validation.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run hit `dist` write `EPERM`; elevated rerun passed.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run hit Vitest/esbuild `spawn EPERM`; elevated rerun passed with 4 selected tests and 36 skipped.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`: sandbox run hit Vitest/esbuild `spawn EPERM`; elevated rerun passed with 5 selected tests and 35 skipped.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "print"`: sandbox run hit Vitest/esbuild `spawn EPERM`; elevated rerun passed with 6 selected tests and 34 skipped.
+  - `rtk npm run test -w packages/ts-shell -- src/core/shell/sessionRuntime.test.ts`: sandbox run hit Vitest/esbuild `spawn EPERM`; elevated rerun passed with 30 tests.
+  - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts`: sandbox run hit Vitest/esbuild `spawn EPERM`; elevated rerun passed with 56 tests.
+  - `rtk npm run verify:result-contract`: sandbox run hit child process `spawn EPERM`; elevated rerun passed all result-contract checks.
+  - `rtk npm run verify:cli-entry`: sandbox run hit synthetic `D:\Test` fixture write `EPERM`; elevated rerun passed all CLI entry checks.
+  - `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path`: sandbox run hit Vitest/esbuild `spawn EPERM`; elevated rerun passed with 1 selected golden test.
+- H post-merge round on `main`:
+  - `rtk git status --short`: passed after merge/audit cleanup; main ahead of origin due local merge and closeout.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run hit `dist` write `EPERM`; elevated rerun passed.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run hit Vitest/esbuild `spawn EPERM`; elevated rerun passed with 4 selected tests.
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`: sandbox run hit Vitest/esbuild `spawn EPERM`; elevated rerun passed with 5 selected tests.
+  - `rtk npm run verify:result-contract`: elevated rerun passed all result-contract checks.
+  - `rtk npm run verify:cli-entry`: elevated rerun passed all CLI entry checks.
+  - `HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path`: elevated rerun passed with 1 selected golden test.
 
 Notes:
 
@@ -286,7 +310,7 @@ Notes:
 - F implementation intentionally did not modify `cli.tsx`: current production mode separation already belongs there and was sufficient. The new test locks the observable `--print` non-interactive boundary; default pipe-stream approval behavior is not treated as live TTY prompt evidence and remains separate from the deferred PTY prompt work.
 - F validation rejected an overbroad first attempt to assert default pipe-stream approval as `--print` default-deny. The actual pipe-stream default CLI can proceed through synthetic approval and then stop on execution/verification failure, so this checkpoint intentionally scopes the hard gate to `--print` non-interactive approval and leaves pipe-stream approval attribution for a future blocker only if it becomes main-path critical.
 - G implementation stayed in test utilities and test orchestration. It did not change `cli.tsx`; production EOF/close behavior was already expressed by the default non-TTY stream close path and this checkpoint locks the user-visible contract.
-- Next selected checkpoint is H. Live TTY route audit / merge readiness. It should verify and seal the route, not add another same-family interactive proof.
+- H sealed the route. Next step is to return to a fresh main-path blocker assessment, not continue interactive CLI same-family proof, unless a new real live TTY regression appears.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 
