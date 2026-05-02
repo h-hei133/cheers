@@ -14,6 +14,7 @@ import {
   runInteractiveLineSmoke,
   runInteractiveStartupSmoke,
 } from "./test-utils/cliHarness.js";
+import { seedStoppedRecoveryContextSession } from "./test-utils/stoppedRecoveryFixture.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, "..", "..", "..");
@@ -3794,162 +3795,12 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
   }, 60000);
 
   it("keeps stopped recoverable result context actionable through bare and follow-up /continue", async () => {
-    const projectRoot = path.join(
-      fakeHomeDir,
-      "continue-stopped-recovery-context-project",
-    );
-    fs.mkdirSync(path.join(projectRoot, "docs"), { recursive: true });
-    fs.writeFileSync(
-      path.join(projectRoot, "docs", "failed-edit.md"),
-      "Current content remains unchanged.\n",
-      "utf8",
-    );
-
-    const stoppedSessionId = "sess_continue_stopped_recovery";
-    seedSessionWithTitle({
-      sessionId: stoppedSessionId,
+    const {
       projectRoot,
-      title: "Stopped Continue Recovery Context",
-      status: "completed",
-    });
-    writeCurrentSessionPointer({ projectRoot, sessionId: stoppedSessionId });
-
-    const now = new Date().toISOString();
-    const stoppedSessionDir = path.join(sessionsDir, stoppedSessionId);
-    const stopReason =
-      "patch-from-not-found: Source text was not found in docs/failed-edit.md.";
-    const nextAction =
-      "Re-read docs/failed-edit.md, then rerun with the exact current text to replace.";
-    fs.writeFileSync(
-      path.join(stoppedSessionDir, "state.json"),
-      JSON.stringify(
-        {
-          status: "completed",
-          projectRoot,
-          runPhase: "idle",
-          terminalReason: "stopped_error",
-          terminalClassification: "stopped",
-          durableStatus: "stopped",
-        },
-        null,
-        2,
-      ),
-      "utf8",
-    );
-    fs.writeFileSync(
-      path.join(stoppedSessionDir, "transcript.jsonl"),
-      [
-        {
-          type: "message",
-          role: "user",
-          content: "replace old text in docs/failed-edit.md",
-          timestamp: now,
-        },
-        {
-          type: "query-event",
-          event: {
-            type: "query.completed",
-            result: {
-              status: "stopped_error",
-              terminalReason: "stopped_error",
-              terminalClassification: "stopped",
-              stopReason,
-              transcript: [],
-              sharedContext: {
-                sessionId: stoppedSessionId,
-                initialPrompt: "replace old text in docs/failed-edit.md",
-                notes: [],
-                handoffs: [],
-              },
-              finalOutput:
-                "Stopped before editing docs/failed-edit.md because the requested source text was missing.",
-              codingResult: {
-                taskKind: "edit-file",
-                changedFiles: [],
-                failedFiles: [
-                  {
-                    path: "docs/failed-edit.md",
-                    reason: stopReason,
-                  },
-                ],
-                patches: [
-                  {
-                    path: "docs/failed-edit.md",
-                    operation: "replace",
-                    status: "failed",
-                    failureCode: "patch-from-not-found",
-                    reason: stopReason,
-                  },
-                ],
-                repair: {
-                  status: "failed",
-                  attempts: 1,
-                  recoveredItems: [],
-                  failedItems: ["docs/failed-edit.md"],
-                  notes: [`${stopReason} Next action: ${nextAction}`],
-                },
-                continuation: {
-                  status: "failed-after-bounded-continuation",
-                  attempts: 1,
-                  evidence: ["actionable-blocker-kind:patch-from-not-found"],
-                },
-                changeSet: {
-                  gitAware: false,
-                  preExistingDirtyFiles: [],
-                  postRunDirtyFiles: [],
-                  attemptedFiles: ["docs/failed-edit.md"],
-                  changedFiles: [],
-                  unchangedAttemptedFiles: ["docs/failed-edit.md"],
-                },
-                taskSatisfaction: {
-                  verdict: "completed-with-caveats",
-                  reasons: [stopReason],
-                  requiredEvidence: ["inspect->edit->verify contract execution"],
-                  observedEvidence: [
-                    "actionable-blocker-kind:patch-from-not-found",
-                  ],
-                },
-                verifiedFiles: [],
-                unverifiedFiles: [
-                  {
-                    path: "docs/failed-edit.md",
-                    reason: stopReason,
-                  },
-                ],
-                verification: {
-                  status: "blocked",
-                  reason: stopReason,
-                  blockerKind: "patch-from-not-found",
-                  nextAction,
-                },
-                lastActionResultSeed: {
-                  actionKind: "edit-file",
-                  target: "docs/failed-edit.md",
-                  changedFiles: [],
-                  failedFiles: ["docs/failed-edit.md"],
-                  verification: {
-                    status: "blocked",
-                    reason: stopReason,
-                    blockerKind: "patch-from-not-found",
-                  },
-                  blockerKind: "patch-from-not-found",
-                  reason: stopReason,
-                },
-                evidence: [
-                  "actionable-blocker-kind:patch-from-not-found",
-                  `mutation-summary-next-action:${nextAction}`,
-                ],
-                failureBoundary: stopReason,
-              },
-            },
-          },
-          timestamp: now,
-        },
-      ]
-        .map((entry) => JSON.stringify(entry))
-        .join("\n") + "\n",
-      "utf8",
-    );
+      sessionDir: stoppedSessionDir,
+      stopReason,
+      nextAction,
+    } = seedStoppedRecoveryContextSession({ fakeHomeDir, sessionsDir });
 
     const runPrint = (prompt: string) =>
       spawnSync(
@@ -4021,6 +3872,43 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(stoppedNoteText).toContain("restored-session-state-consumed");
     expect(stoppedNoteText).toContain("last-terminal=stopped:stopped_error");
   }, 60000);
+
+  it("interactive stopped follow-up smoke preserves recovery context", async () => {
+    const followUpPrompt = "continue from stopped edit failure";
+    const { projectRoot, stopReason, nextAction } =
+      seedStoppedRecoveryContextSession({
+        fakeHomeDir,
+        sessionsDir,
+        sessionId: "sess_interactive_stopped_recovery",
+        projectName: "interactive-stopped-recovery-context-project",
+      });
+
+    const result = await runInteractiveLineSmoke({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot],
+      line: `/continue ${followUpPrompt}`,
+      waitFor: "Failure handoff: status=blocked",
+      envOverrides: {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      },
+      timeoutMs: 30000,
+    });
+
+    expect(result.output).toContain("Private Coding Agents Shell");
+    expect(result.output).toContain("Continuation");
+    expect(result.output).toContain("Failure handoff: status=blocked");
+    expect(result.output).toContain("target=docs/failed-edit.md");
+    expect(result.output).toContain(`reason=${stopReason}`);
+    expect(result.output).toContain("blocker=patch-from-not-found");
+    expect(result.output).toContain(
+      "next=Re-read docs/failed-edit.md, then rerun with the exact current text to replace",
+    );
+    expect(result.output).not.toContain("No recoverable session found");
+    expect(result.output).not.toContain("Success handoff: status=passed");
+    expect(result.output.includes("approval> ")).toBe(false);
+    expect(nextAction).toContain("Re-read docs/failed-edit.md");
+  }, 35000);
 
   it("shows structured execution result surface for synthetic print success path", async () => {
     const projectRoot = path.join(fakeHomeDir, "execution-surface-success");

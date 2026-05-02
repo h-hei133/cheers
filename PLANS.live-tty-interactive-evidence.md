@@ -183,7 +183,6 @@ opencode 参考：
 
 Backlog:
 
-- D. Interactive stopped follow-up smoke
 - E. Interactive approval prompt smoke
 - F. Non-interactive vs interactive approval boundary
 - G. EOF / close / interrupt attribution smoke
@@ -191,7 +190,7 @@ Backlog:
 
 Current:
 
-- D. Interactive stopped follow-up smoke
+- E. Interactive approval prompt smoke
 
 Completed:
 
@@ -207,6 +206,10 @@ Completed:
   - Commit: checkpoint commit reported in final status.
   - Files changed: `packages/ts-shell/src/test-utils/cliHarness.ts`, `packages/ts-shell/src/cli-baseline.test.ts`, `PLANS.live-tty-interactive-evidence.md`.
   - Result: completed. Added a minimal `runInteractiveLineSmoke` helper and a focused `/sessions current` smoke that drives one harmless interactive slash command after prompt readiness, confirms current-session output, and verifies no provider turn/result or approval prompt is triggered.
+- D. Interactive stopped follow-up smoke
+  - Commit: checkpoint commit reported in final status.
+  - Files changed: `packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts`, `packages/ts-shell/src/cli-baseline.test.ts`, `PLANS.live-tty-interactive-evidence.md`.
+  - Result: completed. Extracted the stopped recovery fixture to test-utils and added a focused interactive `/continue <follow-up>` smoke proving stopped edit failure context preserves blocker, target file, reason, and next action after the live prompt accepts user follow-up.
 
 Verification:
 
@@ -224,6 +227,10 @@ Verification:
 - C slash command smoke round:
   - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 2 selected tests and 35 skipped.
   - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 5 selected tests and 32 skipped.
+  - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
+- D stopped follow-up smoke round:
+  - `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 3 selected tests and 35 skipped.
+  - `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts`: sandbox run failed with Vitest/esbuild `spawn EPERM`; elevated rerun passed with 56 tests.
   - `rtk npm run build -w packages/ts-shell`: sandbox run failed with `EPERM` while writing `dist`; elevated rerun of the same RTK command passed.
 
 Notes:
@@ -243,7 +250,11 @@ Notes:
 - C implementation kept production behavior unchanged and did not modify `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
 - `runInteractiveLineSmoke` intentionally supports one scripted line and one expected marker. It is enough for harmless slash-command evidence but is not yet a general multi-turn driver.
 - The `/sessions current` smoke stays within synthetic/test home, does not execute a model/provider turn, does not emit `Result`, and does not enter `approval>`.
-- Next selected checkpoint is D. Interactive stopped follow-up smoke. It should reuse the line-driving helper shape, but may need a focused fixture for stopped session state before starting the interactive shell.
+- D implementation kept production behavior unchanged and did not modify `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
+- The stopped recovery fixture now lives in `packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts` and is shared by the existing print-mode `/continue` test and the new interactive `/continue <follow-up>` smoke, avoiding duplicate large transcript/state setup in `cli-baseline.test.ts`.
+- The interactive stopped follow-up smoke uses fake home and `PRIVATE_AGENTS_PROVIDER_MODE=synthetic`; it does not read or modify `D:\Test\home-sf`.
+- Three-file guardrail clarification: `cli.tsx`, `SessionManager.ts`, and `runMvpIntegratedFlow.ts` may be modified when the feature truly belongs to their entry wiring / durable session state / orchestration responsibilities. The guardrail is not a blanket ban; it requires a responsibility check and minimal scoped changes.
+- Next selected checkpoint is E. Interactive approval prompt smoke. It should first verify whether the existing line helper is enough to observe and answer `approval> `, then add the smallest safe synthetic approval requested/denied/approved smoke.
 
 ## 13. 每个 checkpoint 的目标、允许/禁止修改文件、验证命令
 
