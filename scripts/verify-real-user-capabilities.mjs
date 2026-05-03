@@ -31,6 +31,8 @@ const terminalResultSurfaceDryRun = process.argv.includes('--terminal-result-sur
 const toolExecutionPlanningDryRun = process.argv.includes('--tool-execution-planning-dry-run')
 const failureFollowupContextDryRun = process.argv.includes('--failure-followup-context-dry-run')
 const realReadonlyCodingDryRun = process.argv.includes('--real-readonly-coding-dry-run')
+const realReadonlyCodingPreflight = process.argv.includes('--real-readonly-coding-preflight')
+const realReadonlyCodingPreflightSelfTest = process.argv.includes('--real-readonly-coding-preflight-self-test')
 
 const failureCategories = [
   'none',
@@ -1331,12 +1333,119 @@ function printHelp() {
   console.log('  --tool-execution-planning-dry-run')
   console.log('  --failure-followup-context-dry-run')
   console.log('  --real-readonly-coding-dry-run')
+  console.log('  --real-readonly-coding-preflight-self-test')
   console.log('')
-  console.log('Future explicit opt-in smoke:')
+  console.log('Explicit opt-in real-provider checks:')
+  console.log('  --real-readonly-coding-preflight')
+  console.log('    Opt-in only; readiness preflight only; no model turn.')
   console.log('  --real-readonly-coding-smoke')
-  console.log('    Opt-in only; read-only; excluded from default verification.')
+  console.log('    Future opt-in only; read-only; excluded from default verification.')
   console.log('    External network/auth/model failures are attribution outcomes, not automatic product regressions.')
   console.log('    Real provider secrets/config must be redacted and must not be printed.')
+}
+
+function renderReadonlyPreflightNotice() {
+  console.log('real-provider-readonly-preflight=opt-in')
+  console.log('modelTurn=false')
+  console.log('readOnlyFixture=false')
+  console.log('real-provider failure attribution: external network/auth/model failures are not automatic product regressions')
+  console.log('real provider secrets/config must be redacted and must not be printed')
+}
+
+function buildReadonlyPreflightStatus(preflight) {
+  if (preflight.ok) {
+    return {
+      status: 'PASS',
+      statusDetail: 'ready',
+      exitCode: 0,
+      failureCategory: 'none',
+      failureReason: '',
+    }
+  }
+  if (preflight.status === 'provider-network-inconclusive') {
+    return {
+      status: 'PROVIDER_NETWORK',
+      statusDetail: 'provider-network-inconclusive',
+      exitCode: 2,
+      failureCategory: 'provider-readiness',
+      failureReason: 'provider-network-inconclusive: provider endpoint remained unreachable during readiness preflight',
+    }
+  }
+  if (preflight.status === 'config-failure') {
+    return {
+      status: 'CONFIG',
+      statusDetail: 'config-failure',
+      exitCode: 3,
+      failureCategory: 'provider-readiness',
+      failureReason: 'config-failure: fix provider configuration or authentication before running read-only smoke',
+    }
+  }
+  return {
+    status: 'FAIL',
+    statusDetail: preflight.status ?? 'provider-readiness-failed',
+    exitCode: 1,
+    failureCategory: 'provider-readiness',
+    failureReason: 'provider-readiness failed before read-only model turn',
+  }
+}
+
+function runRealReadonlyCodingPreflightSelfTest() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-readonly-coding-preflight-self-test')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('modelTurn=false')
+  console.log('reportWritten=false')
+
+  const cases = [
+    {
+      name: 'ready',
+      preflight: { ok: true, status: 'pass' },
+      expected: { status: 'PASS', exitCode: 0 },
+    },
+    {
+      name: 'network',
+      preflight: { ok: false, status: 'provider-network-inconclusive' },
+      expected: { status: 'PROVIDER_NETWORK', exitCode: 2 },
+    },
+    {
+      name: 'config',
+      preflight: { ok: false, status: 'config-failure' },
+      expected: { status: 'CONFIG', exitCode: 3 },
+    },
+    {
+      name: 'unknown',
+      preflight: { ok: false, status: 'provider-readiness-failed' },
+      expected: { status: 'FAIL', exitCode: 1 },
+    },
+  ]
+
+  let ok = true
+  for (const item of cases) {
+    const status = buildReadonlyPreflightStatus(item.preflight)
+    const passed =
+      status.status === item.expected.status &&
+      status.exitCode === item.expected.exitCode &&
+      status.failureReason.indexOf('sk-') === -1 &&
+      status.failureReason.indexOf('.private-agents/config.json') === -1
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] preflight-${item.name} status=${status.status} exit=${status.exitCode}`)
+    ok = ok && passed
+  }
+
+  process.exit(ok ? 0 : 1)
+}
+
+async function runRealReadonlyCodingPreflight() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-readonly-coding-preflight')
+  renderReadonlyPreflightNotice()
+  const preflight = await runProviderReadinessPreflight()
+  const status = buildReadonlyPreflightStatus(preflight)
+  console.log(`[${status.status}] real-readonly-coding-preflight status=${status.statusDetail}`)
+  if (preflight.outputTail) {
+    console.log(preflight.outputTail)
+  }
+  process.exit(status.exitCode)
 }
 
 function runRealReadonlyCodingDryRun() {
@@ -1418,6 +1527,14 @@ function runRealReadonlyCodingDryRun() {
 async function main() {
   if (showHelp) {
     printHelp()
+    return
+  }
+  if (realReadonlyCodingPreflightSelfTest) {
+    runRealReadonlyCodingPreflightSelfTest()
+    return
+  }
+  if (realReadonlyCodingPreflight) {
+    await runRealReadonlyCodingPreflight()
     return
   }
   if (realReadonlyCodingDryRun) {
