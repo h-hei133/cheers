@@ -281,6 +281,17 @@ Recommended short-term strategy:
 - First add parser-only / preview / verification contracts in isolated modules.
 - Only consider apply after no-partial behavior is proven by tests.
 
+Checkpoint C decision:
+
+- Production behavior remains unchanged: `apply_patch` shaped input and unified diff shaped input continue to be rejected as `patch-generation-failed`.
+- The route does not proceed directly to parser or applicator implementation from C.
+- The next implementation checkpoint is type/contract design only, with no production wiring and no disk mutation.
+- The first future supported shape, if later approved by parser/verify/preview/no-partial checkpoints, should be a structured apply_patch grammar contract that can represent add/update/delete/move but may still reject every operation except the selected minimum support level.
+- Short-term minimum support target remains parser/preview/verification-first, not apply-first.
+- `*** Update File` single-file update-only is the earliest plausible apply candidate, but only after D-H prove structured types, parsing, verification, preview, and no-partial apply behavior.
+- Multi-file, add, delete, move, fuzzy matching, rollback, AST patching, and broad batch engines remain explicitly deferred.
+- Unsupported shapes must continue to produce safe structured blocker evidence and actionable next action rather than partial writes or generic model failure.
+
 ## 16. parse / verify / apply / preview / result contract 的目标模块布局
 
 Recommended module responsibilities:
@@ -347,10 +358,12 @@ Current:
 - B. Reference implementation comparison
   - Type: read-only reference comparison / plan update.
   - Goal: compare Claude Code FileEditTool and opencode edit/apply_patch semantics, then document boundaries to absorb without copying code.
+- C. Capability decision document
+  - Type: decision document / plan update.
+  - Goal: choose short-term production policy and explicitly separate parser/contract design from any apply behavior.
 
 Backlog:
 
-- C. Capability decision document
 - D. Patch contract type design
 - E. Parser-only prototype
 - F. Verification-only checkpoint
@@ -412,6 +425,32 @@ Completed:
     - Keep current production rejection of apply_patch/unified diff until the capability decision checkpoint explicitly chooses a minimum supported shape.
   - Boundary result:
     - The next checkpoint should be a capability decision document, not parser/apply implementation.
+    - No real provider smoke was run.
+    - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used.
+    - No production code, tests, dependency manifest, lockfile, or three-large-file target was modified.
+- C. Capability decision document
+  - Result: completed as a decision document / plan update checkpoint.
+  - Files changed:
+    - `PLANS.edit-patch-capability-boundary.md`
+  - Decision:
+    - Keep production `apply_patch` and unified diff rejection unchanged for now.
+    - Do not add parser/apply wiring in C.
+    - Move next to D. Patch contract type design.
+    - D may define `ParsedPatch`, file operation, hunk, verification, application-plan, preview/result, and failure-code contracts, but it must not connect to production mutation paths.
+    - Parser-only and verification-only behavior remain later checkpoints.
+    - No disk mutation from apply_patch is allowed before no-partial behavior is locked.
+    - The earliest possible apply candidate remains single-file `*** Update File` after D-H, not before.
+  - Still-rejected shapes:
+    - raw unified diff.
+    - multi-file production apply.
+    - add/delete/move production apply.
+    - fuzzy patch application.
+    - AST patching.
+    - implicit apply_patch invocation without explicit tool boundary.
+    - any patch with partial verification failure.
+  - Boundary result:
+    - The current safe rejection policy remains the product behavior.
+    - The next checkpoint is contract type design, not parser/apply implementation.
     - No real provider smoke was run.
     - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used.
     - No production code, tests, dependency manifest, lockfile, or three-large-file target was modified.
@@ -783,9 +822,11 @@ This planning round does not execute A.
 - Completed: Planning.
 - Completed: A. Current edit/patch capability audit.
 - Completed: B. Reference implementation comparison.
-- Current: C. Capability decision document.
-- Backlog: D. Patch contract type design; E. Parser-only prototype; F. Verification-only checkpoint; G. Preview contract checkpoint; H. No-partial-apply contract checkpoint; I. Minimal single-file update apply checkpoint; J. Multi-file strategy checkpoint; K. Route audit / merge readiness.
+- Completed: C. Capability decision document.
+- Current: D. Patch contract type design.
+- Backlog: E. Parser-only prototype; F. Verification-only checkpoint; G. Preview contract checkpoint; H. No-partial-apply contract checkpoint; I. Minimal single-file update apply checkpoint; J. Multi-file strategy checkpoint; K. Route audit / merge readiness.
 - Verification for Planning: pending.
 - Verification for A: `rtk git status --short` passed with only `PLANS.edit-patch-capability-boundary.md` modified. `rtk npm run build -w packages/ts-shell` passed. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts` passed with 6 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/targetResolution.test.ts` passed with 6 tests.
 - Verification for B: `rtk git status --short` passed with only `PLANS.edit-patch-capability-boundary.md` modified. `rtk npm run build -w packages/ts-shell` passed.
-- Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A was a read-only audit / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. B was a read-only reference comparison / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
+- Verification for C: `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run build -w packages/ts-shell` passed.
+- Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A was a read-only audit / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. B was a read-only reference comparison / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. C was a decision document / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
