@@ -361,10 +361,12 @@ Current:
 - C. Capability decision document
   - Type: decision document / plan update.
   - Goal: choose short-term production policy and explicitly separate parser/contract design from any apply behavior.
+- D. Patch contract type design
+  - Type: isolated type contract implementation.
+  - Goal: add minimal structured contracts for parsed patches, file operations, hunks, verification, application plans, previews, and failure codes without production wiring.
 
 Backlog:
 
-- D. Patch contract type design
 - E. Parser-only prototype
 - F. Verification-only checkpoint
 - G. Preview contract checkpoint
@@ -454,6 +456,31 @@ Completed:
     - No real provider smoke was run.
     - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used.
     - No production code, tests, dependency manifest, lockfile, or three-large-file target was modified.
+- D. Patch contract type design
+  - Result: completed as an isolated type contract implementation checkpoint.
+  - Files changed:
+    - `packages/ts-shell/src/orchestration/patchParsing/types.ts`
+    - `packages/ts-shell/src/orchestration/patchParsing/types.test.ts`
+    - `PLANS.edit-patch-capability-boundary.md`
+  - Contracts added:
+    - `PatchOperationKind` for add/update/delete/move operation identity.
+    - `PatchFailureCode` for parse, verify, apply-plan, write, and no-partial blockers.
+    - `PatchLineChange` and `PatchHunk` for structured hunk representation.
+    - `PatchFileOperation` union for add/update/delete/move file operations.
+    - `ParsedPatch` for raw patch text plus structured operations.
+    - `PatchVerificationResult` for ok plan or no-write failures.
+    - `PatchApplicationPlan` for verified operations plus atomicity strategy.
+    - `PatchPreviewResult` for changed/failed/summary preview with `willWrite: false`.
+  - Boundary result:
+    - Types are not imported by production orchestration.
+    - No parser was implemented.
+    - No verifier was implemented.
+    - No applicator was implemented.
+    - No disk mutation path was added.
+    - Current `apply_patch` and unified diff rejection behavior remains unchanged.
+    - No real provider smoke was run.
+    - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used.
+    - `cli.tsx`, `SessionManager.ts`, and `runMvpIntegratedFlow.ts` were not modified.
 
 ## 19. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -823,10 +850,12 @@ This planning round does not execute A.
 - Completed: A. Current edit/patch capability audit.
 - Completed: B. Reference implementation comparison.
 - Completed: C. Capability decision document.
-- Current: D. Patch contract type design.
-- Backlog: E. Parser-only prototype; F. Verification-only checkpoint; G. Preview contract checkpoint; H. No-partial-apply contract checkpoint; I. Minimal single-file update apply checkpoint; J. Multi-file strategy checkpoint; K. Route audit / merge readiness.
+- Completed: D. Patch contract type design.
+- Current: E. Parser-only prototype.
+- Backlog: F. Verification-only checkpoint; G. Preview contract checkpoint; H. No-partial-apply contract checkpoint; I. Minimal single-file update apply checkpoint; J. Multi-file strategy checkpoint; K. Route audit / merge readiness.
 - Verification for Planning: pending.
 - Verification for A: `rtk git status --short` passed with only `PLANS.edit-patch-capability-boundary.md` modified. `rtk npm run build -w packages/ts-shell` passed. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts` passed with 6 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/targetResolution.test.ts` passed with 6 tests.
 - Verification for B: `rtk git status --short` passed with only `PLANS.edit-patch-capability-boundary.md` modified. `rtk npm run build -w packages/ts-shell` passed.
 - Verification for C: `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run build -w packages/ts-shell` passed.
-- Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A was a read-only audit / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. B was a read-only reference comparison / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. C was a decision document / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
+- Verification for D: `rtk npm run test -w packages/ts-shell -- src/orchestration/patchParsing/types.test.ts` passed with 3 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run build -w packages/ts-shell` passed.
+- Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A was a read-only audit / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. B was a read-only reference comparison / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. C was a decision document / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. D added isolated patch contract types and focused type tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement parser/verification/application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
