@@ -46,6 +46,8 @@ export function normalizeCliOutput(output: string): string {
   return output.replace(/\\/g, "/");
 }
 
+// These helpers drive the CLI through child_process pipes. They cover
+// pipe-spawn interactive behavior, not true PTY / terminal fidelity.
 export async function runCliCommandToClose(input: {
   spawnCli: SpawnCliForTest;
   fakeHome: string;
@@ -137,7 +139,7 @@ export async function runInteractiveStartupSmoke(input: {
     const timeout = setTimeout(() => {
       fail(
         new Error(
-          `Timed out waiting for interactive startup marker: ${readyMarker}\nOutput so far:\n${output}`,
+          `Timed out waiting for pipe-spawn interactive startup marker: ${readyMarker}\nOutput so far:\n${output}`,
         ),
       );
     }, timeoutMs);
@@ -213,7 +215,7 @@ export async function runInteractiveLineSmoke(input: {
     const timeout = setTimeout(() => {
       fail(
         new Error(
-          `Timed out waiting for interactive line marker: ${waitFor}\nOutput so far:\n${output}`,
+          `Timed out waiting for pipe-spawn interactive line marker: ${waitFor}\nOutput so far:\n${output}`,
         ),
       );
     }, timeoutMs);
@@ -285,7 +287,7 @@ export async function runInteractiveEofSmoke(input: {
     const timeout = setTimeout(() => {
       fail(
         new Error(
-          `Timed out waiting for interactive EOF close\nOutput so far:\n${output}`,
+          `Timed out waiting for pipe-spawn interactive EOF close\nOutput so far:\n${output}`,
         ),
       );
     }, timeoutMs);
