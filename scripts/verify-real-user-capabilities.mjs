@@ -4,6 +4,15 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import {
+  cleanupReadonlyFixture,
+  compareReadonlySnapshots,
+  createReadonlyCodingFixture,
+  snapshotReadonlyFixture,
+} from './real-provider-readonly-fixture.mjs'
+import {
+  redactAndAssertReadonlyProviderOutput,
+} from './real-provider-readonly-redaction.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
@@ -16,10 +25,12 @@ const reportPath = 'D:/Test/test-results/real-user-capabilities-report.json'
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const includeCandidates = process.argv.includes('--include-candidates')
 const includeContinueSmoke = process.argv.includes('--include-continue-smoke')
+const showHelp = process.argv.includes('--help') || process.argv.includes('-h')
 const turnBoundaryDryRun = process.argv.includes('--turn-boundary-dry-run')
 const terminalResultSurfaceDryRun = process.argv.includes('--terminal-result-surface-dry-run')
 const toolExecutionPlanningDryRun = process.argv.includes('--tool-execution-planning-dry-run')
 const failureFollowupContextDryRun = process.argv.includes('--failure-followup-context-dry-run')
+const realReadonlyCodingDryRun = process.argv.includes('--real-readonly-coding-dry-run')
 
 const failureCategories = [
   'none',
@@ -1310,7 +1321,109 @@ function runToolExecutionPlanningDryRun() {
   process.exit(ok ? 0 : 1)
 }
 
+function printHelp() {
+  console.log('Usage: node scripts/verify-real-user-capabilities.mjs [options]')
+  console.log('')
+  console.log('Default mode runs the existing real-user capability gate and may perform real-provider checks.')
+  console.log('Safe dry-run options do not execute real provider calls:')
+  console.log('  --turn-boundary-dry-run')
+  console.log('  --terminal-result-surface-dry-run')
+  console.log('  --tool-execution-planning-dry-run')
+  console.log('  --failure-followup-context-dry-run')
+  console.log('  --real-readonly-coding-dry-run')
+  console.log('')
+  console.log('Future explicit opt-in smoke:')
+  console.log('  --real-readonly-coding-smoke')
+  console.log('    Opt-in only; read-only; excluded from default verification.')
+  console.log('    External network/auth/model failures are attribution outcomes, not automatic product regressions.')
+  console.log('    Real provider secrets/config must be redacted and must not be printed.')
+}
+
+function runRealReadonlyCodingDryRun() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-readonly-coding-dry-run')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('modelTurn=false')
+  console.log('reportWritten=false')
+  console.log('defaultSmoke=skipped')
+
+  const fixture = createReadonlyCodingFixture()
+  try {
+    const before = snapshotReadonlyFixture(fixture.fixtureDir)
+    const after = snapshotReadonlyFixture(fixture.fixtureDir)
+    const comparison = compareReadonlySnapshots(before, after)
+    const redaction = redactAndAssertReadonlyProviderOutput(
+      [
+        'Authorization: Bearer sk-live-secret-123456789',
+        'api_key=sk-url-secret-123456789',
+        'refresh_token=refresh-secret',
+        'D:/Test/home-sf/.private-agents/config.json',
+      ].join('\n'),
+    )
+    const report = {
+      capability: 'real-readonly-coding-smoke',
+      provider: 'real',
+      mode: 'dry-run',
+      optInRequired: true,
+      realProviderExecution: false,
+      modelTurn: false,
+      fixture: {
+        files: fixture.files,
+        noMutation: comparison.ok,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+      },
+      resultContract: {
+        expectedTerminalResult: 'success-or-attributed-provider-failure',
+        expectedChangedFiles: [],
+        requiresChangedFilesEmpty: true,
+      },
+      redaction: {
+        ok: redaction.ok,
+        leaks: redaction.leaks,
+      },
+      skip: {
+        defaultGate: true,
+        reason: 'real-provider read-only coding smoke requires explicit opt-in',
+      },
+    }
+
+    const promptOk =
+      fixture.prompt.includes('read-only task') &&
+      fixture.prompt.includes('changedFiles is empty') &&
+      fixture.prompt.includes('Do not run shell commands')
+    const reportOk =
+      report.optInRequired &&
+      !report.realProviderExecution &&
+      !report.modelTurn &&
+      report.fixture.noMutation &&
+      report.resultContract.requiresChangedFilesEmpty &&
+      report.redaction.ok &&
+      report.skip.defaultGate
+    const passed = promptOk && reportOk
+
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`noMutation=${comparison.ok}`)
+    console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+    console.log(`skipReason=${report.skip.reason}`)
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] real-readonly-coding-dry-run-contract`)
+    process.exit(passed ? 0 : 1)
+  } finally {
+    cleanupReadonlyFixture(fixture.fixtureDir)
+  }
+}
+
 async function main() {
+  if (showHelp) {
+    printHelp()
+    return
+  }
+  if (realReadonlyCodingDryRun) {
+    runRealReadonlyCodingDryRun()
+    return
+  }
   if (turnBoundaryDryRun) {
     runTurnBoundaryDryRun()
     return

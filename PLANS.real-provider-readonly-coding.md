@@ -360,6 +360,21 @@ Completed:
     - No real provider smoke was run.
     - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used as runtime home.
     - No production CLI behavior, provider/auth core, dependency manifest, lockfile, or three-large-file target was modified.
+- E. Dry-run contract for real read-only smoke
+  - Result: completed as a script dry-run contract checkpoint.
+  - Files changed:
+    - `scripts/verify-real-user-capabilities.mjs`
+    - `PLANS.real-provider-readonly-coding.md`
+  - Implementation:
+    - Added safe `--help` handling that exits before default real-provider gate execution.
+    - Added `--real-readonly-coding-dry-run`.
+    - The dry-run creates the safe fixture, snapshots it before/after, asserts no mutation, runs redaction assertions on synthetic secret-like strings, and builds an in-memory report contract.
+    - The dry-run prints `homeRead=false`, `real-provider execution skipped`, `modelTurn=false`, `reportWritten=false`, and `defaultSmoke=skipped`.
+    - The future opt-in smoke remains documented as `--real-readonly-coding-smoke`, but no real-provider model turn is implemented in this checkpoint.
+  - Boundary result:
+    - No real provider smoke was run.
+    - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used as runtime home.
+    - No production CLI behavior, provider/auth core, dependency manifest, lockfile, or three-large-file target was modified.
 
 ## 17. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -691,11 +706,13 @@ This planning round does not execute A.
 - Completed: B. Opt-in flag design.
 - Completed: C. Safe workspace fixture.
 - Completed: D. Redaction assertion helper.
-- Current: E. Dry-run contract for real read-only smoke.
-- Backlog: F-I as listed above.
+- Completed: E. Dry-run contract for real read-only smoke.
+- Current: F. Opt-in real-provider readiness preflight.
+- Backlog: G-I as listed above.
 - Verification for Planning: `rtk git status --short` passed with only `PLANS.real-provider-readonly-coding.md` untracked. `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated. `rtk git diff` passed; the new plan file was still untracked at that point, so no tracked diff was printed.
 - Verification for A: read-only audit commands completed with RTK. `rtk git status --short --branch` passed clean before checkpoint edits. Target audit used `rtk read scripts/verify-real-user-capabilities.mjs`, `rtk read scripts/verify-provider-readiness.mjs`, `rtk read packages/ts-shell/src/core/shell/providerFailureRedaction.ts`, `rtk read packages/ts-shell/src/core/shell/providerReadiness.ts`, `rtk read packages/ts-shell/src/config/runtimeConfig.ts`, `rtk read packages/ts-shell/src/core/shell/sessionRuntime.ts`, `rtk grep "PRIVATE_AGENTS_PROVIDER_MODE" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "verify:real-user-capabilities" package.json`, `rtk grep "read/inspect only" packages/ts-shell/src/core/shell/sessionRuntime.ts`, and `rtk grep "changedFiles" packages/ts-shell/src/orchestration/types.ts packages/ts-shell/src/core/query/resultMapper.ts`. Reference checks used targeted RTK grep against Claude Code query/result files and opencode read/edit/tool/permission files. `rtk git status --short` passed with only `PLANS.real-provider-readonly-coding.md` modified. `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated.
 - Verification for B: `rtk grep "--help" scripts/verify-real-user-capabilities.mjs scripts/verify-provider-readiness.mjs` was attempted but rtk interpreted `--help` as its own option, so it was not counted as evidence. `rtk grep "real-readonly" .` showed the proposed flag only existed in this plan before the design note. `rtk git status --short` passed with `PLANS.real-provider-readonly-coding.md` modified and `scripts/real-provider-readonly-coding-smoke.design.md` untracked before staging. `rtk npm run build -w packages/ts-shell` failed with sandbox `dist` write `EPERM`; the current approval policy does not allow elevated rerun. `rtk node node_modules/typescript/bin/tsc -p packages/ts-shell/tsconfig.build.json --noEmit` passed as the no-output TypeScript validation for this design-only checkpoint.
 - Verification for C: `rtk node scripts/real-provider-readonly-fixture.mjs --self-test` passed and reported `noMutation=true`. `rtk node scripts/verify-real-user-capabilities.mjs --failure-followup-context-dry-run` passed with real-provider execution skipped, homeRead=false, followupExecution=false, and reportWritten=false. `rtk npm run build -w packages/ts-shell` passed.
 - Verification for D: `rtk node scripts/real-provider-readonly-redaction.mjs --self-test` initially failed because the self-test expected `[PRIVATE_AGENTS_CONFIG_PATH]` while the helper correctly emitted `[REAL_PROVIDER_CONFIG_PATH]`; after narrowing the self-test assertion, the same command passed. `rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts` passed with 13 tests. `rtk npm run build -w packages/ts-shell` passed.
-- Notes: Planning, A, B, C, and D did not run real provider smoke, did not execute an opt-in model turn, did not read or modify `D:\Test\home-sf`, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. The next checkpoint is E dry-run contract for real read-only smoke; it should wire script args, fixture setup, redaction assertions, report schema, skip behavior, and no-mutation checks without running real provider.
+- Verification for E: `rtk node scripts/verify-real-user-capabilities.mjs --help` passed and returned safe help without executing the default real-provider gate. `rtk node scripts/verify-real-user-capabilities.mjs --real-readonly-coding-dry-run` passed with `homeRead=false`, `real-provider execution skipped`, `modelTurn=false`, `reportWritten=false`, `defaultSmoke=skipped`, `noMutation=true`, and `redaction=pass`. `rtk node scripts/verify-real-user-capabilities.mjs --failure-followup-context-dry-run` passed. `rtk npm run verify:result-contract` passed.
+- Notes: Planning, A, B, C, D, and E did not run real provider smoke, did not execute an opt-in model turn, did not read or modify `D:\Test\home-sf`, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. The next checkpoint is F opt-in real-provider readiness preflight; it may design or implement opt-in preflight behavior, but must not run a model turn.
