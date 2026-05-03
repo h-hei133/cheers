@@ -288,6 +288,28 @@ Backlog:
 Completed:
 
 - Planning: created `PLANS.pty-strategy-capability.md` from current local `main`.
+- A. PTY strategy and dependency audit
+  - Result: completed as a read-only audit / planning checkpoint.
+  - Files changed: `PLANS.pty-strategy-capability.md`.
+  - Target audit findings:
+    - Root `package.json` keeps `engines.node` at `>=20.0.0`; the current local Node runtime reported by `rtk proxy node -v` is `v24.12.0`, so any future native PTY dependency must be checked against current Node ABI / Windows support before adoption.
+    - `packages/ts-shell/package.json` has no runtime dependencies and only `vitest`, `typescript`, and `tsx` as dev dependencies.
+    - `rtk grep "node-pty" package.json package-lock.json packages/ts-shell/package.json` found no manifest or lockfile reference to `node-pty`.
+    - `rtk npm ls node-pty --workspaces` returned an empty dependency tree, confirming no installed workspace dependency named `node-pty`; the non-zero exit is expected for absent dependency evidence, not a product failure.
+    - `packages/ts-shell/src/test-utils/cliHarness.ts` drives CLI processes through `ChildProcess` stdin/stdout/stderr pipes and does not create a PTY.
+    - `packages/ts-shell/src/cli-baseline.test.ts` creates `spawnCli` with `stdio: ["pipe", "pipe", "pipe"]`; current interactive smokes are already named `pipe-spawn interactive ...`.
+    - `scripts/live-interactive-runner.mjs` uses inherited stdio and requires `process.stdin.isTTY` / `process.stdout.isTTY`; it is useful manual/live-runner evidence but not an automated PTY gate.
+    - `packages/ts-shell/src/entrypoints/cli.tsx` has production TTY boundaries via `stdinIsTty`, non-interactive approval gating, readline setup, keypress handling, and SIGINT handling.
+    - `packages/ts-shell/src/cli-baseline.test.ts` already notes OS-level SIGINT is not reliable from the non-TTY spawn harness, reinforcing that current SIGINT coverage is not true terminal interrupt coverage.
+    - `rtk find "*.yml" .github` returned no workflow files, so CI PTY support cannot be inferred from repository workflow configuration in this checkout.
+  - Reference audit findings:
+    - opencode `cli/cmd/run.ts` branches on `process.stdin.isTTY` / `process.stdout.isTTY`, reinforcing that TTY and non-TTY paths are semantically distinct.
+    - opencode permission events include `permission.asked`, reinforcing that approval prompt/event handling is a separate layer from generic process IO.
+    - Claude Code targeted permission grep showed permission denial tracking in query/runtime boundaries; no code was copied.
+  - Feasibility conclusion:
+    - Do not introduce `node-pty` or any PTY dependency in this checkpoint.
+    - Current automated tests can prove pipe stdin/stdout behavior only; they cannot prove true PTY prompt fidelity, raw mode, Ctrl-C, PTY close, or approval prompt interactivity.
+    - The next safest checkpoint is B. PTY coverage boundary contract, limited to documentation/naming/comment boundary work if any remaining wording can mislead.
 
 ## 17. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -637,7 +659,9 @@ read-only audit / planning checkpoint
 ## Checkpoint Status Override
 
 - Completed: Planning.
-- Current: A. PTY strategy and dependency audit.
-- Backlog: B-J as listed above.
-- Verification: pending for planning round.
-- Notes: planning round intentionally does not implement a checkpoint, does not introduce PTY dependency, does not touch provider/auth core, and does not read or modify `D:\Test\home-sf`.
+- Completed: A. PTY strategy and dependency audit.
+- Current: B. PTY coverage boundary contract.
+- Backlog: C-J as listed above.
+- Verification for Planning: `rtk git status --short` passed with only `PLANS.pty-strategy-capability.md` untracked before commit; `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated; `rtk git diff` passed.
+- Verification for A: read-only audit commands completed with RTK. `rtk git status --short --branch` passed clean before checkpoint edits. Target audit used `rtk read package.json`, `rtk read packages/ts-shell/package.json`, `rtk read packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk grep "pipe-spawn interactive" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "stdio" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts scripts/live-interactive-runner.mjs`, `rtk grep "node-pty" package.json package-lock.json packages/ts-shell/package.json`, `rtk npm ls node-pty --workspaces`, `rtk proxy node -v`, `rtk find "*.yml" .github`, `rtk grep "isTTY" packages/ts-shell/src/entrypoints/cli.tsx scripts/live-interactive-runner.mjs D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts`, `rtk grep "SIGINT" packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/cli-baseline.test.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts`, and `rtk grep "permission.asked" D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\permission\permission.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\acp\agent.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\tool\tool.ts`. `rtk git status --short` passed with only `PLANS.pty-strategy-capability.md` modified. `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated.
+- Notes: A did not modify production code, tests, dependency manifests, lockfiles, provider/auth core, `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A did not read or modify `D:\Test\home-sf`. Current automated evidence remains pipe-spawn only; true PTY strategy remains unapproved pending later checkpoints.
