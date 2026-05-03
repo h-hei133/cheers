@@ -344,10 +344,12 @@ Current:
 - A. Current edit/patch capability audit
   - Type: read-only audit / plan update.
   - Goal: audit patchMutationLane, mutationExecution, targetResolution, runMvp edit/write path, resultMapper, and sessionRuntime edit/patch capability and failure contract.
+- B. Reference implementation comparison
+  - Type: read-only reference comparison / plan update.
+  - Goal: compare Claude Code FileEditTool and opencode edit/apply_patch semantics, then document boundaries to absorb without copying code.
 
 Backlog:
 
-- B. Reference implementation comparison
 - C. Capability decision document
 - D. Patch contract type design
 - E. Parser-only prototype
@@ -377,6 +379,39 @@ Completed:
   - Boundary result:
     - Current production policy remains correct: `apply_patch` and unified diff input stay rejected until parser/verification/preview/no-partial contracts exist.
     - The next checkpoint should not implement parser/apply yet; it should compare Claude Code and opencode semantics and document which boundaries to adopt.
+    - No real provider smoke was run.
+    - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used.
+    - No production code, tests, dependency manifest, lockfile, or three-large-file target was modified.
+- B. Reference implementation comparison
+  - Result: completed as a read-only semantic comparison / plan update checkpoint.
+  - Files changed:
+    - `PLANS.edit-patch-capability-boundary.md`
+  - Claude Code files compared:
+    - `D:\LenovoSoftstore\pyproject\source-claudecode\tools\FileEditTool\FileEditTool.ts`
+    - `D:\LenovoSoftstore\pyproject\source-claudecode\tools\FileEditTool\utils.ts`
+    - `D:\LenovoSoftstore\pyproject\source-claudecode\tools\FileEditTool\types.ts`
+    - `D:\LenovoSoftstore\pyproject\source-claudecode\tools\FileEditTool\prompt.ts`
+  - opencode files compared:
+    - `D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\tool\edit.ts`
+    - `D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\tool\multiedit.ts`
+    - `D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\tool\apply_patch.ts`
+    - `D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\patch\patch.ts`
+  - Reference findings:
+    - Claude Code FileEditTool is an exact edit tool, not a general patch engine: its schema centers `file_path`, `old_string`, `new_string`, and optional `replace_all`.
+    - Claude Code validates read-first state and stale file modification before writing, rejects missing/not-read/modified/not-found/ambiguous replacement cases, generates patch metadata before write, then returns structured result metadata including original file, structured patch, replaceAll, and userModified.
+    - Claude Code keeps edit normalization and patch generation in FileEditTool utilities rather than in the query loop, which reinforces this route's rule that parsing and verification must not be embedded in `runMvpIntegratedFlow.ts`.
+    - opencode separates `edit`, `multiedit`, and `apply_patch` tools; `multiedit` is sequential exact edits, while `apply_patch` owns apply_patch-shaped grammar and multi-file metadata.
+    - opencode `apply_patch` parses hunks first, validates/derives all file changes, builds permission metadata with diff and per-file summaries, then applies add/update/delete/move changes and reports changed files.
+    - opencode `patch/patch.ts` exposes separate parse and verified forms (`MaybeApplyPatch`, `MaybeApplyPatchVerified`, `ApplyPatchAction`, `ApplyPatchFileChange`), which supports target-side parser/verification contracts before any production apply wiring.
+  - Boundaries to adopt:
+    - Keep exact edit and apply_patch as distinct capability boundaries.
+    - Preserve read-first / stale guard semantics before write.
+    - Split parse, verify, preview/result, and apply into separate modules.
+    - Build permission/result metadata from a preverified diff/plan, not from raw patch text at the terminal layer.
+    - Do not enable production apply until no-partial behavior is proven; opencode's sequential write path is informative but not sufficient as the target no-partial contract.
+    - Keep current production rejection of apply_patch/unified diff until the capability decision checkpoint explicitly chooses a minimum supported shape.
+  - Boundary result:
+    - The next checkpoint should be a capability decision document, not parser/apply implementation.
     - No real provider smoke was run.
     - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used.
     - No production code, tests, dependency manifest, lockfile, or three-large-file target was modified.
@@ -747,8 +782,10 @@ This planning round does not execute A.
 
 - Completed: Planning.
 - Completed: A. Current edit/patch capability audit.
-- Current: B. Reference implementation comparison.
-- Backlog: C. Capability decision document; D. Patch contract type design; E. Parser-only prototype; F. Verification-only checkpoint; G. Preview contract checkpoint; H. No-partial-apply contract checkpoint; I. Minimal single-file update apply checkpoint; J. Multi-file strategy checkpoint; K. Route audit / merge readiness.
+- Completed: B. Reference implementation comparison.
+- Current: C. Capability decision document.
+- Backlog: D. Patch contract type design; E. Parser-only prototype; F. Verification-only checkpoint; G. Preview contract checkpoint; H. No-partial-apply contract checkpoint; I. Minimal single-file update apply checkpoint; J. Multi-file strategy checkpoint; K. Route audit / merge readiness.
 - Verification for Planning: pending.
 - Verification for A: `rtk git status --short` passed with only `PLANS.edit-patch-capability-boundary.md` modified. `rtk npm run build -w packages/ts-shell` passed. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts` passed with 6 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/targetResolution.test.ts` passed with 6 tests.
-- Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A was a read-only audit / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
+- Verification for B: `rtk git status --short` passed with only `PLANS.edit-patch-capability-boundary.md` modified. `rtk npm run build -w packages/ts-shell` passed.
+- Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A was a read-only audit / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. B was a read-only reference comparison / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
