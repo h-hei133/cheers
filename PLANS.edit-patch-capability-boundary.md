@@ -292,6 +292,15 @@ Checkpoint C decision:
 - Multi-file, add, delete, move, fuzzy matching, rollback, AST patching, and broad batch engines remain explicitly deferred.
 - Unsupported shapes must continue to produce safe structured blocker evidence and actionable next action rather than partial writes or generic model failure.
 
+Checkpoint J multi-file strategy:
+
+- Production apply remains single-file only in isolated test modules and is not wired to orchestration.
+- Multi-file patches may be parsed into structured operations and may be verified or previewed in dry contracts, but they must not be applied to disk by the current route.
+- `applySingleFileUpdateIntent` intentionally rejects multiple write intents with `patch-apply-plan-not-verified`; this is the active guard against accidental multi-file apply.
+- Future multi-file apply support requires a dedicated checkpoint after this route with per-file permission metadata, result summary mapping, workspace boundary checks for every operation, and a no-partial multi-file write strategy.
+- Add/delete/move remain representation and verification concepts only; they are not production apply capabilities.
+- Current production `apply_patch` and unified diff rejection remains the user-visible behavior until explicit orchestration wiring is separately approved and validated.
+
 ## 16. parse / verify / apply / preview / result contract 的目标模块布局
 
 Recommended module responsibilities:
@@ -348,6 +357,13 @@ Recommended first atomicity rule:
 - No production apply until verify-all-before-write is implemented and tested.
 - Rollback remains deferred until a concrete need appears.
 
+Checkpoint J atomicity decision:
+
+- Multi-file apply is deferred rather than enabled in this route.
+- If multi-file apply is reconsidered later, the first acceptable strategy remains verify-all-before-write with planned content computed for every file before any write callback runs.
+- Rollback is not selected as the next step because Windows locks, add/delete/move semantics, and user dirty worktrees make rollback a broader system than this route should absorb.
+- A future staged-write or snapshot-rollback design must prove it does not rely on git cleanliness and does not mutate outside the verified workspace boundary.
+
 ## 18. 路线分阶段 backlog
 
 Current:
@@ -379,11 +395,11 @@ Current:
 
 Current:
 
-- J. Multi-file strategy checkpoint
+- K. Route audit / merge readiness
 
 Backlog:
 
-- K. Route audit / merge readiness
+- none for this stage unless route audit finds a route-introduced regression.
 
 Completed:
 
@@ -589,6 +605,22 @@ Completed:
     - Applicator is not imported by production orchestration.
     - Current `apply_patch` and unified diff rejection behavior remains unchanged.
     - Multi-file, add, delete, move, rollback, and production apply remain unsupported.
+    - No real provider smoke was run.
+    - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used.
+    - `cli.tsx`, `SessionManager.ts`, and `runMvpIntegratedFlow.ts` were not modified.
+- J. Multi-file strategy checkpoint
+  - Result: completed as a strategy / plan update checkpoint.
+  - Files changed:
+    - `PLANS.edit-patch-capability-boundary.md`
+  - Strategy decided:
+    - Multi-file patch parsing, dry verification, and preview may remain as structured contract capabilities.
+    - Multi-file production apply remains deferred and unsupported in this route.
+    - Current single-file applicator remains intentionally narrow and rejects multiple write intents before writer invocation.
+    - Future multi-file apply requires a separate route or explicit checkpoint with per-file permission metadata, result summary mapping, workspace-boundary proof for every operation, and no-partial multi-file write proof.
+    - Add/delete/move remain non-production apply capabilities.
+  - Boundary result:
+    - No code behavior changed.
+    - Current `apply_patch` and unified diff rejection behavior remains unchanged.
     - No real provider smoke was run.
     - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used.
     - `cli.tsx`, `SessionManager.ts`, and `runMvpIntegratedFlow.ts` were not modified.
@@ -967,8 +999,9 @@ This planning round does not execute A.
 - Completed: G. Preview contract checkpoint.
 - Completed: H. No-partial-apply contract checkpoint.
 - Completed: I. Minimal single-file update apply checkpoint.
-- Current: J. Multi-file strategy checkpoint.
-- Backlog: K. Route audit / merge readiness.
+- Completed: J. Multi-file strategy checkpoint.
+- Current: K. Route audit / merge readiness.
+- Backlog: none for this stage unless route audit finds a route-introduced regression.
 - Verification for Planning: pending.
 - Verification for A: `rtk git status --short` passed with only `PLANS.edit-patch-capability-boundary.md` modified. `rtk npm run build -w packages/ts-shell` passed. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts` passed with 6 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/targetResolution.test.ts` passed with 6 tests.
 - Verification for B: `rtk git status --short` passed with only `PLANS.edit-patch-capability-boundary.md` modified. `rtk npm run build -w packages/ts-shell` passed.
@@ -979,4 +1012,5 @@ This planning round does not execute A.
 - Verification for G: `rtk npm run test -w packages/ts-shell -- src/orchestration/patchResult/preview.test.ts` passed with 3 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchVerification/verify.test.ts` passed with 7 tests. `rtk npm run verify:result-contract` passed. `rtk npm run build -w packages/ts-shell` passed.
 - Verification for H: `rtk npm run test -w packages/ts-shell -- src/orchestration/patchApplication/noPartialApply.test.ts` passed with 3 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchVerification/verify.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts` passed with 6 tests. `rtk npm run build -w packages/ts-shell` passed.
 - Verification for I: `rtk npm run test -w packages/ts-shell -- src/orchestration/patchApplication/singleFileUpdateApply.test.ts` passed with 5 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchApplication/noPartialApply.test.ts` passed with 3 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts` passed with 6 tests. `rtk npm run build -w packages/ts-shell` passed.
-- Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A was a read-only audit / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. B was a read-only reference comparison / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. C was a decision document / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. D added isolated patch contract types and focused type tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement parser/verification/application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. E added isolated parser-only behavior and focused parser tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement verification/application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. F added isolated dry verification behavior and focused verifier tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. G added isolated preview/result contract behavior and focused preview tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement application behavior, did not change current rejection behavior or terminal wording, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. H added isolated no-partial write-intent contract behavior and focused tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement production application behavior, did not change current rejection behavior or terminal wording, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. I added isolated single-file update apply behavior with an injected writer and focused tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement production application behavior, did not change current apply_patch/unified diff rejection behavior or terminal wording, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
+- Verification for J: `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts` passed with 6 tests. `rtk npm run build -w packages/ts-shell` passed.
+- Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A was a read-only audit / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. B was a read-only reference comparison / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. C was a decision document / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. D added isolated patch contract types and focused type tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement parser/verification/application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. E added isolated parser-only behavior and focused parser tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement verification/application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. F added isolated dry verification behavior and focused verifier tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. G added isolated preview/result contract behavior and focused preview tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement application behavior, did not change current rejection behavior or terminal wording, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. H added isolated no-partial write-intent contract behavior and focused tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement production application behavior, did not change current rejection behavior or terminal wording, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. I added isolated single-file update apply behavior with an injected writer and focused tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement production application behavior, did not change current apply_patch/unified diff rejection behavior or terminal wording, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. J completed multi-file strategy as a plan-only checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code, did not enable multi-file writes, did not change current apply_patch/unified diff rejection behavior or terminal wording, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
