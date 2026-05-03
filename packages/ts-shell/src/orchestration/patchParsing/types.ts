@@ -116,3 +116,14 @@ export interface PatchPreviewResult {
   readonly files: readonly PatchPreviewFile[];
   readonly willWrite: false;
 }
+
+export type PatchParseResult =
+  | {
+      readonly ok: true;
+      readonly patch: ParsedPatch;
+    }
+  | {
+      readonly ok: false;
+      readonly failure: PatchFailure;
+      readonly rawText: string;
+    };

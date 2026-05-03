@@ -364,10 +364,12 @@ Current:
 - D. Patch contract type design
   - Type: isolated type contract implementation.
   - Goal: add minimal structured contracts for parsed patches, file operations, hunks, verification, application plans, previews, and failure codes without production wiring.
+- E. Parser-only prototype
+  - Type: isolated parser-only implementation.
+  - Goal: parse apply_patch grammar into structured output or structured rejection without filesystem reads, writes, verification, or production wiring.
 
 Backlog:
 
-- E. Parser-only prototype
 - F. Verification-only checkpoint
 - G. Preview contract checkpoint
 - H. No-partial-apply contract checkpoint
@@ -477,6 +479,27 @@ Completed:
     - No verifier was implemented.
     - No applicator was implemented.
     - No disk mutation path was added.
+    - Current `apply_patch` and unified diff rejection behavior remains unchanged.
+    - No real provider smoke was run.
+    - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used.
+    - `cli.tsx`, `SessionManager.ts`, and `runMvpIntegratedFlow.ts` were not modified.
+- E. Parser-only prototype
+  - Result: completed as an isolated parser-only implementation checkpoint.
+  - Files changed:
+    - `packages/ts-shell/src/orchestration/patchParsing/parser.ts`
+    - `packages/ts-shell/src/orchestration/patchParsing/parser.test.ts`
+    - `packages/ts-shell/src/orchestration/patchParsing/types.ts`
+    - `PLANS.edit-patch-capability-boundary.md`
+  - Parser-only behavior added:
+    - Parses `*** Begin Patch` / `*** End Patch` bounded input.
+    - Parses `*** Add File`, `*** Update File`, `*** Delete File`, and `*** Move to` operation shapes into `ParsedPatch`.
+    - Parses update hunks with `@@` headers and context/add/remove line changes.
+    - Returns structured parse failures for missing markers, empty patches, unsupported operation lines, malformed add content, missing paths, missing hunks, and malformed hunk lines.
+  - Boundary result:
+    - Parser does not read filesystem state.
+    - Parser does not verify file existence, hunk context, path boundaries, or operation support.
+    - Parser does not apply patches or write files.
+    - Parser is not imported by production orchestration.
     - Current `apply_patch` and unified diff rejection behavior remains unchanged.
     - No real provider smoke was run.
     - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used.
@@ -851,11 +874,13 @@ This planning round does not execute A.
 - Completed: B. Reference implementation comparison.
 - Completed: C. Capability decision document.
 - Completed: D. Patch contract type design.
-- Current: E. Parser-only prototype.
-- Backlog: F. Verification-only checkpoint; G. Preview contract checkpoint; H. No-partial-apply contract checkpoint; I. Minimal single-file update apply checkpoint; J. Multi-file strategy checkpoint; K. Route audit / merge readiness.
+- Completed: E. Parser-only prototype.
+- Current: F. Verification-only checkpoint.
+- Backlog: G. Preview contract checkpoint; H. No-partial-apply contract checkpoint; I. Minimal single-file update apply checkpoint; J. Multi-file strategy checkpoint; K. Route audit / merge readiness.
 - Verification for Planning: pending.
 - Verification for A: `rtk git status --short` passed with only `PLANS.edit-patch-capability-boundary.md` modified. `rtk npm run build -w packages/ts-shell` passed. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts` passed with 6 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/targetResolution.test.ts` passed with 6 tests.
 - Verification for B: `rtk git status --short` passed with only `PLANS.edit-patch-capability-boundary.md` modified. `rtk npm run build -w packages/ts-shell` passed.
 - Verification for C: `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run build -w packages/ts-shell` passed.
 - Verification for D: `rtk npm run test -w packages/ts-shell -- src/orchestration/patchParsing/types.test.ts` passed with 3 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run build -w packages/ts-shell` passed.
-- Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A was a read-only audit / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. B was a read-only reference comparison / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. C was a decision document / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. D added isolated patch contract types and focused type tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement parser/verification/application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
+- Verification for E: initial `rtk npm run build -w packages/ts-shell` failed from E-introduced TypeScript narrowing issues in `patchParsing/parser.ts`; fixed locally and reran. Final `rtk npm run test -w packages/ts-shell -- src/orchestration/patchParsing/parser.test.ts` passed with 6 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run build -w packages/ts-shell` passed. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchParsing/types.test.ts` passed with 3 tests.
+- Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A was a read-only audit / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. B was a read-only reference comparison / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. C was a decision document / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. D added isolated patch contract types and focused type tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement parser/verification/application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. E added isolated parser-only behavior and focused parser tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement verification/application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
