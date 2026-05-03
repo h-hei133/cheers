@@ -1,0 +1,630 @@
+# Real-Provider Read-Only Coding Evidence
+
+## 1. 总目标
+
+建立一条显式 opt-in 的 real-provider read-only coding flow evidence 路线，用于证明真实 provider 可以在安全边界内完成 read / inspect / summarize 类 coding task，并把成功、失败、终端结果、无写入 contract 和 redaction 结果清楚呈现。
+
+本路线直接服务 user-minimal real main path:
+
+- Step 3: 用户输入真实任务后进入统一 query loop。
+- Step 4: 系统使用真实模型和真实工具链，但本路线只允许 read-only inspection，不做 edit/write/mutation。
+- Step 5: 系统输出清楚 terminal state；真实 provider 的 network/auth/config/model failure 必须可归因。
+- Step 6: 失败或停止后的下一步必须可行动，且不能污染真实 provider home。
+
+本路线默认不运行真实 provider smoke；真实 provider 只允许在后续明确 opt-in checkpoint 中使用。
+
+## 2. 当前分支
+
+```text
+real-provider-readonly-coding-evidence
+```
+
+从当前本地 `main` 创建。分支创建前确认:
+
+```text
+main...origin/main [ahead 8]
+HEAD: 012feb8 Record PTY strategy post-merge verification
+```
+
+## 3. base/main 状态
+
+分支 base 为本地 `main`:
+
+```text
+012feb8 Record PTY strategy post-merge verification
+```
+
+重要状态:
+
+- 本地 `main` clean。
+- 本地 `main` ahead `origin/main` by 8。
+- 不得 reset、rebase、drop 或覆盖这些本地提交。
+- 上一条 `pty-strategy-capability-boundary` 路线已阶段性封口，`origin/pty-strategy-capability-boundary` 包含 `4b7b41f`。
+- PowerShell profile warning 是当前环境噪音，除非实际阻塞命令，否则不作为产品失败。
+
+## 4. 背景审查结论
+
+此前已经完成或阶段性收口:
+
+- `main-path-boundaries`: 三大巨型文件第一轮边界治理。
+- `real-main-path-evidence`: CLI / real-ish main path evidence。
+- `long-session-continuity-hardening`: compact / replay / resume / continue continuity。
+- `real-provider-safe-evidence`: real-provider safety attribution / redaction / dry-run evidence。
+- `live-tty-interactive-evidence`: pipe-spawn interactive evidence。
+- `pty-strategy-capability-boundary`: pipe-spawn 不等于 true PTY，true PTY 继续前需要 strategy / dependency approval。
+- `approval-tool-provenance-contract`: approval/tool execution provenance contract 已封口。
+
+当前缺口: real-provider-safe 路线主要证明 failure attribution / redaction，不证明真实 provider 能完成 read-only coding task。
+
+## 5. 为什么选择 real-provider opt-in read-only coding flow
+
+当前 synthetic main path、CLI entry、result contract、provider readiness、redaction、failure follow-up 已较稳。剩余真实用户风险是: 成功路径上真实 provider 是否能在不写入、不泄露、不污染 real home 的前提下完成最小 read-only coding flow。
+
+选择 read-only opt-in 的原因:
+
+- 比 edit/write 更接近当前安全边界，可先证明 model turn + query loop + terminal result。
+- 可以用 changedFiles empty / fixture hash / read-only no-mutation contract 明确证明无写入。
+- 网络、认证、配置、模型失败可以被分类为外部或配置状态，而不是自动算产品逻辑回归。
+- 不把 synthetic golden 包装成 real-provider 成熟证据。
+
+## 6. 明确不做的方向
+
+- 不新增 provider，不改 auth core。
+- 不读取、复制、打印、修改、清理或泄露真实 auth/key/provider 配置。
+- 不默认运行 real-provider smoke 或 `verify-real-user-capabilities`。
+- 不执行 edit/write/tool mutation。
+- 不把 real-provider network 波动误判为产品回归。
+- 不处理 Windows EBUSY。
+- 不修 `runMvpIntegratedFlow` 全量旧失败。
+- 不做完整 apply_patch、AST patch、rollback、batch engine、stream mid-flight retry、全局网络重试。
+- 不继续 provider readiness dry-run、PTY、long-session、approval/tool provenance、edit/patch marker、verification surface 同族 proof，除非来自本路线 read-only coding flow 缺口。
+- 不把 synthetic golden 通过包装成 real-provider 成熟证据。
+- 不为了减少行数而拆三大巨型文件。
+
+## 7. 环境约束
+
+目标仓库:
+
+```text
+D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents
+```
+
+参考仓库只读:
+
+```text
+D:\LenovoSoftstore\pyproject\source-claudecode
+D:\LenovoSoftstore\pyproject\opencode
+```
+
+默认验证只允许使用:
+
+```text
+D:\Test\pca-home-synth
+PRIVATE_AGENTS_PROVIDER_MODE=synthetic
+```
+
+失败态或隔离验证只能使用 synthetic/test home 或临时 test home。不得污染 `D:\Test\home-sf`。
+
+## 8. 真实 provider 安全约束
+
+`D:\Test\home-sf` 是 real-provider runtime home，只能在后续明确 opt-in checkpoint 中使用。
+
+硬性边界:
+
+- 默认验证不得使用 `D:\Test\home-sf`。
+- 不得读取、打印、复制、修改、清理真实 auth/key/provider 配置。
+- 不得输出 auth header、token、key、provider config path detail、real home config detail。
+- 后续 opt-in smoke 只能用 read-only fixture workspace，不得写真实 workspace。
+- opt-in smoke 失败时只做归因，不自动视为产品回归。
+- 输出 tail、report、error、next action 必须经过 redaction 检查。
+
+## 9. 参考实现约束
+
+目标仓库优先；参考仓库只做小范围语义对照，不照抄代码。
+
+目标仓库 grounding files:
+
+- `AGENTS.md`
+- `scripts/verify-real-user-capabilities.mjs`
+- `scripts/verify-provider-readiness.mjs`
+- `packages/ts-shell/src/core/shell/providerReadiness.ts`
+- `packages/ts-shell/src/core/shell/providerFailureRedaction.ts`
+- `packages/ts-shell/src/core/shell/providerReadiness.test.ts`
+- `packages/ts-shell/src/cli-baseline.test.ts`
+- `package.json`
+
+Claude Code semantic reference:
+
+- `QueryEngine.ts`
+- `query.ts`
+- `commands.ts`
+- `cli/print` or structured output related files
+- provider/model request/error handling related files
+- `tools/FileReadTool/*`
+- `tools/FileEditTool/*`
+- permission / tool result related files
+
+opencode semantic reference:
+
+- `packages/opencode/src/cli/cmd/run.ts`
+- provider/model related files
+- `packages/opencode/src/tool/tool.ts`
+- `packages/opencode/src/tool/read.ts`
+- `packages/opencode/src/tool/bash.ts`
+- `packages/opencode/src/permission/permission.ts`
+- `packages/opencode/src/acp/agent.ts`
+
+Absorb only semantic boundaries:
+
+- real provider / model failure presentation.
+- read-only inspect vs edit/write separation.
+- auth/network/config failure attribution.
+- secret and provider detail redaction.
+- CLI run/print result and next action surfaces.
+
+## 10. 三大巨型文件新增代码约束
+
+The three large files are not absolutely forbidden, but this route should not touch them during planning:
+
+- `packages/ts-shell/src/entrypoints/cli.tsx`
+- `packages/ts-shell/src/session/SessionManager.ts`
+- `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`
+
+Later route helpers should prefer:
+
+- `scripts/*`
+- `packages/ts-shell/src/core/shell/*`
+- `packages/ts-shell/src/core/query/*`
+- `packages/ts-shell/src/config/*`
+- `packages/ts-shell/src/test-utils/*`
+- `packages/ts-shell/src/model-adapters/*`
+
+Only modify the three large files if the behavior truly belongs to entry wiring, durable session state, or main orchestration sequencing. If that happens, checkpoint notes must explain why the logic cannot live in a clearer helper module.
+
+## 11. 当前已闭合能力
+
+Current closed or stage-sealed capabilities:
+
+- packaged CLI and `--print` / stdin boundary.
+- synthetic golden main path.
+- result/failure terminal contract.
+- provider readiness and provider failure redaction.
+- real-provider-safe attribution dry-runs.
+- long-session compact / replay / resume continuity.
+- approval/tool execution provenance internal contract.
+- pipe-spawn interactive startup, slash command, stopped follow-up, print boundary, EOF close smoke.
+- PTY strategy/capability boundary; pipe-spawn is not true PTY.
+
+These prove many default and synthetic surfaces, but not a successful real-provider read-only coding task.
+
+## 12. 当前主要风险
+
+- Real provider may fail because of external network, auth, config, quota, endpoint, or model availability.
+- A real-provider failure must not be reported as product regression unless local logic caused it.
+- Output may accidentally include token/header/key/path/provider detail if redaction is incomplete.
+- Read-only task could accidentally execute a write-capable tool or mutate workspace/session state beyond expected artifacts.
+- Existing `verify-real-user-capabilities.mjs` has dry-run flags, but no dedicated real read-only coding opt-in flag yet.
+- `changedFiles` / report checks exist, but read-only no-mutation evidence needs a focused contract.
+- Default CI must remain synthetic and stable; real provider opt-in must be skipped unless explicitly requested.
+
+## 13. real-provider read-only coding flow coverage boundary
+
+This route may prove:
+
+- explicit opt-in real-provider preflight and model turn.
+- read/inspect/summarize task over a small safe fixture workspace.
+- terminal result surface for real-provider success, stopped, or failure.
+- `changedFiles` empty and no fixture mutation.
+- redacted output and safe failure attribution.
+- no default use of real-provider smoke.
+
+This route must not claim:
+
+- edit/write tool maturity.
+- mutation safety for arbitrary workspaces.
+- true PTY behavior.
+- provider reliability across networks or accounts.
+- synthetic golden as real-provider evidence.
+
+## 14. opt-in / skip / attribution 规则
+
+Default behavior:
+
+- Do not run real provider.
+- Use synthetic/test home only.
+- Real-provider smoke must be skipped unless an explicit opt-in flag is present.
+
+Future opt-in flag should be explicit, for example:
+
+```text
+--real-readonly-coding-smoke
+```
+
+Future opt-in run must print:
+
+- mode and opt-in status.
+- that external network/auth/model failure is attribution, not automatic product regression.
+- that real auth/key/provider config will not be read, printed, modified, or cleaned.
+- that only read-only fixture workspace is in scope.
+
+Failure categories must include at least:
+
+- auth/config failure.
+- network/provider unavailable.
+- model unsupported or quota/rate limited.
+- product regression.
+- inconclusive external failure.
+
+## 15. secret / path / provider detail redaction 规则
+
+All real-provider output, report tails, error strings, and next-action text must avoid:
+
+- bearer tokens.
+- API keys.
+- refresh/access tokens.
+- auth headers.
+- provider config raw paths or file contents.
+- `D:\Test\home-sf` config detail.
+- credential-like URL query params.
+
+Existing helpers to reuse or audit:
+
+- `packages/ts-shell/src/core/shell/providerFailureRedaction.ts`
+- `scripts/verify-provider-readiness.mjs` redaction routines.
+- `scripts/verify-real-user-capabilities.mjs` redaction routines.
+
+Redaction tests must assert both positive replacement markers and negative absence of original secret-like samples.
+
+## 16. 路线分阶段 backlog
+
+Current:
+
+- A. Real-provider read-only flow audit
+  - Type: read-only audit / planning checkpoint.
+  - Goal: audit existing real-provider scripts, readiness, runtime config, CLI entry, session runtime, and redaction capability without running real provider.
+
+Backlog:
+
+- B. Opt-in flag design
+- C. Safe workspace fixture
+- D. Redaction assertion helper
+- E. Dry-run contract for real read-only smoke
+- F. Opt-in real-provider readiness preflight
+- G. Opt-in real-provider read-only model turn
+- H. Real-provider failure attribution in read-only flow
+- I. Route audit / merge readiness
+
+Completed:
+
+- Planning: created `PLANS.real-provider-readonly-coding.md` from current local `main`.
+
+## 17. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
+
+### A. Real-provider read-only flow audit
+
+Goal:
+
+- Read-only audit `verify-real-user-capabilities`, provider readiness, runtime config, CLI entry, session runtime, and redaction surfaces.
+- Do not run real provider.
+- Update this plan with findings, Completed / Current / Backlog / Verification / Notes.
+
+Allowed files:
+
+- `PLANS.real-provider-readonly-coding.md`
+
+Forbidden files/actions:
+
+- production code.
+- real provider execution.
+- `D:\Test\home-sf`.
+- auth/provider config.
+
+Verification:
+
+```powershell
+rtk git status --short
+rtk npm run build -w packages/ts-shell
+```
+
+### B. Opt-in flag design
+
+Goal:
+
+- Design a clear opt-in flag such as `--real-readonly-coding-smoke`.
+- Default must remain skip/no-op for real provider.
+- Define command help text, risk warning, and attribution status.
+
+Allowed files:
+
+- `PLANS.real-provider-readonly-coding.md`
+- optional script design notes.
+
+Forbidden:
+
+- running real provider.
+- modifying auth core.
+- adding write/edit behavior.
+
+Verification:
+
+```powershell
+rtk node scripts/verify-real-user-capabilities.mjs --help
+rtk npm run build -w packages/ts-shell
+```
+
+### C. Safe workspace fixture
+
+Goal:
+
+- Design or implement a small temporary fixture containing only harmless text files.
+- Read-only task must inspect/summarize fixture content and prove no mutation.
+
+Allowed files:
+
+- `scripts/*`
+- `packages/ts-shell/src/test-utils/*`
+- `PLANS.real-provider-readonly-coding.md`
+
+Forbidden:
+
+- real workspace mutation.
+- `D:\Test\home-sf` access.
+- edit/write tools.
+
+Verification:
+
+```powershell
+rtk node scripts/verify-real-user-capabilities.mjs --failure-followup-context-dry-run
+rtk npm run build -w packages/ts-shell
+```
+
+### D. Redaction assertion helper
+
+Goal:
+
+- Reuse or add helper that checks real-provider output/report text for secrets and provider detail.
+- Keep helper out of the three large files.
+
+Allowed files:
+
+- `scripts/*`
+- `packages/ts-shell/src/core/shell/*`
+- `packages/ts-shell/src/test-utils/*`
+- focused tests
+- `PLANS.real-provider-readonly-coding.md`
+
+Forbidden:
+
+- raw secret printing.
+- real auth/config reads.
+- broad logger rewrites.
+
+Verification:
+
+```powershell
+rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts
+rtk npm run build -w packages/ts-shell
+```
+
+### E. Dry-run contract for real read-only smoke
+
+Goal:
+
+- Validate script args, fixture setup, redaction assertions, report schema, skip behavior, and no-mutation checks without running real provider.
+
+Allowed files:
+
+- `scripts/*`
+- `packages/ts-shell/src/test-utils/*`
+- `PLANS.real-provider-readonly-coding.md`
+
+Forbidden:
+
+- real provider execution.
+- real home access.
+- provider/auth core changes.
+
+Verification:
+
+```powershell
+rtk node scripts/verify-real-user-capabilities.mjs --help
+rtk node scripts/verify-real-user-capabilities.mjs --failure-followup-context-dry-run
+rtk npm run verify:result-contract
+```
+
+### F. Opt-in real-provider readiness preflight
+
+Goal:
+
+- Only with explicit opt-in, run readiness preflight without model turn.
+- Classify auth/network/config/unsupported failures safely.
+
+Allowed files:
+
+- `scripts/*`
+- config/readiness helpers if needed
+- `PLANS.real-provider-readonly-coding.md`
+
+Forbidden:
+
+- model turn.
+- config reads/prints beyond existing safe runtime loading.
+- secret/path leakage.
+
+Verification:
+
+```powershell
+rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts
+rtk npm run test -w packages/ts-shell -- src/config/runtimeConfig.test.ts
+```
+
+### G. Opt-in real-provider read-only model turn
+
+Goal:
+
+- Only with explicit opt-in, run one real provider read-only task against safe fixture.
+- Success requires visible model turn, terminal result, `changedFiles` empty, fixture unchanged, and redacted output.
+- Failure is attribution unless local product regression is proven.
+
+Allowed files:
+
+- `scripts/*`
+- `packages/ts-shell/src/test-utils/*`
+- focused result helpers if needed
+- `PLANS.real-provider-readonly-coding.md`
+
+Forbidden:
+
+- edit/write/mutation tools.
+- real workspace mutation.
+- default CI gate.
+- leaking real provider detail.
+
+Verification:
+
+```powershell
+rtk npm run verify:result-contract
+rtk npm run verify:cli-entry
+```
+
+The opt-in real-provider command must be run only when the checkpoint explicitly requests it and must print the real-provider risk notice first.
+
+### H. Real-provider failure attribution in read-only flow
+
+Goal:
+
+- Verify safe failure reason and next action for model/network/auth failures.
+- Ensure no secret or provider config detail leaks.
+- Ensure real home and safe fixture are not polluted.
+
+Allowed files:
+
+- `scripts/*`
+- redaction/failure helpers
+- focused tests
+- `PLANS.real-provider-readonly-coding.md`
+
+Forbidden:
+
+- global network retry systems.
+- auth core changes.
+- real config mutation.
+
+Verification:
+
+```powershell
+rtk npm run verify:result-contract
+rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts
+```
+
+### I. Route audit / merge readiness
+
+Goal:
+
+- Stage-seal route after focused validation.
+- Do not expand same-family proof.
+- Real-provider opt-in smoke is not a default gate.
+
+Allowed files:
+
+- `PLANS.real-provider-readonly-coding.md`
+- explicit minimal regression fix if route introduced one.
+
+Forbidden:
+
+- new checkpoint.
+- provider/auth core changes.
+- edit/write/mutation proof expansion.
+
+Verification:
+
+```powershell
+rtk git status --short
+rtk npm run build -w packages/ts-shell
+rtk npm run verify:result-contract
+rtk npm run verify:cli-entry
+HOME=D:\Test\pca-home-synth USERPROFILE=D:\Test\pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path
+```
+
+## 18. 失败归因规则
+
+All failures must be classified before fixing:
+
+1. route-introduced product regression.
+2. existing old failure.
+3. too-broad filter hit unrelated case.
+4. environment issue: sandbox EPERM, spawn EPERM, dist write failure, network timeout, PowerShell profile warning.
+5. real-provider external failure: auth, config, network, endpoint, quota, model unsupported.
+6. concurrent branch/main difference.
+7. inconclusive.
+
+Rules:
+
+- Product regression: minimal fix and rerun related validation.
+- External provider failure: record attribution and do not widen product fix.
+- Environment failure: rerun same RTK command elevated once when appropriate.
+- Inconclusive: stop checkpoint, do not merge.
+
+## 19. RTK/audit 残留规则
+
+Validation may generate:
+
+- `.sisyphus/audit/permissions.jsonl`
+- `packages/ts-shell/.sisyphus/audit/permissions.jsonl`
+- `rtk/history.db`
+- similar audit/runtime residue.
+
+Before commit or final status, clean or restore these residues. Do not commit:
+
+- audit residue.
+- real user config.
+- temporary home.
+- unrelated generated artifacts.
+
+If RTK status/restore keeps writing audit, explain why and use minimal raw `git restore` / raw final `git status --short` only for cleanup confirmation.
+
+## 20. 提交/push 规则
+
+One checkpoint per commit.
+
+Planning commit:
+
+```text
+Plan real provider read-only coding evidence track
+```
+
+Push rules:
+
+- Attempt push once when requested.
+- If push fails due network/auth/permission/safety review, do not bypass or retry repeatedly.
+- Record commit hash, push failure reason, and current git status.
+
+## 21. 当前推荐第一个 checkpoint
+
+Recommended first checkpoint:
+
+```text
+A. Real-provider read-only flow audit
+```
+
+Type:
+
+```text
+read-only audit / planning checkpoint
+```
+
+Reason:
+
+- Existing `verify-real-user-capabilities.mjs` has dry-run flags and redaction logic, but no dedicated read-only real-provider opt-in flow yet.
+- Provider readiness and redaction helpers already exist and should be audited before adding new script behavior.
+- A does not run real provider, does not touch `D:\Test\home-sf`, and does not modify production code.
+
+This planning round does not execute A.
+
+## Checkpoint Status Override
+
+- Completed: Planning.
+- Current: A. Real-provider read-only flow audit.
+- Backlog: B-I as listed above.
+- Verification for Planning: `rtk git status --short` passed with only `PLANS.real-provider-readonly-coding.md` untracked. `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated. `rtk git diff` passed; the new plan file was still untracked at that point, so no tracked diff was printed.
+- Notes: Planning only. No real provider smoke, no opt-in model turn, no `D:\Test\home-sf` access, no production code change, and no three-large-file edit.
