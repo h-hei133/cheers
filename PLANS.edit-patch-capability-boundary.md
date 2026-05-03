@@ -361,6 +361,25 @@ Backlog:
 Completed:
 
 - Planning: created `PLANS.edit-patch-capability-boundary.md` from current local `main`.
+- A. Current edit/patch capability audit
+  - Result: completed as a read-only audit / plan update checkpoint.
+  - Files changed:
+    - `PLANS.edit-patch-capability-boundary.md`
+  - Target audit findings:
+    - `packages/ts-shell/src/orchestration/patchMutationLane.ts` owns the current single-file explicit replace lane, including exact match success, `patch-target-missing`, `patch-from-not-found`, `patch-ambiguous`, `patch-generation-failed`, apply_patch-shaped rejection, unified diff rejection, and multi-file target intent rejection.
+    - `packages/ts-shell/src/orchestration/mutationExecution.ts` owns stale-read pre-dispatch verification, write failure reporting, applied/failed patch records, changed/failed file aggregation, and `partial-mutation-failed` blocker construction.
+    - `packages/ts-shell/src/orchestration/mutationResultAggregation.ts` is already a clean small-module boundary for reconciling mutation summaries into `changedFiles`, `failedFiles`, `patches`, `evidence`, and `repairNotes`.
+    - `packages/ts-shell/src/orchestration/targetResolution.ts` owns prompt file target extraction and blocks ambiguous sibling edit targets before mutation planning.
+    - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts` imports these helper modules, resolves task targets near planning, calls `executeFileMutationBranch` from the edit/write orchestration branch, reconciles mutation summaries after mutation attempts, and calls `applySingleFileReplacePatch` only inside the explicit replace instruction derivation path.
+    - `packages/ts-shell/src/core/query/resultMapper.ts` recognizes patch/stale/partial mutation blockers from structured evidence markers when present, but still has fallback reason-text classification for patch-generation, stale-read, partial-mutation, from-not-found, ambiguous-target, and related blockers.
+    - `packages/ts-shell/src/core/shell/sessionRuntime.ts` renders coding result summaries and next actions for patch blockers, but also still contains local classifier/rendering logic for patch/stale/partial mutation kinds.
+    - Focused tests already cover patch lane success/failures, stale-read pre-dispatch blocking, partial mutation summary blockers, ambiguous target resolution, runMvp apply_patch-shaped rejection, and result/session rendering for partial mutation blockers.
+  - Boundary result:
+    - Current production policy remains correct: `apply_patch` and unified diff input stay rejected until parser/verification/preview/no-partial contracts exist.
+    - The next checkpoint should not implement parser/apply yet; it should compare Claude Code and opencode semantics and document which boundaries to adopt.
+    - No real provider smoke was run.
+    - `D:\Test\home-sf` was not read, modified, copied, cleaned, or used.
+    - No production code, tests, dependency manifest, lockfile, or three-large-file target was modified.
 
 ## 19. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -727,7 +746,9 @@ This planning round does not execute A.
 ## Checkpoint Status Override
 
 - Completed: Planning.
-- Current: A. Current edit/patch capability audit.
-- Backlog: B. Reference implementation comparison; C. Capability decision document; D. Patch contract type design; E. Parser-only prototype; F. Verification-only checkpoint; G. Preview contract checkpoint; H. No-partial-apply contract checkpoint; I. Minimal single-file update apply checkpoint; J. Multi-file strategy checkpoint; K. Route audit / merge readiness.
+- Completed: A. Current edit/patch capability audit.
+- Current: B. Reference implementation comparison.
+- Backlog: C. Capability decision document; D. Patch contract type design; E. Parser-only prototype; F. Verification-only checkpoint; G. Preview contract checkpoint; H. No-partial-apply contract checkpoint; I. Minimal single-file update apply checkpoint; J. Multi-file strategy checkpoint; K. Route audit / merge readiness.
 - Verification for Planning: pending.
-- Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
+- Verification for A: `rtk git status --short` passed with only `PLANS.edit-patch-capability-boundary.md` modified. `rtk npm run build -w packages/ts-shell` passed. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts` passed with 6 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/targetResolution.test.ts` passed with 6 tests.
+- Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A was a read-only audit / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
