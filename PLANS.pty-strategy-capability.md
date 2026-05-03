@@ -352,6 +352,23 @@ Completed:
     - No true PTY harness or PTY smoke was implemented.
     - No production module imports the detector.
     - No CLI behavior, provider/auth core, package manifest, lockfile, or real-provider home was touched.
+- E. Dependency decision checkpoint
+  - Result: completed as an explicit no-dependency decision.
+  - Files changed:
+    - `packages/ts-shell/src/test-utils/ptyDependencyDecision.md`
+    - `PLANS.pty-strategy-capability.md`
+  - Decision:
+    - Do not add `node-pty` or any equivalent PTY dependency in this route state.
+    - No true PTY strategy is approved yet.
+    - The detector should continue to default to `dependency-unavailable` when no approved strategy/probe is provided.
+  - Rationale:
+    - Windows native support and Node ABI compatibility have not been approved.
+    - CI support cannot be inferred from this checkout.
+    - Current Windows Codex validation repeatedly needs elevated reruns for build/test spawn or dist writes, so native PTY probing must remain separately attributable.
+    - No user approval has been given to modify package manifests or lockfiles.
+  - Boundary result:
+    - No package manifest, lockfile, dependency, true PTY harness, PTY smoke, production CLI behavior, provider/auth core, or real-provider home was touched.
+    - F-J remain blocked/deferred until explicit PTY strategy/dependency approval.
 
 ## 17. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -705,11 +722,13 @@ read-only audit / planning checkpoint
 - Completed: B. PTY coverage boundary contract.
 - Completed: C. PTY capability detector design.
 - Completed: D. PTY capability detector implementation.
-- Current: E. Dependency decision checkpoint.
-- Backlog: F-J as listed above.
+- Completed: E. Dependency decision checkpoint.
+- Current: blocked before F. Minimal true PTY harness prototype pending explicit PTY strategy/dependency approval.
+- Backlog: F-J blocked/deferred as listed above.
 - Verification for Planning: `rtk git status --short` passed with only `PLANS.pty-strategy-capability.md` untracked before commit; `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated; `rtk git diff` passed.
 - Verification for A: read-only audit commands completed with RTK. `rtk git status --short --branch` passed clean before checkpoint edits. Target audit used `rtk read package.json`, `rtk read packages/ts-shell/package.json`, `rtk read packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk grep "pipe-spawn interactive" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "stdio" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts scripts/live-interactive-runner.mjs`, `rtk grep "node-pty" package.json package-lock.json packages/ts-shell/package.json`, `rtk npm ls node-pty --workspaces`, `rtk proxy node -v`, `rtk find "*.yml" .github`, `rtk grep "isTTY" packages/ts-shell/src/entrypoints/cli.tsx scripts/live-interactive-runner.mjs D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts`, `rtk grep "SIGINT" packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/cli-baseline.test.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts`, and `rtk grep "permission.asked" D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\permission\permission.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\acp\agent.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\tool\tool.ts`. `rtk git status --short` passed with only `PLANS.pty-strategy-capability.md` modified. `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated.
 - Verification for B: `rtk git status --short` passed with only `PLANS.pty-strategy-capability.md` and `packages/ts-shell/src/test-utils/cliHarness.ts` modified. `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"` first failed with Vitest/esbuild `spawn EPERM`, then passed with the same RTK command elevated: 4 tests passed, 36 skipped. `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` first failed with Vitest/esbuild `spawn EPERM`, then passed with the same RTK command elevated: 5 tests passed, 35 skipped.
 - Verification for C: `rtk git status --short` passed with `PLANS.pty-strategy-capability.md` modified and `packages/ts-shell/src/test-utils/ptyCapabilityDetector.design.md` untracked before staging. `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated. `rtk git diff` passed.
 - Verification for D: `rtk git status --short` passed with `PLANS.pty-strategy-capability.md` modified and `packages/ts-shell/src/test-utils/ptyCapabilityDetector.ts` / `ptyCapabilityDetector.test.ts` untracked before staging. `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`; an initial run also exposed a local TypeScript narrowing issue in `ptyCapabilityDetector.ts`, which was fixed before final validation. After the fix, build failed only with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated. `rtk npm run test -w packages/ts-shell -- src/test-utils/ptyCapabilityDetector.test.ts` first failed with Vitest/esbuild `spawn EPERM`, then passed with the same RTK command elevated: 6 tests passed. `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"` first failed with Vitest/esbuild `spawn EPERM`, then passed with the same RTK command elevated: 4 tests passed, 36 skipped.
-- Notes: A did not modify production code, tests, dependency manifests, lockfiles, provider/auth core, `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A did not read or modify `D:\Test\home-sf`. B modified only the test utility boundary comment/error strings and plan status. C added a test-utils-only design note and plan status. D added a test-utils-only detector/helper plus focused tests; it did not add a dependency, implement a PTY harness, touch production CLI behavior, or access real-provider home. Current automated evidence remains pipe-spawn only; true PTY strategy remains unapproved pending dependency decision.
+- Verification for E: `rtk git status --short` passed with `PLANS.pty-strategy-capability.md` modified and `packages/ts-shell/src/test-utils/ptyDependencyDecision.md` untracked before staging. `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated. `rtk git diff` passed.
+- Notes: A did not modify production code, tests, dependency manifests, lockfiles, provider/auth core, `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A did not read or modify `D:\Test\home-sf`. B modified only the test utility boundary comment/error strings and plan status. C added a test-utils-only design note and plan status. D added a test-utils-only detector/helper plus focused tests. E recorded a no-dependency decision and blocked F-J pending explicit strategy/dependency approval. Current automated evidence remains pipe-spawn only; true PTY strategy remains unapproved.
