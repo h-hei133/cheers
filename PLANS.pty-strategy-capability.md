@@ -323,6 +323,19 @@ Completed:
     - Current automated interactive evidence remains useful pipe stdin/stdout coverage.
     - No test helper, test title, or timeout message changed by this checkpoint should be read as true PTY evidence.
     - No dependency, production CLI behavior, provider/auth core, or real-provider home was touched.
+- C. PTY capability detector design
+  - Result: completed as a test-utils-only design checkpoint.
+  - Files changed:
+    - `packages/ts-shell/src/test-utils/ptyCapabilityDetector.design.md`
+    - `PLANS.pty-strategy-capability.md`
+  - Design output:
+    - Proposed future test-only helper location: `packages/ts-shell/src/test-utils/ptyCapabilityDetector.ts`.
+    - Proposed `PtyCapabilityStatus` contract with `available: true` for approved PTY strategies and explicit unavailable reasons for `dependency-unavailable`, `environment-unsupported`, `sandbox-spawn-blocked`, `sandbox-filesystem-blocked`, `manual-tty-only`, and `unknown`.
+    - Proposed detection order: require an approved PTY strategy first, probe an approved dependency or external PTY probe only after approval, and classify manual inherited TTY runners as `manual-tty-only`.
+    - Proposed skip contract: PTY tests must include `true PTY unavailable`, the detector reason/details, and a statement that pipe-spawn coverage is not a PTY fallback.
+    - Safety rules keep the detector test-only, avoid fake production `FORCE_TTY` overrides, avoid real-provider home, avoid dangerous commands, and avoid dependency manifest mutations during detector implementation.
+  - Boundary result:
+    - No detector implementation, PTY dependency, true PTY harness, production CLI change, or package manifest change was introduced.
 
 ## 17. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -674,9 +687,11 @@ read-only audit / planning checkpoint
 - Completed: Planning.
 - Completed: A. PTY strategy and dependency audit.
 - Completed: B. PTY coverage boundary contract.
-- Current: C. PTY capability detector design.
-- Backlog: D-J as listed above.
+- Completed: C. PTY capability detector design.
+- Current: D. PTY capability detector implementation.
+- Backlog: E-J as listed above.
 - Verification for Planning: `rtk git status --short` passed with only `PLANS.pty-strategy-capability.md` untracked before commit; `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated; `rtk git diff` passed.
 - Verification for A: read-only audit commands completed with RTK. `rtk git status --short --branch` passed clean before checkpoint edits. Target audit used `rtk read package.json`, `rtk read packages/ts-shell/package.json`, `rtk read packages/ts-shell/src/test-utils/cliHarness.ts`, `rtk grep "pipe-spawn interactive" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "stdio" packages/ts-shell/src/cli-baseline.test.ts packages/ts-shell/src/test-utils/cliHarness.ts scripts/live-interactive-runner.mjs`, `rtk grep "node-pty" package.json package-lock.json packages/ts-shell/package.json`, `rtk npm ls node-pty --workspaces`, `rtk proxy node -v`, `rtk find "*.yml" .github`, `rtk grep "isTTY" packages/ts-shell/src/entrypoints/cli.tsx scripts/live-interactive-runner.mjs D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts`, `rtk grep "SIGINT" packages/ts-shell/src/entrypoints/cli.tsx packages/ts-shell/src/cli-baseline.test.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\cli\cmd\run.ts`, and `rtk grep "permission.asked" D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\permission\permission.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\acp\agent.ts D:\LenovoSoftstore\pyproject\opencode\packages\opencode\src\tool\tool.ts`. `rtk git status --short` passed with only `PLANS.pty-strategy-capability.md` modified. `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated.
 - Verification for B: `rtk git status --short` passed with only `PLANS.pty-strategy-capability.md` and `packages/ts-shell/src/test-utils/cliHarness.ts` modified. `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "interactive"` first failed with Vitest/esbuild `spawn EPERM`, then passed with the same RTK command elevated: 4 tests passed, 36 skipped. `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"` first failed with Vitest/esbuild `spawn EPERM`, then passed with the same RTK command elevated: 5 tests passed, 35 skipped.
-- Notes: A did not modify production code, tests, dependency manifests, lockfiles, provider/auth core, `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A did not read or modify `D:\Test\home-sf`. B modified only the test utility boundary comment/error strings and plan status. Current automated evidence remains pipe-spawn only; true PTY strategy remains unapproved pending later checkpoints.
+- Verification for C: `rtk git status --short` passed with `PLANS.pty-strategy-capability.md` modified and `packages/ts-shell/src/test-utils/ptyCapabilityDetector.design.md` untracked before staging. `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated. `rtk git diff` passed.
+- Notes: A did not modify production code, tests, dependency manifests, lockfiles, provider/auth core, `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A did not read or modify `D:\Test\home-sf`. B modified only the test utility boundary comment/error strings and plan status. C added a test-utils-only design note and plan status; it did not implement a detector, add a dependency, touch production CLI behavior, or access real-provider home. Current automated evidence remains pipe-spawn only; true PTY strategy remains unapproved pending later checkpoints.
