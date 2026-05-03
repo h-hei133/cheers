@@ -297,6 +297,26 @@ Backlog:
 Completed:
 
 - Planning: created `PLANS.real-provider-readonly-coding.md` from current local `main`.
+- A. Real-provider read-only flow audit
+  - Result: completed as a read-only audit / planning checkpoint.
+  - Files changed:
+    - `PLANS.real-provider-readonly-coding.md`
+  - Target audit findings:
+    - `scripts/verify-real-user-capabilities.mjs` already separates `syntheticHome` (`D:/Test/pca-home-synth`) and `realHome` (`D:/Test/home-sf`), computes changed files from before/after snapshots, writes reports, classifies provider readiness failures, and has dry-run modes for turn boundary, terminal result surface, tool execution planning, and failure follow-up context.
+    - Existing real-provider scenarios in `verify-real-user-capabilities.mjs` and real-mode focused tests are edit/write oriented; there is no dedicated read-only real-provider coding opt-in flag yet.
+    - `scripts/verify-provider-readiness.mjs` already performs real-provider readiness smoke and redacts output, but it reads real provider config as part of its explicit smoke path and is not suitable as a default gate.
+    - `packages/ts-shell/src/core/shell/providerFailureRedaction.ts` provides reusable redaction for bearer tokens, key/value secrets, query-param secrets, OpenAI-style keys, and real/private agent config paths.
+    - `packages/ts-shell/src/core/shell/providerReadiness.ts` classifies missing key/config, unsupported provider, auth, network, and unknown readiness failures with redacted unknown details.
+    - `packages/ts-shell/src/config/runtimeConfig.ts` reads user config from HOME/USERPROFILE/private override, so future opt-in real-provider checkpoints must be careful to use `D:\Test\home-sf` only as runtime home and never print/read raw config content in evidence.
+    - `packages/ts-shell/src/core/shell/sessionRuntime.ts` already renders read/inspect-only evidence when read files are present and `changedFiles` / `failedFiles` are empty.
+    - `packages/ts-shell/src/core/query/resultMapper.ts` and `packages/ts-shell/src/orchestration/types.ts` already expose `changedFiles` as a result contract field that can anchor read-only no-mutation checks.
+  - Reference audit findings:
+    - Claude Code query/result flow keeps tool results and terminal result semantics distinct; this route should preserve that boundary rather than adding ad hoc output parsing as proof.
+    - opencode read/edit/tool layering separates read permission from edit/bash paths; this route should model read-only evidence as read/inspect/summarize only, not as a write-capable smoke with protected files.
+  - Boundary result:
+    - No real provider smoke was run.
+    - `D:\Test\home-sf` was not read, modified, copied, cleaned, or printed from local filesystem; it was only referenced as a literal boundary in existing source text and the plan.
+    - No production code, provider/auth core, dependency manifest, lockfile, or three-large-file target was modified.
 
 ## 17. 每个 checkpoint 的目标、允许修改文件、禁止修改文件、验证命令
 
@@ -624,7 +644,9 @@ This planning round does not execute A.
 ## Checkpoint Status Override
 
 - Completed: Planning.
-- Current: A. Real-provider read-only flow audit.
-- Backlog: B-I as listed above.
+- Completed: A. Real-provider read-only flow audit.
+- Current: B. Opt-in flag design.
+- Backlog: C-I as listed above.
 - Verification for Planning: `rtk git status --short` passed with only `PLANS.real-provider-readonly-coding.md` untracked. `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated. `rtk git diff` passed; the new plan file was still untracked at that point, so no tracked diff was printed.
-- Notes: Planning only. No real provider smoke, no opt-in model turn, no `D:\Test\home-sf` access, no production code change, and no three-large-file edit.
+- Verification for A: read-only audit commands completed with RTK. `rtk git status --short --branch` passed clean before checkpoint edits. Target audit used `rtk read scripts/verify-real-user-capabilities.mjs`, `rtk read scripts/verify-provider-readiness.mjs`, `rtk read packages/ts-shell/src/core/shell/providerFailureRedaction.ts`, `rtk read packages/ts-shell/src/core/shell/providerReadiness.ts`, `rtk read packages/ts-shell/src/config/runtimeConfig.ts`, `rtk read packages/ts-shell/src/core/shell/sessionRuntime.ts`, `rtk grep "PRIVATE_AGENTS_PROVIDER_MODE" packages/ts-shell/src/cli-baseline.test.ts`, `rtk grep "verify:real-user-capabilities" package.json`, `rtk grep "read/inspect only" packages/ts-shell/src/core/shell/sessionRuntime.ts`, and `rtk grep "changedFiles" packages/ts-shell/src/orchestration/types.ts packages/ts-shell/src/core/query/resultMapper.ts`. Reference checks used targeted RTK grep against Claude Code query/result files and opencode read/edit/tool/permission files. `rtk git status --short` passed with only `PLANS.real-provider-readonly-coding.md` modified. `rtk npm run build -w packages/ts-shell` first failed with sandbox `dist` write `EPERM`, then passed with the same RTK command elevated.
+- Notes: Planning and A did not run real provider smoke, did not execute an opt-in model turn, did not read or modify `D:\Test\home-sf`, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. The next checkpoint is B opt-in flag design; it should design the flag/help/skip contract before any fixture or real-provider execution work.
