@@ -33,6 +33,7 @@ const failureFollowupContextDryRun = process.argv.includes('--failure-followup-c
 const realReadonlyCodingDryRun = process.argv.includes('--real-readonly-coding-dry-run')
 const realReadonlyCodingPreflight = process.argv.includes('--real-readonly-coding-preflight')
 const realReadonlyCodingPreflightSelfTest = process.argv.includes('--real-readonly-coding-preflight-self-test')
+const realReadonlyCodingFailureAttributionSelfTest = process.argv.includes('--real-readonly-coding-failure-attribution-self-test')
 const realReadonlyCodingSmoke = process.argv.includes('--real-readonly-coding-smoke')
 
 const failureCategories = [
@@ -52,6 +53,8 @@ const providerConfigFailurePattern =
   /(provider-readiness:(missing-key|missing-config|unsupported-provider)|missing.*config|failed to parse.*config|config\.json|missing.*key|api key|apikey|not connected|connect first|credentials|missing baseUrl|baseUrl is missing|model is missing)/i
 const providerAuthFailurePattern =
   /(provider-readiness:auth|authentication was rejected|invalid authentication|invalid api key|unauthorized|forbidden|401|403|kind[:= ]+authentication)/i
+const providerModelFailurePattern =
+  /(provider-readiness:model|model.*(?:not found|not available|unsupported|does not exist|is invalid)|unsupported model|invalid model|quota|rate limit|429|insufficient quota|context length|maximum context)/i
 const realHomeConfigPattern =
   /[A-Za-z]:[\\/]+Test[\\/]+home-sf[\\/]+\.private-agents[\\/]+config\.json/gi
 const bearerTokenPattern = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi
@@ -555,6 +558,13 @@ function classifyProviderReadinessFailure(failureReason, output, provider) {
       reason: 'provider-readiness:missing-config: provider credential or endpoint configuration is incomplete',
     }
   }
+  if (providerModelFailurePattern.test(normalized)) {
+    return {
+      statusDetail: 'provider-model-failed',
+      exitCode: 1,
+      reason: 'provider-readiness:model: provider model was unavailable or rejected this turn',
+    }
+  }
   if (isProviderReadinessOutput(normalized)) {
     return {
       statusDetail: 'provider-readiness-failed',
@@ -639,6 +649,9 @@ function summarizeFailureStatus(results) {
     if (providerFailures.some((entry) => entry.statusDetail === 'config-failure')) {
       return { statusDetail: 'config-failure', exitCode: 3 }
     }
+    if (providerFailures.some((entry) => entry.statusDetail === 'provider-model-failed')) {
+      return { statusDetail: 'provider-model-failed', exitCode: 1 }
+    }
     return { statusDetail: 'provider-readiness-failed', exitCode: 1 }
   }
 
@@ -652,6 +665,9 @@ function nextActionForFailureSurface(failureCategory, statusDetail) {
     }
     if (statusDetail === 'config-failure') {
       return 'Fix provider configuration or authentication outside this run, then retry the same capability gate.'
+    }
+    if (statusDetail === 'provider-model-failed') {
+      return 'Select an available provider model or wait for quota/rate-limit recovery, then retry the same read-only smoke.'
     }
     return 'Inspect provider readiness output, fix the provider state, then retry the same capability gate.'
   }
@@ -1335,6 +1351,7 @@ function printHelp() {
   console.log('  --failure-followup-context-dry-run')
   console.log('  --real-readonly-coding-dry-run')
   console.log('  --real-readonly-coding-preflight-self-test')
+  console.log('  --real-readonly-coding-failure-attribution-self-test')
   console.log('')
   console.log('Explicit opt-in real-provider checks:')
   console.log('  --real-readonly-coding-preflight')
@@ -1431,6 +1448,123 @@ function runRealReadonlyCodingPreflightSelfTest() {
       status.failureReason.indexOf('sk-') === -1 &&
       status.failureReason.indexOf('.private-agents/config.json') === -1
     console.log(`[${passed ? 'PASS' : 'FAIL'}] preflight-${item.name} status=${status.status} exit=${status.exitCode}`)
+    ok = ok && passed
+  }
+
+  process.exit(ok ? 0 : 1)
+}
+
+function runRealReadonlyCodingFailureAttributionSelfTest() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-readonly-coding-failure-attribution-self-test')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('modelTurn=false')
+  console.log('reportWritten=false')
+
+  const cases = [
+    {
+      name: 'network-mid-turn',
+      result: {
+        code: 0,
+        timedOut: false,
+        output: [
+          'Provider readiness failed (provider-readiness:network): Unable to reach the OpenAI-compatible endpoint.',
+          'Authorization: Bearer sk-live-secret-123456789',
+          'D:/Test/home-sf/.private-agents/config.json',
+        ].join('\n'),
+      },
+      expected: {
+        status: 'PROVIDER_NETWORK',
+        statusDetail: 'provider-network-inconclusive',
+        exitCode: 2,
+        nextAction: 'Retry when the provider endpoint is reachable',
+      },
+    },
+    {
+      name: 'auth-mid-turn',
+      result: {
+        code: 1,
+        timedOut: false,
+        output: 'provider-readiness:auth invalid api key api_key=sk-live-secret-123456789',
+      },
+      expected: {
+        status: 'CONFIG',
+        statusDetail: 'config-failure',
+        exitCode: 3,
+        nextAction: 'Fix provider configuration or authentication',
+      },
+    },
+    {
+      name: 'model-mid-turn',
+      result: {
+        code: 1,
+        timedOut: false,
+        output: 'provider-readiness:model unsupported model or rate limit 429 for requested model',
+      },
+      expected: {
+        status: 'FAIL',
+        statusDetail: 'provider-model-failed',
+        exitCode: 1,
+        nextAction: 'Select an available provider model',
+      },
+    },
+    {
+      name: 'timeout-mid-turn',
+      result: {
+        code: -1,
+        timedOut: true,
+        output: 'read-only model turn timed out',
+      },
+      expected: {
+        status: 'PROVIDER_NETWORK',
+        statusDetail: 'provider-network-inconclusive',
+        exitCode: 2,
+        nextAction: 'Retry when the provider endpoint is reachable',
+      },
+    },
+  ]
+
+  let ok = true
+  for (const item of cases) {
+    const redaction = redactAndAssertReadonlyProviderOutput(item.result.output)
+    const status = buildReadonlySmokeFailureStatus(item.result, redaction.redacted, redaction)
+    const surface = buildTerminalResultSurface({
+      status: status.status,
+      provider: 'real',
+      failureCategory: status.failureCategory,
+      failureReason: status.failureReason,
+      outputTail: redaction.redacted,
+    })
+    const followup = buildFailureFollowupContext({
+      status: status.status,
+      provider: 'real',
+      failureCategory: status.failureCategory,
+      failureReason: status.failureReason,
+      outputTail: redaction.redacted,
+    }, 'retry after provider recovers with api_key=sk-live-secret-123456789')
+    const combined = [
+      status.status,
+      status.statusDetail,
+      status.failureReason,
+      surface.nextAction,
+      surface.outputTail,
+      followup.contextLine,
+    ].join('\n')
+    const safe = redactAndAssertReadonlyProviderOutput(combined)
+    const passed =
+      status.status === item.expected.status &&
+      status.statusDetail === item.expected.statusDetail &&
+      status.exitCode === item.expected.exitCode &&
+      surface.nextAction.includes(item.expected.nextAction) &&
+      followup.contextLine.includes(`status=${item.expected.statusDetail}`) &&
+      safe.ok
+    console.log(
+      `[${passed ? 'PASS' : 'FAIL'}] readonly-failure-${item.name} status=${status.statusDetail} exit=${status.exitCode} redaction=${safe.ok ? 'pass' : 'fail'}`,
+    )
+    if (!passed && safe.leaks.length > 0) {
+      console.log(`leaks=${safe.leaks.join(',')}`)
+    }
     ok = ok && passed
   }
 
@@ -1749,6 +1883,10 @@ async function main() {
   }
   if (realReadonlyCodingPreflightSelfTest) {
     runRealReadonlyCodingPreflightSelfTest()
+    return
+  }
+  if (realReadonlyCodingFailureAttributionSelfTest) {
+    runRealReadonlyCodingFailureAttributionSelfTest()
     return
   }
   if (realReadonlyCodingPreflight) {
