@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import crypto from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -25,6 +26,7 @@ export function createReadonlyCodingFixture(options = {}) {
     'src/context.txt': [
       'Project: Project Atlas',
       'Runtime: TypeScript control plane with provider-backed query loop.',
+      'Data flow: user task -> query loop -> read-only inspection -> terminal result.',
       'Important: this smoke must not edit, create, delete, rename, or rewrite files.',
       '',
     ].join('\n'),
@@ -43,6 +45,7 @@ export function createReadonlyCodingFixture(options = {}) {
     fs.mkdirSync(path.dirname(absolutePath), { recursive: true })
     fs.writeFileSync(absolutePath, content, 'utf8')
   }
+  initializeFixtureGitRepo(fixtureDir, Object.keys(files))
 
   return {
     fixtureDir,
@@ -52,14 +55,12 @@ export function createReadonlyCodingFixture(options = {}) {
 }
 
 export function buildReadonlyCodingPrompt(files) {
+  const target = files.includes('src/context.txt') ? 'src/context.txt' : files[0]
   return [
-    'Read the fixture files listed below and summarize the project in three bullets.',
-    'This is a read-only task: do not edit, create, delete, rename, or rewrite any file.',
+    `Read ${target} and return first 5 lines.`,
+    'This is a read-only task.',
     'Do not run shell commands.',
-    'Mention Project Atlas, the TypeScript control-plane data flow, and the no-mutation safety constraint.',
-    'Files:',
-    ...files.map((file) => `- ${file}`),
-    'Expected evidence: terminal result is success, changedFiles is empty, and the fixture snapshot is unchanged.',
+    'Reply in the terminal only.',
   ].join('\n')
 }
 
@@ -71,6 +72,9 @@ export function snapshotReadonlyFixture(fixtureDir) {
   function visit(directory) {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const absolutePath = path.join(directory, entry.name)
+      if (entry.isDirectory() && entry.name === '.git') {
+        continue
+      }
       const relativePath = path.relative(root, absolutePath).replace(/\\/g, '/')
       if (entry.isDirectory()) {
         visit(absolutePath)
@@ -122,6 +126,25 @@ function sha256(content) {
   return crypto.createHash('sha256').update(content).digest('hex')
 }
 
+function initializeFixtureGitRepo(fixtureDir, files) {
+  execFileSync('git', ['init', '--quiet'], { cwd: fixtureDir, stdio: 'ignore' })
+  execFileSync('git', ['add', '--', ...files], { cwd: fixtureDir, stdio: 'ignore' })
+  execFileSync(
+    'git',
+    [
+      '-c',
+      'user.name=Private Agents Fixture',
+      '-c',
+      'user.email=private-agents-fixture@example.invalid',
+      'commit',
+      '--quiet',
+      '-m',
+      'seed read-only fixture',
+    ],
+    { cwd: fixtureDir, stdio: 'ignore' },
+  )
+}
+
 function assertNotRealProviderHome(targetPath) {
   const normalized = normalizePath(targetPath)
   if (normalized === FORBIDDEN_REAL_HOME_FRAGMENT || normalized.startsWith(`${FORBIDDEN_REAL_HOME_FRAGMENT}/`)) {
@@ -143,8 +166,8 @@ function runSelfTest() {
     const filesOk = expectedFiles.every((file) => fixture.files.includes(file))
     const promptOk =
       fixture.prompt.includes('read-only task') &&
-      fixture.prompt.includes('changedFiles is empty') &&
-      fixture.prompt.includes('Project Atlas')
+      fixture.prompt.includes('src/context.txt') &&
+      fixture.prompt.includes('Reply in the terminal only')
     const passed = filesOk && promptOk && comparison.ok
     console.log(`fixture=${fixture.fixtureDir}`)
     console.log(`files=${fixture.files.join(',')}`)

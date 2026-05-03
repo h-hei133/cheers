@@ -33,6 +33,7 @@ const failureFollowupContextDryRun = process.argv.includes('--failure-followup-c
 const realReadonlyCodingDryRun = process.argv.includes('--real-readonly-coding-dry-run')
 const realReadonlyCodingPreflight = process.argv.includes('--real-readonly-coding-preflight')
 const realReadonlyCodingPreflightSelfTest = process.argv.includes('--real-readonly-coding-preflight-self-test')
+const realReadonlyCodingSmoke = process.argv.includes('--real-readonly-coding-smoke')
 
 const failureCategories = [
   'none',
@@ -1339,15 +1340,16 @@ function printHelp() {
   console.log('  --real-readonly-coding-preflight')
   console.log('    Opt-in only; readiness preflight only; no model turn.')
   console.log('  --real-readonly-coding-smoke')
-  console.log('    Future opt-in only; read-only; excluded from default verification.')
+  console.log('    Opt-in only; runs one real-provider read-only model turn against a temporary fixture.')
+  console.log('    Excluded from default verification; does not edit/write/mutate by design.')
   console.log('    External network/auth/model failures are attribution outcomes, not automatic product regressions.')
   console.log('    Real provider secrets/config must be redacted and must not be printed.')
 }
 
-function renderReadonlyPreflightNotice() {
-  console.log('real-provider-readonly-preflight=opt-in')
-  console.log('modelTurn=false')
-  console.log('readOnlyFixture=false')
+function renderReadonlyPreflightNotice(options = {}) {
+  console.log(`real-provider-readonly-${options.smoke ? 'smoke' : 'preflight'}=opt-in`)
+  console.log(`modelTurn=${options.modelTurn ? 'true' : 'false'}`)
+  console.log(`readOnlyFixture=${options.readOnlyFixture ? 'true' : 'false'}`)
   console.log('real-provider failure attribution: external network/auth/model failures are not automatic product regressions')
   console.log('real provider secrets/config must be redacted and must not be printed')
 }
@@ -1448,6 +1450,221 @@ async function runRealReadonlyCodingPreflight() {
   process.exit(status.exitCode)
 }
 
+function buildReadonlySmokeFailureStatus(result, output, redaction) {
+  if (result.timedOut) {
+    return {
+      status: 'PROVIDER_NETWORK',
+      statusDetail: 'provider-network-inconclusive',
+      exitCode: 2,
+      failureCategory: 'provider-readiness',
+      failureReason: 'provider-network-inconclusive: read-only model turn timed out',
+    }
+  }
+
+  const providerFailure = classifyProviderReadinessFailure(
+    `read-only model turn exited ${result.code}`,
+    output,
+    'real',
+  )
+  if (providerFailure) {
+    return {
+      status: providerFailure.exitCode === 2 ? 'PROVIDER_NETWORK' : providerFailure.exitCode === 3 ? 'CONFIG' : 'FAIL',
+      statusDetail: providerFailure.statusDetail,
+      exitCode: providerFailure.exitCode,
+      failureCategory: 'provider-readiness',
+      failureReason: providerFailure.reason,
+    }
+  }
+
+  if (!redaction.ok) {
+    return {
+      status: 'FAIL',
+      statusDetail: 'redaction-leak',
+      exitCode: 1,
+      failureCategory: 'task-execution-failure',
+      failureReason: `redaction leak detected: ${redaction.leaks.join(',') || 'unknown'}`,
+    }
+  }
+
+  return {
+    status: 'FAIL',
+    statusDetail: 'read-only-smoke-failed',
+    exitCode: 1,
+    failureCategory: categorizeFailure(`read-only model turn exited ${result.code}`, output, 'real'),
+    failureReason: `read-only model turn exited ${result.code}`,
+  }
+}
+
+function assertReadonlySmokeSuccess(output, snapshotComparison, redaction) {
+  const failures = []
+  if (!redaction.ok) {
+    failures.push(`redaction leak detected: ${redaction.leaks.join(',') || 'unknown'}`)
+  }
+  if (!snapshotComparison.ok) {
+    const changed = [
+      ...snapshotComparison.added.map((name) => `added:${name}`),
+      ...snapshotComparison.removed.map((name) => `removed:${name}`),
+      ...snapshotComparison.changed.map((name) => `changed:${name}`),
+    ]
+    failures.push(`fixture mutated: ${changed.join(',') || 'unknown'}`)
+  }
+  if (!/(^|\r?\n)Result\s*(\r?\n|$)/.test(output) || !/-\s*Outcome:\s*success/i.test(output)) {
+    failures.push('terminal result success was not visible')
+  }
+  if (!/-\s*(Changed|Changed files):\s*none/i.test(output)) {
+    failures.push('changedFiles empty was not visible')
+  }
+  return {
+    ok: failures.length === 0,
+    failures,
+  }
+}
+
+async function runRealReadonlyCodingSmoke() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-readonly-coding-smoke')
+  renderReadonlyPreflightNotice({ modelTurn: true, readOnlyFixture: true, smoke: true })
+  console.log('homeRead=false')
+  console.log('defaultSmoke=skipped')
+  console.log('realProviderHome=runtime-only')
+
+  const preflight = await runProviderReadinessPreflight()
+  const preflightStatus = buildReadonlyPreflightStatus(preflight)
+  console.log(`[${preflightStatus.status}] real-readonly-coding-preflight status=${preflightStatus.statusDetail}`)
+  if (!preflight.ok) {
+    if (preflight.outputTail) {
+      console.log(preflight.outputTail)
+    }
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-readonly-coding-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: preflightStatus.status,
+      statusDetail: preflightStatus.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: false,
+      readOnlyFixture: false,
+      failureCategory: preflightStatus.failureCategory,
+      failureReason: preflightStatus.failureReason,
+      outputTail: preflight.outputTail,
+    })
+    process.exit(preflightStatus.exitCode)
+  }
+
+  const fixture = createReadonlyCodingFixture()
+  try {
+    const before = snapshotReadonlyFixture(fixture.fixtureDir)
+    const result = await run(process.execPath, [
+      tsxCliPath,
+      cliEntryPath,
+      '--project',
+      fixture.fixtureDir,
+      '--print',
+      fixture.prompt,
+    ], {
+      cwd: tsShellRoot,
+      env: {
+        HOME: realHome,
+        USERPROFILE: realHome,
+        PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+      },
+      timeoutMs: 420000,
+    })
+    const after = snapshotReadonlyFixture(fixture.fixtureDir)
+    const comparison = compareReadonlySnapshots(before, after)
+    const redaction = redactAndAssertReadonlyProviderOutput(result.output)
+    const redactedOutput = redaction.redacted
+    const providerFailure = classifyProviderReadinessFailure(
+      `read-only model turn exited ${result.code}`,
+      redactedOutput,
+      'real',
+    )
+
+    if (result.code === 0 && !result.timedOut && !providerFailure) {
+      const success = assertReadonlySmokeSuccess(redactedOutput, comparison, redaction)
+      const report = {
+        generatedAt: new Date().toISOString(),
+        capability: 'real-readonly-coding-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: success.ok ? 'PASS' : 'FAIL',
+        statusDetail: success.ok ? 'passed' : 'product-regression',
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        readOnlyFixture: true,
+        fixture: {
+          files: fixture.files,
+          noMutation: comparison.ok,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        terminalResultVisible: /(^|\r?\n)Result\s*(\r?\n|$)/.test(redactedOutput),
+        changedFilesEmptyVisible: /-\s*(Changed|Changed files):\s*none/i.test(redactedOutput),
+        redaction: {
+          ok: redaction.ok,
+          leaks: redaction.leaks,
+        },
+        failureCategory: success.ok ? 'none' : 'task-execution-failure',
+        failureReason: success.failures.join('; '),
+        outputTail: summarizeOutput(redactedOutput),
+      }
+      writeReport(report)
+      console.log(`fixtureFiles=${fixture.files.join(',')}`)
+      console.log(`noMutation=${comparison.ok}`)
+      console.log(`terminalResultVisible=${report.terminalResultVisible}`)
+      console.log(`changedFilesEmptyVisible=${report.changedFilesEmptyVisible}`)
+      console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+      if (!success.ok) {
+        console.log(`failureReason=${report.failureReason}`)
+      }
+      console.log(`[${success.ok ? 'PASS' : 'FAIL'}] real-readonly-coding-smoke`)
+      process.exit(success.ok ? 0 : 1)
+    }
+
+    const failureStatus = buildReadonlySmokeFailureStatus(result, redactedOutput, redaction)
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-readonly-coding-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: failureStatus.status,
+      statusDetail: failureStatus.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: true,
+      readOnlyFixture: true,
+      fixture: {
+        files: fixture.files,
+        noMutation: comparison.ok,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+      },
+      redaction: {
+        ok: redaction.ok,
+        leaks: redaction.leaks,
+      },
+      failureCategory: failureStatus.failureCategory,
+      failureReason: failureStatus.failureReason,
+      outputTail: summarizeOutput(redactedOutput),
+    })
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`noMutation=${comparison.ok}`)
+    console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+    console.log(`[${failureStatus.status}] real-readonly-coding-smoke status=${failureStatus.statusDetail}`)
+    if (redactedOutput) {
+      console.log(summarizeOutput(redactedOutput))
+    }
+    process.exit(failureStatus.exitCode)
+  } finally {
+    cleanupReadonlyFixture(fixture.fixtureDir)
+  }
+}
+
 function runRealReadonlyCodingDryRun() {
   console.log('gate name=real-user-capabilities')
   console.log('mode=real-readonly-coding-dry-run')
@@ -1501,7 +1718,8 @@ function runRealReadonlyCodingDryRun() {
 
     const promptOk =
       fixture.prompt.includes('read-only task') &&
-      fixture.prompt.includes('changedFiles is empty') &&
+      fixture.prompt.includes('src/context.txt') &&
+      fixture.prompt.includes('Reply in the terminal only') &&
       fixture.prompt.includes('Do not run shell commands')
     const reportOk =
       report.optInRequired &&
@@ -1535,6 +1753,10 @@ async function main() {
   }
   if (realReadonlyCodingPreflight) {
     await runRealReadonlyCodingPreflight()
+    return
+  }
+  if (realReadonlyCodingSmoke) {
+    await runRealReadonlyCodingSmoke()
     return
   }
   if (realReadonlyCodingDryRun) {
