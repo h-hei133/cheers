@@ -4,15 +4,21 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import {
+  getRealProviderHome,
+  getSyntheticHome,
+  getTestRoot,
+} from './support/testPaths.mjs'
+import { pathsEqual } from './support/scriptRuntime.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const expectedRepoRoot = path.resolve('D:/LenovoSoftstore/pyproject/source-claudecode/private-coding-agents')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
-const syntheticHome = 'D:/Test/pca-home-synth'
-const realProviderHome = 'D:/Test/home-sf'
-const targetProject = 'D:/Test/evidence-artifacts-gate'
+const syntheticHome = getSyntheticHome()
+const realProviderHome = getRealProviderHome({ allowDefault: true })
+const targetProject = path.join(getTestRoot(), 'evidence-artifacts-gate')
 const sessionsRoot = path.join(syntheticHome, '.private-agents', 'sessions')
 const runId = `${Date.now()}`
 const successRelativePath = `scripts/evidence_success_${runId}.py`
@@ -319,10 +325,10 @@ async function main() {
   console.log(`repo=${repoRoot}`)
   console.log(`target project=${targetProject}`)
   console.log(`synthetic HOME=${syntheticHome}`)
-  console.log(`real-provider HOME=${realProviderHome}`)
+  console.log(`real-provider HOME=${realProviderHome ?? 'not-configured'}`)
   console.log('homeCreated=false')
 
-  if (normalizeForCompare(repoRoot) !== normalizeForCompare(expectedRepoRoot)) {
+  if (process.platform === 'win32' && !pathsEqual(repoRoot, expectedRepoRoot)) {
     printStep('repo-root', 'config-failure', `expected=${expectedRepoRoot}`)
     process.exit(3)
   }

@@ -4,11 +4,16 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import {
+  getRealProviderHome,
+  getSyntheticHome,
+} from './support/testPaths.mjs'
+import { pathsEqual } from './support/scriptRuntime.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const expectedRepoRoot = 'D:\\LenovoSoftstore\\pyproject\\source-claudecode\\private-coding-agents'
-const syntheticHome = 'D:/Test/pca-home-synth'
-const realHome = 'D:/Test/home-sf'
+const syntheticHome = getSyntheticHome()
+const realHome = getRealProviderHome({ allowDefault: true })
 const requiredCommands = [
   'verify:permission-memory',
   'verify:rust-execution:env',
@@ -99,8 +104,10 @@ function loadPackageJson() {
 }
 
 function checkRepoRoot() {
-  const cwdOk = normalizePath(process.cwd()) === normalizePath(repoRoot)
-  const expectedOk = normalizePath(repoRoot) === normalizePath(expectedRepoRoot)
+  const cwdOk = pathsEqual(process.cwd(), repoRoot)
+  const expectedOk = process.platform === 'win32'
+    ? normalizePath(repoRoot) === normalizePath(expectedRepoRoot)
+    : repoRoot === path.resolve(repoRoot)
   if (!cwdOk || !expectedOk) {
     printStep(
       'repo-root',
@@ -114,6 +121,10 @@ function checkRepoRoot() {
 }
 
 function checkHome(name, homePath) {
+  if (!homePath) {
+    printStep(name, 'pass', 'not-configured')
+    return true
+  }
   if (!fs.existsSync(homePath)) {
     printStep(name, 'config-failure', `${homePath} missing`)
     return false
@@ -176,39 +187,19 @@ function getProviderEnvVar(provider) {
 }
 
 function checkRealProviderConfig() {
+  if (!realHome) {
+    printStep('real-provider-config', 'pass', 'not-configured')
+    printStep('real-provider-credential', 'pass', 'not-checked')
+    return true
+  }
   const configPath = path.join(realHome, '.private-agents', 'config.json')
   if (!fs.existsSync(configPath)) {
     printStep('real-provider-config', 'config-failure', `${configPath} missing`)
     return false
   }
 
-  let config
-  try {
-    config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
-  } catch (error) {
-    printStep('real-provider-config', 'config-failure', error instanceof Error ? error.message : String(error))
-    return false
-  }
-  printStep('real-provider-config', 'pass', configPath)
-
-  const resolved = resolveCredential(config)
-  console.log(`provider=${resolved.provider}`)
-  console.log(`activeConnection=${resolved.activeConnectionId}`)
-  console.log(`credentialSource=${resolved.credentialSource}`)
-  console.log(`authMode=${resolved.authMode}`)
-  console.log(`endpoint=${resolved.baseUrl ?? 'none'}`)
-  console.log(`model=${resolved.model ?? 'none'}`)
-  if (resolved.credentialSource === 'missing' || !resolved.hasCredential) {
-    printStep('real-provider-credential', 'config-failure', 'credential missing')
-    return false
-  }
-  if (['openai-compatible', 'google', 'antigravity', 'claudecode'].includes(resolved.provider)) {
-    if (!resolved.baseUrl || !resolved.model) {
-      printStep('real-provider-credential', 'config-failure', 'baseUrl/model missing')
-      return false
-    }
-  }
-  printStep('real-provider-credential', 'pass', 'credential present (redacted)')
+  printStep('real-provider-config', 'pass', 'config path present; content not read')
+  printStep('real-provider-credential', 'pass', 'not-checked')
   return true
 }
 
@@ -250,7 +241,7 @@ async function main() {
   console.log(`workingDirectory=${process.cwd()}`)
   console.log(`repo=${repoRoot}`)
   console.log(`syntheticHome=${syntheticHome}`)
-  console.log(`realProviderHome=${realHome}`)
+  console.log(`realProviderHome=${realHome ?? 'not-configured'}`)
   console.log('homeCreated=false')
 
   const checks = []

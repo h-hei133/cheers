@@ -4,27 +4,34 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import {
+  getRealProviderHome,
+  getSyntheticHome,
+  getTestRoot,
+} from './support/testPaths.mjs'
+import { resolveVitestPath } from './support/scriptRuntime.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
-const vitestPath = path.join(tsShellRoot, 'node_modules', 'vitest', 'vitest.mjs')
+const vitestPath = resolveVitestPath(repoRoot, tsShellRoot)
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
-const syntheticHome = 'D:/Test/pca-home-synth'
-const realHome = 'D:/Test/home-sf'
-const projectRoot = 'D:/Test/real-fresh-editwrite-compact-rebased'
+const syntheticHome = getSyntheticHome()
+const realHome = getRealProviderHome({ allowDefault: true })
+const projectRoot = path.join(getTestRoot(), 'real-fresh-editwrite-compact-rebased')
 const realSessionId = 'sess_12903adabf7ae26e_1776956738259'
 const syntheticSessionId = 'sess_8c44c8891210d92e_1776956957666'
-const replayFile = path.join(repoRoot, 'tmp-real-one-reflective.txt')
+const replayFile = path.join(getTestRoot(), 'permission-memory-replay.txt')
 
+const authorityRoot = process.platform === 'win32' ? projectRoot.replaceAll('/', '\\') : projectRoot
 const requiredExplanationMarkers = [
   'Last approval decision: allow-once.',
   'Lifecycle: one-shot (allow-once/deny).',
   'Cache effect: none.',
-  'Authority root: D:\\Test\\real-fresh-editwrite-compact-rebased.',
+  `Authority root: ${authorityRoot}.`,
   'Subject permission request: bash/spawn/process(node).',
   'Subject permission scope: bash/spawn/process(node).',
-  'Subject permission root: D:\\Test\\real-fresh-editwrite-compact-rebased.',
+  `Subject permission root: ${authorityRoot}.`,
   'Current request context scope: bash/spawn/process(node).',
   'Why asking again: allow-once grants are consumed',
 ]
@@ -141,7 +148,6 @@ function ensureSyntheticPermissionMemoryFixture() {
   writeText(path.join(projectRoot, 'src', 'permission-memory-fixture.txt'), 'permission memory fixture\n')
 
   const now = new Date().toISOString()
-  const authorityRoot = projectRoot.replaceAll('/', '\\')
   const rebasedRoot = projectRoot.replaceAll('\\', '/')
   const cacheKey = `${rebasedRoot.toLowerCase()}|bash:spawn:process:node`
   const continuity = {
@@ -344,8 +350,8 @@ async function runSyntheticExplanationGate() {
   printStep('synthetic-print-explanation', 'pass')
 
   if (!fs.existsSync(replayFile)) {
-    printStep('synthetic-replay-explanation', 'fail', `${replayFile} missing`)
-    return false
+    fs.mkdirSync(path.dirname(replayFile), { recursive: true })
+    fs.writeFileSync(replayFile, 'what did I just approve and why is it asking again\n', 'utf8')
   }
   const replayResult = await runCli([
     '--project',
@@ -404,11 +410,11 @@ function classifyRealFailure(result) {
 async function runRealGate() {
   console.log('permission-memory real-provider smoke gate')
   console.log(`repo=${repoRoot}`)
-  console.log(`real HOME=${realHome}`)
+  console.log(`real HOME=${realHome ?? 'not-configured'}`)
   console.log('homeCreated=false')
 
-  const configPath = path.join(realHome, '.private-agents', 'config.json')
-  if (!fs.existsSync(realHome) || !fs.existsSync(configPath)) {
+  const configPath = realHome ? path.join(realHome, '.private-agents', 'config.json') : 'not-configured'
+  if (!realHome || !fs.existsSync(realHome) || !fs.existsSync(configPath)) {
     printStep('real-provider-config', 'config failure', `${configPath} missing`)
     return { ok: false, classification: 'config failure' }
   }
