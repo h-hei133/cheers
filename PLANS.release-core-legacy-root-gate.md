@@ -201,3 +201,34 @@ Not run:
 - The helper intentionally handles only a single detected legacy root; conflicting legacy roots remain unmodified.
 - Rebinding a stale absolute target to the current workspace requires an existing file and known project-local suffix markers.
 - The two large runtime files were touched only for helper wiring, but they remain high-risk areas for future broad refactors.
+
+## 17. Stacked Merge Readiness
+
+Status: completed.
+
+Stacked merge-readiness on `release-core-legacy-root-gate` passed:
+
+- `rtk npm run build -w packages/ts-shell`
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk npm run verify:result-contract`
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk npm run verify:cli-entry`
+- `HOME=/tmp/pca-home-synth USERPROFILE=/tmp/pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path`
+- `rtk node scripts/verify-permission-memory.mjs hard`
+- `rtk node scripts/verify-session-lifecycle.mjs`
+- `rtk npm run verify:release:core`
+
+Merge order into `main`:
+
+- `e8e0c42 Merge branch 'linux-release-script-compatibility-audit'`
+- `31a65bf Merge branch 'release-core-legacy-root-gate'`
+
+Post-merge validation on `main` passed with the same command set.
+
+## 18. Route Seal
+
+- Route audit / merge readiness completed.
+- Release-core legacy root gate is restored on Linux/WSL.
+- `verify:release:core` now passes after the stacked pair is merged.
+- No real-provider smoke was run.
+- No provider/auth core changes were made.
+- No default `verify-real-user-capabilities` was run.
+- Next recommendation: return to a fresh main-path blocker assessment instead of continuing same-family legacy root proof work, unless a new release-core regression appears.

@@ -180,3 +180,36 @@ Decision:
 - The branch removes Linux script blockers and exposes deeper legacy-root product assertions, but exact main equivalence is not established because `main` is blocked earlier by script compatibility failures.
 - Do not merge this route yet under the failure-equivalence rule.
 - Next route should either land the script compatibility route with an explicit exception for earlier main blockers, or first create a dedicated legacy-root rebasing / release-core gate failure route with a narrower product-runtime fix.
+
+## 14. Stacked Merge Readiness
+
+Status: completed.
+
+The previous strict-equivalence blocker was resolved by the stacked `release-core-legacy-root-gate` route. That route fixed the deeper legacy-root product/runtime failures exposed by this Linux script compatibility route, allowing the stacked pair to merge safely.
+
+Stacked merge-readiness on `release-core-legacy-root-gate` passed:
+
+- `rtk npm run build -w packages/ts-shell`
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk npm run verify:result-contract`
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk npm run verify:cli-entry`
+- `HOME=/tmp/pca-home-synth USERPROFILE=/tmp/pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path`
+- `rtk node scripts/verify-permission-memory.mjs hard`
+- `rtk node scripts/verify-session-lifecycle.mjs`
+- `rtk npm run verify:release:core`
+
+Merge order:
+
+- First layer: `e8e0c42 Merge branch 'linux-release-script-compatibility-audit'`
+- Second layer: `31a65bf Merge branch 'release-core-legacy-root-gate'`
+
+Post-merge validation on `main` passed with the same command set.
+
+## 15. Route Seal
+
+- Route audit / merge readiness completed.
+- This route is merged to `main` as the first layer of the stacked pair.
+- Windows defaults remain preserved.
+- Linux/WSL synthetic and test path support is merged.
+- No full `D:/Test` or `D:\Test` replacement was done.
+- Deferred release/regression scripts remain deferred unless they become a concrete blocker.
+- Do not continue Linux path compatibility expansion by default; return to a new main-path blocker assessment.
