@@ -3,11 +3,12 @@
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { resolveVitestPath } from './support/scriptRuntime.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
 const rustCoreRoot = path.join(repoRoot, 'packages', 'rust-core')
-const vitestPath = path.join(tsShellRoot, 'node_modules', 'vitest', 'vitest.mjs')
+const vitestPath = resolveVitestPath(repoRoot, tsShellRoot)
 
 function parseMode(argv) {
   const mode = argv[2] ?? 'hard'

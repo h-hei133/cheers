@@ -4,18 +4,21 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { getSyntheticHome, getTestRoot } from './support/testPaths.mjs'
+import { resolveVitestPath } from './support/scriptRuntime.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
-const vitestPath = path.join(tsShellRoot, 'node_modules', 'vitest', 'vitest.mjs')
+const vitestPath = resolveVitestPath(repoRoot, tsShellRoot)
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
-const syntheticHome = 'D:/Test/pca-home-synth'
-const fixturePath = 'D:/Test/query-orchestration-fixture.txt'
-const replayPath = 'D:/Test/query-orchestration-replay.txt'
+const syntheticHome = getSyntheticHome()
+const projectRoot = getTestRoot()
+const fixturePath = path.join(projectRoot, 'query-orchestration-fixture.txt')
+const replayPath = path.join(projectRoot, 'query-orchestration-replay.txt')
 
 const queryMarkers = [
-  'Read result for D:/Test/query-orchestration-fixture.txt:',
+  `Read result for ${fixturePath}:`,
   'query orchestration fixture line 1',
   'Result',
   'Outcome: success',
@@ -98,7 +101,7 @@ function assertMarkers(output, markers, label) {
 }
 
 function writeFixtures() {
-  fs.mkdirSync('D:/Test', { recursive: true })
+  fs.mkdirSync(projectRoot, { recursive: true })
   fs.writeFileSync(
     fixturePath,
     ['query orchestration fixture line 1', 'query orchestration fixture line 2'].join('\n'),
@@ -106,7 +109,7 @@ function writeFixtures() {
   )
   fs.writeFileSync(
     replayPath,
-    'read the first line from D:/Test/query-orchestration-fixture.txt\n',
+    `read the first line from ${fixturePath}\n`,
     'utf8',
   )
 }
@@ -127,9 +130,9 @@ async function runSyntheticPrintReplayGate() {
     tsxCliPath,
     cliEntryPath,
     '--project',
-    'D:/Test',
+    projectRoot,
     '--print',
-    'read the first line from D:/Test/query-orchestration-fixture.txt',
+    `read the first line from ${fixturePath}`,
   ], { cwd: tsShellRoot, env, timeoutMs: 240000 })
   if (printResult.code !== 0 || printResult.timedOut) {
     printStep('query-orchestration-synthetic-print', 'product-regression', printResult.timedOut ? 'timed out' : `exit=${printResult.code}`)
@@ -142,7 +145,7 @@ async function runSyntheticPrintReplayGate() {
     tsxCliPath,
     cliEntryPath,
     '--project',
-    'D:/Test',
+    projectRoot,
     '--replay-file',
     replayPath,
   ], { cwd: tsShellRoot, env, timeoutMs: 240000 })

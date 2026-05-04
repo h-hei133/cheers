@@ -4,11 +4,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { getSyntheticHome } from './support/testPaths.mjs'
+import { resolveVitestPath } from './support/scriptRuntime.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
-const vitestPath = path.join(tsShellRoot, 'node_modules', 'vitest', 'vitest.mjs')
-const syntheticHome = 'D:/Test/pca-home-synth'
+const vitestPath = resolveVitestPath(repoRoot, tsShellRoot)
+const syntheticHome = getSyntheticHome()
 
 function run(command, args, options = {}) {
   return new Promise((resolve) => {
