@@ -71,24 +71,22 @@ Claude Code and opencode were inspected only for semantics. The route follows th
 - B. Fixture design for real-provider coding flow. Completed.
 - C. Preflight-only coding flow self-test. Completed.
 - D. Opt-in real-provider minimal coding smoke. Completed.
-- E. Failure attribution for real coding flow.
+- E. Failure attribution for real coding flow. Completed.
 - F. Follow-up context for real coding failure.
 - G. Route audit / merge readiness.
 
 ## 13. Current Checkpoint
 
-D implemented in this route checkpoint:
+E implemented in this route checkpoint:
 
-- Added explicit opt-in `--real-coding-flow-smoke`.
-- The smoke creates an isolated coding fixture outside the repository and real-provider home.
-- The only expected fixture mutation is `note.txt`; `README.md` and `LOCKED.md` remain protected.
-- The smoke checks repository cleanliness before and after the model turn.
-- The smoke attributes provider readiness, auth/config, model, redaction, terminal-result, changed-files, verification, and repository mutation failures separately.
-- The smoke remains excluded from default gates and was not run in this checkpoint.
+- Added `--real-coding-flow-failure-attribution-self-test`.
+- Tightened `--real-coding-flow-smoke` failure categories to the route attribution names.
+- Covered provider-network, auth/config, model/quota/rate-limit, redaction, no-mutation guard, real repo mutation leak, terminal-result, changed-files, verification, and product-runtime attribution without real-provider execution.
+- Kept the smoke opt-in only and excluded from default gates.
 
 No real-provider write smoke was run.
 
-Current checkpoint is E: Failure attribution for real coding flow.
+Current checkpoint is F: Follow-up context for real coding failure.
 
 ## 14. Validation Commands
 
@@ -100,6 +98,7 @@ Current checkpoint is E: Failure attribution for real coding flow.
 - `rtk node scripts/real-provider-coding-redaction.mjs --self-test`
 - `rtk node scripts/verify-real-user-capabilities.mjs --help`
 - `rtk node scripts/verify-real-user-capabilities.mjs --real-coding-flow-dry-run`
+- `rtk node scripts/verify-real-user-capabilities.mjs --real-coding-flow-failure-attribution-self-test`
 
 ## 15. Failure Attribution Rules
 
@@ -122,4 +121,4 @@ Before commit, ensure no `.sisyphus/audit/permissions.jsonl`, `packages/ts-shell
 
 ## 17. Next Step
 
-Next checkpoint E should tighten real coding flow failure attribution around `--real-coding-flow-smoke` without running real provider by default and without reading or printing provider config.
+Next checkpoint F should add safe follow-up context for real coding failures without running real provider by default and without reading or printing provider config.
