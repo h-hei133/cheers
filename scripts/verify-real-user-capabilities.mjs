@@ -56,6 +56,7 @@ const realReadonlyCodingSmoke = process.argv.includes('--real-readonly-coding-sm
 const realCodingFlowDryRun = process.argv.includes('--real-coding-flow-dry-run')
 const realCodingFlowSmoke = process.argv.includes('--real-coding-flow-smoke')
 const realCodingFlowFailureAttributionSelfTest = process.argv.includes('--real-coding-flow-failure-attribution-self-test')
+const realCodingFlowFollowupContextSelfTest = process.argv.includes('--real-coding-flow-followup-context-self-test')
 
 const failureCategories = [
   'none',
@@ -1395,6 +1396,7 @@ function printHelp() {
   console.log('  --real-readonly-coding-failure-attribution-self-test')
   console.log('  --real-coding-flow-dry-run')
   console.log('  --real-coding-flow-failure-attribution-self-test')
+  console.log('  --real-coding-flow-followup-context-self-test')
   console.log('')
   console.log('Explicit opt-in real-provider checks:')
   console.log('  --real-readonly-coding-preflight')
@@ -1705,6 +1707,96 @@ function codingFlowFailureCategoryForStatus(statusDetail, fallback = 'product ru
   if (statusDetail === 'changed-files-wrong') return 'changedFiles wrong'
   if (statusDetail === 'verification-failed') return 'verification failed'
   return fallback
+}
+
+function nextActionForCodingFlowFailure(failureCategory, statusDetail) {
+  if (failureCategory === 'provider-network-inconclusive') {
+    return 'Retry the same isolated fixture task when the provider endpoint is reachable.'
+  }
+  if (failureCategory === 'auth/config failure') {
+    return 'Fix provider configuration or authentication outside this run, then retry the same isolated fixture task.'
+  }
+  if (failureCategory === 'model/quota/rate-limit failure') {
+    return 'Select an available model or wait for quota/rate-limit recovery, then retry the same isolated fixture task.'
+  }
+  if (failureCategory === 'fixture setup failure') {
+    return 'Fix fixture setup under the configured test root, then rerun the focused coding flow smoke.'
+  }
+  if (failureCategory === 'no-mutation guard failure') {
+    return 'Start from a clean repository state, then rerun the focused coding flow smoke.'
+  }
+  if (failureCategory === 'real repo mutation leak') {
+    return 'Inspect and restore repository changes before retrying; do not continue from a mutated target repo.'
+  }
+  if (failureCategory === 'redaction failure') {
+    return 'Fix redaction before surfacing or retrying this failure context.'
+  }
+  if (failureCategory === 'terminal result missing') {
+    return 'Repair the terminal result surface, then rerun the focused coding flow smoke.'
+  }
+  if (failureCategory === 'changedFiles wrong') {
+    return 'Inspect fixture changed files and retry with only note.txt editable.'
+  }
+  if (failureCategory === 'verification failed') {
+    return 'Repair the fixture verification failure, then retry the same isolated fixture task.'
+  }
+  if (failureCategory === 'RTK/environment issue') {
+    return 'Fix the local RTK or execution environment issue, then rerun the focused check.'
+  }
+  if (statusDetail === 'passed') {
+    return 'Continue with the next task.'
+  }
+  return 'Inspect the coding flow runtime failure, fix the product issue, then retry the focused smoke.'
+}
+
+function buildCodingFlowFailureFollowupContext(result, followupPrompt, fixture = {}) {
+  const failureCategory = result.failureCategory ?? 'product runtime regression'
+  const statusDetail =
+    result.statusDetail ??
+    statusDetailForCodingFlowFailureCategory(failureCategory)
+  const outcome = result.status === 'PASS'
+    ? 'success'
+    : ['provider-network-inconclusive', 'auth/config failure', 'model/quota/rate-limit failure'].includes(failureCategory)
+      ? 'provider-failure'
+      : 'stopped'
+  const changedFiles = [...(result.changedFiles ?? [])].sort()
+  const editableFiles = [...(fixture.editableFiles ?? result.editableFiles ?? ['note.txt'])].sort()
+  const protectedFiles = [...(fixture.protectedFiles ?? result.protectedFiles ?? ['README.md', 'LOCKED.md'])].sort()
+  const verification = result.verification ?? (failureCategory === 'verification failed' ? 'failed' : 'blocked')
+  const reason = redactAndAssertCodingProviderOutput(result.failureReason ?? '').redacted
+  const doNext = nextActionForCodingFlowFailure(failureCategory, statusDetail)
+  const safeFollowupPrompt = redactAndAssertCodingProviderOutput(followupPrompt).redacted
+  const contextLine = [
+    `previousOutcome=${outcome}`,
+    `blocker=${failureCategory}`,
+    `status=${statusDetail}`,
+    changedFiles.length > 0 ? `changedFiles=${changedFiles.join(',')}` : 'changedFiles=none',
+    `editableFiles=${editableFiles.join(',')}`,
+    `protectedFiles=${protectedFiles.join(',')}`,
+    `verification=${verification}`,
+    reason ? `reason=${reason}` : '',
+    `DoNext=${doNext}`,
+    `followup=${safeFollowupPrompt}`,
+  ].filter(Boolean).join(' | ')
+  const redaction = redactAndAssertCodingProviderOutput(contextLine)
+
+  return {
+    previousOutcome: outcome,
+    blocker: failureCategory,
+    statusDetail,
+    changedFiles,
+    editableFiles,
+    protectedFiles,
+    verification,
+    reason,
+    doNext,
+    followupPrompt: safeFollowupPrompt,
+    contextLine: redaction.redacted,
+    redaction: {
+      ok: redaction.ok,
+      leaks: redaction.leaks,
+    },
+  }
 }
 
 function buildCodingFlowSmokeFailureStatus(result, output, redaction) {
@@ -2080,6 +2172,144 @@ function runRealCodingFlowFailureAttributionSelfTest() {
     )
     if (!passed && safe.leaks.length > 0) {
       console.log(`leaks=${safe.leaks.join(',')}`)
+    }
+    ok = ok && passed
+  }
+
+  process.exit(ok ? 0 : 1)
+}
+
+function runRealCodingFlowFollowupContextSelfTest() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-coding-flow-followup-context-self-test')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('modelTurn=false')
+  console.log('reportWritten=false')
+
+  const fixture = {
+    editableFiles: ['note.txt'],
+    protectedFiles: ['README.md', 'LOCKED.md'],
+  }
+  const cases = [
+    {
+      name: 'provider-network',
+      result: {
+        status: 'PROVIDER_NETWORK',
+        statusDetail: 'provider-network-inconclusive',
+        failureCategory: 'provider-network-inconclusive',
+        failureReason: [
+          'provider-readiness:network: endpoint unreachable',
+          'Authorization: Bearer sk-live-secret-123456789',
+          'D:/Test/home-sf/.private-agents/config.json',
+        ].join('\n'),
+        changedFiles: [],
+        verification: 'blocked',
+      },
+      followupPrompt: 'retry after api_key=sk-live-secret-123456789 recovers',
+      expected: [
+        'previousOutcome=provider-failure',
+        'blocker=provider-network-inconclusive',
+        'status=provider-network-inconclusive',
+        'changedFiles=none',
+        'editableFiles=note.txt',
+        'protectedFiles=LOCKED.md,README.md',
+        'verification=blocked',
+        'DoNext=Retry the same isolated fixture task',
+      ],
+    },
+    {
+      name: 'auth-config',
+      result: {
+        status: 'CONFIG',
+        statusDetail: 'config-failure',
+        failureCategory: 'auth/config failure',
+        failureReason: 'provider-readiness:auth invalid api key api_key=sk-live-secret-123456789',
+        changedFiles: [],
+        verification: 'blocked',
+      },
+      followupPrompt: 'retry without printing D:/Test/home-sf/.private-agents/config.json',
+      expected: [
+        'previousOutcome=provider-failure',
+        'blocker=auth/config failure',
+        'status=config-failure',
+        'DoNext=Fix provider configuration or authentication outside this run',
+      ],
+    },
+    {
+      name: 'changed-files-wrong',
+      result: {
+        status: 'FAIL',
+        statusDetail: 'changed-files-wrong',
+        failureCategory: 'changedFiles wrong',
+        failureReason: 'changedFiles wrong: observed=README.md expected=note.txt',
+        changedFiles: ['README.md'],
+        verification: 'failed',
+      },
+      followupPrompt: 'retry and only edit note.txt',
+      expected: [
+        'previousOutcome=stopped',
+        'blocker=changedFiles wrong',
+        'status=changed-files-wrong',
+        'changedFiles=README.md',
+        'DoNext=Inspect fixture changed files and retry with only note.txt editable',
+      ],
+    },
+    {
+      name: 'verification-failed',
+      result: {
+        status: 'FAIL',
+        statusDetail: 'verification-failed',
+        failureCategory: 'verification failed',
+        failureReason: 'verification failed: note.txt does not contain status: ready',
+        changedFiles: ['note.txt'],
+        verification: 'failed',
+      },
+      followupPrompt: 'make note.txt contain status: ready',
+      expected: [
+        'previousOutcome=stopped',
+        'blocker=verification failed',
+        'status=verification-failed',
+        'changedFiles=note.txt',
+        'verification=failed',
+        'DoNext=Repair the fixture verification failure',
+      ],
+    },
+    {
+      name: 'repo-leak',
+      result: {
+        status: 'FAIL',
+        statusDetail: 'real-repo-mutation-leak',
+        failureCategory: 'real repo mutation leak',
+        failureReason: 'real repo mutation leak: repository changed during smoke',
+        changedFiles: ['note.txt'],
+        verification: 'blocked',
+      },
+      followupPrompt: 'restore repo before retrying',
+      expected: [
+        'previousOutcome=stopped',
+        'blocker=real repo mutation leak',
+        'status=real-repo-mutation-leak',
+        'DoNext=Inspect and restore repository changes before retrying',
+      ],
+    },
+  ]
+
+  let ok = true
+  for (const item of cases) {
+    const context = buildCodingFlowFailureFollowupContext(item.result, item.followupPrompt, fixture)
+    const hasExpected = item.expected.every((marker) => context.contextLine.includes(marker))
+    const avoidsConfigPath = !/\.private-agents[\\/]+config\.json/i.test(context.contextLine)
+    const avoidsKey = !/\bsk-[A-Za-z0-9][A-Za-z0-9._-]{8,}\b/i.test(context.contextLine)
+    const passed = hasExpected && avoidsConfigPath && avoidsKey && context.redaction.ok
+    console.log(
+      `[${passed ? 'PASS' : 'FAIL'}] coding-flow-followup-${item.name} blocker=${context.blocker} status=${context.statusDetail} redaction=${context.redaction.ok ? 'pass' : 'fail'}`,
+    )
+    if (!passed) {
+      console.log(`context=${context.contextLine}`)
+      if (context.redaction.leaks.length > 0) {
+        console.log(`leaks=${context.redaction.leaks.join(',')}`)
+      }
     }
     ok = ok && passed
   }
@@ -2602,14 +2832,16 @@ function runRealCodingFlowDryRun() {
       failureReason: '',
       outputTail: 'Result\n- Outcome: success\n- Changed files: note.txt\n- Verification: passed',
     })
-    const followup = buildFailureFollowupContext({
+    const followup = buildCodingFlowFailureFollowupContext({
       status: 'FAIL',
       provider: 'real',
-      failureCategory: 'provider-readiness',
+      statusDetail: 'provider-network-inconclusive',
+      failureCategory: 'provider-network-inconclusive',
       failureReason: 'provider-readiness:network: provider endpoint was unreachable during this turn',
+      changedFiles: [],
+      verification: 'blocked',
       outputTail: 'provider-network-inconclusive',
-    }, 'retry the same fixture task after api_key=sk-live-secret-123456789 recovers')
-    const followupSafe = redactAndAssertCodingProviderOutput(followup.contextLine)
+    }, 'retry the same fixture task after api_key=sk-live-secret-123456789 recovers', fixture)
     const noteContent = fs.readFileSync(path.join(fixture.fixtureDir, 'note.txt'), 'utf8')
     const promptOk =
       fixture.prompt.includes('Edit only note.txt') &&
@@ -2629,9 +2861,9 @@ function runRealCodingFlowDryRun() {
       terminalSurface.nextAction === 'Continue with the next task.'
     const failureAttributionOk =
       followup.previousOutcome === 'provider-failure' &&
-      followup.blocker === 'provider-readiness' &&
+      followup.blocker === 'provider-network-inconclusive' &&
       followup.statusDetail === 'provider-network-inconclusive' &&
-      followupSafe.ok
+      followup.redaction.ok
     const passed =
       noMutation.ok &&
       expected.ok &&
@@ -2647,7 +2879,7 @@ function runRealCodingFlowDryRun() {
     console.log(`protectedUnchanged=${expected.protectedChanged.length === 0}`)
     console.log(`terminalResultSurface=${surfaceOk ? 'pass' : 'fail'}`)
     console.log(`failureFollowupContext=${failureAttributionOk ? 'pass' : 'fail'}`)
-    console.log(`redaction=${redaction.ok && followupSafe.ok ? 'pass' : 'fail'}`)
+    console.log(`redaction=${redaction.ok && followup.redaction.ok ? 'pass' : 'fail'}`)
     console.log(`skipReason=${contract.skip.reason}`)
     console.log(`[${passed ? 'PASS' : 'FAIL'}] real-coding-flow-dry-run-contract`)
     process.exit(passed ? 0 : 1)
@@ -2671,6 +2903,10 @@ async function main() {
   }
   if (realCodingFlowFailureAttributionSelfTest) {
     runRealCodingFlowFailureAttributionSelfTest()
+    return
+  }
+  if (realCodingFlowFollowupContextSelfTest) {
+    runRealCodingFlowFollowupContextSelfTest()
     return
   }
   if (realReadonlyCodingPreflight) {

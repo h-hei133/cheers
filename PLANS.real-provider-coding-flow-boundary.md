@@ -72,21 +72,22 @@ Claude Code and opencode were inspected only for semantics. The route follows th
 - C. Preflight-only coding flow self-test. Completed.
 - D. Opt-in real-provider minimal coding smoke. Completed.
 - E. Failure attribution for real coding flow. Completed.
-- F. Follow-up context for real coding failure.
+- F. Follow-up context for real coding failure. Completed.
 - G. Route audit / merge readiness.
 
 ## 13. Current Checkpoint
 
-E implemented in this route checkpoint:
+F implemented in this route checkpoint:
 
-- Added `--real-coding-flow-failure-attribution-self-test`.
-- Tightened `--real-coding-flow-smoke` failure categories to the route attribution names.
-- Covered provider-network, auth/config, model/quota/rate-limit, redaction, no-mutation guard, real repo mutation leak, terminal-result, changed-files, verification, and product-runtime attribution without real-provider execution.
+- Added `--real-coding-flow-followup-context-self-test`.
+- Added coding-flow-specific follow-up context for provider, config/auth, changed-files, verification, and repository mutation failures.
+- Follow-up context carries only safe outcome, blocker, status, fixture file roles, verification state, next action, and a redacted follow-up prompt.
+- Updated the coding-flow dry-run to use the coding-flow-specific follow-up context.
 - Kept the smoke opt-in only and excluded from default gates.
 
 No real-provider write smoke was run.
 
-Current checkpoint is F: Follow-up context for real coding failure.
+Current checkpoint is G: Route audit / merge readiness.
 
 ## 14. Validation Commands
 
@@ -99,6 +100,7 @@ Current checkpoint is F: Follow-up context for real coding failure.
 - `rtk node scripts/verify-real-user-capabilities.mjs --help`
 - `rtk node scripts/verify-real-user-capabilities.mjs --real-coding-flow-dry-run`
 - `rtk node scripts/verify-real-user-capabilities.mjs --real-coding-flow-failure-attribution-self-test`
+- `rtk node scripts/verify-real-user-capabilities.mjs --real-coding-flow-followup-context-self-test`
 
 ## 15. Failure Attribution Rules
 
@@ -121,4 +123,4 @@ Before commit, ensure no `.sisyphus/audit/permissions.jsonl`, `packages/ts-shell
 
 ## 17. Next Step
 
-Next checkpoint F should add safe follow-up context for real coding failures without running real provider by default and without reading or printing provider config.
+Next checkpoint G should perform route audit / merge readiness without running real provider by default and without reading or printing provider config.
