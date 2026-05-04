@@ -1,0 +1,57 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+
+const WINDOWS_SYNTHETIC_HOME = 'D:/Test/pca-home-synth'
+const LINUX_SYNTHETIC_HOME = '/tmp/pca-home-synth'
+const WINDOWS_TEST_ROOT = 'D:/Test'
+const LINUX_TEST_ROOT = '/tmp/private-agents-test'
+const WINDOWS_REAL_PROVIDER_HOME = 'D:/Test/home-sf'
+
+export function isWindowsPlatform() {
+  return process.platform === 'win32'
+}
+
+export function getSyntheticHome() {
+  return cleanEnvPath(process.env.PRIVATE_AGENTS_SYNTHETIC_HOME) ??
+    (isWindowsPlatform() ? WINDOWS_SYNTHETIC_HOME : LINUX_SYNTHETIC_HOME)
+}
+
+export function getTestRoot() {
+  return cleanEnvPath(process.env.PRIVATE_AGENTS_TEST_ROOT) ??
+    (isWindowsPlatform() ? WINDOWS_TEST_ROOT : LINUX_TEST_ROOT)
+}
+
+export function getCliEntryGateRoot() {
+  return cleanEnvPath(process.env.PRIVATE_AGENTS_CLI_ENTRY_GATE_ROOT) ??
+    path.join(getTestRoot(), 'cli-entry-gate')
+}
+
+export function getRealProviderHome(options = {}) {
+  const configured = cleanEnvPath(process.env.PRIVATE_AGENTS_REAL_HOME)
+  if (configured) return configured
+  if (options.allowDefault === true && isWindowsPlatform()) return WINDOWS_REAL_PROVIDER_HOME
+  return undefined
+}
+
+export function ensureDirIfNeeded(targetPath) {
+  if (!targetPath) return false
+  if (fs.existsSync(targetPath)) return false
+  fs.mkdirSync(targetPath, { recursive: true })
+  return true
+}
+
+export function describeTestPaths() {
+  return {
+    platform: os.platform(),
+    syntheticHome: getSyntheticHome(),
+    testRoot: getTestRoot(),
+    cliEntryGateRoot: getCliEntryGateRoot(),
+    realProviderHome: getRealProviderHome({ allowDefault: true }) ?? 'not-configured',
+  }
+}
+
+function cleanEnvPath(value) {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : undefined
+}

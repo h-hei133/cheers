@@ -13,15 +13,22 @@ import {
 import {
   redactAndAssertReadonlyProviderOutput,
 } from './real-provider-readonly-redaction.mjs'
+import {
+  ensureDirIfNeeded,
+  getRealProviderHome,
+  getSyntheticHome,
+  getTestRoot,
+} from './support/testPaths.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
 
-const syntheticHome = 'D:/Test/pca-home-synth'
-const realHome = 'D:/Test/home-sf'
-const reportPath = 'D:/Test/test-results/real-user-capabilities-report.json'
+const syntheticHome = getSyntheticHome()
+const realHome = getRealProviderHome({ allowDefault: true })
+const testRoot = getTestRoot()
+const reportPath = path.join(testRoot, 'test-results', 'real-user-capabilities-report.json')
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const includeCandidates = process.argv.includes('--include-candidates')
 const includeContinueSmoke = process.argv.includes('--include-continue-smoke')
@@ -152,7 +159,7 @@ const scenarios = [
   {
     id: 'synthetic-single-file-protected-verify',
     provider: 'synthetic',
-    projectDir: `D:/Test/pca-capability-gate-synthetic-${runId}`,
+    projectDir: path.join(testRoot, `pca-capability-gate-synthetic-${runId}`),
     files: {
       'LOCKED.md': 'Do not modify this file.\n',
     },
@@ -170,7 +177,7 @@ const scenarios = [
   {
     id: 'real-small-bugfix-followup-verify',
     provider: 'real',
-    projectDir: `D:/Test/pca-capability-gate-real-bugfix-${runId}`,
+    projectDir: path.join(testRoot, `pca-capability-gate-real-bugfix-${runId}`),
     files: {
       'math.js': 'export function double(n) {\n  return n + 2;\n}\n',
       'README.md': 'double(3) should return 6.\n',
@@ -197,7 +204,7 @@ const scenarios = [
   {
     id: 'real-multifile-consistency-verify',
     provider: 'real',
-    projectDir: `D:/Test/pca-capability-gate-real-multifile-${runId}`,
+    projectDir: path.join(testRoot, `pca-capability-gate-real-multifile-${runId}`),
     files: {
       'todo.txt': 'ship minimal CLI smoke\ndocument one follow-up\nverify multi-file follow-up\n',
       'plan.txt': '- ship minimal CLI smoke\n- document one follow-up\n',
@@ -220,7 +227,7 @@ const candidateScenarios = [
   {
     id: 'real-small-project-smoke',
     provider: 'real',
-    projectDir: `D:/Test/pca-candidate-real-small-project-${runId}`,
+    projectDir: path.join(testRoot, `pca-candidate-real-small-project-${runId}`),
     files: {
       'src/utils.js': 'export function greet(name = "world") {\n  return "Hello, " + name;\n}\n',
       'src/app.js': 'import { greet } from "./utils.js";\n\nexport const message = greet("Ada");\n',
@@ -253,7 +260,7 @@ const candidateScenarios = [
   {
     id: 'real-completed-continue-followup-verify',
     provider: 'real',
-    projectDir: `D:/Test/pca-candidate-real-continue-${runId}`,
+    projectDir: path.join(testRoot, `pca-candidate-real-continue-${runId}`),
     files: {
       'math.js': 'export function double(n) {\n  return n + 2;\n}\n',
       'README.md': 'double(3) should return 6.\n',
@@ -751,17 +758,25 @@ function normalizeSlashes(value) {
   return String(value ?? '').replace(/\\/g, '/')
 }
 
+function hasPathPrefix(value, prefix) {
+  const normalizedValue = normalizeSlashes(value).toLowerCase()
+  const normalizedPrefix = normalizeSlashes(prefix).toLowerCase()
+  return normalizedValue === normalizedPrefix || normalizedValue.startsWith(`${normalizedPrefix}/`)
+}
+
 function isInsideSyntheticOrTempWorkspace(value) {
-  const normalized = normalizeSlashes(value).toLowerCase()
   return (
-    normalized.startsWith('d:/test/pca-home-synth') ||
-    normalized.startsWith('d:/test/pca-tool-planning-') ||
-    normalized.startsWith('c:/tmp/')
+    hasPathPrefix(value, syntheticHome) ||
+    hasPathPrefix(value, path.join(testRoot, 'pca-tool-planning-provider-gated')) ||
+    hasPathPrefix(value, path.join(testRoot, 'pca-tool-planning-read')) ||
+    hasPathPrefix(value, path.join(testRoot, 'pca-tool-planning-command')) ||
+    hasPathPrefix(value, '/tmp') ||
+    hasPathPrefix(value, 'c:/tmp')
   )
 }
 
 function isRealProviderHomePath(value) {
-  return normalizeSlashes(value).toLowerCase().startsWith('d:/test/home-sf')
+  return Boolean(realHome && hasPathPrefix(value, realHome)) || hasPathPrefix(value, 'D:/Test/home-sf')
 }
 
 function buildToolExecutionPlanningAudit(plan) {
@@ -1249,7 +1264,7 @@ function runToolExecutionPlanningDryRun() {
         tool: 'bash',
         command: 'node --version',
         approval: 'explicit-allow',
-        projectDir: 'D:/Test/pca-tool-planning-provider-gated',
+        projectDir: path.join(testRoot, 'pca-tool-planning-provider-gated'),
       },
       expectedDecision: 'provider-gated',
       expectedExecute: false,
@@ -1259,7 +1274,7 @@ function runToolExecutionPlanningDryRun() {
       plan: {
         providerStatus: 'ready',
         tool: 'read-file',
-        targetPath: 'D:/Test/pca-tool-planning-read/fixture.txt',
+        targetPath: path.join(testRoot, 'pca-tool-planning-read', 'fixture.txt'),
         writes: false,
       },
       expectedDecision: 'allow-read-only',
@@ -1272,7 +1287,7 @@ function runToolExecutionPlanningDryRun() {
         tool: 'bash',
         command: 'node --version',
         approval: 'not-requested',
-        projectDir: 'D:/Test/pca-tool-planning-command',
+        projectDir: path.join(testRoot, 'pca-tool-planning-command'),
       },
       expectedDecision: 'approval-required',
       expectedExecute: false,
@@ -1284,7 +1299,7 @@ function runToolExecutionPlanningDryRun() {
         tool: 'bash',
         command: 'node --version',
         approval: 'explicit-allow',
-        projectDir: 'D:/Test/pca-tool-planning-command',
+        projectDir: path.join(testRoot, 'pca-tool-planning-command'),
       },
       expectedDecision: 'allow-benign-command',
       expectedExecute: true,
@@ -1296,7 +1311,7 @@ function runToolExecutionPlanningDryRun() {
         tool: 'bash',
         command: 'del /s /q D:\\Test\\home-sf',
         approval: 'explicit-allow',
-        projectDir: 'D:/Test/pca-tool-planning-command',
+        projectDir: path.join(testRoot, 'pca-tool-planning-command'),
       },
       expectedDecision: 'blocked-command-not-allowlisted',
       expectedExecute: false,
@@ -1306,7 +1321,9 @@ function runToolExecutionPlanningDryRun() {
       plan: {
         providerStatus: 'ready',
         tool: 'write-file',
-        targetPath: 'D:/Test/home-sf/.private-agents/config.json',
+        targetPath: realHome
+          ? path.join(realHome, '.private-agents', 'config.json')
+          : 'D:/Test/home-sf/.private-agents/config.json',
         writes: true,
       },
       expectedDecision: 'blocked-real-home',
@@ -1923,12 +1940,19 @@ async function main() {
   console.log('state semantics: provider preflight inconclusive skips capability execution; mid-turn provider readiness stays provider-readiness, not coding failure')
   console.log(`repo=${repoRoot}`)
   console.log(`synthetic HOME=${syntheticHome}`)
-  console.log(`real HOME=${realHome}`)
-  console.log('homeCreated=false')
+  console.log(`real HOME=${realHome ?? 'not-configured'}`)
+  const homeCreated = ensureDirIfNeeded(syntheticHome)
+  console.log(`homeCreated=${homeCreated}`)
   console.log(`candidateMode=${includeCandidates ? 'include-candidates' : includeContinueSmoke ? 'include-continue-smoke' : 'off'}`)
 
   try {
     ensureHome(syntheticHome, 'synthetic')
+    if (!realHome) {
+      throw Object.assign(
+        new Error('real provider home is not configured; set PRIVATE_AGENTS_REAL_HOME on Linux/WSL to opt in'),
+        { configFailure: true },
+      )
+    }
     ensureHome(realHome, 'real')
   } catch (error) {
     const report = {
