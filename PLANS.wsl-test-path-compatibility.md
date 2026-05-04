@@ -238,3 +238,32 @@ Deferred:
 Next recommended action:
 
 Return to a fresh main-path blocker assessment from `main`; do not continue expanding the WSL path track unless a concrete validation gate is blocked by path compatibility.
+
+## 19. Real-Readonly Preflight Home Override Follow-Up
+
+Follow-up issue:
+
+- On WSL/Linux, `--real-readonly-coding-preflight` still routed through `scripts/verify-provider-readiness.mjs`, which used the old hardcoded `D:/Test/home-sf` real-provider home.
+- This caused explicit `PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real` runs to report `D:/Test/home-sf missing`.
+
+Fix:
+
+- `scripts/verify-provider-readiness.mjs` now resolves real-provider home through `getRealProviderHome({ allowDefault: true })`.
+- `scripts/verify-real-user-capabilities.mjs` passes `HOME`, `USERPROFILE`, and `PRIVATE_AGENTS_REAL_HOME` into the provider-readiness preflight subprocess.
+- Provider readiness has a `--preflight-only` mode for the real-readonly preflight path, so this check does not run the real model smoke.
+
+Validation:
+
+- `PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real rtk proxy bash -lc 'echo "$PRIVATE_AGENTS_REAL_HOME"; test -d "$PRIVATE_AGENTS_REAL_HOME" && echo real-home-exists'` confirmed the explicit real home directory exists.
+- `HOME=/home/wang/.private-agents-real USERPROFILE=/home/wang/.private-agents-real PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real rtk node scripts/verify-real-user-capabilities.mjs --real-readonly-coding-preflight` used `/home/wang/.private-agents-real` for both `HOME used` and `USERPROFILE used`, did not print `D:/Test/home-sf missing`, and returned `config-failure` because the existing readiness logic did not find `/home/wang/.private-agents-real/.private-agents/config.json`.
+- `rtk node scripts/verify-provider-readiness.mjs --preflight-only` with no `PRIVATE_AGENTS_REAL_HOME` reported `HOME used=not-configured` / `USERPROFILE used=not-configured` on Linux, not `D:/Test/home-sf`.
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk npm run verify:result-contract` passed.
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk npm run verify:cli-entry` passed.
+- `rtk npm run build -w packages/ts-shell` passed.
+
+Safety:
+
+- No default `verify-real-user-capabilities` run.
+- No `--real-readonly-coding-smoke` run.
+- No provider/auth core or production CLI/session/runMvp code changed.
+- No real provider config content was printed, copied, modified, cleaned, or read directly outside the existing readiness path.

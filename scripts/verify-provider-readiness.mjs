@@ -4,15 +4,17 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { getRealProviderHome, getTestRoot } from './support/testPaths.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
-const realHome = 'D:/Test/home-sf'
-const projectRoot = 'D:/Test/provider-readiness-smoke'
+const realHome = getRealProviderHome({ allowDefault: true })
+const projectRoot = path.join(getTestRoot(), 'provider-readiness-smoke')
 const fixturePath = `${projectRoot}/fixture.txt`
 const classificationSelfTest = process.argv.includes('--classification-self-test')
+const preflightOnly = process.argv.includes('--preflight-only')
 
 const networkFailurePattern =
   /(provider-readiness:network|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network|socket hang up|TLS|timeout|unreachable)/i
@@ -104,6 +106,13 @@ function renderPresence(value) {
 }
 
 function loadConfig() {
+  if (!realHome) {
+    return {
+      ok: false,
+      status: 'config-failure',
+      reason: 'real provider home is not configured; set PRIVATE_AGENTS_REAL_HOME on Linux/WSL to opt in',
+    }
+  }
   const configPath = path.join(realHome, '.private-agents', 'config.json')
   if (!fs.existsSync(realHome)) {
     return { ok: false, status: 'config-failure', reason: `${realHome} missing` }
@@ -370,12 +379,12 @@ async function main() {
   }
 
   console.log('gate name=provider-readiness')
-  console.log('mode=smoke')
+  console.log(`mode=${preflightOnly ? 'preflight-only' : 'smoke'}`)
   console.log('status taxonomy: pass=0 product-regression=1 provider-network-inconclusive=2 config-failure=3')
   console.log('exit semantics: 0=ready, 1=provider reachable but smoke contract regressed, 2=network inconclusive after retry, 3=config/auth/unsupported/misconfigured')
   console.log(`repo=${repoRoot}`)
-  console.log(`HOME used=${realHome}`)
-  console.log(`USERPROFILE used=${realHome}`)
+  console.log(`HOME used=${realHome ?? 'not-configured'}`)
+  console.log(`USERPROFILE used=${realHome ?? 'not-configured'}`)
   console.log('homeCreated=false')
 
   const loaded = loadConfig()
@@ -398,6 +407,11 @@ async function main() {
     process.exit(3)
   }
   printStep('real-provider-credential', 'pass', 'credential present (redacted)')
+
+  if (preflightOnly) {
+    printStep('provider-readiness-preflight', 'pass', 'configuration resolved (redacted)')
+    process.exit(0)
+  }
 
   let smoke = await runRealProviderSmoke()
   if (smoke.code === 2) {

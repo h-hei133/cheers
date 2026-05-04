@@ -336,8 +336,18 @@ function providerReadinessStatusForCode(code) {
 async function runProviderReadinessPreflight() {
   const result = await run(process.execPath, [
     path.join(repoRoot, 'scripts', 'verify-provider-readiness.mjs'),
+    '--preflight-only',
   ], {
     cwd: repoRoot,
+    env: {
+      ...(realHome
+        ? {
+            HOME: realHome,
+            USERPROFILE: realHome,
+            PRIVATE_AGENTS_REAL_HOME: realHome,
+          }
+        : {}),
+    },
     timeoutMs: 660000,
   })
   return {
