@@ -11,8 +11,19 @@ import {
   snapshotReadonlyFixture,
 } from './real-provider-readonly-fixture.mjs'
 import {
+  assertOnlyExpectedCodingFixtureChanges,
+  buildCodingFlowDryRunContract,
+  cleanupCodingFlowFixture,
+  compareCodingFlowSnapshots,
+  createCodingFlowFixture,
+  snapshotCodingFlowFixture,
+} from './real-provider-coding-fixture.mjs'
+import {
   redactAndAssertReadonlyProviderOutput,
 } from './real-provider-readonly-redaction.mjs'
+import {
+  redactAndAssertCodingProviderOutput,
+} from './real-provider-coding-redaction.mjs'
 import {
   ensureDirIfNeeded,
   getRealProviderHome,
@@ -42,6 +53,7 @@ const realReadonlyCodingPreflight = process.argv.includes('--real-readonly-codin
 const realReadonlyCodingPreflightSelfTest = process.argv.includes('--real-readonly-coding-preflight-self-test')
 const realReadonlyCodingFailureAttributionSelfTest = process.argv.includes('--real-readonly-coding-failure-attribution-self-test')
 const realReadonlyCodingSmoke = process.argv.includes('--real-readonly-coding-smoke')
+const realCodingFlowDryRun = process.argv.includes('--real-coding-flow-dry-run')
 
 const failureCategories = [
   'none',
@@ -1379,6 +1391,7 @@ function printHelp() {
   console.log('  --real-readonly-coding-dry-run')
   console.log('  --real-readonly-coding-preflight-self-test')
   console.log('  --real-readonly-coding-failure-attribution-self-test')
+  console.log('  --real-coding-flow-dry-run')
   console.log('')
   console.log('Explicit opt-in real-provider checks:')
   console.log('  --real-readonly-coding-preflight')
@@ -1388,6 +1401,9 @@ function printHelp() {
   console.log('    Excluded from default verification; does not edit/write/mutate by design.')
   console.log('    External network/auth/model failures are attribution outcomes, not automatic product regressions.')
   console.log('    Real provider secrets/config must be redacted and must not be printed.')
+  console.log('  --real-coding-flow-smoke')
+  console.log('    Planned opt-in only; not implemented by this checkpoint.')
+  console.log('    Future smoke must mutate only an isolated fixture workspace and keep the repository clean.')
 }
 
 function renderReadonlyPreflightNotice(options = {}) {
@@ -1903,6 +1919,103 @@ function runRealReadonlyCodingDryRun() {
   }
 }
 
+function runRealCodingFlowDryRun() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-coding-flow-dry-run')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('modelTurn=false')
+  console.log('reportWritten=false')
+  console.log('defaultSmoke=skipped')
+
+  const fixture = createCodingFlowFixture()
+  try {
+    const before = snapshotCodingFlowFixture(fixture.fixtureDir)
+    const noMutation = compareCodingFlowSnapshots(before, before)
+    fs.writeFileSync(
+      path.join(fixture.fixtureDir, 'note.txt'),
+      'status: ready\nowner: fixture\n',
+      'utf8',
+    )
+    const after = snapshotCodingFlowFixture(fixture.fixtureDir)
+    const comparison = compareCodingFlowSnapshots(before, after)
+    const expected = assertOnlyExpectedCodingFixtureChanges(
+      comparison,
+      ['note.txt'],
+      fixture.protectedFiles,
+    )
+    const redaction = redactAndAssertCodingProviderOutput(
+      [
+        'Authorization: Bearer sk-live-secret-123456789',
+        'api_key=sk-url-secret-123456789',
+        'refresh_token=refresh-secret',
+        'access_token=access-secret',
+        'D:/Test/home-sf/.private-agents/config.json',
+        '/home/example/.private-agents-real/.private-agents/config.json',
+      ].join('\n'),
+    )
+    const contract = buildCodingFlowDryRunContract(fixture)
+    const terminalSurface = buildTerminalResultSurface({
+      status: 'PASS',
+      provider: 'real',
+      failureCategory: 'none',
+      failureReason: '',
+      outputTail: 'Result\n- Outcome: success\n- Changed files: note.txt\n- Verification: passed',
+    })
+    const followup = buildFailureFollowupContext({
+      status: 'FAIL',
+      provider: 'real',
+      failureCategory: 'provider-readiness',
+      failureReason: 'provider-readiness:network: provider endpoint was unreachable during this turn',
+      outputTail: 'provider-network-inconclusive',
+    }, 'retry the same fixture task after api_key=sk-live-secret-123456789 recovers')
+    const followupSafe = redactAndAssertCodingProviderOutput(followup.contextLine)
+    const noteContent = fs.readFileSync(path.join(fixture.fixtureDir, 'note.txt'), 'utf8')
+    const promptOk =
+      fixture.prompt.includes('Edit only note.txt') &&
+      fixture.prompt.includes('status: ready') &&
+      fixture.prompt.includes('Do not modify README.md') &&
+      fixture.prompt.includes('Do not modify LOCKED.md')
+    const contractOk =
+      contract.optInRequired &&
+      !contract.realProviderExecution &&
+      !contract.modelTurn &&
+      contract.skip.defaultGate &&
+      contract.expectedChangedFiles.length === 1 &&
+      contract.expectedChangedFiles[0] === 'note.txt' &&
+      contract.expectedVerification === 'passed'
+    const surfaceOk =
+      terminalSurface.outcome === 'success' &&
+      terminalSurface.nextAction === 'Continue with the next task.'
+    const failureAttributionOk =
+      followup.previousOutcome === 'provider-failure' &&
+      followup.blocker === 'provider-readiness' &&
+      followup.statusDetail === 'provider-network-inconclusive' &&
+      followupSafe.ok
+    const passed =
+      noMutation.ok &&
+      expected.ok &&
+      noteContent.includes('status: ready') &&
+      redaction.ok &&
+      promptOk &&
+      contractOk &&
+      surfaceOk &&
+      failureAttributionOk
+
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`changedFiles=${expected.observed.join(',')}`)
+    console.log(`protectedUnchanged=${expected.protectedChanged.length === 0}`)
+    console.log(`terminalResultSurface=${surfaceOk ? 'pass' : 'fail'}`)
+    console.log(`failureFollowupContext=${failureAttributionOk ? 'pass' : 'fail'}`)
+    console.log(`redaction=${redaction.ok && followupSafe.ok ? 'pass' : 'fail'}`)
+    console.log(`skipReason=${contract.skip.reason}`)
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] real-coding-flow-dry-run-contract`)
+    process.exit(passed ? 0 : 1)
+  } finally {
+    cleanupCodingFlowFixture(fixture.fixtureDir)
+  }
+}
+
 async function main() {
   if (showHelp) {
     printHelp()
@@ -1926,6 +2039,10 @@ async function main() {
   }
   if (realReadonlyCodingDryRun) {
     runRealReadonlyCodingDryRun()
+    return
+  }
+  if (realCodingFlowDryRun) {
+    runRealCodingFlowDryRun()
     return
   }
   if (turnBoundaryDryRun) {
