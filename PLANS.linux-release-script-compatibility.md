@@ -153,3 +153,30 @@ These are existing product/runtime test failures and are out of scope for this r
 - WSL/Linux baseline gates passed.
 - Several child gates now progress to product assertions; remaining failures are categorized as product/runtime backlog, not script compatibility.
 - Real provider config content was not read, printed, copied, modified, or cleaned.
+
+## 13. Failure Equivalence Audit
+
+Status: completed, merge deferred.
+
+Branch results on `linux-release-script-compatibility-audit`:
+
+- `rtk node scripts/verify-permission-memory.mjs hard` still fails legacy-root rebasing and authority explanation assertions.
+- `rtk node scripts/verify-session-lifecycle.mjs` still fails lowercase legacy-root rebasing and migration continuity assertions.
+- `rtk node scripts/verify-query-orchestration.mjs` now passes.
+- `rtk node scripts/verify-workspace-safety.mjs` now passes.
+- `rtk npm run verify:release:core` passes doctor, then stops at `permission-memory`.
+
+Main comparison results:
+
+- `rtk node scripts/verify-permission-memory.mjs hard` fails earlier on package-local Vitest resolution and `D:/Test/pca-home-synth` missing.
+- `rtk node scripts/verify-session-lifecycle.mjs` fails earlier on package-local Vitest resolution and `D:/Test/pca-home-synth` missing.
+- `rtk node scripts/verify-query-orchestration.mjs` fails earlier on package-local Vitest resolution and `D:/Test/pca-home-synth` missing.
+- `rtk node scripts/verify-workspace-safety.mjs` fails earlier on the Windows-only repo-root expectation.
+- `rtk npm run verify:release:core` fails earlier in doctor on Windows-only repo-root, synthetic home, and real-provider default paths.
+
+Decision:
+
+- The failures are not equivalent between `main` and this branch.
+- The branch removes Linux script blockers and exposes deeper legacy-root product assertions, but exact main equivalence is not established because `main` is blocked earlier by script compatibility failures.
+- Do not merge this route yet under the failure-equivalence rule.
+- Next route should either land the script compatibility route with an explicit exception for earlier main blockers, or first create a dedicated legacy-root rebasing / release-core gate failure route with a narrower product-runtime fix.
