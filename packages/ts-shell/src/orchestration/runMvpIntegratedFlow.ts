@@ -9,6 +9,10 @@ import type {
 } from "../config/runtimeConfig.js";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
+import {
+  normalizeSubjectTargetWithRootPath,
+  rebindPathLikeToWorkspace,
+} from "../core/paths/legacyRootRebase.js";
 import type { QueryEvent } from "../core/query/events.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { OpenAIModelAdapter } from "../model-adapters/providers/openai/OpenAIModelAdapter.js";
@@ -3766,56 +3770,7 @@ function rebindContinuationTargetToWorkspace(
   if (!isUsableContinuationTargetPath(normalizedCandidate)) {
     return undefined;
   }
-
-  const workspaceAbsolute = path.resolve(workspaceRoot);
-  const normalizedWorkspace = workspaceAbsolute.toLowerCase();
-  const resolvedCandidateAbsolute = path.resolve(
-    workspaceAbsolute,
-    normalizedCandidate,
-  );
-  const normalizedResolved = resolvedCandidateAbsolute.toLowerCase();
-  const inWorkspace =
-    normalizedResolved === normalizedWorkspace ||
-    normalizedResolved.startsWith(
-      `${normalizedWorkspace}${path.sep.toLowerCase()}`,
-    );
-  if (inWorkspace) {
-    return normalizePathLike(
-      path.relative(workspaceAbsolute, resolvedCandidateAbsolute),
-    );
-  }
-
-  if (!path.isAbsolute(normalizedCandidate)) {
-    return undefined;
-  }
-
-  const candidateParts = normalizePathLike(normalizedCandidate)
-    .split("/")
-    .filter((part) => part.length > 0);
-  for (
-    let startIndex = Math.max(0, candidateParts.length - 6);
-    startIndex < candidateParts.length;
-    startIndex += 1
-  ) {
-    const suffix = candidateParts.slice(startIndex).join("/");
-    if (!suffix) {
-      continue;
-    }
-    const reboundAbsolute = path.resolve(workspaceAbsolute, suffix);
-    if (!fs.existsSync(reboundAbsolute)) {
-      continue;
-    }
-    try {
-      if (!fs.statSync(reboundAbsolute).isFile()) {
-        continue;
-      }
-    } catch {
-      continue;
-    }
-    return normalizePathLike(path.relative(workspaceAbsolute, reboundAbsolute));
-  }
-
-  return undefined;
+  return rebindPathLikeToWorkspace(normalizedCandidate, workspaceRoot);
 }
 
 function deriveExplainTargetPathFromAssistantOutput(
@@ -9080,47 +9035,7 @@ function normalizeSubjectTargetWithRoot(input: {
   readonly target?: string;
   readonly partial: boolean;
 } {
-  const target = normalizeOptionalAuditText(input.target);
-  const root = normalizeOptionalAuditText(input.root);
-  if (!target) {
-    return { partial: false };
-  }
-  if (!root || !path.isAbsolute(target) || !path.isAbsolute(root)) {
-    return { target, partial: false };
-  }
-  const normalizedTarget = path.normalize(target);
-  const normalizedRoot = path.normalize(root);
-  const lowerTarget = normalizedTarget.toLowerCase();
-  const lowerRoot = normalizedRoot.toLowerCase();
-  if (
-    lowerTarget === lowerRoot ||
-    lowerTarget.startsWith(`${lowerRoot}${path.sep}`)
-  ) {
-    return { target: normalizedTarget, partial: false };
-  }
-
-  // Best-effort rebasing for project-local files after root migration.
-  const markerMatches = [
-    "\\src\\",
-    "\\packages\\",
-    "\\app\\",
-    "\\tests\\",
-    "\\test\\",
-  ];
-  for (const marker of markerMatches) {
-    const markerIndex = lowerTarget.indexOf(marker);
-    if (markerIndex <= 0) {
-      continue;
-    }
-    const suffix = normalizedTarget.slice(markerIndex + 1);
-    const candidate = path.normalize(path.join(normalizedRoot, suffix));
-    if (fs.existsSync(candidate)) {
-      return { target: candidate, partial: false };
-    }
-  }
-
-  // Keep truthfulness: unresolved legacy target is omitted instead of showing stale root text.
-  return { partial: true };
+  return normalizeSubjectTargetWithRootPath(input);
 }
 
 function hasLocalExplainEvidenceInContinuity(

@@ -25,6 +25,7 @@ import {
   CONTINUATION_SAFETY_POLICY,
   resolveContinuationSafety,
 } from "../core/query/runtimeState.js";
+import { rebaseLegacyPermissionRootsInWorkingMemory } from "../core/paths/legacyRootRebase.js";
 import {
   applyLifecycleEventToIndex,
   createEmptyLifecycleIndex,
@@ -2782,21 +2783,12 @@ export class SessionManager {
     sessionProjectRoot: string,
   ): unknown {
     const normalizedProjectRoot = path.resolve(sessionProjectRoot);
-    const legacyRootCandidate = this.detectLegacyPermissionRootCandidate(
+    const rebasedWorkingMemory = rebaseLegacyPermissionRootsInWorkingMemory(
       workingMemory,
       normalizedProjectRoot,
     );
-
-    let nextWorkingMemory = workingMemory;
-    if (legacyRootCandidate) {
-      nextWorkingMemory = this.rebaseProjectRootInValue(
-        nextWorkingMemory,
-        legacyRootCandidate,
-        normalizedProjectRoot,
-      );
-    }
     return this.rebaseApprovalAuditCacheKeyRoot(
-      nextWorkingMemory,
+      rebasedWorkingMemory,
       normalizedProjectRoot,
     );
   }
@@ -5797,5 +5789,4 @@ export class SessionManager {
     }
   }
 }
-
 
