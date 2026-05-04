@@ -172,7 +172,7 @@ If RTK itself rewrites audit files during status/restore checks, use the smalles
 ## 17. Current Checkpoint
 
 - Branch created from `main`.
-- Pre-existing modified `package-lock.json` remains unrelated and untouched.
+- `package-lock.json` has no diff at merge-readiness.
 - Helper added.
 - First-batch scripts wired for synthetic/test path compatibility.
 - Real provider home was not read or used for smoke execution.
@@ -182,3 +182,59 @@ If RTK itself rewrites audit files during status/restore checks, use the smalles
 - Real-user-capabilities dry-run/self-test commands passed and reported `homeRead=false`.
 - Golden main path gate passed outside the sandbox; sandbox run timed out at the test's 45s internal limit.
 - RTK audit JSONL residue was restored; `rtk/history.db` is tracked and unchanged.
+
+## 18. Route Audit / Merge Readiness Closure
+
+Route audit and merge readiness completed on `wsl-test-path-compatibility`.
+
+Merge-readiness validation passed:
+
+- `rtk git status --short`
+- `rtk npm run build -w packages/ts-shell`
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk npm run verify:result-contract`
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk npm run verify:cli-entry`
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk node scripts/verify-real-user-capabilities.mjs --failure-followup-context-dry-run`
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk node scripts/verify-real-user-capabilities.mjs --real-readonly-coding-dry-run`
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk node scripts/verify-real-user-capabilities.mjs --real-readonly-coding-failure-attribution-self-test`
+- `HOME=/tmp/pca-home-synth USERPROFILE=/tmp/pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path`
+
+Merged back to `main` with a no-ff merge commit:
+
+- `cfbce4d Merge branch 'wsl-test-path-compatibility'`
+- Merge parents: `3b5d667` and `7f1a57d`
+
+Post-merge validation on `main` passed:
+
+- `rtk git status --short`
+- `rtk npm run build -w packages/ts-shell`
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk npm run verify:result-contract`
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk npm run verify:cli-entry`
+- `PRIVATE_AGENTS_SYNTHETIC_HOME=/tmp/pca-home-synth PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test rtk node scripts/verify-real-user-capabilities.mjs --failure-followup-context-dry-run`
+- `HOME=/tmp/pca-home-synth USERPROFILE=/tmp/pca-home-synth PRIVATE_AGENTS_PROVIDER_MODE=synthetic rtk npm run test:gate:golden-main-path`
+
+This route is stage-sealed for synthetic/test path compatibility.
+
+Preserved Windows defaults:
+
+- `D:/Test/pca-home-synth`
+- `D:/Test`
+- `D:/Test/cli-entry-gate`
+- `D:/Test/home-sf`
+
+Added Linux/WSL defaults:
+
+- `/tmp/pca-home-synth`
+- `/tmp/private-agents-test`
+- `/tmp/private-agents-test/cli-entry-gate`
+
+Linux/WSL real-provider home remains explicit opt-in through `PRIVATE_AGENTS_REAL_HOME`.
+
+Deferred:
+
+- Second-batch release/regression scripts remain deferred unless they become an actual blocker.
+- No global `D:/Test` or `D:\Test` replacement should be done.
+- No provider/auth, CLI/session/runMvp, or real-provider route expansion belongs to this track.
+
+Next recommended action:
+
+Return to a fresh main-path blocker assessment from `main`; do not continue expanding the WSL path track unless a concrete validation gate is blocked by path compatibility.
