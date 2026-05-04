@@ -26,6 +26,7 @@ import {
 } from './real-provider-coding-redaction.mjs'
 import {
   ensureDirIfNeeded,
+  getRealCodingFlowRuntimeHome,
   getRealProviderHome,
   getSyntheticHome,
   getTestRoot,
@@ -87,6 +88,10 @@ const keyValueSecretPattern =
 const openAiStyleKeyPattern = /\b(sk-[A-Za-z0-9][A-Za-z0-9._-]{8,})\b/g
 const secretQueryParamPattern =
   /([?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|key|signature|sig)=)[^&\s"'`<>]+/gi
+const posixPrivateAgentsConfigPattern =
+  /\/[^\s"'`<>]+\/\.private-agents\/config\.json/gi
+const posixPrivateAgentsRealHomePattern =
+  /\/[^\s"'`<>]*\.private-agents-real(?:\/[^\s"'`<>]*)?/gi
 
 const futureGateCandidates = [
   {
@@ -349,6 +354,7 @@ function providerReadinessStatusForCode(code) {
 }
 
 async function runProviderReadinessPreflight() {
+  const readinessRuntimeHome = getRealCodingFlowRuntimeHome(`${runId}-provider-readiness`)
   const result = await run(process.execPath, [
     path.join(repoRoot, 'scripts', 'verify-provider-readiness.mjs'),
     '--preflight-only',
@@ -357,8 +363,8 @@ async function runProviderReadinessPreflight() {
     env: {
       ...(realHome
         ? {
-            HOME: realHome,
-            USERPROFILE: realHome,
+            HOME: readinessRuntimeHome,
+            USERPROFILE: readinessRuntimeHome,
             PRIVATE_AGENTS_REAL_HOME: realHome,
           }
         : {}),
@@ -434,6 +440,8 @@ function redactProviderOutput(input) {
     )
     .replace(openAiStyleKeyPattern, '[REDACTED_API_KEY]')
     .replace(secretQueryParamPattern, '$1[REDACTED]')
+    .replace(posixPrivateAgentsConfigPattern, '[PRIVATE_AGENTS_CONFIG_PATH]')
+    .replace(posixPrivateAgentsRealHomePattern, '[REAL_PROVIDER_HOME]')
     .replace(realHomeConfigPattern, '[REAL_PROVIDER_CONFIG_PATH]')
 }
 
@@ -1749,6 +1757,74 @@ function nextActionForCodingFlowFailure(failureCategory, statusDetail) {
   return 'Inspect the coding flow runtime failure, fix the product issue, then retry the focused smoke.'
 }
 
+function buildCodingFlowContractFields({
+  failureCategory,
+  statusDetail,
+  changedFiles = [],
+  verification = 'blocked',
+  redaction = { ok: true, leaks: [] },
+  repoBefore,
+  repoAfter,
+  output = '',
+} = {}) {
+  const repositoryClean =
+    Boolean(repoBefore?.ok) &&
+    !repoBefore?.status &&
+    (repoAfter ? Boolean(repoAfter.ok) && !repoAfter.status : true)
+  return {
+    repositoryClean,
+    terminalResultVisible: /(^|\r?\n)Result\s*(\r?\n|$)/.test(String(output ?? '')),
+    changedFiles: [...changedFiles].sort(),
+    verification,
+    redaction: {
+      ok: Boolean(redaction.ok),
+      leaks: [...(redaction.leaks ?? [])],
+    },
+    nextAction: nextActionForCodingFlowFailure(
+      failureCategory ?? 'product runtime regression',
+      statusDetail ?? statusDetailForCodingFlowFailureCategory(failureCategory),
+    ),
+  }
+}
+
+function createIsolatedCodingFlowRuntimeHome() {
+  const runtimeHome = getRealCodingFlowRuntimeHome(runId)
+  assertSafeCodingFlowRuntimeHome(runtimeHome)
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  return runtimeHome
+}
+
+function cleanupIsolatedCodingFlowRuntimeHome(runtimeHome) {
+  if (!runtimeHome) return
+  assertSafeCodingFlowRuntimeHome(runtimeHome)
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+}
+
+function assertSafeCodingFlowRuntimeHome(runtimeHome) {
+  const normalized = normalizePathForSafety(runtimeHome)
+  const normalizedTestRoot = normalizePathForSafety(testRoot)
+  if (!(normalized === normalizedTestRoot || normalized.startsWith(`${normalizedTestRoot}/`))) {
+    throw new Error('Refusing to use coding flow runtime home outside the configured test root')
+  }
+
+  const normalizedRepoRoot = normalizePathForSafety(repoRoot)
+  if (normalized === normalizedRepoRoot || normalized.startsWith(`${normalizedRepoRoot}/`)) {
+    throw new Error('Refusing to use repository root for coding flow runtime home')
+  }
+
+  if (realHome) {
+    const normalizedRealHome = normalizePathForSafety(realHome)
+    if (normalized === normalizedRealHome || normalized.startsWith(`${normalizedRealHome}/`)) {
+      throw new Error('Refusing to use real-provider home for coding flow runtime home')
+    }
+  }
+}
+
+function normalizePathForSafety(value) {
+  return path.resolve(value).replace(/\\/g, '/').toLowerCase()
+}
+
 function buildCodingFlowFailureFollowupContext(result, followupPrompt, fixture = {}) {
   const failureCategory = result.failureCategory ?? 'product runtime regression'
   const statusDetail =
@@ -2593,6 +2669,10 @@ async function runRealCodingFlowSmoke() {
       writableFixture: false,
       failureCategory: status.failureCategory,
       failureReason: status.failureReason,
+      ...buildCodingFlowContractFields({
+        failureCategory: status.failureCategory,
+        statusDetail: status.statusDetail,
+      }),
     })
     console.log(`[${status.status}] real-coding-flow-smoke status=${status.statusDetail}`)
     console.log(status.failureReason)
@@ -2616,6 +2696,11 @@ async function runRealCodingFlowSmoke() {
       failureReason: repoBefore.ok
         ? 'no-mutation guard failure: repository was not clean before smoke'
         : 'no-mutation guard failure: repository status could not be checked before smoke',
+      ...buildCodingFlowContractFields({
+        failureCategory: 'no-mutation guard failure',
+        statusDetail: 'no-mutation-guard-failure',
+        repoBefore,
+      }),
       outputTail: repoBefore.outputTail,
     })
     console.log('[FAIL] real-coding-flow-smoke status=no-mutation-guard-failure')
@@ -2646,11 +2731,21 @@ async function runRealCodingFlowSmoke() {
         preflightStatus.failureCategory,
       ),
       failureReason: preflightStatus.failureReason,
+      ...buildCodingFlowContractFields({
+        failureCategory: codingFlowFailureCategoryForStatus(
+          preflightStatus.statusDetail,
+          preflightStatus.failureCategory,
+        ),
+        statusDetail: preflightStatus.statusDetail,
+        repoBefore,
+        output: preflight.outputTail,
+      }),
       outputTail: preflight.outputTail,
     })
     process.exit(preflightStatus.exitCode)
   }
 
+  const runtimeHome = createIsolatedCodingFlowRuntimeHome()
   const fixture = createCodingFlowFixture()
   try {
     const before = snapshotCodingFlowFixture(fixture.fixtureDir)
@@ -2666,8 +2761,10 @@ async function runRealCodingFlowSmoke() {
     ], {
       cwd: tsShellRoot,
       env: {
-        HOME: realHome,
-        USERPROFILE: realHome,
+        HOME: runtimeHome,
+        USERPROFILE: runtimeHome,
+        PRIVATE_AGENTS_HOME_OVERRIDE: realHome,
+        PRIVATE_AGENTS_REAL_HOME: realHome,
         PRIVATE_AGENTS_PROVIDER_MODE: 'real',
       },
       timeoutMs: 420000,
@@ -2710,6 +2807,7 @@ async function runRealCodingFlowSmoke() {
         realProviderExecution: true,
         modelTurn: true,
         writableFixture: true,
+        runtimeHome: 'isolated-test-root',
         fixture: {
           files: fixture.files,
           editableFiles: fixture.editableFiles,
@@ -2728,6 +2826,10 @@ async function runRealCodingFlowSmoke() {
         },
         failureCategory: success.failureCategory,
         failureReason: success.failures.join('; '),
+        nextAction: nextActionForCodingFlowFailure(
+          success.failureCategory,
+          success.statusDetail,
+        ),
         outputTail: summarizeOutput(redactedOutput),
       }
       writeReport(report)
@@ -2757,6 +2859,7 @@ async function runRealCodingFlowSmoke() {
       realProviderExecution: true,
       modelTurn: true,
       writableFixture: true,
+      runtimeHome: 'isolated-test-root',
       fixture: {
         files: fixture.files,
         editableFiles: fixture.editableFiles,
@@ -2765,13 +2868,18 @@ async function runRealCodingFlowSmoke() {
         removed: comparison.removed,
         changed: comparison.changed,
       },
-      repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
-      redaction: {
-        ok: redaction.ok,
-        leaks: redaction.leaks,
-      },
       failureCategory: failureStatus.failureCategory,
       failureReason: failureStatus.failureReason,
+      ...buildCodingFlowContractFields({
+        failureCategory: failureStatus.failureCategory,
+        statusDetail: failureStatus.statusDetail,
+        changedFiles: expected.observed,
+        verification: expected.ok ? 'blocked' : 'failed',
+        redaction,
+        repoBefore,
+        repoAfter,
+        output: redactedOutput,
+      }),
       outputTail: summarizeOutput(redactedOutput),
     })
     console.log(`fixtureFiles=${fixture.files.join(',')}`)
@@ -2786,6 +2894,7 @@ async function runRealCodingFlowSmoke() {
     process.exit(failureStatus.exitCode)
   } finally {
     cleanupCodingFlowFixture(fixture.fixtureDir)
+    cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
   }
 }
 
@@ -2822,6 +2931,7 @@ function runRealCodingFlowDryRun() {
         'access_token=access-secret',
         'D:/Test/home-sf/.private-agents/config.json',
         '/home/example/.private-agents-real/.private-agents/config.json',
+        '/home/wang/.private-agents-real/.private-agents/sessions/session-1/transcript.jsonl',
       ].join('\n'),
     )
     const contract = buildCodingFlowDryRunContract(fixture)
@@ -2853,6 +2963,8 @@ function runRealCodingFlowDryRun() {
       !contract.realProviderExecution &&
       !contract.modelTurn &&
       contract.skip.defaultGate &&
+      contract.runtimeHome === 'isolated-test-root' &&
+      contract.configHome === 'explicit-real-provider-home' &&
       contract.expectedChangedFiles.length === 1 &&
       contract.expectedChangedFiles[0] === 'note.txt' &&
       contract.expectedVerification === 'passed'

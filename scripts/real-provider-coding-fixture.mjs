@@ -159,6 +159,8 @@ export function buildCodingFlowDryRunContract(fixture) {
     optInRequired: true,
     realProviderExecution: false,
     modelTurn: false,
+    runtimeHome: 'isolated-test-root',
+    configHome: 'explicit-real-provider-home',
     fixtureWorkspace: 'temporary-test-root',
     expectedChangedFiles: ['note.txt'],
     protectedFiles: fixture.protectedFiles,

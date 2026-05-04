@@ -34,6 +34,11 @@ export function getRealProviderHome(options = {}) {
   return undefined
 }
 
+export function getRealCodingFlowRuntimeHome(runId = 'manual') {
+  const safeRunId = String(runId).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) || 'manual'
+  return path.join(getTestRoot(), 'real-provider-coding-flow-runtime-home', safeRunId)
+}
+
 export function ensureDirIfNeeded(targetPath) {
   if (!targetPath) return false
   if (fs.existsSync(targetPath)) return false
@@ -48,6 +53,7 @@ export function describeTestPaths() {
     testRoot: getTestRoot(),
     cliEntryGateRoot: getCliEntryGateRoot(),
     realProviderHome: getRealProviderHome({ allowDefault: true }) ?? 'not-configured',
+    realCodingFlowRuntimeHome: getRealCodingFlowRuntimeHome('describe'),
   }
 }
 

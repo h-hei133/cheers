@@ -8,6 +8,8 @@ const WINDOWS_PRIVATE_AGENTS_CONFIG_PATTERN =
 const POSIX_PRIVATE_AGENTS_CONFIG_PATTERN =
   /\/[^\s"'`<>]+\/\.private-agents\/config\.json/gi
 const REAL_HOME_PATTERN = /[A-Za-z]:[\\/]+Test[\\/]+home-sf(?:[\\/][^\s"'`<>]*)?/gi
+const POSIX_REAL_HOME_PATTERN =
+  /\/[^\s"'`<>]*\.private-agents-real(?:\/[^\s"'`<>]*)?/gi
 const BEARER_TOKEN_PATTERN = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi
 const AUTHORIZATION_BEARER_PATTERN =
   /\b(authorization\s*[:=]\s*)(["']?)Bearer\s+[A-Za-z0-9._~+/=-]+/gi
@@ -19,6 +21,7 @@ const SECRET_QUERY_PARAM_PATTERN =
 
 const FORBIDDEN_PROVIDER_DETAIL_PATTERNS = [
   { label: 'real-provider-home', pattern: /D:[\\/]+Test[\\/]+home-sf/i },
+  { label: 'posix-real-provider-home', pattern: /\/[^\s"'`<>]*\.private-agents-real/i },
   { label: 'private-agents-config-path', pattern: /\.private-agents[\\/]+config\.json/i },
   { label: 'bearer-token', pattern: /Bearer\s+(?!\[REDACTED\])[A-Za-z0-9._~+/=-]+/i },
   { label: 'api-key-value', pattern: /\b(api[_-]?key|x-api-key)\s*[:=]\s*(?!["']?\[REDACTED\])["']?[^\s"'`,;]+/i },
@@ -45,6 +48,7 @@ export function redactCodingProviderOutput(input) {
     .replace(WINDOWS_PRIVATE_AGENTS_CONFIG_PATTERN, '[PRIVATE_AGENTS_CONFIG_PATH]')
     .replace(POSIX_PRIVATE_AGENTS_CONFIG_PATTERN, '[PRIVATE_AGENTS_CONFIG_PATH]')
     .replace(REAL_HOME_PATTERN, '[REAL_PROVIDER_HOME]')
+    .replace(POSIX_REAL_HOME_PATTERN, '[REAL_PROVIDER_HOME]')
 }
 
 export function assertCodingProviderOutputRedacted(input) {
@@ -77,6 +81,7 @@ function runSelfTest() {
     'https://example.test/v1?api_key=sk-url-secret&signature=sig-secret',
     'D:/Test/home-sf/.private-agents/config.json',
     '/home/example/.private-agents-real/.private-agents/config.json',
+    '/home/wang/.private-agents-real/.private-agents/sessions/session-1/transcript.jsonl',
   ].join('\n')
 
   const result = redactAndAssertCodingProviderOutput(sample)
@@ -85,7 +90,9 @@ function runSelfTest() {
       result.redacted.includes('Authorization: [REDACTED]')) &&
     result.redacted.includes('api_key=[REDACTED]') &&
     result.redacted.includes('refresh_token=[REDACTED]') &&
-    result.redacted.includes('[PRIVATE_AGENTS_CONFIG_PATH]')
+    result.redacted.includes('[PRIVATE_AGENTS_CONFIG_PATH]') &&
+    result.redacted.includes('[REAL_PROVIDER_HOME]') &&
+    !result.redacted.includes('.private-agents-real')
   const passed = result.ok && hasMarkers
 
   console.log(`[${passed ? 'PASS' : 'FAIL'}] real-provider-coding-redaction-self-test`)
