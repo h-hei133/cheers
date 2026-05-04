@@ -4,14 +4,22 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import {
+  ensureDirIfNeeded,
+  getSyntheticHome,
+  getTestRoot,
+} from './support/testPaths.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
-const vitestPath = path.join(tsShellRoot, 'node_modules', 'vitest', 'vitest.mjs')
+const vitestPath = firstExistingPath([
+  path.join(tsShellRoot, 'node_modules', 'vitest', 'vitest.mjs'),
+  path.join(repoRoot, 'node_modules', 'vitest', 'vitest.mjs'),
+])
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
-const syntheticHome = 'D:/Test/pca-home-synth'
-const projectRoot = 'D:/Test/result-contract-gate'
+const syntheticHome = getSyntheticHome()
+const projectRoot = path.join(getTestRoot(), 'result-contract-gate')
 const fixturePath = `${projectRoot}/fixture.txt`
 const replayPath = `${projectRoot}/replay.txt`
 
@@ -21,9 +29,13 @@ const successResultMarkers = [
   'Action result',
   'Task: read-file',
   'Verification: not-requested',
-  'Read result for D:/Test/result-contract-gate/fixture.txt:',
+  `Read result for ${fixturePath}:`,
   'result contract fixture line 1',
 ]
+
+function firstExistingPath(candidates) {
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0]
+}
 
 function run(command, args, options = {}) {
   return new Promise((resolve) => {
@@ -168,12 +180,8 @@ async function main() {
   console.log('status taxonomy: pass=0 product-regression=1 provider-network-inconclusive=2 config-failure=3')
   console.log(`repo=${repoRoot}`)
   console.log(`synthetic HOME=${syntheticHome}`)
-  console.log('homeCreated=false')
-
-  if (!fs.existsSync(syntheticHome)) {
-    printStep('synthetic-home', 'config-failure', `${syntheticHome} missing`)
-    process.exit(3)
-  }
+  const homeCreated = ensureDirIfNeeded(syntheticHome)
+  console.log(`homeCreated=${homeCreated}`)
 
   const checks = []
   checks.push(await runFocusedTest(

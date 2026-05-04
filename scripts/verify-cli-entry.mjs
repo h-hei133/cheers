@@ -4,6 +4,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import {
+  ensureDirIfNeeded,
+  getCliEntryGateRoot,
+  getRealProviderHome,
+  getSyntheticHome,
+  getTestRoot,
+} from './support/testPaths.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
@@ -12,17 +19,21 @@ const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
 const packagedCliEntryPath = path.join(repoRoot, 'dist', 'cli.js')
 const builtTsShellCliPath = path.join(tsShellRoot, 'dist', 'packages', 'ts-shell', 'src', 'entrypoints', 'cli.js')
 const buildCliBinScriptPath = path.join(repoRoot, 'scripts', 'build-cli-bin.mjs')
-const syntheticHome = 'D:/Test/pca-home-synth'
-const realProviderHome = 'D:/Test/home-sf'
-const projectRoot = 'D:/Test/cli-entry-gate'
-const followupProjectRoot = 'D:/Test/cli-entry-followup-gate'
-const migratedProjectRoot = 'D:/Test/cli-entry-gate-rebased'
-const oldProjectRoot = 'D:/Test/cli-entry-gate-old-root'
+const syntheticHome = getSyntheticHome()
+const realProviderHome = getRealProviderHome({ allowDefault: true })
+const testRoot = getTestRoot()
+const projectRoot = getCliEntryGateRoot()
+const followupProjectRoot = path.join(testRoot, 'cli-entry-followup-gate')
+const migratedProjectRoot = path.join(testRoot, 'cli-entry-gate-rebased')
+const oldProjectRoot = path.join(testRoot, 'cli-entry-gate-old-root')
 const fixturePath = `${projectRoot}/fixture.txt`
 const stdinFixturePath = `${projectRoot}/stdin-fixture.txt`
 const replayPath = `${projectRoot}/replay.txt`
 const migratedFixturePath = `${migratedProjectRoot}/rebased-fixture.txt`
 const seededSessionId = 'cli_entry_gate_seeded_session'
+const fixtureReadMarker = `Read result for ${fixturePath}:`
+const stdinFixtureReadMarker = `Read result for ${stdinFixturePath}:`
+const migratedFixtureReadMarker = `Read result for ${migratedFixturePath}:`
 
 const commonResultMarkers = [
   'Result',
@@ -272,12 +283,12 @@ async function runPrintReplayBoundary() {
   const printOk = await assertSuccessfulCliRun(
     'cli-entry-print-mode',
     ['--project', projectRoot, '--print', `read the first line from ${fixturePath}`],
-    ['Read result for D:/Test/cli-entry-gate/fixture.txt:', 'cli entry fixture line 1'],
+    [fixtureReadMarker, 'cli entry fixture line 1'],
   )
   const replayOk = await assertSuccessfulCliRun(
     'cli-entry-replay-file-mode',
     ['--project', projectRoot, '--replay-file', replayPath],
-    ['Replay mode: running 1 prompt(s)', 'Read result for D:/Test/cli-entry-gate/fixture.txt:', 'cli entry fixture line 1'],
+    ['Replay mode: running 1 prompt(s)', fixtureReadMarker, 'cli entry fixture line 1'],
   )
   return printOk && replayOk
 }
@@ -287,9 +298,9 @@ async function runStdinPromptBoundary() {
     'cli-entry-print-stdin-plus-prompt-boundary',
     ['--project', projectRoot, '--print', `read the first line from ${fixturePath}`],
     [
-      'Read result for D:/Test/cli-entry-gate/fixture.txt:',
+      fixtureReadMarker,
       'cli entry fixture line 1',
-      'Read result for D:/Test/cli-entry-gate/stdin-fixture.txt:',
+      stdinFixtureReadMarker,
       'cli entry stdin fixture line 1',
     ],
     { stdin: `read the first line from ${stdinFixturePath}\n` },
@@ -597,7 +608,7 @@ async function runSessionMigrationBoundary() {
       '--print',
       `read the first line from ${migratedFixturePath}`,
     ],
-    ['Read result for D:/Test/cli-entry-gate-rebased/rebased-fixture.txt:', 'cli entry migrated fixture line 1'],
+    [migratedFixtureReadMarker, 'cli entry migrated fixture line 1'],
   )
   if (!ok) return false
 
@@ -666,7 +677,7 @@ async function runPackagedEntryBoundary() {
     ['--project', projectRoot, '--print', `read the first line from ${fixturePath}`],
     [
       ...commonResultMarkers,
-      'Read result for D:/Test/cli-entry-gate/fixture.txt:',
+      fixtureReadMarker,
       'cli entry fixture line 1',
     ],
   )
@@ -679,14 +690,11 @@ async function main() {
   console.log('status taxonomy: pass=0 product-regression=1 provider-network-inconclusive=2 config-failure=3')
   console.log(`repo=${repoRoot}`)
   console.log(`synthetic HOME=${syntheticHome}`)
-  console.log(`real-provider HOME not used=${realProviderHome}`)
-  console.log('homeCreated=false')
+  console.log(`real-provider HOME not used=${realProviderHome ?? 'not-configured'}`)
+  const homeCreated = ensureDirIfNeeded(syntheticHome)
+  console.log(`homeCreated=${homeCreated}`)
 
-  if (!fs.existsSync(syntheticHome)) {
-    printStep('synthetic-home', 'config-failure', `${syntheticHome} missing`)
-    process.exit(3)
-  }
-  if (path.resolve(syntheticHome) === path.resolve(realProviderHome)) {
+  if (realProviderHome && path.resolve(syntheticHome) === path.resolve(realProviderHome)) {
     printStep('home-boundary', 'config-failure', 'synthetic and real-provider homes are identical')
     process.exit(3)
   }
