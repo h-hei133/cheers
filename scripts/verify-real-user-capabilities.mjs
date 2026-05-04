@@ -54,6 +54,7 @@ const realReadonlyCodingPreflightSelfTest = process.argv.includes('--real-readon
 const realReadonlyCodingFailureAttributionSelfTest = process.argv.includes('--real-readonly-coding-failure-attribution-self-test')
 const realReadonlyCodingSmoke = process.argv.includes('--real-readonly-coding-smoke')
 const realCodingFlowDryRun = process.argv.includes('--real-coding-flow-dry-run')
+const realCodingFlowSmoke = process.argv.includes('--real-coding-flow-smoke')
 
 const failureCategories = [
   'none',
@@ -1402,8 +1403,8 @@ function printHelp() {
   console.log('    External network/auth/model failures are attribution outcomes, not automatic product regressions.')
   console.log('    Real provider secrets/config must be redacted and must not be printed.')
   console.log('  --real-coding-flow-smoke')
-  console.log('    Planned opt-in only; not implemented by this checkpoint.')
-  console.log('    Future smoke must mutate only an isolated fixture workspace and keep the repository clean.')
+  console.log('    Opt-in only; runs one real-provider model turn against an isolated writable fixture.')
+  console.log('    Excluded from default verification; only note.txt may change and the repository must stay clean.')
 }
 
 function renderReadonlyPreflightNotice(options = {}) {
@@ -1672,6 +1673,141 @@ function buildReadonlySmokeFailureStatus(result, output, redaction) {
   }
 }
 
+function renderCodingFlowPreflightNotice(options = {}) {
+  console.log('real-provider-coding-flow-smoke=opt-in')
+  console.log(`modelTurn=${options.modelTurn ? 'true' : 'false'}`)
+  console.log(`writableFixture=${options.writableFixture ? 'true' : 'false'}`)
+  console.log('real-provider failure attribution: external network/auth/model failures are not automatic product regressions')
+  console.log('real provider secrets/config must be redacted and must not be printed')
+}
+
+function buildCodingFlowPreflightStatus(preflight) {
+  const status = buildReadonlyPreflightStatus(preflight)
+  if (status.failureReason.includes('read-only')) {
+    return {
+      ...status,
+      failureReason: status.failureReason.replace('read-only smoke', 'coding flow smoke'),
+    }
+  }
+  return status
+}
+
+function buildCodingFlowSmokeFailureStatus(result, output, redaction) {
+  if (result.timedOut) {
+    return {
+      status: 'PROVIDER_NETWORK',
+      statusDetail: 'provider-network-inconclusive',
+      exitCode: 2,
+      failureCategory: 'provider-readiness',
+      failureReason: 'provider-network-inconclusive: coding flow model turn timed out',
+    }
+  }
+
+  const providerFailure = classifyProviderReadinessFailure(
+    `coding flow model turn exited ${result.code}`,
+    output,
+    'real',
+  )
+  if (providerFailure) {
+    return {
+      status: providerFailure.exitCode === 2 ? 'PROVIDER_NETWORK' : providerFailure.exitCode === 3 ? 'CONFIG' : 'FAIL',
+      statusDetail: providerFailure.statusDetail,
+      exitCode: providerFailure.exitCode,
+      failureCategory: 'provider-readiness',
+      failureReason: providerFailure.reason,
+    }
+  }
+
+  if (!redaction.ok) {
+    return {
+      status: 'FAIL',
+      statusDetail: 'redaction-failure',
+      exitCode: 1,
+      failureCategory: 'redaction failure',
+      failureReason: `redaction leak detected: ${redaction.leaks.join(',') || 'unknown'}`,
+    }
+  }
+
+  return {
+    status: 'FAIL',
+    statusDetail: 'product-runtime-regression',
+    exitCode: 1,
+    failureCategory: 'product runtime regression',
+    failureReason: `coding flow model turn exited ${result.code}`,
+  }
+}
+
+async function readRepoStatusShort() {
+  const result = await run('git', ['status', '--short'], {
+    cwd: repoRoot,
+    timeoutMs: 30000,
+  })
+  return {
+    ok: result.code === 0 && !result.timedOut,
+    status: result.stdout.trim(),
+    outputTail: summarizeOutput(result.output),
+  }
+}
+
+function assertCodingFlowSmokeSuccess(output, comparison, expected, noteContent, redaction, repoBefore, repoAfter) {
+  const failures = []
+  if (!repoBefore.ok || repoBefore.status) {
+    failures.push('no-mutation guard failure: repository was not clean before smoke')
+  }
+  if (!repoAfter.ok) {
+    failures.push('no-mutation guard failure: repository status could not be checked after smoke')
+  } else if (repoAfter.status) {
+    failures.push('real repo mutation leak: repository changed during smoke')
+  }
+  if (!redaction.ok) {
+    failures.push(`redaction failure: ${redaction.leaks.join(',') || 'unknown'}`)
+  }
+  if (!expected.ok) {
+    if (expected.unexpected.length > 0 || expected.missing.length > 0) {
+      failures.push(`changedFiles wrong: observed=${expected.observed.join(',') || 'none'} expected=${expected.expected.join(',')}`)
+    }
+    if (expected.protectedChanged.length > 0) {
+      failures.push(`verification failed: protected files changed: ${expected.protectedChanged.join(',')}`)
+    }
+    if (comparison.added.length > 0 || comparison.removed.length > 0) {
+      failures.push('changedFiles wrong: fixture files were added or removed')
+    }
+  }
+  if (!noteContent.includes('status: ready')) {
+    failures.push('verification failed: note.txt does not contain status: ready')
+  }
+  if (!/(^|\r?\n)Result\s*(\r?\n|$)/.test(output) || !/-\s*Outcome:\s*success/i.test(output)) {
+    failures.push('terminal result missing')
+  }
+  if (!/-\s*(Changed|Changed files):\s*note\.txt/i.test(output)) {
+    failures.push('changedFiles wrong: terminal changed files did not report note.txt')
+  }
+  if (!/Verification:\s*passed/i.test(output) && !/verification passed/i.test(output)) {
+    failures.push('verification failed: terminal verification did not report passed')
+  }
+
+  let failureCategory = 'none'
+  if (failures.some((failure) => failure.startsWith('no-mutation guard failure'))) {
+    failureCategory = 'no-mutation guard failure'
+  } else if (failures.some((failure) => failure.startsWith('real repo mutation leak'))) {
+    failureCategory = 'real repo mutation leak'
+  } else if (failures.some((failure) => failure.startsWith('redaction failure'))) {
+    failureCategory = 'redaction failure'
+  } else if (failures.some((failure) => failure.startsWith('terminal result missing'))) {
+    failureCategory = 'terminal result missing'
+  } else if (failures.some((failure) => failure.startsWith('changedFiles wrong'))) {
+    failureCategory = 'changedFiles wrong'
+  } else if (failures.some((failure) => failure.startsWith('verification failed'))) {
+    failureCategory = 'verification failed'
+  }
+
+  return {
+    ok: failures.length === 0,
+    failures,
+    failureCategory,
+  }
+}
+
 function assertReadonlySmokeSuccess(output, snapshotComparison, redaction) {
   const failures = []
   if (!redaction.ok) {
@@ -1919,6 +2055,228 @@ function runRealReadonlyCodingDryRun() {
   }
 }
 
+async function runRealCodingFlowSmoke() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-coding-flow-smoke')
+  renderCodingFlowPreflightNotice({ modelTurn: true, writableFixture: true })
+  console.log('homeRead=false')
+  console.log('defaultSmoke=skipped')
+  console.log('realProviderHome=runtime-only')
+
+  if (!realHome) {
+    const status = {
+      status: 'CONFIG',
+      statusDetail: 'config-failure',
+      exitCode: 3,
+      failureCategory: 'auth/config failure',
+      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME on Linux/WSL before running coding flow smoke',
+    }
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-coding-flow-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: status.status,
+      statusDetail: status.statusDetail,
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      writableFixture: false,
+      failureCategory: status.failureCategory,
+      failureReason: status.failureReason,
+    })
+    console.log(`[${status.status}] real-coding-flow-smoke status=${status.statusDetail}`)
+    console.log(status.failureReason)
+    process.exit(status.exitCode)
+  }
+
+  const repoBefore = await readRepoStatusShort()
+  if (!repoBefore.ok || repoBefore.status) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-coding-flow-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: 'FAIL',
+      statusDetail: 'no-mutation-guard-failure',
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      writableFixture: false,
+      failureCategory: 'no-mutation guard failure',
+      failureReason: repoBefore.ok
+        ? 'no-mutation guard failure: repository was not clean before smoke'
+        : 'no-mutation guard failure: repository status could not be checked before smoke',
+      outputTail: repoBefore.outputTail,
+    })
+    console.log('[FAIL] real-coding-flow-smoke status=no-mutation-guard-failure')
+    console.log('failureReason=no-mutation guard failure: repository must be clean before opt-in coding flow smoke')
+    process.exit(1)
+  }
+
+  const preflight = await runProviderReadinessPreflight()
+  const preflightStatus = buildCodingFlowPreflightStatus(preflight)
+  console.log(`[${preflightStatus.status}] real-coding-flow-preflight status=${preflightStatus.statusDetail}`)
+  if (!preflight.ok) {
+    if (preflight.outputTail) {
+      console.log(preflight.outputTail)
+    }
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-coding-flow-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: preflightStatus.status,
+      statusDetail: preflightStatus.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: false,
+      writableFixture: false,
+      failureCategory: preflightStatus.exitCode === 3 ? 'auth/config failure' : preflightStatus.failureCategory,
+      failureReason: preflightStatus.failureReason,
+      outputTail: preflight.outputTail,
+    })
+    process.exit(preflightStatus.exitCode)
+  }
+
+  const fixture = createCodingFlowFixture()
+  try {
+    const before = snapshotCodingFlowFixture(fixture.fixtureDir)
+    const result = await run(process.execPath, [
+      tsxCliPath,
+      cliEntryPath,
+      '--project',
+      fixture.fixtureDir,
+      '--non-interactive-approval',
+      'allow-once',
+      '--print',
+      fixture.prompt,
+    ], {
+      cwd: tsShellRoot,
+      env: {
+        HOME: realHome,
+        USERPROFILE: realHome,
+        PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+      },
+      timeoutMs: 420000,
+    })
+    const after = snapshotCodingFlowFixture(fixture.fixtureDir)
+    const comparison = compareCodingFlowSnapshots(before, after)
+    const expected = assertOnlyExpectedCodingFixtureChanges(
+      comparison,
+      ['note.txt'],
+      fixture.protectedFiles,
+    )
+    const noteContent = fs.readFileSync(path.join(fixture.fixtureDir, 'note.txt'), 'utf8')
+    const redaction = redactAndAssertCodingProviderOutput(result.output)
+    const redactedOutput = redaction.redacted
+    const repoAfter = await readRepoStatusShort()
+    const providerFailure = classifyProviderReadinessFailure(
+      `coding flow model turn exited ${result.code}`,
+      redactedOutput,
+      'real',
+    )
+
+    if (result.code === 0 && !result.timedOut && !providerFailure) {
+      const success = assertCodingFlowSmokeSuccess(
+        redactedOutput,
+        comparison,
+        expected,
+        noteContent,
+        redaction,
+        repoBefore,
+        repoAfter,
+      )
+      const report = {
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-coding-flow-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: success.ok ? 'PASS' : 'FAIL',
+        statusDetail: success.ok ? 'passed' : success.failureCategory,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        writableFixture: true,
+        fixture: {
+          files: fixture.files,
+          editableFiles: fixture.editableFiles,
+          protectedFiles: fixture.protectedFiles,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+        terminalResultVisible: /(^|\r?\n)Result\s*(\r?\n|$)/.test(redactedOutput),
+        changedFiles: expected.observed,
+        verification: success.ok ? 'passed' : 'failed',
+        redaction: {
+          ok: redaction.ok,
+          leaks: redaction.leaks,
+        },
+        failureCategory: success.failureCategory,
+        failureReason: success.failures.join('; '),
+        outputTail: summarizeOutput(redactedOutput),
+      }
+      writeReport(report)
+      console.log(`fixtureFiles=${fixture.files.join(',')}`)
+      console.log(`changedFiles=${expected.observed.join(',')}`)
+      console.log(`protectedUnchanged=${expected.protectedChanged.length === 0}`)
+      console.log(`repositoryClean=${report.repositoryClean}`)
+      console.log(`terminalResultVisible=${report.terminalResultVisible}`)
+      console.log(`verification=${report.verification}`)
+      console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+      if (!success.ok) {
+        console.log(`failureReason=${report.failureReason}`)
+      }
+      console.log(`[${success.ok ? 'PASS' : 'FAIL'}] real-coding-flow-smoke`)
+      process.exit(success.ok ? 0 : 1)
+    }
+
+    const failureStatus = buildCodingFlowSmokeFailureStatus(result, redactedOutput, redaction)
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-coding-flow-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: failureStatus.status,
+      statusDetail: failureStatus.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: true,
+      writableFixture: true,
+      fixture: {
+        files: fixture.files,
+        editableFiles: fixture.editableFiles,
+        protectedFiles: fixture.protectedFiles,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+      },
+      repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+      redaction: {
+        ok: redaction.ok,
+        leaks: redaction.leaks,
+      },
+      failureCategory: failureStatus.failureCategory,
+      failureReason: failureStatus.failureReason,
+      outputTail: summarizeOutput(redactedOutput),
+    })
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`changedFiles=${expected.observed.join(',')}`)
+    console.log(`protectedUnchanged=${expected.protectedChanged.length === 0}`)
+    console.log(`repositoryClean=${repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status}`)
+    console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+    console.log(`[${failureStatus.status}] real-coding-flow-smoke status=${failureStatus.statusDetail}`)
+    if (redactedOutput) {
+      console.log(summarizeOutput(redactedOutput))
+    }
+    process.exit(failureStatus.exitCode)
+  } finally {
+    cleanupCodingFlowFixture(fixture.fixtureDir)
+  }
+}
+
 function runRealCodingFlowDryRun() {
   console.log('gate name=real-user-capabilities')
   console.log('mode=real-coding-flow-dry-run')
@@ -2039,6 +2397,10 @@ async function main() {
   }
   if (realReadonlyCodingDryRun) {
     runRealReadonlyCodingDryRun()
+    return
+  }
+  if (realCodingFlowSmoke) {
+    await runRealCodingFlowSmoke()
     return
   }
   if (realCodingFlowDryRun) {
