@@ -73,21 +73,21 @@ Claude Code and opencode were inspected only for semantics. The route follows th
 - D. Opt-in real-provider minimal coding smoke. Completed.
 - E. Failure attribution for real coding flow. Completed.
 - F. Follow-up context for real coding failure. Completed.
-- G. Route audit / merge readiness.
+- G. Route audit / merge readiness. Completed.
 
 ## 13. Current Checkpoint
 
-F implemented in this route checkpoint:
+G implemented in this route checkpoint:
 
-- Added `--real-coding-flow-followup-context-self-test`.
-- Added coding-flow-specific follow-up context for provider, config/auth, changed-files, verification, and repository mutation failures.
-- Follow-up context carries only safe outcome, blocker, status, fixture file roles, verification state, next action, and a redacted follow-up prompt.
-- Updated the coding-flow dry-run to use the coding-flow-specific follow-up context.
-- Kept the smoke opt-in only and excluded from default gates.
+- Route audit / merge readiness completed on `real-provider-coding-flow-boundary`.
+- Merge-readiness validation passed on the route branch.
+- Merged to `main` with `--no-ff` as `fb53331 Merge real provider coding flow boundary`.
+- Post-merge validation passed on `main`.
+- Route is sealed; no real-provider write smoke was run and no provider config was read, printed, copied, modified, or cleaned.
 
 No real-provider write smoke was run.
 
-Current checkpoint is G: Route audit / merge readiness.
+Current checkpoint is complete. This route is sealed.
 
 ## 14. Validation Commands
 
@@ -123,4 +123,15 @@ Before commit, ensure no `.sisyphus/audit/permissions.jsonl`, `packages/ts-shell
 
 ## 17. Next Step
 
-Next checkpoint G should perform route audit / merge readiness without running real provider by default and without reading or printing provider config.
+This route is sealed. The next route should only run the explicit opt-in `--real-coding-flow-smoke` after restating fixture, repository no-mutation, provider-config redaction, and Windows/WSL compatibility boundaries.
+
+## 18. Route Closure Record
+
+- Merge-readiness validation on `real-provider-coding-flow-boundary`: passed.
+- Merge method: `rtk git merge --no-ff real-provider-coding-flow-boundary -m "Merge real provider coding flow boundary"`.
+- Merge commit: `fb53331 Merge real provider coding flow boundary`.
+- Post-merge validation on `main`: passed.
+- Default `verify-real-user-capabilities` was not run.
+- Real-provider coding smoke was not run.
+- Provider/auth core was not modified.
+- Windows default real-provider home and Linux/WSL explicit real-home opt-in were preserved.
