@@ -28,7 +28,12 @@ It is not a default gate and is not run by this checkpoint.
 10. Redact provider output and fail if secrets or config paths leak.
 11. Capture real repository `git status --short` after the turn and fail if it changed.
 12. Failure reports include `repositoryClean`, `terminalResultVisible`, `changedFiles`, `verification`, `redaction`, `failureCategory`, `failureReason`, and `nextAction` when possible.
-13. Clean the fixture and isolated runtime home unless the caller explicitly asks to keep test artifacts.
+13. No-op or no-mutation failures include safe diagnostics:
+    - process summary: exit code, timeout flag, output byte count, redacted stdout/stderr/combined tails, and output marker booleans.
+    - fixture summary: observed/expected changed files, protected changed files, and `note.txt` status as only `draft`, `ready`, `other`, or `missing`.
+    - runtime summary: isolated runtime home kind, whether `.private-agents`/session artifacts were created under that isolated home, and `realProviderHomeUsedForRuntime=false`.
+    - classification summary: `failureStage`, `failureCategory`, `statusDetail`, and `nextAction`.
+14. Clean the fixture and isolated runtime home unless the caller explicitly asks to keep test artifacts.
 
 ## Failure Attribution
 

@@ -142,6 +142,24 @@ export function assertOnlyExpectedCodingFixtureChanges(
   }
 }
 
+export function readCodingFlowNoteStatus(fixtureDir) {
+  const root = path.resolve(fixtureDir)
+  assertSafeFixturePath(root)
+  const notePath = path.join(root, 'note.txt')
+  if (!fs.existsSync(notePath)) {
+    return 'missing'
+  }
+
+  const content = fs.readFileSync(notePath, 'utf8')
+  const match = content.match(/^status:\s*(.+)$/m)
+  if (!match) {
+    return 'other'
+  }
+
+  const status = match[1]?.trim()
+  return status === 'draft' || status === 'ready' ? status : 'other'
+}
+
 export function cleanupCodingFlowFixture(fixtureDir) {
   const root = path.resolve(fixtureDir)
   assertSafeFixturePath(root)
@@ -227,7 +245,9 @@ function runSelfTest() {
     const before = snapshotCodingFlowFixture(fixture.fixtureDir)
     const noMutation = compareCodingFlowSnapshots(before, before)
     const notePath = path.join(fixture.fixtureDir, 'note.txt')
+    const noteStatusBefore = readCodingFlowNoteStatus(fixture.fixtureDir)
     fs.writeFileSync(notePath, 'status: ready\nowner: fixture\n', 'utf8')
+    const noteStatusAfter = readCodingFlowNoteStatus(fixture.fixtureDir)
     const after = snapshotCodingFlowFixture(fixture.fixtureDir)
     const comparison = compareCodingFlowSnapshots(before, after)
     const expected = assertOnlyExpectedCodingFixtureChanges(
@@ -243,12 +263,16 @@ function runSelfTest() {
     const passed =
       noMutation.ok &&
       expected.ok &&
+      noteStatusBefore === 'draft' &&
+      noteStatusAfter === 'ready' &&
       noteContent.includes('status: ready') &&
       promptOk
 
     console.log(`fixture=${fixture.fixtureDir}`)
     console.log(`files=${fixture.files.join(',')}`)
     console.log(`changedFiles=${expected.observed.join(',')}`)
+    console.log(`noteStatusBefore=${noteStatusBefore}`)
+    console.log(`noteStatusAfter=${noteStatusAfter}`)
     console.log(`protectedUnchanged=${expected.protectedChanged.length === 0}`)
     console.log(`[${passed ? 'PASS' : 'FAIL'}] real-provider-coding-fixture-self-test`)
     process.exitCode = passed ? 0 : 1

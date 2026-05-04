@@ -16,6 +16,7 @@ import {
   cleanupCodingFlowFixture,
   compareCodingFlowSnapshots,
   createCodingFlowFixture,
+  readCodingFlowNoteStatus,
   snapshotCodingFlowFixture,
 } from './real-provider-coding-fixture.mjs'
 import {
@@ -58,6 +59,7 @@ const realCodingFlowDryRun = process.argv.includes('--real-coding-flow-dry-run')
 const realCodingFlowSmoke = process.argv.includes('--real-coding-flow-smoke')
 const realCodingFlowFailureAttributionSelfTest = process.argv.includes('--real-coding-flow-failure-attribution-self-test')
 const realCodingFlowFollowupContextSelfTest = process.argv.includes('--real-coding-flow-followup-context-self-test')
+const realCodingFlowDiagnosticsSelfTest = process.argv.includes('--real-coding-flow-diagnostics-self-test')
 
 const failureCategories = [
   'none',
@@ -1405,6 +1407,7 @@ function printHelp() {
   console.log('  --real-coding-flow-dry-run')
   console.log('  --real-coding-flow-failure-attribution-self-test')
   console.log('  --real-coding-flow-followup-context-self-test')
+  console.log('  --real-coding-flow-diagnostics-self-test')
   console.log('')
   console.log('Explicit opt-in real-provider checks:')
   console.log('  --real-readonly-coding-preflight')
@@ -1785,6 +1788,142 @@ function buildCodingFlowContractFields({
       statusDetail ?? statusDetailForCodingFlowFailureCategory(failureCategory),
     ),
   }
+}
+
+function buildCodingFlowDiagnostics({
+  result = { code: undefined, timedOut: false, stdout: '', stderr: '', output: '' },
+  redactedOutput = '',
+  comparison = { added: [], removed: [], changed: [] },
+  expected = { observed: [], expected: ['note.txt'], protectedChanged: [] },
+  noteStatusBefore = 'missing',
+  noteStatusAfter = 'missing',
+  runtimeHome,
+  failureCategory = 'product runtime regression',
+  statusDetail = 'product-runtime-regression',
+  output = redactedOutput,
+} = {}) {
+  const safeOutput = String(output ?? '')
+  const safeStdout = redactProviderOutput(result.stdout ?? '')
+  const safeStderr = redactProviderOutput(result.stderr ?? '')
+  return {
+    process: {
+      modelTurnExitCode: typeof result.code === 'number' ? result.code : null,
+      modelTurnTimedOut: Boolean(result.timedOut),
+      modelTurnOutputBytes: Buffer.byteLength(String(result.output ?? ''), 'utf8'),
+      stdoutTailRedacted: summarizeOutput(safeStdout),
+      stderrTailRedacted: summarizeOutput(safeStderr),
+      combinedOutputTailRedacted: summarizeOutput(safeOutput),
+      outputMarkers: detectCodingFlowOutputMarkers(safeOutput),
+    },
+    fixture: {
+      fixtureChangedFiles: [...(expected.observed ?? [])].sort(),
+      expectedChangedFiles: [...(expected.expected ?? ['note.txt'])].sort(),
+      noteStatusBefore,
+      noteStatusAfter,
+      protectedChangedFiles: [...(expected.protectedChanged ?? [])].sort(),
+      addedFiles: [...(comparison.added ?? [])].sort(),
+      removedFiles: [...(comparison.removed ?? [])].sort(),
+    },
+    runtime: {
+      runtimeHomeKind: 'isolated-test-root',
+      runtimeHomeState: inspectCodingFlowRuntimeHome(runtimeHome),
+      realProviderHomeUsedForRuntime: false,
+      configHomeKind: 'explicit-real-provider-home',
+    },
+    classification: {
+      failureStage: deriveCodingFlowFailureStage({
+        failureCategory,
+        statusDetail,
+        output: safeOutput,
+        expected,
+        noteStatusAfter,
+      }),
+      failureCategory,
+      statusDetail,
+      nextAction: nextActionForCodingFlowFailure(failureCategory, statusDetail),
+    },
+  }
+}
+
+function detectCodingFlowOutputMarkers(output) {
+  const normalized = String(output ?? '')
+  return {
+    hasResultBlock: /(^|\r?\n)Result\s*(\r?\n|$)/.test(normalized),
+    hasActionResult: /Action result/i.test(normalized),
+    hasChangedFilesLine: /-\s*(Changed|Changed files):/i.test(normalized),
+    hasVerificationLine: /Verification:/i.test(normalized) || /verification passed/i.test(normalized),
+    hasProviderReadinessMarker: hasExplicitProviderReadinessMarker(normalized),
+    hasPermissionPromptMarker: /permission|approval|approve|deny|allow-once/i.test(normalized),
+    hasToolExecutionMarker: /tool|edit|write|patch|changedFiles/i.test(normalized),
+  }
+}
+
+function inspectCodingFlowRuntimeHome(runtimeHome) {
+  if (!runtimeHome) {
+    return {
+      existsAfterTurn: false,
+      privateAgentsDirCreated: false,
+      sessionArtifactCount: 0,
+    }
+  }
+
+  assertSafeCodingFlowRuntimeHome(runtimeHome)
+  const privateAgentsDir = path.join(runtimeHome, '.private-agents')
+  return {
+    existsAfterTurn: fs.existsSync(runtimeHome),
+    privateAgentsDirCreated: fs.existsSync(privateAgentsDir),
+    sessionArtifactCount: countFilesUnder(path.join(privateAgentsDir, 'sessions'), 200),
+  }
+}
+
+function countFilesUnder(root, limit) {
+  if (!fs.existsSync(root)) return 0
+  let count = 0
+  const visit = (directory) => {
+    if (count >= limit) return
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (count >= limit) return
+      const absolutePath = path.join(directory, entry.name)
+      if (entry.isDirectory()) {
+        visit(absolutePath)
+      } else {
+        count += 1
+      }
+    }
+  }
+  visit(root)
+  return count
+}
+
+function deriveCodingFlowFailureStage({
+  failureCategory,
+  statusDetail,
+  output,
+  expected = {},
+  noteStatusAfter,
+}) {
+  if (
+    statusDetail === 'config-failure' ||
+    statusDetail === 'provider-network-inconclusive' ||
+    statusDetail === 'provider-model-failed' ||
+    String(failureCategory ?? '').includes('provider') ||
+    hasExplicitProviderReadinessMarker(output)
+  ) {
+    return 'model-turn'
+  }
+  if (failureCategory === 'terminal result missing') {
+    return 'terminal-surface'
+  }
+  if (
+    failureCategory === 'changedFiles wrong' ||
+    (expected.observed ?? []).join(',') !== (expected.expected ?? ['note.txt']).join(',')
+  ) {
+    return 'mutation-assertion'
+  }
+  if (failureCategory === 'verification failed' || noteStatusAfter !== 'ready') {
+    return 'verification-assertion'
+  }
+  return 'model-turn'
 }
 
 function createIsolatedCodingFlowRuntimeHome() {
@@ -2393,6 +2532,104 @@ function runRealCodingFlowFollowupContextSelfTest() {
   process.exit(ok ? 0 : 1)
 }
 
+function runRealCodingFlowDiagnosticsSelfTest() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-coding-flow-diagnostics-self-test')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('modelTurn=false')
+  console.log('reportWritten=false')
+
+  const runtimeHome = createIsolatedCodingFlowRuntimeHome()
+  const fixture = createCodingFlowFixture()
+  try {
+    fs.mkdirSync(path.join(runtimeHome, '.private-agents', 'sessions', 'diagnostic-session'), {
+      recursive: true,
+    })
+    fs.writeFileSync(
+      path.join(runtimeHome, '.private-agents', 'sessions', 'diagnostic-session', 'transcript.jsonl'),
+      '{}\n',
+      'utf8',
+    )
+
+    const before = snapshotCodingFlowFixture(fixture.fixtureDir)
+    const noteStatusBefore = readCodingFlowNoteStatus(fixture.fixtureDir)
+    const after = snapshotCodingFlowFixture(fixture.fixtureDir)
+    const noteStatusAfter = readCodingFlowNoteStatus(fixture.fixtureDir)
+    const comparison = compareCodingFlowSnapshots(before, after)
+    const expected = assertOnlyExpectedCodingFixtureChanges(
+      comparison,
+      ['note.txt'],
+      fixture.protectedFiles,
+    )
+    const result = {
+      code: 0,
+      timedOut: false,
+      stdout: [
+        'Action result unavailable',
+        'Authorization: Bearer sk-live-secret-123456789',
+        '/home/wang/.private-agents-real/.private-agents/config.json',
+      ].join('\n'),
+      stderr: 'api_key=sk-url-secret-123456789',
+      output: [
+        'Action result unavailable',
+        'Authorization: Bearer sk-live-secret-123456789',
+        '/home/wang/.private-agents-real/.private-agents/config.json',
+        'api_key=sk-url-secret-123456789',
+      ].join('\n'),
+    }
+    const redacted = redactProviderOutput(result.output)
+    const diagnostics = buildCodingFlowDiagnostics({
+      result,
+      redactedOutput: redacted,
+      comparison,
+      expected,
+      noteStatusBefore,
+      noteStatusAfter,
+      runtimeHome,
+      failureCategory: 'changedFiles wrong',
+      statusDetail: 'changed-files-wrong',
+    })
+    const serialized = JSON.stringify(diagnostics)
+    const passed =
+      diagnostics.process.modelTurnExitCode === 0 &&
+      diagnostics.process.modelTurnTimedOut === false &&
+      diagnostics.process.modelTurnOutputBytes > 0 &&
+      diagnostics.process.outputMarkers.hasActionResult &&
+      !diagnostics.process.outputMarkers.hasResultBlock &&
+      diagnostics.fixture.fixtureChangedFiles.length === 0 &&
+      diagnostics.fixture.expectedChangedFiles.join(',') === 'note.txt' &&
+      diagnostics.fixture.noteStatusBefore === 'draft' &&
+      diagnostics.fixture.noteStatusAfter === 'draft' &&
+      diagnostics.runtime.runtimeHomeKind === 'isolated-test-root' &&
+      diagnostics.runtime.runtimeHomeState.existsAfterTurn &&
+      diagnostics.runtime.runtimeHomeState.privateAgentsDirCreated &&
+      diagnostics.runtime.runtimeHomeState.sessionArtifactCount === 1 &&
+      diagnostics.runtime.realProviderHomeUsedForRuntime === false &&
+      diagnostics.runtime.configHomeKind === 'explicit-real-provider-home' &&
+      diagnostics.classification.failureStage === 'mutation-assertion' &&
+      diagnostics.classification.failureCategory === 'changedFiles wrong' &&
+      diagnostics.classification.statusDetail === 'changed-files-wrong' &&
+      !serialized.includes('.private-agents-real') &&
+      !serialized.includes('.private-agents/config.json') &&
+      !serialized.includes('sk-live-secret') &&
+      !serialized.includes('sk-url-secret')
+
+    console.log(`modelTurnExitCode=${diagnostics.process.modelTurnExitCode}`)
+    console.log(`modelTurnTimedOut=${diagnostics.process.modelTurnTimedOut}`)
+    console.log(`noteStatusBefore=${diagnostics.fixture.noteStatusBefore}`)
+    console.log(`noteStatusAfter=${diagnostics.fixture.noteStatusAfter}`)
+    console.log(`runtimeHomeKind=${diagnostics.runtime.runtimeHomeKind}`)
+    console.log(`failureStage=${diagnostics.classification.failureStage}`)
+    console.log(`redaction=${passed ? 'pass' : 'fail'}`)
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] real-coding-flow-diagnostics-self-test`)
+    process.exitCode = passed ? 0 : 1
+  } finally {
+    cleanupCodingFlowFixture(fixture.fixtureDir)
+    cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+  }
+}
+
 function assertReadonlySmokeSuccess(output, snapshotComparison, redaction) {
   const failures = []
   if (!redaction.ok) {
@@ -2748,6 +2985,7 @@ async function runRealCodingFlowSmoke() {
   const runtimeHome = createIsolatedCodingFlowRuntimeHome()
   const fixture = createCodingFlowFixture()
   try {
+    const noteStatusBefore = readCodingFlowNoteStatus(fixture.fixtureDir)
     const before = snapshotCodingFlowFixture(fixture.fixtureDir)
     const result = await run(process.execPath, [
       tsxCliPath,
@@ -2770,6 +3008,7 @@ async function runRealCodingFlowSmoke() {
       timeoutMs: 420000,
     })
     const after = snapshotCodingFlowFixture(fixture.fixtureDir)
+    const noteStatusAfter = readCodingFlowNoteStatus(fixture.fixtureDir)
     const comparison = compareCodingFlowSnapshots(before, after)
     const expected = assertOnlyExpectedCodingFixtureChanges(
       comparison,
@@ -2831,6 +3070,17 @@ async function runRealCodingFlowSmoke() {
           success.statusDetail,
         ),
         outputTail: summarizeOutput(redactedOutput),
+        diagnostics: buildCodingFlowDiagnostics({
+          result,
+          redactedOutput,
+          comparison,
+          expected,
+          noteStatusBefore,
+          noteStatusAfter,
+          runtimeHome,
+          failureCategory: success.failureCategory,
+          statusDetail: success.statusDetail,
+        }),
       }
       writeReport(report)
       console.log(`fixtureFiles=${fixture.files.join(',')}`)
@@ -2839,6 +3089,10 @@ async function runRealCodingFlowSmoke() {
       console.log(`repositoryClean=${report.repositoryClean}`)
       console.log(`terminalResultVisible=${report.terminalResultVisible}`)
       console.log(`verification=${report.verification}`)
+      console.log(`noteStatusBefore=${noteStatusBefore}`)
+      console.log(`noteStatusAfter=${noteStatusAfter}`)
+      console.log(`failureStage=${report.diagnostics.classification.failureStage}`)
+      console.log(`outputMarkers=${JSON.stringify(report.diagnostics.process.outputMarkers)}`)
       console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
       if (!success.ok) {
         console.log(`failureReason=${report.failureReason}`)
@@ -2881,11 +3135,33 @@ async function runRealCodingFlowSmoke() {
         output: redactedOutput,
       }),
       outputTail: summarizeOutput(redactedOutput),
+      diagnostics: buildCodingFlowDiagnostics({
+        result,
+        redactedOutput,
+        comparison,
+        expected,
+        noteStatusBefore,
+        noteStatusAfter,
+        runtimeHome,
+        failureCategory: failureStatus.failureCategory,
+        statusDetail: failureStatus.statusDetail,
+      }),
     })
     console.log(`fixtureFiles=${fixture.files.join(',')}`)
     console.log(`changedFiles=${expected.observed.join(',')}`)
     console.log(`protectedUnchanged=${expected.protectedChanged.length === 0}`)
     console.log(`repositoryClean=${repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status}`)
+    console.log(`terminalResultVisible=${/(^|\r?\n)Result\s*(\r?\n|$)/.test(redactedOutput)}`)
+    console.log(`verification=${expected.ok ? 'blocked' : 'failed'}`)
+    console.log(`noteStatusBefore=${noteStatusBefore}`)
+    console.log(`noteStatusAfter=${noteStatusAfter}`)
+    console.log(`failureStage=${deriveCodingFlowFailureStage({
+      failureCategory: failureStatus.failureCategory,
+      statusDetail: failureStatus.statusDetail,
+      output: redactedOutput,
+      expected,
+      noteStatusAfter,
+    })}`)
     console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
     console.log(`[${failureStatus.status}] real-coding-flow-smoke status=${failureStatus.statusDetail}`)
     if (redactedOutput) {
@@ -2952,6 +3228,23 @@ function runRealCodingFlowDryRun() {
       verification: 'blocked',
       outputTail: 'provider-network-inconclusive',
     }, 'retry the same fixture task after api_key=sk-live-secret-123456789 recovers', fixture)
+    const diagnostics = buildCodingFlowDiagnostics({
+      result: {
+        code: 0,
+        timedOut: false,
+        stdout: 'Action result unavailable',
+        stderr: '',
+        output: 'Action result unavailable',
+      },
+      redactedOutput: 'Action result unavailable',
+      comparison,
+      expected,
+      noteStatusBefore: 'draft',
+      noteStatusAfter: 'ready',
+      runtimeHome: path.join(getTestRoot(), 'real-provider-coding-flow-runtime-home', 'dry-run'),
+      failureCategory: 'none',
+      statusDetail: 'passed',
+    })
     const noteContent = fs.readFileSync(path.join(fixture.fixtureDir, 'note.txt'), 'utf8')
     const promptOk =
       fixture.prompt.includes('Edit only note.txt') &&
@@ -2976,6 +3269,15 @@ function runRealCodingFlowDryRun() {
       followup.blocker === 'provider-network-inconclusive' &&
       followup.statusDetail === 'provider-network-inconclusive' &&
       followup.redaction.ok
+    const diagnosticsOk =
+      diagnostics.process.modelTurnExitCode === 0 &&
+      diagnostics.fixture.expectedChangedFiles.join(',') === 'note.txt' &&
+      diagnostics.fixture.fixtureChangedFiles.join(',') === 'note.txt' &&
+      diagnostics.fixture.noteStatusBefore === 'draft' &&
+      diagnostics.fixture.noteStatusAfter === 'ready' &&
+      diagnostics.runtime.runtimeHomeKind === 'isolated-test-root' &&
+      diagnostics.runtime.realProviderHomeUsedForRuntime === false &&
+      diagnostics.runtime.configHomeKind === 'explicit-real-provider-home'
     const passed =
       noMutation.ok &&
       expected.ok &&
@@ -2984,13 +3286,15 @@ function runRealCodingFlowDryRun() {
       promptOk &&
       contractOk &&
       surfaceOk &&
-      failureAttributionOk
+      failureAttributionOk &&
+      diagnosticsOk
 
     console.log(`fixtureFiles=${fixture.files.join(',')}`)
     console.log(`changedFiles=${expected.observed.join(',')}`)
     console.log(`protectedUnchanged=${expected.protectedChanged.length === 0}`)
     console.log(`terminalResultSurface=${surfaceOk ? 'pass' : 'fail'}`)
     console.log(`failureFollowupContext=${failureAttributionOk ? 'pass' : 'fail'}`)
+    console.log(`diagnosticsShape=${diagnosticsOk ? 'pass' : 'fail'}`)
     console.log(`redaction=${redaction.ok && followup.redaction.ok ? 'pass' : 'fail'}`)
     console.log(`skipReason=${contract.skip.reason}`)
     console.log(`[${passed ? 'PASS' : 'FAIL'}] real-coding-flow-dry-run-contract`)
@@ -3019,6 +3323,10 @@ async function main() {
   }
   if (realCodingFlowFollowupContextSelfTest) {
     runRealCodingFlowFollowupContextSelfTest()
+    return
+  }
+  if (realCodingFlowDiagnosticsSelfTest) {
+    runRealCodingFlowDiagnosticsSelfTest()
     return
   }
   if (realReadonlyCodingPreflight) {
