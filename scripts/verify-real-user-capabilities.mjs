@@ -28,6 +28,7 @@ import {
 import {
   ensureDirIfNeeded,
   getRealCodingFlowRuntimeHome,
+  getRealCodingFlowAuditLogPath,
   getRealProviderHome,
   getSyntheticHome,
   getTestRoot,
@@ -60,6 +61,7 @@ const realCodingFlowSmoke = process.argv.includes('--real-coding-flow-smoke')
 const realCodingFlowFailureAttributionSelfTest = process.argv.includes('--real-coding-flow-failure-attribution-self-test')
 const realCodingFlowFollowupContextSelfTest = process.argv.includes('--real-coding-flow-followup-context-self-test')
 const realCodingFlowDiagnosticsSelfTest = process.argv.includes('--real-coding-flow-diagnostics-self-test')
+const realCodingFlowAuditIsolationSelfTest = process.argv.includes('--real-coding-flow-audit-isolation-self-test')
 
 const failureCategories = [
   'none',
@@ -1408,6 +1410,7 @@ function printHelp() {
   console.log('  --real-coding-flow-failure-attribution-self-test')
   console.log('  --real-coding-flow-followup-context-self-test')
   console.log('  --real-coding-flow-diagnostics-self-test')
+  console.log('  --real-coding-flow-audit-isolation-self-test')
   console.log('')
   console.log('Explicit opt-in real-provider checks:')
   console.log('  --real-readonly-coding-preflight')
@@ -1798,6 +1801,9 @@ function buildCodingFlowDiagnostics({
   noteStatusBefore = 'missing',
   noteStatusAfter = 'missing',
   runtimeHome,
+  auditLogPath,
+  repoAfter,
+  auditResidueCleaned = false,
   prompt = '',
   failureCategory = 'product runtime regression',
   statusDetail = 'product-runtime-regression',
@@ -1845,6 +1851,12 @@ function buildCodingFlowDiagnostics({
       realProviderHomeUsedForRuntime: false,
       configHomeKind: 'explicit-real-provider-home',
     },
+    auditIsolation: inspectCodingFlowAuditIsolation({
+      auditLogPath,
+      repoAfter,
+      auditResidueCleaned,
+    }),
+    mutation: buildCodingFlowMutationDiagnostics(safeOutput),
     classification: {
       failureStage: deriveCodingFlowFailureStage({
         failureCategory,
@@ -1857,6 +1869,59 @@ function buildCodingFlowDiagnostics({
       statusDetail,
       nextAction: nextActionForCodingFlowFailure(failureCategory, statusDetail),
     },
+  }
+}
+
+function inspectCodingFlowAuditIsolation({
+  auditLogPath,
+  repoAfter,
+  auditResidueCleaned = false,
+} = {}) {
+  return {
+    auditLogKind: auditLogPath && isPathInsideTestRoot(auditLogPath)
+      ? 'isolated-test-root'
+      : auditLogPath
+        ? 'non-isolated'
+        : 'not-configured',
+    repoAuditResidueDetected: Boolean(repoAfter?.status && /\.sisyphus[\/\\]audit[\/\\]permissions\.jsonl/.test(repoAfter.status)),
+    auditResidueCleaned: Boolean(auditResidueCleaned),
+    auditLogCreated: Boolean(auditLogPath && fs.existsSync(auditLogPath)),
+  }
+}
+
+function buildCodingFlowMutationDiagnostics(output) {
+  const normalized = String(output ?? '')
+  const taskKind = normalized.match(/-\s*Task:\s*([^\r\n]+)/i)?.[1]?.trim() ?? 'unknown'
+  const failedFileReason =
+    normalized.match(/-\s*Failure reason:\s*([^\r\n]+)/i)?.[1]?.trim() ??
+    normalized.match(/-\s*Failed files:\s*([^\r\n]+)/i)?.[1]?.trim() ??
+    ''
+  const actionSummary = normalized.match(/-\s*Actions:\s*([^\r\n]+)/i)?.[1]?.trim() ?? ''
+  const actionSequence = actionSummary
+    ? actionSummary
+        .split(',')
+        .map((entry) => entry.replace(/\([^)]*\)/g, '').trim())
+        .filter(Boolean)
+    : []
+  const targetFile =
+    normalized.match(/-\s*Read files:\s*([^\r\n,]+)/i)?.[1]?.trim() ??
+    normalized.match(/-\s*Unchanged attempted files:\s*([^\r\n,]+)/i)?.[1]?.trim() ??
+    normalized.match(/-\s*Failed files:\s*([^\s,(]+)/i)?.[1]?.trim() ??
+    'unknown'
+  const patchFailureCode =
+    normalized.match(/\b(patch-from-not-found|patch-ambiguous|edit-transform-unclear|edit-target-missing)\b/i)?.[1]?.toLowerCase() ??
+    'none'
+
+  return {
+    taskKind,
+    actionSequence,
+    targetFile,
+    mutationInstructionPresent: !/mutation instruction missing/i.test(normalized),
+    replaceFromPresent: /\b(?:replaceFrom|fromText|source text|current source text)\b/i.test(normalized),
+    replaceToPresent: /\b(?:replaceTo|toText|replacement text|new text)\b/i.test(normalized),
+    patchFailureCode,
+    failedFileReason: failedFileReason ? summarizeOutput(failedFileReason) : '',
+    modelTextTailRedacted: summarizeOutput(normalized),
   }
 }
 
@@ -1984,6 +2049,26 @@ function assertSafeCodingFlowRuntimeHome(runtimeHome) {
       throw new Error('Refusing to use real-provider home for coding flow runtime home')
     }
   }
+}
+
+function createIsolatedCodingFlowAuditLogPath() {
+  const auditLogPath = getRealCodingFlowAuditLogPath(runId)
+  assertSafeCodingFlowRuntimeHome(path.dirname(auditLogPath))
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+  return auditLogPath
+}
+
+function cleanupIsolatedCodingFlowAuditLog(auditLogPath) {
+  if (!auditLogPath) return
+  assertSafeCodingFlowRuntimeHome(path.dirname(auditLogPath))
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+}
+
+function isPathInsideTestRoot(targetPath) {
+  const normalized = normalizePathForSafety(targetPath)
+  const normalizedTestRoot = normalizePathForSafety(testRoot)
+  return normalized === normalizedTestRoot || normalized.startsWith(`${normalizedTestRoot}/`)
 }
 
 function normalizePathForSafety(value) {
@@ -2567,6 +2652,7 @@ function runRealCodingFlowDiagnosticsSelfTest() {
   console.log('reportWritten=false')
 
   const runtimeHome = createIsolatedCodingFlowRuntimeHome()
+  const auditLogPath = createIsolatedCodingFlowAuditLogPath()
   const fixture = createCodingFlowFixture()
   try {
     fs.mkdirSync(path.join(runtimeHome, '.private-agents', 'sessions', 'diagnostic-session'), {
@@ -2592,13 +2678,29 @@ function runRealCodingFlowDiagnosticsSelfTest() {
       code: 0,
       timedOut: false,
       stdout: [
-        'Action result unavailable',
+        'Action result',
+        '- Task: edit-file',
+        '- Changed: none',
+        '- Failed files: note.txt (patch-from-not-found: mutation instruction missing)',
+        '- Failure reason: mutation instruction missing',
+        '- Read files: note.txt',
+        '- Verification: skipped',
+        'Execution summary',
+        '- Actions: read (1 run)',
         'Authorization: Bearer sk-live-secret-123456789',
         '/home/wang/.private-agents-real/.private-agents/config.json',
       ].join('\n'),
       stderr: 'api_key=sk-url-secret-123456789',
       output: [
-        'Action result unavailable',
+        'Action result',
+        '- Task: edit-file',
+        '- Changed: none',
+        '- Failed files: note.txt (patch-from-not-found: mutation instruction missing)',
+        '- Failure reason: mutation instruction missing',
+        '- Read files: note.txt',
+        '- Verification: skipped',
+        'Execution summary',
+        '- Actions: read (1 run)',
         'Authorization: Bearer sk-live-secret-123456789',
         '/home/wang/.private-agents-real/.private-agents/config.json',
         'api_key=sk-url-secret-123456789',
@@ -2613,6 +2715,8 @@ function runRealCodingFlowDiagnosticsSelfTest() {
       noteStatusBefore,
       noteStatusAfter,
       runtimeHome,
+      auditLogPath,
+      repoAfter: { ok: true, status: '', outputTail: '' },
       prompt: fixture.prompt,
       failureCategory: 'changedFiles wrong',
       statusDetail: 'changed-files-wrong',
@@ -2633,7 +2737,7 @@ function runRealCodingFlowDiagnosticsSelfTest() {
       diagnostics.routing.enteredSessionRuntime === true &&
       diagnostics.routing.codingResultPresent === true &&
       diagnostics.routing.resultBlockPresent === false &&
-      diagnostics.routing.toolExecutionMarkerPresent === false &&
+      diagnostics.routing.toolExecutionMarkerPresent === true &&
       diagnostics.fixture.fixtureChangedFiles.length === 0 &&
       diagnostics.fixture.expectedChangedFiles.join(',') === 'note.txt' &&
       diagnostics.fixture.noteStatusBefore === 'draft' &&
@@ -2644,6 +2748,17 @@ function runRealCodingFlowDiagnosticsSelfTest() {
       diagnostics.runtime.runtimeHomeState.sessionArtifactCount === 1 &&
       diagnostics.runtime.realProviderHomeUsedForRuntime === false &&
       diagnostics.runtime.configHomeKind === 'explicit-real-provider-home' &&
+      diagnostics.auditIsolation.auditLogKind === 'isolated-test-root' &&
+      diagnostics.auditIsolation.repoAuditResidueDetected === false &&
+      diagnostics.auditIsolation.auditResidueCleaned === false &&
+      diagnostics.auditIsolation.auditLogCreated === false &&
+      diagnostics.mutation.taskKind === 'edit-file' &&
+      diagnostics.mutation.actionSequence.join(',') === 'read' &&
+      diagnostics.mutation.targetFile === 'note.txt' &&
+      diagnostics.mutation.mutationInstructionPresent === false &&
+      diagnostics.mutation.replaceFromPresent === false &&
+      diagnostics.mutation.replaceToPresent === false &&
+      diagnostics.mutation.patchFailureCode === 'patch-from-not-found' &&
       diagnostics.classification.failureStage === 'mutation-assertion' &&
       diagnostics.classification.failureCategory === 'changedFiles wrong' &&
       diagnostics.classification.statusDetail === 'changed-files-wrong' &&
@@ -2659,6 +2774,9 @@ function runRealCodingFlowDiagnosticsSelfTest() {
     console.log(`repoAwareSummaryDetected=${diagnostics.routing.repoAwareSummaryDetected}`)
     console.log(`promptIntentHint=${diagnostics.routing.promptIntentHint}`)
     console.log(`runtimeHomeKind=${diagnostics.runtime.runtimeHomeKind}`)
+    console.log(`auditLogKind=${diagnostics.auditIsolation.auditLogKind}`)
+    console.log(`mutationInstructionPresent=${diagnostics.mutation.mutationInstructionPresent}`)
+    console.log(`patchFailureCode=${diagnostics.mutation.patchFailureCode}`)
     console.log(`failureStage=${diagnostics.classification.failureStage}`)
     console.log(`redaction=${passed ? 'pass' : 'fail'}`)
     console.log(`[${passed ? 'PASS' : 'FAIL'}] real-coding-flow-diagnostics-self-test`)
@@ -2666,6 +2784,66 @@ function runRealCodingFlowDiagnosticsSelfTest() {
   } finally {
     cleanupCodingFlowFixture(fixture.fixtureDir)
     cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
+  }
+}
+
+function runRealCodingFlowAuditIsolationSelfTest() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-coding-flow-audit-isolation-self-test')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('modelTurn=false')
+  console.log('reportWritten=false')
+
+  const auditLogPath = createIsolatedCodingFlowAuditLogPath()
+  try {
+    const cleanRepo = { ok: true, status: '', outputTail: '' }
+    const dirtyRepo = {
+      ok: true,
+      status: '?? packages/ts-shell/.sisyphus/audit/permissions.jsonl',
+      outputTail: '',
+    }
+    const beforeCreate = inspectCodingFlowAuditIsolation({
+      auditLogPath,
+      repoAfter: cleanRepo,
+      auditResidueCleaned: false,
+    })
+    fs.writeFileSync(auditLogPath, '{"eventType":"permission_check"}\n', 'utf8')
+    const afterCreate = inspectCodingFlowAuditIsolation({
+      auditLogPath,
+      repoAfter: cleanRepo,
+      auditResidueCleaned: false,
+    })
+    const residueDetected = inspectCodingFlowAuditIsolation({
+      auditLogPath,
+      repoAfter: dirtyRepo,
+      auditResidueCleaned: true,
+    })
+    const serialized = JSON.stringify({ beforeCreate, afterCreate, residueDetected })
+    const passed =
+      beforeCreate.auditLogKind === 'isolated-test-root' &&
+      beforeCreate.repoAuditResidueDetected === false &&
+      beforeCreate.auditResidueCleaned === false &&
+      beforeCreate.auditLogCreated === false &&
+      afterCreate.auditLogKind === 'isolated-test-root' &&
+      afterCreate.auditLogCreated === true &&
+      afterCreate.repoAuditResidueDetected === false &&
+      residueDetected.repoAuditResidueDetected === true &&
+      residueDetected.auditResidueCleaned === true &&
+      !serialized.includes(auditLogPath) &&
+      !serialized.includes('.private-agents-real') &&
+      !serialized.includes('.private-agents/config.json')
+
+    console.log(`auditLogKind=${afterCreate.auditLogKind}`)
+    console.log(`auditLogCreated=${afterCreate.auditLogCreated}`)
+    console.log(`repoAuditResidueDetected=${residueDetected.repoAuditResidueDetected}`)
+    console.log(`auditResidueCleaned=${residueDetected.auditResidueCleaned}`)
+    console.log(`redaction=${passed ? 'pass' : 'fail'}`)
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] real-coding-flow-audit-isolation-self-test`)
+    process.exitCode = passed ? 0 : 1
+  } finally {
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
   }
 }
 
@@ -3022,6 +3200,7 @@ async function runRealCodingFlowSmoke() {
   }
 
   const runtimeHome = createIsolatedCodingFlowRuntimeHome()
+  const auditLogPath = createIsolatedCodingFlowAuditLogPath()
   const fixture = createCodingFlowFixture()
   try {
     const noteStatusBefore = readCodingFlowNoteStatus(fixture.fixtureDir)
@@ -3043,6 +3222,7 @@ async function runRealCodingFlowSmoke() {
         PRIVATE_AGENTS_HOME_OVERRIDE: realHome,
         PRIVATE_AGENTS_REAL_HOME: realHome,
         PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+        PRIVATE_AGENTS_AUDIT_LOG_PATH: auditLogPath,
       },
       timeoutMs: 420000,
     })
@@ -3117,6 +3297,8 @@ async function runRealCodingFlowSmoke() {
           noteStatusBefore,
           noteStatusAfter,
           runtimeHome,
+          auditLogPath,
+          repoAfter,
           prompt: fixture.prompt,
           failureCategory: success.failureCategory,
           statusDetail: success.statusDetail,
@@ -3133,6 +3315,8 @@ async function runRealCodingFlowSmoke() {
       console.log(`noteStatusAfter=${noteStatusAfter}`)
       console.log(`repoAwareSummaryDetected=${report.diagnostics.routing.repoAwareSummaryDetected}`)
       console.log(`enteredSessionRuntime=${report.diagnostics.routing.enteredSessionRuntime}`)
+      console.log(`auditLogKind=${report.diagnostics.auditIsolation.auditLogKind}`)
+      console.log(`repoAuditResidueDetected=${report.diagnostics.auditIsolation.repoAuditResidueDetected}`)
       console.log(`failureStage=${report.diagnostics.classification.failureStage}`)
       console.log(`outputMarkers=${JSON.stringify(report.diagnostics.process.outputMarkers)}`)
       console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
@@ -3185,6 +3369,8 @@ async function runRealCodingFlowSmoke() {
         noteStatusBefore,
         noteStatusAfter,
         runtimeHome,
+        auditLogPath,
+        repoAfter,
         prompt: fixture.prompt,
         failureCategory: failureStatus.failureCategory,
         statusDetail: failureStatus.statusDetail,
@@ -3206,12 +3392,16 @@ async function runRealCodingFlowSmoke() {
       noteStatusBefore,
       noteStatusAfter,
       runtimeHome,
+      auditLogPath,
+      repoAfter,
       prompt: fixture.prompt,
       failureCategory: failureStatus.failureCategory,
       statusDetail: failureStatus.statusDetail,
     })
     console.log(`repoAwareSummaryDetected=${failureDiagnostics.routing.repoAwareSummaryDetected}`)
     console.log(`enteredSessionRuntime=${failureDiagnostics.routing.enteredSessionRuntime}`)
+    console.log(`auditLogKind=${failureDiagnostics.auditIsolation.auditLogKind}`)
+    console.log(`repoAuditResidueDetected=${failureDiagnostics.auditIsolation.repoAuditResidueDetected}`)
     console.log(`failureStage=${deriveCodingFlowFailureStage({
       failureCategory: failureStatus.failureCategory,
       statusDetail: failureStatus.statusDetail,
@@ -3228,6 +3418,7 @@ async function runRealCodingFlowSmoke() {
   } finally {
     cleanupCodingFlowFixture(fixture.fixtureDir)
     cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
   }
 }
 
@@ -3285,6 +3476,7 @@ function runRealCodingFlowDryRun() {
       verification: 'blocked',
       outputTail: 'provider-network-inconclusive',
     }, 'retry the same fixture task after api_key=sk-live-secret-123456789 recovers', fixture)
+    const dryRunAuditLogPath = getRealCodingFlowAuditLogPath('dry-run')
     const diagnostics = buildCodingFlowDiagnostics({
       result: {
         code: 0,
@@ -3299,6 +3491,8 @@ function runRealCodingFlowDryRun() {
       noteStatusBefore: 'draft',
       noteStatusAfter: 'ready',
       runtimeHome: path.join(getTestRoot(), 'real-provider-coding-flow-runtime-home', 'dry-run'),
+      auditLogPath: dryRunAuditLogPath,
+      repoAfter: { ok: true, status: '', outputTail: '' },
       prompt: fixture.prompt,
       failureCategory: 'none',
       statusDetail: 'passed',
@@ -3335,7 +3529,10 @@ function runRealCodingFlowDryRun() {
       diagnostics.fixture.noteStatusAfter === 'ready' &&
       diagnostics.runtime.runtimeHomeKind === 'isolated-test-root' &&
       diagnostics.runtime.realProviderHomeUsedForRuntime === false &&
-      diagnostics.runtime.configHomeKind === 'explicit-real-provider-home'
+      diagnostics.runtime.configHomeKind === 'explicit-real-provider-home' &&
+      diagnostics.auditIsolation.auditLogKind === 'isolated-test-root' &&
+      diagnostics.auditIsolation.repoAuditResidueDetected === false &&
+      diagnostics.mutation.mutationInstructionPresent === true
     const passed =
       noMutation.ok &&
       expected.ok &&
@@ -3385,6 +3582,10 @@ async function main() {
   }
   if (realCodingFlowDiagnosticsSelfTest) {
     runRealCodingFlowDiagnosticsSelfTest()
+    return
+  }
+  if (realCodingFlowAuditIsolationSelfTest) {
+    runRealCodingFlowAuditIsolationSelfTest()
     return
   }
   if (realReadonlyCodingPreflight) {

@@ -12,6 +12,7 @@ It is not a default gate and is not run by this checkpoint.
 - `README.md` and `LOCKED.md` are protected.
 - Real-provider config is sourced only through explicit `PRIVATE_AGENTS_REAL_HOME` on Linux/WSL or the Windows default home.
 - CLI runtime/session `HOME` and `USERPROFILE` must use an isolated runtime home under the configured test root, never the real-provider home.
+- Permission audit logs must be explicitly routed to an isolated audit log path under the configured test root for this smoke. The smoke reports only safe audit isolation labels/booleans, not the audit path.
 - Provider config content, keys, headers, and tokens are never printed.
 
 ## Smoke Contract
@@ -19,7 +20,7 @@ It is not a default gate and is not run by this checkpoint.
 1. Run provider readiness preflight with explicit real home.
 2. Capture real repository `git status --short` before the model turn.
 3. Create the fixture workspace outside the repository and outside real-provider home.
-4. Run one real provider model turn with the fixture as `--project`, isolated runtime `HOME`/`USERPROFILE`, and explicit real-provider config source.
+4. Run one real provider model turn with the fixture as `--project`, isolated runtime `HOME`/`USERPROFILE`, isolated permission audit log path, and explicit real-provider config source.
 5. Capture fixture snapshot before and after the turn.
 6. Assert `changedFiles` is exactly `note.txt`.
 7. Assert protected files are unchanged.
@@ -33,8 +34,20 @@ It is not a default gate and is not run by this checkpoint.
     - process summary: exit code, timeout flag, output byte count, redacted stdout/stderr/combined tails, and output marker booleans.
     - fixture summary: observed/expected changed files, protected changed files, and `note.txt` status as only `draft`, `ready`, `other`, or `missing`.
     - runtime summary: isolated runtime home kind, whether `.private-agents`/session artifacts were created under that isolated home, and `realProviderHomeUsedForRuntime=false`.
+    - audit isolation summary: `auditLogKind`, `repoAuditResidueDetected`, `auditResidueCleaned`, and `auditLogCreated`.
+    - mutation summary: `taskKind`, `actionSequence`, `targetFile`, `mutationInstructionPresent`, `replaceFromPresent`, `replaceToPresent`, `patchFailureCode`, `failedFileReason`, and a redacted model text tail.
     - classification summary: `failureStage`, `failureCategory`, `statusDetail`, and `nextAction`.
 14. Clean the fixture and isolated runtime home unless the caller explicitly asks to keep test artifacts.
+
+## Audit Isolation Guard
+
+The smoke must set `PRIVATE_AGENTS_AUDIT_LOG_PATH` for the child CLI process to
+an isolated path under the configured test root. `AuditTrail` path precedence is:
+explicit constructor config, then `PRIVATE_AGENTS_AUDIT_LOG_PATH`, then the
+legacy `process.cwd()/.sisyphus/audit/permissions.jsonl` default. The override
+does not change permission semantics and must fail through the existing audit
+write behavior if the path is invalid or unwritable; it must not silently fall
+back to the repository path.
 
 ## Repo-Aware Routing Guard
 

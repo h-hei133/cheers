@@ -2,14 +2,24 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { AuditTrail } from './auditTrail.js'
 import { SandboxEnforcer } from './sandboxEnforcer.js'
 import { SandboxPolicy } from './sandboxPolicy.js'
 
 const workspaceRoot = path.join(os.tmpdir(), 'private-agents-workspace')
 const auditLogPath = path.join(os.tmpdir(), 'private-agents-audit.jsonl')
 
+async function waitForFile(filePath: string): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (fs.existsSync(filePath)) return
+    await new Promise(resolve => setTimeout(resolve, 5))
+  }
+}
+
 describe('sandbox policy and escalation workflow', () => {
   afterEach(() => {
+    delete process.env.PRIVATE_AGENTS_AUDIT_LOG_PATH
+    fs.rmSync(auditLogPath, { force: true })
   })
 
   it('denies out-of-workspace writes and network access by default', () => {
@@ -96,9 +106,43 @@ describe('sandbox policy and escalation workflow', () => {
 
     enforcer.close()
 
+    await waitForFile(auditLogPath)
     const auditContent = fs.readFileSync(auditLogPath, 'utf8')
     expect(auditContent).toContain('permission_check')
     expect(auditContent).toContain('escalation_request')
     expect(auditContent).toContain('escalation_decision')
+  })
+
+  it('uses explicit audit config before environment override', () => {
+    const envAuditPath = path.join(os.tmpdir(), 'private-agents-env-audit.jsonl')
+    const explicitAuditPath = path.join(os.tmpdir(), 'private-agents-explicit-audit.jsonl')
+    fs.rmSync(envAuditPath, { force: true })
+    fs.rmSync(explicitAuditPath, { force: true })
+    process.env.PRIVATE_AGENTS_AUDIT_LOG_PATH = envAuditPath
+
+    const audit = new AuditTrail({ logFilePath: explicitAuditPath })
+    try {
+      expect(audit.getLogFilePath()).toBe(explicitAuditPath)
+      expect(fs.existsSync(path.dirname(explicitAuditPath))).toBe(true)
+      expect(fs.existsSync(envAuditPath)).toBe(false)
+    } finally {
+      audit.close()
+      fs.rmSync(envAuditPath, { force: true })
+      fs.rmSync(explicitAuditPath, { force: true })
+    }
+  })
+
+  it('uses PRIVATE_AGENTS_AUDIT_LOG_PATH when no explicit audit config is provided', () => {
+    const envAuditPath = path.join(os.tmpdir(), 'private-agents-env-audit.jsonl')
+    fs.rmSync(envAuditPath, { force: true })
+    process.env.PRIVATE_AGENTS_AUDIT_LOG_PATH = envAuditPath
+
+    const audit = new AuditTrail()
+    try {
+      expect(audit.getLogFilePath()).toBe(envAuditPath)
+    } finally {
+      audit.close()
+      fs.rmSync(envAuditPath, { force: true })
+    }
   })
 })

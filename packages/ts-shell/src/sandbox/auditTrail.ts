@@ -30,6 +30,7 @@ export class AuditTrail {
   private entryCount: number = 0;
 
   constructor(config?: Partial<AuditLogConfig>) {
+    const configuredLogPath = process.env.PRIVATE_AGENTS_AUDIT_LOG_PATH?.trim();
     const defaultLogPath = path.join(
       process.cwd(),
       '.sisyphus',
@@ -38,7 +39,7 @@ export class AuditTrail {
     );
 
     this.config = {
-      logFilePath: config?.logFilePath ?? defaultLogPath,
+      logFilePath: config?.logFilePath ?? (configuredLogPath || defaultLogPath),
       maxEntriesPerFile: config?.maxEntriesPerFile ?? 10000,
       rotateOnSize: config?.rotateOnSize ?? true,
     };

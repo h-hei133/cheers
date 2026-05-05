@@ -39,6 +39,11 @@ export function getRealCodingFlowRuntimeHome(runId = 'manual') {
   return path.join(getTestRoot(), 'real-provider-coding-flow-runtime-home', safeRunId)
 }
 
+export function getRealCodingFlowAuditLogPath(runId = 'manual') {
+  const safeRunId = String(runId).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) || 'manual'
+  return path.join(getTestRoot(), 'real-provider-coding-flow-audit', safeRunId, 'permissions.jsonl')
+}
+
 export function ensureDirIfNeeded(targetPath) {
   if (!targetPath) return false
   if (fs.existsSync(targetPath)) return false
@@ -54,6 +59,7 @@ export function describeTestPaths() {
     cliEntryGateRoot: getCliEntryGateRoot(),
     realProviderHome: getRealProviderHome({ allowDefault: true }) ?? 'not-configured',
     realCodingFlowRuntimeHome: getRealCodingFlowRuntimeHome('describe'),
+    realCodingFlowAuditLogPath: getRealCodingFlowAuditLogPath('describe'),
   }
 }
 
