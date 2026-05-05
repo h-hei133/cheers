@@ -93,8 +93,16 @@ describe("targetResolution", () => {
       "./src/main.ts",
       "C:\\outside\\tmp\\notes.md",
     ]);
-    expect(resolution.workspacePaths).toEqual(["./src/main.ts"]);
-    expect(resolution.externalPaths).toEqual(["C:\\outside\\tmp\\notes.md"]);
+    if (process.platform === "win32") {
+      expect(resolution.workspacePaths).toEqual(["./src/main.ts"]);
+      expect(resolution.externalPaths).toEqual(["C:\\outside\\tmp\\notes.md"]);
+    } else {
+      expect(resolution.workspacePaths).toEqual([
+        "./src/main.ts",
+        "C:\\outside\\tmp\\notes.md",
+      ]);
+      expect(resolution.externalPaths).toEqual([]);
+    }
     expect(resolution.blocker).toBeNull();
   });
 
@@ -115,5 +123,65 @@ describe("targetResolution", () => {
       candidates: ["src/alpha.ts", "src/beta.ts"],
     });
     expect(pickPrimaryTarget(resolution.prompt, workspaceRoot)).toBeNull();
+  });
+
+  it("treats keep-unchanged file mentions as protected constraints, not edit targets", () => {
+    const resolution = resolveTaskTargets(
+      "Edit note.txt and keep README.md / LOCKED.md unchanged",
+      workspaceRoot,
+    );
+
+    expect(resolution.cleanedPaths).toEqual([
+      "note.txt",
+      "README.md",
+      "LOCKED.md",
+    ]);
+    expect(resolution.primaryTarget?.cleaned).toBe("note.txt");
+    expect(resolution.blocker).toBeNull();
+    expect(pickPrimaryTarget(resolution.prompt, workspaceRoot)?.cleaned).toBe(
+      "note.txt",
+    );
+  });
+
+  it("does not block the real coding flow fixture prompt on protected sibling mentions", () => {
+    const resolution = resolveTaskTargets(
+      [
+        "This is an isolated fixture coding task.",
+        "Edit only note.txt.",
+        'Change the line "status: draft" to exactly "status: ready".',
+        "Do not modify README.md.",
+        "Do not modify LOCKED.md.",
+        'Verify note.txt contains "status: ready" and protected files are unchanged.',
+      ].join("\n"),
+      workspaceRoot,
+    );
+
+    expect(resolution.primaryTarget?.cleaned).toBe("note.txt");
+    expect(resolution.blocker).toBeNull();
+  });
+
+  it("keeps true multi-target edits ambiguous after protected filtering", () => {
+    const resolution = resolveTaskTargets(
+      "replace token in src/alpha.ts and src/beta.ts",
+      workspaceRoot,
+    );
+
+    expect(resolution.primaryTarget).toBeNull();
+    expect(resolution.blocker?.code).toBe("ambiguous-target");
+    expect(resolution.blocker?.candidates).toEqual([
+      "src/alpha.ts",
+      "src/beta.ts",
+    ]);
+  });
+
+  it("allows editing one file while another sibling is explicitly protected", () => {
+    const resolution = resolveTaskTargets(
+      "edit README.md and do not modify LOCKED.md",
+      workspaceRoot,
+    );
+
+    expect(resolution.cleanedPaths).toEqual(["README.md", "LOCKED.md"]);
+    expect(resolution.primaryTarget?.cleaned).toBe("README.md");
+    expect(resolution.blocker).toBeNull();
   });
 });

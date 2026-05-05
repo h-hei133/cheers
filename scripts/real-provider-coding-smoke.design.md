@@ -45,6 +45,16 @@ through to the normal coding flow. Repo status, branch, changes, and summary
 prompts without an explicit file mutation target remain on the repo-aware
 summary path.
 
+## Target Disambiguation Guard
+
+The fixture may mention protected files such as `README.md` and `LOCKED.md` as
+negative constraints. Those mentions are not edit targets. Target resolution
+must preserve the raw mentioned files for diagnostics, but protected contexts
+such as `do not modify README.md`, `keep LOCKED.md unchanged`, or
+`protected files: README.md, LOCKED.md` must not participate in ambiguous edit
+target competition. True multi-target edit requests still remain blocked by
+the `ambiguous-target` contract.
+
 ## Failure Attribution
 
 - `provider-network-inconclusive`: endpoint, DNS, timeout, socket, or TLS failures.

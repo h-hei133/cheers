@@ -70,8 +70,9 @@ export function resolveTaskTargets(
   workspaceRoot: string,
 ): TaskTargetResolution {
   const targets = extractPromptTargets(prompt, workspaceRoot);
-  const blocker = findAmbiguousSiblingTargetBlocker(targets);
-  const primaryTarget = blocker ? null : (targets[0] ?? null);
+  const editCandidateTargets = filterProtectedConstraintTargets(prompt, targets);
+  const blocker = findAmbiguousSiblingTargetBlocker(editCandidateTargets);
+  const primaryTarget = blocker ? null : (editCandidateTargets[0] ?? null);
   const cleanedPaths = targets.map((target) => target.cleaned);
   const workspacePaths = targets
     .filter((target) => target.inWorkspace)
@@ -90,6 +91,52 @@ export function resolveTaskTargets(
     workspacePaths,
     externalPaths,
   };
+}
+
+function filterProtectedConstraintTargets(
+  prompt: string,
+  targets: readonly ResolvedTarget[],
+): readonly ResolvedTarget[] {
+  const protectedTargets = new Set(
+    targets
+      .filter((target) => isProtectedConstraintMention(prompt, target.cleaned))
+      .map((target) => normalizeMentionForCompare(target.cleaned)),
+  );
+
+  if (protectedTargets.size === 0) {
+    return targets;
+  }
+
+  return targets.filter(
+    (target) => !protectedTargets.has(normalizeMentionForCompare(target.cleaned)),
+  );
+}
+
+function isProtectedConstraintMention(prompt: string, cleanedTarget: string): boolean {
+  const escapedTarget = escapeRegExp(cleanedTarget);
+  const flags = "i";
+  const patterns = [
+    new RegExp(`\\bdo\\s+not\\s+(?:modify|edit|change)\\s+${escapedTarget}\\b`, flags),
+    new RegExp(
+      `\\b(?:keep|leave)\\b[^\\n]*\\b${escapedTarget}\\b[^\\n]*\\bunchanged\\b`,
+      flags,
+    ),
+    new RegExp(`\\b${escapedTarget}\\s+unchanged\\b`, flags),
+    new RegExp(
+      `\\bprotected\\s+files?\\s*[:：][^\\n]*\\b${escapedTarget}\\b`,
+      flags,
+    ),
+  ];
+
+  return patterns.some((pattern) => pattern.test(prompt));
+}
+
+function normalizeMentionForCompare(value: string): string {
+  return value.replace(/\\/g, "/").toLowerCase();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function findAmbiguousSiblingTargetBlocker(
