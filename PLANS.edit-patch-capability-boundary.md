@@ -1102,6 +1102,33 @@ Production wiring gate 仍未通过:
 - 还没有 dry-run production path self-test。
 - 因此下一步如果继续本路线，应先做 dry-run/self-test wiring，不应直接写文件。
 
+## 26. Contract-only gate route audit / merge-readiness
+
+当前 edit/apply_patch contract-only 路线已阶段性封口。
+
+已完成的最近 checkpoint:
+
+- `86c024c Add single file update patch readiness contract`
+- `6cef174 Add single file update patch production gate contract`
+
+Route audit 结论:
+
+- readiness contract 与 production gate contract focused tests 均通过。
+- 当前 production `apply_patch` / unified diff 用户可见行为仍保持 rejected。
+- 没有接入 production apply_patch wiring。
+- 没有修改 `cli.tsx`、`SessionManager.ts`、`sessionRuntime.ts`、`runMvpIntegratedFlow.ts`。
+- multi-file / add / delete / move / rollback / AST patch / full apply_patch engine 仍 unsupported。
+- production gate 只是 permission / approval metadata 与 result / session surface 的 contract-only proof，不代表 write path 已成熟。
+
+当前路线封口状态:
+
+- Current: route stage-sealed after contract-only gate audit.
+- Backlog: none inside this route unless explicit new route is opened.
+- 推荐下一条独立路线（如继续 edit/apply_patch）:
+  - `single-file apply_patch dry-run production wiring`
+  - 目标只能是 dry-run/self-test wiring，先证明 approval、stale-read revalidation、resultMapper/sessionRuntime terminal surface 和 no-write behavior。
+  - 不应直接进入 write path。
+
 ## Checkpoint Status Override
 
 - Completed: Planning.
@@ -1116,7 +1143,10 @@ Production wiring gate 仍未通过:
 - Completed: I. Minimal single-file update apply checkpoint.
 - Completed: J. Multi-file strategy checkpoint.
 - Completed: K. Route audit / merge readiness.
-- Current: route stage-sealed.
+- Completed: Single-file Update File preview-to-production readiness contract.
+- Completed: Single-file Update File permission/result/session production gate contract.
+- Completed: Contract-only gate route audit / merge-readiness.
+- Current: route stage-sealed after contract-only gate audit.
 - Backlog: none unless explicit production apply wiring route is opened.
 - Verification for Planning: pending.
 - Verification for A: `rtk git status --short` passed with only `PLANS.edit-patch-capability-boundary.md` modified. `rtk npm run build -w packages/ts-shell` passed. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts` passed with 6 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/targetResolution.test.ts` passed with 6 tests.
@@ -1130,4 +1160,7 @@ Production wiring gate 仍未通过:
 - Verification for I: `rtk npm run test -w packages/ts-shell -- src/orchestration/patchApplication/singleFileUpdateApply.test.ts` passed with 5 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchApplication/noPartialApply.test.ts` passed with 3 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts` passed with 6 tests. `rtk npm run build -w packages/ts-shell` passed.
 - Verification for J: `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts` passed with 6 tests. `rtk npm run build -w packages/ts-shell` passed.
 - Verification for K: merge-readiness and post-merge verification passed as recorded above. No validation failures required attribution.
+- Verification for single-file Update File preview-to-production readiness contract: `rtk npm run test -w packages/ts-shell -- src/orchestration/patchResult/readiness.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run build -w packages/ts-shell` passed.
+- Verification for single-file Update File permission/result/session production gate contract: `rtk npm run test -w packages/ts-shell -- src/orchestration/patchResult/productionGate.test.ts` passed with 8 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchResult/readiness.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run build -w packages/ts-shell` passed.
+- Verification for contract-only gate route audit / merge-readiness: `rtk npm run test -w packages/ts-shell -- src/orchestration/patchResult/readiness.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchResult/productionGate.test.ts` passed with 8 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchVerification/verify.test.ts` passed with 7 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchApplication/noPartialApply.test.ts` passed with 3 tests. `rtk npm run test -w packages/ts-shell -- src/orchestration/patchApplication/singleFileUpdateApply.test.ts` passed with 5 tests. `rtk npm run build -w packages/ts-shell` passed.
 - Notes: Planning did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement checkpoint A, did not change production code, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. A was a read-only audit / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. B was a read-only reference comparison / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. C was a decision document / plan update checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code or tests, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. D added isolated patch contract types and focused type tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement parser/verification/application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. E added isolated parser-only behavior and focused parser tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement verification/application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. F added isolated dry verification behavior and focused verifier tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement application behavior, did not change current rejection behavior, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. G added isolated preview/result contract behavior and focused preview tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement application behavior, did not change current rejection behavior or terminal wording, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. H added isolated no-partial write-intent contract behavior and focused tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement production application behavior, did not change current rejection behavior or terminal wording, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. I added isolated single-file update apply behavior with an injected writer and focused tests only; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not implement production application behavior, did not change current apply_patch/unified diff rejection behavior or terminal wording, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. J completed multi-file strategy as a plan-only checkpoint; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not change production code, did not enable multi-file writes, did not change current apply_patch/unified diff rejection behavior or terminal wording, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`. K stage-sealed the route after merge-readiness and post-merge validation; it did not run real provider smoke, did not touch `D:\Test\home-sf`, did not add a new checkpoint, did not enable production apply, did not change current apply_patch/unified diff rejection behavior or terminal wording, and did not edit `cli.tsx`, `SessionManager.ts`, or `runMvpIntegratedFlow.ts`.
