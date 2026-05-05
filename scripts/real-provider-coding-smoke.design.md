@@ -29,11 +29,21 @@ It is not a default gate and is not run by this checkpoint.
 11. Capture real repository `git status --short` after the turn and fail if it changed.
 12. Failure reports include `repositoryClean`, `terminalResultVisible`, `changedFiles`, `verification`, `redaction`, `failureCategory`, `failureReason`, and `nextAction` when possible.
 13. No-op or no-mutation failures include safe diagnostics:
+    - routing summary: non-interactive CLI command kind, safe cwd/project kind labels, prompt byte count, prompt intent hint, whether `Repo-aware summary` intercepted the turn, whether the session runtime was entered, and whether result/tool markers were present.
     - process summary: exit code, timeout flag, output byte count, redacted stdout/stderr/combined tails, and output marker booleans.
     - fixture summary: observed/expected changed files, protected changed files, and `note.txt` status as only `draft`, `ready`, `other`, or `missing`.
     - runtime summary: isolated runtime home kind, whether `.private-agents`/session artifacts were created under that isolated home, and `realProviderHomeUsedForRuntime=false`.
     - classification summary: `failureStage`, `failureCategory`, `statusDetail`, and `nextAction`.
 14. Clean the fixture and isolated runtime home unless the caller explicitly asks to keep test artifacts.
+
+## Repo-Aware Routing Guard
+
+The real coding flow fixture prompt is an explicit single-file mutation task.
+Repo-aware status/summary shortcuts must not handle prompts with both mutation
+intent and an explicit file target such as `note.txt`; those prompts must fall
+through to the normal coding flow. Repo status, branch, changes, and summary
+prompts without an explicit file mutation target remain on the repo-aware
+summary path.
 
 ## Failure Attribution
 

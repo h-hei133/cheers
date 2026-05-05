@@ -1798,6 +1798,7 @@ function buildCodingFlowDiagnostics({
   noteStatusBefore = 'missing',
   noteStatusAfter = 'missing',
   runtimeHome,
+  prompt = '',
   failureCategory = 'product runtime regression',
   statusDetail = 'product-runtime-regression',
   output = redactedOutput,
@@ -1805,7 +1806,21 @@ function buildCodingFlowDiagnostics({
   const safeOutput = String(output ?? '')
   const safeStdout = redactProviderOutput(result.stdout ?? '')
   const safeStderr = redactProviderOutput(result.stderr ?? '')
+  const outputMarkers = detectCodingFlowOutputMarkers(safeOutput)
+  const repoAwareSummaryDetected = /(^|\r?\n)Repo-aware summary(\r?\n|$)/.test(safeOutput)
   return {
+    routing: {
+      cliCommandKind: 'print-non-interactive',
+      cwdKind: 'ts-shell-root',
+      projectKind: 'isolated-fixture',
+      promptBytes: Buffer.byteLength(String(prompt ?? ''), 'utf8'),
+      promptIntentHint: inferCodingFlowPromptIntentHint(prompt),
+      repoAwareSummaryDetected,
+      enteredSessionRuntime: !repoAwareSummaryDetected,
+      codingResultPresent: outputMarkers.hasActionResult,
+      resultBlockPresent: outputMarkers.hasResultBlock,
+      toolExecutionMarkerPresent: outputMarkers.hasToolExecutionMarker,
+    },
     process: {
       modelTurnExitCode: typeof result.code === 'number' ? result.code : null,
       modelTurnTimedOut: Boolean(result.timedOut),
@@ -1813,7 +1828,7 @@ function buildCodingFlowDiagnostics({
       stdoutTailRedacted: summarizeOutput(safeStdout),
       stderrTailRedacted: summarizeOutput(safeStderr),
       combinedOutputTailRedacted: summarizeOutput(safeOutput),
-      outputMarkers: detectCodingFlowOutputMarkers(safeOutput),
+      outputMarkers,
     },
     fixture: {
       fixtureChangedFiles: [...(expected.observed ?? [])].sort(),
@@ -1843,6 +1858,17 @@ function buildCodingFlowDiagnostics({
       nextAction: nextActionForCodingFlowFailure(failureCategory, statusDetail),
     },
   }
+}
+
+function inferCodingFlowPromptIntentHint(prompt) {
+  const normalized = String(prompt ?? '').toLowerCase()
+  if (/\bnote\.txt\b/.test(normalized) && /\b(edit|write|change|replace|update|modify)\b/.test(normalized)) {
+    return 'single-file-edit'
+  }
+  if (/\b(edit|write|change|replace|update|modify)\b/.test(normalized)) {
+    return 'mutation'
+  }
+  return 'unknown'
 }
 
 function detectCodingFlowOutputMarkers(output) {
@@ -2587,6 +2613,7 @@ function runRealCodingFlowDiagnosticsSelfTest() {
       noteStatusBefore,
       noteStatusAfter,
       runtimeHome,
+      prompt: fixture.prompt,
       failureCategory: 'changedFiles wrong',
       statusDetail: 'changed-files-wrong',
     })
@@ -2597,6 +2624,16 @@ function runRealCodingFlowDiagnosticsSelfTest() {
       diagnostics.process.modelTurnOutputBytes > 0 &&
       diagnostics.process.outputMarkers.hasActionResult &&
       !diagnostics.process.outputMarkers.hasResultBlock &&
+      diagnostics.routing.cliCommandKind === 'print-non-interactive' &&
+      diagnostics.routing.cwdKind === 'ts-shell-root' &&
+      diagnostics.routing.projectKind === 'isolated-fixture' &&
+      diagnostics.routing.promptBytes > 0 &&
+      diagnostics.routing.promptIntentHint === 'single-file-edit' &&
+      diagnostics.routing.repoAwareSummaryDetected === false &&
+      diagnostics.routing.enteredSessionRuntime === true &&
+      diagnostics.routing.codingResultPresent === true &&
+      diagnostics.routing.resultBlockPresent === false &&
+      diagnostics.routing.toolExecutionMarkerPresent === false &&
       diagnostics.fixture.fixtureChangedFiles.length === 0 &&
       diagnostics.fixture.expectedChangedFiles.join(',') === 'note.txt' &&
       diagnostics.fixture.noteStatusBefore === 'draft' &&
@@ -2619,6 +2656,8 @@ function runRealCodingFlowDiagnosticsSelfTest() {
     console.log(`modelTurnTimedOut=${diagnostics.process.modelTurnTimedOut}`)
     console.log(`noteStatusBefore=${diagnostics.fixture.noteStatusBefore}`)
     console.log(`noteStatusAfter=${diagnostics.fixture.noteStatusAfter}`)
+    console.log(`repoAwareSummaryDetected=${diagnostics.routing.repoAwareSummaryDetected}`)
+    console.log(`promptIntentHint=${diagnostics.routing.promptIntentHint}`)
     console.log(`runtimeHomeKind=${diagnostics.runtime.runtimeHomeKind}`)
     console.log(`failureStage=${diagnostics.classification.failureStage}`)
     console.log(`redaction=${passed ? 'pass' : 'fail'}`)
@@ -3078,6 +3117,7 @@ async function runRealCodingFlowSmoke() {
           noteStatusBefore,
           noteStatusAfter,
           runtimeHome,
+          prompt: fixture.prompt,
           failureCategory: success.failureCategory,
           statusDetail: success.statusDetail,
         }),
@@ -3091,6 +3131,8 @@ async function runRealCodingFlowSmoke() {
       console.log(`verification=${report.verification}`)
       console.log(`noteStatusBefore=${noteStatusBefore}`)
       console.log(`noteStatusAfter=${noteStatusAfter}`)
+      console.log(`repoAwareSummaryDetected=${report.diagnostics.routing.repoAwareSummaryDetected}`)
+      console.log(`enteredSessionRuntime=${report.diagnostics.routing.enteredSessionRuntime}`)
       console.log(`failureStage=${report.diagnostics.classification.failureStage}`)
       console.log(`outputMarkers=${JSON.stringify(report.diagnostics.process.outputMarkers)}`)
       console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
@@ -3143,6 +3185,7 @@ async function runRealCodingFlowSmoke() {
         noteStatusBefore,
         noteStatusAfter,
         runtimeHome,
+        prompt: fixture.prompt,
         failureCategory: failureStatus.failureCategory,
         statusDetail: failureStatus.statusDetail,
       }),
@@ -3155,6 +3198,20 @@ async function runRealCodingFlowSmoke() {
     console.log(`verification=${expected.ok ? 'blocked' : 'failed'}`)
     console.log(`noteStatusBefore=${noteStatusBefore}`)
     console.log(`noteStatusAfter=${noteStatusAfter}`)
+    const failureDiagnostics = buildCodingFlowDiagnostics({
+      result,
+      redactedOutput,
+      comparison,
+      expected,
+      noteStatusBefore,
+      noteStatusAfter,
+      runtimeHome,
+      prompt: fixture.prompt,
+      failureCategory: failureStatus.failureCategory,
+      statusDetail: failureStatus.statusDetail,
+    })
+    console.log(`repoAwareSummaryDetected=${failureDiagnostics.routing.repoAwareSummaryDetected}`)
+    console.log(`enteredSessionRuntime=${failureDiagnostics.routing.enteredSessionRuntime}`)
     console.log(`failureStage=${deriveCodingFlowFailureStage({
       failureCategory: failureStatus.failureCategory,
       statusDetail: failureStatus.statusDetail,
@@ -3242,6 +3299,7 @@ function runRealCodingFlowDryRun() {
       noteStatusBefore: 'draft',
       noteStatusAfter: 'ready',
       runtimeHome: path.join(getTestRoot(), 'real-provider-coding-flow-runtime-home', 'dry-run'),
+      prompt: fixture.prompt,
       failureCategory: 'none',
       statusDetail: 'passed',
     })

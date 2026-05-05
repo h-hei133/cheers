@@ -31,10 +31,18 @@ export function resolveRepoAwarePromptResponse(
   }
 
   const hasExecutionIntent =
-    /\b(implement|fix|write|edit|create|add|remove|refactor|run|execute|patch)\b/i.test(
+    /\b(implement|fix|write|edit|create|add|remove|refactor|run|execute|patch|change|modify|replace|update)\b/i.test(
       normalized,
     ) ||
-    /(?:实现|修复|修改|编写|新增|删除|重构|运行|执行|补丁)/u.test(trimmed);
+    /(?:实现|修复|修改|编写|新增|删除|重构|运行|执行|补丁|替换|更新)/u.test(trimmed);
+  const hasExplicitFileTarget =
+    /(?:^|[\s`"'])[\w./\\-]+\.[A-Za-z0-9]{1,12}(?=$|[\s`"',:;.)\]])/.test(
+      trimmed,
+    ) || /(?:文件|路径)\s*[:：]?\s*[\w./\\-]+\.[A-Za-z0-9]{1,12}/u.test(trimmed);
+  if (hasExecutionIntent && hasExplicitFileTarget) {
+    return undefined;
+  }
+
   const hasPlanningIntent =
     /\b(what should i do|next step|status|state|where .*chang|where .*concentrat)\b/i.test(
       normalized,
@@ -117,4 +125,3 @@ function summarizeHotspots(paths: readonly string[], limit: number): string[] {
     .slice(0, limit)
     .map(([dir]) => dir);
 }
-
