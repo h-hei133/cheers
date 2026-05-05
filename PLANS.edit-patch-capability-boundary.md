@@ -1059,6 +1059,49 @@ This planning round does not execute A.
 - 不修改 `cli.tsx`、`SessionManager.ts`、`sessionRuntime.ts`、`runMvpIntegratedFlow.ts`。
 - 不运行 real provider。
 
+## 25. Single-file Update File production gate contract
+
+本轮新增 permission / approval metadata 与 result / session surface 的 production gate contract。该 gate 仍是 contract-only，不代表 production apply_patch 已可接线。
+
+结论:
+
+- `packages/ts-shell/src/orchestration/patchResult/productionGate.ts` 基于已有 readiness contract 生成未来 production wiring 前必须稳定的两个合同:
+  - `buildSingleFileUpdatePatchApprovalContract(...)`
+  - `buildSingleFileUpdatePatchResultSurfaceContract(...)`
+- permission / approval metadata contract 已能表达:
+  - permission kind = `edit`
+  - operation kind = `update`
+  - target path / approval patterns
+  - diff summary / preview summary
+  - additions / deletions
+  - `singleFileOnly=true`
+  - unsupported operations marker: `multi-file`, `add`, `delete`, `move`
+  - `auditSafe=true`
+  - `willWrite=false`
+- approval denied / readiness blocked 路径明确保证:
+  - `writeIntent.authorized=false`
+  - `writeIntent.count=0`
+  - `changedFiles=[]`
+  - result surface 带 actionable `nextAction` / `doNext`
+- result / session surface contract 已能表达:
+  - `changedFiles`
+  - `failedFiles`
+  - patch records
+  - evidence markers
+  - `nextAction` / `doNext`
+  - failureCategory / blocker
+  - blocked / unsupported no-write proof
+- unsupported multi-file 和 add/delete/move 继续 blocked，不产生 write intent。
+- production `apply_patch` / unified diff 在当前 explicit replace lane 继续 rejected；用户可见行为未改变。
+
+Production wiring gate 仍未通过:
+
+- 还没有把 approval metadata 接入真实 permission prompt / audit decision。
+- 还没有证明 approval 后 stale-read revalidation。
+- 还没有把 result surface 接入 `resultMapper` / `sessionRuntime` 的真实 terminal rendering。
+- 还没有 dry-run production path self-test。
+- 因此下一步如果继续本路线，应先做 dry-run/self-test wiring，不应直接写文件。
+
 ## Checkpoint Status Override
 
 - Completed: Planning.
