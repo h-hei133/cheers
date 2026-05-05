@@ -3,7 +3,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   cleanupReadonlyFixture,
   compareReadonlySnapshots,
@@ -2839,7 +2839,13 @@ function isNonMutatingFollowupPrompt(prompt) {
   )
 }
 
-function detectFollowupEditRouting(output) {
+function detectFollowupEditRouting(output, executionPath = 'cli-orchestration') {
+  if (executionPath === 'direct-provider-explanation') {
+    return {
+      enteredEditTargetResolution: false,
+      ambiguousTargetDetected: false,
+    }
+  }
   const normalized = String(output ?? '')
   const ambiguousTargetDetected = /\bambiguous-target\b/i.test(normalized)
   const enteredEditTargetResolution =
@@ -2852,24 +2858,34 @@ function detectFollowupEditRouting(output) {
   }
 }
 
-function buildCodingFlowFollowupRoutingDiagnostics({ prompt = '', output = '' } = {}) {
+function buildCodingFlowFollowupRoutingDiagnostics({
+  prompt = '',
+  output = '',
+  executionPath = 'cli-orchestration',
+} = {}) {
   return {
+    followupExecutionPath: executionPath,
     followupPromptIntent: inferFollowupPromptIntent(prompt),
     nonMutatingFollowup: isNonMutatingFollowupPrompt(prompt),
-    ...detectFollowupEditRouting(output),
+    ...detectFollowupEditRouting(output, executionPath),
   }
 }
 
 function assertCodingFlowFollowupSmokeResponse({
   output = '',
   prompt = '',
+  executionPath = 'cli-orchestration',
   redaction = { ok: true, leaks: [] },
   comparison = { ok: true, added: [], removed: [], changed: [] },
   repoBefore = { ok: true, status: '' },
   repoAfter = { ok: true, status: '' },
 } = {}) {
   const normalized = String(output ?? '')
-  const routing = buildCodingFlowFollowupRoutingDiagnostics({ prompt, output: normalized })
+  const routing = buildCodingFlowFollowupRoutingDiagnostics({
+    prompt,
+    output: normalized,
+    executionPath,
+  })
   const failures = []
   if (routing.followupPromptIntent !== 'explain-failure' || !routing.nonMutatingFollowup) {
     failures.push('follow-up prompt is not explain-only non-mutating')
@@ -2950,6 +2966,101 @@ function statusForCodingFlowFollowupAssertion(assertion) {
   return { status: 'FAIL', statusDetail: 'follow-up-ignored-context', exitCode: 1, failureCategory: 'follow-up response ignores failure context', failureReason: assertion.failures.join('; ') }
 }
 
+function buildDirectProviderExplanationEvalScript() {
+  const modelClientUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'model-adapters', 'client.ts')).href
+  const runtimeConfigUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'config', 'runtimeConfig.ts')).href
+  const providerCredentialsUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'core', 'shell', 'providerCredentials.ts')).href
+  return `
+    import { createModelClient } from ${JSON.stringify(modelClientUrl)};
+    import { getRuntimeConfig } from ${JSON.stringify(runtimeConfigUrl)};
+    import { resolveProviderCredential } from ${JSON.stringify(providerCredentialsUrl)};
+
+    const prompt = process.env.PRIVATE_AGENTS_FOLLOWUP_PROMPT ?? '';
+    const workspaceRoot = process.env.PRIVATE_AGENTS_FOLLOWUP_WORKSPACE ?? process.cwd();
+    const runtimeConfig = getRuntimeConfig(workspaceRoot);
+    const resolved = resolveProviderCredential({ runtimeConfig });
+    const credential = resolved.credential;
+    if (!credential) {
+      throw new Error('provider-readiness:missing-key');
+    }
+    if (credential.accountAuth && credential.accountAuth.expiresAt <= Date.now()) {
+      throw new Error('provider-readiness:auth account-auth token expired; reconnect before running follow-up smoke');
+    }
+    const model = (resolved.model ?? credential.model ?? '').trim() ||
+      (credential.provider === 'openai' && credential.accountAuth ? 'gpt-5.4' : 'gpt-4.1-mini');
+    const client = createModelClient({
+      provider: credential.provider,
+      apiKey: credential.apiKey,
+      accountAuth: credential.accountAuth,
+      baseUrl: resolved.baseUrl ?? credential.baseUrl,
+      requestedCapabilities: { supportsToolCalls: false },
+      fallbackPolicy: { enabled: false },
+    });
+    let output = '';
+    const signal = AbortSignal.timeout(300000);
+    for await (const event of client.stream({
+      schemaVersion: '1.0.0',
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: [
+            'You are answering a non-mutating failure follow-up.',
+            'Do not call tools. Do not claim any file was changed.',
+            'Explain the supplied failure context and provide a safe next step only.'
+          ].join(' ')
+        },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0,
+      maxOutputTokens: 700,
+    }, signal)) {
+      if (event.type === 'content.delta') {
+        output += event.delta;
+      }
+    }
+    console.log('__FOLLOWUP_PROVIDER_RESULT__' + JSON.stringify({ output }));
+  `
+}
+
+async function runDirectProviderExplanationTurn({ prompt, runtimeHome, realHome, fixtureDir }) {
+  const result = await run(process.execPath, [
+    tsxCliPath,
+    '--eval',
+    buildDirectProviderExplanationEvalScript(),
+  ], {
+    cwd: tsShellRoot,
+    env: {
+      HOME: runtimeHome,
+      USERPROFILE: runtimeHome,
+      PRIVATE_AGENTS_HOME_OVERRIDE: realHome,
+      PRIVATE_AGENTS_REAL_HOME: realHome,
+      PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+      PRIVATE_AGENTS_FOLLOWUP_PROMPT: prompt,
+      PRIVATE_AGENTS_FOLLOWUP_WORKSPACE: fixtureDir,
+    },
+    timeoutMs: 420000,
+  })
+  const resultLine = result.stdout
+    .split(/\r?\n/)
+    .find((line) => line.startsWith('__FOLLOWUP_PROVIDER_RESULT__'))
+  let output = ''
+  if (resultLine) {
+    try {
+      const parsed = JSON.parse(resultLine.slice('__FOLLOWUP_PROVIDER_RESULT__'.length))
+      output = typeof parsed.output === 'string' ? parsed.output : ''
+    } catch {
+      output = ''
+    }
+  }
+  return {
+    ...result,
+    stdout: output,
+    output: output || result.output,
+    rawOutput: result.output,
+  }
+}
+
 function runRealCodingFlowFollowupSmokeDryRun() {
   console.log('gate name=real-user-capabilities')
   console.log('mode=real-coding-flow-followup-smoke-dry-run')
@@ -2973,30 +3084,35 @@ function runRealCodingFlowFollowupSmokeDryRun() {
       'Safe next action: in a later human-authorized turn, use the current source text and an exact replacement while keeping README.md and LOCKED.md unchanged.',
     ].join('\n'),
     prompt,
+    executionPath: 'direct-provider-explanation',
     redaction: { ok: true, leaks: [] },
     comparison: { ok: true, added: [], removed: [], changed: [] },
   })
   const ignoresContext = assertCodingFlowFollowupSmokeResponse({
     output: 'Please try again later.',
     prompt,
+    executionPath: 'direct-provider-explanation',
     redaction: { ok: true, leaks: [] },
     comparison: { ok: true, added: [], removed: [], changed: [] },
   })
   const claimsSuccess = assertCodingFlowFollowupSmokeResponse({
     output: 'I successfully changed note.txt to status: ready.',
     prompt,
+    executionPath: 'direct-provider-explanation',
     redaction: { ok: true, leaks: [] },
     comparison: { ok: true, added: [], removed: [], changed: [] },
   })
   const mutationLeak = assertCodingFlowFollowupSmokeResponse({
     output: 'The next step is to explain note.txt patch-from-not-found and exact replacement recovery.',
     prompt,
+    executionPath: 'direct-provider-explanation',
     redaction: { ok: true, leaks: [] },
     comparison: { ok: false, added: [], removed: [], changed: ['note.txt'] },
   })
   const leak = assertCodingFlowFollowupSmokeResponse({
     output: 'The next step is to explain note.txt patch-from-not-found and exact replacement recovery.',
     prompt,
+    executionPath: 'direct-provider-explanation',
     redaction: { ok: false, leaks: ['api_key'] },
     comparison: { ok: true, added: [], removed: [], changed: [] },
   })
@@ -3013,7 +3129,11 @@ function runRealCodingFlowFollowupSmokeDryRun() {
     redaction: { ok: true, leaks: [] },
     comparison: { ok: true, added: [], removed: [], changed: [] },
   })
-  const routingDiagnostics = buildCodingFlowFollowupRoutingDiagnostics({ prompt, output: passing.failures.join('\n') })
+  const routingDiagnostics = buildCodingFlowFollowupRoutingDiagnostics({
+    prompt,
+    output: passing.failures.join('\n'),
+    executionPath: 'direct-provider-explanation',
+  })
   const serialized = JSON.stringify({ context, prompt, redacted: redaction.redacted })
   const passed =
     context.previousOutcome === 'stopped' &&
@@ -3021,6 +3141,9 @@ function runRealCodingFlowFollowupSmokeDryRun() {
     context.failedFiles.join(',') === 'note.txt' &&
     routingDiagnostics.followupPromptIntent === 'explain-failure' &&
     routingDiagnostics.nonMutatingFollowup &&
+    routingDiagnostics.followupExecutionPath === 'direct-provider-explanation' &&
+    routingDiagnostics.enteredEditTargetResolution === false &&
+    routingDiagnostics.ambiguousTargetDetected === false &&
     prompt.includes('Explain only') &&
     prompt.includes('Do not claim the previous coding task is complete') &&
     passing.ok &&
@@ -3046,7 +3169,10 @@ function runRealCodingFlowFollowupSmokeDryRun() {
   console.log(`targetFile=${context.targetFile}`)
   console.log(`failedFiles=${context.failedFiles.join(',')}`)
   console.log(`followupPromptIntent=${routingDiagnostics.followupPromptIntent}`)
+  console.log(`followupExecutionPath=${routingDiagnostics.followupExecutionPath}`)
   console.log(`nonMutatingFollowup=${routingDiagnostics.nonMutatingFollowup}`)
+  console.log(`enteredEditTargetResolution=${routingDiagnostics.enteredEditTargetResolution}`)
+  console.log(`ambiguousTargetDetected=${routingDiagnostics.ambiguousTargetDetected}`)
   console.log(`responseAssertion=${passing.ok ? 'pass' : 'fail'}`)
   console.log(`ignoresContextStatus=${statusForCodingFlowFollowupAssertion(ignoresContext).statusDetail}`)
   console.log(`claimsSuccessStatus=${statusForCodingFlowFollowupAssertion(claimsSuccess).statusDetail}`)
@@ -3149,26 +3275,11 @@ async function runRealCodingFlowFollowupSmoke() {
     const context = buildSyntheticPatchFromNotFoundFollowupContext()
     const prompt = buildCodingFlowFollowupPrompt(context)
     const before = snapshotCodingFlowFixture(fixture.fixtureDir)
-    const result = await run(process.execPath, [
-      tsxCliPath,
-      cliEntryPath,
-      '--project',
-      fixture.fixtureDir,
-      '--non-interactive-approval',
-      'allow-once',
-      '--print',
+    const result = await runDirectProviderExplanationTurn({
       prompt,
-    ], {
-      cwd: tsShellRoot,
-      env: {
-        HOME: runtimeHome,
-        USERPROFILE: runtimeHome,
-        PRIVATE_AGENTS_HOME_OVERRIDE: realHome,
-        PRIVATE_AGENTS_REAL_HOME: realHome,
-        PRIVATE_AGENTS_PROVIDER_MODE: 'real',
-        PRIVATE_AGENTS_AUDIT_LOG_PATH: auditLogPath,
-      },
-      timeoutMs: 420000,
+      runtimeHome,
+      realHome,
+      fixtureDir: fixture.fixtureDir,
     })
     const after = snapshotCodingFlowFixture(fixture.fixtureDir)
     const comparison = compareCodingFlowSnapshots(before, after)
@@ -3184,6 +3295,7 @@ async function runRealCodingFlowFollowupSmoke() {
       ? assertCodingFlowFollowupSmokeResponse({
           output: redactedOutput,
           prompt,
+          executionPath: 'direct-provider-explanation',
           redaction,
           comparison,
           repoBefore,
@@ -3199,7 +3311,11 @@ async function runRealCodingFlowFollowupSmoke() {
           claimsSuccess: false,
           fixtureMutationLeak: comparison.ok === false || comparison.added.length > 0 || comparison.removed.length > 0 || comparison.changed.length > 0,
           repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
-          routing: buildCodingFlowFollowupRoutingDiagnostics({ prompt, output: redactedOutput }),
+          routing: buildCodingFlowFollowupRoutingDiagnostics({
+            prompt,
+            output: redactedOutput,
+            executionPath: 'direct-provider-explanation',
+          }),
         }
     const assertionStatus = result.code === 0 && !result.timedOut
       ? statusForCodingFlowFollowupAssertion(assertion)
@@ -3214,6 +3330,7 @@ async function runRealCodingFlowFollowupSmoke() {
       reportPath,
       realProviderExecution: true,
       modelTurn: true,
+      followupExecutionPath: 'direct-provider-explanation',
       syntheticFailureContext: true,
       stoppedSessionCreated: false,
       fixtureMutationAllowed: false,
@@ -3270,6 +3387,7 @@ async function runRealCodingFlowFollowupSmoke() {
     console.log(`auditLogKind=${report.auditIsolation.auditLogKind}`)
     console.log(`repoAuditResidueDetected=${report.auditIsolation.repoAuditResidueDetected}`)
     console.log(`fixtureMutationLeak=${report.responseAssertion.fixtureMutationLeak}`)
+    console.log(`followupExecutionPath=${report.routingDiagnostics.followupExecutionPath}`)
     console.log(`followupPromptIntent=${report.routingDiagnostics.followupPromptIntent}`)
     console.log(`nonMutatingFollowup=${report.routingDiagnostics.nonMutatingFollowup}`)
     console.log(`enteredEditTargetResolution=${report.routingDiagnostics.enteredEditTargetResolution}`)

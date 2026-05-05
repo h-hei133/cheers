@@ -55,14 +55,18 @@ The opt-in follow-up smoke:
 - does not create, resume, or mutate a durable stopped session;
 - uses an isolated fixture project, isolated runtime `HOME`/`USERPROFILE`, and
   an isolated audit log path;
+- uses the direct provider explanation path, not the CLI `--print` coding
+  orchestration path, because this smoke validates provider understanding of
+  failure context rather than edit execution;
 - uses an explain-only, non-mutating prompt: the provider is asked to explain
   the stopped failure and describe a safe human-authorized recovery shape, not
   to perform recovery in the current turn;
 - explicitly tells the provider not to inspect, modify, create, remove, or
   write files, not to treat `DoNext`/recovery labels as work to perform now,
   and not to claim the task has already succeeded;
-- reports routing diagnostics: `followupPromptIntent`,
-  `nonMutatingFollowup`, `enteredEditTargetResolution`, and
+- reports routing diagnostics: `followupExecutionPath`,
+  `followupPromptIntent`, `nonMutatingFollowup`,
+  `enteredEditTargetResolution`, and
   `ambiguousTargetDetected`;
 - fails if the fixture changes, the repository becomes dirty, redaction leaks,
   the response is missing, the response ignores the target/failure context, no
