@@ -59,3 +59,7 @@ rtk git status --short
 
 If this contract passes without changing resultMapper production logic, proceed
 to the sessionRuntime display contract as a separate commit.
+
+## Follow-up
+
+- SessionRuntime display contract: see `PLANS.single-file-apply-patch-sessionruntime-display-contract.md`.
