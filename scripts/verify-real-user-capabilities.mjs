@@ -60,6 +60,8 @@ const realCodingFlowDryRun = process.argv.includes('--real-coding-flow-dry-run')
 const realCodingFlowSmoke = process.argv.includes('--real-coding-flow-smoke')
 const realCodingFlowFailureAttributionSelfTest = process.argv.includes('--real-coding-flow-failure-attribution-self-test')
 const realCodingFlowFollowupContextSelfTest = process.argv.includes('--real-coding-flow-followup-context-self-test')
+const realCodingFlowFollowupSmokeDryRun = process.argv.includes('--real-coding-flow-followup-smoke-dry-run')
+const realCodingFlowFollowupSmoke = process.argv.includes('--real-coding-flow-followup-smoke')
 const realCodingFlowDiagnosticsSelfTest = process.argv.includes('--real-coding-flow-diagnostics-self-test')
 const realCodingFlowAuditIsolationSelfTest = process.argv.includes('--real-coding-flow-audit-isolation-self-test')
 
@@ -1409,6 +1411,7 @@ function printHelp() {
   console.log('  --real-coding-flow-dry-run')
   console.log('  --real-coding-flow-failure-attribution-self-test')
   console.log('  --real-coding-flow-followup-context-self-test')
+  console.log('  --real-coding-flow-followup-smoke-dry-run')
   console.log('  --real-coding-flow-diagnostics-self-test')
   console.log('  --real-coding-flow-audit-isolation-self-test')
   console.log('')
@@ -1423,6 +1426,9 @@ function printHelp() {
   console.log('  --real-coding-flow-smoke')
   console.log('    Opt-in only; runs one real-provider model turn against an isolated writable fixture.')
   console.log('    Excluded from default verification; only note.txt may change and the repository must stay clean.')
+  console.log('  --real-coding-flow-followup-smoke')
+  console.log('    Opt-in only; runs one real-provider response turn against synthetic stopped/failure context.')
+  console.log('    Excluded from default verification; must not modify the isolated fixture.')
 }
 
 function renderReadonlyPreflightNotice(options = {}) {
@@ -2770,6 +2776,427 @@ function runRealCodingFlowFollowupContextSelfTest() {
   process.exit(ok ? 0 : 1)
 }
 
+function buildSyntheticPatchFromNotFoundFollowupContext() {
+  const fixture = {
+    editableFiles: ['note.txt'],
+    protectedFiles: ['README.md', 'LOCKED.md'],
+  }
+  const result = {
+    status: 'FAIL',
+    statusDetail: 'patch-from-not-found',
+    failureCategory: 'product runtime regression',
+    failureReason: 'patch-from-not-found: mutation instruction missing for note.txt',
+    changedFiles: [],
+    failedFiles: ['note.txt'],
+    targetFile: 'note.txt',
+    verification: 'blocked',
+    nextAction: 'Retry with exact replacement for note.txt after reading the current fixture content.',
+  }
+  return buildCodingFlowFailureFollowupContext(
+    result,
+    'explain the previous failure and provide a safe recovery step for note.txt',
+    fixture,
+  )
+}
+
+function buildCodingFlowFollowupPrompt(context) {
+  return [
+    'You are receiving a safe redacted follow-up context from a previous stopped coding flow.',
+    '',
+    '<context>',
+    context.contextLine,
+    '</context>',
+    '',
+    'Do not modify files.',
+    'Do not claim the task is complete or successful.',
+    'Explain what failed, identify the target file, and give the safe next recovery step.',
+    'Your response should mention the target and the patch-from-not-found or exact-replacement recovery semantics.',
+  ].join('\n')
+}
+
+function assertCodingFlowFollowupSmokeResponse({
+  output = '',
+  redaction = { ok: true, leaks: [] },
+  comparison = { ok: true, added: [], removed: [], changed: [] },
+  repoBefore = { ok: true, status: '' },
+  repoAfter = { ok: true, status: '' },
+} = {}) {
+  const normalized = String(output ?? '')
+  const failures = []
+  if (!redaction.ok) {
+    failures.push('redaction leak')
+  }
+  if (!repoBefore.ok || repoBefore.status || !repoAfter.ok || repoAfter.status) {
+    failures.push('real repo mutation leak')
+  }
+  const changed = [...(comparison.changed ?? []), ...(comparison.added ?? []), ...(comparison.removed ?? [])].sort()
+  if (changed.length > 0 || comparison.ok === false) {
+    failures.push(`fixture mutation leak: ${changed.length > 0 ? changed.join(',') : 'unknown'}`)
+  }
+  if (normalized.trim().length === 0) {
+    failures.push('terminal result missing')
+  }
+  if (!/\b(note\.txt|target file)\b/i.test(normalized)) {
+    failures.push('context missing: target file not acknowledged')
+  }
+  if (!/\b(patch-from-not-found|mutation instruction missing|exact replacement|exact current source|re-read|read the current|source text not found)\b/i.test(normalized)) {
+    failures.push('follow-up response ignores failure context')
+  }
+  if (!/\b(next step|next action|safe recovery|re-read|read the current|provide the exact|retry with exact|do not modify protected)\b/i.test(normalized)) {
+    failures.push('safe next action missing')
+  }
+  if (/\b(?:I (?:have )?(?:completed|fixed|changed|updated)|successfully (?:changed|updated|fixed)|task (?:is )?(?:complete|completed)|status:\s*ready)\b/i.test(normalized)) {
+    failures.push('follow-up response claims success')
+  }
+  return {
+    ok: failures.length === 0,
+    failures,
+    responseVisible: normalized.trim().length > 0,
+    acknowledgesTarget: /\b(note\.txt|target file)\b/i.test(normalized),
+    acknowledgesFailure: /\b(patch-from-not-found|mutation instruction missing|exact replacement|exact current source|re-read|read the current|source text not found)\b/i.test(normalized),
+    safeNextAction: /\b(next step|next action|safe recovery|re-read|read the current|provide the exact|retry with exact|do not modify protected)\b/i.test(normalized),
+    claimsSuccess: /\b(?:I (?:have )?(?:completed|fixed|changed|updated)|successfully (?:changed|updated|fixed)|task (?:is )?(?:complete|completed)|status:\s*ready)\b/i.test(normalized),
+    fixtureMutationLeak: changed.length > 0 || comparison.ok === false,
+    repositoryClean: Boolean(repoBefore.ok) && !repoBefore.status && Boolean(repoAfter.ok) && !repoAfter.status,
+  }
+}
+
+function statusForCodingFlowFollowupAssertion(assertion) {
+  if (assertion.ok) {
+    return {
+      status: 'PASS',
+      statusDetail: 'passed',
+      exitCode: 0,
+      failureCategory: 'none',
+      failureReason: '',
+    }
+  }
+  if (assertion.failures.some((entry) => entry.includes('redaction leak'))) {
+    return { status: 'FAIL', statusDetail: 'redaction-failure', exitCode: 1, failureCategory: 'redaction failure', failureReason: 'redaction leak' }
+  }
+  if (assertion.failures.some((entry) => entry.includes('real repo mutation leak'))) {
+    return { status: 'FAIL', statusDetail: 'real-repo-mutation-leak', exitCode: 1, failureCategory: 'real repo mutation leak', failureReason: 'real repo mutation leak' }
+  }
+  if (assertion.failures.some((entry) => entry.includes('fixture mutation leak'))) {
+    return { status: 'FAIL', statusDetail: 'fixture-mutation-leak', exitCode: 1, failureCategory: 'fixture mutation leak', failureReason: assertion.failures.join('; ') }
+  }
+  if (assertion.failures.some((entry) => entry.includes('terminal result missing'))) {
+    return { status: 'FAIL', statusDetail: 'terminal-result-missing', exitCode: 1, failureCategory: 'terminal result missing', failureReason: 'provider response was not visible' }
+  }
+  if (assertion.failures.some((entry) => entry.includes('claims success'))) {
+    return { status: 'FAIL', statusDetail: 'follow-up-claimed-success', exitCode: 1, failureCategory: 'follow-up response claims success', failureReason: assertion.failures.join('; ') }
+  }
+  if (assertion.failures.some((entry) => entry.includes('context missing'))) {
+    return { status: 'FAIL', statusDetail: 'context-missing', exitCode: 1, failureCategory: 'context missing', failureReason: assertion.failures.join('; ') }
+  }
+  return { status: 'FAIL', statusDetail: 'follow-up-ignored-context', exitCode: 1, failureCategory: 'follow-up response ignores failure context', failureReason: assertion.failures.join('; ') }
+}
+
+function runRealCodingFlowFollowupSmokeDryRun() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-coding-flow-followup-smoke-dry-run')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('modelTurn=false')
+  console.log('reportWritten=false')
+  console.log('defaultSmoke=skipped')
+
+  const context = buildSyntheticPatchFromNotFoundFollowupContext()
+  const prompt = buildCodingFlowFollowupPrompt(context)
+  const redaction = redactAndAssertCodingProviderOutput([
+    prompt,
+    'Authorization: Bearer sk-live-secret-123456789',
+    'api_key=sk-url-secret-123456789',
+    '/home/wang/.private-agents-real/.private-agents/config.json',
+  ].join('\n'))
+  const passing = assertCodingFlowFollowupSmokeResponse({
+    output: [
+      'The previous stopped coding flow targeted note.txt and failed with patch-from-not-found because the mutation instruction was missing.',
+      'Safe next action: re-read note.txt, then retry with the exact current source text and exact replacement while keeping README.md and LOCKED.md unchanged.',
+    ].join('\n'),
+    redaction: { ok: true, leaks: [] },
+    comparison: { ok: true, added: [], removed: [], changed: [] },
+  })
+  const ignoresContext = assertCodingFlowFollowupSmokeResponse({
+    output: 'Please try again later.',
+    redaction: { ok: true, leaks: [] },
+    comparison: { ok: true, added: [], removed: [], changed: [] },
+  })
+  const claimsSuccess = assertCodingFlowFollowupSmokeResponse({
+    output: 'I successfully changed note.txt to status: ready.',
+    redaction: { ok: true, leaks: [] },
+    comparison: { ok: true, added: [], removed: [], changed: [] },
+  })
+  const mutationLeak = assertCodingFlowFollowupSmokeResponse({
+    output: 'The next step is to re-read note.txt and retry with exact replacement.',
+    redaction: { ok: true, leaks: [] },
+    comparison: { ok: false, added: [], removed: [], changed: ['note.txt'] },
+  })
+  const leak = assertCodingFlowFollowupSmokeResponse({
+    output: 'The next step is to re-read note.txt and retry with exact replacement.',
+    redaction: { ok: false, leaks: ['api_key'] },
+    comparison: { ok: true, added: [], removed: [], changed: [] },
+  })
+  const serialized = JSON.stringify({ context, prompt, redacted: redaction.redacted })
+  const passed =
+    context.previousOutcome === 'stopped' &&
+    context.targetFile === 'note.txt' &&
+    context.failedFiles.join(',') === 'note.txt' &&
+    prompt.includes('Do not modify files') &&
+    prompt.includes('Do not claim the task is complete') &&
+    passing.ok &&
+    !ignoresContext.ok &&
+    statusForCodingFlowFollowupAssertion(ignoresContext).statusDetail === 'context-missing' &&
+    !claimsSuccess.ok &&
+    statusForCodingFlowFollowupAssertion(claimsSuccess).statusDetail === 'follow-up-claimed-success' &&
+    !mutationLeak.ok &&
+    statusForCodingFlowFollowupAssertion(mutationLeak).statusDetail === 'fixture-mutation-leak' &&
+    !leak.ok &&
+    statusForCodingFlowFollowupAssertion(leak).statusDetail === 'redaction-failure' &&
+    redaction.ok &&
+    !serialized.includes('.private-agents-real') &&
+    !serialized.includes('.private-agents/config.json') &&
+    !serialized.includes('sk-live-secret') &&
+    !serialized.includes('sk-url-secret')
+
+  console.log(`previousOutcome=${context.previousOutcome}`)
+  console.log(`targetFile=${context.targetFile}`)
+  console.log(`failedFiles=${context.failedFiles.join(',')}`)
+  console.log(`responseAssertion=${passing.ok ? 'pass' : 'fail'}`)
+  console.log(`ignoresContextStatus=${statusForCodingFlowFollowupAssertion(ignoresContext).statusDetail}`)
+  console.log(`claimsSuccessStatus=${statusForCodingFlowFollowupAssertion(claimsSuccess).statusDetail}`)
+  console.log(`mutationLeakStatus=${statusForCodingFlowFollowupAssertion(mutationLeak).statusDetail}`)
+  console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+  console.log(`[${passed ? 'PASS' : 'FAIL'}] real-coding-flow-followup-smoke-dry-run`)
+  process.exit(passed ? 0 : 1)
+}
+
+async function runRealCodingFlowFollowupSmoke() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-coding-flow-followup-smoke')
+  console.log('homeRead=false')
+  console.log('defaultSmoke=skipped')
+  console.log('realProviderHome=runtime-only')
+  console.log('fixtureMutationAllowed=false')
+
+  if (!realHome) {
+    const report = {
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-coding-flow-followup-smoke',
+      provider: 'real',
+      mode: 'explicit-opt-in',
+      status: 'CONFIG',
+      statusDetail: 'config-failure',
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: false,
+      writableFixture: false,
+      failureCategory: 'provider-readiness',
+      failureReason: 'real provider home is not configured; set PRIVATE_AGENTS_REAL_HOME to opt in',
+    }
+    writeReport(report)
+    console.log('[CONFIG] real-coding-flow-followup-smoke status=config-failure')
+    console.log(`report=${reportPath}`)
+    process.exit(3)
+  }
+
+  try {
+    ensureHome(realHome, 'real')
+  } catch (error) {
+    const report = {
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-coding-flow-followup-smoke',
+      provider: 'real',
+      mode: 'explicit-opt-in',
+      status: 'CONFIG',
+      statusDetail: 'config-failure',
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: false,
+      writableFixture: false,
+      failureCategory: 'provider-readiness',
+      failureReason: error.message,
+    }
+    writeReport(report)
+    console.log('[CONFIG] real-coding-flow-followup-smoke status=config-failure')
+    console.log(`report=${reportPath}`)
+    process.exit(3)
+  }
+
+  const repoBefore = await readRepoStatusShort()
+  const preflight = await runProviderReadinessPreflight()
+  const preflightStatus = buildReadonlyPreflightStatus(preflight)
+  console.log(`preflight=${preflightStatus.statusDetail}`)
+  if (!preflight.ok) {
+    const repoAfter = await readRepoStatusShort()
+    const report = {
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-coding-flow-followup-smoke',
+      provider: 'real',
+      mode: 'explicit-opt-in',
+      status: preflightStatus.status,
+      statusDetail: preflightStatus.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: false,
+      writableFixture: false,
+      repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+      failureCategory: preflightStatus.failureCategory,
+      failureReason: preflightStatus.failureReason,
+      outputTail: preflight.outputTail,
+      redaction: {
+        ok: true,
+        leaks: [],
+      },
+    }
+    writeReport(report)
+    console.log(`[${preflightStatus.status}] real-coding-flow-followup-smoke status=${preflightStatus.statusDetail}`)
+    console.log(`repositoryClean=${report.repositoryClean}`)
+    console.log(`report=${reportPath}`)
+    process.exit(preflightStatus.exitCode)
+  }
+
+  const runtimeHome = createIsolatedCodingFlowRuntimeHome()
+  const auditLogPath = createIsolatedCodingFlowAuditLogPath()
+  const fixture = createCodingFlowFixture()
+  try {
+    const context = buildSyntheticPatchFromNotFoundFollowupContext()
+    const prompt = buildCodingFlowFollowupPrompt(context)
+    const before = snapshotCodingFlowFixture(fixture.fixtureDir)
+    const result = await run(process.execPath, [
+      tsxCliPath,
+      cliEntryPath,
+      '--project',
+      fixture.fixtureDir,
+      '--non-interactive-approval',
+      'allow-once',
+      '--print',
+      prompt,
+    ], {
+      cwd: tsShellRoot,
+      env: {
+        HOME: runtimeHome,
+        USERPROFILE: runtimeHome,
+        PRIVATE_AGENTS_HOME_OVERRIDE: realHome,
+        PRIVATE_AGENTS_REAL_HOME: realHome,
+        PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+        PRIVATE_AGENTS_AUDIT_LOG_PATH: auditLogPath,
+      },
+      timeoutMs: 420000,
+    })
+    const after = snapshotCodingFlowFixture(fixture.fixtureDir)
+    const comparison = compareCodingFlowSnapshots(before, after)
+    const redaction = redactAndAssertCodingProviderOutput(result.output)
+    const redactedOutput = redaction.redacted
+    const repoAfter = await readRepoStatusShort()
+    const providerFailure = buildCodingFlowSmokeFailureStatus(result, redactedOutput, redaction)
+    const assertion = result.code === 0 && !result.timedOut && !classifyProviderReadinessFailure(
+      `coding flow follow-up model turn exited ${result.code}`,
+      redactedOutput,
+      'real',
+    )
+      ? assertCodingFlowFollowupSmokeResponse({
+          output: redactedOutput,
+          redaction,
+          comparison,
+          repoBefore,
+          repoAfter,
+        })
+      : {
+          ok: false,
+          failures: [providerFailure.failureReason],
+          responseVisible: redactedOutput.trim().length > 0,
+          acknowledgesTarget: false,
+          acknowledgesFailure: false,
+          safeNextAction: false,
+          claimsSuccess: false,
+          fixtureMutationLeak: comparison.ok === false || comparison.added.length > 0 || comparison.removed.length > 0 || comparison.changed.length > 0,
+          repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+        }
+    const assertionStatus = result.code === 0 && !result.timedOut
+      ? statusForCodingFlowFollowupAssertion(assertion)
+      : providerFailure
+    const report = {
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-coding-flow-followup-smoke',
+      provider: 'real',
+      mode: 'explicit-opt-in',
+      status: assertionStatus.status,
+      statusDetail: assertionStatus.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: true,
+      syntheticFailureContext: true,
+      stoppedSessionCreated: false,
+      fixtureMutationAllowed: false,
+      runtimeHome: 'isolated-test-root',
+      auditIsolation: inspectCodingFlowAuditIsolation({
+        auditLogPath,
+        repoAfter,
+      }),
+      fixture: {
+        files: fixture.files,
+        editableFiles: fixture.editableFiles,
+        protectedFiles: fixture.protectedFiles,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+      },
+      followupContext: {
+        previousOutcome: context.previousOutcome,
+        blocker: context.blocker,
+        statusDetail: context.statusDetail,
+        targetFile: context.targetFile,
+        failedFiles: context.failedFiles,
+        changedFiles: context.changedFiles,
+        verification: context.verification,
+        protectedFiles: context.protectedFiles,
+        redaction: context.redaction,
+      },
+      responseAssertion: {
+        ok: assertion.ok,
+        responseVisible: assertion.responseVisible,
+        acknowledgesTarget: assertion.acknowledgesTarget,
+        acknowledgesFailure: assertion.acknowledgesFailure,
+        safeNextAction: assertion.safeNextAction,
+        claimsSuccess: assertion.claimsSuccess,
+        fixtureMutationLeak: assertion.fixtureMutationLeak,
+      },
+      repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+      redaction: {
+        ok: redaction.ok,
+        leaks: redaction.leaks,
+      },
+      failureCategory: assertionStatus.failureCategory,
+      failureReason: assertionStatus.failureReason || assertion.failures.join('; '),
+      nextAction: assertion.ok
+        ? 'Continue with the next explicitly authorized validation.'
+        : 'Inspect the redacted follow-up response assertion and retry only after fixing the product or smoke contract issue.',
+      outputTail: summarizeOutput(redactedOutput),
+    }
+    writeReport(report)
+    console.log(`status=${report.status}`)
+    console.log(`statusDetail=${report.statusDetail}`)
+    console.log(`repositoryClean=${report.repositoryClean}`)
+    console.log(`auditLogKind=${report.auditIsolation.auditLogKind}`)
+    console.log(`repoAuditResidueDetected=${report.auditIsolation.repoAuditResidueDetected}`)
+    console.log(`fixtureMutationLeak=${report.responseAssertion.fixtureMutationLeak}`)
+    console.log(`responseVisible=${report.responseAssertion.responseVisible}`)
+    console.log(`acknowledgesTarget=${report.responseAssertion.acknowledgesTarget}`)
+    console.log(`acknowledgesFailure=${report.responseAssertion.acknowledgesFailure}`)
+    console.log(`safeNextAction=${report.responseAssertion.safeNextAction}`)
+    console.log(`claimsSuccess=${report.responseAssertion.claimsSuccess}`)
+    console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+    console.log(`[${report.status}] real-coding-flow-followup-smoke status=${report.statusDetail}`)
+    process.exit(assertionStatus.exitCode)
+  } finally {
+    cleanupCodingFlowFixture(fixture.fixtureDir)
+    cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
+  }
+}
+
+
 function runRealCodingFlowDiagnosticsSelfTest() {
   console.log('gate name=real-user-capabilities')
   console.log('mode=real-coding-flow-diagnostics-self-test')
@@ -3756,6 +4183,10 @@ async function main() {
     runRealCodingFlowFollowupContextSelfTest()
     return
   }
+  if (realCodingFlowFollowupSmokeDryRun) {
+    runRealCodingFlowFollowupSmokeDryRun()
+    return
+  }
   if (realCodingFlowDiagnosticsSelfTest) {
     runRealCodingFlowDiagnosticsSelfTest()
     return
@@ -3778,6 +4209,10 @@ async function main() {
   }
   if (realCodingFlowSmoke) {
     await runRealCodingFlowSmoke()
+    return
+  }
+  if (realCodingFlowFollowupSmoke) {
+    await runRealCodingFlowFollowupSmoke()
     return
   }
   if (realCodingFlowDryRun) {

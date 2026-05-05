@@ -43,7 +43,28 @@ It is not a default gate and is not run by default checkpoints. The minimal isol
 
 The non-real `--real-coding-flow-followup-context-self-test` covers safe follow-up context construction for stopped/failure outcomes. It includes a `patch-from-not-found` / `mutation instruction missing` scenario with `note.txt` as the target/failed file, no changed files, blocked verification, protected-file constraints, a redacted user follow-up prompt, and a safe `DoNext`. Sensitive provider details injected into the synthetic failure reason or follow-up prompt must be reduced to redacted labels; raw API keys, tokens, Authorization header values, provider config paths, and real-provider home paths must not survive in the context.
 
-This self-test is not a real-provider follow-up smoke. Any future actual-provider follow-up smoke must use a separate explicit opt-in flag, reuse isolated fixture/runtime/audit paths, avoid default gates, avoid fixture mutation unless the contract explicitly allows it, and must not change stopped durable-session auto-recovery semantics.
+The actual-provider follow-up smoke is a separate explicit opt-in flag:
+`--real-coding-flow-followup-smoke`. A non-provider companion,
+`--real-coding-flow-followup-smoke-dry-run`, validates the prompt/context and
+assertion shapes without reading real-provider config or running a model.
+
+The opt-in follow-up smoke:
+
+- reuses `buildCodingFlowFailureFollowupContext()` with a synthetic
+  `patch-from-not-found` / `mutation instruction missing` failure report;
+- does not create, resume, or mutate a durable stopped session;
+- uses an isolated fixture project, isolated runtime `HOME`/`USERPROFILE`, and
+  an isolated audit log path;
+- asks the provider only to explain the stopped failure and propose safe
+  recovery;
+- explicitly tells the provider not to modify files and not to claim the task
+  has already succeeded;
+- fails if the fixture changes, the repository becomes dirty, redaction leaks,
+  the response is missing, the response ignores the target/failure context, no
+  safe next action is present, or the response incorrectly claims completion.
+
+This follow-up smoke is not a default gate and must not change stopped durable
+session auto-recovery semantics.
 
 ## Audit Isolation Guard
 
