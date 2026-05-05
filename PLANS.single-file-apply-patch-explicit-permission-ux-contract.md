@@ -57,3 +57,9 @@ rtk git status --short
 
 Next contract-only step: final stale-read revalidation before write. That step
 must remain no-write and writer-unreachable until separately approved.
+
+## Pointer: final stale-read before write contract
+
+See `PLANS.single-file-apply-patch-final-stale-read-before-write-contract.md` for
+the contract-only final write-preflight stale-read guard. It consumes the
+explicit permission UX result but still keeps writer reachability false.
