@@ -135,3 +135,10 @@ rtk npm run test -w packages/ts-shell -- src/orchestration/patchResult/singleFil
 rtk npm run build -w packages/ts-shell
 rtk git status --short
 ```
+
+## Pointer: explicit permission UX contract
+
+See `PLANS.single-file-apply-patch-explicit-permission-ux-contract.md` for the
+contract-only explicit permission UX path. It proves approval cannot be inferred
+from prompt text or bare metadata, and that requested approval still does not
+authorize a write intent before final stale-read and writer-boundary contracts.
