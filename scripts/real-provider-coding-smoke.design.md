@@ -48,6 +48,14 @@ The actual-provider follow-up smoke is a separate explicit opt-in flag:
 `--real-coding-flow-followup-smoke-dry-run`, validates the prompt/context and
 assertion shapes without reading real-provider config or running a model.
 
+The opt-in follow-up smoke has passed with a real provider. Sealed evidence:
+`followupExecutionPath=direct-provider-explanation`,
+`enteredEditTargetResolution=false`, `ambiguousTargetDetected=false`,
+`responseVisible=true`, `acknowledgesTarget=true`,
+`acknowledgesFailure=true`, `safeNextAction=true`, `claimsSuccess=false`,
+`fixtureMutationLeak=false`, `repositoryClean=true`, audit isolated, and
+redaction passed.
+
 The opt-in follow-up smoke:
 
 - reuses `buildCodingFlowFailureFollowupContext()` with a synthetic
@@ -73,8 +81,10 @@ The opt-in follow-up smoke:
   safe next action is present, the response incorrectly claims completion, or
   the follow-up is routed into edit target resolution.
 
-This follow-up smoke is not a default gate and must not change stopped durable
-session auto-recovery semantics.
+This follow-up smoke is not a default gate. It validates provider
+understanding of failure context only; it is not automatic recovery, edit repair,
+or stopped-session auto-resume. It must not change stopped durable session
+auto-recovery semantics.
 
 ## Audit Isolation Guard
 

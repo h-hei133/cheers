@@ -132,6 +132,35 @@ Recent route-closing commit:
 
 - `4b6b90c Fix real coding smoke mutation diagnostics source`
 
+### F. Real-provider failure follow-up explanation evidence (stage-sealed 2026-05-05)
+
+The explicit opt-in `--real-coding-flow-followup-smoke` has passed for the synthetic stopped/failure follow-up route. This is evidence that a real provider can receive a redacted `patch-from-not-found` / `mutation instruction missing` context through the non-mutating direct-provider explanation path and produce a safe recovery explanation without mutating the fixture or repository.
+
+Key sealed evidence:
+
+- `followupExecutionPath=direct-provider-explanation`
+- `enteredEditTargetResolution=false` and `ambiguousTargetDetected=false`
+- `responseVisible=true`
+- `acknowledgesTarget=true` for `note.txt`
+- `acknowledgesFailure=true` for the stopped/failure context
+- `safeNextAction=true`
+- `claimsSuccess=false`
+- `fixtureMutationLeak=false`
+- `repositoryClean=true`
+- audit output was isolated under the test root
+- redaction passed; real provider config content, paths, tokens, keys, and headers were not printed or committed
+
+Important boundaries:
+
+- this smoke remains explicit opt-in only; it is not part of `release-core`, `cli-entry`, `result-contract`, CI, or any default gate
+- it validates failure-context explanation only, not automatic recovery, edit repair execution, durable stopped-session resume, or stopped-session auto-recovery
+- stopped durable session auto-recovery strategy is unchanged
+
+Recent route-closing commits:
+
+- `f4957e3 Use direct provider path for coding flow follow-up smoke`
+- `652434b Fix direct provider follow-up eval wrapper`
+
 Explicitly unsupported in this stage:
 
 - fuzzy replace matching
@@ -167,8 +196,8 @@ Escalate from hardening into focused implementation when one is reproducible:
 
 ## 9. Current Minimal Next Step
 
-- move next real-provider work toward stopped/failure follow-up with an actual model, or perform edit/apply_patch production wiring pre-assessment
-- do not continue same-family minimal write smoke hardening unless a regression appears
+- consider edit/apply_patch production wiring pre-assessment or durable stopped-session continuity analysis as separate, explicitly scoped work
+- do not continue same-family minimal write or failure-explanation smoke hardening unless a regression appears
 - keep hardening the default interactive experience and output truthfulness
 - avoid unrelated provider/auth expansion during this stage unless it blocks mainline usability
 
