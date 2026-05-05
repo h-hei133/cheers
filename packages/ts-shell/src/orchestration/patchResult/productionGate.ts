@@ -1,4 +1,6 @@
 import type { PatchFailure } from "../patchParsing/types.js";
+import type { SingleFileApplyPatchBaseEvidence } from "./baseEvidence.js";
+import type { SingleFileApplyPatchStaleReadResult } from "./singleFileApplyPatchStaleRead.js";
 import type {
   SingleFileUpdatePatchReadinessContract,
   SingleFileUpdatePatchResultRecord,
@@ -21,6 +23,15 @@ export interface SingleFileUpdatePatchApprovalMetadata {
   readonly singleFileOnly: true;
   readonly unsupportedOperations: readonly ["multi-file", "add", "delete", "move"];
   readonly willWrite: false;
+  readonly baseEvidence?: SingleFileApplyPatchBaseEvidence;
+  readonly staleReadPrecondition?: SingleFileUpdatePatchStaleReadPrecondition;
+}
+
+export interface SingleFileUpdatePatchStaleReadPrecondition {
+  readonly required: true;
+  readonly phase: "write-decision-dry-run";
+  readonly requiredBefore: "write-decision";
+  readonly blocksWriteOn: readonly ["stale-read", "target-missing"];
 }
 
 export interface SingleFileUpdatePatchApprovalFileMetadata {
@@ -76,11 +87,16 @@ export function buildSingleFileUpdatePatchApprovalContract(
   readiness: SingleFileUpdatePatchReadinessContract,
   input: {
     readonly decision?: SingleFileUpdatePatchApprovalDecision;
+    readonly baseEvidence?: SingleFileApplyPatchBaseEvidence;
+    readonly staleRead?: SingleFileApplyPatchStaleReadResult;
   } = {},
 ): SingleFileUpdatePatchApprovalContract {
-  const decision = readiness.ready ? (input.decision ?? "pending") : "blocked";
-  const metadata = buildApprovalMetadata(readiness);
-  const authorized = decision === "approved" && readiness.ready;
+  const baseEvidence = input.baseEvidence ?? input.staleRead?.baseEvidence;
+  const decision = approvalDecision(readiness, input);
+  const metadata = buildApprovalMetadata(readiness, {
+    baseEvidence,
+  });
+  const authorized = decision === "approved" && readiness.ready && !baseEvidence;
 
   return {
     capability: "single-file-update-apply-patch-production-gate",
@@ -161,6 +177,9 @@ export function buildSingleFileUpdatePatchResultSurfaceContract(input: {
 
 function buildApprovalMetadata(
   readiness: SingleFileUpdatePatchReadinessContract,
+  input: {
+    readonly baseEvidence?: SingleFileApplyPatchBaseEvidence;
+  } = {},
 ): SingleFileUpdatePatchApprovalMetadata {
   const targetPath = readiness.permissionMetadata.targetPath;
   const summary = readiness.permissionMetadata.previewSummary[0];
@@ -188,7 +207,37 @@ function buildApprovalMetadata(
     singleFileOnly: true,
     unsupportedOperations: readiness.permissionMetadata.unsupportedOperations,
     willWrite: false,
+    ...(input.baseEvidence
+      ? {
+          baseEvidence: input.baseEvidence,
+          staleReadPrecondition: {
+            required: true,
+            phase: "write-decision-dry-run",
+            requiredBefore: "write-decision",
+            blocksWriteOn: ["stale-read", "target-missing"],
+          },
+        }
+      : {}),
   };
+}
+
+function approvalDecision(
+  readiness: SingleFileUpdatePatchReadinessContract,
+  input: {
+    readonly decision?: SingleFileUpdatePatchApprovalDecision;
+    readonly baseEvidence?: SingleFileApplyPatchBaseEvidence;
+    readonly staleRead?: SingleFileApplyPatchStaleReadResult;
+  },
+): SingleFileUpdatePatchApprovalDecision {
+  if (!readiness.ready || input.staleRead?.status === "blocked") {
+    return "blocked";
+  }
+
+  const requested = input.decision ?? "pending";
+  if ((input.baseEvidence || input.staleRead) && requested === "approved") {
+    return "pending";
+  }
+  return requested;
 }
 
 function buildDiffSummary(

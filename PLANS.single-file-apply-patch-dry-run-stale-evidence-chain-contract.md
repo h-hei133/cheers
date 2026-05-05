@@ -59,3 +59,5 @@ Focused tests must prove:
 ## Follow-up Gate
 
 The next route may evaluate permission metadata binding to `baseEvidence`. It must not proceed to write wiring until approval, stale-read, result/session surface, and final writer boundary are proven together.
+
+- See `PLANS.single-file-apply-patch-permission-metadata-binding-contract.md` for the follow-up contract that binds approval metadata to base evidence and stale-read preconditions.

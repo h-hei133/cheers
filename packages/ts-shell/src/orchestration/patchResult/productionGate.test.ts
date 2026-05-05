@@ -11,6 +11,7 @@ import type {
   PatchVerificationResult,
 } from "../patchParsing/types.js";
 import { verifyParsedPatch } from "../patchVerification/verify.js";
+import { buildSingleFileApplyPatchBaseEvidence } from "./baseEvidence.js";
 import { buildPatchPreview } from "./preview.js";
 import {
   buildSingleFileUpdatePatchApprovalContract,
@@ -75,6 +76,47 @@ describe("single-file Update File apply_patch production gate contract", () => {
       },
       nextAction: expect.stringContaining("Request explicit edit approval"),
     });
+  });
+
+  it("binds approval metadata to base evidence and stale-read precondition without authorizing writes", () => {
+    const readiness = buildReadiness(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/app.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** End Patch",
+      ],
+      {
+        "src/app.ts": "old\n",
+      },
+    );
+    const baseEvidence = buildSingleFileApplyPatchBaseEvidence({
+      targetPath: "src/app.ts",
+      baseContent: "old\n",
+    });
+
+    const approval = buildSingleFileUpdatePatchApprovalContract(readiness, {
+      baseEvidence,
+      decision: "approved",
+    });
+
+    expect(approval.decision).toBe("pending");
+    expect(approval.writeIntent).toEqual({ authorized: false, count: 0 });
+    expect(approval.metadata.baseEvidence).toEqual(baseEvidence);
+    expect(approval.metadata.staleReadPrecondition).toEqual({
+      required: true,
+      phase: "write-decision-dry-run",
+      requiredBefore: "write-decision",
+      blocksWriteOn: ["stale-read", "target-missing"],
+    });
+    expect(
+      Object.prototype.hasOwnProperty.call(
+        approval.metadata.baseEvidence,
+        "baseContent",
+      ),
+    ).toBe(false);
   });
 
   it("builds result/session surface shape for valid readiness without production wiring", () => {
