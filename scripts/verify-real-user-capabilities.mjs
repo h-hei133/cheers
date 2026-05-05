@@ -2975,52 +2975,63 @@ function buildDirectProviderExplanationEvalScript() {
     import { getRuntimeConfig } from ${JSON.stringify(runtimeConfigUrl)};
     import { resolveProviderCredential } from ${JSON.stringify(providerCredentialsUrl)};
 
-    const prompt = process.env.PRIVATE_AGENTS_FOLLOWUP_PROMPT ?? '';
-    const workspaceRoot = process.env.PRIVATE_AGENTS_FOLLOWUP_WORKSPACE ?? process.cwd();
-    const runtimeConfig = getRuntimeConfig(workspaceRoot);
-    const resolved = resolveProviderCredential({ runtimeConfig });
-    const credential = resolved.credential;
-    if (!credential) {
-      throw new Error('provider-readiness:missing-key');
-    }
-    if (credential.accountAuth && credential.accountAuth.expiresAt <= Date.now()) {
-      throw new Error('provider-readiness:auth account-auth token expired; reconnect before running follow-up smoke');
-    }
-    const model = (resolved.model ?? credential.model ?? '').trim() ||
-      (credential.provider === 'openai' && credential.accountAuth ? 'gpt-5.4' : 'gpt-4.1-mini');
-    const client = createModelClient({
-      provider: credential.provider,
-      apiKey: credential.apiKey,
-      accountAuth: credential.accountAuth,
-      baseUrl: resolved.baseUrl ?? credential.baseUrl,
-      requestedCapabilities: { supportsToolCalls: false },
-      fallbackPolicy: { enabled: false },
-    });
-    let output = '';
-    const signal = AbortSignal.timeout(300000);
-    for await (const event of client.stream({
-      schemaVersion: '1.0.0',
-      model,
-      messages: [
-        {
-          role: 'system',
-          content: [
-            'You are answering a non-mutating failure follow-up.',
-            'Do not call tools. Do not claim any file was changed.',
-            'Explain the supplied failure context and provide a safe next step only.'
-          ].join(' ')
-        },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0,
-      maxOutputTokens: 700,
-    }, signal)) {
-      if (event.type === 'content.delta') {
-        output += event.delta;
+    ;(async () => {
+      const prompt = process.env.PRIVATE_AGENTS_FOLLOWUP_PROMPT ?? '';
+      const workspaceRoot = process.env.PRIVATE_AGENTS_FOLLOWUP_WORKSPACE ?? process.cwd();
+      const runtimeConfig = getRuntimeConfig(workspaceRoot);
+      const resolved = resolveProviderCredential({ runtimeConfig });
+      const credential = resolved.credential;
+      if (!credential) {
+        throw new Error('provider-readiness:missing-key');
       }
-    }
-    console.log('__FOLLOWUP_PROVIDER_RESULT__' + JSON.stringify({ output }));
+      if (credential.accountAuth && credential.accountAuth.expiresAt <= Date.now()) {
+        throw new Error('provider-readiness:auth account-auth token expired; reconnect before running follow-up smoke');
+      }
+      const model = (resolved.model ?? credential.model ?? '').trim() ||
+        (credential.provider === 'openai' && credential.accountAuth ? 'gpt-5.4' : 'gpt-4.1-mini');
+      const client = createModelClient({
+        provider: credential.provider,
+        apiKey: credential.apiKey,
+        accountAuth: credential.accountAuth,
+        baseUrl: resolved.baseUrl ?? credential.baseUrl,
+        requestedCapabilities: { supportsToolCalls: false },
+        fallbackPolicy: { enabled: false },
+      });
+      let output = '';
+      const signal = AbortSignal.timeout(300000);
+      for await (const event of client.stream({
+        schemaVersion: '1.0.0',
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: [
+              'You are answering a non-mutating failure follow-up.',
+              'Do not call tools. Do not claim any file was changed.',
+              'Explain the supplied failure context and provide a safe next step only.'
+            ].join(' ')
+          },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0,
+        maxOutputTokens: 700,
+      }, signal)) {
+        if (event.type === 'content.delta') {
+          output += event.delta;
+        }
+      }
+      console.log('__FOLLOWUP_PROVIDER_RESULT__' + JSON.stringify({ output }));
+    })().catch((error) => {
+      console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+      process.exit(1);
+    });
   `
+}
+
+function directProviderExplanationEvalScriptUsesAsyncWrapper(script) {
+  return /;\s*\(async\s*\(\)\s*=>\s*\{/.test(script) &&
+    /\}\)\(\)\.catch\(\(error\)\s*=>/.test(script) &&
+    /for\s+await\s*\(/.test(script)
 }
 
 async function runDirectProviderExplanationTurn({ prompt, runtimeHome, realHome, fixtureDir }) {
@@ -3072,6 +3083,9 @@ function runRealCodingFlowFollowupSmokeDryRun() {
 
   const context = buildSyntheticPatchFromNotFoundFollowupContext()
   const prompt = buildCodingFlowFollowupPrompt(context)
+  const evalScriptWrapped = directProviderExplanationEvalScriptUsesAsyncWrapper(
+    buildDirectProviderExplanationEvalScript(),
+  )
   const redaction = redactAndAssertCodingProviderOutput([
     prompt,
     'Authorization: Bearer sk-live-secret-123456789',
@@ -3144,6 +3158,7 @@ function runRealCodingFlowFollowupSmokeDryRun() {
     routingDiagnostics.followupExecutionPath === 'direct-provider-explanation' &&
     routingDiagnostics.enteredEditTargetResolution === false &&
     routingDiagnostics.ambiguousTargetDetected === false &&
+    evalScriptWrapped &&
     prompt.includes('Explain only') &&
     prompt.includes('Do not claim the previous coding task is complete') &&
     passing.ok &&
@@ -3173,6 +3188,7 @@ function runRealCodingFlowFollowupSmokeDryRun() {
   console.log(`nonMutatingFollowup=${routingDiagnostics.nonMutatingFollowup}`)
   console.log(`enteredEditTargetResolution=${routingDiagnostics.enteredEditTargetResolution}`)
   console.log(`ambiguousTargetDetected=${routingDiagnostics.ambiguousTargetDetected}`)
+  console.log(`evalScriptAsyncWrapper=${evalScriptWrapped ? 'pass' : 'fail'}`)
   console.log(`responseAssertion=${passing.ok ? 'pass' : 'fail'}`)
   console.log(`ignoresContextStatus=${statusForCodingFlowFollowupAssertion(ignoresContext).statusDetail}`)
   console.log(`claimsSuccessStatus=${statusForCodingFlowFollowupAssertion(claimsSuccess).statusDetail}`)
