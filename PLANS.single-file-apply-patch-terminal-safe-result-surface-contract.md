@@ -59,3 +59,4 @@ Focused tests must prove:
 ## Follow-up Gate
 
 Production write remains blocked after this contract. A future route may evaluate resultMapper/sessionRuntime dry-run projection only after this terminal-safe surface is stable; production write decision still requires explicit permission UX, final stale-read revalidation, writer boundary proof, and unchanged production rejection until intentionally changed.
+Follow-up: resultMapper/sessionRuntime bridge projection is tracked in `PLANS.single-file-apply-patch-resultmapper-sessionruntime-bridge-contract.md`.
