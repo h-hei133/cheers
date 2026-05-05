@@ -66,3 +66,5 @@ Focused tests must prove:
 ## P1 Decision Gate
 
 If this route is later expanded, the next decision must be a separate plan for stale-read revalidation, permission UX dry-run surface, and resultMapper/sessionRuntime terminal integration. It must still not jump directly to a write path.
+
+- See `PLANS.single-file-apply-patch-stale-read-revalidation-contract.md` for the P1 stale-read revalidation contract that follows this dry-run route.
