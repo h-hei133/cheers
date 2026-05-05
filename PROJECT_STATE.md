@@ -169,6 +169,22 @@ Explicitly unsupported in this stage:
 - multi failed target automatic repair
 - implicit workspace/root mode changes as part of edit repair
 
+
+### G. Single-file `apply_patch` pre-production surface contracts (stage-sealed 2026-05-05)
+
+The single-file `apply_patch` route is sealed through contract-only dry-run, stale-read, permission metadata, terminal-safe surface, runtime bridge, resultMapper consumer, and sessionRuntime display contracts. This proves preview / blocked / permission-pending states remain non-mutating and non-success-like across mapper/display projections.
+
+Important boundaries:
+
+- production `apply_patch` and unified diff inputs remain rejected in the mutation lane
+- no production writer, CLI, `runMvpIntegratedFlow`, resultMapper production logic, or sessionRuntime production logic is wired for this route
+- production write decision gate remains blocked pending explicit permission UX, final stale-read revalidation placement, writer boundary proof, and approved runtime/display wiring
+
+Recent route-closing commits:
+
+- `7aee9f8 Add single file apply patch resultMapper consumer contract`
+- `d9658e5 Add single file apply patch sessionRuntime display contract`
+
 ## 6. Confirmed Baseline Facts
 
 - unified query loop exists and is durable
@@ -196,7 +212,8 @@ Escalate from hardening into focused implementation when one is reproducible:
 
 ## 9. Current Minimal Next Step
 
-- consider edit/apply_patch production wiring pre-assessment or durable stopped-session continuity analysis as separate, explicitly scoped work
+- single-file `apply_patch` production write remains blocked; start with a new `$deep-interview` before any permission UX, final stale-read production placement, writer boundary, or runtime/display production wiring work
+- consider durable stopped-session continuity analysis as separate, explicitly scoped work
 - do not continue same-family minimal write or failure-explanation smoke hardening unless a regression appears
 - keep hardening the default interactive experience and output truthfulness
 - avoid unrelated provider/auth expansion during this stage unless it blocks mainline usability

@@ -62,3 +62,7 @@ rtk git status --short
 
 If this contract passes without changing sessionRuntime production logic,
 proceed to the pre-production blocker summary as a separate commit.
+
+## Follow-up
+
+- Pre-production blocker summary: see `PLANS.single-file-apply-patch-pre-production-blocker-summary.md`.
