@@ -102,6 +102,36 @@ Real-provider CLI acceptance now covers the two core single-file edit repair cha
 | repair evidence visible in CLI surface | real-provider + synthetic | pass | repaired failure reason / target file / payload kind visible in Action result | `sessionRuntime.test.ts` repair context rendering |
 | multi failed target abandoned diagnostic | synthetic + real CLI acceptance | pass | `repairContextUsed:false`, `repairContextAbandoned:true`, `multiple-failed-targets`, candidate count | `runMvpIntegratedFlow.test.ts -t "failed target candidates"` and `sessionRuntime.test.ts` |
 
+
+### E. Real-provider minimal coding flow evidence (stage-sealed 2026-05-05)
+
+The explicit opt-in `--real-coding-flow-smoke` has passed for the isolated minimal single-file write route. This is evidence that a real provider can enter the coding flow, read and edit the isolated fixture, emit a visible terminal result, and preserve repository/provider-home safety boundaries.
+
+Key sealed evidence:
+
+- real provider preflight was ready before execution
+- normal coding flow was entered; the turn was not handled by repo-aware summary routing
+- action sequence included `read` and `edit`
+- only `note.txt` changed; `changedFiles` was exactly `["note.txt"]`
+- `note.txt` changed from `status: draft` to `status: ready`
+- protected fixture files `README.md` and `LOCKED.md` stayed unchanged
+- verification passed and terminal result details were visible
+- real repository stayed clean before/after the smoke
+- runtime home, fixture workspace, report, and audit log were isolated under the test root and cleaned after the run
+- redaction passed; real provider config content, paths, tokens, keys, and headers were not printed or committed
+- mutation diagnostics were corrected so successful structured edits no longer misleadingly report missing replacement fields
+
+Important boundaries:
+
+- this smoke remains explicit opt-in only; it is not part of `release-core`, `cli-entry`, `result-contract`, CI, or any default gate
+- real provider configuration must still be supplied explicitly and must not be read, printed, copied, modified, cleaned, or committed
+- the evidence covers only the isolated fixture's minimal single-file write path
+- it does not prove maturity of multi-file edit, full `apply_patch`, long-task continuity, true PTY automation, or production repository mutation workflows
+
+Recent route-closing commit:
+
+- `4b6b90c Fix real coding smoke mutation diagnostics source`
+
 Explicitly unsupported in this stage:
 
 - fuzzy replace matching
@@ -123,8 +153,9 @@ Explicitly unsupported in this stage:
 ## 7. Current Primary Gaps
 
 1. true live TTY automation evidence remains weaker than print/stdin/replay evidence in this environment
-2. execution success still depends on model/tool behavior; output contract improvements do not guarantee every edit request is actually executed
-3. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
+2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
+3. multi-file edit, full apply_patch, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
+4. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
 ## 8. Re-entry / Escalation Triggers
 
@@ -136,8 +167,9 @@ Escalate from hardening into focused implementation when one is reproducible:
 
 ## 9. Current Minimal Next Step
 
+- move next real-provider work toward stopped/failure follow-up with an actual model, or perform edit/apply_patch production wiring pre-assessment
+- do not continue same-family minimal write smoke hardening unless a regression appears
 - keep hardening the default interactive experience and output truthfulness
-- prefer medium-impact user-visible improvements over low-value micro-patches
 - avoid unrelated provider/auth expansion during this stage unless it blocks mainline usability
 
 ## 10. Update Rules

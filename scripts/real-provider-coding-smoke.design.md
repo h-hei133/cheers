@@ -1,7 +1,7 @@
 # Real Provider Coding Flow Smoke Design
 
-This document defines the future explicit opt-in `--real-coding-flow-smoke`.
-It is not a default gate and is not run by this checkpoint.
+This document defines the explicit opt-in `--real-coding-flow-smoke`.
+It is not a default gate and is not run by default checkpoints. The minimal isolated single-file write route has passed with a real provider: the smoke changed only `note.txt` from `status: draft` to `status: ready`, kept `README.md` and `LOCKED.md` unchanged, reported `changedFiles=["note.txt"]`, showed terminal result and verification details, kept the real repository clean, used isolated runtime/audit/report/fixture locations, and passed redaction.
 
 ## Boundary
 
@@ -99,4 +99,6 @@ the `ambiguous-target` contract.
 - No real repository mutation.
 - No full apply-patch, rollback, AST patch, or multi-file edit implementation.
 - No provider/auth core changes.
+- No production multi-file edit maturity claim.
+- No long-session continuity or true PTY maturity claim.
 - No CLI/session/orchestration giant-file changes.
