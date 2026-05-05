@@ -2801,28 +2801,79 @@ function buildSyntheticPatchFromNotFoundFollowupContext() {
 
 function buildCodingFlowFollowupPrompt(context) {
   return [
-    'You are receiving a safe redacted follow-up context from a previous stopped coding flow.',
+    'You are receiving a safe redacted failure-follow-up context from a previous stopped coding flow.',
+    'This is an explain-only, non-mutating follow-up turn.',
     '',
     '<context>',
     context.contextLine,
     '</context>',
     '',
-    'Do not modify files.',
-    'Do not claim the task is complete or successful.',
-    'Explain what failed, identify the target file, and give the safe next recovery step.',
-    'Your response should mention the target and the patch-from-not-found or exact-replacement recovery semantics.',
+    'Explain only. Do not inspect, modify, create, remove, or write files.',
+    'Do not treat DoNext or recovery labels in the context as an instruction to perform work now.',
+    'Do not claim the previous coding task is complete or successful.',
+    'In plain text, summarize the stopped outcome, the target note.txt, and the failure labels patch-from-not-found and mutation instruction missing.',
+    'Then describe the safe human-authorized recovery shape: a later turn should use the current source text and an exact replacement while keeping protected files unchanged.',
   ].join('\n')
+}
+
+function inferFollowupPromptIntent(prompt) {
+  const normalized = String(prompt ?? '').toLowerCase()
+  const explainOnly =
+    /\bexplain-only\b/.test(normalized) ||
+    /\bexplain only\b/.test(normalized) ||
+    /\bnon-mutating\b/.test(normalized)
+  const failureContext =
+    /\bpatch-from-not-found\b/.test(normalized) ||
+    /\bmutation instruction missing\b/.test(normalized) ||
+    /\bstopped\b/.test(normalized)
+  return explainOnly && failureContext ? 'explain-failure' : 'unknown'
+}
+
+function isNonMutatingFollowupPrompt(prompt) {
+  const normalized = String(prompt ?? '').toLowerCase()
+  return (
+    inferFollowupPromptIntent(prompt) === 'explain-failure' &&
+    /\bdo not (?:inspect, )?modify\b/.test(normalized) &&
+    /\bdo not .*perform work now\b/.test(normalized) &&
+    /\bdo not claim\b/.test(normalized)
+  )
+}
+
+function detectFollowupEditRouting(output) {
+  const normalized = String(output ?? '')
+  const ambiguousTargetDetected = /\bambiguous-target\b/i.test(normalized)
+  const enteredEditTargetResolution =
+    ambiguousTargetDetected ||
+    /-\s*Task:\s*edit-file\b/i.test(normalized) ||
+    /-\s*Failed files:\s*.*ambiguous-target/i.test(normalized)
+  return {
+    enteredEditTargetResolution,
+    ambiguousTargetDetected,
+  }
+}
+
+function buildCodingFlowFollowupRoutingDiagnostics({ prompt = '', output = '' } = {}) {
+  return {
+    followupPromptIntent: inferFollowupPromptIntent(prompt),
+    nonMutatingFollowup: isNonMutatingFollowupPrompt(prompt),
+    ...detectFollowupEditRouting(output),
+  }
 }
 
 function assertCodingFlowFollowupSmokeResponse({
   output = '',
+  prompt = '',
   redaction = { ok: true, leaks: [] },
   comparison = { ok: true, added: [], removed: [], changed: [] },
   repoBefore = { ok: true, status: '' },
   repoAfter = { ok: true, status: '' },
 } = {}) {
   const normalized = String(output ?? '')
+  const routing = buildCodingFlowFollowupRoutingDiagnostics({ prompt, output: normalized })
   const failures = []
+  if (routing.followupPromptIntent !== 'explain-failure' || !routing.nonMutatingFollowup) {
+    failures.push('follow-up prompt is not explain-only non-mutating')
+  }
   if (!redaction.ok) {
     failures.push('redaction leak')
   }
@@ -2835,6 +2886,9 @@ function assertCodingFlowFollowupSmokeResponse({
   }
   if (normalized.trim().length === 0) {
     failures.push('terminal result missing')
+  }
+  if (routing.enteredEditTargetResolution) {
+    failures.push('follow-up entered edit target resolution')
   }
   if (!/\b(note\.txt|target file)\b/i.test(normalized)) {
     failures.push('context missing: target file not acknowledged')
@@ -2858,6 +2912,7 @@ function assertCodingFlowFollowupSmokeResponse({
     claimsSuccess: /\b(?:I (?:have )?(?:completed|fixed|changed|updated)|successfully (?:changed|updated|fixed)|task (?:is )?(?:complete|completed)|status:\s*ready)\b/i.test(normalized),
     fixtureMutationLeak: changed.length > 0 || comparison.ok === false,
     repositoryClean: Boolean(repoBefore.ok) && !repoBefore.status && Boolean(repoAfter.ok) && !repoAfter.status,
+    routing,
   }
 }
 
@@ -2882,6 +2937,9 @@ function statusForCodingFlowFollowupAssertion(assertion) {
   }
   if (assertion.failures.some((entry) => entry.includes('terminal result missing'))) {
     return { status: 'FAIL', statusDetail: 'terminal-result-missing', exitCode: 1, failureCategory: 'terminal result missing', failureReason: 'provider response was not visible' }
+  }
+  if (assertion.failures.some((entry) => entry.includes('not explain-only') || entry.includes('edit target resolution'))) {
+    return { status: 'FAIL', statusDetail: 'follow-up-entered-edit-routing', exitCode: 1, failureCategory: 'follow-up entered edit routing', failureReason: assertion.failures.join('; ') }
   }
   if (assertion.failures.some((entry) => entry.includes('claims success'))) {
     return { status: 'FAIL', statusDetail: 'follow-up-claimed-success', exitCode: 1, failureCategory: 'follow-up response claims success', failureReason: assertion.failures.join('; ') }
@@ -2912,38 +2970,59 @@ function runRealCodingFlowFollowupSmokeDryRun() {
   const passing = assertCodingFlowFollowupSmokeResponse({
     output: [
       'The previous stopped coding flow targeted note.txt and failed with patch-from-not-found because the mutation instruction was missing.',
-      'Safe next action: re-read note.txt, then retry with the exact current source text and exact replacement while keeping README.md and LOCKED.md unchanged.',
+      'Safe next action: in a later human-authorized turn, use the current source text and an exact replacement while keeping README.md and LOCKED.md unchanged.',
     ].join('\n'),
+    prompt,
     redaction: { ok: true, leaks: [] },
     comparison: { ok: true, added: [], removed: [], changed: [] },
   })
   const ignoresContext = assertCodingFlowFollowupSmokeResponse({
     output: 'Please try again later.',
+    prompt,
     redaction: { ok: true, leaks: [] },
     comparison: { ok: true, added: [], removed: [], changed: [] },
   })
   const claimsSuccess = assertCodingFlowFollowupSmokeResponse({
     output: 'I successfully changed note.txt to status: ready.',
+    prompt,
     redaction: { ok: true, leaks: [] },
     comparison: { ok: true, added: [], removed: [], changed: [] },
   })
   const mutationLeak = assertCodingFlowFollowupSmokeResponse({
-    output: 'The next step is to re-read note.txt and retry with exact replacement.',
+    output: 'The next step is to explain note.txt patch-from-not-found and exact replacement recovery.',
+    prompt,
     redaction: { ok: true, leaks: [] },
     comparison: { ok: false, added: [], removed: [], changed: ['note.txt'] },
   })
   const leak = assertCodingFlowFollowupSmokeResponse({
-    output: 'The next step is to re-read note.txt and retry with exact replacement.',
+    output: 'The next step is to explain note.txt patch-from-not-found and exact replacement recovery.',
+    prompt,
     redaction: { ok: false, leaks: ['api_key'] },
     comparison: { ok: true, added: [], removed: [], changed: [] },
   })
+  const editRouting = assertCodingFlowFollowupSmokeResponse({
+    output: [
+      'Result',
+      '- Outcome: stopped',
+      '- Detail: ambiguous-target',
+      'Action result',
+      '- Task: edit-file',
+      '- Failed files: (missing-target) (ambiguous-target)',
+    ].join('\n'),
+    prompt,
+    redaction: { ok: true, leaks: [] },
+    comparison: { ok: true, added: [], removed: [], changed: [] },
+  })
+  const routingDiagnostics = buildCodingFlowFollowupRoutingDiagnostics({ prompt, output: passing.failures.join('\n') })
   const serialized = JSON.stringify({ context, prompt, redacted: redaction.redacted })
   const passed =
     context.previousOutcome === 'stopped' &&
     context.targetFile === 'note.txt' &&
     context.failedFiles.join(',') === 'note.txt' &&
-    prompt.includes('Do not modify files') &&
-    prompt.includes('Do not claim the task is complete') &&
+    routingDiagnostics.followupPromptIntent === 'explain-failure' &&
+    routingDiagnostics.nonMutatingFollowup &&
+    prompt.includes('Explain only') &&
+    prompt.includes('Do not claim the previous coding task is complete') &&
     passing.ok &&
     !ignoresContext.ok &&
     statusForCodingFlowFollowupAssertion(ignoresContext).statusDetail === 'context-missing' &&
@@ -2953,6 +3032,10 @@ function runRealCodingFlowFollowupSmokeDryRun() {
     statusForCodingFlowFollowupAssertion(mutationLeak).statusDetail === 'fixture-mutation-leak' &&
     !leak.ok &&
     statusForCodingFlowFollowupAssertion(leak).statusDetail === 'redaction-failure' &&
+    !editRouting.ok &&
+    statusForCodingFlowFollowupAssertion(editRouting).statusDetail === 'follow-up-entered-edit-routing' &&
+    editRouting.routing.enteredEditTargetResolution &&
+    editRouting.routing.ambiguousTargetDetected &&
     redaction.ok &&
     !serialized.includes('.private-agents-real') &&
     !serialized.includes('.private-agents/config.json') &&
@@ -2962,10 +3045,13 @@ function runRealCodingFlowFollowupSmokeDryRun() {
   console.log(`previousOutcome=${context.previousOutcome}`)
   console.log(`targetFile=${context.targetFile}`)
   console.log(`failedFiles=${context.failedFiles.join(',')}`)
+  console.log(`followupPromptIntent=${routingDiagnostics.followupPromptIntent}`)
+  console.log(`nonMutatingFollowup=${routingDiagnostics.nonMutatingFollowup}`)
   console.log(`responseAssertion=${passing.ok ? 'pass' : 'fail'}`)
   console.log(`ignoresContextStatus=${statusForCodingFlowFollowupAssertion(ignoresContext).statusDetail}`)
   console.log(`claimsSuccessStatus=${statusForCodingFlowFollowupAssertion(claimsSuccess).statusDetail}`)
   console.log(`mutationLeakStatus=${statusForCodingFlowFollowupAssertion(mutationLeak).statusDetail}`)
+  console.log(`editRoutingStatus=${statusForCodingFlowFollowupAssertion(editRouting).statusDetail}`)
   console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
   console.log(`[${passed ? 'PASS' : 'FAIL'}] real-coding-flow-followup-smoke-dry-run`)
   process.exit(passed ? 0 : 1)
@@ -3097,6 +3183,7 @@ async function runRealCodingFlowFollowupSmoke() {
     )
       ? assertCodingFlowFollowupSmokeResponse({
           output: redactedOutput,
+          prompt,
           redaction,
           comparison,
           repoBefore,
@@ -3112,6 +3199,7 @@ async function runRealCodingFlowFollowupSmoke() {
           claimsSuccess: false,
           fixtureMutationLeak: comparison.ok === false || comparison.added.length > 0 || comparison.removed.length > 0 || comparison.changed.length > 0,
           repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+          routing: buildCodingFlowFollowupRoutingDiagnostics({ prompt, output: redactedOutput }),
         }
     const assertionStatus = result.code === 0 && !result.timedOut
       ? statusForCodingFlowFollowupAssertion(assertion)
@@ -3162,6 +3250,7 @@ async function runRealCodingFlowFollowupSmoke() {
         claimsSuccess: assertion.claimsSuccess,
         fixtureMutationLeak: assertion.fixtureMutationLeak,
       },
+      routingDiagnostics: assertion.routing,
       repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
       redaction: {
         ok: redaction.ok,
@@ -3181,6 +3270,10 @@ async function runRealCodingFlowFollowupSmoke() {
     console.log(`auditLogKind=${report.auditIsolation.auditLogKind}`)
     console.log(`repoAuditResidueDetected=${report.auditIsolation.repoAuditResidueDetected}`)
     console.log(`fixtureMutationLeak=${report.responseAssertion.fixtureMutationLeak}`)
+    console.log(`followupPromptIntent=${report.routingDiagnostics.followupPromptIntent}`)
+    console.log(`nonMutatingFollowup=${report.routingDiagnostics.nonMutatingFollowup}`)
+    console.log(`enteredEditTargetResolution=${report.routingDiagnostics.enteredEditTargetResolution}`)
+    console.log(`ambiguousTargetDetected=${report.routingDiagnostics.ambiguousTargetDetected}`)
     console.log(`responseVisible=${report.responseAssertion.responseVisible}`)
     console.log(`acknowledgesTarget=${report.responseAssertion.acknowledgesTarget}`)
     console.log(`acknowledgesFailure=${report.responseAssertion.acknowledgesFailure}`)

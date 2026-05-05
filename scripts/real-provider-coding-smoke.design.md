@@ -55,13 +55,19 @@ The opt-in follow-up smoke:
 - does not create, resume, or mutate a durable stopped session;
 - uses an isolated fixture project, isolated runtime `HOME`/`USERPROFILE`, and
   an isolated audit log path;
-- asks the provider only to explain the stopped failure and propose safe
-  recovery;
-- explicitly tells the provider not to modify files and not to claim the task
-  has already succeeded;
+- uses an explain-only, non-mutating prompt: the provider is asked to explain
+  the stopped failure and describe a safe human-authorized recovery shape, not
+  to perform recovery in the current turn;
+- explicitly tells the provider not to inspect, modify, create, remove, or
+  write files, not to treat `DoNext`/recovery labels as work to perform now,
+  and not to claim the task has already succeeded;
+- reports routing diagnostics: `followupPromptIntent`,
+  `nonMutatingFollowup`, `enteredEditTargetResolution`, and
+  `ambiguousTargetDetected`;
 - fails if the fixture changes, the repository becomes dirty, redaction leaks,
   the response is missing, the response ignores the target/failure context, no
-  safe next action is present, or the response incorrectly claims completion.
+  safe next action is present, the response incorrectly claims completion, or
+  the follow-up is routed into edit target resolution.
 
 This follow-up smoke is not a default gate and must not change stopped durable
 session auto-recovery semantics.
