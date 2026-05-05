@@ -58,3 +58,7 @@ Focused tests must prove:
 ## Follow-up Gate
 
 Production write remains blocked after this bridge. A future route may evaluate resultMapper/sessionRuntime contract tests against the bridge output, but direct runtime wiring and production writes require separate approval, explicit permission UX, final stale-read revalidation, and writer-boundary proof.
+
+## Follow-up
+
+- ResultMapper consumer contract: see `PLANS.single-file-apply-patch-resultmapper-consumer-contract.md`.
