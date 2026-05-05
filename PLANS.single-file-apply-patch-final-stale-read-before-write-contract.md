@@ -66,3 +66,9 @@ rtk git status --short
 This step can be sealed when all validation above passes and git status is
 clean after commit. The next step remains contract-only writer boundary proof;
 production write wiring still requires a separate review.
+
+## Pointer: writer boundary proof contract
+
+See `PLANS.single-file-apply-patch-writer-boundary-proof-contract.md` for the
+contract-only writer boundary proof. It consumes explicit permission UX plus
+final stale-read results and still keeps writer reachability false.
