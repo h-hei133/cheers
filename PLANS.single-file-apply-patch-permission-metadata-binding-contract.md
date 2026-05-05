@@ -53,3 +53,4 @@ Focused tests must prove:
 ## Follow-up Gate
 
 Production write remains blocked. A future route may evaluate result/session surface binding or an explicit write decision gate, but only after approval metadata, stale-read, terminal result, and final writer boundary are proven together.
+Follow-up: terminal-safe projection is tracked in `PLANS.single-file-apply-patch-terminal-safe-result-surface-contract.md`.
