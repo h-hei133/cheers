@@ -1,3 +1,9 @@
+import {
+  buildSingleFileApplyPatchBaseEvidence,
+  digestSingleFileApplyPatchContent,
+  type SingleFileApplyPatchBaseEvidence,
+} from "./baseEvidence.js";
+
 export type SingleFileApplyPatchStaleReadPhase = "write-decision-dry-run";
 
 export type SingleFileApplyPatchStaleReadStatus = "contract-ready" | "blocked";
@@ -7,9 +13,11 @@ export type SingleFileApplyPatchStaleReadBlocker =
   | "target-missing";
 
 export interface SingleFileApplyPatchStaleReadOptions {
-  readonly targetPath: string;
-  readonly baseContent: string;
+  readonly targetPath?: string;
+  readonly baseContent?: string;
+  readonly baseEvidence?: SingleFileApplyPatchBaseEvidence;
   readonly currentContent: string | undefined;
+  readonly currentDigest?: string;
   readonly phase: SingleFileApplyPatchStaleReadPhase;
   readonly dryRun: true;
 }
@@ -17,6 +25,7 @@ export interface SingleFileApplyPatchStaleReadOptions {
 export interface SingleFileApplyPatchStaleReadResult {
   readonly status: SingleFileApplyPatchStaleReadStatus;
   readonly targetPath: string;
+  readonly baseEvidence: SingleFileApplyPatchBaseEvidence;
   readonly phase: SingleFileApplyPatchStaleReadPhase;
   readonly staleReadDetected: boolean;
   readonly writeDecisionBlocked: boolean;
@@ -35,9 +44,14 @@ export interface SingleFileApplyPatchStaleReadResult {
 export function buildSingleFileApplyPatchStaleReadContract(
   options: SingleFileApplyPatchStaleReadOptions,
 ): SingleFileApplyPatchStaleReadResult {
+  const baseEvidence = resolveBaseEvidence(options);
+  const targetPath = options.targetPath ?? baseEvidence.targetPath;
+
   if (options.currentContent === undefined) {
     return blocked({
       options,
+      targetPath,
+      baseEvidence,
       blocker: "target-missing",
       staleReadDetected: true,
       reason: "Patch target is missing before the write decision.",
@@ -50,9 +64,15 @@ export function buildSingleFileApplyPatchStaleReadContract(
     });
   }
 
-  if (options.baseContent !== options.currentContent) {
+  const currentDigest =
+    options.currentDigest ??
+    digestSingleFileApplyPatchContent(options.currentContent);
+
+  if (baseEvidence.baseDigest !== currentDigest) {
     return blocked({
       options,
+      targetPath,
+      baseEvidence,
       blocker: "stale-read",
       staleReadDetected: true,
       reason:
@@ -71,7 +91,8 @@ export function buildSingleFileApplyPatchStaleReadContract(
 
   return {
     status: "contract-ready",
-    targetPath: options.targetPath,
+    targetPath,
+    baseEvidence,
     phase: options.phase,
     staleReadDetected: false,
     writeDecisionBlocked: false,
@@ -85,7 +106,7 @@ export function buildSingleFileApplyPatchStaleReadContract(
     doNext: nextAction,
     evidence: [
       "apply-patch-stale-read:contract-ready",
-      "apply-patch-stale-read:base-content-matches-current-content",
+      "apply-patch-stale-read:base-evidence-matches-current-content",
       "apply-patch-stale-read:will-write-false",
       "apply-patch-stale-read:no-writer-invoked",
       "apply-patch-stale-read:not-production-write-ready",
@@ -93,8 +114,27 @@ export function buildSingleFileApplyPatchStaleReadContract(
   };
 }
 
+function resolveBaseEvidence(
+  options: SingleFileApplyPatchStaleReadOptions,
+): SingleFileApplyPatchBaseEvidence {
+  if (options.baseEvidence) {
+    return options.baseEvidence;
+  }
+  if (options.targetPath === undefined || options.baseContent === undefined) {
+    throw new Error(
+      "Stale-read revalidation requires baseEvidence or targetPath plus baseContent.",
+    );
+  }
+  return buildSingleFileApplyPatchBaseEvidence({
+    targetPath: options.targetPath,
+    baseContent: options.baseContent,
+  });
+}
+
 function blocked(input: {
   readonly options: SingleFileApplyPatchStaleReadOptions;
+  readonly targetPath: string;
+  readonly baseEvidence: SingleFileApplyPatchBaseEvidence;
   readonly blocker: SingleFileApplyPatchStaleReadBlocker;
   readonly staleReadDetected: boolean;
   readonly reason: string;
@@ -103,7 +143,8 @@ function blocked(input: {
 }): SingleFileApplyPatchStaleReadResult {
   return {
     status: "blocked",
-    targetPath: input.options.targetPath,
+    targetPath: input.targetPath,
+    baseEvidence: input.baseEvidence,
     phase: input.options.phase,
     staleReadDetected: input.staleReadDetected,
     writeDecisionBlocked: true,

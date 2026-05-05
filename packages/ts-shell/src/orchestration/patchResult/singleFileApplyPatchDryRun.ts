@@ -4,6 +4,10 @@ import type { PatchFailure } from "../patchParsing/types.js";
 import { verifyParsedPatch } from "../patchVerification/verify.js";
 import { buildPatchPreview } from "./preview.js";
 import {
+  buildSingleFileApplyPatchBaseEvidence,
+  type SingleFileApplyPatchBaseEvidence,
+} from "./baseEvidence.js";
+import {
   buildSingleFileUpdatePatchApprovalContract,
   buildSingleFileUpdatePatchResultSurfaceContract,
   type SingleFileUpdatePatchApprovalContract,
@@ -78,6 +82,7 @@ export interface SingleFileApplyPatchDryRunResult {
   readonly resultSurface:
     | SingleFileUpdatePatchResultSurfaceContract
     | SingleFileApplyPatchDryRunBlockedSurface;
+  readonly baseEvidence?: SingleFileApplyPatchBaseEvidence;
   readonly evidence: readonly string[];
   readonly nextAction: string;
   readonly doNext: string;
@@ -123,12 +128,16 @@ export function buildSingleFileApplyPatchDryRun(
   };
   const previewChangedFiles = readiness.ready ? preview.changedFiles : [];
   const wouldChangeFiles = readiness.ready ? readiness.result.changedFiles : [];
+  const baseEvidence = readiness.ready
+    ? baseEvidenceFromVerification(verification)
+    : undefined;
   const evidence = [
     ...resultSurface.evidence,
     "apply-patch-dry-run:explicit-opt-in",
     "apply-patch-dry-run:will-write-false",
     "apply-patch-dry-run:no-writer-invoked",
     "apply-patch-dry-run:terminal-changed-files-empty",
+    ...(baseEvidence ? ["apply-patch-dry-run:base-evidence-captured"] : []),
   ];
 
   return {
@@ -144,11 +153,31 @@ export function buildSingleFileApplyPatchDryRun(
     doesNotClaimWriteSuccess: true,
     approval,
     resultSurface,
+    baseEvidence,
     evidence,
     nextAction: resultSurface.nextAction,
     doNext: resultSurface.doNext,
     noPartial: readiness.noPartial,
   };
+}
+
+function baseEvidenceFromVerification(
+  verification: ReturnType<typeof verifyParsedPatch>,
+): SingleFileApplyPatchBaseEvidence | undefined {
+  if (verification.ok === false || verification.plan.operations.length !== 1) {
+    return undefined;
+  }
+  const operation = verification.plan.operations[0];
+  if (!operation || operation.operation.kind !== "update") {
+    return undefined;
+  }
+  if (operation.originalContent === undefined) {
+    return undefined;
+  }
+  return buildSingleFileApplyPatchBaseEvidence({
+    targetPath: operation.operation.path,
+    baseContent: operation.originalContent,
+  });
 }
 
 function blockedFromParseFailure(

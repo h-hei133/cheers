@@ -4,6 +4,7 @@ import {
   applySingleFileReplacePatch,
   type SingleFileReplacePatchResult,
 } from "../patchMutationLane.js";
+import { digestSingleFileApplyPatchContent } from "./baseEvidence.js";
 import { buildSingleFileApplyPatchDryRun } from "./singleFileApplyPatchDryRun.js";
 
 const workspaceRoot = path.resolve("D:/workspace/project");
@@ -39,6 +40,16 @@ describe("buildSingleFileApplyPatchDryRun", () => {
     expect(result.approval.writeIntent).toEqual({ authorized: false, count: 0 });
     expect(result.resultSurface.status).toBe("ready");
     expect(result.resultSurface.changedFiles).toEqual([]);
+    expect(result.baseEvidence).toEqual({
+      targetPath: "src/app.ts",
+      baseDigest: digestSingleFileApplyPatchContent("old\n"),
+      digestAlgorithm: "sha256",
+      capturedAtPhase: "dry-run-preview",
+      source: "verify-readFile",
+    });
+    expect(Object.prototype.hasOwnProperty.call(result.baseEvidence, "baseContent")).toBe(
+      false,
+    );
     expect(result.noPartial).toEqual({
       atomicity: "verify-all-before-write",
       writeIntents: 1,
@@ -50,6 +61,7 @@ describe("buildSingleFileApplyPatchDryRun", () => {
         "apply-patch-dry-run:will-write-false",
         "apply-patch-dry-run:no-writer-invoked",
         "apply-patch-dry-run:terminal-changed-files-empty",
+        "apply-patch-dry-run:base-evidence-captured",
       ]),
     );
   });

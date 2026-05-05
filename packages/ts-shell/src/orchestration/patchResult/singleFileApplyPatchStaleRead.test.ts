@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import {
+  buildSingleFileApplyPatchBaseEvidence,
+  digestSingleFileApplyPatchContent,
+} from "./baseEvidence.js";
 import { buildSingleFileApplyPatchStaleReadContract } from "./singleFileApplyPatchStaleRead.js";
 
 describe("buildSingleFileApplyPatchStaleReadContract", () => {
@@ -15,16 +19,63 @@ describe("buildSingleFileApplyPatchStaleReadContract", () => {
     expect(result.staleReadDetected).toBe(false);
     expect(result.writeDecisionBlocked).toBe(false);
     expect(result.blocker).toBeUndefined();
+    expect(result.baseEvidence).toEqual({
+      targetPath: "src/app.ts",
+      baseDigest: digestSingleFileApplyPatchContent("old\n"),
+      digestAlgorithm: "sha256",
+      capturedAtPhase: "dry-run-preview",
+      source: "verify-readFile",
+    });
     expectNoWriteProof(result);
     expect(result.doesNotClaimProductionWriteReady).toBe(true);
     expect(result.nextAction).toContain("not production-write-ready");
     expect(result.evidence).toEqual(
       expect.arrayContaining([
         "apply-patch-stale-read:contract-ready",
-        "apply-patch-stale-read:base-content-matches-current-content",
+        "apply-patch-stale-read:base-evidence-matches-current-content",
         "apply-patch-stale-read:not-production-write-ready",
       ]),
     );
+  });
+
+  it("marks unchanged target content contract-ready from base evidence", () => {
+    const baseEvidence = buildSingleFileApplyPatchBaseEvidence({
+      targetPath: "src/app.ts",
+      baseContent: "old\n",
+    });
+
+    const result = buildSingleFileApplyPatchStaleReadContract({
+      baseEvidence,
+      currentContent: "old\n",
+      phase: "write-decision-dry-run",
+      dryRun: true,
+    });
+
+    expect(result.status).toBe("contract-ready");
+    expect(result.targetPath).toBe("src/app.ts");
+    expect(result.baseEvidence).toEqual(baseEvidence);
+    expect(result.doesNotClaimProductionWriteReady).toBe(true);
+    expectNoWriteProof(result);
+  });
+
+  it("blocks stale target content from base evidence and current digest", () => {
+    const baseEvidence = buildSingleFileApplyPatchBaseEvidence({
+      targetPath: "src/app.ts",
+      baseContent: "old\n",
+    });
+
+    const result = buildSingleFileApplyPatchStaleReadContract({
+      baseEvidence,
+      currentContent: "changed\n",
+      currentDigest: digestSingleFileApplyPatchContent("changed\n"),
+      phase: "write-decision-dry-run",
+      dryRun: true,
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("stale-read");
+    expect(result.baseEvidence).toEqual(baseEvidence);
+    expectNoWriteProof(result);
   });
 
   it("blocks write decision when target content changed after preview", () => {

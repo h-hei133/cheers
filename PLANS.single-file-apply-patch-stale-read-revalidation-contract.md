@@ -62,3 +62,5 @@ Focused tests must prove:
 ## Follow-up Gate
 
 A future route may evaluate permission UX dry-run surface or resultMapper/sessionRuntime display. Production write wiring remains blocked until stale-read, permission approval, result surface, and final writer boundary are proven together in a separate plan.
+
+- See `PLANS.single-file-apply-patch-dry-run-stale-evidence-chain-contract.md` for the follow-up contract that lets dry-run base evidence drive this stale-read revalidation without exposing base file content.
