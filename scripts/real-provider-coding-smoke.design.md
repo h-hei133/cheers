@@ -35,7 +35,7 @@ It is not a default gate and is not run by this checkpoint.
     - fixture summary: observed/expected changed files, protected changed files, and `note.txt` status as only `draft`, `ready`, `other`, or `missing`.
     - runtime summary: isolated runtime home kind, whether `.private-agents`/session artifacts were created under that isolated home, and `realProviderHomeUsedForRuntime=false`.
     - audit isolation summary: `auditLogKind`, `repoAuditResidueDetected`, `auditResidueCleaned`, and `auditLogCreated`.
-    - mutation summary: `taskKind`, `actionSequence`, `targetFile`, `mutationInstructionPresent`, `replaceFromPresent`, `replaceToPresent`, `patchFailureCode`, `failedFileReason`, and a redacted model text tail.
+    - mutation summary: `taskKind`, `actionSequence`, `targetFile`, `mutationInstructionPresent`, `replaceFromPresent`, `replaceToPresent`, `replaceFieldSource`, `diagnosticSource`, `patchFailureCode`, `failedFileReason`, and a redacted model text tail. Successful structured edit results must not be reported as missing replacement fields merely because no literal replace fields were emitted; the diagnostics must distinguish structured success from redacted output fallback.
     - classification summary: `failureStage`, `failureCategory`, `statusDetail`, and `nextAction`.
 14. Clean the fixture and isolated runtime home unless the caller explicitly asks to keep test artifacts.
 

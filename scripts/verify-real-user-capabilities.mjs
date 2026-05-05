@@ -1856,7 +1856,13 @@ function buildCodingFlowDiagnostics({
       repoAfter,
       auditResidueCleaned,
     }),
-    mutation: buildCodingFlowMutationDiagnostics(safeOutput),
+    mutation: buildCodingFlowMutationDiagnostics(safeOutput, {
+      comparison,
+      expected,
+      noteStatusBefore,
+      noteStatusAfter,
+      statusDetail,
+    }),
     classification: {
       failureStage: deriveCodingFlowFailureStage({
         failureCategory,
@@ -1889,7 +1895,53 @@ function inspectCodingFlowAuditIsolation({
   }
 }
 
-function buildCodingFlowMutationDiagnostics(output) {
+function detectLiteralReplaceFieldsFromOutput(output) {
+  const normalized = String(output ?? '')
+  const explicitFrom = /\b(?:replaceFrom|fromText|source text|current source text)\b/i.test(normalized)
+  const explicitTo = /\b(?:replaceTo|toText|replacement text|new text)\b/i.test(normalized)
+  const replaceSummary = /\breplaced\s+[`"'][\s\S]+?[`"']\s+with\s+[`"'][\s\S]+?[`"']/i.test(normalized)
+  const replaceDirective = /\breplace\s+[`"'][\s\S]+?[`"']\s+with\s+[`"'][\s\S]+?[`"']/i.test(normalized)
+  return {
+    replaceFromPresent: explicitFrom || replaceSummary || replaceDirective,
+    replaceToPresent: explicitTo || replaceSummary || replaceDirective,
+    source: explicitFrom || explicitTo || replaceSummary || replaceDirective
+      ? 'redacted-output-summary'
+      : 'none',
+  }
+}
+
+function deriveStructuredMutationDiagnosticSource({
+  actionSequence = [],
+  expected = { observed: [] },
+  noteStatusBefore = 'missing',
+  noteStatusAfter = 'missing',
+  patchFailureCode = 'none',
+  statusDetail = 'product-runtime-regression',
+} = {}) {
+  const changedFiles = [...(expected.observed ?? [])]
+  const structuredSuccess =
+    statusDetail === 'passed' &&
+    patchFailureCode === 'none' &&
+    actionSequence.includes('edit') &&
+    changedFiles.includes('note.txt') &&
+    noteStatusBefore === 'draft' &&
+    noteStatusAfter === 'ready'
+
+  if (structuredSuccess) {
+    return 'structured-success-no-literal-replace'
+  }
+  if (actionSequence.length > 0 || changedFiles.length > 0 || patchFailureCode !== 'none') {
+    return 'structured-result'
+  }
+  return 'output-tail-fallback'
+}
+
+function buildCodingFlowMutationDiagnostics(output, {
+  expected = { observed: [] },
+  noteStatusBefore = 'missing',
+  noteStatusAfter = 'missing',
+  statusDetail = 'product-runtime-regression',
+} = {}) {
   const normalized = String(output ?? '')
   const taskKind = normalized.match(/-\s*Task:\s*([^\r\n]+)/i)?.[1]?.trim() ?? 'unknown'
   const failedFileReason =
@@ -1905,20 +1957,35 @@ function buildCodingFlowMutationDiagnostics(output) {
     : []
   const targetFile =
     normalized.match(/-\s*Read files:\s*([^\r\n,]+)/i)?.[1]?.trim() ??
+    normalized.match(/-\s*Changed files:\s*([^\r\n,]+)/i)?.[1]?.trim() ??
     normalized.match(/-\s*Unchanged attempted files:\s*([^\r\n,]+)/i)?.[1]?.trim() ??
     normalized.match(/-\s*Failed files:\s*([^\s,(]+)/i)?.[1]?.trim() ??
     'unknown'
   const patchFailureCode =
     normalized.match(/\b(patch-from-not-found|patch-ambiguous|edit-transform-unclear|edit-target-missing)\b/i)?.[1]?.toLowerCase() ??
     'none'
+  const outputReplaceFields = detectLiteralReplaceFieldsFromOutput(normalized)
+  const diagnosticSource = deriveStructuredMutationDiagnosticSource({
+    actionSequence,
+    expected,
+    noteStatusBefore,
+    noteStatusAfter,
+    patchFailureCode,
+    statusDetail,
+  })
+  const structuredSuccessWithoutLiteralFields =
+    diagnosticSource === 'structured-success-no-literal-replace' &&
+    outputReplaceFields.source === 'none'
 
   return {
     taskKind,
     actionSequence,
     targetFile,
     mutationInstructionPresent: !/mutation instruction missing/i.test(normalized),
-    replaceFromPresent: /\b(?:replaceFrom|fromText|source text|current source text)\b/i.test(normalized),
-    replaceToPresent: /\b(?:replaceTo|toText|replacement text|new text)\b/i.test(normalized),
+    replaceFromPresent: structuredSuccessWithoutLiteralFields ? null : outputReplaceFields.replaceFromPresent,
+    replaceToPresent: structuredSuccessWithoutLiteralFields ? null : outputReplaceFields.replaceToPresent,
+    replaceFieldSource: outputReplaceFields.source,
+    diagnosticSource,
     patchFailureCode,
     failedFileReason: failedFileReason ? summarizeOutput(failedFileReason) : '',
     modelTextTailRedacted: summarizeOutput(normalized),
@@ -2721,7 +2788,41 @@ function runRealCodingFlowDiagnosticsSelfTest() {
       failureCategory: 'changedFiles wrong',
       statusDetail: 'changed-files-wrong',
     })
-    const serialized = JSON.stringify(diagnostics)
+    const successResult = {
+      code: 0,
+      timedOut: false,
+      stdout: [
+        'Edit completed for note.txt. Verification passed.',
+        'Result',
+        '- Outcome: success',
+        'Action result',
+        '- Task: edit-file',
+        '- Changed: 1 file(s)',
+        '- Changed files: note.txt',
+        '- Read files: note.txt',
+        '- Change summary: note.txt: replaced `status: draft` with `status: ready`',
+        '- Verification: passed',
+        'Execution summary',
+        '- Actions: read, edit (2 run)',
+      ].join('\n'),
+      stderr: '',
+    }
+    successResult.output = successResult.stdout
+    const successDiagnostics = buildCodingFlowDiagnostics({
+      result: successResult,
+      redactedOutput: redactProviderOutput(successResult.output),
+      comparison: { added: [], removed: [], changed: ['note.txt'] },
+      expected: { observed: ['note.txt'], expected: ['note.txt'], protectedChanged: [] },
+      noteStatusBefore: 'draft',
+      noteStatusAfter: 'ready',
+      runtimeHome,
+      auditLogPath,
+      repoAfter: { ok: true, status: '', outputTail: '' },
+      prompt: fixture.prompt,
+      failureCategory: 'none',
+      statusDetail: 'passed',
+    })
+    const serialized = JSON.stringify({ diagnostics, successDiagnostics })
     const passed =
       diagnostics.process.modelTurnExitCode === 0 &&
       diagnostics.process.modelTurnTimedOut === false &&
@@ -2758,7 +2859,18 @@ function runRealCodingFlowDiagnosticsSelfTest() {
       diagnostics.mutation.mutationInstructionPresent === false &&
       diagnostics.mutation.replaceFromPresent === false &&
       diagnostics.mutation.replaceToPresent === false &&
+      diagnostics.mutation.replaceFieldSource === 'none' &&
+      diagnostics.mutation.diagnosticSource === 'structured-result' &&
       diagnostics.mutation.patchFailureCode === 'patch-from-not-found' &&
+      successDiagnostics.mutation.taskKind === 'edit-file' &&
+      successDiagnostics.mutation.actionSequence.join(',') === 'read,edit' &&
+      successDiagnostics.mutation.targetFile === 'note.txt' &&
+      successDiagnostics.mutation.mutationInstructionPresent === true &&
+      successDiagnostics.mutation.replaceFromPresent === true &&
+      successDiagnostics.mutation.replaceToPresent === true &&
+      successDiagnostics.mutation.replaceFieldSource === 'redacted-output-summary' &&
+      successDiagnostics.mutation.diagnosticSource === 'structured-success-no-literal-replace' &&
+      successDiagnostics.mutation.patchFailureCode === 'none' &&
       diagnostics.classification.failureStage === 'mutation-assertion' &&
       diagnostics.classification.failureCategory === 'changedFiles wrong' &&
       diagnostics.classification.statusDetail === 'changed-files-wrong' &&
@@ -2776,6 +2888,10 @@ function runRealCodingFlowDiagnosticsSelfTest() {
     console.log(`runtimeHomeKind=${diagnostics.runtime.runtimeHomeKind}`)
     console.log(`auditLogKind=${diagnostics.auditIsolation.auditLogKind}`)
     console.log(`mutationInstructionPresent=${diagnostics.mutation.mutationInstructionPresent}`)
+    console.log(`mutationDiagnosticSource=${diagnostics.mutation.diagnosticSource}`)
+    console.log(`successReplaceFromPresent=${successDiagnostics.mutation.replaceFromPresent}`)
+    console.log(`successReplaceToPresent=${successDiagnostics.mutation.replaceToPresent}`)
+    console.log(`successReplaceFieldSource=${successDiagnostics.mutation.replaceFieldSource}`)
     console.log(`patchFailureCode=${diagnostics.mutation.patchFailureCode}`)
     console.log(`failureStage=${diagnostics.classification.failureStage}`)
     console.log(`redaction=${passed ? 'pass' : 'fail'}`)
