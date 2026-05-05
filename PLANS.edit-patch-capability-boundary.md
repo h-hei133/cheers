@@ -1026,6 +1026,39 @@ Reason:
 
 This planning round does not execute A.
 
+## 24. Single-file Update File preview-to-production readiness contract
+
+本轮新增 contract-only readiness surface，继续保持 production `apply_patch` / unified diff rejected 行为不变。
+
+结论:
+
+- `packages/ts-shell/src/orchestration/patchResult/readiness.ts` 只汇总已有 parse / verify / preview / no-partial 结果，不写文件，不接入 `runMvpIntegratedFlow.ts`。
+- readiness 成功条件限定为 exactly one `*** Update File` target、verification ok、preview exactly one update file、no-partial contract ok。
+- permission metadata shape 已能表达:
+  - `operationKind=update`
+  - target path
+  - preview summary
+  - additions / deletions
+  - `singleFileOnly=true`
+  - unsupported operations marker: `multi-file`, `add`, `delete`, `move`
+  - `willWrite=false`
+- result contract shape 已能表达:
+  - `changedFiles`
+  - `failedFiles`
+  - patch records
+  - evidence
+  - retryable `nextAction`
+- failure no-write contract 已覆盖 missing file、ambiguous hunk、unsupported add/delete/move、multi-file patch。
+- 该 checkpoint 不代表 production wiring readiness complete；未来接线仍需 permission UX、read-first/stale alignment、resultMapper/sessionRuntime/runMvp terminal fields、failure taxonomy 和 user-visible regression gates。
+
+边界:
+
+- 不实现 multi-file writes。
+- 不实现 add/delete/move writes。
+- 不实现 rollback、fuzzy patch、AST patch 或完整 apply_patch engine。
+- 不修改 `cli.tsx`、`SessionManager.ts`、`sessionRuntime.ts`、`runMvpIntegratedFlow.ts`。
+- 不运行 real provider。
+
 ## Checkpoint Status Override
 
 - Completed: Planning.
