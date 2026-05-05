@@ -54,8 +54,8 @@ export function createCodingFlowFixture(options = {}) {
 export function buildCodingFlowPrompt() {
   return [
     'This is an isolated fixture coding task.',
+    'In note.txt, replace "status: draft" with "status: ready".',
     'Edit only note.txt.',
-    'Change the line "status: draft" to exactly "status: ready".',
     'Do not modify README.md.',
     'Do not modify LOCKED.md.',
     'Verify note.txt contains "status: ready" and protected files are unchanged.',

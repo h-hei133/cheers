@@ -2105,6 +2105,113 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     ).resolves.toBe("stable content\n");
   }, 15000);
 
+  it("real coding flow old status prompt stops at patch-from-not-found", async () => {
+    await fs.writeFile(
+      path.join(workspaceRoot, "note.txt"),
+      "status: draft\nowner: fixture\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "README.md"),
+      "protected readme\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "LOCKED.md"),
+      "protected locked\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_real_coding_flow_old_status_prompt",
+      prompt: [
+        "This is an isolated fixture coding task.",
+        "Edit only note.txt.",
+        'Change the line "status: draft" to exactly "status: ready".',
+        "Do not modify README.md.",
+        "Do not modify LOCKED.md.",
+        'Verify note.txt contains "status: ready" and protected files are unchanged.',
+      ].join("\n"),
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.codingResult?.taskKind).toBe("edit-file");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.failedFiles?.[0]?.path).toBe("note.txt");
+    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
+      "patch-from-not-found",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "note.txt"), "utf8"),
+    ).resolves.toBe("status: draft\nowner: fixture\n");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "README.md"), "utf8"),
+    ).resolves.toBe("protected readme\n");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "LOCKED.md"), "utf8"),
+    ).resolves.toBe("protected locked\n");
+  }, 15000);
+
+  it("real coding flow parser-friendly status replace edits only note.txt", async () => {
+    await fs.writeFile(
+      path.join(workspaceRoot, "note.txt"),
+      "status: draft\nowner: fixture\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "README.md"),
+      "protected readme\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "LOCKED.md"),
+      "protected locked\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_real_coding_flow_replace_contract",
+      prompt: [
+        'In note.txt, replace "status: draft" with "status: ready".',
+        "Edit only note.txt.",
+        "Do not modify README.md.",
+        "Do not modify LOCKED.md.",
+        'Verify note.txt contains "status: ready" and protected files are unchanged.',
+      ].join("\n"),
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.codingResult?.taskKind).toBe("edit-file");
+    expect(result.codingResult?.changedFiles).toEqual(["note.txt"]);
+    expect(result.codingResult?.failedFiles).toEqual([]);
+    expect(result.codingResult?.patches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "note.txt",
+          status: "applied",
+        }),
+      ]),
+    );
+    expect(result.codingResult?.failedFiles.map((file) => file.reason)).toEqual(
+      expect.not.arrayContaining([expect.stringContaining("patch-from-not-found")]),
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "note.txt"), "utf8"),
+    ).resolves.toBe("status: ready\nowner: fixture\n");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "README.md"), "utf8"),
+    ).resolves.toBe("protected readme\n");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "LOCKED.md"), "utf8"),
+    ).resolves.toBe("protected locked\n");
+  }, 15000);
+
   it("repairs patch-from-not-found follow-up by reusing the failed edit target", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(

@@ -52,6 +52,10 @@ back to the repository path.
 ## Repo-Aware Routing Guard
 
 The real coding flow fixture prompt is an explicit single-file mutation task.
+It must use the supported single-file replace contract shape
+`In note.txt, replace "status: draft" with "status: ready".` so the
+orchestration layer can extract both replace-from and replace-to text before
+entering the patch lane.
 Repo-aware status/summary shortcuts must not handle prompts with both mutation
 intent and an explicit file target such as `note.txt`; those prompts must fall
 through to the normal coding flow. Repo status, branch, changes, and summary

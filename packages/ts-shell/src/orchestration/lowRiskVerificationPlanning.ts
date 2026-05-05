@@ -137,13 +137,30 @@ function extractLowRiskFileContentVerifications(
   prompt: string,
 ): LowRiskFileContentAssertion[] {
   const assertions: LowRiskFileContentAssertion[] = [];
+  const quotedMatches = prompt.matchAll(
+    /([\w./\\-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))\s+\b(?:contains|includes|has)\b\s*[:=]?\s*[`"“”'](.+?)[`"“”']/gi,
+  );
+  for (const match of quotedMatches) {
+    const path = match[1]?.trim();
+    const expectedText = match[2]?.trim();
+    if (path && expectedText) {
+      assertions.push({
+        path: path.replace(/\\/g, "/"),
+        expectedText,
+      });
+    }
+  }
+
   const matches = prompt.matchAll(
-    /([\w./\\-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))\s+\b(?:contains|includes|has)\b\s*[:=]?\s*[`"“”']?(.+?)[`"“”']?(?=(?:\s+\band\s+[\w./\\-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html)\s+\b(?:contains|includes|has|(?:is|stays?|remains?)\s+unchanged)\b)|[.。]|$)/gi,
+    /([\w./\\-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))\s+\b(?:contains|includes|has)\b\s*[:=]?\s*(?![`"“”'])(.+?)(?=(?:\s+\band\s+[\w./\\-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html)\s+\b(?:contains|includes|has|(?:is|stays?|remains?)\s+unchanged)\b)|[.。]|$)/gi,
   );
   for (const match of matches) {
     const path = match[1]?.trim();
     const expectedText = match[2]?.trim();
-    if (path && expectedText) {
+    const alreadyCovered = assertions.some(
+      (assertion) => normalizePathLike(assertion.path) === normalizePathLike(path ?? ""),
+    );
+    if (path && expectedText && !alreadyCovered) {
       assertions.push({
         path: path.replace(/\\/g, "/"),
         expectedText,
