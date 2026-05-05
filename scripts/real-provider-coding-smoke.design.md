@@ -39,6 +39,12 @@ It is not a default gate and is not run by default checkpoints. The minimal isol
     - classification summary: `failureStage`, `failureCategory`, `statusDetail`, and `nextAction`.
 14. Clean the fixture and isolated runtime home unless the caller explicitly asks to keep test artifacts.
 
+## Failure Follow-up Context Guard
+
+The non-real `--real-coding-flow-followup-context-self-test` covers safe follow-up context construction for stopped/failure outcomes. It includes a `patch-from-not-found` / `mutation instruction missing` scenario with `note.txt` as the target/failed file, no changed files, blocked verification, protected-file constraints, a redacted user follow-up prompt, and a safe `DoNext`. Sensitive provider details injected into the synthetic failure reason or follow-up prompt must be reduced to redacted labels; raw API keys, tokens, Authorization header values, provider config paths, and real-provider home paths must not survive in the context.
+
+This self-test is not a real-provider follow-up smoke. Any future actual-provider follow-up smoke must use a separate explicit opt-in flag, reuse isolated fixture/runtime/audit paths, avoid default gates, avoid fixture mutation unless the contract explicitly allows it, and must not change stopped durable-session auto-recovery semantics.
+
 ## Audit Isolation Guard
 
 The smoke must set `PRIVATE_AGENTS_AUDIT_LOG_PATH` for the child CLI process to

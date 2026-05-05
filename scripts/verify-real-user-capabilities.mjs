@@ -2142,6 +2142,12 @@ function normalizePathForSafety(value) {
   return path.resolve(value).replace(/\\/g, '/').toLowerCase()
 }
 
+function summarizeRedactedProviderDetails(value) {
+  return String(value ?? '')
+    .replace(/Authorization\s*:\s*\[REDACTED\](?:\s+\[REDACTED\])?/gi, '[REDACTED_AUTH_HEADER]')
+    .replace(/\b(?:api_key|refresh_token|access_token)\s*=\s*\[REDACTED\]/gi, '[REDACTED_SECRET]')
+}
+
 function buildCodingFlowFailureFollowupContext(result, followupPrompt, fixture = {}) {
   const failureCategory = result.failureCategory ?? 'product runtime regression'
   const statusDetail =
@@ -2153,16 +2159,24 @@ function buildCodingFlowFailureFollowupContext(result, followupPrompt, fixture =
       ? 'provider-failure'
       : 'stopped'
   const changedFiles = [...(result.changedFiles ?? [])].sort()
+  const failedFiles = [...(result.failedFiles ?? [])].sort()
+  const targetFile = result.targetFile ?? failedFiles[0] ?? result.failedFile ?? undefined
   const editableFiles = [...(fixture.editableFiles ?? result.editableFiles ?? ['note.txt'])].sort()
   const protectedFiles = [...(fixture.protectedFiles ?? result.protectedFiles ?? ['README.md', 'LOCKED.md'])].sort()
   const verification = result.verification ?? (failureCategory === 'verification failed' ? 'failed' : 'blocked')
-  const reason = redactAndAssertCodingProviderOutput(result.failureReason ?? '').redacted
-  const doNext = nextActionForCodingFlowFailure(failureCategory, statusDetail)
-  const safeFollowupPrompt = redactAndAssertCodingProviderOutput(followupPrompt).redacted
+  const reason = summarizeRedactedProviderDetails(
+    redactAndAssertCodingProviderOutput(result.failureReason ?? '').redacted,
+  )
+  const doNext = result.nextAction ?? nextActionForCodingFlowFailure(failureCategory, statusDetail)
+  const safeFollowupPrompt = summarizeRedactedProviderDetails(
+    redactAndAssertCodingProviderOutput(followupPrompt).redacted,
+  )
   const contextLine = [
     `previousOutcome=${outcome}`,
     `blocker=${failureCategory}`,
     `status=${statusDetail}`,
+    targetFile ? `targetFile=${targetFile}` : '',
+    failedFiles.length > 0 ? `failedFiles=${failedFiles.join(',')}` : '',
     changedFiles.length > 0 ? `changedFiles=${changedFiles.join(',')}` : 'changedFiles=none',
     `editableFiles=${editableFiles.join(',')}`,
     `protectedFiles=${protectedFiles.join(',')}`,
@@ -2178,6 +2192,8 @@ function buildCodingFlowFailureFollowupContext(result, followupPrompt, fixture =
     blocker: failureCategory,
     statusDetail,
     changedFiles,
+    failedFiles,
+    targetFile,
     editableFiles,
     protectedFiles,
     verification,
@@ -2669,6 +2685,48 @@ function runRealCodingFlowFollowupContextSelfTest() {
       ],
     },
     {
+      name: 'patch-from-not-found',
+      result: {
+        status: 'FAIL',
+        statusDetail: 'patch-from-not-found',
+        failureCategory: 'product runtime regression',
+        failureReason: [
+          'patch-from-not-found: mutation instruction missing for note.txt',
+          'Authorization: Bearer sk-live-secret-123456789',
+          'api_key=sk-url-secret-123456789',
+          'refresh_token=refresh-secret',
+          'access_token=access-secret',
+          'D:/Test/home-sf/.private-agents/config.json',
+          '/home/wang/.private-agents-real/.private-agents/config.json',
+        ].join('\n'),
+        changedFiles: [],
+        failedFiles: ['note.txt'],
+        targetFile: 'note.txt',
+        verification: 'blocked',
+        nextAction: 'Retry with exact replacement for note.txt after reading the current fixture content.',
+      },
+      followupPrompt: [
+        'retry with exact replacement for note.txt',
+        'Authorization: Bearer sk-live-secret-123456789',
+        'api_key=sk-url-secret-123456789',
+        '/home/wang/.private-agents-real/.private-agents/config.json',
+      ].join(' '),
+      expected: [
+        'previousOutcome=stopped',
+        'blocker=product runtime regression',
+        'status=patch-from-not-found',
+        'targetFile=note.txt',
+        'failedFiles=note.txt',
+        'changedFiles=none',
+        'protectedFiles=LOCKED.md,README.md',
+        'verification=blocked',
+        'reason=patch-from-not-found',
+        'mutation instruction missing',
+        'DoNext=Retry with exact replacement for note.txt',
+        'followup=retry with exact replacement for note.txt',
+      ],
+    },
+    {
       name: 'repo-leak',
       result: {
         status: 'FAIL',
@@ -2692,9 +2750,11 @@ function runRealCodingFlowFollowupContextSelfTest() {
   for (const item of cases) {
     const context = buildCodingFlowFailureFollowupContext(item.result, item.followupPrompt, fixture)
     const hasExpected = item.expected.every((marker) => context.contextLine.includes(marker))
-    const avoidsConfigPath = !/\.private-agents[\\/]+config\.json/i.test(context.contextLine)
+    const avoidsConfigPath = !/\.private-agents(?:-real)?[\\/]+(?:\.private-agents[\\/]+)?config\.json/i.test(context.contextLine)
     const avoidsKey = !/\bsk-[A-Za-z0-9][A-Za-z0-9._-]{8,}\b/i.test(context.contextLine)
-    const passed = hasExpected && avoidsConfigPath && avoidsKey && context.redaction.ok
+    const avoidsAuthHeader = !/Authorization\s*:/i.test(context.contextLine)
+    const avoidsToken = !/\b(?:refresh_token|access_token|api_key)\b/i.test(context.contextLine)
+    const passed = hasExpected && avoidsConfigPath && avoidsKey && avoidsAuthHeader && avoidsToken && context.redaction.ok
     console.log(
       `[${passed ? 'PASS' : 'FAIL'}] coding-flow-followup-${item.name} blocker=${context.blocker} status=${context.statusDetail} redaction=${context.redaction.ok ? 'pass' : 'fail'}`,
     )
