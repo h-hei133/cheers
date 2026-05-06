@@ -68,4 +68,60 @@ describe("lightweight chat route", () => {
       }
     }
   });
+
+  it("maps real provider fetch failures into a structured terminal result", async () => {
+    const fetchFailure = Object.assign(new TypeError("fetch failed"), {
+      cause: {
+        name: "ConnectTimeoutError",
+        code: "UND_ERR_CONNECT_TIMEOUT",
+        message: "Connect Timeout Error",
+      },
+    });
+    const fetchImpl = (async () => {
+      throw fetchFailure;
+    }) as typeof fetch;
+    const events = [];
+
+    for await (const event of streamLightweightChat({
+      sessionId: "sess_light_error",
+      prompt: "这是一次测试",
+      mode: "chat",
+      providerMode: "real",
+      providerCredential: {
+        provider: "openai-compatible",
+        authMode: "api-key",
+        apiKey: "sk-test-secret",
+        baseUrl: "https://api.example.test/v1",
+        model: "test-model",
+        source: "config",
+        envVarName: "TEST_API_KEY",
+      },
+      fetchImpl,
+    })) {
+      events.push(event);
+    }
+
+    expect(events.some((event) => event.type === "query.failed")).toBe(false);
+    expect(events.some((event) => event.type === "lifecycle.error")).toBe(false);
+    expect(events.some((event) => event.type === "tool.started")).toBe(false);
+    expect(events.some((event) => event.type === "approval.requested")).toBe(false);
+
+    const completed = events.at(-1);
+    expect(completed?.type).toBe("query.completed");
+    if (completed?.type === "query.completed") {
+      expect(completed.result.status).toBe("stopped_error");
+      expect(completed.result.terminalClassification).toBe("error");
+      expect(completed.result.stopReason).toContain("provider-network");
+      expect(completed.result.stopReason).toContain("fetch failed");
+      expect(completed.result.stopReason).not.toContain("sk-test-secret");
+      expect(completed.result.sharedContext.notes).toContain("providerCalls=1");
+      expect(completed.result.sharedContext.notes).toContain(
+        "provider-error-kind=network",
+      );
+      expect(completed.result.sharedContext.notes).toContain(
+        "write: disabled (router grants no permissions)",
+      );
+      expect(completed.result.transcript).toEqual([]);
+    }
+  });
 });

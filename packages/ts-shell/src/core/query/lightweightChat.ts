@@ -1,6 +1,8 @@
 import type { SchemaVersion } from "../../../../../contracts/typescript/types.js";
 import type { ResolvedProviderCredential } from "../shell/providerCredentials.js";
+import { redactProviderFailureDetail } from "../shell/providerFailureRedaction.js";
 import { OpenAIModelAdapter } from "../../model-adapters/providers/openai/OpenAIModelAdapter.js";
+import type { NormalizedProviderError } from "../../model-adapters/types.js";
 import type { QueryEvent } from "./events.js";
 import type { TaskMode } from "./routeDecision.js";
 import type { AgentExecutionOutput, OrchestrationResult } from "../../orchestration/types.js";
@@ -67,7 +69,23 @@ export async function* streamLightweightChat(
   yield { type: "query.started", sessionId: options.sessionId, prompt: options.prompt };
   yield { type: "turn.started", role: "coder", turn: 1 };
 
-  const result = await runLightweightChat(options);
+  let result: LightweightChatResult;
+  try {
+    result = await runLightweightChat(options);
+  } catch (error) {
+    yield {
+      type: "query.completed",
+      result: buildStoppedErrorResult({
+        sessionId: options.sessionId,
+        prompt: options.prompt,
+        mode: options.mode,
+        error,
+        providerCallCount: options.providerMode === "real" ? 1 : 0,
+      }),
+    };
+    return;
+  }
+
   const output: AgentExecutionOutput = {
     role: "coder",
     content: result.output,
@@ -177,4 +195,78 @@ function buildCompletedResult(input: {
     },
     finalOutput: input.output.content,
   };
+}
+
+function buildStoppedErrorResult(input: {
+  readonly sessionId: string;
+  readonly prompt: string;
+  readonly mode: LightweightChatOptions["mode"];
+  readonly error: unknown;
+  readonly providerCallCount: number;
+}): OrchestrationResult {
+  const providerError = asNormalizedProviderError(input.error);
+  const errorKind = providerError?.kind ?? "unknown";
+  const stopReason = formatProviderStopReason(input.error);
+  const notes = [
+    `route: mode=${input.mode} path=lightweight`,
+    `providerCalls=${input.providerCallCount}`,
+    `provider-error-kind=${errorKind}`,
+    "tool: skipped (lightweight no-write route)",
+    "write: disabled (router grants no permissions)",
+  ];
+
+  return {
+    status: "stopped_error",
+    terminalReason: "stopped_error",
+    terminalClassification: "error",
+    stopReason,
+    transcript: [],
+    sharedContext: {
+      sessionId: input.sessionId,
+      initialPrompt: input.prompt,
+      notes,
+      handoffs: [],
+    },
+    finalOutput: "",
+  };
+}
+
+function formatProviderStopReason(error: unknown): string {
+  const providerError = asNormalizedProviderError(error);
+  if (providerError) {
+    const details = [
+      providerError.statusCode != null ? `status=${providerError.statusCode}` : undefined,
+      providerError.code ? `code=${providerError.code}` : undefined,
+      `retriable=${providerError.retriable ? "true" : "false"}`,
+    ].filter(Boolean);
+    const suffix = details.length > 0 ? ` (${details.join(" ")})` : "";
+    return redactProviderFailureDetail(
+      `Provider request failed (provider-${providerError.kind}): ${providerError.message}${suffix}`,
+    );
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  return redactProviderFailureDetail(
+    `Provider request failed (provider-unknown): ${message}`,
+  );
+}
+
+function asNormalizedProviderError(
+  error: unknown,
+): NormalizedProviderError | undefined {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "kind" in error &&
+    "provider" in error &&
+    "message" in error &&
+    "retriable" in error &&
+    typeof (error as { kind?: unknown }).kind === "string" &&
+    typeof (error as { provider?: unknown }).provider === "string" &&
+    typeof (error as { message?: unknown }).message === "string" &&
+    typeof (error as { retriable?: unknown }).retriable === "boolean"
+  ) {
+    return error as NormalizedProviderError;
+  }
+  return undefined;
 }

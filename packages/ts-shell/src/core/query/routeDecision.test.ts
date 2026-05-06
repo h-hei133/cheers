@@ -21,6 +21,25 @@ describe("query route decision", () => {
     expect(decision.noWrite).toBe(true);
   });
 
+  it("does not downgrade error explanation to ordinary chat", () => {
+    const decision = decideQueryRoute({ prompt: "解释这段日志为什么失败" });
+
+    expect(decision.mode).toBe("analysis");
+    expect(decision.route).toBe("lightweight");
+    expect(decision.noWrite).toBe(true);
+  });
+
+  it.each([
+    "review src/app.ts 是否有问题",
+    "检查 package.json 里的 scripts 有没有问题",
+  ])("routes read-only review prompts to analysis: %s", (prompt) => {
+    const decision = decideQueryRoute({ prompt });
+
+    expect(decision.mode).toBe("analysis");
+    expect(decision.route).toBe("lightweight");
+    expect(decision.noWrite).toBe(true);
+  });
+
   it("routes explicit planning to a no-write plan path", () => {
     const decision = decideQueryRoute({
       prompt: "先不要写代码，制定一个实现计划",
@@ -41,6 +60,7 @@ describe("query route decision", () => {
   it("keeps tool and write requests behind orchestration boundaries", () => {
     for (const prompt of [
       "修改 src/app.ts",
+      "把 README 里的错误说明改一下",
       "apply_patch 更新文件",
       "运行命令并修复",
       "commit 并 push",
@@ -50,6 +70,19 @@ describe("query route decision", () => {
       expect(decision.route).toBe("orchestrated");
       expect(decision.noWrite).toBe(false);
     }
+  });
+
+  it.each([
+    "commit 是什么意思",
+    "delete 是什么意思",
+    "run 是什么意思",
+    "请不要修改文件，只解释 commit 是什么意思",
+  ])("does not treat concept explanations as tool/write requests: %s", (prompt) => {
+    const decision = decideQueryRoute({ prompt });
+
+    expect(decision.mode).toBe("chat");
+    expect(decision.route).toBe("lightweight");
+    expect(decision.noWrite).toBe(true);
   });
 
   it("does not let active recovery seeds take the lightweight route", () => {

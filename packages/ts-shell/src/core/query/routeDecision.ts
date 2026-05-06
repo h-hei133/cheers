@@ -23,6 +23,8 @@ export interface RouteDecision {
 
 interface IntentSignals {
   readonly asksForNoWritePlan: boolean;
+  readonly asksForExplicitNoWrite: boolean;
+  readonly asksForConceptExplanation: boolean;
   readonly asksForPlan: boolean;
   readonly asksForAnalysis: boolean;
   readonly asksForImplementation: boolean;
@@ -56,6 +58,20 @@ export function decideQueryRoute(input: RouteDecisionInput): RouteDecision {
       noWrite: false,
       reason: "runtime recovery seed must preserve orchestration semantics",
       signals: ["runtime-seed", ...signalNames],
+    };
+  }
+
+  if (
+    signals.asksForConceptExplanation &&
+    !signals.hasPatchShape &&
+    !signals.hasCodeFence
+  ) {
+    return {
+      mode: "chat",
+      route: "lightweight",
+      noWrite: true,
+      reason: "concept explanation request uses lightweight chat route",
+      signals: signalNames,
     };
   }
 
@@ -123,7 +139,15 @@ export function decideQueryRoute(input: RouteDecisionInput): RouteDecision {
 function extractIntentSignals(prompt: string): IntentSignals {
   const normalized = normalizeForIntent(prompt);
   const text = `${normalized} ${prompt}`;
-  const asksForNoWritePlan = hasAny(text, [
+  const asksForExplicitNoWrite = hasAny(text, [
+    /(?:先不要(?:写|改|实现|执行|运行)|不要(?:写|改|执行|运行|实现|修改)|只(?:解释|说明|分析|回答)|不(?:要|用).{0,8}(?:工具|命令|写文件|改文件|修改文件))/u,
+    /\b(?:no code|read[- ]?only|do not (?:write|implement|execute|run|modify)|don't (?:write|implement|execute|run|modify)|explain only)\b/i,
+  ]);
+  const asksForConceptExplanation = hasAny(text, [
+    /(?:是什么意思|什么意思|什么含义|含义是什么|概念是什么|解释一下.{0,24}(?:是什么|什么意思|含义|概念))/u,
+    /\b(?:what is|what does .{1,40} mean|meaning of|explain (?:the )?(?:term|concept))\b/i,
+  ]);
+  const asksForNoWritePlan = asksForExplicitNoWrite || hasAny(text, [
     /(?:先不要(?:写|改|实现|执行)|不要(?:写|改|执行|实现)|只(?:给|输出).{0,8}(?:计划|方案|步骤)|(?:制定|给).{0,8}(?:计划|方案|步骤))/u,
     /\b(?:plan only|no code|do not (?:write|implement|execute|modify)|don't (?:write|implement|execute|modify))\b/i,
   ]);
@@ -138,23 +162,30 @@ function extractIntentSignals(prompt: string): IntentSignals {
     /(?:错误|失败|报错|日志|堆栈|模块|代码|diff|回归|原因|问题|故障)/u,
   ]);
   const asksForAnalysis =
-    hasAny(text, [/\b(analy[sz]e|diagnose|investigate|root cause|what caused)\b/i, /(?:分析|定位|排查|根因|原因|问题在哪)/u]) ||
+    hasAny(text, [
+      /\b(analy[sz]e|diagnose|investigate|root cause|what caused|review|inspect|check)\b/i,
+      /(?:分析|定位|排查|根因|原因|问题在哪|检查|审查|看看|是否有问题|有没有问题)/u,
+    ]) ||
     (hasAnalysisContext &&
       hasAny(text, [/\b(explain|why|what happened)\b/i, /(?:解释|为什么|怎么回事|看看)/u]));
   const asksForImplementation =
     !asksForNoWritePlan &&
+    !asksForConceptExplanation &&
     hasAny(text, [
       /\b(implement|fix|modify|update|change|refactor|wire|add|create|repair)\b/i,
-      /(?:实现|修复|修改|更新|接入|新增|创建|改代码|按计划)/u,
+      /(?:实现|修复|修改|更新|接入|新增|创建|改代码|按计划|改一下|写一下|加一下|调整|改成)/u,
     ]);
   const asksForCommand = hasAny(text, [
     /\b(run|execute|test|build|commit|push|shell|terminal|npm|pnpm|yarn|git)\b/i,
     /(?:运行|执行|构建|提交|推送|命令|终端)/u,
   ]);
-  const asksForExplicitCommand = hasAny(text, [
-    /\b(run|execute|command|shell|terminal|npm|pnpm|yarn|git|commit|push)\b/i,
-    /(?:运行|执行|命令|终端|提交|推送)/u,
-  ]);
+  const asksForExplicitCommand =
+    !asksForConceptExplanation &&
+    !asksForExplicitNoWrite &&
+    hasAny(text, [
+      /\b(run|execute|command|shell|terminal|npm|pnpm|yarn|git|commit|push)\b/i,
+      /(?:运行|执行|命令|终端|提交|推送)/u,
+    ]);
   const hasPatchShape = /(?:\*\*\* Begin Patch|diff --git|@@\s|apply_patch)/i.test(
     prompt,
   );
@@ -171,6 +202,8 @@ function extractIntentSignals(prompt: string): IntentSignals {
 
   return {
     asksForNoWritePlan,
+    asksForExplicitNoWrite,
+    asksForConceptExplanation,
     asksForPlan,
     asksForAnalysis,
     asksForImplementation,
@@ -186,6 +219,8 @@ function extractIntentSignals(prompt: string): IntentSignals {
 function renderSignals(signals: IntentSignals): string[] {
   const entries: Array<[keyof IntentSignals, string]> = [
     ["asksForNoWritePlan", "no-write-plan"],
+    ["asksForExplicitNoWrite", "explicit-no-write"],
+    ["asksForConceptExplanation", "concept-explanation"],
     ["asksForPlan", "plan"],
     ["asksForAnalysis", "analysis"],
     ["asksForImplementation", "implementation"],
@@ -215,7 +250,7 @@ function hasAny(value: string, patterns: readonly RegExp[]): boolean {
 }
 
 function hasPathLikeReference(prompt: string): boolean {
-  return /(?:[A-Za-z]:[\\/][^\s"'`<>|?*]+|\.{1,2}[\\/][^\s"'`<>|?*]+|\/[^\s"'`<>|?*]+|[A-Za-z0-9._-]+\.(?:d\.ts|test\.(?:ts|tsx|js|jsx)|spec\.(?:ts|tsx|js|jsx)|tsx|jsx|ts|js|py|go|rs|md|txt|json|log|yaml|yml|toml))(?:$|\s|[,.!?;:])/i.test(
+  return /(?:[A-Za-z]:[\\/][^\s"'`<>|?*]+|\.{1,2}[\\/][^\s"'`<>|?*]+|\/[^\s"'`<>|?*]+|[A-Za-z0-9._-]+\.(?:d\.ts|test\.(?:ts|tsx|js|jsx)|spec\.(?:ts|tsx|js|jsx)|tsx|jsx|ts|js|py|go|rs|md|txt|json|log|yaml|yml|toml)|\b(?:README|AGENTS|LICENSE|Makefile|Dockerfile)\b)(?:$|\s|[,.!?;:，。！？；：])/i.test(
     prompt,
   );
 }
