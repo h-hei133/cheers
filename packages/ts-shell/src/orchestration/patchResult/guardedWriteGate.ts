@@ -24,6 +24,7 @@ export interface GuardedWriteGate {
   readonly explicitOptIn: boolean;
   readonly writeDecisionStatus: WriteDecisionGate["status"];
   readonly blocker?: GuardedWriteGateBlocker;
+  readonly targetPath?: string;
   readonly singleFileUpdateOnly: boolean;
   readonly defaultProductionRejectionUnchanged: boolean;
   readonly approvedForWriteRequired: true;
@@ -57,6 +58,9 @@ export function buildGuardedWriteGate(
     explicitOptIn: options.explicitOptIn,
     writeDecisionStatus: options.writeDecision.status,
     ...(blocker ? { blocker } : {}),
+    ...(options.writeDecision.baseEvidence?.targetPath
+      ? { targetPath: options.writeDecision.baseEvidence.targetPath }
+      : {}),
     singleFileUpdateOnly: options.singleFileUpdateOnly,
     defaultProductionRejectionUnchanged:
       options.defaultProductionRejectionUnchanged,
@@ -98,6 +102,9 @@ export function buildGuardedWriteGate(
       ...(options.singleFileUpdateOnly
         ? ["apply-patch-guarded-write-gate:single-file-update-only"]
         : ["apply-patch-guarded-write-gate:unsupported-operation"]),
+      ...(options.writeDecision.baseEvidence?.targetPath
+        ? ["apply-patch-guarded-write-gate:approval-bound-target"]
+        : []),
       ...(options.defaultProductionRejectionUnchanged
         ? ["apply-patch-guarded-write-gate:default-production-rejection-unchanged"]
         : ["apply-patch-guarded-write-gate:default-rejection-regression"]),
