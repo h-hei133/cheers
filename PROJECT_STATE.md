@@ -342,6 +342,44 @@ Important boundaries:
 - the passing guarded candidate does not approve multi-file/add/delete/move,
   AST, fuzzy patching, rollback, or release/default gates
 
+### M. Single-file `apply_patch` guarded production route seam (attempted 2026-05-06)
+
+The guarded production route seam has been added and validated locally for an
+explicit opt-in, single-file Update File route against an isolated temporary
+workspace.
+
+Key local evidence:
+
+- route wiring gate requires explicit route opt-in
+- guarded gate must be `ready`
+- write decision must be `approved-for-write`
+- final stale-read remains immediately before the writer
+- result/session status is write-success only after verified write
+- non-opt-in route requests remain stopped/no-write
+- default production `apply_patch` and unified diff rejection remains unchanged
+
+Real-provider guarded route smoke status:
+
+- in-sandbox attempt: readiness passed, then tsx IPC failed with `listen EPERM`
+  before route execution
+- outside-sandbox rerun: readiness passed and provider path was reached
+- result: `PROVIDER_NETWORK`, `provider-network-inconclusive`, `fetch failed`,
+  retriable
+- fixture changed: none
+- repository clean: true
+- redaction: pass
+
+Current gate state: attempted/blocked by provider network. This is not a route
+failure, redaction failure, unexpected write, or write-success result.
+
+Important boundaries:
+
+- this smoke remains explicit opt-in only and uses a temporary workspace
+- production `apply_patch` and unified diff inputs remain rejected by default
+- default production write remains blocked
+- production CLI/session/runtime write wiring still requires a separate review
+- no further automatic provider retry is planned
+
 ## 6. Confirmed Baseline Facts
 
 - unified query loop exists and is durable
@@ -358,7 +396,7 @@ Important boundaries:
 2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
 3. multi-file edit, production apply_patch write, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
 4. production single-file `apply_patch` route wiring remains blocked; result/session safety is proven only at seam level
-5. production single-file `apply_patch` write route remains unwired even though the isolated fixture and guarded isolated-workspace write gates have passed
+5. production single-file `apply_patch` write route remains unwired; the isolated fixture and guarded isolated-workspace write gates have passed, but the guarded production route real-provider smoke is still attempted/blocked by provider network
 6. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
 ## 8. Re-entry / Escalation Triggers
@@ -371,7 +409,8 @@ Escalate from hardening into focused implementation when one is reproducible:
 
 ## 9. Current Minimal Next Step
 
-- single-file `apply_patch` production write remains blocked; start with a fresh review before production resultMapper/sessionRuntime wiring, durable runtime route wiring, or default production write enablement
+- single-file `apply_patch` production write remains blocked; the guarded production route seam is locally validated, but the real-provider guarded route smoke is attempted/blocked by provider network
+- start with an explicit real-provider guarded route smoke rerun only when provider/network conditions are expected to be available; do not continue to production resultMapper/sessionRuntime wiring, durable runtime route wiring, or default production write enablement before that gate passes and receives separate review
 - the isolated fixture and guarded isolated-workspace write smokes have passed; treat them only as explicit opt-in isolated evidence, not default production write evidence, and do not rerun automatically
 - the real-provider non-mutating dry-run smoke and permission UX no-write smoke are sealed; do not rerun them by default unless validating a regression or a new provider-facing route decision
 - consider durable stopped-session continuity analysis as separate, explicitly scoped work
