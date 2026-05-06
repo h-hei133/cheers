@@ -76,6 +76,7 @@ const realApplyPatchPermissionUxSmoke = process.argv.includes('--real-apply-patc
 const realApplyPatchWriteFixtureSmoke = process.argv.includes('--real-apply-patch-write-fixture-smoke')
 const realApplyPatchRuntimeNoWriteSmoke = process.argv.includes('--real-apply-patch-runtime-no-write-smoke')
 const realApplyPatchGuardedWriteSmoke = process.argv.includes('--real-apply-patch-guarded-write-smoke')
+const realApplyPatchGuardedRouteSmoke = process.argv.includes('--real-apply-patch-guarded-route-smoke')
 
 const failureCategories = [
   'none',
@@ -1455,6 +1456,10 @@ function printHelp() {
   console.log('    Excluded from default verification; the production writer and repository must remain untouched.')
   console.log('  --real-apply-patch-guarded-write-smoke')
   console.log('    Opt-in only; routes one real-provider apply_patch preview through the guarded production-write candidate lane.')
+  console.log('    The generated patch may write only the isolated temporary workspace target.')
+  console.log('    Excluded from default verification; default production apply_patch rejection must remain unchanged.')
+  console.log('  --real-apply-patch-guarded-route-smoke')
+  console.log('    Opt-in only; routes one real-provider apply_patch preview through the guarded production route.')
   console.log('    The generated patch may write only the isolated temporary workspace target.')
   console.log('    Excluded from default verification; default production apply_patch rejection must remain unchanged.')
 }
@@ -5176,6 +5181,169 @@ async function runApplyPatchGuardedWriteRoute({
   }
 }
 
+function buildApplyPatchGuardedRouteEvalScript() {
+  const routeUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'singleFileApplyPatchOptInDryRunRoute.ts')).href
+  const decisionUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'writeDecisionGate.ts')).href
+  const guardedUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'guardedWriteGate.ts')).href
+  const productionRouteUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'productionRoute.ts')).href
+  const smokeUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'guardedRouteSmoke.ts')).href
+  return `
+    import fs from 'node:fs';
+    import path from 'node:path';
+    import { buildSingleFileApplyPatchOptInDryRunRoute } from ${JSON.stringify(routeUrl)};
+    import { buildWriteDecisionGate } from ${JSON.stringify(decisionUrl)};
+    import { buildGuardedWriteGate } from ${JSON.stringify(guardedUrl)};
+    import { runProductionRoute } from ${JSON.stringify(productionRouteUrl)};
+    import { buildGuardedRouteSmokeContract } from ${JSON.stringify(smokeUrl)};
+
+    const workspaceRoot = path.resolve(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
+    const rawPatchText = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
+    const redaction = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
+    const workspaceChangedFiles = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_GUARDED_ROUTE_CHANGED ?? '[]');
+    const protectedFilesUnchanged = process.env.PRIVATE_AGENTS_APPLY_PATCH_GUARDED_ROUTE_PROTECTED_UNCHANGED === 'true';
+    const repositoryClean = process.env.PRIVATE_AGENTS_APPLY_PATCH_GUARDED_ROUTE_REPOSITORY_CLEAN === 'true';
+    const expectedChangedFiles = ['src/app.ts'];
+    const readWorkspaceFile = (absolutePath) => {
+      const resolved = path.resolve(absolutePath);
+      if (!(resolved === workspaceRoot || resolved.startsWith(workspaceRoot + path.sep))) {
+        return undefined;
+      }
+      return fs.existsSync(resolved) ? fs.readFileSync(resolved, 'utf8') : undefined;
+    };
+    const writeWorkspaceFile = (relativePath, content) => {
+      const resolved = path.resolve(workspaceRoot, relativePath);
+      const relative = path.relative(workspaceRoot, resolved);
+      if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        throw new Error('Refusing to write outside isolated guarded apply_patch workspace');
+      }
+      fs.writeFileSync(resolved, content, 'utf8');
+    };
+    (async () => {
+      const routeResult = buildSingleFileApplyPatchOptInDryRunRoute({
+        workspaceRoot,
+        rawPatchText,
+        dryRun: true,
+        explicitOptIn: true,
+        requestedUserDecision: 'approved',
+        readFile: readWorkspaceFile,
+      });
+      const writeDecision = buildWriteDecisionGate({
+        permissionUx: routeResult.permissionUx,
+        explicitApprovedForWrite: true,
+      });
+      const guardedGate = buildGuardedWriteGate({
+        explicitOptIn: true,
+        writeDecision,
+        singleFileUpdateOnly: true,
+        defaultProductionRejectionUnchanged: true,
+      });
+      const productionRoute = await runProductionRoute({
+        workspaceRoot,
+        rawPatchText,
+        permissionUx: routeResult.permissionUx,
+        guardedGate,
+        explicitRouteOptIn: true,
+        singleFileUpdateOnly: true,
+        defaultProductionRejectionUnchanged: true,
+        safeResultSessionProjection: true,
+        isolatedWorkspace: true,
+        readFile: readWorkspaceFile,
+        writeFile: writeWorkspaceFile,
+      });
+      const smoke = buildGuardedRouteSmokeContract({
+        explicitOptIn: true,
+        syntheticProductionRouteValidated: true,
+        productionRoute,
+        redactionCheck: redaction,
+        isolatedWorkspace: true,
+        privateAgentsRealRead: false,
+        providerConfigPrinted: false,
+        repositoryClean,
+        workspaceChangedFiles,
+        expectedChangedFiles,
+        protectedFilesUnchanged,
+      });
+      console.log('__APPLY_PATCH_GUARDED_ROUTE_RESULT__' + JSON.stringify({ routeResult, writeDecision, guardedGate, productionRoute, smoke }));
+    })().catch((error) => {
+      console.log('__APPLY_PATCH_GUARDED_ROUTE_RESULT__' + JSON.stringify({
+        routeError: formatEvalError(error),
+      }));
+      process.exitCode = 1;
+    });
+
+    function formatEvalError(error) {
+      if (error instanceof Error) {
+        return error.stack ?? error.message;
+      }
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return String(error);
+      }
+    }
+  `
+}
+
+async function runApplyPatchGuardedRouteRoute({
+  fixtureDir,
+  patchText,
+  redaction,
+  workspaceChangedFiles,
+  protectedFilesUnchanged,
+  repositoryClean,
+}) {
+  const result = await run(process.execPath, [
+    tsxCliPath,
+    '--eval',
+    buildApplyPatchGuardedRouteEvalScript(),
+  ], {
+    cwd: tsShellRoot,
+    env: {
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
+        ok: redaction.ok,
+        leaks: redaction.leaks,
+      }),
+      PRIVATE_AGENTS_APPLY_PATCH_GUARDED_ROUTE_CHANGED: JSON.stringify(workspaceChangedFiles),
+      PRIVATE_AGENTS_APPLY_PATCH_GUARDED_ROUTE_PROTECTED_UNCHANGED: String(protectedFilesUnchanged),
+      PRIVATE_AGENTS_APPLY_PATCH_GUARDED_ROUTE_REPOSITORY_CLEAN: String(repositoryClean),
+    },
+    timeoutMs: 120000,
+  })
+  const resultLine = result.stdout
+    .split(/\r?\n/)
+    .find((line) => line.startsWith('__APPLY_PATCH_GUARDED_ROUTE_RESULT__'))
+  if (!resultLine) {
+    return {
+      ok: false,
+      failureReason: 'guarded-route-failure: route runner did not emit a result marker',
+      outputTail: summarizeOutput(result.output),
+      result,
+    }
+  }
+  try {
+    const parsed = JSON.parse(resultLine.slice('__APPLY_PATCH_GUARDED_ROUTE_RESULT__'.length))
+    return {
+      ok: result.code === 0 && !result.timedOut,
+      ...parsed,
+      failureReason: parsed.routeError
+        ? `guarded-route-failure: route runner failed: ${summarizeOutput(parsed.routeError)}`
+        : result.code === 0 && !result.timedOut
+          ? undefined
+          : `guarded-route-failure: route runner exited code=${result.code} timedOut=${result.timedOut}`,
+      result,
+    }
+  } catch {
+    return {
+      ok: false,
+      failureReason: 'guarded-route-failure: route runner emitted invalid JSON',
+      outputTail: summarizeOutput(result.output),
+      result,
+    }
+  }
+}
+
 function assertApplyPatchDryRunSmokeSuccess({ routeBundle, comparison, repoBefore, repoAfter, redaction }) {
   const failures = []
   const routeResult = routeBundle?.routeResult
@@ -5604,6 +5772,101 @@ function assertApplyPatchGuardedWriteSmokeSuccess({ guardedBundle, comparison, r
     failureCategory,
     statusDetail: failureCategory === 'guarded write failure'
       ? 'guarded-write-failure'
+      : statusDetailForApplyPatchDryRunFailureCategory(failureCategory),
+  }
+}
+
+function assertApplyPatchGuardedRouteSmokeSuccess({ routeBundle, comparison, repoBefore, repoAfter, redaction }) {
+  const failures = []
+  const productionRoute = routeBundle?.productionRoute
+  const smoke = routeBundle?.smoke
+  const workspaceChangedOk =
+    comparison.added.length === 0 &&
+    comparison.removed.length === 0 &&
+    comparison.changed.length === 1 &&
+    comparison.changed[0] === 'src/app.ts'
+  const protectedFilesUnchanged = !comparison.changed.includes('LOCKED.md')
+
+  if (!repoBefore.ok || repoBefore.status) {
+    failures.push('no-mutation guard failure: repository was not clean before smoke')
+  }
+  if (!repoAfter.ok) {
+    failures.push('no-mutation guard failure: repository status could not be checked after smoke')
+  } else if (repoAfter.status) {
+    failures.push('real repo mutation leak: repository changed during smoke')
+  }
+  if (!redaction.ok) {
+    failures.push(`redaction failure: ${redaction.leaks.join(',') || 'unknown'}`)
+  }
+  if (!routeBundle?.ok || !productionRoute || !smoke) {
+    failures.push(routeBundle?.failureReason ?? 'guarded-route-failure: missing guarded route result')
+  } else {
+    if (!workspaceChangedOk || !protectedFilesUnchanged) {
+      failures.push(`unexpected write: added=${comparison.added.join(',') || 'none'} removed=${comparison.removed.join(',') || 'none'} changed=${comparison.changed.join(',') || 'none'}`)
+    }
+    if (smoke.status !== 'ready') {
+      failures.push(`guarded-route-failure: smoke status ${smoke.status}${smoke.failure ? ` (${smoke.failure})` : ''}`)
+    }
+    if (
+      productionRoute.status !== 'written' ||
+      productionRoute.routeGate?.status !== 'ready' ||
+      productionRoute.changedFiles?.length !== 1 ||
+      productionRoute.changedFiles[0] !== 'src/app.ts' ||
+      productionRoute.writeIntents?.length !== 1 ||
+      productionRoute.writeIntents[0] !== 'src/app.ts' ||
+      productionRoute.productionWriterInvoked !== true ||
+      productionRoute.productionWriterTarget !== 'isolated-workspace' ||
+      productionRoute.realRepositoryWrite !== false ||
+      productionRoute.appliedPatchRecord !== false
+    ) {
+      failures.push('unexpected write: guarded route did not report exactly one isolated workspace write')
+    }
+    if (
+      productionRoute.terminalClassification !== 'success' ||
+      productionRoute.terminalSuccessAllowed !== true ||
+      productionRoute.mutationSuccessClaimAllowed !== true ||
+      productionRoute.resultSessionStatus !== 'write-success' ||
+      productionRoute.writeLane?.verificationStatus !== 'passed' ||
+      smoke.terminalClassification !== 'success' ||
+      smoke.terminalSuccessAllowed !== true ||
+      smoke.mutationSuccessClaimAllowed !== true
+    ) {
+      failures.push('unexpected success claim: terminal success was not tied to a verified guarded route write')
+    }
+    if (
+      smoke.productionWriterTarget !== 'isolated-workspace' ||
+      smoke.realRepositoryWrite !== false ||
+      smoke.appliedPatchRecord !== false ||
+      smoke.protectedFilesUnchanged !== true ||
+      smoke.repositoryClean !== true ||
+      smoke.routeStatus !== 'written' ||
+      smoke.routeGateStatus !== 'ready'
+    ) {
+      failures.push('unexpected write: smoke exposed non-isolated repository/applied/protected-file route state')
+    }
+  }
+
+  let failureCategory = 'none'
+  if (failures.some((failure) => failure.startsWith('no-mutation guard failure'))) {
+    failureCategory = 'no-mutation guard failure'
+  } else if (failures.some((failure) => failure.startsWith('real repo mutation leak'))) {
+    failureCategory = 'real repo mutation leak'
+  } else if (failures.some((failure) => failure.startsWith('redaction failure'))) {
+    failureCategory = 'redaction failure'
+  } else if (failures.some((failure) => failure.startsWith('unexpected write'))) {
+    failureCategory = 'unexpected write'
+  } else if (failures.some((failure) => failure.startsWith('unexpected success claim'))) {
+    failureCategory = 'unexpected success claim'
+  } else if (failures.some((failure) => failure.startsWith('guarded-route-failure'))) {
+    failureCategory = 'guarded route failure'
+  }
+
+  return {
+    ok: failures.length === 0,
+    failures,
+    failureCategory,
+    statusDetail: failureCategory === 'guarded route failure'
+      ? 'guarded-route-failure'
       : statusDetailForApplyPatchDryRunFailureCategory(failureCategory),
   }
 }
@@ -7127,6 +7390,336 @@ async function runRealApplyPatchGuardedWriteSmoke() {
   }
 }
 
+async function runRealApplyPatchGuardedRouteSmoke() {
+  const smokeRunId = `real-apply-patch-guarded-route-${Date.now()}`
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-apply-patch-guarded-route-smoke')
+  console.log('status taxonomy: pass=0 product-regression=1 provider-network-inconclusive=2 config-failure=3')
+  console.log('real-provider=explicit-opt-in')
+  console.log('homeRead=false')
+  console.log('defaultSmoke=skipped')
+  console.log('realProviderHome=config-only')
+  console.log('writeScope=isolated-workspace-only')
+
+  if (!realHome) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-guarded-route-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: 'CONFIG',
+      statusDetail: 'config-failure',
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      noProductionWrite: true,
+      failureCategory: 'auth/config failure',
+      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch guarded route smoke',
+      changedFiles: [],
+      writeIntents: [],
+      productionWriterInvoked: false,
+    })
+    console.log('[CONFIG] real-apply-patch-guarded-route-smoke status=config-failure')
+    console.log('config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch guarded route smoke')
+    process.exit(3)
+  }
+
+  const repoBefore = await readRepoStatusShort()
+  if (!repoBefore.ok || repoBefore.status) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-guarded-route-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: 'FAIL',
+      statusDetail: 'no-mutation-guard-failure',
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      noProductionWrite: true,
+      failureCategory: 'no-mutation guard failure',
+      failureReason: repoBefore.ok
+        ? 'no-mutation guard failure: repository was not clean before smoke'
+        : 'no-mutation guard failure: repository status could not be checked before smoke',
+      changedFiles: [],
+      writeIntents: [],
+      productionWriterInvoked: false,
+      outputTail: repoBefore.outputTail,
+    })
+    console.log('[FAIL] real-apply-patch-guarded-route-smoke status=no-mutation-guard-failure')
+    process.exit(1)
+  }
+
+  const preflight = await runProviderReadinessPreflight()
+  const preflightStatus = buildCodingFlowPreflightStatus(preflight)
+  console.log(`[${preflightStatus.status}] real-apply-patch-guarded-route-preflight status=${preflightStatus.statusDetail}`)
+  if (!preflight.ok) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-guarded-route-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: preflightStatus.status,
+      statusDetail: preflightStatus.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: false,
+      noProductionWrite: true,
+      failureCategory: codingFlowFailureCategoryForStatus(
+        preflightStatus.statusDetail,
+        preflightStatus.failureCategory,
+      ),
+      failureReason: preflightStatus.failureReason,
+      changedFiles: [],
+      writeIntents: [],
+      productionWriterInvoked: false,
+      outputTail: preflight.outputTail,
+    })
+    process.exit(preflightStatus.exitCode)
+  }
+
+  const runtimeHome = getRealCodingFlowRuntimeHome(`${smokeRunId}-apply-patch-guarded-route`)
+  const auditLogPath = getRealCodingFlowAuditLogPath(`${smokeRunId}-apply-patch-guarded-route`)
+  assertSafeCodingFlowRuntimeHome(runtimeHome)
+  assertSafeCodingFlowRuntimeHome(path.dirname(auditLogPath))
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+  const fixture = createApplyPatchDryRunFixture()
+  try {
+    const before = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const providerResult = await runApplyPatchDryRunProviderTurn({
+      prompt: fixture.prompt,
+      runtimeHome,
+      realHome,
+      fixtureDir: fixture.fixtureDir,
+      auditLogPath,
+    })
+    const redaction = redactAndAssertCodingProviderOutput(providerResult.rawOutput || providerResult.output)
+    const redactedProviderOutput = redactAndAssertCodingProviderOutput(providerResult.output).redacted
+    const providerFailure = classifyProviderReadinessFailure(
+      `apply_patch guarded route model turn exited ${providerResult.code}`,
+      redaction.redacted,
+      'real',
+    )
+    const extracted = extractSingleApplyPatchBlock(redactedProviderOutput)
+    let routeBundle = undefined
+    if (providerResult.code === 0 && !providerResult.timedOut && !providerFailure && extracted.status === 'ok') {
+      const routeBefore = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+      const repoDuringRoute = await readRepoStatusShort()
+      routeBundle = await runApplyPatchGuardedRouteRoute({
+        fixtureDir: fixture.fixtureDir,
+        patchText: extracted.patchText,
+        redaction,
+        workspaceChangedFiles: ['src/app.ts'],
+        protectedFilesUnchanged: true,
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoDuringRoute.ok && !repoDuringRoute.status,
+      })
+      const routeAfter = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+      const routeComparison = compareApplyPatchDryRunSnapshots(routeBefore, routeAfter)
+      if (
+        routeBundle?.productionRoute?.status === 'written' &&
+        (
+          routeComparison.added.length !== 0 ||
+          routeComparison.removed.length !== 0 ||
+          routeComparison.changed.length !== 1 ||
+          routeComparison.changed[0] !== 'src/app.ts'
+        )
+      ) {
+        routeBundle = {
+          ...(routeBundle ?? {}),
+          ok: false,
+          failureReason: `guarded-route-failure: guarded route changed unexpected files added=${routeComparison.added.join(',') || 'none'} removed=${routeComparison.removed.join(',') || 'none'} changed=${routeComparison.changed.join(',') || 'none'}`,
+          routeComparison,
+        }
+      }
+    }
+    const after = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const comparison = compareApplyPatchDryRunSnapshots(before, after)
+    const repoAfter = await readRepoStatusShort()
+
+    if (providerFailure || providerResult.code !== 0 || providerResult.timedOut) {
+      const failureStatus = buildCodingFlowSmokeFailureStatus(providerResult, redaction.redacted, redaction)
+      writeReport({
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-apply-patch-guarded-route-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: failureStatus.status,
+        statusDetail: failureStatus.statusDetail,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        noProductionWrite: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+        changedFiles: [],
+        writeIntents: [],
+        productionWriterInvoked: false,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        failureCategory: failureStatus.failureCategory,
+        failureReason: failureStatus.failureReason,
+        outputTail: summarizeOutput(redaction.redacted),
+      })
+      console.log(`fixtureFiles=${fixture.files.join(',')}`)
+      console.log(`fixtureChanged=${comparison.changed.join(',') || 'none'}`)
+      console.log(`repositoryClean=${repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status}`)
+      console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+      console.log(`[${failureStatus.status}] real-apply-patch-guarded-route-smoke status=${failureStatus.statusDetail}`)
+      if (redaction.redacted) console.log(summarizeOutput(redaction.redacted))
+      process.exit(failureStatus.exitCode)
+    }
+
+    if (extracted.status !== 'ok') {
+      const failureCategory = extracted.status === 'provider-output-multiple-patches'
+        ? 'provider output multiple patches'
+        : 'provider output missing apply_patch'
+      const statusDetail = statusDetailForApplyPatchDryRunFailureCategory(failureCategory)
+      writeReport({
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-apply-patch-guarded-route-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: 'FAIL',
+        statusDetail,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        noProductionWrite: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        writeIntents: [],
+        productionWriterInvoked: false,
+        terminalSuccessAllowed: false,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        failureCategory,
+        failureReason: `${statusDetail}: provider output did not contain exactly one apply_patch preview block`,
+        outputTail: summarizeOutput(redactedProviderOutput),
+      })
+      console.log(`fixtureFiles=${fixture.files.join(',')}`)
+      console.log(`applyPatchBlocks=${extracted.count}`)
+      console.log(`fixtureChanged=${comparison.changed.join(',') || 'none'}`)
+      console.log(`repositoryClean=${repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status}`)
+      console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+      console.log(`[FAIL] real-apply-patch-guarded-route-smoke status=${statusDetail}`)
+      process.exit(1)
+    }
+
+    const success = assertApplyPatchGuardedRouteSmokeSuccess({
+      routeBundle,
+      comparison,
+      repoBefore,
+      repoAfter,
+      redaction,
+    })
+    const writeDecision = routeBundle?.writeDecision
+    const guardedGate = routeBundle?.guardedGate
+    const productionRoute = routeBundle?.productionRoute
+    const routeGate = productionRoute?.routeGate
+    const writeLane = productionRoute?.writeLane
+    const smoke = routeBundle?.smoke
+    const report = {
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-guarded-route-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: success.ok ? 'PASS' : 'FAIL',
+      statusDetail: success.ok ? 'passed' : success.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: true,
+      noProductionWrite: true,
+      runtimeHome: 'isolated-test-root',
+      fixture: {
+        files: fixture.files,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+        protectedFilesUnchanged: !comparison.changed.includes('LOCKED.md'),
+      },
+      repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+      routeRunnerFailure: routeBundle?.ok === false
+        ? routeBundle.failureReason ?? 'guarded-route-failure: route runner failed'
+        : '',
+      writeDecisionStatus: writeDecision?.status ?? 'missing',
+      writeDecisionBlocker: writeDecision?.blocker ?? '',
+      guardedGateStatus: guardedGate?.status ?? 'missing',
+      guardedGateBlocker: guardedGate?.blocker ?? '',
+      routeGateStatus: routeGate?.status ?? 'missing',
+      routeGateBlocker: routeGate?.blocker ?? '',
+      productionRouteStatus: productionRoute?.status ?? 'missing',
+      productionRouteBlocker: productionRoute?.blocker ?? '',
+      writeLaneStatus: writeLane?.status ?? 'missing',
+      writeLaneBlocker: writeLane?.blocker ?? '',
+      terminalClassification: productionRoute?.terminalClassification ?? 'missing',
+      changedFiles: productionRoute?.changedFiles ?? [],
+      writeIntents: productionRoute?.writeIntents ?? [],
+      productionWriterInvoked: productionRoute?.productionWriterInvoked ?? false,
+      productionWriterTarget: productionRoute?.productionWriterTarget ?? 'missing',
+      realRepositoryWrite: productionRoute?.realRepositoryWrite ?? true,
+      noAppliedPatchRecord: productionRoute?.appliedPatchRecord === false,
+      terminalSuccessAllowed: productionRoute?.terminalSuccessAllowed === true &&
+        productionRoute?.terminalClassification === 'success' &&
+        productionRoute?.writeLane?.verificationStatus === 'passed',
+      redaction: { ok: redaction.ok, leaks: redaction.leaks },
+      failureCategory: success.failureCategory,
+      failureReason: success.failures.join('; '),
+      outputTail: summarizeOutput(redactedProviderOutput),
+      gateStatus: smoke?.status ?? 'missing',
+      gateEvidence: smoke?.evidence ?? [],
+    }
+    writeReport(report)
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`applyPatchBlocks=${extracted.count}`)
+    console.log(`fixtureChanged=${comparison.changed.join(',') || 'none'}`)
+    console.log(`repositoryClean=${report.repositoryClean}`)
+    console.log(`writeDecisionStatus=${report.writeDecisionStatus}`)
+    if (report.writeDecisionBlocker) console.log(`writeDecisionBlocker=${report.writeDecisionBlocker}`)
+    console.log(`guardedGateStatus=${report.guardedGateStatus}`)
+    if (report.guardedGateBlocker) console.log(`guardedGateBlocker=${report.guardedGateBlocker}`)
+    console.log(`routeGateStatus=${report.routeGateStatus}`)
+    if (report.routeGateBlocker) console.log(`routeGateBlocker=${report.routeGateBlocker}`)
+    console.log(`productionRouteStatus=${report.productionRouteStatus}`)
+    if (report.productionRouteBlocker) console.log(`productionRouteBlocker=${report.productionRouteBlocker}`)
+    console.log(`writeLaneStatus=${report.writeLaneStatus}`)
+    if (report.writeLaneBlocker) console.log(`writeLaneBlocker=${report.writeLaneBlocker}`)
+    console.log(`terminalClassification=${report.terminalClassification}`)
+    console.log(`changedFiles=${report.changedFiles.join(',')}`)
+    console.log(`writeIntents=${report.writeIntents.join(',')}`)
+    console.log(`productionWriterInvoked=${report.productionWriterInvoked}`)
+    console.log(`productionWriterTarget=${report.productionWriterTarget}`)
+    console.log(`realRepositoryWrite=${report.realRepositoryWrite}`)
+    console.log(`noAppliedPatchRecord=${report.noAppliedPatchRecord}`)
+    console.log(`terminalSuccessAllowed=${report.terminalSuccessAllowed}`)
+    console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+    if (!success.ok) {
+      if (report.routeRunnerFailure) console.log(`routeRunnerFailure=${report.routeRunnerFailure}`)
+      console.log(`failureReason=${report.failureReason}`)
+    }
+    console.log(`[${success.ok ? 'PASS' : 'FAIL'}] real-apply-patch-guarded-route-smoke`)
+    process.exit(success.ok ? 0 : 1)
+  } finally {
+    cleanupApplyPatchDryRunFixture(fixture.fixtureDir)
+    cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
+  }
+}
+
 async function main() {
   if (showHelp) {
     printHelp()
@@ -7178,6 +7771,10 @@ async function main() {
   }
   if (realApplyPatchGuardedWriteSmoke) {
     await runRealApplyPatchGuardedWriteSmoke()
+    return
+  }
+  if (realApplyPatchGuardedRouteSmoke) {
+    await runRealApplyPatchGuardedRouteSmoke()
     return
   }
   if (realApplyPatchWriteFixtureSmoke) {
