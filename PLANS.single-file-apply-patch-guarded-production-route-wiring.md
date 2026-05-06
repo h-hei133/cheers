@@ -54,6 +54,24 @@ This is an attempted/blocked provider-network result, not a route failure,
 redaction failure, unexpected write, or write-success result. Do not retry
 repeatedly; rerun only as an explicit real-provider gate attempt.
 
+2026-05-06 single retry:
+
+- repository pre-check: clean
+- readiness preflight: passed with explicit `PRIVATE_AGENTS_REAL_HOME`
+- in-sandbox attempt: readiness preflight passed, then tsx IPC failed with
+  `listen EPERM` on `/tmp/tsx-1000/*.pipe` before route execution
+- rerun outside sandbox: readiness preflight passed and provider path was reached
+- result: `PROVIDER_NETWORK`, `provider-network-inconclusive`
+- provider message after redaction: `fetch failed`, retriable
+- fixture changed: none
+- repository clean: true
+- redaction: pass
+- default production `apply_patch` / unified diff rejection regression: passed
+
+The retry remains attempted/blocked by provider network. It is not evidence of
+route failure, redaction failure, unexpected write, or write success. No further
+automatic retry is planned.
+
 ## Next Boundary
 
 The guarded production route is implemented and locally validated, but the

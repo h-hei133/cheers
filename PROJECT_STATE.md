@@ -368,6 +368,9 @@ Real-provider guarded route smoke status:
 - fixture changed: none
 - repository clean: true
 - redaction: pass
+- single retry: repeated the same outcome after readiness passed and provider
+  path was reached; default `apply_patch` / unified diff rejection regression
+  also passed
 
 Current gate state: attempted/blocked by provider network. This is not a route
 failure, redaction failure, unexpected write, or write-success result.
