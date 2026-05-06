@@ -185,6 +185,31 @@ Recent route-closing commits:
 - `7aee9f8 Add single file apply patch resultMapper consumer contract`
 - `d9658e5 Add single file apply patch sessionRuntime display contract`
 
+### H. Single-file `apply_patch` result/session safe wiring seams (stage-sealed 2026-05-06)
+
+The production write gate preconditions and result/session safe wiring phase are sealed at contract/seam level. The route now has explicit permission UX, final stale-read, writer boundary proof, resultMapper seam, and sessionRuntime seam coverage without production runtime wiring.
+
+Key sealed evidence:
+
+- resultMapper-facing seam consumes mapper-safe projection only
+- sessionRuntime-facing seam consumes resultMapper seam output only
+- dry-run, blocked, and permission-pending states stay non-success-like
+- `willWrite=false`, `changedFiles=[]`, `writeIntents=[]`, no writer invocation, no applied patch record, and no mutation success remain preserved
+- actionable `nextAction` / `doNext` stays visible through the seam outputs
+
+Important boundaries:
+
+- production `resultMapper.ts` and `sessionRuntime.ts` logic is still unchanged for this route
+- CLI, SessionManager, `runMvpIntegratedFlow`, provider/auth, real-provider scripts, release gates, and writer code remain unwired
+- production `apply_patch` and unified diff rejection behavior remains required
+- real-provider coverage remains unnecessary for this seam-only phase and is not meaningful for production write until a route is separately approved
+
+Recent route-closing commits:
+
+- `Add single file apply patch resultMapper seam contract`
+- `Add single file apply patch sessionRuntime seam contract`
+- `Document single file apply patch result session safe wiring blockers`
+
 ## 6. Confirmed Baseline Facts
 
 - unified query loop exists and is durable
@@ -200,7 +225,8 @@ Recent route-closing commits:
 1. true live TTY automation evidence remains weaker than print/stdin/replay evidence in this environment
 2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
 3. multi-file edit, full apply_patch, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
-4. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
+4. production single-file `apply_patch` route wiring remains blocked; result/session safety is proven only at seam level
+5. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
 ## 8. Re-entry / Escalation Triggers
 
@@ -212,7 +238,8 @@ Escalate from hardening into focused implementation when one is reproducible:
 
 ## 9. Current Minimal Next Step
 
-- single-file `apply_patch` production write remains blocked; start with a new `$deep-interview` before any permission UX, final stale-read production placement, writer boundary, or runtime/display production wiring work
+- single-file `apply_patch` production write remains blocked; start with a fresh review before any production opt-in dry-run route, provider-facing permission UX route, production resultMapper/sessionRuntime wiring, final stale-read production placement, or writer boundary work
+- plan a real-provider non-mutating dry-run gate only after a production opt-in dry-run route is wired; do not run real provider for seam/helper/contract-only work
 - consider durable stopped-session continuity analysis as separate, explicitly scoped work
 - do not continue same-family minimal write or failure-explanation smoke hardening unless a regression appears
 - keep hardening the default interactive experience and output truthfulness
