@@ -2,12 +2,12 @@
 
 ## Outcome
 
-Status: `attempted/blocked`
+Status: `passed`
 
 The explicit opt-in real-provider apply_patch dry-run smoke command now exists
-and was executed. The smoke did not reach a completed apply_patch dry-run route
-because the provider model turn failed with a network-attributed provider
-failure.
+and was executed. On retry, the real provider produced exactly one single-file
+`apply_patch` preview block, and that preview passed through the explicit
+opt-in dry-run route without writing.
 
 This is not a production write pass and does not open the production write gate.
 
@@ -26,7 +26,7 @@ Real-provider readiness preflight passed with explicit real-provider opt-in:
 rtk proxy env HOME=/tmp/private-agents-test/apply-patch-real-gate-home USERPROFILE=/tmp/private-agents-test/apply-patch-real-gate-home PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test/apply-patch-real-gate PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real node scripts/verify-provider-readiness.mjs --preflight-only
 ```
 
-Actual smoke attempted:
+Actual smoke passed:
 
 ```bash
 rtk proxy env HOME=/tmp/private-agents-test/apply-patch-real-gate-home USERPROFILE=/tmp/private-agents-test/apply-patch-real-gate-home PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test/apply-patch-real-gate PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real node scripts/verify-real-user-capabilities.mjs --real-apply-patch-dry-run-smoke
@@ -36,24 +36,34 @@ rtk proxy env HOME=/tmp/private-agents-test/apply-patch-real-gate-home USERPROFI
 
 The actual smoke report recorded:
 
-- `status=PROVIDER_NETWORK`
-- `statusDetail=provider-network-inconclusive`
-- `failureCategory=provider-network-inconclusive`
-- `failureReason=provider-readiness:network: provider endpoint was unreachable during this turn`
+- `status=PASS`
+- `statusDetail=passed`
+- `failureCategory=none`
 - `realProviderExecution=true`
 - `modelTurn=true`
 - `noWriteMode=true`
 - `fixture.noMutation=true`
 - `repositoryClean=true`
+- `routeStatus=permission-pending`
+- `displayStatus=permission-pending`
+- `terminalClassification=stopped`
+- `willWrite=false`
 - `changedFiles=[]`
 - `writeIntents=[]`
 - `noWriterInvoked=true`
+- `noAppliedPatchRecord=true`
+- `terminalNoSuccessClaim=true`
 - `redaction.ok=true`
 
-The redacted output tail was:
+The redacted output tail was the generated preview:
 
 ```text
-{"provider":"openai-compatible","kind":"network","message":"fetch failed","retriable":true,"cause":{}}
+*** Begin Patch
+*** Update File: src/app.ts
+@@
+-status: draft
++status: ready
+*** End Patch
 ```
 
 ## Boundary
@@ -63,5 +73,6 @@ Production single-file `apply_patch` remains blocked:
 - writer remains unreachable
 - production write remains disabled
 - default production `apply_patch` and unified diff rejection remain unchanged
-- this outcome does not validate a successful provider-facing dry-run preview
-- retrying the same smoke is appropriate only when the provider endpoint is reachable
+- this outcome validates only a provider-facing non-mutating dry-run preview
+- it does not validate production write, writer invocation, or production
+  resultMapper/sessionRuntime wiring

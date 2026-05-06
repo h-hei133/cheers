@@ -210,6 +210,39 @@ Recent route-closing commits:
 - `Add single file apply patch sessionRuntime seam contract`
 - `Document single file apply patch result session safe wiring blockers`
 
+### I. Single-file `apply_patch` real-provider non-mutating dry-run smoke (stage-sealed 2026-05-06)
+
+The explicit opt-in `--real-apply-patch-dry-run-smoke` has passed for the
+single-file `apply_patch` production-adjacent dry-run route. This is evidence
+that a real provider can produce a single-file `apply_patch` preview and that
+the preview can pass through the explicit opt-in dry-run route without writing.
+
+Key sealed evidence:
+
+- real provider preflight was ready before execution
+- the provider produced exactly one `apply_patch` preview block for `src/app.ts`
+- route status and display status stayed `permission-pending`
+- terminal classification stayed `stopped`, not `success`
+- `willWrite=false`, `changedFiles=[]`, `writeIntents=[]`
+- `noWriterInvoked=true` and no applied patch record was recorded
+- fixture files stayed unchanged and the real repository stayed clean
+- redaction passed; real provider config content, paths, tokens, keys, and
+  headers were not printed or committed
+
+Important boundaries:
+
+- this smoke remains explicit opt-in only; it is not part of release/default
+  gates or CI
+- it validates only a provider-facing non-mutating dry-run preview
+- production `apply_patch` and unified diff inputs remain rejected by default
+- production write, writer invocation, and production resultMapper/sessionRuntime
+  wiring remain blocked pending separate review
+
+Recent route-closing commits:
+
+- `Add single file apply patch real provider dry run smoke`
+- `Document single file apply patch real provider dry run gate outcome`
+
 ## 6. Confirmed Baseline Facts
 
 - unified query loop exists and is durable
@@ -224,7 +257,7 @@ Recent route-closing commits:
 
 1. true live TTY automation evidence remains weaker than print/stdin/replay evidence in this environment
 2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
-3. multi-file edit, full apply_patch, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
+3. multi-file edit, production apply_patch write, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
 4. production single-file `apply_patch` route wiring remains blocked; result/session safety is proven only at seam level
 5. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
@@ -238,8 +271,8 @@ Escalate from hardening into focused implementation when one is reproducible:
 
 ## 9. Current Minimal Next Step
 
-- single-file `apply_patch` production write remains blocked; start with a fresh review before any production opt-in dry-run route, provider-facing permission UX route, production resultMapper/sessionRuntime wiring, final stale-read production placement, or writer boundary work
-- plan a real-provider non-mutating dry-run gate only after a production opt-in dry-run route is wired; do not run real provider for seam/helper/contract-only work
+- single-file `apply_patch` production write remains blocked; start with a fresh review before provider-facing permission UX route, production resultMapper/sessionRuntime wiring, final stale-read production placement, or writer boundary work
+- the real-provider non-mutating dry-run smoke is sealed; do not rerun it by default unless validating a regression or a new provider-facing route decision
 - consider durable stopped-session continuity analysis as separate, explicitly scoped work
 - do not continue same-family minimal write or failure-explanation smoke hardening unless a regression appears
 - keep hardening the default interactive experience and output truthfulness
