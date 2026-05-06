@@ -310,6 +310,38 @@ Important boundaries:
   explicit real-provider opt-in, isolated fixture, redaction, and repo-clean
   constraints
 
+### L. Single-file `apply_patch` guarded production-write candidate smoke (stage-sealed 2026-05-06)
+
+The explicit opt-in `--real-apply-patch-guarded-write-smoke` has passed for the
+single-file `apply_patch` guarded production-write candidate lane against an
+isolated temporary workspace.
+
+Key sealed evidence:
+
+- readiness preflight passed
+- real-provider model path was reached
+- provider output contained exactly one `apply_patch` block
+- write decision status was `approved-for-write`
+- guarded gate status was `ready`
+- guarded write lane status was `written`
+- only isolated workspace `src/app.ts` changed
+- `changedFiles=src/app.ts` and `writeIntents=src/app.ts`
+- production writer was invoked only with `productionWriterTarget=isolated-workspace`
+- `realRepositoryWrite=false`
+- terminal success was allowed only after verified isolated workspace write
+- no applied patch record was recorded
+- redaction passed
+- real repository stayed clean
+
+Important boundaries:
+
+- this smoke remains explicit opt-in only and uses a temporary workspace
+- production `apply_patch` and unified diff inputs remain rejected by default
+- default production write remains blocked
+- production result/session/runtime wiring still requires a separate review
+- the passing guarded candidate does not approve multi-file/add/delete/move,
+  AST, fuzzy patching, rollback, or release/default gates
+
 ## 6. Confirmed Baseline Facts
 
 - unified query loop exists and is durable
@@ -326,7 +358,7 @@ Important boundaries:
 2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
 3. multi-file edit, production apply_patch write, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
 4. production single-file `apply_patch` route wiring remains blocked; result/session safety is proven only at seam level
-5. production single-file `apply_patch` write route remains unwired even though the isolated fixture write gate has passed
+5. production single-file `apply_patch` write route remains unwired even though the isolated fixture and guarded isolated-workspace write gates have passed
 6. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
 ## 8. Re-entry / Escalation Triggers
@@ -339,8 +371,8 @@ Escalate from hardening into focused implementation when one is reproducible:
 
 ## 9. Current Minimal Next Step
 
-- single-file `apply_patch` production write remains blocked; start with a fresh review before production resultMapper/sessionRuntime wiring, final stale-read production placement, writer boundary work, or production write decision work
-- the isolated fixture write smoke has passed; treat it only as isolated fixture evidence, not production write evidence, and do not rerun automatically
+- single-file `apply_patch` production write remains blocked; start with a fresh review before production resultMapper/sessionRuntime wiring, durable runtime route wiring, or default production write enablement
+- the isolated fixture and guarded isolated-workspace write smokes have passed; treat them only as explicit opt-in isolated evidence, not default production write evidence, and do not rerun automatically
 - the real-provider non-mutating dry-run smoke and permission UX no-write smoke are sealed; do not rerun them by default unless validating a regression or a new provider-facing route decision
 - consider durable stopped-session continuity analysis as separate, explicitly scoped work
 - do not continue same-family minimal write or failure-explanation smoke hardening unless a regression appears
