@@ -276,20 +276,22 @@ Important boundaries:
 ### K. Single-file `apply_patch` isolated fixture write smoke (attempted 2026-05-06)
 
 The explicit opt-in `--real-apply-patch-write-fixture-smoke` now exists and is
-validated locally as the narrow isolated fixture write gate. The latest
-real-provider run reached readiness and the provider model path, then stopped as
+validated locally as the narrow isolated fixture write gate. The latest single
+retry reached readiness and the provider model path, then stopped as
 `PROVIDER_NETWORK` / `provider-network-inconclusive` due to timeout.
 
 Observed evidence:
 
 - readiness preflight passed
+- default production `apply_patch` / unified diff rejection regression passed
 - real-provider model path was reached
 - redaction passed
 - fixture files stayed unchanged because the provider turn did not complete
 - real repository stayed clean
 
-Current gate state: attempted/blocked by provider timeout. It is not a route
-failure, not an unexpected write, and not a production write pass.
+Current gate state: attempted/blocked by provider timeout after the requested
+single retry. It is not a route failure, not an unexpected write, and not a
+production write pass.
 
 Important boundaries:
 
