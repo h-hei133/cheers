@@ -105,6 +105,8 @@ describe("lightweight chat route", () => {
     expect(events.some((event) => event.type === "lifecycle.error")).toBe(false);
     expect(events.some((event) => event.type === "tool.started")).toBe(false);
     expect(events.some((event) => event.type === "approval.requested")).toBe(false);
+    expect(events.some((event) => event.type === "turn.started")).toBe(false);
+    expect(events.some((event) => event.type === "turn.completed")).toBe(false);
 
     const completed = events.at(-1);
     expect(completed?.type).toBe("query.completed");

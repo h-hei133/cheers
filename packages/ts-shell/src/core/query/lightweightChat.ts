@@ -67,7 +67,6 @@ export async function* streamLightweightChat(
   options: LightweightChatOptions,
 ): AsyncIterable<QueryEvent> {
   yield { type: "query.started", sessionId: options.sessionId, prompt: options.prompt };
-  yield { type: "turn.started", role: "coder", turn: 1 };
 
   let result: LightweightChatResult;
   try {
@@ -86,6 +85,7 @@ export async function* streamLightweightChat(
     return;
   }
 
+  yield { type: "turn.started", role: "coder", turn: 1 };
   const output: AgentExecutionOutput = {
     role: "coder",
     content: result.output,

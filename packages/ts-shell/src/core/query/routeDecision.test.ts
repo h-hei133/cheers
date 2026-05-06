@@ -50,11 +50,31 @@ describe("query route decision", () => {
     expect(decision.noWrite).toBe(true);
   });
 
+  it.each([
+    "不要修改文件，分析这个错误原因",
+    "只回答：这个日志为什么失败",
+    "请不要修改，看看 package.json scripts 有没有问题",
+  ])("keeps explicit no-write analysis out of plan mode: %s", (prompt) => {
+    const decision = decideQueryRoute({ prompt });
+
+    expect(decision.mode).toBe("analysis");
+    expect(decision.route).toBe("lightweight");
+    expect(decision.noWrite).toBe(true);
+  });
+
   it("keeps implementation requests on the existing orchestration path", () => {
     const decision = decideQueryRoute({ prompt: "实现这个功能并测试" });
 
     expect(decision.mode).toBe("implementation");
     expect(decision.route).toBe("orchestrated");
+  });
+
+  it("keeps mixed plan then implementation requests on orchestration", () => {
+    const decision = decideQueryRoute({ prompt: "先制定计划，然后实现" });
+
+    expect(decision.mode).toBe("implementation");
+    expect(decision.route).toBe("orchestrated");
+    expect(decision.noWrite).toBe(false);
   });
 
   it("keeps tool and write requests behind orchestration boundaries", () => {

@@ -139,6 +139,10 @@ export function decideQueryRoute(input: RouteDecisionInput): RouteDecision {
 function extractIntentSignals(prompt: string): IntentSignals {
   const normalized = normalizeForIntent(prompt);
   const text = `${normalized} ${prompt}`;
+  const asksForPlanThenImplementation = hasAny(text, [
+    /\b(?:plan|planning|steps|roadmap).{0,40}\b(?:then|and)\b.{0,40}\b(?:implement|execute|fix|modify|change|write|code)\b/i,
+    /(?:先|先.*?再|然后|并且|并).{0,12}(?:计划|规划|方案|步骤).{0,20}(?:然后|再|并|并且).{0,12}(?:实现|执行|修改|修复|写代码|编码)/u,
+  ]);
   const asksForExplicitNoWrite = hasAny(text, [
     /(?:先不要(?:写|改|实现|执行|运行)|不要(?:写|改|执行|运行|实现|修改)|只(?:解释|说明|分析|回答)|不(?:要|用).{0,8}(?:工具|命令|写文件|改文件|修改文件))/u,
     /\b(?:no code|read[- ]?only|do not (?:write|implement|execute|run|modify)|don't (?:write|implement|execute|run|modify)|explain only)\b/i,
@@ -147,10 +151,12 @@ function extractIntentSignals(prompt: string): IntentSignals {
     /(?:是什么意思|什么意思|什么含义|含义是什么|概念是什么|解释一下.{0,24}(?:是什么|什么意思|含义|概念))/u,
     /\b(?:what is|what does .{1,40} mean|meaning of|explain (?:the )?(?:term|concept))\b/i,
   ]);
-  const asksForNoWritePlan = asksForExplicitNoWrite || hasAny(text, [
-    /(?:先不要(?:写|改|实现|执行)|不要(?:写|改|执行|实现)|只(?:给|输出).{0,8}(?:计划|方案|步骤)|(?:制定|给).{0,8}(?:计划|方案|步骤))/u,
-    /\b(?:plan only|no code|do not (?:write|implement|execute|modify)|don't (?:write|implement|execute|modify))\b/i,
-  ]);
+  const asksForNoWritePlan =
+    !asksForPlanThenImplementation &&
+    hasAny(text, [
+      /(?:先不要(?:写|改|实现|执行).{0,12}(?:计划|方案|步骤)|不要(?:写|改|执行|实现).{0,12}(?:计划|方案|步骤)|只(?:给|输出).{0,8}(?:计划|方案|步骤)|(?:制定|给).{0,8}(?:计划|方案|步骤))/u,
+      /\b(?:plan only|give me (?:a )?plan|produce (?:a )?plan|no code,?\s*(?:just )?(?:give|write|produce).{0,20}\bplan)\b/i,
+    ]);
   const asksForPlan =
     asksForNoWritePlan ||
     hasAny(text, [
@@ -171,10 +177,12 @@ function extractIntentSignals(prompt: string): IntentSignals {
   const asksForImplementation =
     !asksForNoWritePlan &&
     !asksForConceptExplanation &&
-    hasAny(text, [
-      /\b(implement|fix|modify|update|change|refactor|wire|add|create|repair)\b/i,
-      /(?:实现|修复|修改|更新|接入|新增|创建|改代码|按计划|改一下|写一下|加一下|调整|改成)/u,
-    ]);
+    (asksForPlanThenImplementation ||
+      (!asksForExplicitNoWrite &&
+        hasAny(text, [
+          /\b(implement|fix|modify|update|change|refactor|wire|add|create|repair)\b/i,
+          /(?:实现|修复|修改|更新|接入|新增|创建|改代码|按计划|改一下|写一下|加一下|调整|改成)/u,
+        ])));
   const asksForCommand = hasAny(text, [
     /\b(run|execute|test|build|commit|push|shell|terminal|npm|pnpm|yarn|git)\b/i,
     /(?:运行|执行|构建|提交|推送|命令|终端)/u,
@@ -193,10 +201,11 @@ function extractIntentSignals(prompt: string): IntentSignals {
   const hasPathReference = hasPathLikeReference(prompt);
   const asksForToolOrWrite =
     hasPatchShape ||
-    hasAny(text, [
-      /\b(apply_patch|write|edit|delete|remove|rename|move|save|commit|push)\b/i,
-      /(?:写入|编辑|删除|移除|重命名|移动|保存|提交|推送|改文件|修改文件)/u,
-    ]) ||
+    (!asksForExplicitNoWrite &&
+      hasAny(text, [
+        /\b(apply_patch|write|edit|delete|remove|rename|move|save|commit|push)\b/i,
+        /(?:写入|编辑|删除|移除|重命名|移动|保存|提交|推送|改文件|修改文件)/u,
+      ])) ||
     asksForExplicitCommand ||
     (asksForImplementation && hasPathReference);
 
