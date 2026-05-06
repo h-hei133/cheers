@@ -273,26 +273,32 @@ Important boundaries:
 - production write, writer invocation, and production resultMapper/sessionRuntime
   wiring remain blocked pending separate review
 
-### K. Single-file `apply_patch` isolated fixture write smoke (attempted 2026-05-06)
+### K. Single-file `apply_patch` isolated fixture write smoke (stage-sealed 2026-05-06)
 
 The explicit opt-in `--real-apply-patch-write-fixture-smoke` now exists and is
-validated locally as the narrow isolated fixture write gate. The latest single
-retry reached readiness and the provider model path, then stopped as
-`PROVIDER_NETWORK` / `provider-network-inconclusive` due to timeout.
+validated locally and by real provider as the narrow isolated fixture write
+gate. After a route bridge repair, the real-provider rerun passed.
 
-Observed evidence:
+Key sealed evidence:
 
 - readiness preflight passed
 - default production `apply_patch` / unified diff rejection regression passed
 - real-provider model path was reached
+- provider output contained exactly one `apply_patch` block
+- write decision status was `approved-for-write`
+- isolated write lane status was `written`
+- only isolated fixture `src/app.ts` changed
+- `changedFiles=src/app.ts` and `writeIntents=src/app.ts`
+- `fixtureWriterInvoked=true`
+- `productionWriterInvoked=false`
+- terminal success was allowed only after verified isolated fixture write
+- no applied patch record was recorded
 - redaction passed
-- fixture files stayed unchanged because the provider turn did not complete
 - real repository stayed clean
 
-Current gate state: provider-timeout blocker closed as attempted/blocked after
-the requested single retry. It is not a route failure, not an unexpected write,
-not a production write pass, and not evidence that production write may be
-enabled.
+Current gate state: passed as an explicit opt-in isolated fixture write gate.
+It is not production write wiring and is not evidence that production write may
+be enabled by default.
 
 Important boundaries:
 
@@ -320,7 +326,7 @@ Important boundaries:
 2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
 3. multi-file edit, production apply_patch write, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
 4. production single-file `apply_patch` route wiring remains blocked; result/session safety is proven only at seam level
-5. single-file `apply_patch` isolated fixture write smoke exists, but the provider-timeout blocker is closed as attempted/blocked rather than sealed as passed
+5. production single-file `apply_patch` write route remains unwired even though the isolated fixture write gate has passed
 6. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
 ## 8. Re-entry / Escalation Triggers
@@ -334,7 +340,7 @@ Escalate from hardening into focused implementation when one is reproducible:
 ## 9. Current Minimal Next Step
 
 - single-file `apply_patch` production write remains blocked; start with a fresh review before production resultMapper/sessionRuntime wiring, final stale-read production placement, writer boundary work, or production write decision work
-- the isolated fixture write smoke provider-timeout blocker is closed as attempted/blocked; do not treat it as production write evidence or rerun automatically
+- the isolated fixture write smoke has passed; treat it only as isolated fixture evidence, not production write evidence, and do not rerun automatically
 - the real-provider non-mutating dry-run smoke and permission UX no-write smoke are sealed; do not rerun them by default unless validating a regression or a new provider-facing route decision
 - consider durable stopped-session continuity analysis as separate, explicitly scoped work
 - do not continue same-family minimal write or failure-explanation smoke hardening unless a regression appears

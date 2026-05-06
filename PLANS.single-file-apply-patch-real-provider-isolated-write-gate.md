@@ -1,6 +1,6 @@
 # Single-file apply_patch real-provider isolated write gate
 
-Status: implemented as an explicit opt-in smoke; provider-timeout blocker is closed as attempted/blocked by external provider timeout; production write remains disabled.
+Status: passed as an explicit opt-in isolated fixture smoke after the route bridge repair; production write remains disabled.
 
 ## Scope
 
@@ -45,7 +45,7 @@ The command is explicit opt-in. It uses the existing readiness/redaction smoke i
 
 ## Next Boundary
 
-A passing isolated fixture write gate would be evidence for planning production write wiring, not approval to wire it. This gate has not passed because both real-provider attempts timed out after the provider path was reached. Production write remains blocked.
+A passing isolated fixture write gate is evidence for planning production write wiring, not approval to wire it. Production write remains blocked.
 
 Before any production write wiring, separately review the production route, final stale-read location, writer boundary, result/session success surface, and default rejection behavior.
 
@@ -76,12 +76,31 @@ This is an attempted/blocked gate result, not a route failure and not a write-su
 
 The retry remains attempted/blocked by provider timeout. It is not evidence of route failure, unexpected write, or write success.
 
+2026-05-06 route repair and rerun:
+
+- readiness preflight: passed with explicit `PRIVATE_AGENTS_REAL_HOME`
+- real-provider model path: reached
+- provider output: exactly one `apply_patch` block
+- route bridge: repaired to return the isolated write lane result from the eval runner
+- write decision: `approved-for-write`
+- write lane: `written`
+- changed files: `src/app.ts`
+- write intents: `src/app.ts`
+- fixture writer invoked: true
+- production writer invoked: false
+- no applied patch record: true
+- terminal success allowed: true only after verified isolated fixture write
+- repository clean: true
+- redaction: pass
+
+This is a passed isolated fixture write gate. It is not production write wiring and does not change default production `apply_patch` / unified diff rejection.
+
 ## Blocker Closure
 
-Provider-timeout closure status: closed as external timeout, not product pass.
+Provider-timeout closure status: superseded by the passed route-repair rerun.
 
 - no further automatic retry is planned
-- this does not block local contract work, but it does block claiming the real-provider isolated fixture write gate as passed
+- the real-provider isolated fixture write gate can be treated as passed
 - production write remains blocked
 - default production `apply_patch` and unified diff rejection must remain unchanged
 - a future rerun requires explicit real-provider opt-in and the same isolated fixture/redaction/repo-clean constraints
