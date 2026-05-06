@@ -49,6 +49,11 @@ import {
   checkRealProviderReadiness,
   createProviderReadinessTerminalEvent,
 } from "../core/shell/providerReadiness.js";
+import {
+  decideQueryRoute,
+  type TaskMode,
+} from "../core/query/routeDecision.js";
+import { streamLightweightChat } from "../core/query/lightweightChat.js";
 import { resolveSessionReference } from "../core/shell/recovery.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
 import type {
@@ -1200,6 +1205,40 @@ async function* streamOrchestratedResponse(
     process.env.PRIVATE_AGENTS_PROVIDER_MODE === "synthetic"
       ? "synthetic"
       : "real";
+  const routeDecision = decideQueryRoute({
+    prompt,
+    agentMode,
+    hasRuntimeSeed: Boolean(runtimeSeed),
+  });
+
+  if (routeDecision.route === "lightweight") {
+    const localReadiness = validateLightweightProviderCredential({
+      providerMode,
+      providerCredentialResolution,
+    });
+    if ("stopReason" in localReadiness) {
+      yield createProviderReadinessTerminalEvent({
+        sessionId,
+        prompt,
+        stopReason: localReadiness.stopReason,
+      });
+      return;
+    }
+    for await (const event of streamLightweightChat({
+      sessionId,
+      prompt,
+      mode: routeDecision.mode as Extract<
+        TaskMode,
+        "chat" | "analysis" | "plan"
+      >,
+      providerMode,
+      providerCredential: providerCredentialResolution.credential,
+      signal,
+    })) {
+      yield event;
+    }
+    return;
+  }
 
   if (providerMode === "real") {
     const readiness = await checkRealProviderReadiness({
@@ -1234,6 +1273,52 @@ async function* streamOrchestratedResponse(
   })) {
     yield event;
   }
+}
+
+function validateLightweightProviderCredential(input: {
+  readonly providerMode: "synthetic" | "real";
+  readonly providerCredentialResolution: ProviderCredentialResolution;
+}): { readonly ok: true } | { readonly ok: false; readonly stopReason: string } {
+  if (input.providerMode === "synthetic") {
+    return { ok: true };
+  }
+
+  const provider = input.providerCredentialResolution.provider;
+  const credential = input.providerCredentialResolution.credential;
+  const hasCredential = Boolean(
+    credential?.apiKey?.trim() || credential?.accountAuth?.accessToken?.trim(),
+  );
+  if (!hasCredential) {
+    return {
+      ok: false,
+      stopReason: `Provider readiness failed (provider-readiness:missing-key): ${input.providerCredentialResolution.expectedEnvVarName} or configured credential is missing for lightweight chat.`,
+    };
+  }
+  if (
+    (provider === "openai-compatible" ||
+      provider === "google" ||
+      provider === "antigravity" ||
+      provider === "claudecode") &&
+    !input.providerCredentialResolution.baseUrl?.trim()
+  ) {
+    return {
+      ok: false,
+      stopReason: `Provider readiness failed (provider-readiness:missing-config): ${provider} requires a configured base URL for lightweight chat.`,
+    };
+  }
+  if (
+    (provider === "openai-compatible" ||
+      provider === "google" ||
+      provider === "antigravity" ||
+      provider === "claudecode") &&
+    !input.providerCredentialResolution.model?.trim()
+  ) {
+    return {
+      ok: false,
+      stopReason: `Provider readiness failed (provider-readiness:missing-config): ${provider} requires a configured model for lightweight chat.`,
+    };
+  }
+  return { ok: true };
 }
 
 function createCliEscalationPromptHandler(
