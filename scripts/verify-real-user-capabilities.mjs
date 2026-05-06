@@ -72,6 +72,7 @@ const realCodingFlowDiagnosticsSelfTest = process.argv.includes('--real-coding-f
 const realCodingFlowAuditIsolationSelfTest = process.argv.includes('--real-coding-flow-audit-isolation-self-test')
 const realApplyPatchDryRunSmokeDryRun = process.argv.includes('--real-apply-patch-dry-run-smoke-dry-run')
 const realApplyPatchDryRunSmoke = process.argv.includes('--real-apply-patch-dry-run-smoke')
+const realApplyPatchPermissionUxSmoke = process.argv.includes('--real-apply-patch-permission-ux-smoke')
 
 const failureCategories = [
   'none',
@@ -4631,6 +4632,136 @@ async function runApplyPatchDryRunRoute({ fixtureDir, patchText, redaction }) {
   }
 }
 
+function buildApplyPatchPermissionUxRouteEvalScript() {
+  const routeUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'singleFileApplyPatchOptInDryRunRoute.ts')).href
+  const seamUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'singleFileApplyPatchPermissionUxRealRouteSeam.ts')).href
+  const gateUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'singleFileApplyPatchRealProviderPermissionUxGate.ts')).href
+  return `
+    import fs from 'node:fs';
+    import path from 'node:path';
+    import { buildSingleFileApplyPatchOptInDryRunRoute } from ${JSON.stringify(routeUrl)};
+    import { buildSingleFileApplyPatchPermissionUxRealRouteSeam } from ${JSON.stringify(seamUrl)};
+    import { buildSingleFileApplyPatchRealProviderPermissionUxGateContract } from ${JSON.stringify(gateUrl)};
+
+    const workspaceRoot = path.resolve(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
+    const rawPatchText = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
+    const redaction = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
+    const readFixtureFile = (absolutePath) => {
+      const resolved = path.resolve(absolutePath);
+      if (!(resolved === workspaceRoot || resolved.startsWith(workspaceRoot + path.sep))) {
+        return undefined;
+      }
+      return fs.existsSync(resolved) ? fs.readFileSync(resolved, 'utf8') : undefined;
+    };
+    const pendingRouteResult = buildSingleFileApplyPatchOptInDryRunRoute({
+      workspaceRoot,
+      rawPatchText,
+      dryRun: true,
+      explicitOptIn: true,
+      requestedUserDecision: 'pending',
+      readFile: readFixtureFile,
+    });
+    const deniedRouteResult = buildSingleFileApplyPatchOptInDryRunRoute({
+      workspaceRoot,
+      rawPatchText,
+      dryRun: true,
+      explicitOptIn: true,
+      requestedUserDecision: 'denied',
+      readFile: readFixtureFile,
+    });
+    let staleReads = 0;
+    const blockedRouteResult = buildSingleFileApplyPatchOptInDryRunRoute({
+      workspaceRoot,
+      rawPatchText,
+      dryRun: true,
+      explicitOptIn: true,
+      requestedUserDecision: 'approved',
+      readFile: (absolutePath) => {
+        const current = readFixtureFile(absolutePath);
+        if (current === undefined) return undefined;
+        staleReads += 1;
+        return staleReads === 1 ? current : current + '\\nexternal stale-read marker\\n';
+      },
+    });
+    const pendingSeam = buildSingleFileApplyPatchPermissionUxRealRouteSeam({
+      routeResult: pendingRouteResult,
+      requestedUserDecision: 'pending',
+    });
+    const deniedSeam = buildSingleFileApplyPatchPermissionUxRealRouteSeam({
+      routeResult: deniedRouteResult,
+      requestedUserDecision: 'denied',
+    });
+    const blockedSeam = buildSingleFileApplyPatchPermissionUxRealRouteSeam({
+      routeResult: blockedRouteResult,
+      requestedUserDecision: 'approved',
+    });
+    const gate = buildSingleFileApplyPatchRealProviderPermissionUxGateContract({
+      explicitOptIn: true,
+      syntheticPermissionUxValidated: true,
+      pendingRouteResult,
+      pendingSeam,
+      deniedSeam,
+      blockedSeam,
+      redactionCheck: redaction,
+      isolatedFixture: true,
+      noWriteMode: true,
+      privateAgentsRealRead: false,
+      providerConfigPrinted: false,
+    });
+    console.log('__APPLY_PATCH_PERMISSION_UX_ROUTE_RESULT__' + JSON.stringify({
+      pendingRouteResult,
+      deniedRouteResult,
+      blockedRouteResult,
+      pendingSeam,
+      deniedSeam,
+      blockedSeam,
+      gate,
+    }));
+  `
+}
+
+async function runApplyPatchPermissionUxRoute({ fixtureDir, patchText, redaction }) {
+  const result = await run(process.execPath, [
+    tsxCliPath,
+    '--eval',
+    buildApplyPatchPermissionUxRouteEvalScript(),
+  ], {
+    cwd: tsShellRoot,
+    env: {
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
+        ok: redaction.ok,
+        leaks: redaction.leaks,
+      }),
+    },
+    timeoutMs: 120000,
+  })
+  const resultLine = result.stdout
+    .split(/\r?\n/)
+    .find((line) => line.startsWith('__APPLY_PATCH_PERMISSION_UX_ROUTE_RESULT__'))
+  if (!resultLine) {
+    return {
+      ok: false,
+      failureReason: 'permission-ux-failure: route runner did not emit a result marker',
+      result,
+    }
+  }
+  try {
+    return {
+      ok: result.code === 0 && !result.timedOut,
+      ...JSON.parse(resultLine.slice('__APPLY_PATCH_PERMISSION_UX_ROUTE_RESULT__'.length)),
+      result,
+    }
+  } catch {
+    return {
+      ok: false,
+      failureReason: 'permission-ux-failure: route runner emitted invalid JSON',
+      result,
+    }
+  }
+}
+
 function assertApplyPatchDryRunSmokeSuccess({ routeBundle, comparison, repoBefore, repoAfter, redaction }) {
   const failures = []
   const routeResult = routeBundle?.routeResult
@@ -4717,6 +4848,94 @@ function statusDetailForApplyPatchDryRunFailureCategory(failureCategory) {
   if (failureCategory === 'provider output multiple patches') return 'provider-output-multiple-patches'
   if (failureCategory === 'provider-readiness') return 'provider-readiness'
   return 'passed'
+}
+
+function assertApplyPatchPermissionUxSmokeSuccess({ permissionBundle, comparison, repoBefore, repoAfter, redaction }) {
+  const failures = []
+  const gate = permissionBundle?.gate
+  if (!repoBefore.ok || repoBefore.status) {
+    failures.push('no-mutation guard failure: repository was not clean before smoke')
+  }
+  if (!repoAfter.ok) {
+    failures.push('no-mutation guard failure: repository status could not be checked after smoke')
+  } else if (repoAfter.status) {
+    failures.push('real repo mutation leak: repository changed during smoke')
+  }
+  if (!comparison.ok) {
+    failures.push(`fixture mutation leak: added=${comparison.added.join(',') || 'none'} removed=${comparison.removed.join(',') || 'none'} changed=${comparison.changed.join(',') || 'none'}`)
+  }
+  if (!redaction.ok) {
+    failures.push(`redaction failure: ${redaction.leaks.join(',') || 'unknown'}`)
+  }
+  if (!permissionBundle?.ok || !gate) {
+    failures.push(permissionBundle?.failureReason ?? 'permission-ux-failure: missing permission UX result')
+  } else {
+    if (gate.status !== 'ready') {
+      failures.push(`permission-ux-failure: gate status ${gate.status}${gate.failure ? ` (${gate.failure})` : ''}`)
+    }
+    if (
+      permissionBundle.pendingSeam?.permissionStatus !== 'pending' ||
+      permissionBundle.deniedSeam?.permissionStatus !== 'denied' ||
+      permissionBundle.blockedSeam?.permissionStatus !== 'blocked'
+    ) {
+      failures.push('permission-ux-failure: pending/denied/blocked states were not preserved')
+    }
+    if (
+      gate.willWrite !== false ||
+      gate.changedFiles?.length !== 0 ||
+      gate.writeIntents?.length !== 0 ||
+      gate.noWriterInvoked !== true ||
+      gate.noAppliedPatchRecord !== true ||
+      [permissionBundle.pendingSeam, permissionBundle.deniedSeam, permissionBundle.blockedSeam].some((seam) =>
+        seam?.willWrite !== false ||
+        seam?.changedFiles?.length !== 0 ||
+        seam?.writeIntents?.length !== 0 ||
+        seam?.noWriterInvoked !== true ||
+        seam?.noAppliedPatchRecord !== true
+      )
+    ) {
+      failures.push('unexpected write: permission UX gate exposed write-like state')
+    }
+    if (
+      gate.doesNotClaimMutationSuccess !== true ||
+      gate.doesNotClaimWriteSuccess !== true ||
+      permissionBundle.pendingRouteResult?.resultMapperSeam?.terminalClassification === 'success' ||
+      permissionBundle.pendingRouteResult?.sessionRuntimeSeam?.mutationSuccessDisplayed ||
+      permissionBundle.pendingRouteResult?.sessionRuntimeSeam?.writeSuccessDisplayed ||
+      [permissionBundle.pendingSeam, permissionBundle.deniedSeam, permissionBundle.blockedSeam].some((seam) =>
+        seam?.doesNotClaimMutationSuccess !== true ||
+        seam?.doesNotClaimWriteSuccess !== true
+      )
+    ) {
+      failures.push('unexpected success claim: permission UX looked like a write success')
+    }
+  }
+
+  let failureCategory = 'none'
+  if (failures.some((failure) => failure.startsWith('no-mutation guard failure'))) {
+    failureCategory = 'no-mutation guard failure'
+  } else if (failures.some((failure) => failure.startsWith('real repo mutation leak'))) {
+    failureCategory = 'real repo mutation leak'
+  } else if (failures.some((failure) => failure.startsWith('fixture mutation leak'))) {
+    failureCategory = 'unexpected write'
+  } else if (failures.some((failure) => failure.startsWith('redaction failure'))) {
+    failureCategory = 'redaction failure'
+  } else if (failures.some((failure) => failure.startsWith('unexpected write'))) {
+    failureCategory = 'unexpected write'
+  } else if (failures.some((failure) => failure.startsWith('unexpected success claim'))) {
+    failureCategory = 'unexpected success claim'
+  } else if (failures.some((failure) => failure.startsWith('permission-ux-failure'))) {
+    failureCategory = 'permission UX failure'
+  }
+
+  return {
+    ok: failures.length === 0,
+    failures,
+    failureCategory,
+    statusDetail: failureCategory === 'permission UX failure'
+      ? 'permission-ux-failure'
+      : statusDetailForApplyPatchDryRunFailureCategory(failureCategory),
+  }
 }
 
 function runRealApplyPatchDryRunSmokeDryRun() {
@@ -5045,6 +5264,283 @@ async function runRealApplyPatchDryRunSmoke() {
   }
 }
 
+async function runRealApplyPatchPermissionUxSmoke() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-apply-patch-permission-ux-smoke')
+  renderCodingFlowPreflightNotice({ modelTurn: true, writableFixture: false })
+  console.log('homeRead=false')
+  console.log('defaultSmoke=skipped')
+  console.log('realProviderHome=config-only')
+
+  if (!realHome) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-permission-ux-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: 'CONFIG',
+      statusDetail: 'config-failure',
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      noWriteMode: true,
+      failureCategory: 'auth/config failure',
+      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch permission UX smoke',
+      changedFiles: [],
+      writeIntents: [],
+      noWriterInvoked: true,
+    })
+    console.log('[CONFIG] real-apply-patch-permission-ux-smoke status=config-failure')
+    console.log('config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch permission UX smoke')
+    process.exit(3)
+  }
+
+  const repoBefore = await readRepoStatusShort()
+  if (!repoBefore.ok || repoBefore.status) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-permission-ux-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: 'FAIL',
+      statusDetail: 'no-mutation-guard-failure',
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      noWriteMode: true,
+      failureCategory: 'no-mutation guard failure',
+      failureReason: repoBefore.ok
+        ? 'no-mutation guard failure: repository was not clean before smoke'
+        : 'no-mutation guard failure: repository status could not be checked before smoke',
+      changedFiles: [],
+      writeIntents: [],
+      noWriterInvoked: true,
+      outputTail: repoBefore.outputTail,
+    })
+    console.log('[FAIL] real-apply-patch-permission-ux-smoke status=no-mutation-guard-failure')
+    process.exit(1)
+  }
+
+  const preflight = await runProviderReadinessPreflight()
+  const preflightStatus = buildCodingFlowPreflightStatus(preflight)
+  console.log(`[${preflightStatus.status}] real-apply-patch-permission-ux-preflight status=${preflightStatus.statusDetail}`)
+  if (!preflight.ok) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-permission-ux-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: preflightStatus.status,
+      statusDetail: preflightStatus.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: false,
+      noWriteMode: true,
+      failureCategory: codingFlowFailureCategoryForStatus(
+        preflightStatus.statusDetail,
+        preflightStatus.failureCategory,
+      ),
+      failureReason: preflightStatus.failureReason,
+      changedFiles: [],
+      writeIntents: [],
+      noWriterInvoked: true,
+      outputTail: preflight.outputTail,
+    })
+    process.exit(preflightStatus.exitCode)
+  }
+
+  const runtimeHome = getRealCodingFlowRuntimeHome(`${runId}-apply-patch-permission-ux`)
+  const auditLogPath = getRealCodingFlowAuditLogPath(`${runId}-apply-patch-permission-ux`)
+  assertSafeCodingFlowRuntimeHome(runtimeHome)
+  assertSafeCodingFlowRuntimeHome(path.dirname(auditLogPath))
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+  const fixture = createApplyPatchDryRunFixture()
+  try {
+    const before = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const providerResult = await runApplyPatchDryRunProviderTurn({
+      prompt: fixture.prompt,
+      runtimeHome,
+      realHome,
+      fixtureDir: fixture.fixtureDir,
+      auditLogPath,
+    })
+    const redaction = redactAndAssertCodingProviderOutput(providerResult.rawOutput || providerResult.output)
+    const redactedProviderOutput = redactAndAssertCodingProviderOutput(providerResult.output).redacted
+    const providerFailure = classifyProviderReadinessFailure(
+      `apply_patch permission UX model turn exited ${providerResult.code}`,
+      redaction.redacted,
+      'real',
+    )
+    const extracted = extractSingleApplyPatchBlock(redactedProviderOutput)
+    let permissionBundle = undefined
+    if (providerResult.code === 0 && !providerResult.timedOut && !providerFailure && extracted.status === 'ok') {
+      permissionBundle = await runApplyPatchPermissionUxRoute({
+        fixtureDir: fixture.fixtureDir,
+        patchText: extracted.patchText,
+        redaction,
+      })
+    }
+    const after = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const comparison = compareApplyPatchDryRunSnapshots(before, after)
+    const repoAfter = await readRepoStatusShort()
+
+    if (providerFailure || providerResult.code !== 0 || providerResult.timedOut) {
+      const failureStatus = buildCodingFlowSmokeFailureStatus(providerResult, redaction.redacted, redaction)
+      writeReport({
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-apply-patch-permission-ux-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: failureStatus.status,
+        statusDetail: failureStatus.statusDetail,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        noWriteMode: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          noMutation: comparison.ok,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+        changedFiles: [],
+        writeIntents: [],
+        noWriterInvoked: true,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        failureCategory: failureStatus.failureCategory,
+        failureReason: failureStatus.failureReason,
+        outputTail: summarizeOutput(redaction.redacted),
+      })
+      console.log(`fixtureFiles=${fixture.files.join(',')}`)
+      console.log(`noMutation=${comparison.ok}`)
+      console.log(`repositoryClean=${repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status}`)
+      console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+      console.log(`[${failureStatus.status}] real-apply-patch-permission-ux-smoke status=${failureStatus.statusDetail}`)
+      if (redaction.redacted) console.log(summarizeOutput(redaction.redacted))
+      process.exit(failureStatus.exitCode)
+    }
+
+    if (extracted.status !== 'ok') {
+      const failureCategory = extracted.status === 'provider-output-multiple-patches'
+        ? 'provider output multiple patches'
+        : 'provider output missing apply_patch'
+      const statusDetail = statusDetailForApplyPatchDryRunFailureCategory(failureCategory)
+      writeReport({
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-apply-patch-permission-ux-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: 'FAIL',
+        statusDetail,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        noWriteMode: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          noMutation: comparison.ok,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        writeIntents: [],
+        noWriterInvoked: true,
+        terminalNoSuccessClaim: true,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        failureCategory,
+        failureReason: `${statusDetail}: provider output did not contain exactly one apply_patch preview block`,
+        outputTail: summarizeOutput(redactedProviderOutput),
+      })
+      console.log(`fixtureFiles=${fixture.files.join(',')}`)
+      console.log(`applyPatchBlocks=${extracted.count}`)
+      console.log(`noMutation=${comparison.ok}`)
+      console.log(`repositoryClean=${repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status}`)
+      console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+      console.log(`[FAIL] real-apply-patch-permission-ux-smoke status=${statusDetail}`)
+      process.exit(1)
+    }
+
+    const success = assertApplyPatchPermissionUxSmokeSuccess({
+      permissionBundle,
+      comparison,
+      repoBefore,
+      repoAfter,
+      redaction,
+    })
+    const report = {
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-permission-ux-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: success.ok ? 'PASS' : 'FAIL',
+      statusDetail: success.ok ? 'passed' : success.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: true,
+      noWriteMode: true,
+      runtimeHome: 'isolated-test-root',
+      fixture: {
+        files: fixture.files,
+        noMutation: comparison.ok,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+      },
+      repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+      pendingStatus: permissionBundle?.pendingSeam?.permissionStatus ?? 'missing',
+      deniedStatus: permissionBundle?.deniedSeam?.permissionStatus ?? 'missing',
+      blockedStatus: permissionBundle?.blockedSeam?.permissionStatus ?? 'missing',
+      terminalClassification: permissionBundle?.pendingRouteResult?.resultMapperSeam?.terminalClassification ?? 'missing',
+      willWrite: false,
+      changedFiles: [],
+      writeIntents: [],
+      noWriterInvoked: true,
+      noAppliedPatchRecord: true,
+      terminalNoSuccessClaim: permissionBundle?.pendingRouteResult?.sessionRuntimeSeam?.writeSuccessDisplayed === false &&
+        permissionBundle?.pendingRouteResult?.sessionRuntimeSeam?.mutationSuccessDisplayed === false &&
+        permissionBundle?.pendingRouteResult?.resultMapperSeam?.terminalClassification !== 'success',
+      redaction: { ok: redaction.ok, leaks: redaction.leaks },
+      failureCategory: success.failureCategory,
+      failureReason: success.failures.join('; '),
+      outputTail: summarizeOutput(redactedProviderOutput),
+      gateEvidence: permissionBundle?.gate?.evidence ?? [],
+    }
+    writeReport(report)
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`applyPatchBlocks=${extracted.count}`)
+    console.log(`noMutation=${comparison.ok}`)
+    console.log(`repositoryClean=${report.repositoryClean}`)
+    console.log(`pendingStatus=${report.pendingStatus}`)
+    console.log(`deniedStatus=${report.deniedStatus}`)
+    console.log(`blockedStatus=${report.blockedStatus}`)
+    console.log(`terminalClassification=${report.terminalClassification}`)
+    console.log('changedFiles=')
+    console.log('writeIntents=')
+    console.log(`noWriterInvoked=${report.noWriterInvoked}`)
+    console.log(`terminalNoSuccessClaim=${report.terminalNoSuccessClaim}`)
+    console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+    if (!success.ok) {
+      console.log(`failureReason=${report.failureReason}`)
+    }
+    console.log(`[${success.ok ? 'PASS' : 'FAIL'}] real-apply-patch-permission-ux-smoke`)
+    process.exit(success.ok ? 0 : 1)
+  } finally {
+    cleanupApplyPatchDryRunFixture(fixture.fixtureDir)
+    cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
+  }
+}
+
 async function main() {
   if (showHelp) {
     printHelp()
@@ -5084,6 +5580,10 @@ async function main() {
   }
   if (realApplyPatchDryRunSmoke) {
     await runRealApplyPatchDryRunSmoke()
+    return
+  }
+  if (realApplyPatchPermissionUxSmoke) {
+    await runRealApplyPatchPermissionUxSmoke()
     return
   }
   if (realReadonlyCodingPreflight) {

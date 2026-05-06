@@ -243,6 +243,36 @@ Recent route-closing commits:
 - `Add single file apply patch real provider dry run smoke`
 - `Document single file apply patch real provider dry run gate outcome`
 
+### J. Single-file `apply_patch` real-provider permission UX no-write gate (stage-sealed 2026-05-06)
+
+The explicit opt-in `--real-apply-patch-permission-ux-smoke` has passed for the
+single-file `apply_patch` provider-facing permission UX route. This is evidence
+that a real provider can produce a single-file `apply_patch` preview and the
+runtime can project pending, denied, and blocked permission UX states without
+writing or claiming success.
+
+Key sealed evidence:
+
+- real provider preflight was ready before execution
+- the provider produced exactly one `apply_patch` preview block for `src/app.ts`
+- permission UX states stayed distinct: `pending`, `denied`, and `blocked`
+- terminal classification stayed `stopped`, not `success`
+- `willWrite=false`, `changedFiles=[]`, `writeIntents=[]`
+- `noWriterInvoked=true` and no applied patch record was recorded
+- fixture files stayed unchanged and the real repository stayed clean
+- redaction passed; real provider config content, tokens, keys, and headers were
+  not printed or committed
+
+Important boundaries:
+
+- this smoke remains explicit opt-in only; it is not part of release/default
+  gates or CI
+- it validates only provider-facing permission UX no-write projection
+- approval still does not authorize a write
+- production `apply_patch` and unified diff inputs remain rejected by default
+- production write, writer invocation, and production resultMapper/sessionRuntime
+  wiring remain blocked pending separate review
+
 ## 6. Confirmed Baseline Facts
 
 - unified query loop exists and is durable
@@ -271,8 +301,8 @@ Escalate from hardening into focused implementation when one is reproducible:
 
 ## 9. Current Minimal Next Step
 
-- single-file `apply_patch` production write remains blocked; start with a fresh review before provider-facing permission UX route, production resultMapper/sessionRuntime wiring, final stale-read production placement, or writer boundary work
-- the real-provider non-mutating dry-run smoke is sealed; do not rerun it by default unless validating a regression or a new provider-facing route decision
+- single-file `apply_patch` production write remains blocked; start with a fresh review before production resultMapper/sessionRuntime wiring, final stale-read production placement, writer boundary work, or production write decision work
+- the real-provider non-mutating dry-run smoke and permission UX no-write smoke are sealed; do not rerun them by default unless validating a regression or a new provider-facing route decision
 - consider durable stopped-session continuity analysis as separate, explicitly scoped work
 - do not continue same-family minimal write or failure-explanation smoke hardening unless a regression appears
 - keep hardening the default interactive experience and output truthfulness
