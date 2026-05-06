@@ -11,6 +11,12 @@ import {
   snapshotReadonlyFixture,
 } from './real-provider-readonly-fixture.mjs'
 import {
+  cleanupApplyPatchDryRunFixture,
+  compareApplyPatchDryRunSnapshots,
+  createApplyPatchDryRunFixture,
+  snapshotApplyPatchDryRunFixture,
+} from './real-provider-apply-patch-dry-run-fixture.mjs'
+import {
   assertOnlyExpectedCodingFixtureChanges,
   buildCodingFlowDryRunContract,
   cleanupCodingFlowFixture,
@@ -64,6 +70,8 @@ const realCodingFlowFollowupSmokeDryRun = process.argv.includes('--real-coding-f
 const realCodingFlowFollowupSmoke = process.argv.includes('--real-coding-flow-followup-smoke')
 const realCodingFlowDiagnosticsSelfTest = process.argv.includes('--real-coding-flow-diagnostics-self-test')
 const realCodingFlowAuditIsolationSelfTest = process.argv.includes('--real-coding-flow-audit-isolation-self-test')
+const realApplyPatchDryRunSmokeDryRun = process.argv.includes('--real-apply-patch-dry-run-smoke-dry-run')
+const realApplyPatchDryRunSmoke = process.argv.includes('--real-apply-patch-dry-run-smoke')
 
 const failureCategories = [
   'none',
@@ -1414,6 +1422,7 @@ function printHelp() {
   console.log('  --real-coding-flow-followup-smoke-dry-run')
   console.log('  --real-coding-flow-diagnostics-self-test')
   console.log('  --real-coding-flow-audit-isolation-self-test')
+  console.log('  --real-apply-patch-dry-run-smoke-dry-run')
   console.log('')
   console.log('Explicit opt-in real-provider checks:')
   console.log('  --real-readonly-coding-preflight')
@@ -1429,6 +1438,10 @@ function printHelp() {
   console.log('  --real-coding-flow-followup-smoke')
   console.log('    Opt-in only; runs one real-provider response turn against synthetic stopped/failure context.')
   console.log('    Excluded from default verification; must not modify the isolated fixture.')
+  console.log('  --real-apply-patch-dry-run-smoke')
+  console.log('    Opt-in only; runs one real-provider model turn to produce a single-file apply_patch preview.')
+  console.log('    Excluded from default verification; fixture and repository must remain unchanged.')
+  console.log('    The generated patch is routed through the explicit opt-in dry-run route only; writer remains unreachable.')
 }
 
 function renderReadonlyPreflightNotice(options = {}) {
@@ -3022,9 +3035,24 @@ function buildDirectProviderExplanationEvalScript() {
       }
       console.log('__FOLLOWUP_PROVIDER_RESULT__' + JSON.stringify({ output }));
     })().catch((error) => {
-      console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+      console.error(formatProviderEvalError(error));
       process.exit(1);
     });
+
+    function formatProviderEvalError(error) {
+      if (error instanceof Error) {
+        return error.stack ?? error.message;
+      }
+      try {
+        return JSON.stringify(error, (_key, value) => {
+          if (typeof value === 'function') return '[function]';
+          if (typeof value === 'bigint') return value.toString();
+          return value;
+        });
+      } catch {
+        return String(error);
+      }
+    }
   `
 }
 
@@ -4389,6 +4417,634 @@ function runRealCodingFlowDryRun() {
   }
 }
 
+function buildApplyPatchDryRunProviderEvalScript() {
+  const modelClientUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'model-adapters', 'client.ts')).href
+  const runtimeConfigUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'config', 'runtimeConfig.ts')).href
+  const providerCredentialsUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'core', 'shell', 'providerCredentials.ts')).href
+  return `
+    import { createModelClient } from ${JSON.stringify(modelClientUrl)};
+    import { getRuntimeConfig } from ${JSON.stringify(runtimeConfigUrl)};
+    import { resolveProviderCredential } from ${JSON.stringify(providerCredentialsUrl)};
+
+    ;(async () => {
+      const prompt = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PROMPT ?? '';
+      const workspaceRoot = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? process.cwd();
+      const runtimeConfig = getRuntimeConfig(workspaceRoot);
+      const resolved = resolveProviderCredential({ runtimeConfig });
+      const credential = resolved.credential;
+      if (!credential) {
+        throw new Error('provider-readiness:missing-key');
+      }
+      if (credential.accountAuth && credential.accountAuth.expiresAt <= Date.now()) {
+        throw new Error('provider-readiness:auth account-auth token expired; reconnect before running apply_patch dry-run smoke');
+      }
+      const model = (resolved.model ?? credential.model ?? '').trim() ||
+        (credential.provider === 'openai' && credential.accountAuth ? 'gpt-5.4' : 'gpt-4.1-mini');
+      const client = createModelClient({
+        provider: credential.provider,
+        apiKey: credential.apiKey,
+        accountAuth: credential.accountAuth,
+        baseUrl: resolved.baseUrl ?? credential.baseUrl,
+        requestedCapabilities: { supportsToolCalls: false },
+        fallbackPolicy: { enabled: false },
+      });
+      let output = '';
+      const signal = AbortSignal.timeout(300000);
+      for await (const event of client.stream({
+        schemaVersion: '1.0.0',
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: [
+              'You generate non-mutating apply_patch previews only.',
+              'Return exactly one apply_patch block.',
+              'Do not call tools.',
+              'Do not claim that files were changed or written.'
+            ].join(' ')
+          },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0,
+        maxOutputTokens: 700,
+      }, signal)) {
+        if (event.type === 'content.delta') {
+          output += event.delta;
+        }
+      }
+      console.log('__APPLY_PATCH_DRY_RUN_PROVIDER_RESULT__' + JSON.stringify({ output }));
+    })().catch((error) => {
+      console.error(formatProviderEvalError(error));
+      process.exit(1);
+    });
+
+    function formatProviderEvalError(error) {
+      if (error instanceof Error) {
+        return error.stack ?? error.message;
+      }
+      try {
+        return JSON.stringify(error, (_key, value) => {
+          if (typeof value === 'function') return '[function]';
+          if (typeof value === 'bigint') return value.toString();
+          return value;
+        });
+      } catch {
+        return String(error);
+      }
+    }
+  `
+}
+
+async function runApplyPatchDryRunProviderTurn({ prompt, runtimeHome, realHome, fixtureDir, auditLogPath }) {
+  const result = await run(process.execPath, [
+    tsxCliPath,
+    '--eval',
+    buildApplyPatchDryRunProviderEvalScript(),
+  ], {
+    cwd: tsShellRoot,
+    env: {
+      HOME: runtimeHome,
+      USERPROFILE: runtimeHome,
+      PRIVATE_AGENTS_HOME_OVERRIDE: realHome,
+      PRIVATE_AGENTS_REAL_HOME: realHome,
+      PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+      PRIVATE_AGENTS_AUDIT_LOG_PATH: auditLogPath,
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PROMPT: prompt,
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+    },
+    timeoutMs: 420000,
+  })
+  const resultLine = result.stdout
+    .split(/\r?\n/)
+    .find((line) => line.startsWith('__APPLY_PATCH_DRY_RUN_PROVIDER_RESULT__'))
+  let output = ''
+  if (resultLine) {
+    try {
+      const parsed = JSON.parse(resultLine.slice('__APPLY_PATCH_DRY_RUN_PROVIDER_RESULT__'.length))
+      output = typeof parsed.output === 'string' ? parsed.output : ''
+    } catch {
+      output = ''
+    }
+  }
+  return {
+    ...result,
+    stdout: output,
+    output: output || result.output,
+    rawOutput: result.output,
+  }
+}
+
+function extractSingleApplyPatchBlock(output) {
+  const normalized = String(output ?? '').replace(/\r\n/g, '\n')
+  const matches = [...normalized.matchAll(/\*\*\* Begin Patch[\s\S]*?\*\*\* End Patch/g)]
+    .map((match) => match[0].trim())
+  return {
+    status: matches.length === 1
+      ? 'ok'
+      : matches.length === 0
+        ? 'provider-output-missing-apply-patch'
+        : 'provider-output-multiple-patches',
+    patchText: matches.length === 1 ? matches[0] : '',
+    count: matches.length,
+  }
+}
+
+function buildApplyPatchDryRunRouteEvalScript() {
+  const routeUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'singleFileApplyPatchOptInDryRunRoute.ts')).href
+  const gateUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'singleFileApplyPatchRealProviderDryRunGate.ts')).href
+  return `
+    import fs from 'node:fs';
+    import path from 'node:path';
+    import { buildSingleFileApplyPatchOptInDryRunRoute } from ${JSON.stringify(routeUrl)};
+    import { buildSingleFileApplyPatchRealProviderDryRunGateContract } from ${JSON.stringify(gateUrl)};
+
+    const workspaceRoot = path.resolve(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
+    const rawPatchText = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
+    const redaction = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
+    const routeResult = buildSingleFileApplyPatchOptInDryRunRoute({
+      workspaceRoot,
+      rawPatchText,
+      dryRun: true,
+      explicitOptIn: true,
+      requestedUserDecision: 'approved',
+      readFile: (absolutePath) => {
+        const resolved = path.resolve(absolutePath);
+        if (!(resolved === workspaceRoot || resolved.startsWith(workspaceRoot + path.sep))) {
+          return undefined;
+        }
+        return fs.existsSync(resolved) ? fs.readFileSync(resolved, 'utf8') : undefined;
+      },
+    });
+    const gate = buildSingleFileApplyPatchRealProviderDryRunGateContract({
+      explicitOptIn: true,
+      syntheticRouteValidated: true,
+      routeResult,
+      redactionCheck: redaction,
+      isolatedFixture: true,
+      noWriteMode: true,
+      privateAgentsRealRead: false,
+      providerConfigPrinted: false,
+    });
+    console.log('__APPLY_PATCH_DRY_RUN_ROUTE_RESULT__' + JSON.stringify({ routeResult, gate }));
+  `
+}
+
+async function runApplyPatchDryRunRoute({ fixtureDir, patchText, redaction }) {
+  const result = await run(process.execPath, [
+    tsxCliPath,
+    '--eval',
+    buildApplyPatchDryRunRouteEvalScript(),
+  ], {
+    cwd: tsShellRoot,
+    env: {
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
+        ok: redaction.ok,
+        leaks: redaction.leaks,
+      }),
+    },
+    timeoutMs: 120000,
+  })
+  const resultLine = result.stdout
+    .split(/\r?\n/)
+    .find((line) => line.startsWith('__APPLY_PATCH_DRY_RUN_ROUTE_RESULT__'))
+  if (!resultLine) {
+    return {
+      ok: false,
+      failureReason: 'route-failure: route runner did not emit a result marker',
+      result,
+    }
+  }
+  try {
+    return {
+      ok: result.code === 0 && !result.timedOut,
+      ...JSON.parse(resultLine.slice('__APPLY_PATCH_DRY_RUN_ROUTE_RESULT__'.length)),
+      result,
+    }
+  } catch {
+    return {
+      ok: false,
+      failureReason: 'route-failure: route runner emitted invalid JSON',
+      result,
+    }
+  }
+}
+
+function assertApplyPatchDryRunSmokeSuccess({ routeBundle, comparison, repoBefore, repoAfter, redaction }) {
+  const failures = []
+  const routeResult = routeBundle?.routeResult
+  const gate = routeBundle?.gate
+  if (!repoBefore.ok || repoBefore.status) {
+    failures.push('no-mutation guard failure: repository was not clean before smoke')
+  }
+  if (!repoAfter.ok) {
+    failures.push('no-mutation guard failure: repository status could not be checked after smoke')
+  } else if (repoAfter.status) {
+    failures.push('real repo mutation leak: repository changed during smoke')
+  }
+  if (!comparison.ok) {
+    failures.push(`fixture mutation leak: added=${comparison.added.join(',') || 'none'} removed=${comparison.removed.join(',') || 'none'} changed=${comparison.changed.join(',') || 'none'}`)
+  }
+  if (!redaction.ok) {
+    failures.push(`redaction failure: ${redaction.leaks.join(',') || 'unknown'}`)
+  }
+  if (!routeBundle?.ok || !routeResult || !gate) {
+    failures.push(routeBundle?.failureReason ?? 'route-failure: missing route result')
+  } else {
+    if (routeResult.status === 'rejected') {
+      failures.push('route-failure: opt-in dry-run route rejected the generated apply_patch preview')
+    }
+    if (gate.status !== 'ready') {
+      failures.push(`route-failure: gate status ${gate.status}${gate.failure ? ` (${gate.failure})` : ''}`)
+    }
+    if (
+      routeResult.willWrite !== false ||
+      routeResult.changedFiles?.length !== 0 ||
+      routeResult.writeIntents?.length !== 0 ||
+      routeResult.noWriterInvoked !== true ||
+      routeResult.noAppliedPatchRecord !== true
+    ) {
+      failures.push('unexpected write: route exposed write-like state')
+    }
+    if (
+      routeResult.doesNotClaimMutationSuccess !== true ||
+      routeResult.doesNotClaimWriteSuccess !== true ||
+      routeResult.resultMapperSeam?.terminalClassification === 'success' ||
+      routeResult.resultMapperSeam?.patchesApplied ||
+      routeResult.resultMapperSeam?.taskSatisfied ||
+      routeResult.sessionRuntimeSeam?.mutationSuccessDisplayed ||
+      routeResult.sessionRuntimeSeam?.writeSuccessDisplayed ||
+      routeResult.sessionRuntimeSeam?.appliedPatchDisplayed
+    ) {
+      failures.push('unexpected success claim: dry-run preview looked like a write success')
+    }
+  }
+
+  let failureCategory = 'none'
+  if (failures.some((failure) => failure.startsWith('no-mutation guard failure'))) {
+    failureCategory = 'no-mutation guard failure'
+  } else if (failures.some((failure) => failure.startsWith('real repo mutation leak'))) {
+    failureCategory = 'real repo mutation leak'
+  } else if (failures.some((failure) => failure.startsWith('fixture mutation leak'))) {
+    failureCategory = 'unexpected write'
+  } else if (failures.some((failure) => failure.startsWith('redaction failure'))) {
+    failureCategory = 'redaction failure'
+  } else if (failures.some((failure) => failure.startsWith('unexpected write'))) {
+    failureCategory = 'unexpected write'
+  } else if (failures.some((failure) => failure.startsWith('unexpected success claim'))) {
+    failureCategory = 'unexpected success claim'
+  } else if (failures.some((failure) => failure.startsWith('route-failure'))) {
+    failureCategory = 'route failure'
+  }
+
+  return {
+    ok: failures.length === 0,
+    failures,
+    failureCategory,
+    statusDetail: statusDetailForApplyPatchDryRunFailureCategory(failureCategory),
+  }
+}
+
+function statusDetailForApplyPatchDryRunFailureCategory(failureCategory) {
+  if (failureCategory === 'no-mutation guard failure') return 'no-mutation-guard-failure'
+  if (failureCategory === 'real repo mutation leak') return 'real-repo-mutation-leak'
+  if (failureCategory === 'redaction failure') return 'redaction-failure'
+  if (failureCategory === 'unexpected write') return 'unexpected-write'
+  if (failureCategory === 'unexpected success claim') return 'unexpected-success-claim'
+  if (failureCategory === 'route failure') return 'route-failure'
+  if (failureCategory === 'provider output missing apply_patch') return 'provider-output-missing-apply-patch'
+  if (failureCategory === 'provider output multiple patches') return 'provider-output-multiple-patches'
+  if (failureCategory === 'provider-readiness') return 'provider-readiness'
+  return 'passed'
+}
+
+function runRealApplyPatchDryRunSmokeDryRun() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-apply-patch-dry-run-smoke-dry-run')
+  console.log('homeRead=false')
+  console.log('real-provider execution skipped')
+  console.log('modelTurn=false')
+  console.log('reportWritten=false')
+  console.log('defaultSmoke=skipped')
+
+  const fixture = createApplyPatchDryRunFixture()
+  try {
+    const before = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const after = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const comparison = compareApplyPatchDryRunSnapshots(before, after)
+    const extracted = extractSingleApplyPatchBlock(fixture.prompt)
+    const redaction = redactAndAssertCodingProviderOutput([
+      fixture.prompt,
+      'Authorization: Bearer sk-live-secret-123456789',
+      'api_key=sk-url-secret-123456789',
+      '/home/wang/.private-agents-real/.private-agents/config.json',
+    ].join('\n'))
+    const passed =
+      comparison.ok &&
+      extracted.status === 'ok' &&
+      redaction.ok &&
+      fixture.prompt.includes('Do not claim that any file was modified')
+
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`noMutation=${comparison.ok}`)
+    console.log(`applyPatchBlocks=${extracted.count}`)
+    console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+    console.log('skipReason=real-provider apply_patch dry-run smoke requires explicit opt-in')
+    console.log(`[${passed ? 'PASS' : 'FAIL'}] real-apply-patch-dry-run-smoke-contract`)
+    process.exit(passed ? 0 : 1)
+  } finally {
+    cleanupApplyPatchDryRunFixture(fixture.fixtureDir)
+  }
+}
+
+async function runRealApplyPatchDryRunSmoke() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-apply-patch-dry-run-smoke')
+  renderCodingFlowPreflightNotice({ modelTurn: true, writableFixture: false })
+  console.log('homeRead=false')
+  console.log('defaultSmoke=skipped')
+  console.log('realProviderHome=config-only')
+
+  if (!realHome) {
+    const status = {
+      status: 'CONFIG',
+      statusDetail: 'config-failure',
+      exitCode: 3,
+      failureCategory: 'auth/config failure',
+      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch dry-run smoke',
+    }
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-dry-run-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: status.status,
+      statusDetail: status.statusDetail,
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      noWriteMode: true,
+      failureCategory: status.failureCategory,
+      failureReason: status.failureReason,
+      changedFiles: [],
+      writeIntents: [],
+      noWriterInvoked: true,
+    })
+    console.log(`[${status.status}] real-apply-patch-dry-run-smoke status=${status.statusDetail}`)
+    console.log(status.failureReason)
+    process.exit(status.exitCode)
+  }
+
+  const repoBefore = await readRepoStatusShort()
+  if (!repoBefore.ok || repoBefore.status) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-dry-run-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: 'FAIL',
+      statusDetail: 'no-mutation-guard-failure',
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      noWriteMode: true,
+      failureCategory: 'no-mutation guard failure',
+      failureReason: repoBefore.ok
+        ? 'no-mutation guard failure: repository was not clean before smoke'
+        : 'no-mutation guard failure: repository status could not be checked before smoke',
+      changedFiles: [],
+      writeIntents: [],
+      noWriterInvoked: true,
+      outputTail: repoBefore.outputTail,
+    })
+    console.log('[FAIL] real-apply-patch-dry-run-smoke status=no-mutation-guard-failure')
+    console.log('failureReason=no-mutation guard failure: repository must be clean before opt-in apply_patch dry-run smoke')
+    process.exit(1)
+  }
+
+  const preflight = await runProviderReadinessPreflight()
+  const preflightStatus = buildCodingFlowPreflightStatus(preflight)
+  console.log(`[${preflightStatus.status}] real-apply-patch-dry-run-preflight status=${preflightStatus.statusDetail}`)
+  if (!preflight.ok) {
+    if (preflight.outputTail) {
+      console.log(preflight.outputTail)
+    }
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-dry-run-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: preflightStatus.status,
+      statusDetail: preflightStatus.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: false,
+      noWriteMode: true,
+      failureCategory: codingFlowFailureCategoryForStatus(
+        preflightStatus.statusDetail,
+        preflightStatus.failureCategory,
+      ),
+      failureReason: preflightStatus.failureReason,
+      changedFiles: [],
+      writeIntents: [],
+      noWriterInvoked: true,
+      outputTail: preflight.outputTail,
+    })
+    process.exit(preflightStatus.exitCode)
+  }
+
+  const runtimeHome = getRealCodingFlowRuntimeHome(`${runId}-apply-patch-dry-run`)
+  const auditLogPath = getRealCodingFlowAuditLogPath(`${runId}-apply-patch-dry-run`)
+  assertSafeCodingFlowRuntimeHome(runtimeHome)
+  assertSafeCodingFlowRuntimeHome(path.dirname(auditLogPath))
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+  const fixture = createApplyPatchDryRunFixture()
+  try {
+    const before = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const providerResult = await runApplyPatchDryRunProviderTurn({
+      prompt: fixture.prompt,
+      runtimeHome,
+      realHome,
+      fixtureDir: fixture.fixtureDir,
+      auditLogPath,
+    })
+    const redaction = redactAndAssertCodingProviderOutput(providerResult.rawOutput || providerResult.output)
+    const redactedProviderOutput = redactAndAssertCodingProviderOutput(providerResult.output).redacted
+    const providerFailure = classifyProviderReadinessFailure(
+      `apply_patch dry-run model turn exited ${providerResult.code}`,
+      redaction.redacted,
+      'real',
+    )
+    const extracted = extractSingleApplyPatchBlock(redactedProviderOutput)
+    let routeBundle = undefined
+    if (providerResult.code === 0 && !providerResult.timedOut && !providerFailure && extracted.status === 'ok') {
+      routeBundle = await runApplyPatchDryRunRoute({
+        fixtureDir: fixture.fixtureDir,
+        patchText: extracted.patchText,
+        redaction,
+      })
+    }
+    const after = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const comparison = compareApplyPatchDryRunSnapshots(before, after)
+    const repoAfter = await readRepoStatusShort()
+
+    if (providerFailure || providerResult.code !== 0 || providerResult.timedOut) {
+      const failureStatus = buildCodingFlowSmokeFailureStatus(providerResult, redaction.redacted, redaction)
+      writeReport({
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-apply-patch-dry-run-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: failureStatus.status,
+        statusDetail: failureStatus.statusDetail,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        noWriteMode: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          noMutation: comparison.ok,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+        changedFiles: [],
+        writeIntents: [],
+        noWriterInvoked: true,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        failureCategory: failureStatus.failureCategory,
+        failureReason: failureStatus.failureReason,
+        outputTail: summarizeOutput(redaction.redacted),
+      })
+      console.log(`fixtureFiles=${fixture.files.join(',')}`)
+      console.log(`noMutation=${comparison.ok}`)
+      console.log(`repositoryClean=${repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status}`)
+      console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+      console.log(`[${failureStatus.status}] real-apply-patch-dry-run-smoke status=${failureStatus.statusDetail}`)
+      if (redaction.redacted) console.log(summarizeOutput(redaction.redacted))
+      process.exit(failureStatus.exitCode)
+    }
+
+    if (extracted.status !== 'ok') {
+      const failureCategory = extracted.status === 'provider-output-multiple-patches'
+        ? 'provider output multiple patches'
+        : 'provider output missing apply_patch'
+      const statusDetail = statusDetailForApplyPatchDryRunFailureCategory(failureCategory)
+      writeReport({
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-apply-patch-dry-run-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: 'FAIL',
+        statusDetail,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        noWriteMode: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          noMutation: comparison.ok,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        writeIntents: [],
+        noWriterInvoked: true,
+        terminalNoSuccessClaim: true,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        failureCategory,
+        failureReason: `${statusDetail}: provider output did not contain exactly one apply_patch preview block`,
+        outputTail: summarizeOutput(redactedProviderOutput),
+      })
+      console.log(`fixtureFiles=${fixture.files.join(',')}`)
+      console.log(`applyPatchBlocks=${extracted.count}`)
+      console.log(`noMutation=${comparison.ok}`)
+      console.log(`repositoryClean=${repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status}`)
+      console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+      console.log(`[FAIL] real-apply-patch-dry-run-smoke status=${statusDetail}`)
+      process.exit(1)
+    }
+
+    const success = assertApplyPatchDryRunSmokeSuccess({
+      routeBundle,
+      comparison,
+      repoBefore,
+      repoAfter,
+      redaction,
+    })
+    const routeResult = routeBundle?.routeResult
+    const report = {
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-dry-run-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: success.ok ? 'PASS' : 'FAIL',
+      statusDetail: success.ok ? 'passed' : success.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: true,
+      noWriteMode: true,
+      runtimeHome: 'isolated-test-root',
+      fixture: {
+        files: fixture.files,
+        noMutation: comparison.ok,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+      },
+      repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+      routeStatus: routeResult?.status ?? 'missing',
+      displayStatus: routeResult?.sessionRuntimeSeam?.displayStatus ?? 'missing',
+      terminalClassification: routeResult?.resultMapperSeam?.terminalClassification ?? 'missing',
+      willWrite: false,
+      changedFiles: [],
+      writeIntents: [],
+      noWriterInvoked: true,
+      noAppliedPatchRecord: true,
+      terminalNoSuccessClaim: routeResult?.sessionRuntimeSeam?.writeSuccessDisplayed === false &&
+        routeResult?.sessionRuntimeSeam?.mutationSuccessDisplayed === false &&
+        routeResult?.resultMapperSeam?.terminalClassification !== 'success',
+      redaction: { ok: redaction.ok, leaks: redaction.leaks },
+      failureCategory: success.failureCategory,
+      failureReason: success.failures.join('; '),
+      outputTail: summarizeOutput(redactedProviderOutput),
+      gateEvidence: routeBundle?.gate?.evidence ?? [],
+    }
+    writeReport(report)
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`applyPatchBlocks=${extracted.count}`)
+    console.log(`noMutation=${comparison.ok}`)
+    console.log(`repositoryClean=${report.repositoryClean}`)
+    console.log(`routeStatus=${report.routeStatus}`)
+    console.log(`displayStatus=${report.displayStatus}`)
+    console.log(`terminalClassification=${report.terminalClassification}`)
+    console.log('changedFiles=')
+    console.log('writeIntents=')
+    console.log(`noWriterInvoked=${report.noWriterInvoked}`)
+    console.log(`terminalNoSuccessClaim=${report.terminalNoSuccessClaim}`)
+    console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+    if (!success.ok) {
+      console.log(`failureReason=${report.failureReason}`)
+    }
+    console.log(`[${success.ok ? 'PASS' : 'FAIL'}] real-apply-patch-dry-run-smoke`)
+    process.exit(success.ok ? 0 : 1)
+  } finally {
+    cleanupApplyPatchDryRunFixture(fixture.fixtureDir)
+    cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
+  }
+}
+
 async function main() {
   if (showHelp) {
     printHelp()
@@ -4420,6 +5076,14 @@ async function main() {
   }
   if (realCodingFlowAuditIsolationSelfTest) {
     runRealCodingFlowAuditIsolationSelfTest()
+    return
+  }
+  if (realApplyPatchDryRunSmokeDryRun) {
+    runRealApplyPatchDryRunSmokeDryRun()
+    return
+  }
+  if (realApplyPatchDryRunSmoke) {
+    await runRealApplyPatchDryRunSmoke()
     return
   }
   if (realReadonlyCodingPreflight) {
