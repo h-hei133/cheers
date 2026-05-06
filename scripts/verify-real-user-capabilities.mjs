@@ -73,6 +73,7 @@ const realCodingFlowAuditIsolationSelfTest = process.argv.includes('--real-codin
 const realApplyPatchDryRunSmokeDryRun = process.argv.includes('--real-apply-patch-dry-run-smoke-dry-run')
 const realApplyPatchDryRunSmoke = process.argv.includes('--real-apply-patch-dry-run-smoke')
 const realApplyPatchPermissionUxSmoke = process.argv.includes('--real-apply-patch-permission-ux-smoke')
+const realApplyPatchWriteFixtureSmoke = process.argv.includes('--real-apply-patch-write-fixture-smoke')
 
 const failureCategories = [
   'none',
@@ -1443,6 +1444,10 @@ function printHelp() {
   console.log('    Opt-in only; runs one real-provider model turn to produce a single-file apply_patch preview.')
   console.log('    Excluded from default verification; fixture and repository must remain unchanged.')
   console.log('    The generated patch is routed through the explicit opt-in dry-run route only; writer remains unreachable.')
+  console.log('  --real-apply-patch-write-fixture-smoke')
+  console.log('    Opt-in only; runs one real-provider model turn to produce a single-file apply_patch preview.')
+  console.log('    The generated patch may write only the isolated temporary fixture target after explicit approved-for-write.')
+  console.log('    Excluded from default verification; the production writer and repository must remain untouched.')
 }
 
 function renderReadonlyPreflightNotice(options = {}) {
@@ -4762,6 +4767,127 @@ async function runApplyPatchPermissionUxRoute({ fixtureDir, patchText, redaction
   }
 }
 
+function buildApplyPatchWriteFixtureEvalScript() {
+  const routeUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'singleFileApplyPatchOptInDryRunRoute.ts')).href
+  const decisionUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'writeDecisionGate.ts')).href
+  const laneUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'isolatedWriteLane.ts')).href
+  const smokeUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'realProviderWriteSmoke.ts')).href
+  return `
+    import fs from 'node:fs';
+    import path from 'node:path';
+    import { buildSingleFileApplyPatchOptInDryRunRoute } from ${JSON.stringify(routeUrl)};
+    import { buildWriteDecisionGate } from ${JSON.stringify(decisionUrl)};
+    import { runIsolatedWriteLane } from ${JSON.stringify(laneUrl)};
+    import { buildRealProviderWriteSmokeContract } from ${JSON.stringify(smokeUrl)};
+
+    const workspaceRoot = path.resolve(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
+    const rawPatchText = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
+    const redaction = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
+    const beforeChangedFiles = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_WRITE_FIXTURE_CHANGED ?? '[]');
+    const protectedFilesUnchanged = process.env.PRIVATE_AGENTS_APPLY_PATCH_WRITE_FIXTURE_PROTECTED_UNCHANGED === 'true';
+    const expectedChangedFiles = ['src/app.ts'];
+    const readFixtureFile = (absolutePath) => {
+      const resolved = path.resolve(absolutePath);
+      if (!(resolved === workspaceRoot || resolved.startsWith(workspaceRoot + path.sep))) {
+        return undefined;
+      }
+      return fs.existsSync(resolved) ? fs.readFileSync(resolved, 'utf8') : undefined;
+    };
+    const writeFixtureFile = (relativePath, content) => {
+      const resolved = path.resolve(workspaceRoot, relativePath);
+      const relative = path.relative(workspaceRoot, resolved);
+      if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        throw new Error('Refusing to write outside isolated apply_patch fixture');
+      }
+      fs.writeFileSync(resolved, content, 'utf8');
+    };
+    const routeResult = buildSingleFileApplyPatchOptInDryRunRoute({
+      workspaceRoot,
+      rawPatchText,
+      dryRun: true,
+      explicitOptIn: true,
+      requestedUserDecision: 'approved',
+      readFile: readFixtureFile,
+    });
+    const writeDecision = buildWriteDecisionGate({
+      permissionUx: routeResult.permissionUx,
+      explicitApprovedForWrite: true,
+    });
+    const writeLane = await runIsolatedWriteLane({
+      workspaceRoot,
+      rawPatchText,
+      permissionUx: routeResult.permissionUx,
+      writeDecision,
+      isolatedFixture: true,
+      readFile: readFixtureFile,
+      writeFile: writeFixtureFile,
+    });
+    const smoke = buildRealProviderWriteSmokeContract({
+      explicitOptIn: true,
+      syntheticWriteLaneValidated: true,
+      writeLane,
+      redactionCheck: redaction,
+      isolatedFixture: true,
+      privateAgentsRealRead: false,
+      providerConfigPrinted: false,
+      fixtureChangedFiles: beforeChangedFiles,
+      expectedChangedFiles,
+      protectedFilesUnchanged,
+    });
+    console.log('__APPLY_PATCH_WRITE_FIXTURE_RESULT__' + JSON.stringify({ routeResult, writeDecision, writeLane, smoke }));
+  `
+}
+
+async function runApplyPatchWriteFixtureRoute({
+  fixtureDir,
+  patchText,
+  redaction,
+  fixtureChangedFiles,
+  protectedFilesUnchanged,
+}) {
+  const result = await run(process.execPath, [
+    tsxCliPath,
+    '--eval',
+    buildApplyPatchWriteFixtureEvalScript(),
+  ], {
+    cwd: tsShellRoot,
+    env: {
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
+        ok: redaction.ok,
+        leaks: redaction.leaks,
+      }),
+      PRIVATE_AGENTS_APPLY_PATCH_WRITE_FIXTURE_CHANGED: JSON.stringify(fixtureChangedFiles),
+      PRIVATE_AGENTS_APPLY_PATCH_WRITE_FIXTURE_PROTECTED_UNCHANGED: String(protectedFilesUnchanged),
+    },
+    timeoutMs: 120000,
+  })
+  const resultLine = result.stdout
+    .split(/\r?\n/)
+    .find((line) => line.startsWith('__APPLY_PATCH_WRITE_FIXTURE_RESULT__'))
+  if (!resultLine) {
+    return {
+      ok: false,
+      failureReason: 'write-fixture-failure: route runner did not emit a result marker',
+      result,
+    }
+  }
+  try {
+    return {
+      ok: result.code === 0 && !result.timedOut,
+      ...JSON.parse(resultLine.slice('__APPLY_PATCH_WRITE_FIXTURE_RESULT__'.length)),
+      result,
+    }
+  } catch {
+    return {
+      ok: false,
+      failureReason: 'write-fixture-failure: route runner emitted invalid JSON',
+      result,
+    }
+  }
+}
+
 function assertApplyPatchDryRunSmokeSuccess({ routeBundle, comparison, repoBefore, repoAfter, redaction }) {
   const failures = []
   const routeResult = routeBundle?.routeResult
@@ -4934,6 +5060,94 @@ function assertApplyPatchPermissionUxSmokeSuccess({ permissionBundle, comparison
     failureCategory,
     statusDetail: failureCategory === 'permission UX failure'
       ? 'permission-ux-failure'
+      : statusDetailForApplyPatchDryRunFailureCategory(failureCategory),
+  }
+}
+
+function assertApplyPatchWriteFixtureSmokeSuccess({ writeBundle, comparison, repoBefore, repoAfter, redaction }) {
+  const failures = []
+  const writeLane = writeBundle?.writeLane
+  const smoke = writeBundle?.smoke
+  const fixtureChangedOk =
+    comparison.added.length === 0 &&
+    comparison.removed.length === 0 &&
+    comparison.changed.length === 1 &&
+    comparison.changed[0] === 'src/app.ts'
+  const protectedFilesUnchanged = !comparison.changed.includes('LOCKED.md')
+
+  if (!repoBefore.ok || repoBefore.status) {
+    failures.push('no-mutation guard failure: repository was not clean before smoke')
+  }
+  if (!repoAfter.ok) {
+    failures.push('no-mutation guard failure: repository status could not be checked after smoke')
+  } else if (repoAfter.status) {
+    failures.push('real repo mutation leak: repository changed during smoke')
+  }
+  if (!fixtureChangedOk || !protectedFilesUnchanged) {
+    failures.push(`unexpected write: added=${comparison.added.join(',') || 'none'} removed=${comparison.removed.join(',') || 'none'} changed=${comparison.changed.join(',') || 'none'}`)
+  }
+  if (!redaction.ok) {
+    failures.push(`redaction failure: ${redaction.leaks.join(',') || 'unknown'}`)
+  }
+  if (!writeBundle?.ok || !writeLane || !smoke) {
+    failures.push(writeBundle?.failureReason ?? 'write-fixture-failure: missing isolated write result')
+  } else {
+    if (smoke.status !== 'ready') {
+      failures.push(`write-fixture-failure: smoke status ${smoke.status}${smoke.failure ? ` (${smoke.failure})` : ''}`)
+    }
+    if (
+      writeLane.status !== 'written' ||
+      writeLane.changedFiles?.length !== 1 ||
+      writeLane.changedFiles[0] !== 'src/app.ts' ||
+      writeLane.writeIntents?.length !== 1 ||
+      writeLane.writeIntents[0] !== 'src/app.ts' ||
+      writeLane.fixtureWriterInvoked !== true ||
+      writeLane.productionWriterInvoked !== false ||
+      writeLane.noProductionWrite !== true ||
+      writeLane.appliedPatchRecord !== false
+    ) {
+      failures.push('unexpected write: isolated lane did not report exactly one fixture-only write')
+    }
+    if (
+      writeLane.terminalClassification !== 'success' ||
+      writeLane.mutationSuccessClaimAllowed !== true ||
+      writeLane.verificationStatus !== 'passed' ||
+      smoke.terminalClassification !== 'success' ||
+      smoke.mutationSuccessClaimAllowed !== true
+    ) {
+      failures.push('unexpected success claim: terminal success was not tied to a verified fixture write')
+    }
+    if (
+      smoke.productionWriterInvoked !== false ||
+      smoke.noProductionWrite !== true ||
+      smoke.appliedPatchRecord !== false ||
+      smoke.protectedFilesUnchanged !== true
+    ) {
+      failures.push('unexpected write: smoke exposed production/applied/protected-file write state')
+    }
+  }
+
+  let failureCategory = 'none'
+  if (failures.some((failure) => failure.startsWith('no-mutation guard failure'))) {
+    failureCategory = 'no-mutation guard failure'
+  } else if (failures.some((failure) => failure.startsWith('real repo mutation leak'))) {
+    failureCategory = 'real repo mutation leak'
+  } else if (failures.some((failure) => failure.startsWith('redaction failure'))) {
+    failureCategory = 'redaction failure'
+  } else if (failures.some((failure) => failure.startsWith('unexpected write'))) {
+    failureCategory = 'unexpected write'
+  } else if (failures.some((failure) => failure.startsWith('unexpected success claim'))) {
+    failureCategory = 'unexpected success claim'
+  } else if (failures.some((failure) => failure.startsWith('write-fixture-failure'))) {
+    failureCategory = 'write fixture failure'
+  }
+
+  return {
+    ok: failures.length === 0,
+    failures,
+    failureCategory,
+    statusDetail: failureCategory === 'write fixture failure'
+      ? 'write-fixture-failure'
       : statusDetailForApplyPatchDryRunFailureCategory(failureCategory),
   }
 }
@@ -5541,6 +5755,301 @@ async function runRealApplyPatchPermissionUxSmoke() {
   }
 }
 
+async function runRealApplyPatchWriteFixtureSmoke() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-apply-patch-write-fixture-smoke')
+  renderCodingFlowPreflightNotice({ modelTurn: true, writableFixture: true })
+  console.log('homeRead=false')
+  console.log('defaultSmoke=skipped')
+  console.log('realProviderHome=config-only')
+  console.log('writeScope=isolated-fixture-only')
+
+  if (!realHome) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-write-fixture-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: 'CONFIG',
+      statusDetail: 'config-failure',
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      noProductionWrite: true,
+      failureCategory: 'auth/config failure',
+      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch write fixture smoke',
+      changedFiles: [],
+      writeIntents: [],
+      productionWriterInvoked: false,
+    })
+    console.log('[CONFIG] real-apply-patch-write-fixture-smoke status=config-failure')
+    console.log('config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch write fixture smoke')
+    process.exit(3)
+  }
+
+  const repoBefore = await readRepoStatusShort()
+  if (!repoBefore.ok || repoBefore.status) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-write-fixture-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: 'FAIL',
+      statusDetail: 'no-mutation-guard-failure',
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      noProductionWrite: true,
+      failureCategory: 'no-mutation guard failure',
+      failureReason: repoBefore.ok
+        ? 'no-mutation guard failure: repository was not clean before smoke'
+        : 'no-mutation guard failure: repository status could not be checked before smoke',
+      changedFiles: [],
+      writeIntents: [],
+      productionWriterInvoked: false,
+      outputTail: repoBefore.outputTail,
+    })
+    console.log('[FAIL] real-apply-patch-write-fixture-smoke status=no-mutation-guard-failure')
+    process.exit(1)
+  }
+
+  const preflight = await runProviderReadinessPreflight()
+  const preflightStatus = buildCodingFlowPreflightStatus(preflight)
+  console.log(`[${preflightStatus.status}] real-apply-patch-write-fixture-preflight status=${preflightStatus.statusDetail}`)
+  if (!preflight.ok) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-write-fixture-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: preflightStatus.status,
+      statusDetail: preflightStatus.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: false,
+      noProductionWrite: true,
+      failureCategory: codingFlowFailureCategoryForStatus(
+        preflightStatus.statusDetail,
+        preflightStatus.failureCategory,
+      ),
+      failureReason: preflightStatus.failureReason,
+      changedFiles: [],
+      writeIntents: [],
+      productionWriterInvoked: false,
+      outputTail: preflight.outputTail,
+    })
+    process.exit(preflightStatus.exitCode)
+  }
+
+  const runtimeHome = getRealCodingFlowRuntimeHome(`${runId}-apply-patch-write-fixture`)
+  const auditLogPath = getRealCodingFlowAuditLogPath(`${runId}-apply-patch-write-fixture`)
+  assertSafeCodingFlowRuntimeHome(runtimeHome)
+  assertSafeCodingFlowRuntimeHome(path.dirname(auditLogPath))
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+  const fixture = createApplyPatchDryRunFixture()
+  try {
+    const before = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const providerResult = await runApplyPatchDryRunProviderTurn({
+      prompt: fixture.prompt,
+      runtimeHome,
+      realHome,
+      fixtureDir: fixture.fixtureDir,
+      auditLogPath,
+    })
+    const redaction = redactAndAssertCodingProviderOutput(providerResult.rawOutput || providerResult.output)
+    const redactedProviderOutput = redactAndAssertCodingProviderOutput(providerResult.output).redacted
+    const providerFailure = classifyProviderReadinessFailure(
+      `apply_patch write fixture model turn exited ${providerResult.code}`,
+      redaction.redacted,
+      'real',
+    )
+    const extracted = extractSingleApplyPatchBlock(redactedProviderOutput)
+    let writeBundle = undefined
+    if (providerResult.code === 0 && !providerResult.timedOut && !providerFailure && extracted.status === 'ok') {
+      const routeBefore = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+      writeBundle = await runApplyPatchWriteFixtureRoute({
+        fixtureDir: fixture.fixtureDir,
+        patchText: extracted.patchText,
+        redaction,
+        fixtureChangedFiles: ['src/app.ts'],
+        protectedFilesUnchanged: true,
+      })
+      const routeAfter = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+      const routeComparison = compareApplyPatchDryRunSnapshots(routeBefore, routeAfter)
+      if (
+        routeComparison.added.length !== 0 ||
+        routeComparison.removed.length !== 0 ||
+        routeComparison.changed.length !== 1 ||
+        routeComparison.changed[0] !== 'src/app.ts'
+      ) {
+        writeBundle = {
+          ...(writeBundle ?? {}),
+          ok: false,
+          failureReason: `write-fixture-failure: isolated route changed unexpected files added=${routeComparison.added.join(',') || 'none'} removed=${routeComparison.removed.join(',') || 'none'} changed=${routeComparison.changed.join(',') || 'none'}`,
+          routeComparison,
+        }
+      }
+    }
+    const after = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const comparison = compareApplyPatchDryRunSnapshots(before, after)
+    const repoAfter = await readRepoStatusShort()
+
+    if (providerFailure || providerResult.code !== 0 || providerResult.timedOut) {
+      const failureStatus = buildCodingFlowSmokeFailureStatus(providerResult, redaction.redacted, redaction)
+      writeReport({
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-apply-patch-write-fixture-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: failureStatus.status,
+        statusDetail: failureStatus.statusDetail,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        noProductionWrite: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+        changedFiles: [],
+        writeIntents: [],
+        productionWriterInvoked: false,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        failureCategory: failureStatus.failureCategory,
+        failureReason: failureStatus.failureReason,
+        outputTail: summarizeOutput(redaction.redacted),
+      })
+      console.log(`fixtureFiles=${fixture.files.join(',')}`)
+      console.log(`fixtureChanged=${comparison.changed.join(',') || 'none'}`)
+      console.log(`repositoryClean=${repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status}`)
+      console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+      console.log(`[${failureStatus.status}] real-apply-patch-write-fixture-smoke status=${failureStatus.statusDetail}`)
+      if (redaction.redacted) console.log(summarizeOutput(redaction.redacted))
+      process.exit(failureStatus.exitCode)
+    }
+
+    if (extracted.status !== 'ok') {
+      const failureCategory = extracted.status === 'provider-output-multiple-patches'
+        ? 'provider output multiple patches'
+        : 'provider output missing apply_patch'
+      const statusDetail = statusDetailForApplyPatchDryRunFailureCategory(failureCategory)
+      writeReport({
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-apply-patch-write-fixture-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: 'FAIL',
+        statusDetail,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        noProductionWrite: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        writeIntents: [],
+        productionWriterInvoked: false,
+        terminalSuccessAllowed: false,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        failureCategory,
+        failureReason: `${statusDetail}: provider output did not contain exactly one apply_patch preview block`,
+        outputTail: summarizeOutput(redactedProviderOutput),
+      })
+      console.log(`fixtureFiles=${fixture.files.join(',')}`)
+      console.log(`applyPatchBlocks=${extracted.count}`)
+      console.log(`fixtureChanged=${comparison.changed.join(',') || 'none'}`)
+      console.log(`repositoryClean=${repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status}`)
+      console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+      console.log(`[FAIL] real-apply-patch-write-fixture-smoke status=${statusDetail}`)
+      process.exit(1)
+    }
+
+    const success = assertApplyPatchWriteFixtureSmokeSuccess({
+      writeBundle,
+      comparison,
+      repoBefore,
+      repoAfter,
+      redaction,
+    })
+    const writeLane = writeBundle?.writeLane
+    const smoke = writeBundle?.smoke
+    const report = {
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-write-fixture-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: success.ok ? 'PASS' : 'FAIL',
+      statusDetail: success.ok ? 'passed' : success.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: true,
+      noProductionWrite: true,
+      runtimeHome: 'isolated-test-root',
+      fixture: {
+        files: fixture.files,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+        protectedFilesUnchanged: !comparison.changed.includes('LOCKED.md'),
+      },
+      repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+      writeLaneStatus: writeLane?.status ?? 'missing',
+      terminalClassification: writeLane?.terminalClassification ?? 'missing',
+      changedFiles: writeLane?.changedFiles ?? [],
+      writeIntents: writeLane?.writeIntents ?? [],
+      fixtureWriterInvoked: writeLane?.fixtureWriterInvoked ?? false,
+      productionWriterInvoked: writeLane?.productionWriterInvoked ?? false,
+      noAppliedPatchRecord: writeLane?.appliedPatchRecord === false,
+      terminalSuccessAllowed: writeLane?.mutationSuccessClaimAllowed === true &&
+        writeLane?.terminalClassification === 'success' &&
+        writeLane?.verificationStatus === 'passed',
+      redaction: { ok: redaction.ok, leaks: redaction.leaks },
+      failureCategory: success.failureCategory,
+      failureReason: success.failures.join('; '),
+      outputTail: summarizeOutput(redactedProviderOutput),
+      gateStatus: smoke?.status ?? 'missing',
+      gateEvidence: smoke?.evidence ?? [],
+    }
+    writeReport(report)
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`applyPatchBlocks=${extracted.count}`)
+    console.log(`fixtureChanged=${comparison.changed.join(',') || 'none'}`)
+    console.log(`repositoryClean=${report.repositoryClean}`)
+    console.log(`writeLaneStatus=${report.writeLaneStatus}`)
+    console.log(`terminalClassification=${report.terminalClassification}`)
+    console.log(`changedFiles=${report.changedFiles.join(',')}`)
+    console.log(`writeIntents=${report.writeIntents.join(',')}`)
+    console.log(`fixtureWriterInvoked=${report.fixtureWriterInvoked}`)
+    console.log(`productionWriterInvoked=${report.productionWriterInvoked}`)
+    console.log(`noAppliedPatchRecord=${report.noAppliedPatchRecord}`)
+    console.log(`terminalSuccessAllowed=${report.terminalSuccessAllowed}`)
+    console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+    if (!success.ok) {
+      console.log(`failureReason=${report.failureReason}`)
+    }
+    console.log(`[${success.ok ? 'PASS' : 'FAIL'}] real-apply-patch-write-fixture-smoke`)
+    process.exit(success.ok ? 0 : 1)
+  } finally {
+    cleanupApplyPatchDryRunFixture(fixture.fixtureDir)
+    cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
+  }
+}
+
 async function main() {
   if (showHelp) {
     printHelp()
@@ -5584,6 +6093,10 @@ async function main() {
   }
   if (realApplyPatchPermissionUxSmoke) {
     await runRealApplyPatchPermissionUxSmoke()
+    return
+  }
+  if (realApplyPatchWriteFixtureSmoke) {
+    await runRealApplyPatchWriteFixtureSmoke()
     return
   }
   if (realReadonlyCodingPreflight) {
