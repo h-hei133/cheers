@@ -1,6 +1,6 @@
 # Single-file apply_patch guarded production route wiring
 
-Status: route contract and synthetic route passed; real-provider guarded route smoke attempted/blocked by provider network; default production write remains disabled.
+Status: route contract, synthetic route, result/session projection, and real-provider guarded route smoke passed; default production write remains disabled.
 
 ## Scope
 
@@ -16,10 +16,12 @@ unreviewed CLI/session/runtime wiring.
 
 - `routeWiringGate.ts` defines the route-level entry gate.
 - `productionRoute.ts` composes the route gate with the guarded write lane.
+- `productionRouteProjection.ts` maps verified route output through
+  resultMapper-facing and session-display-facing success/stopped projections.
 - `guardedRouteSmoke.ts` records real-provider route smoke safety requirements.
 - `scripts/verify-real-user-capabilities.mjs --real-apply-patch-guarded-route-smoke`
   runs the explicit opt-in real-provider route gate against an isolated
-  workspace.
+  workspace and verifies the runtime projection.
 
 ## Required Evidence
 
@@ -33,48 +35,44 @@ unreviewed CLI/session/runtime wiring.
 - production writer target is `isolated-workspace`
 - real repository write is false
 - terminal success is allowed only after verified write
+- resultMapper projection reports success only for a verified write
+- session display projection reports `write-success` only for a verified write
 - redaction passes
 - target repository remains clean
 - default production `apply_patch` and unified diff rejection remains unchanged
 
 ## Latest Run
 
-2026-05-06 real-provider guarded route smoke:
-
-- in-sandbox attempt: readiness preflight passed, then tsx IPC failed with
-  `listen EPERM` on `/tmp/tsx-1000/*.pipe` before route execution
-- rerun outside sandbox: readiness preflight passed and provider path was reached
-- result: `PROVIDER_NETWORK`, `provider-network-inconclusive`
-- provider message after redaction: `fetch failed`, retriable
-- fixture changed: none
-- repository clean: true
-- redaction: pass
-
-This is an attempted/blocked provider-network result, not a route failure,
-redaction failure, unexpected write, or write-success result. Do not retry
-repeatedly; rerun only as an explicit real-provider gate attempt.
-
-2026-05-06 single retry:
+2026-05-06 real-provider guarded route smoke rerun after result/session
+projection wiring:
 
 - repository pre-check: clean
 - readiness preflight: passed with explicit `PRIVATE_AGENTS_REAL_HOME`
-- in-sandbox attempt: readiness preflight passed, then tsx IPC failed with
-  `listen EPERM` on `/tmp/tsx-1000/*.pipe` before route execution
-- rerun outside sandbox: readiness preflight passed and provider path was reached
-- result: `PROVIDER_NETWORK`, `provider-network-inconclusive`
-- provider message after redaction: `fetch failed`, retriable
-- fixture changed: none
+- provider path: reached
+- provider output: exactly one `apply_patch` block
+- write decision: `approved-for-write`
+- guarded gate: `ready`
+- route gate: `ready`
+- production route: `written`
+- write lane: `written`
+- resultMapper projection: `completed/success`
+- session display projection: `write-success`
+- fixture changed: `src/app.ts`
+- changed files / write intents: `src/app.ts`
+- production writer target: `isolated-workspace`
+- real repository write: false
+- no applied patch record: true
+- terminal success allowed: true only after verified isolated workspace write
 - repository clean: true
 - redaction: pass
-- default production `apply_patch` / unified diff rejection regression: passed
 
-The retry remains attempted/blocked by provider network. It is not evidence of
-route failure, redaction failure, unexpected write, or write success. No further
-automatic retry is planned.
+This is a passed explicit opt-in guarded route gate. It does not enable default
+production write.
 
 ## Next Boundary
 
-The guarded production route is implemented and locally validated, but the
-real-provider route smoke is not passed yet. Production write remains blocked
-until the real-provider guarded route smoke passes and a separate review
-approves any CLI/session/runtime production wiring.
+The guarded production route is implemented, locally validated, and
+real-provider validated against an isolated workspace. Production write remains
+blocked by default; any CLI / `runMvpIntegratedFlow` real-user workspace wiring
+still requires a separate entrypoint review for explicit opt-in UX, durable
+state implications, and abort/rollback boundaries.

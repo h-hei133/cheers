@@ -342,7 +342,7 @@ Important boundaries:
 - the passing guarded candidate does not approve multi-file/add/delete/move,
   AST, fuzzy patching, rollback, or release/default gates
 
-### M. Single-file `apply_patch` guarded production route seam (attempted 2026-05-06)
+### M. Single-file `apply_patch` guarded production route seam (stage-sealed 2026-05-06)
 
 The guarded production route seam has been added and validated locally for an
 explicit opt-in, single-file Update File route against an isolated temporary
@@ -360,28 +360,32 @@ Key local evidence:
 
 Real-provider guarded route smoke status:
 
-- in-sandbox attempt: readiness passed, then tsx IPC failed with `listen EPERM`
-  before route execution
-- outside-sandbox rerun: readiness passed and provider path was reached
-- result: `PROVIDER_NETWORK`, `provider-network-inconclusive`, `fetch failed`,
-  retriable
-- fixture changed: none
+- readiness preflight passed with explicit `PRIVATE_AGENTS_REAL_HOME`
+- real-provider model path was reached
+- provider output contained exactly one `apply_patch` block
+- write decision status was `approved-for-write`
+- guarded gate, route gate, production route, and write lane were ready/written
+- resultMapper projection mapped the verified route write to `completed/success`
+- session display projection showed `write-success` only after the verified write
+- only isolated workspace `src/app.ts` changed
+- `changedFiles=src/app.ts` and `writeIntents=src/app.ts`
+- production writer was invoked only with `productionWriterTarget=isolated-workspace`
+- `realRepositoryWrite=false`
+- terminal success was allowed only after verified isolated workspace write
+- no applied patch record was recorded
 - repository clean: true
 - redaction: pass
-- single retry: repeated the same outcome after readiness passed and provider
-  path was reached; default `apply_patch` / unified diff rejection regression
-  also passed
 
-Current gate state: attempted/blocked by provider network. This is not a route
-failure, redaction failure, unexpected write, or write-success result.
+Current gate state: passed as an explicit opt-in guarded route gate against an
+isolated workspace. This is not default production write enablement.
 
 Important boundaries:
 
 - this smoke remains explicit opt-in only and uses a temporary workspace
 - production `apply_patch` and unified diff inputs remain rejected by default
 - default production write remains blocked
-- production CLI/session/runtime write wiring still requires a separate review
-- no further automatic provider retry is planned
+- production CLI / `runMvpIntegratedFlow` write wiring still requires a separate
+  entrypoint review before touching real user workspaces
 
 ## 6. Confirmed Baseline Facts
 
@@ -398,8 +402,8 @@ Important boundaries:
 1. true live TTY automation evidence remains weaker than print/stdin/replay evidence in this environment
 2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
 3. multi-file edit, production apply_patch write, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
-4. production single-file `apply_patch` route wiring remains blocked; result/session safety is proven only at seam level
-5. production single-file `apply_patch` write route remains unwired; the isolated fixture and guarded isolated-workspace write gates have passed, but the guarded production route real-provider smoke is still attempted/blocked by provider network
+4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow` write route remains unwired; default rejection is still required
+5. the guarded production route real-provider smoke has passed only for explicit opt-in isolated workspace routing, not default real user workspace mutation
 6. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
 ## 8. Re-entry / Escalation Triggers
@@ -412,8 +416,12 @@ Escalate from hardening into focused implementation when one is reproducible:
 
 ## 9. Current Minimal Next Step
 
-- single-file `apply_patch` production write remains blocked; the guarded production route seam is locally validated, but the real-provider guarded route smoke is attempted/blocked by provider network
-- start with an explicit real-provider guarded route smoke rerun only when provider/network conditions are expected to be available; do not continue to production resultMapper/sessionRuntime wiring, durable runtime route wiring, or default production write enablement before that gate passes and receives separate review
+- single-file `apply_patch` guarded route is now validated through real-provider,
+  resultMapper projection, and session display projection in an isolated
+  workspace
+- do not continue to default production write enablement, CLI wiring, or
+  `runMvpIntegratedFlow` workspace mutation before a separate entrypoint review
+  defines the explicit opt-in UX and real-user workspace boundary
 - the isolated fixture and guarded isolated-workspace write smokes have passed; treat them only as explicit opt-in isolated evidence, not default production write evidence, and do not rerun automatically
 - the real-provider non-mutating dry-run smoke and permission UX no-write smoke are sealed; do not rerun them by default unless validating a regression or a new provider-facing route decision
 - consider durable stopped-session continuity analysis as separate, explicitly scoped work

@@ -5186,6 +5186,7 @@ function buildApplyPatchGuardedRouteEvalScript() {
   const decisionUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'writeDecisionGate.ts')).href
   const guardedUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'guardedWriteGate.ts')).href
   const productionRouteUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'productionRoute.ts')).href
+  const routeProjectionUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'productionRouteProjection.ts')).href
   const smokeUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'guardedRouteSmoke.ts')).href
   return `
     import fs from 'node:fs';
@@ -5194,6 +5195,7 @@ function buildApplyPatchGuardedRouteEvalScript() {
     import { buildWriteDecisionGate } from ${JSON.stringify(decisionUrl)};
     import { buildGuardedWriteGate } from ${JSON.stringify(guardedUrl)};
     import { runProductionRoute } from ${JSON.stringify(productionRouteUrl)};
+    import { buildProductionRouteRuntimeProjection } from ${JSON.stringify(routeProjectionUrl)};
     import { buildGuardedRouteSmokeContract } from ${JSON.stringify(smokeUrl)};
 
     const workspaceRoot = path.resolve(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
@@ -5250,6 +5252,9 @@ function buildApplyPatchGuardedRouteEvalScript() {
         readFile: readWorkspaceFile,
         writeFile: writeWorkspaceFile,
       });
+      const runtimeProjection = buildProductionRouteRuntimeProjection({
+        productionRoute,
+      });
       const smoke = buildGuardedRouteSmokeContract({
         explicitOptIn: true,
         syntheticProductionRouteValidated: true,
@@ -5263,7 +5268,7 @@ function buildApplyPatchGuardedRouteEvalScript() {
         expectedChangedFiles,
         protectedFilesUnchanged,
       });
-      console.log('__APPLY_PATCH_GUARDED_ROUTE_RESULT__' + JSON.stringify({ routeResult, writeDecision, guardedGate, productionRoute, smoke }));
+      console.log('__APPLY_PATCH_GUARDED_ROUTE_RESULT__' + JSON.stringify({ routeResult, writeDecision, guardedGate, productionRoute, runtimeProjection, smoke }));
     })().catch((error) => {
       console.log('__APPLY_PATCH_GUARDED_ROUTE_RESULT__' + JSON.stringify({
         routeError: formatEvalError(error),
@@ -5779,6 +5784,7 @@ function assertApplyPatchGuardedWriteSmokeSuccess({ guardedBundle, comparison, r
 function assertApplyPatchGuardedRouteSmokeSuccess({ routeBundle, comparison, repoBefore, repoAfter, redaction }) {
   const failures = []
   const productionRoute = routeBundle?.productionRoute
+  const runtimeProjection = routeBundle?.runtimeProjection
   const smoke = routeBundle?.smoke
   const workspaceChangedOk =
     comparison.added.length === 0 &&
@@ -5798,7 +5804,7 @@ function assertApplyPatchGuardedRouteSmokeSuccess({ routeBundle, comparison, rep
   if (!redaction.ok) {
     failures.push(`redaction failure: ${redaction.leaks.join(',') || 'unknown'}`)
   }
-  if (!routeBundle?.ok || !productionRoute || !smoke) {
+  if (!routeBundle?.ok || !productionRoute || !runtimeProjection || !smoke) {
     failures.push(routeBundle?.failureReason ?? 'guarded-route-failure: missing guarded route result')
   } else {
     if (!workspaceChangedOk || !protectedFilesUnchanged) {
@@ -5827,11 +5833,19 @@ function assertApplyPatchGuardedRouteSmokeSuccess({ routeBundle, comparison, rep
       productionRoute.mutationSuccessClaimAllowed !== true ||
       productionRoute.resultSessionStatus !== 'write-success' ||
       productionRoute.writeLane?.verificationStatus !== 'passed' ||
+      runtimeProjection.status !== 'write-success' ||
+      runtimeProjection.terminalStatus !== 'completed' ||
+      runtimeProjection.terminalClassification !== 'success' ||
+      runtimeProjection.sessionDisplay?.displayStatus !== 'write-success' ||
+      runtimeProjection.sessionDisplay?.writeSuccessDisplayed !== true ||
+      runtimeProjection.sessionDisplay?.changedDisplay?.length !== 1 ||
+      runtimeProjection.sessionDisplay.changedDisplay[0] !== 'src/app.ts' ||
+      runtimeProjection.safetyProof?.successAfterVerifiedWrite !== true ||
       smoke.terminalClassification !== 'success' ||
       smoke.terminalSuccessAllowed !== true ||
       smoke.mutationSuccessClaimAllowed !== true
     ) {
-      failures.push('unexpected success claim: terminal success was not tied to a verified guarded route write')
+      failures.push('unexpected success claim: terminal/result/session success was not tied to a verified guarded route write')
     }
     if (
       smoke.productionWriterTarget !== 'isolated-workspace' ||
@@ -7630,6 +7644,7 @@ async function runRealApplyPatchGuardedRouteSmoke() {
     const writeDecision = routeBundle?.writeDecision
     const guardedGate = routeBundle?.guardedGate
     const productionRoute = routeBundle?.productionRoute
+    const runtimeProjection = routeBundle?.runtimeProjection
     const routeGate = productionRoute?.routeGate
     const writeLane = productionRoute?.writeLane
     const smoke = routeBundle?.smoke
@@ -7667,6 +7682,9 @@ async function runRealApplyPatchGuardedRouteSmoke() {
       writeLaneStatus: writeLane?.status ?? 'missing',
       writeLaneBlocker: writeLane?.blocker ?? '',
       terminalClassification: productionRoute?.terminalClassification ?? 'missing',
+      mappedTerminalClassification: runtimeProjection?.terminalClassification ?? 'missing',
+      mappedTerminalStatus: runtimeProjection?.terminalStatus ?? 'missing',
+      sessionDisplayStatus: runtimeProjection?.sessionDisplay?.displayStatus ?? 'missing',
       changedFiles: productionRoute?.changedFiles ?? [],
       writeIntents: productionRoute?.writeIntents ?? [],
       productionWriterInvoked: productionRoute?.productionWriterInvoked ?? false,
@@ -7699,6 +7717,9 @@ async function runRealApplyPatchGuardedRouteSmoke() {
     console.log(`writeLaneStatus=${report.writeLaneStatus}`)
     if (report.writeLaneBlocker) console.log(`writeLaneBlocker=${report.writeLaneBlocker}`)
     console.log(`terminalClassification=${report.terminalClassification}`)
+    console.log(`mappedTerminalClassification=${report.mappedTerminalClassification}`)
+    console.log(`mappedTerminalStatus=${report.mappedTerminalStatus}`)
+    console.log(`sessionDisplayStatus=${report.sessionDisplayStatus}`)
     console.log(`changedFiles=${report.changedFiles.join(',')}`)
     console.log(`writeIntents=${report.writeIntents.join(',')}`)
     console.log(`productionWriterInvoked=${report.productionWriterInvoked}`)
