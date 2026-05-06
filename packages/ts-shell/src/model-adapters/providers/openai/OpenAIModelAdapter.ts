@@ -11,6 +11,7 @@ import {
   writeUserRuntimeConfigFile,
 } from '../../../config/runtimeConfig.js'
 import { createComponentLogger, recordCount } from '../../../observability/index.js'
+import { createProviderFetchFromEnv } from '../../providerFetch.js'
 import type { OpenAIChatCompletionsStreamChunk } from './wireTypes.js'
 import type {
   ModelProviderAdapter,
@@ -43,7 +44,10 @@ export class OpenAIModelAdapter implements ModelProviderAdapter {
   private accountAuth?: ModelProviderConfig['accountAuth']
   private readonly fetchImpl: typeof fetch
 
-  constructor(config: ModelProviderConfig, fetchImpl: typeof fetch = fetch) {
+  constructor(
+    config: ModelProviderConfig,
+    fetchImpl: typeof fetch = createProviderFetchFromEnv(),
+  ) {
     this.id = config.provider
     this.baseUrl = config.baseUrl ?? DEFAULT_OPENAI_BASE_URL
     this.apiKey = config.apiKey

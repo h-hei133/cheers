@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { Agent, ProxyAgent, fetch as undiciFetch } from 'undici'
 import { getRealProviderHome, getTestRoot } from './support/testPaths.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -22,6 +23,14 @@ const expectedBaselineBaseUrl =
 const expectedBaselineModel =
   process.env.PRIVATE_AGENTS_EXPECT_MODEL?.trim() ||
   'deepseek-ai/DeepSeek-V4-Flash'
+const providerProxy =
+  process.env.PRIVATE_AGENTS_PROVIDER_PROXY?.trim() ||
+  undefined
+const providerNoProxy =
+  process.env.PRIVATE_AGENTS_PROVIDER_NO_PROXY?.trim() ||
+  process.env.NO_PROXY?.trim() ||
+  process.env.no_proxy?.trim() ||
+  undefined
 
 const networkFailurePattern =
   /(provider-readiness:network|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network|socket hang up|TLS|timeout|unreachable)/i
@@ -110,6 +119,83 @@ function redactProviderOutput(input) {
 
 function renderPresence(value) {
   return value ? 'present' : 'none'
+}
+
+function resolveProviderTransport() {
+  const connectTimeoutMs = parsePositiveInteger(
+    process.env.PRIVATE_AGENTS_PROVIDER_CONNECT_TIMEOUT_MS,
+    30000,
+  )
+  const headersTimeoutMs = parsePositiveInteger(
+    process.env.PRIVATE_AGENTS_PROVIDER_HEADERS_TIMEOUT_MS,
+    120000,
+  )
+  const bodyTimeoutMs = parsePositiveInteger(
+    process.env.PRIVATE_AGENTS_PROVIDER_BODY_TIMEOUT_MS,
+    120000,
+  )
+  const explicitProxy = providerProxy?.toLowerCase() === 'env'
+    ? process.env.HTTPS_PROXY?.trim() ||
+      process.env.https_proxy?.trim() ||
+      process.env.HTTP_PROXY?.trim() ||
+      process.env.http_proxy?.trim() ||
+      undefined
+    : providerProxy && providerProxy.toLowerCase() !== 'off' && providerProxy.toLowerCase() !== 'none'
+      ? providerProxy
+      : undefined
+  const noProxy = (providerNoProxy ?? '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+  return {
+    connectTimeoutMs,
+    headersTimeoutMs,
+    bodyTimeoutMs,
+    proxyUrl: explicitProxy,
+    noProxy,
+  }
+}
+
+function createProviderFetch() {
+  const transport = resolveProviderTransport()
+  const directDispatcher = new Agent({
+    connect: { timeout: transport.connectTimeoutMs },
+    headersTimeout: transport.headersTimeoutMs,
+    bodyTimeout: transport.bodyTimeoutMs,
+  })
+  const proxyDispatcher = transport.proxyUrl
+    ? new ProxyAgent({
+        uri: transport.proxyUrl,
+        connect: { timeout: transport.connectTimeoutMs },
+        headersTimeout: transport.headersTimeoutMs,
+        bodyTimeout: transport.bodyTimeoutMs,
+      })
+    : undefined
+
+  return async function providerFetch(url, init = {}) {
+    const parsed = new URL(String(url))
+    const dispatcher =
+      proxyDispatcher && !matchesNoProxy(parsed.hostname, transport.noProxy)
+        ? proxyDispatcher
+        : directDispatcher
+    return await undiciFetch(url, { ...init, dispatcher })
+  }
+}
+
+function matchesNoProxy(hostname, entries) {
+  const host = hostname.toLowerCase()
+  for (const entry of entries) {
+    if (entry === '*') return true
+    if (entry.startsWith('*.') && host.endsWith(entry.slice(1))) return true
+    if (entry.startsWith('.') && (host === entry.slice(1) || host.endsWith(entry))) return true
+    if (host === entry) return true
+  }
+  return false
+}
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number.parseInt(value ?? '', 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
 function loadConfig() {
@@ -431,6 +517,8 @@ async function runProviderBaselineSmoke(resolved) {
   console.log(`baselineModel=${model || 'missing'}`)
   console.log(`baselineModelExpected=${expectedBaselineModel}`)
   console.log(`baselineAuthorization=${authToken ? 'Bearer [REDACTED]' : 'missing'}`)
+  console.log(`baselineProxy=${resolveProviderTransport().proxyUrl ? 'enabled' : 'disabled'}`)
+  console.log(`baselineNoProxy=${providerNoProxy ? 'configured' : 'none'}`)
 
   if (resolved.provider !== 'openai-compatible') {
     printStep(
@@ -464,7 +552,7 @@ async function runProviderBaselineSmoke(resolved) {
   const startedAt = Date.now()
   let response
   try {
-    response = await fetch(endpoint, {
+    response = await createProviderFetch()(endpoint, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

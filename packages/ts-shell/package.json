@@ -19,10 +19,12 @@
     "test:gate:golden-main-path": "vitest run src/cli-baseline.test.ts -t \"GOLDEN_MAIN_PATH\"",
     "test:watch": "vitest"
   },
-  "dependencies": {},
+  "dependencies": {
+    "undici": "^7.18.2"
+  },
   "devDependencies": {
-    "vitest": "^0.34.0",
+    "tsx": "^4.0.0",
     "typescript": "^5.2.0",
-    "tsx": "^4.0.0"
+    "vitest": "^0.34.0"
   }
 }

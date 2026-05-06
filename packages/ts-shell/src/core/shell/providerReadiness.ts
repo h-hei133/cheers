@@ -3,6 +3,7 @@ import type {
   GoogleAccountAuthConfig,
   OpenAIAccountAuthConfig,
 } from "../../config/runtimeConfig.js";
+import { createProviderFetchFromEnv } from "../../model-adapters/providerFetch.js";
 import type { QueryEvent } from "../query/events.js";
 import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
 import { getProviderApiKeyEnvVarName } from "./providerCredentials.js";
@@ -96,7 +97,7 @@ export async function checkRealProviderReadiness(
     return { ok: true };
   }
 
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = options.fetchImpl ?? createProviderFetchFromEnv();
   const timeoutMs = options.timeoutMs ?? 5000;
   const baseUrl = normalizeBaseUrl(
     options.baseUrl ?? DEFAULT_PROVIDER_BASE_URL,
