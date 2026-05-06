@@ -74,6 +74,9 @@ describe("connect command runtime", () => {
     expect(stored.providerConnections?.[0]?.baseUrl).toBe(
       "https://api.siliconflow.cn/v1",
     );
+    expect(stored.providerConnections?.[0]?.model).toBe(
+      "deepseek-ai/DeepSeek-V4-Flash",
+    );
   });
 
   it("explains config status versus live provider readiness", async () => {

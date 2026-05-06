@@ -153,6 +153,29 @@ describe("runtime config", () => {
     expect(candidates[1]).toBe(path.join(fakeRoot, ".private-agents.json"));
   });
 
+  it("uses the same user config path for connection writes and runtime reads", () => {
+    const configPath = getUserRuntimeConfigPath();
+    expect(getCandidateConfigPaths(fakeRoot)[0]).toBe(configPath);
+
+    writeUserRuntimeConfigFile({
+      provider: "openai-compatible",
+      providerCredentials: {
+        "openai-compatible": {
+          apiKey: "user-compatible-key",
+          baseUrl: "https://api.siliconflow.cn/v1",
+          model: "deepseek-ai/DeepSeek-V4-Flash",
+        },
+      },
+    });
+
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.provider).toBe("openai-compatible");
+    expect(config.configSources).toContain(configPath);
+    expect(config.providerCredentials["openai-compatible"]?.model).toBe(
+      "deepseek-ai/DeepSeek-V4-Flash",
+    );
+  });
+
   it("reads and writes user runtime config file for credential onboarding", () => {
     const configPath = getUserRuntimeConfigPath();
     expect(readUserRuntimeConfigFile()).toEqual({});

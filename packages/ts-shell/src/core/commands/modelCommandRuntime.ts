@@ -332,7 +332,7 @@ function fallbackModelsForProvider(
   if (provider === "claudecode") {
     return ["gpt-4.1-mini", "gpt-4.1", "gpt-5.4"];
   }
-  return ["deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-Coder-32B-Instruct"];
+  return ["deepseek-ai/DeepSeek-V4-Flash", "Qwen/Qwen2.5-Coder-32B-Instruct"];
 }
 
 function parseArgsWithFlags(args: string[]): {

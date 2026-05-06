@@ -59,6 +59,7 @@
     "verify:real-user-capabilities": "node scripts/verify-real-user-capabilities.mjs",
     "verify:real-user-capabilities:candidates": "node scripts/verify-real-user-capabilities.mjs --include-candidates",
     "verify:provider-readiness": "node scripts/verify-provider-readiness.mjs",
+    "verify:provider-baseline": "node scripts/verify-provider-readiness.mjs --baseline-smoke",
     "verify:release:smoke": "node scripts/verify-release-smoke.mjs",
     "verify:release:core": "node scripts/verify-release-core.mjs",
     "verify:release:real": "node scripts/verify-release-real.mjs",

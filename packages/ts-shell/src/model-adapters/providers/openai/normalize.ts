@@ -371,10 +371,26 @@ function getErrorCode(error: unknown): string | undefined {
     return (error as { error: { code: string } }).error.code
   }
 
+  const cause = getErrorCause(error)
+  if (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'code' in cause &&
+    typeof (cause as { code?: unknown }).code === 'string'
+  ) {
+    return (cause as { code: string }).code
+  }
+
   return undefined
 }
 
 function getErrorMessage(error: unknown): string {
+  const message = getBaseErrorMessage(error)
+  const cause = formatFetchFailureCause(error)
+  return cause ? `${message} (${cause})` : message
+}
+
+function getBaseErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
   }
@@ -389,6 +405,67 @@ function getErrorMessage(error: unknown): string {
   }
 
   return 'Unknown provider error'
+}
+
+function getErrorCause(error: unknown): unknown {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'cause' in error
+  ) {
+    return (error as { cause?: unknown }).cause
+  }
+  return undefined
+}
+
+function formatFetchFailureCause(error: unknown): string | undefined {
+  const cause = getErrorCause(error)
+  if (typeof cause !== 'object' || cause === null) {
+    return undefined
+  }
+
+  const fields: string[] = []
+  appendStringField(fields, cause, 'name')
+  appendStringField(fields, cause, 'code')
+  appendNumberField(fields, cause, 'errno')
+  appendStringField(fields, cause, 'syscall')
+  appendStringField(fields, cause, 'hostname')
+  appendStringField(fields, cause, 'address')
+  appendNumberField(fields, cause, 'port')
+
+  if (cause instanceof Error && cause.message.trim()) {
+    fields.push(`message=${sanitizeCauseField(cause.message)}`)
+  }
+
+  return fields.length > 0 ? `cause: ${fields.join(' ')}` : undefined
+}
+
+function appendStringField(
+  fields: string[],
+  source: object,
+  key: string,
+): void {
+  if (
+    key in source &&
+    typeof (source as Record<string, unknown>)[key] === 'string' &&
+    ((source as Record<string, string>)[key]).trim().length > 0
+  ) {
+    fields.push(`${key}=${sanitizeCauseField((source as Record<string, string>)[key])}`)
+  }
+}
+
+function appendNumberField(
+  fields: string[],
+  source: object,
+  key: string,
+): void {
+  if (key in source && typeof (source as Record<string, unknown>)[key] === 'number') {
+    fields.push(`${key}=${String((source as Record<string, number>)[key])}`)
+  }
+}
+
+function sanitizeCauseField(value: string): string {
+  return value.replace(/\s+/g, '_').slice(0, 160)
 }
 
 function getRetryAfterMs(error: unknown): number | undefined {

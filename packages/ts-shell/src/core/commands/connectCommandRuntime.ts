@@ -50,7 +50,7 @@ const CONNECT_PRESETS: readonly ConnectPreset[] = [
     label: "SiliconFlow (OpenAI Compatible)",
     provider: "openai-compatible",
     defaultBaseUrl: "https://api.siliconflow.cn/v1",
-    defaultModel: "deepseek-ai/DeepSeek-V3",
+    defaultModel: "deepseek-ai/DeepSeek-V4-Flash",
   },
   {
     id: "google",

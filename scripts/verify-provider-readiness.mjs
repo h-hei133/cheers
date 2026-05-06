@@ -15,6 +15,13 @@ const projectRoot = path.join(getTestRoot(), 'provider-readiness-smoke')
 const fixturePath = `${projectRoot}/fixture.txt`
 const classificationSelfTest = process.argv.includes('--classification-self-test')
 const preflightOnly = process.argv.includes('--preflight-only')
+const baselineSmoke = process.argv.includes('--baseline-smoke')
+const expectedBaselineBaseUrl =
+  process.env.PRIVATE_AGENTS_EXPECT_PROVIDER_BASE_URL?.trim() ||
+  'https://api.siliconflow.cn/v1'
+const expectedBaselineModel =
+  process.env.PRIVATE_AGENTS_EXPECT_MODEL?.trim() ||
+  'deepseek-ai/DeepSeek-V4-Flash'
 
 const networkFailurePattern =
   /(provider-readiness:network|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network|socket hang up|TLS|timeout|unreachable)/i
@@ -133,12 +140,23 @@ function loadConfig() {
 }
 
 function resolveCredential(config) {
-  const provider = typeof config.provider === 'string' ? config.provider : 'openai'
+  const configuredProvider = typeof config.provider === 'string' ? config.provider : 'openai'
   const connections = Array.isArray(config.providerConnections) ? config.providerConnections : []
   const activeConnection = connections.find(
     (connection) => connection?.id === config.activeProviderConnectionId,
-  ) ?? connections.find((connection) => connection?.provider === provider)
+  ) ?? connections.find((connection) => connection?.provider === configuredProvider)
+  const provider = activeConnection?.provider ?? configuredProvider
   const profile = config.providerCredentials?.[provider] ?? {}
+  const envApiKey = process.env[getProviderEnvVar(provider)]?.trim()
+  const connectionApiKey =
+    activeConnection?.provider === provider ? activeConnection.apiKey?.trim() : undefined
+  const configApiKey = profile.apiKey?.trim()
+  const accountAuth =
+    provider === 'openai'
+      ? activeConnection?.accountAuth?.openai ?? profile.accountAuth?.openai
+      : provider === 'google'
+        ? activeConnection?.accountAuth?.google ?? profile.accountAuth?.google
+        : undefined
 
   const source = activeConnection?.provider === provider && (activeConnection.apiKey || activeConnection.accountAuth)
     ? 'connection'
@@ -157,6 +175,7 @@ function resolveCredential(config) {
   const hasCredential =
     source === 'env' ||
     Boolean(activeConnection?.apiKey || activeConnection?.accountAuth || profile.apiKey || profile.accountAuth)
+  const apiKey = connectionApiKey ?? configApiKey ?? envApiKey
 
   return {
     provider,
@@ -166,6 +185,8 @@ function resolveCredential(config) {
     baseUrl,
     model,
     hasCredential,
+    apiKey,
+    accountAuth,
   }
 }
 
@@ -372,6 +393,126 @@ async function runRealProviderSmoke() {
   return { ok: true, status: 'pass', code: 0 }
 }
 
+function summarizeFetchCause(error) {
+  const cause = error && typeof error === 'object' ? error.cause : undefined
+  if (!cause || typeof cause !== 'object') {
+    return redactProviderOutput(error instanceof Error ? error.message : String(error))
+  }
+
+  const fields = []
+  for (const key of ['name', 'code', 'errno', 'syscall', 'hostname', 'address', 'port']) {
+    const value = cause[key]
+    if (typeof value === 'string' && value.trim()) {
+      fields.push(`${key}=${value.trim().replace(/\s+/g, '_').slice(0, 160)}`)
+    } else if (typeof value === 'number') {
+      fields.push(`${key}=${value}`)
+    }
+  }
+  if (cause instanceof Error && cause.message.trim()) {
+    fields.push(`message=${cause.message.trim().replace(/\s+/g, '_').slice(0, 160)}`)
+  }
+  return redactProviderOutput(fields.length > 0 ? fields.join(' ') : String(error))
+}
+
+async function runProviderBaselineSmoke(resolved) {
+  const baseUrl = String(resolved.baseUrl ?? '').replace(/\/+$/, '')
+  const model = String(resolved.model ?? '').trim()
+  const endpoint = `${baseUrl}/chat/completions`
+  const expectedEndpoint = `${expectedBaselineBaseUrl.replace(/\/+$/, '')}/chat/completions`
+  const accountToken = resolved.accountAuth?.accessToken?.trim()
+  const authToken = accountToken || resolved.apiKey?.trim()
+
+  console.log('baselinePrompt=hello / 你是什么模型')
+  console.log('baselineTools=0')
+  console.log('baselineWillWrite=false')
+  console.log(`baselineProvider=${resolved.provider}`)
+  console.log(`baselineUrl=${endpoint}`)
+  console.log(`baselineUrlExpected=${expectedEndpoint}`)
+  console.log(`baselineModel=${model || 'missing'}`)
+  console.log(`baselineModelExpected=${expectedBaselineModel}`)
+  console.log(`baselineAuthorization=${authToken ? 'Bearer [REDACTED]' : 'missing'}`)
+
+  if (resolved.provider !== 'openai-compatible') {
+    printStep(
+      'provider-baseline-config',
+      'config-failure',
+      `expected provider openai-compatible, got ${resolved.provider}`,
+    )
+    return { ok: false, status: 'config-failure', code: 3 }
+  }
+  if (endpoint !== expectedEndpoint) {
+    printStep(
+      'provider-baseline-config',
+      'config-failure',
+      `expected chat endpoint ${expectedEndpoint}, got ${endpoint}`,
+    )
+    return { ok: false, status: 'config-failure', code: 3 }
+  }
+  if (model !== expectedBaselineModel) {
+    printStep(
+      'provider-baseline-config',
+      'config-failure',
+      `expected model ${expectedBaselineModel}, got ${model || 'missing'}`,
+    )
+    return { ok: false, status: 'config-failure', code: 3 }
+  }
+  if (!authToken) {
+    printStep('provider-baseline-config', 'config-failure', 'authorization header missing')
+    return { ok: false, status: 'config-failure', code: 3 }
+  }
+
+  const startedAt = Date.now()
+  let response
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({
+        model,
+        stream: true,
+        messages: [{ role: 'user', content: 'hello / 你是什么模型' }],
+      }),
+      signal: AbortSignal.timeout(30000),
+    })
+  } catch (error) {
+    const cause = summarizeFetchCause(error)
+    printStep('provider-baseline-chat', 'provider-network-inconclusive', 'fetch failed')
+    console.log(`fetchCause=${cause}`)
+    console.log(`elapsedMs=${Date.now() - startedAt}`)
+    return { ok: false, status: 'provider-network-inconclusive', code: 2 }
+  }
+
+  console.log(`httpStatus=${response.status}`)
+  if (response.status === 401 || response.status === 403) {
+    printStep('provider-baseline-chat', 'config-failure', `HTTP ${response.status}`)
+    return { ok: false, status: 'config-failure', code: 3 }
+  }
+  if (!response.ok) {
+    const errorText = redactProviderOutput((await response.text()).slice(0, 400))
+    printStep('provider-baseline-chat', 'config-failure', `HTTP ${response.status}`)
+    if (errorText) console.log(`httpErrorBody=${errorText}`)
+    return { ok: false, status: 'config-failure', code: 3 }
+  }
+
+  const text = redactProviderOutput((await response.text()).slice(0, 400))
+  const redactionPassed =
+    !/Bearer\s+(?!\[REDACTED\])\S+/i.test(text) &&
+    !/sk-[A-Za-z0-9][A-Za-z0-9._-]{8,}/.test(text)
+  console.log(`responseBodyPresent=${text.length > 0}`)
+  console.log(`redaction=${redactionPassed ? 'pass' : 'fail'}`)
+  printStep(
+    'provider-baseline-chat',
+    redactionPassed ? 'pass' : 'product-regression',
+    `elapsedMs=${Date.now() - startedAt}`,
+  )
+  return redactionPassed
+    ? { ok: true, status: 'pass', code: 0 }
+    : { ok: false, status: 'product-regression', code: 1 }
+}
+
 async function main() {
   if (classificationSelfTest) {
     runClassificationSelfTest()
@@ -379,7 +520,7 @@ async function main() {
   }
 
   console.log('gate name=provider-readiness')
-  console.log(`mode=${preflightOnly ? 'preflight-only' : 'smoke'}`)
+  console.log(`mode=${preflightOnly ? 'preflight-only' : baselineSmoke ? 'baseline-smoke' : 'smoke'}`)
   console.log('status taxonomy: pass=0 product-regression=1 provider-network-inconclusive=2 config-failure=3')
   console.log('exit semantics: 0=ready, 1=provider reachable but smoke contract regressed, 2=network inconclusive after retry, 3=config/auth/unsupported/misconfigured')
   console.log(`repo=${repoRoot}`)
@@ -411,6 +552,12 @@ async function main() {
   if (preflightOnly) {
     printStep('provider-readiness-preflight', 'pass', 'configuration resolved (redacted)')
     process.exit(0)
+  }
+
+  if (baselineSmoke) {
+    const baseline = await runProviderBaselineSmoke(resolved)
+    printStep('provider-baseline-smoke-gate', baseline.status)
+    process.exit(baseline.code)
   }
 
   let smoke = await runRealProviderSmoke()

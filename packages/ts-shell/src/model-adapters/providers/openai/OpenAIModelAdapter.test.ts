@@ -163,6 +163,67 @@ describe('OpenAI model adapter', () => {
     ])
   })
 
+  it('surfaces openai-compatible chat request diagnostics without exposing secrets', async () => {
+    const calls: Array<{
+      url: string
+      authorization?: string
+      model?: string
+    }> = []
+    const networkCause = Object.assign(
+      new Error('getaddrinfo ENOTFOUND api.siliconflow.cn'),
+      {
+        code: 'ENOTFOUND',
+        errno: -3008,
+        syscall: 'getaddrinfo',
+        hostname: 'api.siliconflow.cn',
+      },
+    )
+    const adapter = new OpenAIModelAdapter(
+      {
+        provider: 'openai-compatible',
+        apiKey: 'sk-siliconflow-secret',
+        baseUrl: 'https://api.siliconflow.cn/v1',
+      },
+      async (input, init) => {
+        calls.push({
+          url: String(input),
+          authorization:
+            typeof init?.headers === 'object' && init.headers !== null
+              ? (init.headers as Record<string, string>).authorization
+              : undefined,
+          model:
+            typeof init?.body === 'string'
+              ? (JSON.parse(init.body) as { model?: string }).model
+              : undefined,
+        })
+        throw new TypeError('fetch failed', { cause: networkCause })
+      },
+    )
+
+    await expect(async () => {
+      for await (const _event of adapter.streamResponse({
+        schemaVersion: '1.0.0',
+        model: 'deepseek-ai/DeepSeek-V4-Flash',
+        messages: [{ role: 'user', content: 'hello / 你是什么模型' }],
+      })) {
+        // Drain stream to force the request.
+      }
+    }).rejects.toMatchObject({
+      provider: 'openai-compatible',
+      kind: 'network',
+      code: 'ENOTFOUND',
+      message: expect.stringContaining('cause:'),
+    })
+
+    expect(calls).toEqual([
+      {
+        url: 'https://api.siliconflow.cn/v1/chat/completions',
+        authorization: 'Bearer sk-siliconflow-secret',
+        model: 'deepseek-ai/DeepSeek-V4-Flash',
+      },
+    ])
+  })
+
   it('uses codex endpoint for account-auth and emits response text', async () => {
     const calls: Array<{ url: string; body?: string }> = []
     const encoder = new TextEncoder()
