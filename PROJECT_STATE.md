@@ -289,9 +289,10 @@ Observed evidence:
 - fixture files stayed unchanged because the provider turn did not complete
 - real repository stayed clean
 
-Current gate state: attempted/blocked by provider timeout after the requested
-single retry. It is not a route failure, not an unexpected write, and not a
-production write pass.
+Current gate state: provider-timeout blocker closed as attempted/blocked after
+the requested single retry. It is not a route failure, not an unexpected write,
+not a production write pass, and not evidence that production write may be
+enabled.
 
 Important boundaries:
 
@@ -299,6 +300,9 @@ Important boundaries:
 - production `apply_patch` and unified diff inputs remain rejected by default
 - production write, writer invocation, and production resultMapper/sessionRuntime
   wiring remain blocked pending separate review
+- no further automatic provider retry is planned; any future rerun requires
+  explicit real-provider opt-in, isolated fixture, redaction, and repo-clean
+  constraints
 
 ## 6. Confirmed Baseline Facts
 
@@ -316,7 +320,7 @@ Important boundaries:
 2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
 3. multi-file edit, production apply_patch write, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
 4. production single-file `apply_patch` route wiring remains blocked; result/session safety is proven only at seam level
-5. single-file `apply_patch` isolated fixture write smoke exists, but the latest real-provider attempt is blocked by provider timeout rather than sealed as passed
+5. single-file `apply_patch` isolated fixture write smoke exists, but the provider-timeout blocker is closed as attempted/blocked rather than sealed as passed
 6. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
 ## 8. Re-entry / Escalation Triggers
@@ -330,7 +334,7 @@ Escalate from hardening into focused implementation when one is reproducible:
 ## 9. Current Minimal Next Step
 
 - single-file `apply_patch` production write remains blocked; start with a fresh review before production resultMapper/sessionRuntime wiring, final stale-read production placement, writer boundary work, or production write decision work
-- the isolated fixture write smoke can be rerun only as an explicit real-provider gate attempt; do not treat the timeout-blocked run as production write evidence
+- the isolated fixture write smoke provider-timeout blocker is closed as attempted/blocked; do not treat it as production write evidence or rerun automatically
 - the real-provider non-mutating dry-run smoke and permission UX no-write smoke are sealed; do not rerun them by default unless validating a regression or a new provider-facing route decision
 - consider durable stopped-session continuity analysis as separate, explicitly scoped work
 - do not continue same-family minimal write or failure-explanation smoke hardening unless a regression appears

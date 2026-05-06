@@ -1,6 +1,6 @@
 # Single-file apply_patch real-provider isolated write gate
 
-Status: implemented as an explicit opt-in smoke; latest real-provider retry is attempted/blocked by provider timeout; production write remains disabled.
+Status: implemented as an explicit opt-in smoke; provider-timeout blocker is closed as attempted/blocked by external provider timeout; production write remains disabled.
 
 ## Scope
 
@@ -45,7 +45,9 @@ The command is explicit opt-in. It uses the existing readiness/redaction smoke i
 
 ## Next Boundary
 
-A passing isolated fixture write gate is evidence for planning production write wiring, not approval to wire it. Before production write wiring, separately review the production route, final stale-read location, writer boundary, result/session success surface, and default rejection behavior.
+A passing isolated fixture write gate would be evidence for planning production write wiring, not approval to wire it. This gate has not passed because both real-provider attempts timed out after the provider path was reached. Production write remains blocked.
+
+Before any production write wiring, separately review the production route, final stale-read location, writer boundary, result/session success surface, and default rejection behavior.
 
 ## Latest Runs
 
@@ -73,3 +75,13 @@ This is an attempted/blocked gate result, not a route failure and not a write-su
 - redaction: pass
 
 The retry remains attempted/blocked by provider timeout. It is not evidence of route failure, unexpected write, or write success.
+
+## Blocker Closure
+
+Provider-timeout closure status: closed as external timeout, not product pass.
+
+- no further automatic retry is planned
+- this does not block local contract work, but it does block claiming the real-provider isolated fixture write gate as passed
+- production write remains blocked
+- default production `apply_patch` and unified diff rejection must remain unchanged
+- a future rerun requires explicit real-provider opt-in and the same isolated fixture/redaction/repo-clean constraints
