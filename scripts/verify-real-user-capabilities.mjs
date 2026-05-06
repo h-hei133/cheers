@@ -4899,40 +4899,58 @@ function buildApplyPatchWriteFixtureEvalScript() {
       }
       fs.writeFileSync(resolved, content, 'utf8');
     };
-    const routeResult = buildSingleFileApplyPatchOptInDryRunRoute({
-      workspaceRoot,
-      rawPatchText,
-      dryRun: true,
-      explicitOptIn: true,
-      requestedUserDecision: 'approved',
-      readFile: readFixtureFile,
+    (async () => {
+      const routeResult = buildSingleFileApplyPatchOptInDryRunRoute({
+        workspaceRoot,
+        rawPatchText,
+        dryRun: true,
+        explicitOptIn: true,
+        requestedUserDecision: 'approved',
+        readFile: readFixtureFile,
+      });
+      const writeDecision = buildWriteDecisionGate({
+        permissionUx: routeResult.permissionUx,
+        explicitApprovedForWrite: true,
+      });
+      const writeLane = await runIsolatedWriteLane({
+        workspaceRoot,
+        rawPatchText,
+        permissionUx: routeResult.permissionUx,
+        writeDecision,
+        isolatedFixture: true,
+        readFile: readFixtureFile,
+        writeFile: writeFixtureFile,
+      });
+      const smoke = buildRealProviderWriteSmokeContract({
+        explicitOptIn: true,
+        syntheticWriteLaneValidated: true,
+        writeLane,
+        redactionCheck: redaction,
+        isolatedFixture: true,
+        privateAgentsRealRead: false,
+        providerConfigPrinted: false,
+        fixtureChangedFiles: beforeChangedFiles,
+        expectedChangedFiles,
+        protectedFilesUnchanged,
+      });
+      console.log('__APPLY_PATCH_WRITE_FIXTURE_RESULT__' + JSON.stringify({ routeResult, writeDecision, writeLane, smoke }));
+    })().catch((error) => {
+      console.log('__APPLY_PATCH_WRITE_FIXTURE_RESULT__' + JSON.stringify({
+        routeError: formatEvalError(error),
+      }));
+      process.exitCode = 1;
     });
-    const writeDecision = buildWriteDecisionGate({
-      permissionUx: routeResult.permissionUx,
-      explicitApprovedForWrite: true,
-    });
-    const writeLane = await runIsolatedWriteLane({
-      workspaceRoot,
-      rawPatchText,
-      permissionUx: routeResult.permissionUx,
-      writeDecision,
-      isolatedFixture: true,
-      readFile: readFixtureFile,
-      writeFile: writeFixtureFile,
-    });
-    const smoke = buildRealProviderWriteSmokeContract({
-      explicitOptIn: true,
-      syntheticWriteLaneValidated: true,
-      writeLane,
-      redactionCheck: redaction,
-      isolatedFixture: true,
-      privateAgentsRealRead: false,
-      providerConfigPrinted: false,
-      fixtureChangedFiles: beforeChangedFiles,
-      expectedChangedFiles,
-      protectedFilesUnchanged,
-    });
-    console.log('__APPLY_PATCH_WRITE_FIXTURE_RESULT__' + JSON.stringify({ routeResult, writeDecision, writeLane, smoke }));
+
+    function formatEvalError(error) {
+      if (error instanceof Error) {
+        return error.stack ?? error.message;
+      }
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return String(error);
+      }
+    }
   `
 }
 
@@ -4968,19 +4986,27 @@ async function runApplyPatchWriteFixtureRoute({
     return {
       ok: false,
       failureReason: 'write-fixture-failure: route runner did not emit a result marker',
+      outputTail: summarizeOutput(result.output),
       result,
     }
   }
   try {
+    const parsed = JSON.parse(resultLine.slice('__APPLY_PATCH_WRITE_FIXTURE_RESULT__'.length))
     return {
       ok: result.code === 0 && !result.timedOut,
-      ...JSON.parse(resultLine.slice('__APPLY_PATCH_WRITE_FIXTURE_RESULT__'.length)),
+      ...parsed,
+      failureReason: parsed.routeError
+        ? `write-fixture-failure: route runner failed: ${summarizeOutput(parsed.routeError)}`
+        : result.code === 0 && !result.timedOut
+          ? undefined
+          : `write-fixture-failure: route runner exited code=${result.code} timedOut=${result.timedOut}`,
       result,
     }
   } catch {
     return {
       ok: false,
       failureReason: 'write-fixture-failure: route runner emitted invalid JSON',
+      outputTail: summarizeOutput(result.output),
       result,
     }
   }
@@ -5258,15 +5284,15 @@ function assertApplyPatchWriteFixtureSmokeSuccess({ writeBundle, comparison, rep
   } else if (repoAfter.status) {
     failures.push('real repo mutation leak: repository changed during smoke')
   }
-  if (!fixtureChangedOk || !protectedFilesUnchanged) {
-    failures.push(`unexpected write: added=${comparison.added.join(',') || 'none'} removed=${comparison.removed.join(',') || 'none'} changed=${comparison.changed.join(',') || 'none'}`)
-  }
   if (!redaction.ok) {
     failures.push(`redaction failure: ${redaction.leaks.join(',') || 'unknown'}`)
   }
   if (!writeBundle?.ok || !writeLane || !smoke) {
     failures.push(writeBundle?.failureReason ?? 'write-fixture-failure: missing isolated write result')
   } else {
+    if (!fixtureChangedOk || !protectedFilesUnchanged) {
+      failures.push(`unexpected write: added=${comparison.added.join(',') || 'none'} removed=${comparison.removed.join(',') || 'none'} changed=${comparison.changed.join(',') || 'none'}`)
+    }
     if (smoke.status !== 'ready') {
       failures.push(`write-fixture-failure: smoke status ${smoke.status}${smoke.failure ? ` (${smoke.failure})` : ''}`)
     }
@@ -6342,10 +6368,13 @@ async function runRealApplyPatchWriteFixtureSmoke() {
       const routeAfter = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
       const routeComparison = compareApplyPatchDryRunSnapshots(routeBefore, routeAfter)
       if (
-        routeComparison.added.length !== 0 ||
-        routeComparison.removed.length !== 0 ||
-        routeComparison.changed.length !== 1 ||
-        routeComparison.changed[0] !== 'src/app.ts'
+        writeBundle?.writeLane?.status === 'written' &&
+        (
+          routeComparison.added.length !== 0 ||
+          routeComparison.removed.length !== 0 ||
+          routeComparison.changed.length !== 1 ||
+          routeComparison.changed[0] !== 'src/app.ts'
+        )
       ) {
         writeBundle = {
           ...(writeBundle ?? {}),
@@ -6447,6 +6476,7 @@ async function runRealApplyPatchWriteFixtureSmoke() {
       repoAfter,
       redaction,
     })
+    const writeDecision = writeBundle?.writeDecision
     const writeLane = writeBundle?.writeLane
     const smoke = writeBundle?.smoke
     const report = {
@@ -6469,7 +6499,13 @@ async function runRealApplyPatchWriteFixtureSmoke() {
         protectedFilesUnchanged: !comparison.changed.includes('LOCKED.md'),
       },
       repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+      routeRunnerFailure: writeBundle?.ok === false
+        ? writeBundle.failureReason ?? 'write-fixture-failure: route runner failed'
+        : '',
+      writeDecisionStatus: writeDecision?.status ?? 'missing',
+      writeDecisionBlocker: writeDecision?.blocker ?? '',
       writeLaneStatus: writeLane?.status ?? 'missing',
+      writeLaneBlocker: writeLane?.blocker ?? '',
       terminalClassification: writeLane?.terminalClassification ?? 'missing',
       changedFiles: writeLane?.changedFiles ?? [],
       writeIntents: writeLane?.writeIntents ?? [],
@@ -6491,7 +6527,10 @@ async function runRealApplyPatchWriteFixtureSmoke() {
     console.log(`applyPatchBlocks=${extracted.count}`)
     console.log(`fixtureChanged=${comparison.changed.join(',') || 'none'}`)
     console.log(`repositoryClean=${report.repositoryClean}`)
+    console.log(`writeDecisionStatus=${report.writeDecisionStatus}`)
+    if (report.writeDecisionBlocker) console.log(`writeDecisionBlocker=${report.writeDecisionBlocker}`)
     console.log(`writeLaneStatus=${report.writeLaneStatus}`)
+    if (report.writeLaneBlocker) console.log(`writeLaneBlocker=${report.writeLaneBlocker}`)
     console.log(`terminalClassification=${report.terminalClassification}`)
     console.log(`changedFiles=${report.changedFiles.join(',')}`)
     console.log(`writeIntents=${report.writeIntents.join(',')}`)
@@ -6501,6 +6540,7 @@ async function runRealApplyPatchWriteFixtureSmoke() {
     console.log(`terminalSuccessAllowed=${report.terminalSuccessAllowed}`)
     console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
     if (!success.ok) {
+      if (report.routeRunnerFailure) console.log(`routeRunnerFailure=${report.routeRunnerFailure}`)
       console.log(`failureReason=${report.failureReason}`)
     }
     console.log(`[${success.ok ? 'PASS' : 'FAIL'}] real-apply-patch-write-fixture-smoke`)
