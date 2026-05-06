@@ -1,6 +1,6 @@
 # Single-file apply_patch real-provider isolated write gate
 
-Status: implemented as an explicit opt-in smoke; production write remains disabled.
+Status: implemented as an explicit opt-in smoke; latest real-provider run is attempted/blocked by provider timeout; production write remains disabled.
 
 ## Scope
 
@@ -46,3 +46,17 @@ The command is explicit opt-in. It uses the existing readiness/redaction smoke i
 ## Next Boundary
 
 A passing isolated fixture write gate is evidence for planning production write wiring, not approval to wire it. Before production write wiring, separately review the production route, final stale-read location, writer boundary, result/session success surface, and default rejection behavior.
+
+## Latest Run
+
+2026-05-06:
+
+- readiness preflight: passed
+- real-provider model path: reached
+- result: `PROVIDER_NETWORK`, `provider-network-inconclusive`
+- provider message after redaction: operation aborted due to timeout
+- fixture mutation: none
+- repository clean: true
+- redaction: pass
+
+This is an attempted/blocked gate result, not a route failure and not a write-success result. Do not retry repeatedly; rerun only as an explicit real-provider gate attempt.
