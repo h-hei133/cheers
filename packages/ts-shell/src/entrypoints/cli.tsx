@@ -84,7 +84,10 @@ import {
   recordCount,
   setGlobalTraceContext,
 } from "../observability/index.js";
-import { streamMvpIntegratedFlow } from "../orchestration/runMvpIntegratedFlow.js";
+import {
+  streamMvpIntegratedFlow,
+  type ApplyPatchRuntimeRouteOptions,
+} from "../orchestration/runMvpIntegratedFlow.js";
 import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type {
@@ -114,6 +117,7 @@ interface CliOptions {
   promptArg?: string;
   migrateSessionRoot?: boolean;
   nonInteractiveApproval?: "deny" | "allow-once" | "allow-always";
+  applyPatchRuntimeRoute?: boolean;
 }
 
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
@@ -280,6 +284,7 @@ async function main(): Promise<void> {
   options.printMode = args.includes("--print") || args.includes("-p");
   options.migrateSessionRoot = args.includes("--migrate-session-root");
   options.nonInteractiveApproval = parseNonInteractiveApprovalMode(args);
+  options.applyPatchRuntimeRoute = args.includes("--apply-patch-runtime-route");
   options.promptArg = derivePromptArgument(args, options.projectPath);
 
   const resolveCredentialSnapshot = (): ProviderCredentialResolution =>
@@ -432,6 +437,15 @@ async function main(): Promise<void> {
         sessionRuntime.getAgentMode(),
         runtimeSeed,
         continuityState,
+        options.applyPatchRuntimeRoute === true
+          ? {
+              explicitRuntimeOptIn: true,
+              requestedUserDecision: applyPatchDecisionFromApprovalMode(
+                options.nonInteractiveApproval,
+              ),
+              runtimeSource: "production-adjacent",
+            }
+          : undefined,
       );
     },
   });
@@ -1201,11 +1215,32 @@ async function* streamOrchestratedResponse(
   agentMode: "plan" | "build",
   runtimeSeed?: QueryRuntimeStateSeed,
   continuityState?: SessionContinuitySnapshot,
+  applyPatchRuntimeRoute?: ApplyPatchRuntimeRouteOptions,
 ) {
   const providerMode =
     process.env.PRIVATE_AGENTS_PROVIDER_MODE === "synthetic"
       ? "synthetic"
       : "real";
+  if (applyPatchRuntimeRoute) {
+    for await (const event of streamMvpIntegratedFlow({
+      sessionId,
+      prompt,
+      continuityState,
+      workspaceRoot,
+      abortSignal: signal,
+      escalationPromptHandler,
+      providerMode,
+      maxTurns,
+      realProvider: providerCredentialResolution.credential,
+      agentMode,
+      runtimeSeed,
+      applyPatchRuntimeRoute,
+    })) {
+      yield event;
+    }
+    return;
+  }
+
   const routeDecision = decideQueryRoute({
     prompt,
     agentMode,
@@ -1271,6 +1306,7 @@ async function* streamOrchestratedResponse(
     realProvider: providerCredentialResolution.credential,
     agentMode,
     runtimeSeed,
+    applyPatchRuntimeRoute,
   })) {
     yield event;
   }
@@ -1812,6 +1848,18 @@ function parseNonInteractiveApprovalMode(
     `Invalid --non-interactive-approval value: ${normalizedRaw}. Use deny, allow-once, or allow-always.`,
   );
   process.exit(1);
+}
+
+function applyPatchDecisionFromApprovalMode(
+  mode: "deny" | "allow-once" | "allow-always" | undefined,
+): ApplyPatchRuntimeRouteOptions["requestedUserDecision"] | undefined {
+  if (mode === "deny") {
+    return "denied";
+  }
+  if (mode === "allow-once" || mode === "allow-always") {
+    return "approved";
+  }
+  return undefined;
 }
 
 function materializeApprovalModeObject(input: {

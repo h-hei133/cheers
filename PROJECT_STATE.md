@@ -387,6 +387,32 @@ Important boundaries:
 - production CLI / `runMvpIntegratedFlow` write wiring still requires a separate
   entrypoint review before touching real user workspaces
 
+### N. Single-file `apply_patch` CLI / runMvp no-write entrypoint (landed 2026-05-06)
+
+The single-file `apply_patch` route now has an explicit CLI /
+`runMvpIntegratedFlow` no-write entrypoint for raw Update File payloads against
+the selected workspace.
+
+Key evidence:
+
+- CLI requires `--apply-patch-runtime-route` before the runtime route is used
+- `runMvpIntegratedFlow` requires an explicit `applyPatchRuntimeRoute` option
+- requested approval from `--non-interactive-approval allow-once|allow-always`
+  is recorded only as permission UX input and does not authorize a write
+- runtime output is mapped from the safe no-write projection
+- terminal/session output stays stopped/non-success-like
+- `changedFiles=[]`, `writeIntents=[]`, no writer invocation, and no applied
+  patch record remain preserved
+- the CLI entrypoint leaves the selected workspace file unchanged
+
+Important boundaries:
+
+- this is not real-user workspace write enablement
+- production `apply_patch` and unified diff inputs remain rejected by default
+- write success remains limited to the explicit isolated-workspace guarded route
+- real-workspace writer routing still requires a separate write-entrypoint
+  review for UX, durable state, abort/rollback, and final writer boundary
+
 ## 6. Confirmed Baseline Facts
 
 - unified query loop exists and is durable
@@ -402,7 +428,7 @@ Important boundaries:
 1. true live TTY automation evidence remains weaker than print/stdin/replay evidence in this environment
 2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
 3. multi-file edit, production apply_patch write, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
-4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow` write route remains unwired; default rejection is still required
+4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow` write route remains unwired; an explicit CLI/runMvp no-write route exists, and default rejection is still required
 5. the guarded production route real-provider smoke has passed only for explicit opt-in isolated workspace routing, not default real user workspace mutation
 6. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
@@ -419,9 +445,13 @@ Escalate from hardening into focused implementation when one is reproducible:
 - single-file `apply_patch` guarded route is now validated through real-provider,
   resultMapper projection, and session display projection in an isolated
   workspace
-- do not continue to default production write enablement, CLI wiring, or
-  `runMvpIntegratedFlow` workspace mutation before a separate entrypoint review
-  defines the explicit opt-in UX and real-user workspace boundary
+- CLI / `runMvpIntegratedFlow` now expose an explicit no-write runtime
+  entrypoint for raw single-file `apply_patch` previews against the selected
+  workspace
+- do not continue to default production write enablement or
+  `runMvpIntegratedFlow` workspace mutation before a separate write-entrypoint
+  review defines the explicit write UX, durable state implications, abort /
+  rollback behavior, and real-user workspace boundary
 - the isolated fixture and guarded isolated-workspace write smokes have passed; treat them only as explicit opt-in isolated evidence, not default production write evidence, and do not rerun automatically
 - the real-provider non-mutating dry-run smoke and permission UX no-write smoke are sealed; do not rerun them by default unless validating a regression or a new provider-facing route decision
 - consider durable stopped-session continuity analysis as separate, explicitly scoped work

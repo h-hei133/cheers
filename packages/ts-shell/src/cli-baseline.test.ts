@@ -3238,6 +3238,56 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(transcript).toContain("\"type\":\"query.completed\"");
   }, 45000);
 
+  it("routes explicit apply_patch CLI opt-in through no-write runtime surface", () => {
+    const projectRoot = path.join(fakeHomeDir, "cli-apply-patch-runtime-project");
+    const targetDir = path.join(projectRoot, "src");
+    fs.mkdirSync(targetDir, { recursive: true });
+    const targetPath = path.join(targetDir, "app.ts");
+    fs.writeFileSync(targetPath, "old\n", "utf8");
+    const rawPatchText = [
+      "*** Begin Patch",
+      "*** Update File: src/app.ts",
+      "@@",
+      "-old",
+      "+new",
+      "*** End Patch",
+    ].join("\n");
+
+    const result = spawnSync(
+      nodeExe,
+      [
+        tsxCliPath,
+        cliPath,
+        "--project",
+        projectRoot,
+        "--print",
+        "--apply-patch-runtime-route",
+        "--non-interactive-approval",
+        "allow-once",
+        rawPatchText,
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 30000,
+      },
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    expect(output).toContain("Result");
+    expect(output).toContain("- Changed: none");
+    expect(output).toContain("Record that explicit approval was requested");
+    expect(fs.readFileSync(targetPath, "utf8")).toBe("old\n");
+  }, 35000);
+
   it("prefers completed current session for /continue follow-up over recovery fallback", async () => {
     const projectRoot = path.join(
       fakeHomeDir,

@@ -57,6 +57,12 @@ import {
   applySingleFileReplacePatch,
   formatPatchFailureReason,
 } from "./patchMutationLane.js";
+import {
+  buildNoWriteRuntimeRoute,
+  type NoWriteRuntimeSource,
+} from "./patchResult/noWriteRuntimeRoute.js";
+import { buildNoWriteRuntimeRouteResult } from "./patchResult/runtimeRouteResult.js";
+import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
 import { resolveTaskTargets } from "./targetResolution.js";
 import type {
   ResolvedTarget,
@@ -113,11 +119,24 @@ export interface MvpIntegratedFlowOptions {
     readonly model?: string;
   };
   readonly runtimeSeed?: QueryRuntimeStateSeed;
+  readonly applyPatchRuntimeRoute?: ApplyPatchRuntimeRouteOptions;
+}
+
+export interface ApplyPatchRuntimeRouteOptions {
+  readonly explicitRuntimeOptIn: boolean;
+  readonly rawPatchText?: string;
+  readonly requestedUserDecision?: SingleFileApplyPatchRequestedUserDecision;
+  readonly runtimeSource?: NoWriteRuntimeSource;
 }
 
 export async function runMvpIntegratedFlow(
   options: MvpIntegratedFlowOptions,
 ): Promise<OrchestrationResult> {
+  const applyPatchRuntimeResult = runApplyPatchRuntimeRouteIfRequested(options);
+  if (applyPatchRuntimeResult) {
+    return applyPatchRuntimeResult;
+  }
+
   const logger = createComponentLogger("orchestration");
   const workflowContext = getWorkflowGitContext(options.workspaceRoot);
   const runtimeConfig = getRuntimeConfig(options.workspaceRoot);
@@ -177,6 +196,17 @@ export async function runMvpIntegratedFlow(
 export async function* streamMvpIntegratedFlow(
   options: MvpIntegratedFlowOptions,
 ): AsyncIterable<QueryEvent> {
+  const applyPatchRuntimeResult = runApplyPatchRuntimeRouteIfRequested(options);
+  if (applyPatchRuntimeResult) {
+    yield {
+      type: "query.started",
+      sessionId: options.sessionId,
+      prompt: options.prompt,
+    };
+    yield { type: "query.completed", result: applyPatchRuntimeResult };
+    return;
+  }
+
   const workflowContext = getWorkflowGitContext(options.workspaceRoot);
   const runtimeConfig = getRuntimeConfig(options.workspaceRoot);
   const mcpGateway = new CoreMcpGateway(options.workspaceRoot);
@@ -222,6 +252,48 @@ export async function* streamMvpIntegratedFlow(
   } finally {
     enforcer.close();
   }
+}
+
+function runApplyPatchRuntimeRouteIfRequested(
+  options: MvpIntegratedFlowOptions,
+): OrchestrationResult | undefined {
+  const routeOptions = options.applyPatchRuntimeRoute;
+  if (!routeOptions) {
+    return undefined;
+  }
+
+  const route = buildNoWriteRuntimeRoute({
+    workspaceRoot: options.workspaceRoot,
+    rawPatchText: routeOptions.rawPatchText ?? options.prompt,
+    explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
+    ...(routeOptions.requestedUserDecision
+      ? { requestedUserDecision: routeOptions.requestedUserDecision }
+      : {}),
+    runtimeSource: routeOptions.runtimeSource ?? "production-adjacent",
+    readFile: (absolutePath) => {
+      const resolved = path.resolve(absolutePath);
+      const workspaceRoot = path.resolve(options.workspaceRoot);
+      const relative = path.relative(workspaceRoot, resolved);
+      if (
+        relative === "" ||
+        relative.startsWith("..") ||
+        path.isAbsolute(relative)
+      ) {
+        return undefined;
+      }
+      try {
+        return fs.readFileSync(resolved, "utf8");
+      } catch {
+        return undefined;
+      }
+    },
+  });
+
+  return buildNoWriteRuntimeRouteResult({
+    sessionId: options.sessionId,
+    prompt: options.prompt,
+    route,
+  });
 }
 
 function createIntegratedRunner(

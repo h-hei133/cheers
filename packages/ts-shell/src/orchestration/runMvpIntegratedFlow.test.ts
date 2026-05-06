@@ -3505,6 +3505,96 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     await expect(fs.readFile(targetPath, "utf8")).resolves.toBe(original);
   }, 15000);
 
+  it("routes explicit apply_patch runtime opt-in through the no-write surface", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "app.ts");
+    const original = "old\n";
+    await fs.writeFile(targetPath, original, "utf8");
+    const rawPatchText = [
+      "*** Begin Patch",
+      "*** Update File: src/app.ts",
+      "@@",
+      "-old",
+      "+new",
+      "*** End Patch",
+    ].join("\n");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_apply_patch_runtime_entrypoint",
+      prompt: rawPatchText,
+      workspaceRoot,
+      maxTurns: 1,
+      applyPatchRuntimeRoute: {
+        explicitRuntimeOptIn: true,
+        requestedUserDecision: "approved",
+        runtimeSource: "production-adjacent",
+      },
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.changeSet.attemptedFiles).toEqual(["src/app.ts"]);
+    expect(result.codingResult?.verification.status).toBe("blocked");
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-no-write-runtime-route:explicit-runtime-opt-in",
+        "apply-patch-runtime-entrypoint:no-write-route-result",
+        "apply-patch-runtime-entrypoint:no-writer-invoked",
+        "apply-patch-runtime-entrypoint:no-write-success",
+      ]),
+    );
+    await expect(fs.readFile(targetPath, "utf8")).resolves.toBe(original);
+  }, 15000);
+
+  it("streams explicit apply_patch runtime opt-in as a terminal stopped event", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "app.ts");
+    const original = "old\n";
+    await fs.writeFile(targetPath, original, "utf8");
+    const rawPatchText = [
+      "*** Begin Patch",
+      "*** Update File: src/app.ts",
+      "@@",
+      "-old",
+      "+new",
+      "*** End Patch",
+    ].join("\n");
+
+    const events: QueryEvent[] = [];
+    for await (const event of streamMvpIntegratedFlow({
+      sessionId: "sess_t10_apply_patch_runtime_stream",
+      prompt: rawPatchText,
+      workspaceRoot,
+      maxTurns: 1,
+      applyPatchRuntimeRoute: {
+        explicitRuntimeOptIn: true,
+        requestedUserDecision: "denied",
+        runtimeSource: "production-adjacent",
+      },
+    })) {
+      events.push(event);
+    }
+
+    expect(events.map((event) => event.type)).toEqual([
+      "query.started",
+      "query.completed",
+    ]);
+    const completed = events.find((event) => event.type === "query.completed");
+    expect(completed?.type).toBe("query.completed");
+    if (completed?.type === "query.completed") {
+      expect(completed.result.status).toBe("stopped_error");
+      expect(completed.result.codingResult?.changedFiles).toEqual([]);
+      expect(completed.result.codingResult?.evidence).toEqual(
+        expect.arrayContaining([
+          "apply-patch-no-write-runtime-route:permission:denied",
+          "apply-patch-runtime-entrypoint:no-write-success",
+        ]),
+      );
+    }
+    await expect(fs.readFile(targetPath, "utf8")).resolves.toBe(original);
+  }, 15000);
+
   it("runs low-risk multi-file consistency verification after a file edit", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     await fs.writeFile(
