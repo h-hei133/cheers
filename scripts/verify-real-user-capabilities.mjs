@@ -74,6 +74,7 @@ const realApplyPatchDryRunSmokeDryRun = process.argv.includes('--real-apply-patc
 const realApplyPatchDryRunSmoke = process.argv.includes('--real-apply-patch-dry-run-smoke')
 const realApplyPatchPermissionUxSmoke = process.argv.includes('--real-apply-patch-permission-ux-smoke')
 const realApplyPatchWriteFixtureSmoke = process.argv.includes('--real-apply-patch-write-fixture-smoke')
+const realApplyPatchRuntimeNoWriteSmoke = process.argv.includes('--real-apply-patch-runtime-no-write-smoke')
 
 const failureCategories = [
   'none',
@@ -1444,6 +1445,9 @@ function printHelp() {
   console.log('    Opt-in only; runs one real-provider model turn to produce a single-file apply_patch preview.')
   console.log('    Excluded from default verification; fixture and repository must remain unchanged.')
   console.log('    The generated patch is routed through the explicit opt-in dry-run route only; writer remains unreachable.')
+  console.log('  --real-apply-patch-runtime-no-write-smoke')
+  console.log('    Opt-in only; routes one real-provider apply_patch preview through the runtime no-write surface.')
+  console.log('    Excluded from default verification; fixture and repository must remain unchanged and writer remains unreachable.')
   console.log('  --real-apply-patch-write-fixture-smoke')
   console.log('    Opt-in only; runs one real-provider model turn to produce a single-file apply_patch preview.')
   console.log('    The generated patch may write only the isolated temporary fixture target after explicit approved-for-write.')
@@ -4767,6 +4771,100 @@ async function runApplyPatchPermissionUxRoute({ fixtureDir, patchText, redaction
   }
 }
 
+function buildApplyPatchRuntimeNoWriteRouteEvalScript() {
+  const routeUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'noWriteRuntimeRoute.ts')).href
+  const smokeUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'runtimeNoWriteSmoke.ts')).href
+  return `
+    import fs from 'node:fs';
+    import path from 'node:path';
+    import { buildNoWriteRuntimeRoute } from ${JSON.stringify(routeUrl)};
+    import { buildRuntimeNoWriteSmokeContract } from ${JSON.stringify(smokeUrl)};
+
+    const workspaceRoot = path.resolve(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
+    const rawPatchText = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
+    const redaction = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
+    const fixtureUnchanged = process.env.PRIVATE_AGENTS_APPLY_PATCH_RUNTIME_FIXTURE_UNCHANGED === 'true';
+    const repositoryClean = process.env.PRIVATE_AGENTS_APPLY_PATCH_RUNTIME_REPOSITORY_CLEAN === 'true';
+    const readFixtureFile = (absolutePath) => {
+      const resolved = path.resolve(absolutePath);
+      if (!(resolved === workspaceRoot || resolved.startsWith(workspaceRoot + path.sep))) {
+        return undefined;
+      }
+      return fs.existsSync(resolved) ? fs.readFileSync(resolved, 'utf8') : undefined;
+    };
+    const route = buildNoWriteRuntimeRoute({
+      workspaceRoot,
+      rawPatchText,
+      explicitRuntimeOptIn: true,
+      requestedUserDecision: 'pending',
+      runtimeSource: 'real-provider-smoke',
+      readFile: readFixtureFile,
+    });
+    const smoke = buildRuntimeNoWriteSmokeContract({
+      explicitOptIn: true,
+      syntheticRuntimeValidated: true,
+      route,
+      redactionCheck: redaction,
+      isolatedFixture: true,
+      privateAgentsRealRead: false,
+      providerConfigPrinted: false,
+      fixtureUnchanged,
+      repositoryClean,
+    });
+    console.log('__APPLY_PATCH_RUNTIME_NO_WRITE_RESULT__' + JSON.stringify({ route, smoke }));
+  `
+}
+
+async function runApplyPatchRuntimeNoWriteRoute({
+  fixtureDir,
+  patchText,
+  redaction,
+  fixtureUnchanged,
+  repositoryClean,
+}) {
+  const result = await run(process.execPath, [
+    tsxCliPath,
+    '--eval',
+    buildApplyPatchRuntimeNoWriteRouteEvalScript(),
+  ], {
+    cwd: tsShellRoot,
+    env: {
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
+      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
+        ok: redaction.ok,
+        leaks: redaction.leaks,
+      }),
+      PRIVATE_AGENTS_APPLY_PATCH_RUNTIME_FIXTURE_UNCHANGED: String(fixtureUnchanged),
+      PRIVATE_AGENTS_APPLY_PATCH_RUNTIME_REPOSITORY_CLEAN: String(repositoryClean),
+    },
+    timeoutMs: 120000,
+  })
+  const resultLine = result.stdout
+    .split(/\r?\n/)
+    .find((line) => line.startsWith('__APPLY_PATCH_RUNTIME_NO_WRITE_RESULT__'))
+  if (!resultLine) {
+    return {
+      ok: false,
+      failureReason: 'runtime-no-write-failure: route runner did not emit a result marker',
+      result,
+    }
+  }
+  try {
+    return {
+      ok: result.code === 0 && !result.timedOut,
+      ...JSON.parse(resultLine.slice('__APPLY_PATCH_RUNTIME_NO_WRITE_RESULT__'.length)),
+      result,
+    }
+  } catch {
+    return {
+      ok: false,
+      failureReason: 'runtime-no-write-failure: route runner emitted invalid JSON',
+      result,
+    }
+  }
+}
+
 function buildApplyPatchWriteFixtureEvalScript() {
   const routeUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'singleFileApplyPatchOptInDryRunRoute.ts')).href
   const decisionUrl = pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'writeDecisionGate.ts')).href
@@ -4974,6 +5072,83 @@ function statusDetailForApplyPatchDryRunFailureCategory(failureCategory) {
   if (failureCategory === 'provider output multiple patches') return 'provider-output-multiple-patches'
   if (failureCategory === 'provider-readiness') return 'provider-readiness'
   return 'passed'
+}
+
+function assertApplyPatchRuntimeNoWriteSmokeSuccess({ runtimeBundle, comparison, repoBefore, repoAfter, redaction }) {
+  const failures = []
+  const route = runtimeBundle?.route
+  const smoke = runtimeBundle?.smoke
+  if (!repoBefore.ok || repoBefore.status) {
+    failures.push('no-mutation guard failure: repository was not clean before smoke')
+  }
+  if (!repoAfter.ok) {
+    failures.push('no-mutation guard failure: repository status could not be checked after smoke')
+  } else if (repoAfter.status) {
+    failures.push('real repo mutation leak: repository changed during smoke')
+  }
+  if (!comparison.ok) {
+    failures.push(`fixture mutation leak: added=${comparison.added.join(',') || 'none'} removed=${comparison.removed.join(',') || 'none'} changed=${comparison.changed.join(',') || 'none'}`)
+  }
+  if (!redaction.ok) {
+    failures.push(`redaction failure: ${redaction.leaks.join(',') || 'unknown'}`)
+  }
+  if (!runtimeBundle?.ok || !route || !smoke) {
+    failures.push(runtimeBundle?.failureReason ?? 'route-failure: missing runtime no-write result')
+  } else {
+    if (smoke.status !== 'ready') {
+      failures.push(`route-failure: runtime no-write smoke status ${smoke.status}${smoke.failure ? ` (${smoke.failure})` : ''}`)
+    }
+    if (!['permission-pending', 'denied', 'blocked'].includes(route.displayStatus)) {
+      failures.push(`route-failure: unexpected runtime display status ${route.displayStatus}`)
+    }
+    if (
+      route.willWrite !== false ||
+      route.changedFiles?.length !== 0 ||
+      route.writeIntents?.length !== 0 ||
+      route.noWriterInvoked !== true ||
+      route.noAppliedPatchRecord !== true ||
+      smoke.willWrite !== false ||
+      smoke.changedFiles?.length !== 0 ||
+      smoke.writeIntents?.length !== 0 ||
+      smoke.noWriterInvoked !== true ||
+      smoke.noAppliedPatchRecord !== true
+    ) {
+      failures.push('unexpected write: runtime route exposed write-like state')
+    }
+    if (
+      route.terminalClassification !== 'stopped' ||
+      route.doesNotClaimMutationSuccess !== true ||
+      route.doesNotClaimWriteSuccess !== true ||
+      smoke.terminalClassification !== 'stopped' ||
+      smoke.terminalNoSuccessClaim !== true
+    ) {
+      failures.push('unexpected success claim: runtime no-write route looked like a write success')
+    }
+  }
+
+  let failureCategory = 'none'
+  if (failures.some((failure) => failure.startsWith('no-mutation guard failure'))) {
+    failureCategory = 'no-mutation guard failure'
+  } else if (failures.some((failure) => failure.startsWith('real repo mutation leak'))) {
+    failureCategory = 'real repo mutation leak'
+  } else if (failures.some((failure) => failure.startsWith('fixture mutation leak'))) {
+    failureCategory = 'unexpected write'
+  } else if (failures.some((failure) => failure.startsWith('redaction failure'))) {
+    failureCategory = 'redaction failure'
+  } else if (failures.some((failure) => failure.startsWith('unexpected write'))) {
+    failureCategory = 'unexpected write'
+  } else if (failures.some((failure) => failure.startsWith('unexpected success claim'))) {
+    failureCategory = 'unexpected success claim'
+  } else if (failures.some((failure) => failure.startsWith('route-failure'))) {
+    failureCategory = 'route failure'
+  }
+
+  return {
+    ok: failures.length === 0,
+    failures,
+    failureCategory,
+    statusDetail: statusDetailForApplyPatchDryRunFailureCategory(failureCategory),
+  }
 }
 
 function assertApplyPatchPermissionUxSmokeSuccess({ permissionBundle, comparison, repoBefore, repoAfter, redaction }) {
@@ -5755,6 +5930,293 @@ async function runRealApplyPatchPermissionUxSmoke() {
   }
 }
 
+async function runRealApplyPatchRuntimeNoWriteSmoke() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=real-apply-patch-runtime-no-write-smoke')
+  renderCodingFlowPreflightNotice({ modelTurn: true, writableFixture: false })
+  console.log('homeRead=false')
+  console.log('defaultSmoke=skipped')
+  console.log('realProviderHome=config-only')
+
+  if (!realHome) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-runtime-no-write-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: 'CONFIG',
+      statusDetail: 'config-failure',
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      noWriteMode: true,
+      failureCategory: 'auth/config failure',
+      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch runtime no-write smoke',
+      changedFiles: [],
+      writeIntents: [],
+      noWriterInvoked: true,
+    })
+    console.log('[CONFIG] real-apply-patch-runtime-no-write-smoke status=config-failure')
+    console.log('config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch runtime no-write smoke')
+    process.exit(3)
+  }
+
+  const repoBefore = await readRepoStatusShort()
+  if (!repoBefore.ok || repoBefore.status) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-runtime-no-write-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: 'FAIL',
+      statusDetail: 'no-mutation-guard-failure',
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      noWriteMode: true,
+      failureCategory: 'no-mutation guard failure',
+      failureReason: repoBefore.ok
+        ? 'no-mutation guard failure: repository was not clean before smoke'
+        : 'no-mutation guard failure: repository status could not be checked before smoke',
+      changedFiles: [],
+      writeIntents: [],
+      noWriterInvoked: true,
+      outputTail: repoBefore.outputTail,
+    })
+    console.log('[FAIL] real-apply-patch-runtime-no-write-smoke status=no-mutation-guard-failure')
+    process.exit(1)
+  }
+
+  const preflight = await runProviderReadinessPreflight()
+  const preflightStatus = buildCodingFlowPreflightStatus(preflight)
+  console.log(`[${preflightStatus.status}] real-apply-patch-runtime-no-write-preflight status=${preflightStatus.statusDetail}`)
+  if (!preflight.ok) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-runtime-no-write-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: preflightStatus.status,
+      statusDetail: preflightStatus.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: false,
+      noWriteMode: true,
+      failureCategory: codingFlowFailureCategoryForStatus(
+        preflightStatus.statusDetail,
+        preflightStatus.failureCategory,
+      ),
+      failureReason: preflightStatus.failureReason,
+      changedFiles: [],
+      writeIntents: [],
+      noWriterInvoked: true,
+      outputTail: preflight.outputTail,
+    })
+    process.exit(preflightStatus.exitCode)
+  }
+
+  const runtimeHome = getRealCodingFlowRuntimeHome(`${runId}-apply-patch-runtime-no-write`)
+  const auditLogPath = getRealCodingFlowAuditLogPath(`${runId}-apply-patch-runtime-no-write`)
+  assertSafeCodingFlowRuntimeHome(runtimeHome)
+  assertSafeCodingFlowRuntimeHome(path.dirname(auditLogPath))
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+  const fixture = createApplyPatchDryRunFixture()
+  try {
+    const before = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const providerResult = await runApplyPatchDryRunProviderTurn({
+      prompt: fixture.prompt,
+      runtimeHome,
+      realHome,
+      fixtureDir: fixture.fixtureDir,
+      auditLogPath,
+    })
+    const redaction = redactAndAssertCodingProviderOutput(providerResult.rawOutput || providerResult.output)
+    const redactedProviderOutput = redactAndAssertCodingProviderOutput(providerResult.output).redacted
+    const providerFailure = classifyProviderReadinessFailure(
+      `apply_patch runtime no-write model turn exited ${providerResult.code}`,
+      redaction.redacted,
+      'real',
+    )
+    const extracted = extractSingleApplyPatchBlock(redactedProviderOutput)
+    let runtimeBundle = undefined
+    const afterProvider = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const providerComparison = compareApplyPatchDryRunSnapshots(before, afterProvider)
+    const repoAfterProvider = await readRepoStatusShort()
+    if (providerResult.code === 0 && !providerResult.timedOut && !providerFailure && extracted.status === 'ok') {
+      runtimeBundle = await runApplyPatchRuntimeNoWriteRoute({
+        fixtureDir: fixture.fixtureDir,
+        patchText: extracted.patchText,
+        redaction,
+        fixtureUnchanged: providerComparison.ok,
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoAfterProvider.ok && !repoAfterProvider.status,
+      })
+    }
+    const after = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const comparison = compareApplyPatchDryRunSnapshots(before, after)
+    const repoAfter = await readRepoStatusShort()
+
+    if (providerFailure || providerResult.code !== 0 || providerResult.timedOut) {
+      const failureStatus = buildCodingFlowSmokeFailureStatus(providerResult, redaction.redacted, redaction)
+      writeReport({
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-apply-patch-runtime-no-write-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: failureStatus.status,
+        statusDetail: failureStatus.statusDetail,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        noWriteMode: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          noMutation: comparison.ok,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+        changedFiles: [],
+        writeIntents: [],
+        noWriterInvoked: true,
+        noAppliedPatchRecord: true,
+        terminalNoSuccessClaim: true,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        failureCategory: failureStatus.failureCategory,
+        failureReason: failureStatus.failureReason,
+        outputTail: summarizeOutput(redaction.redacted),
+      })
+      console.log(`fixtureFiles=${fixture.files.join(',')}`)
+      console.log(`noMutation=${comparison.ok}`)
+      console.log(`repositoryClean=${repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status}`)
+      console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+      console.log(`[${failureStatus.status}] real-apply-patch-runtime-no-write-smoke status=${failureStatus.statusDetail}`)
+      if (redaction.redacted) console.log(summarizeOutput(redaction.redacted))
+      process.exit(failureStatus.exitCode)
+    }
+
+    if (extracted.status !== 'ok') {
+      const failureCategory = extracted.status === 'provider-output-multiple-patches'
+        ? 'provider output multiple patches'
+        : 'provider output missing apply_patch'
+      const statusDetail = statusDetailForApplyPatchDryRunFailureCategory(failureCategory)
+      writeReport({
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-apply-patch-runtime-no-write-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: 'FAIL',
+        statusDetail,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        noWriteMode: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          noMutation: comparison.ok,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        writeIntents: [],
+        noWriterInvoked: true,
+        noAppliedPatchRecord: true,
+        terminalNoSuccessClaim: true,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        failureCategory,
+        failureReason: `${statusDetail}: provider output did not contain exactly one apply_patch preview block`,
+        outputTail: summarizeOutput(redactedProviderOutput),
+      })
+      console.log(`fixtureFiles=${fixture.files.join(',')}`)
+      console.log(`applyPatchBlocks=${extracted.count}`)
+      console.log(`noMutation=${comparison.ok}`)
+      console.log(`repositoryClean=${repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status}`)
+      console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+      console.log(`[FAIL] real-apply-patch-runtime-no-write-smoke status=${statusDetail}`)
+      process.exit(1)
+    }
+
+    const success = assertApplyPatchRuntimeNoWriteSmokeSuccess({
+      runtimeBundle,
+      comparison,
+      repoBefore,
+      repoAfter,
+      redaction,
+    })
+    const route = runtimeBundle?.route
+    const smoke = runtimeBundle?.smoke
+    const report = {
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-runtime-no-write-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: success.ok ? 'PASS' : 'FAIL',
+      statusDetail: success.ok ? 'passed' : success.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: true,
+      noWriteMode: true,
+      runtimeHome: 'isolated-test-root',
+      fixture: {
+        files: fixture.files,
+        noMutation: comparison.ok,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+      },
+      repositoryClean: repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status,
+      routeStatus: route?.routeStatus ?? 'missing',
+      displayStatus: route?.displayStatus ?? 'missing',
+      terminalClassification: route?.terminalClassification ?? 'missing',
+      willWrite: false,
+      changedFiles: [],
+      writeIntents: [],
+      noWriterInvoked: true,
+      noAppliedPatchRecord: true,
+      terminalNoSuccessClaim: route?.doesNotClaimWriteSuccess === true &&
+        route?.doesNotClaimMutationSuccess === true &&
+        route?.terminalClassification !== 'success',
+      redaction: { ok: redaction.ok, leaks: redaction.leaks },
+      failureCategory: success.failureCategory,
+      failureReason: success.failures.join('; '),
+      outputTail: summarizeOutput(redactedProviderOutput),
+      gateStatus: smoke?.status ?? 'missing',
+      gateEvidence: smoke?.evidence ?? [],
+    }
+    writeReport(report)
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`applyPatchBlocks=${extracted.count}`)
+    console.log(`noMutation=${comparison.ok}`)
+    console.log(`repositoryClean=${report.repositoryClean}`)
+    console.log(`routeStatus=${report.routeStatus}`)
+    console.log(`displayStatus=${report.displayStatus}`)
+    console.log(`terminalClassification=${report.terminalClassification}`)
+    console.log('changedFiles=')
+    console.log('writeIntents=')
+    console.log(`noWriterInvoked=${report.noWriterInvoked}`)
+    console.log(`noAppliedPatchRecord=${report.noAppliedPatchRecord}`)
+    console.log(`terminalNoSuccessClaim=${report.terminalNoSuccessClaim}`)
+    console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
+    if (!success.ok) {
+      console.log(`failureReason=${report.failureReason}`)
+    }
+    console.log(`[${success.ok ? 'PASS' : 'FAIL'}] real-apply-patch-runtime-no-write-smoke`)
+    process.exit(success.ok ? 0 : 1)
+  } finally {
+    cleanupApplyPatchDryRunFixture(fixture.fixtureDir)
+    cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
+  }
+}
+
 async function runRealApplyPatchWriteFixtureSmoke() {
   console.log('gate name=real-user-capabilities')
   console.log('mode=real-apply-patch-write-fixture-smoke')
@@ -6093,6 +6555,10 @@ async function main() {
   }
   if (realApplyPatchPermissionUxSmoke) {
     await runRealApplyPatchPermissionUxSmoke()
+    return
+  }
+  if (realApplyPatchRuntimeNoWriteSmoke) {
+    await runRealApplyPatchRuntimeNoWriteSmoke()
     return
   }
   if (realApplyPatchWriteFixtureSmoke) {
