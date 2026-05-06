@@ -183,10 +183,12 @@ function extractIntentSignals(prompt: string): IntentSignals {
           /\b(implement|fix|modify|update|change|refactor|wire|add|create|repair)\b/i,
           /(?:实现|修复|修改|更新|接入|新增|创建|改代码|按计划|改一下|写一下|加一下|调整|改成)/u,
         ])));
-  const asksForCommand = hasAny(text, [
-    /\b(run|execute|test|build|commit|push|shell|terminal|npm|pnpm|yarn|git)\b/i,
-    /(?:运行|执行|构建|提交|推送|命令|终端)/u,
-  ]);
+  const asksForCommand =
+    !asksForExplicitNoWrite &&
+    hasAny(text, [
+      /\b(run|execute|test|build|commit|push|shell|terminal|npm|pnpm|yarn|git)\b/i,
+      /(?:运行|执行|构建|提交|推送|命令|终端)/u,
+    ]);
   const asksForExplicitCommand =
     !asksForConceptExplanation &&
     !asksForExplicitNoWrite &&

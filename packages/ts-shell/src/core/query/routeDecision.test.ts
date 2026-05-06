@@ -54,6 +54,10 @@ describe("query route decision", () => {
     "不要修改文件，分析这个错误原因",
     "只回答：这个日志为什么失败",
     "请不要修改，看看 package.json scripts 有没有问题",
+    "不要运行命令，分析这个错误原因",
+    "不要执行，只解释 npm test 为什么失败",
+    "只回答：npm run build 为什么失败",
+    "不要运行 npm test，只分析为什么失败",
   ])("keeps explicit no-write analysis out of plan mode: %s", (prompt) => {
     const decision = decideQueryRoute({ prompt });
 
