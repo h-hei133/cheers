@@ -12,6 +12,12 @@ import {
 } from "./singleFileApplyPatchOptInDryRunRoute.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
 import type { WorkspaceWriteTargetAuthority } from "./workspaceAuthority.js";
+import {
+  buildWorkspaceWriteFailureState,
+  type WorkspaceWriteEffect,
+  type WorkspaceWriteFailurePhase,
+  type WorkspaceWriteFailureState,
+} from "./writeFailureState.js";
 import { buildWriteDecisionGate, type WriteDecisionGate } from "./writeDecisionGate.js";
 
 export type WorkspaceWriteRouteStatus = "written" | "blocked";
@@ -27,6 +33,7 @@ export type WorkspaceWriteRouteBlocker =
   | "target-mismatch"
   | "workspace-boundary"
   | "final-stale-read"
+  | "aborted-before-write"
   | "no-op"
   | "write-application"
   | "post-write-verification";
@@ -44,6 +51,7 @@ export interface WorkspaceWriteRouteOptions {
     relativePath: string,
   ) => WorkspaceWriteTargetAuthority;
   readonly writeFile: (relativePath: string, content: string) => void | Promise<void>;
+  readonly abortSignal?: AbortSignal;
 }
 
 type FinalStaleRead = ReturnType<typeof buildSingleFileApplyPatchFinalStaleReadContract>;
@@ -60,6 +68,9 @@ export type WorkspaceWriteRoute =
       readonly workspaceWriterInvoked: true;
       readonly writerTarget: "selected-workspace";
       readonly selectedWorkspaceWrite: true;
+      readonly writerStarted: true;
+      readonly writeEffect: "verified";
+      readonly writeFailureState: WorkspaceWriteFailureState;
       readonly changedFiles: readonly [string];
       readonly writeIntents: readonly [string];
       readonly appliedPatchRecord: false;
@@ -85,6 +96,9 @@ export type WorkspaceWriteRoute =
       readonly workspaceWriterInvoked: boolean;
       readonly writerTarget: "none" | "selected-workspace";
       readonly selectedWorkspaceWrite: boolean;
+      readonly writerStarted: boolean;
+      readonly writeEffect: WorkspaceWriteEffect;
+      readonly writeFailureState: WorkspaceWriteFailureState;
       readonly changedFiles: readonly [];
       readonly writeIntents: readonly [];
       readonly appliedPatchRecord: false;
@@ -101,6 +115,23 @@ export type WorkspaceWriteRoute =
 export async function runWorkspaceWriteRoute(
   options: WorkspaceWriteRouteOptions,
 ): Promise<WorkspaceWriteRoute> {
+  if (options.abortSignal?.aborted) {
+    const writeFailureState = buildWorkspaceWriteFailureState({
+      phase: "before-writer",
+    });
+    return blocked({
+      blocker: "aborted-before-write",
+      failures: [],
+      nextAction:
+        "Stop: apply_patch workspace write was aborted before the workspace writer became reachable.",
+      evidence: [
+        "apply-patch-workspace-write-route:aborted-before-write",
+        ...writeFailureState.evidence,
+      ],
+      writeFailureState,
+    });
+  }
+
   if (!options.explicitRuntimeOptIn) {
     return blocked({
       blocker: "runtime-opt-in-missing",
@@ -347,10 +378,37 @@ export async function runWorkspaceWriteRoute(
     });
   }
 
+  if (options.abortSignal?.aborted) {
+    const writeFailureState = buildWorkspaceWriteFailureState({
+      phase: "before-writer",
+      targetPath: intent.path,
+    });
+    return blocked({
+      blocker: "aborted-before-write",
+      targetPath: intent.path,
+      dryRunRoute,
+      writeDecision,
+      guardedGate,
+      finalStaleRead,
+      failures: [],
+      nextAction:
+        "Stop: apply_patch workspace write was aborted after final stale-read but before the workspace writer ran.",
+      evidence: [
+        "apply-patch-workspace-write-route:aborted-before-writer",
+        ...writeFailureState.evidence,
+      ],
+      writeFailureState,
+    });
+  }
+
   const applied = await applySingleFileUpdateIntent(writeIntent, {
     writeFile: options.writeFile,
   });
   if (applied.ok === false) {
+    const writeFailureState = buildWorkspaceWriteFailureState({
+      phase: "writer-failed",
+      targetPath: intent.path,
+    });
     return blocked({
       blocker: "write-application",
       targetPath: intent.path,
@@ -363,15 +421,21 @@ export async function runWorkspaceWriteRoute(
       writerTarget: "selected-workspace",
       selectedWorkspaceWrite: true,
       postWriteVerification: "blocked",
-      nextAction:
-        applied.failedFiles[0]?.nextAction ??
-        "Retry after checking workspace write permissions.",
-      evidence: ["apply-patch-workspace-write-route:write-application-blocked"],
+      nextAction: `${applied.failedFiles[0]?.nextAction ?? "Retry after checking workspace write permissions."} ${writeFailureState.nextAction}`,
+      evidence: [
+        "apply-patch-workspace-write-route:write-application-blocked",
+        ...writeFailureState.evidence,
+      ],
+      writeFailureState,
     });
   }
 
   const writtenContent = options.readVerifiedFile(intent.path);
   if (writtenContent !== intent.content) {
+    const writeFailureState = buildWorkspaceWriteFailureState({
+      phase: "post-write-verification-failed",
+      targetPath: intent.path,
+    });
     return blocked({
       blocker: "post-write-verification",
       targetPath: intent.path,
@@ -384,9 +448,12 @@ export async function runWorkspaceWriteRoute(
       writerTarget: "selected-workspace",
       selectedWorkspaceWrite: true,
       postWriteVerification: "failed",
-      nextAction:
-        "Stop: workspace writer returned but post-write verification did not match the approved content.",
-      evidence: ["apply-patch-workspace-write-route:post-write-verification-failed"],
+      nextAction: writeFailureState.nextAction,
+      evidence: [
+        "apply-patch-workspace-write-route:post-write-verification-failed",
+        ...writeFailureState.evidence,
+      ],
+      writeFailureState,
     });
   }
 
@@ -407,6 +474,10 @@ export async function runWorkspaceWriteRoute(
 
   const nextAction =
     "Review the selected workspace change; default apply_patch remains rejected outside this explicit write entrypoint.";
+  const writeFailureState = buildWorkspaceWriteFailureState({
+    phase: "verified-write",
+    targetPath,
+  });
   return {
     source: "single-file-apply-patch-workspace-write-route",
     status: "written",
@@ -418,6 +489,9 @@ export async function runWorkspaceWriteRoute(
     workspaceWriterInvoked: true,
     writerTarget: "selected-workspace",
     selectedWorkspaceWrite: true,
+    writerStarted: true,
+    writeEffect: "verified",
+    writeFailureState,
     changedFiles: [targetPath],
     writeIntents: [targetPath],
     appliedPatchRecord: false,
@@ -439,6 +513,7 @@ export async function runWorkspaceWriteRoute(
       "apply-patch-workspace-write-route:post-write-verification-passed",
       "apply-patch-workspace-write-route:success-after-verified-write",
       "apply-patch-workspace-write-route:default-production-rejection-unchanged",
+      ...writeFailureState.evidence,
     ],
   };
 }
@@ -466,11 +541,19 @@ function blocked(
     readonly workspaceWriterInvoked?: boolean;
     readonly writerTarget?: "none" | "selected-workspace";
     readonly selectedWorkspaceWrite?: boolean;
+    readonly writeFailureState?: WorkspaceWriteFailureState;
+    readonly failurePhase?: WorkspaceWriteFailurePhase;
     readonly postWriteVerification?: "not-run" | "blocked" | "failed";
     readonly nextAction: string;
     readonly evidence: readonly string[];
   },
 ): WorkspaceWriteRoute {
+  const writeFailureState =
+    input.writeFailureState ??
+    buildWorkspaceWriteFailureState({
+      phase: input.failurePhase ?? "before-writer",
+      targetPath: input.targetPath,
+    });
   return {
     source: "single-file-apply-patch-workspace-write-route",
     status: "blocked",
@@ -484,6 +567,9 @@ function blocked(
     workspaceWriterInvoked: input.workspaceWriterInvoked ?? false,
     writerTarget: input.writerTarget ?? "none",
     selectedWorkspaceWrite: input.selectedWorkspaceWrite ?? false,
+    writerStarted: writeFailureState.writerStarted,
+    writeEffect: writeFailureState.writeEffect,
+    writeFailureState,
     changedFiles: [],
     writeIntents: [],
     appliedPatchRecord: false,
@@ -496,7 +582,10 @@ function blocked(
     doNext: input.nextAction,
     evidence: [
       ...input.evidence,
+      ...writeFailureState.evidence,
       `apply-patch-workspace-write-route:blocker:${input.blocker}`,
+      `apply-patch-workspace-write-route:write-effect:${writeFailureState.writeEffect}`,
+      `apply-patch-workspace-write-route:failure-phase:${writeFailureState.failurePhase}`,
       "apply-patch-workspace-write-route:changed-files-empty",
       "apply-patch-workspace-write-route:write-intents-empty",
       ...(input.workspaceWriterInvoked

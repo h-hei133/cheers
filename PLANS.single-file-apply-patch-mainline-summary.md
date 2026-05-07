@@ -1,7 +1,8 @@
 # Single-file apply_patch mainline summary
 
 Status: summarized after the explicit workspace write entrypoint and symlink
-workspace-boundary fix landed on `main`.
+workspace-boundary fix landed on `main`, then updated for the explicit
+selected-workspace write failure durability stage.
 
 This document summarizes only the single-file `apply_patch` mainline. It does
 not reopen the default production route and does not claim support for
@@ -149,6 +150,15 @@ Evidence:
 - symlink swaps at the writer boundary are blocked before content is written
 - selected-workspace write success is reported only after post-write content
   verification
+- abort before the selected-workspace writer is reachable stops with
+  `writeEffect=none`, empty `changedFiles`, empty `writeIntents`, and no success
+  claim
+- writer-started failures are now durable stopped states:
+  `writeEffect=unknown` when the writer failed before final verification, and
+  `writeEffect=unverified` when post-write verification did not match approved
+  content
+- writer-started stopped states require user inspection and re-reading the
+  current target before retry; they do not report write success
 
 Follow-up attention:
 
@@ -160,9 +170,9 @@ Follow-up attention:
   model.
 - Workspace write failures now carry more precise stopped attribution for
   workspace-boundary, write-application, and post-write verification blockers.
-- Durable stopped-session implications, abort behavior, and broader user
-  workspace safety policy still need a separate review before any default route
-  is considered.
+- Durable stopped-session replay/resume across process restarts and broader
+  user workspace safety policy still need a separate review before any default
+  route is considered.
 
 ## Deferred or not started
 
@@ -191,6 +201,9 @@ Follow-up attention:
 - Symlink swap at the selected workspace writer boundary.
 - Coarse workspace write failure attribution for workspace-boundary,
   write-application, and post-write verification blockers.
+- Abort-before-writer ambiguity for selected-workspace writes.
+- Success-like surface leakage for writer-started failures whose final state is
+  unknown or unverified.
 
 ## Remaining blockers and risks
 
@@ -200,8 +213,10 @@ Follow-up attention:
   release/default readiness.
 - Broader cross-platform TOCTOU / atomic-write hardening is still a follow-up
   risk, not a default-route blocker by itself.
-- Durable state, abort/interrupt, retry, and stopped-session resume semantics for
-  selected-workspace apply_patch writes need a separate review.
+- Durable state now distinguishes no-write aborts from writer-started
+  unknown/unverified failures inside the route result. Cross-process
+  stopped-session resume semantics and automatic recovery still need a separate
+  review.
 - Real-provider gates prove specific isolated or explicitly selected routes only;
   they do not prove multi-file, default write, long-task continuity, or full
   production mutation maturity.
@@ -221,6 +236,10 @@ Passed explicit opt-in gates:
 - guarded production route smoke against isolated workspace
 - selected-workspace write smoke against isolated test workspace
 
+Current branch validation for writer-started failure durability should rerun the
+selected-workspace write smoke before claiming the route remains real-provider
+safe, because the writer reachable path and result surface changed.
+
 Required policy for any rerun:
 
 - explicit `PRIVATE_AGENTS_REAL_HOME`
@@ -231,16 +250,17 @@ Required policy for any rerun:
 - repository clean before and after
 - audit/history residue cleanup before commit
 
-No real-provider gate is required for this documentation update.
+No real-provider gate is required for documentation-only updates. A code branch
+that changes writer-reachable route semantics should rerun the selected
+workspace write smoke before being sealed.
 
 ## Recommended next stage
 
 1. Return focus to the default user main path unless a concrete apply_patch
    regression appears. The apply_patch mainline now has explicit no-write and
    explicit selected-workspace write entrypoints.
-2. If continuing apply_patch work, review durable state, abort/interrupt, retry,
-   and stopped-session semantics for selected-workspace writes before considering
-   default route changes.
-3. Treat descriptor-level no-follow / TOCTOU hardening as a focused safety
-   follow-up. It is narrower and more appropriate than expanding into multi-file
-   or full edit-engine work.
+2. If continuing apply_patch work, review cross-process stopped-session
+   persistence and user retry UX for writer-started unknown/unverified states
+   before considering default route changes.
+3. Keep rollback, atomic multi-step transactions, multi-file support, AST, and
+   fuzzy patching deferred unless a separate main-path blocker justifies them.

@@ -286,6 +286,7 @@ async function runApplyPatchRuntimeRouteIfRequested(
       readVerifiedFile: workspaceAuthority.readVerifiedFile,
       validateWriteTarget: workspaceAuthority.validateWriteTarget,
       writeFile: workspaceAuthority.writeFile,
+      ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
     });
     return buildWorkspaceWriteRouteResult({
       sessionId: options.sessionId,

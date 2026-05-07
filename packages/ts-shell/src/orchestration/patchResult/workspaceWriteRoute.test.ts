@@ -46,6 +46,9 @@ describe("single-file apply_patch real workspace write route", () => {
     expect(result.workspaceWriterInvoked).toBe(true);
     expect(result.writerTarget).toBe("selected-workspace");
     expect(result.selectedWorkspaceWrite).toBe(true);
+    expect(result.writerStarted).toBe(true);
+    expect(result.writeEffect).toBe("verified");
+    expect(result.writeFailureState.failurePhase).toBe("verified-write");
     expect(result.finalStaleRead.finalRevalidation).toBe("passed");
     expect(result.postWriteVerification).toBe("passed");
     expect(result.terminalClassification).toBe("success");
@@ -276,6 +279,10 @@ describe("single-file apply_patch real workspace write route", () => {
     expect(result.workspaceWriterInvoked).toBe(true);
     expect(result.writerTarget).toBe("selected-workspace");
     expect(result.selectedWorkspaceWrite).toBe(true);
+    expect(result.writerStarted).toBe(true);
+    expect(result.writeEffect).toBe("unknown");
+    expect(result.writeFailureState.failurePhase).toBe("writer-failed");
+    expect(result.writeFailureState.requiresUserInspection).toBe(true);
     expect(result.changedFiles).toEqual([]);
     expect(result.writeIntents).toEqual([]);
     expect(result.appliedPatchRecord).toBe(false);
@@ -287,11 +294,73 @@ describe("single-file apply_patch real workspace write route", () => {
       expect.arrayContaining([
         "apply-patch-workspace-write-route:write-application-blocked",
         "apply-patch-workspace-write-route:writer-invoked-no-success-claim",
+        "apply-patch-write-failure-state:write-effect-unknown",
         "apply-patch-workspace-write-route:no-success-claim",
       ]),
     );
     expect(fs.readFileSync(outsideTarget, "utf8")).toBe(
       "status: draft\nowner: outside-workspace\n",
+    );
+  });
+
+  it("blocks aborts before the workspace writer without reporting a write effect", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const controller = new AbortController();
+    controller.abort();
+    const before = snapshotFixture(fixture.workspaceRoot);
+
+    const result = await runWorkspaceWriteRoute({
+      workspaceRoot: fixture.workspaceRoot,
+      rawPatchText: applyPatchText,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: "approved",
+      defaultProductionRejectionUnchanged: true,
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: () => {
+        throw new Error("writer must stay unreachable after pre-write abort");
+      },
+      abortSignal: controller.signal,
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("aborted-before-write");
+    expect(result.writeEffect).toBe("none");
+    expect(result.writeFailureState.failurePhase).toBe("before-writer");
+    expectNoBlockedWriteLeak(result);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("finishes post-write verification even if the abort signal fires after the writer starts", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const controller = new AbortController();
+
+    const result = await runWorkspaceWriteRoute({
+      workspaceRoot: fixture.workspaceRoot,
+      rawPatchText: applyPatchText,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: "approved",
+      defaultProductionRejectionUnchanged: true,
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: (relativePath, content) => {
+        controller.abort();
+        authority.writeFile(relativePath, content);
+      },
+      abortSignal: controller.signal,
+    });
+
+    expect(result.status).toBe("written");
+    expect(result.writeEffect).toBe("verified");
+    expect(result.postWriteVerification).toBe("passed");
+    expect(readFile(fixture.workspaceRoot, "src/app.ts")).toBe(
+      "status: ready\nowner: user-workspace\n",
     );
   });
 });
@@ -344,6 +413,9 @@ function expectNoBlockedWriteLeak(
   expect(result.workspaceWriterInvoked).toBe(false);
   expect(result.writerTarget).toBe("none");
   expect(result.selectedWorkspaceWrite).toBe(false);
+  expect(result.writerStarted).toBe(false);
+  expect(result.writeEffect).toBe("none");
+  expect(result.writeFailureState.failurePhase).toBe("before-writer");
   expect(result.appliedPatchRecord).toBe(false);
   expect(result.terminalClassification).toBe("stopped");
   expect(result.terminalSuccessAllowed).toBe(false);

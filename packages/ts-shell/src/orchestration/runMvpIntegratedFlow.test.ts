@@ -3685,6 +3685,52 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     await expect(fs.readFile(targetPath, "utf8")).resolves.toBe(original);
   }, 15000);
 
+  it("keeps apply_patch workspace write opt-in no-write when aborted before writer", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    const targetPath = path.join(workspaceRoot, "src", "app.ts");
+    const original = "old\n";
+    await fs.writeFile(targetPath, original, "utf8");
+    const rawPatchText = [
+      "*** Begin Patch",
+      "*** Update File: src/app.ts",
+      "@@",
+      "-old",
+      "+new",
+      "*** End Patch",
+    ].join("\n");
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_apply_patch_workspace_write_aborted_before_writer",
+      prompt: rawPatchText,
+      workspaceRoot,
+      maxTurns: 1,
+      abortSignal: controller.signal,
+      applyPatchRuntimeRoute: {
+        explicitRuntimeOptIn: true,
+        requestedUserDecision: "approved",
+        runtimeSource: "production-adjacent",
+        workspaceWrite: {
+          explicitWorkspaceWriteOptIn: true,
+        },
+      },
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-workspace-write-route:aborted-before-write",
+        "apply-patch-workspace-write-route:no-writer-invoked",
+        "apply-patch-workspace-write-result:write-effect:none",
+        "apply-patch-workspace-write-result:no-write-success",
+      ]),
+    );
+    await expect(fs.readFile(targetPath, "utf8")).resolves.toBe(original);
+  }, 15000);
+
   it("runs low-risk multi-file consistency verification after a file edit", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     await fs.writeFile(

@@ -42,6 +42,7 @@ describe("single-file apply_patch workspace write result", () => {
 
     expect(route.status).toBe("blocked");
     expect(route.blocker).toBe("post-write-verification");
+    expect(route.writeEffect).toBe("unverified");
 
     const result = buildWorkspaceWriteRouteResult({
       sessionId: "session-1",
@@ -57,16 +58,72 @@ describe("single-file apply_patch workspace write result", () => {
     expect(result.codingResult?.patches?.[0]?.failureCode).toBe(
       "readback-mismatch",
     );
+    expect(result.codingResult?.repair.status).toBe("failed");
+    expect(result.codingResult?.continuation.status).toBe(
+      "failed-after-bounded-continuation",
+    );
     expect(result.codingResult?.verification.status).toBe("blocked");
     expect(result.codingResult?.verification.blockerKind).toBe(
       "environment-not-ready",
     );
     expect(result.codingResult?.evidence).toEqual(
       expect.arrayContaining([
+        "actionable-blocker-kind:partial-mutation-failed",
         "actionable-blocker-kind:verification-failed",
+        "apply-patch-workspace-write-result:write-effect:unverified",
+        "apply-patch-workspace-write-result:user-inspection-required",
         "apply-patch-workspace-write-result:no-write-success",
       ]),
     );
+  });
+
+  it("maps writer application failures to stopped unknown write-effect recovery", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const route = await runWorkspaceWriteRoute({
+      workspaceRoot: fixture.workspaceRoot,
+      rawPatchText: applyPatchText,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: "approved",
+      defaultProductionRejectionUnchanged: true,
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: () => {
+        throw new Error("simulated writer failure after start");
+      },
+    });
+
+    expect(route.status).toBe("blocked");
+    expect(route.blocker).toBe("write-application");
+    expect(route.writeEffect).toBe("unknown");
+
+    const result = buildWorkspaceWriteRouteResult({
+      sessionId: "session-1",
+      prompt: applyPatchText,
+      route,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.patches?.[0]?.failureCode).toBe("write-failed");
+    expect(result.codingResult?.repair.status).toBe("failed");
+    expect(result.codingResult?.continuation.status).toBe(
+      "failed-after-bounded-continuation",
+    );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "actionable-blocker-kind:partial-mutation-failed",
+        "apply-patch-workspace-write-result:write-effect:unknown",
+        "apply-patch-workspace-write-result:writer-started-no-success",
+        "apply-patch-workspace-write-result:user-inspection-required",
+      ]),
+    );
+    expect(
+      fs.readFileSync(path.join(fixture.workspaceRoot, "src", "app.ts"), "utf8"),
+    ).toBe("status: draft\nowner: user-workspace\n");
   });
 
   it("maps workspace boundary failures to stopped write-failed attribution", async () => {
@@ -118,6 +175,7 @@ describe("single-file apply_patch workspace write result", () => {
     expect(result.codingResult?.evidence).toEqual(
       expect.arrayContaining([
         "actionable-blocker-kind:partial-mutation-failed",
+        "apply-patch-workspace-write-result:write-effect:none",
         "apply-patch-workspace-write-result:no-write-success",
       ]),
     );

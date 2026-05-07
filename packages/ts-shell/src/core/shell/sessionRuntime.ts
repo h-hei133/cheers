@@ -828,7 +828,7 @@ function actionableBlockerNextAction(kind: ActionableBlockerKind): string {
     case "stale-read":
       return "Re-read the latest target file content, then rerun the edit against that current content.";
     case "partial-mutation-failed":
-      return "Review the failed files, re-read current content, and retry only the unresolved mutation.";
+      return "Review the failed files, re-read current content, inspect any writer-started target before retrying, and retry only the unresolved mutation.";
     case "ambiguous-target":
       return "Specify one exact target file/path (and exact from/to text if editing), then rerun.";
     case "verification-failed":

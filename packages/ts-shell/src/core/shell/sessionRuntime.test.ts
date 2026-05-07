@@ -1920,7 +1920,7 @@ describe("shell session runtime (W5)", () => {
     const stopReason =
       "partial-mutation-failed: One or more file mutations failed, so the mutation set cannot be reported as successfully applied.";
     const nextAction =
-      "Review the failed files, re-read current content, and retry only the unresolved mutation.";
+      "Review the failed files, re-read current content, inspect any writer-started target before retrying, and retry only the unresolved mutation.";
 
     const runtime = new ShellSessionRuntime({
       sessionManager: {
@@ -2079,7 +2079,7 @@ describe("shell session runtime (W5)", () => {
     const stopReason =
       "partial-mutation-failed: One or more file mutations failed, so the mutation set cannot be reported as successfully applied.";
     const nextAction =
-      "Review the failed files, re-read current content, and retry only the unresolved mutation.";
+      "Review the failed files, re-read current content, inspect any writer-started target before retrying, and retry only the unresolved mutation.";
 
     const runtime = new ShellSessionRuntime({
       sessionManager: {

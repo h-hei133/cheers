@@ -434,6 +434,10 @@ Key implemented boundaries:
   opened target
 - symlink swaps at the writer boundary are blocked without reporting changed
   files or write success
+- abort before the selected-workspace writer is reached now stops the route with
+  no write effect, and writer-started failures now preserve durable
+  `unknown`/`unverified` write-effect attribution for user inspection before
+  retry
 - workspace-boundary, write-application, and post-write verification failures
   now surface as stopped write/readback blockers instead of generic success-like
   results
@@ -456,6 +460,9 @@ Important boundaries:
 
 - this is not default production `apply_patch` enablement
 - this does not add multi-file/add/delete/move/AST/fuzzy/rollback support
+- this does not add rollback or full atomic transaction semantics; if the writer
+  has started and verification cannot prove success, the user-visible state is
+  stopped and requires re-reading the current target before retry
 - this does not change release/default gates
 - real-provider workspace-write smoke must run only with explicit opt-in,
   isolated HOME/test workspace, redaction, and repository-clean checks
@@ -475,7 +482,7 @@ Important boundaries:
 1. true live TTY automation evidence remains weaker than print/stdin/replay evidence in this environment
 2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
 3. multi-file edit, production apply_patch write, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
-4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow` write route remains disabled; an explicit CLI/runMvp no-write route exists, an explicit workspace write entrypoint has landed, and default rejection is still required
+4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow` write route remains disabled; an explicit CLI/runMvp no-write route exists, an explicit workspace write entrypoint has landed with durable writer-started failure attribution, and default rejection is still required
 5. the guarded production route real-provider smoke has passed only for explicit opt-in isolated workspace routing, not default real user workspace mutation
 6. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
@@ -499,11 +506,11 @@ Escalate from hardening into focused implementation when one is reproducible:
   for raw single-file `apply_patch` payloads; keep it opt-in only and do not
   treat it as default apply_patch enablement
 - selected-workspace writer authority now includes descriptor verification for
-  the opened target and stopped attribution for write/readback blockers; broader
-  cross-platform atomic write / durable abort semantics remain separate work
+  the opened target, abort-before-writer no-write handling, and stopped
+  `unknown`/`unverified` attribution for writer-started failures; broader
+  cross-platform atomic write / rollback semantics remain separate work
 - do not continue to default production write enablement before a separate
-  review defines durable state implications, broader abort / rollback behavior,
-  and default user-workspace safety policy
+  review defines rollback behavior and default user-workspace safety policy
 - the isolated fixture and guarded isolated-workspace write smokes have passed; treat them only as explicit opt-in isolated evidence, not default production write evidence, and do not rerun automatically
 - the real-provider non-mutating dry-run smoke and permission UX no-write smoke are sealed; do not rerun them by default unless validating a regression or a new provider-facing route decision
 - consider durable stopped-session continuity analysis as separate, explicitly scoped work

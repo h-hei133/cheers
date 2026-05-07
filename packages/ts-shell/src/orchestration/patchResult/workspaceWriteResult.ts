@@ -106,6 +106,11 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
 
   const target = route.targetPath ?? route.dryRunRoute?.permissionUx.baseEvidence?.targetPath;
   const reason = route.nextAction;
+  const writerStarted = route.writeFailureState.writerStarted;
+  const writeEffect = route.writeFailureState.writeEffect;
+  const recoveryNote = writerStarted
+    ? route.writeFailureState.nextAction
+    : "No workspace writer ran before this route stopped.";
   return {
     taskKind: "edit-file",
     changedFiles: [],
@@ -124,11 +129,27 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
         reason,
       },
     ],
-    repair: emptyRepair(),
+    repair: {
+      status: writerStarted ? "failed" : "not-needed",
+      attempts: writerStarted ? 1 : 0,
+      recoveredItems: [],
+      failedItems: target && writerStarted ? [target] : [],
+      notes: [
+        recoveryNote,
+        "workspace write route only; no automatic repair was attempted in this lane.",
+      ],
+    },
     continuation: {
-      status: "first-pass-success",
-      attempts: 0,
-      evidence: ["apply-patch-workspace-write-result:no-continuation"],
+      status: writerStarted
+        ? "failed-after-bounded-continuation"
+        : "first-pass-success",
+      attempts: writerStarted ? 1 : 0,
+      evidence: [
+        writerStarted
+          ? "apply-patch-workspace-write-result:writer-started-stopped"
+          : "apply-patch-workspace-write-result:no-continuation",
+        `apply-patch-workspace-write-result:write-effect:${writeEffect}`,
+      ],
     },
     changeSet: {
       gitAware: false,
@@ -144,6 +165,9 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
       requiredEvidence: [
         "blocked workspace write route must not display write success",
         "blocked workspace write route must not report changed files",
+        ...(writerStarted
+          ? ["writer-invoked failure must require current-file inspection"]
+          : []),
       ],
       observedEvidence: [...route.evidence],
     },
@@ -161,6 +185,13 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
       "apply-patch-workspace-write-result:coding-result-blocked",
       "apply-patch-workspace-write-result:changed-files-empty",
       "apply-patch-workspace-write-result:no-write-success",
+      `apply-patch-workspace-write-result:write-effect:${writeEffect}`,
+      ...(writerStarted
+        ? [
+            "apply-patch-workspace-write-result:writer-started-no-success",
+            "apply-patch-workspace-write-result:user-inspection-required",
+          ]
+        : []),
     ],
     lastActionResultSeed: {
       actionKind: "edit-file",
@@ -245,6 +276,7 @@ function buildOutput(route: WorkspaceWriteRoute): string {
   return [
     "apply_patch workspace write blocked before success.",
     "Changed: none",
+    `Write effect: ${route.writeEffect}`,
     `Reason: ${route.nextAction}`,
     `Next: ${route.nextAction}`,
   ].join("\n");
@@ -284,11 +316,14 @@ function actionableBlockerEvidence(
   if (route.blocker === "final-stale-read") {
     return ["actionable-blocker-kind:stale-read"];
   }
-  if (route.blocker === "post-write-verification") {
-    return ["actionable-blocker-kind:verification-failed"];
-  }
   if (route.blocker === "write-application" || route.blocker === "workspace-boundary") {
     return ["actionable-blocker-kind:partial-mutation-failed"];
+  }
+  if (route.blocker === "post-write-verification") {
+    return [
+      "actionable-blocker-kind:partial-mutation-failed",
+      "actionable-blocker-kind:verification-failed",
+    ];
   }
   return ["actionable-blocker-kind:patch-generation-failed"];
 }
