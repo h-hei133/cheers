@@ -3288,6 +3288,59 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(fs.readFileSync(targetPath, "utf8")).toBe("old\n");
   }, 35000);
 
+  it("routes explicit apply_patch CLI workspace write opt-in through verified write surface", () => {
+    const projectRoot = path.join(fakeHomeDir, "cli-apply-patch-workspace-write-project");
+    const targetDir = path.join(projectRoot, "src");
+    fs.mkdirSync(targetDir, { recursive: true });
+    const targetPath = path.join(targetDir, "app.ts");
+    const lockedPath = path.join(projectRoot, "LOCKED.md");
+    fs.writeFileSync(targetPath, "old\n", "utf8");
+    fs.writeFileSync(lockedPath, "locked\n", "utf8");
+    const rawPatchText = [
+      "*** Begin Patch",
+      "*** Update File: src/app.ts",
+      "@@",
+      "-old",
+      "+new",
+      "*** End Patch",
+    ].join("\n");
+
+    const result = spawnSync(
+      nodeExe,
+      [
+        tsxCliPath,
+        cliPath,
+        "--project",
+        projectRoot,
+        "--print",
+        "--apply-patch-workspace-write",
+        "--non-interactive-approval",
+        "allow-once",
+        rawPatchText,
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          USERPROFILE: fakeHomeDir,
+          HOME: fakeHomeDir,
+          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        },
+        encoding: "utf8",
+        timeout: 30000,
+      },
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    expect(output).toContain("apply_patch workspace write succeeded");
+    expect(output).toContain("src/app.ts");
+    expect(output.toLowerCase()).toContain("success");
+    expect(fs.readFileSync(targetPath, "utf8")).toBe("new\n");
+    expect(fs.readFileSync(lockedPath, "utf8")).toBe("locked\n");
+  }, 35000);
+
   it("prefers completed current session for /continue follow-up over recovery fallback", async () => {
     const projectRoot = path.join(
       fakeHomeDir,

@@ -62,6 +62,8 @@ import {
   type NoWriteRuntimeSource,
 } from "./patchResult/noWriteRuntimeRoute.js";
 import { buildNoWriteRuntimeRouteResult } from "./patchResult/runtimeRouteResult.js";
+import { buildWorkspaceWriteRouteResult } from "./patchResult/workspaceWriteResult.js";
+import { runWorkspaceWriteRoute } from "./patchResult/workspaceWriteRoute.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
 import { resolveTaskTargets } from "./targetResolution.js";
 import type {
@@ -127,12 +129,16 @@ export interface ApplyPatchRuntimeRouteOptions {
   readonly rawPatchText?: string;
   readonly requestedUserDecision?: SingleFileApplyPatchRequestedUserDecision;
   readonly runtimeSource?: NoWriteRuntimeSource;
+  readonly workspaceWrite?: {
+    readonly explicitWorkspaceWriteOptIn: boolean;
+  };
 }
 
 export async function runMvpIntegratedFlow(
   options: MvpIntegratedFlowOptions,
 ): Promise<OrchestrationResult> {
-  const applyPatchRuntimeResult = runApplyPatchRuntimeRouteIfRequested(options);
+  const applyPatchRuntimeResult =
+    await runApplyPatchRuntimeRouteIfRequested(options);
   if (applyPatchRuntimeResult) {
     return applyPatchRuntimeResult;
   }
@@ -196,7 +202,8 @@ export async function runMvpIntegratedFlow(
 export async function* streamMvpIntegratedFlow(
   options: MvpIntegratedFlowOptions,
 ): AsyncIterable<QueryEvent> {
-  const applyPatchRuntimeResult = runApplyPatchRuntimeRouteIfRequested(options);
+  const applyPatchRuntimeResult =
+    await runApplyPatchRuntimeRouteIfRequested(options);
   if (applyPatchRuntimeResult) {
     yield {
       type: "query.started",
@@ -254,12 +261,33 @@ export async function* streamMvpIntegratedFlow(
   }
 }
 
-function runApplyPatchRuntimeRouteIfRequested(
+async function runApplyPatchRuntimeRouteIfRequested(
   options: MvpIntegratedFlowOptions,
-): OrchestrationResult | undefined {
+): Promise<OrchestrationResult | undefined> {
   const routeOptions = options.applyPatchRuntimeRoute;
   if (!routeOptions) {
     return undefined;
+  }
+
+  if (routeOptions.workspaceWrite?.explicitWorkspaceWriteOptIn) {
+    const route = await runWorkspaceWriteRoute({
+      workspaceRoot: options.workspaceRoot,
+      rawPatchText: routeOptions.rawPatchText ?? options.prompt,
+      explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
+      explicitWorkspaceWriteOptIn:
+        routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
+      ...(routeOptions.requestedUserDecision
+        ? { requestedUserDecision: routeOptions.requestedUserDecision }
+        : {}),
+      defaultProductionRejectionUnchanged: true,
+      readFile: readWorkspaceFile(options.workspaceRoot),
+      writeFile: writeWorkspaceFile(options.workspaceRoot),
+    });
+    return buildWorkspaceWriteRouteResult({
+      sessionId: options.sessionId,
+      prompt: options.prompt,
+      route,
+    });
   }
 
   const route = buildNoWriteRuntimeRoute({
@@ -270,23 +298,7 @@ function runApplyPatchRuntimeRouteIfRequested(
       ? { requestedUserDecision: routeOptions.requestedUserDecision }
       : {}),
     runtimeSource: routeOptions.runtimeSource ?? "production-adjacent",
-    readFile: (absolutePath) => {
-      const resolved = path.resolve(absolutePath);
-      const workspaceRoot = path.resolve(options.workspaceRoot);
-      const relative = path.relative(workspaceRoot, resolved);
-      if (
-        relative === "" ||
-        relative.startsWith("..") ||
-        path.isAbsolute(relative)
-      ) {
-        return undefined;
-      }
-      try {
-        return fs.readFileSync(resolved, "utf8");
-      } catch {
-        return undefined;
-      }
-    },
+    readFile: readWorkspaceFile(options.workspaceRoot),
   });
 
   return buildNoWriteRuntimeRouteResult({
@@ -294,6 +306,46 @@ function runApplyPatchRuntimeRouteIfRequested(
     prompt: options.prompt,
     route,
   });
+}
+
+function readWorkspaceFile(
+  workspaceRootInput: string,
+): (absolutePath: string) => string | undefined {
+  const workspaceRoot = path.resolve(workspaceRootInput);
+  return (absolutePath) => {
+    const resolved = path.resolve(absolutePath);
+    if (!pathStaysInsideWorkspace(workspaceRoot, resolved)) {
+      return undefined;
+    }
+    try {
+      return fs.readFileSync(resolved, "utf8");
+    } catch {
+      return undefined;
+    }
+  };
+}
+
+function writeWorkspaceFile(
+  workspaceRootInput: string,
+): (relativePath: string, content: string) => void {
+  const workspaceRoot = path.resolve(workspaceRootInput);
+  return (relativePath, content) => {
+    const resolved = path.resolve(workspaceRoot, relativePath);
+    if (!pathStaysInsideWorkspace(workspaceRoot, resolved)) {
+      throw new Error("Refusing to write outside selected workspace");
+    }
+    fs.writeFileSync(resolved, content, "utf8");
+  };
+}
+
+function pathStaysInsideWorkspace(
+  workspaceRoot: string,
+  absolutePath: string,
+): boolean {
+  const relative = path.relative(workspaceRoot, absolutePath);
+  return (
+    relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative)
+  );
 }
 
 function createIntegratedRunner(

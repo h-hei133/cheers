@@ -413,6 +413,45 @@ Important boundaries:
 - real-workspace writer routing still requires a separate write-entrypoint
   review for UX, durable state, abort/rollback, and final writer boundary
 
+### O. Single-file `apply_patch` real workspace write entrypoint (landed 2026-05-07)
+
+The single-file `apply_patch` route now has an explicit CLI /
+`runMvpIntegratedFlow` write entrypoint for raw `Update File` payloads against
+the selected workspace.
+
+Key implemented boundaries:
+
+- CLI requires `--apply-patch-workspace-write` before the workspace writer is
+  reachable
+- existing `--apply-patch-runtime-route` remains no-write when the workspace
+  write flag is absent
+- `--non-interactive-approval allow-once|allow-always` is required as explicit
+  approved-for-write input for this entrypoint
+- final stale-read runs immediately before the writer
+- writer success is projected only after post-write content verification
+- denied, blocked, stale, unsupported, and no-op routes remain stopped and do
+  not report changed files or write success
+- default production `apply_patch` and unified diff rejection remains required
+
+Real-provider workspace-write smoke status:
+
+- readiness preflight passed with explicit `PRIVATE_AGENTS_REAL_HOME`
+- real-provider model path produced exactly one `apply_patch` block
+- CLI workspace write entrypoint wrote only isolated test workspace `src/app.ts`
+- `changedFiles=src/app.ts` and `writeIntents=src/app.ts`
+- writer target was isolated test workspace
+- terminal success was allowed only after verified write
+- repository clean: true
+- redaction: pass
+
+Important boundaries:
+
+- this is not default production `apply_patch` enablement
+- this does not add multi-file/add/delete/move/AST/fuzzy/rollback support
+- this does not change release/default gates
+- real-provider workspace-write smoke must run only with explicit opt-in,
+  isolated HOME/test workspace, redaction, and repository-clean checks
+
 ## 6. Confirmed Baseline Facts
 
 - unified query loop exists and is durable
@@ -428,7 +467,7 @@ Important boundaries:
 1. true live TTY automation evidence remains weaker than print/stdin/replay evidence in this environment
 2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
 3. multi-file edit, production apply_patch write, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
-4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow` write route remains unwired; an explicit CLI/runMvp no-write route exists, and default rejection is still required
+4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow` write route remains disabled; an explicit CLI/runMvp no-write route exists, an explicit workspace write entrypoint is being validated, and default rejection is still required
 5. the guarded production route real-provider smoke has passed only for explicit opt-in isolated workspace routing, not default real user workspace mutation
 6. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
@@ -448,10 +487,12 @@ Escalate from hardening into focused implementation when one is reproducible:
 - CLI / `runMvpIntegratedFlow` now expose an explicit no-write runtime
   entrypoint for raw single-file `apply_patch` previews against the selected
   workspace
-- do not continue to default production write enablement or
-  `runMvpIntegratedFlow` workspace mutation before a separate write-entrypoint
-  review defines the explicit write UX, durable state implications, abort /
-  rollback behavior, and real-user workspace boundary
+- CLI / `runMvpIntegratedFlow` now expose an explicit workspace write entrypoint
+  for raw single-file `apply_patch` payloads; keep it opt-in only and do not
+  treat it as default apply_patch enablement
+- do not continue to default production write enablement before a separate
+  review defines durable state implications, broader abort / rollback behavior,
+  and default user-workspace safety policy
 - the isolated fixture and guarded isolated-workspace write smokes have passed; treat them only as explicit opt-in isolated evidence, not default production write evidence, and do not rerun automatically
 - the real-provider non-mutating dry-run smoke and permission UX no-write smoke are sealed; do not rerun them by default unless validating a regression or a new provider-facing route decision
 - consider durable stopped-session continuity analysis as separate, explicitly scoped work

@@ -77,6 +77,7 @@ const realApplyPatchWriteFixtureSmoke = process.argv.includes('--real-apply-patc
 const realApplyPatchRuntimeNoWriteSmoke = process.argv.includes('--real-apply-patch-runtime-no-write-smoke')
 const realApplyPatchGuardedWriteSmoke = process.argv.includes('--real-apply-patch-guarded-write-smoke')
 const realApplyPatchGuardedRouteSmoke = process.argv.includes('--real-apply-patch-guarded-route-smoke')
+const realApplyPatchWorkspaceWriteSmoke = process.argv.includes('--real-apply-patch-workspace-write-smoke')
 
 const failureCategories = [
   'none',
@@ -1462,6 +1463,10 @@ function printHelp() {
   console.log('    Opt-in only; routes one real-provider apply_patch preview through the guarded production route.')
   console.log('    The generated patch may write only the isolated temporary workspace target.')
   console.log('    Excluded from default verification; default production apply_patch rejection must remain unchanged.')
+  console.log('  --real-apply-patch-workspace-write-smoke')
+  console.log('    Opt-in only; routes one real-provider apply_patch preview through the CLI workspace write entrypoint.')
+  console.log('    The generated patch may write only the isolated test workspace target after explicit approval.')
+  console.log('    Excluded from default verification; real provider config is redacted and the repository must remain clean.')
 }
 
 function renderReadonlyPreflightNotice(options = {}) {
@@ -7741,6 +7746,296 @@ async function runRealApplyPatchGuardedRouteSmoke() {
   }
 }
 
+async function runRealApplyPatchWorkspaceWriteSmoke() {
+  console.log('mode=real-apply-patch-workspace-write-smoke')
+  console.log('status taxonomy: pass=0 product-regression=1 provider-network-inconclusive=2 config-failure=3')
+  console.log('real-provider=explicit-opt-in')
+  console.log('homeRead=false')
+  console.log('defaultSmoke=skipped')
+  console.log('realProviderHome=config-only')
+  console.log('writeScope=isolated-test-workspace-only')
+
+  if (!realHome) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-workspace-write-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: 'CONFIG',
+      statusDetail: 'config-failure',
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      failureCategory: 'auth/config failure',
+      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch workspace write smoke',
+      changedFiles: [],
+      writeIntents: [],
+      workspaceWriterInvoked: false,
+    })
+    console.log('[CONFIG] real-apply-patch-workspace-write-smoke status=config-failure')
+    process.exit(3)
+  }
+
+  const repoBefore = await readRepoStatusShort()
+  if (!repoBefore.ok || repoBefore.status) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-workspace-write-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: 'FAIL',
+      statusDetail: 'no-mutation-guard-failure',
+      reportPath,
+      realProviderExecution: false,
+      modelTurn: false,
+      failureCategory: 'no-mutation guard failure',
+      failureReason: repoBefore.ok
+        ? 'no-mutation guard failure: repository was not clean before smoke'
+        : 'no-mutation guard failure: repository status could not be checked before smoke',
+      changedFiles: [],
+      writeIntents: [],
+      workspaceWriterInvoked: false,
+      outputTail: repoBefore.outputTail,
+    })
+    console.log('[FAIL] real-apply-patch-workspace-write-smoke status=no-mutation-guard-failure')
+    process.exit(1)
+  }
+
+  const preflight = await runProviderReadinessPreflight()
+  const preflightStatus = buildCodingFlowPreflightStatus(preflight)
+  console.log(`[${preflightStatus.status}] real-apply-patch-workspace-write-preflight status=${preflightStatus.statusDetail}`)
+  if (!preflight.ok) {
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-workspace-write-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: preflightStatus.status,
+      statusDetail: preflightStatus.statusDetail,
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: false,
+      failureCategory: codingFlowFailureCategoryForStatus(
+        preflightStatus.statusDetail,
+        preflightStatus.failureCategory,
+      ),
+      failureReason: preflightStatus.failureReason,
+      changedFiles: [],
+      writeIntents: [],
+      workspaceWriterInvoked: false,
+      outputTail: preflight.outputTail,
+    })
+    process.exit(preflightStatus.exitCode)
+  }
+
+  const smokeRunId = `real-apply-patch-workspace-write-${Date.now()}`
+  const runtimeHome = getRealCodingFlowRuntimeHome(`${smokeRunId}-apply-patch-workspace-write`)
+  const auditLogPath = getRealCodingFlowAuditLogPath(`${smokeRunId}-apply-patch-workspace-write`)
+  assertSafeCodingFlowRuntimeHome(runtimeHome)
+  assertSafeCodingFlowRuntimeHome(path.dirname(auditLogPath))
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+  const fixture = createApplyPatchDryRunFixture()
+  try {
+    const before = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const providerResult = await runApplyPatchDryRunProviderTurn({
+      prompt: fixture.prompt,
+      runtimeHome,
+      realHome,
+      fixtureDir: fixture.fixtureDir,
+      auditLogPath,
+    })
+    const redaction = redactAndAssertCodingProviderOutput(providerResult.rawOutput || providerResult.output)
+    const redactedProviderOutput = redactAndAssertCodingProviderOutput(providerResult.output).redacted
+    const providerFailure = classifyProviderReadinessFailure(
+      `apply_patch workspace write model turn exited ${providerResult.code}`,
+      redaction.redacted,
+      'real',
+    )
+    const extracted = extractSingleApplyPatchBlock(redactedProviderOutput)
+    let cliResult = undefined
+    if (providerResult.code === 0 && !providerResult.timedOut && !providerFailure && extracted.status === 'ok') {
+      cliResult = await runApplyPatchWorkspaceWriteCli({
+        fixtureDir: fixture.fixtureDir,
+        patchText: extracted.patchText,
+        runtimeHome,
+        auditLogPath,
+      })
+    }
+    const after = snapshotApplyPatchDryRunFixture(fixture.fixtureDir)
+    const comparison = compareApplyPatchDryRunSnapshots(before, after)
+    const repoAfter = await readRepoStatusShort()
+    const cliRedaction = redactAndAssertCodingProviderOutput(cliResult?.output ?? '')
+    const redactionOk = redaction.ok && cliRedaction.ok
+    const repositoryClean = repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status
+
+    if (providerFailure || providerResult.code !== 0 || providerResult.timedOut) {
+      const failureStatus = buildCodingFlowSmokeFailureStatus(providerResult, redaction.redacted, redaction)
+      writeReport({
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-apply-patch-workspace-write-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: failureStatus.status,
+        statusDetail: failureStatus.statusDetail,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        changedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        failureCategory: failureStatus.failureCategory,
+        failureReason: failureStatus.failureReason,
+        outputTail: summarizeOutput(redaction.redacted),
+      })
+      console.log(`[${failureStatus.status}] real-apply-patch-workspace-write-smoke status=${failureStatus.statusDetail}`)
+      if (redaction.redacted) console.log(summarizeOutput(redaction.redacted))
+      process.exit(failureStatus.exitCode)
+    }
+
+    if (extracted.status !== 'ok') {
+      const failureCategory = extracted.status === 'provider-output-multiple-patches'
+        ? 'provider output multiple patches'
+        : 'provider output missing apply_patch'
+      const statusDetail = statusDetailForApplyPatchDryRunFailureCategory(failureCategory)
+      writeReport({
+        generatedAt: new Date().toISOString(),
+        capability: 'real-provider-apply-patch-workspace-write-smoke',
+        provider: 'real',
+        mode: 'opt-in-smoke',
+        status: 'FAIL',
+        statusDetail,
+        reportPath,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        terminalSuccessAllowed: false,
+        redaction: { ok: redactionOk, leaks: [...redaction.leaks, ...cliRedaction.leaks] },
+        failureCategory,
+        failureReason: `${statusDetail}: provider output did not contain exactly one apply_patch preview block`,
+        outputTail: summarizeOutput(redactedProviderOutput),
+      })
+      console.log(`[FAIL] real-apply-patch-workspace-write-smoke status=${statusDetail}`)
+      process.exit(1)
+    }
+
+    const expectedChanged = comparison.added.length === 0 &&
+      comparison.removed.length === 0 &&
+      comparison.changed.length === 1 &&
+      comparison.changed[0] === 'src/app.ts'
+    const cliPassed = cliResult?.code === 0 &&
+      !cliResult.timedOut &&
+      /apply_patch workspace write succeeded/i.test(cliResult.output) &&
+      /success/i.test(cliResult.output)
+    const protectedFilesUnchanged = !comparison.changed.includes('LOCKED.md')
+    const success = expectedChanged && cliPassed && repositoryClean && redactionOk && protectedFilesUnchanged
+    const failures = [
+      ...(expectedChanged ? [] : [`unexpected write target: changed=${comparison.changed.join(',') || 'none'} added=${comparison.added.join(',') || 'none'} removed=${comparison.removed.join(',') || 'none'}`]),
+      ...(cliPassed ? [] : [`cli route failure: code=${cliResult?.code ?? 'missing'} timedOut=${cliResult?.timedOut ?? 'missing'}`]),
+      ...(repositoryClean ? [] : ['repository mutated or status unavailable']),
+      ...(redactionOk ? [] : [`redaction failure: ${[...redaction.leaks, ...cliRedaction.leaks].join(',') || 'unknown'}`]),
+      ...(protectedFilesUnchanged ? [] : ['protected fixture file changed']),
+    ]
+    writeReport({
+      generatedAt: new Date().toISOString(),
+      capability: 'real-provider-apply-patch-workspace-write-smoke',
+      provider: 'real',
+      mode: 'opt-in-smoke',
+      status: success ? 'PASS' : 'FAIL',
+      statusDetail: success ? 'passed' : 'workspace-write-route-failure',
+      reportPath,
+      realProviderExecution: true,
+      modelTurn: true,
+      runtimeHome: 'isolated-test-root',
+      fixture: {
+        files: fixture.files,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+        protectedFilesUnchanged,
+      },
+      repositoryClean,
+      applyPatchBlocks: extracted.count,
+      changedFiles: success ? ['src/app.ts'] : [],
+      writeIntents: success ? ['src/app.ts'] : [],
+      workspaceWriterInvoked: success,
+      writerTarget: success ? 'isolated-test-workspace' : 'missing',
+      terminalSuccessAllowed: success,
+      redaction: { ok: redactionOk, leaks: [...redaction.leaks, ...cliRedaction.leaks] },
+      failureCategory: success ? 'none' : 'route failure',
+      failureReason: failures.join('; '),
+      outputTail: summarizeOutput(cliRedaction.redacted || redactedProviderOutput),
+    })
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`applyPatchBlocks=${extracted.count}`)
+    console.log(`fixtureChanged=${comparison.changed.join(',') || 'none'}`)
+    console.log(`repositoryClean=${repositoryClean}`)
+    console.log(`workspaceWriterInvoked=${success}`)
+    console.log(`writerTarget=${success ? 'isolated-test-workspace' : 'missing'}`)
+    console.log(`changedFiles=${success ? 'src/app.ts' : ''}`)
+    console.log(`writeIntents=${success ? 'src/app.ts' : ''}`)
+    console.log(`terminalSuccessAllowed=${success}`)
+    console.log(`redaction=${redactionOk ? 'pass' : 'fail'}`)
+    if (!success) console.log(`failureReason=${failures.join('; ')}`)
+    console.log(`[${success ? 'PASS' : 'FAIL'}] real-apply-patch-workspace-write-smoke`)
+    process.exit(success ? 0 : 1)
+  } finally {
+    cleanupApplyPatchDryRunFixture(fixture.fixtureDir)
+    cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
+  }
+}
+
+async function runApplyPatchWorkspaceWriteCli({
+  fixtureDir,
+  patchText,
+  runtimeHome,
+  auditLogPath,
+}) {
+  return run(process.execPath, [
+    tsxCliPath,
+    cliEntryPath,
+    '--project',
+    fixtureDir,
+    '--print',
+    '--apply-patch-workspace-write',
+    '--non-interactive-approval',
+    'allow-once',
+    patchText,
+  ], {
+    cwd: repoRoot,
+    env: {
+      HOME: runtimeHome,
+      USERPROFILE: runtimeHome,
+      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      PRIVATE_AGENTS_APPROVAL_AUDIT_LOG: auditLogPath,
+    },
+    timeoutMs: 120000,
+  })
+}
+
 async function main() {
   if (showHelp) {
     printHelp()
@@ -7796,6 +8091,10 @@ async function main() {
   }
   if (realApplyPatchGuardedRouteSmoke) {
     await runRealApplyPatchGuardedRouteSmoke()
+    return
+  }
+  if (realApplyPatchWorkspaceWriteSmoke) {
+    await runRealApplyPatchWorkspaceWriteSmoke()
     return
   }
   if (realApplyPatchWriteFixtureSmoke) {

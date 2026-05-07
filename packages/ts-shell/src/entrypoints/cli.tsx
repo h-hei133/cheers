@@ -118,6 +118,7 @@ interface CliOptions {
   migrateSessionRoot?: boolean;
   nonInteractiveApproval?: "deny" | "allow-once" | "allow-always";
   applyPatchRuntimeRoute?: boolean;
+  applyPatchWorkspaceWrite?: boolean;
 }
 
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
@@ -285,6 +286,9 @@ async function main(): Promise<void> {
   options.migrateSessionRoot = args.includes("--migrate-session-root");
   options.nonInteractiveApproval = parseNonInteractiveApprovalMode(args);
   options.applyPatchRuntimeRoute = args.includes("--apply-patch-runtime-route");
+  options.applyPatchWorkspaceWrite = args.includes(
+    "--apply-patch-workspace-write",
+  );
   options.promptArg = derivePromptArgument(args, options.projectPath);
 
   const resolveCredentialSnapshot = (): ProviderCredentialResolution =>
@@ -437,13 +441,21 @@ async function main(): Promise<void> {
         sessionRuntime.getAgentMode(),
         runtimeSeed,
         continuityState,
-        options.applyPatchRuntimeRoute === true
+        options.applyPatchRuntimeRoute === true ||
+          options.applyPatchWorkspaceWrite === true
           ? {
               explicitRuntimeOptIn: true,
               requestedUserDecision: applyPatchDecisionFromApprovalMode(
                 options.nonInteractiveApproval,
               ),
               runtimeSource: "production-adjacent",
+              ...(options.applyPatchWorkspaceWrite === true
+                ? {
+                    workspaceWrite: {
+                      explicitWorkspaceWriteOptIn: true,
+                    },
+                  }
+                : {}),
             }
           : undefined,
       );
