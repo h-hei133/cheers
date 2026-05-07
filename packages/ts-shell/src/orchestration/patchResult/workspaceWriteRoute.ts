@@ -11,6 +11,7 @@ import {
   type SingleFileApplyPatchOptInDryRunRouteAccepted,
 } from "./singleFileApplyPatchOptInDryRunRoute.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
+import type { WorkspaceWriteTargetAuthority } from "./workspaceAuthority.js";
 import { buildWriteDecisionGate, type WriteDecisionGate } from "./writeDecisionGate.js";
 
 export type WorkspaceWriteRouteStatus = "written" | "blocked";
@@ -38,6 +39,10 @@ export interface WorkspaceWriteRouteOptions {
   readonly requestedUserDecision?: SingleFileApplyPatchRequestedUserDecision;
   readonly defaultProductionRejectionUnchanged: true;
   readonly readFile: (absolutePath: string) => string | undefined;
+  readonly readVerifiedFile: (relativePath: string) => string | undefined;
+  readonly validateWriteTarget: (
+    relativePath: string,
+  ) => WorkspaceWriteTargetAuthority;
   readonly writeFile: (relativePath: string, content: string) => void | Promise<void>;
 }
 
@@ -104,6 +109,30 @@ export async function runWorkspaceWriteRoute(
         "Keep apply_patch rejected unless an explicit runtime route opt-in is present.",
       evidence: ["apply-patch-workspace-write-route:runtime-opt-in-missing"],
     });
+  }
+
+  const parsedBeforeRead = parseApplyPatchText(options.rawPatchText);
+  if (
+    options.explicitWorkspaceWriteOptIn &&
+    parsedBeforeRead.ok &&
+    parsedBeforeRead.patch.operations.length === 1 &&
+    parsedBeforeRead.patch.operations[0]?.kind === "update"
+  ) {
+    const targetAuthority = options.validateWriteTarget(
+      parsedBeforeRead.patch.operations[0].path,
+    );
+    if (targetAuthority.ok === false) {
+      return blocked({
+        blocker: "workspace-boundary",
+        targetPath: parsedBeforeRead.patch.operations[0].path,
+        failures: [],
+        nextAction: targetAuthority.message,
+        evidence: [
+          "apply-patch-workspace-write-route:workspace-boundary-blocked",
+          ...targetAuthority.evidence,
+        ],
+      });
+    }
   }
 
   const dryRunRoute = buildSingleFileApplyPatchOptInDryRunRoute({
@@ -266,9 +295,24 @@ export async function runWorkspaceWriteRoute(
     });
   }
 
-  const finalContent = options.readFile(
-    path.resolve(options.workspaceRoot, intent.path),
-  );
+  const targetAuthority = options.validateWriteTarget(intent.path);
+  if (targetAuthority.ok === false) {
+    return blocked({
+      blocker: "workspace-boundary",
+      targetPath: intent.path,
+      dryRunRoute,
+      writeDecision,
+      guardedGate,
+      failures: [],
+      nextAction: targetAuthority.message,
+      evidence: [
+        "apply-patch-workspace-write-route:workspace-boundary-blocked",
+        ...targetAuthority.evidence,
+      ],
+    });
+  }
+
+  const finalContent = options.readVerifiedFile(intent.path);
   const finalStaleRead = buildSingleFileApplyPatchFinalStaleReadContract({
     permissionUx: dryRunRoute.permissionUx,
     currentContent: finalContent,
@@ -322,9 +366,7 @@ export async function runWorkspaceWriteRoute(
     });
   }
 
-  const writtenContent = options.readFile(
-    path.resolve(options.workspaceRoot, intent.path),
-  );
+  const writtenContent = options.readVerifiedFile(intent.path);
   if (writtenContent !== intent.content) {
     return blocked({
       blocker: "post-write-verification",

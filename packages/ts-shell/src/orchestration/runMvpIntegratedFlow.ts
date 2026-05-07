@@ -62,6 +62,7 @@ import {
   type NoWriteRuntimeSource,
 } from "./patchResult/noWriteRuntimeRoute.js";
 import { buildNoWriteRuntimeRouteResult } from "./patchResult/runtimeRouteResult.js";
+import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
 import { buildWorkspaceWriteRouteResult } from "./patchResult/workspaceWriteResult.js";
 import { runWorkspaceWriteRoute } from "./patchResult/workspaceWriteRoute.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
@@ -270,6 +271,7 @@ async function runApplyPatchRuntimeRouteIfRequested(
   }
 
   if (routeOptions.workspaceWrite?.explicitWorkspaceWriteOptIn) {
+    const workspaceAuthority = createWorkspaceWriteAuthority(options.workspaceRoot);
     const route = await runWorkspaceWriteRoute({
       workspaceRoot: options.workspaceRoot,
       rawPatchText: routeOptions.rawPatchText ?? options.prompt,
@@ -280,8 +282,10 @@ async function runApplyPatchRuntimeRouteIfRequested(
         ? { requestedUserDecision: routeOptions.requestedUserDecision }
         : {}),
       defaultProductionRejectionUnchanged: true,
-      readFile: readWorkspaceFile(options.workspaceRoot),
-      writeFile: writeWorkspaceFile(options.workspaceRoot),
+      readFile: workspaceAuthority.readFile,
+      readVerifiedFile: workspaceAuthority.readVerifiedFile,
+      validateWriteTarget: workspaceAuthority.validateWriteTarget,
+      writeFile: workspaceAuthority.writeFile,
     });
     return buildWorkspaceWriteRouteResult({
       sessionId: options.sessionId,
@@ -322,19 +326,6 @@ function readWorkspaceFile(
     } catch {
       return undefined;
     }
-  };
-}
-
-function writeWorkspaceFile(
-  workspaceRootInput: string,
-): (relativePath: string, content: string) => void {
-  const workspaceRoot = path.resolve(workspaceRootInput);
-  return (relativePath, content) => {
-    const resolved = path.resolve(workspaceRoot, relativePath);
-    if (!pathStaysInsideWorkspace(workspaceRoot, resolved)) {
-      throw new Error("Refusing to write outside selected workspace");
-    }
-    fs.writeFileSync(resolved, content, "utf8");
   };
 }
 

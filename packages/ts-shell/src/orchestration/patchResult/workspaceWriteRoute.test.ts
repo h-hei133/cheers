@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { createWorkspaceWriteAuthority } from "./workspaceAuthority.js";
 import { runWorkspaceWriteRoute } from "./workspaceWriteRoute.js";
 
 const applyPatchText = [
@@ -24,6 +25,7 @@ afterEach(() => {
 describe("single-file apply_patch real workspace write route", () => {
   it("writes one selected workspace target after explicit opt-in, approval, final stale-read, and post-write verification", async () => {
     const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
 
     const result = await runWorkspaceWriteRoute({
       workspaceRoot: fixture.workspaceRoot,
@@ -32,8 +34,10 @@ describe("single-file apply_patch real workspace write route", () => {
       explicitWorkspaceWriteOptIn: true,
       requestedUserDecision: "approved",
       defaultProductionRejectionUnchanged: true,
-      readFile: readFixtureFile(fixture.workspaceRoot),
-      writeFile: writeFixtureFile(fixture.workspaceRoot),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: authority.writeFile,
     });
 
     expect(result.status).toBe("written");
@@ -66,6 +70,7 @@ describe("single-file apply_patch real workspace write route", () => {
   it("keeps allow-once approval no-write without explicit workspace write opt-in", async () => {
     const fixture = createFixture();
     const before = snapshotFixture(fixture.workspaceRoot);
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
 
     const result = await runWorkspaceWriteRoute({
       workspaceRoot: fixture.workspaceRoot,
@@ -74,7 +79,9 @@ describe("single-file apply_patch real workspace write route", () => {
       explicitWorkspaceWriteOptIn: false,
       requestedUserDecision: "approved",
       defaultProductionRejectionUnchanged: true,
-      readFile: readFixtureFile(fixture.workspaceRoot),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
       writeFile: () => {
         throw new Error("writer must stay unreachable without write opt-in");
       },
@@ -89,6 +96,9 @@ describe("single-file apply_patch real workspace write route", () => {
   it("keeps denied approval and stale targets away from the writer", async () => {
     const deniedFixture = createFixture();
     const deniedBefore = snapshotFixture(deniedFixture.workspaceRoot);
+    const deniedAuthority = createWorkspaceWriteAuthority(
+      deniedFixture.workspaceRoot,
+    );
 
     const denied = await runWorkspaceWriteRoute({
       workspaceRoot: deniedFixture.workspaceRoot,
@@ -97,7 +107,9 @@ describe("single-file apply_patch real workspace write route", () => {
       explicitWorkspaceWriteOptIn: true,
       requestedUserDecision: "denied",
       defaultProductionRejectionUnchanged: true,
-      readFile: readFixtureFile(deniedFixture.workspaceRoot),
+      readFile: deniedAuthority.readFile,
+      readVerifiedFile: deniedAuthority.readVerifiedFile,
+      validateWriteTarget: deniedAuthority.validateWriteTarget,
       writeFile: () => {
         throw new Error("writer must stay unreachable after denial");
       },
@@ -109,7 +121,7 @@ describe("single-file apply_patch real workspace write route", () => {
     expect(snapshotFixture(deniedFixture.workspaceRoot)).toEqual(deniedBefore);
 
     const staleFixture = createFixture();
-    const staleReadFile = readFixtureFile(staleFixture.workspaceRoot);
+    const staleAuthority = createWorkspaceWriteAuthority(staleFixture.workspaceRoot);
     let readCount = 0;
     const stale = await runWorkspaceWriteRoute({
       workspaceRoot: staleFixture.workspaceRoot,
@@ -118,17 +130,19 @@ describe("single-file apply_patch real workspace write route", () => {
       explicitWorkspaceWriteOptIn: true,
       requestedUserDecision: "approved",
       defaultProductionRejectionUnchanged: true,
-      readFile: (absolutePath) => {
+      readFile: staleAuthority.readFile,
+      readVerifiedFile: (relativePath) => {
         readCount += 1;
-        if (readCount === 3) {
+        if (readCount === 1) {
           fs.writeFileSync(
             path.join(staleFixture.workspaceRoot, "src", "app.ts"),
             "status: draft\nowner: changed-after-approval\n",
             "utf8",
           );
         }
-        return staleReadFile(absolutePath);
+        return staleAuthority.readVerifiedFile(relativePath);
       },
+      validateWriteTarget: staleAuthority.validateWriteTarget,
       writeFile: () => {
         throw new Error("writer must stay unreachable after stale-read");
       },
@@ -145,6 +159,7 @@ describe("single-file apply_patch real workspace write route", () => {
 
   it("blocks no-op patches before success or writer invocation", async () => {
     const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     const noOpPatchText = [
       "*** Begin Patch",
       "*** Update File: src/app.ts",
@@ -162,7 +177,9 @@ describe("single-file apply_patch real workspace write route", () => {
       explicitWorkspaceWriteOptIn: true,
       requestedUserDecision: "approved",
       defaultProductionRejectionUnchanged: true,
-      readFile: readFixtureFile(fixture.workspaceRoot),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
       writeFile: () => {
         throw new Error("writer must stay unreachable for no-op");
       },
@@ -173,41 +190,73 @@ describe("single-file apply_patch real workspace write route", () => {
     expectNoBlockedWriteLeak(result);
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
+
+  it("blocks symlink workspace targets before writer invocation or success", async () => {
+    const fixture = createFixture({ skipTarget: true });
+    const outsideRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), "single-file-apply-patch-outside-"),
+    );
+    tempRoots.push(outsideRoot);
+    const outsideTarget = path.join(outsideRoot, "app.ts");
+    fs.writeFileSync(
+      outsideTarget,
+      "status: draft\nowner: outside-workspace\n",
+      "utf8",
+    );
+    fs.symlinkSync(
+      outsideTarget,
+      path.join(fixture.workspaceRoot, "src", "app.ts"),
+    );
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+
+    const result = await runWorkspaceWriteRoute({
+      workspaceRoot: fixture.workspaceRoot,
+      rawPatchText: applyPatchText,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: "approved",
+      defaultProductionRejectionUnchanged: true,
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: () => {
+        throw new Error("writer must stay unreachable for symlink targets");
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("workspace-boundary");
+    expect(result.targetPath).toBe("src/app.ts");
+    expectNoBlockedWriteLeak(result);
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-workspace-authority:blocked",
+        "apply-patch-workspace-authority:target-symlink",
+      ]),
+    );
+    expect(fs.readFileSync(outsideTarget, "utf8")).toBe(
+      "status: draft\nowner: outside-workspace\n",
+    );
+  });
 });
 
-function createFixture(): { readonly workspaceRoot: string } {
+function createFixture(
+  options: { readonly skipTarget?: boolean } = {},
+): { readonly workspaceRoot: string } {
   const workspaceRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), "single-file-apply-patch-workspace-write-"),
   );
   tempRoots.push(workspaceRoot);
   fs.mkdirSync(path.join(workspaceRoot, "src"), { recursive: true });
-  fs.writeFileSync(
-    path.join(workspaceRoot, "src", "app.ts"),
-    "status: draft\nowner: user-workspace\n",
-    "utf8",
-  );
+  if (!options.skipTarget) {
+    fs.writeFileSync(
+      path.join(workspaceRoot, "src", "app.ts"),
+      "status: draft\nowner: user-workspace\n",
+      "utf8",
+    );
+  }
   fs.writeFileSync(path.join(workspaceRoot, "LOCKED.md"), "do not modify\n", "utf8");
   return { workspaceRoot };
-}
-
-function readFixtureFile(
-  workspaceRoot: string,
-): (absolutePath: string) => string | undefined {
-  return (absolutePath) =>
-    fs.existsSync(absolutePath) ? fs.readFileSync(absolutePath, "utf8") : undefined;
-}
-
-function writeFixtureFile(
-  workspaceRoot: string,
-): (relativePath: string, content: string) => void {
-  return (relativePath, content) => {
-    const absolutePath = path.resolve(workspaceRoot, relativePath);
-    const relative = path.relative(workspaceRoot, absolutePath);
-    if (relative.startsWith("..") || path.isAbsolute(relative)) {
-      throw new Error("Refusing to write outside workspace");
-    }
-    fs.writeFileSync(absolutePath, content, "utf8");
-  };
 }
 
 function readFile(workspaceRoot: string, relativePath: string): string {
