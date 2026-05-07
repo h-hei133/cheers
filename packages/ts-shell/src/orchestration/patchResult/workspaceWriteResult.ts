@@ -152,7 +152,7 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
     verification: {
       status: "blocked",
       reason,
-      blockerKind: "unknown",
+      blockerKind: verificationBlockerKindForBlockedRoute(route),
       nextAction: route.nextAction,
     },
     evidence: [
@@ -170,10 +170,10 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
       verification: {
         status: "blocked",
         reason,
-        blockerKind: "unknown",
+        blockerKind: verificationBlockerKindForBlockedRoute(route),
       },
       reason,
-      blockerKind: "unknown",
+      blockerKind: verificationBlockerKindForBlockedRoute(route),
     },
     failureBoundary: `single-file-apply-patch-workspace-write-${route.blocker}`,
   };
@@ -225,8 +225,9 @@ function buildTerminalInput(route: WorkspaceWriteRoute): QueryTerminal {
   }
   return {
     action: "terminal",
-    terminalReason: "completed",
-    terminalClassification: "success",
+    terminalReason: "stopped_error",
+    terminalClassification: "stopped",
+    stopReason: route.nextAction,
   };
 }
 
@@ -265,6 +266,15 @@ function failureCodeForBlockedRoute(
   if (route.blocker === "final-stale-read") {
     return "stale-read";
   }
+  if (route.blocker === "write-application") {
+    return "write-failed";
+  }
+  if (route.blocker === "post-write-verification") {
+    return "readback-mismatch";
+  }
+  if (route.blocker === "workspace-boundary") {
+    return "write-failed";
+  }
   return "patch-generation-failed";
 }
 
@@ -274,5 +284,27 @@ function actionableBlockerEvidence(
   if (route.blocker === "final-stale-read") {
     return ["actionable-blocker-kind:stale-read"];
   }
+  if (route.blocker === "post-write-verification") {
+    return ["actionable-blocker-kind:verification-failed"];
+  }
+  if (route.blocker === "write-application" || route.blocker === "workspace-boundary") {
+    return ["actionable-blocker-kind:partial-mutation-failed"];
+  }
   return ["actionable-blocker-kind:patch-generation-failed"];
+}
+
+function verificationBlockerKindForBlockedRoute(
+  route: Extract<WorkspaceWriteRoute, { status: "blocked" }>,
+): "approval-denied" | "environment-not-ready" | "unknown" {
+  if (route.blocker === "write-decision") {
+    return "approval-denied";
+  }
+  if (
+    route.blocker === "workspace-boundary" ||
+    route.blocker === "write-application" ||
+    route.blocker === "post-write-verification"
+  ) {
+    return "environment-not-ready";
+  }
+  return "unknown";
 }

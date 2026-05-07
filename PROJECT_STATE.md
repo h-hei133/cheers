@@ -429,6 +429,14 @@ Key implemented boundaries:
   approved-for-write input for this entrypoint
 - final stale-read runs immediately before the writer
 - writer success is projected only after post-write content verification
+- selected workspace authority rejects symlink targets, validates realpath
+  workspace containment, and uses descriptor-verified reads/writes for the
+  opened target
+- symlink swaps at the writer boundary are blocked without reporting changed
+  files or write success
+- workspace-boundary, write-application, and post-write verification failures
+  now surface as stopped write/readback blockers instead of generic success-like
+  results
 - denied, blocked, stale, unsupported, and no-op routes remain stopped and do
   not report changed files or write success
 - default production `apply_patch` and unified diff rejection remains required
@@ -467,7 +475,7 @@ Important boundaries:
 1. true live TTY automation evidence remains weaker than print/stdin/replay evidence in this environment
 2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
 3. multi-file edit, production apply_patch write, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
-4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow` write route remains disabled; an explicit CLI/runMvp no-write route exists, an explicit workspace write entrypoint is being validated, and default rejection is still required
+4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow` write route remains disabled; an explicit CLI/runMvp no-write route exists, an explicit workspace write entrypoint has landed, and default rejection is still required
 5. the guarded production route real-provider smoke has passed only for explicit opt-in isolated workspace routing, not default real user workspace mutation
 6. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
@@ -490,6 +498,9 @@ Escalate from hardening into focused implementation when one is reproducible:
 - CLI / `runMvpIntegratedFlow` now expose an explicit workspace write entrypoint
   for raw single-file `apply_patch` payloads; keep it opt-in only and do not
   treat it as default apply_patch enablement
+- selected-workspace writer authority now includes descriptor verification for
+  the opened target and stopped attribution for write/readback blockers; broader
+  cross-platform atomic write / durable abort semantics remain separate work
 - do not continue to default production write enablement before a separate
   review defines durable state implications, broader abort / rollback behavior,
   and default user-workspace safety policy

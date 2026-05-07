@@ -135,7 +135,8 @@ Implemented:
 - `workspaceWriteRoute` composes dry-run, permission UX, write decision,
   guarded gate, final stale-read, writer call, and post-write verification
 - `workspaceAuthority` enforces lexical workspace boundary, symlink rejection,
-  realpath workspace boundary, verified reads, and verified writes
+  realpath workspace boundary, descriptor-verified reads, and
+  descriptor-verified writes
 
 Evidence:
 
@@ -145,6 +146,7 @@ Evidence:
   not report changed files or success
 - symlink targets inside the workspace that resolve outside the workspace are
   blocked before dry-run read and before writer invocation
+- symlink swaps at the writer boundary are blocked before content is written
 - selected-workspace write success is reported only after post-write content
   verification
 
@@ -152,9 +154,12 @@ Follow-up attention:
 
 - This is explicit selected-workspace write enablement, not default
   `apply_patch` enablement.
-- A general TOCTOU / symlink-swap hardening pass remains possible because the
-  current implementation validates paths before read/write rather than using a
-  descriptor-level no-follow write protocol.
+- A broader cross-platform TOCTOU review remains possible; the current
+  selected-workspace authority now uses descriptor verification for the opened
+  target, but this is still not a full edit-system transaction or rollback
+  model.
+- Workspace write failures now carry more precise stopped attribution for
+  workspace-boundary, write-application, and post-write verification blockers.
 - Durable stopped-session implications, abort behavior, and broader user
   workspace safety policy still need a separate review before any default route
   is considered.
@@ -168,7 +173,7 @@ Follow-up attention:
 - AST patching, fuzzy patching, rollback, or full edit-system replacement
 - release/default gate inclusion for the apply_patch writer
 - durable stopped-session auto-recovery for partially approved write flows
-- descriptor-level no-follow / atomic writer hardening
+- full atomic writer / rollback hardening
 - broad Windows filesystem edge-case hardening, including EBUSY handling
 
 ## Cleared blockers
@@ -183,6 +188,9 @@ Follow-up attention:
 - Real-provider dry-run, permission UX, runtime no-write, isolated write,
   guarded route, and selected-workspace write gate evidence missing.
 - Symlink target escape from selected workspace writer.
+- Symlink swap at the selected workspace writer boundary.
+- Coarse workspace write failure attribution for workspace-boundary,
+  write-application, and post-write verification blockers.
 
 ## Remaining blockers and risks
 
@@ -190,8 +198,8 @@ Follow-up attention:
   default-route review.
 - Selected-workspace write is explicit opt-in only; it should not be treated as
   release/default readiness.
-- TOCTOU / symlink-swap hardening is still a follow-up risk, not a current merge
-  blocker.
+- Broader cross-platform TOCTOU / atomic-write hardening is still a follow-up
+  risk, not a default-route blocker by itself.
 - Durable state, abort/interrupt, retry, and stopped-session resume semantics for
   selected-workspace apply_patch writes need a separate review.
 - Real-provider gates prove specific isolated or explicitly selected routes only;
@@ -236,4 +244,3 @@ No real-provider gate is required for this documentation update.
 3. Treat descriptor-level no-follow / TOCTOU hardening as a focused safety
    follow-up. It is narrower and more appropriate than expanding into multi-file
    or full edit-engine work.
-

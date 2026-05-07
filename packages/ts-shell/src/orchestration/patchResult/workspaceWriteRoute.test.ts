@@ -238,6 +238,62 @@ describe("single-file apply_patch real workspace write route", () => {
       "status: draft\nowner: outside-workspace\n",
     );
   });
+
+  it("blocks symlink swaps at the writer authority without mutating outside the workspace", async () => {
+    const fixture = createFixture();
+    const outsideRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), "single-file-apply-patch-outside-"),
+    );
+    tempRoots.push(outsideRoot);
+    const outsideTarget = path.join(outsideRoot, "app.ts");
+    fs.writeFileSync(
+      outsideTarget,
+      "status: draft\nowner: outside-workspace\n",
+      "utf8",
+    );
+    const workspaceTarget = path.join(fixture.workspaceRoot, "src", "app.ts");
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+
+    const result = await runWorkspaceWriteRoute({
+      workspaceRoot: fixture.workspaceRoot,
+      rawPatchText: applyPatchText,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: "approved",
+      defaultProductionRejectionUnchanged: true,
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: (relativePath, content) => {
+        fs.unlinkSync(workspaceTarget);
+        fs.symlinkSync(outsideTarget, workspaceTarget);
+        authority.writeFile(relativePath, content);
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("write-application");
+    expect(result.workspaceWriterInvoked).toBe(true);
+    expect(result.writerTarget).toBe("selected-workspace");
+    expect(result.selectedWorkspaceWrite).toBe(true);
+    expect(result.changedFiles).toEqual([]);
+    expect(result.writeIntents).toEqual([]);
+    expect(result.appliedPatchRecord).toBe(false);
+    expect(result.postWriteVerification).toBe("blocked");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.terminalSuccessAllowed).toBe(false);
+    expect(result.mutationSuccessClaimAllowed).toBe(false);
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-workspace-write-route:write-application-blocked",
+        "apply-patch-workspace-write-route:writer-invoked-no-success-claim",
+        "apply-patch-workspace-write-route:no-success-claim",
+      ]),
+    );
+    expect(fs.readFileSync(outsideTarget, "utf8")).toBe(
+      "status: draft\nowner: outside-workspace\n",
+    );
+  });
 });
 
 function createFixture(

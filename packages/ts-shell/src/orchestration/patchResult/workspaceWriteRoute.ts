@@ -359,6 +359,10 @@ export async function runWorkspaceWriteRoute(
       guardedGate,
       finalStaleRead,
       failures: applied.failedFiles,
+      workspaceWriterInvoked: true,
+      writerTarget: "selected-workspace",
+      selectedWorkspaceWrite: true,
+      postWriteVerification: "blocked",
       nextAction:
         applied.failedFiles[0]?.nextAction ??
         "Retry after checking workspace write permissions.",
