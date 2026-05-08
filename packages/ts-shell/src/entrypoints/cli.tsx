@@ -77,6 +77,13 @@ import {
   handleShellClose,
   handleShellSigint,
 } from "../core/shell/signalHandlers.js";
+import {
+  formatExecutionStartedLine,
+  formatTurnEndBoundary,
+  formatTurnStartBoundary,
+  renderTurnResultFallback,
+  type TurnEndStatus,
+} from "../core/shell/turnBoundarySurface.js";
 import { isRustDaemonEnabled } from "../daemon/client.js";
 import {
   createComponentLogger,
@@ -1167,17 +1174,15 @@ async function main(): Promise<void> {
         pendingEscPressAt = null;
         sessionRuntime.cancelCurrentRun();
         renderer.renderLine(
-          "\nCurrent response cancelled (double Esc detected).\n",
+          "\nCancellation requested (double Esc detected).",
         );
-        rl.prompt();
         return;
       }
 
       pendingEscPressAt = now;
       renderer.renderLine(
-        "\nPress Esc again within 3 seconds to cancel the current response.\n",
+        "\nPress Esc again within 3 seconds to cancel the current response.",
       );
-      rl.prompt();
       setTimeout(() => {
         if (pendingEscPressAt && Date.now() - pendingEscPressAt >= 3000) {
           pendingEscPressAt = null;
@@ -2565,20 +2570,21 @@ async function executeResolvedPromptTurn(options: {
   turnOrigin?: "normal" | "resumed" | "continued";
 }): Promise<void> {
   const turnOrigin = options.turnOrigin ?? "normal";
-  const turnTag =
-    turnOrigin === "resumed"
-      ? " (resumed)"
-      : turnOrigin === "continued"
-        ? " (continued)"
-        : "";
-  if (options.source === "interactive" && !options.printMode) {
-    const turnLabel = options.turnNumber ?? 0;
+  const interactiveTurn = options.source === "interactive" && !options.printMode;
+  const turnLabel = options.turnNumber ?? 0;
+  let turnEndStatus: TurnEndStatus = "completed";
+  if (interactiveTurn) {
     options.logger.info("CLI interactive turn boundary", {
       sessionId: options.runtimeContext.session.id,
       turn: turnLabel,
       turnOrigin,
     });
-    options.renderer.renderLine(`\n=== Turn ${turnLabel}${turnTag} ===`);
+    options.renderer.renderLine(
+      formatTurnStartBoundary({
+        turnNumber: turnLabel,
+        origin: turnOrigin,
+      }),
+    );
   }
   options.logger.info(
     options.source === "interactive"
@@ -2589,43 +2595,41 @@ async function executeResolvedPromptTurn(options: {
       promptLength: options.effectivePrompt.length,
     },
   );
-  if (!options.printMode) {
-    const startLabel =
-      turnOrigin === "resumed"
-        ? "Execution started (resumed context)"
-        : turnOrigin === "continued"
-          ? "Execution started (continued context)"
-          : "Execution started";
-    options.renderer.renderLine(`${startLabel}...`);
-  }
-  const continuitySnapshot =
-    options.continuityState ??
-    options.sessionManager.buildPromptContinuitySnapshot(
-      options.runtimeContext.session.id,
-      options.effectivePrompt,
-    );
-  const approvalModeObject = materializeApprovalModeObject({
-    prompt: options.effectivePrompt,
-    continuity: continuitySnapshot,
-  });
-  const approvalModeConflict = analyzeApprovalModeConflict(approvalModeObject);
-  if (
-    approvalModeConflict.ambiguousStop &&
-    (options.source === "interactive" || !options.nonInteractiveCliApprovalMode)
-  ) {
-    options.renderer.renderLine(
-      approvalModeConflict.stopReason ?? "Approval mode is ambiguous.",
-    );
-    options.renderer.renderLine(
-      "Re-run with an explicit verify continuation lineage or set --non-interactive-approval for this run.",
-    );
-    return;
-  }
-  recordCount("cli.prompts", 1, {
-    sessionId: options.runtimeContext.session.id,
-  });
-  options.setActiveNonInteractiveApprovalMode(approvalModeObject);
+
   try {
+    const continuitySnapshot =
+      options.continuityState ??
+      options.sessionManager.buildPromptContinuitySnapshot(
+        options.runtimeContext.session.id,
+        options.effectivePrompt,
+      );
+    const approvalModeObject = materializeApprovalModeObject({
+      prompt: options.effectivePrompt,
+      continuity: continuitySnapshot,
+    });
+    const approvalModeConflict =
+      analyzeApprovalModeConflict(approvalModeObject);
+    if (
+      approvalModeConflict.ambiguousStop &&
+      (options.source === "interactive" ||
+        !options.nonInteractiveCliApprovalMode)
+    ) {
+      turnEndStatus = "blocked";
+      renderTurnResultFallback(options.renderer, {
+        outcome: "blocked",
+        detail: approvalModeConflict.stopReason ?? "Approval mode is ambiguous.",
+        doNext:
+          "Re-run with an explicit verify continuation lineage or set --non-interactive-approval for this run.",
+      });
+      return;
+    }
+    if (!options.printMode) {
+      options.renderer.renderLine(formatExecutionStartedLine(turnOrigin));
+    }
+    recordCount("cli.prompts", 1, {
+      sessionId: options.runtimeContext.session.id,
+    });
+    options.setActiveNonInteractiveApprovalMode(approvalModeObject);
     await options.sessionRuntime.executePrompt(
       options.runtimeContext.session.id,
       options.effectivePrompt,
@@ -2635,22 +2639,55 @@ async function executeResolvedPromptTurn(options: {
         continuityState: continuitySnapshot,
       },
     );
+  } catch (error) {
+    const shellState = options.sessionRuntime.getState();
+    if (interactiveTurn && shellState === "interrupted") {
+      turnEndStatus = "interrupted";
+      renderTurnResultFallback(options.renderer, {
+        outcome: "interrupted",
+        detail: "Current request was cancelled before completion.",
+        doNext:
+          "Use /resume to continue the interrupted session, or enter a new prompt.",
+      });
+      return;
+    }
+    turnEndStatus = "error";
+    if (interactiveTurn) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      renderTurnResultFallback(options.renderer, {
+        outcome: "error",
+        detail: errorMessage,
+        doNext: "Review the error, adjust the prompt or environment, and retry.",
+      });
+      options.logger.error("CLI run failed", {
+        sessionId: options.runtimeContext.session.id,
+        error: errorMessage,
+        shellState,
+      });
+      return;
+    }
+    throw error;
   } finally {
     options.setActiveNonInteractiveApprovalMode(undefined);
-  }
-  options.logger.info(
-    options.source === "interactive"
-      ? "CLI run completed"
-      : "CLI run completed (non-interactive)",
-    {
-      sessionId: options.runtimeContext.session.id,
-      shellState: options.sessionRuntime.getState(),
-    },
-  );
-  if (options.source === "interactive" && !options.printMode) {
-    options.renderer.renderLine(
-      `=== End Turn ${options.turnNumber ?? 0}${turnTag} ===\n`,
+    options.logger.info(
+      options.source === "interactive"
+        ? "CLI run completed"
+        : "CLI run completed (non-interactive)",
+      {
+        sessionId: options.runtimeContext.session.id,
+        shellState: options.sessionRuntime.getState(),
+        turnEndStatus,
+      },
     );
+    if (interactiveTurn) {
+      options.renderer.renderLine(
+        formatTurnEndBoundary({
+          turnNumber: turnLabel,
+          origin: turnOrigin,
+          status: turnEndStatus,
+        }),
+      );
+    }
   }
 }
 

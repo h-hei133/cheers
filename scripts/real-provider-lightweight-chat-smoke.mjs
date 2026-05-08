@@ -282,7 +282,10 @@ async function main() {
   console.log(`noToolWriteRoute=${noToolWriteRoute}`)
   console.log(`plainChatSucceeded=${plainChatSucceeded}`)
 
-  if (result.timedOut || networkFailurePattern.test(redactedOutput)) {
+  if (
+    result.timedOut ||
+    (!plainChatSucceeded && networkFailurePattern.test(redactedOutput))
+  ) {
     console.log('[PROVIDER_NETWORK] real-provider-lightweight-chat-smoke')
     console.log(summarizeOutput(redactedOutput))
     process.exit(2)

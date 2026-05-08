@@ -11,9 +11,8 @@ export function handleShellSigint(input: {
   exit: (code: number) => never;
 }): void {
   if (input.sessionRuntime.getCurrentRunController()) {
-    input.renderer.renderLine("\nRun cancelled by user (Ctrl+C)");
+    input.renderer.renderLine("\nCancellation requested by user (Ctrl+C).");
     input.sessionRuntime.cancelCurrentRun();
-    input.readline.prompt();
     return;
   }
 

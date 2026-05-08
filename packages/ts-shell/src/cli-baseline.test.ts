@@ -1,5 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -527,6 +528,111 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
 
     fs.writeFileSync(modulePath, moduleBody, "utf8");
     return { modulePath, logPath };
+  }
+
+  async function createDelayedOpenAiHttpServer(chatDelayMs: number): Promise<{
+    baseUrl: string;
+    logs: Array<{ url: string; authorization: string }>;
+    close: () => Promise<void>;
+  }> {
+    const logs: Array<{ url: string; authorization: string }> = [];
+    const server = http.createServer((request, response) => {
+      const authorization = request.headers.authorization ?? "";
+      logs.push({
+        url: request.url ?? "",
+        authorization: Array.isArray(authorization)
+          ? authorization.join(",")
+          : authorization,
+      });
+
+      if (request.url?.endsWith("/models")) {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ data: [{ id: "gpt-4.1-mini" }] }));
+        return;
+      }
+
+      if (request.url?.endsWith("/chat/completions")) {
+        setTimeout(() => {
+          response.writeHead(200, { "content-type": "text/event-stream" });
+          response.write(
+            `data: ${JSON.stringify({
+              model: "gpt-4.1-mini",
+              choices: [{ delta: { content: "REAL_MOCK_CALL" } }],
+            })}\n\n`,
+          );
+          response.write(
+            `data: ${JSON.stringify({
+              model: "gpt-4.1-mini",
+              choices: [{ delta: { content: "" }, finish_reason: "stop" }],
+              usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+            })}\n\n`,
+          );
+          response.end("data: [DONE]\n\n");
+        }, chatDelayMs);
+        return;
+      }
+
+      response.writeHead(404, { "content-type": "text/plain" });
+      response.end("mock route not found");
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => {
+        server.off("error", reject);
+        resolve();
+      });
+    });
+
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("OpenAI mock server did not bind to a TCP port");
+    }
+
+    return {
+      baseUrl: `http://127.0.0.1:${address.port}/v1`,
+      logs,
+      close: () =>
+        new Promise<void>((resolve, reject) => {
+          server.close((error) => {
+            if (error) {
+              reject(error);
+              return;
+            }
+            resolve();
+          });
+        }),
+    };
+  }
+
+  function writeOpenAiMockConfig(input: {
+    fakeHome: string;
+    apiKey: string;
+    baseUrl: string;
+  }): void {
+    const configPath = path.join(
+      input.fakeHome,
+      ".private-agents",
+      "config.json",
+    );
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          providerCredentials: {
+            openai: {
+              apiKey: input.apiKey,
+              baseUrl: input.baseUrl,
+              model: "gpt-4.1-mini",
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
   }
 
   function createTransientFailureOpenAiFetchMockModule(fakeHome: string): {
@@ -4849,18 +4955,34 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
   }, 35000);
 
   it("gates resume continuity: interrupt once, resume once, then persist completed terminal state", async () => {
+    const mockServer = await createDelayedOpenAiHttpServer(1000);
+    writeOpenAiMockConfig({
+      fakeHome: fakeHomeDir,
+      apiKey: "test-resume-continuity-key",
+      baseUrl: mockServer.baseUrl,
+    });
     let interruptedSessionId = "";
     const interruptedPrompt =
       "Resume continuity gate: interrupted real task path";
     let firstPhaseOutput = "";
 
-    await new Promise<void>((resolve, reject) => {
+    try {
+      await new Promise<void>((resolve, reject) => {
       const cli = spawnCli(fakeHomeDir, [], {
-        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        PRIVATE_AGENTS_PROVIDER_MODE: "real",
+        OPENAI_API_KEY: "test-resume-continuity-key",
       });
       let settled = false;
       let promptSent = false;
       let interrupted = false;
+      let interruptPoll: ReturnType<typeof setInterval> | undefined;
+
+      const stopInterruptPoll = () => {
+        if (interruptPoll) {
+          clearInterval(interruptPoll);
+          interruptPoll = undefined;
+        }
+      };
 
       const finish = () => {
         if (settled) {
@@ -4868,6 +4990,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
         }
         settled = true;
         clearTimeout(timeout);
+        stopInterruptPoll();
         cli.kill();
         resolve();
       };
@@ -4878,6 +5001,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
         }
         settled = true;
         clearTimeout(timeout);
+        stopInterruptPoll();
         cli.kill();
         reject(error);
       };
@@ -4906,12 +5030,22 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
         ) {
           promptSent = true;
           cli.stdin?.write(`${interruptedPrompt}\n`);
-          if (!interrupted) {
-            interrupted = true;
-            setTimeout(() => {
-              cli.kill();
-            }, 300);
-          }
+          interruptPoll = setInterval(() => {
+            if (interrupted) {
+              return;
+            }
+            if (
+              mockServer.logs.some((entry) =>
+                entry.url.endsWith("/chat/completions"),
+              )
+            ) {
+              interrupted = true;
+              stopInterruptPoll();
+              setTimeout(() => {
+                cli.kill();
+              }, 40);
+            }
+          }, 20);
         }
       });
 
@@ -4947,14 +5081,14 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
         fakeHomeDir,
         ["--session-id", interruptedSessionId],
         {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          PRIVATE_AGENTS_PROVIDER_MODE: "real",
+          OPENAI_API_KEY: "test-resume-continuity-key",
         },
       );
       let output = "";
       let settled = false;
       let approvalResponses = 0;
       let observedApprovalPrompts = 0;
-      let completionCount = 0;
       let followUpPromptSent = false;
 
       const finish = (callback: () => void) => {
@@ -5005,10 +5139,10 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
           observedApprovalPrompts = approvalPrompts;
         }
 
-        const completedMarkers = output.match(/Execution summary/g);
-        completionCount = completedMarkers?.length ?? 0;
-
-        if (completionCount >= 1) {
+        if (
+          output.includes("Result") &&
+          output.includes("- Outcome: success")
+        ) {
           clearTimeout(timeout);
           finish(() => {
             expect(output).toContain(
@@ -5078,5 +5212,8 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
         fail(error);
       });
     });
+    } finally {
+      await mockServer.close();
+    }
   }, 50000);
 });
