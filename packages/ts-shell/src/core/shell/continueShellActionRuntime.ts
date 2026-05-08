@@ -5,10 +5,10 @@ import type {
   Session,
   SessionContinuitySnapshot,
   SessionManager,
-  SessionReentrySummary,
 } from "../../session/SessionManager.js";
 import { resumeShellSession } from "./recovery.js";
 import type { ShellRuntimeContext } from "./runtimeContext.js";
+import { renderStoppedContinueGuidanceSurface } from "./sessionStateSurface.js";
 
 export type ResumeLikeShellAction = ShellActionResult & {
   action: "resume-session" | "continue-session";
@@ -26,50 +26,6 @@ function isFailedResumeResult(
   result: ResumeResult,
 ): result is Extract<ResumeResult, { ok: false }> {
   return result.ok === false;
-}
-
-function renderStoppedContinueGuidance(input: {
-  renderer: StreamingRenderer;
-  printMode: boolean;
-  sessionId: string;
-  summary: SessionReentrySummary;
-  snapshot: SessionContinuitySnapshot;
-}): void {
-  const failedFiles = input.snapshot.recentFailedFiles
-    .map((entry) => `${entry.path}${entry.reason ? ` (${entry.reason})` : ""}`)
-    .join(", ");
-  const reason =
-    input.snapshot.lastVerificationReason ??
-    input.snapshot.lastFailure ??
-    input.summary.blockedDetail ??
-    input.summary.resumeDetail ??
-    "The previous run stopped before the task could continue automatically.";
-  const blockerKind =
-    input.snapshot.lastVerificationBlockerKind ??
-    input.summary.blockedReason ??
-    "stopped-result";
-  const doNext =
-    input.snapshot.lastVerificationNextAction ??
-    `Use /continue <follow-up prompt> with a concrete repair instruction for session ${input.sessionId}.`;
-
-  if (!input.printMode) {
-    input.renderer.renderLine("");
-  }
-  input.renderer.renderLine("Result");
-  input.renderer.renderLine("- Outcome: stopped");
-  input.renderer.renderLine("- TerminalState: stopped");
-  input.renderer.renderLine(`- BlockerKind: ${blockerKind}`);
-  input.renderer.renderLine(`- Reason: ${reason}`);
-  if (failedFiles) {
-    input.renderer.renderLine(`- Failed files: ${failedFiles}`);
-  }
-  input.renderer.renderLine(`- DoNext: ${doNext}`);
-  input.renderer.renderLine(
-    `- Next action: Use /continue <follow-up prompt> or provide a concrete repair instruction to continue session ${input.sessionId}.`,
-  );
-  if (!input.printMode) {
-    input.renderer.renderLine("");
-  }
 }
 
 export async function runResumeLikeShellAction(options: {
@@ -154,8 +110,7 @@ export async function runResumeLikeShellAction(options: {
       }
     })();
     if (targetSummary?.terminalClassification === "stopped") {
-      renderStoppedContinueGuidance({
-        renderer: options.renderer,
+      renderStoppedContinueGuidanceSurface(options.renderer, {
         printMode: options.printMode,
         sessionId: targetSessionId,
         summary: targetSummary,

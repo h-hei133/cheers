@@ -15,6 +15,7 @@ export interface LightweightChatOptions {
   readonly mode: Extract<TaskMode, "chat" | "analysis" | "plan">;
   readonly providerMode: "synthetic" | "real";
   readonly providerCredential?: ResolvedProviderCredential;
+  readonly continuityState?: unknown;
   readonly signal?: AbortSignal;
   readonly fetchImpl?: typeof fetch;
 }
@@ -94,6 +95,7 @@ export async function* streamLightweightChat(
       `providerCalls=${result.providerCallCount}`,
       "tool: skipped (lightweight no-write route)",
       "write: disabled (router grants no permissions)",
+      ...buildContinuityNotes(options.prompt, options.continuityState),
     ],
   };
 
@@ -111,6 +113,186 @@ export async function* streamLightweightChat(
       output,
     }),
   };
+}
+
+function buildContinuityNotes(
+  prompt: string,
+  continuityState: unknown,
+): string[] {
+  const continuity = continuityStateAsRecord(continuityState);
+  if (!continuity) {
+    return [];
+  }
+
+  const notes = ["restored-session-state-consumed"];
+  const terminalClassification = stringValue(
+    continuity.lastTerminalClassification,
+  );
+  const terminalReason = stringValue(continuity.lastTerminalReason);
+  if (terminalClassification || terminalReason) {
+    notes.push(
+      `last-terminal=${terminalClassification ?? "unknown"}:${terminalReason ?? "unknown"}`,
+    );
+  }
+
+  notes.push(...buildActionResultSeedNotes(continuity));
+
+  const explicitTarget = extractPromptPathTarget(prompt);
+  if (explicitTarget && continuity.lastActionResultSeed) {
+    notes.push(`explicit-target=${explicitTarget}`);
+    notes.push("seedInfluence=ignored-explicit-target");
+  }
+
+  const diagnostic = parseDiagnosticHandoff(
+    stringValue(continuity.lastFailureHandoffDiagnostic),
+    "failure",
+  ) ?? parseDiagnosticHandoff(
+    stringValue(continuity.lastSuccessHandoffDiagnostic),
+    "success",
+  );
+  if (diagnostic) {
+    if (explicitTarget) {
+      notes.push("diagnosticHandoff=ignored-explicit-target");
+    } else {
+      notes.push(...buildDiagnosticHandoffNotes(diagnostic));
+    }
+  }
+
+  return notes;
+}
+
+function buildActionResultSeedNotes(
+  continuity: Record<string, unknown>,
+): string[] {
+  const seed = continuityStateAsRecord(continuity.lastActionResultSeed);
+  if (!seed) {
+    return [];
+  }
+
+  const parts = ["seed=action-result"];
+  const actionKind = stringValue(seed.actionKind);
+  if (actionKind) {
+    parts.push(`seedAction=${actionKind}`);
+  }
+  const target = stringValue(seed.target);
+  if (target) {
+    parts.push(`seedTarget=${normalizePathLike(target)}`);
+  }
+  const changedFiles = arrayValue(seed.changedFiles);
+  if (changedFiles.length > 0) {
+    parts.push(`seedChangedFiles=${changedFiles.length}`);
+  }
+  const verifiedFiles = arrayValue(seed.verifiedFiles);
+  if (verifiedFiles.length > 0) {
+    parts.push(`seedVerifiedFiles=${verifiedFiles.length}`);
+  }
+  const verification = continuityStateAsRecord(seed.verification);
+  const verificationStatus = stringValue(verification?.status);
+  if (verificationStatus) {
+    parts.push(
+      `seedVerifyStatus=${verificationStatus.toLowerCase().replace(/\s+/g, "-")}`,
+    );
+  }
+  if (stringValue(verification?.command)) {
+    parts.push("seedVerifyCommandInherited=yes");
+  }
+  const blockerKind =
+    stringValue(seed.blockerKind) ?? stringValue(verification?.blockerKind);
+  if (blockerKind) {
+    parts.push(`seedBlocker=${blockerKind.toLowerCase()}`);
+  }
+  if (stringValue(seed.reason) || stringValue(verification?.reason)) {
+    parts.push("seedReason=yes");
+  }
+
+  return [`decision-trace: ${parts.join(" ")}`];
+}
+
+interface DiagnosticHandoff {
+  readonly kind: "failure" | "success";
+  readonly status?: string;
+  readonly target?: string;
+  readonly command?: string;
+  readonly reason?: string;
+  readonly blockerKind?: string;
+}
+
+function parseDiagnosticHandoff(
+  value: string | undefined,
+  kind: DiagnosticHandoff["kind"],
+): DiagnosticHandoff | undefined {
+  if (!value?.trim()) {
+    return undefined;
+  }
+  const prefix = kind === "failure" ? "Failure handoff:" : "Success handoff:";
+  if (!value.startsWith(prefix)) {
+    return undefined;
+  }
+  const fields = new Map<string, string>();
+  for (const part of value.slice(prefix.length).split(";")) {
+    const [rawKey, ...rawValue] = part.trim().split("=");
+    const key = rawKey?.trim();
+    const fieldValue = rawValue.join("=").trim();
+    if (key && fieldValue) {
+      fields.set(key, fieldValue.replace(/[.]+$/, ""));
+    }
+  }
+  return {
+    kind,
+    status: fields.get("status"),
+    target: fields.get("target"),
+    command: fields.get("command"),
+    reason: fields.get("reason"),
+    blockerKind: fields.get("blocker"),
+  };
+}
+
+function buildDiagnosticHandoffNotes(
+  diagnostic: DiagnosticHandoff,
+): string[] {
+  return [
+    `diagnosticHandoff=${diagnostic.kind}`,
+    ...(diagnostic.status
+      ? [`diagnosticStatus=${diagnostic.status.trim().toLowerCase()}`]
+      : []),
+    ...(diagnostic.target
+      ? [`diagnosticTarget=${normalizePathLike(diagnostic.target)}`]
+      : []),
+    ...(diagnostic.command ? ["diagnosticCommandInherited=yes"] : []),
+    ...(diagnostic.reason ? ["diagnosticReason=yes"] : []),
+    ...(diagnostic.blockerKind
+      ? [`diagnosticBlocker=${diagnostic.blockerKind.trim().toLowerCase()}`]
+      : []),
+  ];
+}
+
+function continuityStateAsRecord(
+  value: unknown,
+): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : undefined;
+}
+
+function arrayValue(value: unknown): readonly unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function extractPromptPathTarget(prompt: string): string | undefined {
+  const match = prompt.match(
+    /(?:^|\s)([A-Za-z0-9_./-]+\.(?:[A-Za-z0-9]+))(?:\s|$|[.,;:!?])/,
+  );
+  return match?.[1] ? normalizePathLike(match[1]) : undefined;
+}
+
+function normalizePathLike(value: string): string {
+  return value.trim().replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
 function createAdapter(

@@ -57,6 +57,11 @@ import { streamLightweightChat } from "../core/query/lightweightChat.js";
 import { validateLightweightProviderCredential } from "../core/query/lightweightRoute.js";
 import { resolveSessionReference } from "../core/shell/recovery.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
+import {
+  renderCurrentSessionSurface,
+  renderSessionListSurface,
+  renderSwitchedSessionSurface,
+} from "../core/shell/sessionStateSurface.js";
 import type {
   RootBindingDiagnostic,
   ShellRuntimeContext,
@@ -672,18 +677,23 @@ async function main(): Promise<void> {
       if (isShellAction(slashResult, "list-sessions")) {
         const sessionAction = slashResult.sessionAction ?? "panel";
         if (sessionAction === "list") {
-          renderSessionList(
+          renderSessionListSurface(
             renderer,
-            sessionManager,
-            runtimeContext.session.id,
-            runtimeContext.projectRoot,
+            {
+              sessionManager,
+              activeSessionId: runtimeContext.session.id,
+              preferredProjectRoot: runtimeContext.projectRoot,
+            },
           );
           rl.prompt();
           return;
         }
 
         if (sessionAction === "current") {
-          renderCurrentSession(renderer, sessionManager, runtimeContext);
+          renderCurrentSessionSurface(renderer, {
+            sessionManager,
+            runtimeContext,
+          });
           renderSessionCommandMap(renderer, { compact: true });
           rl.prompt();
           return;
@@ -735,7 +745,10 @@ async function main(): Promise<void> {
             renderer.renderLine(
               `Project context: ${runtimeContext.projectRoot}`,
             );
-            renderSwitchedSessionContext(renderer, sessionManager, resumed.id);
+            renderSwitchedSessionSurface(renderer, {
+              sessionManager,
+              sessionId: resumed.id,
+            });
             renderSessionCommandMap(renderer, { compact: true });
             renderer.renderLine("");
             refreshInteractivePromptChrome();
@@ -793,11 +806,10 @@ async function main(): Promise<void> {
             renderer.renderLine(
               `Project context: ${runtimeContext.projectRoot}`,
             );
-            renderSwitchedSessionContext(
-              renderer,
+            renderSwitchedSessionSurface(renderer, {
               sessionManager,
-              panelResult.switchedSessionId,
-            );
+              sessionId: panelResult.switchedSessionId,
+            });
             renderer.renderLine("");
             refreshInteractivePromptChrome();
           } else {
@@ -1286,6 +1298,7 @@ async function* streamOrchestratedResponse(
       >,
       providerMode,
       providerCredential: providerCredentialResolution.credential,
+      continuityState,
       signal,
     })) {
       yield event;
@@ -2172,11 +2185,13 @@ async function runNonInteractivePrompt(options: {
     if (resolved.slashResult.action === "list-sessions") {
       const sessionAction = resolved.slashResult.sessionAction ?? "panel";
       if (sessionAction === "list") {
-        renderSessionList(
+        renderSessionListSurface(
           options.renderer,
-          options.sessionManager,
-          options.runtimeContext.session.id,
-          options.runtimeContext.projectRoot,
+          {
+            sessionManager: options.sessionManager,
+            activeSessionId: options.runtimeContext.session.id,
+            preferredProjectRoot: options.runtimeContext.projectRoot,
+          },
         );
         return;
       }
@@ -2186,11 +2201,10 @@ async function runNonInteractivePrompt(options: {
           options.renderer,
           options.lifecycleNotices,
         );
-        renderCurrentSession(
-          options.renderer,
-          options.sessionManager,
-          options.runtimeContext,
-        );
+        renderCurrentSessionSurface(options.renderer, {
+          sessionManager: options.sessionManager,
+          runtimeContext: options.runtimeContext,
+        });
         renderSessionCommandMap(options.renderer, { compact: true });
         return;
       }
@@ -2236,11 +2250,10 @@ async function runNonInteractivePrompt(options: {
           options.renderer.renderLine(
             `Project context: ${options.runtimeContext.projectRoot}`,
           );
-          renderSwitchedSessionContext(
-            options.renderer,
-            options.sessionManager,
-            resumed.id,
-          );
+          renderSwitchedSessionSurface(options.renderer, {
+            sessionManager: options.sessionManager,
+            sessionId: resumed.id,
+          });
           renderSessionCommandMap(options.renderer, { compact: true });
           return;
         } catch (error) {
@@ -2900,116 +2913,20 @@ function renderRecentProjectContexts(
   renderer.renderLine("");
 }
 
-function renderSessionList(
-  renderer: StreamingRenderer,
-  sessionManager: SessionManager,
-  activeSessionId: string,
-  preferredProjectRoot: string,
-): void {
-  const summaries = sessionManager.listReentrySummaries({
-    limit: 10,
-    preferredProjectRoot,
-  });
-  if (summaries.length === 0) {
-    renderer.renderLine("\nNo sessions found.\n");
-    return;
-  }
-
-  renderer.renderLine("\nRe-entry sessions");
-  renderer.renderLine(
-    "Use /sessions switch <id|prefix|title|last> to jump directly, /resume [id|prefix|title|last] to continue recoverable work, or /sessions current for active-session details.",
-  );
-  for (const summary of summaries) {
-    const activeMarker = summary.id === activeSessionId ? "*" : " ";
-    const recoverability =
-      summary.resumeDisposition === "fully-resumable"
-        ? "fully-resumable"
-        : summary.resumeDisposition === "partially-resumable"
-          ? "partially-resumable"
-          : "blocked";
-    const title = summary.title?.trim() || "(untitled)";
-    const projectLabel =
-      path.basename(summary.projectRoot) || summary.projectRoot;
-    const terminalLabel = summary.terminalClassification
-      ? ` terminal=${summary.terminalClassification}`
-      : "";
-    const promptLabel = summary.pendingPrompt?.trim()
-      ? ` pending="${truncate(summary.pendingPrompt.trim(), 56)}"`
-      : summary.lastUserMessage?.trim()
-        ? ` last="${truncate(summary.lastUserMessage.trim(), 56)}"`
-        : "";
-    renderer.renderLine(
-      `${activeMarker} ${summary.id}  [${summary.status}] [${recoverability}]  ${title}  @${projectLabel}  updated=${toRelativeTime(summary.updatedAt)}${terminalLabel}${promptLabel}`,
-    );
-  }
-  renderer.renderLine("");
-}
-
-function renderCurrentSession(
-  renderer: StreamingRenderer,
-  sessionManager: SessionManager,
-  runtimeContext: ShellRuntimeContext,
-): void {
-  const summary = sessionManager.describeSessionReentry(
-    runtimeContext.session.id,
-  );
-  const title = summary.title?.trim() || "(untitled)";
-  renderer.renderLine("\nCurrent session");
-  renderer.renderLine(`- ID: ${summary.id}`);
-  renderer.renderLine(`- Title: ${title}`);
-  renderer.renderLine(`- Status: ${summary.status}`);
-  renderer.renderLine(
-    `- Resume: ${summary.resumeDisposition}${summary.autoResumeReady ? " (auto)" : ""}`,
-  );
-  renderer.renderLine(`- Resume detail: ${summary.resumeDetail}`);
-  if (!summary.recoverable) {
-    renderer.renderLine(
-      `- Recoverability: blocked (${summary.blockedReason ?? "unknown"})`,
-    );
-  }
-  renderer.renderLine(`- Project binding: ${summary.projectRoot}`);
-  renderer.renderLine(
-    `- Updated: ${summary.updatedAt} (${toRelativeTime(summary.updatedAt)})`,
-  );
-  if (summary.pendingPrompt?.trim()) {
-    renderer.renderLine(
-      `- Pending prompt: ${truncate(summary.pendingPrompt.trim(), 180)}`,
-    );
-  } else if (summary.lastUserMessage?.trim()) {
-    renderer.renderLine(
-      `- Last user request: ${truncate(summary.lastUserMessage.trim(), 180)}`,
-    );
-  }
-  if (summary.lastAssistantMessage?.trim()) {
-    renderer.renderLine(
-      `- Last assistant output: ${truncate(summary.lastAssistantMessage.trim(), 180)}`,
-    );
-  }
-  if (summary.terminalClassification || summary.terminalReason) {
-    renderer.renderLine(
-      `- Last terminal: ${summary.terminalClassification ?? "unknown"}${summary.terminalReason ? ` (${summary.terminalReason})` : ""}`,
-    );
-  }
-  if (!summary.recoverable && summary.blockedDetail) {
-    renderer.renderLine(
-      `- Recovery boundary: ${truncate(summary.blockedDetail, 180)}`,
-    );
-  }
-  renderer.renderLine("");
-}
-
 function renderSessionSurfaceOverview(
   renderer: StreamingRenderer,
   sessionManager: SessionManager,
   runtimeContext: ShellRuntimeContext,
 ): void {
   renderer.renderLine("\n/sessions (session surface)");
-  renderCurrentSession(renderer, sessionManager, runtimeContext);
-  renderSessionList(
+  renderCurrentSessionSurface(renderer, { sessionManager, runtimeContext });
+  renderSessionListSurface(
     renderer,
-    sessionManager,
-    runtimeContext.session.id,
-    runtimeContext.projectRoot,
+    {
+      sessionManager,
+      activeSessionId: runtimeContext.session.id,
+      preferredProjectRoot: runtimeContext.projectRoot,
+    },
   );
   renderSessionCommandMap(renderer);
 }
@@ -3480,30 +3397,6 @@ function resolveSwitchSessionReference(input: {
       : `\nSwitch target '${input.reference}' was not found.\nHint: run /sessions list, then /sessions switch <id|prefix|title|last>.\n`,
   );
   return null;
-}
-
-function renderSwitchedSessionContext(
-  renderer: StreamingRenderer,
-  sessionManager: SessionManager,
-  sessionId: string,
-): void {
-  const summary = sessionManager.describeSessionReentry(sessionId);
-  const title = summary.title?.trim() || "(untitled)";
-  renderer.renderLine(`Session summary: ${title} [${summary.status}]`);
-  if (summary.pendingPrompt?.trim()) {
-    renderer.renderLine(
-      `Resume cue: pending prompt "${truncate(summary.pendingPrompt.trim(), 140)}"`,
-    );
-  } else if (summary.lastUserMessage?.trim()) {
-    renderer.renderLine(
-      `Resume cue: last user request "${truncate(summary.lastUserMessage.trim(), 140)}"`,
-    );
-  }
-  if (summary.terminalClassification || summary.terminalReason) {
-    renderer.renderLine(
-      `Last terminal: ${summary.terminalClassification ?? "unknown"}${summary.terminalReason ? ` (${summary.terminalReason})` : ""}`,
-    );
-  }
 }
 
 function renderPermissionsList(

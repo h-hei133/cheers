@@ -69,6 +69,50 @@ describe("lightweight chat route", () => {
     }
   });
 
+  it("preserves continuity seed notes in lightweight completed results", async () => {
+    const events = [];
+    for await (const event of streamLightweightChat({
+      sessionId: "sess_light_continuity",
+      prompt: "Read package.js for explicit target guard",
+      mode: "chat",
+      providerMode: "synthetic",
+      continuityState: {
+        lastTerminalClassification: "success",
+        lastTerminalReason: "completed",
+        lastActionResultSeed: {
+          actionKind: "edit-file",
+          target: "src/app.ts",
+          changedFiles: ["src/app.ts"],
+          verifiedFiles: ["src/app.ts"],
+          verification: {
+            status: "passed",
+            command: "npm test -- src/app.test.ts",
+            reason: "Focused test passed.",
+          },
+        },
+        lastSuccessHandoffDiagnostic:
+          "Success handoff: status=passed; target=src/app.ts; command=npm test -- src/app.test.ts; reason=Focused test passed.",
+      },
+    })) {
+      events.push(event);
+    }
+
+    const completed = events.at(-1);
+    expect(completed?.type).toBe("query.completed");
+    if (completed?.type === "query.completed") {
+      const notes = completed.result.sharedContext.notes.join("\n");
+      expect(notes).toContain("restored-session-state-consumed");
+      expect(notes).toContain("seed=action-result");
+      expect(notes).toContain("seedAction=edit-file");
+      expect(notes).toContain("seedTarget=src/app.ts");
+      expect(notes).toContain("seedVerifyStatus=passed");
+      expect(notes).toContain("seedVerifyCommandInherited=yes");
+      expect(notes).toContain("explicit-target=package.js");
+      expect(notes).toContain("seedInfluence=ignored-explicit-target");
+      expect(notes).toContain("diagnosticHandoff=ignored-explicit-target");
+    }
+  });
+
   it("maps real provider fetch failures into a structured terminal result", async () => {
     const fetchFailure = Object.assign(new TypeError("fetch failed"), {
       cause: {

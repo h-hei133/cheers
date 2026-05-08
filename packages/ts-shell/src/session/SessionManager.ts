@@ -93,6 +93,7 @@ export interface SessionReentrySummary {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly pendingPrompt?: string;
+  readonly runPhase?: "idle" | "prompt-persisted" | "turn-active";
   readonly lastError?: string;
   readonly durableStatus?: "success" | "stopped" | "error";
   readonly terminalReason?: TerminalReason;
@@ -2173,6 +2174,7 @@ export class SessionManager {
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       pendingPrompt: recoverySnapshot.pendingPrompt,
+      runPhase: recoverySnapshot.runPhase,
       lastError: session.lastError,
       durableStatus: recoverySnapshot.durableStatus,
       terminalReason: recoverySnapshot.terminalReason,
@@ -5789,4 +5791,3 @@ export class SessionManager {
     }
   }
 }
-

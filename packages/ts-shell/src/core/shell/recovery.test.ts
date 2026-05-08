@@ -39,6 +39,46 @@ function createRuntimeContext(): ShellRuntimeContext {
   } as never;
 }
 
+type ResumeShellSessionResult = Awaited<ReturnType<typeof resumeShellSession>>;
+type ResumedShellSessionResult = Extract<
+  ResumeShellSessionResult,
+  { resumed: true }
+>;
+type AutoResumePayload = NonNullable<ResumedShellSessionResult["autoResume"]>;
+
+function expectResumedResult(
+  result: ResumeShellSessionResult,
+): ResumedShellSessionResult {
+  expect(result.resumed).toBe(true);
+  if (!result.resumed) {
+    throw new Error("Expected resumed session result");
+  }
+  return result;
+}
+
+function expectAutoResumePayload(
+  result: ResumeShellSessionResult,
+): AutoResumePayload {
+  const resumed = expectResumedResult(result);
+  expect(resumed.autoResume).toBeTruthy();
+  if (!resumed.autoResume) {
+    throw new Error("Expected auto-resume payload");
+  }
+  return resumed.autoResume;
+}
+
+async function executeAutoResumePrompt(
+  sessionId: string,
+  result: ResumeShellSessionResult,
+  runtime: Pick<ShellSessionRuntime, "executePrompt">,
+): Promise<string> {
+  const autoResume = expectAutoResumePayload(result);
+  return runtime.executePrompt(sessionId, autoResume.prompt, {
+    runtimeSeed: autoResume.runtimeSeed,
+    continuityState: autoResume.continuityState,
+  });
+}
+
 describe("shell recovery helpers", () => {
   it("resolves session reference by unique id prefix", () => {
     const resolved = resolveSessionReference({
@@ -177,7 +217,9 @@ describe("shell recovery helpers", () => {
       renderer: { renderLine: (line: string) => lines.push(line) } as never,
     });
 
-    expect(result).toEqual({ resumed: true });
+    const resumed = expectResumedResult(result);
+    expect(resumed.autoResume).toBeNull();
+    expect(resumed.disposition).toBe("partially-resumable");
     expect(lines.join("\n")).toContain("Resume candidates:");
     expect(lines.join("\n")).toContain("sess_candidate");
     expect(lines.join("\n")).toContain("Last user request");
@@ -246,6 +288,7 @@ describe("shell recovery helpers", () => {
     const result = await resumeShellSession({
       requestedSessionId: "sess_missing",
       sessionManager: {
+        sessionExists: () => true,
         tryResume: () => ({
           ok: false,
           error: "resume failed",
@@ -739,75 +782,23 @@ describe("shell recovery helpers", () => {
       });
       manager.saveInterrupted(session.id, "turn");
 
-      const runtimeContext: ShellRuntimeContext = {
-        cwd: "D:/repo",
-        originalCwd: "D:/repo",
-        projectRoot: "D:/repo",
-        runtimeConfig: {
-          provider: "openai",
-          daemonEnabled: true,
-          maxTurns: 6,
-          disabledTools: [],
-          hiddenToolPrefixes: [],
-          enableMcpTools: true,
-          configSources: [],
-        },
-        gitContext: {
-          insideGit: true,
-          branch: "main",
-          isClean: true,
-          root: "D:/repo",
-        },
-        session: { id: "sess_current" },
-        activeSession: {
-          sessionId: "sess_current",
-          sessionProjectDir: "D:/repo",
-        },
-      } as never;
-
-      let capturedSeed: {
-        recoveryBoundary: string;
-        pendingApprovals: string[];
-        pendingTools: string[];
-      } | null = null;
-
       const result = await resumeShellSession({
         requestedSessionId: session.id,
         sessionManager: manager,
-        runtimeContext,
-        sessionRuntime: {
-          getState: () => "idle",
-          executePrompt: async (
-            _sessionId: string,
-            _prompt: string,
-            options?: {
-              runtimeSeed?: {
-                recoveryBoundary: string;
-                pendingLifecycle: {
-                  pendingApprovals: Record<string, unknown>;
-                  pendingTools: Record<string, unknown>;
-                };
-              };
-            },
-          ) => {
-            capturedSeed = {
-              recoveryBoundary:
-                options?.runtimeSeed?.recoveryBoundary ?? "missing",
-              pendingApprovals: Object.keys(
-                options?.runtimeSeed?.pendingLifecycle.pendingApprovals ?? {},
-              ),
-              pendingTools: Object.keys(
-                options?.runtimeSeed?.pendingLifecycle.pendingTools ?? {},
-              ),
-            };
-            return "ok";
-          },
-        } as never,
+        runtimeContext: createRuntimeContext(),
         renderer: { renderLine: (line: string) => lines.push(line) } as never,
       });
 
-      expect(result).toEqual({ resumed: true });
-      expect(capturedSeed).toEqual({
+      const autoResume = expectAutoResumePayload(result);
+      expect({
+        recoveryBoundary: autoResume.runtimeSeed.recoveryBoundary,
+        pendingApprovals: Object.keys(
+          autoResume.runtimeSeed.pendingLifecycle.pendingApprovals,
+        ),
+        pendingTools: Object.keys(
+          autoResume.runtimeSeed.pendingLifecycle.pendingTools,
+        ),
+      }).toEqual({
         recoveryBoundary: "mid-turn-reentry",
         pendingApprovals: [],
         pendingTools: [],
@@ -896,66 +887,16 @@ describe("shell recovery helpers", () => {
         "utf8",
       );
 
-      const runtimeContext: ShellRuntimeContext = {
-        cwd: "D:/repo",
-        originalCwd: "D:/repo",
-        projectRoot: "D:/repo",
-        runtimeConfig: {
-          provider: "openai",
-          daemonEnabled: true,
-          maxTurns: 6,
-          disabledTools: [],
-          hiddenToolPrefixes: [],
-          enableMcpTools: true,
-          configSources: [],
-        },
-        gitContext: {
-          insideGit: true,
-          branch: "main",
-          isClean: true,
-          root: "D:/repo",
-        },
-        session: { id: "sess_current" },
-        activeSession: {
-          sessionId: "sess_current",
-          sessionProjectDir: "D:/repo",
-        },
-      } as never;
-
-      let capturedSummary: {
-        ignoredDuplicateTurnStarts: number;
-        ignoredRoleMismatchedTurnCompletions: number;
-      } | null = null;
-
-      await resumeShellSession({
+      const result = await resumeShellSession({
         requestedSessionId: session.id,
         sessionManager: manager,
-        runtimeContext,
-        sessionRuntime: {
-          getState: () => "idle",
-          executePrompt: async (
-            _sessionId: string,
-            _prompt: string,
-            options?: {
-              runtimeSeed?: {
-                truthBoundary?: {
-                  repairSummary?: {
-                    ignoredDuplicateTurnStarts: number;
-                    ignoredRoleMismatchedTurnCompletions: number;
-                  };
-                };
-              };
-            },
-          ) => {
-            capturedSummary =
-              options?.runtimeSeed?.truthBoundary?.repairSummary ?? null;
-            return "ok";
-          },
-        } as never,
+        runtimeContext: createRuntimeContext(),
         renderer: { renderLine() {} } as never,
       });
 
-      expect(capturedSummary).toEqual({
+      expect(
+        expectAutoResumePayload(result).runtimeSeed.truthBoundary.repairSummary,
+      ).toEqual({
         insertedPromptMessage: true,
         insertedQueryStarted: true,
         strippedInterruptedTerminalEvents: 0,
@@ -973,44 +914,15 @@ describe("shell recovery helpers", () => {
 
   it("downgrades unsafe mid-turn recovery seeds when drift summary indicates unreliable open turn", async () => {
     const lines: string[] = [];
-    const executeCalls: Array<{
-      recoveryBoundary?: string;
-      currentRole?: string;
-      turn?: number;
-    }> = [];
-    const runtimeContext: ShellRuntimeContext = {
-      cwd: "D:/repo",
-      originalCwd: "D:/repo",
-      projectRoot: "D:/repo",
-      runtimeConfig: {
-        provider: "openai",
-        daemonEnabled: true,
-        maxTurns: 6,
-        disabledTools: [],
-        hiddenToolPrefixes: [],
-        enableMcpTools: true,
-        configSources: [],
-      },
-      gitContext: {
-        insideGit: true,
-        branch: "main",
-        isClean: true,
-        root: "D:/repo",
-      },
-      session: { id: "sess_current" },
-      activeSession: {
-        sessionId: "sess_current",
-        sessionProjectDir: "D:/repo",
-      },
-    } as never;
-
     const result = await resumeShellSession({
       requestedSessionId: "sess_guarded",
       sessionManager: {
+        sessionExists: () => true,
         tryResume: () => ({
           ok: true,
           session: {
             id: "sess_guarded",
+            projectRoot: "D:/repo",
             pendingPrompt: "continue me",
           },
         }),
@@ -1075,40 +987,26 @@ describe("shell recovery helpers", () => {
           pendingTools: {},
           taskStates: {},
         }),
+        getSessionResumeEligibility: () => ({
+          disposition: "fully-resumable",
+          autoResumeReady: true,
+          detail: "pending prompt is ready to resume",
+        }),
       } as never,
-      runtimeContext,
-      sessionRuntime: {
-        getState: () => "idle",
-        executePrompt: async (
-          _sessionId: string,
-          _prompt: string,
-          options?: {
-            runtimeSeed?: {
-              recoveryBoundary?: string;
-              currentRole?: string;
-              turn?: number;
-            };
-          },
-        ) => {
-          executeCalls.push({
-            recoveryBoundary: options?.runtimeSeed?.recoveryBoundary,
-            currentRole: options?.runtimeSeed?.currentRole,
-            turn: options?.runtimeSeed?.turn,
-          });
-          return "ok";
-        },
-      } as never,
+      runtimeContext: createRuntimeContext(),
       renderer: { renderLine: (line: string) => lines.push(line) } as never,
     });
 
-    expect(result).toEqual({ resumed: true });
-    expect(executeCalls).toEqual([
-      {
-        recoveryBoundary: "fresh-entry",
-        currentRole: "planner",
-        turn: 1,
-      },
-    ]);
+    const autoResume = expectAutoResumePayload(result);
+    expect({
+      recoveryBoundary: autoResume.runtimeSeed.recoveryBoundary,
+      currentRole: autoResume.runtimeSeed.currentRole,
+      turn: autoResume.runtimeSeed.turn,
+    }).toEqual({
+      recoveryBoundary: "fresh-entry",
+      currentRole: "planner",
+      turn: 1,
+    });
     expect(lines.join("\n")).toContain("Resumed session sess_guarded");
     expect(lines.join("\n")).toContain(
       "Recovery guardrail downgraded continuation to fresh-entry",
@@ -1132,31 +1030,17 @@ describe("shell recovery helpers", () => {
 
       const freshBoundaries: string[] = [];
       for (let attempt = 0; attempt < 2; attempt += 1) {
-        await resumeShellSession({
+        const result = await resumeShellSession({
           requestedSessionId: freshSession.id,
           sessionManager: freshManager,
           runtimeContext: createRuntimeContext(),
-          sessionRuntime: {
-            getState: () => "idle",
-            executePrompt: async (
-              _sessionId: string,
-              _prompt: string,
-              options?: {
-                runtimeSeed?: {
-                  truthBoundary?: { continuationSafety?: string };
-                  recoveryBoundary?: string;
-                };
-              },
-            ) => {
-              freshBoundaries.push(
-                `${options?.runtimeSeed?.truthBoundary?.continuationSafety}:${options?.runtimeSeed?.recoveryBoundary}`,
-              );
-              freshManager.saveInterrupted(freshSession.id, "prompt");
-              return "ok";
-            },
-          } as never,
           renderer: { renderLine() {} } as never,
         });
+        const autoResume = expectAutoResumePayload(result);
+        freshBoundaries.push(
+          `${autoResume.runtimeSeed.truthBoundary.continuationSafety}:${autoResume.runtimeSeed.recoveryBoundary}`,
+        );
+        freshManager.saveInterrupted(freshSession.id, "prompt");
       }
       expect(freshBoundaries).toEqual([
         "fresh-only:fresh-entry",
@@ -1189,48 +1073,34 @@ describe("shell recovery helpers", () => {
       const completedBoundaries: string[] = [];
       let completedResumeCount = 0;
       for (let attempt = 0; attempt < 2; attempt += 1) {
-        await resumeShellSession({
+        const result = await resumeShellSession({
           requestedSessionId: completedSession.id,
           sessionManager: completedManager,
           runtimeContext: createRuntimeContext(),
-          sessionRuntime: {
-            getState: () => "idle",
-            executePrompt: async (
-              _sessionId: string,
-              _prompt: string,
-              options?: {
-                runtimeSeed?: {
-                  truthBoundary?: { continuationSafety?: string };
-                  recoveryBoundary?: string;
-                };
-              },
-            ) => {
-              completedBoundaries.push(
-                `${options?.runtimeSeed?.truthBoundary?.continuationSafety}:${options?.runtimeSeed?.recoveryBoundary}`,
-              );
-              completedResumeCount += 1;
-              if (completedResumeCount === 1) {
-                completedManager.appendQueryEvent(completedSession.id, {
-                  type: "turn.started",
-                  role: "coder",
-                  turn: 2,
-                });
-                completedManager.appendQueryEvent(completedSession.id, {
-                  type: "turn.completed",
-                  output: {
-                    role: "coder",
-                    content: "code",
-                    handoffTo: "reviewer",
-                    handoffReason: "review",
-                  },
-                });
-                completedManager.saveInterrupted(completedSession.id, "turn");
-              }
-              return "ok";
-            },
-          } as never,
           renderer: { renderLine() {} } as never,
         });
+        const autoResume = expectAutoResumePayload(result);
+        completedBoundaries.push(
+          `${autoResume.runtimeSeed.truthBoundary.continuationSafety}:${autoResume.runtimeSeed.recoveryBoundary}`,
+        );
+        completedResumeCount += 1;
+        if (completedResumeCount === 1) {
+          completedManager.appendQueryEvent(completedSession.id, {
+            type: "turn.started",
+            role: "coder",
+            turn: 2,
+          });
+          completedManager.appendQueryEvent(completedSession.id, {
+            type: "turn.completed",
+            output: {
+              role: "coder",
+              content: "code",
+              handoffTo: "reviewer",
+              handoffReason: "review",
+            },
+          });
+          completedManager.saveInterrupted(completedSession.id, "turn");
+        }
       }
       expect(completedBoundaries).toEqual([
         "completed-turn-only:completed-turn-reentry",
@@ -1254,48 +1124,34 @@ describe("shell recovery helpers", () => {
       const midTurnBoundaries: string[] = [];
       let midTurnResumeCount = 0;
       for (let attempt = 0; attempt < 2; attempt += 1) {
-        await resumeShellSession({
+        const result = await resumeShellSession({
           requestedSessionId: midTurnSession.id,
           sessionManager: midTurnManager,
           runtimeContext: createRuntimeContext(),
-          sessionRuntime: {
-            getState: () => "idle",
-            executePrompt: async (
-              _sessionId: string,
-              _prompt: string,
-              options?: {
-                runtimeSeed?: {
-                  truthBoundary?: { continuationSafety?: string };
-                  recoveryBoundary?: string;
-                };
-              },
-            ) => {
-              midTurnBoundaries.push(
-                `${options?.runtimeSeed?.truthBoundary?.continuationSafety}:${options?.runtimeSeed?.recoveryBoundary}`,
-              );
-              midTurnResumeCount += 1;
-              if (midTurnResumeCount === 1) {
-                midTurnManager.appendQueryEvent(midTurnSession.id, {
-                  type: "turn.completed",
-                  output: {
-                    role: "planner",
-                    content: "plan complete",
-                    handoffTo: "coder",
-                    handoffReason: "continue",
-                  },
-                });
-                midTurnManager.appendQueryEvent(midTurnSession.id, {
-                  type: "turn.started",
-                  role: "coder",
-                  turn: 2,
-                });
-                midTurnManager.saveInterrupted(midTurnSession.id, "turn");
-              }
-              return "ok";
-            },
-          } as never,
           renderer: { renderLine() {} } as never,
         });
+        const autoResume = expectAutoResumePayload(result);
+        midTurnBoundaries.push(
+          `${autoResume.runtimeSeed.truthBoundary.continuationSafety}:${autoResume.runtimeSeed.recoveryBoundary}`,
+        );
+        midTurnResumeCount += 1;
+        if (midTurnResumeCount === 1) {
+          midTurnManager.appendQueryEvent(midTurnSession.id, {
+            type: "turn.completed",
+            output: {
+              role: "planner",
+              content: "plan complete",
+              handoffTo: "coder",
+              handoffReason: "continue",
+            },
+          });
+          midTurnManager.appendQueryEvent(midTurnSession.id, {
+            type: "turn.started",
+            role: "coder",
+            turn: 2,
+          });
+          midTurnManager.saveInterrupted(midTurnSession.id, "turn");
+        }
       }
       expect(midTurnBoundaries).toEqual([
         "mid-turn-safe:mid-turn-reentry",
@@ -1330,123 +1186,60 @@ describe("shell recovery helpers", () => {
       manager.persistUserPromptBarrier(session.id, "mixed prompt");
       manager.saveInterrupted(session.id, "prompt");
 
-      await resumeShellSession({
-        requestedSessionId: session.id,
-        sessionManager: manager,
-        runtimeContext: createRuntimeContext(),
-        sessionRuntime: {
-          getState: () => "idle",
-          executePrompt: async (
-            _sessionId: string,
-            _prompt: string,
-            options?: {
-              runtimeSeed?: {
-                truthBoundary?: { continuationSafety?: string };
-                recoveryBoundary?: string;
-                currentRole?: string;
-                turn?: number;
-              };
-            },
-          ) => {
-            observations.push({
-              contract:
-                options?.runtimeSeed?.truthBoundary?.continuationSafety ??
-                "missing",
-              boundary: options?.runtimeSeed?.recoveryBoundary ?? "missing",
-              role: options?.runtimeSeed?.currentRole ?? "missing",
-              turn: options?.runtimeSeed?.turn ?? -1,
-            });
-            manager.markTurnActive(session.id);
-            manager.appendQueryEvent(session.id, {
-              type: "turn.started",
-              role: "planner",
-              turn: 1,
-            });
-            manager.appendQueryEvent(session.id, {
-              type: "turn.completed",
-              output: {
-                role: "planner",
-                content: "plan",
-                handoffTo: "coder",
-                handoffReason: "ready",
-              },
-            });
-            manager.saveInterrupted(session.id, "turn");
-            return "ok";
-          },
-        } as never,
-        renderer: { renderLine() {} } as never,
-      });
+      const recordObservation = (autoResume: AutoResumePayload) => {
+        observations.push({
+          contract: autoResume.runtimeSeed.truthBoundary.continuationSafety,
+          boundary: autoResume.runtimeSeed.recoveryBoundary,
+          role: autoResume.runtimeSeed.currentRole,
+          turn: autoResume.runtimeSeed.turn,
+        });
+      };
 
-      await resumeShellSession({
+      const firstResult = await resumeShellSession({
         requestedSessionId: session.id,
         sessionManager: manager,
         runtimeContext: createRuntimeContext(),
-        sessionRuntime: {
-          getState: () => "idle",
-          executePrompt: async (
-            _sessionId: string,
-            _prompt: string,
-            options?: {
-              runtimeSeed?: {
-                truthBoundary?: { continuationSafety?: string };
-                recoveryBoundary?: string;
-                currentRole?: string;
-                turn?: number;
-              };
-            },
-          ) => {
-            observations.push({
-              contract:
-                options?.runtimeSeed?.truthBoundary?.continuationSafety ??
-                "missing",
-              boundary: options?.runtimeSeed?.recoveryBoundary ?? "missing",
-              role: options?.runtimeSeed?.currentRole ?? "missing",
-              turn: options?.runtimeSeed?.turn ?? -1,
-            });
-            manager.appendQueryEvent(session.id, {
-              type: "turn.started",
-              role: "coder",
-              turn: 2,
-            });
-            manager.saveInterrupted(session.id, "turn");
-            return "ok";
-          },
-        } as never,
         renderer: { renderLine() {} } as never,
       });
+      recordObservation(expectAutoResumePayload(firstResult));
+      manager.markTurnActive(session.id);
+      manager.appendQueryEvent(session.id, {
+        type: "turn.started",
+        role: "planner",
+        turn: 1,
+      });
+      manager.appendQueryEvent(session.id, {
+        type: "turn.completed",
+        output: {
+          role: "planner",
+          content: "plan",
+          handoffTo: "coder",
+          handoffReason: "ready",
+        },
+      });
+      manager.saveInterrupted(session.id, "turn");
 
-      await resumeShellSession({
+      const secondResult = await resumeShellSession({
         requestedSessionId: session.id,
         sessionManager: manager,
         runtimeContext: createRuntimeContext(),
-        sessionRuntime: {
-          getState: () => "idle",
-          executePrompt: async (
-            _sessionId: string,
-            _prompt: string,
-            options?: {
-              runtimeSeed?: {
-                truthBoundary?: { continuationSafety?: string };
-                recoveryBoundary?: string;
-                currentRole?: string;
-                turn?: number;
-              };
-            },
-          ) => {
-            observations.push({
-              contract:
-                options?.runtimeSeed?.truthBoundary?.continuationSafety ??
-                "missing",
-              boundary: options?.runtimeSeed?.recoveryBoundary ?? "missing",
-              role: options?.runtimeSeed?.currentRole ?? "missing",
-              turn: options?.runtimeSeed?.turn ?? -1,
-            });
-            return "ok";
-          },
-        } as never,
         renderer: { renderLine() {} } as never,
       });
+      recordObservation(expectAutoResumePayload(secondResult));
+      manager.appendQueryEvent(session.id, {
+        type: "turn.started",
+        role: "coder",
+        turn: 2,
+      });
+      manager.saveInterrupted(session.id, "turn");
+
+      const thirdResult = await resumeShellSession({
+        requestedSessionId: session.id,
+        sessionManager: manager,
+        runtimeContext: createRuntimeContext(),
+        renderer: { renderLine() {} } as never,
+      });
+      recordObservation(expectAutoResumePayload(thirdResult));
 
       expect(observations).toEqual([
         {
@@ -1560,7 +1353,7 @@ describe("shell recovery helpers", () => {
         renderer: { renderLine() {} } as never,
       });
 
-      expect(result).toEqual({ resumed: true });
+      await executeAutoResumePrompt(session.id, result, runtime);
       expect(capturedRuntimeSeed).toBeDefined();
       expect(capturedRuntimeSeed?.recoveryBoundary).toBe("mid-turn-reentry");
       expect(
@@ -1695,7 +1488,7 @@ describe("shell recovery helpers", () => {
         renderer: { renderLine() {} } as never,
       });
 
-      expect(result).toEqual({ resumed: true });
+      await executeAutoResumePrompt(session.id, result, runtime);
       expect(capturedRuntimeSeed?.pendingLifecycle.pendingApprovals).toEqual(
         {},
       );
@@ -1812,7 +1605,7 @@ describe("shell recovery helpers", () => {
         renderer: { renderLine() {} } as never,
       });
 
-      expect(result).toEqual({ resumed: true });
+      await executeAutoResumePrompt(session.id, result, runtime);
       expect(capturedRuntimeSeed?.pendingLifecycle.pendingApprovals).toEqual(
         {},
       );
@@ -1986,7 +1779,7 @@ describe("shell recovery helpers", () => {
         renderer: { renderLine() {} } as never,
       });
 
-      expect(result).toEqual({ resumed: true });
+      await executeAutoResumePrompt(session.id, result, runtime);
       expect(capturedRuntimeSeed?.recoveryBoundary).toBe("fresh-entry");
       expect(
         capturedRuntimeSeed?.truthBoundary.repairSummary.insertedRunInterrupted,
@@ -2197,7 +1990,9 @@ describe("shell recovery helpers", () => {
         renderer: { renderLine() {} } as never,
       });
 
-      expect(result).toEqual({ resumed: true });
+      await expect(
+        executeAutoResumePrompt(session.id, result, runtime),
+      ).rejects.toThrow("daemon exploded");
 
       expect(capturedRuntimeSeed?.recoveryBoundary).toBe("fresh-entry");
       expect(
@@ -2387,7 +2182,7 @@ describe("shell recovery helpers", () => {
         renderer: { renderLine() {} } as never,
       });
 
-      expect(firstResult).toEqual({ resumed: true });
+      await executeAutoResumePrompt(session.id, firstResult, firstRuntime);
       expect(firstSeed?.recoveryBoundary).toBe("fresh-entry");
       expect(
         firstSeed?.truthBoundary.repairSummary.insertedRunInterrupted,
@@ -2447,7 +2242,7 @@ describe("shell recovery helpers", () => {
         renderer: { renderLine() {} } as never,
       });
 
-      expect(secondResult).toEqual({ resumed: true });
+      await executeAutoResumePrompt(session.id, secondResult, secondRuntime);
       expect(secondSeed?.recoveryBoundary).toBe("mid-turn-reentry");
       expect(
         secondSeed?.truthBoundary.repairSummary.insertedRunInterrupted,
@@ -2635,7 +2430,7 @@ describe("shell recovery helpers", () => {
         renderer: { renderLine() {} } as never,
       });
 
-      expect(result).toEqual({ resumed: true });
+      await executeAutoResumePrompt(session.id, result, runtime);
       expect(capturedRuntimeSeed?.recoveryBoundary).toBe(
         "completed-turn-reentry",
       );
@@ -2825,7 +2620,7 @@ describe("shell recovery helpers", () => {
         renderer: { renderLine() {} } as never,
       });
 
-      expect(result).toEqual({ resumed: true });
+      await executeAutoResumePrompt(session.id, result, runtime);
       expect(capturedRuntimeSeed?.recoveryBoundary).toBe("mid-turn-reentry");
       expect(capturedRuntimeSeed?.truthBoundary.continuationSafety).toBe(
         "mid-turn-safe",
@@ -3032,7 +2827,7 @@ describe("shell recovery helpers", () => {
         renderer: { renderLine() {} } as never,
       });
 
-      expect(result).toEqual({ resumed: true });
+      await executeAutoResumePrompt(session.id, result, runtime);
       expect(capturedRuntimeSeed?.recoveryBoundary).toBe("mid-turn-reentry");
       expect(capturedRuntimeSeed?.currentRole).toBe("reviewer");
       expect(capturedRuntimeSeed?.turn).toBe(3);
@@ -3244,7 +3039,7 @@ describe("shell recovery helpers", () => {
         renderer: { renderLine() {} } as never,
       });
 
-      expect(firstResult).toEqual({ resumed: true });
+      await executeAutoResumePrompt(session.id, firstResult, firstRuntime);
       expect(firstSeed?.recoveryBoundary).toBe("mid-turn-reentry");
       expect(firstSeed?.currentRole).toBe("reviewer");
       expect(firstSeed?.turn).toBe(3);
@@ -3333,7 +3128,7 @@ describe("shell recovery helpers", () => {
         renderer: { renderLine() {} } as never,
       });
 
-      expect(secondResult).toEqual({ resumed: true });
+      await executeAutoResumePrompt(session.id, secondResult, secondRuntime);
       expect(secondSeed?.recoveryBoundary).toBe("mid-turn-reentry");
       expect(secondSeed?.currentRole).toBe("coder");
       expect(secondSeed?.turn).toBe(4);

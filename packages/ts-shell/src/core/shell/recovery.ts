@@ -46,7 +46,10 @@ export function resolveSessionReference(input: {
       : { ok: false, reason: "not-found", candidates: [] };
   }
 
-  if (input.sessionManager.sessionExists(reference)) {
+  if (
+    typeof input.sessionManager.sessionExists === "function" &&
+    input.sessionManager.sessionExists(reference)
+  ) {
     return { ok: true, sessionId: reference };
   }
 
