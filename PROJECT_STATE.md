@@ -5,7 +5,9 @@
 - Project name: private-coding-agents
 - Current stage mainline: **active product hardening** on default CLI path
 - Stage objective: make the interactive shell feel production-grade while preserving load-bearing runtime semantics
-- Current focus: transport-unified turn execution + answer-first terminal rendering contract
+- Current focus: default CLI truthfulness / continuity is stage-sealed; next
+  implementation should be chosen from current main-path blockers, with durable
+  stopped-session write continuity as the leading candidate.
 
 What this stage is **not**:
 
@@ -16,11 +18,11 @@ What this stage is **not**:
 ## 2. Repository and Reference Boundaries
 
 - Read-only reference repo:
-  - `D:\LenovoSoftstore\pyproject\source-claudecode`
+  - `/home/wang/projects/source-claudecode`
 - Writable working repo:
-  - `D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents`
+  - `/home/wang/projects/coding-agents`
 - Secondary reference for UX/provider patterns:
-  - `D:\LenovoSoftstore\pyproject\opencode`
+  - `/home/wang/projects/opencode`
 
 Boundary rules:
 
@@ -67,7 +69,39 @@ The primary user-visible mainline is now:
 5. Result block stays minimal and actionable in compact mode
 6. Session remains ready for next turn with clear boundaries
 
-## 5. Latest Implemented Delta (2026-04-26)
+## 5. Latest Implemented Delta (through 2026-05-08)
+
+### Current closeout: default CLI truthfulness / continuity
+
+The default CLI output and interaction-continuity route is stage-sealed on
+`main`.
+
+Recent closeout commits:
+
+- `b0dca85 Make CLI turn endings truthful`
+- `f7cc6ef fix cli continuity recovery surface`
+
+Key sealed evidence:
+
+- turn endings now use a focused turn-boundary surface instead of ad hoc CLI
+  wording
+- `/sessions current`, `/sessions switch`, `/resume`, and `/continue` share the
+  current session store and surface resume readiness from `sessionStateSurface`
+- `runResumeLikeShellAction` consumes `autoResume` payloads with runtime seed and
+  continuity state instead of only opening session context
+- completed-session `/continue` carries continuity seed notes through the
+  lightweight no-write route
+- interrupted resume smoke now uses a local HTTP mock, reducing provider mock
+  leakage from `NODE_OPTIONS --require`
+- the explicit lightweight real-provider gate passed with redaction and
+  repository-clean checks
+
+Important boundaries:
+
+- this does not prove true PTY terminal fidelity
+- this does not enable default production `apply_patch` writes
+- this does not add multi-file/add/delete/move/AST/fuzzy/rollback support
+- writer-started stopped-session continuity remains a separate route candidate
 
 ### A. Transport-unified turn execution (already landed)
 
@@ -479,11 +513,19 @@ Important boundaries:
 
 ## 7. Current Primary Gaps
 
-1. true live TTY automation evidence remains weaker than print/stdin/replay evidence in this environment
-2. execution success still depends on model/tool behavior; the sealed real-provider smoke only proves the isolated minimal single-file write path
-3. multi-file edit, production apply_patch write, long-task continuity, and true PTY automation remain outside the sealed real-provider minimal write evidence
-4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow` write route remains disabled; an explicit CLI/runMvp no-write route exists, an explicit workspace write entrypoint has landed with durable writer-started failure attribution, and default rejection is still required
-5. the guarded production route real-provider smoke has passed only for explicit opt-in isolated workspace routing, not default real user workspace mutation
+1. true PTY automation evidence remains weaker than print/stdin/replay and
+   pipe-spawn interactive evidence in this environment
+2. execution success still depends on model/tool behavior; sealed real-provider
+   smokes prove only their explicit isolated or selected-workspace routes
+3. multi-file edit, default production `apply_patch` write, durable
+   writer-started stopped-session continuity, and true PTY automation remain
+   outside the sealed evidence
+4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow`
+   write route remains disabled; an explicit CLI/runMvp no-write route exists,
+   an explicit workspace write entrypoint has landed with durable
+   writer-started failure attribution, and default rejection is still required
+5. real-provider write evidence covers explicit opt-in isolated or selected
+   test workspaces, not default real user workspace mutation
 6. some legacy docs and examples still reflect previous phase assumptions and need gradual cleanup
 
 ## 8. Re-entry / Escalation Triggers
@@ -496,27 +538,19 @@ Escalate from hardening into focused implementation when one is reproducible:
 
 ## 9. Current Minimal Next Step
 
-- single-file `apply_patch` guarded route is now validated through real-provider,
-  resultMapper projection, and session display projection in an isolated
-  workspace
-- CLI / `runMvpIntegratedFlow` now expose an explicit no-write runtime
-  entrypoint for raw single-file `apply_patch` previews against the selected
-  workspace
-- CLI / `runMvpIntegratedFlow` now expose an explicit workspace write entrypoint
-  for raw single-file `apply_patch` payloads; keep it opt-in only and do not
-  treat it as default apply_patch enablement
-- selected-workspace writer authority now includes descriptor verification for
-  the opened target, abort-before-writer no-write handling, and stopped
-  `unknown`/`unverified` attribution for writer-started failures; broader
-  cross-platform atomic write / rollback semantics remain separate work
-- do not continue to default production write enablement before a separate
-  review defines rollback behavior and default user-workspace safety policy
-- the isolated fixture and guarded isolated-workspace write smokes have passed; treat them only as explicit opt-in isolated evidence, not default production write evidence, and do not rerun automatically
-- the real-provider non-mutating dry-run smoke and permission UX no-write smoke are sealed; do not rerun them by default unless validating a regression or a new provider-facing route decision
-- consider durable stopped-session continuity analysis as separate, explicitly scoped work
-- do not continue same-family minimal write or failure-explanation smoke hardening unless a regression appears
-- keep hardening the default interactive experience and output truthfulness
-- avoid unrelated provider/auth expansion during this stage unless it blocks mainline usability
+- Do not continue same-family CLI truthfulness, approval/tool provenance, PTY
+  boundary, or minimal apply_patch evidence work unless a regression appears.
+- The strongest next implementation candidate is durable stopped-session write
+  continuity for explicit selected-workspace `apply_patch` results whose
+  writer-started state is `unknown` or `unverified`.
+- That next route should first audit session persistence, recovery, resume,
+  continue, and compact prompt continuity for the writer-started stopped state.
+- Keep default production `apply_patch` enablement blocked until a separate
+  review defines rollback behavior and default user-workspace safety policy.
+- Existing real-provider gates remain explicit opt-in evidence only; do not
+  rerun them for documentation-only changes or unrelated route selection.
+- Avoid unrelated provider/auth expansion during this stage unless it blocks
+  mainline usability.
 
 ## 10. Update Rules
 

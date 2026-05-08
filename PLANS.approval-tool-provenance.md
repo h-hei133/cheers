@@ -62,11 +62,11 @@
 
 ## 7. 环境约束
 
-- 目标仓库：`D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents`
-- Claude Code 参考仓库只读：`D:\LenovoSoftstore\pyproject\source-claudecode`
-- opencode 参考仓库只读：`D:\LenovoSoftstore\pyproject\opencode`
-- real-provider home 固定为 `D:\Test\home-sf`，不得读取、复制、修改、清理或泄露。
-- synthetic home 固定为 `D:\Test\pca-home-synth`，验证时设置 `PRIVATE_AGENTS_PROVIDER_MODE=synthetic`。
+- 当前目标仓库：`/home/wang/projects/coding-agents`
+- Claude Code 参考仓库只读：`/home/wang/projects/source-claudecode`
+- opencode 参考仓库只读：`/home/wang/projects/opencode`
+- real-provider home 固定为 `/home/wang/.private-agents-real`，只能通过显式 opt-in gate 使用，不得读取、复制、修改、清理或泄露。
+- synthetic/test home 必须使用临时隔离目录；验证时设置 `PRIVATE_AGENTS_PROVIDER_MODE=synthetic`。
 - 失败态或隔离验证只能使用临时 synthetic/test home。
 - RTK command discipline active：读文件、搜索、git status/diff/log、测试、构建和大输出命令必须显式使用 `rtk`。
 
@@ -174,10 +174,14 @@ opencode targeted reference:
 
 ## 13. 路线分阶段 backlog
 
+- Route status: stage-sealed on `main`.
+- Current: return to main-path blocker assessment.
+- Backlog: none unless a new approval/tool provenance regression appears.
+
 Completed:
 
 - A. Approval/tool provenance contract audit
-  - Completed in commit pending for this checkpoint.
+  - Completed in checkpoint A.
   - Scope: read-only audit plus plan update; no production or test code changed.
   - Main-path steps advanced: Step 4 approval/tool provenance clarity, Step 5 terminal failure attribution, Step 6 continuity provenance preservation.
   - Target audit findings:
@@ -198,7 +202,7 @@ Completed:
     - opencode `tool.ts` / `bash.ts` keep tool execution result metadata separate from permission decisions, which supports a clean permission-vs-execution boundary.
   - Decision: B should design the smallest compatible provenance type/fixture first; production wiring should not start in `runMvpIntegratedFlow.ts`.
 - B. Provenance type / fixture planning
-  - Completed in commit pending for this checkpoint.
+  - Completed in checkpoint B.
   - Scope: added a test-utils-only fixture/type draft; no production path imports it.
   - Added `packages/ts-shell/src/test-utils/approvalToolProvenanceFixtures.ts`.
   - Fixture shape:
@@ -211,7 +215,7 @@ Completed:
     - `unavailableToolProvenanceFixture` represents tool registry/MCP unavailability separately from approval denial and runtime execution failure.
   - Compatibility decision: future production wiring should promote or mirror this shape in a real module only after C/D helpers prove the boundaries; old sessions without these fields must continue to rely on legacy evidence fallback.
 - C. Approval decision provenance helper
-  - Completed in commit pending for this checkpoint.
+  - Completed in checkpoint C.
   - Scope: added the smallest production helper in `packages/ts-shell/src/core/tools/approvalProvenance.ts` plus focused tests.
   - Added `deriveApprovalDecisionProvenance(...)` to map approval decision provenance from structured metadata first, then legacy `wasEscalated` metadata.
   - Added `toLegacyApprovalOutcome(...)` so existing `QueryEvent.approval.resolved.outcome` remains `approved | denied`.
@@ -219,7 +223,7 @@ Completed:
   - User-visible terminal wording and event wire shape are unchanged.
   - `runMvpIntegratedFlow.ts`, `SessionManager.ts`, and `cli.tsx` were not modified.
 - D. Tool execution provenance helper
-  - Completed in commit pending for this checkpoint.
+  - Completed in checkpoint D.
   - Scope: added the smallest production helper in `packages/ts-shell/src/core/tools/toolExecutionProvenance.ts` plus focused tests.
   - Added `deriveToolExecutionProvenance(...)` to classify tool outcomes as `executed-succeeded`, `executed-failed`, `permission-blocked`, `approval-denied`, `sandbox-preflight-blocked`, or `unavailable-tool`.
   - Added `toLegacyToolSuccess(...)` so existing `QueryEvent.tool.result.success` remains a boolean.
@@ -227,16 +231,22 @@ Completed:
   - User-visible terminal wording and event wire shape are unchanged.
   - `runMvpIntegratedFlow.ts`, `SessionManager.ts`, and `cli.tsx` were not modified.
 
-Current:
-
 - E. runMvp minimal provenance wiring
-
-Backlog:
-
+  - Added optional `CodingResultSummary.provenance`, a focused
+    `orchestration/codingResultProvenance.ts` adapter, and minimal runMvp
+    wiring for approval/tool lifecycle provenance.
 - F. resultMapper structured consumption
+  - `resultMapper` now prefers structured provenance for approved bash execution
+    failures and falls back to legacy evidence markers.
 - G. sessionRuntime structured rendering guard
+  - `sessionRuntime` now prefers structured provenance for the same
+    approved-execution-failed distinction while preserving terminal wording.
 - H. continuity preservation guard
+  - `SessionManager` continuity and `continuityFormatter` preserve structured
+    approval/tool provenance without a destructive storage migration.
 - I. route audit / merge readiness
+  - Route audit, merge, and post-merge verification are recorded in the
+    checkpoint status override below.
 
 Verification:
 
@@ -530,23 +540,21 @@ Plan approval tool provenance contract track
 - push 因认证、网络、权限或审核失败时，不绕过、不反复重试；记录失败原因、当前 commit hash、当前 git status。
 - 本路线如果最终 merge 回 main，必须先完成 route audit / merge readiness 和 post-merge verification。
 
-## 19. 当前推荐第一个 checkpoint
+## 19. 当前路线状态
 
 Current:
 
-- `A. Approval/tool provenance contract audit`
+- Route sealed on `main`.
 
 类型：
 
-- read-only audit / planning checkpoint
+- completed implementation / merge-readiness route.
 
-推荐原因：
+结论：
 
-- 现有用户可见输出已经能区分 explicit approval denied 与 approved execution failed。
-- 但内部 provenance 来源散落在 `approvalFlow`、`ToolRuntime`、`runMvpIntegratedFlow`、`resultMapper`、`sessionRuntime`、`SessionManager`。
-- 直接实现 helper 前，需要先精确标注哪些地方是 source-of-truth、哪些是 derived marker、哪些是 text fallback。
-
-本轮不执行 A，只创建路线计划文件。
+- approval/tool provenance should not continue as same-family proof unless a
+  new regression appears.
+- Current route selection should return to main-path blocker assessment.
 
 ## Checkpoint Status Override
 

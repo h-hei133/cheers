@@ -480,26 +480,24 @@ opencode 参考重点：
 - 不要把多个 checkpoint 混在一个 commit。
 - push 如果因认证、网络、权限或审核失败，不要绕过，不要反复重试；记录 commit hash、失败原因、当前 git status。
 
-## 16. 当前推荐第一个 checkpoint
+## 16. 当前路线状态
 
-当前推荐第一个 checkpoint：
+当前状态：
 
-- A. Compact/replay coverage audit
+- route sealed on `main`
 
-原因：
+结论：
 
-- 当前代码已经存在 `compactSummaryFormatter.ts`、`continuityFormatter.ts`、`replayPlanBuilder.ts`，不应从 opportunistic extraction 起手。
-- 现有 tests 覆盖了部分 auto-compact 和 action result seed，但尚需明确 stopped、verification-failed、tool-failed、edit-failed、changed files、next action、action result handoff 跨 compact/replay 的缺口。
-- 该 checkpoint 风险最低，能给后续 fixture builder 和 focused behavior-preserving fixes 提供明确证据。
-
-本 planning checkpoint 不执行 A，只创建路线文件并运行 build。下一轮如果继续本路线，应先读取本文件 Current，再执行 A 并同步更新 Current / Backlog / Completed / Verification / Notes。
+- A-G 和 merge-readiness closeout 已完成。
+- 不继续 long-session continuity same-family proof，除非出现新的 compact/resume/continue 回归。
+- 下一步路线选择应回到当前 main-path blocker assessment。
 
 ## Checkpoint Tracking Update: G Completed
 
 This section supersedes the original "current recommended first checkpoint" text above.
 
 - Completed: A. Compact/replay coverage audit; B. Long-session continuity fixture builder; C. Compact preserves stopped recovery context; D. Compact preserves verification-failed repair context; E. Compact preserves approved execution failure provenance; F. Resume after compact uses continuity context; G. Long-session CLI synthetic smoke.
-- Current: Long-session continuity route audit / merge readiness.
+- Current: route sealed on `main`; return to main-path blocker assessment.
 - Backlog: none. H. Continuity summary formatter extraction is not selected because no current compact/resume blocker requires it.
 - Verification for A: read-only RTK inspection of `SessionManager.ts`, `SessionManager.test.ts`, `sessionRuntime.ts`, Claude Code compact/tool-result semantics, and opencode compaction/session semantics; production code and tests were not modified.
 - Notes: A found that existing compact coverage is narrow but real. Approval memory, approval audit history, and action result seed handoff survive auto-compact. Stopped and verification-failed continuity are covered for immediate snapshot/context paths, but not yet through a reusable long-session compact/reload fixture. The next checkpoint should add a fixture builder outside the three giant files before adding behavior proofs.

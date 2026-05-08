@@ -1,9 +1,13 @@
 # Single-file apply_patch write failure durability
 
-Status: implementation stage for explicit selected-workspace write failure
-semantics. This plan does not enable default `apply_patch`, default unified
+Status: implemented on `main` for explicit selected-workspace write failure
+semantics. This route does not enable default `apply_patch`, default unified
 diff handling, multi-file edits, add/delete/move, AST, fuzzy patching, rollback,
 or release/default gates.
+
+Latest implementation commit:
+
+- `889e7f4 Add apply patch write failure durability`
 
 ## Goal
 
@@ -61,11 +65,14 @@ verified stage. This work does not add rollback or a broader transaction model.
   inspection.
 - Post-write verification failure is not write success.
 
-## Real-provider gate
+## Real-provider gate boundary
 
-Because this stage changes writer-reachable route semantics and the
-user-visible result surface, the selected-workspace real-provider smoke should
-be rerun before sealing the branch.
+Because this route changes writer-reachable route semantics and the
+user-visible result surface, any future behavior branch that changes this path
+should rerun the selected-workspace real-provider smoke before making a
+real-provider safety claim.
+
+Documentation-only updates do not require a real-provider rerun.
 
 Required policy:
 
@@ -89,7 +96,7 @@ described as default production write readiness.
 - default production `apply_patch` enablement
 - multi-file/add/delete/move/AST/fuzzy patch support
 
-## Seal criteria
+## Validation checklist for future behavior changes
 
 - focused route/result/session tests pass for `apply_patch` and
   `partial-mutation`

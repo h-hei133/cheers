@@ -220,9 +220,9 @@ Follow-up attention:
 - Real-provider gates prove specific isolated or explicitly selected routes only;
   they do not prove multi-file, default write, long-task continuity, or full
   production mutation maturity.
-- Some older plan summaries and `PROJECT_STATE.md` gap wording may still use
-  pre-merge phrasing such as "being validated"; current code on `main` shows the
-  explicit workspace write entrypoint has landed.
+- Some older plan summaries may still use pre-merge phrasing such as "being
+  validated"; current code on `main` shows the explicit workspace write
+  entrypoint and writer-started failure durability have landed.
 
 ## Real-provider gate state
 
@@ -236,9 +236,10 @@ Passed explicit opt-in gates:
 - guarded production route smoke against isolated workspace
 - selected-workspace write smoke against isolated test workspace
 
-Current branch validation for writer-started failure durability should rerun the
-selected-workspace write smoke before claiming the route remains real-provider
-safe, because the writer reachable path and result surface changed.
+Future behavior branches that change writer-reachable route semantics should
+rerun the selected-workspace write smoke before claiming the route remains
+real-provider safe, because the writer reachable path and result surface are
+provider-facing.
 
 Required policy for any rerun:
 

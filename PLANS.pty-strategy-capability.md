@@ -88,21 +88,21 @@ origin/main: eaf4780 Record approval provenance post-merge verification
 目标仓库：
 
 ```text
-D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents
+/home/wang/projects/coding-agents
 ```
 
 参考仓库只读：
 
 ```text
-D:\LenovoSoftstore\pyproject\source-claudecode
-D:\LenovoSoftstore\pyproject\opencode
+/home/wang/projects/source-claudecode
+/home/wang/projects/opencode
 ```
 
 真实配置边界：
 
-- real-provider home 固定为 `D:\Test\home-sf`。
+- real-provider home 固定为 `/home/wang/.private-agents-real`，只能通过显式 opt-in gate 使用。
 - 不得读取、复制、修改、清理或泄露真实 auth/key/provider 配置。
-- synthetic home 固定为 `D:\Test\pca-home-synth`。
+- synthetic/test home 必须使用临时隔离目录。
 - 使用 synthetic provider 时设置 `PRIVATE_AGENTS_PROVIDER_MODE=synthetic`。
 - 失败态或隔离验证只能使用 synthetic/test home 或临时 test home。
 
@@ -269,21 +269,22 @@ opencode targeted reference:
 
 Current:
 
-- A. PTY strategy and dependency audit
-  - Type: read-only audit / planning checkpoint.
-  - Goal: audit package dependencies, Vitest/Node/Windows/sandbox capability, existing cliHarness and interactive tests; decide whether true PTY is feasible without adding dependencies.
+- Route stage-sealed on `main`.
+  - A-E and J completed the audit, boundary documentation, test-utils-only
+    detector, explicit no-dependency decision, and merge-readiness closeout.
+  - No true PTY strategy or dependency is approved.
+  - Current automated evidence remains pipe-spawn plus detector/skip boundary,
+    not true PTY coverage.
 
 Backlog:
 
-- B. PTY coverage boundary contract
-- C. PTY capability detector design
-- D. PTY capability detector implementation
-- E. Dependency decision checkpoint
-- F. Minimal true PTY harness prototype
-- G. True PTY startup readiness smoke
-- H. True PTY approval prompt smoke
-- I. True PTY interrupt attribution smoke
-- J. Route audit / merge readiness
+- None for this route unless explicit PTY strategy/dependency approval is
+  granted.
+- F-I remain blocked/deferred under that future approval boundary:
+  - F. Minimal true PTY harness prototype
+  - G. True PTY startup readiness smoke
+  - H. True PTY approval prompt smoke
+  - I. True PTY interrupt attribution smoke
 
 Completed:
 
@@ -708,27 +709,25 @@ Push 规则：
 - 记录 commit hash、push 失败原因、当前 git status。
 - merge 回 main 前必须重新确认 `origin/main` 与本地 main 差异。
 
-## 21. 当前推荐第一个 checkpoint
+## 21. 当前路线状态
 
-推荐第一个 checkpoint：
+当前状态：
 
 ```text
-A. PTY strategy and dependency audit
+route stage-sealed on main
 ```
 
 类型：
 
 ```text
-read-only audit / planning checkpoint
+completed boundary / no-dependency decision route
 ```
 
-选择原因：
+结论：
 
-- 当前代码已有 pipe-spawn interactive helpers 和清晰 test naming，但没有 true PTY dependency 或 PTY harness。
-- 在新增 capability detector 或任何 PTY prototype 前，必须先确认当前 package / Node / Vitest / Windows / sandbox 能力边界。
-- 该 checkpoint 不需要 real-provider、不读取 real home、不修改 production code、不新增依赖，风险最低。
-
-本轮只创建路线计划文件，不执行 A。
+- A-E 和 J 已完成；不继续 PTY same-family work。
+- true PTY dependency / strategy 仍未获批准。
+- 后续只有在明确批准 PTY strategy/dependency 后，才应重开 F-I。
 
 ## Checkpoint Status Override
 
