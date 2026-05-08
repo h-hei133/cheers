@@ -25,6 +25,10 @@ export function mergeContinuitySummaryEntries(
       key !== "last-action-handoff-summary" &&
       key !== "last-seed-influence" &&
       key !== "last-seed-influence-handoff-summary" &&
+      key !== "last-writer-started" &&
+      key !== "last-write-effect" &&
+      key !== "last-write-requires-user-inspection" &&
+      key !== "last-write-effect-target" &&
       key !== "last-failure-handoff-diagnostic" &&
       key !== "last-success-handoff-diagnostic"
     );
@@ -106,6 +110,20 @@ export function mergeContinuitySummaryEntries(
     "last-seed-influence-handoff-summary",
     continuity.lastSeedInfluenceHandoffSummary,
   );
+  if (typeof continuity.lastWriterStarted === "boolean") {
+    approvalPairs.push([
+      "last-writer-started",
+      continuity.lastWriterStarted ? "yes" : "no",
+    ]);
+  }
+  addPair("last-write-effect", continuity.lastWriteEffect);
+  if (typeof continuity.lastWriteRequiresUserInspection === "boolean") {
+    approvalPairs.push([
+      "last-write-requires-user-inspection",
+      continuity.lastWriteRequiresUserInspection ? "yes" : "no",
+    ]);
+  }
+  addPair("last-write-effect-target", continuity.lastWriteEffectTarget);
   addPair(
     "last-failure-handoff-diagnostic",
     continuity.lastFailureHandoffDiagnostic,

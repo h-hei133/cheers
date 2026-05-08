@@ -98,6 +98,22 @@ export function formatPromptContinuityContext(
       `- last-seed-influence-handoff-summary: ${compactText(snapshot.lastSeedInfluenceHandoffSummary, 180)}`,
     );
   }
+  if (snapshot.lastWriterStarted !== undefined) {
+    lines.push(
+      `- last-writer-started: ${snapshot.lastWriterStarted ? "yes" : "no"}`,
+    );
+  }
+  if (snapshot.lastWriteEffect) {
+    lines.push(`- last-write-effect: ${snapshot.lastWriteEffect}`);
+  }
+  if (snapshot.lastWriteRequiresUserInspection !== undefined) {
+    lines.push(
+      `- last-write-requires-user-inspection: ${snapshot.lastWriteRequiresUserInspection ? "yes" : "no"}`,
+    );
+  }
+  if (snapshot.lastWriteEffectTarget) {
+    lines.push(`- last-write-effect-target: ${snapshot.lastWriteEffectTarget}`);
+  }
   if (snapshot.lastFailureHandoffDiagnostic) {
     lines.push(
       `- last-failure-handoff-diagnostic: ${compactText(snapshot.lastFailureHandoffDiagnostic, 220)}`,

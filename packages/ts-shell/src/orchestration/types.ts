@@ -76,6 +76,7 @@ export type CodingContinuationStatus =
   | 'first-pass-success'
   | 'recovered-after-continuation'
   | 'failed-after-bounded-continuation'
+export type CodingWriteEffect = 'none' | 'unknown' | 'unverified' | 'verified'
 export type CodingDiagnosisDisposition =
   | 'grounded-explanation'
   | 'needs-verification'
@@ -179,6 +180,9 @@ export interface CodingActionResultSeed {
   readonly target?: string
   readonly changedFiles?: readonly string[]
   readonly verifiedFiles?: readonly string[]
+  readonly writerStarted?: boolean
+  readonly writeEffect?: CodingWriteEffect
+  readonly requiresUserInspection?: boolean
   readonly verification?: {
     readonly status?: CodingVerificationStatus
     readonly command?: string

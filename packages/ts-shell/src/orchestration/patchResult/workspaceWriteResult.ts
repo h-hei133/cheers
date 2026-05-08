@@ -198,6 +198,9 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
       ...(target ? { target } : {}),
       changedFiles: [],
       verifiedFiles: [],
+      writerStarted,
+      writeEffect,
+      requiresUserInspection: writerStarted,
       verification: {
         status: "blocked",
         reason,

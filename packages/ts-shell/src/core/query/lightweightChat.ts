@@ -186,6 +186,16 @@ function buildActionResultSeedNotes(
   if (verifiedFiles.length > 0) {
     parts.push(`seedVerifiedFiles=${verifiedFiles.length}`);
   }
+  if (seed.writerStarted === true) {
+    parts.push("seedWriterStarted=yes");
+  }
+  const writeEffect = stringValue(seed.writeEffect);
+  if (writeEffect) {
+    parts.push(`seedWriteEffect=${writeEffect.toLowerCase()}`);
+  }
+  if (seed.requiresUserInspection === true) {
+    parts.push("seedRequiresUserInspection=yes");
+  }
   const verification = continuityStateAsRecord(seed.verification);
   const verificationStatus = stringValue(verification?.status);
   if (verificationStatus) {

@@ -1129,13 +1129,27 @@ function buildContinuationSeedSummary(input: {
     readDecisionTraceValue(input.notes, "seedVerifyStatus") ??
     seed?.verification?.status ??
     input.codingResult?.verification.status;
+  const writerStarted =
+    readDecisionTraceValue(input.notes, "seedWriterStarted") ??
+    (seed?.writerStarted ? "yes" : undefined);
+  const writeEffect =
+    readDecisionTraceValue(input.notes, "seedWriteEffect") ??
+    seed?.writeEffect;
+  const requiresUserInspection =
+    readDecisionTraceValue(input.notes, "seedRequiresUserInspection") ??
+    (seed?.requiresUserInspection ? "yes" : undefined);
   const targetLabel = target ? ` on ${target}` : "";
   const focusLabel = target ? "the same target" : "the same task";
   const verificationLabel = verificationStatus
     ? `; verification status: ${verificationStatus}`
     : "";
+  const writerLabel = writerStarted ? `; writer-started=${writerStarted}` : "";
+  const writeEffectLabel = writeEffect ? `; write-effect=${writeEffect}` : "";
+  const inspectionLabel = requiresUserInspection
+    ? `; requires-user-inspection=${requiresUserInspection}`
+    : "";
 
-  return `Resumed from ${action}${targetLabel}${verificationLabel}; next focus is ${focusLabel}.`;
+  return `Resumed from ${action}${targetLabel}${verificationLabel}${writerLabel}${writeEffectLabel}${inspectionLabel}; next focus is ${focusLabel}.`;
 }
 
 function readDecisionTraceValue(

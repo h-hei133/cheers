@@ -624,6 +624,15 @@ function buildActionResultSeedDecisionTrace(
   if (seed.verifiedFiles?.length) {
     parts.push(`seedVerifiedFiles=${seed.verifiedFiles.length}`);
   }
+  if (seed.writerStarted) {
+    parts.push("seedWriterStarted=yes");
+  }
+  if (seed.writeEffect?.trim()) {
+    parts.push(`seedWriteEffect=${seed.writeEffect.trim().toLowerCase()}`);
+  }
+  if (seed.requiresUserInspection) {
+    parts.push("seedRequiresUserInspection=yes");
+  }
   const verificationStatus = seed.verification?.status?.trim();
   if (verificationStatus) {
     parts.push(

@@ -35,7 +35,9 @@ import type {
   AgentExecutionOutput,
   AgentRole,
   CodingActionResultSeed,
+  CodingResultSummary,
   CodingTaskKind,
+  CodingWriteEffect,
   ContinuationReason,
   TerminalClassification,
   TerminalReason,
@@ -152,6 +154,10 @@ export interface SessionContinuitySnapshot {
   readonly lastStagedRepairNextStep?: number;
   readonly lastAnswerDefect?: string;
   readonly lastActionResultSeed?: CodingActionResultSeed;
+  readonly lastWriterStarted?: boolean;
+  readonly lastWriteEffect?: CodingWriteEffect;
+  readonly lastWriteRequiresUserInspection?: boolean;
+  readonly lastWriteEffectTarget?: string;
   readonly lastActionHandoffSummary?: string;
   readonly lastSeedInfluence?: SeedInfluenceDiagnostic;
   readonly lastSeedInfluenceHandoffSummary?: string;
@@ -2397,6 +2403,9 @@ export class SessionManager {
       toolExecutionProvenanceItems[toolExecutionProvenanceItems.length - 1];
     const lastAnswerDefect =
       this.extractLastAnswerDefect(lastCodingResult) ?? undefined;
+    const lastWriteContinuity =
+      this.buildWriteContinuityDiagnostic(lastCodingResult) ??
+      this.extractWriteContinuityFromMemory(stateSnapshot?.workingMemory);
     const lastActionHandoffSummary =
       this.buildActionHandoffSummary(lastCodingResult?.lastActionResultSeed) ??
       this.extractActionHandoffSummaryFromMemory(stateSnapshot?.workingMemory);
@@ -2540,6 +2549,21 @@ export class SessionManager {
       lastTaskKind: lastCodingResult?.taskKind,
       ...(lastCodingResult?.lastActionResultSeed
         ? { lastActionResultSeed: lastCodingResult.lastActionResultSeed }
+        : {}),
+      ...(lastWriteContinuity?.writerStarted !== undefined
+        ? { lastWriterStarted: lastWriteContinuity.writerStarted }
+        : {}),
+      ...(lastWriteContinuity?.writeEffect
+        ? { lastWriteEffect: lastWriteContinuity.writeEffect }
+        : {}),
+      ...(lastWriteContinuity?.requiresUserInspection !== undefined
+        ? {
+            lastWriteRequiresUserInspection:
+              lastWriteContinuity.requiresUserInspection,
+          }
+        : {}),
+      ...(lastWriteContinuity?.target
+        ? { lastWriteEffectTarget: lastWriteContinuity.target }
         : {}),
       ...(lastActionHandoffSummary ? { lastActionHandoffSummary } : {}),
       ...(lastSeedInfluence ? { lastSeedInfluence } : {}),
@@ -2958,6 +2982,21 @@ export class SessionManager {
       lastTerminalReason: snapshot.lastTerminalReason,
       ...(snapshot.lastSeedInfluence
         ? { lastSeedInfluence: snapshot.lastSeedInfluence }
+        : {}),
+      ...(snapshot.lastWriterStarted !== undefined
+        ? { lastWriterStarted: snapshot.lastWriterStarted }
+        : {}),
+      ...(snapshot.lastWriteEffect
+        ? { lastWriteEffect: snapshot.lastWriteEffect }
+        : {}),
+      ...(snapshot.lastWriteRequiresUserInspection !== undefined
+        ? {
+            lastWriteRequiresUserInspection:
+              snapshot.lastWriteRequiresUserInspection,
+          }
+        : {}),
+      ...(snapshot.lastWriteEffectTarget
+        ? { lastWriteEffectTarget: snapshot.lastWriteEffectTarget }
         : {}),
       ...(snapshot.lastSeedInfluenceHandoffSummary
         ? {
@@ -4394,6 +4433,67 @@ export class SessionManager {
     return normalized.length > 0 ? normalized : undefined;
   }
 
+  private normalizeOptionalBoolean(value: unknown): boolean | undefined {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (typeof value !== "string") {
+      return undefined;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "yes" || normalized === "true") {
+      return true;
+    }
+    if (normalized === "no" || normalized === "false") {
+      return false;
+    }
+    return undefined;
+  }
+
+  private normalizeWriteEffect(value: unknown): CodingWriteEffect | undefined {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (
+      normalized === "none" ||
+      normalized === "unknown" ||
+      normalized === "unverified" ||
+      normalized === "verified"
+    ) {
+      return normalized;
+    }
+    return undefined;
+  }
+
+  private extractSummaryString(
+    summaryEntries: readonly string[],
+    key: string,
+  ): string | undefined {
+    const prefix = `${key.toLowerCase()}:`;
+    for (const entry of summaryEntries) {
+      const normalized = entry.trim().startsWith("- ")
+        ? entry.trim().slice(2).trim()
+        : entry.trim();
+      if (normalized.toLowerCase().startsWith(prefix)) {
+        const value = normalized.slice(prefix.length).trim();
+        if (value) {
+          return value;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private extractSummaryBoolean(
+    summaryEntries: readonly string[],
+    key: string,
+  ): boolean | undefined {
+    return this.normalizeOptionalBoolean(
+      this.extractSummaryString(summaryEntries, key),
+    );
+  }
+
   private selectContinuationEvidenceForSnapshot(
     evidence: readonly string[],
   ): string[] {
@@ -5071,6 +5171,22 @@ export class SessionManager {
     if (actionHandoffSummary) {
       continuity.lastActionHandoffSummary = actionHandoffSummary;
     }
+    const writeContinuity = this.buildWriteContinuityDiagnostic(
+      event.result.codingResult,
+    );
+    if (writeContinuity?.writerStarted !== undefined) {
+      continuity.lastWriterStarted = writeContinuity.writerStarted;
+    }
+    if (writeContinuity?.writeEffect) {
+      continuity.lastWriteEffect = writeContinuity.writeEffect;
+    }
+    if (writeContinuity?.requiresUserInspection !== undefined) {
+      continuity.lastWriteRequiresUserInspection =
+        writeContinuity.requiresUserInspection;
+    }
+    if (writeContinuity?.target) {
+      continuity.lastWriteEffectTarget = writeContinuity.target;
+    }
     const seedInfluence = this.extractSeedInfluenceFromQueryResult(event.result);
     const seedInfluenceHandoffSummary = this.buildSeedInfluenceHandoffSummary(
       event.result.codingResult?.lastActionResultSeed,
@@ -5119,7 +5235,87 @@ export class SessionManager {
     const verificationLabel = verificationStatus
       ? `; verification status: ${verificationStatus}`
       : "";
-    return `Resumed from ${action}${targetLabel}${verificationLabel}; next focus is ${focusLabel}.`;
+    const writerLabel = seed.writerStarted ? "; writer-started=yes" : "";
+    const writeEffectLabel = seed.writeEffect
+      ? `; write-effect=${seed.writeEffect}`
+      : "";
+    const inspectionLabel = seed.requiresUserInspection
+      ? "; requires-user-inspection=yes"
+      : "";
+    return `Resumed from ${action}${targetLabel}${verificationLabel}${writerLabel}${writeEffectLabel}${inspectionLabel}; next focus is ${focusLabel}.`;
+  }
+
+  private buildWriteContinuityDiagnostic(
+    codingResult: CodingResultSummary | undefined,
+  ):
+    | {
+        readonly writerStarted?: boolean;
+        readonly writeEffect?: CodingWriteEffect;
+        readonly requiresUserInspection?: boolean;
+        readonly target?: string;
+      }
+    | undefined {
+    if (!codingResult) {
+      return undefined;
+    }
+    const seed = codingResult.lastActionResultSeed;
+    const writeEffect =
+      seed?.writeEffect ??
+      this.extractWriteEffectFromEvidence(codingResult.evidence) ??
+      this.extractWriteEffectFromEvidence(codingResult.continuation.evidence);
+    const writerStartedFromEvidence =
+      codingResult.evidence.some((entry) =>
+        entry.includes("writer-started-no-success"),
+      ) ||
+      codingResult.continuation.evidence.some((entry) =>
+        entry.includes("writer-started-stopped"),
+      );
+    const writerStarted =
+      seed?.writerStarted ??
+      (writerStartedFromEvidence ? true : undefined);
+    const requiresUserInspectionFromEvidence = codingResult.evidence.some(
+      (entry) => entry.includes("user-inspection-required"),
+    );
+    const requiresUserInspection =
+      seed?.requiresUserInspection ??
+      (requiresUserInspectionFromEvidence ? true : undefined);
+    if (
+      writerStarted === undefined &&
+      writeEffect === undefined &&
+      requiresUserInspection === undefined
+    ) {
+      return undefined;
+    }
+    const target =
+      seed?.target ??
+      codingResult.failedFiles[0]?.path ??
+      codingResult.unverifiedFiles[0]?.path ??
+      codingResult.changeSet.attemptedFiles[0];
+    return {
+      ...(writerStarted !== undefined ? { writerStarted } : {}),
+      ...(writeEffect ? { writeEffect } : {}),
+      ...(requiresUserInspection !== undefined
+        ? { requiresUserInspection }
+        : {}),
+      ...(target ? { target } : {}),
+    };
+  }
+
+  private extractWriteEffectFromEvidence(
+    evidence: readonly string[],
+  ): CodingWriteEffect | undefined {
+    for (const entry of evidence) {
+      const value = entry.match(/write-effect:(none|unknown|unverified|verified)\b/)?.[1];
+      if (
+        value === "none" ||
+        value === "unknown" ||
+        value === "unverified" ||
+        value === "verified"
+      ) {
+        return value;
+      }
+    }
+    return undefined;
   }
 
   private buildSeedInfluenceHandoffSummary(
@@ -5191,6 +5387,16 @@ export class SessionManager {
     }
     if (blockerKind) {
       parts.push(`blocker=${blockerKind}`);
+    }
+    const writeContinuity = this.buildWriteContinuityDiagnostic(codingResult);
+    if (writeContinuity?.writerStarted) {
+      parts.push("writer-started=yes");
+    }
+    if (writeContinuity?.writeEffect) {
+      parts.push(`write-effect=${writeContinuity.writeEffect}`);
+    }
+    if (writeContinuity?.requiresUserInspection) {
+      parts.push("requires-user-inspection=yes");
     }
     parts.push(`next=${this.compactText(nextFocus, 140).replace(/[.]+$/, "")}`);
     return `${parts.join("; ")}.`;
@@ -5359,6 +5565,66 @@ export class SessionManager {
       }
     }
     return undefined;
+  }
+
+  private extractWriteContinuityFromMemory(
+    workingMemory: unknown,
+  ):
+    | {
+        readonly writerStarted?: boolean;
+        readonly writeEffect?: CodingWriteEffect;
+        readonly requiresUserInspection?: boolean;
+        readonly target?: string;
+      }
+    | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    const continuity =
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+        ? (root.continuity as Record<string, unknown>)
+        : undefined;
+    const summaryEntries = Array.isArray(root.summary)
+      ? root.summary.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    const writerStarted =
+      this.normalizeOptionalBoolean(continuity?.lastWriterStarted) ??
+      this.extractSummaryBoolean(summaryEntries, "last-writer-started");
+    const requiresUserInspection =
+      this.normalizeOptionalBoolean(
+        continuity?.lastWriteRequiresUserInspection,
+      ) ??
+      this.extractSummaryBoolean(
+        summaryEntries,
+        "last-write-requires-user-inspection",
+      );
+    const writeEffect = this.normalizeWriteEffect(
+      continuity?.lastWriteEffect,
+    ) ?? this.normalizeWriteEffect(
+      this.extractSummaryString(summaryEntries, "last-write-effect"),
+    );
+    const target =
+      this.normalizeOptionalString(continuity?.lastWriteEffectTarget) ??
+      this.extractSummaryString(summaryEntries, "last-write-effect-target");
+    if (
+      writerStarted === undefined &&
+      requiresUserInspection === undefined &&
+      writeEffect === undefined &&
+      !target
+    ) {
+      return undefined;
+    }
+    return {
+      ...(writerStarted !== undefined ? { writerStarted } : {}),
+      ...(requiresUserInspection !== undefined
+        ? { requiresUserInspection }
+        : {}),
+      ...(writeEffect ? { writeEffect } : {}),
+      ...(target ? { target } : {}),
+    };
   }
 
   private extractSeedInfluenceHandoffSummaryFromMemory(

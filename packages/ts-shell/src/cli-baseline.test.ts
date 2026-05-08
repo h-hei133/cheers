@@ -16,7 +16,10 @@ import {
   runInteractiveLineSmoke,
   runInteractiveStartupSmoke,
 } from "./test-utils/cliHarness.js";
-import { seedStoppedRecoveryContextSession } from "./test-utils/stoppedRecoveryFixture.js";
+import {
+  seedStoppedRecoveryContextSession,
+  seedWriterStartedStoppedRecoveryContextSession,
+} from "./test-utils/stoppedRecoveryFixture.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, "..", "..", "..");
@@ -4121,6 +4124,89 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(stoppedNoteText).toContain("seedBlocker=patch-from-not-found");
     expect(stoppedNoteText).toContain("restored-session-state-consumed");
     expect(stoppedNoteText).toContain("last-terminal=stopped:stopped_error");
+  }, 60000);
+
+  it("keeps writer-started stopped write effect actionable through bare and follow-up /continue", async () => {
+    const {
+      projectRoot,
+      sessionDir: stoppedSessionDir,
+      stopReason,
+      nextAction,
+      targetPath,
+    } = seedWriterStartedStoppedRecoveryContextSession({
+      fakeHomeDir,
+      sessionsDir,
+      writeEffect: "unknown",
+    });
+
+    const runPrint = (prompt: string) =>
+      spawnSync(
+        nodeExe,
+        [
+          tsxCliPath,
+          cliPath,
+          "--project",
+          projectRoot,
+          "--print",
+          prompt,
+        ],
+        {
+          cwd: repoRoot,
+          env: {
+            ...process.env,
+            USERPROFILE: fakeHomeDir,
+            HOME: fakeHomeDir,
+            PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          },
+          encoding: "utf8",
+          timeout: 30000,
+        },
+      );
+
+    const bareResult = runPrint("/continue");
+    expect(bareResult.error).toBeUndefined();
+    expect(bareResult.status).toBe(0);
+    const bareOutput = `${bareResult.stdout ?? ""}${bareResult.stderr ?? ""}`;
+    expect(bareOutput).toContain("TerminalState: stopped");
+    expect(bareOutput).toContain(`Reason: ${stopReason}`);
+    expect(bareOutput).toContain(`Failed files: ${targetPath}`);
+    expect(bareOutput).toContain(`DoNext: ${nextAction}`);
+    expect(bareOutput).not.toContain("No recoverable session found");
+    expect(bareOutput).not.toContain(`Changed files: ${targetPath}`);
+
+    const result = runPrint("/continue continue uncertain writer state");
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    expect(output).toContain("Continuation");
+    expect(output).toContain("Failure handoff: status=blocked");
+    expect(output).toContain(`target=${targetPath}`);
+    expect(output).toContain("writer-started=yes");
+    expect(output).toContain("write-effect=unknown");
+    expect(output).toContain("requires-user-inspection=yes");
+    expect(output).toContain(
+      `next=${nextAction.replace(/[.]+$/, "")}`,
+    );
+    expect(output).not.toContain("Success handoff: status=passed");
+    expect(output).not.toContain(`Changed files: ${targetPath}`);
+
+    const stoppedEntries = parseTranscriptJsonl(
+      path.join(stoppedSessionDir, "transcript.jsonl"),
+    );
+    const stoppedNotes = stoppedEntries
+      .filter(
+        (entry) =>
+          entry.type === "query-event" && entry.event?.type === "query.completed",
+      )
+      .flatMap((entry) => entry.event?.result?.sharedContext?.notes ?? []);
+    const stoppedNoteText = stoppedNotes.join("\n");
+    expect(stoppedNoteText).toContain("seed=action-result");
+    expect(stoppedNoteText).toContain("seedAction=edit-file");
+    expect(stoppedNoteText).toContain(`seedTarget=${targetPath}`);
+    expect(stoppedNoteText).toContain("seedWriterStarted=yes");
+    expect(stoppedNoteText).toContain("seedWriteEffect=unknown");
+    expect(stoppedNoteText).toContain("seedRequiresUserInspection=yes");
+    expect(stoppedNoteText).not.toContain("seedChangedFiles=");
   }, 60000);
 
   it("pipe-spawn interactive stopped follow-up smoke preserves recovery context", async () => {

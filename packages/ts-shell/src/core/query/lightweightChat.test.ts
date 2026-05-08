@@ -113,6 +113,50 @@ describe("lightweight chat route", () => {
     }
   });
 
+  it("preserves writer-started write effect in lightweight continuity seed notes", async () => {
+    const events = [];
+    for await (const event of streamLightweightChat({
+      sessionId: "sess_light_writer_started",
+      prompt: "continue uncertain writer state",
+      mode: "chat",
+      providerMode: "synthetic",
+      continuityState: {
+        lastTerminalClassification: "stopped",
+        lastTerminalReason: "stopped_error",
+        lastActionResultSeed: {
+          actionKind: "edit-file",
+          target: "docs/uncertain-edit.md",
+          changedFiles: [],
+          verifiedFiles: [],
+          writerStarted: true,
+          writeEffect: "unknown",
+          requiresUserInspection: true,
+          verification: {
+            status: "blocked",
+            reason: "write effect unknown",
+            blockerKind: "environment-not-ready",
+          },
+        },
+        lastFailureHandoffDiagnostic:
+          "Failure handoff: status=blocked; target=docs/uncertain-edit.md; writer-started=yes; write-effect=unknown; next=Re-read docs/uncertain-edit.md before retrying.",
+      },
+    })) {
+      events.push(event);
+    }
+
+    const completed = events.at(-1);
+    expect(completed?.type).toBe("query.completed");
+    if (completed?.type === "query.completed") {
+      const notes = completed.result.sharedContext.notes.join("\n");
+      expect(notes).toContain("seed=action-result");
+      expect(notes).toContain("seedTarget=docs/uncertain-edit.md");
+      expect(notes).toContain("seedWriterStarted=yes");
+      expect(notes).toContain("seedWriteEffect=unknown");
+      expect(notes).toContain("seedRequiresUserInspection=yes");
+      expect(notes).not.toContain("seedChangedFiles=");
+    }
+  });
+
   it("maps real provider fetch failures into a structured terminal result", async () => {
     const fetchFailure = Object.assign(new TypeError("fetch failed"), {
       cause: {
