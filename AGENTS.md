@@ -1,416 +1,423 @@
 # AGENTS.md
 
-## Scope
+## Scope and Repositories
 
-This repository is the working project for a private multi-language coding agents rewrite.
+This repository is the writable target project for a private multi-language coding agents rewrite.
 
-Writable target repo:
-D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents
-
-Read-only reference repo:
-D:\LenovoSoftstore\pyproject\source-claudecode
-
-The target repo is the only place where code may be modified.
-The reference repo is used only to recover ClaudeCode’s load-bearing runtime semantics, responsibility boundaries, and migration truth.
-
-## RTK Command Discipline for Windows Native Codex Sessions
-
-This project is used from native Windows, not WSL2.
-
-Codex must minimize shell-output token usage by explicitly using `rtk` for repository inspection, file reads, searches, git inspection, builds, tests, and command output that may be large.
-
-### Mandatory RTK Usage
-
-Before producing or running any shell command, check whether the command:
-
-- reads file content
-- lists directories
-- searches files
-- inspects git state or diffs
-- runs tests
-- runs builds
-- emits logs or potentially large output
-
-If yes, use `rtk` explicitly.
-
-Required patterns:
-
-```powershell
-rtk read <path>
-rtk ls <path>
-rtk grep "<pattern>" <path>
-rtk find "<pattern>" <path>
-rtk git status
-rtk git diff
-rtk git log -n 10
-rtk npm run build
-rtk npm test
-rtk pnpm test
-rtk cargo test
-rtk pytest
-```
-
-### Forbidden Raw Commands Unless Explicitly Justified
-
-Do not use raw Windows or Unix-style commands for repository inspection when an RTK equivalent can be used.
-
-Avoid:
-
-```powershell
-type <file>
-cat <file>
-Get-Content <file>
-dir
-ls
-findstr
-grep
-git status
-git diff
-git log
-npm run build
-npm test
-cargo test
-pytest
-```
-
-Use the RTK-prefixed equivalent instead.
-
-### Raw Output Escape Hatch
-
-Use raw commands only when RTK cannot perform the required action or when exact unfiltered output is required for debugging.
-
-In that case, prefer:
-
-```powershell
-rtk proxy <command>
-```
-
-When using a raw non-RTK command, state why RTK was not sufficient.
-
-### Session Self-Check
-
-At the start of each implementation round, confirm that RTK command discipline is active.
-
-If you accidentally propose a non-RTK command where RTK should be used, rewrite it before execution.
-
-### Windows Path Rules
-
-Use Windows-native paths when needed.
-
-The writable target repository remains:
+Writable target repository:
 
 ```text
-D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents
+/home/wang/projects/coding-agents
 ```
 
-The read-only reference repository remains:
+Read-only reference repositories:
 
 ```text
-D:\LenovoSoftstore\pyproject\source-claudecode
+/home/wang/projects/source-claudecode
+/home/wang/projects/opencode
 ```
 
-Do not assume WSL paths such as `/mnt/c/...`.
-Do not instruct the user to switch to WSL2.
+Only the target repository may be modified. The reference repositories are used only to recover load-bearing runtime semantics, responsibility boundaries, permission behavior, tool execution boundaries, and user-visible result semantics.
+
+Do not copy implementation code mechanically from the reference repositories. Use them to align architectural responsibility and runtime behavior.
+
+## External Codex / RTK Configuration
+
+RTK is configured for Codex CLI outside this repository.
+
+Use the global configuration as the source of truth for RTK command discipline and Codex-wide operating rules:
+
+```text
+Codex global instructions path: /home/wang/.codex/AGENTS.md
+RTK.md: /home/wang/.codex/RTK.md
+AGENTS.md: @/home/wang/.codex/RTK.md reference already present
+```
+
+Do not duplicate detailed RTK command rules in this repository-level `AGENTS.md`. If RTK behavior or command policy is unclear, consult the global files above.
 
 ## Repository Boundaries
 
-- Default to editing only files under this repository.
-- Treat the parent ClaudeCode snapshot as strictly read-only.
-- Do not modify files in `..\`.
-- Run build and test commands from this repository root, not from the parent snapshot root.
-- Keep TypeScript imports ending in `.js`.
+- Default to editing only files under the target repository.
+- Treat both reference repositories as strictly read-only.
+- Do not modify files in parent directories or sibling repositories.
+- Run build and test commands from the target repository root unless a tool explicitly requires another working directory.
+- Keep TypeScript imports ending in `.js` when importing local TypeScript modules that compile to JavaScript.
+- Do not introduce repository-local rules that conflict with the global Codex or RTK configuration.
 
-Important reference-oriented parent paths include:
+If the reference repositories and the target repository use different structure, preserve the reference semantics and implement the target design inside this repository.
 
-- `..\QueryEngine.ts`
-- `..\query.ts`
-- `..\tools.ts`
-- `..\commands.ts`
-- `..\setup.ts`
-- `..\services/mcp/**`
+## Real Provider Configuration Boundary
 
-If source and target responsibilities differ, preserve the source snapshot as reference truth for responsibilities, but implement the target design inside this working project.
+A real provider home exists at:
 
-## Stage Intent
+```text
+/home/wang/.private-agents-real
+```
 
-The current stage is not primarily about expanding product surface or continuing local runtime hardening by default.
+Real provider configuration may only be consumed through explicit opt-in gate commands that set:
 
-The current stage goal is:
+```text
+PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real
+```
 
-Close a user-minimal real main path while staying aligned with ClaudeCode-grade load-bearing architecture.
+Never manually read, print, copy, clean, modify, summarize, or reveal files under the real provider home. This includes provider env files, config files, keys, tokens, headers, credentials, session files, or any provider-auth material.
 
-Default task selection rule:
-Do not ask "what can still be locally hardened?"
-Ask "what most directly blocks a user from continuously completing a real task?"
+Real-provider gates must use isolated runtime and test directories, such as:
 
-Do not treat the current stage as:
+```text
+PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test/<gate-name>
+HOME=/tmp/private-agents-test/<gate-name>-home
+USERPROFILE=/tmp/private-agents-test/<gate-name>-home
+```
 
-- proof-family closure as the default
-- acceptance-surface micro-patching as the default
-- document-sync-first work
-- project-level audit mode
-- roadmap expansion mode
+Do not treat `PRIVATE_AGENTS_REAL_HOME` as a normal runtime home. It is only an explicit credential/config source for approved readiness or smoke scripts.
+
+Real-provider validation must preserve:
+
+- redaction of secrets and provider config paths
+- clean repository status before and after the gate
+- no audit/history residue in the repository
+- precise failure attribution, such as provider-network, config failure, route failure, redaction failure, unexpected write, or unexpected success claim
 
 ## Architecture Boundaries
 
 ### TypeScript = control plane
 
-Includes:
-
-- shell
-- session
-- orchestration
-- slash command
-- recovery
-- permission UX
-- MCP capability routing
-- runtime durability / replay / recovery semantics
+TypeScript owns shell, session, orchestration, query loop, slash commands, permission UX, recovery, replay, runtime durability, result mapping, terminal/session surface, and high-level capability routing.
 
 ### Rust = execution plane
 
-Includes:
-
-- daemon
-- command execution
-- timeout
-- cancel
-- sandbox preflight
-- execution responsibility
+Rust owns execution-plane responsibilities such as daemon behavior, command execution, timeout, cancellation, sandbox preflight, and low-level execution isolation.
 
 ### contracts = cross-runtime semantic boundary
 
-Used to carry protocol, boundary, lifecycle, and semantic constraints shared by TypeScript and Rust.
+`contracts` carries shared protocol, lifecycle, boundary, and semantic constraints across TypeScript and Rust. Contract changes must keep both sides aligned.
 
 ### Python eval layer
 
-Includes:
+`packages/python-eval/` is an evaluation layer. Do not move orchestration, replay, recovery, permission, or runtime durability semantics into the Python eval layer for local convenience.
 
-- `packages/python-eval/`
+Default responsibility rules:
 
-Default rules:
+- Keep control-plane semantics in TypeScript.
+- Put only clear execution-plane responsibility in Rust.
+- Do not break TypeScript / Rust / contracts boundaries to make a demo path appear usable.
+- Do not hide permission, write authorization, or runtime lifecycle semantics behind convenience plumbing.
 
-- replay / recovery / orchestration / transcript re-entry / durability stay in TypeScript
-- only clear execution responsibility goes into Rust
-- do not move control-plane semantics into Rust for local convenience
-- do not break TS / Rust / contracts boundaries just to make a demo path appear usable
+## Reference Alignment
 
-## User-Minimal Real Main Path
-
-All implementation work in this stage must directly serve at least one of these six steps:
-
-1. User starts the CLI in a clean runnable environment and sees clear runtime mode and session state.
-2. User creates a new session or resumes an interrupted one, and session health is checked first; broken sessions must not pollute the current flow.
-3. User enters a real task, and the system enters a unified query loop.
-4. The system uses a real model and real toolchain; permission escalation is explicitly approved or denied by the user, not inferred from prompt keywords.
-5. The system emits a clear terminal state (success / stopped / error) and persists it; errors are actionable and retryable.
-6. The user can continue the next turn or resume after interruption with consistent semantics and without manual repair.
-
-Before starting each round, always identify:
-
-- which of the six steps the current task directly advances
-- if none, the task is not a default mainline task for this stage
-
-## Current Priority Principle
-
-Use `PROJECT_STATE.md` as the current stage snapshot for top blockers and immediate priorities.
-
-Unless newer evidence clearly overrides it, prefer work that directly closes the current top blockers on the real main path.
-
-Do not freely jump to unrelated local correctness slices unless they more directly improve real user continuity than the current main-path blockers do.
-
-## ClaudeCode Reference Alignment
-
-The reference repo is the architecture truth source for ClaudeCode’s load-bearing runtime semantics.
-
-When the current task touches:
+Use the reference repositories for targeted semantic comparison when a task touches:
 
 - session lifecycle
-- query loop / orchestration
+- query loop or orchestration
 - permission model
-- recovery / resume
-- capability routing
-- terminal / durable semantics
+- tool boundary or tool execution
+- file edit/write behavior
+- recovery or resume
+- terminal/result/session surface
+- durable state
+- provider-facing behavior
 - execution-plane responsibility
 
-you must:
+Expected reference workflow:
 
-1. inspect the target repo implementation first
-2. do a small, targeted comparison against the ClaudeCode reference
-3. use that comparison to keep responsibility boundaries and runtime semantics aligned
+1. Inspect the target repository implementation first.
+2. Perform a small, targeted comparison against the relevant Claude Code or opencode files.
+3. Use the comparison to preserve responsibility boundaries and runtime semantics.
+4. Implement the target design in this repository.
 
-Do not use the reference repo for:
+Do not use the reference repositories for large-scale source scanning, architecture audits without a direct task, or mechanical source-structure copying.
 
-- large-scale source scanning
-- architecture audits
-- mechanical source-structure copying
+## Large File and Module Boundaries
 
-Do not create a toy implementation that merely runs while drifting away from ClaudeCode-grade architecture.
+Avoid growing central orchestration files. Prefer adding focused modules for new behavior instead of extending already-large or high-touch files.
 
-The goal is not a simplified demo clone.
-The goal is a target implementation whose user-facing main path is being closed while staying aligned with ClaudeCode’s load-bearing semantics.
+Use minimal wiring only in these files unless there is a documented reason:
 
-## Modes
+```text
+packages/ts-shell/src/entrypoints/cli.tsx
+packages/ts-shell/src/session/SessionManager.ts
+packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts
+```
 
-This prompt supports two modes, but Implementation is the default.
+Do not place policy logic, writer boundary logic, permission semantics, provider-gate semantics, or result/session mapping logic directly in those files when a focused module can own it.
 
-### Mode=Implementation
+When extracting or adding behavior:
 
-Use when the current blocker is sufficiently clear.
+- keep invariants close to the code that owns them
+- move related tests with the new module when practical
+- prefer module-level documentation for safety-sensitive boundaries
+- avoid adding broad helper layers that obscure responsibility
+- avoid trivial one-use helpers unless they isolate policy, boundary, or safety semantics from a large file
 
-Requirements:
+## File Placement and Naming Rules
 
-- must modify code around a real blocker on the six-step main path
-- must run directly related validation
-- must not stop at summary only
-- must not default to test-only output
-- must not prioritize document sync over implementation closure
+Directory names should carry domain context. File names should carry local responsibility.
 
-### Mode=State-Recovery
+Do not encode a roadmap title into a file name. Prefer short, responsibility-based names over long names that combine every route, provider, permission, status, and implementation detail.
 
-Use only when:
+In `packages/ts-shell/src/orchestration/patchResult/`, do not repeat the full `singleFileApplyPatch` prefix unless it is needed to avoid real ambiguity. The directory already provides patch/result context.
 
-- taking over an interrupted scene
-- the factual state is unclear
-- docs, code, tests, and behavior disagree
-- the main-path blocker is not yet clear enough for direct implementation
+Use consistent suffixes:
 
-Requirements:
+- `*Gate.ts` for precondition checks and entry decisions.
+- `*Route.ts` for composed execution paths.
+- `*Result.ts` or `*Projection.ts` for terminal/result/session mapping.
+- `*State.ts` for state models.
+- `*Smoke.ts` for real-provider or end-to-end smoke wrappers.
+- `*Authority.ts` or `*Policy.ts` for boundary and safety checks.
+- `*Surface.ts` for user-visible or terminal-facing projections.
+- `*Bridge.ts` for adapter layers between internal contracts and runtime-facing shapes.
 
-- recover factual state first
-- identify:
-  1. which of the six steps is currently blocked
-  2. which current blocker is the most direct
-  3. what the smallest implementation action is
-- do not stop at status summary
-- state recovery must lead into an implementation action unless truly BLOCKED
+Tests should normally match the module name:
 
-## Evidence Priority
+```text
+workspaceWriteRoute.ts
+workspaceWriteRoute.test.ts
+```
 
-Prefer evidence in this order:
+Integration tests may use scenario names, but should still be short and responsibility-based.
 
-1. current task input
-2. current main-path blocker
-3. related code
-4. related tests
-5. current failure output / validation result
-6. recent changes in directly relevant files
-7. `PROJECT_STATE.md` and other docs
-8. small targeted ClaudeCode reference comparison
+Prefer adding focused modules over growing central files. If a file name exceeds 45 characters or has more than four semantic segments, consider whether the directory should carry more context or whether the file should be split.
 
-Documents are reference material, not automatic truth.
-If docs conflict with code reality, trust code reality.
+Avoid route-title names such as:
+
+```text
+singleFileApplyPatchRealProviderPermissionUxGate.ts
+singleFileApplyPatchProductionOptInNoWriteRuntimeRouteContract.ts
+singleFileApplyPatchGuardedProductionRouteRuntimeProjection.ts
+```
+
+Prefer shorter responsibility names such as:
+
+```text
+permissionUxGate.ts
+noWriteRuntimeRoute.ts
+realProviderWriteSmoke.ts
+productionRouteProjection.ts
+```
+
+Use this placement guidance for common areas:
+
+- `packages/ts-shell/src/orchestration/patchResult/`
+  - patch/apply_patch route contracts, gates, result projections, write policies, authority checks, and small orchestration helpers.
+  - Do not place CLI parsing, provider-auth logic, or broad session persistence here.
+
+- `packages/ts-shell/src/orchestration/patchApplication/`
+  - low-level patch application or writer implementation details.
+  - Do not place terminal/session projection logic here.
+
+- `packages/ts-shell/src/core/query/`
+  - generic query and result mapping.
+  - Prefer projecting feature-specific state into a generic result shape before handing it to query-level mappers.
+
+- `packages/ts-shell/src/core/shell/`
+  - shell/session display surface.
+  - Keep feature-specific policy and writer semantics outside this layer when possible.
+
+- `packages/ts-shell/src/entrypoints/`
+  - CLI argument parsing and minimal entrypoint wiring.
+  - Do not place permission, writer, route, or result mapping logic directly in entrypoints.
+
+- `packages/ts-shell/src/session/`
+  - session lifecycle, durable session state, and resume/recovery boundaries.
+  - Do not place feature route details here unless the task is explicitly about durable session semantics.
+
+- `scripts/`
+  - repository-level validation scripts, readiness checks, and real-provider smoke entrypoints.
+  - If a validation script grows too large, prefer extracting scenario-specific smoke modules under a focused subdirectory such as `scripts/real-provider-smokes/`.
+
+- `PLANS.*` and `PROJECT_STATE.md`
+  - route plans, state summaries, and stage records.
+  - These files may use longer descriptive names because they are human-facing records, not runtime modules.
+
+Do not launch large rename-only cleanups by default. Prefer this migration strategy:
+
+1. Apply the naming and placement rules to new files.
+2. Rename old files only when they are already being substantially modified.
+3. Keep rename-only commits separate from behavior changes.
+4. Do not rename already validated route files merely for cosmetic consistency.
+5. Keep long plan-document names acceptable, but keep code module names short.
+
+
+## Naming and API Shape Rules
+
+Use short, responsibility-based names. Do not encode an entire roadmap title into a file, function, or type name.
+
+Good examples:
+
+```text
+workspaceBoundary.ts
+workspaceAuthority.ts
+writeFailureState.ts
+writeRecovery.ts
+runtimeWriteRoute.ts
+routeWiringGate.ts
+productionRoute.ts
+permissionUxRoute.ts
+```
+
+Avoid long route-title names that combine every project concept into one module name.
+
+For safety-sensitive APIs:
+
+- prefer explicit enums over booleans
+- prefer named option objects over positional literals
+- avoid ambiguous `approved`, `enabled`, or `allowed` booleans when the distinction is permission, preview, dry-run, or write authorization
+- keep dry-run, permission-pending, denied, blocked, approved-for-write, and write-success states distinct
+- never let prompt keywords imply write authorization
+
+Test files should normally match the module under test.
 
 ## Task Selection Rules
 
-Before editing code, answer:
+Before editing code, identify:
 
-1. Which of the six main-path steps does this task directly advance?
-2. Which current blocker does it address?
-3. If it does not directly address the main path, why is it still more urgent?
-4. If you cannot justify 3, do not choose it as the main task.
+1. Which user-facing path or runtime capability the task improves.
+2. Which concrete blocker or risk it reduces.
+3. Why this task is more important than local cleanup or proof-only work.
+4. Which files and tests are directly relevant.
 
-If the current task should not continue as written, output:
+If the task does not reduce a real blocker or improve a user-facing path, do not make it the main implementation task.
 
-REFOCUS
+If the requested task appears misaligned, output a refocus recommendation that states:
 
-- why the current task should not continue
-- what code / tests / failures / docs were actually checked
-- the direct evidence
-- the better next implementation action
-- why it is closer to the real main path
-- why no code was changed this round
+- what was checked
+- what evidence was found
+- why the current direction should not continue
+- what better implementation action is closer to the real runtime path
 
 ## Default Prohibitions
 
-Unless directly blocking the real main path, do not:
+Unless directly required by the current task, do not:
 
-- keep adding same-family local runtime hardening cases
-- prioritize doc sync above implementation closure
-- do project-level audits, roadmap expansion, or wide refactors
-- expand naming systems or state taxonomy
-- do UI polish unrelated to the minimal real main path
-- add test-only work as the default mainline output
-- keep closing local correctness slices that do not move real user usability
-- introduce temporary behavior that makes the path look usable while drifting away from ClaudeCode-grade semantics
+- add a provider
+- change provider/auth core
+- read, print, copy, clean, or modify real provider configuration
+- change release/default gates
+- touch sealed release-core paths
+- perform wide architecture audits or roadmap expansion
+- do broad refactors
+- expand naming systems or state taxonomies for their own sake
+- add test-only work as the default output
+- add UI polish unrelated to the active runtime path
+- keep closing same-family local correctness slices after the relevant risk has been reduced
+- move control-plane semantics into Rust for convenience
+- introduce temporary behavior that makes the system look usable while drifting away from the intended architecture
 
-## Success Criteria
+For apply_patch and file-writing work, do not:
 
-In this stage, success is not "local state increment".
-A round only counts as meaningful progress if it achieves at least one of:
+- infer write authorization from prompt text
+- treat dry-run, preview, or permission-pending as write success
+- skip final stale-read before writer
+- widen single-file update behavior into multi-file/add/delete/move without a dedicated plan
+- treat isolated test/workspace success as default production readiness
+- weaken workspace boundary checks
+- hide unverified write outcomes behind success-like terminal states
 
-1. Main-path increment
+## Trigger-Based Validation Rules
 
-- one of the six steps becomes more real / usable
+Run focused validation tied to the change.
 
-2. Main-path blocker reduction
+Use these trigger rules:
 
-- one current blocker is materially reduced or removed
+- If CLI flags change, run focused CLI tests.
+- If runtime route behavior changes, run focused runMvp/runtime route tests.
+- If result or session surface changes, run focused result/session tests.
+- If workspace writer policy changes, run workspace write route tests, mutation-lane rejection regression, and build.
+- If permission, approval, or write-decision behavior changes, run focused permission/write-gate tests.
+- If provider-facing routes or smoke scripts change, run syntax checks, readiness preflight, and the relevant isolated real-provider gate when appropriate.
+- If contract shapes change, run tests that validate both producer and consumer semantics.
+- If default rejection behavior is relevant, run the mutation-lane rejection regression.
 
-3. Main-path validation gate
-
-- a direct smoke / E2E gate is added for the real user main path
-
-Tests only count as primary progress if they gate the real user main path.
-A local proof test alone is not enough.
+Do not default every round to full-repository validation. Broaden validation only when touched files cross core boundaries or focused tests cannot cover the risk.
 
 ## Validation Rules
 
-Run the narrowest validation that directly supports the main-path change.
+Validation should distinguish:
 
-Priority:
-
-1. directly related tests
-2. directly related smoke / E2E for the main path
-3. broader build / wider checks only when needed
-
-Do not default every round to full-repo validation.
-
-If validation fails, distinguish:
-
-- failures introduced this round
-- failures relevant to the current main path
+- failures introduced by the current change
+- failures relevant to the current runtime path
 - pre-existing unrelated failures
+- provider/network/config failures outside the product route
 
-If a failure is pre-existing and unrelated, record it as such and do not automatically widen the task just to clean it up.
+If a failure is pre-existing and unrelated, record it as such and do not automatically expand the task to fix it.
+
+If validation produces audit/history residue, remove or restore it before finalizing.
+
+Do not claim validation passed unless the command actually ran and passed.
+
+## Real Provider Validation Rules
+
+Run real-provider gates only when the change affects provider-facing behavior, runtime/CLI production routes, writer reachability, provider smoke scripts, or a claim about real-provider behavior.
+
+Real-provider gates must:
+
+- use explicit `PRIVATE_AGENTS_REAL_HOME`
+- use isolated runtime/test directories
+- avoid manually reading or printing real provider files
+- check redaction
+- verify repository cleanliness
+- check for audit/history residue
+- precisely classify failures
+
+A real-provider run that reaches the provider path but fails with network errors is not a route failure. Record it as provider-network or equivalent. Do not retry repeatedly unless the task explicitly asks for a bounded retry.
 
 ## Stop Conditions
 
-Stop expanding the round when:
+Stop expanding the round when the next step would require:
 
-- the next step would require a new persistence layer
-- the next step would require broad event protocol / taxonomy changes
-- the next step would move control-plane semantics into Rust
-- changes spread beyond the directly relevant main-path slice
-- progress would now depend on broad scaffolding instead of the current slice itself
-- a more direct blocker has overtaken the current action
-- further progress would visibly drift away from ClaudeCode load-bearing semantics
+- a new persistence layer
+- broad event protocol or taxonomy changes
+- release/default gate changes
+- moving control-plane semantics into Rust
+- writing outside the intended workspace or test fixture
+- changing provider/auth core
+- full edit engine behavior
+- multi-file/add/delete/move support
+- rollback, AST patch, or fuzzy patch support
+- broad CLI/session/provider architecture changes
+- work that visibly drifts from the current runtime boundary
+
+When a stop condition is reached, report the boundary and propose a separate plan or branch for that work.
 
 ## Reporting Requirements
 
-If implementation is claimed complete, include:
+If implementation is claimed complete, report:
 
-- files actually changed
+- branch name and base commit when applicable
+- files changed
 - what changed in each file
-- commands actually run
-- results of those commands
+- commands run
+- command results
+- real-provider gate results and attribution when applicable
+- audit/history residue handling
 - what was not run
-- which of the six steps was advanced
-- which blocker was reduced
+- which runtime path or blocker was advanced
+- remaining risks
 - the single best next action
 
-Do not present intention or design as completed implementation.
-Do not say something was validated unless it was actually run.
+Do not present intention, design, or a skipped validation as completed implementation.
 
-## PROJECT_STATE.md Handling
+## Project State Files
 
-Do not treat `PROJECT_STATE.md` as the source of truth.
-Use it as a stage snapshot only.
+`PROJECT_STATE.md` and `PLANS.*.md` are project-state aids, not automatic truth.
 
-Only update it when:
+Use them to understand recent decisions, blockers, and planned boundaries, but prefer evidence in this order:
+
+1. current user instruction
+2. current code
+3. focused tests
+4. actual validation output
+5. recent commits in relevant files
+6. project state documents
+7. targeted reference-repository comparison
+
+Update project state files only when:
 
 - a blocker materially changes
-- a real main-path fact is established
-- the current recommended action materially changes
-- the file is clearly behind code reality
+- a real runtime fact is established
+- the recommended next action materially changes
+- the document is clearly behind code reality
 
-Otherwise, leave it unchanged and only mention what would be worth recording there.
+Do not use `AGENTS.md` to record current project status, completed milestones, branch state, or future roadmap.
