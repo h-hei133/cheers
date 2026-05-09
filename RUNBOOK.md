@@ -105,6 +105,22 @@ work:
 | Focused regression guard | `npm run test -w packages/ts-shell -- <file> -t "<case>"` | Required when the current bounded slice added or changed a focused guard | Proves the exact behavior being closed without treating legacy wide tests as release blockers. |
 | Release core | `npm run verify:release:core` | Broader deterministic release gate | Runs the hard gate set listed above; use before release handoff or when changing shared CLI/runtime contracts. |
 
+### Add File classification boundary
+
+The current apply_patch surface can classify `*** Add File` patches in a
+synthetic/no-write path, but it cannot create files. This classification is
+diagnostic candidate/backlog evidence only:
+
+- selected-workspace single-file Add File is reported as create/add not enabled
+- existing target, missing parent directory, outside-workspace target, and
+  multi-file add each remain blocked with no write intents
+- `changedFiles=[]`, `writeIntents=[]`, `willWrite=false`, and no writer success
+  claim are required invariants
+- default MVP remains selected-workspace existing-file single-file update only
+- broader apply_patch, create/add writing, delete/move, multi-file, rollback,
+  real-provider create smoke, provider/auth flow, and CLI/session schema remain
+  out of scope
+
 `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.test.ts` full-suite
 is not a current main-path gate. It is a broad historical contract corpus used
 for attribution and targeted focused guards. Running it in full is allowed for

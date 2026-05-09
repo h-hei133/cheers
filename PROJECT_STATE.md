@@ -76,6 +76,25 @@ The primary user-visible mainline is now:
 
 ## 5. Latest Implemented Delta (through 2026-05-09)
 
+### Current closeout: Add File no-write classification
+
+The apply_patch dry-run/readiness path now recognizes `*** Add File` patches as
+create/add candidate evidence without creating files or entering the selected
+workspace writer.
+
+Key boundaries:
+
+- Add File classification is synthetic/no-write only and remains outside the
+  default MVP gate
+- classified Add File results keep `willWrite=false`, `changedFiles=[]`,
+  `writeIntents=[]`, and no writer-reachable success claim
+- classified blockers distinguish unsupported add, existing-target collision,
+  missing parent directory, outside-workspace target, and multi-file add
+- current supported mutation capability remains selected-workspace
+  existing-file single-file update only
+- broader apply_patch, create/add writing, delete/move, multi-file, rollback,
+  provider/auth, CLI/session schema, and production mutation flow are unchanged
+
 ### Current closeout: real-user capability gate tiering
 
 The `verify-real-user-capabilities` gate is now tiered so the default MVP

@@ -329,6 +329,9 @@ function surfaceBlockerFromFailures(
     case "patch-parse-invalid-format":
     case "patch-parse-unsupported-operation":
     case "patch-verify-operation-unsupported":
+    case "patch-add-file-not-enabled":
+    case "patch-add-file-parent-missing":
+    case "patch-add-file-target-exists":
       return "unsupported-patch-shape";
     default:
       return "production-gate-not-wired";

@@ -519,6 +519,18 @@ const tierDescriptorCases = [
     expectedToPassCurrentMvp: false,
   },
   {
+    id: 'backlog-create-add-file-no-write-classification',
+    tier: 'backlog',
+    provider: 'synthetic',
+    executable: false,
+    expectedCapability: 'selected-workspace single-file add/create no-write classification',
+    currentSupportedCapability: 'Add File patches can be classified as no-write candidate/backlog evidence; create/add writing remains unsupported.',
+    reasonForTier: 'Backlog because the product still must not create files; this records the synthetic no-write classification surface without promoting create/add to MVP or candidate write support.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+  },
+  {
     id: 'backlog-delete-move-support',
     tier: 'backlog',
     provider: 'synthetic',

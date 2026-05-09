@@ -12,6 +12,7 @@ import type {
 export interface VerifyParsedPatchOptions {
   readonly workspaceRoot: string;
   readonly readFile: (absolutePath: string) => string | undefined;
+  readonly directoryExists?: (absolutePath: string) => boolean;
   readonly supportedOperations?: readonly PatchOperationKind[];
 }
 
@@ -34,13 +35,9 @@ export function verifyParsedPatch(
     }
 
     if (!supportedOperations.has(operation.kind)) {
-      failures.push({
-        code: "patch-verify-operation-unsupported",
-        path: operation.path,
-        message: `Patch operation ${operation.kind} is not supported by this verification pass.`,
-        nextAction:
-          "Use the currently supported operation shape or keep this patch rejected until the capability is enabled.",
-      });
+      failures.push(
+        unsupportedOperationFailure(operation, resolved.absolutePath, options),
+      );
       continue;
     }
 
@@ -155,6 +152,12 @@ function verifyAddOperation(
       ],
     };
   }
+  if (parentDirectoryMissing(absolutePath, options)) {
+    return {
+      ok: false,
+      failures: [addParentMissingFailure(operation.path)],
+    };
+  }
 
   return {
     ok: true,
@@ -164,6 +167,63 @@ function verifyAddOperation(
       additions: countLines(operation.content),
       deletions: 0,
     },
+  };
+}
+
+function unsupportedOperationFailure(
+  operation: PatchFileOperation,
+  absolutePath: string,
+  options: VerifyParsedPatchOptions,
+): PatchFailure {
+  if (operation.kind === "add") {
+    const existing = options.readFile(absolutePath);
+    if (existing !== undefined) {
+      return {
+        code: "patch-add-file-target-exists",
+        path: operation.path,
+        message:
+          "Add File patch target already exists; create/add writing is not enabled.",
+        nextAction:
+          "Use a single-file Update File patch for existing files; keep create/add support disabled until a dedicated write route exists.",
+      };
+    }
+    if (parentDirectoryMissing(absolutePath, options)) {
+      return addParentMissingFailure(operation.path);
+    }
+    return {
+      code: "patch-add-file-not-enabled",
+      path: operation.path,
+      message:
+        "Add File patches are recognized, but create/add writing is not enabled. Current support is existing-file single-file update only.",
+      nextAction:
+        "Keep this as no-write candidate/backlog evidence; implement a dedicated selected-workspace single-file add route before writing new files.",
+    };
+  }
+
+  return {
+    code: "patch-verify-operation-unsupported",
+    path: operation.path,
+    message: `Patch operation ${operation.kind} is not supported by this verification pass.`,
+    nextAction:
+      "Use the currently supported operation shape or keep this patch rejected until the capability is enabled.",
+  };
+}
+
+function parentDirectoryMissing(
+  absolutePath: string,
+  options: VerifyParsedPatchOptions,
+): boolean {
+  return options.directoryExists?.(path.dirname(absolutePath)) === false;
+}
+
+function addParentMissingFailure(path: string): PatchFailure {
+  return {
+    code: "patch-add-file-parent-missing",
+    path,
+    message:
+      "Add File patch parent directory is missing; creating directories is not enabled.",
+    nextAction:
+      "Create parent directories through a separate approved capability before considering a single-file add route.",
   };
 }
 

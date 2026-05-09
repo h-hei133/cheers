@@ -1,6 +1,9 @@
 export type PatchOperationKind = "add" | "update" | "delete" | "move";
 
 export type PatchFailureCode =
+  | "patch-add-file-not-enabled"
+  | "patch-add-file-parent-missing"
+  | "patch-add-file-target-exists"
   | "patch-parse-invalid-format"
   | "patch-parse-empty"
   | "patch-parse-unsupported-operation"

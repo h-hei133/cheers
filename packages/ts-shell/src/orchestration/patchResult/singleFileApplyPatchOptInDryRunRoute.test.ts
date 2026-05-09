@@ -115,8 +115,9 @@ describe("single-file apply_patch opt-in dry-run route seam", () => {
     expect(result.status).toBe("blocked");
     expect(result.explicitOptIn).toBe(true);
     expect(result.dryRun.status).toBe("blocked");
-    expect(result.dryRun.failedFiles[0]?.code).toBe(
-      "patch-verify-operation-unsupported",
+    expect(result.dryRun.failedFiles[0]?.code).toBe("patch-add-file-not-enabled");
+    expect(result.dryRun.unsupportedCapability?.blockedReason).toBe(
+      "add-file-not-enabled",
     );
     expect(result.terminalSurface.status).toBe("blocked");
     expectNoWriteNoSuccess(result);

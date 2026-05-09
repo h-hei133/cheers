@@ -194,6 +194,55 @@ describe("single-file apply_patch real workspace write route", () => {
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
 
+  it("classifies Add File patches before the selected workspace writer is reachable", async () => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const addPatchText = [
+      "*** Begin Patch",
+      "*** Add File: src/new.ts",
+      "+new",
+      "*** End Patch",
+    ].join("\n");
+
+    const result = await runWorkspaceWriteRoute({
+      workspaceRoot: fixture.workspaceRoot,
+      rawPatchText: addPatchText,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: "approved",
+      defaultProductionRejectionUnchanged: true,
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: () => {
+        throw new Error("writer must stay unreachable for Add File");
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("dry-run");
+    expect(result.failures[0]).toEqual(
+      expect.objectContaining({
+        code: "patch-add-file-not-enabled",
+        path: "src/new.ts",
+      }),
+    );
+    expect(result.dryRunRoute?.dryRun.unsupportedCapability).toEqual(
+      expect.objectContaining({
+        operation: "add",
+        blockedReason: "add-file-not-enabled",
+        wouldCreateFiles: ["src/new.ts"],
+        willWrite: false,
+        writerReachable: false,
+        changedFiles: [],
+        writeIntents: [],
+      }),
+    );
+    expectNoBlockedWriteLeak(result);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
   it("blocks symlink workspace targets before writer invocation or success", async () => {
     const fixture = createFixture({ skipTarget: true });
     const outsideRoot = fs.mkdtempSync(

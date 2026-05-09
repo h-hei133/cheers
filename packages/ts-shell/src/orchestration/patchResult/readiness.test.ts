@@ -118,7 +118,7 @@ describe("buildSingleFileUpdatePatchReadinessContract", () => {
         "*** End Patch",
       ],
       files: {},
-      expectedCode: "patch-verify-operation-unsupported",
+      expectedCode: "patch-add-file-not-enabled",
       expectedPath: "src/new.ts",
     },
     {
@@ -225,6 +225,42 @@ describe("buildSingleFileUpdatePatchReadinessContract", () => {
       });
     },
   );
+
+  it("classifies Add File collision without write intents", () => {
+    const verification = verifyPatch(
+      [
+        "*** Begin Patch",
+        "*** Add File: src/app.ts",
+        "+new",
+        "*** End Patch",
+      ],
+      {
+        "src/app.ts": "existing\n",
+      },
+    );
+    const preview = buildPatchPreview(verification);
+    const noPartial = buildNoPartialPatchApplicationContract(verification);
+
+    const readiness = buildSingleFileUpdatePatchReadinessContract({
+      verification,
+      preview,
+      applicationContract: noPartial,
+    });
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.result.changedFiles).toEqual([]);
+    expect(readiness.result.failedFiles).toEqual([
+      expect.objectContaining({
+        code: "patch-add-file-target-exists",
+        path: "src/app.ts",
+      }),
+    ]);
+    expect(readiness.noPartial).toEqual({
+      atomicity: "verify-all-before-write",
+      writeIntents: 0,
+      blockedWrites: true,
+    });
+  });
 });
 
 function verifyPatch(

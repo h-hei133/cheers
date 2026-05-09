@@ -50,17 +50,13 @@ describe("verifyParsedPatch", () => {
 
     const result = verifyParsedPatch(patch, {
       workspaceRoot,
-      readFile: () => {
-        throw new Error("readFile should not run for unsupported add");
-      },
+      readFile: () => undefined,
     });
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.changedFiles).toEqual([]);
-      expect(result.failures[0]?.code).toBe(
-        "patch-verify-operation-unsupported",
-      );
+      expect(result.failures[0]?.code).toBe("patch-add-file-not-enabled");
     }
   });
 

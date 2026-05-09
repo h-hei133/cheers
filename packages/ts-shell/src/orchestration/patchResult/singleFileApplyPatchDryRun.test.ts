@@ -103,7 +103,7 @@ describe("buildSingleFileApplyPatchDryRun", () => {
         "*** End Patch",
       ],
       files: {},
-      expectedCode: "patch-verify-operation-unsupported",
+      expectedCode: "patch-add-file-not-enabled",
     },
     {
       name: "Delete File",
@@ -139,6 +139,158 @@ describe("buildSingleFileApplyPatchDryRun", () => {
     expectBlockedNoWrite(result);
     expect(result.failedFiles[0]?.code).toBe(expectedCode);
     expect(result.approval.decision).toBe("blocked");
+  });
+
+  it("classifies a selected-workspace single-file add as candidate/backlog no-write evidence", () => {
+    const result = dryRun(
+      [
+        "*** Begin Patch",
+        "*** Add File: src/new.ts",
+        "+new",
+        "*** End Patch",
+      ],
+      {},
+      {
+        existingDirectories: ["src"],
+      },
+    );
+
+    expectBlockedNoWrite(result);
+    expect(result.failedFiles[0]).toEqual(
+      expect.objectContaining({
+        code: "patch-add-file-not-enabled",
+        path: "src/new.ts",
+      }),
+    );
+    expect(result.wouldCreateFiles).toEqual(["src/new.ts"]);
+    expect(result.approval.operationKind).toBe("add");
+    expect(result.unsupportedCapability).toEqual({
+      capability: "create-file-candidate-only",
+      operation: "add",
+      tier: "backlog",
+      classificationMode: "synthetic-no-write",
+      targetPath: "src/new.ts",
+      wouldCreateFiles: ["src/new.ts"],
+      blockedReason: "add-file-not-enabled",
+      expectedCapability: "selected-workspace single-file add/create",
+      currentSupportedCapability: "existing-file single-file update only",
+      drivesApplyPatchExpansion: false,
+      willWrite: false,
+      writerReachable: false,
+      changedFiles: [],
+      writeIntents: [],
+      explanation: expect.stringContaining("recognized"),
+      nextAction: expect.stringContaining("existing-file single-file updates"),
+    });
+    expect(result.resultSurface.unsupportedCapability?.blockedReason).toBe(
+      "add-file-not-enabled",
+    );
+    expect(result.resultSurface.noWriteProof).toEqual({
+      willWrite: false,
+      writeIntentCount: 0,
+      blockedWrites: true,
+      reason: expect.stringContaining("create candidate"),
+    });
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-dry-run:add-file-classified",
+        "apply-patch-dry-run:add-file-blocker:add-file-not-enabled",
+        "apply-patch-dry-run:create-file-candidate-only",
+        "apply-patch-dry-run:no-writer-invoked",
+      ]),
+    );
+  });
+
+  it("classifies Add File target collision without write intents", () => {
+    const result = dryRun(
+      [
+        "*** Begin Patch",
+        "*** Add File: src/app.ts",
+        "+new",
+        "*** End Patch",
+      ],
+      {
+        "src/app.ts": "existing\n",
+      },
+      {
+        existingDirectories: ["src"],
+      },
+    );
+
+    expectBlockedNoWrite(result);
+    expect(result.failedFiles[0]?.code).toBe("patch-add-file-target-exists");
+    expect(result.unsupportedCapability?.blockedReason).toBe(
+      "add-file-target-exists",
+    );
+    expect(result.wouldCreateFiles).toEqual(["src/app.ts"]);
+  });
+
+  it("classifies Add File parent-missing without creating directories", () => {
+    const result = dryRun(
+      [
+        "*** Begin Patch",
+        "*** Add File: missing/new.ts",
+        "+new",
+        "*** End Patch",
+      ],
+      {},
+      {
+        existingDirectories: ["src"],
+      },
+    );
+
+    expectBlockedNoWrite(result);
+    expect(result.failedFiles[0]?.code).toBe("patch-add-file-parent-missing");
+    expect(result.unsupportedCapability?.blockedReason).toBe(
+      "add-file-parent-missing",
+    );
+    expect(result.wouldCreateFiles).toEqual(["missing/new.ts"]);
+  });
+
+  it("classifies Add File outside the workspace before any writer can run", () => {
+    const result = dryRun(
+      [
+        "*** Begin Patch",
+        "*** Add File: ../outside.txt",
+        "+outside",
+        "*** End Patch",
+      ],
+      {},
+      {
+        existingDirectories: ["src"],
+      },
+    );
+
+    expectBlockedNoWrite(result);
+    expect(result.failedFiles[0]?.code).toBe("patch-verify-path-outside-workspace");
+    expect(result.unsupportedCapability?.blockedReason).toBe(
+      "add-file-outside-workspace",
+    );
+    expect(result.wouldCreateFiles).toEqual(["../outside.txt"]);
+  });
+
+  it("keeps multi-file add patches blocked with no write intents", () => {
+    const result = dryRun(
+      [
+        "*** Begin Patch",
+        "*** Add File: src/a.ts",
+        "+a",
+        "*** Add File: src/b.ts",
+        "+b",
+        "*** End Patch",
+      ],
+      {},
+      {
+        existingDirectories: ["src"],
+      },
+    );
+
+    expectBlockedNoWrite(result);
+    expect(result.failedFiles[0]?.code).toBe("patch-apply-plan-not-verified");
+    expect(result.unsupportedCapability?.blockedReason).toBe(
+      "multi-file-add-not-enabled",
+    );
+    expect(result.wouldCreateFiles).toEqual(["src/a.ts", "src/b.ts"]);
   });
 
   it.each([
@@ -260,12 +412,26 @@ describe("buildSingleFileApplyPatchDryRun", () => {
 function dryRun(
   lines: readonly string[],
   files: Readonly<Record<string, string>>,
+  options: {
+    readonly existingDirectories?: readonly string[];
+  } = {},
 ): ReturnType<typeof buildSingleFileApplyPatchDryRun> {
   return buildSingleFileApplyPatchDryRun({
     workspaceRoot,
     rawPatchText: lines.join("\n"),
     dryRun: true,
     readFile: (absolutePath) => files[path.relative(workspaceRoot, absolutePath)],
+    ...(options.existingDirectories
+      ? {
+          directoryExists: (absolutePath: string) => {
+            const relativePath = path.relative(workspaceRoot, absolutePath) || ".";
+            return (
+              relativePath === "." ||
+              options.existingDirectories?.includes(relativePath) === true
+            );
+          },
+        }
+      : {}),
   });
 }
 

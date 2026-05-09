@@ -92,9 +92,7 @@ describe("buildNoPartialPatchApplicationContract", () => {
     if (!contract.ok) {
       expect(contract.changedFiles).toEqual([]);
       expect(contract.writeIntents).toEqual([]);
-      expect(contract.failures[0]?.code).toBe(
-        "patch-verify-operation-unsupported",
-      );
+      expect(contract.failures[0]?.code).toBe("patch-add-file-not-enabled");
     }
   });
 });
