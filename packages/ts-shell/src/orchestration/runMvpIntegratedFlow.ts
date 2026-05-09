@@ -13,6 +13,10 @@ import {
   normalizeSubjectTargetWithRootPath,
   rebindPathLikeToWorkspace,
 } from "../core/paths/legacyRootRebase.js";
+import {
+  projectToolLifecycle,
+  type ToolLifecycleProjection,
+} from "../core/tools/toolLifecycleProjection.js";
 import type { QueryEvent } from "../core/query/events.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { OpenAIModelAdapter } from "../model-adapters/providers/openai/OpenAIModelAdapter.js";
@@ -834,6 +838,7 @@ interface ToolLifecycleResult {
   readonly output?: string;
   readonly error?: string;
   readonly metadata?: Record<string, unknown>;
+  readonly projection: ToolLifecycleProjection;
   readonly provenance?: CodingResultProvenanceSummary;
 }
 
@@ -6125,7 +6130,7 @@ async function executeWorkflowTaskPlan(input: {
               if (entry.source !== "read-tool") {
                 return {
                   path: entry.path,
-                  result: { success: true, output: entry.output },
+                  result: { success: true, output: entry.output, error: undefined },
                 };
               }
               const readResult = await dispatchToolWithLifecycle({
@@ -10633,11 +10638,20 @@ async function dispatchToolWithLifecycle(input: {
   const provenance = input.provenanceCollector
     ? summarizeCodingResultProvenance(input.provenanceCollector)
     : undefined;
+  const projection = projectToolLifecycle({
+    toolName: input.toolName,
+    success: result.success,
+    output: result.output,
+    error: result.error,
+    metadata: result.metadata,
+    requireApprovalEvent: input.requireApprovalEvent,
+  });
   return {
     success: result.success,
     output: result.output,
     error: result.error,
     metadata: result.metadata,
+    projection,
     ...(provenance ? { provenance } : {}),
   };
 }
@@ -10649,9 +10663,11 @@ function classifyVerificationFailure(input: ToolLifecycleResult): {
   nextAction?: string;
 } {
   const reason = truncate(
-    input.error ?? input.output ?? "verify command failed",
+    input.projection.reason ?? input.error ?? input.output ?? "verify command failed",
   );
-  const blockerKind = inferVerificationBlockerKind(input, reason);
+  const blockerKind =
+    input.projection.verificationBlockerKind ??
+    inferVerificationBlockerKind(input, reason);
   if (!blockerKind) {
     return { status: "failed", reason };
   }
@@ -10660,12 +10676,12 @@ function classifyVerificationFailure(input: ToolLifecycleResult): {
     status: "blocked",
     reason,
     blockerKind,
-    nextAction: blockerNextAction(blockerKind),
+    nextAction: input.projection.nextAction ?? blockerNextAction(blockerKind),
   };
 }
 
 function inferVerificationBlockerKind(
-  input: ToolLifecycleResult,
+  input: { readonly metadata?: Record<string, unknown> },
   reason: string,
 ): CodingVerificationBlockerKind | undefined {
   const normalizedReason = reason.toLowerCase();
@@ -10978,7 +10994,7 @@ function extractVerificationBlockerKindFromContinuity(
 
   if (continuity.lastVerificationReason?.trim()) {
     return inferVerificationBlockerKind(
-      { success: false, error: continuity.lastVerificationReason },
+      {},
       continuity.lastVerificationReason,
     );
   }
