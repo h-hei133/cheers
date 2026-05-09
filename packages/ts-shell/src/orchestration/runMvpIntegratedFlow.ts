@@ -65,6 +65,7 @@ import {
   buildNoWriteRuntimeRoute,
   type NoWriteRuntimeSource,
 } from "./patchResult/noWriteRuntimeRoute.js";
+import { projectMutationVerificationHandoff } from "./patchResult/mutationVerificationProjection.js";
 import { buildNoWriteRuntimeRouteResult } from "./patchResult/runtimeRouteResult.js";
 import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
 import { buildWorkspaceWriteRouteResult } from "./patchResult/workspaceWriteResult.js";
@@ -6503,51 +6504,17 @@ function assembleActionResultContract(
   input: ActionResultContractInput,
 ): Pick<WorkflowExecutionResult, "codingResult" | "userFacingOutput"> {
   const userFacingOutput = buildActionResultDelivery(input);
-  const taskVerdict = input.crossFileDegradationReason
-    ? "insufficient-evidence"
-    : input.crossFileRemainingTargets.length > 0
-      ? "completed-with-caveats"
-      : input.failedFiles.length > 0
-        ? "insufficient-evidence"
-        : input.verification.status === "failed" ||
-            input.verification.status === "blocked"
-          ? "completed-with-caveats"
-          : "satisfied";
-  const taskReasons = input.crossFileDegradationReason
-    ? [
-        `Cross-file continuation degraded to terminal due to unrecoverable remaining targets: ${input.degradedCrossFileTargets.join(", ")}`,
-        `degradation-reason: ${input.crossFileDegradationReason}`,
-      ]
-    : input.crossFileRemainingTargets.length > 0
-      ? [
-          `Cross-file repair partially completed; remaining targets: ${input.crossFileRemainingTargets.join(", ")}`,
-          ...(input.crossFileFailedByReason.length > 0
-            ? [
-                `Failed-by-reason: ${input.crossFileFailedByReason
-                  .map(
-                    (item) =>
-                      `${item.path}=>${item.failureCode} (${item.reason})`,
-                  )
-                  .join("; ")}`,
-              ]
-            : []),
-          ...(input.crossFileSkippedFiles.length > 0
-            ? [
-                `Skipped files: ${input.crossFileSkippedFiles
-                  .map((item) => `${item.path} (${item.reason})`)
-                  .join("; ")}`,
-              ]
-            : []),
-        ]
-      : input.failedFiles.length > 0
-        ? ["Workflow stopped on blocker/failure."]
-        : input.verification.status === "failed"
-          ? ["Edit applied but verify failed; repair required."]
-          : input.verification.status === "blocked"
-            ? [
-                `Edit applied but verify was blocked (${input.verification.blockerKind ?? "unknown"}); follow next action before continuing.`,
-              ]
-            : ["Workflow completed under inspect/edit/verify contract."];
+  const mutationHandoff = projectMutationVerificationHandoff({
+    changedFiles: input.changedFiles,
+    failedFiles: input.failedFiles,
+    verification: input.verification,
+    evidence: input.evidence,
+    crossFileDegradationReason: input.crossFileDegradationReason,
+    degradedCrossFileTargets: input.degradedCrossFileTargets,
+    crossFileRemainingTargets: input.crossFileRemainingTargets,
+    crossFileFailedByReason: input.crossFileFailedByReason,
+    crossFileSkippedFiles: input.crossFileSkippedFiles,
+  });
 
   return {
     codingResult: buildCodingResult(input.taskKind, {
@@ -6560,8 +6527,8 @@ function assembleActionResultContract(
       repairNotes: input.repairNotes,
       evidence: input.evidence,
       provenance: input.provenance,
-      taskVerdict,
-      taskReasons,
+      taskVerdict: mutationHandoff.taskVerdict,
+      taskReasons: [...mutationHandoff.taskReasons],
     }),
     userFacingOutput,
   };

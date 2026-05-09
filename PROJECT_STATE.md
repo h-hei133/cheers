@@ -76,6 +76,32 @@ The primary user-visible mainline is now:
 
 ## 5. Latest Implemented Delta (through 2026-05-09)
 
+### Current closeout: mutation verification handoff projection
+
+Selected-workspace mutation verification and failure handoff now has a focused
+pure projection helper under `patchResult`.
+
+Key boundaries:
+
+- `mutationVerificationProjection.ts` classifies verified writes,
+  verification-blocked/failed, protected-file changes, stale-read blockers,
+  post-write verification failure, writer-started unknown/unverified effects,
+  unsupported patch shapes, and no-mutation outcomes
+- the helper only projects handoff kind, reason, next action, changed files,
+  failed files, task verdict/reasons, patch failure code, blocker kind, and
+  inspection evidence; it does not read, write, call providers, invoke tools, or
+  change session schema
+- `runMvpIntegratedFlow.ts` now delegates mutation task verdict/reason
+  projection to the helper, while leaving the query loop, provider flow, tool
+  dispatch, writer path, and mutation execution order unchanged
+- `workspaceWriteResult.ts` now uses the same helper for selected-workspace
+  write success and stopped failure surfaces, preserving `changedFiles=[]` for
+  blocked/writer-started cases and preserving inspection-required handoff for
+  unknown/unverified write effects
+- create/add/delete/move, multi-file, rollback, broader `apply_patch`,
+  provider/auth flow, real-user gate tiering, and CLI interaction behavior are
+  unchanged
+
 ### Current closeout: release-core permission-memory gate
 
 `verify:release:core` no longer fails the permission-memory hard gate because

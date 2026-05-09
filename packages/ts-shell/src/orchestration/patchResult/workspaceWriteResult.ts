@@ -3,10 +3,10 @@ import type { QueryRuntimeState } from "../../core/query/runtimeState.js";
 import type { QueryTerminal } from "../../core/query/transitions.js";
 import { createEmptyLifecycleIndex } from "../../core/tools/toolResultLifecycle.js";
 import type {
-  CodingPatchFailureCode,
   CodingResultSummary,
   OrchestrationResult,
 } from "../types.js";
+import { projectMutationVerificationHandoff } from "./mutationVerificationProjection.js";
 import type { WorkspaceWriteRoute } from "./workspaceWriteRoute.js";
 
 export function buildWorkspaceWriteRouteResult(input: {
@@ -28,10 +28,28 @@ export function buildWorkspaceWriteRouteResult(input: {
 
 function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
   if (route.status === "written") {
+    const handoff = projectMutationVerificationHandoff({
+      changedFiles: route.changedFiles,
+      failedFiles: [],
+      verification: {
+        status: "passed",
+        reason:
+          "Single-file workspace update completed after final freshness preflight and post-write verification.",
+        selectionScope: "focused",
+        selectionSource: "auto-from-changes",
+      },
+      evidence: route.evidence,
+      targetPath: route.targetPath,
+      reason:
+        "Single-file workspace update completed after final freshness preflight and post-write verification.",
+      writerStarted: route.writerStarted,
+      writeEffect: route.writeEffect,
+      postWriteVerification: route.postWriteVerification,
+    });
     return {
       taskKind: "edit-file",
-      changedFiles: [...route.changedFiles],
-      failedFiles: [],
+      changedFiles: [...handoff.changedFiles],
+      failedFiles: [...handoff.failedFiles],
       repair: emptyRepair(),
       continuation: {
         status: "first-pass-success",
@@ -41,14 +59,14 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
       changeSet: {
         gitAware: false,
         preExistingDirtyFiles: [],
-        postRunDirtyFiles: [...route.changedFiles],
+        postRunDirtyFiles: [...handoff.changedFiles],
         attemptedFiles: [...route.writeIntents],
-        changedFiles: [...route.changedFiles],
+        changedFiles: [...handoff.changedFiles],
         unchangedAttemptedFiles: [],
       },
       taskSatisfaction: {
-        verdict: "satisfied",
-        reasons: [],
+        verdict: handoff.taskVerdict,
+        reasons: [...handoff.taskReasons],
         requiredEvidence: [
           "explicit workspace write opt-in",
           "approved-for-write decision",
@@ -57,7 +75,7 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
         ],
         observedEvidence: [...route.evidence],
       },
-      verifiedFiles: [...route.changedFiles],
+      verifiedFiles: [...handoff.changedFiles],
       unverifiedFiles: [],
       verification: {
         status: "passed",
@@ -73,8 +91,8 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
       lastActionResultSeed: {
         actionKind: "edit-file",
         target: route.targetPath,
-        changedFiles: [...route.changedFiles],
-        verifiedFiles: [...route.changedFiles],
+        changedFiles: [...handoff.changedFiles],
+        verifiedFiles: [...handoff.changedFiles],
         verification: {
           status: "passed",
           reason:
@@ -111,8 +129,7 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
   const recoveryNote = writerStarted
     ? route.writeFailureState.nextAction
     : "No workspace writer ran before this route stopped.";
-  return {
-    taskKind: "edit-file",
+  const handoff = projectMutationVerificationHandoff({
     changedFiles: [],
     failedFiles: [
       {
@@ -120,12 +137,33 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
         reason,
       },
     ],
+    verification: {
+      status: "blocked",
+      reason,
+      ...(route.writeDecision?.status === "denied"
+        ? { blockerKind: "approval-denied" as const }
+        : {}),
+      nextAction: route.nextAction,
+    },
+    evidence: route.evidence,
+    ...(target ? { targetPath: target } : {}),
+    reason,
+    nextAction: route.nextAction,
+    routeBlocker: route.blocker,
+    writerStarted,
+    writeEffect,
+    postWriteVerification: route.postWriteVerification,
+  });
+  return {
+    taskKind: "edit-file",
+    changedFiles: [...handoff.changedFiles],
+    failedFiles: [...handoff.failedFiles],
     patches: [
       {
         path: target ?? "(apply_patch)",
         operation: "replace",
         status: "failed",
-        failureCode: failureCodeForBlockedRoute(route),
+        failureCode: handoff.patchFailureCode,
         reason,
       },
     ],
@@ -160,8 +198,8 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
       unchangedAttemptedFiles: target ? [target] : [],
     },
     taskSatisfaction: {
-      verdict: "insufficient-evidence",
-      reasons: [reason],
+      verdict: handoff.taskVerdict,
+      reasons: [...handoff.taskReasons],
       requiredEvidence: [
         "blocked workspace write route must not display write success",
         "blocked workspace write route must not report changed files",
@@ -176,12 +214,12 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
     verification: {
       status: "blocked",
       reason,
-      blockerKind: verificationBlockerKindForBlockedRoute(route),
+      blockerKind: handoff.verificationBlockerKind,
       nextAction: route.nextAction,
     },
     evidence: [
       ...route.evidence,
-      ...actionableBlockerEvidence(route),
+      ...handoff.actionableEvidence,
       "apply-patch-workspace-write-result:coding-result-blocked",
       "apply-patch-workspace-write-result:changed-files-empty",
       "apply-patch-workspace-write-result:no-write-success",
@@ -202,16 +240,16 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
         ? {
             writerStarted,
             writeEffect,
-            requiresUserInspection: true,
+            requiresUserInspection: handoff.requiresUserInspection,
           }
         : {}),
       verification: {
         status: "blocked",
         reason,
-        blockerKind: verificationBlockerKindForBlockedRoute(route),
+        blockerKind: handoff.verificationBlockerKind,
       },
       reason,
-      blockerKind: verificationBlockerKindForBlockedRoute(route),
+      blockerKind: handoff.verificationBlockerKind,
     },
     failureBoundary: `single-file-apply-patch-workspace-write-${route.blocker}`,
   };
@@ -297,56 +335,4 @@ function emptyRepair(): CodingResultSummary["repair"] {
     failedItems: [],
     notes: ["workspace write route only; no repair was attempted in this lane."],
   };
-}
-
-function failureCodeForBlockedRoute(
-  route: Extract<WorkspaceWriteRoute, { status: "blocked" }>,
-): CodingPatchFailureCode {
-  if (route.blocker === "final-stale-read") {
-    return "stale-read";
-  }
-  if (route.blocker === "write-application") {
-    return "write-failed";
-  }
-  if (route.blocker === "post-write-verification") {
-    return "readback-mismatch";
-  }
-  if (route.blocker === "workspace-boundary") {
-    return "write-failed";
-  }
-  return "patch-generation-failed";
-}
-
-function actionableBlockerEvidence(
-  route: Extract<WorkspaceWriteRoute, { status: "blocked" }>,
-): readonly string[] {
-  if (route.blocker === "final-stale-read") {
-    return ["actionable-blocker-kind:stale-read"];
-  }
-  if (route.blocker === "write-application" || route.blocker === "workspace-boundary") {
-    return ["actionable-blocker-kind:partial-mutation-failed"];
-  }
-  if (route.blocker === "post-write-verification") {
-    return [
-      "actionable-blocker-kind:partial-mutation-failed",
-      "actionable-blocker-kind:verification-failed",
-    ];
-  }
-  return ["actionable-blocker-kind:patch-generation-failed"];
-}
-
-function verificationBlockerKindForBlockedRoute(
-  route: Extract<WorkspaceWriteRoute, { status: "blocked" }>,
-): "approval-denied" | "environment-not-ready" | "unknown" {
-  if (route.blocker === "write-decision") {
-    return "approval-denied";
-  }
-  if (
-    route.blocker === "workspace-boundary" ||
-    route.blocker === "write-application" ||
-    route.blocker === "post-write-verification"
-  ) {
-    return "environment-not-ready";
-  }
-  return "unknown";
 }

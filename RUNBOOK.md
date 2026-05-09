@@ -97,6 +97,14 @@ approval-memory prompts must run through orchestration continuity so CLI
 `--print` can explain the last approval decision without contacting a real
 provider or changing permission persistence.
 
+Mutation verification and selected-workspace write failure handoff should route
+through the pure projection helper in `patchResult/mutationVerificationProjection.ts`.
+That helper owns classification of verification-blocked, post-write
+verification failure, protected unchanged violations, stale-read, writer-started
+unknown/unverified, unsupported patch shape, and no-mutation surfaces. It must
+remain projection-only: no provider access, no file I/O, no writer invocation,
+and no session schema changes.
+
 ### Current main-path gate layering
 
 Use these commands as the current default verification stack for main-path
