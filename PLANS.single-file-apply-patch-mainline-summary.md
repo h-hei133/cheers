@@ -1,8 +1,8 @@
 # Single-file apply_patch mainline summary
 
 Status: summarized after the explicit workspace write entrypoint and symlink
-workspace-boundary fix landed on `main`, then updated for the explicit
-selected-workspace write failure durability stage.
+workspace-boundary fix landed on `main`, then updated for writer-started
+stopped-session continuity on the explicit selected-workspace route.
 
 This document summarizes only the single-file `apply_patch` mainline. It does
 not reopen the default production route and does not claim support for
@@ -159,6 +159,11 @@ Evidence:
   content
 - writer-started stopped states require user inspection and re-reading the
   current target before retry; they do not report write success
+- next turn and `/continue` preserve writer-started stopped continuity with
+  target, `writer-started=yes`, `write-effect=unknown|unverified`,
+  `requires-user-inspection=yes`, and a re-read next action
+- no-writer blocked routes no longer carry `writeEffect=none` into the
+  continuity seed/display path
 
 Follow-up attention:
 
@@ -170,9 +175,8 @@ Follow-up attention:
   model.
 - Workspace write failures now carry more precise stopped attribution for
   workspace-boundary, write-application, and post-write verification blockers.
-- Durable stopped-session replay/resume across process restarts and broader
-  user workspace safety policy still need a separate review before any default
-  route is considered.
+- Broader user workspace safety policy still needs a separate review before any
+  default route is considered.
 
 ## Deferred or not started
 
@@ -182,7 +186,7 @@ Follow-up attention:
 - add, delete, move, rename, chmod, or file creation support
 - AST patching, fuzzy patching, rollback, or full edit-system replacement
 - release/default gate inclusion for the apply_patch writer
-- durable stopped-session auto-recovery for partially approved write flows
+- automatic repair/retry for writer-started stopped write flows
 - full atomic writer / rollback hardening
 - broad Windows filesystem edge-case hardening, including EBUSY handling
 
@@ -202,8 +206,8 @@ Follow-up attention:
 - Coarse workspace write failure attribution for workspace-boundary,
   write-application, and post-write verification blockers.
 - Abort-before-writer ambiguity for selected-workspace writes.
-- Success-like surface leakage for writer-started failures whose final state is
-  unknown or unverified.
+- Missing cross-turn `/continue` evidence for writer-started failures whose
+  final state is unknown or unverified.
 
 ## Remaining blockers and risks
 
@@ -214,9 +218,9 @@ Follow-up attention:
 - Broader cross-platform TOCTOU / atomic-write hardening is still a follow-up
   risk, not a default-route blocker by itself.
 - Durable state now distinguishes no-write aborts from writer-started
-  unknown/unverified failures inside the route result. Cross-process
-  stopped-session resume semantics and automatic recovery still need a separate
-  review.
+  unknown/unverified failures inside the route result and preserves those
+  states through next turn and `/continue`. Automatic repair/retry still needs
+  a separate review.
 - Real-provider gates prove specific isolated or explicitly selected routes only;
   they do not prove multi-file, default write, long-task continuity, or full
   production mutation maturity.

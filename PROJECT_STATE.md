@@ -5,9 +5,10 @@
 - Project name: private-coding-agents
 - Current stage mainline: **active product hardening** on default CLI path
 - Stage objective: make the interactive shell feel production-grade while preserving load-bearing runtime semantics
-- Current focus: default CLI truthfulness / continuity is stage-sealed; next
-  implementation should be chosen from current main-path blockers, with durable
-  stopped-session write continuity as the leading candidate.
+- Current focus: default CLI truthfulness / continuity and writer-started
+  stopped-session continuity are stage-sealed; next implementation should be
+  chosen from current main-path blockers instead of extending the same
+  continuity proof family without a new regression.
 
 What this stage is **not**:
 
@@ -69,7 +70,57 @@ The primary user-visible mainline is now:
 5. Result block stays minimal and actionable in compact mode
 6. Session remains ready for next turn with clear boundaries
 
-## 5. Latest Implemented Delta (through 2026-05-08)
+## 5. Latest Implemented Delta (through 2026-05-09)
+
+### Current closeout: writer-started stopped-session continuity
+
+The apply_patch writer-started stopped-session continuity route is stage-sealed
+on `main`.
+
+Recent closeout commits:
+
+- `e8602e5 Add writer-started stopped session continuity`
+- `271742a Narrow writer continuity evidence`
+
+Key sealed evidence:
+
+- explicit selected-workspace writer-started stopped states persist
+  `writerStarted`, `writeEffect=unknown|unverified`,
+  `requiresUserInspection`, target, reason, blocker, and next action through
+  the session continuity seed
+- next turn and `/continue` render failure handoff, target,
+  `writer-started=yes`, `write-effect=unknown|unverified`, and re-read next
+  action instead of success handoff
+- writer-started stopped paths keep `changedFiles=[]` and do not expose
+  write success or write intents
+- no-writer blocked routes no longer surface `writeEffect=none` in the
+  continuity display/seed path
+- `/continue` now has end-to-end synthetic fixture coverage for both
+  `writeEffect=unknown` and `writeEffect=unverified`
+
+Important boundaries:
+
+- this does not enable default production `apply_patch` writes
+- this does not add rollback, atomic transactions, multi-file/add/delete/move,
+  AST, or fuzzy patch support
+- real-provider gate was not required for the final continuity evidence
+  narrowing because no provider-facing route or provider/auth logic changed
+- future behavior branches that change writer-reachable route semantics should
+  rerun the selected-workspace real-provider smoke before claiming
+  real-provider safety
+
+Validation recorded for the final narrowing commit:
+
+- `rtk npm run test -w packages/ts-shell -- src/orchestration/patchResult/workspaceWriteResult.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/core/shell/sessionRuntime.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/core/query/lightweightChat.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/core/query/resultMapper.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "continue"`
+- `rtk npm run test -w packages/ts-shell -- src/orchestration/patchMutationLane.test.ts`
+- `rtk npm run verify:result-contract`
+- `rtk npm run build -w packages/ts-shell`
+- `rtk git diff --check`
 
 ### Current closeout: default CLI truthfulness / continuity
 
@@ -101,7 +152,7 @@ Important boundaries:
 - this does not prove true PTY terminal fidelity
 - this does not enable default production `apply_patch` writes
 - this does not add multi-file/add/delete/move/AST/fuzzy/rollback support
-- writer-started stopped-session continuity remains a separate route candidate
+- writer-started stopped-session continuity is now sealed separately on `main`
 
 ### A. Transport-unified turn execution (already landed)
 
@@ -517,9 +568,8 @@ Important boundaries:
    pipe-spawn interactive evidence in this environment
 2. execution success still depends on model/tool behavior; sealed real-provider
    smokes prove only their explicit isolated or selected-workspace routes
-3. multi-file edit, default production `apply_patch` write, durable
-   writer-started stopped-session continuity, and true PTY automation remain
-   outside the sealed evidence
+3. multi-file edit, default production `apply_patch` write, rollback/atomic
+   write recovery, and true PTY automation remain outside the sealed evidence
 4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow`
    write route remains disabled; an explicit CLI/runMvp no-write route exists,
    an explicit workspace write entrypoint has landed with durable
@@ -540,11 +590,12 @@ Escalate from hardening into focused implementation when one is reproducible:
 
 - Do not continue same-family CLI truthfulness, approval/tool provenance, PTY
   boundary, or minimal apply_patch evidence work unless a regression appears.
-- The strongest next implementation candidate is durable stopped-session write
-  continuity for explicit selected-workspace `apply_patch` results whose
-  writer-started state is `unknown` or `unverified`.
-- That next route should first audit session persistence, recovery, resume,
-  continue, and compact prompt continuity for the writer-started stopped state.
+- Writer-started stopped-session continuity for explicit selected-workspace
+  `apply_patch` results is now sealed for next turn and `/continue`; do not
+  continue that same-family route unless a new regression appears.
+- If continuing apply_patch, the next route should be a fresh blocker
+  assessment around default-route safety, rollback/atomicity, or user-workspace
+  policy rather than more continuity proof.
 - Keep default production `apply_patch` enablement blocked until a separate
   review defines rollback behavior and default user-workspace safety policy.
 - Existing real-provider gates remain explicit opt-in evidence only; do not
