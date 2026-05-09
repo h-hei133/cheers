@@ -9,6 +9,11 @@ export type StoppedRecoveryContextFixture = {
   nextAction: string;
 };
 
+export type NonWriteStoppedRecoveryScenario =
+  | "patch-generation-failed"
+  | "stale-read"
+  | "approval-denied";
+
 export function seedStoppedRecoveryContextSession(input: {
   fakeHomeDir: string;
   sessionsDir: string;
@@ -421,4 +426,260 @@ export function seedWriterStartedStoppedRecoveryContextSession(input: {
     writeEffect,
     targetPath,
   };
+}
+
+export function seedNonWriteStoppedRecoveryContextSession(input: {
+  fakeHomeDir: string;
+  sessionsDir: string;
+  scenario: NonWriteStoppedRecoveryScenario;
+  sessionId?: string;
+  projectName?: string;
+}): StoppedRecoveryContextFixture & {
+  scenario: NonWriteStoppedRecoveryScenario;
+  targetPath: string;
+  blockerKind: string;
+} {
+  const scenario = input.scenario;
+  const targetPath = targetPathForNonWriteScenario(scenario);
+  const projectRoot = path.join(
+    input.fakeHomeDir,
+    input.projectName ?? `continue-non-write-${scenario}-project`,
+  );
+  fs.mkdirSync(path.join(projectRoot, path.dirname(targetPath)), {
+    recursive: true,
+  });
+  fs.writeFileSync(
+    path.join(projectRoot, targetPath),
+    "Current content remains unchanged.\n",
+    "utf8",
+  );
+
+  const sessionId = input.sessionId ?? `sess_non_write_${scenario}`;
+  const sessionDir = path.join(input.sessionsDir, sessionId);
+  const now = new Date().toISOString();
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(sessionDir, "metadata.json"),
+    JSON.stringify(
+      {
+        id: sessionId,
+        projectRoot,
+        title: `Non-Write Stopped ${scenario}`,
+        createdAt: now,
+        updatedAt: now,
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+
+  const currentStorePath = path.join(
+    input.fakeHomeDir,
+    ".private-agents",
+    "current-session.json",
+  );
+  fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });
+  fs.writeFileSync(
+    currentStorePath,
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        byProjectRoot: {
+          [path.resolve(projectRoot).toLowerCase()]: {
+            sessionId,
+            updatedAt: now,
+          },
+        },
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+
+  const { stopReason, nextAction, blockerKind, failureCode } =
+    nonWriteScenarioDetails(scenario, targetPath);
+  fs.writeFileSync(
+    path.join(sessionDir, "state.json"),
+    JSON.stringify(
+      {
+        status: "completed",
+        projectRoot,
+        runPhase: "idle",
+        terminalReason: "stopped_error",
+        terminalClassification: "stopped",
+        durableStatus: "stopped",
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(sessionDir, "transcript.jsonl"),
+    [
+      {
+        type: "message",
+        role: "user",
+        content: `attempt non-write edit for ${targetPath}`,
+        timestamp: now,
+      },
+      {
+        type: "query-event",
+        event: {
+          type: "query.completed",
+          result: {
+            status: "stopped_error",
+            terminalReason: "stopped_error",
+            terminalClassification: "stopped",
+            stopReason,
+            transcript: [],
+            sharedContext: {
+              sessionId,
+              initialPrompt: `attempt non-write edit for ${targetPath}`,
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: `Stopped before writing ${targetPath}.`,
+            codingResult: {
+              taskKind: "edit-file",
+              changedFiles: [],
+              failedFiles: [{ path: targetPath, reason: stopReason }],
+              patches: [
+                {
+                  path: targetPath,
+                  operation: "replace",
+                  status: "failed",
+                  failureCode,
+                  reason: stopReason,
+                },
+              ],
+              repair: {
+                status: "not-needed",
+                attempts: 0,
+                recoveredItems: [],
+                failedItems: [targetPath],
+                notes: [`Next action: ${nextAction}`],
+              },
+              continuation: {
+                status: "first-pass-success",
+                attempts: 0,
+                evidence: [
+                  `actionable-blocker-kind:${blockerKind}`,
+                  `actionable-blocker-next:${nextAction}`,
+                ],
+              },
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: [],
+                attemptedFiles: [targetPath],
+                changedFiles: [],
+                unchangedAttemptedFiles: [targetPath],
+              },
+              taskSatisfaction: {
+                verdict: "insufficient-evidence",
+                reasons: [stopReason],
+                requiredEvidence: ["no writer invocation", "no changed files"],
+                observedEvidence: [`actionable-blocker-kind:${blockerKind}`],
+              },
+              verifiedFiles: [],
+              unverifiedFiles: [{ path: targetPath, reason: stopReason }],
+              verification: {
+                status: "blocked",
+                reason: stopReason,
+                blockerKind: "unknown",
+              },
+              lastActionResultSeed: {
+                actionKind: "edit-file",
+                target: targetPath,
+                changedFiles: [],
+                verifiedFiles: [],
+                verification: {
+                  status: "blocked",
+                  reason: stopReason,
+                  blockerKind: "unknown",
+                },
+                blockerKind: "unknown",
+                reason: stopReason,
+              },
+              evidence: [
+                `actionable-blocker-kind:${blockerKind}`,
+                `actionable-blocker-next:${nextAction}`,
+              ],
+              failureBoundary: stopReason,
+            },
+          },
+        },
+        timestamp: now,
+      },
+    ]
+      .map((entry) => JSON.stringify(entry))
+      .join("\n") + "\n",
+    "utf8",
+  );
+
+  return {
+    projectRoot,
+    sessionId,
+    sessionDir,
+    stopReason,
+    nextAction,
+    scenario,
+    targetPath,
+    blockerKind,
+  };
+}
+
+function targetPathForNonWriteScenario(
+  scenario: NonWriteStoppedRecoveryScenario,
+): string {
+  switch (scenario) {
+    case "patch-generation-failed":
+      return "src/patch-shape.ts";
+    case "stale-read":
+      return "src/stale-read.ts";
+    case "approval-denied":
+      return "src/denied-edit.ts";
+  }
+}
+
+function nonWriteScenarioDetails(
+  scenario: NonWriteStoppedRecoveryScenario,
+  targetPath: string,
+): {
+  stopReason: string;
+  nextAction: string;
+  blockerKind: string;
+  failureCode: string;
+} {
+  switch (scenario) {
+    case "patch-generation-failed":
+      return {
+        stopReason:
+          `patch-generation-failed: unified diff/apply_patch syntax is not supported for ${targetPath}.`,
+        nextAction:
+          "Rerun with one explicit target file plus exact replace-from and replace-to text; do not pass unified diff or apply_patch syntax.",
+        blockerKind: "patch-generation-failed",
+        failureCode: "patch-generation-failed",
+      };
+    case "stale-read":
+      return {
+        stopReason:
+          `stale-read: ${targetPath} changed since it was read for this edit.`,
+        nextAction:
+          `Re-read ${targetPath}, then rerun the edit against that current content.`,
+        blockerKind: "stale-read",
+        failureCode: "stale-read",
+      };
+    case "approval-denied":
+      return {
+        stopReason: `Approval denied by user for apply_patch on ${targetPath}.`,
+        nextAction:
+          "Submit the prompt again and approve escalation only if the requested edit is still intended.",
+        blockerKind: "approval-denied",
+        failureCode: "write-failed",
+      };
+  }
 }

@@ -358,6 +358,54 @@ describe("mapTerminalToOrchestrationResult", () => {
     expect(result.stopReason).toBe("Re-run and approve escalation.");
   });
 
+  it("maps approval-denied evidence to stopped instead of hard error", () => {
+    const fakeState = {
+      transcript: [
+        {
+          role: "assistant",
+          content: "Permission denied before editing.",
+          codingResult: buildCodingResult({
+            changedFiles: [],
+            failedFiles: [
+              {
+                path: "src/app.ts",
+                reason: "Approval denied by user for apply_patch on src/app.ts.",
+              },
+            ],
+            verification: {
+              status: "blocked",
+              reason: "Approval denied by user for apply_patch on src/app.ts.",
+              blockerKind: "unknown",
+            },
+            verdict: "insufficient-evidence",
+            reasons: ["Approval denied by user for apply_patch on src/app.ts."],
+            evidence: ["actionable-blocker-kind:approval-denied"],
+          }),
+        },
+      ],
+      sharedContext: {
+        sessionId: "sess_mapper_approval_denied_evidence",
+        initialPrompt: "prompt",
+        notes: [],
+        handoffs: [],
+      },
+      lastContinuationReason: undefined,
+    } as never;
+
+    const result = mapTerminalToOrchestrationResult(fakeState, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+      stopReason: undefined,
+    } as never);
+
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason).toBe(
+      "Approval denied by user for apply_patch on src/app.ts.",
+    );
+    expect(result.codingResult?.changedFiles).toEqual([]);
+  });
+
   it("keeps non-verification actionable blockers stopped even with hard failure text", () => {
     const fakeState = {
       transcript: [

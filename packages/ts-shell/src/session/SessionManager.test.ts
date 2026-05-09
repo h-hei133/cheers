@@ -1943,6 +1943,128 @@ describe("SessionManager", () => {
     );
   });
 
+  it("derives non-write stopped blocker and next action from result evidence", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    const stopReason =
+      "stale-read: src/stale.ts changed since it was read for this edit.";
+    const nextAction =
+      "Re-read src/stale.ts, then rerun the edit against that current content.";
+
+    manager.markRunStarted(session.id, "continue stale edit");
+    manager.addTurn(session.id, {
+      role: "user",
+      content: "edit src/stale.ts",
+    });
+    manager.appendQueryEvent(session.id, {
+      type: "query.completed",
+      result: {
+        status: "stopped_error",
+        terminalReason: "stopped_error",
+        terminalClassification: "stopped",
+        stopReason,
+        transcript: [],
+        sharedContext: {
+          sessionId: session.id,
+          initialPrompt: "edit src/stale.ts",
+          notes: [],
+          handoffs: [],
+        },
+        finalOutput: "",
+        codingResult: {
+          taskKind: "edit-file",
+          changedFiles: [],
+          failedFiles: [{ path: "src/stale.ts", reason: stopReason }],
+          patches: [
+            {
+              path: "src/stale.ts",
+              operation: "replace",
+              status: "failed",
+              failureCode: "stale-read",
+              reason: stopReason,
+            },
+          ],
+          repair: {
+            status: "not-needed",
+            attempts: 0,
+            recoveredItems: [],
+            failedItems: ["src/stale.ts"],
+            notes: [`Next action: ${nextAction}`],
+          },
+          continuation: {
+            status: "first-pass-success",
+            attempts: 0,
+            evidence: [
+              "actionable-blocker-kind:stale-read",
+              `actionable-blocker-next:${nextAction}`,
+            ],
+          },
+          changeSet: {
+            gitAware: false,
+            preExistingDirtyFiles: [],
+            postRunDirtyFiles: [],
+            attemptedFiles: ["src/stale.ts"],
+            changedFiles: [],
+            unchangedAttemptedFiles: ["src/stale.ts"],
+          },
+          taskSatisfaction: {
+            verdict: "insufficient-evidence",
+            reasons: [stopReason],
+            requiredEvidence: ["no writer invocation", "no changed files"],
+            observedEvidence: ["actionable-blocker-kind:stale-read"],
+          },
+          verifiedFiles: [],
+          unverifiedFiles: [{ path: "src/stale.ts", reason: stopReason }],
+          verification: {
+            status: "blocked",
+            reason: stopReason,
+            blockerKind: "unknown",
+          },
+          lastActionResultSeed: {
+            actionKind: "edit-file",
+            target: "src/stale.ts",
+            changedFiles: [],
+            verifiedFiles: [],
+            verification: {
+              status: "blocked",
+              reason: stopReason,
+              blockerKind: "unknown",
+            },
+            blockerKind: "unknown",
+            reason: stopReason,
+          },
+          evidence: [
+            "actionable-blocker-kind:stale-read",
+            `actionable-blocker-next:${nextAction}`,
+          ],
+          failureBoundary: stopReason,
+        },
+      },
+    });
+    manager.saveError(session.id, stopReason, {
+      terminalReason: "stopped_error",
+      terminalClassification: "stopped",
+    });
+
+    const snapshot = manager.buildContinuitySnapshot(session.id);
+    expect(snapshot.lastVerificationBlockerKind).toBe("stale-read");
+    expect(snapshot.lastVerificationNextAction).toBe(nextAction);
+    expect(snapshot.lastFailureHandoffDiagnostic).toBe(
+      `Failure handoff: status=blocked; target=src/stale.ts; reason=${stopReason}; blocker=stale-read; next=${nextAction.replace(/[.]+$/, "")}.`,
+    );
+    expect(snapshot.lastWriterStarted).toBeUndefined();
+    expect(snapshot.lastWriteEffect).toBeUndefined();
+    expect(snapshot.recentChangedFiles).toEqual([]);
+
+    const context = manager.buildPromptContinuityContext(
+      session.id,
+      "continue stale edit",
+    );
+    expect(context).toContain("- last-verification-blocker-kind: stale-read");
+    expect(context).toContain(`- last-verification-next-action: ${nextAction}`);
+    expect(context).not.toContain("- last-write-effect:");
+  });
+
   it("preserves verification failed repair context across auto-compact reload", () => {
     const manager = new SessionManager();
     const fixture = createLongSessionContinuityFixture(

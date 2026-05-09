@@ -52,7 +52,8 @@ type ActionableBlockerKind =
   | "stale-read"
   | "partial-mutation-failed"
   | "verification-failed"
-  | "command-not-allowlisted";
+  | "command-not-allowlisted"
+  | "approval-denied";
 
 function deriveTruthfulTerminal(input: {
   terminal: QueryTerminal;
@@ -316,7 +317,11 @@ function deriveActionableBlockerContract(input: {
     return undefined;
   }
 
-  return { kind, reason };
+  const nextAction = input.codingResult?.verification.nextAction?.trim();
+  return {
+    kind,
+    reason: kind === "approval-denied" && nextAction ? nextAction : reason,
+  };
 }
 
 function findActionableKindFromEvidence(
@@ -342,7 +347,8 @@ function findActionableKindFromEvidence(
     actionableMarker === "stale-read" ||
     actionableMarker === "partial-mutation-failed" ||
     actionableMarker === "verification-failed" ||
-    actionableMarker === "command-not-allowlisted"
+    actionableMarker === "command-not-allowlisted" ||
+    actionableMarker === "approval-denied"
   ) {
     return actionableMarker;
   }
@@ -359,6 +365,14 @@ function classifyActionableKind(
   }
   if (normalized.includes("not allowed in the mvp allowlist")) {
     return "command-not-allowlisted";
+  }
+  if (
+    normalized.includes("approval denied") ||
+    normalized.includes("user rejected") ||
+    normalized.includes("rejected permission") ||
+    normalized.includes("permission rejected")
+  ) {
+    return "approval-denied";
   }
   if (
     normalized.includes("patch-target-missing") ||

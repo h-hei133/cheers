@@ -173,6 +173,9 @@ function failureCodeForRoute(route: NoWriteRuntimeRoute): CodingPatchFailureCode
 }
 
 function actionableBlockerEvidence(route: NoWriteRuntimeRoute): readonly string[] {
+  if (route.status === "denied") {
+    return ["actionable-blocker-kind:approval-denied"];
+  }
   if (route.status === "blocked") {
     return ["actionable-blocker-kind:stale-read"];
   }

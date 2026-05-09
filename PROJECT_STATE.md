@@ -5,10 +5,11 @@
 - Project name: private-coding-agents
 - Current stage mainline: **active product hardening** on default CLI path
 - Stage objective: make the interactive shell feel production-grade while preserving load-bearing runtime semantics
-- Current focus: default CLI truthfulness / continuity and writer-started
-  stopped-session continuity are stage-sealed; next implementation should be
-  chosen from current main-path blockers instead of extending the same
-  continuity proof family without a new regression.
+- Current focus: default CLI truthfulness / continuity, writer-started
+  stopped-session continuity, and non-write stopped `/continue` replay
+  evidence are stage-sealed; next implementation should be chosen from current
+  main-path blockers instead of extending the same continuity proof family
+  without a new regression.
 
 What this stage is **not**:
 
@@ -71,6 +72,40 @@ The primary user-visible mainline is now:
 6. Session remains ready for next turn with clear boundaries
 
 ## 5. Latest Implemented Delta (through 2026-05-09)
+
+### Current closeout: non-write stopped `/continue` replay evidence
+
+The stopped result `/continue` replay evidence route has been extended beyond
+writer-started write failures to cover representative non-write stopped cases.
+
+Recent closeout commit:
+
+- pending on `stopped-continue-replay-nonwrite`
+
+Key sealed evidence:
+
+- `/continue` has real CLI child-process fixture coverage for
+  `patch-generation-failed`, `stale-read`, and `approval-denied`
+- non-write stopped continuity preserves target, reason, blocker kind, failed
+  file, and next action through the session handoff path
+- no-writer stopped paths do not render `writer-started=yes`,
+  `write-effect=*`, changed files, write intents, or success handoff
+- `approval-denied` is now recognized as an actionable blocker kind in the
+  no-write runtime result/resultMapper/session continuity path
+- raw result evidence may still contain internal no-write markers such as
+  `apply-patch-workspace-write-result:write-effect:none`; that remains
+  acceptable as result evidence and does not enter continuity seed/display
+
+Important boundaries:
+
+- provider-readiness failure remains a current-turn/pre-query readiness concern,
+  not an action-result `/continue` handoff
+- this does not enable default production `apply_patch` writes
+- this does not change provider/auth core, CLI provider readiness, release
+  gates, rollback, atomic transactions, or default unified diff rejection
+- real-provider gate is not required because this route changes synthetic
+  session/result continuity evidence only and does not touch provider-facing
+  behavior
 
 ### Current closeout: writer-started stopped-session continuity
 
@@ -593,6 +628,10 @@ Escalate from hardening into focused implementation when one is reproducible:
 - Writer-started stopped-session continuity for explicit selected-workspace
   `apply_patch` results is now sealed for next turn and `/continue`; do not
   continue that same-family route unless a new regression appears.
+- Non-write stopped `/continue` replay evidence for
+  `patch-generation-failed`, `stale-read`, and `approval-denied` is now sealed;
+  do not keep expanding same-family stopped replay fixtures unless a concrete
+  stopped/resume regression appears.
 - If continuing apply_patch, the next route should be a fresh blocker
   assessment around default-route safety, rollback/atomicity, or user-workspace
   policy rather than more continuity proof.

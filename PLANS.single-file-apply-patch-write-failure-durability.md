@@ -81,6 +81,12 @@ verified stage. This work does not add rollback or a broader transaction model.
   `/continue` continuity.
 - `/continue` has end-to-end fixture coverage for both `writeEffect=unknown`
   and `writeEffect=unverified`.
+- `/continue` also has end-to-end CLI fixture coverage for representative
+  non-write stopped cases: `patch-generation-failed`, `stale-read`, and
+  `approval-denied`.
+- Non-write stopped cases may keep internal no-write evidence such as
+  `write-effect:none` in the raw result evidence, but that evidence must not
+  enter continuity seed/display or be rendered as a writer-started state.
 
 ## Real-provider gate boundary
 
@@ -112,6 +118,8 @@ described as default production write readiness.
 - rollback or automatic repair after writer-started failure
 - broader compact/auto-recovery behavior beyond next turn and `/continue`
   evidence
+- more same-family non-write stopped `/continue` fixture expansion unless a
+  concrete stopped/resume regression appears
 - atomic multi-step transaction semantics
 - Windows EBUSY and broad cross-platform filesystem semantics
 - default production `apply_patch` enablement
@@ -123,6 +131,8 @@ described as default production write readiness.
   `partial-mutation`
 - `/continue` fixtures cover both `writeEffect=unknown` and
   `writeEffect=unverified` without changed-file or success-handoff leakage
+- non-write stopped `/continue` fixtures preserve blocker, target, failed file,
+  reason, and next action without writer/write-effect leakage
 - default mutation-lane rejection regression passes
 - package build passes
 - real-provider selected-workspace write smoke passes or is precisely attributed

@@ -208,6 +208,8 @@ Follow-up attention:
 - Abort-before-writer ambiguity for selected-workspace writes.
 - Missing cross-turn `/continue` evidence for writer-started failures whose
   final state is unknown or unverified.
+- Missing cross-turn `/continue` evidence for representative non-write stopped
+  cases: `patch-generation-failed`, `stale-read`, and `approval-denied`.
 
 ## Remaining blockers and risks
 
@@ -221,6 +223,11 @@ Follow-up attention:
   unknown/unverified failures inside the route result and preserves those
   states through next turn and `/continue`. Automatic repair/retry still needs
   a separate review.
+- Non-write stopped results now preserve actionable blocker/next-action
+  continuity through `/continue` without reporting changed files, write intents,
+  writer-started state, write effect, or success handoff. Internal raw evidence
+  such as `write-effect:none` remains acceptable only as result evidence, not
+  as continuity seed/display.
 - Real-provider gates prove specific isolated or explicitly selected routes only;
   they do not prove multi-file, default write, long-task continuity, or full
   production mutation maturity.
@@ -264,8 +271,8 @@ workspace write smoke before being sealed.
 1. Return focus to the default user main path unless a concrete apply_patch
    regression appears. The apply_patch mainline now has explicit no-write and
    explicit selected-workspace write entrypoints.
-2. If continuing apply_patch work, review cross-process stopped-session
-   persistence and user retry UX for writer-started unknown/unverified states
-   before considering default route changes.
+2. If continuing apply_patch work, choose a fresh blocker such as default-route
+   safety policy, rollback/atomicity, or user-workspace mutation policy rather
+   than extending same-family `/continue` evidence without a regression.
 3. Keep rollback, atomic multi-step transactions, multi-file support, AST, and
    fuzzy patching deferred unless a separate main-path blocker justifies them.

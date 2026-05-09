@@ -17,6 +17,7 @@ import {
   runInteractiveStartupSmoke,
 } from "./test-utils/cliHarness.js";
 import {
+  seedNonWriteStoppedRecoveryContextSession,
   seedStoppedRecoveryContextSession,
   seedWriterStartedStoppedRecoveryContextSession,
 } from "./test-utils/stoppedRecoveryFixture.js";
@@ -4210,6 +4211,101 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       expect(stoppedNoteText).toContain(`seedWriteEffect=${writeEffect}`);
       expect(stoppedNoteText).toContain("seedRequiresUserInspection=yes");
       expect(stoppedNoteText).not.toContain("seedChangedFiles=");
+    },
+    60000,
+  );
+
+  it.each([
+    "patch-generation-failed",
+    "stale-read",
+    "approval-denied",
+  ] as const)(
+    "keeps non-write stopped %s evidence actionable through bare and follow-up /continue",
+    async (scenario) => {
+      const {
+        projectRoot,
+        sessionDir: stoppedSessionDir,
+        stopReason,
+        nextAction,
+        targetPath,
+        blockerKind,
+      } = seedNonWriteStoppedRecoveryContextSession({
+        fakeHomeDir,
+        sessionsDir,
+        scenario,
+        sessionId: `sess_non_write_${scenario}_recovery`,
+        projectName: `continue-non-write-${scenario}-project`,
+      });
+
+      const runPrint = (prompt: string) =>
+        spawnSync(
+          nodeExe,
+          [
+            tsxCliPath,
+            cliPath,
+            "--project",
+            projectRoot,
+            "--print",
+            prompt,
+          ],
+          {
+            cwd: repoRoot,
+            env: {
+              ...process.env,
+              USERPROFILE: fakeHomeDir,
+              HOME: fakeHomeDir,
+              PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+            },
+            encoding: "utf8",
+            timeout: 30000,
+          },
+        );
+
+      const bareResult = runPrint("/continue");
+      expect(bareResult.error).toBeUndefined();
+      expect(bareResult.status).toBe(0);
+      const bareOutput = `${bareResult.stdout ?? ""}${bareResult.stderr ?? ""}`;
+      expect(bareOutput).toContain("TerminalState: stopped");
+      expect(bareOutput).toContain(`BlockerKind: ${blockerKind}`);
+      expect(bareOutput).toContain(`Reason: ${stopReason}`);
+      expect(bareOutput).toContain(`Failed files: ${targetPath}`);
+      expect(bareOutput).toContain(`DoNext: ${nextAction}`);
+      expect(bareOutput).not.toContain("No recoverable session found");
+      expect(bareOutput).not.toContain(`Changed files: ${targetPath}`);
+
+      const result = runPrint(`/continue continue ${scenario}`);
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+      const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+      expect(output).toContain("Continuation");
+      expect(output).toContain("Failure handoff: status=blocked");
+      expect(output).toContain(`target=${targetPath}`);
+      expect(output).toContain(`reason=${stopReason}`);
+      expect(output).toContain(`blocker=${blockerKind}`);
+      expect(output).toContain(`next=${nextAction.replace(/[.]+$/, "")}`);
+      expect(output).not.toContain("Success handoff: status=passed");
+      expect(output).not.toContain(`Changed files: ${targetPath}`);
+      expect(output).not.toContain("writer-started=yes");
+      expect(output).not.toContain("write-effect=");
+
+      const stoppedEntries = parseTranscriptJsonl(
+        path.join(stoppedSessionDir, "transcript.jsonl"),
+      );
+      const stoppedNotes = stoppedEntries
+        .filter(
+          (entry) =>
+            entry.type === "query-event" &&
+            entry.event?.type === "query.completed",
+        )
+        .flatMap((entry) => entry.event?.result?.sharedContext?.notes ?? []);
+      const stoppedNoteText = stoppedNotes.join("\n");
+      expect(stoppedNoteText).toContain("seed=action-result");
+      expect(stoppedNoteText).toContain("seedAction=edit-file");
+      expect(stoppedNoteText).toContain(`seedTarget=${targetPath}`);
+      expect(stoppedNoteText).toContain(`diagnosticBlocker=${blockerKind}`);
+      expect(stoppedNoteText).not.toContain("seedChangedFiles=");
+      expect(stoppedNoteText).not.toContain("seedWriterStarted=yes");
+      expect(stoppedNoteText).not.toContain("seedWriteEffect=");
     },
     60000,
   );

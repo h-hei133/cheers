@@ -43,6 +43,7 @@ import type {
   TerminalReason,
 } from "../orchestration/types.js";
 import { mergeContinuitySummaryEntries } from "./compactSummaryFormatter.js";
+import { deriveActionableFailureContinuity } from "./actionableFailureContinuity.js";
 import { formatPromptContinuityContext } from "./continuityFormatter.js";
 import {
   createEmptyCurrentSessionSelectionStore,
@@ -2425,6 +2426,8 @@ export class SessionManager {
       this.extractFailureHandoffDiagnosticFromMemory(
         stateSnapshot?.workingMemory,
       );
+    const lastActionableFailure =
+      deriveActionableFailureContinuity(lastCodingResult);
     const lastSuccessHandoffDiagnostic =
       this.buildSuccessHandoffDiagnostic(lastCodingResult) ??
       this.extractSuccessHandoffDiagnosticFromMemory(
@@ -2633,8 +2636,12 @@ export class SessionManager {
       lastVerificationStatus: lastCodingResult?.verification.status,
       lastVerificationCommand: lastCodingResult?.verification.command,
       lastVerificationReason: lastCodingResult?.verification.reason,
-      lastVerificationBlockerKind: lastCodingResult?.verification.blockerKind,
-      lastVerificationNextAction: lastCodingResult?.verification.nextAction,
+      lastVerificationBlockerKind:
+        lastActionableFailure?.blockerKind ??
+        lastCodingResult?.verification.blockerKind,
+      lastVerificationNextAction:
+        lastActionableFailure?.nextAction ??
+        lastCodingResult?.verification.nextAction,
       ...(lastCodingResult?.verification.status === "blocked"
       && lastCodingResult.verification.blockerKind === "approval-denied"
       && Boolean(lastCodingResult.verification.command?.trim())
@@ -5348,7 +5355,9 @@ export class SessionManager {
     const failedFile = codingResult.failedFiles.find((entry) =>
       entry.reason.trim(),
     );
+    const actionableFailure = deriveActionableFailureContinuity(codingResult);
     const blockerKind =
+      actionableFailure?.blockerKind ??
       seed?.verification?.blockerKind ??
       seed?.blockerKind ??
       codingResult.verification.blockerKind;
@@ -5372,6 +5381,7 @@ export class SessionManager {
       codingResult.taskSatisfaction.reasons[0] ??
       codingResult.failureBoundary;
     const nextFocus =
+      actionableFailure?.nextAction ??
       codingResult.verification.nextAction ??
       (status === "blocked"
         ? "resolve the blocker and rerun the intended verification"

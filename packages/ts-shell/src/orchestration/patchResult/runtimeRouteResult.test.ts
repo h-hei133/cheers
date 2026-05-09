@@ -79,4 +79,37 @@ describe("apply_patch no-write runtime route result", () => {
       ]),
     );
   });
+
+  it("keeps denied permission stopped without write-success leakage", () => {
+    const route = buildNoWriteRuntimeRoute({
+      workspaceRoot,
+      rawPatchText,
+      explicitRuntimeOptIn: true,
+      requestedUserDecision: "denied",
+      runtimeSource: "production-adjacent",
+      readFile: () => "old\n",
+    });
+
+    const result = buildNoWriteRuntimeRouteResult({
+      sessionId: "sess_apply_patch_runtime_denied",
+      prompt: rawPatchText,
+      route,
+    });
+
+    expect(route.status).toBe("denied");
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.changeSet.changedFiles).toEqual([]);
+    expect(result.codingResult?.changeSet.attemptedFiles).toEqual(["src/app.ts"]);
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "actionable-blocker-kind:approval-denied",
+        "apply-patch-runtime-entrypoint:no-writer-invoked",
+        "apply-patch-runtime-entrypoint:no-write-success",
+      ]),
+    );
+    expect(JSON.stringify(result)).not.toContain('"writeIntents":["src/app.ts"]');
+    expect(JSON.stringify(result)).not.toContain('"writerStarted":true');
+  });
 });
