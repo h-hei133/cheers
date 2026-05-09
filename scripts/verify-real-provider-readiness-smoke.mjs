@@ -11,6 +11,7 @@ const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
 const classificationSelfTest = process.argv.includes('--classification-self-test')
 const help = process.argv.includes('--help') || process.argv.includes('-h')
+const defaultProviderEnvPath = '/home/wang/.private-agents-real/provider.env'
 
 const allowedProviders = new Set([
   'openai',
@@ -46,19 +47,22 @@ function usage() {
   console.log('Required opt-in env:')
   console.log('  PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1')
   console.log('  PRIVATE_AGENTS_TEST_ROOT=<isolated test root>')
+  console.log('Provider env may be supplied explicitly or by silently loading provider.env.')
   console.log('  PRIVATE_AGENTS_REAL_PROVIDER=openai|openai-compatible|google|antigravity|claudecode')
+  console.log('  PRIVATE_AGENTS_PROVIDER=<same providers>  accepted alias')
   console.log('  PRIVATE_AGENTS_REAL_API_KEY=<provider api key>')
+  console.log('  OPENAI_API_KEY / OPENAI_COMPATIBLE_API_KEY / GOOGLE_API_KEY / ANTIGRAVITY_API_KEY / CLAUDECODE_API_KEY')
   console.log('  PRIVATE_AGENTS_REAL_BASE_URL=<base url>   required for OpenAI-compatible style providers')
   console.log('  PRIVATE_AGENTS_REAL_MODEL=<model>         required for OpenAI-compatible style providers')
   console.log('')
-  console.log('This smoke refuses PRIVATE_AGENTS_REAL_HOME and never reads real user provider config.')
+  console.log('This smoke never reads real user provider config directories.')
 }
 
-function printHeader(mode) {
+function printHeader(mode, configSource = 'explicit-env-or-provider-env') {
   console.log('gate name=real-provider-readiness-smoke')
   console.log(`mode=${mode}`)
   console.log('status taxonomy: pass=0 product-regression=1 network=2 missing-config/missing-key/auth/unsupported=3')
-  console.log('configSource=explicit-env')
+  console.log(`configSource=${configSource}`)
   console.log('real-provider-home-read=false')
 }
 
@@ -115,14 +119,206 @@ function classifyOutput(result) {
   return { status: 'product-regression', code: 1 }
 }
 
+function parseProviderEnvFile(filePath) {
+  const resolved = path.resolve(filePath)
+  if (resolved !== defaultProviderEnvPath) {
+    return {
+      ok: false,
+      status: 'missing-config',
+      code: 3,
+      reason: 'provider env path must be /home/wang/.private-agents-real/provider.env',
+    }
+  }
+  if (!fs.existsSync(resolved)) {
+    return {
+      ok: false,
+      status: 'missing-config',
+      code: 3,
+      reason: 'provider.env is not present at the approved path',
+    }
+  }
+
+  const parsed = {}
+  const content = fs.readFileSync(resolved, 'utf8')
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/)
+    if (!match) continue
+    const key = match[1]
+    let value = match[2]?.trim() ?? ''
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    } else {
+      const commentIndex = value.search(/\s+#/)
+      if (commentIndex >= 0) value = value.slice(0, commentIndex).trim()
+    }
+    parsed[key] = value
+  }
+  return { ok: true, env: parsed }
+}
+
+function getTrimmed(env, names) {
+  for (const name of names) {
+    const value = env[name]?.trim()
+    if (value) return value
+  }
+  return undefined
+}
+
+function normalizeProvider(value) {
+  const normalized = value?.trim().toLowerCase().replace(/_/g, '-')
+  switch (normalized) {
+    case 'compatible':
+    case 'openai-compatible':
+    case 'openai-compatible-api':
+    case 'siliconflow':
+    case 'deepseek':
+      return 'openai-compatible'
+    default:
+      return normalized
+  }
+}
+
+function hasCompatibleBaseUrlHint(env) {
+  return Boolean(
+    getTrimmed(env, [
+      'PRIVATE_AGENTS_REAL_BASE_URL',
+      'PRIVATE_AGENTS_PROVIDER_BASE_URL',
+      'PRIVATE_AGENTS_BASE_URL',
+      'OPENAI_COMPATIBLE_BASE_URL',
+      'OPENAI_API_BASE',
+      'OPENAI_API_BASE_URL',
+      'OPENAI_BASE_URL',
+      'API_BASE_URL',
+      'BASE_URL',
+    ]),
+  )
+}
+
+function chooseProvider(env) {
+  const explicit = getTrimmed(env, [
+    'PRIVATE_AGENTS_REAL_PROVIDER',
+    'PRIVATE_AGENTS_PROVIDER',
+  ])
+  if (explicit) return normalizeProvider(explicit)
+  if (
+    getTrimmed(env, ['OPENAI_API_KEY']) &&
+    hasCompatibleBaseUrlHint(env)
+  ) {
+    return 'openai-compatible'
+  }
+  if (getTrimmed(env, ['OPENAI_COMPATIBLE_API_KEY'])) return 'openai-compatible'
+  if (getTrimmed(env, ['GOOGLE_API_KEY'])) return 'google'
+  if (getTrimmed(env, ['ANTIGRAVITY_API_KEY'])) return 'antigravity'
+  if (getTrimmed(env, ['CLAUDECODE_API_KEY'])) return 'claudecode'
+  if (getTrimmed(env, ['OPENAI_API_KEY'])) return 'openai'
+  return undefined
+}
+
+function providerSpecificApiKeyNames(provider) {
+  switch (provider) {
+    case 'openai':
+      return ['OPENAI_API_KEY']
+    case 'google':
+      return ['GOOGLE_API_KEY']
+    case 'antigravity':
+      return ['ANTIGRAVITY_API_KEY']
+    case 'claudecode':
+      return ['CLAUDECODE_API_KEY']
+    default:
+      return ['OPENAI_COMPATIBLE_API_KEY', 'OPENAI_API_KEY']
+  }
+}
+
+function providerSpecificBaseUrlNames(provider) {
+  switch (provider) {
+    case 'openai':
+      return ['OPENAI_BASE_URL', 'OPENAI_API_BASE', 'OPENAI_API_BASE_URL']
+    case 'google':
+      return ['GOOGLE_BASE_URL']
+    case 'antigravity':
+      return ['ANTIGRAVITY_BASE_URL']
+    case 'claudecode':
+      return ['CLAUDECODE_BASE_URL']
+    default:
+      return [
+        'OPENAI_COMPATIBLE_BASE_URL',
+        'OPENAI_BASE_URL',
+        'OPENAI_API_BASE',
+        'OPENAI_API_BASE_URL',
+        'API_BASE_URL',
+        'BASE_URL',
+      ]
+  }
+}
+
+function providerSpecificModelNames(provider) {
+  switch (provider) {
+    case 'openai':
+      return ['OPENAI_MODEL', 'MODEL']
+    case 'google':
+      return ['GOOGLE_MODEL']
+    case 'antigravity':
+      return ['ANTIGRAVITY_MODEL']
+    case 'claudecode':
+      return ['CLAUDECODE_MODEL']
+    default:
+      return ['OPENAI_COMPATIBLE_MODEL', 'OPENAI_MODEL', 'MODEL']
+  }
+}
+
+function buildEffectiveEnv(processEnv) {
+  if (processEnv.PRIVATE_AGENTS_REAL_PROVIDER_SMOKE?.trim() !== '1') {
+    return {
+      env: processEnv,
+      configSource: 'not-loaded-no-opt-in',
+    }
+  }
+
+  const providerEnvPath =
+    processEnv.PRIVATE_AGENTS_PROVIDER_ENV?.trim() ||
+    processEnv.PRIVATE_AGENTS_REAL_PROVIDER_ENV?.trim() ||
+    defaultProviderEnvPath
+  const explicitProviderEnvPath = Boolean(
+    processEnv.PRIVATE_AGENTS_PROVIDER_ENV?.trim() ||
+      processEnv.PRIVATE_AGENTS_REAL_PROVIDER_ENV?.trim(),
+  )
+  const loaded = parseProviderEnvFile(providerEnvPath)
+  if (!loaded.ok) {
+    if (
+      !explicitProviderEnvPath &&
+      loaded.status === 'missing-config' &&
+      loaded.reason === 'provider.env is not present at the approved path'
+    ) {
+      return {
+        env: processEnv,
+        configSource: 'explicit-env',
+      }
+    }
+    return {
+      env: processEnv,
+      configSource: 'explicit-env',
+      providerEnvError: loaded,
+    }
+  }
+
+  return {
+    env: {
+      ...loaded.env,
+      ...processEnv,
+    },
+    configSource: 'explicit-env+provider-env',
+  }
+}
+
 function validateEnv(env) {
   const optIn = env.PRIVATE_AGENTS_REAL_PROVIDER_SMOKE?.trim() === '1'
   if (!optIn) {
     return { ok: false, skip: true, status: 'skip', code: 0, reason: 'set PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1 to run the real provider smoke' }
-  }
-
-  if (env.PRIVATE_AGENTS_REAL_HOME?.trim()) {
-    return { ok: false, status: 'missing-config', code: 3, reason: 'PRIVATE_AGENTS_REAL_HOME must be unset; this smoke uses explicit env and isolated HOME only' }
   }
 
   const testRoot = env.PRIVATE_AGENTS_TEST_ROOT?.trim()
@@ -130,21 +326,34 @@ function validateEnv(env) {
     return { ok: false, status: 'missing-config', code: 3, reason: 'PRIVATE_AGENTS_TEST_ROOT is required and must point at an isolated temp directory' }
   }
 
-  const provider = env.PRIVATE_AGENTS_REAL_PROVIDER?.trim().toLowerCase()
+  const provider = chooseProvider(env)
   if (!provider) {
-    return { ok: false, status: 'missing-config', code: 3, reason: 'PRIVATE_AGENTS_REAL_PROVIDER is required' }
+    return { ok: false, status: 'missing-config', code: 3, reason: 'PRIVATE_AGENTS_REAL_PROVIDER or PRIVATE_AGENTS_PROVIDER is required' }
   }
   if (!allowedProviders.has(provider)) {
     return { ok: false, status: 'unsupported', code: 3, reason: `unsupported provider ${provider}` }
   }
 
-  const apiKey = env.PRIVATE_AGENTS_REAL_API_KEY?.trim()
+  const apiKey = getTrimmed(env, [
+    'PRIVATE_AGENTS_REAL_API_KEY',
+    ...providerSpecificApiKeyNames(provider),
+  ])
   if (!apiKey) {
-    return { ok: false, status: 'missing-key', code: 3, reason: 'PRIVATE_AGENTS_REAL_API_KEY is required' }
+    return { ok: false, status: 'missing-key', code: 3, reason: `PRIVATE_AGENTS_REAL_API_KEY or ${getProviderEnvVar(provider)} is required` }
   }
 
-  const baseUrl = env.PRIVATE_AGENTS_REAL_BASE_URL?.trim()
-  const model = env.PRIVATE_AGENTS_REAL_MODEL?.trim()
+  const baseUrl = getTrimmed(env, [
+    'PRIVATE_AGENTS_REAL_BASE_URL',
+    'PRIVATE_AGENTS_PROVIDER_BASE_URL',
+    'PRIVATE_AGENTS_BASE_URL',
+    ...providerSpecificBaseUrlNames(provider),
+  ])
+  const model = getTrimmed(env, [
+    'PRIVATE_AGENTS_REAL_MODEL',
+    'PRIVATE_AGENTS_PROVIDER_MODEL',
+    'PRIVATE_AGENTS_MODEL',
+    ...providerSpecificModelNames(provider),
+  ])
   if (compatibleProviders.has(provider) && !baseUrl) {
     return { ok: false, status: 'missing-config', code: 3, reason: `${provider} requires PRIVATE_AGENTS_REAL_BASE_URL` }
   }
@@ -341,6 +550,64 @@ function runClassificationSelfTest() {
   )
   ok = ok && redactionPassed
 
+  const envCases = [
+    {
+      name: 'default-skip-no-provider-env-load',
+      env: {},
+      assert(result) {
+        return result.status === 'skip' && result.code === 0
+      },
+    },
+    {
+      name: 'explicit-openai-compatible-alias',
+      env: {
+        PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: '1',
+        PRIVATE_AGENTS_TEST_ROOT: '/tmp/private-agents-test/provider-readiness-self-test',
+        PRIVATE_AGENTS_REAL_PROVIDER: 'siliconflow',
+        PRIVATE_AGENTS_REAL_API_KEY: 'test-key',
+        PRIVATE_AGENTS_REAL_BASE_URL: 'https://example.test/v1',
+        PRIVATE_AGENTS_REAL_MODEL: 'test-model',
+      },
+      assert(result) {
+        return result.ok === true && result.provider === 'openai-compatible'
+      },
+    },
+    {
+      name: 'openai-key-with-compatible-base-url',
+      env: {
+        PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: '1',
+        PRIVATE_AGENTS_TEST_ROOT: '/tmp/private-agents-test/provider-readiness-self-test',
+        OPENAI_API_KEY: 'test-key',
+        BASE_URL: 'https://example.test/v1',
+        MODEL: 'test-model',
+      },
+      assert(result) {
+        return result.ok === true && result.provider === 'openai-compatible'
+      },
+    },
+    {
+      name: 'opt-in-missing-key',
+      env: {
+        PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: '1',
+        PRIVATE_AGENTS_TEST_ROOT: '/tmp/private-agents-test/provider-readiness-self-test',
+        PRIVATE_AGENTS_REAL_PROVIDER: 'openai',
+      },
+      assert(result) {
+        return result.status === 'missing-key' && result.code === 3
+      },
+    },
+  ]
+  for (const envCase of envCases) {
+    const validation = validateEnv(envCase.env)
+    const passed = envCase.assert(validation)
+    printStep(
+      `real-provider-readiness-env-contract-${envCase.name}`,
+      passed ? 'pass' : 'product-regression',
+      passed ? 'contract preserved' : `status=${validation.status ?? 'ok'}`,
+    )
+    ok = ok && passed
+  }
+
   printStep('real-provider-readiness-classification-self-test', ok ? 'pass' : 'product-regression')
   process.exit(ok ? 0 : 1)
 }
@@ -356,8 +623,17 @@ async function main() {
     return
   }
 
-  printHeader('real-smoke')
-  const validation = validateEnv(process.env)
+  const effective = buildEffectiveEnv(process.env)
+  printHeader('real-smoke', effective.configSource)
+  if (effective.providerEnvError) {
+    printStep(
+      'real-provider-readiness-provider-env',
+      effective.providerEnvError.status,
+      effective.providerEnvError.reason,
+    )
+    process.exit(effective.providerEnvError.code)
+  }
+  const validation = validateEnv(effective.env)
   if (!validation.ok) {
     printStep('real-provider-readiness-opt-in', validation.status, validation.reason)
     process.exit(validation.code)

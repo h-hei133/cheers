@@ -70,7 +70,7 @@ failure is product code, provider/network, or local environment.
 | Doctor/env gate | `npm run verify:doctor` | First command on a new machine, before diagnosing product regressions. | Local environment, working directory, home, toolchain, or provider config is not ready. |
 | Deterministic hard gate | `npm run verify:release:core` | Default local release check before handing off changes. | Product regression or local config failure; it should not depend on provider network. |
 | Real-provider smoke gate | `npm run verify:release:smoke` | After core passes, when checking real-provider readiness. | Provider pass, network inconclusive, config failure, or product regression. |
-| Provider readiness smoke | `npm run verify:provider-readiness` | Focused real-provider entry check using `D:\Test\home-sf`. | Same taxonomy as smoke, with provider/home/config evidence. |
+| Provider readiness smoke | `npm run verify:provider-readiness:real` | Explicit opt-in real-provider readiness check using isolated test/runtime homes. | Skip without opt-in; otherwise pass, provider-network, config/auth/unsupported, unknown, or product regression. |
 | Evidence inspector | `npm run evidence:inspect -- --home <home> --latest` | After a run produced session artifacts, or after a gate points to a session/project. | Prints read-only artifact summary; `artifact-status=degraded` means evidence is incomplete, not repaired. |
 | Failure handoff | `npm run failure:handoff -- --log-file <path> --gate <gate> --command "<command>" --exit-code <code>` | After capturing a failing gate log and needing a compact handoff. | Produces a redacted triage summary; exit 0 means the handoff printed, not that the failed gate passed. |
 
@@ -188,9 +188,75 @@ or partial evidence. That is a diagnostic state, not a repair operation.
 ### Home and mode rules
 
 - Synthetic gates use `D:\Test\pca-home-synth` with `PRIVATE_AGENTS_PROVIDER_MODE=synthetic`.
-- Real-provider smoke uses `D:\Test\home-sf` as both `HOME` and `USERPROFILE`.
-- Do not create a third home.
-- Do not copy or configure provider credentials outside `D:\Test\home-sf`.
+- Real-provider readiness smoke uses an isolated runtime home under
+  `PRIVATE_AGENTS_TEST_ROOT`; the script sets child `HOME` and `USERPROFILE`
+  to that isolated runtime home.
+- Real-provider readiness smoke does not use `PRIVATE_AGENTS_REAL_HOME` as a
+  runtime home and does not read real user provider config directories.
+- Do not copy provider credentials into repo files, logs, reports, or runtime
+  homes.
+
+### Real provider readiness smoke
+
+`npm run verify:provider-readiness:real` is an explicit opt-in smoke for the
+real-provider readiness boundary. It is not part of default build/test or the
+CLI baseline.
+
+Default and self-test behavior:
+
+- `npm run verify:provider-readiness:real`
+  - skips with exit 0 unless `PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1` is set
+  - does not load provider credentials and does not contact a provider
+- `npm run verify:provider-readiness:real -- --classification-self-test`
+  - runs local classification/redaction/env-contract checks only
+  - does not load provider credentials and does not contact a provider
+
+Opt-in contract:
+
+- required:
+  - `PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1`
+  - `PRIVATE_AGENTS_TEST_ROOT=<isolated temp root>`
+- provider selector:
+  - `PRIVATE_AGENTS_REAL_PROVIDER=<provider>` or
+    `PRIVATE_AGENTS_PROVIDER=<provider>`
+  - supported selectors: `openai`, `openai-compatible`, `google`,
+    `antigravity`, `claudecode`
+  - `siliconflow`, `deepseek`, and `compatible` are treated as
+    `openai-compatible`
+- credentials and provider details may come from explicit env or the approved
+  provider env file loaded silently:
+  - `PRIVATE_AGENTS_REAL_API_KEY` or provider-specific API key env
+  - `PRIVATE_AGENTS_REAL_BASE_URL` / `PRIVATE_AGENTS_REAL_MODEL` for
+    OpenAI-compatible style providers
+  - common aliases such as `OPENAI_API_KEY`, `OPENAI_COMPATIBLE_API_KEY`,
+    `BASE_URL`, and `MODEL`
+
+Provider env loading:
+
+- The only approved provider env file for this smoke is
+  `/home/wang/.private-agents-real/provider.env`.
+- Load it silently in the command environment; never print, cat, echo, copy,
+  record, or summarize its contents or any env values.
+- Do not read any other files under `/home/wang/.private-agents-real`.
+
+Example Linux/WSL shape:
+
+```sh
+set -a
+. /home/wang/.private-agents-real/provider.env
+set +a
+PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1 \
+PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test/provider-readiness-real \
+npm run verify:provider-readiness:real
+```
+
+Failure classification:
+
+- missing config or missing key exits 3
+- auth failures such as 401/403 or invalid key exit 3
+- network/proxy/timeout failures exit 2
+- unknown provider readiness failures exit 1
+- product regression exits 1
 
 ### Real single-file capability smoke
 

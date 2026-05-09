@@ -76,6 +76,34 @@ The primary user-visible mainline is now:
 
 ## 5. Latest Implemented Delta (through 2026-05-09)
 
+### Current closeout: real-provider readiness smoke env contract
+
+`verify:provider-readiness:real` now has a stable opt-in environment contract
+for isolated real-provider readiness checks.
+
+Key boundaries:
+
+- default `verify:provider-readiness:real` skips without touching the real
+  provider unless `PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1` is set
+- `--classification-self-test` remains synthetic/local and does not read
+  provider credentials or contact a provider
+- opt-in smoke uses isolated `PRIVATE_AGENTS_TEST_ROOT`, `HOME`, and
+  `USERPROFILE`; the child CLI always receives `PRIVATE_AGENTS_REAL_HOME=''`
+- provider configuration comes only from explicit environment variables or
+  the approved provider env file loaded silently at
+  `/home/wang/.private-agents-real/provider.env`
+- the smoke does not read real user provider config directories
+- failure attribution stays specific: missing config, missing key, auth,
+  network, unsupported, unknown, or product regression
+
+Important boundaries:
+
+- production provider/auth flow is unchanged
+- default CLI baseline, real-user capability gates, apply_patch/mutation,
+  session schema, and CLI interaction semantics are unchanged
+- provider secrets and provider env values must not be printed, copied,
+  logged, or summarized
+
 ### Current closeout: Add File no-write classification
 
 The apply_patch dry-run/readiness path now recognizes `*** Add File` patches as
