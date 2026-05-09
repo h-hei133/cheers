@@ -194,6 +194,19 @@ describe("single-file apply_patch workspace write result", () => {
     expect(result.codingResult?.verification.blockerKind).toBe(
       "environment-not-ready",
     );
+    expect(result.codingResult?.lastActionResultSeed).toMatchObject({
+      target: "src/app.ts",
+      changedFiles: [],
+      verifiedFiles: [],
+      verification: {
+        status: "blocked",
+      },
+    });
+    expect(result.codingResult?.lastActionResultSeed?.writerStarted).toBeUndefined();
+    expect(result.codingResult?.lastActionResultSeed?.writeEffect).toBeUndefined();
+    expect(
+      result.codingResult?.lastActionResultSeed?.requiresUserInspection,
+    ).toBeUndefined();
     expect(result.codingResult?.evidence).toEqual(
       expect.arrayContaining([
         "actionable-blocker-kind:partial-mutation-failed",

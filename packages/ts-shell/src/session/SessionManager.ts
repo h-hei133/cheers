@@ -5259,7 +5259,7 @@ export class SessionManager {
       return undefined;
     }
     const seed = codingResult.lastActionResultSeed;
-    const writeEffect =
+    const observedWriteEffect =
       seed?.writeEffect ??
       this.extractWriteEffectFromEvidence(codingResult.evidence) ??
       this.extractWriteEffectFromEvidence(codingResult.continuation.evidence);
@@ -5273,6 +5273,7 @@ export class SessionManager {
     const writerStarted =
       seed?.writerStarted ??
       (writerStartedFromEvidence ? true : undefined);
+    const writeEffect = writerStarted ? observedWriteEffect : undefined;
     const requiresUserInspectionFromEvidence = codingResult.evidence.some(
       (entry) => entry.includes("user-inspection-required"),
     );

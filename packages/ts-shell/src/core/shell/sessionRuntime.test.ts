@@ -644,100 +644,108 @@ describe("shell session runtime (W5)", () => {
     }
   });
 
-  it("passes writer-started stopped write effect into the next prompt run", async () => {
-    const originalUserProfile = process.env.USERPROFILE;
-    const originalHome = process.env.HOME;
-    const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-writer-started-continuity-"),
-    );
-    process.env.USERPROFILE = fakeHome;
-    process.env.HOME = fakeHome;
+  it.each(["unknown", "unverified"] as const)(
+    "passes writer-started stopped %s write effect into the next prompt run",
+    async (writeEffect) => {
+      const originalUserProfile = process.env.USERPROFILE;
+      const originalHome = process.env.HOME;
+      const fakeHome = fs.mkdtempSync(
+        path.join(os.tmpdir(), "private-agents-writer-started-continuity-"),
+      );
+      process.env.USERPROFILE = fakeHome;
+      process.env.HOME = fakeHome;
 
-    try {
-      const sessionsDir = path.join(fakeHome, ".private-agents", "sessions");
-      const {
-        projectRoot,
-        sessionId,
-        stopReason,
-        nextAction,
-        targetPath,
-      } = seedWriterStartedStoppedRecoveryContextSession({
-        fakeHomeDir: fakeHome,
-        sessionsDir,
-        writeEffect: "unknown",
-      });
-      const manager = new SessionManager({ projectRoot });
-      const renderedLines: string[] = [];
-      let capturedContinuity:
-        | import("../../session/SessionManager.js").SessionContinuitySnapshot
-        | undefined;
+      try {
+        const sessionsDir = path.join(fakeHome, ".private-agents", "sessions");
+        const {
+          projectRoot,
+          sessionId,
+          stopReason,
+          nextAction,
+          targetPath,
+        } = seedWriterStartedStoppedRecoveryContextSession({
+          fakeHomeDir: fakeHome,
+          sessionsDir,
+          writeEffect,
+        });
+        const manager = new SessionManager({ projectRoot });
+        const renderedLines: string[] = [];
+        let capturedContinuity:
+          | import("../../session/SessionManager.js").SessionContinuitySnapshot
+          | undefined;
 
-      const runtime = new ShellSessionRuntime({
-        sessionManager: manager,
-        renderer: {
-          renderLine(line?: string) {
-            renderedLines.push(line ?? "");
-          },
-          renderChunk() {},
-        } as never,
-        runPrompt: async function* (_prompt, _signal, _runtimeSeed, continuityState) {
-          capturedContinuity = continuityState;
-          yield {
-            type: "query.completed",
-            result: {
-              status: "completed",
-              terminalReason: "completed",
-              terminalClassification: "success",
-              transcript: [],
-              sharedContext: {
-                sessionId,
-                initialPrompt: "continue uncertain writer state",
-                notes: [],
-                handoffs: [],
-              },
-              finalOutput: "continued",
+        const runtime = new ShellSessionRuntime({
+          sessionManager: manager,
+          renderer: {
+            renderLine(line?: string) {
+              renderedLines.push(line ?? "");
             },
-          };
-        },
-      });
+            renderChunk() {},
+          } as never,
+          runPrompt: async function* (
+            _prompt,
+            _signal,
+            _runtimeSeed,
+            continuityState,
+          ) {
+            capturedContinuity = continuityState;
+            yield {
+              type: "query.completed",
+              result: {
+                status: "completed",
+                terminalReason: "completed",
+                terminalClassification: "success",
+                transcript: [],
+                sharedContext: {
+                  sessionId,
+                  initialPrompt: "continue uncertain writer state",
+                  notes: [],
+                  handoffs: [],
+                },
+                finalOutput: "continued",
+              },
+            };
+          },
+        });
 
-      await runtime.executePrompt(sessionId, "continue uncertain writer state");
+        await runtime.executePrompt(sessionId, "continue uncertain writer state");
 
-      expect(capturedContinuity?.lastWriterStarted).toBe(true);
-      expect(capturedContinuity?.lastWriteEffect).toBe("unknown");
-      expect(capturedContinuity?.lastWriteRequiresUserInspection).toBe(true);
-      expect(capturedContinuity?.lastWriteEffectTarget).toBe(targetPath);
-      expect(capturedContinuity?.recentChangedFiles).toEqual([]);
-      expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
-        "Failure handoff: status=blocked",
-      );
-      expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
-        `target=${targetPath}`,
-      );
-      expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
-        "writer-started=yes",
-      );
-      expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
-        "write-effect=unknown",
-      );
-      expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
-        `next=${nextAction.replace(/[.]+$/, "")}.`,
-      );
-      expect(capturedContinuity?.lastSuccessHandoffDiagnostic).toBeUndefined();
-      expect(capturedContinuity?.lastFailure).toBe(stopReason);
-      const rendered = renderedLines.join("\n");
-      expect(rendered).toContain("Continuation");
-      expect(rendered).toContain("writer-started=yes");
-      expect(rendered).toContain("write-effect=unknown");
-      expect(rendered).toContain(`target=${targetPath}`);
-      expect(rendered).not.toContain(`Changed files: ${targetPath}`);
-      expect(rendered).not.toContain("Success handoff: status=passed");
-    } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
-      fs.rmSync(fakeHome, { recursive: true, force: true });
-    }
-  });
+        expect(capturedContinuity?.lastWriterStarted).toBe(true);
+        expect(capturedContinuity?.lastWriteEffect).toBe(writeEffect);
+        expect(capturedContinuity?.lastWriteRequiresUserInspection).toBe(true);
+        expect(capturedContinuity?.lastWriteEffectTarget).toBe(targetPath);
+        expect(capturedContinuity?.recentChangedFiles).toEqual([]);
+        expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
+          "Failure handoff: status=blocked",
+        );
+        expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
+          `target=${targetPath}`,
+        );
+        expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
+          "writer-started=yes",
+        );
+        expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
+          `write-effect=${writeEffect}`,
+        );
+        expect(capturedContinuity?.lastFailureHandoffDiagnostic).toContain(
+          `next=${nextAction.replace(/[.]+$/, "")}.`,
+        );
+        expect(capturedContinuity?.lastSuccessHandoffDiagnostic).toBeUndefined();
+        expect(capturedContinuity?.lastFailure).toBe(stopReason);
+        const rendered = renderedLines.join("\n");
+        expect(rendered).toContain("Continuation");
+        expect(rendered).toContain("writer-started=yes");
+        expect(rendered).toContain(`write-effect=${writeEffect}`);
+        expect(rendered).toContain(`target=${targetPath}`);
+        expect(rendered).not.toContain(`Changed files: ${targetPath}`);
+        expect(rendered).not.toContain("Success handoff: status=passed");
+      } finally {
+        process.env.USERPROFILE = originalUserProfile;
+        process.env.HOME = originalHome;
+        fs.rmSync(fakeHome, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("uses compact mode by default and only prints final assistant output", async () => {
     const renderedLines: string[] = [];
