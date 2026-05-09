@@ -25,6 +25,18 @@ process.stdin.on('end', () => {
 
   if (request.action === 'invoke-tool') {
     const message = request.args?.message ?? 'missing'
+    if (message === 'mcp-error') {
+      process.stdout.write(JSON.stringify({
+        content: 'MCP tool rejected request: invalid message',
+        isError: true,
+      }))
+      return
+    }
+    if (message === 'mcp-throw') {
+      process.stderr.write('MCP stdio execution failed')
+      process.exitCode = 1
+      return
+    }
     process.stdout.write(JSON.stringify({ content: `echo:${message}` }))
     return
   }

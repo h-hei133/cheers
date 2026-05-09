@@ -9,6 +9,7 @@ export type ActionableFailureBlockerKind =
   | "partial-mutation-failed"
   | "verification-failed"
   | "command-not-allowlisted"
+  | "mcp-unavailable"
   | "approval-denied";
 
 export interface ActionableFailureContinuity {
@@ -119,6 +120,16 @@ function classifyBlockerFromReason(
     return "verification-failed";
   }
   if (
+    normalized.includes("mcp config is invalid") ||
+    normalized.includes("mcp server ") ||
+    normalized.includes("unknown mcp server") ||
+    (normalized.includes("mcp tool ") &&
+      (normalized.includes("not registered") ||
+        normalized.includes("unavailable")))
+  ) {
+    return "mcp-unavailable";
+  }
+  if (
     normalized.includes("approval denied") ||
     normalized.includes("user rejected") ||
     normalized.includes("rejected permission") ||
@@ -183,6 +194,7 @@ function normalizeActionableBlocker(
     case "partial-mutation-failed":
     case "verification-failed":
     case "command-not-allowlisted":
+    case "mcp-unavailable":
     case "approval-denied":
       return value.trim() as ActionableFailureBlockerKind;
     default:
@@ -210,6 +222,8 @@ function defaultNextAction(blockerKind: string): string | undefined {
       return "Fix the verification failure, then rerun the verification step.";
     case "command-not-allowlisted":
       return "Rephrase the request with an allowlisted command.";
+    case "mcp-unavailable":
+      return "Run /mcp status and /mcp refresh for the affected server, then retry with a visible executable MCP tool.";
     default:
       return undefined;
   }

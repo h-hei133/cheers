@@ -3672,6 +3672,118 @@ describe("SessionManager", () => {
     expect(context).not.toContain("current-permission-request-tool:bash");
   });
 
+  it("persists MCP unavailable tool provenance into next-turn continuity", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    const reason = "MCP server localSdk requires authentication";
+
+    manager.markRunStarted(session.id, "use MCP search");
+    manager.addTurn(session.id, { role: "user", content: "use MCP search" });
+    manager.appendQueryEvent(session.id, {
+      type: "query.completed",
+      result: {
+        status: "stopped_error",
+        terminalReason: "stopped_error",
+        terminalClassification: "stopped",
+        stopReason: reason,
+        transcript: [],
+        sharedContext: {
+          sessionId: session.id,
+          initialPrompt: "use MCP search",
+          notes: [],
+          handoffs: [],
+        },
+        finalOutput: "MCP tool unavailable.",
+        codingResult: {
+          taskKind: "run-command",
+          changedFiles: [],
+          failedFiles: [],
+          patches: [],
+          repair: {
+            status: "failed",
+            attempts: 1,
+            recoveredItems: [],
+            failedItems: [],
+            notes: [reason],
+          },
+          continuation: {
+            status: "failed-after-bounded-continuation",
+            attempts: 1,
+            evidence: ["actionable-blocker-kind:mcp-unavailable"],
+          },
+          changeSet: {
+            gitAware: false,
+            preExistingDirtyFiles: [],
+            postRunDirtyFiles: [],
+            attemptedFiles: [],
+            changedFiles: [],
+            unchangedAttemptedFiles: [],
+          },
+          taskSatisfaction: {
+            verdict: "insufficient-evidence",
+            reasons: [reason],
+            requiredEvidence: ["mcp tool execution result"],
+            observedEvidence: ["actionable-blocker-kind:mcp-unavailable"],
+          },
+          verifiedFiles: [],
+          unverifiedFiles: [],
+          verification: {
+            status: "blocked",
+            reason,
+            blockerKind: "unknown",
+            nextAction:
+              "Run /mcp status and /mcp refresh localSdk before retrying.",
+          },
+          evidence: ["actionable-blocker-kind:mcp-unavailable"],
+          failureBoundary: "unavailable-tool",
+          provenance: {
+            toolExecutions: [
+              {
+                kind: "unavailable-tool",
+                source: "mcp-registry",
+                legacySuccess: false,
+                toolName: "mcp__localSdk__search",
+                taskId: "task_mcp_unavailable",
+                failureBoundary: "unavailable-tool",
+              },
+            ],
+          },
+        },
+      },
+    });
+    manager.saveError(session.id, reason, {
+      terminalReason: "stopped_error",
+      terminalClassification: "stopped",
+    });
+
+    const snapshot = manager.buildContinuitySnapshot(session.id);
+    expect(snapshot.lastToolExecutionProvenanceKind).toBe("unavailable-tool");
+    expect(snapshot.lastToolExecutionProvenanceSource).toBe("mcp-registry");
+    expect(snapshot.lastToolExecutionProvenanceToolName).toBe(
+      "mcp__localSdk__search",
+    );
+    expect(snapshot.lastToolExecutionFailureBoundary).toBe("unavailable-tool");
+    expect(snapshot.lastVerificationBlockerKind).toBe("mcp-unavailable");
+    expect(snapshot.recentChangedFiles).toEqual([]);
+    expect(snapshot.recentFailedFiles).toEqual([]);
+
+    const context = manager.buildPromptContinuityContext(
+      session.id,
+      "continue after MCP rejection",
+    );
+    expect(context).toContain(
+      "- last-tool-execution-provenance-kind: unavailable-tool",
+    );
+    expect(context).toContain(
+      "- last-tool-execution-provenance-tool: mcp__localSdk__search",
+    );
+    expect(context).toContain(
+      "- last-tool-execution-failure-boundary: unavailable-tool",
+    );
+    expect(context).toContain("- last-verification-blocker-kind: mcp-unavailable");
+    expect(context).not.toContain("- recent-changed-files:");
+  });
+
   it("retains transform evidence in continuity snapshot for temporal multi-hop rollover", () => {
     const manager = new SessionManager();
     const session = manager.createNew();

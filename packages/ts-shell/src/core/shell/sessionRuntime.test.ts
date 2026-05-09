@@ -2417,7 +2417,7 @@ describe("shell session runtime (W5)", () => {
                 unchangedAttemptedFiles: ["(command)"],
               },
               taskSatisfaction: {
-                verdict: "not-completed",
+                verdict: "insufficient-evidence",
                 reasons: [stopReason],
                 requiredEvidence: ["approved tool execution result"],
                 observedEvidence: [],
@@ -2626,6 +2626,130 @@ describe("shell session runtime (W5)", () => {
         line.includes("Bash execution failed after approval"),
       ),
     ).toBe(false);
+  });
+
+  it("renders MCP unavailable tool results as stopped without changed files", async () => {
+    const renderedLines: string[] = [];
+    const reason = "MCP server localSdk requires authentication";
+    const nextAction =
+      "Run /mcp status and /mcp refresh for the affected server, then retry with a visible executable MCP tool.";
+
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        markRunStarted() {},
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine(line: string) {
+          renderedLines.push(line);
+        },
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* () {
+        yield {
+          type: "tool.started",
+          toolName: "mcp__localSdk__search",
+          taskId: "task_mcp_1",
+        };
+        yield {
+          type: "tool.result",
+          toolName: "mcp__localSdk__search",
+          taskId: "task_mcp_1",
+          success: false,
+        };
+        yield {
+          type: "query.completed",
+          result: {
+            status: "stopped_error",
+            terminalReason: "stopped_error",
+            terminalClassification: "stopped",
+            stopReason: reason,
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_mcp_unavailable_surface",
+              initialPrompt: "use mcp search",
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "",
+            codingResult: {
+              taskKind: "run-command",
+              changedFiles: [],
+              failedFiles: [],
+              patches: [],
+              repair: {
+                status: "failed",
+                attempts: 1,
+                recoveredItems: [],
+                failedItems: [],
+                notes: [reason],
+              },
+              continuation: {
+                status: "failed-after-bounded-continuation",
+                attempts: 1,
+                evidence: ["actionable-blocker-kind:mcp-unavailable"],
+              },
+              changeSet: {
+                gitAware: false,
+                preExistingDirtyFiles: [],
+                postRunDirtyFiles: [],
+                attemptedFiles: [],
+                changedFiles: [],
+                unchangedAttemptedFiles: [],
+              },
+              taskSatisfaction: {
+                verdict: "insufficient-evidence",
+                reasons: [reason],
+                requiredEvidence: ["mcp tool execution result"],
+                observedEvidence: ["actionable-blocker-kind:mcp-unavailable"],
+              },
+              verifiedFiles: [],
+              unverifiedFiles: [],
+              verification: {
+                status: "blocked",
+                reason,
+                blockerKind: "unknown",
+                nextAction,
+              },
+              evidence: ["actionable-blocker-kind:mcp-unavailable"],
+              failureBoundary: "unavailable-tool",
+              provenance: {
+                toolExecutions: [
+                  {
+                    kind: "unavailable-tool",
+                    source: "mcp-registry",
+                    legacySuccess: false,
+                    toolName: "mcp__localSdk__search",
+                    taskId: "task_mcp_1",
+                    failureBoundary: "unavailable-tool",
+                  },
+                ],
+              },
+            },
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_mcp_unavailable_surface", "use mcp search");
+
+    expect(renderedLines).toContain("Result");
+    expect(renderedLines).toContain("- Outcome: stopped");
+    expect(renderedLines).toContain("- BlockerKind: mcp-unavailable");
+    expect(renderedLines).toContain(`- Reason: ${reason}`);
+    expect(renderedLines).toContain(`- DoNext: ${nextAction}`);
+    expect(renderedLines).toContain("Action result");
+    expect(renderedLines).toContain("- Changed: none");
+    expect(renderedLines).not.toContain(`- Failed files: (tool) (${reason})`);
+    expect(renderedLines).toContain(`- Next action: ${nextAction}`);
+    expect(renderedLines).not.toContain("- Outcome: success");
   });
 
   it("prints actionable hints for provider readiness auth/network failures and keeps error persistence", async () => {

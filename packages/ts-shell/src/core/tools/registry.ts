@@ -264,6 +264,17 @@ export function createCoreToolRegistry(options?: {
 
         try {
           const result = await options.mcpGateway.invokeTool(tool.serverName, tool.toolName, args)
+          if (result.isError) {
+            return deniedResult(result.content, {
+              executionPath: 'mcp-stdio',
+              serverName: tool.serverName,
+              toolName: tool.toolName,
+              status: 'failed',
+              failureKind: 'execution_failure',
+              reason: result.content,
+              doNext: `Inspect MCP tool ${tool.qualifiedName} error output, refresh ${tool.serverName}, and retry only if the request is still valid.`,
+            })
+          }
           return approvedResult(result.content, {
             executionPath: 'mcp-stdio',
             serverName: tool.serverName,
@@ -280,7 +291,16 @@ export function createCoreToolRegistry(options?: {
               doNext: error.doNext,
             })
           }
-          throw error
+          const reason = error instanceof Error ? error.message : String(error)
+          return deniedResult(reason, {
+            executionPath: 'mcp-stdio',
+            serverName: tool.serverName,
+            toolName: tool.toolName,
+            status: 'failed',
+            failureKind: 'execution_failure',
+            reason,
+            doNext: `Inspect MCP tool ${tool.qualifiedName} error output, refresh ${tool.serverName}, and retry only if the request is still valid.`,
+          })
         }
       },
     })

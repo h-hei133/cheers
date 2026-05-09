@@ -65,6 +65,25 @@ describe("tool execution provenance", () => {
     });
   });
 
+  it("maps MCP gateway blockers as unavailable tools instead of executed success", () => {
+    expect(
+      deriveToolExecutionProvenance({
+        success: false,
+        error: "MCP server localSdk requires authentication",
+        metadata: {
+          executionPath: "mcp-stdio",
+          blockerKind: "environment-not-ready",
+          reason: "MCP server localSdk requires authentication",
+        },
+      }),
+    ).toEqual({
+      kind: "unavailable-tool",
+      source: "mcp-registry",
+      legacySuccess: false,
+      failureBoundary: "unavailable-tool",
+    });
+  });
+
   it("maps MVP allowlist denial as permission blocked", () => {
     expect(
       deriveToolExecutionProvenance({

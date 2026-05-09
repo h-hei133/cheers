@@ -406,6 +406,63 @@ describe("mapTerminalToOrchestrationResult", () => {
     expect(result.codingResult?.changedFiles).toEqual([]);
   });
 
+  it("maps MCP unavailable evidence to stopped without changed files", () => {
+    const reason = "MCP server localSdk requires authentication";
+    const fakeState = {
+      transcript: [
+        {
+          role: "assistant",
+          content: "MCP tool unavailable.",
+          codingResult: buildCodingResult({
+            changedFiles: [],
+            failedFiles: [],
+            verification: {
+              status: "blocked",
+              reason,
+              blockerKind: "unknown",
+              nextAction:
+                "Run /mcp status and /mcp refresh localSdk before retrying.",
+            },
+            verdict: "insufficient-evidence",
+            reasons: ["Workflow stopped on MCP tool availability."],
+            evidence: ["actionable-blocker-kind:mcp-unavailable"],
+            provenance: {
+              toolExecutions: [
+                {
+                  kind: "unavailable-tool",
+                  source: "mcp-registry",
+                  legacySuccess: false,
+                  toolName: "mcp__localSdk__search",
+                  taskId: "task_mapper_mcp",
+                  failureBoundary: "unavailable-tool",
+                },
+              ],
+            },
+          }),
+        },
+      ],
+      sharedContext: {
+        sessionId: "sess_mapper_mcp_unavailable",
+        initialPrompt: "prompt",
+        notes: [],
+        handoffs: [],
+      },
+      lastContinuationReason: undefined,
+    } as never;
+
+    const result = mapTerminalToOrchestrationResult(fakeState, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+      stopReason: undefined,
+    } as never);
+
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.status).toBe("stopped_error");
+    expect(result.stopReason).toBe(reason);
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.failedFiles).toEqual([]);
+  });
+
   it("keeps non-verification actionable blockers stopped even with hard failure text", () => {
     const fakeState = {
       transcript: [
@@ -832,7 +889,7 @@ function buildCodingResult(input: {
   verification: {
     status: "blocked" | "failed" | "not-run";
     reason: string;
-    blockerKind?: "approval-denied" | "no-verify-strategy";
+    blockerKind?: "approval-denied" | "no-verify-strategy" | "unknown";
     nextAction?: string;
   };
   verdict: "completed-with-caveats" | "failed" | "insufficient-evidence";

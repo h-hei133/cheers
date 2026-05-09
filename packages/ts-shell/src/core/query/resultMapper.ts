@@ -53,6 +53,7 @@ type ActionableBlockerKind =
   | "partial-mutation-failed"
   | "verification-failed"
   | "command-not-allowlisted"
+  | "mcp-unavailable"
   | "approval-denied";
 
 function deriveTruthfulTerminal(input: {
@@ -348,6 +349,7 @@ function findActionableKindFromEvidence(
     actionableMarker === "partial-mutation-failed" ||
     actionableMarker === "verification-failed" ||
     actionableMarker === "command-not-allowlisted" ||
+    actionableMarker === "mcp-unavailable" ||
     actionableMarker === "approval-denied"
   ) {
     return actionableMarker;
@@ -360,6 +362,16 @@ function classifyActionableKind(
   verificationFailed: boolean,
 ): ActionableBlockerKind | undefined {
   const normalized = reason.toLowerCase();
+  if (
+    normalized.includes("mcp config is invalid") ||
+    normalized.includes("mcp server ") ||
+    normalized.includes("unknown mcp server") ||
+    (normalized.includes("mcp tool ") &&
+      (normalized.includes("not registered") ||
+        normalized.includes("unavailable")))
+  ) {
+    return "mcp-unavailable";
+  }
   if (verificationFailed || normalized.includes("verification failed")) {
     return "verification-failed";
   }

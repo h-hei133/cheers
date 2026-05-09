@@ -71,6 +71,16 @@ export function deriveToolExecutionProvenance(
 
   const error = input.error?.toLowerCase() ?? "";
   const reason = readLowerString(input.metadata?.reason) ?? "";
+  const executionPath = readLowerString(input.metadata?.executionPath) ?? "";
+  if (executionPath.startsWith("mcp") && isMcpUnavailableReason(error, reason)) {
+    return {
+      kind: "unavailable-tool",
+      source: "mcp-registry",
+      legacySuccess: false,
+      failureBoundary: "unavailable-tool",
+    };
+  }
+
   if (error.includes("not registered") || reason.includes("not registered")) {
     return {
       kind: "unavailable-tool",
@@ -125,4 +135,17 @@ function failureBoundaryForKind(
 
 function readLowerString(value: unknown): string | undefined {
   return typeof value === "string" ? value.toLowerCase() : undefined;
+}
+
+function isMcpUnavailableReason(error: string, reason: string): boolean {
+  const combined = `${error} ${reason}`;
+  return (
+    combined.includes("mcp config is invalid") ||
+    combined.includes("mcp server ") ||
+    combined.includes("unknown mcp server") ||
+    combined.includes("mcp tool ") && (
+      combined.includes("not registered") ||
+      combined.includes("unavailable")
+    )
+  );
 }

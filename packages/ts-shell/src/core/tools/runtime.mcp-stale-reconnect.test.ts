@@ -427,4 +427,105 @@ describe('core tool runtime stale reconnect consistency', () => {
       doNext: 'Run /mcp status and /mcp refresh to list available MCP tools, then retry with a visible tool name.',
     })
   })
+
+  it('treats MCP isError tool responses as failed execution instead of success', async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true })
+    await fs.writeFile(
+      path.join(workspaceRoot, '.private-agents.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          stdioEcho: {
+            transport: 'stdio',
+            command: process.execPath,
+            args: [path.resolve(process.cwd(), 'src/core/mcp/fixtures/mockMcpServer.mjs')],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const gateway = new CoreMcpGateway(workspaceRoot)
+    const snapshot = await gateway.snapshot()
+    const runtime = new ToolRuntime(new SandboxEnforcer({ workspaceRoot, auditLogPath }), {
+      mcpTools: snapshot.tools,
+      mcpGateway: gateway,
+      runtimeConfig: {
+        provider: 'openai',
+        daemonEnabled: true,
+        maxTurns: 6,
+        disabledTools: [],
+        hiddenToolPrefixes: [],
+        enableMcpTools: true,
+        configSources: [],
+      },
+    })
+
+    const result = await runtime.execute(
+      'mcp__stdioEcho__echo_message',
+      { message: 'mcp-error' },
+      { taskId: 'task_mcp_is_error', workspaceRoot },
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('MCP tool rejected request: invalid message')
+    expect(result.output).toBeUndefined()
+    expect(result.metadata).toMatchObject({
+      executionPath: 'mcp-stdio',
+      serverName: 'stdioEcho',
+      toolName: 'echo_message',
+      status: 'failed',
+      failureKind: 'execution_failure',
+      reason: 'MCP tool rejected request: invalid message',
+    })
+  }, 15000)
+
+  it('keeps thrown MCP execution failures on the MCP execution boundary', async () => {
+    await fs.mkdir(workspaceRoot, { recursive: true })
+    await fs.writeFile(
+      path.join(workspaceRoot, '.private-agents.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          stdioEcho: {
+            transport: 'stdio',
+            command: process.execPath,
+            args: [path.resolve(process.cwd(), 'src/core/mcp/fixtures/mockMcpServer.mjs')],
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const gateway = new CoreMcpGateway(workspaceRoot)
+    const snapshot = await gateway.snapshot()
+    const runtime = new ToolRuntime(new SandboxEnforcer({ workspaceRoot, auditLogPath }), {
+      mcpTools: snapshot.tools,
+      mcpGateway: gateway,
+      runtimeConfig: {
+        provider: 'openai',
+        daemonEnabled: true,
+        maxTurns: 6,
+        disabledTools: [],
+        hiddenToolPrefixes: [],
+        enableMcpTools: true,
+        configSources: [],
+      },
+    })
+
+    const result = await runtime.execute(
+      'mcp__stdioEcho__echo_message',
+      { message: 'mcp-throw' },
+      { taskId: 'task_mcp_throw', workspaceRoot },
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('MCP stdio execution failed')
+    expect(result.metadata).toMatchObject({
+      executionPath: 'mcp-stdio',
+      serverName: 'stdioEcho',
+      toolName: 'echo_message',
+      status: 'failed',
+      failureKind: 'execution_failure',
+      reason: 'MCP stdio execution failed',
+    })
+  }, 15000)
 })

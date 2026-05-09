@@ -678,6 +678,7 @@ type ActionableBlockerKind =
   | "partial-mutation-failed"
   | "verification-failed"
   | "command-not-allowlisted"
+  | "mcp-unavailable"
   | "approval-denied";
 
 function deriveActionableBlockerContract(input: {
@@ -748,6 +749,7 @@ function findActionableBlockerKindInEvidence(
     actionableMarker === "partial-mutation-failed" ||
     actionableMarker === "verification-failed" ||
     actionableMarker === "command-not-allowlisted" ||
+    actionableMarker === "mcp-unavailable" ||
     actionableMarker === "approval-denied"
   ) {
     return actionableMarker;
@@ -760,6 +762,16 @@ function classifyActionableBlockerKind(
   verificationFailed: boolean,
 ): ActionableBlockerKind | undefined {
   const normalizedReason = reason.toLowerCase();
+  if (
+    normalizedReason.includes("mcp config is invalid") ||
+    normalizedReason.includes("mcp server ") ||
+    normalizedReason.includes("unknown mcp server") ||
+    (normalizedReason.includes("mcp tool ") &&
+      (normalizedReason.includes("not registered") ||
+        normalizedReason.includes("unavailable")))
+  ) {
+    return "mcp-unavailable";
+  }
   if (verificationFailed || normalizedReason.includes("verification failed")) {
     return "verification-failed";
   }
@@ -817,6 +829,8 @@ function actionableBlockerNextAction(kind: ActionableBlockerKind): string {
   switch (kind) {
     case "command-not-allowlisted":
       return "Rephrase the request with an allowlisted command: node --version, npm test -- --help, or npm run build -- --help.";
+    case "mcp-unavailable":
+      return "Run /mcp status and /mcp refresh for the affected server, then retry with a visible executable MCP tool.";
     case "approval-denied":
       return "Re-run and approve escalation for verify command execution.";
     case "patch-from-not-found":
@@ -1437,6 +1451,13 @@ function buildCodingResultNextAction(
 
   if (/approval|approve escalation/i.test(candidateText)) {
     return "Rerun with --non-interactive-approval allow-once, or use an interactive shell and approve the request.";
+  }
+
+  if (
+    /mcp (?:config|server)|unknown mcp server/i.test(candidateText) ||
+    /mcp tool .*?(?:not registered|unavailable)/i.test(candidateText)
+  ) {
+    return "Run /mcp status and /mcp refresh for the affected server, then retry with a visible executable MCP tool.";
   }
 
   if (codingResult.verification.status === "failed") {
