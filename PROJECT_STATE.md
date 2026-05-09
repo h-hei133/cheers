@@ -6,10 +6,10 @@
 - Current stage mainline: **active product hardening** on default CLI path
 - Stage objective: make the interactive shell feel production-grade while preserving load-bearing runtime semantics
 - Current focus: default CLI truthfulness / continuity, writer-started
-  stopped-session continuity, and non-write stopped `/continue` replay
-  evidence are stage-sealed; next implementation should be chosen from current
-  main-path blockers instead of extending the same continuity proof family
-  without a new regression.
+  stopped-session continuity, non-write stopped `/continue` replay evidence,
+  and MCP visibility / execution / rejection consistency are stage-sealed;
+  next implementation should be chosen from current main-path blockers instead
+  of extending the same continuity proof family without a new regression.
 
 What this stage is **not**:
 
@@ -72,6 +72,51 @@ The primary user-visible mainline is now:
 6. Session remains ready for next turn with clear boundaries
 
 ## 5. Latest Implemented Delta (through 2026-05-09)
+
+### Current closeout: MCP visibility / execution / rejection consistency
+
+The MCP focused gate is stage-sealed on `main`.
+
+Recent closeout commit:
+
+- `a024d11 Harden MCP tool failure provenance and continuity`
+
+Key sealed evidence:
+
+- MCP `isError` responses and MCP stdio execution throws no longer flow through
+  a success result shape
+- MCP unavailable/rejected/execution-failed outcomes retain provenance for
+  execution path, server/tool, reason, and failure kind
+- MCP unavailable is recognized as an actionable stopped blocker in
+  `resultMapper`, `sessionRuntime`, and session continuity
+- MCP unavailable/rejected/transport failure cases do not report
+  `changedFiles` or fake file-level `failedFiles`
+- CLI MCP baseline coverage exercises the visible user-facing MCP failure
+  surface in addition to focused registry/provenance/runtime tests
+
+Important boundaries:
+
+- approval denied, MCP unavailable, and MCP execution failed remain separate
+  failure classes; this route does not collapse them into a generic error
+- this does not change provider/auth core, real-provider readiness, default
+  production `apply_patch`, unified diff rejection, rollback, atomic
+  transactions, or multi-file write behavior
+- real-provider gate was not required because the route changes MCP/tool
+  failure classification and session/result display only, without touching
+  provider-facing credential or provider readiness paths
+
+Validation recorded for the closeout commit:
+
+- `rtk npm run build -w packages/ts-shell`
+- `rtk npm run verify:result-contract`
+- `rtk npm run test -w packages/ts-shell -- src/core/tools/runtime.mcp-stale-reconnect.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/core/mcp/gateway.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/core/tools/toolExecutionProvenance.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/core/query/resultMapper.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/core/shell/sessionRuntime.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/session/SessionManager.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/orchestration/mutationExecution.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "MCP"`
 
 ### Current closeout: non-write stopped `/continue` replay evidence
 
