@@ -73,6 +73,47 @@ The primary user-visible mainline is now:
 
 ## 5. Latest Implemented Delta (through 2026-05-09)
 
+### Current closeout: hermetic provider-readiness CLI baseline
+
+The default `src/cli-baseline.test.ts` suite is no longer polluted by
+real-provider-like OpenAI auth/readiness state.
+
+Recent closeout commit:
+
+- pending
+
+Key sealed evidence:
+
+- the four formerly fragile real-provider-like CLI chain tests now use an
+  isolated local OpenAI-compatible HTTP fixture through fake-home provider
+  config instead of `NODE_OPTIONS` / `globalThis.fetch` interception
+- full `src/cli-baseline.test.ts` now passes by default without real OpenAI
+  credentials, browser login state, `/home/wang/.private-agents-real`, or live
+  network success
+- deterministic readiness coverage remains in default tests for missing-key,
+  auth-like 401/403, unsupported/missing config, network retry, and CLI
+  readiness surface
+- real-provider readiness remains an explicit opt-in gate through
+  `verify:provider-readiness` / `verify:provider-baseline`, not part of default
+  CLI baseline
+
+Important boundaries:
+
+- this does not change provider/auth production behavior, browser login,
+  credential discovery, CLI interaction model, session schema, apply_patch,
+  mutation flow, or real-provider gate behavior
+- real-provider gate was not run because this route isolates default tests and
+  does not claim real-provider readiness success
+
+Validation recorded for the closeout:
+
+- `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts -t "provider readiness"`
+- `rtk npm run verify:result-contract`
+- `rtk npm run build -w packages/ts-shell`
+- `rtk git diff --check`
+
 ### Current closeout: MCP visibility / execution / rejection consistency
 
 The MCP focused gate is stage-sealed on `main`.

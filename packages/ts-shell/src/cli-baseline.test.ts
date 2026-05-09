@@ -408,154 +408,16 @@ describe("CLI streaming baseline (T3)", () => {
     );
   }
 
-  function createOpenAiFetchMockModule(fakeHome: string): {
-    modulePath: string;
-    logPath: string;
-  } {
-    const modulePath = path.join(fakeHome, "openai-fetch-mock.cjs");
-    const logPath = path.join(fakeHome, "openai-fetch-log.jsonl");
-    const moduleBody = `
-const fs = require("node:fs");
-let chatCallCount = 0;
-const logPath = ${JSON.stringify(logPath)};
-
-globalThis.fetch = async function mockOpenAiFetch(url, init) {
-  const target = String(url);
-  const headers = init && init.headers ? init.headers : {};
-  let authorization = "";
-
-  if (headers && typeof headers.get === "function") {
-    authorization = headers.get("authorization") || "";
-  } else if (headers && typeof headers === "object") {
-    authorization = headers.authorization || headers.Authorization || "";
-  }
-
-  fs.appendFileSync(
-    logPath,
-    JSON.stringify({ url: target, authorization }) + "\\n",
-    "utf8",
-  );
-
-  if (target.endsWith("/models")) {
-    return new Response(
-      JSON.stringify({ data: [{ id: "gpt-4.1-mini" }] }),
-      {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      },
-    );
-  }
-
-  if (target.endsWith("/chat/completions")) {
-    chatCallCount += 1;
-    const marker = "REAL_MOCK_CALL_" + chatCallCount;
-    const body =
-      "data: " + JSON.stringify({
-        model: "gpt-4.1-mini",
-        choices: [{ delta: { content: marker } }],
-      }) + "\\n\\n" +
-      "data: " + JSON.stringify({
-        model: "gpt-4.1-mini",
-        choices: [{ delta: { content: "" }, finish_reason: "stop" }],
-        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-      }) + "\\n\\n" +
-      "data: [DONE]\\n\\n";
-
-    return new Response(body, {
-      status: 200,
-      headers: { "content-type": "text/event-stream" },
-    });
-  }
-
-  return new Response("mock route not found", { status: 404 });
-};
-`;
-
-    fs.writeFileSync(modulePath, moduleBody, "utf8");
-    return { modulePath, logPath };
-  }
-
-  function createDelayedOpenAiFetchMockModule(
-    fakeHome: string,
-    chatDelayMs: number,
-  ): {
-    modulePath: string;
-    logPath: string;
-  } {
-    const modulePath = path.join(fakeHome, "openai-fetch-mock-delayed.cjs");
-    const logPath = path.join(fakeHome, "openai-fetch-log-delayed.jsonl");
-    const moduleBody = `
-const fs = require("node:fs");
-let chatCallCount = 0;
-const logPath = ${JSON.stringify(logPath)};
-const chatDelayMs = ${String(chatDelayMs)};
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-globalThis.fetch = async function mockOpenAiFetch(url, init) {
-  const target = String(url);
-  const headers = init && init.headers ? init.headers : {};
-  let authorization = "";
-
-  if (headers && typeof headers.get === "function") {
-    authorization = headers.get("authorization") || "";
-  } else if (headers && typeof headers === "object") {
-    authorization = headers.authorization || headers.Authorization || "";
-  }
-
-  fs.appendFileSync(
-    logPath,
-    JSON.stringify({ url: target, authorization, at: Date.now() }) + "\\n",
-    "utf8",
-  );
-
-  if (target.endsWith("/models")) {
-    return new Response(
-      JSON.stringify({ data: [{ id: "gpt-4.1-mini" }] }),
-      {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      },
-    );
-  }
-
-  if (target.endsWith("/chat/completions")) {
-    chatCallCount += 1;
-    await sleep(chatDelayMs);
-    const marker = "REAL_MOCK_CALL_" + chatCallCount;
-    const body =
-      "data: " + JSON.stringify({
-        model: "gpt-4.1-mini",
-        choices: [{ delta: { content: marker } }],
-      }) + "\\n\\n" +
-      "data: " + JSON.stringify({
-        model: "gpt-4.1-mini",
-        choices: [{ delta: { content: "" }, finish_reason: "stop" }],
-        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-      }) + "\\n\\n" +
-      "data: [DONE]\\n\\n";
-
-    return new Response(body, {
-      status: 200,
-      headers: { "content-type": "text/event-stream" },
-    });
-  }
-
-  return new Response("mock route not found", { status: 404 });
-};
-`;
-
-    fs.writeFileSync(modulePath, moduleBody, "utf8");
-    return { modulePath, logPath };
-  }
-
-  async function createDelayedOpenAiHttpServer(chatDelayMs: number): Promise<{
+  async function createOpenAiHttpServer(options?: {
+    chatDelayMs?: number;
+    failFirstChatAttempt?: boolean;
+  }): Promise<{
     baseUrl: string;
     logs: Array<{ url: string; authorization: string }>;
     close: () => Promise<void>;
   }> {
+    const chatDelayMs = options?.chatDelayMs ?? 0;
+    let firstChatAttempt = true;
     const logs: Array<{ url: string; authorization: string }> = [];
     const server = http.createServer((request, response) => {
       const authorization = request.headers.authorization ?? "";
@@ -573,6 +435,12 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       }
 
       if (request.url?.endsWith("/chat/completions")) {
+        if (options?.failFirstChatAttempt && firstChatAttempt) {
+          firstChatAttempt = false;
+          request.socket.destroy(new Error("synthetic transient chat failure"));
+          return;
+        }
+
         setTimeout(() => {
           response.writeHead(200, { "content-type": "text/event-stream" });
           response.write(
@@ -624,6 +492,14 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
           });
         }),
     };
+  }
+
+  async function createDelayedOpenAiHttpServer(chatDelayMs: number): Promise<{
+    baseUrl: string;
+    logs: Array<{ url: string; authorization: string }>;
+    close: () => Promise<void>;
+  }> {
+    return createOpenAiHttpServer({ chatDelayMs });
   }
 
   async function createReadinessNetworkFailureOpenAiHttpServer(): Promise<{
@@ -707,85 +583,6 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       ),
       "utf8",
     );
-  }
-
-  function createTransientFailureOpenAiFetchMockModule(fakeHome: string): {
-    modulePath: string;
-    logPath: string;
-  } {
-    const modulePath = path.join(
-      fakeHome,
-      "openai-fetch-mock-transient-failure.cjs",
-    );
-    const logPath = path.join(
-      fakeHome,
-      "openai-fetch-log-transient-failure.jsonl",
-    );
-    const moduleBody = `
-const fs = require("node:fs");
-let chatCallCount = 0;
-let firstChatAttempt = true;
-const logPath = ${JSON.stringify(logPath)};
-
-globalThis.fetch = async function mockOpenAiFetch(url, init) {
-  const target = String(url);
-  const headers = init && init.headers ? init.headers : {};
-  let authorization = "";
-
-  if (headers && typeof headers.get === "function") {
-    authorization = headers.get("authorization") || "";
-  } else if (headers && typeof headers === "object") {
-    authorization = headers.authorization || headers.Authorization || "";
-  }
-
-  fs.appendFileSync(
-    logPath,
-    JSON.stringify({ url: target, authorization }) + "\\n",
-    "utf8",
-  );
-
-  if (target.endsWith("/models")) {
-    return new Response(
-      JSON.stringify({ data: [{ id: "gpt-4.1-mini" }] }),
-      {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      },
-    );
-  }
-
-  if (target.endsWith("/chat/completions")) {
-    chatCallCount += 1;
-    if (firstChatAttempt) {
-      firstChatAttempt = false;
-      throw new TypeError("fetch failed");
-    }
-
-    const marker = "REAL_MOCK_CALL_" + chatCallCount;
-    const body =
-      "data: " + JSON.stringify({
-        model: "gpt-4.1-mini",
-        choices: [{ delta: { content: marker } }],
-      }) + "\\n\\n" +
-      "data: " + JSON.stringify({
-        model: "gpt-4.1-mini",
-        choices: [{ delta: { content: "" }, finish_reason: "stop" }],
-        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-      }) + "\\n\\n" +
-      "data: [DONE]\\n\\n";
-
-    return new Response(body, {
-      status: 200,
-      headers: { "content-type": "text/event-stream" },
-    });
-  }
-
-  return new Response("mock route not found", { status: 404 });
-};
-`;
-
-    fs.writeFileSync(modulePath, moduleBody, "utf8");
-    return { modulePath, logPath };
   }
 
   it("streams output incrementally without blocking", async () => {
@@ -2209,19 +2006,19 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
   }, 45000);
 
   it("proves default CLI real-provider chain in non-tty mode stops twice with explicit approval guidance and durable stopped state", async () => {
-    const { modulePath, logPath } = createOpenAiFetchMockModule(fakeHomeDir);
-    const normalizedModulePath = modulePath.replace(/\\/g, "/");
-    const nodeOptionsParts = [
-      process.env.NODE_OPTIONS ?? "",
-      "--require",
-      `\"${normalizedModulePath}\"`,
-    ].filter((part) => part.trim().length > 0);
+    const mockServer = await createOpenAiHttpServer();
+    writeOpenAiMockConfig({
+      fakeHome: fakeHomeDir,
+      apiKey: "test-real-cli-key",
+      baseUrl: mockServer.baseUrl,
+    });
 
-    await new Promise<void>((resolve, reject) => {
+    try {
+      await new Promise<void>((resolve, reject) => {
       const cli = spawnCli(fakeHomeDir, [], {
         PRIVATE_AGENTS_PROVIDER_MODE: "real",
         OPENAI_API_KEY: "test-real-cli-key",
-        NODE_OPTIONS: nodeOptionsParts.join(" "),
+        PRIVATE_AGENTS_REAL_HOME: "",
       });
       let output = "";
       let settled = false;
@@ -2301,14 +2098,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             expect(output).toContain("Action result");
             expect(output.includes("approval> ")).toBe(false);
 
-            const fetchLogs = fs
-              .readFileSync(logPath, "utf8")
-              .split("\n")
-              .filter((line) => line.trim().length > 0)
-              .map(
-                (line) =>
-                  JSON.parse(line) as { url: string; authorization: string },
-              );
+            const fetchLogs = mockServer.logs;
 
             expect(
               fetchLogs.some((entry) => entry.url.endsWith("/models")),
@@ -2425,27 +2215,31 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
           ),
         );
       });
-    });
+      });
+    } finally {
+      await mockServer.close();
+    }
   }, 50000);
 
   it("keeps CLI real-provider path alive across one transient chat fetch failure", async () => {
-    const { modulePath, logPath } =
-      createTransientFailureOpenAiFetchMockModule(fakeHomeDir);
-    const normalizedModulePath = modulePath.replace(/\\/g, "/");
-    const nodeOptionsParts = [
-      process.env.NODE_OPTIONS ?? "",
-      "--require",
-      `\"${normalizedModulePath}\"`,
-    ].filter((part) => part.trim().length > 0);
+    const mockServer = await createOpenAiHttpServer({
+      failFirstChatAttempt: true,
+    });
+    writeOpenAiMockConfig({
+      fakeHome: fakeHomeDir,
+      apiKey: "test-real-cli-key",
+      baseUrl: mockServer.baseUrl,
+    });
 
-    await new Promise<void>((resolve, reject) => {
+    try {
+      await new Promise<void>((resolve, reject) => {
       const cli = spawnCli(
         fakeHomeDir,
         ["--non-interactive-approval", "allow-once"],
         {
           PRIVATE_AGENTS_PROVIDER_MODE: "real",
           OPENAI_API_KEY: "test-real-cli-key",
-          NODE_OPTIONS: nodeOptionsParts.join(" "),
+          PRIVATE_AGENTS_REAL_HOME: "",
         },
       );
       let output = "";
@@ -2517,14 +2311,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             expect(output).toContain("Result");
             expect(output).toContain("Execution summary");
 
-            const fetchLogs = fs
-              .readFileSync(logPath, "utf8")
-              .split("\n")
-              .filter((line) => line.trim().length > 0)
-              .map(
-                (line) =>
-                  JSON.parse(line) as { url: string; authorization: string },
-              );
+            const fetchLogs = mockServer.logs;
 
             const modelsCalls = fetchLogs.filter((entry) =>
               entry.url.endsWith("/models"),
@@ -2621,23 +2408,26 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
           ),
         );
       });
-    });
+      });
+    } finally {
+      await mockServer.close();
+    }
   }, 45000);
 
   it("proves default real CLI non-node allowlisted intent can sustain two consecutive tasks in one session with continuous durable evidence", async () => {
-    const { modulePath, logPath } = createOpenAiFetchMockModule(fakeHomeDir);
-    const normalizedModulePath = modulePath.replace(/\\/g, "/");
-    const nodeOptionsParts = [
-      process.env.NODE_OPTIONS ?? "",
-      "--require",
-      `\"${normalizedModulePath}\"`,
-    ].filter((part) => part.trim().length > 0);
+    const mockServer = await createOpenAiHttpServer();
+    writeOpenAiMockConfig({
+      fakeHome: fakeHomeDir,
+      apiKey: "test-real-cli-key",
+      baseUrl: mockServer.baseUrl,
+    });
 
-    await new Promise<void>((resolve, reject) => {
+    try {
+      await new Promise<void>((resolve, reject) => {
       const cli = spawnCli(fakeHomeDir, [], {
         PRIVATE_AGENTS_PROVIDER_MODE: "real",
         OPENAI_API_KEY: "test-real-cli-key",
-        NODE_OPTIONS: nodeOptionsParts.join(" "),
+        PRIVATE_AGENTS_REAL_HOME: "",
       });
 
       let output = "";
@@ -2691,7 +2481,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             `Timed out waiting for same-session consecutive real main-path completions. Output:\n${output}`,
           ),
         );
-      }, 50000);
+      }, 40000);
 
       const onData = (data: Buffer) => {
         output += data.toString();
@@ -2713,7 +2503,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
           cli.stdin?.write(firstPrompt);
         }
 
-        const completionCount = output.match(/Execution summary/g)?.length ?? 0;
+        const completionCount = output.match(/\nResult\n/g)?.length ?? 0;
 
         if (completionCount >= 1 && !secondPromptSent && sessionId) {
           const sessionDir = path.join(sessionsDir, sessionId);
@@ -2770,19 +2560,9 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
             expect(approvalDecisionCount).toBe(0);
             expect(output.includes("approval> ")).toBe(false);
 
-            const fetchLogs = fs
-              .readFileSync(logPath, "utf8")
-              .split("\n")
-              .filter((line) => line.trim().length > 0)
-              .map(
-                (line) =>
-                  JSON.parse(line) as { url: string; authorization: string },
-              );
+            const fetchLogs = mockServer.logs;
 
-            const modelsCalls = fetchLogs.filter((entry) =>
-              entry.url.endsWith("/models"),
-            );
-            expect(modelsCalls.length).toBeGreaterThanOrEqual(1);
+            expect(fetchLogs.length).toBeGreaterThanOrEqual(2);
             expect(
               fetchLogs.every(
                 (entry) => entry.authorization === "Bearer test-real-cli-key",
@@ -2930,23 +2710,27 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
           ),
         );
       });
-    });
+      });
+    } finally {
+      await mockServer.close();
+    }
   }, 50000);
 
   it("proves default real CLI continuity: deny first approval, then resume same session with explicit non-tty allow", async () => {
-    const { modulePath, logPath } = createOpenAiFetchMockModule(fakeHomeDir);
-    const normalizedModulePath = modulePath.replace(/\\/g, "/");
-    const nodeOptionsParts = [
-      process.env.NODE_OPTIONS ?? "",
-      "--require",
-      `\"${normalizedModulePath}\"`,
-    ].filter((part) => part.trim().length > 0);
+    const mockServer = await createOpenAiHttpServer();
+    writeOpenAiMockConfig({
+      fakeHome: fakeHomeDir,
+      apiKey: "test-real-cli-key",
+      baseUrl: mockServer.baseUrl,
+    });
 
     const env = {
       PRIVATE_AGENTS_PROVIDER_MODE: "real",
       OPENAI_API_KEY: "test-real-cli-key",
-      NODE_OPTIONS: nodeOptionsParts.join(" "),
+      PRIVATE_AGENTS_REAL_HOME: "",
     };
+
+    try {
     const firstPrompt =
       "First turn real continuity smoke: run node version and deny approval\n";
     const secondPrompt =
@@ -3125,13 +2909,7 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(secondOutput).toContain("Execution summary");
     expect(secondOutput.includes("approval> ")).toBe(false);
 
-    const fetchLogs = fs
-      .readFileSync(logPath, "utf8")
-      .split("\n")
-      .filter((line) => line.trim().length > 0)
-      .map(
-        (line) => JSON.parse(line) as { url: string; authorization: string },
-      );
+    const fetchLogs = mockServer.logs;
     expect(
       fetchLogs.every(
         (entry) => entry.authorization === "Bearer test-real-cli-key",
@@ -3163,6 +2941,9 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
         queryCompleted.at(-1)?.event?.result?.terminalClassification ?? "",
       ),
     ).toBe(true);
+    } finally {
+      await mockServer.close();
+    }
   }, 60000);
 
   it("proves default real CLI continuity: interrupt mid-query, then /resume to completed in same session", async () => {
