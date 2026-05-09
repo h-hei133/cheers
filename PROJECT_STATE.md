@@ -7,9 +7,12 @@
 - Stage objective: make the interactive shell feel production-grade while preserving load-bearing runtime semantics
 - Current focus: default CLI truthfulness / continuity, writer-started
   stopped-session continuity, non-write stopped `/continue` replay evidence,
-  and MCP visibility / execution / rejection consistency are stage-sealed;
-  next implementation should be chosen from current main-path blockers instead
-  of extending the same continuity proof family without a new regression.
+  MCP visibility / execution / rejection consistency, tool lifecycle
+  projection, stopped-session continuity projection, selected-workspace
+  cross-process resume evidence, CLI entry parity, and isolated
+  real-provider readiness smoke gating are stage-sealed; next implementation
+  should be chosen from current main-path blockers instead of extending the
+  same continuity proof family without a new regression.
 
 What this stage is **not**:
 
@@ -80,7 +83,7 @@ command and remains outside default test/build/CLI baseline paths.
 
 Recent closeout commit:
 
-- pending
+- `de2576c Add isolated real-provider readiness smoke gate`
 
 Key sealed evidence:
 
@@ -108,6 +111,138 @@ Important boundaries:
   opt-in or missing credential is a clear skip/config result, not a default
   test failure
 
+Validation recorded for the closeout:
+
+- `rtk npm run verify:provider-readiness:real`
+- `rtk npm run verify:provider-readiness:real -- --classification-self-test`
+- opt-in localhost-unreachable classification check exited with expected
+  network classification
+- `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/core/shell/providerReadiness.test.ts`
+- `rtk npm run verify:result-contract`
+- `rtk npm run build -w packages/ts-shell`
+- `rtk git diff --check`
+
+### Current closeout: CLI stdin / print / interactive entry parity
+
+The CLI three-entry baseline route is stage-sealed on `main`.
+
+Recent closeout commit:
+
+- `22383f8 Add CLI entry parity baseline`
+
+Key sealed evidence:
+
+- `stdin`, `--print`, and pipe-spawn interactive paths now share focused
+  parity baseline coverage for read-only prompt handling, `/sessions current`,
+  provider-readiness missing-key surface, stopped `/continue`, and MCP
+  unavailable surface
+- the stdin harness exercises the real CLI entrypoint through child-process
+  stdin instead of internal runtime helpers
+- the interactive pipe-spawn wait marker now matches only output produced after
+  test input is sent, reducing false positives from startup text
+- entry-specific assertions preserve stopped/error/success truthfulness and do
+  not allow `changedFiles` / `failedFiles` to vary by input transport
+
+Important boundaries:
+
+- this route only changes CLI baseline tests and the test harness
+- it does not change provider implementation, session schema, runtime flow,
+  MCP discovery, mutation flow, apply_patch capabilities, real-provider gates,
+  or the broader CLI interaction model
+- full `src/cli-baseline.test.ts` is hermetic after the provider-readiness
+  isolation follow-up
+
+### Current closeout: selected-workspace write cross-process resume evidence
+
+The selected-workspace writer-started resume fixture route is stage-sealed on
+`main`.
+
+Recent closeout commit:
+
+- `9459180 Add cross-process resume coverage for selected workspace writes`
+
+Key sealed evidence:
+
+- a first process runs the selected-workspace write route and writes a stopped
+  session with `writerStarted=true` and `writeEffect=unknown|unverified`
+- a second CLI `/continue <prompt>` process reloads the same persisted session
+  and follows continuity-only resume instead of treating the previous turn as
+  success
+- resumed output preserves target, writer-started state, write effect,
+  `requiresUserInspection`, and next action while keeping `changedFiles=[]`
+  and avoiding fake file-level `failedFiles`
+- `continueShellActionRuntime` now allows explicit `/continue <prompt>` on an
+  actionable stopped session to proceed through continuity-only follow-up;
+  ordinary guidance, completed sessions, and non-actionable stopped/error
+  sessions remain guarded by their existing paths
+
+Important boundaries:
+
+- this is evidence and a narrow `/continue <prompt>` stopped-session fix, not a
+  new write capability
+- it does not change apply_patch support scope, session schema,
+  compact/replay, provider behavior, MCP discovery, mutation flow, or CLI
+  interaction model
+
+### Current closeout: stopped-session continuity projection
+
+The stopped-session recovery surface extraction is stage-sealed on `main`.
+
+Recent closeout commit:
+
+- `61cf822 Extract stopped-session continuity projection`
+
+Key sealed evidence:
+
+- `stoppedSessionContinuity.ts` owns the pure projection from existing stopped
+  results, failure reasons, tool lifecycle projection, and mutation metadata to
+  continuity payload
+- `SessionManager.ts` now uses the focused projection for stopped/error
+  continuity instead of carrying the local classification logic directly
+- writer-started unknown/unverified, approval denied, stale-read, MCP
+  unavailable, tool execution failed, and generic stopped/error cases remain
+  distinct and keep actionable reasons / next actions
+- continuity preserves only real `changedFiles` / `failedFiles` metadata and
+  does not invent write success, fake changed files, or verified write effects
+
+Important boundaries:
+
+- session persistence schema, compact/replay, CLI continue flow, provider
+  behavior, success handoff, and mutation flow are unchanged
+- this is a bounded extraction, not a session-system rewrite
+
+### Current closeout: tool lifecycle projection
+
+The tool lifecycle projection extraction is stage-sealed on `main`.
+
+Recent closeout commit:
+
+- `337edec Extract tool lifecycle projection`
+
+Key sealed evidence:
+
+- `toolLifecycleProjection.ts` provides a pure projection for existing tool
+  result/provenance/approval signals into stable lifecycle kinds such as
+  success, approval-denied, tool-unavailable, MCP unavailable,
+  MCP execution failed, tool execution failed, permission-blocked, and
+  environment-blocked
+- `runMvpIntegratedFlow.ts` has narrow wiring through
+  `dispatchToolWithLifecycle` and verification-failure classification while
+  keeping the original fallback paths
+- MCP `isError` / stdio throw and generic tool failures are not success-like;
+  approval denied, permission blocked, unavailable, and execution failed
+  remain separate semantics
+- the projection does not execute tools, access providers, read/write files,
+  mutate session state, handle UI, or fabricate `changedFiles` / `failedFiles`
+
+Important boundaries:
+
+- query loop ordering, provider flow, mutation flow, CLI behavior, session
+  storage, default apply_patch behavior, and MCP discovery are unchanged
+- this is a bounded extraction from `runMvpIntegratedFlow.ts`, not a broad
+  orchestration refactor
+
 ### Current closeout: hermetic provider-readiness CLI baseline
 
 The default `src/cli-baseline.test.ts` suite is no longer polluted by
@@ -115,7 +250,8 @@ real-provider-like OpenAI auth/readiness state.
 
 Recent closeout commit:
 
-- pending
+- `ff20c76 Fix provider readiness CLI baseline isolation`
+- `be6135f fix auth error`
 
 Key sealed evidence:
 
@@ -201,7 +337,7 @@ writer-started write failures to cover representative non-write stopped cases.
 
 Recent closeout commit:
 
-- pending on `stopped-continue-replay-nonwrite`
+- `6e62235 Add non-write stopped continue replay evidence`
 
 Key sealed evidence:
 
