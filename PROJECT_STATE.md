@@ -73,6 +73,41 @@ The primary user-visible mainline is now:
 
 ## 5. Latest Implemented Delta (through 2026-05-09)
 
+### Current closeout: isolated opt-in real-provider readiness smoke
+
+A new real-provider readiness smoke gate is available as an explicit opt-in
+command and remains outside default test/build/CLI baseline paths.
+
+Recent closeout commit:
+
+- pending
+
+Key sealed evidence:
+
+- `verify:provider-readiness:real` defaults to a skip/refusal path unless
+  `PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1` is set
+- the smoke uses explicit provider env and an isolated
+  `PRIVATE_AGENTS_TEST_ROOT` runtime home, then forces child CLI `HOME` and
+  `USERPROFILE` to that isolated home
+- the smoke refuses `PRIVATE_AGENTS_REAL_HOME` instead of reading real user
+  provider configuration from `/home/wang/.private-agents-real`
+- readiness outcomes are classified as missing-key, missing-config, auth,
+  network, unsupported, unknown, pass, or product-regression instead of
+  collapsing 401/403 or `invalid_api_key` into a generic failure
+- classification and redaction self-tests can run without opt-in and without
+  touching a real provider
+
+Important boundaries:
+
+- default `src/cli-baseline.test.ts`, build, result-contract verification, and
+  provider readiness unit tests do not run the real-provider smoke
+- this does not change production provider/auth flow, browser login,
+  credential discovery, CLI interaction model, session schema, apply_patch,
+  mutation flow, or real-provider home handling
+- the actual real-provider smoke remains manual and credentialed; a missing
+  opt-in or missing credential is a clear skip/config result, not a default
+  test failure
+
 ### Current closeout: hermetic provider-readiness CLI baseline
 
 The default `src/cli-baseline.test.ts` suite is no longer polluted by
