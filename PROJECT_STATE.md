@@ -104,6 +104,25 @@ Important boundaries:
 - real-provider checks remain explicit and must use isolated runtime/test homes;
   provider secrets must not be printed or persisted
 
+Follow-up opt-in evidence:
+
+- `verify-real-user-capabilities` now also exposes
+  `--case=real-selected-workspace-single-file-update` and
+  `verify:real-user-capabilities:real-single-file`
+- this candidate smoke uses a real provider only after explicit opt-in, then
+  routes exactly one provider-produced `Update File: src/app.ts` patch through
+  the explicit selected-workspace workspace-write entrypoint against an
+  isolated temporary fixture
+- the fixture contains only one existing target file; post-write verification
+  requires that `src/app.ts` changed from `draft` to `ready` and that no files
+  were added, removed, or otherwise changed
+- the case is metadata-visible in `--list` and `--tier=candidate --dry-run`,
+  but it is not part of the default MVP gate and does not run under
+  `--tier=mvp`
+- this evidence does not open broader `apply_patch`, create/add,
+  delete/move, multi-file, rollback, protected composite, provider/auth, or
+  production mutation behavior
+
 ### Current closeout: isolated opt-in real-provider readiness smoke
 
 A new real-provider readiness smoke gate is available as an explicit opt-in

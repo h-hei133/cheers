@@ -101,6 +101,7 @@ work:
 | --- | --- | --- | --- |
 | Golden CLI main path | `npm run test:gate:golden-main-path` | Required stable gate | Fast synthetic CLI baseline for the user-visible main path. |
 | Real user capabilities | `npm run verify:real-user-capabilities` | Required stable MVP gate for current dogfood mutation evidence | Synthetic selected-workspace existing-file single-file update. Broader real-provider, protected consistency, release, and backlog cases require explicit `--tier=...`. |
+| Real single-file provider smoke | `npm run verify:real-user-capabilities:real-single-file` | Explicit opt-in candidate evidence | Real provider model turn plus isolated selected-workspace existing-file single-file update. It is not part of default MVP, and it does not enable create/add/delete/move/multi-file/rollback or broader `apply_patch`. |
 | Focused regression guard | `npm run test -w packages/ts-shell -- <file> -t "<case>"` | Required when the current bounded slice added or changed a focused guard | Proves the exact behavior being closed without treating legacy wide tests as release blockers. |
 | Release core | `npm run verify:release:core` | Broader deterministic release gate | Runs the hard gate set listed above; use before release handoff or when changing shared CLI/runtime contracts. |
 
@@ -131,7 +132,7 @@ Known failure buckets in that full suite:
 When a future change touches `runMvpIntegratedFlow.ts`, prefer this order:
 
 1. Run the focused guard for the changed behavior.
-2. Run `npm run verify:real-user-capabilities` for the MVP selected-workspace update gate; use `--tier=candidate` or explicit real-provider smoke flags only when the behavior affects those non-default tiers.
+2. Run `npm run verify:real-user-capabilities` for the MVP selected-workspace update gate; use `--tier=candidate`, `--case=real-selected-workspace-single-file-update`, or explicit real-provider smoke flags only when the behavior affects those non-default tiers.
 3. Run `npm run test:gate:golden-main-path`.
 4. Run the full `runMvpIntegratedFlow.test.ts` only for attribution or when intentionally working down that legacy corpus.
 
@@ -174,6 +175,30 @@ or partial evidence. That is a diagnostic state, not a repair operation.
 - Real-provider smoke uses `D:\Test\home-sf` as both `HOME` and `USERPROFILE`.
 - Do not create a third home.
 - Do not copy or configure provider credentials outside `D:\Test\home-sf`.
+
+### Real single-file capability smoke
+
+`npm run verify:real-user-capabilities:real-single-file` is a candidate-only,
+explicit opt-in smoke for real-provider dogfood of the current MVP mutation
+boundary.
+
+Required boundary:
+
+- one real-provider model turn may produce exactly one `apply_patch` block
+- the write route may update only existing `src/app.ts` in an isolated temporary
+  selected workspace
+- the fixture contains no create/add/delete/move/multi-file/protected composite
+  requirement
+- post-write verification must prove the target file changed from `draft` to
+  `ready` and no other file was added, removed, or changed
+- provider/preflight, model output, unsupported patch, verification-blocked, no
+  mutation, and post-write verification failures must remain separately
+  attributable
+
+On Linux/WSL, run it only with explicit real-provider opt-in and isolated test
+homes. If `provider.env` is used, load it silently in the command environment;
+never print, copy, log, or summarize provider secrets or values. `--list` and
+`--dry-run` show the case metadata without touching the real provider.
 
 ## Suggested debug reading order
 

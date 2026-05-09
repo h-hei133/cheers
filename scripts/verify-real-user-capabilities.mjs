@@ -17,6 +17,13 @@ import {
   snapshotApplyPatchDryRunFixture,
 } from './real-provider-apply-patch-dry-run-fixture.mjs'
 import {
+  cleanupSingleFileUpdateFixture,
+  compareSingleFileUpdateSnapshots,
+  createSingleFileUpdateFixture,
+  readSingleFileUpdateTarget,
+  snapshotSingleFileUpdateFixture,
+} from './real-provider-single-file-update-fixture.mjs'
+import {
   assertOnlyExpectedCodingFixtureChanges,
   buildCodingFlowDryRunContract,
   cleanupCodingFlowFixture,
@@ -51,7 +58,9 @@ const testRoot = getTestRoot()
 const reportPath = path.join(testRoot, 'test-results', 'real-user-capabilities-report.json')
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const tierValues = ['mvp', 'candidate', 'release', 'backlog', 'all']
+const realSingleFileUpdateCaseId = 'real-selected-workspace-single-file-update'
 const selectedTier = parseTierArg(process.argv)
+const selectedCaseId = parseCaseArg(process.argv)
 const includeCandidates = process.argv.includes('--include-candidates')
 const includeContinueSmoke = process.argv.includes('--include-continue-smoke')
 const listCases = process.argv.includes('--list')
@@ -88,6 +97,11 @@ const failureCategories = [
   'provider-readiness',
   'task-execution-failure',
   'model-output',
+  'provider/preflight',
+  'unsupported patch',
+  'verification-blocked',
+  'no mutation',
+  'post-write verification failed',
   'unsupported-patch-shape',
   'verification-failed',
   'verification-blocked',
@@ -134,6 +148,17 @@ function parseTierArg(argv) {
     process.exit(3)
   }
   return normalized
+}
+
+function parseCaseArg(argv) {
+  const explicitEquals = argv.find((arg) => arg.startsWith('--case='))
+  const raw = explicitEquals
+    ? explicitEquals.slice('--case='.length)
+    : argv.includes('--case')
+      ? argv[argv.indexOf('--case') + 1]
+      : undefined
+  const normalized = raw?.trim()
+  return normalized || undefined
 }
 
 const futureGateCandidates = [
@@ -419,6 +444,20 @@ const candidateScenarios = [
 
 const tierDescriptorCases = [
   {
+    id: realSingleFileUpdateCaseId,
+    tier: 'candidate',
+    provider: 'real',
+    executable: false,
+    manualFlag: `--case=${realSingleFileUpdateCaseId}`,
+    expectedCapability: 'real provider selected-workspace existing-file single-file update',
+    currentSupportedCapability: 'selected-workspace existing-file single-file update only',
+    reasonForTier: 'Candidate opt-in because it uses a real provider to dogfood the existing MVP mutation boundary without changing the default synthetic gate.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: true,
+    expectedToPassCurrentMvp: false,
+    expectedToPassInCurrentMVP: false,
+  },
+  {
     id: 'real-apply-patch-workspace-write-smoke',
     tier: 'candidate',
     provider: 'real',
@@ -537,7 +576,12 @@ function caseMatchesTier(capabilityCase, tier) {
   return tier === 'all' || capabilityCase.tier === tier
 }
 
+function findCapabilityCaseById(caseId) {
+  return allCapabilityCases().find((capabilityCase) => capabilityCase.id === caseId)
+}
+
 function caseMetadata(capabilityCase) {
+  const expectedToPassCurrentMvp = Boolean(capabilityCase.expectedToPassCurrentMvp)
   return {
     id: capabilityCase.id,
     tier: capabilityCase.tier,
@@ -547,7 +591,8 @@ function caseMetadata(capabilityCase) {
     reasonForTier: capabilityCase.reasonForTier,
     drivesApplyPatchExpansion: Boolean(capabilityCase.drivesApplyPatchExpansion),
     requiresRealProvider: Boolean(capabilityCase.requiresRealProvider),
-    expectedToPassCurrentMvp: Boolean(capabilityCase.expectedToPassCurrentMvp),
+    expectedToPassCurrentMvp,
+    expectedToPassInCurrentMVP: expectedToPassCurrentMvp,
     executable: capabilityCase.executable !== false,
     ...(capabilityCase.manualFlag ? { manualFlag: capabilityCase.manualFlag } : {}),
   }
@@ -563,11 +608,20 @@ function withCaseMetadata(capabilityCase, result) {
     drivesApplyPatchExpansion: Boolean(capabilityCase.drivesApplyPatchExpansion),
     requiresRealProvider: Boolean(capabilityCase.requiresRealProvider),
     expectedToPassCurrentMvp: Boolean(capabilityCase.expectedToPassCurrentMvp),
+    expectedToPassInCurrentMVP: Boolean(capabilityCase.expectedToPassCurrentMvp),
     caseMetadata: caseMetadata(capabilityCase),
   }
 }
 
 function skippedCasesForTier(tier) {
+  if (selectedCaseId) {
+    return allCapabilityCases()
+      .filter((capabilityCase) => capabilityCase.id !== selectedCaseId)
+      .map((capabilityCase) => ({
+        ...caseMetadata(capabilityCase),
+        skipReason: `selected case=${selectedCaseId}; case id=${capabilityCase.id}; ${capabilityCase.reasonForTier}`,
+      }))
+  }
   return allCapabilityCases()
     .filter((capabilityCase) => !caseMatchesTier(capabilityCase, tier))
     .map((capabilityCase) => ({
@@ -577,6 +631,14 @@ function skippedCasesForTier(tier) {
 }
 
 function selectedCasesForTier(tier) {
+  if (selectedCaseId) {
+    const capabilityCase = findCapabilityCaseById(selectedCaseId)
+    if (!capabilityCase) {
+      console.error(`Invalid --case value: ${selectedCaseId}. Use --list to inspect available case ids.`)
+      process.exit(3)
+    }
+    return [capabilityCase]
+  }
   if (includeContinueSmoke) {
     return candidateScenarios.filter(
       (scenario) => scenario.id === 'real-completed-continue-followup-verify',
@@ -1866,6 +1928,7 @@ function printHelp() {
   console.log('  --tier=release    Metadata for release-only gates; use explicit release commands for execution.')
   console.log('  --tier=backlog    Unsupported/future capability cases retained outside MVP.')
   console.log('  --tier=all        Explicitly select all executable tier cases.')
+  console.log('  --case=<id>       Explicitly select one case by id; real-provider cases remain opt-in.')
   console.log('  --list            Print all case metadata and skip reasons without execution.')
   console.log('  --dry-run         Print selected/skipped cases without touching provider or fixtures.')
   console.log('Safe dry-run options do not execute real provider calls:')
@@ -1885,6 +1948,9 @@ function printHelp() {
   console.log('  --real-apply-patch-dry-run-smoke-dry-run')
   console.log('')
   console.log('Explicit opt-in real-provider checks:')
+  console.log(`  --case=${realSingleFileUpdateCaseId}`)
+  console.log('    Opt-in only; runs one real-provider model turn and writes only one existing file in an isolated selected workspace.')
+  console.log('    Excluded from default MVP verification; does not enable create/add/delete/move/multi-file/rollback or broader apply_patch.')
   console.log('  --real-readonly-coding-preflight')
   console.log('    Opt-in only; readiness preflight only; no model turn.')
   console.log('  --real-readonly-coding-smoke')
@@ -8462,6 +8528,432 @@ async function runRealApplyPatchWorkspaceWriteSmoke() {
   }
 }
 
+function statusDetailForRealSingleFileUpdateFailureCategory(failureCategory) {
+  if (failureCategory === 'provider/preflight') return 'provider-preflight'
+  if (failureCategory === 'model output') return 'model-output'
+  if (failureCategory === 'unsupported patch') return 'unsupported-patch'
+  if (failureCategory === 'verification-blocked') return 'verification-blocked'
+  if (failureCategory === 'no mutation') return 'no-mutation'
+  if (failureCategory === 'post-write verification failed') return 'post-write-verification-failed'
+  if (failureCategory === 'redaction failure') return 'redaction-failure'
+  return 'passed'
+}
+
+function classifySingleFileUpdatePatchShape(patchText) {
+  const normalized = String(patchText ?? '').replace(/\r\n/g, '\n')
+  const updateFiles = [...normalized.matchAll(/^\*\*\* Update File:\s+(.+)$/gm)]
+    .map((match) => match[1].trim())
+  const unsupportedHeaders = [
+    /^\*\*\* Add File:/m,
+    /^\*\*\* Delete File:/m,
+    /^\*\*\* Move to:/m,
+  ].filter((pattern) => pattern.test(normalized))
+
+  if (unsupportedHeaders.length > 0) {
+    return {
+      ok: false,
+      reason: 'unsupported patch: add/delete/move headers are outside the single-file update smoke boundary',
+    }
+  }
+  if (updateFiles.length !== 1 || updateFiles[0] !== 'src/app.ts') {
+    return {
+      ok: false,
+      reason: `unsupported patch: expected exactly one Update File for src/app.ts, observed ${updateFiles.join(',') || 'none'}`,
+    }
+  }
+  if (
+    !normalized.includes('-export const status = "draft"') ||
+    !normalized.includes('+export const status = "ready"')
+  ) {
+    return {
+      ok: false,
+      reason: 'unsupported patch: expected deterministic draft-to-ready hunk for src/app.ts',
+    }
+  }
+  return { ok: true, reason: '' }
+}
+
+function buildRealSingleFileUpdateFailure({ category, reason, status = 'FAIL', statusDetail, exitCode = 1 }) {
+  return {
+    status,
+    statusDetail: statusDetail ?? statusDetailForRealSingleFileUpdateFailureCategory(category),
+    exitCode,
+    failureCategory: category,
+    failureReason: reason,
+  }
+}
+
+function writeRealSingleFileUpdateReport(fields) {
+  writeReport({
+    generatedAt: new Date().toISOString(),
+    capability: realSingleFileUpdateCaseId,
+    provider: 'real',
+    mode: 'opt-in-case',
+    tier: 'candidate',
+    reportPath,
+    expectedCapability: 'real provider selected-workspace existing-file single-file update',
+    currentSupportedCapability: 'selected-workspace existing-file single-file update only',
+    drivesApplyPatchExpansion: false,
+    expectedToPassCurrentMvp: false,
+    expectedToPassInCurrentMVP: false,
+    ...fields,
+  })
+}
+
+async function runRealSelectedWorkspaceSingleFileUpdate() {
+  console.log(`mode=${realSingleFileUpdateCaseId}`)
+  console.log('status taxonomy: pass=0 product-regression=1 provider-network-inconclusive=2 config-failure=3')
+  console.log('real-provider=explicit-opt-in')
+  console.log('homeRead=false')
+  console.log('defaultSmoke=skipped')
+  console.log('realProviderHome=config-only')
+  console.log('writeScope=isolated-selected-workspace-existing-file-only')
+  console.log('mutationBoundary=update-only single-file no-create no-delete no-move no-multifile no-rollback')
+
+  if (!realHome) {
+    const failure = buildRealSingleFileUpdateFailure({
+      category: 'provider/preflight',
+      reason: 'provider/preflight: set PRIVATE_AGENTS_REAL_HOME before running real selected-workspace single-file update smoke',
+      status: 'CONFIG',
+      exitCode: 3,
+    })
+    writeRealSingleFileUpdateReport({
+      ...failure,
+      realProviderExecution: false,
+      modelTurn: false,
+      changedFiles: [],
+      writeIntents: [],
+      workspaceWriterInvoked: false,
+    })
+    console.log(`[CONFIG] ${realSingleFileUpdateCaseId} status=${failure.statusDetail}`)
+    process.exitCode = failure.exitCode
+    return
+  }
+
+  const repoBefore = await readRepoStatusShort()
+  if (!repoBefore.ok || repoBefore.status) {
+    const failure = buildRealSingleFileUpdateFailure({
+      category: 'verification-blocked',
+      reason: repoBefore.ok
+        ? 'verification-blocked: repository was not clean before opt-in real single-file smoke'
+        : 'verification-blocked: repository status could not be checked before opt-in real single-file smoke',
+    })
+    writeRealSingleFileUpdateReport({
+      ...failure,
+      realProviderExecution: false,
+      modelTurn: false,
+      changedFiles: [],
+      writeIntents: [],
+      workspaceWriterInvoked: false,
+      outputTail: repoBefore.outputTail,
+    })
+    console.log(`[FAIL] ${realSingleFileUpdateCaseId} status=${failure.statusDetail}`)
+    console.log(`failureReason=${failure.failureReason}`)
+    process.exitCode = failure.exitCode
+    return
+  }
+
+  const preflight = await runProviderReadinessPreflight()
+  const preflightStatus = buildCodingFlowPreflightStatus(preflight)
+  console.log(`[${preflightStatus.status}] real-single-file-update-preflight status=${preflightStatus.statusDetail}`)
+  if (!preflight.ok) {
+    const failure = buildRealSingleFileUpdateFailure({
+      category: 'provider/preflight',
+      reason: preflightStatus.failureReason,
+      status: preflightStatus.status,
+      statusDetail: preflightStatus.statusDetail,
+      exitCode: preflightStatus.exitCode,
+    })
+    writeRealSingleFileUpdateReport({
+      ...failure,
+      realProviderExecution: true,
+      modelTurn: false,
+      providerReadiness: preflight,
+      changedFiles: [],
+      writeIntents: [],
+      workspaceWriterInvoked: false,
+      outputTail: preflight.outputTail,
+    })
+    process.exitCode = failure.exitCode
+    return
+  }
+
+  const smokeRunId = `${realSingleFileUpdateCaseId}-${Date.now()}`
+  const runtimeHome = getRealCodingFlowRuntimeHome(`${smokeRunId}-runtime`)
+  const auditLogPath = getRealCodingFlowAuditLogPath(`${smokeRunId}-audit`)
+  assertSafeCodingFlowRuntimeHome(runtimeHome)
+  assertSafeCodingFlowRuntimeHome(path.dirname(auditLogPath))
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+
+  const fixture = createSingleFileUpdateFixture()
+  try {
+    const before = snapshotSingleFileUpdateFixture(fixture.fixtureDir)
+    const beforeTarget = readSingleFileUpdateTarget(fixture.fixtureDir)
+    const providerResult = await runApplyPatchDryRunProviderTurn({
+      prompt: fixture.prompt,
+      runtimeHome,
+      realHome,
+      fixtureDir: fixture.fixtureDir,
+      auditLogPath,
+    })
+    const redaction = redactAndAssertCodingProviderOutput(providerResult.rawOutput || providerResult.output)
+    const redactedProviderOutput = redactAndAssertCodingProviderOutput(providerResult.output).redacted
+    const providerFailure = classifyProviderReadinessFailure(
+      `real single-file update model turn exited ${providerResult.code}`,
+      redaction.redacted,
+      'real',
+    )
+
+    let cliResult = undefined
+    const extracted = extractSingleApplyPatchBlock(redactedProviderOutput)
+    const patchShape = extracted.status === 'ok'
+      ? classifySingleFileUpdatePatchShape(extracted.patchText)
+      : { ok: false, reason: '' }
+
+    if (providerResult.code === 0 && !providerResult.timedOut && !providerFailure && extracted.status === 'ok' && patchShape.ok) {
+      cliResult = await runApplyPatchWorkspaceWriteCli({
+        fixtureDir: fixture.fixtureDir,
+        patchText: extracted.patchText,
+        runtimeHome,
+        auditLogPath,
+      })
+    }
+
+    const after = snapshotSingleFileUpdateFixture(fixture.fixtureDir)
+    const afterTarget = readSingleFileUpdateTarget(fixture.fixtureDir)
+    const comparison = compareSingleFileUpdateSnapshots(before, after)
+    const repoAfter = await readRepoStatusShort()
+    const cliRedaction = redactAndAssertCodingProviderOutput(cliResult?.output ?? '')
+    const redactionOk = redaction.ok && cliRedaction.ok
+    const repositoryClean = repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status
+
+    if (providerFailure || providerResult.code !== 0 || providerResult.timedOut) {
+      const providerStatus = buildCodingFlowSmokeFailureStatus(providerResult, redaction.redacted, redaction)
+      const failure = buildRealSingleFileUpdateFailure({
+        category: 'provider/preflight',
+        reason: providerStatus.failureReason,
+        status: providerStatus.status,
+        statusDetail: providerStatus.statusDetail,
+        exitCode: providerStatus.exitCode,
+      })
+      writeRealSingleFileUpdateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        changedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        outputTail: summarizeOutput(redaction.redacted),
+      })
+      console.log(`[${failure.status}] ${realSingleFileUpdateCaseId} status=${failure.statusDetail}`)
+      if (redaction.redacted) console.log(summarizeOutput(redaction.redacted))
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    if (!redactionOk) {
+      const failure = buildRealSingleFileUpdateFailure({
+        category: 'redaction failure',
+        reason: `redaction failure: ${[...redaction.leaks, ...cliRedaction.leaks].join(',') || 'unknown'}`,
+      })
+      writeRealSingleFileUpdateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        changedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        redaction: { ok: false, leaks: [...redaction.leaks, ...cliRedaction.leaks] },
+      })
+      console.log(`[FAIL] ${realSingleFileUpdateCaseId} status=${failure.statusDetail}`)
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    if (extracted.status !== 'ok') {
+      const failure = buildRealSingleFileUpdateFailure({
+        category: 'model output',
+        reason: `model output: provider output did not contain exactly one apply_patch block (${extracted.status})`,
+        statusDetail: extracted.status,
+      })
+      writeRealSingleFileUpdateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        outputTail: summarizeOutput(redactedProviderOutput),
+      })
+      console.log(`[FAIL] ${realSingleFileUpdateCaseId} status=${failure.statusDetail}`)
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    if (!patchShape.ok) {
+      const failure = buildRealSingleFileUpdateFailure({
+        category: 'unsupported patch',
+        reason: patchShape.reason,
+      })
+      writeRealSingleFileUpdateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        outputTail: summarizeOutput(redactedProviderOutput),
+      })
+      console.log(`[FAIL] ${realSingleFileUpdateCaseId} status=${failure.statusDetail}`)
+      console.log(`failureReason=${failure.failureReason}`)
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    const cliPassed = cliResult?.code === 0 &&
+      !cliResult.timedOut &&
+      /apply_patch workspace write succeeded/i.test(cliResult.output) &&
+      /success/i.test(cliResult.output)
+    if (!cliPassed) {
+      const unsupported = /unsupported|not supported|only supports|failed to parse|cannot apply|rejected/i.test(cliResult?.output ?? '')
+      const failure = buildRealSingleFileUpdateFailure({
+        category: unsupported ? 'unsupported patch' : 'verification-blocked',
+        reason: unsupported
+          ? `unsupported patch: workspace write route rejected the provider patch (${summarizeOutput(cliResult?.output ?? '')})`
+          : `verification-blocked: workspace write CLI did not complete successfully code=${cliResult?.code ?? 'missing'} timedOut=${cliResult?.timedOut ?? 'missing'}`,
+      })
+      writeRealSingleFileUpdateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        writeIntents: ['src/app.ts'],
+        workspaceWriterInvoked: true,
+        outputTail: summarizeOutput(cliRedaction.redacted || redactedProviderOutput),
+      })
+      console.log(`[FAIL] ${realSingleFileUpdateCaseId} status=${failure.statusDetail}`)
+      console.log(`failureReason=${failure.failureReason}`)
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    const targetChanged = beforeTarget !== afterTarget
+    const onlyTargetChanged = comparison.added.length === 0 &&
+      comparison.removed.length === 0 &&
+      comparison.changed.length === 1 &&
+      comparison.changed[0] === 'src/app.ts'
+    const targetContentOk =
+      afterTarget.includes('export const status = "ready"') &&
+      !afterTarget.includes('export const status = "draft"') &&
+      afterTarget.includes('export const owner = "fixture"')
+    const success = targetChanged && onlyTargetChanged && targetContentOk && repositoryClean
+    const failureCategory = !targetChanged
+      ? 'no mutation'
+      : success
+        ? 'none'
+        : 'post-write verification failed'
+    const failures = [
+      ...(targetChanged ? [] : ['no mutation: src/app.ts did not change after workspace write route completed']),
+      ...(onlyTargetChanged ? [] : [`post-write verification failed: expected only src/app.ts changed; changed=${comparison.changed.join(',') || 'none'} added=${comparison.added.join(',') || 'none'} removed=${comparison.removed.join(',') || 'none'}`]),
+      ...(targetContentOk ? [] : ['post-write verification failed: src/app.ts does not contain the expected ready status while preserving owner']),
+      ...(repositoryClean ? [] : ['post-write verification failed: repository mutated or status unavailable']),
+    ]
+
+    writeRealSingleFileUpdateReport({
+      status: success ? 'PASS' : 'FAIL',
+      statusDetail: success ? 'passed' : statusDetailForRealSingleFileUpdateFailureCategory(failureCategory),
+      realProviderExecution: true,
+      modelTurn: true,
+      runtimeHome: 'isolated-test-root',
+      fixture: {
+        files: fixture.files,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+      },
+      repositoryClean,
+      applyPatchBlocks: extracted.count,
+      changedFiles: success ? ['src/app.ts'] : comparison.changed,
+      writeIntents: ['src/app.ts'],
+      workspaceWriterInvoked: true,
+      writerTarget: 'isolated-selected-workspace',
+      terminalSuccessAllowed: success,
+      redaction: { ok: true, leaks: [] },
+      failureCategory,
+      failureReason: failures.join('; '),
+      outputTail: summarizeOutput(cliRedaction.redacted || redactedProviderOutput),
+    })
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`applyPatchBlocks=${extracted.count}`)
+    console.log(`fixtureChanged=${comparison.changed.join(',') || 'none'}`)
+    console.log(`fixtureAdded=${comparison.added.join(',') || 'none'}`)
+    console.log(`fixtureRemoved=${comparison.removed.join(',') || 'none'}`)
+    console.log(`targetChanged=${targetChanged}`)
+    console.log(`postWriteVerification=${success ? 'pass' : 'fail'}`)
+    console.log(`repositoryClean=${repositoryClean}`)
+    console.log('workspaceWriterInvoked=true')
+    console.log('writerTarget=isolated-selected-workspace')
+    console.log(`changedFiles=${success ? 'src/app.ts' : comparison.changed.join(',')}`)
+    console.log('writeIntents=src/app.ts')
+    console.log(`redaction=${redactionOk ? 'pass' : 'fail'}`)
+    if (!success) console.log(`failureReason=${failures.join('; ')}`)
+    console.log(`[${success ? 'PASS' : 'FAIL'}] ${realSingleFileUpdateCaseId}`)
+    process.exitCode = success ? 0 : 1
+    return
+  } finally {
+    cleanupSingleFileUpdateFixture(fixture.fixtureDir)
+    cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
+  }
+}
+
 async function runApplyPatchWorkspaceWriteCli({
   fixtureDir,
   patchText,
@@ -8596,11 +9088,14 @@ async function main() {
     return
   }
 
-  const executionTier = includeCandidates
-    ? 'candidate'
-    : includeContinueSmoke
+  const selectedCase = selectedCaseId ? findCapabilityCaseById(selectedCaseId) : undefined
+  const executionTier = selectedCase
+    ? selectedCase.tier
+    : includeCandidates
       ? 'candidate'
-      : selectedTier
+      : includeContinueSmoke
+        ? 'candidate'
+        : selectedTier
   const selectedPlanCases = selectedCasesForTier(executionTier)
   const selectedScenarios = selectedExecutableScenariosForTier(executionTier)
   const skippedCases = skippedCasesForTier(executionTier)
@@ -8615,6 +9110,7 @@ async function main() {
   console.log(`real HOME=${realHome ? 'configured' : 'not-configured'}`)
   console.log(`requestedTier=${selectedTier}`)
   console.log(`executionTier=${executionTier}`)
+  console.log(`requestedCase=${selectedCaseId ?? 'none'}`)
   console.log(`candidateMode=${includeCandidates ? 'include-candidates-legacy' : includeContinueSmoke ? 'include-continue-smoke-legacy' : 'off'}`)
   printCasePlan(executionTier, selectedPlanCases, skippedCases, { dryRun, list: listCases })
 
@@ -8627,6 +9123,16 @@ async function main() {
     })
     console.log(`planCases=${plan.allCases.length}`)
     return
+  }
+
+  if (selectedCaseId === realSingleFileUpdateCaseId) {
+    await runRealSelectedWorkspaceSingleFileUpdate()
+    return
+  }
+
+  if (selectedCaseId && selectedScenarios.length === 0) {
+    console.log(`[CONFIG] selected case is metadata-only and has no direct executor: ${selectedCaseId}`)
+    process.exit(3)
   }
 
   const homeCreated = ensureDirIfNeeded(syntheticHome)
