@@ -56,6 +56,10 @@ import {
   type CurrentSessionSelectionStore,
 } from "./currentSessionSelection.js";
 import { buildReplayPlanFromSnapshot } from "./replayPlanBuilder.js";
+import {
+  buildStoppedSessionFailureHandoffDiagnostic,
+  deriveStoppedSessionContinuitySurface,
+} from "./stoppedSessionContinuity.js";
 
 export type { CurrentSessionSelectionResolution } from "./currentSessionSelection.js";
 
@@ -2404,8 +2408,10 @@ export class SessionManager {
       toolExecutionProvenanceItems[toolExecutionProvenanceItems.length - 1];
     const lastAnswerDefect =
       this.extractLastAnswerDefect(lastCodingResult) ?? undefined;
+    const lastStoppedSessionContinuity =
+      deriveStoppedSessionContinuitySurface(lastCodingResult);
     const lastWriteContinuity =
-      this.buildWriteContinuityDiagnostic(lastCodingResult) ??
+      lastStoppedSessionContinuity?.writeContinuity ??
       this.extractWriteContinuityFromMemory(stateSnapshot?.workingMemory);
     const lastActionHandoffSummary =
       this.buildActionHandoffSummary(lastCodingResult?.lastActionResultSeed) ??
@@ -2422,11 +2428,12 @@ export class SessionManager {
         stateSnapshot?.workingMemory,
       );
     const lastFailureHandoffDiagnostic =
-      this.buildFailureHandoffDiagnostic(lastCodingResult) ??
+      lastStoppedSessionContinuity?.failureHandoffDiagnostic ??
       this.extractFailureHandoffDiagnosticFromMemory(
         stateSnapshot?.workingMemory,
       );
     const lastActionableFailure =
+      lastStoppedSessionContinuity?.actionableFailure ??
       deriveActionableFailureContinuity(lastCodingResult);
     const lastSuccessHandoffDiagnostic =
       this.buildSuccessHandoffDiagnostic(lastCodingResult) ??
@@ -5178,9 +5185,10 @@ export class SessionManager {
     if (actionHandoffSummary) {
       continuity.lastActionHandoffSummary = actionHandoffSummary;
     }
-    const writeContinuity = this.buildWriteContinuityDiagnostic(
+    const stoppedSessionContinuity = deriveStoppedSessionContinuitySurface(
       event.result.codingResult,
     );
+    const writeContinuity = stoppedSessionContinuity?.writeContinuity;
     if (writeContinuity?.writerStarted !== undefined) {
       continuity.lastWriterStarted = writeContinuity.writerStarted;
     }
@@ -5206,9 +5214,8 @@ export class SessionManager {
       continuity.lastSeedInfluenceHandoffSummary =
         seedInfluenceHandoffSummary;
     }
-    const failureHandoffDiagnostic = this.buildFailureHandoffDiagnostic(
-      event.result.codingResult,
-    );
+    const failureHandoffDiagnostic =
+      stoppedSessionContinuity?.failureHandoffDiagnostic;
     if (failureHandoffDiagnostic) {
       continuity.lastFailureHandoffDiagnostic = failureHandoffDiagnostic;
     }
@@ -5252,80 +5259,6 @@ export class SessionManager {
     return `Resumed from ${action}${targetLabel}${verificationLabel}${writerLabel}${writeEffectLabel}${inspectionLabel}; next focus is ${focusLabel}.`;
   }
 
-  private buildWriteContinuityDiagnostic(
-    codingResult: CodingResultSummary | undefined,
-  ):
-    | {
-        readonly writerStarted?: boolean;
-        readonly writeEffect?: CodingWriteEffect;
-        readonly requiresUserInspection?: boolean;
-        readonly target?: string;
-      }
-    | undefined {
-    if (!codingResult) {
-      return undefined;
-    }
-    const seed = codingResult.lastActionResultSeed;
-    const observedWriteEffect =
-      seed?.writeEffect ??
-      this.extractWriteEffectFromEvidence(codingResult.evidence) ??
-      this.extractWriteEffectFromEvidence(codingResult.continuation.evidence);
-    const writerStartedFromEvidence =
-      codingResult.evidence.some((entry) =>
-        entry.includes("writer-started-no-success"),
-      ) ||
-      codingResult.continuation.evidence.some((entry) =>
-        entry.includes("writer-started-stopped"),
-      );
-    const writerStarted =
-      seed?.writerStarted ??
-      (writerStartedFromEvidence ? true : undefined);
-    const writeEffect = writerStarted ? observedWriteEffect : undefined;
-    const requiresUserInspectionFromEvidence = codingResult.evidence.some(
-      (entry) => entry.includes("user-inspection-required"),
-    );
-    const requiresUserInspection =
-      seed?.requiresUserInspection ??
-      (requiresUserInspectionFromEvidence ? true : undefined);
-    if (
-      writerStarted === undefined &&
-      writeEffect === undefined &&
-      requiresUserInspection === undefined
-    ) {
-      return undefined;
-    }
-    const target =
-      seed?.target ??
-      codingResult.failedFiles[0]?.path ??
-      codingResult.unverifiedFiles[0]?.path ??
-      codingResult.changeSet.attemptedFiles[0];
-    return {
-      ...(writerStarted !== undefined ? { writerStarted } : {}),
-      ...(writeEffect ? { writeEffect } : {}),
-      ...(requiresUserInspection !== undefined
-        ? { requiresUserInspection }
-        : {}),
-      ...(target ? { target } : {}),
-    };
-  }
-
-  private extractWriteEffectFromEvidence(
-    evidence: readonly string[],
-  ): CodingWriteEffect | undefined {
-    for (const entry of evidence) {
-      const value = entry.match(/write-effect:(none|unknown|unverified|verified)\b/)?.[1];
-      if (
-        value === "none" ||
-        value === "unknown" ||
-        value === "unverified" ||
-        value === "verified"
-      ) {
-        return value;
-      }
-    }
-    return undefined;
-  }
-
   private buildSeedInfluenceHandoffSummary(
     seed: CodingActionResultSeed | undefined,
     influence: SeedInfluenceDiagnostic | undefined,
@@ -5340,79 +5273,6 @@ export class SessionManager {
     return `Seed influence: ${influence} from ${action}${targetLabel}.`;
   }
 
-  private buildFailureHandoffDiagnostic(
-    codingResult:
-      | NonNullable<Extract<QueryEvent, { type: "query.completed" }>["result"]["codingResult"]>
-      | undefined,
-  ): string | undefined {
-    if (!codingResult) {
-      return undefined;
-    }
-    const seed = codingResult.lastActionResultSeed;
-    const status =
-      seed?.verification?.status ?? codingResult.verification.status;
-    const isFailureStatus = status === "failed" || status === "blocked";
-    const failedFile = codingResult.failedFiles.find((entry) =>
-      entry.reason.trim(),
-    );
-    const actionableFailure = deriveActionableFailureContinuity(codingResult);
-    const blockerKind =
-      actionableFailure?.blockerKind ??
-      seed?.verification?.blockerKind ??
-      seed?.blockerKind ??
-      codingResult.verification.blockerKind;
-    if (!isFailureStatus && !failedFile && !blockerKind) {
-      return undefined;
-    }
-
-    const command =
-      seed?.verification?.command ?? codingResult.verification.command;
-    const target =
-      seed?.target ??
-      failedFile?.path ??
-      codingResult.changedFiles[0] ??
-      codingResult.verifiedFiles[0] ??
-      codingResult.unverifiedFiles[0]?.path;
-    const reason =
-      seed?.verification?.reason ??
-      seed?.reason ??
-      codingResult.verification.reason ??
-      failedFile?.reason ??
-      codingResult.taskSatisfaction.reasons[0] ??
-      codingResult.failureBoundary;
-    const nextFocus =
-      actionableFailure?.nextAction ??
-      codingResult.verification.nextAction ??
-      (status === "blocked"
-        ? "resolve the blocker and rerun the intended verification"
-        : "inspect the failure and rerun verification");
-    const parts = [`Failure handoff: status=${status ?? "failed"}`];
-    if (target) {
-      parts.push(`target=${target}`);
-    }
-    if (command) {
-      parts.push(`command=${command}`);
-    }
-    if (reason) {
-      parts.push(`reason=${this.compactText(reason, 140)}`);
-    }
-    if (blockerKind) {
-      parts.push(`blocker=${blockerKind}`);
-    }
-    const writeContinuity = this.buildWriteContinuityDiagnostic(codingResult);
-    if (writeContinuity?.writerStarted) {
-      parts.push("writer-started=yes");
-    }
-    if (writeContinuity?.writeEffect) {
-      parts.push(`write-effect=${writeContinuity.writeEffect}`);
-    }
-    if (writeContinuity?.requiresUserInspection) {
-      parts.push("requires-user-inspection=yes");
-    }
-    parts.push(`next=${this.compactText(nextFocus, 140).replace(/[.]+$/, "")}`);
-    return `${parts.join("; ")}.`;
-  }
-
   private buildSuccessHandoffDiagnostic(
     codingResult:
       | NonNullable<Extract<QueryEvent, { type: "query.completed" }>["result"]["codingResult"]>
@@ -5421,7 +5281,7 @@ export class SessionManager {
     if (!codingResult) {
       return undefined;
     }
-    if (this.buildFailureHandoffDiagnostic(codingResult)) {
+    if (buildStoppedSessionFailureHandoffDiagnostic(codingResult)) {
       return undefined;
     }
 
