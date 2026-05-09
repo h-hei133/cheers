@@ -76,6 +76,34 @@ The primary user-visible mainline is now:
 
 ## 5. Latest Implemented Delta (through 2026-05-09)
 
+### Current closeout: real-user capability gate tiering
+
+The `verify-real-user-capabilities` gate is now tiered so the default MVP
+capability check validates the current dogfood mutation boundary without being
+blocked by broader future edit expectations.
+
+Current tier split:
+
+- default `verify:real-user-capabilities` runs `--tier=mvp`
+- MVP validates an existing-file, single-file, selected-workspace update through
+  the explicit workspace write entrypoint
+- candidate tier keeps real-provider bugfix/follow-up, protected consistency,
+  and richer selected-workspace smoke evidence explicit
+- release tier records release-only gates such as CLI entry stability,
+  permission-memory, release-core, and long-session/compact continuity as
+  non-MVP blockers
+- backlog tier retains create/add, delete/move, multi-file, rollback, fuzzy/AST,
+  broad `apply_patch`, and arbitrary mutation expectations outside MVP
+
+Important boundaries:
+
+- create/add file, multi-file, and protected composite cases are retained but no
+  longer block MVP
+- broader `apply_patch` support is not opened
+- production provider/auth flow and production mutation paths are unchanged
+- real-provider checks remain explicit and must use isolated runtime/test homes;
+  provider secrets must not be printed or persisted
+
 ### Current closeout: isolated opt-in real-provider readiness smoke
 
 A new real-provider readiness smoke gate is available as an explicit opt-in

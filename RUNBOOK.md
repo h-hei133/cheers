@@ -100,7 +100,7 @@ work:
 | Layer | Command | Gate status | Purpose |
 | --- | --- | --- | --- |
 | Golden CLI main path | `npm run test:gate:golden-main-path` | Required stable gate | Fast synthetic CLI baseline for the user-visible main path. |
-| Real user capabilities | `npm run verify:real-user-capabilities` | Required stable gate when real-provider behavior is touched | Real-provider smoke for small bugfix, follow-up, protected-file, and multi-file consistency behavior. Uses `D:\Test\home-sf`. |
+| Real user capabilities | `npm run verify:real-user-capabilities` | Required stable MVP gate for current dogfood mutation evidence | Synthetic selected-workspace existing-file single-file update. Broader real-provider, protected consistency, release, and backlog cases require explicit `--tier=...`. |
 | Focused regression guard | `npm run test -w packages/ts-shell -- <file> -t "<case>"` | Required when the current bounded slice added or changed a focused guard | Proves the exact behavior being closed without treating legacy wide tests as release blockers. |
 | Release core | `npm run verify:release:core` | Broader deterministic release gate | Runs the hard gate set listed above; use before release handoff or when changing shared CLI/runtime contracts. |
 
@@ -131,7 +131,7 @@ Known failure buckets in that full suite:
 When a future change touches `runMvpIntegratedFlow.ts`, prefer this order:
 
 1. Run the focused guard for the changed behavior.
-2. Run `npm run verify:real-user-capabilities` when the behavior affects real task completion.
+2. Run `npm run verify:real-user-capabilities` for the MVP selected-workspace update gate; use `--tier=candidate` or explicit real-provider smoke flags only when the behavior affects those non-default tiers.
 3. Run `npm run test:gate:golden-main-path`.
 4. Run the full `runMvpIntegratedFlow.test.ts` only for attribution or when intentionally working down that legacy corpus.
 

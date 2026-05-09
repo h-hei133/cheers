@@ -50,8 +50,12 @@ const realHome = getRealProviderHome({ allowDefault: true })
 const testRoot = getTestRoot()
 const reportPath = path.join(testRoot, 'test-results', 'real-user-capabilities-report.json')
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
+const tierValues = ['mvp', 'candidate', 'release', 'backlog', 'all']
+const selectedTier = parseTierArg(process.argv)
 const includeCandidates = process.argv.includes('--include-candidates')
 const includeContinueSmoke = process.argv.includes('--include-continue-smoke')
+const listCases = process.argv.includes('--list')
+const dryRun = process.argv.includes('--dry-run')
 const showHelp = process.argv.includes('--help') || process.argv.includes('-h')
 const turnBoundaryDryRun = process.argv.includes('--turn-boundary-dry-run')
 const terminalResultSurfaceDryRun = process.argv.includes('--terminal-result-surface-dry-run')
@@ -83,9 +87,13 @@ const failureCategories = [
   'none',
   'provider-readiness',
   'task-execution-failure',
+  'model-output',
+  'unsupported-patch-shape',
   'verification-failed',
   'verification-blocked',
   'protected-file-changed',
+  'over-scoped-expectation',
+  'product-gap',
   'assertion-mismatch',
   'environment-filesystem-issue',
 ]
@@ -112,6 +120,21 @@ const posixPrivateAgentsConfigPattern =
   /\/[^\s"'`<>]+\/\.private-agents\/config\.json/gi
 const posixPrivateAgentsRealHomePattern =
   /\/[^\s"'`<>]*\.private-agents-real(?:\/[^\s"'`<>]*)?/gi
+
+function parseTierArg(argv) {
+  const explicitEquals = argv.find((arg) => arg.startsWith('--tier='))
+  const raw = explicitEquals
+    ? explicitEquals.slice('--tier='.length)
+    : argv.includes('--tier')
+      ? argv[argv.indexOf('--tier') + 1]
+      : undefined
+  const normalized = raw?.trim().toLowerCase() || 'mvp'
+  if (!tierValues.includes(normalized)) {
+    console.error(`Invalid --tier value: ${raw}. Use ${tierValues.join('|')}.`)
+    process.exit(3)
+  }
+  return normalized
+}
 
 const futureGateCandidates = [
   {
@@ -197,8 +220,45 @@ const futureGateCandidates = [
 
 const scenarios = [
   {
-    id: 'synthetic-single-file-protected-verify',
+    id: 'synthetic-selected-workspace-single-file-update',
+    tier: 'mvp',
     provider: 'synthetic',
+    execution: 'apply-patch-workspace-write-cli',
+    expectedCapability: 'existing-file single-file selected-workspace update only',
+    currentSupportedCapability: 'explicit apply_patch workspace write entrypoint for exactly one update operation',
+    reasonForTier: 'MVP dogfood mutation boundary: update one existing file in the selected workspace with explicit approval and post-write verification.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: true,
+    projectDir: path.join(testRoot, `pca-capability-gate-mvp-workspace-update-${runId}`),
+    files: {
+      'src/app.ts': 'old\n',
+      'LOCKED.md': 'locked\n',
+    },
+    protectedFiles: ['LOCKED.md'],
+    patchText: [
+      '*** Begin Patch',
+      '*** Update File: src/app.ts',
+      '@@',
+      '-old',
+      '+new',
+      '*** End Patch',
+    ].join('\n'),
+    expectChanged: ['src/app.ts'],
+    expectContains: {
+      'src/app.ts': ['new'],
+    },
+  },
+  {
+    id: 'synthetic-single-file-protected-verify',
+    tier: 'backlog',
+    provider: 'synthetic',
+    expectedCapability: 'create/add file plus protected-file composite verification',
+    currentSupportedCapability: 'not supported by the current MVP selected-workspace update-only route',
+    reasonForTier: 'Requires create/add semantics and a composite protected-file expectation, so it must not block MVP update-only dogfood.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
     projectDir: path.join(testRoot, `pca-capability-gate-synthetic-${runId}`),
     files: {
       'LOCKED.md': 'Do not modify this file.\n',
@@ -216,7 +276,14 @@ const scenarios = [
   },
   {
     id: 'real-small-bugfix-followup-verify',
+    tier: 'candidate',
     provider: 'real',
+    expectedCapability: 'real-provider existing-file single-file bugfix plus follow-up and protected-file consistency',
+    currentSupportedCapability: 'MVP supports an explicit selected-workspace single-file update; this richer natural-language follow-up path remains candidate evidence.',
+    reasonForTier: 'Useful dogfood signal, but it mixes real-provider behavior, completed follow-up, and richer verification beyond the default MVP gate.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: true,
+    expectedToPassCurrentMvp: false,
     projectDir: path.join(testRoot, `pca-capability-gate-real-bugfix-${runId}`),
     files: {
       'math.js': 'export function double(n) {\n  return n + 2;\n}\n',
@@ -243,7 +310,14 @@ const scenarios = [
   },
   {
     id: 'real-multifile-consistency-verify',
+    tier: 'candidate',
     provider: 'real',
+    expectedCapability: 'real-provider cross-file consistency check while mutating one selected file',
+    currentSupportedCapability: 'single-file selected-workspace updates are supported; broader cross-file consistency remains candidate evidence.',
+    reasonForTier: 'Valuable protected/consistency signal, but cross-file consistency expectations should not block the MVP update-only gate.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: true,
+    expectedToPassCurrentMvp: false,
     projectDir: path.join(testRoot, `pca-capability-gate-real-multifile-${runId}`),
     files: {
       'todo.txt': 'ship minimal CLI smoke\ndocument one follow-up\nverify multi-file follow-up\n',
@@ -266,7 +340,14 @@ const scenarios = [
 const candidateScenarios = [
   {
     id: 'real-small-project-smoke',
+    tier: 'candidate',
     provider: 'real',
+    expectedCapability: 'real-provider small project protected-file consistency with multi-file natural-language edit',
+    currentSupportedCapability: 'not a current MVP blocker; broader natural-language multi-file coordination remains candidate evidence.',
+    reasonForTier: 'Candidate only because it exercises protected-file consistency and multi-file coordination beyond update-only MVP.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: true,
+    expectedToPassCurrentMvp: false,
     projectDir: path.join(testRoot, `pca-candidate-real-small-project-${runId}`),
     files: {
       'src/utils.js': 'export function greet(name = "world") {\n  return "Hello, " + name;\n}\n',
@@ -299,7 +380,14 @@ const candidateScenarios = [
   },
   {
     id: 'real-completed-continue-followup-verify',
+    tier: 'candidate',
     provider: 'real',
+    expectedCapability: 'real-provider completed-session follow-up over one existing file',
+    currentSupportedCapability: 'single-file update is MVP; completed-session real follow-up stability is candidate evidence.',
+    reasonForTier: 'Candidate only because it adds same-session /continue behavior and transcript evidence beyond the MVP mutation proof.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: true,
+    expectedToPassCurrentMvp: false,
     projectDir: path.join(testRoot, `pca-candidate-real-continue-${runId}`),
     files: {
       'math.js': 'export function double(n) {\n  return n + 2;\n}\n',
@@ -328,6 +416,210 @@ const candidateScenarios = [
     ],
   },
 ]
+
+const tierDescriptorCases = [
+  {
+    id: 'real-apply-patch-workspace-write-smoke',
+    tier: 'candidate',
+    provider: 'real',
+    executable: false,
+    manualFlag: '--real-apply-patch-workspace-write-smoke',
+    expectedCapability: 'real-provider selected-workspace single-file apply_patch smoke with richer verification',
+    currentSupportedCapability: 'available only as an explicit opt-in smoke flag against an isolated test workspace',
+    reasonForTier: 'Candidate because it requires a real provider and exercises richer model-output and route projection behavior than MVP.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: true,
+    expectedToPassCurrentMvp: false,
+  },
+  {
+    id: 'release-cli-entry-followup-stability',
+    tier: 'release',
+    provider: 'synthetic',
+    executable: false,
+    expectedCapability: 'CLI entry and follow-up stability suitable for release evidence',
+    currentSupportedCapability: 'covered by focused CLI entry and baseline gates, not by the default MVP capability tier',
+    reasonForTier: 'Release-only gate; it should not block MVP mutation dogfood.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+  },
+  {
+    id: 'release-permission-memory-hard-gate',
+    tier: 'release',
+    provider: 'synthetic',
+    executable: false,
+    expectedCapability: 'hard permission-memory gate',
+    currentSupportedCapability: 'external release gate via verify:permission-memory, not a real-user MVP capability case',
+    reasonForTier: 'Release-only safety evidence; it should not block MVP selected-workspace update proof.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+  },
+  {
+    id: 'release-core-capability-gate',
+    tier: 'release',
+    provider: 'synthetic',
+    executable: false,
+    expectedCapability: 'release-core deterministic capability gate',
+    currentSupportedCapability: 'external release gate via verify:release:core',
+    reasonForTier: 'Release-only breadth gate; not a default MVP capability blocker.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+  },
+  {
+    id: 'release-long-session-compact-continuity',
+    tier: 'release',
+    provider: 'synthetic',
+    executable: false,
+    expectedCapability: 'long-session and compact continuity release evidence',
+    currentSupportedCapability: 'handled by focused session/continuity gates rather than this MVP mutation gate',
+    reasonForTier: 'Release-only durability evidence, explicitly outside the MVP mutation boundary.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+  },
+  {
+    id: 'backlog-delete-move-support',
+    tier: 'backlog',
+    provider: 'synthetic',
+    executable: false,
+    expectedCapability: 'delete, move, rename, or chmod support',
+    currentSupportedCapability: 'unsupported by the selected-workspace update-only MVP route',
+    reasonForTier: 'Backlog because it requires new mutation semantics beyond existing-file update.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+  },
+  {
+    id: 'backlog-multi-file-mutation',
+    tier: 'backlog',
+    provider: 'synthetic',
+    executable: false,
+    expectedCapability: 'multi-file mutation support',
+    currentSupportedCapability: 'unsupported by the selected-workspace update-only MVP route',
+    reasonForTier: 'Backlog because multi-file writes require a dedicated plan and cannot be inferred from MVP success.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+  },
+  {
+    id: 'backlog-rollback-fuzzy-ast-broad-apply-patch',
+    tier: 'backlog',
+    provider: 'synthetic',
+    executable: false,
+    expectedCapability: 'rollback, fuzzy matching, AST edit, and broad apply_patch support',
+    currentSupportedCapability: 'unsupported; current route is one explicit update operation only',
+    reasonForTier: 'Backlog because these are full edit-system expansions and must not be opened by this gate split.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+  },
+  {
+    id: 'backlog-arbitrary-project-mutation',
+    tier: 'backlog',
+    provider: 'synthetic',
+    executable: false,
+    expectedCapability: 'arbitrary project mutation outside the selected workspace update lane',
+    currentSupportedCapability: 'unsupported as an MVP blocker',
+    reasonForTier: 'Backlog because arbitrary mutation needs a broader user-workspace safety policy.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+  },
+]
+
+function allCapabilityCases() {
+  return [...scenarios, ...candidateScenarios, ...tierDescriptorCases]
+}
+
+function caseMatchesTier(capabilityCase, tier) {
+  return tier === 'all' || capabilityCase.tier === tier
+}
+
+function caseMetadata(capabilityCase) {
+  return {
+    id: capabilityCase.id,
+    tier: capabilityCase.tier,
+    provider: capabilityCase.provider,
+    expectedCapability: capabilityCase.expectedCapability,
+    currentSupportedCapability: capabilityCase.currentSupportedCapability,
+    reasonForTier: capabilityCase.reasonForTier,
+    drivesApplyPatchExpansion: Boolean(capabilityCase.drivesApplyPatchExpansion),
+    requiresRealProvider: Boolean(capabilityCase.requiresRealProvider),
+    expectedToPassCurrentMvp: Boolean(capabilityCase.expectedToPassCurrentMvp),
+    executable: capabilityCase.executable !== false,
+    ...(capabilityCase.manualFlag ? { manualFlag: capabilityCase.manualFlag } : {}),
+  }
+}
+
+function withCaseMetadata(capabilityCase, result) {
+  return {
+    ...result,
+    tier: capabilityCase.tier,
+    expectedCapability: capabilityCase.expectedCapability,
+    currentSupportedCapability: capabilityCase.currentSupportedCapability,
+    reasonForTier: capabilityCase.reasonForTier,
+    drivesApplyPatchExpansion: Boolean(capabilityCase.drivesApplyPatchExpansion),
+    requiresRealProvider: Boolean(capabilityCase.requiresRealProvider),
+    expectedToPassCurrentMvp: Boolean(capabilityCase.expectedToPassCurrentMvp),
+    caseMetadata: caseMetadata(capabilityCase),
+  }
+}
+
+function skippedCasesForTier(tier) {
+  return allCapabilityCases()
+    .filter((capabilityCase) => !caseMatchesTier(capabilityCase, tier))
+    .map((capabilityCase) => ({
+      ...caseMetadata(capabilityCase),
+      skipReason: `selected tier=${tier}; case tier=${capabilityCase.tier}; ${capabilityCase.reasonForTier}`,
+    }))
+}
+
+function selectedCasesForTier(tier) {
+  if (includeContinueSmoke) {
+    return candidateScenarios.filter(
+      (scenario) => scenario.id === 'real-completed-continue-followup-verify',
+    )
+  }
+  const normalizedTier = includeCandidates ? 'candidate' : tier
+  return allCapabilityCases().filter((capabilityCase) => caseMatchesTier(capabilityCase, normalizedTier))
+}
+
+function selectedExecutableScenariosForTier(tier) {
+  return selectedCasesForTier(tier).filter((scenario) => scenario.executable !== false)
+}
+
+function printCasePlan(tier, selected, skipped, options = {}) {
+  console.log(`tier=${tier}`)
+  console.log(`mode=${options.dryRun ? 'dry-run' : options.list ? 'list' : 'execute'}`)
+  console.log(`selectedCases=${selected.length}`)
+  for (const capabilityCase of selected) {
+    const metadata = caseMetadata(capabilityCase)
+    const label = metadata.executable ? 'RUN' : 'META'
+    console.log(
+      `[${label}] ${metadata.id} tier=${metadata.tier} provider=${metadata.provider} expectedToPassCurrentMvp=${metadata.expectedToPassCurrentMvp} realProvider=${metadata.requiresRealProvider}`,
+    )
+    console.log(`      expectedCapability=${metadata.expectedCapability}`)
+    console.log(`      currentSupportedCapability=${metadata.currentSupportedCapability}`)
+    if (metadata.manualFlag) {
+      console.log(`      manualFlag=${metadata.manualFlag}`)
+    }
+  }
+  for (const skippedCase of skipped) {
+    console.log(`[SKIP] ${skippedCase.id} reason=${skippedCase.skipReason}`)
+  }
+}
+
+function buildTierPlanReport(tier, selected, skipped, options = {}) {
+  return {
+    tier,
+    mode: options.dryRun ? 'dry-run' : options.list ? 'list' : 'execute',
+    selectedCases: selected.map(caseMetadata),
+    skippedCases: skipped,
+    allCases: allCapabilityCases().map(caseMetadata),
+  }
+}
 
 function run(command, args, options = {}) {
   return new Promise((resolve) => {
@@ -642,6 +934,29 @@ function categorizeFailure(failureReason, output, provider) {
   const normalized = `${String(failureReason ?? '')}\n${String(output ?? '')}`.toLowerCase()
   if (!normalized.trim()) return 'none'
   if (
+    normalized.includes('unsupported patch shape') ||
+    normalized.includes('only supports one explicit single-file') ||
+    normalized.includes('add file') ||
+    normalized.includes('delete file') ||
+    normalized.includes('move file')
+  ) {
+    return 'unsupported-patch-shape'
+  }
+  if (
+    normalized.includes('provider output did not contain') ||
+    normalized.includes('provider output missing') ||
+    normalized.includes('multiple patches')
+  ) {
+    return 'model-output'
+  }
+  if (
+    normalized.includes('over-scoped') ||
+    normalized.includes('outside the current tier') ||
+    normalized.includes('not an mvp blocker')
+  ) {
+    return 'over-scoped-expectation'
+  }
+  if (
     normalized.includes('home is missing') ||
     normalized.includes('provider') ||
     normalized.includes('auth') ||
@@ -675,6 +990,9 @@ function categorizeFailure(failureReason, output, provider) {
     normalized.includes('expected changed files not changed')
   ) {
     return 'assertion-mismatch'
+  }
+  if (normalized.includes('product gap')) {
+    return 'product-gap'
   }
   return 'task-execution-failure'
 }
@@ -739,6 +1057,18 @@ function nextActionForFailureSurface(failureCategory, statusDetail) {
   }
   if (failureCategory === 'assertion-mismatch') {
     return 'Inspect changed files and rerun the scenario after correcting the mismatch.'
+  }
+  if (failureCategory === 'unsupported-patch-shape') {
+    return 'Keep this case out of MVP until a dedicated add/delete/move/multi-file or broad apply_patch plan exists.'
+  }
+  if (failureCategory === 'model-output') {
+    return 'Inspect the model output shape; do not treat missing or multiple patch blocks as verified mutation success.'
+  }
+  if (failureCategory === 'over-scoped-expectation') {
+    return 'Retain this case in its non-MVP tier and rerun the MVP tier without treating it as a blocker.'
+  }
+  if (failureCategory === 'product-gap') {
+    return 'Decide whether the product gap belongs in candidate, release, or a separate implementation plan.'
   }
   if (failureCategory === 'environment-filesystem-issue') {
     return 'Fix the local filesystem or sandbox permission issue, then rerun the gate.'
@@ -904,6 +1234,9 @@ function buildToolExecutionPlanningAudit(plan) {
 }
 
 async function runScenario(scenario) {
+  if (scenario.execution === 'apply-patch-workspace-write-cli') {
+    return runApplyPatchWorkspaceWriteScenario(scenario)
+  }
   prepareProject(scenario)
   let previousSnapshot = snapshot(scenario.projectDir)
   const turnResults = []
@@ -1002,6 +1335,119 @@ async function runScenario(scenario) {
     failureCategory: 'none',
     failureReason: '',
     turns: turnResults,
+  }
+}
+
+async function runApplyPatchWorkspaceWriteScenario(scenario) {
+  prepareProject(scenario)
+  const runtimeHome = path.join(testRoot, 'real-user-capabilities-runtime-home', `${scenario.id}-${runId}`)
+  const auditLogPath = path.join(testRoot, 'real-user-capabilities-audit', `${scenario.id}-${runId}`, 'permissions.jsonl')
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+
+  try {
+    const before = snapshot(scenario.projectDir)
+    const result = await runApplyPatchWorkspaceWriteCli({
+      fixtureDir: scenario.projectDir,
+      patchText: scenario.patchText,
+      runtimeHome,
+      auditLogPath,
+    })
+    const after = snapshot(scenario.projectDir)
+    const observedChanged = changedFiles(before, after)
+    const expectedChanged = [...(scenario.expectChanged ?? [])].sort()
+    const failures = []
+    const unexpectedChanges = observedChanged.filter((name) => !expectedChanged.includes(name))
+    const missingChanges = expectedChanged.filter((name) => !observedChanged.includes(name))
+    if (result.code !== 0 || result.timedOut) {
+      failures.push(result.timedOut ? 'workspace write CLI timed out' : `workspace write CLI exited ${result.code}`)
+    }
+    if (!/apply_patch workspace write succeeded/i.test(result.output)) {
+      failures.push('workspace write success marker missing')
+    }
+    if (!/success/i.test(result.output)) {
+      failures.push('terminal success marker missing')
+    }
+    if (unexpectedChanges.length > 0) {
+      failures.push(`unexpected changed files: ${unexpectedChanges.join(', ')}`)
+    }
+    if (missingChanges.length > 0) {
+      failures.push(`expected changed files not changed: ${missingChanges.join(', ')}`)
+    }
+    for (const protectedFile of scenario.protectedFiles ?? []) {
+      if (before.get(protectedFile) !== after.get(protectedFile)) {
+        failures.push(`protected file changed: ${protectedFile}`)
+      }
+    }
+    for (const [relativePath, markers] of Object.entries(scenario.expectContains ?? {})) {
+      const content = after.get(relativePath)
+      if (typeof content !== 'string') {
+        failures.push(`expected file missing: ${relativePath}`)
+        continue
+      }
+      for (const marker of markers) {
+        if (!content.includes(marker)) {
+          failures.push(`missing marker in ${relativePath}: ${marker}`)
+        }
+      }
+    }
+
+    if (failures.length > 0) {
+      return {
+        capability: scenario.id,
+        provider: scenario.provider,
+        status: 'FAIL',
+        projectDir: scenario.projectDir,
+        sessionId: '(workspace-write-cli)',
+        changedFiles: observedChanged,
+        protectedFiles: scenario.protectedFiles,
+        reportPath,
+        verification: 'blocked',
+        failureCategory: categorizeFailure(failures.join('; '), result.output, scenario.provider),
+        failureReason: normalizeFailureReason(failures.join('; '), result.output, scenario.provider),
+        outputTail: summarizeOutput(result.output),
+        turns: [
+          {
+            turn: 1,
+            mode: 'apply-patch-workspace-write-cli',
+            sessionId: '(workspace-write-cli)',
+            changedFiles: observedChanged,
+            verification: 'blocked',
+            outputTail: summarizeOutput(result.output),
+          },
+        ],
+      }
+    }
+
+    return {
+      capability: scenario.id,
+      provider: scenario.provider,
+      status: 'PASS',
+      projectDir: scenario.projectDir,
+      sessionId: '(workspace-write-cli)',
+      changedFiles: observedChanged,
+      protectedFiles: scenario.protectedFiles,
+      reportPath,
+      verification: 'passed',
+      failureCategory: 'none',
+      failureReason: '',
+      turns: [
+        {
+          turn: 1,
+          mode: 'apply-patch-workspace-write-cli',
+          sessionId: '(workspace-write-cli)',
+          changedFiles: observedChanged,
+          verification: 'passed',
+          outputTail: summarizeOutput(result.output),
+        },
+      ],
+    }
+  } finally {
+    fs.rmSync(scenario.projectDir, { recursive: true, force: true })
+    fs.rmSync(runtimeHome, { recursive: true, force: true })
+    fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
   }
 }
 
@@ -1413,7 +1859,15 @@ function runToolExecutionPlanningDryRun() {
 function printHelp() {
   console.log('Usage: node scripts/verify-real-user-capabilities.mjs [options]')
   console.log('')
-  console.log('Default mode runs the existing real-user capability gate and may perform real-provider checks.')
+  console.log('Default mode runs --tier=mvp: existing-file, single-file, selected-workspace update only.')
+  console.log('Tier selection:')
+  console.log('  --tier=mvp        Default MVP/dogfood gate. Synthetic selected-workspace update only.')
+  console.log('  --tier=candidate  Explicit candidate checks; may require real provider.')
+  console.log('  --tier=release    Metadata for release-only gates; use explicit release commands for execution.')
+  console.log('  --tier=backlog    Unsupported/future capability cases retained outside MVP.')
+  console.log('  --tier=all        Explicitly select all executable tier cases.')
+  console.log('  --list            Print all case metadata and skip reasons without execution.')
+  console.log('  --dry-run         Print selected/skipped cases without touching provider or fixtures.')
   console.log('Safe dry-run options do not execute real provider calls:')
   console.log('  --turn-boundary-dry-run')
   console.log('  --terminal-result-surface-dry-run')
@@ -8142,34 +8596,66 @@ async function main() {
     return
   }
 
+  const executionTier = includeCandidates
+    ? 'candidate'
+    : includeContinueSmoke
+      ? 'candidate'
+      : selectedTier
+  const selectedPlanCases = selectedCasesForTier(executionTier)
+  const selectedScenarios = selectedExecutableScenariosForTier(executionTier)
+  const skippedCases = skippedCasesForTier(executionTier)
+  const selectedMetadata = selectedPlanCases.map(caseMetadata)
+  const selectedRequiresRealProvider = selectedScenarios.some((scenario) => scenario.requiresRealProvider)
+
   console.log('gate name=real-user-capabilities')
   console.log('status taxonomy: PASS=0 FAIL=1 PROVIDER_NETWORK=2 CONFIG=3')
-  console.log('state semantics: provider preflight inconclusive skips capability execution; mid-turn provider readiness stays provider-readiness, not coding failure')
+  console.log('state semantics: provider preflight inconclusive skips real capability execution; synthetic MVP remains isolated from real-provider readiness')
   console.log(`repo=${repoRoot}`)
   console.log(`synthetic HOME=${syntheticHome}`)
-  console.log(`real HOME=${realHome ?? 'not-configured'}`)
+  console.log(`real HOME=${realHome ? 'configured' : 'not-configured'}`)
+  console.log(`requestedTier=${selectedTier}`)
+  console.log(`executionTier=${executionTier}`)
+  console.log(`candidateMode=${includeCandidates ? 'include-candidates-legacy' : includeContinueSmoke ? 'include-continue-smoke-legacy' : 'off'}`)
+  printCasePlan(executionTier, selectedPlanCases, skippedCases, { dryRun, list: listCases })
+
+  if (listCases || dryRun) {
+    console.log('real-provider execution skipped')
+    console.log('reportWritten=false')
+    const plan = buildTierPlanReport(executionTier, selectedPlanCases, skippedCases, {
+      dryRun,
+      list: listCases,
+    })
+    console.log(`planCases=${plan.allCases.length}`)
+    return
+  }
+
   const homeCreated = ensureDirIfNeeded(syntheticHome)
   console.log(`homeCreated=${homeCreated}`)
-  console.log(`candidateMode=${includeCandidates ? 'include-candidates' : includeContinueSmoke ? 'include-continue-smoke' : 'off'}`)
 
   try {
     ensureHome(syntheticHome, 'synthetic')
-    if (!realHome) {
-      throw Object.assign(
-        new Error('real provider home is not configured; set PRIVATE_AGENTS_REAL_HOME on Linux/WSL to opt in'),
-        { configFailure: true },
-      )
+    if (selectedRequiresRealProvider) {
+      if (!realHome) {
+        throw Object.assign(
+          new Error('real provider home is not configured; set PRIVATE_AGENTS_REAL_HOME on Linux/WSL to opt in'),
+          { configFailure: true },
+        )
+      }
+      ensureHome(realHome, 'real')
     }
-    ensureHome(realHome, 'real')
   } catch (error) {
     const report = {
       generatedAt: new Date().toISOString(),
       status: 'CONFIG',
+      statusDetail: 'config-failure',
+      tier: executionTier,
       reportPath,
       failureCategory: 'provider-readiness',
       failureReason: error.message,
       failureCategories,
       futureGateCandidates,
+      selectedCases: selectedMetadata,
+      skippedCases,
       candidates: [],
       capabilities: [],
     }
@@ -8179,87 +8665,82 @@ async function main() {
     process.exit(3)
   }
 
-  const providerPreflight = await runProviderReadinessPreflight()
-  if (!providerPreflight.ok) {
-    const isConfig = providerPreflight.status === 'config-failure'
-    const report = {
-      generatedAt: new Date().toISOString(),
-      status: 'FAIL',
-      statusDetail: providerPreflight.status,
-      reportPath,
-      failureCategory: 'provider-readiness',
-      failureReason:
+  let providerPreflight = undefined
+  if (selectedRequiresRealProvider) {
+    providerPreflight = await runProviderReadinessPreflight()
+    if (!providerPreflight.ok) {
+      const isConfig = providerPreflight.status === 'config-failure'
+      const report = {
+        generatedAt: new Date().toISOString(),
+        status: 'FAIL',
+        statusDetail: providerPreflight.status,
+        tier: executionTier,
+        reportPath,
+        failureCategory: 'provider-readiness',
+        failureReason:
+          providerPreflight.status === 'provider-network-inconclusive'
+            ? 'provider-network-inconclusive: provider endpoint remained unreachable after readiness retry'
+            : providerPreflight.status,
+        providerReadiness: providerPreflight,
+        capabilitySkipped: true,
+        codingCapabilityNotEvaluated: true,
+        failureCategories,
+        futureGateCandidates,
+        selectedCases: selectedMetadata,
+        skippedCases,
+        capabilities: [],
+        candidates: [],
+      }
+      writeReport(report)
+      const label =
         providerPreflight.status === 'provider-network-inconclusive'
-          ? 'provider-network-inconclusive: provider endpoint remained unreachable after readiness retry'
-          : providerPreflight.status,
-      providerReadiness: providerPreflight,
-      capabilitySkipped: true,
-      codingCapabilityNotEvaluated: true,
-      failureCategories,
-      futureGateCandidates,
-      capabilities: [],
-      candidates: [],
+          ? 'PROVIDER_NETWORK'
+          : isConfig
+            ? 'CONFIG'
+            : 'FAIL'
+      console.log(`[${label}] provider-readiness-preflight - ${report.failureReason}`)
+      console.log(`report=${reportPath}`)
+      process.exit(
+        providerPreflight.status === 'provider-network-inconclusive'
+          ? 2
+          : isConfig
+            ? 3
+            : 1,
+      )
     }
-    writeReport(report)
-    const label =
-      providerPreflight.status === 'provider-network-inconclusive'
-        ? 'PROVIDER_NETWORK'
-        : isConfig
-          ? 'CONFIG'
-          : 'FAIL'
-    console.log(`[${label}] provider-readiness-preflight - ${report.failureReason}`)
-    console.log(`report=${reportPath}`)
-    process.exit(
-      providerPreflight.status === 'provider-network-inconclusive'
-        ? 2
-        : isConfig
-          ? 3
-          : 1,
-    )
+    console.log('[PASS] provider-readiness-preflight - real provider reachable')
+  } else {
+    console.log('[SKIP] provider-readiness-preflight - selected tier has no real-provider cases')
   }
-  console.log('[PASS] provider-readiness-preflight - real provider reachable')
 
-  const capabilities = []
-  for (const scenario of scenarios) {
-    const result = await runScenario(scenario)
-    capabilities.push(result)
+  const results = []
+  for (const scenario of selectedScenarios) {
+    const result = withCaseMetadata(scenario, await runScenario(scenario))
+    results.push(result)
     const suffix = result.status === 'PASS' ? `verification=${result.verification}` : renderTerminalResultSurface(result)
-    console.log(`[${result.status}] ${scenario.id} - provider=${scenario.provider} project=${scenario.projectDir} session=${result.sessionId} ${suffix}`)
+    console.log(`[${result.status}] ${scenario.id} - tier=${scenario.tier} provider=${scenario.provider} project=${scenario.projectDir} session=${result.sessionId} ${suffix}`)
   }
 
-  const candidates = []
-  const selectedCandidateScenarios = includeCandidates
-    ? candidateScenarios
-    : includeContinueSmoke
-      ? candidateScenarios.filter(
-          (scenario) => scenario.id === 'real-completed-continue-followup-verify',
-        )
-      : []
-  if (selectedCandidateScenarios.length > 0) {
-    for (const scenario of selectedCandidateScenarios) {
-      const result = await runScenario(scenario)
-      candidates.push(result)
-      const suffix = result.status === 'PASS' ? `verification=${result.verification}` : renderTerminalResultSurface(result)
-      console.log(`[${result.status}] candidate:${scenario.id} - provider=${scenario.provider} project=${scenario.projectDir} session=${result.sessionId} ${suffix}`)
-    }
-  }
-
-  const ok =
-    capabilities.every((capability) => capability.status === 'PASS') &&
-    candidates.every((candidate) => candidate.status === 'PASS')
-  const summarizedFailure = summarizeFailureStatus([...capabilities, ...candidates])
+  const ok = results.every((capability) => capability.status === 'PASS')
+  const summarizedFailure = summarizeFailureStatus(results)
+  const capabilities = results.filter((result) => result.tier === 'mvp')
+  const candidates = results.filter((result) => result.tier === 'candidate')
   const report = {
     generatedAt: new Date().toISOString(),
     status: ok ? 'PASS' : 'FAIL',
     statusDetail: summarizedFailure.statusDetail,
+    tier: executionTier,
     reportPath,
-    providerReadiness: providerPreflight,
-    capabilitySkipped: false,
-    codingCapabilityNotEvaluated: false,
+    providerReadiness: providerPreflight ?? { status: 'skipped', reason: 'selected tier has no real-provider cases' },
+    capabilitySkipped: selectedScenarios.length === 0,
+    codingCapabilityNotEvaluated: selectedScenarios.length === 0,
     failureCategories,
     futureGateCandidates: buildCandidateMetadata(candidates),
+    selectedCases: selectedMetadata,
+    skippedCases,
     capabilities,
     candidates,
+    results,
   }
   writeReport(report)
   console.log(`report=${reportPath}`)
