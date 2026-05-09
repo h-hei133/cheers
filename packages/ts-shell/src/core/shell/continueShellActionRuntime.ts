@@ -66,7 +66,10 @@ export async function runResumeLikeShellAction(options: {
       }
     })();
 
-    if (targetSummary?.status === "completed") {
+    if (
+      targetSummary?.status === "completed" ||
+      targetSummary?.terminalClassification === "stopped"
+    ) {
       const resumeResult = options.sessionManager.tryResume(
         targetSessionId,
         options.runtimeContext.projectRoot,

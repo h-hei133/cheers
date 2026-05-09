@@ -25,6 +25,11 @@ import {
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, "..", "..", "..");
 const cliPath = path.join(currentDir, "entrypoints", "cli.tsx");
+const workspaceWriteResumeProducerPath = path.join(
+  currentDir,
+  "test-utils",
+  "workspaceWriteResumeProducer.ts",
+);
 const tsxCliPath = path.join(
   repoRoot,
   "node_modules",
@@ -41,16 +46,27 @@ type ParsedTranscriptEntry = {
     prompt?: string;
     toolName?: string;
     success?: boolean;
-    result?: {
-      status?: string;
-      terminalClassification?: string;
-      codingResult?: {
-        taskKind?: string;
-        changedFiles?: string[];
-        evidence?: string[];
-      };
-      sharedContext?: {
-        notes?: string[];
+      result?: {
+        status?: string;
+        terminalClassification?: string;
+        codingResult?: {
+          taskKind?: string;
+          changedFiles?: string[];
+          failedFiles?: Array<{ path?: string; reason?: string }>;
+          evidence?: string[];
+          changeSet?: {
+            changedFiles?: string[];
+          };
+          lastActionResultSeed?: {
+            target?: string;
+            changedFiles?: string[];
+            writerStarted?: boolean;
+            writeEffect?: string;
+            requiresUserInspection?: boolean;
+          };
+        };
+        sharedContext?: {
+          notes?: string[];
       };
     };
   };
@@ -4211,6 +4227,144 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
       expect(stoppedNoteText).toContain(`seedWriteEffect=${writeEffect}`);
       expect(stoppedNoteText).toContain("seedRequiresUserInspection=yes");
       expect(stoppedNoteText).not.toContain("seedChangedFiles=");
+    },
+    60000,
+  );
+
+  it.each(["unknown", "unverified"] as const)(
+    "keeps selected-workspace writer-started %s write effect truthful across process /continue",
+    async (writeEffect) => {
+      const producer = spawnSync(
+        nodeExe,
+        [
+          tsxCliPath,
+          workspaceWriteResumeProducerPath,
+          "--home",
+          fakeHomeDir,
+          "--effect",
+          writeEffect,
+        ],
+        {
+          cwd: repoRoot,
+          env: {
+            ...process.env,
+            USERPROFILE: fakeHomeDir,
+            HOME: fakeHomeDir,
+            PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+            PRIVATE_AGENTS_REAL_HOME: "",
+          },
+          encoding: "utf8",
+          timeout: 30000,
+        },
+      );
+      expect(producer.error).toBeUndefined();
+      expect(producer.status).toBe(0);
+      const produced = JSON.parse(producer.stdout) as {
+        projectRoot: string;
+        sessionId: string;
+        sessionDir: string;
+        targetPath: string;
+        writeEffect: typeof writeEffect;
+        stopReason: string;
+        nextAction: string;
+        changedFiles: string[];
+        seedChangedFiles: string[];
+      };
+      expect(produced.writeEffect).toBe(writeEffect);
+      expect(produced.changedFiles).toEqual([]);
+      expect(produced.seedChangedFiles).toEqual([]);
+
+      const runPrint = (prompt: string) =>
+        spawnSync(
+          nodeExe,
+          [
+            tsxCliPath,
+            cliPath,
+            "--project",
+            produced.projectRoot,
+            "--print",
+            prompt,
+          ],
+          {
+            cwd: repoRoot,
+            env: {
+              ...process.env,
+              USERPROFILE: fakeHomeDir,
+              HOME: fakeHomeDir,
+              PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+              PRIVATE_AGENTS_REAL_HOME: "",
+            },
+            encoding: "utf8",
+            timeout: 30000,
+          },
+        );
+
+      const bareResult = runPrint("/continue");
+      expect(bareResult.error).toBeUndefined();
+      expect(bareResult.status).toBe(0);
+      const bareOutput = `${bareResult.stdout ?? ""}${bareResult.stderr ?? ""}`;
+      expect(bareOutput).toContain("TerminalState: stopped");
+      expect(bareOutput).toContain(`Reason: ${produced.stopReason}`);
+      expect(bareOutput).toContain(`Failed files: ${produced.targetPath}`);
+      expect(bareOutput).toContain(`DoNext: ${produced.nextAction}`);
+      expect(bareOutput).not.toContain("No recoverable session found");
+      expect(bareOutput).not.toContain(`Changed files: ${produced.targetPath}`);
+
+      const result = runPrint("/continue continue selected workspace write");
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+      const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+      expect(output).toContain("Continuation");
+      expect(output).toContain("Failure handoff: status=blocked");
+      expect(output).toContain(`target=${produced.targetPath}`);
+      expect(output).toContain("writer-started=yes");
+      expect(output).toContain(`write-effect=${writeEffect}`);
+      expect(output).toContain("requires-user-inspection=yes");
+      expect(output).toContain(`next=${produced.nextAction.slice(0, 48)}`);
+      expect(output).not.toContain("Success handoff: status=passed");
+      expect(output).not.toContain(`Changed files: ${produced.targetPath}`);
+
+      const entries = parseTranscriptJsonl(
+        path.join(produced.sessionDir, "transcript.jsonl"),
+      );
+      const originalResult = entries.find(
+        (entry) =>
+          entry.type === "query-event" &&
+          entry.event?.type === "query.completed" &&
+          entry.event.result?.codingResult?.lastActionResultSeed
+            ?.writeEffect === writeEffect,
+      )?.event?.result;
+      expect(originalResult?.terminalClassification).toBe("stopped");
+      expect(originalResult?.codingResult?.changedFiles).toEqual([]);
+      expect(originalResult?.codingResult?.changeSet?.changedFiles).toEqual([]);
+      expect(
+        originalResult?.codingResult?.lastActionResultSeed?.changedFiles,
+      ).toEqual([]);
+      expect(originalResult?.codingResult?.lastActionResultSeed).toMatchObject({
+        target: produced.targetPath,
+        writerStarted: true,
+        writeEffect,
+        requiresUserInspection: true,
+      });
+      expect(originalResult?.codingResult?.failedFiles?.[0]?.path).toBe(
+        produced.targetPath,
+      );
+
+      const notes = entries
+        .filter(
+          (entry) =>
+            entry.type === "query-event" &&
+            entry.event?.type === "query.completed",
+        )
+        .flatMap((entry) => entry.event?.result?.sharedContext?.notes ?? []);
+      const noteText = notes.join("\n");
+      expect(noteText).toContain("seed=action-result");
+      expect(noteText).toContain("seedAction=edit-file");
+      expect(noteText).toContain(`seedTarget=${produced.targetPath}`);
+      expect(noteText).toContain("seedWriterStarted=yes");
+      expect(noteText).toContain(`seedWriteEffect=${writeEffect}`);
+      expect(noteText).toContain("seedRequiresUserInspection=yes");
+      expect(noteText).not.toContain("seedChangedFiles=");
     },
     60000,
   );
