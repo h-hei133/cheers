@@ -119,6 +119,17 @@ describe("query route decision", () => {
     expect(decision.signals).toContain("runtime-seed");
   });
 
+  it("keeps permission-memory reflection on orchestration continuity", () => {
+    const decision = decideQueryRoute({
+      prompt: "what did I just approve and why is it asking again",
+    });
+
+    expect(decision.mode).toBe("chat");
+    expect(decision.route).toBe("orchestrated");
+    expect(decision.noWrite).toBe(true);
+    expect(decision.signals).toContain("reflective-permission-memory");
+  });
+
   it("uses active plan mode as a no-write route boundary", () => {
     const decision = decideQueryRoute({
       prompt: "看看下一步怎么做",

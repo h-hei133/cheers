@@ -30,6 +30,7 @@ interface IntentSignals {
   readonly asksForImplementation: boolean;
   readonly asksForToolOrWrite: boolean;
   readonly asksForCommand: boolean;
+  readonly asksForReflectivePermissionMemory: boolean;
   readonly hasPatchShape: boolean;
   readonly hasCodeFence: boolean;
   readonly hasPathReference: boolean;
@@ -58,6 +59,16 @@ export function decideQueryRoute(input: RouteDecisionInput): RouteDecision {
       noWrite: false,
       reason: "runtime recovery seed must preserve orchestration semantics",
       signals: ["runtime-seed", ...signalNames],
+    };
+  }
+
+  if (signals.asksForReflectivePermissionMemory) {
+    return {
+      mode: "chat",
+      route: "orchestrated",
+      noWrite: true,
+      reason: "permission memory reflection requires orchestration continuity",
+      signals: signalNames,
     };
   }
 
@@ -189,6 +200,10 @@ function extractIntentSignals(prompt: string): IntentSignals {
       /\b(run|execute|test|build|commit|push|shell|terminal|npm|pnpm|yarn|git)\b/i,
       /(?:运行|执行|构建|提交|推送|命令|终端)/u,
     ]);
+  const asksForReflectivePermissionMemory = hasAny(text, [
+    /(?:what did i just approve|what did i approve|was that allow-once or allow-always|was that cached or one-shot|why is it asking again|did that get persisted|was that persisted)/i,
+    /(?:刚才我批准了什么|刚才那个是一次性还是永久授权|为什么这次还要再问审批|刚才那个授权有没有落盘|刚才那个授权是缓存还是一次性)/u,
+  ]);
   const asksForExplicitCommand =
     !asksForConceptExplanation &&
     !asksForExplicitNoWrite &&
@@ -220,6 +235,7 @@ function extractIntentSignals(prompt: string): IntentSignals {
     asksForImplementation,
     asksForToolOrWrite,
     asksForCommand,
+    asksForReflectivePermissionMemory,
     hasPatchShape,
     hasCodeFence,
     hasPathReference,
@@ -237,6 +253,7 @@ function renderSignals(signals: IntentSignals): string[] {
     ["asksForImplementation", "implementation"],
     ["asksForToolOrWrite", "tool-write"],
     ["asksForCommand", "command"],
+    ["asksForReflectivePermissionMemory", "reflective-permission-memory"],
     ["hasPatchShape", "patch-shape"],
     ["hasCodeFence", "code-fence"],
     ["hasPathReference", "path-reference"],

@@ -92,6 +92,11 @@ failure is product code, provider/network, or local environment.
 
 Real-provider smoke is intentionally not part of release core.
 
+The permission-memory step is synthetic and deterministic. Its reflective
+approval-memory prompts must run through orchestration continuity so CLI
+`--print` can explain the last approval decision without contacting a real
+provider or changing permission persistence.
+
 ### Current main-path gate layering
 
 Use these commands as the current default verification stack for main-path

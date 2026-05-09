@@ -76,6 +76,23 @@ The primary user-visible mainline is now:
 
 ## 5. Latest Implemented Delta (through 2026-05-09)
 
+### Current closeout: release-core permission-memory gate
+
+`verify:release:core` no longer fails the permission-memory hard gate because
+approval-memory reflection prompts now stay on the orchestrated continuity
+route instead of falling through to lightweight chat.
+
+Key boundaries:
+
+- the fix is limited to query route classification for permission-memory
+  reflection prompts such as "what did I just approve and why is it asking
+  again"
+- the prompt remains no-write chat, but it uses orchestration so the existing
+  session continuity and approval-memory explanation surface are available
+- permission approval/denial persistence semantics, session schema,
+  provider/auth flow, real-provider smokes, apply_patch, mutation capability,
+  and real-user capability gate tiering are unchanged
+
 ### Current closeout: real-provider readiness smoke env contract
 
 `verify:provider-readiness:real` now has a stable opt-in environment contract
