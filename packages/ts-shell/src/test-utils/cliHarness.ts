@@ -12,6 +12,11 @@ export type ClosedCliCommandResult = {
   output: string;
 };
 
+export type StdinCliCommandResult = {
+  code: number | null;
+  output: string;
+};
+
 export type InteractiveStartupSmokeResult = {
   output: string;
   sessionId: string | null;
@@ -82,6 +87,53 @@ export async function runCliCommandToClose(input: {
       output += data.toString();
     });
     cli.stdin?.end();
+    cli.on("close", (code) => {
+      clearTimeout(timeout);
+      resolve({ code, output });
+    });
+    cli.on("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+}
+
+export async function runCliStdinToClose(input: {
+  spawnCli: SpawnCliForTest;
+  fakeHome: string;
+  stdin: string;
+  args?: string[];
+  envOverrides?: Record<string, string>;
+  timeoutMs?: number;
+}): Promise<StdinCliCommandResult> {
+  const {
+    spawnCli,
+    fakeHome,
+    stdin,
+    args = [],
+    envOverrides = {},
+    timeoutMs = 30000,
+  } = input;
+
+  return await new Promise((resolve, reject) => {
+    const cli = spawnCli(fakeHome, args, envOverrides);
+    let output = "";
+    const timeout = setTimeout(() => {
+      cli.kill();
+      reject(
+        new Error(
+          `Timed out waiting for CLI stdin command: ${args.join(" ")}\nOutput so far:\n${output}`,
+        ),
+      );
+    }, timeoutMs);
+
+    cli.stdout?.on("data", (data) => {
+      output += data.toString();
+    });
+    cli.stderr?.on("data", (data) => {
+      output += data.toString();
+    });
+    cli.stdin?.end(stdin);
     cli.on("close", (code) => {
       clearTimeout(timeout);
       resolve({ code, output });
@@ -190,6 +242,7 @@ export async function runInteractiveLineSmoke(input: {
     let output = "";
     let sessionId: string | null = null;
     let lineSent = false;
+    let outputLengthWhenLineSent = 0;
     let settled = false;
 
     const finish = () => {
@@ -227,10 +280,14 @@ export async function runInteractiveLineSmoke(input: {
       }
       if (!lineSent && output.includes(readyMarker)) {
         lineSent = true;
+        outputLengthWhenLineSent = output.length;
         cli.stdin?.write(line.endsWith("\n") ? line : `${line}\n`);
         return;
       }
-      if (lineSent && output.includes(waitFor)) {
+      if (
+        lineSent &&
+        output.slice(outputLengthWhenLineSent).includes(waitFor)
+      ) {
         finish();
       }
     };

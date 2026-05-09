@@ -12,6 +12,7 @@ import {
   createGitRepoFixture,
   normalizeCliOutput,
   runCliCommandToClose,
+  runCliStdinToClose,
   runInteractiveEofSmoke,
   runInteractiveLineSmoke,
   runInteractiveStartupSmoke,
@@ -890,6 +891,348 @@ globalThis.fetch = async function mockOpenAiFetch(url, init) {
     expect(state.terminalClassification).toBeUndefined();
     expect(state.durableStatus).toBeUndefined();
   }, 20000);
+
+  it("CLI entry parity keeps read-only prompt result surface aligned across stdin, print, and pipe-spawn interactive entries", async () => {
+    const projectRoot = path.join(fakeHomeDir, "entry-parity-read-only");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const targetPath = path.join(projectRoot, "note.txt");
+    const originalContent = [
+      "alpha entry parity",
+      "beta no mutation",
+      "gamma stable result",
+    ].join("\n");
+    fs.writeFileSync(targetPath, originalContent, "utf8");
+    const prompt =
+      "Inspect ./note.txt and summarize it. Do not edit, modify, write, or change the file.";
+    const env = {
+      PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      PRIVATE_AGENTS_REAL_HOME: "",
+    };
+
+    const stdinResult = await runCliStdinToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot],
+      stdin: `${prompt}\n`,
+      envOverrides: env,
+      timeoutMs: 35000,
+    });
+    const printResult = await runCliCommandToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot, "--print", prompt],
+      envOverrides: env,
+      timeoutMs: 35000,
+    });
+    const interactiveResult = await runInteractiveLineSmoke({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot],
+      line: prompt,
+      waitFor: "- No files changed: read/inspect only.",
+      envOverrides: env,
+      timeoutMs: 35000,
+    });
+
+    expect(stdinResult.code).toBe(0);
+    expect(printResult.code).toBe(0);
+
+    const outputs = [
+      stdinResult.output,
+      printResult.output,
+      interactiveResult.output,
+    ].map(normalizeCliOutput);
+
+    for (const output of outputs) {
+      expect(output).toContain("Result");
+      expect(output).toContain("Action result");
+      expect(output).toContain("- Task: read-file");
+      expect(output).toContain("- Changed: none");
+      expect(output).toContain("- Read files: ./note.txt");
+      expect(output).toContain("- No files changed: read/inspect only.");
+      expect(output).not.toContain("- Changed files: note.txt");
+      expect(output).not.toContain("approval> ");
+      expect(output).not.toContain("approval-audit:event=decision");
+      expect(output).not.toContain("mutation patch applied");
+    }
+    expect(fs.readFileSync(targetPath, "utf8")).toBe(originalContent);
+  }, 60000);
+
+  it("CLI entry parity keeps sessions current slash surface aligned across stdin, print, and pipe-spawn interactive entries", async () => {
+    const projectRoot = path.join(fakeHomeDir, "entry-parity-sessions-current");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const env = {
+      PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      PRIVATE_AGENTS_REAL_HOME: "",
+    };
+
+    const stdinResult = await runCliStdinToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot],
+      stdin: "/sessions current\n",
+      envOverrides: env,
+      timeoutMs: 30000,
+    });
+    const printResult = await runCliCommandToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot, "--print", "/sessions current"],
+      envOverrides: env,
+      timeoutMs: 30000,
+    });
+    const interactiveResult = await runInteractiveLineSmoke({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot],
+      line: "/sessions current",
+      waitFor: "- Project binding:",
+      envOverrides: env,
+      timeoutMs: 30000,
+    });
+
+    expect(stdinResult.code).toBe(0);
+    expect(printResult.code).toBe(0);
+    const outputs = [
+      stdinResult.output,
+      printResult.output,
+      interactiveResult.output,
+    ].map(normalizeCliOutput);
+    for (const output of outputs) {
+      expect(output).toContain("Current session");
+      expect(output).toMatch(/(?:- ID:|Session:\s*sess_)/);
+      expect(output).toContain("- Project binding:");
+      expect(output).not.toContain("Result");
+      expect(output).not.toContain("Outcome: success");
+      expect(output).not.toContain("approval> ");
+    }
+  }, 45000);
+
+  it("CLI entry parity keeps provider readiness missing-key surface aligned across stdin, print, and pipe-spawn interactive entries", async () => {
+    const projectRoot = path.join(fakeHomeDir, "entry-parity-readiness");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const prompt = "Run a real provider task without API key";
+    const env = {
+      PRIVATE_AGENTS_PROVIDER_MODE: "real",
+      PRIVATE_AGENTS_HOME_OVERRIDE: "",
+      PRIVATE_AGENTS_REAL_HOME: "",
+      OPENAI_API_KEY: "",
+    };
+
+    const stdinResult = await runCliStdinToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot],
+      stdin: `${prompt}\n`,
+      envOverrides: env,
+      timeoutMs: 30000,
+    });
+    const printResult = await runCliCommandToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot, "--print", prompt],
+      envOverrides: env,
+      timeoutMs: 30000,
+    });
+    const interactiveResult = await runInteractiveLineSmoke({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", projectRoot],
+      line: prompt,
+      waitFor: "Configure credential via /connect set",
+      envOverrides: env,
+      timeoutMs: 30000,
+    });
+
+    expect(stdinResult.code).toBe(0);
+    expect(printResult.code).toBe(0);
+    const outputs = [
+      stdinResult.output,
+      printResult.output,
+      interactiveResult.output,
+    ].map(normalizeCliOutput);
+    for (const output of outputs) {
+      expect(output).toContain("Result");
+      expect(output).toContain("- Outcome: error");
+      expect(output).toContain("provider-readiness:missing-key");
+      expect(output).toContain("Configure credential via /connect set");
+      expect(output).not.toContain("Outcome: success");
+      expect(output).not.toContain("Response complete");
+      expect(output).not.toContain("approval> ");
+    }
+  }, 60000);
+
+  it("CLI entry parity keeps stopped /continue failure handoff aligned across stdin, print, and pipe-spawn interactive entries", async () => {
+    const env = {
+      PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+      PRIVATE_AGENTS_REAL_HOME: "",
+    };
+    const createFixture = (label: string) =>
+      seedStoppedRecoveryContextSession({
+        fakeHomeDir,
+        sessionsDir,
+        sessionId: `sess_entry_parity_continue_${label}`,
+        projectName: `entry-parity-continue-${label}`,
+      });
+
+    const stdinFixture = createFixture("stdin");
+    const stdinResult = await runCliStdinToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", stdinFixture.projectRoot],
+      stdin: "/continue continue stopped context from stdin\n",
+      envOverrides: env,
+      timeoutMs: 35000,
+    });
+
+    const printFixture = createFixture("print");
+    const printResult = await runCliCommandToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: [
+        "--project",
+        printFixture.projectRoot,
+        "--print",
+        "/continue continue stopped context from print",
+      ],
+      envOverrides: env,
+      timeoutMs: 35000,
+    });
+
+    const interactiveFixture = createFixture("interactive");
+    const interactiveResult = await runInteractiveLineSmoke({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--project", interactiveFixture.projectRoot],
+      line: "/continue continue stopped context from interactive",
+      waitFor: "Failure handoff: status=blocked",
+      envOverrides: env,
+      timeoutMs: 35000,
+    });
+
+    expect(stdinResult.code).toBe(0);
+    expect(printResult.code).toBe(0);
+    const checks: Array<{
+      output: string;
+      stopReason: string;
+      nextAction: string;
+    }> = [
+      {
+        output: stdinResult.output,
+        stopReason: stdinFixture.stopReason,
+        nextAction: stdinFixture.nextAction,
+      },
+      {
+        output: printResult.output,
+        stopReason: printFixture.stopReason,
+        nextAction: printFixture.nextAction,
+      },
+      {
+        output: interactiveResult.output,
+        stopReason: interactiveFixture.stopReason,
+        nextAction: interactiveFixture.nextAction,
+      },
+    ];
+    for (const { output: rawOutput, stopReason, nextAction } of checks) {
+      const output = normalizeCliOutput(rawOutput);
+      expect(output).toContain("Continuation");
+      expect(output).toContain("Failure handoff: status=blocked");
+      expect(output).toContain("target=docs/failed-edit.md");
+      expect(output).toContain(`reason=${stopReason}`);
+      expect(output).toContain("blocker=patch-from-not-found");
+      expect(output).toContain(`next=${nextAction.replace(/[.]+$/, "")}`);
+      expect(output).not.toContain("Success handoff: status=passed");
+      expect(output).not.toContain("Changed files: docs/failed-edit.md");
+      expect(output).not.toContain("No recoverable session found");
+    }
+  }, 90000);
+
+  it("CLI entry parity keeps MCP unavailable control-plane surface aligned across stdin, print, and pipe-spawn interactive entries", async () => {
+    const projectRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), "private-agents-cli-entry-parity-mcp-"),
+    );
+    try {
+      fs.writeFileSync(
+        path.join(projectRoot, ".private-agents.mcp.json"),
+        JSON.stringify({
+          mcpServers: {
+            connectedSdk: {
+              transport: "sdk",
+              mockTools: [
+                {
+                  serverName: "connectedSdk",
+                  toolName: "search",
+                  qualifiedName: "mcp__connectedSdk__search",
+                  description: "Search MCP",
+                },
+              ],
+            },
+            needsAuth: {
+              transport: "http",
+              url: "https://example.com/mcp",
+              authRequired: true,
+            },
+            brokenStdio: {
+              transport: "stdio",
+            },
+          },
+        }),
+        "utf8",
+      );
+      const env = {
+        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        PRIVATE_AGENTS_REAL_HOME: "",
+      };
+
+      const stdinResult = await runCliStdinToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot],
+        stdin: "/mcp status\n",
+        envOverrides: env,
+        timeoutMs: 30000,
+      });
+      const printResult = await runCliCommandToClose({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot, "--print", "/mcp status"],
+        envOverrides: env,
+        timeoutMs: 30000,
+      });
+      const interactiveResult = await runInteractiveLineSmoke({
+        spawnCli,
+        fakeHome: fakeHomeDir,
+        args: ["--project", projectRoot],
+        line: "/mcp status",
+        waitFor: "MCP server brokenStdio is unavailable",
+        envOverrides: env,
+        timeoutMs: 30000,
+      });
+
+      expect(stdinResult.code).toBe(0);
+      expect(printResult.code).toBe(0);
+      const outputs = [
+        stdinResult.output,
+        printResult.output,
+        interactiveResult.output,
+      ].map(normalizeCliOutput);
+      for (const output of outputs) {
+        expect(output).toContain("connectedSdk: connected");
+        expect(output).toContain("needsAuth: needs-auth");
+        expect(output).toContain("MCP server needsAuth requires authentication");
+        expect(output).toContain("brokenStdio: failed");
+        expect(output).toContain(
+          "MCP server brokenStdio is unavailable: Missing stdio command",
+        );
+        expect(output).toContain("tools=0, executable=no");
+        expect(output).not.toContain("Outcome: success");
+        expect(output).not.toContain("Changed files:");
+        expect(output).not.toContain("approval> ");
+      }
+    } finally {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
+  }, 90000);
 
   it("persists session metadata to local filesystem", async () => {
     await new Promise<void>((resolve, reject) => {
