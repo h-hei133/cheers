@@ -140,4 +140,70 @@ describe("runResumeLikeShellAction", () => {
       expect(turns[0].runtimeSeed).toBeUndefined();
       expect(turns[0].continuityState?.sessionId).toBe(session.id);
     }));
+
+  it("renders stopped guidance before a stopped-session follow-up prompt", async () =>
+    withFakeHome("private-agents-stopped-continue-action-", async () => {
+      const manager = new SessionManager();
+      const session = manager.createNew();
+      manager.addTurn(session.id, {
+        role: "user",
+        content: "run failing verification",
+      });
+      manager.markRunStarted(session.id, "run failing verification");
+      manager.saveError(session.id, "verification failed with exit code 1", {
+        terminalReason: "stopped_error",
+        terminalClassification: "stopped",
+      });
+
+      const lines: string[] = [];
+      const turns: ResumeLikePromptTurnInput[] = [];
+      const result = await runResumeLikeShellAction({
+        slashResult: {
+          kind: "shell-action",
+          action: "continue-session",
+          sessionId: session.id,
+          continuationPrompt: "what should I do next after the failed command",
+        },
+        source: "interactive",
+        printMode: false,
+        sessionManager: manager,
+        runtimeContext: createRuntimeContext(session),
+        renderer: {
+          renderLine(line: string) {
+            lines.push(line);
+          },
+        } as never,
+        turnNumber: 4,
+        normalizePromptForExecution: (prompt) => prompt.trim(),
+        switchRuntimeSessionProjectContext: (runtimeContext, nextSession) => {
+          runtimeContext.session = nextSession;
+        },
+        renderSessionCommandMap: () => undefined,
+        executeResolvedPromptTurn: async (input) => {
+          lines.push("EXECUTE_FOLLOWUP");
+          turns.push(input);
+        },
+      });
+
+      expect(result.turnNumber).toBe(5);
+      expect(turns).toHaveLength(1);
+      expect(turns[0]).toMatchObject({
+        effectivePrompt: "what should I do next after the failed command",
+        turnNumber: 5,
+        turnOrigin: "continued",
+      });
+      expect(turns[0].continuityState?.lastTerminalClassification).toBe(
+        "stopped",
+      );
+      expect(lines).toContain("Result");
+      expect(lines).toContain("- Outcome: stopped");
+      expect(lines).toContain("- TerminalState: stopped");
+      expect(lines).toContain("- Reason: verification failed with exit code 1");
+      expect(lines).toContain(
+        `- Next action: Use /continue <follow-up prompt> or provide a concrete repair instruction to continue session ${session.id}.`,
+      );
+      expect(lines.indexOf("- Outcome: stopped")).toBeLessThan(
+        lines.indexOf("EXECUTE_FOLLOWUP"),
+      );
+    }));
 });

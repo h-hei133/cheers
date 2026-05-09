@@ -89,6 +89,15 @@ export async function runResumeLikeShellAction(options: {
         resumeResult.session,
       );
 
+      if (targetSummary.terminalClassification === "stopped") {
+        renderStoppedContinueGuidanceSurface(options.renderer, {
+          printMode: options.printMode,
+          sessionId: targetSessionId,
+          summary: targetSummary,
+          snapshot: options.sessionManager.buildContinuitySnapshot(targetSessionId),
+        });
+      }
+
       const nextTurn = (options.turnNumber ?? 0) + 1;
       const effectiveFollowUp =
         options.normalizePromptForExecution(continuationPrompt);
