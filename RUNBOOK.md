@@ -115,6 +115,7 @@ work:
 | Golden CLI main path | `npm run test:gate:golden-main-path` | Required stable gate | Fast synthetic CLI baseline for the user-visible main path. |
 | Real user capabilities | `npm run verify:real-user-capabilities` | Required stable MVP gate for current dogfood mutation evidence | Synthetic selected-workspace existing-file single-file update. Broader real-provider, protected consistency, release, and backlog cases require explicit `--tier=...`. |
 | Synthetic Add File create smoke | `npm run verify:real-user-capabilities -- --case=synthetic-selected-workspace-single-file-create` | Explicit candidate evidence | Synthetic selected-workspace single-file Add File create through the explicit write entrypoint. It is not part of default MVP and does not enable multi-file/delete/move/rollback or broad `apply_patch`. |
+| Synthetic multi-file update planning | `npm run verify:real-user-capabilities -- --tier=candidate --dry-run` | Explicit candidate metadata | Synthetic selected-workspace exactly two-file Update File planning/preflight classification. It is no-write only: no writer, no `changedFiles`, no `writeIntents`, no rollback, and no broad `apply_patch`. |
 | Real single-file provider smoke | `npm run verify:real-user-capabilities:real-single-file` | Explicit opt-in candidate evidence | Real provider model turn plus isolated selected-workspace existing-file single-file update. It is not part of default MVP, and it does not enable create/add/delete/move/multi-file/rollback or broader `apply_patch`. |
 | Real Add File create provider smoke | `npm run verify:real-user-capabilities:real-create` | Explicit opt-in candidate evidence | Real provider model turn plus isolated selected-workspace single-file Add File create. It is not part of default MVP, and it does not enable multi-file/delete/move/rollback, parent directory creation, or broader `apply_patch`. |
 | Focused regression guard | `npm run test -w packages/ts-shell -- <file> -t "<case>"` | Required when the current bounded slice added or changed a focused guard | Proves the exact behavior being closed without treating legacy wide tests as release blockers. |
@@ -172,6 +173,37 @@ outside the explicit candidate create route:
 - default MVP remains selected-workspace existing-file single-file update only
 - broader apply_patch, default create/add writing, delete/move, multi-file,
   rollback, provider/auth flow, and CLI/session schema remain out of scope
+
+### Multi-file Update File planning boundary
+
+`*** Update File` patches with exactly two selected-workspace existing-file
+targets can be classified as candidate planning/preflight evidence without
+writing files.
+
+Allowed planning surface:
+
+- exactly two `*** Update File` operations
+- selected workspace only
+- existing files only
+- all hunk/context verification must pass before `wouldChangeFiles` is reported
+
+No-write invariants:
+
+- no selected-workspace writer is reachable
+- `changedFiles=[]`
+- `writeIntents=[]`
+- `willWrite=false`
+- terminal/result surface must not claim write success
+
+Blocked planning surface:
+
+- one Update File remains on the existing single-file dry-run path
+- 3+ Update File operations
+- add, delete, move, mixed operations
+- missing targets, outside-workspace paths, and hunk/context mismatches
+
+This does not enable multi-file writing, rollback, broad `apply_patch`,
+provider/auth changes, CLI/session schema changes, or default MVP gate changes.
 
 `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.test.ts` full-suite
 is not a current main-path gate. It is a broad historical contract corpus used

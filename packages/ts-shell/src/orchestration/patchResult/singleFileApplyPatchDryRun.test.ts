@@ -66,7 +66,7 @@ describe("buildSingleFileApplyPatchDryRun", () => {
     );
   });
 
-  it("keeps multi-file Update File patches blocked with no terminal changed files", () => {
+  it("classifies exactly two Update File patches as candidate no-write planning", () => {
     const result = dryRun(
       [
         "*** Begin Patch",
@@ -86,11 +86,46 @@ describe("buildSingleFileApplyPatchDryRun", () => {
       },
     );
 
-    expectBlockedNoWrite(result);
-    expect(result.failedFiles[0]?.code).toBe("patch-apply-plan-not-verified");
+    expect(result.status).toBe("blocked");
+    expect(result.willWrite).toBe(false);
+    expect(result.changedFiles).toEqual([]);
+    expect(result.writeIntents).toEqual([]);
+    expect(result.noWriterInvoked).toBe(true);
+    expect(result.failedFiles).toEqual([]);
+    expect(result.wouldChangeFiles).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(result.previewChangedFiles).toEqual(["src/a.ts", "src/b.ts"]);
     expect(result.approval.decision).toBe("blocked");
+    expect(result.approval.writeIntent).toEqual({ authorized: false, count: 0 });
+    expect(result.approval.metadata.singleFileOnly).toBe(false);
     expect(result.resultSurface.status).toBe("blocked");
+    expect(result.resultSurface.failureCategory).toBe(
+      "candidate-capability-no-write",
+    );
     expect(result.resultSurface.changedFiles).toEqual([]);
+    expect(result.resultSurface.failedFiles).toEqual([]);
+    expect(result.resultSurface.unsupportedCapability).toEqual(
+      expect.objectContaining({
+        capability: "multi-file-update-candidate-no-write",
+        tier: "candidate",
+        blockedReason: "multi-file-update-write-not-enabled",
+        wouldChangeFiles: ["src/a.ts", "src/b.ts"],
+        failedFiles: [],
+        changedFiles: [],
+        writeIntents: [],
+      }),
+    );
+    expect(result.noPartial).toEqual({
+      atomicity: "verify-all-before-write",
+      writeIntents: 0,
+      blockedWrites: true,
+    });
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-dry-run:multi-file-update-planning-classified",
+        "apply-patch-dry-run:multi-file-update-candidate-no-write",
+        "apply-patch-dry-run:no-writer-invoked",
+      ]),
+    );
   });
 
   it.each([

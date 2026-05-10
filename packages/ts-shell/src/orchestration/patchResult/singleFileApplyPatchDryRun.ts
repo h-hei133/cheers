@@ -18,7 +18,15 @@ import {
   type SingleFileUpdatePatchApprovalContract,
   type SingleFileUpdatePatchResultSurfaceContract,
 } from "./productionGate.js";
+import {
+  classifyMultiFileUpdatePlanningNoWrite,
+  type MultiFileUpdatePlanningClassification,
+} from "./multiFileUpdatePlanning.js";
 import { buildSingleFileUpdatePatchReadinessContract } from "./readiness.js";
+
+type UnsupportedCapability =
+  | AddFileNoWriteClassification
+  | MultiFileUpdatePlanningClassification;
 
 export interface SingleFileApplyPatchDryRunOptions {
   readonly workspaceRoot: string;
@@ -42,7 +50,7 @@ export interface SingleFileApplyPatchDryRunBlockedApproval {
   readonly metadata: {
     readonly auditSafe: true;
     readonly willWrite: false;
-    readonly singleFileOnly: true;
+    readonly singleFileOnly: boolean;
     readonly unsupportedOperations: readonly [
       "multi-file",
       "add",
@@ -61,9 +69,11 @@ export interface SingleFileApplyPatchDryRunBlockedSurface {
   readonly evidence: readonly string[];
   readonly nextAction: string;
   readonly doNext: string;
-  readonly failureCategory: "unsupported-patch-shape";
-  readonly blocker: "unsupported-patch-shape";
-  readonly unsupportedCapability?: AddFileNoWriteClassification;
+  readonly failureCategory:
+    | "unsupported-patch-shape"
+    | "candidate-capability-no-write";
+  readonly blocker: "unsupported-patch-shape" | "candidate-capability-no-write";
+  readonly unsupportedCapability?: UnsupportedCapability;
   readonly noWriteProof: {
     readonly willWrite: false;
     readonly writeIntentCount: 0;
@@ -90,7 +100,7 @@ export interface SingleFileApplyPatchDryRunResult {
   readonly resultSurface:
     | SingleFileUpdatePatchResultSurfaceContract
     | SingleFileApplyPatchDryRunBlockedSurface;
-  readonly unsupportedCapability?: AddFileNoWriteClassification;
+  readonly unsupportedCapability?: UnsupportedCapability;
   readonly baseEvidence?: SingleFileApplyPatchBaseEvidence;
   readonly evidence: readonly string[];
   readonly nextAction: string;
@@ -110,6 +120,20 @@ export function buildSingleFileApplyPatchDryRun(
   const parsed = parseApplyPatchText(options.rawPatchText);
   if (parsed.ok === false) {
     return blockedFromParseFailure(parsed.failure);
+  }
+
+  const multiFileUpdatePlanning = classifyMultiFileUpdatePlanningNoWrite(
+    parsed.patch,
+    {
+      workspaceRoot: options.workspaceRoot,
+      readFile: options.readFile,
+      ...(options.directoryExists
+        ? { directoryExists: options.directoryExists }
+        : {}),
+    },
+  );
+  if (multiFileUpdatePlanning) {
+    return blockedFromMultiFileUpdatePlanning(multiFileUpdatePlanning);
   }
 
   const addClassification = classifyAddFileNoWrite(parsed.patch, {
@@ -332,6 +356,80 @@ function blockedFromAddFileClassification(
     wouldCreateFiles: classification.wouldCreateFiles,
     previewChangedFiles: [],
     failedFiles: [failure],
+    writeIntents: [],
+    noWriterInvoked: true,
+    terminalResultVisible: true,
+    doesNotClaimWriteSuccess: true,
+    approval,
+    resultSurface,
+    unsupportedCapability: classification,
+    evidence,
+    nextAction: classification.nextAction,
+    doNext: classification.nextAction,
+    noPartial: {
+      atomicity: "verify-all-before-write",
+      writeIntents: 0,
+      blockedWrites: true,
+    },
+  };
+}
+
+function blockedFromMultiFileUpdatePlanning(
+  classification: MultiFileUpdatePlanningClassification,
+): SingleFileApplyPatchDryRunResult {
+  const evidence = [
+    "apply-patch-dry-run:blocked",
+    "apply-patch-dry-run:multi-file-update-planning-classified",
+    `apply-patch-dry-run:multi-file-update-blocker:${classification.blockedReason}`,
+    "apply-patch-dry-run:multi-file-update-candidate-no-write",
+    "apply-patch-dry-run:will-write-false",
+    "apply-patch-dry-run:no-writer-invoked",
+    "apply-patch-dry-run:terminal-changed-files-empty",
+  ];
+  const approval: SingleFileApplyPatchDryRunBlockedApproval = {
+    capability: "single-file-update-apply-patch-dry-run",
+    permissionKind: "edit",
+    operationKind: "update",
+    decision: "blocked",
+    writeIntent: {
+      authorized: false,
+      count: 0,
+    },
+    metadata: {
+      auditSafe: true,
+      willWrite: false,
+      singleFileOnly: false,
+      unsupportedOperations,
+    },
+    nextAction: classification.nextAction,
+  };
+  const resultSurface: SingleFileApplyPatchDryRunBlockedSurface = {
+    status: "blocked",
+    changedFiles: [],
+    failedFiles: classification.failedFiles,
+    patches: [],
+    evidence,
+    nextAction: classification.nextAction,
+    doNext: classification.nextAction,
+    failureCategory: "candidate-capability-no-write",
+    blocker: "candidate-capability-no-write",
+    unsupportedCapability: classification,
+    noWriteProof: {
+      willWrite: false,
+      writeIntentCount: 0,
+      blockedWrites: true,
+      reason: classification.explanation,
+    },
+  };
+
+  return {
+    status: "blocked",
+    willWrite: false,
+    changedFiles: [],
+    wouldChangeFiles: classification.wouldChangeFiles,
+    wouldCreateFiles: [],
+    previewChangedFiles: classification.wouldChangeFiles,
+    failedFiles: classification.failedFiles,
     writeIntents: [],
     noWriterInvoked: true,
     terminalResultVisible: true,

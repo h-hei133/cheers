@@ -105,6 +105,26 @@ Key boundaries:
   `apply_patch`, delete/move, multi-file, rollback, provider/auth, and
   default real-provider create execution remain unchanged
 
+### Current closeout: multi-file Update File no-write planning
+
+Selected-workspace multi-file `*** Update File` now has a synthetic candidate
+planning/preflight classification for exactly two existing files.
+
+Key boundaries:
+
+- the planner accepts exactly two Update File operations and rejects add,
+  delete, move, mixed, and 3+ file patches
+- both targets must resolve inside the selected workspace and pass existing-file
+  update verification before the planner reports `wouldChangeFiles`
+- the path is no-write only: `changedFiles=[]`, `writeIntents=[]`,
+  `willWrite=false`, and no selected-workspace writer is reachable
+- failed preflight paths keep file-level failure detail for missing targets,
+  workspace-boundary violations, and hunk/context mismatches
+- `verify-real-user-capabilities` records this as candidate no-write metadata;
+  default MVP remains selected-workspace existing-file single-file update
+- broader apply_patch, multi-file writing, add/delete/move, rollback,
+  provider/auth, CLI/session schema, and default gates remain unchanged
+
 ### Current closeout: mutation verification handoff projection
 
 Selected-workspace mutation verification and failure handoff now has a focused
@@ -213,8 +233,11 @@ Current tier split:
 - release tier records release-only gates such as CLI entry stability,
   permission-memory, release-core, and long-session/compact continuity as
   non-MVP blockers
-- backlog tier retains create/add, delete/move, multi-file, rollback, fuzzy/AST,
-  broad `apply_patch`, and arbitrary mutation expectations outside MVP
+- candidate tier now also records exactly two-file Update File no-write
+  planning/preflight classification
+- backlog tier retains create/add outside the explicit candidate route,
+  delete/move, multi-file writing, rollback, fuzzy/AST, broad `apply_patch`,
+  and arbitrary mutation expectations outside MVP
 
 Important boundaries:
 
