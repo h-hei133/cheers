@@ -71,6 +71,8 @@ const tierValues = ['mvp', 'candidate', 'release', 'backlog', 'all']
 const suiteValues = ['candidate-mutation']
 const candidateMutationSuiteId = 'candidate-mutation'
 const defaultProviderEnvPath = '/home/wang/.private-agents-real/provider.env'
+const applyPatchProviderResultMarker = '__APPLY_PATCH_DRY_RUN_PROVIDER_RESULT__'
+const applyPatchProviderDiagnosticsMarker = '__APPLY_PATCH_DRY_RUN_PROVIDER_DIAGNOSTICS__'
 const realSingleFileUpdateCaseId = 'real-selected-workspace-single-file-update'
 const realSingleFileCreateCaseId = 'real-selected-workspace-single-file-create'
 const realTwoFileUpdateCaseId = 'real-selected-workspace-two-file-update'
@@ -109,6 +111,7 @@ const realApplyPatchGuardedWriteSmoke = process.argv.includes('--real-apply-patc
 const realApplyPatchGuardedRouteSmoke = process.argv.includes('--real-apply-patch-guarded-route-smoke')
 const realApplyPatchWorkspaceWriteSmoke = process.argv.includes('--real-apply-patch-workspace-write-smoke')
 const realMutationEnvContract = prepareRealMutationEnvContract()
+let lastApplyPatchProviderDiagnostics = undefined
 const syntheticHome = getSyntheticHome()
 const realHome = realMutationEnvContract.realHome ?? getRealProviderHome({ allowDefault: true })
 const testRoot = getTestRoot()
@@ -206,6 +209,7 @@ function prepareRealMutationEnvContract() {
       enabled: false,
       realHome: undefined,
       configSource: 'not-loaded',
+      providerDiagnostics: undefined,
       error: undefined,
       generatedRealHome: false,
     }
@@ -218,6 +222,7 @@ function prepareRealMutationEnvContract() {
       enabled: true,
       realHome: explicitRealHome || undefined,
       configSource: 'explicit-env',
+      providerDiagnostics: undefined,
       error: loaded,
       generatedRealHome: false,
     }
@@ -234,12 +239,15 @@ function prepareRealMutationEnvContract() {
     process.env.PRIVATE_AGENTS_TEST_ROOT = path.join(getTestRoot(), 'candidate-mutation-real')
   }
 
-  const resolved = resolveProviderEnvConfig(process.env)
+  const resolved = resolveProviderEnvConfig(process.env, {
+    providerEnvLoaded: loaded.configSource === 'explicit-env+provider-env',
+  })
   if (!resolved.ok) {
     return {
       enabled: true,
       realHome: explicitRealHome || undefined,
       configSource: loaded.configSource,
+      providerDiagnostics: undefined,
       error: resolved,
       generatedRealHome: false,
     }
@@ -253,6 +261,13 @@ function prepareRealMutationEnvContract() {
     enabled: true,
     realHome: generatedRealHome,
     configSource: loaded.configSource,
+    providerDiagnostics: buildProviderDiagnostics({
+      provider: resolved.provider,
+      baseUrl: resolved.baseUrl,
+      model: resolved.model,
+      configSource: loaded.configSource,
+      credentialSource: 'env',
+    }),
     error: undefined,
     generatedRealHome: true,
   }
@@ -304,13 +319,17 @@ function loadApprovedProviderEnv(processEnv) {
 
   const parsed = {}
   const content = fs.readFileSync(resolved, 'utf8')
+  for (const variant of providerEnvTextVariants(content)) {
+    mergeProviderEnvConfigObject(parsed, parseProviderEnvJsonObject(variant))
+    mergeProviderEnvLooseConfig(parsed, variant)
+  }
   for (const rawLine of content.split(/\r?\n/)) {
     const line = rawLine.trim()
     if (!line || line.startsWith('#')) continue
-    const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/)
+    const match = line.match(/^(?:(?:export|declare\s+-x)\s+)?["']?([A-Za-z_][A-Za-z0-9_.-]*)["']?\s*[:=]\s*(.*)$/)
     if (!match) continue
     const key = match[1]
-    let value = match[2]?.trim() ?? ''
+    let value = match[2]?.trim().replace(/,$/, '').trim() ?? ''
     if (
       (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
@@ -321,20 +340,176 @@ function loadApprovedProviderEnv(processEnv) {
       if (commentIndex >= 0) value = value.slice(0, commentIndex).trim()
     }
     parsed[key] = value
+    for (const variant of providerEnvTextVariants(value)) {
+      mergeProviderEnvConfigObject(parsed, parseProviderEnvJsonObject(variant))
+      mergeProviderEnvLooseConfig(parsed, variant)
+    }
   }
   return { ok: true, env: parsed, configSource: 'explicit-env+provider-env' }
 }
 
-function resolveProviderEnvConfig(env) {
+function providerEnvTextVariants(content) {
+  const text = String(content ?? '')
+  const variants = [text]
+  const unescapedJson = text
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+  if (unescapedJson !== text) variants.push(unescapedJson)
+  return variants
+}
+
+function parseProviderEnvJsonObject(content) {
+  const trimmed = content.trim()
+  if (!trimmed.startsWith('{')) return undefined
+  try {
+    const parsed = JSON.parse(trimmed)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function mergeProviderEnvConfigObject(target, config) {
+  if (!config) return
+  const provider = typeof config.provider === 'string' ? config.provider : undefined
+  if (provider && target.provider === undefined) target.provider = provider
+  mergeDirectProviderCredentialMap(target, config)
+  if (provider) {
+    const normalizedProvider = normalizeRealProvider(provider)
+    if (normalizedProvider) {
+      for (const field of ['apiKey', 'baseUrl', 'model']) {
+        const fieldValue = config[field]
+        if (typeof fieldValue === 'string' && fieldValue.trim()) {
+          target[`providerCredentials.${normalizedProvider}.${field}`] ??= fieldValue
+        }
+      }
+    }
+  }
+  const credentials = config.providerCredentials
+  if (!credentials || typeof credentials !== 'object' || Array.isArray(credentials)) return
+  mergeDirectProviderCredentialMap(target, credentials)
+  for (const [providerId, value] of Object.entries(credentials)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+    const normalizedProviderId = normalizeRealProvider(providerId)
+    if (!normalizedProviderId) continue
+    for (const field of ['apiKey', 'baseUrl', 'model']) {
+      const fieldValue = value[field]
+      if (typeof fieldValue === 'string' && fieldValue.trim()) {
+        target[`providerCredentials.${normalizedProviderId}.${field}`] = fieldValue
+      }
+    }
+  }
+}
+
+function mergeDirectProviderCredentialMap(target, config) {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return
+  for (const [providerId, value] of Object.entries(config)) {
+    const normalizedProviderId = normalizeRealProvider(providerId)
+    if (!normalizedProviderId || !value || typeof value !== 'object' || Array.isArray(value)) continue
+    for (const field of ['apiKey', 'baseUrl', 'model']) {
+      const fieldValue = value[field]
+      if (typeof fieldValue === 'string' && fieldValue.trim()) {
+        target[`providerCredentials.${normalizedProviderId}.${field}`] ??= fieldValue
+      }
+    }
+    if (
+      target.provider === undefined &&
+      ['openai-compatible', 'google', 'antigravity', 'claudecode', 'openai'].includes(normalizedProviderId)
+    ) {
+      target.provider = normalizedProviderId
+    }
+  }
+}
+
+function mergeProviderEnvLooseConfig(target, content) {
+  const text = String(content ?? '')
+  const providerMatch = text.match(/(?:^|\n)\s*["']?(?:provider|providerId|provider_id|selectedProvider|selected_provider)["']?\s*[:=]\s*["']?([^"',\n#}]+)["']?/i)
+  const provider = normalizeRealProvider(providerMatch?.[1])
+  if (provider && target.provider === undefined) {
+    target.provider = provider
+  }
+  if (
+    target.provider === undefined &&
+    providerKeyAliases('openai-compatible').some((alias) => text.includes(alias))
+  ) {
+    target.provider = 'openai-compatible'
+  }
+  for (const providerId of ['openai-compatible', 'google', 'antigravity', 'claudecode', 'openai']) {
+    if (!providerKeyAliases(providerId).some((alias) => text.includes(alias))) continue
+    for (const field of ['apiKey', 'baseUrl', 'model']) {
+      const fieldValue = extractLooseProviderCredentialField(text, providerId, field)
+      if (fieldValue && target[`providerCredentials.${providerId}.${field}`] === undefined) {
+        target[`providerCredentials.${providerId}.${field}`] = fieldValue
+      }
+    }
+  }
+  if (
+    target.provider === undefined &&
+    /providerCredentials/i.test(text) &&
+    providerKeyAliases('openai-compatible').some((alias) => text.includes(alias))
+  ) {
+    target.provider = 'openai-compatible'
+  }
+  const compatibleBaseUrl = extractLooseCompatibleBaseUrl(text)
+  const compatibleModel = extractLooseCompatibleModel(text)
+  if (compatibleBaseUrl) {
+    target.provider ??= 'openai-compatible'
+    target['providerCredentials.openai-compatible.baseUrl'] ??= compatibleBaseUrl
+  }
+  if (compatibleModel) {
+    target.provider ??= 'openai-compatible'
+    target['providerCredentials.openai-compatible.model'] ??= compatibleModel
+  }
+}
+
+function extractLooseProviderCredentialField(content, providerId, field) {
+  const providerIndex = providerKeyAliases(providerId)
+    .map((alias) => content.indexOf(alias))
+    .filter((index) => index >= 0)
+    .sort((left, right) => left - right)[0]
+  if (providerIndex < 0) return undefined
+  const window = content.slice(providerIndex, providerIndex + 2000)
+  const pattern = new RegExp(`["']?(?:${field}|${fieldAliases(field).join('|')})["']?\\s*[:=]\\s*["']?([^"',\\n#}]+)["']?`, 'i')
+  const match = window.match(pattern)
+  return match?.[1]?.trim()
+}
+
+function extractLooseCompatibleBaseUrl(content) {
+  const explicit = content.match(/https:\/\/api\.siliconflow\.cn\/v1\b/i)?.[0]
+  if (explicit) return explicit
+  const generic = content.match(/["']?(?:baseUrl|base_url|baseURL)["']?\s*[:=]\s*["']?(https?:\/\/[^"',\s#}]+)["']?/i)?.[1]
+  return generic?.trim()
+}
+
+function extractLooseCompatibleModel(content) {
+  const explicit = content.match(/\bdeepseek-ai\/DeepSeek-V4-Flash\b/)?.[0]
+  if (explicit) return explicit
+  const generic = content.match(/["']?model["']?\s*[:=]\s*["']?([^"',\n#}]+)["']?/i)?.[1]
+  return generic?.trim()
+}
+
+function fieldAliases(field) {
+  if (field === 'apiKey') return ['api_key', 'api-key', 'apikey']
+  if (field === 'baseUrl') return ['base_url', 'baseURL', 'base-url']
+  return []
+}
+
+function resolveProviderEnvConfig(env, { providerEnvLoaded = false } = {}) {
   const provider = normalizeRealProvider(getFirstEnvValue(env, [
     'PRIVATE_AGENTS_REAL_PROVIDER',
     'PRIVATE_AGENTS_PROVIDER',
-  ])) ?? inferProviderFromEnv(env)
+    'provider',
+    'PROVIDER',
+  ])) ?? inferProviderFromEnv(env, { allowOpenAiFallback: !providerEnvLoaded })
   if (!provider) {
     return {
       ok: false,
       status: 'config-failure',
-      reason: 'PRIVATE_AGENTS_REAL_PROVIDER or PRIVATE_AGENTS_PROVIDER is required for candidate mutation real suite',
+      reason: providerEnvLoaded
+        ? 'approved provider.env was loaded but did not expose a supported provider selector; refusing ambient OPENAI_API_KEY fallback'
+        : 'PRIVATE_AGENTS_REAL_PROVIDER or PRIVATE_AGENTS_PROVIDER is required for candidate mutation real suite',
     }
   }
 
@@ -391,10 +566,14 @@ function resolveProviderEnvConfig(env) {
   return { ok: true, provider, apiKey, apiKeyEnvVar, baseUrl, model }
 }
 
-function inferProviderFromEnv(env) {
+function inferProviderFromEnv(env, { allowOpenAiFallback = true } = {}) {
+  if (hasProviderCredentialConfig(env, 'openai-compatible')) return 'openai-compatible'
   if (getFirstEnvValue(env, ['OPENAI_COMPATIBLE_API_KEY'])) return 'openai-compatible'
+  if (hasProviderCredentialConfig(env, 'google')) return 'google'
   if (getFirstEnvValue(env, ['GOOGLE_API_KEY'])) return 'google'
+  if (hasProviderCredentialConfig(env, 'antigravity')) return 'antigravity'
   if (getFirstEnvValue(env, ['ANTIGRAVITY_API_KEY'])) return 'antigravity'
+  if (hasProviderCredentialConfig(env, 'claudecode')) return 'claudecode'
   if (getFirstEnvValue(env, ['CLAUDECODE_API_KEY'])) return 'claudecode'
   if (
     getFirstEnvValue(env, ['PRIVATE_AGENTS_REAL_API_KEY']) &&
@@ -436,8 +615,18 @@ function inferProviderFromEnv(env) {
   ) {
     return 'openai-compatible'
   }
-  if (getFirstEnvValue(env, ['OPENAI_API_KEY'])) return 'openai'
+  if (allowOpenAiFallback && getFirstEnvValue(env, ['OPENAI_API_KEY'])) return 'openai'
   return undefined
+}
+
+function hasProviderCredentialConfig(env, provider) {
+  return Boolean(
+    getFirstEnvValue(env, [
+      ...providerCredentialFieldNames(provider, 'apiKey'),
+      ...providerCredentialFieldNames(provider, 'baseUrl'),
+      ...providerCredentialFieldNames(provider, 'model'),
+    ]),
+  )
 }
 
 function writeEnvBackedRealProviderConfig(input) {
@@ -477,6 +666,7 @@ function normalizeRealProvider(value) {
   const normalized = value?.trim().toLowerCase().replace(/_/g, '-')
   switch (normalized) {
     case 'compatible':
+    case 'openaicompatible':
     case 'openai-compatible-api':
     case 'siliconflow':
     case 'deepseek':
@@ -502,23 +692,41 @@ function providerApiKeyEnvVar(provider) {
 }
 
 function providerApiKeyAliases(provider) {
-  return provider === 'openai-compatible'
-    ? ['OPENAI_API_KEY']
-    : []
+  switch (provider) {
+    case 'openai':
+      return providerCredentialFieldNames('openai', 'apiKey')
+    case 'google':
+      return providerCredentialFieldNames('google', 'apiKey')
+    case 'antigravity':
+      return providerCredentialFieldNames('antigravity', 'apiKey')
+    case 'claudecode':
+      return providerCredentialFieldNames('claudecode', 'apiKey')
+    default:
+      return [
+        ...providerCredentialFieldNames('openai-compatible', 'apiKey'),
+        'OPENAI_API_KEY',
+      ]
+  }
 }
 
 function providerBaseUrlAliases(provider) {
   switch (provider) {
     case 'openai':
-      return ['OPENAI_BASE_URL', 'OPENAI_API_BASE', 'OPENAI_API_BASE_URL']
+      return [
+        ...providerCredentialFieldNames('openai', 'baseUrl'),
+        'OPENAI_BASE_URL',
+        'OPENAI_API_BASE',
+        'OPENAI_API_BASE_URL',
+      ]
     case 'google':
-      return ['GOOGLE_BASE_URL']
+      return [...providerCredentialFieldNames('google', 'baseUrl'), 'GOOGLE_BASE_URL']
     case 'antigravity':
-      return ['ANTIGRAVITY_BASE_URL']
+      return [...providerCredentialFieldNames('antigravity', 'baseUrl'), 'ANTIGRAVITY_BASE_URL']
     case 'claudecode':
-      return ['CLAUDECODE_BASE_URL']
+      return [...providerCredentialFieldNames('claudecode', 'baseUrl'), 'CLAUDECODE_BASE_URL']
     default:
       return [
+        ...providerCredentialFieldNames('openai-compatible', 'baseUrl'),
         'OPENAI_COMPATIBLE_BASE_URL',
         'OPENAI_BASE_URL',
         'OPENAI_API_BASE',
@@ -532,20 +740,88 @@ function providerBaseUrlAliases(provider) {
 function providerModelAliases(provider) {
   switch (provider) {
     case 'openai':
-      return ['OPENAI_MODEL', 'MODEL']
+      return [...providerCredentialFieldNames('openai', 'model'), 'OPENAI_MODEL', 'MODEL']
     case 'google':
-      return ['GOOGLE_MODEL']
+      return [...providerCredentialFieldNames('google', 'model'), 'GOOGLE_MODEL']
     case 'antigravity':
-      return ['ANTIGRAVITY_MODEL']
+      return [...providerCredentialFieldNames('antigravity', 'model'), 'ANTIGRAVITY_MODEL']
     case 'claudecode':
-      return ['CLAUDECODE_MODEL']
+      return [...providerCredentialFieldNames('claudecode', 'model'), 'CLAUDECODE_MODEL']
     default:
-      return ['OPENAI_COMPATIBLE_MODEL', 'OPENAI_MODEL', 'MODEL']
+      return [
+        ...providerCredentialFieldNames('openai-compatible', 'model'),
+        'OPENAI_COMPATIBLE_MODEL',
+        'OPENAI_MODEL',
+        'MODEL',
+      ]
   }
+}
+
+function providerCredentialFieldNames(provider, field) {
+  const aliases = providerKeyAliases(provider)
+  const envField = field === 'apiKey' ? 'API_KEY' : field === 'baseUrl' ? 'BASE_URL' : 'MODEL'
+  return [
+    ...aliases.map((alias) => `providerCredentials.${alias}.${field}`),
+    ...aliases.map((alias) => `provider_credentials.${alias}.${field}`),
+    ...aliases.map((alias) => `PROVIDER_CREDENTIALS.${alias}.${field}`),
+    ...aliases.map((alias) => `PROVIDER_CREDENTIALS_${alias.toUpperCase().replace(/-/g, '_')}_${envField}`),
+    ...aliases.map((alias) => `PRIVATE_AGENTS_PROVIDER_CREDENTIALS_${alias.toUpperCase().replace(/-/g, '_')}_${envField}`),
+  ]
+}
+
+function providerKeyAliases(provider) {
+  if (provider === 'openai-compatible') {
+    return ['openai-compatible', 'openaiCompatible', 'openai_compatible', 'openai-compatible-api']
+  }
+  return [provider]
 }
 
 function providerRequiresEndpointConfig(provider) {
   return ['openai-compatible', 'google', 'antigravity', 'claudecode'].includes(provider)
+}
+
+function buildProviderDiagnostics({
+  provider,
+  baseUrl,
+  model,
+  configSource,
+  credentialSource,
+}) {
+  return {
+    providerId: provider ?? 'unknown',
+    clientProtocol: provider === 'openai-compatible' ? 'openai-compatible' : (provider ?? 'unknown'),
+    baseUrlHost: baseUrlHost(baseUrl),
+    model: model?.trim() || 'default',
+    configSource: configSource ?? 'unknown',
+    credentialSource: credentialSource ?? 'unknown',
+  }
+}
+
+function baseUrlHost(baseUrl) {
+  const trimmed = baseUrl?.trim()
+  if (!trimmed) return 'none'
+  try {
+    return new URL(trimmed).host || 'none'
+  } catch {
+    return 'invalid'
+  }
+}
+
+function renderProviderDiagnostics(diagnostics) {
+  if (!diagnostics) return []
+  return [
+    `providerId=${diagnostics.providerId ?? 'unknown'}`,
+    `clientProtocol=${diagnostics.clientProtocol ?? 'unknown'}`,
+    `baseUrlHost=${diagnostics.baseUrlHost ?? 'none'}`,
+    `model=${diagnostics.model ?? 'default'}`,
+    `configSource=${diagnostics.configSource ?? 'unknown'}`,
+  ]
+}
+
+function printProviderDiagnostics(diagnostics) {
+  for (const line of renderProviderDiagnostics(diagnostics)) {
+    console.log(line)
+  }
 }
 
 const futureGateCandidates = [
@@ -5991,11 +6267,21 @@ function buildApplyPatchDryRunProviderEvalScript() {
       }
       const model = (resolved.model ?? credential.model ?? '').trim() ||
         (credential.provider === 'openai' && credential.accountAuth ? 'gpt-5.4' : 'gpt-4.1-mini');
+      const baseUrl = resolved.baseUrl ?? credential.baseUrl;
+      const diagnostics = {
+        providerId: credential.provider,
+        clientProtocol: credential.provider === 'openai-compatible' ? 'openai-compatible' : credential.provider,
+        baseUrlHost: baseUrlHost(baseUrl),
+        model,
+        configSource: process.env.PRIVATE_AGENTS_REAL_CONFIG_SOURCE ?? 'runtime-config',
+        credentialSource: credential.source,
+      };
+      console.log(${JSON.stringify(applyPatchProviderDiagnosticsMarker)} + JSON.stringify(diagnostics));
       const client = createModelClient({
         provider: credential.provider,
         apiKey: credential.apiKey,
         accountAuth: credential.accountAuth,
-        baseUrl: resolved.baseUrl ?? credential.baseUrl,
+        baseUrl,
         requestedCapabilities: { supportsToolCalls: false },
         fallbackPolicy: { enabled: false },
       });
@@ -6023,11 +6309,21 @@ function buildApplyPatchDryRunProviderEvalScript() {
           output += event.delta;
         }
       }
-      console.log('__APPLY_PATCH_DRY_RUN_PROVIDER_RESULT__' + JSON.stringify({ output }));
+      console.log(${JSON.stringify(applyPatchProviderResultMarker)} + JSON.stringify({ output, diagnostics }));
     })().catch((error) => {
       console.error(formatProviderEvalError(error));
       process.exit(1);
     });
+
+    function baseUrlHost(baseUrl) {
+      const trimmed = typeof baseUrl === 'string' ? baseUrl.trim() : '';
+      if (!trimmed) return 'none';
+      try {
+        return new URL(trimmed).host || 'none';
+      } catch {
+        return 'invalid';
+      }
+    }
 
     function formatProviderEvalError(error) {
       if (error instanceof Error) {
@@ -6062,26 +6358,54 @@ async function runApplyPatchDryRunProviderTurn({ prompt, runtimeHome, realHome, 
       PRIVATE_AGENTS_AUDIT_LOG_PATH: auditLogPath,
       PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PROMPT: prompt,
       PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      PRIVATE_AGENTS_REAL_CONFIG_SOURCE: realMutationEnvContract.configSource,
     },
     timeoutMs: 420000,
   })
-  const resultLine = result.stdout
-    .split(/\r?\n/)
-    .find((line) => line.startsWith('__APPLY_PATCH_DRY_RUN_PROVIDER_RESULT__'))
+  const stdoutLines = result.stdout.split(/\r?\n/)
+  const resultLine = stdoutLines
+    .find((line) => line.startsWith(applyPatchProviderResultMarker))
+  const diagnosticsLine = stdoutLines
+    .find((line) => line.startsWith(applyPatchProviderDiagnosticsMarker))
   let output = ''
+  let providerDiagnostics = undefined
   if (resultLine) {
     try {
-      const parsed = JSON.parse(resultLine.slice('__APPLY_PATCH_DRY_RUN_PROVIDER_RESULT__'.length))
+      const parsed = JSON.parse(resultLine.slice(applyPatchProviderResultMarker.length))
       output = typeof parsed.output === 'string' ? parsed.output : ''
+      if (parsed.diagnostics && typeof parsed.diagnostics === 'object') {
+        providerDiagnostics = parsed.diagnostics
+      }
     } catch {
       output = ''
     }
   }
+  if (!providerDiagnostics && diagnosticsLine) {
+    try {
+      const parsed = JSON.parse(diagnosticsLine.slice(applyPatchProviderDiagnosticsMarker.length))
+      if (parsed && typeof parsed === 'object') providerDiagnostics = parsed
+    } catch {
+      providerDiagnostics = undefined
+    }
+  }
+  if (providerDiagnostics) {
+    lastApplyPatchProviderDiagnostics = providerDiagnostics
+  }
+  const stdoutWithoutMarkers = stdoutLines
+    .filter((line) =>
+      !line.startsWith(applyPatchProviderResultMarker) &&
+      !line.startsWith(applyPatchProviderDiagnosticsMarker)
+    )
+    .join('\n')
+  const rawOutputWithoutMarkers = [stdoutWithoutMarkers, result.stderr]
+    .filter(Boolean)
+    .join('')
   return {
     ...result,
     stdout: output,
-    output: output || result.output,
-    rawOutput: result.output,
+    output: output || rawOutputWithoutMarkers || result.output,
+    rawOutput: rawOutputWithoutMarkers || result.output,
+    providerDiagnostics,
   }
 }
 
@@ -9736,6 +10060,9 @@ function buildRealTwoFileUpdateFailure({ category, reason, status = 'FAIL', stat
 }
 
 function writeRealSingleFileUpdateReport(fields) {
+  const providerDiagnostics = fields.providerDiagnostics ??
+    lastApplyPatchProviderDiagnostics ??
+    realMutationEnvContract.providerDiagnostics
   writeReport({
     generatedAt: new Date().toISOString(),
     capability: realSingleFileUpdateCaseId,
@@ -9748,11 +10075,15 @@ function writeRealSingleFileUpdateReport(fields) {
     drivesApplyPatchExpansion: false,
     expectedToPassCurrentMvp: false,
     expectedToPassInCurrentMVP: false,
+    ...(providerDiagnostics ? { providerDiagnostics } : {}),
     ...fields,
   })
 }
 
 function writeRealSingleFileCreateReport(fields) {
+  const providerDiagnostics = fields.providerDiagnostics ??
+    lastApplyPatchProviderDiagnostics ??
+    realMutationEnvContract.providerDiagnostics
   writeReport({
     generatedAt: new Date().toISOString(),
     capability: realSingleFileCreateCaseId,
@@ -9765,11 +10096,15 @@ function writeRealSingleFileCreateReport(fields) {
     drivesApplyPatchExpansion: false,
     expectedToPassCurrentMvp: false,
     expectedToPassInCurrentMVP: false,
+    ...(providerDiagnostics ? { providerDiagnostics } : {}),
     ...fields,
   })
 }
 
 function writeRealTwoFileUpdateReport(fields) {
+  const providerDiagnostics = fields.providerDiagnostics ??
+    lastApplyPatchProviderDiagnostics ??
+    realMutationEnvContract.providerDiagnostics
   writeReport({
     generatedAt: new Date().toISOString(),
     capability: realTwoFileUpdateCaseId,
@@ -9782,6 +10117,7 @@ function writeRealTwoFileUpdateReport(fields) {
     drivesApplyPatchExpansion: false,
     expectedToPassCurrentMvp: false,
     expectedToPassInCurrentMVP: false,
+    ...(providerDiagnostics ? { providerDiagnostics } : {}),
     ...fields,
   })
 }
@@ -9795,6 +10131,7 @@ async function runRealSelectedWorkspaceTwoFileUpdate() {
   console.log('realProviderHome=config-only')
   console.log('writeScope=isolated-selected-workspace-exactly-two-existing-files')
   console.log('mutationBoundary=update-only exactly-two-files no-create no-delete no-move no-3plus no-rollback')
+  printProviderDiagnostics(realMutationEnvContract.providerDiagnostics)
 
   if (!realHome) {
     const failure = buildRealTwoFileUpdateFailure({
@@ -9888,6 +10225,7 @@ async function runRealSelectedWorkspaceTwoFileUpdate() {
       fixtureDir: fixture.fixtureDir,
       auditLogPath,
     })
+    printProviderDiagnostics(providerResult.providerDiagnostics ?? realMutationEnvContract.providerDiagnostics)
     const redaction = redactAndAssertCodingProviderOutput(providerResult.rawOutput || providerResult.output)
     const redactedProviderOutput = redactAndAssertCodingProviderOutput(providerResult.output).redacted
     const providerFailure = classifyProviderReadinessFailure(
@@ -10171,6 +10509,7 @@ async function runRealSelectedWorkspaceSingleFileCreate() {
   console.log('realProviderHome=config-only')
   console.log('writeScope=isolated-selected-workspace-single-file-add-only')
   console.log('mutationBoundary=create-only single-file no-update no-delete no-move no-multifile no-rollback no-parent-dir-create')
+  printProviderDiagnostics(realMutationEnvContract.providerDiagnostics)
 
   if (!realHome) {
     const failure = buildRealSingleFileCreateFailure({
@@ -10261,6 +10600,7 @@ async function runRealSelectedWorkspaceSingleFileCreate() {
       fixtureDir: fixture.fixtureDir,
       auditLogPath,
     })
+    printProviderDiagnostics(providerResult.providerDiagnostics ?? realMutationEnvContract.providerDiagnostics)
     const redaction = redactAndAssertCodingProviderOutput(providerResult.rawOutput || providerResult.output)
     const redactedProviderOutput = redactAndAssertCodingProviderOutput(providerResult.output).redacted
     const providerFailure = classifyProviderReadinessFailure(
@@ -10522,6 +10862,7 @@ async function runRealSelectedWorkspaceSingleFileUpdate() {
   console.log('realProviderHome=config-only')
   console.log('writeScope=isolated-selected-workspace-existing-file-only')
   console.log('mutationBoundary=update-only single-file no-create no-delete no-move no-multifile no-rollback')
+  printProviderDiagnostics(realMutationEnvContract.providerDiagnostics)
 
   if (!realHome) {
     const failure = buildRealSingleFileUpdateFailure({
@@ -10612,6 +10953,7 @@ async function runRealSelectedWorkspaceSingleFileUpdate() {
       fixtureDir: fixture.fixtureDir,
       auditLogPath,
     })
+    printProviderDiagnostics(providerResult.providerDiagnostics ?? realMutationEnvContract.providerDiagnostics)
     const redaction = redactAndAssertCodingProviderOutput(providerResult.rawOutput || providerResult.output)
     const redactedProviderOutput = redactAndAssertCodingProviderOutput(providerResult.output).redacted
     const providerFailure = classifyProviderReadinessFailure(
@@ -10977,6 +11319,7 @@ async function runRealCandidateMutationSuiteCase(caseId) {
     failureCategory,
     failureReason: report.failureReason ?? '',
     outputTail: report.outputTail ?? '',
+    providerDiagnostics: report.providerDiagnostics ?? realMutationEnvContract.providerDiagnostics,
     changedFiles: report.changedFiles ?? [],
     failedFiles: report.failedFiles ?? [],
     writeIntents: report.writeIntents ?? [],
@@ -11132,6 +11475,9 @@ async function main() {
     console.log(`suite name=${selectedSuiteId}`)
     console.log(`suite real-provider cases=${includeRealProviderSuiteCases ? 'include-real' : 'skipped-by-default'}`)
     console.log(`suite real-provider configSource=${realMutationEnvContract.configSource}`)
+    if (includeRealProviderSuiteCases && realMutationEnvContract.providerDiagnostics) {
+      printProviderDiagnostics(realMutationEnvContract.providerDiagnostics)
+    }
     console.log('suite defaultMvpAffected=false')
   }
   console.log('status taxonomy: PASS=0 FAIL=1 PROVIDER_NETWORK=2 CONFIG=3')

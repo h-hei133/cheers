@@ -137,6 +137,11 @@ Candidate mutation real suite contract:
   isolated provider config home under `PRIVATE_AGENTS_TEST_ROOT`, sets child
   `HOME` and `USERPROFILE` to per-smoke isolated runtime homes, and uses
   `PRIVATE_AGENTS_REAL_HOME` only for that generated config source.
+- `provider=openai-compatible` and
+  `providerCredentials.openai-compatible.{apiKey,baseUrl,model}` in the
+  approved env file are preserved as provider id `openai-compatible`; the
+  OpenAI-compatible client protocol is reported separately and base URL
+  diagnostics print only the host, for example `api.siliconflow.cn`.
 - The suite must not read real user provider config directories. Missing
   provider selector, key, base URL, or model is a CONFIG failure; auth, network,
   model-output, route, and post-write failures must remain separately

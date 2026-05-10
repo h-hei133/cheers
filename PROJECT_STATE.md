@@ -262,6 +262,10 @@ Current tier split:
   `PRIVATE_AGENTS_TEST_ROOT`, and uses `PRIVATE_AGENTS_REAL_HOME` only for that
   generated config source; default suite and dry-run modes still do not touch
   the real provider
+- openai-compatible provider.env shapes, including SiliconFlow-style
+  `providerCredentials.openai-compatible.*`, remain provider id
+  `openai-compatible`; smoke diagnostics distinguish provider identity from the
+  OpenAI-compatible protocol and print only the base URL host
 - release tier records release-only gates such as CLI entry stability,
   permission-memory, release-core, and long-session/compact continuity as
   non-MVP blockers
