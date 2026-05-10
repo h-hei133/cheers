@@ -320,6 +320,46 @@ const scenarios = [
     ],
   },
   {
+    id: 'synthetic-selected-workspace-multi-file-update-planning',
+    tier: 'candidate',
+    provider: 'synthetic',
+    execution: 'apply-patch-multi-file-update-planning-dry-run',
+    expectedCapability: 'selected-workspace exactly two-file Update File planning/preflight no-write smoke',
+    currentSupportedCapability: 'candidate no-write planning/preflight only; multi-file writer remains disabled',
+    reasonForTier: 'Candidate because exactly two existing-file Update File patches can be planned and preflighted without writer reachability, changedFiles, or writeIntents.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+    projectDir: path.join(testRoot, `pca-capability-gate-candidate-multifile-planning-${runId}`),
+    files: {
+      'src/a.ts': 'a\n',
+      'src/b.ts': 'b\n',
+      'LOCKED.md': 'locked\n',
+    },
+    protectedFiles: ['LOCKED.md'],
+    patchText: [
+      '*** Begin Patch',
+      '*** Update File: src/a.ts',
+      '@@',
+      '-a',
+      '+aa',
+      '*** Update File: src/b.ts',
+      '@@',
+      '-b',
+      '+bb',
+      '*** End Patch',
+    ].join('\n'),
+    expectChanged: [],
+    expectWouldChange: ['src/a.ts', 'src/b.ts'],
+    expectOutputContains: [
+      'multi-file-update-candidate-no-write',
+      'multi-file write not enabled',
+      'changedFiles=',
+      'writeIntents=',
+      'wouldChangeFiles=src/a.ts,src/b.ts',
+    ],
+  },
+  {
     id: 'synthetic-single-file-protected-verify',
     tier: 'backlog',
     provider: 'synthetic',
@@ -597,18 +637,6 @@ const tierDescriptorCases = [
     expectedCapability: 'delete, move, rename, or chmod support',
     currentSupportedCapability: 'unsupported by the selected-workspace update-only MVP route',
     reasonForTier: 'Backlog because it requires new mutation semantics beyond existing-file update.',
-    drivesApplyPatchExpansion: false,
-    requiresRealProvider: false,
-    expectedToPassCurrentMvp: false,
-  },
-  {
-    id: 'candidate-multi-file-update-no-write-planning',
-    tier: 'candidate',
-    provider: 'synthetic',
-    executable: false,
-    expectedCapability: 'selected-workspace exactly two-file Update File planning/preflight no-write classification',
-    currentSupportedCapability: 'candidate no-write planning/preflight only; multi-file writer remains disabled',
-    reasonForTier: 'Candidate because exactly two existing-file Update File patches can be planned and preflighted without writer reachability, changedFiles, or writeIntents.',
     drivesApplyPatchExpansion: false,
     requiresRealProvider: false,
     expectedToPassCurrentMvp: false,
@@ -1374,6 +1402,9 @@ async function runScenario(scenario) {
   if (scenario.execution === 'apply-patch-workspace-write-cli') {
     return runApplyPatchWorkspaceWriteScenario(scenario)
   }
+  if (scenario.execution === 'apply-patch-multi-file-update-planning-dry-run') {
+    return runApplyPatchMultiFileUpdatePlanningScenario(scenario)
+  }
   prepareProject(scenario)
   let previousSnapshot = snapshot(scenario.projectDir)
   const turnResults = []
@@ -1599,6 +1630,245 @@ async function runApplyPatchWorkspaceWriteScenario(scenario) {
     fs.rmSync(runtimeHome, { recursive: true, force: true })
     fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
   }
+}
+
+async function runApplyPatchMultiFileUpdatePlanningScenario(scenario) {
+  prepareProject(scenario)
+  const patchDir = path.join(testRoot, 'real-user-capabilities-patches', `${scenario.id}-${runId}`)
+  const patchPath = path.join(patchDir, 'patch.diff')
+  fs.rmSync(patchDir, { recursive: true, force: true })
+  fs.mkdirSync(patchDir, { recursive: true })
+  fs.writeFileSync(patchPath, scenario.patchText, 'utf8')
+
+  try {
+    const before = snapshot(scenario.projectDir)
+    const result = await runMultiFileUpdatePlanningDryRun({
+      fixtureDir: scenario.projectDir,
+      patchPath,
+    })
+    const after = snapshot(scenario.projectDir)
+    const observedChanged = changedFiles(before, after)
+    const failures = []
+    let dryRunResult
+    if (result.code !== 0 || result.timedOut) {
+      failures.push(result.timedOut ? 'multi-file planning dry-run timed out' : `multi-file planning dry-run exited ${result.code}`)
+    } else {
+      try {
+        dryRunResult = JSON.parse(result.stdout)
+      } catch (error) {
+        failures.push(`multi-file planning dry-run returned non-json output: ${error.message}`)
+      }
+    }
+
+    const expectedChanged = [...(scenario.expectChanged ?? [])].sort()
+    const expectedWouldChange = [...(scenario.expectWouldChange ?? [])].sort()
+    const unexpectedChanges = observedChanged.filter((name) => !expectedChanged.includes(name))
+    const missingChanges = expectedChanged.filter((name) => !observedChanged.includes(name))
+    if (unexpectedChanges.length > 0) {
+      failures.push(`unexpected changed files: ${unexpectedChanges.join(', ')}`)
+    }
+    if (missingChanges.length > 0) {
+      failures.push(`expected changed files not changed: ${missingChanges.join(', ')}`)
+    }
+    for (const protectedFile of scenario.protectedFiles ?? []) {
+      if (before.get(protectedFile) !== after.get(protectedFile)) {
+        failures.push(`protected file changed: ${protectedFile}`)
+      }
+    }
+
+    if (dryRunResult) {
+      const actualChanged = [...(dryRunResult.changedFiles ?? [])].sort()
+      const actualWriteIntents = [...(dryRunResult.writeIntents ?? [])].sort()
+      const actualWouldChange = [...(dryRunResult.wouldChangeFiles ?? [])].sort()
+      if (dryRunResult.status !== 'blocked') {
+        failures.push(`expected blocked no-write planning status, observed ${dryRunResult.status}`)
+      }
+      if (dryRunResult.willWrite !== false) {
+        failures.push('dry-run result did not report willWrite=false')
+      }
+      if (dryRunResult.noWriterInvoked !== true) {
+        failures.push('dry-run result did not prove noWriterInvoked=true')
+      }
+      if (actualChanged.length !== 0) {
+        failures.push(`dry-run changedFiles not empty: ${actualChanged.join(', ')}`)
+      }
+      if (actualWriteIntents.length !== 0) {
+        failures.push(`dry-run writeIntents not empty: ${actualWriteIntents.join(', ')}`)
+      }
+      if (actualWouldChange.join(',') !== expectedWouldChange.join(',')) {
+        failures.push(`wouldChangeFiles mismatch: observed=${actualWouldChange.join(',') || 'none'} expected=${expectedWouldChange.join(',') || 'none'}`)
+      }
+      if (dryRunResult.unsupportedCapability?.capability !== 'multi-file-update-candidate-no-write') {
+        failures.push(`unsupported capability mismatch: ${dryRunResult.unsupportedCapability?.capability ?? 'missing'}`)
+      }
+      if (dryRunResult.unsupportedCapability?.blockedReason !== 'multi-file-update-write-not-enabled') {
+        failures.push(`blocked reason mismatch: ${dryRunResult.unsupportedCapability?.blockedReason ?? 'missing'}`)
+      }
+      if (dryRunResult.resultSurface?.failureCategory !== 'candidate-capability-no-write') {
+        failures.push(`failure category mismatch: ${dryRunResult.resultSurface?.failureCategory ?? 'missing'}`)
+      }
+    }
+
+    const planningOutput = formatMultiFilePlanningOutput(dryRunResult, failures)
+    for (const marker of scenario.expectOutputContains ?? []) {
+      if (!planningOutput.includes(marker)) {
+        failures.push(`output missing marker: ${marker}`)
+      }
+    }
+    console.log(planningOutput)
+
+    if (failures.length > 0) {
+      return {
+        capability: scenario.id,
+        provider: scenario.provider,
+        status: 'FAIL',
+        projectDir: scenario.projectDir,
+        sessionId: '(multi-file-update-planning-dry-run)',
+        changedFiles: observedChanged,
+        protectedFiles: scenario.protectedFiles,
+        reportPath,
+        verification: 'blocked',
+        failureCategory: categorizeFailure(failures.join('; '), `${result.output}\n${planningOutput}`, scenario.provider),
+        failureReason: normalizeFailureReason(failures.join('; '), `${result.output}\n${planningOutput}`, scenario.provider),
+        outputTail: summarizeOutput(`${result.output}\n${planningOutput}`),
+        turns: [
+          {
+            turn: 1,
+            mode: 'apply-patch-multi-file-update-planning-dry-run',
+            sessionId: '(multi-file-update-planning-dry-run)',
+            changedFiles: observedChanged,
+            verification: 'blocked',
+            outputTail: summarizeOutput(planningOutput),
+          },
+        ],
+      }
+    }
+
+    return {
+      capability: scenario.id,
+      provider: scenario.provider,
+      status: 'PASS',
+      projectDir: scenario.projectDir,
+      sessionId: '(multi-file-update-planning-dry-run)',
+      changedFiles: observedChanged,
+      protectedFiles: scenario.protectedFiles,
+      reportPath,
+      verification: 'candidate-no-write-planning-passed',
+      failureCategory: 'none',
+      failureReason: '',
+      outputTail: summarizeOutput(planningOutput),
+      turns: [
+        {
+          turn: 1,
+          mode: 'apply-patch-multi-file-update-planning-dry-run',
+          sessionId: '(multi-file-update-planning-dry-run)',
+          changedFiles: observedChanged,
+          verification: 'candidate-no-write-planning-passed',
+          outputTail: summarizeOutput(planningOutput),
+        },
+      ],
+    }
+  } finally {
+    fs.rmSync(scenario.projectDir, { recursive: true, force: true })
+    fs.rmSync(patchDir, { recursive: true, force: true })
+  }
+}
+
+async function runMultiFileUpdatePlanningDryRun({ fixtureDir, patchPath }) {
+  const dryRunModuleUrl = pathToFileURL(
+    path.join(tsShellRoot, 'src', 'orchestration', 'patchResult', 'singleFileApplyPatchDryRun.ts'),
+  ).href
+  const script = `
+    import fs from 'node:fs';
+    import { buildSingleFileApplyPatchDryRun } from ${JSON.stringify(dryRunModuleUrl)};
+    const workspaceRoot = process.argv[1];
+    const patchPath = process.argv[2];
+    const rawPatchText = fs.readFileSync(patchPath, 'utf8');
+    const readFile = (absolutePath) => {
+      try {
+        return fs.readFileSync(absolutePath, 'utf8');
+      } catch {
+        return undefined;
+      }
+    };
+    const directoryExists = (absolutePath) => {
+      try {
+        return fs.statSync(absolutePath).isDirectory();
+      } catch {
+        return false;
+      }
+    };
+    const dryRun = buildSingleFileApplyPatchDryRun({
+      workspaceRoot,
+      rawPatchText,
+      readFile,
+      directoryExists,
+      dryRun: true,
+    });
+    console.log(JSON.stringify({
+      status: dryRun.status,
+      willWrite: dryRun.willWrite,
+      changedFiles: dryRun.changedFiles,
+      wouldChangeFiles: dryRun.wouldChangeFiles,
+      wouldCreateFiles: dryRun.wouldCreateFiles,
+      writeIntents: dryRun.writeIntents,
+      noWriterInvoked: dryRun.noWriterInvoked,
+      doesNotClaimWriteSuccess: dryRun.doesNotClaimWriteSuccess,
+      failedFiles: dryRun.failedFiles,
+      resultSurface: {
+        status: dryRun.resultSurface.status,
+        failureCategory: dryRun.resultSurface.failureCategory,
+        blocker: dryRun.resultSurface.blocker,
+        noWriteProof: dryRun.resultSurface.noWriteProof,
+      },
+      unsupportedCapability: dryRun.unsupportedCapability,
+      evidence: dryRun.evidence,
+      nextAction: dryRun.nextAction,
+    }));
+  `
+  return run(process.execPath, [
+    tsxCliPath,
+    '-e',
+    script,
+    fixtureDir,
+    patchPath,
+  ], {
+    cwd: repoRoot,
+    env: {
+      HOME: syntheticHome,
+      USERPROFILE: syntheticHome,
+      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+    },
+    timeoutMs: 120000,
+  })
+}
+
+function formatMultiFilePlanningOutput(dryRunResult, failures) {
+  if (!dryRunResult) {
+    return [
+      'mode=apply-patch-multi-file-update-planning-dry-run',
+      'status=blocked',
+      'capability=multi-file-update-candidate-no-write',
+      'changedFiles=',
+      'writeIntents=',
+      `failureReason=${failures.join('; ')}`,
+    ].join('\n')
+  }
+  return [
+    'mode=apply-patch-multi-file-update-planning-dry-run',
+    `status=${dryRunResult.status}`,
+    `capability=${dryRunResult.unsupportedCapability?.capability ?? 'missing'}`,
+    `blockedReason=${dryRunResult.unsupportedCapability?.blockedReason ?? 'missing'}`,
+    `wouldChangeFiles=${(dryRunResult.wouldChangeFiles ?? []).join(',')}`,
+    `changedFiles=${(dryRunResult.changedFiles ?? []).join(',')}`,
+    `writeIntents=${(dryRunResult.writeIntents ?? []).join(',')}`,
+    `willWrite=${dryRunResult.willWrite}`,
+    `noWriterInvoked=${dryRunResult.noWriterInvoked}`,
+    `failureCategory=${dryRunResult.resultSurface?.failureCategory ?? 'missing'}`,
+    `explanation=${dryRunResult.unsupportedCapability?.explanation ?? ''}`,
+    `nextAction=${dryRunResult.nextAction ?? ''}`,
+    'no-write planning: multi-file write not enabled',
+  ].join('\n')
 }
 
 function writeReport(report) {

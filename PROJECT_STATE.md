@@ -120,8 +120,10 @@ Key boundaries:
   `willWrite=false`, and no selected-workspace writer is reachable
 - failed preflight paths keep file-level failure detail for missing targets,
   workspace-boundary violations, and hunk/context mismatches
-- `verify-real-user-capabilities` records this as candidate no-write metadata;
-  default MVP remains selected-workspace existing-file single-file update
+- `verify-real-user-capabilities` includes an executable synthetic candidate
+  smoke, `synthetic-selected-workspace-multi-file-update-planning`, that proves
+  this planning path without changing fixture file contents; default MVP remains
+  selected-workspace existing-file single-file update
 - broader apply_patch, multi-file writing, add/delete/move, rollback,
   provider/auth, CLI/session schema, and default gates remain unchanged
 
