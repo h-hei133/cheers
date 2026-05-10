@@ -134,6 +134,12 @@ Key boundaries:
   candidate smoke that routes exactly two existing-file Update File operations
   through the explicit selected-workspace write entrypoint and verifies both
   changed files
+- `verify-real-user-capabilities` includes
+  `synthetic-selected-workspace-two-file-update-partial-failure`, an executable
+  synthetic candidate smoke that makes the second target unwritable to prove
+  partial failure stays stopped, reports only the verified first file in
+  `changedFiles`, reports the failed second file in `failedFiles`, and does not
+  claim success, rollback, or atomicity
 - `verify-real-user-capabilities` exposes an explicit opt-in real-provider
   candidate smoke, `real-selected-workspace-two-file-update`, which asks the
   provider for exactly one patch block with exactly two Update File operations

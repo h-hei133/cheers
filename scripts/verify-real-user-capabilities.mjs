@@ -420,6 +420,66 @@ const scenarios = [
     ],
   },
   {
+    id: 'synthetic-selected-workspace-two-file-update-partial-failure',
+    tier: 'candidate',
+    provider: 'synthetic',
+    execution: 'apply-patch-workspace-write-cli',
+    expectedCapability: 'selected-workspace exactly two-file Update File partial failure surface',
+    currentSupportedCapability: 'candidate write route stops truthfully when the second sequential write fails after the first file is verified',
+    reasonForTier: 'Candidate because it intentionally exercises partial failure in the exactly-two-file write route; it is not a mutation success case and must not enter the default MVP gate.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+    projectDir: path.join(testRoot, `pca-capability-gate-candidate-two-file-partial-${runId}`),
+    files: {
+      'src/a.ts': 'a\n',
+      'src/b.ts': 'b\n',
+      'LOCKED.md': 'locked\n',
+    },
+    protectedFiles: ['LOCKED.md'],
+    readOnlyBeforeRun: ['src/b.ts'],
+    patchText: [
+      '*** Begin Patch',
+      '*** Update File: src/a.ts',
+      '@@',
+      '-a',
+      '+aa',
+      '*** Update File: src/b.ts',
+      '@@',
+      '-b',
+      '+bb',
+      '*** End Patch',
+    ].join('\n'),
+    expectTerminal: 'stopped',
+    expectWriteEffect: 'unknown',
+    expectChanged: ['src/a.ts'],
+    expectFailedFiles: ['src/b.ts'],
+    expectUnchanged: ['src/b.ts'],
+    expectContains: {
+      'src/a.ts': ['aa'],
+      'src/b.ts': ['b'],
+    },
+    expectExactContent: {
+      'src/a.ts': 'aa\n',
+      'src/b.ts': 'b\n',
+    },
+    expectOutputContains: [
+      'Outcome: stopped',
+      'BlockerKind: partial-mutation-failed',
+      'Changed files: src/a.ts',
+      'Failed files: src/b.ts',
+      'Inspect/re-read both attempted files before retrying',
+      'no rollback was attempted',
+    ],
+    expectOutputNotContains: [
+      'Outcome: success',
+      'apply_patch multi-file workspace write succeeded',
+      'atomic rollback',
+      'rollback succeeded',
+      'Changed files: src/a.ts, src/b.ts',
+    ],
+  },
+  {
     id: 'synthetic-single-file-protected-verify',
     tier: 'backlog',
     provider: 'synthetic',
@@ -941,6 +1001,27 @@ function prepareProject(scenario) {
     const absolutePath = path.join(scenario.projectDir, relativePath)
     fs.mkdirSync(path.dirname(absolutePath), { recursive: true })
     fs.writeFileSync(absolutePath, content, 'utf8')
+  }
+}
+
+function applyScenarioFilePermissions(scenario) {
+  const readonlyFiles = scenario.readOnlyBeforeRun ?? []
+  const restored = []
+  for (const relativePath of readonlyFiles) {
+    const absolutePath = path.join(scenario.projectDir, relativePath)
+    fs.chmodSync(absolutePath, 0o444)
+    restored.push(absolutePath)
+  }
+
+  return () => {
+    for (const absolutePath of restored) {
+      if (!fs.existsSync(absolutePath)) continue
+      try {
+        fs.chmodSync(absolutePath, 0o644)
+      } catch {
+        // Best-effort cleanup before the temporary fixture is removed.
+      }
+    }
   }
 }
 
@@ -1582,6 +1663,7 @@ async function runScenario(scenario) {
 
 async function runApplyPatchWorkspaceWriteScenario(scenario) {
   prepareProject(scenario)
+  let restoreScenarioPermissions = () => {}
   const runtimeHome = path.join(testRoot, 'real-user-capabilities-runtime-home', `${scenario.id}-${runId}`)
   const auditLogPath = path.join(testRoot, 'real-user-capabilities-audit', `${scenario.id}-${runId}`, 'permissions.jsonl')
   fs.rmSync(runtimeHome, { recursive: true, force: true })
@@ -1590,6 +1672,7 @@ async function runApplyPatchWorkspaceWriteScenario(scenario) {
   fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
 
   try {
+    restoreScenarioPermissions = applyScenarioFilePermissions(scenario)
     const before = snapshot(scenario.projectDir)
     const result = await runApplyPatchWorkspaceWriteCli({
       fixtureDir: scenario.projectDir,
@@ -1601,18 +1684,28 @@ async function runApplyPatchWorkspaceWriteScenario(scenario) {
     const observedChanged = changedFiles(before, after)
     const expectedChanged = [...(scenario.expectChanged ?? [])].sort()
     const failures = []
+    const expectStopped = scenario.expectTerminal === 'stopped'
     const unexpectedChanges = observedChanged.filter((name) => !expectedChanged.includes(name))
     const missingChanges = expectedChanged.filter((name) => !observedChanged.includes(name))
     if (result.code !== 0 || result.timedOut) {
       failures.push(result.timedOut ? 'workspace write CLI timed out' : `workspace write CLI exited ${result.code}`)
     }
-    const successMarker =
-      scenario.expectOutputContains?.[0] ?? 'apply_patch workspace write succeeded'
-    if (!new RegExp(escapeRegExp(successMarker), 'i').test(result.output)) {
-      failures.push(`workspace success marker missing: ${successMarker}`)
-    }
-    if (!/success/i.test(result.output)) {
-      failures.push('terminal success marker missing')
+    if (expectStopped) {
+      if (!/Outcome:\s*stopped/i.test(result.output)) {
+        failures.push('terminal stopped marker missing')
+      }
+      if (/Outcome:\s*success/i.test(result.output)) {
+        failures.push('terminal success marker present on expected stopped path')
+      }
+    } else {
+      const successMarker =
+        scenario.expectOutputContains?.[0] ?? 'apply_patch workspace write succeeded'
+      if (!new RegExp(escapeRegExp(successMarker), 'i').test(result.output)) {
+        failures.push(`workspace success marker missing: ${successMarker}`)
+      }
+      if (!/success/i.test(result.output)) {
+        failures.push('terminal success marker missing')
+      }
     }
     if (unexpectedChanges.length > 0) {
       failures.push(`unexpected changed files: ${unexpectedChanges.join(', ')}`)
@@ -1637,10 +1730,23 @@ async function runApplyPatchWorkspaceWriteScenario(scenario) {
         }
       }
     }
+    for (const relativePath of scenario.expectUnchanged ?? []) {
+      if (before.get(relativePath) !== after.get(relativePath)) {
+        failures.push(`expected file to remain unchanged: ${relativePath}`)
+      }
+    }
     for (const [relativePath, expectedContent] of Object.entries(scenario.expectExactContent ?? {})) {
       const content = after.get(relativePath)
       if (content !== expectedContent) {
         failures.push(`exact content mismatch for ${relativePath}`)
+      }
+    }
+    for (const failedFile of scenario.expectFailedFiles ?? []) {
+      if (!new RegExp(`Failed files:[^\\n]*${escapeRegExp(failedFile)}`, 'i').test(result.output)) {
+        failures.push(`failed file marker missing: ${failedFile}`)
+      }
+      if (new RegExp(`Changed files:[^\\n]*${escapeRegExp(failedFile)}`, 'i').test(result.output)) {
+        failures.push(`failed file was reported as changed: ${failedFile}`)
       }
     }
     for (const marker of scenario.expectOutputContains ?? []) {
@@ -1662,6 +1768,9 @@ async function runApplyPatchWorkspaceWriteScenario(scenario) {
         projectDir: scenario.projectDir,
         sessionId: '(workspace-write-cli)',
         changedFiles: observedChanged,
+        failedFiles: scenario.expectFailedFiles ?? [],
+        writeEffect: scenario.expectWriteEffect ?? (expectStopped ? 'unknown' : 'verified'),
+        terminalClassification: expectStopped ? 'stopped' : 'success',
         protectedFiles: scenario.protectedFiles,
         reportPath,
         verification: 'blocked',
@@ -1674,6 +1783,9 @@ async function runApplyPatchWorkspaceWriteScenario(scenario) {
             mode: 'apply-patch-workspace-write-cli',
             sessionId: '(workspace-write-cli)',
             changedFiles: observedChanged,
+            failedFiles: scenario.expectFailedFiles ?? [],
+            writeEffect: scenario.expectWriteEffect ?? (expectStopped ? 'unknown' : 'verified'),
+            terminalClassification: expectStopped ? 'stopped' : 'success',
             verification: 'blocked',
             outputTail: summarizeOutput(result.output),
           },
@@ -1688,6 +1800,9 @@ async function runApplyPatchWorkspaceWriteScenario(scenario) {
       projectDir: scenario.projectDir,
       sessionId: '(workspace-write-cli)',
       changedFiles: observedChanged,
+      failedFiles: scenario.expectFailedFiles ?? [],
+      writeEffect: scenario.expectWriteEffect ?? (expectStopped ? 'unknown' : 'verified'),
+      terminalClassification: expectStopped ? 'stopped' : 'success',
       protectedFiles: scenario.protectedFiles,
       reportPath,
       verification: 'passed',
@@ -1699,12 +1814,16 @@ async function runApplyPatchWorkspaceWriteScenario(scenario) {
           mode: 'apply-patch-workspace-write-cli',
           sessionId: '(workspace-write-cli)',
           changedFiles: observedChanged,
+          failedFiles: scenario.expectFailedFiles ?? [],
+          writeEffect: scenario.expectWriteEffect ?? (expectStopped ? 'unknown' : 'verified'),
+          terminalClassification: expectStopped ? 'stopped' : 'success',
           verification: 'passed',
           outputTail: summarizeOutput(result.output),
         },
       ],
     }
   } finally {
+    restoreScenarioPermissions()
     fs.rmSync(scenario.projectDir, { recursive: true, force: true })
     fs.rmSync(runtimeHome, { recursive: true, force: true })
     fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
