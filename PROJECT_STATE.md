@@ -105,27 +105,33 @@ Key boundaries:
   `apply_patch`, delete/move, multi-file, rollback, provider/auth, and
   default real-provider create execution remain unchanged
 
-### Current closeout: multi-file Update File no-write planning
+### Current closeout: multi-file Update File candidate write route
 
 Selected-workspace multi-file `*** Update File` now has a synthetic candidate
-planning/preflight classification for exactly two existing files.
+write route for exactly two existing files, plus the earlier no-write
+planning/preflight classification.
 
 Key boundaries:
 
-- the planner accepts exactly two Update File operations and rejects add,
-  delete, move, mixed, and 3+ file patches
-- both targets must resolve inside the selected workspace and pass existing-file
-  update verification before the planner reports `wouldChangeFiles`
-- the path is no-write only: `changedFiles=[]`, `writeIntents=[]`,
-  `willWrite=false`, and no selected-workspace writer is reachable
-- failed preflight paths keep file-level failure detail for missing targets,
-  workspace-boundary violations, and hunk/context mismatches
+- the write route accepts exactly two Update File operations and rejects add,
+  delete, move, mixed, duplicate-target, and 3+ file patches
+- both targets must resolve inside the selected workspace, be existing regular
+  files, pass update verification, and pass final freshness checks before the
+  first writer call
+- writing is sequential after explicit approval for exactly the two listed
+  files; no rollback or atomic transaction is claimed
+- per-file post-write readback verification controls `changedFiles`; partial
+  failure stops instead of success, keeps only verified files in `changedFiles`,
+  and reports the failed file in `failedFiles`
+- approval denied, missing targets, workspace-boundary violations,
+  hunk/context mismatches, and final stale-read failures stay no-write with
+  `changedFiles=[]`
 - `verify-real-user-capabilities` includes an executable synthetic candidate
-  smoke, `synthetic-selected-workspace-multi-file-update-planning`, that proves
-  this planning path without changing fixture file contents; default MVP remains
-  selected-workspace existing-file single-file update
-- broader apply_patch, multi-file writing, add/delete/move, rollback,
-  provider/auth, CLI/session schema, and default gates remain unchanged
+  smoke, `synthetic-selected-workspace-multi-file-update-planning`, that remains
+  a no-write planning smoke; the new write route is covered by focused route,
+  writer, and result tests
+- broader apply_patch, add/delete/move, 3+ files, rollback, provider/auth,
+  CLI/session schema, real-provider smokes, and default gates remain unchanged
 
 ### Current closeout: mutation verification handoff projection
 
