@@ -119,6 +119,7 @@ work:
 | Synthetic two-file update write smoke | `npm run verify:real-user-capabilities -- --case=synthetic-selected-workspace-two-file-update` | Explicit candidate evidence | Synthetic selected-workspace exactly two-file Update File write through the explicit workspace-write entrypoint. It updates two existing files with readback-verified `changedFiles`, remains outside default MVP, and does not enable 3+ files, add/delete/move, rollback, real provider, or broad `apply_patch`. |
 | Real single-file provider smoke | `npm run verify:real-user-capabilities:real-single-file` | Explicit opt-in candidate evidence | Real provider model turn plus isolated selected-workspace existing-file single-file update. It is not part of default MVP, and it does not enable create/add/delete/move/multi-file/rollback or broader `apply_patch`. |
 | Real Add File create provider smoke | `npm run verify:real-user-capabilities:real-create` | Explicit opt-in candidate evidence | Real provider model turn plus isolated selected-workspace single-file Add File create. It is not part of default MVP, and it does not enable multi-file/delete/move/rollback, parent directory creation, or broader `apply_patch`. |
+| Real two-file update provider smoke | `npm run verify:real-user-capabilities:real-two-file` | Explicit opt-in candidate evidence | Real provider model turn plus isolated selected-workspace exactly two-file Update File write. It is not part of default MVP, uses `provider.env` only through silent opt-in loading, and does not enable 3+ files, add/delete/move, rollback, or broader `apply_patch`. |
 | Focused regression guard | `npm run test -w packages/ts-shell -- <file> -t "<case>"` | Required when the current bounded slice added or changed a focused guard | Proves the exact behavior being closed without treating legacy wide tests as release blockers. |
 | Release core | `npm run verify:release:core` | Broader deterministic release gate | Runs the hard gate set listed above; use before release handoff or when changing shared CLI/runtime contracts. |
 
@@ -395,6 +396,35 @@ print, copy, log, or summarize provider secrets or values. `--list`,
 show the case metadata without touching the real provider. This smoke does not
 open broader `apply_patch`, parent directory creation, multi-file, delete/move,
 rollback, provider/auth flow, CLI/session schema, or the default MVP gate.
+
+### Real two-file Update File capability smoke
+
+`npm run verify:real-user-capabilities:real-two-file` is a candidate-only,
+explicit opt-in smoke for real-provider dogfood of the narrow selected-workspace
+exactly-two-file Update File route.
+
+Required boundary:
+
+- one real-provider model turn may produce exactly one `apply_patch` block
+- the patch must contain exactly two `*** Update File` operations for
+  `src/a.ts` and `src/b.ts`
+- the isolated fixture contains only two existing target files
+- the route may update only those two files; no create/add, delete, move,
+  rename, 3+ files, protected composite, or rollback is enabled
+- post-write verification must prove both files changed to the deterministic
+  planned content before `changedFiles=[src/a.ts,src/b.ts]` appears
+- provider/preflight, missing patch, multiple patch blocks, unsupported patch
+  shape, generated Add/Delete/Move, wrong target, deterministic content
+  mismatch, route rejection, no mutation, partial mutation failure, post-write
+  verification failure, and redaction failure remain separately attributable
+
+Run it only with explicit real-provider opt-in and isolated test homes. If
+`provider.env` is used, load it silently in the command environment; never
+print, copy, log, or summarize provider secrets or values. `--list`,
+`--tier=candidate --dry-run`, and `--case=real-selected-workspace-two-file-update --dry-run`
+show the case metadata without touching the real provider. This smoke does not
+open broader `apply_patch`, 3+ files, create/add, delete/move, rollback,
+provider/auth flow, CLI/session schema, or the default MVP gate.
 
 ## Suggested debug reading order
 

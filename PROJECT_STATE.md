@@ -134,6 +134,11 @@ Key boundaries:
   candidate smoke that routes exactly two existing-file Update File operations
   through the explicit selected-workspace write entrypoint and verifies both
   changed files
+- `verify-real-user-capabilities` exposes an explicit opt-in real-provider
+  candidate smoke, `real-selected-workspace-two-file-update`, which asks the
+  provider for exactly one patch block with exactly two Update File operations
+  and routes only that patch through the isolated selected-workspace two-file
+  update entrypoint
 - broader apply_patch, add/delete/move, 3+ files, rollback, provider/auth,
   CLI/session schema, real-provider smokes, and default gates remain unchanged
 

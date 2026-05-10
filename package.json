@@ -62,6 +62,7 @@
     "verify:real-user-capabilities:candidates": "node scripts/verify-real-user-capabilities.mjs --tier=candidate",
     "verify:real-user-capabilities:real-single-file": "node scripts/verify-real-user-capabilities.mjs --case=real-selected-workspace-single-file-update",
     "verify:real-user-capabilities:real-create": "node scripts/verify-real-user-capabilities.mjs --case=real-selected-workspace-single-file-create",
+    "verify:real-user-capabilities:real-two-file": "node scripts/verify-real-user-capabilities.mjs --case=real-selected-workspace-two-file-update",
     "verify:real-user-capabilities:release": "node scripts/verify-real-user-capabilities.mjs --tier=release",
     "verify:real-user-capabilities:backlog": "node scripts/verify-real-user-capabilities.mjs --tier=backlog",
     "verify:real-user-capabilities:all": "node scripts/verify-real-user-capabilities.mjs --tier=all",

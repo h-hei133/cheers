@@ -31,6 +31,13 @@ import {
   snapshotSingleFileCreateFixture,
 } from './real-provider-single-file-create-fixture.mjs'
 import {
+  cleanupTwoFileUpdateFixture,
+  compareTwoFileUpdateSnapshots,
+  createTwoFileUpdateFixture,
+  readTwoFileUpdateTargets,
+  snapshotTwoFileUpdateFixture,
+} from './real-provider-two-file-update-fixture.mjs'
+import {
   assertOnlyExpectedCodingFixtureChanges,
   buildCodingFlowDryRunContract,
   cleanupCodingFlowFixture,
@@ -67,6 +74,7 @@ const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const tierValues = ['mvp', 'candidate', 'release', 'backlog', 'all']
 const realSingleFileUpdateCaseId = 'real-selected-workspace-single-file-update'
 const realSingleFileCreateCaseId = 'real-selected-workspace-single-file-create'
+const realTwoFileUpdateCaseId = 'real-selected-workspace-two-file-update'
 const selectedTier = parseTierArg(process.argv)
 const selectedCaseId = parseCaseArg(process.argv)
 const includeCandidates = process.argv.includes('--include-candidates')
@@ -603,6 +611,20 @@ const tierDescriptorCases = [
     expectedCapability: 'real provider selected-workspace single-file Add File create',
     currentSupportedCapability: 'selected-workspace single-file Add File create only',
     reasonForTier: 'Candidate opt-in because it asks a real provider to emit exactly one Add File patch and routes it through the narrow selected-workspace create route without changing the default MVP gate.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: true,
+    expectedToPassCurrentMvp: false,
+    expectedToPassInCurrentMVP: false,
+  },
+  {
+    id: realTwoFileUpdateCaseId,
+    tier: 'candidate',
+    provider: 'real',
+    executable: false,
+    manualFlag: `--case=${realTwoFileUpdateCaseId}`,
+    expectedCapability: 'real provider selected-workspace exactly-2 Update File write',
+    currentSupportedCapability: 'selected-workspace exactly-2 existing-file Update File only',
+    reasonForTier: 'Candidate opt-in because it asks a real provider to emit exactly two Update File operations and routes them through the narrow selected-workspace two-file update route without changing the default MVP gate.',
     drivesApplyPatchExpansion: false,
     requiresRealProvider: true,
     expectedToPassCurrentMvp: false,
@@ -2369,6 +2391,9 @@ function printHelp() {
   console.log(`  --case=${realSingleFileCreateCaseId}`)
   console.log('    Opt-in only; runs one real-provider model turn and creates only one new file in an isolated selected workspace.')
   console.log('    Excluded from default MVP verification; does not enable multi-file/delete/move/rollback, parent directory creation, or broader apply_patch.')
+  console.log(`  --case=${realTwoFileUpdateCaseId}`)
+  console.log('    Opt-in only; runs one real-provider model turn and writes exactly two existing files in an isolated selected workspace.')
+  console.log('    Excluded from default MVP verification; does not enable 3+ files, create/add/delete/move/rollback, or broader apply_patch.')
   console.log('  --real-readonly-coding-preflight')
   console.log('    Opt-in only; readiness preflight only; no model turn.')
   console.log('  --real-readonly-coding-smoke')
@@ -8969,6 +8994,19 @@ function statusDetailForRealSingleFileCreateFailureCategory(failureCategory) {
   return 'passed'
 }
 
+function statusDetailForRealTwoFileUpdateFailureCategory(failureCategory) {
+  if (failureCategory === 'provider/preflight') return 'provider-preflight'
+  if (failureCategory === 'model output') return 'model-output'
+  if (failureCategory === 'unsupported patch') return 'unsupported-patch'
+  if (failureCategory === 'route rejected') return 'route-rejected'
+  if (failureCategory === 'verification-blocked') return 'verification-blocked'
+  if (failureCategory === 'no mutation') return 'no-mutation'
+  if (failureCategory === 'partial mutation failed') return 'partial-mutation-failed'
+  if (failureCategory === 'post-write verification failed') return 'post-write-verification-failed'
+  if (failureCategory === 'redaction failure') return 'redaction-failure'
+  return 'passed'
+}
+
 function classifySingleFileUpdatePatchShape(patchText) {
   const normalized = String(patchText ?? '').replace(/\r\n/g, '\n')
   const updateFiles = [...normalized.matchAll(/^\*\*\* Update File:\s+(.+)$/gm)]
@@ -8998,6 +9036,49 @@ function classifySingleFileUpdatePatchShape(patchText) {
     return {
       ok: false,
       reason: 'unsupported patch: expected deterministic draft-to-ready hunk for src/app.ts',
+    }
+  }
+  return { ok: true, reason: '' }
+}
+
+function classifyTwoFileUpdatePatchShape(patchText, fixture) {
+  const normalized = String(patchText ?? '').replace(/\r\n/g, '\n')
+  const updateFiles = [...normalized.matchAll(/^\*\*\* Update File:\s+(.+)$/gm)]
+    .map((match) => match[1].trim())
+  const addFiles = [...normalized.matchAll(/^\*\*\* Add File:\s+(.+)$/gm)]
+    .map((match) => match[1].trim())
+  const deleteFiles = [...normalized.matchAll(/^\*\*\* Delete File:\s+(.+)$/gm)]
+    .map((match) => match[1].trim())
+  const hasMove = /^\*\*\* Move to:/m.test(normalized)
+
+  if (addFiles.length > 0 || deleteFiles.length > 0 || hasMove) {
+    return {
+      ok: false,
+      reason: `unsupported patch: generated Add/Delete/Move outside the two-file update smoke boundary add=${addFiles.join(',') || 'none'} delete=${deleteFiles.join(',') || 'none'} move=${hasMove}`,
+    }
+  }
+  if (updateFiles.length !== 2) {
+    return {
+      ok: false,
+      reason: `unsupported patch: expected exactly two Update File operations for ${fixture.targetPaths.join(',')}, observed ${updateFiles.join(',') || 'none'}`,
+    }
+  }
+  const expected = fixture.targetPaths.join(',')
+  if (updateFiles.join(',') !== expected) {
+    return {
+      ok: false,
+      reason: `unsupported patch: wrong Update File targets ${updateFiles.join(',')}; expected ${expected}`,
+    }
+  }
+  if (
+    !normalized.includes('-export const alpha = "draft"') ||
+    !normalized.includes('+export const alpha = "ready"') ||
+    !normalized.includes('-export const beta = "draft"') ||
+    !normalized.includes('+export const beta = "ready"')
+  ) {
+    return {
+      ok: false,
+      reason: 'unsupported patch: expected deterministic draft-to-ready hunks for src/a.ts and src/b.ts',
     }
   }
   return { ok: true, reason: '' }
@@ -9081,6 +9162,16 @@ function buildRealSingleFileCreateFailure({ category, reason, status = 'FAIL', s
   }
 }
 
+function buildRealTwoFileUpdateFailure({ category, reason, status = 'FAIL', statusDetail, exitCode = 1 }) {
+  return {
+    status,
+    statusDetail: statusDetail ?? statusDetailForRealTwoFileUpdateFailureCategory(category),
+    exitCode,
+    failureCategory: category,
+    failureReason: reason,
+  }
+}
+
 function writeRealSingleFileUpdateReport(fields) {
   writeReport({
     generatedAt: new Date().toISOString(),
@@ -9113,6 +9204,399 @@ function writeRealSingleFileCreateReport(fields) {
     expectedToPassInCurrentMVP: false,
     ...fields,
   })
+}
+
+function writeRealTwoFileUpdateReport(fields) {
+  writeReport({
+    generatedAt: new Date().toISOString(),
+    capability: realTwoFileUpdateCaseId,
+    provider: 'real',
+    mode: 'opt-in-case',
+    tier: 'candidate',
+    reportPath,
+    expectedCapability: 'real provider selected-workspace exactly-2 Update File write',
+    currentSupportedCapability: 'selected-workspace exactly-2 existing-file Update File only',
+    drivesApplyPatchExpansion: false,
+    expectedToPassCurrentMvp: false,
+    expectedToPassInCurrentMVP: false,
+    ...fields,
+  })
+}
+
+async function runRealSelectedWorkspaceTwoFileUpdate() {
+  console.log(`mode=${realTwoFileUpdateCaseId}`)
+  console.log('status taxonomy: pass=0 product-regression=1 provider-network-inconclusive=2 config-failure=3')
+  console.log('real-provider=explicit-opt-in')
+  console.log('homeRead=false')
+  console.log('defaultSmoke=skipped')
+  console.log('realProviderHome=config-only')
+  console.log('writeScope=isolated-selected-workspace-exactly-two-existing-files')
+  console.log('mutationBoundary=update-only exactly-two-files no-create no-delete no-move no-3plus no-rollback')
+
+  if (!realHome) {
+    const failure = buildRealTwoFileUpdateFailure({
+      category: 'provider/preflight',
+      reason: 'provider/preflight: set PRIVATE_AGENTS_REAL_HOME before running real selected-workspace two-file update smoke',
+      status: 'CONFIG',
+      exitCode: 3,
+    })
+    writeRealTwoFileUpdateReport({
+      ...failure,
+      realProviderExecution: false,
+      modelTurn: false,
+      changedFiles: [],
+      failedFiles: [],
+      writeIntents: [],
+      workspaceWriterInvoked: false,
+    })
+    console.log(`[CONFIG] ${realTwoFileUpdateCaseId} status=${failure.statusDetail}`)
+    process.exitCode = failure.exitCode
+    return
+  }
+
+  const repoBefore = await readRepoStatusShort()
+  if (!repoBefore.ok || repoBefore.status) {
+    const failure = buildRealTwoFileUpdateFailure({
+      category: 'verification-blocked',
+      reason: repoBefore.ok
+        ? 'verification-blocked: repository was not clean before opt-in real two-file update smoke'
+        : 'verification-blocked: repository status could not be checked before opt-in real two-file update smoke',
+    })
+    writeRealTwoFileUpdateReport({
+      ...failure,
+      realProviderExecution: false,
+      modelTurn: false,
+      changedFiles: [],
+      failedFiles: [],
+      writeIntents: [],
+      workspaceWriterInvoked: false,
+      outputTail: repoBefore.outputTail,
+    })
+    console.log(`[FAIL] ${realTwoFileUpdateCaseId} status=${failure.statusDetail}`)
+    console.log(`failureReason=${failure.failureReason}`)
+    process.exitCode = failure.exitCode
+    return
+  }
+
+  const preflight = await runProviderReadinessPreflight()
+  const preflightStatus = buildCodingFlowPreflightStatus(preflight)
+  console.log(`[${preflightStatus.status}] real-two-file-update-preflight status=${preflightStatus.statusDetail}`)
+  if (!preflight.ok) {
+    const failure = buildRealTwoFileUpdateFailure({
+      category: 'provider/preflight',
+      reason: preflightStatus.failureReason,
+      status: preflightStatus.status,
+      statusDetail: preflightStatus.statusDetail,
+      exitCode: preflightStatus.exitCode,
+    })
+    writeRealTwoFileUpdateReport({
+      ...failure,
+      realProviderExecution: true,
+      modelTurn: false,
+      providerReadiness: preflight,
+      changedFiles: [],
+      failedFiles: [],
+      writeIntents: [],
+      workspaceWriterInvoked: false,
+      outputTail: preflight.outputTail,
+    })
+    process.exitCode = failure.exitCode
+    return
+  }
+
+  const smokeRunId = `${realTwoFileUpdateCaseId}-${Date.now()}`
+  const runtimeHome = getRealCodingFlowRuntimeHome(`${smokeRunId}-runtime`)
+  const auditLogPath = getRealCodingFlowAuditLogPath(`${smokeRunId}-audit`)
+  assertSafeCodingFlowRuntimeHome(runtimeHome)
+  assertSafeCodingFlowRuntimeHome(path.dirname(auditLogPath))
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+
+  const fixture = createTwoFileUpdateFixture()
+  try {
+    const before = snapshotTwoFileUpdateFixture(fixture.fixtureDir)
+    const beforeTargets = readTwoFileUpdateTargets(fixture.fixtureDir)
+    const providerResult = await runApplyPatchDryRunProviderTurn({
+      prompt: fixture.prompt,
+      runtimeHome,
+      realHome,
+      fixtureDir: fixture.fixtureDir,
+      auditLogPath,
+    })
+    const redaction = redactAndAssertCodingProviderOutput(providerResult.rawOutput || providerResult.output)
+    const redactedProviderOutput = redactAndAssertCodingProviderOutput(providerResult.output).redacted
+    const providerFailure = classifyProviderReadinessFailure(
+      `real two-file update model turn exited ${providerResult.code}`,
+      redaction.redacted,
+      'real',
+    )
+
+    let cliResult = undefined
+    const extracted = extractSingleApplyPatchBlock(redactedProviderOutput)
+    const patchShape = extracted.status === 'ok'
+      ? classifyTwoFileUpdatePatchShape(extracted.patchText, fixture)
+      : { ok: false, reason: '' }
+
+    if (providerResult.code === 0 && !providerResult.timedOut && !providerFailure && extracted.status === 'ok' && patchShape.ok) {
+      cliResult = await runApplyPatchWorkspaceWriteCli({
+        fixtureDir: fixture.fixtureDir,
+        patchText: extracted.patchText,
+        runtimeHome,
+        auditLogPath,
+      })
+    }
+
+    const after = snapshotTwoFileUpdateFixture(fixture.fixtureDir)
+    const afterTargets = readTwoFileUpdateTargets(fixture.fixtureDir)
+    const comparison = compareTwoFileUpdateSnapshots(before, after)
+    const repoAfter = await readRepoStatusShort()
+    const cliRedaction = redactAndAssertCodingProviderOutput(cliResult?.output ?? '')
+    const redactionOk = redaction.ok && cliRedaction.ok
+    const repositoryClean = repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status
+
+    if (providerFailure || providerResult.code !== 0 || providerResult.timedOut) {
+      const providerStatus = buildCodingFlowSmokeFailureStatus(providerResult, redaction.redacted, redaction)
+      const failure = buildRealTwoFileUpdateFailure({
+        category: 'provider/preflight',
+        reason: providerStatus.failureReason,
+        status: providerStatus.status,
+        statusDetail: providerStatus.statusDetail,
+        exitCode: providerStatus.exitCode,
+      })
+      writeRealTwoFileUpdateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        changedFiles: [],
+        failedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        outputTail: summarizeOutput(redaction.redacted),
+      })
+      console.log(`[${failure.status}] ${realTwoFileUpdateCaseId} status=${failure.statusDetail}`)
+      if (redaction.redacted) console.log(summarizeOutput(redaction.redacted))
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    if (!redactionOk) {
+      const failure = buildRealTwoFileUpdateFailure({
+        category: 'redaction failure',
+        reason: `redaction failure: ${[...redaction.leaks, ...cliRedaction.leaks].join(',') || 'unknown'}`,
+      })
+      writeRealTwoFileUpdateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        changedFiles: [],
+        failedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        redaction: { ok: false, leaks: [...redaction.leaks, ...cliRedaction.leaks] },
+      })
+      console.log(`[FAIL] ${realTwoFileUpdateCaseId} status=${failure.statusDetail}`)
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    if (extracted.status !== 'ok') {
+      const failure = buildRealTwoFileUpdateFailure({
+        category: 'model output',
+        reason: `model output: provider output did not contain exactly one apply_patch block (${extracted.status})`,
+        statusDetail: extracted.status,
+      })
+      writeRealTwoFileUpdateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        failedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        outputTail: summarizeOutput(redactedProviderOutput),
+      })
+      console.log(`[FAIL] ${realTwoFileUpdateCaseId} status=${failure.statusDetail}`)
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    if (!patchShape.ok) {
+      const failure = buildRealTwoFileUpdateFailure({
+        category: 'unsupported patch',
+        reason: patchShape.reason,
+      })
+      writeRealTwoFileUpdateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        failedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        outputTail: summarizeOutput(redactedProviderOutput),
+      })
+      console.log(`[FAIL] ${realTwoFileUpdateCaseId} status=${failure.statusDetail}`)
+      console.log(`failureReason=${failure.failureReason}`)
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    const cliOutput = cliResult?.output ?? ''
+    const cliPassed = cliResult?.code === 0 &&
+      !cliResult.timedOut &&
+      /apply_patch multi-file workspace write succeeded/i.test(cliOutput) &&
+      /Changed: src\/a\.ts, src\/b\.ts/i.test(cliOutput) &&
+      /Verified: each written file matched the approved Update File content/i.test(cliOutput) &&
+      /success/i.test(cliOutput) &&
+      !/atomic rollback|rollback succeeded/i.test(cliOutput)
+    if (!cliPassed) {
+      const partial = /multi-file workspace write stopped|partial|Failed:\s*src\//i.test(cliOutput)
+      const unsupported = /unsupported|not supported|only supports|failed to parse|cannot apply|rejected/i.test(cliOutput)
+      const failure = buildRealTwoFileUpdateFailure({
+        category: partial ? 'partial mutation failed' : unsupported ? 'route rejected' : 'verification-blocked',
+        reason: partial
+          ? `partial mutation failed: workspace route stopped without verified success (${summarizeOutput(cliOutput)})`
+          : unsupported
+            ? `route rejected: workspace two-file update route rejected the provider patch (${summarizeOutput(cliOutput)})`
+            : `verification-blocked: workspace two-file update CLI did not complete successfully code=${cliResult?.code ?? 'missing'} timedOut=${cliResult?.timedOut ?? 'missing'}`,
+      })
+      writeRealTwoFileUpdateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        applyPatchBlocks: extracted.count,
+        changedFiles: comparison.changed,
+        failedFiles: partial ? fixture.targetPaths.filter((targetPath) => !comparison.changed.includes(targetPath)) : [],
+        writeIntents: fixture.targetPaths,
+        workspaceWriterInvoked: Boolean(cliResult),
+        outputTail: summarizeOutput(cliRedaction.redacted || redactedProviderOutput),
+      })
+      console.log(`[FAIL] ${realTwoFileUpdateCaseId} status=${failure.statusDetail}`)
+      console.log(`failureReason=${failure.failureReason}`)
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    const targetChanged = fixture.targetPaths.every(
+      (targetPath) => beforeTargets[targetPath] !== afterTargets[targetPath],
+    )
+    const onlyTargetsChanged = comparison.added.length === 0 &&
+      comparison.removed.length === 0 &&
+      comparison.changed.join(',') === fixture.targetPaths.join(',')
+    const targetContentOk = fixture.targetPaths.every(
+      (targetPath) => afterTargets[targetPath] === fixture.plannedContent[targetPath],
+    )
+    const outputNoRollbackClaim = !/atomic rollback|rollback succeeded/i.test(cliOutput)
+    const success = targetChanged && onlyTargetsChanged && targetContentOk && repositoryClean && outputNoRollbackClaim
+    const failureCategory = !targetChanged
+      ? 'no mutation'
+      : !onlyTargetsChanged
+        ? 'partial mutation failed'
+        : success
+          ? 'none'
+          : 'post-write verification failed'
+    const failures = [
+      ...(targetChanged ? [] : ['no mutation: src/a.ts and src/b.ts did not both change after workspace write route completed']),
+      ...(onlyTargetsChanged ? [] : [`partial mutation failed: expected only src/a.ts and src/b.ts changed; changed=${comparison.changed.join(',') || 'none'} added=${comparison.added.join(',') || 'none'} removed=${comparison.removed.join(',') || 'none'}`]),
+      ...(targetContentOk ? [] : ['post-write verification failed: src/a.ts and src/b.ts content did not match planned ready content']),
+      ...(outputNoRollbackClaim ? [] : ['post-write verification failed: output claimed rollback/atomicity']),
+      ...(repositoryClean ? [] : ['post-write verification failed: repository mutated or status unavailable']),
+    ]
+
+    writeRealTwoFileUpdateReport({
+      status: success ? 'PASS' : 'FAIL',
+      statusDetail: success ? 'passed' : statusDetailForRealTwoFileUpdateFailureCategory(failureCategory),
+      realProviderExecution: true,
+      modelTurn: true,
+      runtimeHome: 'isolated-test-root',
+      fixture: {
+        files: fixture.files,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+      },
+      repositoryClean,
+      applyPatchBlocks: extracted.count,
+      changedFiles: success ? fixture.targetPaths : comparison.changed,
+      failedFiles: success ? [] : fixture.targetPaths.filter((targetPath) => !comparison.changed.includes(targetPath)),
+      writeIntents: fixture.targetPaths,
+      workspaceWriterInvoked: true,
+      writerTarget: 'isolated-selected-workspace',
+      terminalSuccessAllowed: success,
+      redaction: { ok: true, leaks: [] },
+      failureCategory,
+      failureReason: failures.join('; '),
+      outputTail: summarizeOutput(cliRedaction.redacted || redactedProviderOutput),
+    })
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`applyPatchBlocks=${extracted.count}`)
+    console.log(`fixtureChanged=${comparison.changed.join(',') || 'none'}`)
+    console.log(`fixtureAdded=${comparison.added.join(',') || 'none'}`)
+    console.log(`fixtureRemoved=${comparison.removed.join(',') || 'none'}`)
+    console.log(`targetsChanged=${targetChanged}`)
+    console.log(`postWriteVerification=${success ? 'pass' : 'fail'}`)
+    console.log(`repositoryClean=${repositoryClean}`)
+    console.log('workspaceWriterInvoked=true')
+    console.log('writerTarget=isolated-selected-workspace')
+    console.log(`changedFiles=${success ? fixture.targetPaths.join(',') : comparison.changed.join(',')}`)
+    console.log(`failedFiles=${success ? '' : fixture.targetPaths.filter((targetPath) => !comparison.changed.includes(targetPath)).join(',')}`)
+    console.log(`writeIntents=${fixture.targetPaths.join(',')}`)
+    console.log(`rollbackClaim=${outputNoRollbackClaim ? 'none' : 'unexpected'}`)
+    console.log(`redaction=${redactionOk ? 'pass' : 'fail'}`)
+    if (!success) console.log(`failureReason=${failures.join('; ')}`)
+    console.log(`[${success ? 'PASS' : 'FAIL'}] ${realTwoFileUpdateCaseId}`)
+    process.exitCode = success ? 0 : 1
+    return
+  } finally {
+    cleanupTwoFileUpdateFixture(fixture.fixtureDir)
+    cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
+  }
 }
 
 async function runRealSelectedWorkspaceSingleFileCreate() {
@@ -9997,6 +10481,10 @@ async function main() {
   }
   if (selectedCaseId === realSingleFileCreateCaseId) {
     await runRealSelectedWorkspaceSingleFileCreate()
+    return
+  }
+  if (selectedCaseId === realTwoFileUpdateCaseId) {
+    await runRealSelectedWorkspaceTwoFileUpdate()
     return
   }
 
