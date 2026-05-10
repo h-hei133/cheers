@@ -16,6 +16,7 @@ const AUTHORIZATION_BEARER_PATTERN =
 const KEY_VALUE_SECRET_PATTERN =
   /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|x-api-key|token|authorization|signature|sig)(\s*[:=]\s*)(["']?)[^\s"'`,;]+/gi
 const OPENAI_STYLE_KEY_PATTERN = /\b(sk-[A-Za-z0-9][A-Za-z0-9._-]{8,})\b/g
+const MASKED_OPENAI_STYLE_KEY_PATTERN = /\bsk-[A-Za-z0-9][A-Za-z0-9*._-]{8,}\b/g
 const SECRET_QUERY_PARAM_PATTERN =
   /([?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|key|authorization|signature|sig)=)[^&\s"'`<>]+/gi
 
@@ -29,6 +30,7 @@ const FORBIDDEN_PROVIDER_DETAIL_PATTERNS = [
   { label: 'refresh-token-value', pattern: /\brefresh[_-]?token\s*[:=]\s*(?!["']?\[REDACTED\])["']?[^\s"'`,;]+/i },
   { label: 'authorization-value', pattern: /\bauthorization\s*[:=]\s*(?!["']?\[REDACTED\])["']?[^\s"'`,;]+/i },
   { label: 'openai-style-key', pattern: /\bsk-[A-Za-z0-9][A-Za-z0-9._-]{8,}\b/i },
+  { label: 'masked-openai-style-key', pattern: /\bsk-[A-Za-z0-9][A-Za-z0-9*._-]{8,}\b/i },
   { label: 'secret-query-param', pattern: /[?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|key|authorization|signature|sig)=(?!\[REDACTED\])[^&\s"'`<>]+/i },
 ]
 
@@ -44,6 +46,7 @@ export function redactCodingProviderOutput(input) {
       (_match, key, separator, quote) => `${key}${separator}${quote}[REDACTED]`,
     )
     .replace(OPENAI_STYLE_KEY_PATTERN, '[REDACTED_API_KEY]')
+    .replace(MASKED_OPENAI_STYLE_KEY_PATTERN, '[REDACTED_API_KEY]')
     .replace(SECRET_QUERY_PARAM_PATTERN, '$1[REDACTED]')
     .replace(WINDOWS_PRIVATE_AGENTS_CONFIG_PATTERN, '[PRIVATE_AGENTS_CONFIG_PATH]')
     .replace(POSIX_PRIVATE_AGENTS_CONFIG_PATTERN, '[PRIVATE_AGENTS_CONFIG_PATH]')
@@ -75,6 +78,7 @@ export function redactAndAssertCodingProviderOutput(input) {
 function runSelfTest() {
   const sample = [
     'Authorization: Bearer sk-live-secret-123456789',
+    'Incorrect API key provided: sk-live***************************************tail',
     'api_key=sk-query-secret-123456789',
     'refresh_token=refresh-secret',
     'access_token=access-secret',

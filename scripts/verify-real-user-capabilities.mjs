@@ -66,14 +66,11 @@ const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
 
-const syntheticHome = getSyntheticHome()
-const realHome = getRealProviderHome({ allowDefault: true })
-const testRoot = getTestRoot()
-const reportPath = path.join(testRoot, 'test-results', 'real-user-capabilities-report.json')
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const tierValues = ['mvp', 'candidate', 'release', 'backlog', 'all']
 const suiteValues = ['candidate-mutation']
 const candidateMutationSuiteId = 'candidate-mutation'
+const defaultProviderEnvPath = '/home/wang/.private-agents-real/provider.env'
 const realSingleFileUpdateCaseId = 'real-selected-workspace-single-file-update'
 const realSingleFileCreateCaseId = 'real-selected-workspace-single-file-create'
 const realTwoFileUpdateCaseId = 'real-selected-workspace-two-file-update'
@@ -111,6 +108,11 @@ const realApplyPatchRuntimeNoWriteSmoke = process.argv.includes('--real-apply-pa
 const realApplyPatchGuardedWriteSmoke = process.argv.includes('--real-apply-patch-guarded-write-smoke')
 const realApplyPatchGuardedRouteSmoke = process.argv.includes('--real-apply-patch-guarded-route-smoke')
 const realApplyPatchWorkspaceWriteSmoke = process.argv.includes('--real-apply-patch-workspace-write-smoke')
+const realMutationEnvContract = prepareRealMutationEnvContract()
+const syntheticHome = getSyntheticHome()
+const realHome = realMutationEnvContract.realHome ?? getRealProviderHome({ allowDefault: true })
+const testRoot = getTestRoot()
+const reportPath = path.join(testRoot, 'test-results', 'real-user-capabilities-report.json')
 
 const failureCategories = [
   'none',
@@ -148,6 +150,7 @@ const authorizationBearerPattern =
 const keyValueSecretPattern =
   /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|x-api-key)(\s*[:=]\s*)(["']?)[^\s"'`,;]+/gi
 const openAiStyleKeyPattern = /\b(sk-[A-Za-z0-9][A-Za-z0-9._-]{8,})\b/g
+const maskedOpenAiStyleKeyPattern = /\bsk-[A-Za-z0-9][A-Za-z0-9*._-]{8,}\b/g
 const secretQueryParamPattern =
   /([?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|key|signature|sig)=)[^&\s"'`<>]+/gi
 const posixPrivateAgentsConfigPattern =
@@ -195,6 +198,354 @@ function parseSuiteArg(argv) {
     process.exit(3)
   }
   return normalized
+}
+
+function prepareRealMutationEnvContract() {
+  if (!shouldPrepareRealMutationEnv()) {
+    return {
+      enabled: false,
+      realHome: undefined,
+      configSource: 'not-loaded',
+      error: undefined,
+      generatedRealHome: false,
+    }
+  }
+
+  const explicitRealHome = process.env.PRIVATE_AGENTS_REAL_HOME?.trim()
+  const loaded = loadApprovedProviderEnv(process.env)
+  if (!loaded.ok) {
+    return {
+      enabled: true,
+      realHome: explicitRealHome || undefined,
+      configSource: 'explicit-env',
+      error: loaded,
+      generatedRealHome: false,
+    }
+  }
+
+  for (const [key, value] of Object.entries(loaded.env)) {
+    if (key === 'PRIVATE_AGENTS_REAL_HOME') continue
+    if (process.env[key] === undefined && typeof value === 'string') {
+      process.env[key] = value
+    }
+  }
+
+  if (!process.env.PRIVATE_AGENTS_TEST_ROOT?.trim()) {
+    process.env.PRIVATE_AGENTS_TEST_ROOT = path.join(getTestRoot(), 'candidate-mutation-real')
+  }
+
+  const resolved = resolveProviderEnvConfig(process.env)
+  if (!resolved.ok) {
+    return {
+      enabled: true,
+      realHome: explicitRealHome || undefined,
+      configSource: loaded.configSource,
+      error: resolved,
+      generatedRealHome: false,
+    }
+  }
+
+  const generatedRealHome = writeEnvBackedRealProviderConfig(resolved)
+  process.env.PRIVATE_AGENTS_REAL_HOME = generatedRealHome
+  process.env[resolved.apiKeyEnvVar] = resolved.apiKey
+  process.env.PRIVATE_AGENTS_REAL_PROVIDER = resolved.provider
+  return {
+    enabled: true,
+    realHome: generatedRealHome,
+    configSource: loaded.configSource,
+    error: undefined,
+    generatedRealHome: true,
+  }
+}
+
+function cleanupRealMutationEnvContract() {
+  if (realMutationEnvContract.generatedRealHome && realMutationEnvContract.realHome) {
+    fs.rmSync(realMutationEnvContract.realHome, { recursive: true, force: true })
+  }
+}
+
+function shouldPrepareRealMutationEnv() {
+  if (listCases || dryRun) return false
+  if (selectedCaseId) {
+    return selectedCaseId === realSingleFileUpdateCaseId ||
+      selectedCaseId === realSingleFileCreateCaseId ||
+      selectedCaseId === realTwoFileUpdateCaseId
+  }
+  return selectedSuiteId === candidateMutationSuiteId && includeRealProviderSuiteCases
+}
+
+function loadApprovedProviderEnv(processEnv) {
+  const providerEnvPath =
+    processEnv.PRIVATE_AGENTS_PROVIDER_ENV?.trim() ||
+    processEnv.PRIVATE_AGENTS_REAL_PROVIDER_ENV?.trim() ||
+    defaultProviderEnvPath
+  const explicitProviderEnvPath = Boolean(
+    processEnv.PRIVATE_AGENTS_PROVIDER_ENV?.trim() ||
+      processEnv.PRIVATE_AGENTS_REAL_PROVIDER_ENV?.trim(),
+  )
+  const resolved = path.resolve(providerEnvPath)
+  if (resolved !== defaultProviderEnvPath) {
+    return {
+      ok: false,
+      status: 'config-failure',
+      reason: 'provider env path must be /home/wang/.private-agents-real/provider.env',
+    }
+  }
+  if (!fs.existsSync(resolved)) {
+    if (!explicitProviderEnvPath) {
+      return { ok: true, env: {}, configSource: 'explicit-env' }
+    }
+    return {
+      ok: false,
+      status: 'config-failure',
+      reason: 'provider.env is not present at the approved path',
+    }
+  }
+
+  const parsed = {}
+  const content = fs.readFileSync(resolved, 'utf8')
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/)
+    if (!match) continue
+    const key = match[1]
+    let value = match[2]?.trim() ?? ''
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    } else {
+      const commentIndex = value.search(/\s+#/)
+      if (commentIndex >= 0) value = value.slice(0, commentIndex).trim()
+    }
+    parsed[key] = value
+  }
+  return { ok: true, env: parsed, configSource: 'explicit-env+provider-env' }
+}
+
+function resolveProviderEnvConfig(env) {
+  const provider = normalizeRealProvider(getFirstEnvValue(env, [
+    'PRIVATE_AGENTS_REAL_PROVIDER',
+    'PRIVATE_AGENTS_PROVIDER',
+  ])) ?? inferProviderFromEnv(env)
+  if (!provider) {
+    return {
+      ok: false,
+      status: 'config-failure',
+      reason: 'PRIVATE_AGENTS_REAL_PROVIDER or PRIVATE_AGENTS_PROVIDER is required for candidate mutation real suite',
+    }
+  }
+
+  const supported = new Set(['openai', 'openai-compatible', 'google', 'antigravity', 'claudecode'])
+  if (!supported.has(provider)) {
+    return {
+      ok: false,
+      status: 'config-failure',
+      reason: `unsupported provider ${provider}`,
+    }
+  }
+
+  const apiKeyEnvVar = providerApiKeyEnvVar(provider)
+  const apiKey = getFirstEnvValue(env, [
+    apiKeyEnvVar,
+    'PRIVATE_AGENTS_REAL_API_KEY',
+    ...providerApiKeyAliases(provider),
+  ])
+  if (!apiKey) {
+    return {
+      ok: false,
+      status: 'config-failure',
+      reason: `${apiKeyEnvVar} or PRIVATE_AGENTS_REAL_API_KEY is required for candidate mutation real suite`,
+    }
+  }
+
+  const baseUrl = getFirstEnvValue(env, [
+    'PRIVATE_AGENTS_REAL_BASE_URL',
+    'PRIVATE_AGENTS_PROVIDER_BASE_URL',
+    'PRIVATE_AGENTS_BASE_URL',
+    ...providerBaseUrlAliases(provider),
+  ])
+  const model = getFirstEnvValue(env, [
+    'PRIVATE_AGENTS_REAL_MODEL',
+    'PRIVATE_AGENTS_PROVIDER_MODEL',
+    'PRIVATE_AGENTS_MODEL',
+    ...providerModelAliases(provider),
+  ])
+  if (providerRequiresEndpointConfig(provider) && !baseUrl) {
+    return {
+      ok: false,
+      status: 'config-failure',
+      reason: `${provider} requires PRIVATE_AGENTS_REAL_BASE_URL or provider-specific base URL env`,
+    }
+  }
+  if (providerRequiresEndpointConfig(provider) && !model) {
+    return {
+      ok: false,
+      status: 'config-failure',
+      reason: `${provider} requires PRIVATE_AGENTS_REAL_MODEL or provider-specific model env`,
+    }
+  }
+
+  return { ok: true, provider, apiKey, apiKeyEnvVar, baseUrl, model }
+}
+
+function inferProviderFromEnv(env) {
+  if (getFirstEnvValue(env, ['OPENAI_COMPATIBLE_API_KEY'])) return 'openai-compatible'
+  if (getFirstEnvValue(env, ['GOOGLE_API_KEY'])) return 'google'
+  if (getFirstEnvValue(env, ['ANTIGRAVITY_API_KEY'])) return 'antigravity'
+  if (getFirstEnvValue(env, ['CLAUDECODE_API_KEY'])) return 'claudecode'
+  if (
+    getFirstEnvValue(env, ['PRIVATE_AGENTS_REAL_API_KEY']) &&
+    (getFirstEnvValue(env, [
+      'PRIVATE_AGENTS_REAL_BASE_URL',
+      'PRIVATE_AGENTS_PROVIDER_BASE_URL',
+      'PRIVATE_AGENTS_BASE_URL',
+      'OPENAI_COMPATIBLE_BASE_URL',
+      'OPENAI_BASE_URL',
+      'OPENAI_API_BASE',
+      'OPENAI_API_BASE_URL',
+      'API_BASE_URL',
+      'BASE_URL',
+    ]) ||
+      getFirstEnvValue(env, [
+        'PRIVATE_AGENTS_REAL_MODEL',
+        'PRIVATE_AGENTS_PROVIDER_MODEL',
+        'PRIVATE_AGENTS_MODEL',
+        'OPENAI_COMPATIBLE_MODEL',
+        'OPENAI_MODEL',
+        'MODEL',
+      ]))
+  ) {
+    return 'openai-compatible'
+  }
+  if (
+    getFirstEnvValue(env, ['OPENAI_API_KEY']) &&
+    getFirstEnvValue(env, [
+      'OPENAI_COMPATIBLE_BASE_URL',
+      'PRIVATE_AGENTS_REAL_BASE_URL',
+      'PRIVATE_AGENTS_PROVIDER_BASE_URL',
+      'PRIVATE_AGENTS_BASE_URL',
+      'OPENAI_API_BASE',
+      'OPENAI_API_BASE_URL',
+      'OPENAI_BASE_URL',
+      'API_BASE_URL',
+      'BASE_URL',
+    ])
+  ) {
+    return 'openai-compatible'
+  }
+  if (getFirstEnvValue(env, ['OPENAI_API_KEY'])) return 'openai'
+  return undefined
+}
+
+function writeEnvBackedRealProviderConfig(input) {
+  const configHome = path.join(getTestRoot(), 'candidate-mutation-real-provider-home')
+  const configDir = path.join(configHome, '.private-agents')
+  fs.rmSync(configHome, { recursive: true, force: true })
+  fs.mkdirSync(configDir, { recursive: true })
+  fs.writeFileSync(
+    path.join(configDir, 'config.json'),
+    JSON.stringify(
+      {
+        provider: input.provider,
+        providerCredentials: {
+          [input.provider]: {
+            ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+            ...(input.model ? { model: input.model } : {}),
+          },
+        },
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  )
+  return configHome
+}
+
+function getFirstEnvValue(env, names) {
+  for (const name of names) {
+    const value = env[name]?.trim()
+    if (value) return value
+  }
+  return undefined
+}
+
+function normalizeRealProvider(value) {
+  const normalized = value?.trim().toLowerCase().replace(/_/g, '-')
+  switch (normalized) {
+    case 'compatible':
+    case 'openai-compatible-api':
+    case 'siliconflow':
+    case 'deepseek':
+      return 'openai-compatible'
+    default:
+      return normalized
+  }
+}
+
+function providerApiKeyEnvVar(provider) {
+  switch (provider) {
+    case 'openai':
+      return 'OPENAI_API_KEY'
+    case 'google':
+      return 'GOOGLE_API_KEY'
+    case 'antigravity':
+      return 'ANTIGRAVITY_API_KEY'
+    case 'claudecode':
+      return 'CLAUDECODE_API_KEY'
+    default:
+      return 'OPENAI_COMPATIBLE_API_KEY'
+  }
+}
+
+function providerApiKeyAliases(provider) {
+  return provider === 'openai-compatible'
+    ? ['OPENAI_API_KEY']
+    : []
+}
+
+function providerBaseUrlAliases(provider) {
+  switch (provider) {
+    case 'openai':
+      return ['OPENAI_BASE_URL', 'OPENAI_API_BASE', 'OPENAI_API_BASE_URL']
+    case 'google':
+      return ['GOOGLE_BASE_URL']
+    case 'antigravity':
+      return ['ANTIGRAVITY_BASE_URL']
+    case 'claudecode':
+      return ['CLAUDECODE_BASE_URL']
+    default:
+      return [
+        'OPENAI_COMPATIBLE_BASE_URL',
+        'OPENAI_BASE_URL',
+        'OPENAI_API_BASE',
+        'OPENAI_API_BASE_URL',
+        'API_BASE_URL',
+        'BASE_URL',
+      ]
+  }
+}
+
+function providerModelAliases(provider) {
+  switch (provider) {
+    case 'openai':
+      return ['OPENAI_MODEL', 'MODEL']
+    case 'google':
+      return ['GOOGLE_MODEL']
+    case 'antigravity':
+      return ['ANTIGRAVITY_MODEL']
+    case 'claudecode':
+      return ['CLAUDECODE_MODEL']
+    default:
+      return ['OPENAI_COMPATIBLE_MODEL', 'OPENAI_MODEL', 'MODEL']
+  }
+}
+
+function providerRequiresEndpointConfig(provider) {
+  return ['openai-compatible', 'google', 'antigravity', 'claudecode'].includes(provider)
 }
 
 const futureGateCandidates = [
@@ -1155,6 +1506,7 @@ function redactProviderOutput(input) {
       (_match, key, separator, quote) => `${key}${separator}${quote}[REDACTED]`,
     )
     .replace(openAiStyleKeyPattern, '[REDACTED_API_KEY]')
+    .replace(maskedOpenAiStyleKeyPattern, '[REDACTED_API_KEY]')
     .replace(secretQueryParamPattern, '$1[REDACTED]')
     .replace(posixPrivateAgentsConfigPattern, '[PRIVATE_AGENTS_CONFIG_PATH]')
     .replace(posixPrivateAgentsRealHomePattern, '[REAL_PROVIDER_HOME]')
@@ -10556,6 +10908,25 @@ async function runRealCandidateMutationSuiteCase(caseId) {
       exitCode: 3,
     }
   }
+  if (realMutationEnvContract.error) {
+    const reason = realMutationEnvContract.error.reason ?? 'candidate mutation real suite provider env contract failed'
+    return withCaseMetadata(capabilityCase, {
+      status: 'FAIL',
+      statusDetail: realMutationEnvContract.error.status ?? 'config-failure',
+      capability: caseId,
+      provider: 'real',
+      projectDir: '(not-created)',
+      sessionId: '(not-started)',
+      verification: 'real-provider candidate mutation smoke not evaluated',
+      failureCategory: 'provider-readiness',
+      failureReason: `provider-readiness:missing-config: ${reason}`,
+      changedFiles: [],
+      failedFiles: [],
+      writeIntents: [],
+      realProviderExecution: false,
+      exitCode: 3,
+    })
+  }
 
   const previousExitCode = process.exitCode
   process.exitCode = 0
@@ -10760,6 +11131,7 @@ async function main() {
   if (selectedSuiteId) {
     console.log(`suite name=${selectedSuiteId}`)
     console.log(`suite real-provider cases=${includeRealProviderSuiteCases ? 'include-real' : 'skipped-by-default'}`)
+    console.log(`suite real-provider configSource=${realMutationEnvContract.configSource}`)
     console.log('suite defaultMvpAffected=false')
   }
   console.log('status taxonomy: PASS=0 FAIL=1 PROVIDER_NETWORK=2 CONFIG=3')
@@ -10798,15 +11170,27 @@ async function main() {
   }
 
   if (selectedCaseId === realSingleFileUpdateCaseId) {
-    await runRealSelectedWorkspaceSingleFileUpdate()
+    try {
+      await runRealSelectedWorkspaceSingleFileUpdate()
+    } finally {
+      cleanupRealMutationEnvContract()
+    }
     return
   }
   if (selectedCaseId === realSingleFileCreateCaseId) {
-    await runRealSelectedWorkspaceSingleFileCreate()
+    try {
+      await runRealSelectedWorkspaceSingleFileCreate()
+    } finally {
+      cleanupRealMutationEnvContract()
+    }
     return
   }
   if (selectedCaseId === realTwoFileUpdateCaseId) {
-    await runRealSelectedWorkspaceTwoFileUpdate()
+    try {
+      await runRealSelectedWorkspaceTwoFileUpdate()
+    } finally {
+      cleanupRealMutationEnvContract()
+    }
     return
   }
 
@@ -10848,6 +11232,7 @@ async function main() {
     writeReport(report)
     console.log(`[CONFIG] ${error.message}`)
     console.log(`report=${reportPath}`)
+    cleanupRealMutationEnvContract()
     process.exit(3)
   }
 
@@ -10886,6 +11271,7 @@ async function main() {
             : 'FAIL'
       console.log(`[${label}] provider-readiness-preflight - ${report.failureReason}`)
       console.log(`report=${reportPath}`)
+      cleanupRealMutationEnvContract()
       process.exit(
         providerPreflight.status === 'provider-network-inconclusive'
           ? 2
@@ -10953,6 +11339,7 @@ async function main() {
   }
   writeReport(report)
   console.log(`report=${reportPath}`)
+  cleanupRealMutationEnvContract()
   process.exit(summarizedFailure.exitCode)
 }
 

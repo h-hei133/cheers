@@ -257,6 +257,11 @@ Current tier split:
   `verify:real-user-capabilities:candidate-mutation`; it runs the closed
   synthetic mutation cases by default and lists real-provider mutation smokes as
   opt-in unless `--include-real` or the dedicated `:real` script is used
+- `verify:real-user-capabilities:candidate-mutation:real` silently loads the
+  approved provider env file, derives an isolated runtime config home under
+  `PRIVATE_AGENTS_TEST_ROOT`, and uses `PRIVATE_AGENTS_REAL_HOME` only for that
+  generated config source; default suite and dry-run modes still do not touch
+  the real provider
 - release tier records release-only gates such as CLI entry stability,
   permission-memory, release-core, and long-session/compact continuity as
   non-MVP blockers

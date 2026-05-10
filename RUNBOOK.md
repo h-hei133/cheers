@@ -125,6 +125,24 @@ work:
 | Focused regression guard | `npm run test -w packages/ts-shell -- <file> -t "<case>"` | Required when the current bounded slice added or changed a focused guard | Proves the exact behavior being closed without treating legacy wide tests as release blockers. |
 | Release core | `npm run verify:release:core` | Broader deterministic release gate | Runs the hard gate set listed above; use before release handoff or when changing shared CLI/runtime contracts. |
 
+Candidate mutation real suite contract:
+
+- `npm run verify:real-user-capabilities:candidate-mutation` runs only the
+  synthetic candidate mutation smokes and must report `realProviderTouched=false`.
+- `npm run verify:real-user-capabilities -- --suite=candidate-mutation --include-real --dry-run`
+  lists the real-provider mutation smokes without loading credentials or
+  contacting the provider.
+- `npm run verify:real-user-capabilities:candidate-mutation:real` silently loads
+  `/home/wang/.private-agents-real/provider.env` when present, derives an
+  isolated provider config home under `PRIVATE_AGENTS_TEST_ROOT`, sets child
+  `HOME` and `USERPROFILE` to per-smoke isolated runtime homes, and uses
+  `PRIVATE_AGENTS_REAL_HOME` only for that generated config source.
+- The suite must not read real user provider config directories. Missing
+  provider selector, key, base URL, or model is a CONFIG failure; auth, network,
+  model-output, route, and post-write failures must remain separately
+  attributable. A real run that reaches provider execution reports
+  `realProviderTouched=true`.
+
 ### Add File candidate create boundary
 
 `*** Add File` has a narrow synthetic selected-workspace candidate write route.
