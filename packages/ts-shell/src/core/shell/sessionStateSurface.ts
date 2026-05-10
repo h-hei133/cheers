@@ -189,6 +189,8 @@ export function formatStoppedContinueGuidanceLines(input: {
   const failedFiles = input.snapshot.recentFailedFiles
     .map((entry) => `${entry.path}${entry.reason ? ` (${entry.reason})` : ""}`)
     .join(", ");
+  const changedFiles = input.snapshot.recentChangedFiles.join(", ");
+  const verifiedFiles = input.snapshot.recentVerifiedFiles.join(", ");
   const reason =
     input.snapshot.lastVerificationReason ??
     input.snapshot.lastFailure ??
@@ -220,8 +222,38 @@ export function formatStoppedContinueGuidanceLines(input: {
   lines.push("- TerminalState: stopped");
   lines.push(`- BlockerKind: ${blockerKind}`);
   lines.push(`- Reason: ${reason}`);
+  if (changedFiles) {
+    lines.push(`- Changed files: ${changedFiles}`);
+  }
+  if (verifiedFiles) {
+    lines.push(`- Verified files: ${verifiedFiles}`);
+  }
   if (failedFiles) {
     lines.push(`- Failed files: ${failedFiles}`);
+  }
+  if (input.snapshot.lastWriterStarted !== undefined) {
+    lines.push(
+      `- Writer started: ${input.snapshot.lastWriterStarted ? "yes" : "no"}`,
+    );
+  }
+  if (input.snapshot.lastWriteEffect) {
+    lines.push(`- Write effect: ${input.snapshot.lastWriteEffect}`);
+  }
+  if (input.snapshot.lastWriteRequiresUserInspection !== undefined) {
+    lines.push(
+      `- Requires inspection: ${input.snapshot.lastWriteRequiresUserInspection ? "yes" : "no"}`,
+    );
+  }
+  if (input.snapshot.lastFailureHandoffDiagnostic) {
+    lines.push(
+      `- Failure handoff: ${truncate(input.snapshot.lastFailureHandoffDiagnostic, 220)}`,
+    );
+  }
+  if (
+    input.snapshot.lastWriterStarted ||
+    blockerKind === "partial-mutation-failed"
+  ) {
+    lines.push("- Rollback: not attempted");
   }
   lines.push(`- DoNext: ${doNext}`);
   lines.push(

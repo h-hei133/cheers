@@ -1204,6 +1204,20 @@ const scenarios = [
     expectChanged: [],
   },
   {
+    id: 'synthetic-two-file-partial-failure-recovery-followup',
+    tier: 'candidate',
+    provider: 'synthetic',
+    execution: 'mutation-recovery-followup-test',
+    expectedCapability: 'candidate two-file partial failure recovery follow-up surface',
+    currentSupportedCapability: 'synthetic follow-up evidence that stopped partial mutation state stays visible with no rollback claim',
+    reasonForTier: 'Candidate because it proves exactly-two-file partial failure recovery guidance exposes changedFiles, failedFiles, writer-started write effect, and inspect/re-read next action without changing the default MVP gate.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+    projectDir: path.join(testRoot, `pca-capability-gate-partial-recovery-followup-${runId}`),
+    expectChanged: [],
+  },
+  {
     id: 'synthetic-single-file-protected-verify',
     tier: 'backlog',
     provider: 'synthetic',
@@ -1531,6 +1545,7 @@ const candidateMutationSuiteSyntheticCaseIds = [
   'synthetic-selected-workspace-two-file-update',
   'synthetic-selected-workspace-two-file-update-partial-failure',
   'synthetic-mutation-continuity-after-compact',
+  'synthetic-two-file-partial-failure-recovery-followup',
 ]
 
 const candidateMutationSuiteRealCaseIds = [
@@ -2354,6 +2369,9 @@ async function runScenario(scenario) {
   if (scenario.execution === 'mutation-continuity-compact-test') {
     return runMutationContinuityCompactScenario(scenario)
   }
+  if (scenario.execution === 'mutation-recovery-followup-test') {
+    return runMutationRecoveryFollowupScenario(scenario)
+  }
   if (scenario.execution === 'apply-patch-multi-file-update-planning-dry-run') {
     return runApplyPatchMultiFileUpdatePlanningScenario(scenario)
   }
@@ -2531,6 +2549,86 @@ async function runMutationContinuityCompactScenario(scenario) {
         sessionId: '(mutation-compact-continuity)',
         changedFiles: [],
         failedFiles: [],
+        verification: 'passed',
+        outputTail: summarizeOutput(result.output),
+      },
+    ],
+  }
+}
+
+async function runMutationRecoveryFollowupScenario(scenario) {
+  const result = await run(npmBin, [
+    'run',
+    'verify:mutation-recovery:followup',
+  ], {
+    cwd: repoRoot,
+    env: {
+      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+    },
+    timeoutMs: 120000,
+  })
+  const failures = []
+  if (result.code !== 0 || result.timedOut) {
+    failures.push(
+      result.timedOut
+        ? 'mutation recovery follow-up smoke timed out'
+        : `mutation recovery follow-up smoke exited ${result.code}`,
+    )
+  }
+  if (!/continueShellActionRuntime\.test\.ts/.test(result.output)) {
+    failures.push('mutation recovery follow-up focused test output missing')
+  }
+
+  if (failures.length > 0) {
+    return {
+      capability: scenario.id,
+      provider: scenario.provider,
+      status: 'FAIL',
+      projectDir: scenario.projectDir,
+      sessionId: '(mutation-recovery-followup)',
+      changedFiles: ['src/a.ts'],
+      failedFiles: ['src/b.ts'],
+      protectedFiles: scenario.protectedFiles,
+      reportPath,
+      verification: 'blocked',
+      failureCategory: categorizeFailure(failures.join('; '), result.output, scenario.provider),
+      failureReason: normalizeFailureReason(failures.join('; '), result.output, scenario.provider),
+      outputTail: summarizeOutput(result.output),
+      turns: [
+        {
+          turn: 1,
+          mode: 'mutation-recovery-followup-test',
+          sessionId: '(mutation-recovery-followup)',
+          changedFiles: ['src/a.ts'],
+          failedFiles: ['src/b.ts'],
+          verification: 'blocked',
+          outputTail: summarizeOutput(result.output),
+        },
+      ],
+    }
+  }
+
+  return {
+    capability: scenario.id,
+    provider: scenario.provider,
+    status: 'PASS',
+    projectDir: scenario.projectDir,
+    sessionId: '(mutation-recovery-followup)',
+    changedFiles: ['src/a.ts'],
+    failedFiles: ['src/b.ts'],
+    protectedFiles: scenario.protectedFiles,
+    reportPath,
+    verification: 'passed',
+    failureCategory: 'none',
+    failureReason: '',
+    outputTail: summarizeOutput(result.output),
+    turns: [
+      {
+        turn: 1,
+        mode: 'mutation-recovery-followup-test',
+        sessionId: '(mutation-recovery-followup)',
+        changedFiles: ['src/a.ts'],
+        failedFiles: ['src/b.ts'],
         verification: 'passed',
         outputTail: summarizeOutput(result.output),
       },

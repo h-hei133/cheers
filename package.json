@@ -63,6 +63,7 @@
     "verify:real-user-capabilities:candidate-mutation": "node scripts/verify-real-user-capabilities.mjs --suite=candidate-mutation",
     "verify:real-user-capabilities:candidate-mutation:real": "node scripts/verify-real-user-capabilities.mjs --suite=candidate-mutation --include-real",
     "verify:mutation-continuity:compact": "npm run test -w packages/ts-shell -- src/session/mutationCompactContinuity.test.ts",
+    "verify:mutation-recovery:followup": "npm run test -w packages/ts-shell -- src/core/shell/continueShellActionRuntime.test.ts -t \"renders partial mutation recovery details before a stopped-session follow-up prompt\"",
     "verify:real-user-capabilities:real-single-file": "node scripts/verify-real-user-capabilities.mjs --case=real-selected-workspace-single-file-update",
     "verify:real-user-capabilities:real-create": "node scripts/verify-real-user-capabilities.mjs --case=real-selected-workspace-single-file-create",
     "verify:real-user-capabilities:real-two-file": "node scripts/verify-real-user-capabilities.mjs --case=real-selected-workspace-two-file-update",

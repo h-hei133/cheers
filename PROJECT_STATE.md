@@ -148,6 +148,13 @@ Key boundaries:
   partial failure preserves stopped state, `changedFiles=[src/a.ts]`,
   `failedFiles=[src/b.ts]`, writer-started unknown write effect, and the
   inspect/re-read next action without success or rollback wording
+- `verify-real-user-capabilities` includes
+  `synthetic-two-file-partial-failure-recovery-followup`, an executable
+  synthetic candidate smoke that proves stopped `/continue` recovery guidance
+  re-surfaces the partial mutation state: prior run not success,
+  `changedFiles=[src/a.ts]`, `failedFiles=[src/b.ts]`, writer-started unknown
+  write effect, inspect/re-read next action, and explicit no-rollback/no-atomic
+  wording
 - `verify-real-user-capabilities` exposes an explicit opt-in real-provider
   candidate smoke, `real-selected-workspace-two-file-update`, which asks the
   provider for exactly one patch block with exactly two Update File operations
