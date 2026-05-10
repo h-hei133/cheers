@@ -128,8 +128,12 @@ Key boundaries:
   `changedFiles=[]`
 - `verify-real-user-capabilities` includes an executable synthetic candidate
   smoke, `synthetic-selected-workspace-multi-file-update-planning`, that remains
-  a no-write planning smoke; the new write route is covered by focused route,
-  writer, and result tests
+  a no-write planning smoke
+- `verify-real-user-capabilities` also includes
+  `synthetic-selected-workspace-two-file-update`, an executable synthetic
+  candidate smoke that routes exactly two existing-file Update File operations
+  through the explicit selected-workspace write entrypoint and verifies both
+  changed files
 - broader apply_patch, add/delete/move, 3+ files, rollback, provider/auth,
   CLI/session schema, real-provider smokes, and default gates remain unchanged
 

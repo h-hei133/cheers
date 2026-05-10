@@ -360,6 +360,58 @@ const scenarios = [
     ],
   },
   {
+    id: 'synthetic-selected-workspace-two-file-update',
+    tier: 'candidate',
+    provider: 'synthetic',
+    execution: 'apply-patch-workspace-write-cli',
+    expectedCapability: 'selected-workspace exactly two-file Update File write through explicit workspace-write route',
+    currentSupportedCapability: 'candidate write route for exactly two existing-file Update File operations with sequential writes and per-file readback verification',
+    reasonForTier: 'Candidate because it writes two existing selected-workspace files only through explicit approval; it is not part of the default MVP single-file update gate.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+    projectDir: path.join(testRoot, `pca-capability-gate-candidate-two-file-update-${runId}`),
+    files: {
+      'src/a.ts': 'a\n',
+      'src/b.ts': 'b\n',
+      'LOCKED.md': 'locked\n',
+    },
+    protectedFiles: ['LOCKED.md'],
+    patchText: [
+      '*** Begin Patch',
+      '*** Update File: src/a.ts',
+      '@@',
+      '-a',
+      '+aa',
+      '*** Update File: src/b.ts',
+      '@@',
+      '-b',
+      '+bb',
+      '*** End Patch',
+    ].join('\n'),
+    expectChanged: ['src/a.ts', 'src/b.ts'],
+    expectContains: {
+      'src/a.ts': ['aa'],
+      'src/b.ts': ['bb'],
+    },
+    expectExactContent: {
+      'src/a.ts': 'aa\n',
+      'src/b.ts': 'bb\n',
+    },
+    expectOutputContains: [
+      'apply_patch multi-file workspace write succeeded',
+      'Changed: src/a.ts, src/b.ts',
+      'Verified: each written file matched the approved Update File content',
+      'Rollback: not attempted',
+    ],
+    expectOutputNotContains: [
+      'atomic rollback',
+      'rollback succeeded',
+      'apply_patch multi-file workspace write stopped before success',
+      'Failed: src/',
+    ],
+  },
+  {
     id: 'synthetic-single-file-protected-verify',
     tier: 'backlog',
     provider: 'synthetic',
@@ -1572,6 +1624,11 @@ async function runApplyPatchWorkspaceWriteScenario(scenario) {
     for (const marker of scenario.expectOutputContains ?? []) {
       if (!result.output.includes(marker)) {
         failures.push(`output missing marker: ${marker}`)
+      }
+    }
+    for (const marker of scenario.expectOutputNotContains ?? []) {
+      if (result.output.includes(marker)) {
+        failures.push(`output contained forbidden marker: ${marker}`)
       }
     }
 
