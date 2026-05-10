@@ -118,11 +118,35 @@ work:
 | Focused regression guard | `npm run test -w packages/ts-shell -- <file> -t "<case>"` | Required when the current bounded slice added or changed a focused guard | Proves the exact behavior being closed without treating legacy wide tests as release blockers. |
 | Release core | `npm run verify:release:core` | Broader deterministic release gate | Runs the hard gate set listed above; use before release handoff or when changing shared CLI/runtime contracts. |
 
+### Add File candidate create boundary
+
+`*** Add File` has a narrow synthetic selected-workspace candidate write route.
+It is not part of the default MVP gate and does not open broad `apply_patch`.
+
+Allowed create route:
+
+- exactly one `*** Add File` operation
+- selected workspace only
+- explicit runtime opt-in, explicit workspace-write opt-in, and explicit
+  approved-for-write decision
+- parent directory must already exist
+- target must not exist before write
+- exclusive create only; no overwrite and no parent directory creation
+- post-write readback must equal planned content before `changedFiles=[target]`
+
+Blocked create route:
+
+- update, delete, move, mixed, and multi-file patches
+- outside-workspace targets, symlink/path traversal, existing targets, and
+  missing parents
+- every blocked path keeps `changedFiles=[]`, `writeIntents=[]`, and no success
+  terminal result
+
 ### Add File classification boundary
 
-The current apply_patch surface can classify `*** Add File` patches in a
-synthetic/no-write path, but it cannot create files. This classification is
-diagnostic candidate/backlog evidence only:
+The default/no-write apply_patch surface can classify `*** Add File` patches in
+a synthetic/no-write path. This classification is diagnostic backlog evidence
+outside the explicit candidate create route:
 
 - selected-workspace single-file Add File is reported as create/add not enabled
 - existing target, missing parent directory, outside-workspace target, and
@@ -130,9 +154,9 @@ diagnostic candidate/backlog evidence only:
 - `changedFiles=[]`, `writeIntents=[]`, `willWrite=false`, and no writer success
   claim are required invariants
 - default MVP remains selected-workspace existing-file single-file update only
-- broader apply_patch, create/add writing, delete/move, multi-file, rollback,
-  real-provider create smoke, provider/auth flow, and CLI/session schema remain
-  out of scope
+- broader apply_patch, default create/add writing, delete/move, multi-file,
+  rollback, real-provider create smoke, provider/auth flow, and CLI/session
+  schema remain out of scope
 
 `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.test.ts` full-suite
 is not a current main-path gate. It is a broad historical contract corpus used

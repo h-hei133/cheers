@@ -68,6 +68,11 @@ import {
 import { projectMutationVerificationHandoff } from "./patchResult/mutationVerificationProjection.js";
 import { buildNoWriteRuntimeRouteResult } from "./patchResult/runtimeRouteResult.js";
 import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { buildWorkspaceCreateRouteResult } from "./patchResult/workspaceCreateResult.js";
+import {
+  patchIsSingleAddFile,
+  runWorkspaceCreateRoute,
+} from "./patchResult/workspaceCreateRoute.js";
 import { buildWorkspaceWriteRouteResult } from "./patchResult/workspaceWriteResult.js";
 import { runWorkspaceWriteRoute } from "./patchResult/workspaceWriteRoute.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
@@ -277,9 +282,35 @@ async function runApplyPatchRuntimeRouteIfRequested(
 
   if (routeOptions.workspaceWrite?.explicitWorkspaceWriteOptIn) {
     const workspaceAuthority = createWorkspaceWriteAuthority(options.workspaceRoot);
+    const rawPatchText = routeOptions.rawPatchText ?? options.prompt;
+    if (patchIsSingleAddFile(rawPatchText)) {
+      const route = await runWorkspaceCreateRoute({
+        workspaceRoot: options.workspaceRoot,
+        rawPatchText,
+        explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
+        explicitWorkspaceWriteOptIn:
+          routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
+        ...(routeOptions.requestedUserDecision
+          ? { requestedUserDecision: routeOptions.requestedUserDecision }
+          : {}),
+        defaultProductionRejectionUnchanged: true,
+        readFile: workspaceAuthority.readFile,
+        readVerifiedFile: workspaceAuthority.readVerifiedFile,
+        directoryExists: workspaceAuthority.directoryExists,
+        validateCreateTarget: workspaceAuthority.validateCreateTarget,
+        createFileExclusive: workspaceAuthority.createFileExclusive,
+        ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
+      });
+      return buildWorkspaceCreateRouteResult({
+        sessionId: options.sessionId,
+        prompt: options.prompt,
+        route,
+      });
+    }
+
     const route = await runWorkspaceWriteRoute({
       workspaceRoot: options.workspaceRoot,
-      rawPatchText: routeOptions.rawPatchText ?? options.prompt,
+      rawPatchText,
       explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
       explicitWorkspaceWriteOptIn:
         routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,

@@ -74,7 +74,28 @@ The primary user-visible mainline is now:
 5. Result block stays minimal and actionable in compact mode
 6. Session remains ready for next turn with clear boundaries
 
-## 5. Latest Implemented Delta (through 2026-05-09)
+## 5. Latest Implemented Delta (through 2026-05-10)
+
+### Current closeout: narrow Add File candidate create route
+
+Selected-workspace `*** Add File` now has a synthetic candidate write route for
+one new file under explicit runtime and workspace-write approval.
+
+Key boundaries:
+
+- the route accepts exactly one Add File operation and rejects update, delete,
+  move, mixed, and multi-file patches
+- the target must be inside the selected workspace, the parent directory must
+  already exist, and the target must not exist
+- the writer uses exclusive create semantics, does not create parent
+  directories, and performs post-write readback verification before reporting
+  `changedFiles=[target]`
+- blocked paths keep `changedFiles=[]`, `writeIntents=[]`, no success terminal,
+  and no writer invocation unless the failure happened after the exclusive
+  writer started
+- default MVP remains selected-workspace existing-file single-file update; broad
+  `apply_patch`, delete/move, multi-file, rollback, provider/auth, and
+  real-provider create smoke remain unchanged
 
 ### Current closeout: mutation verification handoff projection
 
@@ -150,8 +171,8 @@ Important boundaries:
 ### Current closeout: Add File no-write classification
 
 The apply_patch dry-run/readiness path now recognizes `*** Add File` patches as
-create/add candidate evidence without creating files or entering the selected
-workspace writer.
+create/add candidate/backlog evidence without creating files or entering the
+selected workspace writer in default/no-write paths.
 
 Key boundaries:
 
@@ -161,10 +182,12 @@ Key boundaries:
   `writeIntents=[]`, and no writer-reachable success claim
 - classified blockers distinguish unsupported add, existing-target collision,
   missing parent directory, outside-workspace target, and multi-file add
-- current supported mutation capability remains selected-workspace
-  existing-file single-file update only
-- broader apply_patch, create/add writing, delete/move, multi-file, rollback,
-  provider/auth, CLI/session schema, and production mutation flow are unchanged
+- default MVP remains selected-workspace existing-file single-file update only
+- the separate synthetic candidate create route can create one selected-workspace
+  file only after explicit runtime/write approval and readback verification
+- broader apply_patch, default create/add writing, delete/move, multi-file,
+  rollback, provider/auth, CLI/session schema, and production mutation flow are
+  unchanged
 
 ### Current closeout: real-user capability gate tiering
 

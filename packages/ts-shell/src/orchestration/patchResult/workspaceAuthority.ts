@@ -22,13 +22,39 @@ export type WorkspaceWriteTargetAuthority =
       readonly evidence: readonly string[];
     };
 
+export type WorkspaceCreateTargetAuthority =
+  | {
+      readonly ok: true;
+      readonly absolutePath: string;
+      readonly parentRealPath: string;
+    }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "path-outside-workspace"
+        | "target-exists"
+        | "target-symlink"
+        | "parent-missing"
+        | "parent-symlink"
+        | "parent-not-directory"
+        | "parent-realpath-outside-workspace"
+        | "filesystem-error";
+      readonly message: string;
+      readonly evidence: readonly string[];
+    };
+
 export interface WorkspaceWriteAuthority {
   readonly readFile: (absolutePath: string) => string | undefined;
   readonly readVerifiedFile: (relativePath: string) => string | undefined;
+  readonly directoryExists: (absolutePath: string) => boolean;
   readonly validateWriteTarget: (
     relativePath: string,
   ) => WorkspaceWriteTargetAuthority;
+  readonly validateCreateTarget: (
+    relativePath: string,
+  ) => WorkspaceCreateTargetAuthority;
   readonly writeFile: (relativePath: string, content: string) => void;
+  readonly createFileExclusive: (relativePath: string, content: string) => void;
 }
 
 export function createWorkspaceWriteAuthority(
@@ -94,6 +120,91 @@ export function createWorkspaceWriteAuthority(
     return { ok: true, absolutePath, realPath };
   };
 
+  const validateCreateTarget = (
+    relativePath: string,
+  ): WorkspaceCreateTargetAuthority => {
+    const absolutePath = path.resolve(workspaceRoot, relativePath);
+    if (!pathStaysInsideWorkspace(workspaceRoot, absolutePath)) {
+      return createAuthorityFailure(
+        "path-outside-workspace",
+        "Refuse to create outside the selected workspace.",
+      );
+    }
+
+    try {
+      const targetStat = fs.lstatSync(absolutePath);
+      if (targetStat.isSymbolicLink()) {
+        return createAuthorityFailure(
+          "target-symlink",
+          "Refuse to create through a symlink target in the selected workspace.",
+        );
+      }
+      return createAuthorityFailure(
+        "target-exists",
+        "Refuse to create because the selected workspace target already exists.",
+      );
+    } catch (error) {
+      if (!isMissingFileError(error)) {
+        return createAuthorityFailure(
+          "filesystem-error",
+          "Refuse to create because the selected workspace target could not be inspected.",
+        );
+      }
+    }
+
+    const parentPath = path.dirname(absolutePath);
+    if (!pathStaysInsideOrIsWorkspace(workspaceRoot, parentPath)) {
+      return createAuthorityFailure(
+        "path-outside-workspace",
+        "Refuse to create because the target parent is outside the selected workspace.",
+      );
+    }
+
+    let parentStat: fs.Stats;
+    try {
+      parentStat = fs.lstatSync(parentPath);
+    } catch (error) {
+      return createAuthorityFailure(
+        isMissingFileError(error) ? "parent-missing" : "filesystem-error",
+        isMissingFileError(error)
+          ? "Refuse to create because the selected workspace target parent is missing."
+          : "Refuse to create because the selected workspace target parent could not be inspected.",
+      );
+    }
+
+    if (parentStat.isSymbolicLink()) {
+      return createAuthorityFailure(
+        "parent-symlink",
+        "Refuse to create because the selected workspace target parent is a symlink.",
+      );
+    }
+    if (!parentStat.isDirectory()) {
+      return createAuthorityFailure(
+        "parent-not-directory",
+        "Refuse to create because the selected workspace target parent is not a directory.",
+      );
+    }
+
+    let parentRealPath: string;
+    try {
+      parentRealPath = fs.realpathSync(parentPath);
+    } catch {
+      return createAuthorityFailure(
+        "filesystem-error",
+        "Refuse to create because the selected workspace target parent real path could not be resolved.",
+      );
+    }
+
+    if (!pathStaysInsideOrIsWorkspace(realWorkspaceRoot, parentRealPath)) {
+      return createAuthorityFailure(
+        "parent-realpath-outside-workspace",
+        "Refuse to create because the selected workspace target parent resolves outside the workspace.",
+      );
+    }
+
+    return { ok: true, absolutePath, parentRealPath };
+  };
+
   return {
     readFile: (absolutePath) => {
       const resolved = path.resolve(absolutePath);
@@ -115,6 +226,25 @@ export function createWorkspaceWriteAuthority(
         return undefined;
       }
     },
+    directoryExists: (absolutePath) => {
+      const resolved = path.resolve(absolutePath);
+      if (!pathStaysInsideOrIsWorkspace(workspaceRoot, resolved)) {
+        return false;
+      }
+      try {
+        const stat = fs.lstatSync(resolved);
+        if (stat.isSymbolicLink()) {
+          return false;
+        }
+        if (!stat.isDirectory()) {
+          return false;
+        }
+        const realPath = fs.realpathSync(resolved);
+        return pathStaysInsideOrIsWorkspace(realWorkspaceRoot, realPath);
+      } catch {
+        return false;
+      }
+    },
     readVerifiedFile: (relativePath) => {
       const handle = openVerifiedFile(relativePath, fs.constants.O_RDONLY);
       if (handle.ok === false) {
@@ -129,6 +259,7 @@ export function createWorkspaceWriteAuthority(
       }
     },
     validateWriteTarget,
+    validateCreateTarget,
     writeFile: (relativePath, content) => {
       const handle = openVerifiedFile(relativePath, fs.constants.O_WRONLY);
       if (handle.ok === false) {
@@ -139,6 +270,42 @@ export function createWorkspaceWriteAuthority(
         fs.writeFileSync(handle.fd, content, { encoding: "utf8" });
       } finally {
         fs.closeSync(handle.fd);
+      }
+    },
+    createFileExclusive: (relativePath, content) => {
+      const target = validateCreateTarget(relativePath);
+      if (target.ok === false) {
+        throw new Error(target.message);
+      }
+
+      let fd: number;
+      try {
+        fd = fs.openSync(
+          target.absolutePath,
+          fs.constants.O_CREAT |
+            fs.constants.O_EXCL |
+            fs.constants.O_WRONLY |
+            noFollowFlag,
+          0o666,
+        );
+      } catch (error) {
+        throw new Error(
+          isSymlinkOpenError(error)
+            ? "Refuse to create through a symlink target in the selected workspace."
+            : isFileExistsError(error)
+              ? "Refuse to create because the selected workspace target already exists."
+              : "Refuse to create because the selected workspace target could not be opened exclusively.",
+        );
+      }
+
+      try {
+        const descriptorFailure = verifyCreateDescriptor(fd);
+        if (descriptorFailure) {
+          throw new Error(descriptorFailure.message);
+        }
+        fs.writeFileSync(fd, content, { encoding: "utf8" });
+      } finally {
+        fs.closeSync(fd);
       }
     },
   };
@@ -218,6 +385,44 @@ export function createWorkspaceWriteAuthority(
 
     return undefined;
   }
+
+  function verifyCreateDescriptor(
+    fd: number,
+  ): Extract<WorkspaceCreateTargetAuthority, { ok: false }> | undefined {
+    let stat: fs.Stats;
+    try {
+      stat = fs.fstatSync(fd);
+    } catch {
+      return createAuthorityFailure(
+        "filesystem-error",
+        "Refuse to create because the selected workspace target descriptor could not be inspected.",
+      );
+    }
+
+    if (!stat.isFile()) {
+      return createAuthorityFailure(
+        "filesystem-error",
+        "Refuse to create because the selected workspace target descriptor is not a regular file.",
+      );
+    }
+
+    const descriptorRealPath = realpathForOpenDescriptor(fd);
+    if (!descriptorRealPath) {
+      return createAuthorityFailure(
+        "filesystem-error",
+        "Refuse to create because the selected workspace target descriptor real path could not be resolved.",
+      );
+    }
+
+    if (!pathStaysInsideWorkspace(realWorkspaceRoot, descriptorRealPath)) {
+      return createAuthorityFailure(
+        "path-outside-workspace",
+        "Refuse to create because the opened selected workspace target resolves outside the workspace.",
+      );
+    }
+
+    return undefined;
+  }
 }
 
 function authorityFailure(
@@ -235,12 +440,36 @@ function authorityFailure(
   };
 }
 
+function createAuthorityFailure(
+  reason: Extract<WorkspaceCreateTargetAuthority, { ok: false }>["reason"],
+  message: string,
+): Extract<WorkspaceCreateTargetAuthority, { ok: false }> {
+  return {
+    ok: false,
+    reason,
+    message,
+    evidence: [
+      "apply-patch-workspace-create-authority:blocked",
+      `apply-patch-workspace-create-authority:${reason}`,
+    ],
+  };
+}
+
 function isMissingFileError(error: unknown): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
     "code" in error &&
     (error as { code?: unknown }).code === "ENOENT"
+  );
+}
+
+function isFileExistsError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "EEXIST"
   );
 }
 
@@ -269,4 +498,12 @@ function pathStaysInsideWorkspace(
   return (
     relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative)
   );
+}
+
+function pathStaysInsideOrIsWorkspace(
+  workspaceRoot: string,
+  absolutePath: string,
+): boolean {
+  const relative = path.relative(workspaceRoot, absolutePath);
+  return !relative.startsWith("..") && !path.isAbsolute(relative);
 }
