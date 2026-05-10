@@ -114,6 +114,7 @@ work:
 | --- | --- | --- | --- |
 | Golden CLI main path | `npm run test:gate:golden-main-path` | Required stable gate | Fast synthetic CLI baseline for the user-visible main path. |
 | Real user capabilities | `npm run verify:real-user-capabilities` | Required stable MVP gate for current dogfood mutation evidence | Synthetic selected-workspace existing-file single-file update. Broader real-provider, protected consistency, release, and backlog cases require explicit `--tier=...`. |
+| Synthetic Add File create smoke | `npm run verify:real-user-capabilities -- --case=synthetic-selected-workspace-single-file-create` | Explicit candidate evidence | Synthetic selected-workspace single-file Add File create through the explicit write entrypoint. It is not part of default MVP and does not enable multi-file/delete/move/rollback or broad `apply_patch`. |
 | Real single-file provider smoke | `npm run verify:real-user-capabilities:real-single-file` | Explicit opt-in candidate evidence | Real provider model turn plus isolated selected-workspace existing-file single-file update. It is not part of default MVP, and it does not enable create/add/delete/move/multi-file/rollback or broader `apply_patch`. |
 | Focused regression guard | `npm run test -w packages/ts-shell -- <file> -t "<case>"` | Required when the current bounded slice added or changed a focused guard | Proves the exact behavior being closed without treating legacy wide tests as release blockers. |
 | Release core | `npm run verify:release:core` | Broader deterministic release gate | Runs the hard gate set listed above; use before release handoff or when changing shared CLI/runtime contracts. |
@@ -133,6 +134,14 @@ Allowed create route:
 - target must not exist before write
 - exclusive create only; no overwrite and no parent directory creation
 - post-write readback must equal planned content before `changedFiles=[target]`
+
+Candidate gate evidence:
+
+- `synthetic-selected-workspace-single-file-create` runs only when candidate tier
+  or that explicit case is selected
+- the smoke creates one existing-parent, missing-target file and verifies exact
+  content plus `Changed: <target>` output
+- default `--tier=mvp` must skip this case
 
 Blocked create route:
 

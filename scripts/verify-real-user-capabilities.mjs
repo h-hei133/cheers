@@ -275,6 +275,43 @@ const scenarios = [
     },
   },
   {
+    id: 'synthetic-selected-workspace-single-file-create',
+    tier: 'candidate',
+    provider: 'synthetic',
+    execution: 'apply-patch-workspace-write-cli',
+    expectedCapability: 'selected-workspace single-file Add File create under explicit runtime/write approval',
+    currentSupportedCapability: 'narrow synthetic candidate route for exactly one Add File with exclusive create and post-write readback verification',
+    reasonForTier: 'Candidate because it creates one new file only through the explicit selected-workspace write route; it must not run in the default MVP update-only gate.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+    projectDir: path.join(testRoot, `pca-capability-gate-candidate-create-${runId}`),
+    files: {
+      'src/.keep': 'parent exists\n',
+      'LOCKED.md': 'locked\n',
+    },
+    protectedFiles: ['LOCKED.md'],
+    patchText: [
+      '*** Begin Patch',
+      '*** Add File: src/new-note.txt',
+      '+hello capability gate',
+      '+created by synthetic smoke',
+      '*** End Patch',
+    ].join('\n'),
+    expectChanged: ['src/new-note.txt'],
+    expectContains: {
+      'src/new-note.txt': ['hello capability gate', 'created by synthetic smoke'],
+    },
+    expectExactContent: {
+      'src/new-note.txt': 'hello capability gate\ncreated by synthetic smoke',
+    },
+    expectOutputContains: [
+      'apply_patch workspace create succeeded',
+      'Changed: src/new-note.txt',
+      'Verified: post-write content matched approved Add File patch',
+    ],
+  },
+  {
     id: 'synthetic-single-file-protected-verify',
     tier: 'backlog',
     provider: 'synthetic',
@@ -456,18 +493,6 @@ const tierDescriptorCases = [
     requiresRealProvider: true,
     expectedToPassCurrentMvp: false,
     expectedToPassInCurrentMVP: false,
-  },
-  {
-    id: 'candidate-selected-workspace-single-file-add-create-route',
-    tier: 'candidate',
-    provider: 'synthetic',
-    executable: false,
-    expectedCapability: 'selected-workspace single-file Add File create under explicit runtime/write approval',
-    currentSupportedCapability: 'available only through the narrow synthetic candidate create route; default MVP and broad apply_patch remain update-only/no-write for Add File',
-    reasonForTier: 'Candidate because it writes a new file only in an explicit selected-workspace route with exclusive create and readback verification; it is not default MVP and does not imply multi-file/delete/move support.',
-    drivesApplyPatchExpansion: false,
-    requiresRealProvider: false,
-    expectedToPassCurrentMvp: false,
   },
   {
     id: 'real-apply-patch-workspace-write-smoke',
@@ -1227,6 +1252,10 @@ function normalizeSlashes(value) {
   return String(value ?? '').replace(/\\/g, '/')
 }
 
+function escapeRegExp(value) {
+  return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function hasPathPrefix(value, prefix) {
   const normalizedValue = normalizeSlashes(value).toLowerCase()
   const normalizedPrefix = normalizeSlashes(prefix).toLowerCase()
@@ -1450,8 +1479,10 @@ async function runApplyPatchWorkspaceWriteScenario(scenario) {
     if (result.code !== 0 || result.timedOut) {
       failures.push(result.timedOut ? 'workspace write CLI timed out' : `workspace write CLI exited ${result.code}`)
     }
-    if (!/apply_patch workspace write succeeded/i.test(result.output)) {
-      failures.push('workspace write success marker missing')
+    const successMarker =
+      scenario.expectOutputContains?.[0] ?? 'apply_patch workspace write succeeded'
+    if (!new RegExp(escapeRegExp(successMarker), 'i').test(result.output)) {
+      failures.push(`workspace success marker missing: ${successMarker}`)
     }
     if (!/success/i.test(result.output)) {
       failures.push('terminal success marker missing')
@@ -1477,6 +1508,17 @@ async function runApplyPatchWorkspaceWriteScenario(scenario) {
         if (!content.includes(marker)) {
           failures.push(`missing marker in ${relativePath}: ${marker}`)
         }
+      }
+    }
+    for (const [relativePath, expectedContent] of Object.entries(scenario.expectExactContent ?? {})) {
+      const content = after.get(relativePath)
+      if (content !== expectedContent) {
+        failures.push(`exact content mismatch for ${relativePath}`)
+      }
+    }
+    for (const marker of scenario.expectOutputContains ?? []) {
+      if (!result.output.includes(marker)) {
+        failures.push(`output missing marker: ${marker}`)
       }
     }
 

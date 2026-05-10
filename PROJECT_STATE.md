@@ -93,6 +93,10 @@ Key boundaries:
 - blocked paths keep `changedFiles=[]`, `writeIntents=[]`, no success terminal,
   and no writer invocation unless the failure happened after the exclusive
   writer started
+- `verify-real-user-capabilities` includes an executable synthetic candidate
+  smoke, `synthetic-selected-workspace-single-file-create`, which proves the
+  explicit selected-workspace create route creates one file and reports
+  `changedFiles=[target]` only after readback verification
 - default MVP remains selected-workspace existing-file single-file update; broad
   `apply_patch`, delete/move, multi-file, rollback, provider/auth, and
   real-provider create smoke remain unchanged
