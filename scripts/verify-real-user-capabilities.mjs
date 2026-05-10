@@ -140,7 +140,7 @@ const failureCategories = [
 const providerNetworkFailurePattern =
   /(provider-readiness:network|provider-network-inconclusive|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network|socket hang up|TLS|timeout|unreachable|kind[:= ]+network)/i
 const providerConfigFailurePattern =
-  /(provider-readiness:(missing-key|missing-config|unsupported-provider)|missing.*config|failed to parse.*config|config\.json|missing.*key|api key|apikey|not connected|connect first|credentials|missing baseUrl|baseUrl is missing|model is missing)/i
+  /(provider-readiness:(missing-key|missing-config|unsupported-provider)|missing.*config|failed to parse.*config|config\.json|missing.*key|api key|apikey|not connected|connect first|missing.*credentials|credentials.*missing|credential.*incomplete|missing baseUrl|baseUrl is missing|model is missing)/i
 const providerAuthFailurePattern =
   /(provider-readiness:auth|authentication was rejected|invalid authentication|invalid api key|unauthorized|forbidden|401|403|kind[:= ]+authentication)/i
 const providerModelFailurePattern =
@@ -241,6 +241,7 @@ function prepareRealMutationEnvContract() {
 
   const resolved = resolveProviderEnvConfig(process.env, {
     providerEnvLoaded: loaded.configSource === 'explicit-env+provider-env',
+    providerEnv: loaded.env,
   })
   if (!resolved.ok) {
     return {
@@ -257,15 +258,16 @@ function prepareRealMutationEnvContract() {
   process.env.PRIVATE_AGENTS_REAL_HOME = generatedRealHome
   process.env[resolved.apiKeyEnvVar] = resolved.apiKey
   process.env.PRIVATE_AGENTS_REAL_PROVIDER = resolved.provider
+  const configSource = `${loaded.configSource}${resolved.configSourceSuffix ?? ''}`
   return {
     enabled: true,
     realHome: generatedRealHome,
-    configSource: loaded.configSource,
+    configSource,
     providerDiagnostics: buildProviderDiagnostics({
       provider: resolved.provider,
       baseUrl: resolved.baseUrl,
       model: resolved.model,
-      configSource: loaded.configSource,
+      configSource,
       credentialSource: 'env',
     }),
     error: undefined,
@@ -496,13 +498,33 @@ function fieldAliases(field) {
   return []
 }
 
-function resolveProviderEnvConfig(env, { providerEnvLoaded = false } = {}) {
-  const provider = normalizeRealProvider(getFirstEnvValue(env, [
+function resolveProviderEnvConfig(env, { providerEnvLoaded = false, providerEnv = {} } = {}) {
+  const approvedEnv = providerEnv && typeof providerEnv === 'object' ? providerEnv : {}
+  let provider = normalizeRealProvider(getFirstEnvValue(env, [
     'PRIVATE_AGENTS_REAL_PROVIDER',
     'PRIVATE_AGENTS_PROVIDER',
     'provider',
     'PROVIDER',
-  ])) ?? inferProviderFromEnv(env, { allowOpenAiFallback: !providerEnvLoaded })
+  ])) ??
+    normalizeRealProvider(getFirstEnvValue(approvedEnv, [
+      'PRIVATE_AGENTS_REAL_PROVIDER',
+      'PRIVATE_AGENTS_PROVIDER',
+      'provider',
+      'PROVIDER',
+    ])) ??
+    inferProviderFromEnv(approvedEnv, { allowOpenAiFallback: false }) ??
+    inferProviderFromEnv(env, { allowOpenAiFallback: !providerEnvLoaded })
+  const approvedProviderEnvOpenAiCompatibleDefault = !provider &&
+    providerEnvLoaded &&
+    Boolean(getFirstEnvValue(approvedEnv, [
+      'OPENAI_COMPATIBLE_API_KEY',
+      'PRIVATE_AGENTS_REAL_API_KEY',
+      'OPENAI_API_KEY',
+      ...providerCredentialFieldNames('openai-compatible', 'apiKey'),
+    ]))
+  if (approvedProviderEnvOpenAiCompatibleDefault) {
+    provider = 'openai-compatible'
+  }
   if (!provider) {
     return {
       ok: false,
@@ -526,7 +548,12 @@ function resolveProviderEnvConfig(env, { providerEnvLoaded = false } = {}) {
   const apiKey = getFirstEnvValue(env, [
     apiKeyEnvVar,
     'PRIVATE_AGENTS_REAL_API_KEY',
+  ]) ?? getFirstEnvValue(approvedEnv, [
+    apiKeyEnvVar,
+    'PRIVATE_AGENTS_REAL_API_KEY',
     ...providerApiKeyAliases(provider),
+  ]) ?? getFirstEnvValue(env, [
+    ...filterAmbientOpenAiFallbackAliases(providerApiKeyAliases(provider), { providerEnvLoaded }),
   ])
   if (!apiKey) {
     return {
@@ -540,14 +567,26 @@ function resolveProviderEnvConfig(env, { providerEnvLoaded = false } = {}) {
     'PRIVATE_AGENTS_REAL_BASE_URL',
     'PRIVATE_AGENTS_PROVIDER_BASE_URL',
     'PRIVATE_AGENTS_BASE_URL',
+  ]) ?? getFirstEnvValue(approvedEnv, [
+    'PRIVATE_AGENTS_REAL_BASE_URL',
+    'PRIVATE_AGENTS_PROVIDER_BASE_URL',
+    'PRIVATE_AGENTS_BASE_URL',
     ...providerBaseUrlAliases(provider),
-  ])
+  ]) ?? getFirstEnvValue(env, [
+    ...filterAmbientOpenAiFallbackAliases(providerBaseUrlAliases(provider), { providerEnvLoaded }),
+  ]) ?? (approvedProviderEnvOpenAiCompatibleDefault ? 'https://api.siliconflow.cn/v1' : undefined)
   const model = getFirstEnvValue(env, [
     'PRIVATE_AGENTS_REAL_MODEL',
     'PRIVATE_AGENTS_PROVIDER_MODEL',
     'PRIVATE_AGENTS_MODEL',
+  ]) ?? getFirstEnvValue(approvedEnv, [
+    'PRIVATE_AGENTS_REAL_MODEL',
+    'PRIVATE_AGENTS_PROVIDER_MODEL',
+    'PRIVATE_AGENTS_MODEL',
     ...providerModelAliases(provider),
-  ])
+  ]) ?? getFirstEnvValue(env, [
+    ...filterAmbientOpenAiFallbackAliases(providerModelAliases(provider), { providerEnvLoaded }),
+  ]) ?? (approvedProviderEnvOpenAiCompatibleDefault ? 'deepseek-ai/DeepSeek-V4-Flash' : undefined)
   if (providerRequiresEndpointConfig(provider) && !baseUrl) {
     return {
       ok: false,
@@ -563,7 +602,30 @@ function resolveProviderEnvConfig(env, { providerEnvLoaded = false } = {}) {
     }
   }
 
-  return { ok: true, provider, apiKey, apiKeyEnvVar, baseUrl, model }
+  return {
+    ok: true,
+    provider,
+    apiKey,
+    apiKeyEnvVar,
+    baseUrl,
+    model,
+    configSourceSuffix: approvedProviderEnvOpenAiCompatibleDefault ? '+openai-compatible-defaults' : '',
+  }
+}
+
+function filterAmbientOpenAiFallbackAliases(names, { providerEnvLoaded }) {
+  if (!providerEnvLoaded) return names
+  const ambientOpenAiFallbackNames = new Set([
+    'OPENAI_API_KEY',
+    'OPENAI_BASE_URL',
+    'OPENAI_API_BASE',
+    'OPENAI_API_BASE_URL',
+    'OPENAI_MODEL',
+    'API_BASE_URL',
+    'BASE_URL',
+    'MODEL',
+  ])
+  return names.filter((name) => !ambientOpenAiFallbackNames.has(name))
 }
 
 function inferProviderFromEnv(env, { allowOpenAiFallback = true } = {}) {

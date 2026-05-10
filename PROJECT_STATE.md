@@ -266,6 +266,9 @@ Current tier split:
   `providerCredentials.openai-compatible.*`, remain provider id
   `openai-compatible`; smoke diagnostics distinguish provider identity from the
   OpenAI-compatible protocol and print only the base URL host
+- the candidate real suite refuses ambient `openai` fallback; in the current
+  SiliconFlow-compatible env shape it keeps the opt-in smoke on
+  `openai-compatible` with host-only base URL diagnostics
 - release tier records release-only gates such as CLI entry stability,
   permission-memory, release-core, and long-session/compact continuity as
   non-MVP blockers

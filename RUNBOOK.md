@@ -142,6 +142,10 @@ Candidate mutation real suite contract:
   approved env file are preserved as provider id `openai-compatible`; the
   OpenAI-compatible client protocol is reported separately and base URL
   diagnostics print only the host, for example `api.siliconflow.cn`.
+- If the approved env file is present but exposes only an API key in the
+  current SiliconFlow-compatible setup, the candidate real suite keeps the
+  smoke on the OpenAI-compatible path with host-only SiliconFlow diagnostics
+  instead of falling back to provider id `openai`.
 - The suite must not read real user provider config directories. Missing
   provider selector, key, base URL, or model is a CONFIG failure; auth, network,
   model-output, route, and post-write failures must remain separately
