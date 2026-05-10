@@ -24,6 +24,13 @@ import {
   snapshotSingleFileUpdateFixture,
 } from './real-provider-single-file-update-fixture.mjs'
 import {
+  cleanupSingleFileCreateFixture,
+  compareSingleFileCreateSnapshots,
+  createSingleFileCreateFixture,
+  readSingleFileCreateTarget,
+  snapshotSingleFileCreateFixture,
+} from './real-provider-single-file-create-fixture.mjs'
+import {
   assertOnlyExpectedCodingFixtureChanges,
   buildCodingFlowDryRunContract,
   cleanupCodingFlowFixture,
@@ -59,6 +66,7 @@ const reportPath = path.join(testRoot, 'test-results', 'real-user-capabilities-r
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const tierValues = ['mvp', 'candidate', 'release', 'backlog', 'all']
 const realSingleFileUpdateCaseId = 'real-selected-workspace-single-file-update'
+const realSingleFileCreateCaseId = 'real-selected-workspace-single-file-create'
 const selectedTier = parseTierArg(process.argv)
 const selectedCaseId = parseCaseArg(process.argv)
 const includeCandidates = process.argv.includes('--include-candidates')
@@ -489,6 +497,20 @@ const tierDescriptorCases = [
     expectedCapability: 'real provider selected-workspace existing-file single-file update',
     currentSupportedCapability: 'selected-workspace existing-file single-file update only',
     reasonForTier: 'Candidate opt-in because it uses a real provider to dogfood the existing MVP mutation boundary without changing the default synthetic gate.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: true,
+    expectedToPassCurrentMvp: false,
+    expectedToPassInCurrentMVP: false,
+  },
+  {
+    id: realSingleFileCreateCaseId,
+    tier: 'candidate',
+    provider: 'real',
+    executable: false,
+    manualFlag: `--case=${realSingleFileCreateCaseId}`,
+    expectedCapability: 'real provider selected-workspace single-file Add File create',
+    currentSupportedCapability: 'selected-workspace single-file Add File create only',
+    reasonForTier: 'Candidate opt-in because it asks a real provider to emit exactly one Add File patch and routes it through the narrow selected-workspace create route without changing the default MVP gate.',
     drivesApplyPatchExpansion: false,
     requiresRealProvider: true,
     expectedToPassCurrentMvp: false,
@@ -2017,6 +2039,9 @@ function printHelp() {
   console.log(`  --case=${realSingleFileUpdateCaseId}`)
   console.log('    Opt-in only; runs one real-provider model turn and writes only one existing file in an isolated selected workspace.')
   console.log('    Excluded from default MVP verification; does not enable create/add/delete/move/multi-file/rollback or broader apply_patch.')
+  console.log(`  --case=${realSingleFileCreateCaseId}`)
+  console.log('    Opt-in only; runs one real-provider model turn and creates only one new file in an isolated selected workspace.')
+  console.log('    Excluded from default MVP verification; does not enable multi-file/delete/move/rollback, parent directory creation, or broader apply_patch.')
   console.log('  --real-readonly-coding-preflight')
   console.log('    Opt-in only; readiness preflight only; no model turn.')
   console.log('  --real-readonly-coding-smoke')
@@ -8605,6 +8630,18 @@ function statusDetailForRealSingleFileUpdateFailureCategory(failureCategory) {
   return 'passed'
 }
 
+function statusDetailForRealSingleFileCreateFailureCategory(failureCategory) {
+  if (failureCategory === 'provider/preflight') return 'provider-preflight'
+  if (failureCategory === 'model output') return 'model-output'
+  if (failureCategory === 'unsupported patch') return 'unsupported-patch'
+  if (failureCategory === 'verification-blocked') return 'verification-blocked'
+  if (failureCategory === 'route rejected') return 'route-rejected'
+  if (failureCategory === 'no mutation') return 'no-mutation'
+  if (failureCategory === 'post-write verification failed') return 'post-write-verification-failed'
+  if (failureCategory === 'redaction failure') return 'redaction-failure'
+  return 'passed'
+}
+
 function classifySingleFileUpdatePatchShape(patchText) {
   const normalized = String(patchText ?? '').replace(/\r\n/g, '\n')
   const updateFiles = [...normalized.matchAll(/^\*\*\* Update File:\s+(.+)$/gm)]
@@ -8639,10 +8676,78 @@ function classifySingleFileUpdatePatchShape(patchText) {
   return { ok: true, reason: '' }
 }
 
+function classifySingleFileCreatePatchShape(patchText, fixture) {
+  const normalized = String(patchText ?? '').replace(/\r\n/g, '\n')
+  const addFiles = [...normalized.matchAll(/^\*\*\* Add File:\s+(.+)$/gm)]
+    .map((match) => match[1].trim())
+  const updateFiles = [...normalized.matchAll(/^\*\*\* Update File:\s+(.+)$/gm)]
+    .map((match) => match[1].trim())
+  const deleteFiles = [...normalized.matchAll(/^\*\*\* Delete File:\s+(.+)$/gm)]
+    .map((match) => match[1].trim())
+  const hasMove = /^\*\*\* Move to:/m.test(normalized)
+
+  if (updateFiles.length > 0) {
+    return {
+      ok: false,
+      reason: `unsupported patch: generated Update File instead of Add File (${updateFiles.join(',')})`,
+    }
+  }
+  if (deleteFiles.length > 0 || hasMove) {
+    return {
+      ok: false,
+      reason: 'unsupported patch: delete/move headers are outside the single-file create smoke boundary',
+    }
+  }
+  if (addFiles.length !== 1) {
+    return {
+      ok: false,
+      reason: `unsupported patch: expected exactly one Add File for ${fixture.targetPath}, observed ${addFiles.join(',') || 'none'}`,
+    }
+  }
+  if (addFiles[0] !== fixture.targetPath) {
+    return {
+      ok: false,
+      reason: `unsupported patch: wrong Add File target ${addFiles[0]}; expected ${fixture.targetPath}`,
+    }
+  }
+
+  const content = extractAddFileContent(normalized, fixture.targetPath)
+  if (content !== fixture.plannedContent) {
+    return {
+      ok: false,
+      reason: 'unsupported patch: Add File content did not match the deterministic planned content',
+    }
+  }
+  return { ok: true, reason: '' }
+}
+
+function extractAddFileContent(patchText, targetPath) {
+  const lines = patchText.split('\n')
+  const start = lines.findIndex((line) => line.trim() === `*** Add File: ${targetPath}`)
+  if (start < 0) return ''
+  const content = []
+  for (const line of lines.slice(start + 1)) {
+    if (line.startsWith('*** ')) break
+    if (!line.startsWith('+')) return ''
+    content.push(line.slice(1))
+  }
+  return content.join('\n')
+}
+
 function buildRealSingleFileUpdateFailure({ category, reason, status = 'FAIL', statusDetail, exitCode = 1 }) {
   return {
     status,
     statusDetail: statusDetail ?? statusDetailForRealSingleFileUpdateFailureCategory(category),
+    exitCode,
+    failureCategory: category,
+    failureReason: reason,
+  }
+}
+
+function buildRealSingleFileCreateFailure({ category, reason, status = 'FAIL', statusDetail, exitCode = 1 }) {
+  return {
+    status,
+    statusDetail: statusDetail ?? statusDetailForRealSingleFileCreateFailureCategory(category),
     exitCode,
     failureCategory: category,
     failureReason: reason,
@@ -8664,6 +8769,374 @@ function writeRealSingleFileUpdateReport(fields) {
     expectedToPassInCurrentMVP: false,
     ...fields,
   })
+}
+
+function writeRealSingleFileCreateReport(fields) {
+  writeReport({
+    generatedAt: new Date().toISOString(),
+    capability: realSingleFileCreateCaseId,
+    provider: 'real',
+    mode: 'opt-in-case',
+    tier: 'candidate',
+    reportPath,
+    expectedCapability: 'real provider selected-workspace single-file Add File create',
+    currentSupportedCapability: 'selected-workspace single-file Add File create only',
+    drivesApplyPatchExpansion: false,
+    expectedToPassCurrentMvp: false,
+    expectedToPassInCurrentMVP: false,
+    ...fields,
+  })
+}
+
+async function runRealSelectedWorkspaceSingleFileCreate() {
+  console.log(`mode=${realSingleFileCreateCaseId}`)
+  console.log('status taxonomy: pass=0 product-regression=1 provider-network-inconclusive=2 config-failure=3')
+  console.log('real-provider=explicit-opt-in')
+  console.log('homeRead=false')
+  console.log('defaultSmoke=skipped')
+  console.log('realProviderHome=config-only')
+  console.log('writeScope=isolated-selected-workspace-single-file-add-only')
+  console.log('mutationBoundary=create-only single-file no-update no-delete no-move no-multifile no-rollback no-parent-dir-create')
+
+  if (!realHome) {
+    const failure = buildRealSingleFileCreateFailure({
+      category: 'provider/preflight',
+      reason: 'provider/preflight: set PRIVATE_AGENTS_REAL_HOME before running real selected-workspace single-file create smoke',
+      status: 'CONFIG',
+      exitCode: 3,
+    })
+    writeRealSingleFileCreateReport({
+      ...failure,
+      realProviderExecution: false,
+      modelTurn: false,
+      changedFiles: [],
+      writeIntents: [],
+      workspaceWriterInvoked: false,
+    })
+    console.log(`[CONFIG] ${realSingleFileCreateCaseId} status=${failure.statusDetail}`)
+    process.exitCode = failure.exitCode
+    return
+  }
+
+  const repoBefore = await readRepoStatusShort()
+  if (!repoBefore.ok || repoBefore.status) {
+    const failure = buildRealSingleFileCreateFailure({
+      category: 'verification-blocked',
+      reason: repoBefore.ok
+        ? 'verification-blocked: repository was not clean before opt-in real single-file create smoke'
+        : 'verification-blocked: repository status could not be checked before opt-in real single-file create smoke',
+    })
+    writeRealSingleFileCreateReport({
+      ...failure,
+      realProviderExecution: false,
+      modelTurn: false,
+      changedFiles: [],
+      writeIntents: [],
+      workspaceWriterInvoked: false,
+      outputTail: repoBefore.outputTail,
+    })
+    console.log(`[FAIL] ${realSingleFileCreateCaseId} status=${failure.statusDetail}`)
+    console.log(`failureReason=${failure.failureReason}`)
+    process.exitCode = failure.exitCode
+    return
+  }
+
+  const preflight = await runProviderReadinessPreflight()
+  const preflightStatus = buildCodingFlowPreflightStatus(preflight)
+  console.log(`[${preflightStatus.status}] real-single-file-create-preflight status=${preflightStatus.statusDetail}`)
+  if (!preflight.ok) {
+    const failure = buildRealSingleFileCreateFailure({
+      category: 'provider/preflight',
+      reason: preflightStatus.failureReason,
+      status: preflightStatus.status,
+      statusDetail: preflightStatus.statusDetail,
+      exitCode: preflightStatus.exitCode,
+    })
+    writeRealSingleFileCreateReport({
+      ...failure,
+      realProviderExecution: true,
+      modelTurn: false,
+      providerReadiness: preflight,
+      changedFiles: [],
+      writeIntents: [],
+      workspaceWriterInvoked: false,
+      outputTail: preflight.outputTail,
+    })
+    process.exitCode = failure.exitCode
+    return
+  }
+
+  const smokeRunId = `${realSingleFileCreateCaseId}-${Date.now()}`
+  const runtimeHome = getRealCodingFlowRuntimeHome(`${smokeRunId}-runtime`)
+  const auditLogPath = getRealCodingFlowAuditLogPath(`${smokeRunId}-audit`)
+  assertSafeCodingFlowRuntimeHome(runtimeHome)
+  assertSafeCodingFlowRuntimeHome(path.dirname(auditLogPath))
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+
+  const fixture = createSingleFileCreateFixture()
+  try {
+    const before = snapshotSingleFileCreateFixture(fixture.fixtureDir)
+    const beforeTarget = readSingleFileCreateTarget(fixture.fixtureDir)
+    const providerResult = await runApplyPatchDryRunProviderTurn({
+      prompt: fixture.prompt,
+      runtimeHome,
+      realHome,
+      fixtureDir: fixture.fixtureDir,
+      auditLogPath,
+    })
+    const redaction = redactAndAssertCodingProviderOutput(providerResult.rawOutput || providerResult.output)
+    const redactedProviderOutput = redactAndAssertCodingProviderOutput(providerResult.output).redacted
+    const providerFailure = classifyProviderReadinessFailure(
+      `real single-file create model turn exited ${providerResult.code}`,
+      redaction.redacted,
+      'real',
+    )
+
+    let cliResult = undefined
+    const extracted = extractSingleApplyPatchBlock(redactedProviderOutput)
+    const patchShape = extracted.status === 'ok'
+      ? classifySingleFileCreatePatchShape(extracted.patchText, fixture)
+      : { ok: false, reason: '' }
+
+    if (providerResult.code === 0 && !providerResult.timedOut && !providerFailure && extracted.status === 'ok' && patchShape.ok) {
+      cliResult = await runApplyPatchWorkspaceWriteCli({
+        fixtureDir: fixture.fixtureDir,
+        patchText: extracted.patchText,
+        runtimeHome,
+        auditLogPath,
+      })
+    }
+
+    const after = snapshotSingleFileCreateFixture(fixture.fixtureDir)
+    const afterTarget = readSingleFileCreateTarget(fixture.fixtureDir)
+    const comparison = compareSingleFileCreateSnapshots(before, after)
+    const repoAfter = await readRepoStatusShort()
+    const cliRedaction = redactAndAssertCodingProviderOutput(cliResult?.output ?? '')
+    const redactionOk = redaction.ok && cliRedaction.ok
+    const repositoryClean = repoBefore.ok && !repoBefore.status && repoAfter.ok && !repoAfter.status
+
+    if (providerFailure || providerResult.code !== 0 || providerResult.timedOut) {
+      const providerStatus = buildCodingFlowSmokeFailureStatus(providerResult, redaction.redacted, redaction)
+      const failure = buildRealSingleFileCreateFailure({
+        category: 'provider/preflight',
+        reason: providerStatus.failureReason,
+        status: providerStatus.status,
+        statusDetail: providerStatus.statusDetail,
+        exitCode: providerStatus.exitCode,
+      })
+      writeRealSingleFileCreateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        changedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        redaction: { ok: redaction.ok, leaks: redaction.leaks },
+        outputTail: summarizeOutput(redaction.redacted),
+      })
+      console.log(`[${failure.status}] ${realSingleFileCreateCaseId} status=${failure.statusDetail}`)
+      if (redaction.redacted) console.log(summarizeOutput(redaction.redacted))
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    if (!redactionOk) {
+      const failure = buildRealSingleFileCreateFailure({
+        category: 'redaction failure',
+        reason: `redaction failure: ${[...redaction.leaks, ...cliRedaction.leaks].join(',') || 'unknown'}`,
+      })
+      writeRealSingleFileCreateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        changedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        redaction: { ok: false, leaks: [...redaction.leaks, ...cliRedaction.leaks] },
+      })
+      console.log(`[FAIL] ${realSingleFileCreateCaseId} status=${failure.statusDetail}`)
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    if (extracted.status !== 'ok') {
+      const failure = buildRealSingleFileCreateFailure({
+        category: 'model output',
+        reason: `model output: provider output did not contain exactly one apply_patch block (${extracted.status})`,
+        statusDetail: extracted.status,
+      })
+      writeRealSingleFileCreateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        outputTail: summarizeOutput(redactedProviderOutput),
+      })
+      console.log(`[FAIL] ${realSingleFileCreateCaseId} status=${failure.statusDetail}`)
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    if (!patchShape.ok) {
+      const failure = buildRealSingleFileCreateFailure({
+        category: 'unsupported patch',
+        reason: patchShape.reason,
+      })
+      writeRealSingleFileCreateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        writeIntents: [],
+        workspaceWriterInvoked: false,
+        outputTail: summarizeOutput(redactedProviderOutput),
+      })
+      console.log(`[FAIL] ${realSingleFileCreateCaseId} status=${failure.statusDetail}`)
+      console.log(`failureReason=${failure.failureReason}`)
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    const cliPassed = cliResult?.code === 0 &&
+      !cliResult.timedOut &&
+      /apply_patch workspace create succeeded/i.test(cliResult.output) &&
+      /success/i.test(cliResult.output)
+    if (!cliPassed) {
+      const unsupported = /unsupported|not supported|only supports|failed to parse|cannot apply|rejected/i.test(cliResult?.output ?? '')
+      const failure = buildRealSingleFileCreateFailure({
+        category: unsupported ? 'route rejected' : 'verification-blocked',
+        reason: unsupported
+          ? `route rejected: workspace create route rejected the provider patch (${summarizeOutput(cliResult?.output ?? '')})`
+          : `verification-blocked: workspace create CLI did not complete successfully code=${cliResult?.code ?? 'missing'} timedOut=${cliResult?.timedOut ?? 'missing'}`,
+      })
+      writeRealSingleFileCreateReport({
+        ...failure,
+        realProviderExecution: true,
+        modelTurn: true,
+        runtimeHome: 'isolated-test-root',
+        fixture: {
+          files: fixture.files,
+          added: comparison.added,
+          removed: comparison.removed,
+          changed: comparison.changed,
+        },
+        repositoryClean,
+        applyPatchBlocks: extracted.count,
+        changedFiles: [],
+        writeIntents: [fixture.targetPath],
+        workspaceWriterInvoked: false,
+        outputTail: summarizeOutput(cliRedaction.redacted || redactedProviderOutput),
+      })
+      console.log(`[FAIL] ${realSingleFileCreateCaseId} status=${failure.statusDetail}`)
+      console.log(`failureReason=${failure.failureReason}`)
+      process.exitCode = failure.exitCode
+      return
+    }
+
+    const targetCreated = beforeTarget === undefined && typeof afterTarget === 'string'
+    const onlyTargetAdded = comparison.added.length === 1 &&
+      comparison.added[0] === fixture.targetPath &&
+      comparison.removed.length === 0 &&
+      comparison.changed.length === 0
+    const targetContentOk = afterTarget === fixture.plannedContent
+    const success = targetCreated && onlyTargetAdded && targetContentOk && repositoryClean
+    const failureCategory = !targetCreated
+      ? 'no mutation'
+      : success
+        ? 'none'
+        : 'post-write verification failed'
+    const failures = [
+      ...(targetCreated ? [] : [`no mutation: ${fixture.targetPath} was not created after workspace create route completed`]),
+      ...(onlyTargetAdded ? [] : [`post-write verification failed: expected only ${fixture.targetPath} added; changed=${comparison.changed.join(',') || 'none'} added=${comparison.added.join(',') || 'none'} removed=${comparison.removed.join(',') || 'none'}`]),
+      ...(targetContentOk ? [] : [`post-write verification failed: ${fixture.targetPath} content did not match planned Add File content`]),
+      ...(repositoryClean ? [] : ['post-write verification failed: repository mutated or status unavailable']),
+    ]
+
+    writeRealSingleFileCreateReport({
+      status: success ? 'PASS' : 'FAIL',
+      statusDetail: success ? 'passed' : statusDetailForRealSingleFileCreateFailureCategory(failureCategory),
+      realProviderExecution: true,
+      modelTurn: true,
+      runtimeHome: 'isolated-test-root',
+      fixture: {
+        files: fixture.files,
+        added: comparison.added,
+        removed: comparison.removed,
+        changed: comparison.changed,
+      },
+      repositoryClean,
+      applyPatchBlocks: extracted.count,
+      changedFiles: success ? [fixture.targetPath] : [],
+      writeIntents: [fixture.targetPath],
+      workspaceWriterInvoked: success,
+      writerTarget: success ? 'isolated-selected-workspace' : 'missing-or-unverified',
+      terminalSuccessAllowed: success,
+      redaction: { ok: true, leaks: [] },
+      failureCategory,
+      failureReason: failures.join('; '),
+      outputTail: summarizeOutput(cliRedaction.redacted || redactedProviderOutput),
+    })
+    console.log(`fixtureFiles=${fixture.files.join(',')}`)
+    console.log(`applyPatchBlocks=${extracted.count}`)
+    console.log(`fixtureChanged=${comparison.changed.join(',') || 'none'}`)
+    console.log(`fixtureAdded=${comparison.added.join(',') || 'none'}`)
+    console.log(`fixtureRemoved=${comparison.removed.join(',') || 'none'}`)
+    console.log(`targetCreated=${targetCreated}`)
+    console.log(`postWriteVerification=${success ? 'pass' : 'fail'}`)
+    console.log(`repositoryClean=${repositoryClean}`)
+    console.log(`workspaceWriterInvoked=${success}`)
+    console.log(`writerTarget=${success ? 'isolated-selected-workspace' : 'missing-or-unverified'}`)
+    console.log(`changedFiles=${success ? fixture.targetPath : ''}`)
+    console.log(`writeIntents=${fixture.targetPath}`)
+    console.log(`redaction=${redactionOk ? 'pass' : 'fail'}`)
+    if (!success) console.log(`failureReason=${failures.join('; ')}`)
+    console.log(`[${success ? 'PASS' : 'FAIL'}] ${realSingleFileCreateCaseId}`)
+    process.exitCode = success ? 0 : 1
+    return
+  } finally {
+    cleanupSingleFileCreateFixture(fixture.fixtureDir)
+    cleanupIsolatedCodingFlowRuntimeHome(runtimeHome)
+    cleanupIsolatedCodingFlowAuditLog(auditLogPath)
+  }
 }
 
 async function runRealSelectedWorkspaceSingleFileUpdate() {
@@ -9193,6 +9666,10 @@ async function main() {
 
   if (selectedCaseId === realSingleFileUpdateCaseId) {
     await runRealSelectedWorkspaceSingleFileUpdate()
+    return
+  }
+  if (selectedCaseId === realSingleFileCreateCaseId) {
+    await runRealSelectedWorkspaceSingleFileCreate()
     return
   }
 

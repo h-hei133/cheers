@@ -116,6 +116,7 @@ work:
 | Real user capabilities | `npm run verify:real-user-capabilities` | Required stable MVP gate for current dogfood mutation evidence | Synthetic selected-workspace existing-file single-file update. Broader real-provider, protected consistency, release, and backlog cases require explicit `--tier=...`. |
 | Synthetic Add File create smoke | `npm run verify:real-user-capabilities -- --case=synthetic-selected-workspace-single-file-create` | Explicit candidate evidence | Synthetic selected-workspace single-file Add File create through the explicit write entrypoint. It is not part of default MVP and does not enable multi-file/delete/move/rollback or broad `apply_patch`. |
 | Real single-file provider smoke | `npm run verify:real-user-capabilities:real-single-file` | Explicit opt-in candidate evidence | Real provider model turn plus isolated selected-workspace existing-file single-file update. It is not part of default MVP, and it does not enable create/add/delete/move/multi-file/rollback or broader `apply_patch`. |
+| Real Add File create provider smoke | `npm run verify:real-user-capabilities:real-create` | Explicit opt-in candidate evidence | Real provider model turn plus isolated selected-workspace single-file Add File create. It is not part of default MVP, and it does not enable multi-file/delete/move/rollback, parent directory creation, or broader `apply_patch`. |
 | Focused regression guard | `npm run test -w packages/ts-shell -- <file> -t "<case>"` | Required when the current bounded slice added or changed a focused guard | Proves the exact behavior being closed without treating legacy wide tests as release blockers. |
 | Release core | `npm run verify:release:core` | Broader deterministic release gate | Runs the hard gate set listed above; use before release handoff or when changing shared CLI/runtime contracts. |
 
@@ -141,6 +142,12 @@ Candidate gate evidence:
   or that explicit case is selected
 - the smoke creates one existing-parent, missing-target file and verifies exact
   content plus `Changed: <target>` output
+- `real-selected-workspace-single-file-create` runs only when that explicit case
+  is selected; `--list`, `--tier=candidate --dry-run`, and `--case=... --dry-run`
+  display its metadata without touching the real provider
+- the real smoke requires exactly one provider-produced
+  `*** Add File: src/new-note.txt` patch with deterministic content, then
+  verifies that only `src/new-note.txt` was created
 - default `--tier=mvp` must skip this case
 
 Blocked create route:
@@ -164,8 +171,7 @@ outside the explicit candidate create route:
   claim are required invariants
 - default MVP remains selected-workspace existing-file single-file update only
 - broader apply_patch, default create/add writing, delete/move, multi-file,
-  rollback, real-provider create smoke, provider/auth flow, and CLI/session
-  schema remain out of scope
+  rollback, provider/auth flow, and CLI/session schema remain out of scope
 
 `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.test.ts` full-suite
 is not a current main-path gate. It is a broad historical contract corpus used
@@ -327,6 +333,35 @@ On Linux/WSL, run it only with explicit real-provider opt-in and isolated test
 homes. If `provider.env` is used, load it silently in the command environment;
 never print, copy, log, or summarize provider secrets or values. `--list` and
 `--dry-run` show the case metadata without touching the real provider.
+
+### Real Add File create capability smoke
+
+`npm run verify:real-user-capabilities:real-create` is a candidate-only,
+explicit opt-in smoke for real-provider dogfood of the narrow selected-workspace
+Add File route.
+
+Required boundary:
+
+- one real-provider model turn may produce exactly one `apply_patch` block
+- the patch must contain exactly one `*** Add File: src/new-note.txt`
+- the isolated fixture has an existing `src/` parent and a missing target file
+- the route may create only `src/new-note.txt`; no existing file may be updated,
+  deleted, moved, or renamed
+- post-write verification must prove that only `src/new-note.txt` was created
+  and that its content equals the planned Add File content before
+  `changedFiles=[src/new-note.txt]` appears
+- provider/preflight, missing patch, multiple patch blocks, unsupported patch
+  shape, generated `Update File`, wrong target, content mismatch, route
+  rejection, no mutation, and post-write verification failures must remain
+  separately attributable
+
+Run it only with explicit real-provider opt-in and isolated test homes. If
+`provider.env` is used, load it silently in the command environment; never
+print, copy, log, or summarize provider secrets or values. `--list`,
+`--tier=candidate --dry-run`, and `--case=real-selected-workspace-single-file-create --dry-run`
+show the case metadata without touching the real provider. This smoke does not
+open broader `apply_patch`, parent directory creation, multi-file, delete/move,
+rollback, provider/auth flow, CLI/session schema, or the default MVP gate.
 
 ## Suggested debug reading order
 

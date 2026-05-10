@@ -97,9 +97,13 @@ Key boundaries:
   smoke, `synthetic-selected-workspace-single-file-create`, which proves the
   explicit selected-workspace create route creates one file and reports
   `changedFiles=[target]` only after readback verification
+- `verify-real-user-capabilities` also exposes an explicit opt-in real-provider
+  candidate smoke, `real-selected-workspace-single-file-create`, which asks the
+  provider for exactly one `Add File` patch and then routes only that patch
+  through the same isolated selected-workspace create entrypoint
 - default MVP remains selected-workspace existing-file single-file update; broad
   `apply_patch`, delete/move, multi-file, rollback, provider/auth, and
-  real-provider create smoke remain unchanged
+  default real-provider create execution remain unchanged
 
 ### Current closeout: mutation verification handoff projection
 
@@ -239,6 +243,26 @@ Follow-up opt-in evidence:
 - this evidence does not open broader `apply_patch`, create/add,
   delete/move, multi-file, rollback, protected composite, provider/auth, or
   production mutation behavior
+
+Additional opt-in create evidence:
+
+- `verify-real-user-capabilities` now also exposes
+  `--case=real-selected-workspace-single-file-create` and
+  `verify:real-user-capabilities:real-create`
+- this candidate smoke uses a real provider only after explicit opt-in, then
+  accepts exactly one provider-produced `Add File: src/new-note.txt` patch for
+  an isolated selected workspace where `src/` already exists and the target is
+  missing
+- the smoke rejects missing/multiple patch blocks, generated `Update File`
+  patches, wrong target paths, deterministic content mismatches, mixed
+  operation shapes, route rejection, no mutation, and post-write verification
+  failures as distinct outcomes
+- success requires that only `src/new-note.txt` is created and that
+  `changedFiles=[src/new-note.txt]` is reported only after readback
+  verification
+- this evidence does not open default create/add writing, broader
+  `apply_patch`, parent directory creation, delete/move, multi-file, rollback,
+  protected composite, provider/auth, or default MVP behavior
 
 ### Current closeout: isolated opt-in real-provider readiness smoke
 
