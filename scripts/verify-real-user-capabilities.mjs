@@ -65,6 +65,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
+const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const tierValues = ['mvp', 'candidate', 'release', 'backlog', 'all']
@@ -1189,6 +1190,20 @@ const scenarios = [
     ],
   },
   {
+    id: 'synthetic-mutation-continuity-after-compact',
+    tier: 'candidate',
+    provider: 'synthetic',
+    execution: 'mutation-continuity-compact-test',
+    expectedCapability: 'candidate mutation session persistence and compact-equivalent follow-up continuity',
+    currentSupportedCapability: 'synthetic compact-equivalent continuity evidence for candidate mutation success and partial failure state',
+    reasonForTier: 'Candidate because it proves closed mutation routes keep changedFiles, failedFiles, stopped reason, and partial failure state through session persistence and compact-equivalent reload without changing the default MVP gate.',
+    drivesApplyPatchExpansion: false,
+    requiresRealProvider: false,
+    expectedToPassCurrentMvp: false,
+    projectDir: path.join(testRoot, `pca-capability-gate-mutation-continuity-${runId}`),
+    expectChanged: [],
+  },
+  {
     id: 'synthetic-single-file-protected-verify',
     tier: 'backlog',
     provider: 'synthetic',
@@ -1515,6 +1530,7 @@ const candidateMutationSuiteSyntheticCaseIds = [
   'synthetic-selected-workspace-multi-file-update-planning',
   'synthetic-selected-workspace-two-file-update',
   'synthetic-selected-workspace-two-file-update-partial-failure',
+  'synthetic-mutation-continuity-after-compact',
 ]
 
 const candidateMutationSuiteRealCaseIds = [
@@ -2335,6 +2351,9 @@ async function runScenario(scenario) {
   if (scenario.execution === 'apply-patch-workspace-write-cli') {
     return runApplyPatchWorkspaceWriteScenario(scenario)
   }
+  if (scenario.execution === 'mutation-continuity-compact-test') {
+    return runMutationContinuityCompactScenario(scenario)
+  }
   if (scenario.execution === 'apply-patch-multi-file-update-planning-dry-run') {
     return runApplyPatchMultiFileUpdatePlanningScenario(scenario)
   }
@@ -2436,6 +2455,86 @@ async function runScenario(scenario) {
     failureCategory: 'none',
     failureReason: '',
     turns: turnResults,
+  }
+}
+
+async function runMutationContinuityCompactScenario(scenario) {
+  const result = await run(npmBin, [
+    'run',
+    'verify:mutation-continuity:compact',
+  ], {
+    cwd: repoRoot,
+    env: {
+      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+    },
+    timeoutMs: 120000,
+  })
+  const failures = []
+  if (result.code !== 0 || result.timedOut) {
+    failures.push(
+      result.timedOut
+        ? 'mutation compact continuity smoke timed out'
+        : `mutation compact continuity smoke exited ${result.code}`,
+    )
+  }
+  if (!/mutationCompactContinuity\.test\.ts/.test(result.output)) {
+    failures.push('mutation compact continuity focused test output missing')
+  }
+
+  if (failures.length > 0) {
+    return {
+      capability: scenario.id,
+      provider: scenario.provider,
+      status: 'FAIL',
+      projectDir: scenario.projectDir,
+      sessionId: '(mutation-compact-continuity)',
+      changedFiles: [],
+      failedFiles: [],
+      protectedFiles: scenario.protectedFiles,
+      reportPath,
+      verification: 'blocked',
+      failureCategory: categorizeFailure(failures.join('; '), result.output, scenario.provider),
+      failureReason: normalizeFailureReason(failures.join('; '), result.output, scenario.provider),
+      outputTail: summarizeOutput(result.output),
+      turns: [
+        {
+          turn: 1,
+          mode: 'mutation-continuity-compact-test',
+          sessionId: '(mutation-compact-continuity)',
+          changedFiles: [],
+          failedFiles: [],
+          verification: 'blocked',
+          outputTail: summarizeOutput(result.output),
+        },
+      ],
+    }
+  }
+
+  return {
+    capability: scenario.id,
+    provider: scenario.provider,
+    status: 'PASS',
+    projectDir: scenario.projectDir,
+    sessionId: '(mutation-compact-continuity)',
+    changedFiles: [],
+    failedFiles: [],
+    protectedFiles: scenario.protectedFiles,
+    reportPath,
+    verification: 'passed',
+    failureCategory: 'none',
+    failureReason: '',
+    outputTail: summarizeOutput(result.output),
+    turns: [
+      {
+        turn: 1,
+        mode: 'mutation-continuity-compact-test',
+        sessionId: '(mutation-compact-continuity)',
+        changedFiles: [],
+        failedFiles: [],
+        verification: 'passed',
+        outputTail: summarizeOutput(result.output),
+      },
+    ],
   }
 }
 

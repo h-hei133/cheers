@@ -140,13 +140,22 @@ Key boundaries:
   partial failure stays stopped, reports only the verified first file in
   `changedFiles`, reports the failed second file in `failedFiles`, and does not
   claim success, rollback, or atomicity
+- `verify-real-user-capabilities` includes
+  `synthetic-mutation-continuity-after-compact`, an executable synthetic
+  candidate smoke that uses session persistence, auto-compact, reload, and
+  follow-up continuity context as compact-equivalent evidence that two-file
+  mutation success preserves `changedFiles=[src/a.ts, src/b.ts]` and two-file
+  partial failure preserves stopped state, `changedFiles=[src/a.ts]`,
+  `failedFiles=[src/b.ts]`, writer-started unknown write effect, and the
+  inspect/re-read next action without success or rollback wording
 - `verify-real-user-capabilities` exposes an explicit opt-in real-provider
   candidate smoke, `real-selected-workspace-two-file-update`, which asks the
   provider for exactly one patch block with exactly two Update File operations
   and routes only that patch through the isolated selected-workspace two-file
   update entrypoint
 - broader apply_patch, add/delete/move, 3+ files, rollback, provider/auth,
-  CLI/session schema, real-provider smokes, and default gates remain unchanged
+  CLI/session schema, real-provider smokes, full release long-session proof, and
+  default gates remain unchanged
 
 ### Current closeout: mutation verification handoff projection
 
