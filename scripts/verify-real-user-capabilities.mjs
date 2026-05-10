@@ -72,12 +72,16 @@ const testRoot = getTestRoot()
 const reportPath = path.join(testRoot, 'test-results', 'real-user-capabilities-report.json')
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const tierValues = ['mvp', 'candidate', 'release', 'backlog', 'all']
+const suiteValues = ['candidate-mutation']
+const candidateMutationSuiteId = 'candidate-mutation'
 const realSingleFileUpdateCaseId = 'real-selected-workspace-single-file-update'
 const realSingleFileCreateCaseId = 'real-selected-workspace-single-file-create'
 const realTwoFileUpdateCaseId = 'real-selected-workspace-two-file-update'
 const selectedTier = parseTierArg(process.argv)
 const selectedCaseId = parseCaseArg(process.argv)
+const selectedSuiteId = parseSuiteArg(process.argv)
 const includeCandidates = process.argv.includes('--include-candidates')
+const includeRealProviderSuiteCases = process.argv.includes('--include-real')
 const includeContinueSmoke = process.argv.includes('--include-continue-smoke')
 const listCases = process.argv.includes('--list')
 const dryRun = process.argv.includes('--dry-run')
@@ -175,6 +179,22 @@ function parseCaseArg(argv) {
       : undefined
   const normalized = raw?.trim()
   return normalized || undefined
+}
+
+function parseSuiteArg(argv) {
+  const explicitEquals = argv.find((arg) => arg.startsWith('--suite='))
+  const raw = explicitEquals
+    ? explicitEquals.slice('--suite='.length)
+    : argv.includes('--suite')
+      ? argv[argv.indexOf('--suite') + 1]
+      : undefined
+  const normalized = raw?.trim().toLowerCase()
+  if (!normalized) return undefined
+  if (!suiteValues.includes(normalized)) {
+    console.error(`Invalid --suite value: ${raw}. Use ${suiteValues.join('|')}.`)
+    process.exit(3)
+  }
+  return normalized
 }
 
 const futureGateCandidates = [
@@ -801,6 +821,19 @@ const tierDescriptorCases = [
   },
 ]
 
+const candidateMutationSuiteSyntheticCaseIds = [
+  'synthetic-selected-workspace-single-file-create',
+  'synthetic-selected-workspace-multi-file-update-planning',
+  'synthetic-selected-workspace-two-file-update',
+  'synthetic-selected-workspace-two-file-update-partial-failure',
+]
+
+const candidateMutationSuiteRealCaseIds = [
+  realSingleFileUpdateCaseId,
+  realSingleFileCreateCaseId,
+  realTwoFileUpdateCaseId,
+]
+
 function allCapabilityCases() {
   return [...scenarios, ...candidateScenarios, ...tierDescriptorCases]
 }
@@ -863,6 +896,47 @@ function skippedCasesForTier(tier) {
     }))
 }
 
+function candidateMutationSuiteSelectedIds({ includeReal = false } = {}) {
+  return [
+    ...candidateMutationSuiteSyntheticCaseIds,
+    ...(includeReal ? candidateMutationSuiteRealCaseIds : []),
+  ]
+}
+
+function selectedCasesForSuite(suiteId, { includeReal = false } = {}) {
+  if (suiteId !== candidateMutationSuiteId) {
+    console.error(`Invalid --suite value: ${suiteId}. Use ${suiteValues.join('|')}.`)
+    process.exit(3)
+  }
+  return candidateMutationSuiteSelectedIds({ includeReal }).map((caseId) => {
+    const capabilityCase = findCapabilityCaseById(caseId)
+    if (!capabilityCase) {
+      console.error(`Suite ${suiteId} references unknown case id: ${caseId}`)
+      process.exit(3)
+    }
+    return capabilityCase
+  })
+}
+
+function skippedCasesForSuite(suiteId, { includeReal = false } = {}) {
+  if (suiteId !== candidateMutationSuiteId) {
+    console.error(`Invalid --suite value: ${suiteId}. Use ${suiteValues.join('|')}.`)
+    process.exit(3)
+  }
+  const selectedIds = new Set(candidateMutationSuiteSelectedIds({ includeReal }))
+  return allCapabilityCases()
+    .filter((capabilityCase) => !selectedIds.has(capabilityCase.id))
+    .map((capabilityCase) => {
+      const skipReason = candidateMutationSuiteRealCaseIds.includes(capabilityCase.id)
+        ? `suite=${suiteId}; real-provider mutation smoke is optional and requires --include-real; ${capabilityCase.reasonForTier}`
+        : `suite=${suiteId}; case is outside the candidate mutation dogfood suite; ${capabilityCase.reasonForTier}`
+      return {
+        ...caseMetadata(capabilityCase),
+        skipReason,
+      }
+    })
+}
+
 function selectedCasesForTier(tier) {
   if (selectedCaseId) {
     const capabilityCase = findCapabilityCaseById(selectedCaseId)
@@ -886,12 +960,22 @@ function selectedExecutableScenariosForTier(tier) {
 }
 
 function printCasePlan(tier, selected, skipped, options = {}) {
+  if (options.suite) {
+    console.log(`suite=${options.suite}`)
+    console.log(`suiteIncludeReal=${options.includeReal ? 'true' : 'false'}`)
+  }
   console.log(`tier=${tier}`)
   console.log(`mode=${options.dryRun ? 'dry-run' : options.list ? 'list' : 'execute'}`)
   console.log(`selectedCases=${selected.length}`)
   for (const capabilityCase of selected) {
     const metadata = caseMetadata(capabilityCase)
-    const label = metadata.executable ? 'RUN' : 'META'
+    const label = metadata.executable
+      ? 'RUN'
+      : options.suite === candidateMutationSuiteId &&
+          options.includeReal &&
+          candidateMutationSuiteRealCaseIds.includes(metadata.id)
+        ? 'RUN-REAL'
+        : 'META'
     console.log(
       `[${label}] ${metadata.id} tier=${metadata.tier} provider=${metadata.provider} expectedToPassCurrentMvp=${metadata.expectedToPassCurrentMvp} realProvider=${metadata.requiresRealProvider}`,
     )
@@ -909,6 +993,10 @@ function printCasePlan(tier, selected, skipped, options = {}) {
 function buildTierPlanReport(tier, selected, skipped, options = {}) {
   return {
     tier,
+    ...(options.suite ? {
+      suite: options.suite,
+      suiteIncludeReal: Boolean(options.includeReal),
+    } : {}),
     mode: options.dryRun ? 'dry-run' : options.list ? 'list' : 'execute',
     selectedCases: selected.map(caseMetadata),
     skippedCases: skipped,
@@ -2485,6 +2573,10 @@ function printHelp() {
   console.log('  --tier=backlog    Unsupported/future capability cases retained outside MVP.')
   console.log('  --tier=all        Explicitly select all executable tier cases.')
   console.log('  --case=<id>       Explicitly select one case by id; real-provider cases remain opt-in.')
+  console.log('  --suite=candidate-mutation')
+  console.log('                     Explicit dogfood gate for closed candidate mutation smokes; synthetic cases run by default.')
+  console.log('  --suite=candidate-mutation --include-real')
+  console.log('                     Also run opt-in real-provider mutation smokes; dry-run/list still never touch the provider.')
   console.log('  --list            Print all case metadata and skip reasons without execution.')
   console.log('  --dry-run         Print selected/skipped cases without touching provider or fixtures.')
   console.log('Safe dry-run options do not execute real provider calls:')
@@ -10451,6 +10543,77 @@ async function runApplyPatchWorkspaceWriteCli({
   })
 }
 
+async function runRealCandidateMutationSuiteCase(caseId) {
+  const capabilityCase = findCapabilityCaseById(caseId)
+  if (!capabilityCase) {
+    return {
+      status: 'FAIL',
+      statusDetail: 'unknown-case',
+      capability: caseId,
+      provider: 'real',
+      failureCategory: 'config/environment failure',
+      failureReason: `suite references unknown case id: ${caseId}`,
+      exitCode: 3,
+    }
+  }
+
+  const previousExitCode = process.exitCode
+  process.exitCode = 0
+  if (caseId === realSingleFileUpdateCaseId) {
+    await runRealSelectedWorkspaceSingleFileUpdate()
+  } else if (caseId === realSingleFileCreateCaseId) {
+    await runRealSelectedWorkspaceSingleFileCreate()
+  } else if (caseId === realTwoFileUpdateCaseId) {
+    await runRealSelectedWorkspaceTwoFileUpdate()
+  } else {
+    process.exitCode = previousExitCode
+    return {
+      status: 'FAIL',
+      statusDetail: 'unsupported-suite-real-case',
+      capability: caseId,
+      provider: 'real',
+      failureCategory: 'config/environment failure',
+      failureReason: `case is not wired as a candidate mutation real-provider smoke: ${caseId}`,
+      exitCode: 3,
+    }
+  }
+
+  const exitCode = process.exitCode ?? 0
+  process.exitCode = previousExitCode
+  let report = {}
+  try {
+    report = JSON.parse(fs.readFileSync(reportPath, 'utf8'))
+  } catch {
+    report = {}
+  }
+
+  const status = report.status ?? (exitCode === 0 ? 'PASS' : 'FAIL')
+  const statusDetail = report.statusDetail ?? (exitCode === 0 ? 'passed' : 'failed')
+  const failureCategory =
+    status === 'PASS'
+      ? 'none'
+      : report.failureCategory === 'provider/preflight'
+        ? 'provider-readiness'
+        : report.failureCategory ?? 'task-execution-failure'
+  return withCaseMetadata(capabilityCase, {
+    status,
+    statusDetail,
+    capability: report.capability ?? caseId,
+    provider: 'real',
+    projectDir: report.projectDir ?? '(isolated-real-provider-fixture)',
+    sessionId: report.sessionId ?? '(real-provider-opt-in)',
+    verification: status === 'PASS' ? 'real-provider candidate mutation smoke passed' : 'real-provider candidate mutation smoke failed',
+    failureCategory,
+    failureReason: report.failureReason ?? '',
+    outputTail: report.outputTail ?? '',
+    changedFiles: report.changedFiles ?? [],
+    failedFiles: report.failedFiles ?? [],
+    writeIntents: report.writeIntents ?? [],
+    realProviderExecution: Boolean(report.realProviderExecution),
+    exitCode,
+  })
+}
+
 async function main() {
   if (showHelp) {
     printHelp()
@@ -10557,21 +10720,48 @@ async function main() {
     return
   }
 
+  if (selectedCaseId && selectedSuiteId) {
+    console.error('Invalid selection: use either --case=<id> or --suite=<name>, not both.')
+    process.exit(3)
+  }
+  if (includeRealProviderSuiteCases && selectedSuiteId !== candidateMutationSuiteId) {
+    console.error('Invalid selection: --include-real is only supported with --suite=candidate-mutation.')
+    process.exit(3)
+  }
+
   const selectedCase = selectedCaseId ? findCapabilityCaseById(selectedCaseId) : undefined
   const executionTier = selectedCase
     ? selectedCase.tier
-    : includeCandidates
+    : selectedSuiteId
       ? 'candidate'
-      : includeContinueSmoke
+      : includeCandidates
         ? 'candidate'
-        : selectedTier
-  const selectedPlanCases = selectedCasesForTier(executionTier)
-  const selectedScenarios = selectedExecutableScenariosForTier(executionTier)
-  const skippedCases = skippedCasesForTier(executionTier)
+        : includeContinueSmoke
+          ? 'candidate'
+          : selectedTier
+  const selectedPlanCases = selectedSuiteId
+    ? selectedCasesForSuite(selectedSuiteId, { includeReal: includeRealProviderSuiteCases })
+    : selectedCasesForTier(executionTier)
+  const selectedScenarios = selectedSuiteId
+    ? selectedPlanCases.filter((scenario) => scenario.executable !== false)
+    : selectedExecutableScenariosForTier(executionTier)
+  const skippedCases = selectedSuiteId
+    ? skippedCasesForSuite(selectedSuiteId, { includeReal: includeRealProviderSuiteCases })
+    : skippedCasesForTier(executionTier)
   const selectedMetadata = selectedPlanCases.map(caseMetadata)
   const selectedRequiresRealProvider = selectedScenarios.some((scenario) => scenario.requiresRealProvider)
+  const selectedSuiteRealCases = selectedSuiteId && includeRealProviderSuiteCases
+    ? candidateMutationSuiteRealCaseIds.filter((caseId) =>
+        selectedPlanCases.some((capabilityCase) => capabilityCase.id === caseId),
+      )
+    : []
 
   console.log('gate name=real-user-capabilities')
+  if (selectedSuiteId) {
+    console.log(`suite name=${selectedSuiteId}`)
+    console.log(`suite real-provider cases=${includeRealProviderSuiteCases ? 'include-real' : 'skipped-by-default'}`)
+    console.log('suite defaultMvpAffected=false')
+  }
   console.log('status taxonomy: PASS=0 FAIL=1 PROVIDER_NETWORK=2 CONFIG=3')
   console.log('state semantics: provider preflight inconclusive skips real capability execution; synthetic MVP remains isolated from real-provider readiness')
   console.log(`repo=${repoRoot}`)
@@ -10580,15 +10770,28 @@ async function main() {
   console.log(`requestedTier=${selectedTier}`)
   console.log(`executionTier=${executionTier}`)
   console.log(`requestedCase=${selectedCaseId ?? 'none'}`)
+  console.log(`requestedSuite=${selectedSuiteId ?? 'none'}`)
   console.log(`candidateMode=${includeCandidates ? 'include-candidates-legacy' : includeContinueSmoke ? 'include-continue-smoke-legacy' : 'off'}`)
-  printCasePlan(executionTier, selectedPlanCases, skippedCases, { dryRun, list: listCases })
+  printCasePlan(executionTier, selectedPlanCases, skippedCases, {
+    dryRun,
+    list: listCases,
+    suite: selectedSuiteId,
+    includeReal: includeRealProviderSuiteCases,
+  })
 
   if (listCases || dryRun) {
     console.log('real-provider execution skipped')
+    console.log(`realProviderTouched=false`)
+    if (selectedSuiteId) {
+      console.log(`suiteExecutedCases=0`)
+      console.log(`suiteSkippedRealProviderCases=${includeRealProviderSuiteCases ? 0 : candidateMutationSuiteRealCaseIds.length}`)
+    }
     console.log('reportWritten=false')
     const plan = buildTierPlanReport(executionTier, selectedPlanCases, skippedCases, {
       dryRun,
       list: listCases,
+      suite: selectedSuiteId,
+      includeReal: includeRealProviderSuiteCases,
     })
     console.log(`planCases=${plan.allCases.length}`)
     return
@@ -10703,6 +10906,22 @@ async function main() {
     const suffix = result.status === 'PASS' ? `verification=${result.verification}` : renderTerminalResultSurface(result)
     console.log(`[${result.status}] ${scenario.id} - tier=${scenario.tier} provider=${scenario.provider} project=${scenario.projectDir} session=${result.sessionId} ${suffix}`)
   }
+  for (const caseId of selectedSuiteRealCases) {
+    const result = await runRealCandidateMutationSuiteCase(caseId)
+    results.push(result)
+    const suffix = result.status === 'PASS'
+      ? `verification=${result.verification}`
+      : renderTerminalResultSurface(result)
+    console.log(`[${result.status}] ${caseId} - suite=${selectedSuiteId} tier=${result.tier} provider=real statusDetail=${result.statusDetail} ${suffix}`)
+  }
+  if (selectedSuiteId) {
+    const executedCases = results.map((result) => result.capability ?? result.caseMetadata?.id ?? result.id).filter(Boolean)
+    const skippedReal = includeRealProviderSuiteCases ? [] : candidateMutationSuiteRealCaseIds
+    console.log(`suiteExecutedCases=${executedCases.join(',') || 'none'}`)
+    console.log(`suiteSkippedRealProviderCases=${skippedReal.join(',') || 'none'}`)
+    console.log(`realProviderTouched=${results.some((result) => result.realProviderExecution) ? 'true' : 'false'}`)
+    console.log('defaultMvpAffected=false')
+  }
 
   const ok = results.every((capability) => capability.status === 'PASS')
   const summarizedFailure = summarizeFailureStatus(results)
@@ -10713,6 +10932,13 @@ async function main() {
     status: ok ? 'PASS' : 'FAIL',
     statusDetail: summarizedFailure.statusDetail,
     tier: executionTier,
+    ...(selectedSuiteId ? {
+      suite: selectedSuiteId,
+      suiteIncludeReal: includeRealProviderSuiteCases,
+      suiteSkippedRealProviderCases: includeRealProviderSuiteCases ? [] : candidateMutationSuiteRealCaseIds,
+      realProviderTouched: results.some((result) => result.realProviderExecution),
+      defaultMvpAffected: false,
+    } : {}),
     reportPath,
     providerReadiness: providerPreflight ?? { status: 'skipped', reason: 'selected tier has no real-provider cases' },
     capabilitySkipped: selectedScenarios.length === 0,

@@ -60,6 +60,8 @@
     "verify:real-user-capabilities:mvp": "node scripts/verify-real-user-capabilities.mjs --tier=mvp",
     "verify:real-user-capabilities:candidate": "node scripts/verify-real-user-capabilities.mjs --tier=candidate",
     "verify:real-user-capabilities:candidates": "node scripts/verify-real-user-capabilities.mjs --tier=candidate",
+    "verify:real-user-capabilities:candidate-mutation": "node scripts/verify-real-user-capabilities.mjs --suite=candidate-mutation",
+    "verify:real-user-capabilities:candidate-mutation:real": "node scripts/verify-real-user-capabilities.mjs --suite=candidate-mutation --include-real",
     "verify:real-user-capabilities:real-single-file": "node scripts/verify-real-user-capabilities.mjs --case=real-selected-workspace-single-file-update",
     "verify:real-user-capabilities:real-create": "node scripts/verify-real-user-capabilities.mjs --case=real-selected-workspace-single-file-create",
     "verify:real-user-capabilities:real-two-file": "node scripts/verify-real-user-capabilities.mjs --case=real-selected-workspace-two-file-update",

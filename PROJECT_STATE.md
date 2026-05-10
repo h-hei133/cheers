@@ -253,6 +253,10 @@ Current tier split:
   the explicit workspace write entrypoint
 - candidate tier keeps real-provider bugfix/follow-up, protected consistency,
   and richer selected-workspace smoke evidence explicit
+- candidate mutation smokes are also available as an explicit dogfood suite via
+  `verify:real-user-capabilities:candidate-mutation`; it runs the closed
+  synthetic mutation cases by default and lists real-provider mutation smokes as
+  opt-in unless `--include-real` or the dedicated `:real` script is used
 - release tier records release-only gates such as CLI entry stability,
   permission-memory, release-core, and long-session/compact continuity as
   non-MVP blockers
