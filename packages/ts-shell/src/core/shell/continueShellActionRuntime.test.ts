@@ -199,6 +199,7 @@ describe("runResumeLikeShellAction", () => {
       expect(turns[0].continuityState?.lastTerminalClassification).toBe(
         "stopped",
       );
+      expect(lines).toContain("Continuation");
       expect(lines).toContain("Result");
       expect(lines).toContain("- Outcome: stopped");
       expect(lines).toContain("- TerminalState: stopped");
@@ -271,6 +272,7 @@ describe("runResumeLikeShellAction", () => {
       expect(turns[0].continuityState?.recentFailedFiles).toEqual([
         { path: "src/b.ts", reason: "write failed: EACCES" },
       ]);
+      expect(rendered).toContain("Continuation");
       expect(rendered).toContain("- Outcome: stopped");
       expect(rendered).toContain("- BlockerKind: partial-mutation-failed");
       expect(rendered).toContain("- Changed files: src/a.ts");

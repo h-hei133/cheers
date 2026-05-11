@@ -209,6 +209,7 @@ export function formatStoppedContinueGuidanceLines(input: {
   if (!input.printMode) {
     lines.push("");
   }
+  lines.push("Continuation");
   lines.push("Result");
   lines.push("- Outcome: stopped");
   lines.push(`- Session: ${input.sessionId}`);
@@ -245,9 +246,7 @@ export function formatStoppedContinueGuidanceLines(input: {
     );
   }
   if (input.snapshot.lastFailureHandoffDiagnostic) {
-    lines.push(
-      `- Failure handoff: ${truncate(input.snapshot.lastFailureHandoffDiagnostic, 220)}`,
-    );
+    lines.push(`- Failure handoff: ${input.snapshot.lastFailureHandoffDiagnostic}`);
   }
   if (
     input.snapshot.lastWriterStarted ||
