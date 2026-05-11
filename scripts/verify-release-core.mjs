@@ -6,11 +6,11 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-function runNodeScript(script, args = []) {
+function runNodeScript(script, args = [], extraEnv = {}) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [path.join(repoRoot, 'scripts', script), ...args], {
       cwd: repoRoot,
-      env: process.env,
+      env: { ...process.env, ...extraEnv },
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,
     })
@@ -78,6 +78,17 @@ if (mcpRoutingCode !== 0) {
   const status = mcpRoutingCode === 3 ? 'config-failure' : 'product-regression'
   console.log(`[${status}] release-core - mcp routing exited ${mcpRoutingCode}`)
   process.exit(mcpRoutingCode)
+}
+
+const mcpLocalExecutionCode = await runNodeScript(
+  'verify-mcp-local-execution.mjs',
+  [],
+  { PRIVATE_AGENTS_RELEASE_CORE_WIRED: '1' },
+)
+if (mcpLocalExecutionCode !== 0) {
+  const status = mcpLocalExecutionCode === 3 ? 'config-failure' : 'product-regression'
+  console.log(`[${status}] release-core - mcp-local-execution exited ${mcpLocalExecutionCode}`)
+  process.exit(mcpLocalExecutionCode)
 }
 
 const resultContractCode = await runNodeScript('verify-result-contract.mjs')

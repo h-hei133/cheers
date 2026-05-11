@@ -76,10 +76,11 @@ The primary user-visible mainline is now:
 
 ## 5. Latest Implemented Delta (through 2026-05-11)
 
-### Current closeout: standalone local MCP execution gate
+### Current closeout: local MCP execution release-core gate
 
-MCP local execution now has a deterministic standalone gate outside
-`verify:release:core`.
+MCP local execution now has a deterministic standalone gate and is also wired
+into `verify:release:core` as a hard sub-gate immediately after
+`verify:mcp-routing`.
 
 Key sealed evidence:
 
@@ -98,9 +99,15 @@ Key sealed evidence:
 
 Important boundaries:
 
-- the gate is standalone and not wired into `verify:release:core`
+- the standalone `verify:mcp:local-execution` command remains available
+- the release-core sub-gate emits `gate name=mcp-local-execution`,
+  `mode=synthetic`, `realProviderTouched=false`,
+  `externalMcpServerUsed=false`, `userMcpConfigUsed=false`, the local stdio
+  fixture path, and `releaseCoreWired=true`
 - the user-visible surface proof is focused shell runtime/session evidence, not
   full CLI-entry MCP tool execution proof
+- this is not external MCP proof, user-configured MCP proof, arbitrary MCP
+  ecosystem readiness, or broad/general release readiness
 - it does not read user MCP config, start an external MCP server, touch a real
   provider, alter provider/auth, change mutation routes, or change the default
   MVP gate

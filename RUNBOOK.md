@@ -88,12 +88,21 @@ failure is product code, provider/network, or local environment.
 6. `verify:query-orchestration`
 7. `verify:cli-entry`
 8. `verify:mcp-routing`
-9. `verify:result-contract`
-10. `verify:workspace-safety`
-11. `verify:evidence-artifacts`
-12. `verify:session-durability:long`
+9. `verify:mcp:local-execution`
+10. `verify:result-contract`
+11. `verify:workspace-safety`
+12. `verify:evidence-artifacts`
+13. `verify:session-durability:long`
 
 Real-provider smoke is intentionally not part of release core.
+
+The local MCP execution sub-gate is synthetic and deterministic. It uses the
+local stdio fixture only, does not read user MCP config, does not start an
+external MCP server, and does not contact a real provider. It proves local
+gateway-to-ToolRuntime execution, failure classification, focused shell-session
+surface, and follow-up continuity; it is not proof of external MCP readiness,
+user-configured MCP readiness, arbitrary MCP ecosystem readiness, or full
+CLI-entry MCP tool execution.
 
 The permission-memory step is synthetic and deterministic. Its reflective
 approval-memory prompts must run through orchestration continuity so CLI
@@ -163,7 +172,7 @@ work:
 | Layer | Command | Gate status | Purpose |
 | --- | --- | --- | --- |
 | Golden CLI main path | `npm run test:gate:golden-main-path` | Required stable gate | Fast synthetic CLI baseline for the user-visible main path. |
-| Local MCP execution | `npm run verify:mcp:local-execution` | Standalone deterministic MCP evidence | Uses only the local stdio fixture and isolated HOME/workspace to prove MCP gateway list/invoke, ToolRuntime registry execution, success/failure lifecycle projection, focused shell-session user-visible surface, and follow-up continuity. It is not an external or user-configured MCP gate, is not wired into release-core, and does not touch real providers. |
+| Local MCP execution | `npm run verify:mcp:local-execution` | Deterministic MCP evidence and release-core hard sub-gate | Uses only the local stdio fixture and isolated HOME/workspace to prove MCP gateway list/invoke, ToolRuntime registry execution, success/failure lifecycle projection, focused shell-session user-visible surface, and follow-up continuity. It is wired into `verify:release:core` after `verify:mcp-routing` and remains independently runnable. It is not an external or user-configured MCP gate, is not arbitrary MCP ecosystem readiness, is not full CLI-entry MCP tool execution proof, and does not touch real providers. |
 | Real user capabilities | `npm run verify:real-user-capabilities` | Required stable MVP gate for current dogfood mutation evidence | Synthetic selected-workspace existing-file single-file update. Broader real-provider, protected consistency, release, and backlog cases require explicit `--tier=...`. |
 | Candidate mutation dogfood suite | `npm run verify:real-user-capabilities:candidate-mutation` | Explicit candidate evidence | Aggregates the closed synthetic candidate mutation smokes: single-file Add File create, two-file no-write planning, two-file write success, two-file partial failure, compact-equivalent mutation continuity, and partial-failure recovery follow-up. Real-provider mutation smokes are listed/skipped by default and require `--include-real` or `npm run verify:real-user-capabilities:candidate-mutation:real`; this does not change default MVP or enable 3+ files, delete/move, rollback, or broad `apply_patch`. |
 | Synthetic Add File create smoke | `npm run verify:real-user-capabilities -- --case=synthetic-selected-workspace-single-file-create` | Explicit candidate evidence | Synthetic selected-workspace single-file Add File create through the explicit write entrypoint. It is not part of default MVP and does not enable multi-file/delete/move/rollback or broad `apply_patch`. |
