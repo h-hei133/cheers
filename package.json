@@ -77,6 +77,7 @@
     "verify:lightweight-chat:real": "node scripts/real-provider-lightweight-chat-smoke.mjs",
     "verify:release:smoke": "node scripts/verify-release-smoke.mjs",
     "verify:release:core": "node scripts/verify-release-core.mjs",
+    "verify:release:deterministic": "node scripts/verify-release-deterministic.mjs",
     "verify:release:real": "node scripts/verify-release-real.mjs",
     "test:delta:contracts": "node scripts/delta-regression.mjs --suite contracts",
     "test:delta:xlayer": "node scripts/delta-regression.mjs --suite xlayer",

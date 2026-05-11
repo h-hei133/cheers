@@ -76,6 +76,43 @@ The primary user-visible mainline is now:
 
 ## 5. Latest Implemented Delta (through 2026-05-11)
 
+### Current closeout: deterministic release meta gate
+
+`verify:release:deterministic` is now the default deterministic release
+closeout meta gate. It aggregates the local release-candidate evidence without
+touching the real provider or changing the narrower `verify:release:core`
+contract.
+
+Included hard sub-gates:
+
+- `build -w packages/ts-shell`
+- full `src/cli-baseline.test.ts`
+- `verify:release:core`
+- `verify:real-user-capabilities -- --tier=mvp`
+- `verify:real-user-capabilities -- --suite=candidate-mutation`
+- `verify:real-user-capabilities -- --suite=candidate-mutation --include-real
+  --dry-run`
+- `verify:provider-readiness:real` default skip/pass
+- `verify:provider-readiness:real -- --classification-self-test`
+
+Readiness status:
+
+- if this meta gate passes, the project may claim deterministic
+  release-candidate readiness for the current bounded surface
+- limited dogfood readiness and opt-in synthetic candidate mutation dogfood
+  remain green claims
+- broad/general release readiness is still not claimed
+
+Important boundaries:
+
+- the meta gate clears real-provider opt-in env before child gates and must
+  report `realProviderTouched=false`
+- real-provider candidate mutation remains explicit opt-in through
+  `verify:real-user-capabilities:candidate-mutation:real`
+- this does not add rollback, atomicity, 3+ file support, delete/move support,
+  broad `apply_patch`, arbitrary mutation, external/user-configured MCP proof,
+  provider/auth changes, or default real-provider gates
+
 ### Current closeout: local MCP execution release-core gate
 
 MCP local execution now has a deterministic standalone gate and is also wired

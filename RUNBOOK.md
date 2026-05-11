@@ -68,6 +68,7 @@ failure is product code, provider/network, or local environment.
 | Class | Command | When to run | Failure meaning |
 | --- | --- | --- | --- |
 | Doctor/env gate | `npm run verify:doctor` | First command on a new machine, before diagnosing product regressions. | Local environment, working directory, home, toolchain, or provider config is not ready. |
+| Deterministic release meta gate | `npm run verify:release:deterministic` | Default deterministic release-candidate closeout before handoff. | Product regression or local config failure across build, full CLI baseline, release core, MVP/candidate synthetic mutation, dry-run real-suite contract, and provider-readiness classification. |
 | Deterministic hard gate | `npm run verify:release:core` | Default local release check before handing off changes. | Product regression or local config failure; it should not depend on provider network. |
 | Real-provider smoke gate | `npm run verify:release:smoke` | After core passes, when checking real-provider readiness. | Provider pass, network inconclusive, config failure, or product regression. |
 | Provider readiness smoke | `npm run verify:provider-readiness:real` | Explicit opt-in real-provider readiness check using isolated test/runtime homes. | Skip without opt-in; otherwise pass, provider-network, config/auth/unsupported, unknown, or product regression. |
@@ -95,6 +96,28 @@ failure is product code, provider/network, or local environment.
 13. `verify:session-durability:long`
 
 Real-provider smoke is intentionally not part of release core.
+
+### Deterministic release meta gate
+
+`npm run verify:release:deterministic` is the default deterministic
+release-candidate closeout command. It runs these hard sub-gates:
+
+1. `build -w packages/ts-shell`
+2. full `src/cli-baseline.test.ts`
+3. `verify:release:core`
+4. `verify:real-user-capabilities -- --tier=mvp`
+5. `verify:real-user-capabilities -- --suite=candidate-mutation`
+6. `verify:real-user-capabilities -- --suite=candidate-mutation --include-real
+   --dry-run`
+7. `verify:provider-readiness:real`
+8. `verify:provider-readiness:real -- --classification-self-test`
+
+The meta gate is deterministic-only. It clears real-provider opt-in env before
+child gates, must report `realProviderTouched=false`, and does not execute
+`verify:real-user-capabilities:candidate-mutation:real`,
+`verify:release:real`, external MCP servers, or user-configured MCP. A passing
+meta gate supports deterministic release-candidate readiness for the current
+bounded surface, not broad/general release readiness.
 
 The local MCP execution sub-gate is synthetic and deterministic. It uses the
 local stdio fixture only, does not read user MCP config, does not start an
