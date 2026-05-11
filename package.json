@@ -84,7 +84,8 @@
     "test:delta:full": "node scripts/delta-regression.mjs --suite full",
     "test:delta:nightly": "node scripts/delta-nightly.mjs --duration-minutes 45",
     "test:delta:release": "cmd /d /s /c \"npm run test:delta:full && npm run test:delta:full && node scripts/delta-nightly.mjs --duration-minutes 1\"",
-    "test:coverage:real-shapes": "node scripts/real-shape-coverage.mjs"
+    "test:coverage:real-shapes": "node scripts/real-shape-coverage.mjs",
+    "verify:session-durability:long": "node scripts/verify-session-durability-long.mjs"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -71,6 +71,7 @@ failure is product code, provider/network, or local environment.
 | Deterministic hard gate | `npm run verify:release:core` | Default local release check before handing off changes. | Product regression or local config failure; it should not depend on provider network. |
 | Real-provider smoke gate | `npm run verify:release:smoke` | After core passes, when checking real-provider readiness. | Provider pass, network inconclusive, config failure, or product regression. |
 | Provider readiness smoke | `npm run verify:provider-readiness:real` | Explicit opt-in real-provider readiness check using isolated test/runtime homes. | Skip without opt-in; otherwise pass, provider-network, config/auth/unsupported, unknown, or product regression. |
+| Synthetic long-session durability | `npm run verify:session-durability:long` | When checking compact/reload/`/continue` durability before broad release-readiness claims. | Product regression in session persistence, auto-compact retention, `/continue` continuity, or mutation recovery surface. |
 | Evidence inspector | `npm run evidence:inspect -- --home <home> --latest` | After a run produced session artifacts, or after a gate points to a session/project. | Prints read-only artifact summary; `artifact-status=degraded` means evidence is incomplete, not repaired. |
 | Failure handoff | `npm run failure:handoff -- --log-file <path> --gate <gate> --command "<command>" --exit-code <code>` | After capturing a failing gate log and needing a compact handoff. | Produces a redacted triage summary; exit 0 means the handoff printed, not that the failed gate passed. |
 
@@ -121,6 +122,8 @@ Green deterministic evidence from the closeout sweep:
   --include-real --dry-run`: passed without touching the provider
 - `npm run verify:mutation-recovery:followup`: passed
 - `npm run verify:mutation-continuity:compact`: passed
+- `npm run verify:session-durability:long`: synthetic deterministic
+  compact/reload/`/continue` durability gate passed
 - `npm run verify:provider-readiness:real`: default skip/pass without loading
   provider credentials
 - `npm run verify:provider-readiness:real -- --classification-self-test`:
@@ -143,7 +146,9 @@ Do not widen these claims:
 - MVP is still only the selected-workspace, single-file, existing `Update File`
   synthetic gate
 - candidate create and exactly-two-file update are not MVP/default behavior
-- compact-equivalent continuity is not full long-session release proof
+- compact-equivalent continuity is not full long-session release proof; use
+  `npm run verify:session-durability:long` for the stronger synthetic
+  process-boundary long-session durability evidence
 - no rollback, atomic multi-file transaction, 3+ files, delete/move, broad
   `apply_patch`, arbitrary mutation, provider/auth change, CLI/session schema
   change, or default real-provider gate is implied
@@ -164,6 +169,7 @@ work:
 | Synthetic two-file partial failure smoke | `npm run verify:real-user-capabilities -- --case=synthetic-selected-workspace-two-file-update-partial-failure` | Explicit candidate evidence | Synthetic selected-workspace exactly two-file Update File partial failure through the explicit workspace-write entrypoint. It makes the second file unwritable, expects a stopped result, verifies only the first file changed, verifies `failedFiles` names the second file, and does not claim success, rollback, atomicity, 3+ files, add/delete/move, real provider, or broad `apply_patch`. |
 | Synthetic mutation compact continuity smoke | `npm run verify:real-user-capabilities -- --case=synthetic-mutation-continuity-after-compact` | Explicit candidate evidence | Synthetic compact-equivalent session continuity proof for closed candidate mutation states. It uses SessionManager persistence, auto-compact, reload, and follow-up continuity context to verify two-file success keeps `changedFiles=[src/a.ts,src/b.ts]` and two-file partial failure keeps stopped state, `changedFiles=[src/a.ts]`, `failedFiles=[src/b.ts]`, writer-started unknown effect, and inspect/re-read next action. It is not a full release long-session proof and does not enable new mutation capability. |
 | Synthetic partial failure recovery follow-up | `npm run verify:real-user-capabilities -- --case=synthetic-two-file-partial-failure-recovery-followup` | Explicit candidate evidence | Synthetic stopped `/continue` recovery guidance proof for exactly-two-file partial mutation failure. It verifies the follow-up surface says the prior run stopped, keeps `changedFiles=[src/a.ts]`, `failedFiles=[src/b.ts]`, writer-started unknown write effect, inspect/re-read next action, and no rollback/no atomicity wording. It does not implement rollback or enable 3+ files, add/delete/move, real provider, or broad `apply_patch`. |
+| Synthetic long-session durability | `npm run verify:session-durability:long` | Explicit release-durability evidence | Synthetic deterministic long-session gate for compact/reload/`/continue` durability. It triggers actual `SessionManager` auto-compact threshold, crosses child-process seed/reload/continue boundaries, verifies two-file mutation success and partial failure state, then adds an unrelated post-compact non-mutation turn and verifies mutation continuity still survives. It is not part of default MVP or release-core and does not enable rollback, 3+ files, delete/move, real provider, or broad `apply_patch`. |
 | Real single-file provider smoke | `npm run verify:real-user-capabilities:real-single-file` | Explicit opt-in candidate evidence | Real provider model turn plus isolated selected-workspace existing-file single-file update. It is not part of default MVP, and it does not enable create/add/delete/move/multi-file/rollback or broader `apply_patch`. |
 | Real Add File create provider smoke | `npm run verify:real-user-capabilities:real-create` | Explicit opt-in candidate evidence | Real provider model turn plus isolated selected-workspace single-file Add File create. It is not part of default MVP, and it does not enable multi-file/delete/move/rollback, parent directory creation, or broader `apply_patch`. |
 | Real two-file update provider smoke | `npm run verify:real-user-capabilities:real-two-file` | Explicit opt-in candidate evidence | Real provider model turn plus isolated selected-workspace exactly two-file Update File write. It is not part of default MVP, uses `provider.env` only through silent opt-in loading, and does not enable 3+ files, add/delete/move, rollback, or broader `apply_patch`. |
