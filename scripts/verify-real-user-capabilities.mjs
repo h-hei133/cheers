@@ -2253,6 +2253,9 @@ function renderTerminalResultSurface(result) {
     `Category: ${surface.failureCategory}`,
     `Status: ${surface.statusDetail}`,
   ]
+  if (result.route01FailureClass) {
+    parts.push(`Route01Class: ${result.route01FailureClass}`)
+  }
   if (surface.failureReason) {
     parts.push(`Reason: ${surface.failureReason}`)
   }
@@ -10153,6 +10156,75 @@ function statusDetailForRealTwoFileUpdateFailureCategory(failureCategory) {
   return 'passed'
 }
 
+function route01FailureClassForRealCandidate(fields) {
+  const category = String(fields.failureCategory ?? '').toLowerCase()
+  const detail = String(fields.statusDetail ?? '').toLowerCase()
+  const reason = String(fields.failureReason ?? '').toLowerCase()
+  const combined = `${category}\n${detail}\n${reason}`
+
+  if (fields.status === 'PASS' || category === 'none') return 'none'
+  if (
+    combined.includes('missing-config') ||
+    combined.includes('missing-key') ||
+    combined.includes('config') ||
+    combined.includes('not clean') ||
+    combined.includes('status could not be checked') ||
+    combined.includes('set private_agents_real_home')
+  ) {
+    return 'config'
+  }
+  if (
+    combined.includes('network') ||
+    combined.includes('auth') ||
+    combined.includes('401') ||
+    combined.includes('403') ||
+    combined.includes('unauthorized') ||
+    combined.includes('forbidden')
+  ) {
+    return 'network-auth'
+  }
+  if (category.includes('model output') || detail.includes('provider-output')) {
+    return 'model-output'
+  }
+  if (category.includes('unsupported patch') || detail.includes('unsupported')) {
+    return 'unsupported'
+  }
+  if (
+    category.includes('post-write') ||
+    category.includes('partial mutation failed') ||
+    category.includes('no mutation')
+  ) {
+    return 'post-write'
+  }
+  if (
+    category.includes('route rejected') ||
+    category.includes('verification-blocked') ||
+    combined.includes('workspace write cli') ||
+    combined.includes('route rejected')
+  ) {
+    return 'route'
+  }
+  if (
+    category.includes('redaction') ||
+    combined.includes('repository mutated') ||
+    combined.includes('unexpected success')
+  ) {
+    return 'product-regression'
+  }
+  return 'unknown'
+}
+
+function withRoute01FailureClass(fields) {
+  const route01FailureClass = route01FailureClassForRealCandidate(fields)
+  if (route01FailureClass === 'none') {
+    return fields
+  }
+  return {
+    ...fields,
+    route01FailureClass,
+  }
+}
+
 function classifySingleFileUpdatePatchShape(patchText) {
   const normalized = String(patchText ?? '').replace(/\r\n/g, '\n')
   const updateFiles = [...normalized.matchAll(/^\*\*\* Update File:\s+(.+)$/gm)]
@@ -10289,33 +10361,33 @@ function extractAddFileContent(patchText, targetPath) {
 }
 
 function buildRealSingleFileUpdateFailure({ category, reason, status = 'FAIL', statusDetail, exitCode = 1 }) {
-  return {
+  return withRoute01FailureClass({
     status,
     statusDetail: statusDetail ?? statusDetailForRealSingleFileUpdateFailureCategory(category),
     exitCode,
     failureCategory: category,
     failureReason: reason,
-  }
+  })
 }
 
 function buildRealSingleFileCreateFailure({ category, reason, status = 'FAIL', statusDetail, exitCode = 1 }) {
-  return {
+  return withRoute01FailureClass({
     status,
     statusDetail: statusDetail ?? statusDetailForRealSingleFileCreateFailureCategory(category),
     exitCode,
     failureCategory: category,
     failureReason: reason,
-  }
+  })
 }
 
 function buildRealTwoFileUpdateFailure({ category, reason, status = 'FAIL', statusDetail, exitCode = 1 }) {
-  return {
+  return withRoute01FailureClass({
     status,
     statusDetail: statusDetail ?? statusDetailForRealTwoFileUpdateFailureCategory(category),
     exitCode,
     failureCategory: category,
     failureReason: reason,
-  }
+  })
 }
 
 function writeRealSingleFileUpdateReport(fields) {
@@ -11521,6 +11593,7 @@ async function runRealCandidateMutationSuiteCase(caseId) {
       verification: 'real-provider candidate mutation smoke not evaluated',
       failureCategory: 'provider-readiness',
       failureReason: `provider-readiness:missing-config: ${reason}`,
+      route01FailureClass: 'config',
       changedFiles: [],
       failedFiles: [],
       writeIntents: [],
@@ -11577,6 +11650,12 @@ async function runRealCandidateMutationSuiteCase(caseId) {
     verification: status === 'PASS' ? 'real-provider candidate mutation smoke passed' : 'real-provider candidate mutation smoke failed',
     failureCategory,
     failureReason: report.failureReason ?? '',
+    route01FailureClass: report.route01FailureClass ?? route01FailureClassForRealCandidate({
+      status,
+      statusDetail,
+      failureCategory,
+      failureReason: report.failureReason ?? '',
+    }),
     outputTail: report.outputTail ?? '',
     providerDiagnostics: report.providerDiagnostics ?? realMutationEnvContract.providerDiagnostics,
     changedFiles: report.changedFiles ?? [],
