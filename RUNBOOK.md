@@ -105,6 +105,49 @@ unknown/unverified, unsupported patch shape, and no-mutation surfaces. It must
 remain projection-only: no provider access, no file I/O, no writer invocation,
 and no session schema changes.
 
+### Current readiness snapshot
+
+The latest release-readiness closeout after `e03acbd Fix stopped continue CLI
+parity` supports limited dogfood readiness, not broad/general release.
+
+Green deterministic evidence from the closeout sweep:
+
+- full `src/cli-baseline.test.ts`: 54/54 passed
+- `npm run verify:cli-entry`: passed
+- `npm run verify:release:core`: passed
+- `npm run verify:real-user-capabilities -- --tier=mvp`: passed
+- `npm run verify:real-user-capabilities -- --suite=candidate-mutation`: passed
+- `npm run verify:real-user-capabilities -- --suite=candidate-mutation
+  --include-real --dry-run`: passed without touching the provider
+- `npm run verify:mutation-recovery:followup`: passed
+- `npm run verify:mutation-continuity:compact`: passed
+- `npm run verify:provider-readiness:real`: default skip/pass without loading
+  provider credentials
+- `npm run verify:provider-readiness:real -- --classification-self-test`:
+  passed locally
+- `npm run verify:result-contract`: passed
+- `npm run build -w packages/ts-shell`: passed
+
+Readiness claims allowed by this evidence:
+
+- limited dogfood readiness is green for the current deterministic stack
+- candidate mutation dogfood is green only through the explicit opt-in synthetic
+  suite
+- real-provider candidate mutation remains opt-in; dry-run/listing modes must
+  not load credentials or contact a provider
+- release-readiness prerequisites are mostly green, but full release durability
+  remains future work
+
+Do not widen these claims:
+
+- MVP is still only the selected-workspace, single-file, existing `Update File`
+  synthetic gate
+- candidate create and exactly-two-file update are not MVP/default behavior
+- compact-equivalent continuity is not full long-session release proof
+- no rollback, atomic multi-file transaction, 3+ files, delete/move, broad
+  `apply_patch`, arbitrary mutation, provider/auth change, CLI/session schema
+  change, or default real-provider gate is implied
+
 ### Current main-path gate layering
 
 Use these commands as the current default verification stack for main-path

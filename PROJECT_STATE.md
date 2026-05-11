@@ -74,7 +74,57 @@ The primary user-visible mainline is now:
 5. Result block stays minimal and actionable in compact mode
 6. Session remains ready for next turn with clear boundaries
 
-## 5. Latest Implemented Delta (through 2026-05-10)
+## 5. Latest Implemented Delta (through 2026-05-11)
+
+### Current closeout: release-readiness gate sweep after stopped `/continue` parity
+
+The full CLI baseline stopped `/continue` parity blocker is closed.
+
+Recent closeout commit:
+
+- `e03acbd Fix stopped continue CLI parity`
+
+Key sealed evidence:
+
+- full `src/cli-baseline.test.ts` passes with 54/54 tests after the stopped
+  `/continue` parity fix
+- stopped `/continue` guidance restores the `Continuation` marker on the
+  user-visible stopped-session follow-up surface
+- failure handoff details remain intact instead of being truncated away from
+  recovery guidance; changed files, failed files, inspect/re-read next action,
+  and no-rollback/no-atomicity wording remain visible for partial mutation
+  recovery
+- `verify:cli-entry`, `verify:release:core`, `verify:real-user-capabilities --
+  --tier=mvp`, `verify:real-user-capabilities -- --suite=candidate-mutation`,
+  `verify:mutation-recovery:followup`, `verify:mutation-continuity:compact`,
+  `verify:result-contract`, and `build -w packages/ts-shell` are green in the
+  closeout sweep
+- `verify:real-user-capabilities -- --suite=candidate-mutation --include-real
+  --dry-run` lists the opt-in real-provider candidate mutation cases without
+  touching the provider
+- `verify:provider-readiness:real` remains default skip/pass without reading
+  real provider configuration, and `verify:provider-readiness:real --
+  --classification-self-test` passes locally
+
+Readiness status:
+
+- limited dogfood readiness is green for the current deterministic gate stack
+- candidate mutation dogfood is green for the explicit synthetic opt-in suite
+- real-provider candidate mutation remains explicit opt-in evidence, not a
+  default gate
+- release-readiness prerequisites are mostly green, but broad/general release
+  is not claimed
+
+Important boundaries:
+
+- MVP remains selected-workspace, single-file, existing `Update File` through
+  the synthetic gate
+- candidate Add File create and exactly-two-file Update File write remain
+  candidate-only and do not become MVP/default behavior
+- compact-equivalent mutation continuity is not full long-session release proof
+- no rollback, atomic multi-file transaction, 3+ files, delete/move, broad
+  `apply_patch`, arbitrary project mutation, provider/auth changes, CLI/session
+  schema changes, or default real-provider gate are added
 
 ### Current closeout: narrow Add File candidate create route
 
