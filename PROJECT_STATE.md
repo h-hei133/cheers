@@ -10,9 +10,10 @@
   MCP visibility / execution / rejection consistency, tool lifecycle
   projection, stopped-session continuity projection, selected-workspace
   cross-process resume evidence, CLI entry parity, and isolated
-  real-provider readiness smoke gating are stage-sealed; next implementation
-  should be chosen from current main-path blockers instead of extending the
-  same continuity proof family without a new regression.
+  real-provider readiness smoke gating, release-core durability/MCP hard gates,
+  and deterministic release meta-gate layering are stage-sealed; next
+  implementation should be chosen from current main-path blockers instead of
+  extending the same continuity proof family without a new regression.
 
 What this stage is **not**:
 
@@ -75,6 +76,29 @@ The primary user-visible mainline is now:
 6. Session remains ready for next turn with clear boundaries
 
 ## 5. Latest Implemented Delta (through 2026-05-11)
+
+### Route closeout index for the current release-readiness sweep
+
+This is a compact index for the 15-route sweep; detailed evidence remains in
+the route-specific sections below and in the cited commits.
+
+| # | Route | Closeout |
+| ---: | --- | --- |
+| 1 | `verify-real-user-capabilities` tier split | Done in `ee74ad5`; default MVP remains synthetic selected-workspace single-file existing Update File. |
+| 2 | Selected-workspace single-update real smoke | Done in `b74a035`; explicit opt-in real-provider smoke only. |
+| 3 | `verify:cli-entry` stopped follow-up | Done in `27ba173` and parity blocker closed in `e03acbd`. |
+| 4 | `real-small-bugfix-followup-verify` as MVP dogfood | Replaced instead of promoting the legacy case; MVP dogfood is the narrow synthetic selected-workspace single-update gate from route 1. |
+| 5 | Protected/create case retier | Done in `c08099c`, then bounded create moved to candidate route in `09c6dcd` / `2318f10` / `efb336d`. |
+| 6 | `verify:provider-readiness:real` env contract | Done in `29d177f`; default path skips without loading real provider config. |
+| 7 | `verify:release:core` permission-memory gate | Done in `c8b7141`. |
+| 8 | Mutation route failure projection to result/session | Done in `4776036` and later candidate partial-failure smokes. |
+| 9 | Mutation verification submodule extraction | Done in `4776036`. |
+| 10 | Real provider single-file opt-in smoke | Done in `b74a035`; remains explicit opt-in. |
+| 11 | Add/create file assessment | Completed as candidate synthetic and real smokes in `09c6dcd`, `2318f10`, and `efb336d`. |
+| 12 | Multi-file assessment | Completed as exactly-two candidate route/smokes in `2c5981b`, `cb4337c`, `2e559a3`, `9efd45c`, `59f9169`, and `0ed6c53`. |
+| 13 | Compact / long-session assessment | Completed and wired into release-core in `d77d5d8` and `90118ab`. |
+| 14 | MCP real-execution assessment | Completed as local deterministic MCP execution evidence in `de63e2e`, then wired into release-core in `b657922`; external/user-configured MCP remains out of scope. |
+| 15 | Release gate defaultization | Completed in `4167156` with `verify:release:deterministic`; real provider gates remain opt-in. |
 
 ### Current closeout: deterministic release meta gate
 
