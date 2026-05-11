@@ -79,7 +79,8 @@ The primary user-visible mainline is now:
 ### Current closeout: synthetic long-session compact/reload `/continue` durability gate
 
 Long-session durability now has a deterministic synthetic gate outside the
-default MVP and release-core stacks.
+default MVP stack and wired into `verify:release:core` as its final hard
+sub-gate.
 
 Key sealed evidence:
 
@@ -102,20 +103,26 @@ Key sealed evidence:
   visible
 - the gate uses child processes around seed/reload/continue steps to prove a
   CLI-process-boundary equivalent, while staying synthetic and deterministic
+- `verify:release:core` now executes `session-durability-long` at the end of
+  its deterministic hard-gate sequence, and the standalone
+  `verify:session-durability:long` command remains available
 
 Readiness status:
 
 - limited dogfood readiness remains green
 - this is stronger release-durability evidence than the earlier
   compact-equivalent mutation continuity smoke
+- release-core durability coverage is stronger because actual auto-compact,
+  reload, `/continue`, success, partial failure, and post-compact unrelated
+  turn continuity are now part of the hard gate
 - broad/general release is still not claimed because this does not prove real
   provider long sessions, live TTY behavior, arbitrary project mutation,
   rollback, 3+ files, delete/move, or broad `apply_patch`
 
 Important boundaries:
 
-- the new gate is opt-in via `verify:session-durability:long`
-- it is not part of default MVP and is not wired into `verify:release:core`
+- the gate remains independently runnable via `verify:session-durability:long`
+- it is not part of default MVP; it is now part of `verify:release:core`
 - no mutation writer/route capability, provider/auth flow, CLI/session schema,
   rollback, atomicity, 3+ file support, delete/move support, or broad
   `apply_patch` support is added
@@ -166,9 +173,9 @@ Important boundaries:
 - candidate Add File create and exactly-two-file Update File write remain
   candidate-only and do not become MVP/default behavior
 - compact-equivalent mutation continuity is not full long-session release proof;
-  the separate `verify:session-durability:long` gate provides synthetic
-  process-boundary long-session evidence, but broad/general release durability
-  is still not claimed
+  `verify:session-durability:long` now provides synthetic process-boundary
+  long-session evidence inside `verify:release:core`, but broad/general release
+  durability is still not claimed
 - no rollback, atomic multi-file transaction, 3+ files, delete/move, broad
   `apply_patch`, arbitrary project mutation, provider/auth changes, CLI/session
   schema changes, or default real-provider gate are added

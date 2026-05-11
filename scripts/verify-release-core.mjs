@@ -101,5 +101,11 @@ if (evidenceArtifactsCode !== 0) {
   process.exit(evidenceArtifactsCode)
 }
 
+const sessionDurabilityLongCode = await runNodeScript('verify-session-durability-long.mjs')
+if (sessionDurabilityLongCode !== 0) {
+  console.log(`[product-regression] release-core - session-durability-long exited ${sessionDurabilityLongCode}`)
+  process.exit(sessionDurabilityLongCode)
+}
+
 console.log('[pass] release-core')
 process.exit(0)
