@@ -49,6 +49,7 @@
     "verify:query-orchestration": "node scripts/verify-query-orchestration.mjs",
     "verify:cli-entry": "node scripts/verify-cli-entry.mjs",
     "verify:mcp-routing": "node scripts/verify-mcp-routing.mjs",
+    "verify:mcp:local-execution": "node scripts/verify-mcp-local-execution.mjs",
     "verify:result-contract": "node scripts/verify-result-contract.mjs",
     "verify:workspace-safety": "node scripts/verify-workspace-safety.mjs",
     "verify:evidence-artifacts": "node scripts/verify-evidence-artifacts.mjs",

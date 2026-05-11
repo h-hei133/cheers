@@ -76,6 +76,35 @@ The primary user-visible mainline is now:
 
 ## 5. Latest Implemented Delta (through 2026-05-11)
 
+### Current closeout: standalone local MCP execution gate
+
+MCP local execution now has a deterministic standalone gate outside
+`verify:release:core`.
+
+Key sealed evidence:
+
+- `verify:mcp:local-execution` uses only the local stdio fixture
+  `src/core/mcp/fixtures/mockMcpServer.mjs`
+- the success path crosses `CoreMcpGateway` list/invoke, `ToolRuntime`
+  registry execution, tool provenance, lifecycle projection, focused
+  shell-session user-visible result rendering, and session continuity
+- success keeps `executionPath=mcp-stdio`, server/tool identity, and
+  `changedFiles=[]` / `failedFiles=[]`
+- failure coverage includes MCP `isError`, stdio execution throw, stale or
+  unavailable descriptor handling, and unknown MCP tool execution without
+  success-like projection
+- follow-up continuity keeps MCP tool provenance and failure boundary without
+  fabricating file mutation state
+
+Important boundaries:
+
+- the gate is standalone and not wired into `verify:release:core`
+- the user-visible surface proof is focused shell runtime/session evidence, not
+  full CLI-entry MCP tool execution proof
+- it does not read user MCP config, start an external MCP server, touch a real
+  provider, alter provider/auth, change mutation routes, or change the default
+  MVP gate
+
 ### Current closeout: synthetic long-session compact/reload `/continue` durability gate
 
 Long-session durability now has a deterministic synthetic gate outside the
