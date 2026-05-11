@@ -113,6 +113,8 @@ const realApplyPatchGuardedRouteSmoke = process.argv.includes('--real-apply-patc
 const realApplyPatchWorkspaceWriteSmoke = process.argv.includes('--real-apply-patch-workspace-write-smoke')
 const realMutationEnvContract = prepareRealMutationEnvContract()
 const candidateMutationFailureTaxonomySelfTest = process.argv.includes('--candidate-mutation-failure-taxonomy-self-test')
+const route03TwoFileCliPathEvidence = process.argv.includes('--route03-two-file-cli-path-evidence') ||
+  process.argv.includes('--two-file-cli-path-evidence')
 let lastApplyPatchProviderDiagnostics = undefined
 const syntheticHome = getSyntheticHome()
 const realHome = realMutationEnvContract.realHome ?? getRealProviderHome({ allowDefault: true })
@@ -3488,6 +3490,8 @@ function printHelp() {
   console.log('  --real-coding-flow-diagnostics-self-test')
   console.log('  --real-coding-flow-audit-isolation-self-test')
   console.log('  --real-apply-patch-dry-run-smoke-dry-run')
+  console.log('  --route03-two-file-cli-path-evidence')
+  console.log('    Deterministic CLI --print evidence for the exactly-two-file candidate mutation route; no real provider.')
   console.log('')
   console.log('Explicit opt-in real-provider checks:')
   console.log(`  --case=${realSingleFileUpdateCaseId}`)
@@ -10407,6 +10411,204 @@ function runCandidateMutationFailureTaxonomySelfTest() {
   console.log('[pass] candidate-mutation-failure-taxonomy-self-test')
 }
 
+function route03CliOutcome(output, code) {
+  if (/Outcome:\s*success/i.test(output) || /apply_patch .*workspace write succeeded/i.test(output)) {
+    return 'success'
+  }
+  if (/Outcome:\s*stopped/i.test(output) || /stopped before success/i.test(output) || /blocked before success/i.test(output)) {
+    return 'stopped'
+  }
+  if (code !== 0) return 'error'
+  return 'unknown'
+}
+
+function route03CommandDisplay() {
+  return [
+    process.execPath,
+    path.relative(repoRoot, tsxCliPath),
+    path.relative(repoRoot, cliEntryPath),
+    '--project',
+    '<isolated-selected-workspace>',
+    '--print',
+    '--apply-patch-workspace-write',
+    '--non-interactive-approval',
+    'allow-once',
+    '<apply_patch-text>',
+  ].join(' ')
+}
+
+async function runRoute03TwoFileCliScenario(scenario) {
+  prepareProject(scenario)
+  const runtimeHome = path.join(testRoot, 'route03-cli-evidence-runtime-home', `${scenario.id}-${runId}`)
+  const auditLogPath = path.join(testRoot, 'route03-cli-evidence-audit', `${scenario.id}-${runId}`, 'permissions.jsonl')
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+
+  try {
+    const before = snapshot(scenario.projectDir)
+    const result = await runApplyPatchWorkspaceWriteCli({
+      fixtureDir: scenario.projectDir,
+      patchText: scenario.patchText,
+      runtimeHome,
+      auditLogPath,
+    })
+    const after = snapshot(scenario.projectDir)
+    const observedChanged = changedFiles(before, after)
+    return {
+      id: scenario.id,
+      code: result.code,
+      timedOut: result.timedOut,
+      output: result.output,
+      outputTail: summarizeOutput(result.output),
+      outcome: route03CliOutcome(result.output, result.code),
+      changedFiles: observedChanged,
+      failedFiles: scenario.expectFailedFiles ?? [],
+      selectedWorkspaceIsolated: scenario.projectDir.startsWith(`${testRoot}${path.sep}`),
+    }
+  } finally {
+    fs.rmSync(scenario.projectDir, { recursive: true, force: true })
+    fs.rmSync(runtimeHome, { recursive: true, force: true })
+    fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  }
+}
+
+async function runRoute03TwoFileCliPathEvidence() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=route03-two-file-cli-path-evidence')
+  console.log('realProviderTouched=false')
+  console.log('realProviderExecutionAttempted=false')
+  console.log(`cliCommand=${route03CommandDisplay()}`)
+  console.log('cliMode=--print')
+  console.log('providerMode=synthetic')
+
+  const successScenario = {
+    id: 'route03-two-file-cli-success',
+    projectDir: path.join(testRoot, `route03-two-file-cli-success-${runId}`),
+    files: {
+      'src/a.ts': 'a\n',
+      'src/b.ts': 'b\n',
+      'src/c.ts': 'c\n',
+      'LOCKED.md': 'locked\n',
+    },
+    patchText: [
+      '*** Begin Patch',
+      '*** Update File: src/a.ts',
+      '@@',
+      '-a',
+      '+aa',
+      '*** Update File: src/b.ts',
+      '@@',
+      '-b',
+      '+bb',
+      '*** End Patch',
+    ].join('\n'),
+  }
+  const threeFileScenario = {
+    id: 'route03-unsupported-three-file-update',
+    projectDir: path.join(testRoot, `route03-three-file-cli-${runId}`),
+    files: {
+      'src/a.ts': 'a\n',
+      'src/b.ts': 'b\n',
+      'src/c.ts': 'c\n',
+      'LOCKED.md': 'locked\n',
+    },
+    patchText: [
+      '*** Begin Patch',
+      '*** Update File: src/a.ts',
+      '@@',
+      '-a',
+      '+aa',
+      '*** Update File: src/b.ts',
+      '@@',
+      '-b',
+      '+bb',
+      '*** Update File: src/c.ts',
+      '@@',
+      '-c',
+      '+cc',
+      '*** End Patch',
+    ].join('\n'),
+  }
+  const deleteScenario = {
+    id: 'route03-unsupported-delete-request',
+    projectDir: path.join(testRoot, `route03-delete-cli-${runId}`),
+    files: {
+      'src/a.ts': 'a\n',
+      'src/b.ts': 'b\n',
+      'LOCKED.md': 'locked\n',
+    },
+    patchText: [
+      '*** Begin Patch',
+      '*** Delete File: src/a.ts',
+      '*** Update File: src/b.ts',
+      '@@',
+      '-b',
+      '+bb',
+      '*** End Patch',
+    ].join('\n'),
+  }
+
+  const success = await runRoute03TwoFileCliScenario(successScenario)
+  const threeFile = await runRoute03TwoFileCliScenario(threeFileScenario)
+  const deleteRequest = await runRoute03TwoFileCliScenario(deleteScenario)
+  const postWriteFailure = withRoute02FailureClass({
+    status: 'FAIL',
+    statusDetail: 'post-write-verification-failed',
+    failureCategory: 'post-write verification failed',
+    failureReason: 'post-write verification failed: readback did not match planned content',
+  })
+  const postWriteSurface = buildTerminalResultSurface(postWriteFailure)
+
+  const successChanged = [...success.changedFiles].sort().join(',')
+  const expectedSuccessChanged = 'src/a.ts,src/b.ts'
+  const successSurfaceOk =
+    success.outcome === 'success' &&
+    /Changed(?: files)?:\s*src\/a\.ts,\s*src\/b\.ts/i.test(success.output) &&
+    /Verified: each written file matched the approved Update File content/i.test(success.output)
+  const unsupportedSuccessLike = (result) =>
+    result.outcome === 'success' ||
+    /apply_patch .*workspace write succeeded/i.test(result.output) ||
+    /Outcome:\s*success/i.test(result.output)
+  const failures = [
+    ...(success.code === 0 && !success.timedOut ? [] : [`two-file CLI exited code=${success.code} timedOut=${success.timedOut}`]),
+    ...(success.selectedWorkspaceIsolated ? [] : ['two-file selected workspace was not isolated']),
+    ...(successChanged === expectedSuccessChanged ? [] : [`two-file changedFiles expected ${expectedSuccessChanged}, observed ${successChanged || 'none'}`]),
+    ...(successSurfaceOk ? [] : ['two-file user-visible output lacked success, changedFiles, or post-write verification evidence']),
+    ...(threeFile.changedFiles.length === 0 ? [] : [`3+ file request changed files: ${threeFile.changedFiles.join(',')}`]),
+    ...(!unsupportedSuccessLike(threeFile) ? [] : ['3+ file request was reported as success']),
+    ...(deleteRequest.changedFiles.length === 0 ? [] : [`delete request changed files: ${deleteRequest.changedFiles.join(',')}`]),
+    ...(!unsupportedSuccessLike(deleteRequest) ? [] : ['delete request was reported as success']),
+    ...(postWriteFailure.route02FailureClass === 'post-write' ? [] : [`post-write taxonomy expected post-write, observed ${postWriteFailure.route02FailureClass ?? 'none'}`]),
+    ...(postWriteSurface.outcome !== 'success' && postWriteSurface.statusDetail !== 'passed' ? [] : ['post-write verification failure rendered success-like surface']),
+  ]
+
+  console.log(`selectedWorkspaceIsolated=${success.selectedWorkspaceIsolated}`)
+  console.log(`workspaceWriterInvoked=${successChanged === expectedSuccessChanged && success.outcome === 'success'}`)
+  console.log(`terminalOutcome=${success.outcome}`)
+  console.log(`changedFiles=${success.changedFiles.join(',')}`)
+  console.log(`failedFiles=${success.failedFiles.join(',') || 'none'}`)
+  console.log(`postWriteVerification=${successSurfaceOk ? 'passed' : 'missing'}`)
+  console.log(`userVisibleOutput=${successSurfaceOk ? 'sufficient' : 'insufficient'}`)
+  console.log(`twoFileOutputTail=${success.outputTail}`)
+  console.log(`unsupportedThreeFileOutcome=${threeFile.outcome}`)
+  console.log(`unsupportedThreeFileChangedFiles=${threeFile.changedFiles.join(',') || 'none'}`)
+  console.log(`unsupportedDeleteOutcome=${deleteRequest.outcome}`)
+  console.log(`unsupportedDeleteChangedFiles=${deleteRequest.changedFiles.join(',') || 'none'}`)
+  console.log(`postWriteVerificationFailureOutcome=${postWriteSurface.outcome}`)
+  console.log(`postWriteVerificationFailureRoute02Class=${postWriteFailure.route02FailureClass}`)
+  console.log('postWriteVerificationFailureEvidence=Route02 taxonomy surface; deterministic CLI mismatch injection is not used by this route')
+
+  if (failures.length > 0) {
+    for (const failure of failures) {
+      console.log(`[fail] route03-two-file-cli-path-evidence - ${failure}`)
+    }
+    process.exit(1)
+  }
+  console.log('[pass] route03-two-file-cli-path-evidence')
+}
+
 function classifySingleFileUpdatePatchShape(patchText) {
   const normalized = String(patchText ?? '').replace(/\r\n/g, '\n')
   const updateFiles = [...normalized.matchAll(/^\*\*\* Update File:\s+(.+)$/gm)]
@@ -11861,6 +12063,10 @@ async function main() {
   }
   if (candidateMutationFailureTaxonomySelfTest) {
     runCandidateMutationFailureTaxonomySelfTest()
+    return
+  }
+  if (route03TwoFileCliPathEvidence) {
+    await runRoute03TwoFileCliPathEvidence()
     return
   }
   if (realReadonlyCodingPreflightSelfTest) {
