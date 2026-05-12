@@ -190,6 +190,10 @@ export function formatStoppedContinueGuidanceLines(input: {
     .map((entry) => `${entry.path}${entry.reason ? ` (${entry.reason})` : ""}`)
     .join(", ");
   const changedFiles = input.snapshot.recentChangedFiles.join(", ");
+  const plannedFiles =
+    input.snapshot.lastWriterStarted === false && !changedFiles
+      ? input.snapshot.recentTargetFiles.join(", ")
+      : "";
   const verifiedFiles = input.snapshot.recentVerifiedFiles.join(", ");
   const reason =
     input.snapshot.lastVerificationReason ??
@@ -225,6 +229,9 @@ export function formatStoppedContinueGuidanceLines(input: {
   lines.push(`- Reason: ${reason}`);
   if (changedFiles) {
     lines.push(`- Changed files: ${changedFiles}`);
+  }
+  if (plannedFiles) {
+    lines.push(`- Planned files: ${plannedFiles}`);
   }
   if (verifiedFiles) {
     lines.push(`- Verified files: ${verifiedFiles}`);

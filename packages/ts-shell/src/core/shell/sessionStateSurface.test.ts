@@ -127,4 +127,45 @@ describe("sessionStateSurface", () => {
     );
     expect(lines.toLowerCase()).not.toContain("outcome: success");
   });
+
+  it("renders no-write planned files without labeling them as changed", () => {
+    const lines = formatStoppedContinueGuidanceLines({
+      printMode: true,
+      sessionId: "sess_surface",
+      summary: baseSummary(),
+      snapshot: baseContinuitySnapshot({
+        recentChangedFiles: [],
+        recentTargetFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        recentFailedFiles: [
+          {
+            path: "src/a.ts",
+            reason:
+              "Exactly-three writes remain unsupported; no writer was reachable.",
+          },
+          {
+            path: "src/b.ts",
+            reason:
+              "Exactly-three writes remain unsupported; no writer was reachable.",
+          },
+          {
+            path: "src/c.ts",
+            reason:
+              "Exactly-three writes remain unsupported; no writer was reachable.",
+          },
+        ],
+        lastWriterStarted: false,
+        lastWriteEffectTarget: "src/a.ts, src/b.ts, src/c.ts",
+        lastVerificationReason:
+          "Exactly-three Update File patch passed planning/preflight, but 3-file writes are unsupported and no writer was reachable.",
+        lastVerificationBlockerKind: "generic-stopped",
+      }),
+    }).join("\n");
+
+    expect(lines).toContain("- Outcome: stopped");
+    expect(lines).toContain("- Planned files: src/a.ts, src/b.ts, src/c.ts");
+    expect(lines).toContain("- Writer started: no");
+    expect(lines).not.toContain("- Changed files:");
+    expect(lines.toLowerCase()).not.toContain("outcome: success");
+    expect(lines.toLowerCase()).not.toContain("rollback");
+  });
 });

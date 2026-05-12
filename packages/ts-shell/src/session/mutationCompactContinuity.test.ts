@@ -6,6 +6,8 @@ import type {
   CodingResultSummary,
   OrchestrationResult,
 } from "../orchestration/types.js";
+import { buildMultiFileUpdatePlanningRouteResult } from "../orchestration/patchResult/multiFilePlanningResult.js";
+import type { MultiFileUpdatePlanningClassification } from "../orchestration/patchResult/multiFileUpdatePlanning.js";
 import { SessionManager, type Session } from "./SessionManager.js";
 
 describe("mutation compact continuity", () => {
@@ -122,6 +124,74 @@ describe("mutation compact continuity", () => {
     expect(context).not.toContain("rollback succeeded");
     expect(context).not.toContain("atomic rollback");
   });
+
+  it("preserves exactly-three planning no-write stopped state across compact-equivalent reload and follow-up", () => {
+    const manager = new SessionManager();
+    const session = createSeededMutationSession(
+      manager,
+      "update three files with apply_patch",
+    );
+    const result = makeThreeFilePlanningNoWriteResult(session);
+
+    appendUntilAutoCompact(manager, session, result);
+    manager.saveError(session.id, threeFileStopReason, {
+      terminalReason: "stopped_error",
+      terminalClassification: "stopped",
+    });
+
+    const restoredManager = new SessionManager();
+    const snapshot = restoredManager.buildContinuitySnapshot(session.id);
+    const context = restoredManager.buildPromptContinuityContext(
+      session.id,
+      "continue: what was planned before it stopped?",
+    );
+    const state = readState(restoredManager, session.id);
+
+    expect(state.workingMemory?.compacted).toBe(true);
+    expect(snapshot.lastTerminalClassification).toBe("stopped");
+    expect(snapshot.lastFailure).toBe(threeFileStopReason);
+    expect(snapshot.lastWriterStarted).toBe(false);
+    expect(snapshot.lastWriteEffect).toBeUndefined();
+    expect(snapshot.lastWriteEffectTarget).toBe("src/a.ts, src/b.ts, src/c.ts");
+    expect(snapshot.recentChangedFiles).toEqual([]);
+    expect(snapshot.recentTargetFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+    ]);
+    expect(snapshot.recentVerifiedFiles).toEqual([]);
+    expect(snapshot.recentFailedFiles.map((entry) => entry.path)).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+    ]);
+    expect(snapshot.lastVerificationStatus).toBe("blocked");
+    expect(snapshot.lastFailureHandoffDiagnostic).toContain(
+      "Failure handoff: status=blocked",
+    );
+    expect(snapshot.lastFailureHandoffDiagnostic).toContain(
+      "target=src/a.ts, src/b.ts, src/c.ts",
+    );
+    expect(snapshot.lastFailureHandoffDiagnostic).toContain(
+      "3-file writes are unsupported",
+    );
+    expect(snapshot.lastSuccessHandoffDiagnostic).toBeUndefined();
+    expect(context).toContain("- last-terminal: stopped (stopped_error)");
+    expect(context).toContain("- last-writer-started: no");
+    expect(context).toContain(
+      "- last-write-effect-target: src/a.ts, src/b.ts, src/c.ts",
+    );
+    expect(context).toContain(
+      "- recent-target-files: src/a.ts, src/b.ts, src/c.ts",
+    );
+    expect(context).toContain(
+      "- last-failure-handoff-diagnostic: Failure handoff: status=blocked",
+    );
+    expect(context).not.toContain("- recent-changed-files:");
+    expect(context).not.toContain("- last-terminal: success");
+    expect(context).not.toContain("rollback succeeded");
+    expect(context).not.toContain("atomic rollback");
+  });
 });
 
 const partialFailedReason = "write failed: EACCES";
@@ -129,6 +199,10 @@ const partialStopReason =
   "apply_patch multi-file workspace write stopped before success: src/b.ts failed after src/a.ts was verified.";
 const partialNextAction =
   "Inspect/re-read both attempted files before retrying.";
+const threeFileStopReason =
+  "Exactly-three Update File patch passed selected-workspace planning/preflight, but 3-file writes are unsupported and no writer was reachable.";
+const threeFileNextAction =
+  "No files were changed. Split this into supported smaller operations or wait for a dedicated 3-file write route before writing three files.";
 
 function createSeededMutationSession(
   manager: SessionManager,
@@ -331,6 +405,41 @@ function makeMutationPartialFailureResult(session: Session): OrchestrationResult
     },
     finalOutput: "",
     codingResult,
+  };
+}
+
+function makeThreeFilePlanningNoWriteResult(
+  session: Session,
+): OrchestrationResult {
+  return buildMultiFileUpdatePlanningRouteResult({
+    sessionId: session.id,
+    prompt: "update three files with apply_patch",
+    classification: makeThreeFilePlanningNoWriteClassification(),
+  });
+}
+
+function makeThreeFilePlanningNoWriteClassification(): MultiFileUpdatePlanningClassification {
+  return {
+    capability: "multi-file-update-candidate-no-write",
+    operation: "update",
+    tier: "candidate",
+    classificationMode: "synthetic-no-write",
+    targetPaths: ["src/a.ts", "src/b.ts", "src/c.ts"],
+    plannedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+    wouldChangeFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+    blockedReason: "three-file-update-planning-no-write",
+    expectedCapability:
+      "selected-workspace exactly-three existing-file update planning/no-write",
+    currentSupportedCapability:
+      "exactly-three planning/no-write only; 3-file writes remain unsupported",
+    drivesApplyPatchExpansion: false,
+    willWrite: false,
+    writerReachable: false,
+    changedFiles: [],
+    writeIntents: [],
+    failedFiles: [],
+    explanation: threeFileStopReason,
+    nextAction: threeFileNextAction,
   };
 }
 
