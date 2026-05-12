@@ -109,9 +109,9 @@ describe("local MCP execution gate", () => {
       reason: "MCP tool rejected request: invalid message",
     });
     expect(projectToolLifecycle({ toolName: QUALIFIED_TOOL_NAME, ...isErrorResult })).toMatchObject({
-      kind: "mcp-execution-failed",
+      kind: "mcp-tool-is-error",
       legacySuccess: false,
-      failureBoundary: "mcp-execution-failed",
+      failureBoundary: "mcp-tool-is-error",
       executionPath: "mcp-stdio",
       serverName: SERVER_NAME,
       toolName: TOOL_NAME,
@@ -134,9 +134,9 @@ describe("local MCP execution gate", () => {
       reason: "MCP stdio execution failed",
     });
     expect(projectToolLifecycle({ toolName: QUALIFIED_TOOL_NAME, ...thrownResult })).toMatchObject({
-      kind: "mcp-execution-failed",
+      kind: "mcp-process-failed",
       legacySuccess: false,
-      failureBoundary: "mcp-execution-failed",
+      failureBoundary: "mcp-process-failed",
       executionPath: "mcp-stdio",
       serverName: SERVER_NAME,
       toolName: TOOL_NAME,

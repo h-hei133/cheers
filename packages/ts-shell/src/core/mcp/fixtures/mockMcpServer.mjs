@@ -9,6 +9,14 @@ process.stdin.on('end', () => {
   const request = JSON.parse(input || '{}')
 
   if (request.action === 'list-tools') {
+    if (process.argv.includes('--invalid-tools-list')) {
+      process.stdout.write(JSON.stringify({ tools: 'not-an-array' }))
+      return
+    }
+    if (process.argv.includes('--invalid-json')) {
+      process.stdout.write('{not-json')
+      return
+    }
     process.stdout.write(
       JSON.stringify({
         tools: [
@@ -35,6 +43,10 @@ process.stdin.on('end', () => {
     if (message === 'mcp-throw') {
       process.stderr.write('MCP stdio execution failed')
       process.exitCode = 1
+      return
+    }
+    if (message === 'mcp-malformed') {
+      process.stdout.write(JSON.stringify({ content: 7 }))
       return
     }
     process.stdout.write(JSON.stringify({ content: `echo:${message}` }))

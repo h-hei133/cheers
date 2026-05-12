@@ -7,6 +7,10 @@ import type {
   ScopedMcpServerConfig,
   McpToolDescriptor,
 } from './types.js'
+import {
+  McpClassifiedError,
+  classifyMcpFailure,
+} from './errorTaxonomy.js'
 
 export class CoreMcpClient {
   readonly name: string
@@ -49,9 +53,17 @@ export class CoreMcpClient {
 
   async listTools(): Promise<McpToolDescriptor[]> {
     if (this.config.transport === 'stdio' && this.config.command) {
-      const response = await this.callStdio<{ tools: Array<{ name: string; description: string; inputSchema?: Record<string, unknown> }> }>({
+      const response = await this.callStdio<unknown>({
         action: 'list-tools',
       })
+      if (!isToolListResponse(response)) {
+        throw new McpClassifiedError(
+          classifyMcpFailure({
+            failureClass: 'protocol',
+            detail: `MCP server ${this.name} returned an invalid tools list`,
+          }),
+        )
+      }
       return response.tools.map(tool => ({
         serverName: this.name,
         toolName: tool.name,
@@ -78,11 +90,20 @@ export class CoreMcpClient {
 
   async invokeTool(toolName: string, args: Record<string, unknown>): Promise<McpToolCallResult> {
     if (this.config.transport === 'stdio' && this.config.command) {
-      return this.callStdio<McpToolCallResult>({
+      const response = await this.callStdio<unknown>({
         action: 'invoke-tool',
         toolName,
         args,
       })
+      if (!isToolCallResult(response)) {
+        throw new McpClassifiedError(
+          classifyMcpFailure({
+            failureClass: 'malformed-result',
+            detail: `MCP tool ${toolName} on server ${this.name} returned a malformed result`,
+          }),
+        )
+      }
+      return response
     }
 
     return {
@@ -111,17 +132,36 @@ export class CoreMcpClient {
       child.stderr.on('data', data => {
         stderr += data.toString()
       })
-      child.on('error', reject)
+      child.on('error', error => {
+        reject(new McpClassifiedError(
+          classifyMcpFailure({
+            failureClass: 'stdio-process',
+            detail: `MCP stdio process could not start for ${this.name}: ${error.message}`,
+          }),
+        ))
+      })
       child.on('close', code => {
         if (code !== 0) {
-          reject(new Error(stderr || `MCP stdio call failed with exit code ${code}`))
+          reject(new McpClassifiedError(
+            classifyMcpFailure({
+              failureClass: 'stdio-process',
+              detail: stderr || `MCP stdio process for ${this.name} exited with code ${code}`,
+            }),
+          ))
           return
         }
 
         try {
           resolve(JSON.parse(stdout) as T)
         } catch (error) {
-          reject(error)
+          reject(new McpClassifiedError(
+            classifyMcpFailure({
+              failureClass: 'malformed-result',
+              detail: error instanceof Error
+                ? `MCP stdio response from ${this.name} was not valid JSON: ${error.message}`
+                : `MCP stdio response from ${this.name} was not valid JSON`,
+            }),
+          ))
         }
       })
 
@@ -133,4 +173,28 @@ export class CoreMcpClient {
 
 export function qualifyMcpToolName(serverName: string, toolName: string): string {
   return `mcp__${serverName}__${toolName}`
+}
+
+function isToolListResponse(value: unknown): value is {
+  readonly tools: Array<{ readonly name: string; readonly description: string; readonly inputSchema?: Record<string, unknown> }>
+} {
+  if (!value || typeof value !== 'object' || !Array.isArray((value as { tools?: unknown }).tools)) {
+    return false
+  }
+  return (value as { tools: unknown[] }).tools.every(tool => {
+    if (!tool || typeof tool !== 'object') return false
+    const candidate = tool as { name?: unknown; description?: unknown }
+    return typeof candidate.name === 'string' && typeof candidate.description === 'string'
+  })
+}
+
+function isToolCallResult(value: unknown): value is McpToolCallResult {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const candidate = value as { content?: unknown; isError?: unknown }
+  return (
+    typeof candidate.content === 'string' &&
+    (candidate.isError === undefined || typeof candidate.isError === 'boolean')
+  )
 }

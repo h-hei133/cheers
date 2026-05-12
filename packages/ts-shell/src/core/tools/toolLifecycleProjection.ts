@@ -9,6 +9,9 @@ export type ToolLifecycleProjectionKind =
   | "approval-denied"
   | "tool-unavailable"
   | "mcp-unavailable"
+  | "mcp-tool-is-error"
+  | "mcp-protocol-failed"
+  | "mcp-process-failed"
   | "mcp-execution-failed"
   | "tool-execution-failed"
   | "permission-blocked"
@@ -28,6 +31,8 @@ export interface ToolLifecycleProjection {
   readonly toolName?: string;
   readonly verificationBlockerKind?: ToolLifecycleVerificationBlockerKind;
   readonly nextAction?: string;
+  readonly mcpFailureClass?: string;
+  readonly mcpFailurePlane?: string;
 }
 
 export interface ToolLifecycleProjectionInput extends ToolExecutionResult {
@@ -43,6 +48,8 @@ export function projectToolLifecycle(
   const executionPath = readString(metadata?.executionPath);
   const projectedToolName = readString(metadata?.toolName) ?? input.toolName;
   const serverName = readString(metadata?.serverName);
+  const mcpFailureClass = readString(metadata?.mcpFailureClass);
+  const mcpFailurePlane = readString(metadata?.mcpFailurePlane);
   const reason = firstText(
     input.error,
     readString(metadata?.reason),
@@ -54,6 +61,8 @@ export function projectToolLifecycle(
     ...(executionPath ? { executionPath } : {}),
     ...(serverName ? { serverName } : {}),
     ...(projectedToolName ? { toolName: projectedToolName } : {}),
+    ...(mcpFailureClass ? { mcpFailureClass } : {}),
+    ...(mcpFailurePlane ? { mcpFailurePlane } : {}),
   };
 
   if (provenance.kind === "executed-succeeded") {
@@ -113,6 +122,30 @@ export function projectToolLifecycle(
   }
 
   if (isMcpExecutionPath(executionPath)) {
+    if (mcpFailureClass === "tool-is-error") {
+      return {
+        kind: "mcp-tool-is-error",
+        ...base,
+        failureBoundary: "mcp-tool-is-error",
+      };
+    }
+    if (mcpFailureClass === "protocol" || mcpFailureClass === "malformed-result") {
+      return {
+        kind: "mcp-protocol-failed",
+        ...base,
+        failureBoundary: "mcp-protocol-failed",
+      };
+    }
+    if (
+      mcpFailureClass === "stdio-process" ||
+      mcpFailureClass === "server-unavailable"
+    ) {
+      return {
+        kind: "mcp-process-failed",
+        ...base,
+        failureBoundary: "mcp-process-failed",
+      };
+    }
     return {
       kind: "mcp-execution-failed",
       ...base,

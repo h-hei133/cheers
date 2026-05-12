@@ -9,6 +9,11 @@ import {
   isRustDaemonEnabled,
 } from '../../daemon/client.js'
 import { McpGatewayBlockedError, type CoreMcpGateway } from '../mcp/gateway.js'
+import {
+  classifyMcpFailure,
+  classifyUnknownMcpFailure,
+  mcpFailureMetadata,
+} from '../mcp/errorTaxonomy.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
@@ -265,6 +270,10 @@ export function createCoreToolRegistry(options?: {
         try {
           const result = await options.mcpGateway.invokeTool(tool.serverName, tool.toolName, args)
           if (result.isError) {
+            const taxonomy = classifyMcpFailure({
+              failureClass: 'tool-is-error',
+              detail: result.content,
+            })
             return deniedResult(result.content, {
               executionPath: 'mcp-stdio',
               serverName: tool.serverName,
@@ -272,6 +281,7 @@ export function createCoreToolRegistry(options?: {
               status: 'failed',
               failureKind: 'execution_failure',
               reason: result.content,
+              ...mcpFailureMetadata(taxonomy),
               doNext: `Inspect MCP tool ${tool.qualifiedName} error output, refresh ${tool.serverName}, and retry only if the request is still valid.`,
             })
           }
@@ -288,10 +298,16 @@ export function createCoreToolRegistry(options?: {
               toolName: tool.toolName,
               blockerKind: error.blockerKind,
               reason: error.message,
+              ...mcpFailureMetadata({
+                failureClass: error.mcpFailureClass,
+                failurePlane: error.mcpFailurePlane,
+                safeDetail: error.mcpSafeDetail,
+              }),
               doNext: error.doNext,
             })
           }
-          const reason = error instanceof Error ? error.message : String(error)
+          const taxonomy = classifyUnknownMcpFailure(error)
+          const reason = taxonomy.safeDetail
           return deniedResult(reason, {
             executionPath: 'mcp-stdio',
             serverName: tool.serverName,
@@ -299,6 +315,14 @@ export function createCoreToolRegistry(options?: {
             status: 'failed',
             failureKind: 'execution_failure',
             reason,
+            ...mcpFailureMetadata(
+              taxonomy.failureClass === 'unknown'
+                ? classifyMcpFailure({
+                    failureClass: 'tool-execution',
+                    detail: reason,
+                  })
+                : taxonomy,
+            ),
             doNext: `Inspect MCP tool ${tool.qualifiedName} error output, refresh ${tool.serverName}, and retry only if the request is still valid.`,
           })
         }

@@ -11,6 +11,11 @@ import type {
   McpToolCallResult,
   ScopedMcpServerConfig,
 } from "./types.js";
+import {
+  classifyMcpFailure,
+  type McpFailureClass,
+  type McpFailurePlane,
+} from "./errorTaxonomy.js";
 
 export type McpGatewayBlockerKind =
   | "command-not-allowlisted"
@@ -20,16 +25,27 @@ export type McpGatewayBlockerKind =
 export class McpGatewayBlockedError extends Error {
   readonly blockerKind: McpGatewayBlockerKind;
   readonly doNext: string;
+  readonly mcpFailureClass: McpFailureClass;
+  readonly mcpFailurePlane: McpFailurePlane;
+  readonly mcpSafeDetail: string;
 
   constructor(input: {
     message: string;
     blockerKind: McpGatewayBlockerKind;
     doNext: string;
+    mcpFailureClass?: McpFailureClass;
   }) {
-    super(input.message);
+    const taxonomy = classifyMcpFailure({
+      failureClass: input.mcpFailureClass ?? "unknown",
+      detail: input.message,
+    });
+    super(taxonomy.safeDetail);
     this.name = "McpGatewayBlockedError";
     this.blockerKind = input.blockerKind;
     this.doNext = input.doNext;
+    this.mcpFailureClass = taxonomy.failureClass;
+    this.mcpFailurePlane = taxonomy.failurePlane;
+    this.mcpSafeDetail = taxonomy.safeDetail;
   }
 }
 
@@ -142,6 +158,7 @@ export class CoreMcpGateway {
       throw new McpGatewayBlockedError({
         message: `Unknown MCP server: ${normalizedTarget}`,
         blockerKind: "unknown",
+        mcpFailureClass: "tool-unavailable",
         doNext:
           "Run /mcp status to list configured servers, then retry with a valid server name.",
       });
@@ -168,6 +185,7 @@ export class CoreMcpGateway {
       throw new McpGatewayBlockedError({
         message: `Unknown MCP server: ${serverName}`,
         blockerKind: "unknown",
+        mcpFailureClass: "tool-unavailable",
         doNext:
           "Run /mcp status to list configured servers, then retry with a valid server name.",
       });
@@ -191,6 +209,7 @@ export class CoreMcpGateway {
       throw new McpGatewayBlockedError({
         message: `MCP tool ${toolName} is unavailable on server ${serverName}`,
         blockerKind: "unknown",
+        mcpFailureClass: "tool-unavailable",
         doNext: `Run /mcp refresh ${serverName} and retry with a visible MCP tool.`,
       });
     }
@@ -231,6 +250,7 @@ export class CoreMcpGateway {
     return new McpGatewayBlockedError({
       message: description.reason ?? `MCP server ${state.name} is unavailable`,
       blockerKind: "environment-not-ready",
+      mcpFailureClass: failureClassForConnectionState(state),
       doNext: description.doNext,
     });
   }
@@ -251,7 +271,25 @@ export class CoreMcpGateway {
     return new McpGatewayBlockedError({
       message: error.message,
       blockerKind: "environment-not-ready",
+      mcpFailureClass: "config",
       doNext: error.doNext,
     });
+  }
+}
+
+function failureClassForConnectionState(
+  state: Exclude<McpConnectionState, { type: "connected" }>,
+): McpFailureClass {
+  switch (state.type) {
+    case "needs-auth":
+      return "permission-denied";
+    case "disabled":
+      return "config";
+    case "failed":
+      return state.error.toLowerCase().includes("missing")
+        ? "config"
+        : "server-unavailable";
+    case "pending":
+      return "server-unavailable";
   }
 }

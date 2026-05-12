@@ -8,6 +8,7 @@ import {
   type ToolExecutionResult,
 } from '../../tools/types.js'
 import { isMcpConfigLoadError } from '../mcp/config.js'
+import { classifyMcpFailure, mcpFailureMetadata } from '../mcp/errorTaxonomy.js'
 import type { CoreMcpGateway } from '../mcp/gateway.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import { ToolApprovalFlow } from './approvalFlow.js'
@@ -115,11 +116,16 @@ export class ToolRuntime {
     if (!tool) {
       if (isMcpTool) {
         const [, serverName = 'unknown'] = toolName.split('__')
+        const taxonomy = classifyMcpFailure({
+          failureClass: 'tool-unavailable',
+          detail: `MCP tool '${toolName}' is not registered`,
+        })
         return deniedResult(`MCP tool '${toolName}' is not registered`, {
           executionPath: 'mcp-stdio',
           serverName,
           blockerKind: 'unknown',
           reason: `MCP tool '${toolName}' is not registered`,
+          ...mcpFailureMetadata(taxonomy),
           doNext: 'Run /mcp status and /mcp refresh to list available MCP tools, then retry with a visible tool name.',
         })
       }

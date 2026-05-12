@@ -72,12 +72,34 @@ export function deriveToolExecutionProvenance(
   const error = input.error?.toLowerCase() ?? "";
   const reason = readLowerString(input.metadata?.reason) ?? "";
   const executionPath = readLowerString(input.metadata?.executionPath) ?? "";
+  const mcpFailureClass = readLowerString(input.metadata?.mcpFailureClass);
   if (executionPath.startsWith("mcp") && isMcpUnavailableReason(error, reason)) {
     return {
       kind: "unavailable-tool",
       source: "mcp-registry",
       legacySuccess: false,
       failureBoundary: "unavailable-tool",
+    };
+  }
+
+  if (executionPath.startsWith("mcp") && mcpFailureClass) {
+    if (
+      mcpFailureClass === "config" ||
+      mcpFailureClass === "permission-denied" ||
+      mcpFailureClass === "tool-unavailable"
+    ) {
+      return {
+        kind: "unavailable-tool",
+        source: "mcp-registry",
+        legacySuccess: false,
+        failureBoundary: "unavailable-tool",
+      };
+    }
+    return {
+      kind: "executed-failed",
+      source: "tool-result-metadata",
+      legacySuccess: false,
+      failureBoundary: "tool-execution-failed",
     };
   }
 
