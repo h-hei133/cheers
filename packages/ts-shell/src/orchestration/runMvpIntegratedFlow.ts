@@ -56,31 +56,17 @@ import {
   summarizeFileMutationResults,
 } from "./mutationExecution.js";
 import type { FileMutationExecutionResult } from "./mutationExecution.js";
+import {
+  projectApplyPatchRuntimeMutationRoute,
+  type ApplyPatchRuntimeRouteOptions,
+} from "./mutationRoutingProjection.js";
 import { reconcileFileMutationSummary } from "./mutationResultAggregation.js";
 import {
   applySingleFileReplacePatch,
   formatPatchFailureReason,
 } from "./patchMutationLane.js";
-import {
-  buildNoWriteRuntimeRoute,
-  type NoWriteRuntimeSource,
-} from "./patchResult/noWriteRuntimeRoute.js";
 import { projectMutationVerificationHandoff } from "./patchResult/mutationVerificationProjection.js";
-import { buildNoWriteRuntimeRouteResult } from "./patchResult/runtimeRouteResult.js";
 import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
-import { buildWorkspaceCreateRouteResult } from "./patchResult/workspaceCreateResult.js";
-import {
-  patchIsSingleAddFile,
-  runWorkspaceCreateRoute,
-} from "./patchResult/workspaceCreateRoute.js";
-import { buildMultiFileWriteRouteResult } from "./patchResult/multiFileWriteResult.js";
-import {
-  patchIsExactlyTwoUpdateFiles,
-  runMultiFileWriteRoute,
-} from "./patchResult/multiFileWriteRoute.js";
-import { buildWorkspaceWriteRouteResult } from "./patchResult/workspaceWriteResult.js";
-import { runWorkspaceWriteRoute } from "./patchResult/workspaceWriteRoute.js";
-import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
 import { resolveTaskTargets } from "./targetResolution.js";
 import type {
   ResolvedTarget,
@@ -108,6 +94,8 @@ import type {
   TerminalClassification,
   TerminalReason,
 } from "./types.js";
+
+export type { ApplyPatchRuntimeRouteOptions } from "./mutationRoutingProjection.js";
 
 const CONTRACT_VERSION: SchemaVersion = "1.0.0";
 const RUN_COMMAND_ALLOWLIST = [
@@ -138,16 +126,6 @@ export interface MvpIntegratedFlowOptions {
   };
   readonly runtimeSeed?: QueryRuntimeStateSeed;
   readonly applyPatchRuntimeRoute?: ApplyPatchRuntimeRouteOptions;
-}
-
-export interface ApplyPatchRuntimeRouteOptions {
-  readonly explicitRuntimeOptIn: boolean;
-  readonly rawPatchText?: string;
-  readonly requestedUserDecision?: SingleFileApplyPatchRequestedUserDecision;
-  readonly runtimeSource?: NoWriteRuntimeSource;
-  readonly workspaceWrite?: {
-    readonly explicitWorkspaceWriteOptIn: boolean;
-  };
 }
 
 export async function runMvpIntegratedFlow(
@@ -285,96 +263,15 @@ async function runApplyPatchRuntimeRouteIfRequested(
     return undefined;
   }
 
-  if (routeOptions.workspaceWrite?.explicitWorkspaceWriteOptIn) {
-    const workspaceAuthority = createWorkspaceWriteAuthority(options.workspaceRoot);
-    const rawPatchText = routeOptions.rawPatchText ?? options.prompt;
-    if (patchIsSingleAddFile(rawPatchText)) {
-      const route = await runWorkspaceCreateRoute({
-        workspaceRoot: options.workspaceRoot,
-        rawPatchText,
-        explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
-        explicitWorkspaceWriteOptIn:
-          routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
-        ...(routeOptions.requestedUserDecision
-          ? { requestedUserDecision: routeOptions.requestedUserDecision }
-          : {}),
-        defaultProductionRejectionUnchanged: true,
-        readFile: workspaceAuthority.readFile,
-        readVerifiedFile: workspaceAuthority.readVerifiedFile,
-        directoryExists: workspaceAuthority.directoryExists,
-        validateCreateTarget: workspaceAuthority.validateCreateTarget,
-        createFileExclusive: workspaceAuthority.createFileExclusive,
-        ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
-      });
-      return buildWorkspaceCreateRouteResult({
-        sessionId: options.sessionId,
-        prompt: options.prompt,
-        route,
-      });
-    }
-
-    if (patchIsExactlyTwoUpdateFiles(rawPatchText)) {
-      const route = await runMultiFileWriteRoute({
-        workspaceRoot: options.workspaceRoot,
-        rawPatchText,
-        explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
-        explicitWorkspaceWriteOptIn:
-          routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
-        ...(routeOptions.requestedUserDecision
-          ? { requestedUserDecision: routeOptions.requestedUserDecision }
-          : {}),
-        defaultProductionRejectionUnchanged: true,
-        readFile: workspaceAuthority.readFile,
-        readVerifiedFile: workspaceAuthority.readVerifiedFile,
-        validateWriteTarget: workspaceAuthority.validateWriteTarget,
-        writeFile: workspaceAuthority.writeFile,
-        ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
-      });
-      return buildMultiFileWriteRouteResult({
-        sessionId: options.sessionId,
-        prompt: options.prompt,
-        route,
-      });
-    }
-
-    const route = await runWorkspaceWriteRoute({
-      workspaceRoot: options.workspaceRoot,
-      rawPatchText,
-      explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
-      explicitWorkspaceWriteOptIn:
-        routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
-      ...(routeOptions.requestedUserDecision
-        ? { requestedUserDecision: routeOptions.requestedUserDecision }
-        : {}),
-      defaultProductionRejectionUnchanged: true,
-      readFile: workspaceAuthority.readFile,
-      readVerifiedFile: workspaceAuthority.readVerifiedFile,
-      validateWriteTarget: workspaceAuthority.validateWriteTarget,
-      writeFile: workspaceAuthority.writeFile,
-      ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
-    });
-    return buildWorkspaceWriteRouteResult({
-      sessionId: options.sessionId,
-      prompt: options.prompt,
-      route,
-    });
-  }
-
-  const route = buildNoWriteRuntimeRoute({
-    workspaceRoot: options.workspaceRoot,
-    rawPatchText: routeOptions.rawPatchText ?? options.prompt,
-    explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
-    ...(routeOptions.requestedUserDecision
-      ? { requestedUserDecision: routeOptions.requestedUserDecision }
-      : {}),
-    runtimeSource: routeOptions.runtimeSource ?? "production-adjacent",
-    readFile: readWorkspaceFile(options.workspaceRoot),
-  });
-
-  return buildNoWriteRuntimeRouteResult({
+  return projectApplyPatchRuntimeMutationRoute({
     sessionId: options.sessionId,
     prompt: options.prompt,
-    route,
+    workspaceRoot: options.workspaceRoot,
+    routeOptions,
+    getWorkspaceAuthority: () =>
+      createWorkspaceWriteAuthority(options.workspaceRoot),
+    readNoWriteRuntimeFile: readWorkspaceFile(options.workspaceRoot),
+    ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
   });
 }
 
