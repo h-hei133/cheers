@@ -83,6 +83,16 @@ The current release/readiness claim is deliberately bounded: the project is
 limited dogfood ready and deterministic release-candidate green for the current
 verified surface. It is not broad/general release ready.
 
+### Route 10 evaluation: 3-file planning no-write
+
+Route 10 is documentation-only evaluation in
+`docs/design/three-file-planning-no-write-evaluation.md`. Recommendation: an
+exactly-three selected-workspace existing-file `Update File` planning/no-write
+surface is a reasonable next bounded prerequisite, but only if it remains
+stopped/no-write with `changedFiles=[]`, no writer reachability, no default gate
+change, no real-provider requirement, and no 3-file/broad mutation readiness
+claim.
+
 Allowed claims after the Route 01-08 sweep:
 
 - deterministic release-candidate gate is green for the bounded local surface
