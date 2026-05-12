@@ -60,6 +60,21 @@ import {
   getSyntheticHome,
   getTestRoot,
 } from './support/testPaths.mjs'
+import {
+  candidateMutationFailureTaxonomyFixtures,
+  route01FailureClassForRealCandidate,
+  route02FailureClassForCandidate,
+  statusDetailForRealSingleFileCreateFailureCategory,
+  statusDetailForRealSingleFileUpdateFailureCategory,
+  statusDetailForRealTwoFileUpdateFailureCategory,
+  withRoute01FailureClass,
+  withRoute02FailureClass,
+} from './real-user-capabilities/candidateMutationClassification.mjs'
+import {
+  classifySingleFileCreatePatchShape,
+  classifySingleFileUpdatePatchShape,
+  classifyTwoFileUpdatePatchShape,
+} from './real-user-capabilities/candidateMutationPatchShape.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
@@ -10133,150 +10148,6 @@ async function runRealApplyPatchWorkspaceWriteSmoke() {
   }
 }
 
-function statusDetailForRealSingleFileUpdateFailureCategory(failureCategory) {
-  if (failureCategory === 'provider/preflight') return 'provider-preflight'
-  if (failureCategory === 'model output') return 'model-output'
-  if (failureCategory === 'unsupported patch') return 'unsupported-patch'
-  if (failureCategory === 'verification-blocked') return 'verification-blocked'
-  if (failureCategory === 'no mutation') return 'no-mutation'
-  if (failureCategory === 'post-write verification failed') return 'post-write-verification-failed'
-  if (failureCategory === 'redaction failure') return 'redaction-failure'
-  return 'passed'
-}
-
-function statusDetailForRealSingleFileCreateFailureCategory(failureCategory) {
-  if (failureCategory === 'provider/preflight') return 'provider-preflight'
-  if (failureCategory === 'model output') return 'model-output'
-  if (failureCategory === 'unsupported patch') return 'unsupported-patch'
-  if (failureCategory === 'verification-blocked') return 'verification-blocked'
-  if (failureCategory === 'route rejected') return 'route-rejected'
-  if (failureCategory === 'no mutation') return 'no-mutation'
-  if (failureCategory === 'post-write verification failed') return 'post-write-verification-failed'
-  if (failureCategory === 'redaction failure') return 'redaction-failure'
-  return 'passed'
-}
-
-function statusDetailForRealTwoFileUpdateFailureCategory(failureCategory) {
-  if (failureCategory === 'provider/preflight') return 'provider-preflight'
-  if (failureCategory === 'model output') return 'model-output'
-  if (failureCategory === 'unsupported patch') return 'unsupported-patch'
-  if (failureCategory === 'route rejected') return 'route-rejected'
-  if (failureCategory === 'verification-blocked') return 'verification-blocked'
-  if (failureCategory === 'no mutation') return 'no-mutation'
-  if (failureCategory === 'partial mutation failed') return 'partial-mutation-failed'
-  if (failureCategory === 'post-write verification failed') return 'post-write-verification-failed'
-  if (failureCategory === 'redaction failure') return 'redaction-failure'
-  return 'passed'
-}
-
-function route02FailureClassForCandidate(fields) {
-  const category = String(fields.failureCategory ?? '').toLowerCase()
-  const detail = String(fields.statusDetail ?? '').toLowerCase()
-  const reason = String(fields.failureReason ?? '').toLowerCase()
-  const combined = `${category}\n${detail}\n${reason}`
-
-  if (fields.status === 'PASS' || category === 'none') return 'none'
-  if (
-    combined.includes('missing-config') ||
-    combined.includes('missing-key') ||
-    combined.includes('config') ||
-    combined.includes('not clean') ||
-    combined.includes('status could not be checked') ||
-    combined.includes('set private_agents_real_home')
-  ) {
-    return 'config'
-  }
-  if (
-    combined.includes('network') ||
-    combined.includes('auth') ||
-    combined.includes('401') ||
-    combined.includes('403') ||
-    combined.includes('unauthorized') ||
-    combined.includes('forbidden') ||
-    combined.includes('rate limit') ||
-    combined.includes('429') ||
-    combined.includes('quota') ||
-    combined.includes('unavailable')
-  ) {
-    return 'network-auth'
-  }
-  if (
-    category.includes('model output') ||
-    detail.includes('provider-output') ||
-    detail.includes('model-output') ||
-    combined.includes('provider output did not contain') ||
-    combined.includes('provider output missing') ||
-    combined.includes('multiple patches') ||
-    combined.includes('unparseable') ||
-    combined.includes('malformed')
-  ) {
-    return 'model-output'
-  }
-  if (
-    category.includes('unsupported patch') ||
-    category.includes('unsupported-patch-shape') ||
-    detail.includes('unsupported') ||
-    combined.includes('unsupported capability') ||
-    combined.includes('unsupported operation') ||
-    combined.includes('delete file') ||
-    combined.includes('move file') ||
-    combined.includes('rollback') ||
-    combined.includes('3+ files') ||
-    combined.includes('arbitrary project')
-  ) {
-    return 'unsupported'
-  }
-  if (
-    category.includes('post-write') ||
-    category.includes('partial mutation failed') ||
-    category.includes('no mutation') ||
-    category.includes('verification-failed') ||
-    combined.includes('post-write verification failed') ||
-    combined.includes('readback did not match') ||
-    combined.includes('stale-read') ||
-    combined.includes('changed files') ||
-    combined.includes('workspace boundary')
-  ) {
-    return 'post-write'
-  }
-  if (
-    category.includes('route rejected') ||
-    category.includes('verification-blocked') ||
-    combined.includes('workspace write cli') ||
-    combined.includes('route rejected')
-  ) {
-    return 'route'
-  }
-  if (
-    category.includes('redaction') ||
-    combined.includes('repository mutated') ||
-    combined.includes('unexpected success')
-  ) {
-    return 'product-regression'
-  }
-  return 'unknown'
-}
-
-function route01FailureClassForRealCandidate(fields) {
-  return route02FailureClassForCandidate(fields)
-}
-
-function withRoute02FailureClass(fields) {
-  const route02FailureClass = route02FailureClassForCandidate(fields)
-  if (route02FailureClass === 'none') {
-    return fields
-  }
-  return {
-    ...fields,
-    route02FailureClass,
-    route01FailureClass: fields.route01FailureClass ?? route02FailureClass,
-  }
-}
-
-function withRoute01FailureClass(fields) {
-  return withRoute02FailureClass(fields)
-}
-
 function runCandidateMutationFailureTaxonomySelfTest() {
   console.log('gate name=real-user-capabilities')
   console.log('mode=candidate-mutation-failure-taxonomy-self-test')
@@ -10284,111 +10155,9 @@ function runCandidateMutationFailureTaxonomySelfTest() {
   console.log('candidateMutationRealExecuted=false')
   console.log('defaultMvpAffected=false')
 
-  const cases = [
-    {
-      name: 'success-none',
-      expected: 'none',
-      mustNotSuccess: false,
-      fields: {
-        status: 'PASS',
-        statusDetail: 'passed',
-        failureCategory: 'none',
-        failureReason: '',
-      },
-    },
-    {
-      name: 'dirty-repo-preflight-config',
-      expected: 'config',
-      mustNotSuccess: true,
-      fields: {
-        status: 'FAIL',
-        statusDetail: 'verification-blocked',
-        failureCategory: 'verification-blocked',
-        failureReason: 'verification-blocked: repository was not clean before opt-in real candidate mutation smoke',
-      },
-    },
-    {
-      name: 'network-auth-provider',
-      expected: 'network-auth',
-      mustNotSuccess: true,
-      fields: {
-        status: 'FAIL',
-        statusDetail: 'provider-network-inconclusive',
-        failureCategory: 'provider-readiness',
-        failureReason: 'provider-readiness:network: provider endpoint was unavailable',
-      },
-    },
-    {
-      name: 'malformed-model-output',
-      expected: 'model-output',
-      mustNotSuccess: true,
-      fields: {
-        status: 'FAIL',
-        statusDetail: 'model-output',
-        failureCategory: 'model output',
-        failureReason: 'provider output did not contain one parseable apply_patch block',
-      },
-    },
-    {
-      name: 'unsupported-mutation-shape',
-      expected: 'unsupported',
-      mustNotSuccess: true,
-      fields: {
-        status: 'FAIL',
-        statusDetail: 'unsupported-patch',
-        failureCategory: 'unsupported patch',
-        failureReason: 'unsupported patch: generated Delete File and Move File outside the candidate mutation boundary',
-      },
-    },
-    {
-      name: 'route-rejected',
-      expected: 'route',
-      mustNotSuccess: true,
-      fields: {
-        status: 'FAIL',
-        statusDetail: 'route-rejected',
-        failureCategory: 'route rejected',
-        failureReason: 'route rejected: valid candidate mutation shape had no eligible workspace write lane',
-      },
-    },
-    {
-      name: 'post-write-verification',
-      expected: 'post-write',
-      mustNotSuccess: true,
-      fields: {
-        status: 'FAIL',
-        statusDetail: 'post-write-verification-failed',
-        failureCategory: 'post-write verification failed',
-        failureReason: 'post-write verification failed: readback did not match planned content',
-      },
-    },
-    {
-      name: 'product-regression-redaction',
-      expected: 'product-regression',
-      mustNotSuccess: true,
-      fields: {
-        status: 'FAIL',
-        statusDetail: 'redaction-failure',
-        failureCategory: 'redaction failure',
-        failureReason: 'redaction failure: secret-like provider output escaped the report surface',
-      },
-    },
-    {
-      name: 'unknown-safe-evidence-missing',
-      expected: 'unknown',
-      mustNotSuccess: true,
-      fields: {
-        status: 'FAIL',
-        statusDetail: 'failed',
-        failureCategory: 'task-execution-failure',
-        failureReason: 'opaque failure with no safe evidence available',
-      },
-    },
-  ]
-
   const failures = []
-  for (const fixture of cases) {
-    const result = withRoute02FailureClass(fixture.fields)
+  for (const fixture of candidateMutationFailureTaxonomyFixtures()) {
+    const result = withRoute01FailureClass(fixture.fields)
     const actual = result.route02FailureClass ?? route02FailureClassForCandidate(result)
     const surface = buildTerminalResultSurface(result)
     const successLike =
@@ -10876,141 +10645,6 @@ async function runRoute08UnsupportedPatchE2e() {
     process.exit(1)
   }
   console.log('[pass] route08-unsupported-patch-e2e')
-}
-
-function classifySingleFileUpdatePatchShape(patchText) {
-  const normalized = String(patchText ?? '').replace(/\r\n/g, '\n')
-  const updateFiles = [...normalized.matchAll(/^\*\*\* Update File:\s+(.+)$/gm)]
-    .map((match) => match[1].trim())
-  const unsupportedHeaders = [
-    /^\*\*\* Add File:/m,
-    /^\*\*\* Delete File:/m,
-    /^\*\*\* Move to:/m,
-  ].filter((pattern) => pattern.test(normalized))
-
-  if (unsupportedHeaders.length > 0) {
-    return {
-      ok: false,
-      reason: 'unsupported patch: add/delete/move headers are outside the single-file update smoke boundary',
-    }
-  }
-  if (updateFiles.length !== 1 || updateFiles[0] !== 'src/app.ts') {
-    return {
-      ok: false,
-      reason: `unsupported patch: expected exactly one Update File for src/app.ts, observed ${updateFiles.join(',') || 'none'}`,
-    }
-  }
-  if (
-    !normalized.includes('-export const status = "draft"') ||
-    !normalized.includes('+export const status = "ready"')
-  ) {
-    return {
-      ok: false,
-      reason: 'unsupported patch: expected deterministic draft-to-ready hunk for src/app.ts',
-    }
-  }
-  return { ok: true, reason: '' }
-}
-
-function classifyTwoFileUpdatePatchShape(patchText, fixture) {
-  const normalized = String(patchText ?? '').replace(/\r\n/g, '\n')
-  const updateFiles = [...normalized.matchAll(/^\*\*\* Update File:\s+(.+)$/gm)]
-    .map((match) => match[1].trim())
-  const addFiles = [...normalized.matchAll(/^\*\*\* Add File:\s+(.+)$/gm)]
-    .map((match) => match[1].trim())
-  const deleteFiles = [...normalized.matchAll(/^\*\*\* Delete File:\s+(.+)$/gm)]
-    .map((match) => match[1].trim())
-  const hasMove = /^\*\*\* Move to:/m.test(normalized)
-
-  if (addFiles.length > 0 || deleteFiles.length > 0 || hasMove) {
-    return {
-      ok: false,
-      reason: `unsupported patch: generated Add/Delete/Move outside the two-file update smoke boundary add=${addFiles.join(',') || 'none'} delete=${deleteFiles.join(',') || 'none'} move=${hasMove}`,
-    }
-  }
-  if (updateFiles.length !== 2) {
-    return {
-      ok: false,
-      reason: `unsupported patch: expected exactly two Update File operations for ${fixture.targetPaths.join(',')}, observed ${updateFiles.join(',') || 'none'}`,
-    }
-  }
-  const expected = fixture.targetPaths.join(',')
-  if (updateFiles.join(',') !== expected) {
-    return {
-      ok: false,
-      reason: `unsupported patch: wrong Update File targets ${updateFiles.join(',')}; expected ${expected}`,
-    }
-  }
-  if (
-    !normalized.includes('-export const alpha = "draft"') ||
-    !normalized.includes('+export const alpha = "ready"') ||
-    !normalized.includes('-export const beta = "draft"') ||
-    !normalized.includes('+export const beta = "ready"')
-  ) {
-    return {
-      ok: false,
-      reason: 'unsupported patch: expected deterministic draft-to-ready hunks for src/a.ts and src/b.ts',
-    }
-  }
-  return { ok: true, reason: '' }
-}
-
-function classifySingleFileCreatePatchShape(patchText, fixture) {
-  const normalized = String(patchText ?? '').replace(/\r\n/g, '\n')
-  const addFiles = [...normalized.matchAll(/^\*\*\* Add File:\s+(.+)$/gm)]
-    .map((match) => match[1].trim())
-  const updateFiles = [...normalized.matchAll(/^\*\*\* Update File:\s+(.+)$/gm)]
-    .map((match) => match[1].trim())
-  const deleteFiles = [...normalized.matchAll(/^\*\*\* Delete File:\s+(.+)$/gm)]
-    .map((match) => match[1].trim())
-  const hasMove = /^\*\*\* Move to:/m.test(normalized)
-
-  if (updateFiles.length > 0) {
-    return {
-      ok: false,
-      reason: `unsupported patch: generated Update File instead of Add File (${updateFiles.join(',')})`,
-    }
-  }
-  if (deleteFiles.length > 0 || hasMove) {
-    return {
-      ok: false,
-      reason: 'unsupported patch: delete/move headers are outside the single-file create smoke boundary',
-    }
-  }
-  if (addFiles.length !== 1) {
-    return {
-      ok: false,
-      reason: `unsupported patch: expected exactly one Add File for ${fixture.targetPath}, observed ${addFiles.join(',') || 'none'}`,
-    }
-  }
-  if (addFiles[0] !== fixture.targetPath) {
-    return {
-      ok: false,
-      reason: `unsupported patch: wrong Add File target ${addFiles[0]}; expected ${fixture.targetPath}`,
-    }
-  }
-
-  const content = extractAddFileContent(normalized, fixture.targetPath)
-  if (content !== fixture.plannedContent) {
-    return {
-      ok: false,
-      reason: 'unsupported patch: Add File content did not match the deterministic planned content',
-    }
-  }
-  return { ok: true, reason: '' }
-}
-
-function extractAddFileContent(patchText, targetPath) {
-  const lines = patchText.split('\n')
-  const start = lines.findIndex((line) => line.trim() === `*** Add File: ${targetPath}`)
-  if (start < 0) return ''
-  const content = []
-  for (const line of lines.slice(start + 1)) {
-    if (line.startsWith('*** ')) break
-    if (!line.startsWith('+')) return ''
-    content.push(line.slice(1))
-  }
-  return content.join('\n')
 }
 
 function buildRealSingleFileUpdateFailure({ category, reason, status = 'FAIL', statusDetail, exitCode = 1 }) {
