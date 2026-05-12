@@ -129,6 +129,13 @@ exactly-three selected-workspace update planning/no-write prerequisite for a
 future route. This is not 3-file write support, not broad `apply_patch`, and not
 a release/default gate claim.
 
+Route 11's non-default deterministic verifier is
+`npm run verify:real-user-capabilities:three-file-planning-no-write`. It proves
+exactly-three existing-file `Update File` planning/no-write with planned files,
+`changedFiles=[]`, `writeIntents=[]`, no writer/creator/delete/move invocation,
+and unchanged workspace snapshots. This remains stopped evidence only; it is not
+3-file write support and is not part of the default release gates.
+
 The local MCP execution sub-gate is synthetic and deterministic. It uses the
 local stdio fixture only, does not read user MCP config, does not start an
 external MCP server, and does not contact a real provider. It proves local

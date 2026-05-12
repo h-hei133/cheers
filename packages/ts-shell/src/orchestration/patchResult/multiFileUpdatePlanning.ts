@@ -1,9 +1,11 @@
 import type { ParsedPatch, PatchFailure } from "../patchParsing/types.js";
+import { parseApplyPatchText } from "../patchParsing/parser.js";
 import { verifyParsedPatch } from "../patchVerification/verify.js";
 import { buildPatchPreview } from "./preview.js";
 
 export type MultiFileUpdatePlanningBlockedReason =
   | "multi-file-update-write-not-enabled"
+  | "three-file-update-planning-no-write"
   | "too-many-update-files"
   | "mixed-operations-not-enabled"
   | "workspace-boundary"
@@ -16,10 +18,15 @@ export interface MultiFileUpdatePlanningClassification {
   readonly tier: "candidate";
   readonly classificationMode: "synthetic-no-write";
   readonly targetPaths: readonly string[];
+  readonly plannedFiles: readonly string[];
   readonly wouldChangeFiles: readonly string[];
   readonly blockedReason: MultiFileUpdatePlanningBlockedReason;
-  readonly expectedCapability: "selected-workspace two-file existing-file update planning/preflight";
-  readonly currentSupportedCapability: "planning/preflight only; writer remains single-file";
+  readonly expectedCapability:
+    | "selected-workspace two-file existing-file update planning/preflight"
+    | "selected-workspace exactly-three existing-file update planning/no-write";
+  readonly currentSupportedCapability:
+    | "planning/preflight only; writer remains single-file"
+    | "exactly-three planning/no-write only; 3-file writes remain unsupported";
   readonly drivesApplyPatchExpansion: false;
   readonly willWrite: false;
   readonly writerReachable: false;
@@ -28,6 +35,15 @@ export interface MultiFileUpdatePlanningClassification {
   readonly failedFiles: readonly PatchFailure[];
   readonly explanation: string;
   readonly nextAction: string;
+}
+
+export function patchIsExactlyThreeUpdateFiles(rawPatchText: string): boolean {
+  const parsed = parseApplyPatchText(rawPatchText);
+  return (
+    parsed.ok === true &&
+    parsed.patch.operations.length === 3 &&
+    parsed.patch.operations.every((operation) => operation.kind === "update")
+  );
 }
 
 export function classifyMultiFileUpdatePlanningNoWrite(
@@ -53,6 +69,7 @@ export function classifyMultiFileUpdatePlanningNoWrite(
   if (updateOperations.length !== patch.operations.length) {
     return buildClassification({
       targetPaths,
+      plannedFiles: [],
       wouldChangeFiles: [],
       blockedReason: "mixed-operations-not-enabled",
       failedFiles: [
@@ -72,9 +89,10 @@ export function classifyMultiFileUpdatePlanningNoWrite(
     });
   }
 
-  if (updateOperations.length !== 2) {
+  if (updateOperations.length > 3) {
     return buildClassification({
       targetPaths,
+      plannedFiles: [],
       wouldChangeFiles: [],
       blockedReason: "too-many-update-files",
       failedFiles: [
@@ -83,13 +101,13 @@ export function classifyMultiFileUpdatePlanningNoWrite(
           message:
             "Multi-file update planning accepts exactly two Update File operations.",
           nextAction:
-            "Reduce the patch to exactly two existing-file Update File operations before using the candidate no-write planner.",
+            "Reduce the patch to exactly two existing-file Update File operations, or use the exactly-three planning/no-write verifier without expecting writes.",
         },
       ],
       explanation:
-        "Multi-file update planning is intentionally capped at exactly two files.",
+        "Multi-file update planning is intentionally capped before any 3+ file write support.",
       nextAction:
-        "Reduce the patch to exactly two selected-workspace existing-file Update File targets.",
+        "Reduce the patch to exactly two selected-workspace existing-file Update File targets; 4+ file writes remain unsupported.",
     });
   }
 
@@ -104,6 +122,7 @@ export function classifyMultiFileUpdatePlanningNoWrite(
   if (verification.ok === false) {
     return buildClassification({
       targetPaths,
+      plannedFiles: [],
       wouldChangeFiles: [],
       blockedReason: blockedReasonForFailures(verification.failures),
       failedFiles: verification.failures,
@@ -116,8 +135,23 @@ export function classifyMultiFileUpdatePlanningNoWrite(
   }
 
   const preview = buildPatchPreview(verification);
+  if (updateOperations.length === 3) {
+    return buildClassification({
+      targetPaths,
+      plannedFiles: targetPaths,
+      wouldChangeFiles: preview.changedFiles,
+      blockedReason: "three-file-update-planning-no-write",
+      failedFiles: [],
+      explanation:
+        "Exactly-three Update File patch passed selected-workspace planning/preflight, but 3-file writes are unsupported and no writer was reachable.",
+      nextAction:
+        "No files were changed. Split this into supported smaller operations or wait for a dedicated 3-file write route before writing three files.",
+    });
+  }
+
   return buildClassification({
     targetPaths,
+    plannedFiles: targetPaths,
     wouldChangeFiles: preview.changedFiles,
     blockedReason: "multi-file-update-write-not-enabled",
     failedFiles: [],
@@ -130,6 +164,7 @@ export function classifyMultiFileUpdatePlanningNoWrite(
 
 function buildClassification(input: {
   readonly targetPaths: readonly string[];
+  readonly plannedFiles: readonly string[];
   readonly wouldChangeFiles: readonly string[];
   readonly blockedReason: MultiFileUpdatePlanningBlockedReason;
   readonly failedFiles: readonly PatchFailure[];
@@ -142,11 +177,17 @@ function buildClassification(input: {
     tier: "candidate",
     classificationMode: "synthetic-no-write",
     targetPaths: input.targetPaths,
+    plannedFiles: input.plannedFiles,
     wouldChangeFiles: input.wouldChangeFiles,
     blockedReason: input.blockedReason,
     expectedCapability:
-      "selected-workspace two-file existing-file update planning/preflight",
-    currentSupportedCapability: "planning/preflight only; writer remains single-file",
+      input.blockedReason === "three-file-update-planning-no-write"
+        ? "selected-workspace exactly-three existing-file update planning/no-write"
+        : "selected-workspace two-file existing-file update planning/preflight",
+    currentSupportedCapability:
+      input.blockedReason === "three-file-update-planning-no-write"
+        ? "exactly-three planning/no-write only; 3-file writes remain unsupported"
+        : "planning/preflight only; writer remains single-file",
     drivesApplyPatchExpansion: false,
     willWrite: false,
     writerReachable: false,

@@ -93,6 +93,15 @@ stopped/no-write with `changedFiles=[]`, no writer reachability, no default gate
 change, no real-provider requirement, and no 3-file/broad mutation readiness
 claim.
 
+### Route 11 implementation: 3-file planning no-write
+
+Route 11 adds deterministic exactly-three selected-workspace existing-file
+`Update File` planning/no-write evidence. The route stops before write,
+reports planned files, keeps `changedFiles=[]` and `writeIntents=[]`, avoids
+workspace authority construction for the three-file planning path, and leaves
+3-file writes, 3+ mutation support, delete/move, rollback/atomicity, provider
+behavior, MCP behavior, and default gate membership unsupported.
+
 Allowed claims after the Route 01-08 sweep:
 
 - deterministic release-candidate gate is green for the bounded local surface

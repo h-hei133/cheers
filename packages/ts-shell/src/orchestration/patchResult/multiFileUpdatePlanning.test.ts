@@ -63,7 +63,7 @@ describe("classifyMultiFileUpdatePlanningNoWrite", () => {
     expect(result).toBeUndefined();
   });
 
-  it("blocks more than two Update File operations without write metadata", () => {
+  it("classifies exactly three existing Update File operations as planning/no-write", () => {
     const result = classify(
       [
         "*** Begin Patch",
@@ -85,6 +85,52 @@ describe("classifyMultiFileUpdatePlanningNoWrite", () => {
         "src/a.ts": "a\n",
         "src/b.ts": "b\n",
         "src/c.ts": "c\n",
+      },
+    );
+
+    expectNoWriteBlocked(result, "three-file-update-planning-no-write");
+    expect(result).toEqual(
+      expect.objectContaining({
+        targetPaths: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        plannedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        wouldChangeFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        changedFiles: [],
+        writeIntents: [],
+        willWrite: false,
+        writerReachable: false,
+        failedFiles: [],
+      }),
+    );
+    expect(result?.explanation).toContain("3-file writes are unsupported");
+  });
+
+  it("blocks four Update File operations without write metadata", () => {
+    const result = classify(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/a.ts",
+        "@@",
+        "-a",
+        "+aa",
+        "*** Update File: src/b.ts",
+        "@@",
+        "-b",
+        "+bb",
+        "*** Update File: src/c.ts",
+        "@@",
+        "-c",
+        "+cc",
+        "*** Update File: src/d.ts",
+        "@@",
+        "-d",
+        "+dd",
+        "*** End Patch",
+      ],
+      {
+        "src/a.ts": "a\n",
+        "src/b.ts": "b\n",
+        "src/c.ts": "c\n",
+        "src/d.ts": "d\n",
       },
     );
 

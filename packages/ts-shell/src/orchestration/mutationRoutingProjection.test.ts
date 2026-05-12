@@ -104,13 +104,42 @@ describe("apply_patch mutation routing projection", () => {
     expect(readFile(fixture.workspaceRoot, "src/b.ts")).toBe("b = 2\n");
   });
 
-  it("keeps 3+ Update File patches stopped before writer invocation", async () => {
+  it("projects exactly three Update File patches as stopped planning/no-write before authority construction", async () => {
     const fixture = createFixture({ includeC: true });
+    const before = snapshotFixture(fixture.workspaceRoot);
+    let authorityRequested = false;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, threeFileUpdatePatch()),
+      getWorkspaceAuthority: () => {
+        authorityRequested = true;
+        throw new Error("workspace authority must not be requested");
+      },
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.changeSet.attemptedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+    ]);
+    expect(result?.finalOutput).toContain(
+      "apply_patch exactly-three update planning stopped before write",
+    );
+    expect(result?.finalOutput).toContain("Writer: not invoked");
+    expect(authorityRequested).toBe(false);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("keeps 4+ Update File patches stopped before writer invocation", async () => {
+    const fixture = createFixture({ includeC: true, includeD: true });
     const before = snapshotFixture(fixture.workspaceRoot);
     let writes = 0;
 
     const result = await projectApplyPatchRuntimeMutationRoute({
-      ...runtimeInput(fixture.workspaceRoot, threeFileUpdatePatch()),
+      ...runtimeInput(fixture.workspaceRoot, fourFileUpdatePatch()),
       getWorkspaceAuthority: () =>
         authorityWithBlockedWriter(fixture.workspaceRoot, () => {
           writes += 1;
@@ -225,6 +254,29 @@ function threeFileUpdatePatch(): string {
   ].join("\n");
 }
 
+function fourFileUpdatePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Update File: src/b.ts",
+    "@@",
+    "-b = 1",
+    "+b = 2",
+    "*** Update File: src/c.ts",
+    "@@",
+    "-c = 1",
+    "+c = 2",
+    "*** Update File: src/d.ts",
+    "@@",
+    "-d = 1",
+    "+d = 2",
+    "*** End Patch",
+  ].join("\n");
+}
+
 function addFilePatch(): string {
   return [
     "*** Begin Patch",
@@ -242,7 +294,9 @@ function deleteFilePatch(): string {
   ].join("\n");
 }
 
-function createFixture(options: { readonly includeC?: boolean } = {}): {
+function createFixture(
+  options: { readonly includeC?: boolean; readonly includeD?: boolean } = {},
+): {
   readonly workspaceRoot: string;
 } {
   const workspaceRoot = fs.mkdtempSync(
@@ -264,6 +318,13 @@ function createFixture(options: { readonly includeC?: boolean } = {}): {
     fs.writeFileSync(
       path.join(workspaceRoot, "src", "c.ts"),
       "c = 1\n",
+      "utf8",
+    );
+  }
+  if (options.includeD) {
+    fs.writeFileSync(
+      path.join(workspaceRoot, "src", "d.ts"),
+      "d = 1\n",
       "utf8",
     );
   }
@@ -292,7 +353,7 @@ function readFile(workspaceRoot: string, relativePath: string): string {
 }
 
 function snapshotFixture(workspaceRoot: string): Record<string, string> {
-  const files = ["src/a.ts", "src/b.ts", "src/c.ts", "src/new.ts"];
+  const files = ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts", "src/new.ts"];
   return Object.fromEntries(
     files
       .map((file) => [file, path.join(workspaceRoot, file)] as const)

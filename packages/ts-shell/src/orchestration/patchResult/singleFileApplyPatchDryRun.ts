@@ -86,6 +86,7 @@ export interface SingleFileApplyPatchDryRunResult {
   readonly status: SingleFileApplyPatchDryRunStatus;
   readonly willWrite: false;
   readonly changedFiles: readonly [];
+  readonly plannedFiles: readonly string[];
   readonly wouldChangeFiles: readonly string[];
   readonly wouldCreateFiles: readonly string[];
   readonly previewChangedFiles: readonly string[];
@@ -191,6 +192,7 @@ export function buildSingleFileApplyPatchDryRun(
     status: readiness.ready ? "dry-run-ready" : "blocked",
     willWrite: false,
     changedFiles: [],
+    plannedFiles: [],
     wouldChangeFiles,
     wouldCreateFiles: [],
     previewChangedFiles,
@@ -278,6 +280,7 @@ function blockedFromParseFailure(
     status: "blocked",
     willWrite: false,
     changedFiles: [],
+    plannedFiles: [],
     wouldChangeFiles: [],
     wouldCreateFiles: [],
     previewChangedFiles: [],
@@ -352,6 +355,7 @@ function blockedFromAddFileClassification(
     status: "blocked",
     willWrite: false,
     changedFiles: [],
+    plannedFiles: [],
     wouldChangeFiles: [],
     wouldCreateFiles: classification.wouldCreateFiles,
     previewChangedFiles: [],
@@ -426,6 +430,7 @@ function blockedFromMultiFileUpdatePlanning(
     status: "blocked",
     willWrite: false,
     changedFiles: [],
+    plannedFiles: classification.plannedFiles,
     wouldChangeFiles: classification.wouldChangeFiles,
     wouldCreateFiles: [],
     previewChangedFiles: classification.wouldChangeFiles,
