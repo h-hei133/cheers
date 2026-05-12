@@ -115,6 +115,7 @@ const realMutationEnvContract = prepareRealMutationEnvContract()
 const candidateMutationFailureTaxonomySelfTest = process.argv.includes('--candidate-mutation-failure-taxonomy-self-test')
 const route03TwoFileCliPathEvidence = process.argv.includes('--route03-two-file-cli-path-evidence') ||
   process.argv.includes('--two-file-cli-path-evidence')
+const route08UnsupportedPatchE2e = process.argv.includes('--route08-unsupported-patch-e2e')
 let lastApplyPatchProviderDiagnostics = undefined
 const syntheticHome = getSyntheticHome()
 const realHome = realMutationEnvContract.realHome ?? getRealProviderHome({ allowDefault: true })
@@ -3492,6 +3493,8 @@ function printHelp() {
   console.log('  --real-apply-patch-dry-run-smoke-dry-run')
   console.log('  --route03-two-file-cli-path-evidence')
   console.log('    Deterministic CLI --print evidence for the exactly-two-file candidate mutation route; no real provider.')
+  console.log('  --route08-unsupported-patch-e2e')
+  console.log('    Deterministic CLI --print evidence that unsupported real-model-like patch output stops without success; no real provider.')
   console.log('')
   console.log('Explicit opt-in real-provider checks:')
   console.log(`  --case=${realSingleFileUpdateCaseId}`)
@@ -10609,6 +10612,270 @@ async function runRoute03TwoFileCliPathEvidence() {
   console.log('[pass] route03-two-file-cli-path-evidence')
 }
 
+function route08ClassForScenario(scenario) {
+  if (scenario.expectedClass) return scenario.expectedClass
+  if (scenario.id.includes('malformed')) return 'model-output'
+  return 'unsupported'
+}
+
+function route08PatchScenarios() {
+  return [
+    {
+      id: 'real-model-like-unsupported-three-file-update',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'src/b.ts': 'b\n',
+        'src/c.ts': 'c\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/a.ts',
+        '@@',
+        '-a',
+        '+aa',
+        '*** Update File: src/b.ts',
+        '@@',
+        '-b',
+        '+bb',
+        '*** Update File: src/c.ts',
+        '@@',
+        '-c',
+        '+cc',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-delete-file',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'src/b.ts': 'b\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Delete File: src/a.ts',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-move-file',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'src/b.ts': 'b\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/a.ts',
+        '*** Move to: src/renamed.ts',
+        '@@',
+        '-a',
+        '+aa',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-broad-apply-patch',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'src/b.ts': 'b\n',
+        'src/c.ts': 'c\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/a.ts',
+        '@@',
+        '-a',
+        '+aa',
+        '*** Update File: src/b.ts',
+        '@@',
+        '-b',
+        '+bb',
+        '*** Add File: src/new.ts',
+        '+new',
+        '*** Delete File: src/c.ts',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-malformed-patch-output',
+      expectedClass: 'model-output',
+      files: {
+        'src/a.ts': 'a\n',
+        'src/b.ts': 'b\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/a.ts',
+        '@@',
+        '-a',
+        '+aa',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-mixed-supported-unsupported-patch',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'src/b.ts': 'b\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/a.ts',
+        '@@',
+        '-a',
+        '+aa',
+        '*** Delete File: src/b.ts',
+        '*** End Patch',
+      ].join('\n'),
+    },
+  ]
+}
+
+async function runRoute08UnsupportedPatchScenario(scenario) {
+  const projectDir = path.join(testRoot, `route08-${scenario.id}-${runId}`)
+  const runtimeHome = path.join(testRoot, 'route08-unsupported-runtime-home', `${scenario.id}-${runId}`)
+  const auditLogPath = path.join(testRoot, 'route08-unsupported-audit', `${scenario.id}-${runId}`, 'permissions.jsonl')
+  const prepared = {
+    ...scenario,
+    projectDir,
+  }
+  prepareProject(prepared)
+  fs.rmSync(runtimeHome, { recursive: true, force: true })
+  fs.mkdirSync(runtimeHome, { recursive: true })
+  fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  fs.mkdirSync(path.dirname(auditLogPath), { recursive: true })
+
+  try {
+    const before = snapshot(projectDir)
+    const result = await runApplyPatchWorkspaceWriteCli({
+      fixtureDir: projectDir,
+      patchText: scenario.patchText,
+      runtimeHome,
+      auditLogPath,
+    })
+    const after = snapshot(projectDir)
+    const observedChanged = changedFiles(before, after)
+    const outcome = route03CliOutcome(result.output, result.code)
+    const output = result.output
+    const successLike =
+      outcome === 'success' ||
+      /apply_patch .*workspace write succeeded/i.test(output) ||
+      /Outcome:\s*success/i.test(output)
+    const failureVisible =
+      /Outcome:\s*(stopped|error)/i.test(output) ||
+      /stopped|blocked|unsupported|failed|error/i.test(output) ||
+      result.code !== 0
+    const unsupportedWriteLeak = observedChanged.length > 0
+    const rollbackClaimed = /rollback (?:succeeded|completed)|atomic/i.test(output)
+    return {
+      id: scenario.id,
+      outcome,
+      route08Class: route08ClassForScenario(scenario),
+      status: !successLike && !unsupportedWriteLeak && failureVisible && !rollbackClaimed
+        ? 'PASS'
+        : 'FAIL',
+      code: result.code,
+      timedOut: result.timedOut,
+      changedFiles: observedChanged,
+      failedFiles: [],
+      failureReason: failureVisible
+        ? 'unsupported real-model-like mutation output stopped before success'
+        : 'failure reason was not visible in terminal output',
+      terminalEvidence: failureVisible ? 'visible' : 'missing',
+      noUnsupportedWrites: !unsupportedWriteLeak,
+      successLike,
+      rollbackClaimed,
+      outputTail: summarizeOutput(output),
+    }
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true })
+    fs.rmSync(runtimeHome, { recursive: true, force: true })
+    fs.rmSync(path.dirname(auditLogPath), { recursive: true, force: true })
+  }
+}
+
+async function runRoute08UnsupportedPatchE2e() {
+  console.log('gate name=real-user-capabilities')
+  console.log('mode=route08-unsupported-patch-e2e')
+  console.log('realProviderTouched=false')
+  console.log('realProviderExecution=false')
+  console.log('providerMode=synthetic-real-model-output-equivalent')
+  console.log('defaultMvpAffected=false')
+  console.log('mutationCapabilityAdded=false')
+  console.log('unsupportedMutationSupport=false')
+  console.log(`cliCommand=${route03CommandDisplay()}`)
+
+  const repoBefore = await readRepoStatusShort()
+  if (!repoBefore.ok) {
+    console.log('[CONFIG] route08-unsupported-patch-e2e - repository status could not be checked before verifier')
+    console.log('failureReason=repository status could not be checked')
+    process.exit(3)
+  }
+
+  const results = []
+  for (const scenario of route08PatchScenarios()) {
+    const result = await runRoute08UnsupportedPatchScenario(scenario)
+    results.push(result)
+    console.log(`scenario=${result.id}`)
+    console.log(`outcome=${result.outcome}`)
+    console.log(`Route08Class=${result.route08Class}`)
+    console.log(`changedFiles=${result.changedFiles.join(',') || 'none'}`)
+    console.log(`failedFiles=${result.failedFiles.join(',') || 'none'}`)
+    console.log(`failureReason=${result.failureReason}`)
+    console.log(`terminalEvidence=${result.terminalEvidence}`)
+    console.log(`noUnsupportedWrites=${result.noUnsupportedWrites}`)
+    console.log(`successLike=${result.successLike}`)
+    console.log(`rollbackClaimed=${result.rollbackClaimed}`)
+    console.log(`[${result.status}] ${result.id} - outcome=${result.outcome} Route08Class=${result.route08Class} changedFiles=${result.changedFiles.join(',') || 'none'}`)
+  }
+
+  const repoAfter = await readRepoStatusShort()
+  const failures = [
+    ...results
+      .filter((result) => result.status !== 'PASS')
+      .map((result) => `${result.id}: unsupported output was not safely stopped`),
+    ...(repoAfter.ok && repoAfter.status === repoBefore.status ? [] : ['repository status changed or was unavailable after verifier']),
+  ]
+  const covered = results.map((result) => result.id)
+  writeReport({
+    generatedAt: new Date().toISOString(),
+    capability: 'route08-unsupported-patch-e2e',
+    provider: 'synthetic',
+    mode: 'route08-unsupported-patch-e2e',
+    reportPath,
+    status: failures.length === 0 ? 'PASS' : 'FAIL',
+    statusDetail: failures.length === 0 ? 'passed' : 'unsupported-patch-e2e-failed',
+    realProviderTouched: false,
+    realProviderExecution: false,
+    defaultMvpAffected: false,
+    mutationCapabilityAdded: false,
+    unsupportedMutationSupport: false,
+    coveredCases: covered,
+    results,
+    repositoryStatusBefore: repoBefore.status,
+    repositoryStatusAfter: repoAfter.status,
+    repositoryStatusUnchanged: repoAfter.ok && repoAfter.status === repoBefore.status,
+  })
+  console.log(`coveredCases=${covered.join(',')}`)
+  console.log(`report=${reportPath}`)
+  if (failures.length > 0) {
+    for (const failure of failures) {
+      console.log(`[fail] route08-unsupported-patch-e2e - ${failure}`)
+    }
+    process.exit(1)
+  }
+  console.log('[pass] route08-unsupported-patch-e2e')
+}
+
 function classifySingleFileUpdatePatchShape(patchText) {
   const normalized = String(patchText ?? '').replace(/\r\n/g, '\n')
   const updateFiles = [...normalized.matchAll(/^\*\*\* Update File:\s+(.+)$/gm)]
@@ -12067,6 +12334,10 @@ async function main() {
   }
   if (route03TwoFileCliPathEvidence) {
     await runRoute03TwoFileCliPathEvidence()
+    return
+  }
+  if (route08UnsupportedPatchE2e) {
+    await runRoute08UnsupportedPatchE2e()
     return
   }
   if (realReadonlyCodingPreflightSelfTest) {
