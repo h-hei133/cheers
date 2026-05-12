@@ -37,6 +37,7 @@ Run these from `/home/wang/projects/coding-agents` with `rtk`.
 | Candidate mutation | `rtk npm run verify:real-user-capabilities -- --suite=candidate-mutation` | Pass; `realProviderTouched=false`. |
 | Candidate failure taxonomy | `rtk npm run verify:real-user-capabilities -- --candidate-mutation-failure-taxonomy-self-test` | Pass; taxonomy classes match expected cases. |
 | Two-file CLI evidence | `rtk npm run verify:real-user-capabilities:two-file-cli-evidence` | Pass; `changedFiles=src/a.ts,src/b.ts`; unsupported shapes stopped. |
+| Unsupported patch E2E | `rtk npm run verify:real-user-capabilities:unsupported-patch-e2e` | Pass; real-model-like unsupported outputs stop/error with no writes. |
 | Long-session durability | `rtk npm run verify:session-durability:long` | Pass; synthetic compact/reload `/continue` durability. |
 | Local MCP execution | `rtk npm run verify:mcp:local-execution` | Pass; local stdio fixture only. |
 | MCP error taxonomy | `rtk npm run verify:mcp:error-taxonomy` | Pass; `externalMcpServerUsed=false`. |

@@ -75,7 +75,64 @@ The primary user-visible mainline is now:
 5. Result block stays minimal and actionable in compact mode
 6. Session remains ready for next turn with clear boundaries
 
-## 5. Latest Implemented Delta (through 2026-05-11)
+## 5. Latest Implemented Delta (through 2026-05-12)
+
+### Current release-claims audit after Routes 01-08
+
+The current release/readiness claim is deliberately bounded: the project is
+limited dogfood ready and deterministic release-candidate green for the current
+verified surface. It is not broad/general release ready.
+
+Allowed claims after the Route 01-08 sweep:
+
+- deterministic release-candidate gate is green for the bounded local surface
+- candidate mutation has synthetic green evidence
+- opt-in real candidate mutation happy paths passed for selected-workspace
+  single-file update, single-file create, and exactly-two-file update
+- deterministic candidate mutation failure taxonomy covers config,
+  network/auth, model-output, route, post-write, unsupported,
+  product-regression, and unknown classes
+- deterministic CLI/user-entry two-file evidence exists
+- unsupported real-model-like patch outputs are stopped/error, not success
+- session durability long evidence exists for synthetic auto-compact, reload,
+  `/continue`, mutation success, and partial failure continuity
+- local deterministic MCP execution and MCP error taxonomy have evidence
+- live TTY limited dogfood checklist exists as manual-only validation guidance
+- mutation routing projection and compact continuity summary extraction reduced
+  localized architecture risk without expanding capability
+
+Forbidden claims remain explicit:
+
+- no broad/general release readiness
+- no arbitrary project mutation readiness
+- no broad `apply_patch`, 3+ file writes, delete/move, rollback, or atomic
+  multi-file recovery readiness
+- no external/user-configured MCP, remote MCP, or MCP ecosystem readiness
+- no real-provider default gate readiness or broad real-provider mutation
+  readiness
+- no true real-model unsupported patch coverage beyond deterministic
+  real-model-like evidence
+- no live TTY product readiness from the manual checklist alone
+- no Claude Code or opencode maturity/parity claim
+
+Route 09 did not change product behavior, default gates, mutation capability,
+provider/MCP behavior, or release gate membership. It only synchronizes release
+and readiness wording with the evidence already present after Routes 01-08.
+
+### Route closeout index for Routes 01-08 release-claims sweep
+
+This index is specific to the Route 01-08 claim audit sequence.
+
+| # | Route | Closeout |
+| ---: | --- | --- |
+| 1 | Opt-in real candidate mutation happy path | Done; selected-workspace single-file update, single-file create, and exactly-two-file update passed only through explicit real-provider opt-in. |
+| 2 | Candidate mutation failure taxonomy | Done; unsupported/post-write and other failure classes are classified as stopped/failure, not success. |
+| 3 | Deterministic CLI/user-entry two-file evidence | Done; exactly-two-file selected-workspace update is covered through the CLI `--print` path. |
+| 4 | Mutation routing projection extraction | Done; routing projection risk was reduced without changing mutation capability. |
+| 5 | Compact continuity summary builder extraction | Done; compact summary construction risk was reduced without changing session capability claims. |
+| 6 | MCP error taxonomy | Done; local/error taxonomy improved while external/user-configured MCP readiness remains unclaimed. |
+| 7 | Live TTY limited dogfood checklist | Done; manual-only checklist exists and is not a default gate. |
+| 8 | Unsupported patch E2E verifier | Done; deterministic real-model-like unsupported output shapes stop/error with no writes and no success claim. |
 
 ### Route closeout index for the current release-readiness sweep
 
@@ -136,6 +193,34 @@ Important boundaries:
 - this does not add rollback, atomicity, 3+ file support, delete/move support,
   broad `apply_patch`, arbitrary mutation, external/user-configured MCP proof,
   provider/auth changes, or default real-provider gates
+
+### Current closeout: unsupported patch real-model-like E2E verifier
+
+`verify:real-user-capabilities:unsupported-patch-e2e` is a deterministic,
+non-default verifier for real-model-like unsupported mutation outputs. It does
+not run a real provider and does not add unsupported mutation capability.
+
+Covered scenarios:
+
+- unsupported three-file update
+- unsupported delete file
+- unsupported move file
+- unsupported broad apply_patch
+- malformed patch output
+- mixed supported plus unsupported patch
+
+Key boundaries:
+
+- each scenario must stop/error without writing files
+- `changedFiles=none`, `successLike=false`, and `rollbackClaimed=false` remain
+  required evidence markers
+- malformed output is classified as model-output; unsupported shapes are
+  classified as unsupported
+- this is deterministic real-model-like evidence, not true real-provider
+  unsupported patch coverage
+- broad `apply_patch`, 3+ files, delete/move, rollback, atomicity, arbitrary
+  mutation, real-provider defaults, and default release gate membership remain
+  unchanged
 
 ### Current closeout: local MCP execution release-core gate
 

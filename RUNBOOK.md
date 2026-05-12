@@ -156,6 +156,12 @@ Green deterministic evidence from the closeout sweep:
 - `npm run verify:release:core`: passed
 - `npm run verify:real-user-capabilities -- --tier=mvp`: passed
 - `npm run verify:real-user-capabilities -- --suite=candidate-mutation`: passed
+- `npm run verify:real-user-capabilities -- --candidate-mutation-failure-taxonomy-self-test`:
+  passed locally
+- `npm run verify:real-user-capabilities:two-file-cli-evidence`: passed with
+  deterministic exactly-two-file CLI/user-entry evidence
+- `npm run verify:real-user-capabilities:unsupported-patch-e2e`: passed with
+  deterministic real-model-like unsupported output stopped/error evidence
 - `npm run verify:real-user-capabilities -- --suite=candidate-mutation
   --include-real --dry-run`: passed without touching the provider
 - `npm run verify:mutation-recovery:followup`: passed
@@ -174,22 +180,28 @@ Readiness claims allowed by this evidence:
 - limited dogfood readiness is green for the current deterministic stack
 - candidate mutation dogfood is green only through the explicit opt-in synthetic
   suite
-- real-provider candidate mutation remains opt-in; dry-run/listing modes must
-  not load credentials or contact a provider
-- release-readiness prerequisites are mostly green, but full release durability
-  remains future work
+- opt-in real-provider candidate mutation happy paths have passed for bounded
+  selected-workspace single-file update, single-file create, and exactly-two-file
+  update; these remain non-default evidence
+- dry-run/listing modes must not load credentials or contact a provider
+- deterministic failure taxonomy and unsupported real-model-like patch E2E
+  evidence show unsupported/malformed/post-write failures stop instead of
+  becoming success claims
+- release-readiness prerequisites are green for the deterministic
+  release-candidate surface, but broad/general release is not claimed
 
 Do not widen these claims:
 
 - MVP is still only the selected-workspace, single-file, existing `Update File`
   synthetic gate
 - candidate create and exactly-two-file update are not MVP/default behavior
-- compact-equivalent continuity is not full long-session release proof; use
-  `npm run verify:session-durability:long` for the stronger synthetic
-  process-boundary long-session durability evidence
+- `verify:session-durability:long` is synthetic process-boundary long-session
+  durability evidence, not proof of arbitrary long real-provider sessions
 - no rollback, atomic multi-file transaction, 3+ files, delete/move, broad
   `apply_patch`, arbitrary mutation, provider/auth change, CLI/session schema
-  change, or default real-provider gate is implied
+  change, external/user-configured MCP readiness, true real-model unsupported
+  patch coverage, live TTY product readiness, or default real-provider gate is
+  implied
 
 ### Current main-path gate layering
 
@@ -202,6 +214,8 @@ work:
 | Local MCP execution | `npm run verify:mcp:local-execution` | Deterministic MCP evidence and release-core hard sub-gate | Uses only the local stdio fixture and isolated HOME/workspace to prove MCP gateway list/invoke, ToolRuntime registry execution, success/failure lifecycle projection, focused shell-session user-visible surface, and follow-up continuity. It is wired into `verify:release:core` after `verify:mcp-routing` and remains independently runnable. It is not an external or user-configured MCP gate, is not arbitrary MCP ecosystem readiness, is not full CLI-entry MCP tool execution proof, and does not touch real providers. |
 | Real user capabilities | `npm run verify:real-user-capabilities` | Required stable MVP gate for current dogfood mutation evidence | Synthetic selected-workspace existing-file single-file update. Broader real-provider, protected consistency, release, and backlog cases require explicit `--tier=...`. |
 | Candidate mutation dogfood suite | `npm run verify:real-user-capabilities:candidate-mutation` | Explicit candidate evidence | Aggregates the closed synthetic candidate mutation smokes: single-file Add File create, two-file no-write planning, two-file write success, two-file partial failure, compact-equivalent mutation continuity, and partial-failure recovery follow-up. Real-provider mutation smokes are listed/skipped by default and require `--include-real` or `npm run verify:real-user-capabilities:candidate-mutation:real`; this does not change default MVP or enable 3+ files, delete/move, rollback, or broad `apply_patch`. |
+| Candidate mutation failure taxonomy | `npm run verify:real-user-capabilities -- --candidate-mutation-failure-taxonomy-self-test` | Deterministic failure-class evidence | Covers success, config, network/auth, model-output, unsupported, route, post-write, product-regression, and unknown classifications. It proves these failure surfaces are classified explicitly and do not become product success. |
+| Unsupported patch E2E verifier | `npm run verify:real-user-capabilities:unsupported-patch-e2e` | Deterministic real-model-like unsupported output evidence | Covers unsupported three-file update, delete, move, broad apply_patch, malformed output, and mixed supported/unsupported patch shapes through CLI `--print` without a real provider. Expected outcome is stopped/error, `changedFiles=none`, `successLike=false`, and no rollback claim. This is not true real-provider unsupported patch coverage and does not add unsupported mutation support. |
 | Synthetic Add File create smoke | `npm run verify:real-user-capabilities -- --case=synthetic-selected-workspace-single-file-create` | Explicit candidate evidence | Synthetic selected-workspace single-file Add File create through the explicit write entrypoint. It is not part of default MVP and does not enable multi-file/delete/move/rollback or broad `apply_patch`. |
 | Synthetic multi-file update planning | `npm run verify:real-user-capabilities -- --case=synthetic-selected-workspace-multi-file-update-planning` | Explicit candidate evidence | Synthetic selected-workspace exactly two-file Update File planning/preflight smoke. This smoke remains no-write only: no writer, no `changedFiles`, no `writeIntents`, no rollback, and no broad `apply_patch`; the candidate write route is covered by focused route/result/writer tests and is not part of default MVP. |
 | Synthetic two-file update write smoke | `npm run verify:real-user-capabilities -- --case=synthetic-selected-workspace-two-file-update` | Explicit candidate evidence | Synthetic selected-workspace exactly two-file Update File write through the explicit workspace-write entrypoint. It updates two existing files with readback-verified `changedFiles`, remains outside default MVP, and does not enable 3+ files, add/delete/move, rollback, real provider, or broad `apply_patch`. |
