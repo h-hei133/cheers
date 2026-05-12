@@ -39,6 +39,10 @@
   - `=== Turn N ===`
   - `=== End Turn N ===`
 - avoid overlapping prompt submissions while one turn is in-flight
+- limited live TTY dogfood validation is manual-only and documented in
+  `docs/manual-checks/live-tty-limited-dogfood-checklist.md`; it is not a
+  default release gate and does not claim broad release, real-provider, or
+  external MCP readiness
 
 ## Transport behavior baseline
 
