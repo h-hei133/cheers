@@ -102,6 +102,16 @@ workspace authority construction for the three-file planning path, and leaves
 3-file writes, 3+ mutation support, delete/move, rollback/atomicity, provider
 behavior, MCP behavior, and default gate membership unsupported.
 
+### Route 12 implementation: planned-files stopped/no-write continuity
+
+Route 12 preserves exactly-three planning/no-write context across stopped
+continuity surfaces. Planned files remain target/planning evidence, not changed
+file evidence: `plannedFiles=[src/a.ts,src/b.ts,src/c.ts]`,
+`changedFiles=[]`, writer invocation remains false, the workspace remains
+unchanged, and the terminal/session surface renders planned files without
+labeling them as changed. The non-default verifier is
+`verify:real-user-capabilities:planned-files-continuity`.
+
 Allowed claims after the Route 01-08 sweep:
 
 - deterministic release-candidate gate is green for the bounded local surface
@@ -119,6 +129,9 @@ Allowed claims after the Route 01-08 sweep:
 - live TTY limited dogfood checklist exists as manual-only validation guidance
 - mutation routing projection and compact continuity summary extraction reduced
   localized architecture risk without expanding capability
+- planned-files stopped/no-write continuity exists for exactly-three
+  selected-workspace update planning, while planned files remain distinct from
+  changed files
 
 Forbidden claims remain explicit:
 

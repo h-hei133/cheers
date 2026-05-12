@@ -136,6 +136,13 @@ exactly-three existing-file `Update File` planning/no-write with planned files,
 and unchanged workspace snapshots. This remains stopped evidence only; it is not
 3-file write support and is not part of the default release gates.
 
+Route 12's non-default deterministic verifier is
+`npm run verify:real-user-capabilities:planned-files-continuity`. It proves the
+exactly-three planning/no-write stopped state survives compact-equivalent
+continuity and terminal guidance with planned files visible, `changedFiles=[]`,
+writer invocation false, unchanged workspace snapshots, and no rollback or
+atomicity claim. Planned files are target/planning evidence, not changed files.
+
 The local MCP execution sub-gate is synthetic and deterministic. It uses the
 local stdio fixture only, does not read user MCP config, does not start an
 external MCP server, and does not contact a real provider. It proves local
