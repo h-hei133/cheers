@@ -42,8 +42,8 @@ import type {
   TerminalClassification,
   TerminalReason,
 } from "../orchestration/types.js";
-import { mergeContinuitySummaryEntries } from "./compactSummaryFormatter.js";
 import { deriveActionableFailureContinuity } from "./actionableFailureContinuity.js";
+import { buildCompactContinuitySummary } from "./compactContinuitySummary.js";
 import { formatPromptContinuityContext } from "./continuityFormatter.js";
 import {
   createEmptyCurrentSessionSelectionStore,
@@ -5119,115 +5119,42 @@ export class SessionManager {
 
     const approvalAudit = this.extractApprovalAuditMemoryState(root);
     const approvalAuditHistory = this.extractApprovalAuditHistoryMemoryState(root);
-    const continuity =
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-        ? { ...(root.continuity as Record<string, unknown>) }
-        : {};
-
-    if (approvalAudit) {
-      continuity.lastApprovalDecision = approvalAudit.decision;
-      continuity.lastApprovalDecisionSource = approvalAudit.decisionSource;
-      continuity.lastApprovalPersistent = approvalAudit.persistent;
-      continuity.lastApprovalCacheEffect = approvalAudit.cacheEffect;
-      continuity.lastApprovalProjectRoot = approvalAudit.projectRoot;
-      continuity.lastApprovalCacheKey = approvalAudit.cacheKey;
-      continuity.lastApprovalScope = approvalAudit.scopeLabel;
-      continuity.lastApprovalRecordedAt = approvalAudit.recordedAt;
-      if (approvalAudit.lineage) {
-        continuity.lastApprovalLineage = approvalAudit.lineage;
-      }
-      if (approvalAudit.stopReason) {
-        continuity.lastApprovalStopReason = approvalAudit.stopReason;
-      }
-      if (approvalAudit.channel) {
-        continuity.lastApprovalChannel = approvalAudit.channel;
-      }
-      if (approvalAudit.inputKey) {
-        continuity.lastApprovalInputKey = approvalAudit.inputKey;
-      }
-      if (!continuity.lastRequestScopeCacheKey) {
-        continuity.lastRequestScopeCacheKey = approvalAudit.cacheKey;
-      }
-      if (!continuity.lastRequestScopeLabel) {
-        continuity.lastRequestScopeLabel = approvalAudit.scopeLabel;
-      }
-      if (!continuity.lastRequestScopeProjectRoot) {
-        continuity.lastRequestScopeProjectRoot = approvalAudit.projectRoot;
-      }
-      if (!continuity.lastRequestScopeSource) {
-        continuity.lastRequestScopeSource = "approval-request";
-      }
-      if (!continuity.lastPermissionRequestScopeLabel) {
-        continuity.lastPermissionRequestScopeLabel = approvalAudit.scopeLabel;
-      }
-      if (!continuity.lastPermissionRequestCacheKey) {
-        continuity.lastPermissionRequestCacheKey = approvalAudit.cacheKey;
-      }
-      if (!continuity.lastPermissionRequestProjectRoot) {
-        continuity.lastPermissionRequestProjectRoot = approvalAudit.projectRoot;
-      }
-      if (!continuity.lastPermissionRequestSource) {
-        continuity.lastPermissionRequestSource = "approval-request";
-      }
-      if (!continuity.lastPermissionRequestLineage && approvalAudit.lineage) {
-        continuity.lastPermissionRequestLineage = approvalAudit.lineage;
-      }
-    }
-    if (approvalAuditHistory.length > 0) {
-      continuity.lastApprovalHistory = approvalAuditHistory;
-      root.approvalAuditHistory = approvalAuditHistory;
-    }
     const actionHandoffSummary = this.buildActionHandoffSummary(
       event.result.codingResult?.lastActionResultSeed,
     );
-    if (actionHandoffSummary) {
-      continuity.lastActionHandoffSummary = actionHandoffSummary;
-    }
     const stoppedSessionContinuity = deriveStoppedSessionContinuitySurface(
       event.result.codingResult,
     );
-    const writeContinuity = stoppedSessionContinuity?.writeContinuity;
-    if (writeContinuity?.writerStarted !== undefined) {
-      continuity.lastWriterStarted = writeContinuity.writerStarted;
-    }
-    if (writeContinuity?.writeEffect) {
-      continuity.lastWriteEffect = writeContinuity.writeEffect;
-    }
-    if (writeContinuity?.requiresUserInspection !== undefined) {
-      continuity.lastWriteRequiresUserInspection =
-        writeContinuity.requiresUserInspection;
-    }
-    if (writeContinuity?.target) {
-      continuity.lastWriteEffectTarget = writeContinuity.target;
-    }
     const seedInfluence = this.extractSeedInfluenceFromQueryResult(event.result);
     const seedInfluenceHandoffSummary = this.buildSeedInfluenceHandoffSummary(
       event.result.codingResult?.lastActionResultSeed,
       seedInfluence,
     );
-    if (seedInfluence) {
-      continuity.lastSeedInfluence = seedInfluence;
-    }
-    if (seedInfluenceHandoffSummary) {
-      continuity.lastSeedInfluenceHandoffSummary =
-        seedInfluenceHandoffSummary;
-    }
     const failureHandoffDiagnostic =
       stoppedSessionContinuity?.failureHandoffDiagnostic;
-    if (failureHandoffDiagnostic) {
-      continuity.lastFailureHandoffDiagnostic = failureHandoffDiagnostic;
-    }
     const successHandoffDiagnostic = this.buildSuccessHandoffDiagnostic(
       event.result.codingResult,
     );
-    if (successHandoffDiagnostic) {
-      continuity.lastSuccessHandoffDiagnostic = successHandoffDiagnostic;
+    const compactSummary = buildCompactContinuitySummary({
+      summary: root.summary,
+      continuity: root.continuity,
+      ...(approvalAudit ? { approvalAudit } : {}),
+      approvalAuditHistory,
+      ...(actionHandoffSummary ? { actionHandoffSummary } : {}),
+      ...(stoppedSessionContinuity?.writeContinuity
+        ? { writeContinuity: stoppedSessionContinuity.writeContinuity }
+        : {}),
+      ...(seedInfluence ? { seedInfluence } : {}),
+      ...(seedInfluenceHandoffSummary ? { seedInfluenceHandoffSummary } : {}),
+      ...(failureHandoffDiagnostic ? { failureHandoffDiagnostic } : {}),
+      ...(successHandoffDiagnostic ? { successHandoffDiagnostic } : {}),
+    });
+    if (compactSummary.approvalAuditHistory) {
+      root.approvalAuditHistory = compactSummary.approvalAuditHistory;
     }
 
-    root.continuity = continuity;
-    root.summary = mergeContinuitySummaryEntries(root.summary, continuity);
+    root.continuity = compactSummary.continuity;
+    root.summary = compactSummary.summary;
     root.compacted = true;
     root.compactReason = "auto-threshold";
     root.compactedAt = now;
