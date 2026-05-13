@@ -46,6 +46,18 @@ import {
   type FileConstraintAssertions,
 } from "./fileConstraintAssertions.js";
 import {
+  buildReflectiveStateQueryResponse,
+  buildRepairContinuationObject,
+  buildVerifyContinuationObject,
+  deriveContinuationTargetPath,
+  hasLocalExplainEvidenceInContinuity,
+  hasReadFragmentEvidenceInContinuity,
+  inferVerifyCommandFromContinuity,
+  isVerifyResumeEligibleFromContinuity,
+  type RepairContinuationObject,
+  type VerifyContinuationObject,
+} from "./continuationPlanning.js";
+import {
   buildAmbiguousEditInstructionReason,
   formatEditExecutionFailure,
   formatTargetResolutionBlockerReason,
@@ -67,14 +79,10 @@ import {
   type ApplyPatchRuntimeRouteOptions,
 } from "./mutationRoutingProjection.js";
 import {
-  formatApprovalAuthorityFacts,
   appendCurrentRequestScopeEvidence,
   deriveCurrentPermissionRequestFromToolInput,
 } from "./approvalAuthorityProjection.js";
-import {
-  projectProviderOutcome,
-  projectProviderSafeDiagnostics,
-} from "./providerOutcomeProjection.js";
+import { projectProviderOutcome } from "./providerOutcomeProjection.js";
 import { reconcileFileMutationSummary } from "./mutationResultAggregation.js";
 import {
   applySingleFileReplacePatch,
@@ -100,11 +108,7 @@ import type {
   ResolvedTarget,
   TargetResolutionBlocker,
 } from "./targetResolution.js";
-import {
-  classifyVerificationFailure,
-  blockerNextAction,
-  inferVerificationBlockerKind,
-} from "./toolExecutionOutcomeProjection.js";
+import { classifyVerificationFailure } from "./toolExecutionOutcomeProjection.js";
 import type { SingleFileReplacePatchResult } from "./patchMutationLane.js";
 import {
   appendApprovalRequestedEvent,
@@ -112,6 +116,18 @@ import {
   appendToolResultEvent,
   appendToolStartedEvent,
 } from "./toolLifecycleEvents.js";
+import {
+  buildWorkflowDecisionTrace,
+  type ContinuationTransform,
+  type GroundedDeliverableConstraints,
+  type GroundedRepairInstruction,
+  type GroundedRepairStage,
+  type ReflectiveStateQueryKind,
+  type SingleFileEditFailureReason,
+  type SingleFileEditRepairPayloadKind,
+  type WorkflowTaskPlan,
+} from "./workflowTaskPlanner.js";
+import { projectWorkflowIntent } from "./workflowIntentProjection.js";
 import type {
   AgentExecutionInput,
   AgentExecutionOutput,
@@ -119,7 +135,6 @@ import type {
   CodingResultProvenanceSummary,
   CodingResultSummary,
   CodingTaskKind,
-  CodingVerificationBlockerKind,
   CodingVerificationSummary,
   OrchestrationResult,
 } from "./types.js";
@@ -500,103 +515,6 @@ function createIntegratedRunner(
   };
 }
 
-interface WorkflowTaskPlan {
-  readonly taskKind: CodingTaskKind;
-  readonly reflectiveStateQueryKind?: ReflectiveStateQueryKind;
-  readonly groundedDeliverableMode?: GroundedDeliverableMode;
-  readonly readLineCount?: number;
-  readonly readLineOffset?: number;
-  readonly readFragmentLineIndexes?: readonly number[];
-  readonly readFragmentRanges?: readonly string[];
-  readonly readFragmentSourceWindowStart?: number;
-  readonly readFragmentSourceWindowEnd?: number;
-  readonly readFragmentFingerprint?: string;
-  readonly readFilter?: "none" | "function-definitions";
-  readonly repairInstruction?: GroundedRepairInstruction;
-  readonly reason: string;
-  readonly targetPath?: string;
-  readonly replaceFrom?: string;
-  readonly replaceTo?: string;
-  readonly repairContextUsed?: boolean;
-  readonly repairedFailureReason?: SingleFileEditFailureReason;
-  readonly repairedTargetFile?: string;
-  readonly repairPayloadKind?: SingleFileEditRepairPayloadKind;
-  readonly repairContextAbandoned?: boolean;
-  readonly repairContextAbandonedReason?: "multiple-failed-targets";
-  readonly repairContextAbandonedFailureReason?: SingleFileEditFailureReason;
-  readonly repairContextAbandonedTargetCount?: number;
-  readonly mutationScopeLineIndexes?: readonly number[];
-  readonly mutationScopeRanges?: readonly string[];
-  readonly mutationScopeSourceWindowStart?: number;
-  readonly mutationScopeSourceWindowEnd?: number;
-  readonly mutationScopeFingerprint?: string;
-  readonly mutationScopeRequired?: boolean;
-  readonly continuationRepairReplan?: boolean;
-  readonly avoidPreviousDirection?: boolean;
-  readonly failedTransforms?: readonly ContinuationTransform[];
-  readonly crossFileRepair?: boolean;
-  readonly additionalTargetPaths?: readonly string[];
-  readonly crossFileConvergedNoop?: boolean;
-  readonly previousRemainingTargets?: readonly string[];
-  readonly previousFailedEntries?: ReadonlyArray<{
-    path: string;
-    failureCode: "read-failed" | "patch-generation-failed" | "write-failed";
-    reason: string;
-  }>;
-  readonly continuationLineage?: readonly string[];
-  readonly degradedReopen?: boolean;
-  readonly degradedReopenReason?: string;
-  readonly degradedReopenCandidates?: readonly string[];
-  readonly degradedReopenCandidateSource?: string;
-  readonly degradedReopenCandidatePruned?: readonly string[];
-  readonly inspectFirst: boolean;
-  readonly verifyAfterEdit: boolean;
-  readonly verifyCommand?: string;
-  readonly directCommand?: string;
-  readonly blockedReason?: string;
-  readonly targetMissing?: boolean;
-  readonly usedRestoredState?: boolean;
-}
-
-function buildWorkflowDecisionTrace(plan: WorkflowTaskPlan): string[] {
-  const parts = [
-    `task=${plan.taskKind}`,
-    `target=${plan.targetPath ?? "none"}`,
-    `inspect=${plan.inspectFirst ? "yes" : "no"}`,
-    `verify=${plan.verifyAfterEdit ? "yes" : "no"}`,
-    `restored=${plan.usedRestoredState ? "yes" : "no"}`,
-  ];
-
-  if (plan.reflectiveStateQueryKind) {
-    parts.push(`reflective=${plan.reflectiveStateQueryKind}`);
-  }
-  if (plan.verifyCommand) {
-    parts.push(`verifyCommand=${plan.verifyCommand}`);
-  }
-  if (plan.repairContextUsed !== undefined) {
-    parts.push(`repairContext=${plan.repairContextUsed ? "used" : "not-used"}`);
-  }
-  if (plan.previousRemainingTargets?.length) {
-    parts.push(`remainingTargets=${plan.previousRemainingTargets.length}`);
-  }
-  if (plan.previousFailedEntries?.length) {
-    parts.push(`failedEntries=${plan.previousFailedEntries.length}`);
-  }
-  if (plan.continuationLineage?.length) {
-    parts.push(...plan.continuationLineage);
-  }
-
-  return [`decision-trace: ${parts.join(" ")}`];
-}
-
-type ReflectiveStateQueryKind =
-  | "stop-reason"
-  | "explain-scope"
-  | "read-position"
-  | "next-step"
-  | "approval-memory"
-  | "task-continuity";
-
 interface WorkflowTaskIntentSignals {
   readonly normalized: string;
   readonly intentPrompt: string;
@@ -657,85 +575,6 @@ interface ToolLifecycleResult {
   readonly metadata?: Record<string, unknown>;
   readonly projection: ToolLifecycleProjection;
   readonly provenance?: CodingResultProvenanceSummary;
-}
-
-interface ContinuationTransform {
-  readonly path: string;
-  readonly from: string;
-  readonly to: string;
-}
-
-type SingleFileEditFailureReason =
-  | "edit-target-missing"
-  | "edit-transform-unclear"
-  | "patch-from-not-found"
-  | "patch-ambiguous"
-  | "patch-target-missing";
-
-type SingleFileEditRepairPayloadKind =
-  | "replace-directive"
-  | "fenced-content"
-  | "target-path-with-transform";
-
-interface RepairContinuationObject {
-  readonly kind: "edit-fix";
-  readonly targetPath?: string;
-  readonly authority: "rebased-continuity-target" | "none";
-  readonly replaceFrom?: string;
-  readonly verifyCommand?: string;
-  readonly replaceTo?: string;
-  readonly blockerReason?: string;
-  readonly sourceLineage: readonly string[];
-  readonly confidence: "high" | "medium" | "low";
-  readonly executableNow: boolean;
-  readonly missingFields: readonly string[];
-}
-
-interface VerifyContinuationObject {
-  readonly kind: "rerun-verify";
-  readonly targetPath?: string;
-  readonly authority: "rebased-continuity-target" | "none";
-  readonly command?: string;
-  readonly commandCwd?: string;
-  readonly blockerReason?: string;
-  readonly sourceLineage: readonly string[];
-  readonly resumeEligible: boolean;
-  readonly confidence: "high" | "medium" | "low";
-  readonly executableNow: boolean;
-  readonly missingFields: readonly string[];
-}
-
-interface GroundedDeliverableConstraints {
-  summaryStyle?: "default" | "conclusion-with-evidence";
-  summaryEvidenceCount?: number;
-  includeKeyRisks?: boolean;
-  avoidGenericLanguage?: boolean;
-  explainScope?: "default" | "purpose-io-only";
-  readFilter?: "none" | "function-definitions";
-  preserveRecognizedHighlights?: boolean;
-}
-
-interface GroundedRepairInstruction {
-  readonly operation: "continue" | "repair" | "switch" | "clarify";
-  readonly targetMode?: GroundedDeliverableMode;
-  readonly constraints?: GroundedDeliverableConstraints;
-  readonly stagedSteps?: readonly GroundedRepairStage[];
-  readonly stagedResumeCursor?: number;
-  readonly reason: string;
-  readonly clarificationPrompt?: string;
-}
-
-interface GroundedRepairStage {
-  readonly mode: GroundedDeliverableMode;
-  readonly label: string;
-  readonly constraints?: GroundedDeliverableConstraints;
-  readonly readLineCount?: number;
-  readonly continueFromPreviousRead?: boolean;
-  readonly useLatestReadSnippet?: boolean;
-  readonly summaryConclusionOnly?: boolean;
-  readonly summaryEvidenceOnly?: boolean;
-  readonly summaryEvidenceCount?: number;
-  readonly appendRiskLine?: boolean;
 }
 
 type ReadWindowMode = "reset" | "continue" | "absolute";
@@ -2354,22 +2193,22 @@ function extractWorkflowTaskIntentSignals(
     /(?:\bexplain\b|what .* does|\u89e3\u91ca|\u5728\u505a\u4ec0\u4e48)/i.test(
       groundedIntentPrompt,
     );
+  const workflowIntentProjection = projectWorkflowIntent(
+    groundedIntentPrompt,
+    continuity,
+  );
   const hasReflectiveExplainStateQuestion =
-    isReflectiveExplainStateQuestion(groundedIntentPrompt);
+    workflowIntentProjection.hasReflectiveExplainStateQuestion;
   const hasReflectiveExplainContinuation =
     isReflectiveExplainContinuationPrompt(groundedIntentPrompt);
   const hasReflectiveExplainQuery =
     hasReflectiveExplainStateQuestion || hasReflectiveExplainContinuation;
   const detectedReflectiveStateQueryKind =
-    detectReflectiveStateQueryKind(groundedIntentPrompt);
+    workflowIntentProjection.detectedReflectiveStateQueryKind;
   const reflectiveStateQueryKind =
-    detectedReflectiveStateQueryKind ??
-    (hasStructuredApprovalMemoryInContinuity(continuity) &&
-    hasPermissionExplanationIntent(groundedIntentPrompt)
-      ? "approval-memory"
-      : undefined);
+    workflowIntentProjection.reflectiveStateQueryKind;
   const hasReflectiveActionCue =
-    hasReflectiveStateQueryActionCue(groundedIntentPrompt);
+    workflowIntentProjection.hasReflectiveActionCue;
   const hasPriorLocalExplainEvidence =
     hasLocalExplainEvidenceInContinuity(continuity);
   const hasRecoverableReadFragmentEvidence =
@@ -3092,59 +2931,6 @@ function buildFreshnessObservability(input: {
   };
 }
 
-function deriveContinuationTargetPath(
-  continuity: ContinuityStateLike,
-  workspaceRoot: string,
-): string | undefined {
-  const explainOutputTarget = deriveExplainTargetPathFromAssistantOutput(
-    continuity.lastAssistantOutput,
-  );
-  if (isUsableContinuationTargetPath(explainOutputTarget ?? "")) {
-    const reboundFromExplain = rebindContinuationTargetToWorkspace(
-      explainOutputTarget!,
-      workspaceRoot,
-    );
-    if (reboundFromExplain) {
-      return reboundFromExplain;
-    }
-  }
-  const readLikeTask =
-    continuity.lastTaskKind === "read-file" ||
-    continuity.lastTaskKind === "repo-explain" ||
-    continuity.lastTaskKind === "inspect-files";
-  const diagnosticTarget = projectProviderSafeDiagnostics(continuity)?.target;
-  const preferredOrder = readLikeTask
-    ? [
-        ...(diagnosticTarget ? [diagnosticTarget] : []),
-        ...(continuity.recentTargetFiles ?? []),
-        ...(continuity.recentFailedFiles ?? []).map((entry) => entry.path),
-        ...(continuity.recentChangedFiles ?? []),
-        ...(continuity.recentVerifiedFiles ?? []),
-      ]
-    : [
-        ...(diagnosticTarget ? [diagnosticTarget] : []),
-        ...(continuity.recentTargetFiles ?? []),
-        ...(continuity.recentChangedFiles ?? []),
-        ...(continuity.recentFailedFiles ?? []).map((entry) => entry.path),
-        ...(continuity.recentVerifiedFiles ?? []),
-      ];
-
-  for (const rawCandidate of preferredOrder) {
-    const candidate = normalizePathLike(rawCandidate ?? "");
-    if (!isUsableContinuationTargetPath(candidate)) {
-      continue;
-    }
-    const rebound = rebindContinuationTargetToWorkspace(
-      candidate,
-      workspaceRoot,
-    );
-    if (rebound) {
-      return rebound;
-    }
-  }
-  return undefined;
-}
-
 function resolveSingleFileEditFailureRepairContext(
   continuity: ContinuityStateLike,
   workspaceRoot: string,
@@ -3297,27 +3083,6 @@ function rebindContinuationTargetToWorkspace(
     return undefined;
   }
   return rebindPathLikeToWorkspace(normalizedCandidate, workspaceRoot);
-}
-
-function deriveExplainTargetPathFromAssistantOutput(
-  output: string | undefined,
-): string | undefined {
-  if (!output) {
-    return undefined;
-  }
-  const normalized = output.replace(/\r/g, "");
-  const english =
-    normalized.match(
-      /^\s*Explanation\s+for\s+(.+?)(?:\s+\(\d+(?:-\d+)?\))?:/im,
-    ) ??
-    normalized.match(/^\s*Read result for\s+(.+?)\s*\(/im) ??
-    normalized.match(/^\s*Read result for\s+(.+?):/im);
-  const rawCandidate = english?.[1]?.trim();
-  if (!rawCandidate) {
-    return undefined;
-  }
-  const cleaned = normalizePathLike(rawCandidate);
-  return cleaned.length > 0 ? cleaned : undefined;
 }
 
 function isUsableContinuationTargetPath(candidate: string): boolean {
@@ -6995,310 +6760,13 @@ function hasLocalSliceExplainCue(prompt: string): boolean {
   );
 }
 
-function isReflectiveExplainStateQuestion(prompt: string): boolean {
-  return /(?:what part did you just explain|which part did you just explain|刚才解释的是哪一段|你刚才解释的是哪个片段)/i.test(
-    prompt,
-  );
-}
-
 function isReflectiveExplainContinuationPrompt(prompt: string): boolean {
   return /(?:continue explaining that part|继续解释这部分)/i.test(prompt);
-}
-
-function isReflectiveStopReasonQuery(prompt: string): boolean {
-  return /(?:why did it stop|why did we stop|what failed|where did we stop|刚才为什么停了|为什么停了|刚才失败的是哪一步|上一步失败在哪|刚才卡在哪)/i.test(
-    prompt,
-  );
-}
-
-function isReflectiveReadPositionQuery(prompt: string): boolean {
-  return /(?:where did we stop reading|where did i stop reading|where are we in the read|刚才读到哪里了|读到哪了|读到哪里了)/i.test(
-    prompt,
-  );
-}
-
-function isReflectiveNextStepQuery(prompt: string): boolean {
-  return /(?:what should we do next|what should i do next|what is the next step|现在应该继续什么|下一步做什么|接下来该做什么)/i.test(
-    prompt,
-  );
-}
-
-function isReflectiveApprovalMemoryQuery(prompt: string): boolean {
-  return /(?:what did i just approve|what did i approve|was that allow-once or allow-always|was that cached or one-shot|why is it asking again|did that get persisted|was that persisted|刚才我批准了什么|刚才那个是一次性还是永久授权|为什么这次还要再问审批|刚才那个授权有没有落盘|刚才那个授权是缓存还是一次性)/i.test(
-    prompt,
-  );
-}
-
-function isReflectiveTaskContinuityQuery(prompt: string): boolean {
-  return /(?:after\s+resume|resume\s+check|session-id\s+resume\s+check|explicit\s+session-id\s+resume(?:\s+check)?|same\s+task|exact\s+task|keep\s+the\s+exact\s+task|report\s+in\s+3\s+lines?\s+only)/i.test(
-    prompt,
-  );
-}
-
-function hasReflectiveStateQueryActionCue(prompt: string): boolean {
-  return /(?:\bdo that\b|\bcontinue with that\b|\bthen continue\b|\bcontinue fixing\b|\bcontinue reading(?:\s+next\s+\d+\s+lines?)?\b|\bcontinue explaining(?:\s+that\s+part)?\b|那就按这个继续|按这个继续|那继续|继续修|继续读取|继续解释这部分)/i.test(
-    prompt,
-  );
 }
 
 function isRepairContinuationFollowUpPrompt(prompt: string): boolean {
   return /(?:\bcontinue fixing(?:\s+that)?\b|\bthen continue(?:\s+fixing)?\b|\bwhy did it stop[^\n]*continue\b|\bwhat should we do next[^\n]*continue fixing\b|刚才为什么停了.*继续修|那继续修|继续修这个|就按刚才那个继续修|按这个继续修|那就按这个继续修)/i.test(
     prompt,
-  );
-}
-
-function detectReflectiveStateQueryKind(
-  prompt: string,
-): ReflectiveStateQueryKind | undefined {
-  if (isReflectiveExplainStateQuestion(prompt)) {
-    return "explain-scope";
-  }
-  if (isReflectiveReadPositionQuery(prompt)) {
-    return "read-position";
-  }
-  if (isReflectiveStopReasonQuery(prompt)) {
-    return "stop-reason";
-  }
-  if (isReflectiveNextStepQuery(prompt)) {
-    return "next-step";
-  }
-  if (isReflectiveApprovalMemoryQuery(prompt)) {
-    return "approval-memory";
-  }
-  if (isReflectiveTaskContinuityQuery(prompt)) {
-    return "task-continuity";
-  }
-  return undefined;
-}
-
-function extractTaskTripletFromText(value: string | undefined): {
-  task?: string;
-  done?: string;
-  next?: string;
-} {
-  if (!value?.trim()) {
-    return {};
-  }
-  const task = value.match(/\bTASK\s*=\s*([^\r\n]+)/i)?.[1]?.trim();
-  const done = value.match(/\bDONE\s*=\s*([^\r\n]+)/i)?.[1]?.trim();
-  const next = value.match(/\bNEXT\s*=\s*([^\r\n]+)/i)?.[1]?.trim();
-  return {
-    ...(task ? { task } : {}),
-    ...(done ? { done } : {}),
-    ...(next ? { next } : {}),
-  };
-}
-
-function buildReflectiveStateQueryResponse(input: {
-  kind: ReflectiveStateQueryKind;
-  continuity: ContinuityStateLike;
-  workspaceRoot: string;
-}): string {
-  const targetPath = deriveContinuationTargetPath(
-    input.continuity,
-    input.workspaceRoot,
-  );
-  const terminalClassification =
-    input.continuity.lastTerminalClassification ?? "unknown";
-  const terminalReason = input.continuity.lastTerminalReason ?? "unknown";
-  const failure =
-    input.continuity.lastFailure ??
-    (input.continuity.unresolvedItems ?? []).find((entry) =>
-      /(?:last-error:|stop-reason:|terminal:|failed-files:|verify:)/i.test(
-        entry,
-      ),
-    );
-  const window = extractLastReadWindowFromContinuity(input.continuity);
-  const fragment = extractLastReadDeliveredFragmentFromContinuity(
-    input.continuity,
-  );
-
-  if (input.kind === "stop-reason") {
-    if (!failure && terminalClassification === "unknown") {
-      return "I don't have enough rebased session state to explain why the previous run stopped. Re-run the failed step in this migrated session, then ask again.";
-    }
-    return [
-      `Last run status: ${terminalClassification} (${terminalReason}).`,
-      `Stop reason: ${failure ?? "No detailed blocker was persisted in this session."}`,
-      targetPath ? `Active target context: ${targetPath}.` : undefined,
-    ]
-      .filter((line): line is string => Boolean(line))
-      .join("\n");
-  }
-
-  if (input.kind === "read-position") {
-    if (window.start === undefined && window.end === undefined) {
-      return "I don't have a rebased read-window snapshot for this session. Please run a read step first, then ask where we stopped reading.";
-    }
-    const start = (window.start ?? 0) + 1;
-    const end = window.end ?? window.start ?? 0;
-    return [
-      `Last read position: lines ${start}-${end}.`,
-      window.size !== undefined
-        ? `Window size: ${window.size} lines.`
-        : undefined,
-      targetPath ? `Read target: ${targetPath}.` : undefined,
-    ]
-      .filter((line): line is string => Boolean(line))
-      .join("\n");
-  }
-
-  if (input.kind === "explain-scope") {
-    const rangeText =
-      fragment.ranges?.join(";") ??
-      (fragment.start !== undefined && fragment.end !== undefined
-        ? `${fragment.start + 1}-${fragment.end}`
-        : undefined);
-    const hasSliceEvidence =
-      (fragment.lineIndexes?.length ?? 0) > 0 ||
-      (fragment.ranges?.length ?? 0) > 0 ||
-      (fragment.sourceWindowStart !== undefined &&
-        fragment.sourceWindowEnd !== undefined);
-    if (hasSliceEvidence && rangeText) {
-      return [
-        `Last explain scope: slice ${rangeText}.`,
-        targetPath ? `Explain target: ${targetPath}.` : undefined,
-      ]
-        .filter((line): line is string => Boolean(line))
-        .join("\n");
-    }
-    if (
-      input.continuity.lastGroundedDeliverableMode === "explain" ||
-      input.continuity.lastTaskKind === "repo-explain"
-    ) {
-      return [
-        "Last explain scope: whole-file.",
-        targetPath ? `Explain target: ${targetPath}.` : undefined,
-      ]
-        .filter((line): line is string => Boolean(line))
-        .join("\n");
-    }
-    return "No explain-object is available in the rebased session state. Run an explain step first, then ask which part was explained.";
-  }
-
-  if (input.kind === "approval-memory") {
-    return formatApprovalAuthorityFacts({ continuity: input.continuity });
-  }
-
-  if (input.kind === "task-continuity") {
-    const fromAssistant = extractTaskTripletFromText(
-      input.continuity.lastAssistantOutput,
-    );
-    const fromUser = extractTaskTripletFromText(
-      input.continuity.lastUserIntent,
-    );
-    const task = fromAssistant.task ?? fromUser.task ?? "resume-existing-task";
-    const done =
-      fromAssistant.done ??
-      fromUser.done ??
-      `last-${input.continuity.lastTaskKind ?? "task"}-step`;
-    const next =
-      fromAssistant.next ??
-      fromUser.next ??
-      (input.continuity.lastFailure
-        ? `resolve blocker: ${truncate(input.continuity.lastFailure, 80)}`
-        : "continue same task");
-    return [`TASK=${task}`, `DONE=${done}`, `NEXT=${next}`].join("\n");
-  }
-
-  const unresolvedPreview = (input.continuity.unresolvedItems ?? [])
-    .slice(0, 2)
-    .join(" | ");
-  if (
-    input.continuity.lastVerificationStatus === "failed" ||
-    input.continuity.lastVerificationStatus === "blocked"
-  ) {
-    const blockedKind = extractVerificationBlockerKindFromContinuity(
-      input.continuity,
-    );
-    const blockedNextAction = blockedKind
-      ? blockerNextAction(blockedKind)
-      : undefined;
-    return [
-      input.continuity.lastVerificationStatus === "blocked"
-        ? `Recommended next step: rerun verification command (${input.continuity.lastVerificationCommand ?? "verify command"}) after resolving blocker (${blockedKind ?? "unknown"}).`
-        : `Recommended next step: rerun verification command (${input.continuity.lastVerificationCommand ?? "verify command"}) and fix reported failures.`,
-      input.continuity.lastVerificationReason
-        ? `Verification reason: ${input.continuity.lastVerificationReason}`
-        : undefined,
-      input.continuity.lastVerificationStatus === "blocked" && blockedNextAction
-        ? `Next action: ${blockedNextAction}`
-        : undefined,
-      targetPath ? `Target context: ${targetPath}.` : undefined,
-    ]
-      .filter((line): line is string => Boolean(line))
-      .join("\n");
-  }
-  if (targetPath) {
-    return `Recommended next step: continue the pending task on ${targetPath}.`;
-  }
-  if (unresolvedPreview.length > 0) {
-    return `Recommended next step: resolve unresolved items (${unresolvedPreview}).`;
-  }
-  return "I don't have enough rebased session state to recommend a concrete next step. Provide an explicit target/action so we can continue safely.";
-}
-
-function hasLocalExplainEvidenceInContinuity(
-  continuity: ContinuityStateLike,
-): boolean {
-  return (continuity.lastContinuationEvidence ?? []).some((entry) =>
-    /^local-explain:/i.test(entry.trim()),
-  );
-}
-
-function hasReadFragmentEvidenceInContinuity(
-  continuity: ContinuityStateLike,
-): boolean {
-  if (
-    (continuity.lastReadFragmentLineIndexes?.length ?? 0) > 0 ||
-    (continuity.lastReadFragmentRanges?.length ?? 0) > 0 ||
-    continuity.lastReadFragmentStart !== undefined ||
-    continuity.lastReadFragmentEnd !== undefined ||
-    (continuity.lastReadFragmentSourceWindowStart !== undefined &&
-      continuity.lastReadFragmentSourceWindowEnd !== undefined) ||
-    Boolean(continuity.lastReadFragmentFingerprint)
-  ) {
-    return true;
-  }
-  return (continuity.lastContinuationEvidence ?? []).some((entry) =>
-    /^read-fragment-(?:start|end|line-indexes|ranges|source-window-start|source-window-end|fingerprint):/i.test(
-      entry.trim(),
-    ),
-  );
-}
-
-function hasStructuredApprovalMemoryInContinuity(
-  continuity: ContinuityStateLike,
-): boolean {
-  return Boolean(
-    continuity.lastApprovalDecision ||
-    continuity.lastApprovalDecisionSource ||
-    continuity.lastApprovalCacheEffect ||
-    continuity.lastApprovalProjectRoot ||
-    continuity.lastApprovalCacheKey ||
-    continuity.lastApprovalScope ||
-    continuity.lastApprovalLineage ||
-    continuity.lastApprovalStopReason ||
-    continuity.lastApprovalRecordedAt,
-  );
-}
-
-function hasPermissionExplanationIntent(prompt: string): boolean {
-  const source = stripPathTokensForIntent(prompt);
-  const text = source.length > 0 ? source : prompt;
-  const lowered = text.toLowerCase();
-  const hasPermissionLexicon =
-    /(?:approval|approve|approved|grant|granted|authorize|authorized|permission|allow-once|allow-always|one-shot|persist(?:ed|ence)?|cached?|remember(?:ed)?)/i.test(
-      lowered,
-    ) ||
-    /(?:授权|审批|批准|一次性|永久授权|落盘|缓存|生效|为什么这次又要问)/u.test(
-      text,
-    );
-  if (!hasPermissionLexicon) {
-    return false;
-  }
-  return /(?:\?|why|what|did|was|is it asking again|有没有|是不是|是否|为什么|刚才)/i.test(
-    lowered,
   );
 }
 
@@ -8761,232 +8229,6 @@ function extractReplaceDirective(
   );
   if (enChangeMatch?.[1] && enChangeMatch?.[2]) {
     return { from: enChangeMatch[1], to: enChangeMatch[2] };
-  }
-  return undefined;
-}
-
-function buildRepairContinuationObject(input: {
-  readonly continuity: ContinuityStateLike;
-  readonly targetPath?: string;
-  readonly replaceDirective?: { from: string; to: string };
-}): RepairContinuationObject {
-  const missingFields: string[] = [];
-  if (!input.targetPath) {
-    missingFields.push("target");
-  }
-  if (!input.replaceDirective?.from || !input.replaceDirective?.to) {
-    missingFields.push("transform");
-  }
-
-  const lineage: string[] = [];
-  if (input.continuity.lastFailure) {
-    lineage.push(`failure:${truncate(input.continuity.lastFailure, 120)}`);
-  }
-  if (input.continuity.lastTerminalReason) {
-    lineage.push(`terminal:${input.continuity.lastTerminalReason}`);
-  }
-  for (const entry of input.continuity.lastContinuationEvidence ?? []) {
-    if (/^(?:transform:|repair-failed-files:|reopen-)/i.test(entry)) {
-      lineage.push(entry);
-    }
-    if (lineage.length >= 6) {
-      break;
-    }
-  }
-
-  const confidence: "high" | "medium" | "low" =
-    missingFields.length === 0
-      ? "high"
-      : missingFields.length === 1
-        ? "medium"
-        : "low";
-
-  return {
-    kind: "edit-fix",
-    targetPath: input.targetPath,
-    authority: input.targetPath ? "rebased-continuity-target" : "none",
-    replaceFrom: input.replaceDirective?.from,
-    verifyCommand: inferVerifyCommandFromContinuity(input.continuity),
-    replaceTo: input.replaceDirective?.to,
-    blockerReason:
-      input.continuity.lastFailure ?? input.continuity.lastTerminalReason,
-    sourceLineage: lineage,
-    confidence,
-    executableNow: missingFields.length === 0,
-    missingFields,
-  };
-}
-
-function buildVerifyContinuationObject(input: {
-  readonly continuity: ContinuityStateLike;
-  readonly targetPath?: string;
-  readonly command?: string;
-}): VerifyContinuationObject {
-  const resolvedCommand =
-    input.command ?? inferVerifyCommandFromContinuity(input.continuity);
-  const missingFields: string[] = [];
-  if (!input.targetPath) {
-    missingFields.push("target");
-  }
-  if (!resolvedCommand) {
-    missingFields.push("command");
-  }
-  const resolvedCwd = extractVerifyCwdHintFromContinuity(input.continuity);
-  const resumeEligible = isVerifyResumeEligibleFromContinuity(input.continuity);
-
-  const lineage: string[] = [];
-  if (input.continuity.lastFailure) {
-    lineage.push(`failure:${truncate(input.continuity.lastFailure, 120)}`);
-  }
-  if (input.continuity.lastVerificationReason) {
-    lineage.push(
-      `verify-reason:${truncate(input.continuity.lastVerificationReason, 120)}`,
-    );
-  }
-  if (input.continuity.lastVerificationStatus) {
-    lineage.push(`verify-status:${input.continuity.lastVerificationStatus}`);
-  }
-  for (const entry of input.continuity.lastContinuationEvidence ?? []) {
-    if (
-      /^(?:verify-command-hint:|verify-target-hint:|verify-cwd-hint:|verify-resume-eligible:|verify-blocker-kind:|verify-next-action:|verify:|stop-reason:|last-error:)/i.test(
-        entry,
-      )
-    ) {
-      lineage.push(entry);
-    }
-    if (lineage.length >= 6) {
-      break;
-    }
-  }
-
-  const confidence: "high" | "medium" | "low" =
-    missingFields.length === 0
-      ? "high"
-      : missingFields.length === 1
-        ? "medium"
-        : "low";
-
-  return {
-    kind: "rerun-verify",
-    targetPath: input.targetPath,
-    authority: input.targetPath ? "rebased-continuity-target" : "none",
-    command: resolvedCommand,
-    commandCwd: resolvedCwd,
-    blockerReason:
-      input.continuity.lastVerificationReason ??
-      input.continuity.lastFailure ??
-      input.continuity.lastTerminalReason,
-    sourceLineage: lineage,
-    resumeEligible,
-    confidence,
-    executableNow: missingFields.length === 0,
-    missingFields,
-  };
-}
-
-function inferVerifyCommandFromContinuity(
-  continuity: ContinuityStateLike,
-): string | undefined {
-  if (continuity.lastVerificationCommand?.trim()) {
-    return continuity.lastVerificationCommand.trim();
-  }
-  const diagnosticCommand = projectProviderSafeDiagnostics(
-    continuity,
-  )?.command?.trim();
-  if (diagnosticCommand) {
-    return diagnosticCommand;
-  }
-  for (const entry of continuity.lastContinuationEvidence ?? []) {
-    const hintMatch = entry.match(/^verify-command-hint:(.+)$/i);
-    if (hintMatch?.[1]?.trim()) {
-      return hintMatch[1].trim();
-    }
-    const summaryMatch = entry.match(/^verify=(?:\w+)\s+command=(.+)$/i);
-    if (summaryMatch?.[1]?.trim()) {
-      return summaryMatch[1].trim();
-    }
-  }
-  return undefined;
-}
-
-function extractVerifyCwdHintFromContinuity(
-  continuity: ContinuityStateLike,
-): string | undefined {
-  for (const entry of continuity.lastContinuationEvidence ?? []) {
-    const hintMatch = entry.match(/^verify-cwd-hint:(.+)$/i);
-    if (hintMatch?.[1]?.trim()) {
-      return hintMatch[1].trim();
-    }
-  }
-  return undefined;
-}
-
-function isVerifyResumeEligibleFromContinuity(
-  continuity: ContinuityStateLike,
-): boolean {
-  if (continuity.lastVerificationResumeEligible === true) {
-    return true;
-  }
-  for (const entry of continuity.lastContinuationEvidence ?? []) {
-    const hintMatch = entry.match(/^verify-resume-eligible:(.+)$/i);
-    const parsed = hintMatch?.[1]?.trim().toLowerCase();
-    if (parsed === "true" || parsed === "yes" || parsed === "1") {
-      return true;
-    }
-    if (parsed === "false" || parsed === "no" || parsed === "0") {
-      return false;
-    }
-  }
-  if (
-    continuity.lastVerificationStatus === "blocked" &&
-    (continuity.lastVerificationBlockerKind === "approval-denied" ||
-      /approval denied/i.test(continuity.lastVerificationReason ?? "")) &&
-    Boolean(inferVerifyCommandFromContinuity(continuity))
-  ) {
-    return true;
-  }
-  return false;
-}
-
-function extractVerificationBlockerKindFromContinuity(
-  continuity: ContinuityStateLike,
-): CodingVerificationBlockerKind | undefined {
-  if (continuity.lastVerificationBlockerKind?.trim()) {
-    const parsed = continuity.lastVerificationBlockerKind.trim().toLowerCase();
-    if (
-      [
-        "approval-denied",
-        "missing-command",
-        "environment-not-ready",
-        "no-verify-strategy",
-        "unknown",
-      ].includes(parsed)
-    ) {
-      return parsed as CodingVerificationBlockerKind;
-    }
-  }
-  for (const entry of continuity.lastContinuationEvidence ?? []) {
-    const hintMatch = entry.match(/^verify-blocker-kind:(.+)$/i);
-    const parsed = hintMatch?.[1]?.trim().toLowerCase();
-    if (
-      parsed &&
-      [
-        "approval-denied",
-        "missing-command",
-        "environment-not-ready",
-        "no-verify-strategy",
-        "unknown",
-      ].includes(parsed)
-    ) {
-      return parsed as CodingVerificationBlockerKind;
-    }
-  }
-
-  if (continuity.lastVerificationReason?.trim()) {
-    return inferVerificationBlockerKind(
-      {},
-      continuity.lastVerificationReason,
-    );
   }
   return undefined;
 }
