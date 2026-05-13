@@ -15,9 +15,16 @@ Read-only reference repositories:
 ```text
 /home/wang/projects/source-claudecode
 /home/wang/projects/opencode
+/home/wang/projects/gemini-cli
 ```
 
 Only the target repository may be modified. The reference repositories are used only to recover load-bearing runtime semantics, responsibility boundaries, permission behavior, tool execution boundaries, and user-visible result semantics.
+
+Reference repository roles:
+
+- Claude Code: behavior, UX, tool-result surface, compact/resume, and permission-surface comparison.
+- opencode: open-source agent architecture, permission/tool execution, apply_patch, session processor, and provider-abstraction comparison.
+- Gemini CLI: CLI/core layering, ReAct loop, built-in tools, MCP, checkpoint/headless, and sandbox comparison.
 
 Do not copy implementation code mechanically from the reference repositories. Use them to align architectural responsibility and runtime behavior.
 
@@ -38,7 +45,7 @@ Do not duplicate detailed RTK command rules in this repository-level `AGENTS.md`
 ## Repository Boundaries
 
 - Default to editing only files under the target repository.
-- Treat both reference repositories as strictly read-only.
+- Treat all reference repositories as strictly read-only.
 - Do not modify files in parent directories or sibling repositories.
 - Run build and test commands from the target repository root unless a tool explicitly requires another working directory.
 - Keep TypeScript imports ending in `.js` when importing local TypeScript modules that compile to JavaScript.
@@ -122,11 +129,11 @@ Use the reference repositories for targeted semantic comparison when a task touc
 Expected reference workflow:
 
 1. Inspect the target repository implementation first.
-2. Perform a small, targeted comparison against the relevant Claude Code or opencode files.
+2. Perform a small, targeted comparison against the relevant Claude Code, opencode, or Gemini CLI files.
 3. Use the comparison to preserve responsibility boundaries and runtime semantics.
 4. Implement the target design in this repository.
 
-Do not use the reference repositories for large-scale source scanning, architecture audits without a direct task, or mechanical source-structure copying.
+Do not use the reference repositories for large-scale source scanning, architecture audits without a direct task, or mechanical source-structure copying. Keep reference comparison to a small number of task-relevant snippets; do not perform broad repository scans when a targeted comparison is enough.
 
 ## Large File and Module Boundaries
 

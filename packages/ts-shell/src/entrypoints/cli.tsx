@@ -45,10 +45,7 @@ import {
   type StdinTransportMode,
   updateFenceState,
 } from "../core/shell/printPromptInput.js";
-import {
-  checkRealProviderReadiness,
-  createProviderReadinessTerminalEvent,
-} from "../core/shell/providerReadiness.js";
+import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
 import {
   decideQueryRoute,
   type TaskMode,
@@ -115,6 +112,7 @@ import { parseCliArgs, type CliOptions } from "./cliArgs.js";
 import { resolveCliMode } from "./cliModeDispatch.js";
 import { runCliPrintMode } from "./cliPrintModeRunner.js";
 import { runCliStdinMode } from "./cliStdinModeRunner.js";
+import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
 import { openSessionsPanel } from "./sessionsPanel.js";
 
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
@@ -1218,7 +1216,7 @@ async function* streamOrchestratedResponse(
       providerCredentialResolution,
     });
     if ("stopReason" in localReadiness) {
-      yield createProviderReadinessTerminalEvent({
+      yield createProviderReadinessCliTerminalEvent({
         sessionId,
         prompt,
         stopReason: localReadiness.stopReason,
@@ -1251,7 +1249,7 @@ async function* streamOrchestratedResponse(
       model: providerCredentialResolution.model,
     });
     if (readiness.ok === false) {
-      yield createProviderReadinessTerminalEvent({
+      yield createProviderReadinessCliTerminalEvent({
         sessionId,
         prompt,
         stopReason: readiness.failure.stopReason,
