@@ -31,6 +31,15 @@ import type {
   TerminalReason,
 } from "../orchestration/types.js";
 import { deriveActionableFailureContinuity } from "./actionableFailureContinuity.js";
+import {
+  projectApprovalAudit,
+  projectApprovalAuditContinuity,
+  projectApprovalSummaryFallback,
+} from "./approvalAuditProjection.js";
+import {
+  decodeApprovalMemory,
+  decodeApprovalMemoryHistory,
+} from "./approvalMemoryCodec.js";
 import { applyCompactRetentionPlan } from "./compactRetentionPlanner.js";
 import {
   createEmptyCurrentSessionSelectionStore,
@@ -64,6 +73,14 @@ import type {
   SeedInfluenceDiagnostic,
   SessionContinuitySnapshot,
 } from "./sessionContinuityTypes.js";
+import {
+  extractLastPermissionRequestFromEvidence,
+  extractLastRequestScopeFromEvidence,
+  parsePermissionRequestMemory,
+  parseRequestScopeMemory,
+  resolvePermissionRequestMemory,
+  resolveRequestScopeMemory,
+} from "./permissionRequestMemoryCodec.js";
 import {
   deriveStoppedSessionContinuitySurface,
 } from "./stoppedSessionContinuity.js";
@@ -600,8 +617,9 @@ export class SessionManager {
         ...(decision.inputKey ? { inputKey: decision.inputKey } : {}),
         recordedAt,
       };
-      const approvalAuditHistory = this.extractApprovalAuditHistoryMemoryState(
+      const approvalAuditHistory = decodeApprovalMemoryHistory(
         currentWorkingMemory,
+        { historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT },
       );
       const nextApprovalAuditHistory = [
         ...approvalAuditHistory,
@@ -615,121 +633,20 @@ export class SessionManager {
           : {};
       const nextContinuity: Record<string, unknown> = {
         ...currentContinuity,
-        lastApprovalDecision: nextApprovalAudit.decision,
-        lastApprovalDecisionSource: nextApprovalAudit.decisionSource,
-        lastApprovalPersistent: nextApprovalAudit.persistent,
-        lastApprovalCacheEffect: nextApprovalAudit.cacheEffect,
-        lastApprovalProjectRoot: nextApprovalAudit.projectRoot,
-        lastApprovalCacheKey: nextApprovalAudit.cacheKey,
-        lastApprovalScope: nextApprovalAudit.scopeLabel,
-        lastApprovalRecordedAt: nextApprovalAudit.recordedAt,
-        ...(nextApprovalAudit.lineage
-          ? { lastApprovalLineage: nextApprovalAudit.lineage }
-          : {}),
-        ...(nextApprovalAudit.stopReason
-          ? { lastApprovalStopReason: nextApprovalAudit.stopReason }
-          : {}),
-        ...(nextApprovalAudit.channel
-          ? { lastApprovalChannel: nextApprovalAudit.channel }
-          : {}),
-        ...(nextApprovalAudit.inputKey
-          ? { lastApprovalInputKey: nextApprovalAudit.inputKey }
-          : {}),
-        lastRequestScopeCacheKey: nextApprovalAudit.cacheKey,
-        lastRequestScopeLabel: nextApprovalAudit.scopeLabel,
-        lastRequestScopeProjectRoot: nextApprovalAudit.projectRoot,
-        lastRequestScopeSource: "approval-request",
-        lastPermissionRequestCacheKey: nextApprovalAudit.cacheKey,
-        lastPermissionRequestScopeLabel: nextApprovalAudit.scopeLabel,
-        lastPermissionRequestProjectRoot: nextApprovalAudit.projectRoot,
-        lastPermissionRequestSource: "approval-request",
-        ...(nextApprovalAudit.lineage
-          ? { lastPermissionRequestLineage: nextApprovalAudit.lineage }
-          : {}),
-        lastApprovalHistory: nextApprovalAuditHistory,
+        ...projectApprovalAuditContinuity({
+          approvalAudit: nextApprovalAudit,
+          approvalAuditHistory: nextApprovalAuditHistory,
+        }),
       };
       const currentSummaryEntries = Array.isArray(currentWorkingMemory.summary)
         ? currentWorkingMemory.summary.filter(
             (entry): entry is string => typeof entry === "string",
           )
         : [];
-      const summaryByKey = new Map<string, string>();
-      for (const rawEntry of currentSummaryEntries) {
-        const entry = rawEntry.trim();
-        if (!entry) {
-          continue;
-        }
-        const normalized = entry.startsWith("- ")
-          ? entry.slice(2).trim()
-          : entry;
-        const separator = normalized.indexOf(":");
-        if (separator <= 0) {
-          continue;
-        }
-        const key = normalized.slice(0, separator).trim().toLowerCase();
-        const value = normalized.slice(separator + 1).trim();
-        if (key.startsWith("last-approval-") && value) {
-          summaryByKey.set(key, value);
-        }
-      }
-      const setSummaryApproval = (key: string, value: string | undefined): void => {
-        if (!value?.trim()) {
-          summaryByKey.delete(key);
-          return;
-        }
-        summaryByKey.set(key, value.trim());
-      };
-      setSummaryApproval("last-approval-decision", nextApprovalAudit.decision);
-      setSummaryApproval(
-        "last-approval-decision-source",
-        nextApprovalAudit.decisionSource,
-      );
-      setSummaryApproval(
-        "last-approval-persistent",
-        nextApprovalAudit.persistent ? "yes" : "no",
-      );
-      setSummaryApproval(
-        "last-approval-cache-effect",
-        nextApprovalAudit.cacheEffect,
-      );
-      setSummaryApproval(
-        "last-approval-project-root",
-        nextApprovalAudit.projectRoot,
-      );
-      setSummaryApproval("last-approval-cache-key", nextApprovalAudit.cacheKey);
-      setSummaryApproval("last-approval-scope", nextApprovalAudit.scopeLabel);
-      setSummaryApproval("last-approval-lineage", nextApprovalAudit.lineage);
-      setSummaryApproval(
-        "last-approval-stop-reason",
-        nextApprovalAudit.stopReason,
-      );
-      setSummaryApproval("last-approval-channel", nextApprovalAudit.channel);
-      setSummaryApproval("last-approval-input-key", nextApprovalAudit.inputKey);
-      setSummaryApproval(
-        "last-approval-recorded-at",
-        nextApprovalAudit.recordedAt,
-      );
-      const preservedSummaryEntries = currentSummaryEntries.filter((entry) => {
-        const trimmed = entry.trim();
-        if (!trimmed) {
-          return false;
-        }
-        const normalized = trimmed.startsWith("- ")
-          ? trimmed.slice(2).trim()
-          : trimmed;
-        const separator = normalized.indexOf(":");
-        if (separator <= 0) {
-          return true;
-        }
-        const key = normalized.slice(0, separator).trim().toLowerCase();
-        return !key.startsWith("last-approval-");
+      const nextSummary = projectApprovalSummaryFallback({
+        currentSummaryEntries,
+        approvalAudit: nextApprovalAudit,
       });
-      const nextSummary = [
-        ...preservedSummaryEntries,
-        ...Array.from(summaryByKey.entries()).map(([key, value]) =>
-          `- ${key}: ${value}`,
-        ),
-      ];
       const snapshot = this.buildSessionStateSnapshot(session, current);
       this.writeJsonFileAtomic(statePath, {
         ...snapshot,
@@ -1828,148 +1745,33 @@ export class SessionManager {
     const stagedRepairProgress = this.extractStagedRepairProgress(
       lastCodingResult?.continuation.evidence,
     );
-    const lastRequestScope = this.extractLastRequestScopeFromEvidence(
+    const lastRequestScope = extractLastRequestScopeFromEvidence(
       lastCodingResult?.continuation.evidence,
     );
-    const lastRequestScopeFromMemory = this.extractRequestScopeMemoryState(
+    const lastRequestScopeFromMemory = parseRequestScopeMemory(
       stateSnapshot?.workingMemory,
     );
-    const lastPermissionRequest = this.extractLastPermissionRequestFromEvidence(
+    const lastPermissionRequest = extractLastPermissionRequestFromEvidence(
       lastCodingResult?.continuation.evidence,
     );
     const lastPermissionRequestFromMemory =
-      this.extractPermissionRequestMemoryState(stateSnapshot?.workingMemory);
-    const inferRootFromCacheKey = (cacheKey: string | undefined): string | undefined => {
-      if (!cacheKey) {
-        return undefined;
-      }
-      const divider = cacheKey.indexOf("|");
-      if (divider <= 0) {
-        return undefined;
-      }
-      const rootPart = cacheKey.slice(0, divider).trim();
-      return rootPart.length > 0 ? rootPart : undefined;
-    };
-    const evidenceRequestRoot =
-      lastPermissionRequest.projectRoot &&
-      this.normalizeOptionalString(lastPermissionRequest.projectRoot);
-    const memoryRequestRoot =
-      lastPermissionRequestFromMemory?.projectRoot &&
-      this.normalizeOptionalString(lastPermissionRequestFromMemory.projectRoot);
-    const evidenceRequestRootFromCacheKey = inferRootFromCacheKey(
-      lastPermissionRequest.cacheKey,
-    );
-    const memoryRequestRootFromCacheKey = inferRootFromCacheKey(
-      lastPermissionRequestFromMemory?.cacheKey,
-    );
-    const normalizedSessionRoot = path.resolve(session.projectRoot);
-    const evidenceRequestRootCandidate =
-      evidenceRequestRoot ?? evidenceRequestRootFromCacheKey;
-    const memoryRequestRootCandidate =
-      memoryRequestRoot ?? memoryRequestRootFromCacheKey;
-    const preferMemoryPermissionRequest =
-      Boolean(memoryRequestRootCandidate) &&
-      path.resolve(memoryRequestRootCandidate!) === normalizedSessionRoot &&
-      Boolean(evidenceRequestRootCandidate) &&
-      path.resolve(evidenceRequestRootCandidate!) !== normalizedSessionRoot;
-    const pickPermissionField = <T,>(
-      evidenceValue: T | undefined,
-      memoryValue: T | undefined,
-    ): T | undefined =>
-      preferMemoryPermissionRequest
-        ? (memoryValue ?? evidenceValue)
-        : (evidenceValue ?? memoryValue);
-    const resolvedLastPermissionRequest: PermissionRequestMemoryState = {
-      toolName: pickPermissionField(
-        lastPermissionRequest.toolName,
-        lastPermissionRequestFromMemory?.toolName,
-      ),
-      operation: pickPermissionField(
-        lastPermissionRequest.operation,
-        lastPermissionRequestFromMemory?.operation,
-      ),
-      target: pickPermissionField(
-        lastPermissionRequest.target,
-        lastPermissionRequestFromMemory?.target,
-      ),
-      process: pickPermissionField(
-        lastPermissionRequest.process,
-        lastPermissionRequestFromMemory?.process,
-      ),
-      scopeKey: pickPermissionField(
-        lastPermissionRequest.scopeKey,
-        lastPermissionRequestFromMemory?.scopeKey,
-      ),
-      scopeLabel: pickPermissionField(
-        lastPermissionRequest.scopeLabel,
-        lastPermissionRequestFromMemory?.scopeLabel,
-      ),
-      cacheKey: pickPermissionField(
-        lastPermissionRequest.cacheKey,
-        lastPermissionRequestFromMemory?.cacheKey,
-      ),
-      projectRoot: pickPermissionField(
-        lastPermissionRequest.projectRoot,
-        lastPermissionRequestFromMemory?.projectRoot,
-      ),
-      source: pickPermissionField(
-        lastPermissionRequest.source,
-        lastPermissionRequestFromMemory?.source,
-      ),
-      lineage: pickPermissionField(
-        lastPermissionRequest.lineage,
-        lastPermissionRequestFromMemory?.lineage,
-      ),
-    };
-    const evidenceScopeRoot =
-      lastRequestScope.projectRoot &&
-      this.normalizeOptionalString(lastRequestScope.projectRoot);
-    const memoryScopeRoot =
-      lastRequestScopeFromMemory?.projectRoot &&
-      this.normalizeOptionalString(lastRequestScopeFromMemory.projectRoot);
-    const evidenceScopeRootFromCacheKey = inferRootFromCacheKey(
-      lastRequestScope.cacheKey,
-    );
-    const memoryScopeRootFromCacheKey = inferRootFromCacheKey(
-      lastRequestScopeFromMemory?.cacheKey,
-    );
-    const evidenceScopeRootCandidate = evidenceScopeRoot ?? evidenceScopeRootFromCacheKey;
-    const memoryScopeRootCandidate = memoryScopeRoot ?? memoryScopeRootFromCacheKey;
-    const preferMemoryRequestScope =
-      Boolean(memoryScopeRootCandidate) &&
-      path.resolve(memoryScopeRootCandidate!) === normalizedSessionRoot &&
-      Boolean(evidenceScopeRootCandidate) &&
-      path.resolve(evidenceScopeRootCandidate!) !== normalizedSessionRoot;
-    const pickRequestScopeField = <T,>(
-      evidenceValue: T | undefined,
-      memoryValue: T | undefined,
-    ): T | undefined =>
-      preferMemoryRequestScope
-        ? (memoryValue ?? evidenceValue)
-        : (evidenceValue ?? memoryValue);
-    const resolvedLastRequestScope: RequestScopeMemoryState = {
-      cacheKey: pickRequestScopeField(
-        lastRequestScope.cacheKey,
-        lastRequestScopeFromMemory?.cacheKey,
-      ),
-      scopeLabel: pickRequestScopeField(
-        lastRequestScope.scopeLabel,
-        lastRequestScopeFromMemory?.scopeLabel,
-      ),
-      projectRoot: pickRequestScopeField(
-        lastRequestScope.projectRoot,
-        lastRequestScopeFromMemory?.projectRoot,
-      ),
-      source: pickRequestScopeField(
-        lastRequestScope.source,
-        lastRequestScopeFromMemory?.source,
-      ),
-    };
-    const lastApprovalAudit = this.extractApprovalAuditMemoryState(
+      parsePermissionRequestMemory(stateSnapshot?.workingMemory);
+    const resolvedLastPermissionRequest = resolvePermissionRequestMemory({
+      evidence: lastPermissionRequest,
+      memory: lastPermissionRequestFromMemory,
+      sessionProjectRoot: session.projectRoot,
+    });
+    const resolvedLastRequestScope = resolveRequestScopeMemory({
+      evidence: lastRequestScope,
+      memory: lastRequestScopeFromMemory,
+      sessionProjectRoot: session.projectRoot,
+    });
+    const lastApprovalAudit = decodeApprovalMemory(
       stateSnapshot?.workingMemory,
     );
-    const lastApprovalHistory = this.extractApprovalAuditHistoryMemoryState(
+    const lastApprovalHistory = decodeApprovalMemoryHistory(
       stateSnapshot?.workingMemory,
+      { historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT },
     );
     const approvalProvenanceItems =
       lastCodingResult?.provenance?.approvalDecisions ?? [];
@@ -2206,32 +2008,7 @@ export class SessionManager {
       && Boolean(lastCodingResult.verification.command?.trim())
         ? { lastVerificationResumeEligible: true }
         : {}),
-      ...(lastApprovalAudit
-        ? {
-            lastApprovalDecision: lastApprovalAudit.decision,
-            lastApprovalDecisionSource: lastApprovalAudit.decisionSource,
-            lastApprovalPersistent: lastApprovalAudit.persistent,
-            lastApprovalCacheEffect: lastApprovalAudit.cacheEffect,
-            lastApprovalProjectRoot: lastApprovalAudit.projectRoot,
-            lastApprovalCacheKey: lastApprovalAudit.cacheKey,
-            lastApprovalScope: lastApprovalAudit.scopeLabel,
-            ...(lastApprovalAudit.lineage
-              ? { lastApprovalLineage: lastApprovalAudit.lineage }
-              : {}),
-            ...(lastApprovalAudit.stopReason
-              ? { lastApprovalStopReason: lastApprovalAudit.stopReason }
-              : {}),
-            ...(lastApprovalAudit.channel
-              ? { lastApprovalChannel: lastApprovalAudit.channel }
-              : {}),
-            ...(lastApprovalAudit.inputKey
-              ? { lastApprovalInputKey: lastApprovalAudit.inputKey }
-              : {}),
-            ...(lastApprovalAudit.recordedAt
-              ? { lastApprovalRecordedAt: lastApprovalAudit.recordedAt }
-              : {}),
-          }
-        : {}),
+      ...projectApprovalAudit(lastApprovalAudit),
       ...(lastApprovalHistory.length > 0
         ? { lastApprovalHistory }
         : {}),
@@ -2798,196 +2575,6 @@ export class SessionManager {
     return { stepCount, completedStep, blockedStep, nextStep };
   }
 
-  private extractLastRequestScopeFromEvidence(
-    evidence: readonly string[] | undefined,
-  ): {
-    cacheKey?: string;
-    scopeLabel?: string;
-    projectRoot?: string;
-    source?: "verification-command" | "approval-request";
-  } {
-    if (!evidence?.length) {
-      return {};
-    }
-    let cacheKey: string | undefined;
-    let scopeLabel: string | undefined;
-    let projectRoot: string | undefined;
-    let source: "verification-command" | "approval-request" | undefined;
-    for (let index = evidence.length - 1; index >= 0; index -= 1) {
-      const item = evidence[index]?.trim();
-      if (!item) {
-        continue;
-      }
-      if (!cacheKey) {
-        const match = item.match(/^current-request-scope-cache-key:(.+)$/i);
-        const value = match?.[1]?.trim();
-        if (value) {
-          cacheKey = value;
-        }
-      }
-      if (!scopeLabel) {
-        const match = item.match(/^current-request-scope-label:(.+)$/i);
-        const value = match?.[1]?.trim();
-        if (value) {
-          scopeLabel = value;
-        }
-      }
-      if (!projectRoot) {
-        const match = item.match(/^current-request-scope-project-root:(.+)$/i);
-        const value = match?.[1]?.trim();
-        if (value) {
-          projectRoot = value;
-        }
-      }
-      if (!source) {
-        const match = item.match(/^current-request-scope-source:(.+)$/i);
-        const value = match?.[1]?.trim().toLowerCase();
-        if (value === "verification-command" || value === "approval-request") {
-          source = value;
-        }
-      }
-      if (cacheKey && scopeLabel && projectRoot && source) {
-        break;
-      }
-    }
-    return {
-      ...(cacheKey ? { cacheKey } : {}),
-      ...(scopeLabel ? { scopeLabel } : {}),
-      ...(projectRoot ? { projectRoot } : {}),
-      ...(source ? { source } : {}),
-    };
-  }
-
-  private extractLastPermissionRequestFromEvidence(
-    evidence: readonly string[] | undefined,
-  ): {
-    toolName?: string;
-    operation?: string;
-    target?: string;
-    process?: string;
-    scopeKey?: string;
-    scopeLabel?: string;
-    cacheKey?: string;
-    projectRoot?: string;
-    source?: "verification-command" | "approval-request";
-    lineage?: string;
-  } {
-    if (!evidence?.length) {
-      return {};
-    }
-    let toolName: string | undefined;
-    let operation: string | undefined;
-    let target: string | undefined;
-    let process: string | undefined;
-    let scopeKey: string | undefined;
-    let scopeLabel: string | undefined;
-    let cacheKey: string | undefined;
-    let projectRoot: string | undefined;
-    let source: "verification-command" | "approval-request" | undefined;
-    let lineage: string | undefined;
-    for (let index = evidence.length - 1; index >= 0; index -= 1) {
-      const item = evidence[index]?.trim();
-      if (!item) {
-        continue;
-      }
-      if (!toolName) {
-        const match = item.match(/^current-permission-request-tool:(.+)$/i);
-        const value = match?.[1]?.trim().toLowerCase();
-        if (value) {
-          toolName = value;
-        }
-      }
-      if (!operation) {
-        const match = item.match(/^current-permission-request-operation:(.+)$/i);
-        const value = match?.[1]?.trim().toLowerCase();
-        if (value) {
-          operation = value;
-        }
-      }
-      if (!target) {
-        const match = item.match(/^current-permission-request-target:(.+)$/i);
-        const value = match?.[1]?.trim();
-        if (value) {
-          target = value;
-        }
-      }
-      if (!process) {
-        const match = item.match(/^current-permission-request-process:(.+)$/i);
-        const value = match?.[1]?.trim().toLowerCase();
-        if (value) {
-          process = value;
-        }
-      }
-      if (!scopeKey) {
-        const match = item.match(/^current-permission-request-scope-key:(.+)$/i);
-        const value = match?.[1]?.trim().toLowerCase();
-        if (value) {
-          scopeKey = value;
-        }
-      }
-      if (!scopeLabel) {
-        const match = item.match(/^current-permission-request-scope-label:(.+)$/i);
-        const value = match?.[1]?.trim();
-        if (value) {
-          scopeLabel = value;
-        }
-      }
-      if (!cacheKey) {
-        const match = item.match(/^current-permission-request-cache-key:(.+)$/i);
-        const value = match?.[1]?.trim();
-        if (value) {
-          cacheKey = value;
-        }
-      }
-      if (!projectRoot) {
-        const match = item.match(/^current-permission-request-project-root:(.+)$/i);
-        const value = match?.[1]?.trim();
-        if (value) {
-          projectRoot = value;
-        }
-      }
-      if (!source) {
-        const match = item.match(/^current-permission-request-source:(.+)$/i);
-        const value = match?.[1]?.trim().toLowerCase();
-        if (value === "verification-command" || value === "approval-request") {
-          source = value;
-        }
-      }
-      if (!lineage) {
-        const match = item.match(/^current-permission-request-lineage:(.+)$/i);
-        const value = match?.[1]?.trim();
-        if (value) {
-          lineage = value;
-        }
-      }
-      if (
-        toolName &&
-        operation &&
-        target &&
-        scopeKey &&
-        scopeLabel &&
-        cacheKey &&
-        projectRoot &&
-        source
-      ) {
-        break;
-      }
-    }
-
-    return {
-      ...(toolName ? { toolName } : {}),
-      ...(operation ? { operation } : {}),
-      ...(target ? { target } : {}),
-      ...(process ? { process } : {}),
-      ...(scopeKey ? { scopeKey } : {}),
-      ...(scopeLabel ? { scopeLabel } : {}),
-      ...(cacheKey ? { cacheKey } : {}),
-      ...(projectRoot ? { projectRoot } : {}),
-      ...(source ? { source } : {}),
-      ...(lineage ? { lineage } : {}),
-    };
-  }
-
   private extractLastAnswerDefect(
     codingResult:
       | {
@@ -3164,554 +2751,6 @@ export class SessionManager {
       return normalized;
     }
     return `${normalized.slice(0, max)}...`;
-  }
-
-  private extractApprovalAuditMemoryState(
-    workingMemory: unknown,
-  ): ApprovalAuditMemoryState | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    const fromStructured = this.parseApprovalAuditFromStructuredObject(
-      root.approvalAudit,
-    );
-    if (fromStructured) {
-      return fromStructured;
-    }
-
-    const fromContinuity = this.parseApprovalAuditFromContinuityState(
-      root.continuity,
-    );
-    if (fromContinuity) {
-      return fromContinuity;
-    }
-
-    const fromSummary = this.parseApprovalAuditFromSummary(root.summary);
-    if (fromSummary) {
-      return fromSummary;
-    }
-
-    return undefined;
-  }
-
-  private extractPermissionRequestMemoryState(
-    workingMemory: unknown,
-  ): PermissionRequestMemoryState | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    const fromContinuity = this.parsePermissionRequestFromContinuityState(
-      root.continuity,
-    );
-    if (fromContinuity) {
-      return fromContinuity;
-    }
-    const fromSummary = this.parsePermissionRequestFromSummary(root.summary);
-    if (fromSummary) {
-      return fromSummary;
-    }
-    return undefined;
-  }
-
-  private extractRequestScopeMemoryState(
-    workingMemory: unknown,
-  ): RequestScopeMemoryState | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    if (
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-    ) {
-      const continuity = root.continuity as Record<string, unknown>;
-      const sourceRaw = this.normalizeOptionalString(
-        continuity.lastRequestScopeSource,
-      )?.toLowerCase();
-      const source =
-        sourceRaw === "verification-command" || sourceRaw === "approval-request"
-          ? sourceRaw
-          : undefined;
-      const fromContinuity: RequestScopeMemoryState = {
-        ...(this.normalizeOptionalString(continuity.lastRequestScopeCacheKey)
-          ? {
-              cacheKey: this.normalizeOptionalString(
-                continuity.lastRequestScopeCacheKey,
-              )!,
-            }
-          : {}),
-        ...(this.normalizeOptionalString(continuity.lastRequestScopeLabel)
-          ? {
-              scopeLabel: this.normalizeOptionalString(
-                continuity.lastRequestScopeLabel,
-              )!,
-            }
-          : {}),
-        ...(this.normalizeOptionalString(continuity.lastRequestScopeProjectRoot)
-          ? {
-              projectRoot: this.normalizeOptionalString(
-                continuity.lastRequestScopeProjectRoot,
-              )!,
-            }
-          : {}),
-        ...(source ? { source } : {}),
-      };
-      if (Object.keys(fromContinuity).length > 0) {
-        return fromContinuity;
-      }
-    }
-    if (Array.isArray(root.summary)) {
-      const fields = new Map<string, string>();
-      for (const raw of root.summary) {
-        if (typeof raw !== "string") {
-          continue;
-        }
-        const line =
-          raw.startsWith("- ") || raw.startsWith("* ")
-            ? raw.slice(2).trim()
-            : raw.trim();
-        const idx = line.indexOf(":");
-        if (idx <= 0) {
-          continue;
-        }
-        const key = line.slice(0, idx).trim().toLowerCase();
-        if (!key.startsWith("last-request-scope-")) {
-          continue;
-        }
-        const value = line.slice(idx + 1).trim();
-        if (!value || fields.has(key)) {
-          continue;
-        }
-        fields.set(key, value);
-      }
-      const sourceRaw = fields.get("last-request-scope-source")?.toLowerCase();
-      const source =
-        sourceRaw === "verification-command" || sourceRaw === "approval-request"
-          ? sourceRaw
-          : undefined;
-      const fromSummary: RequestScopeMemoryState = {
-        ...(fields.get("last-request-scope-cache-key")
-          ? { cacheKey: fields.get("last-request-scope-cache-key")! }
-          : {}),
-        ...(fields.get("last-request-scope-label")
-          ? { scopeLabel: fields.get("last-request-scope-label")! }
-          : {}),
-        ...(fields.get("last-request-scope-project-root")
-          ? { projectRoot: fields.get("last-request-scope-project-root")! }
-          : {}),
-        ...(source ? { source } : {}),
-      };
-      if (Object.keys(fromSummary).length > 0) {
-        return fromSummary;
-      }
-    }
-    return undefined;
-  }
-
-  private extractApprovalAuditHistoryMemoryState(
-    workingMemory: unknown,
-  ): readonly ApprovalAuditMemoryState[] {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return [];
-    }
-    const root = workingMemory as Record<string, unknown>;
-    const historyCandidates: unknown[] = [root.approvalAuditHistory];
-    if (
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-    ) {
-      historyCandidates.push(
-        (root.continuity as Record<string, unknown>).lastApprovalHistory,
-      );
-    }
-    for (const candidate of historyCandidates) {
-      if (!Array.isArray(candidate)) {
-        continue;
-      }
-      const parsed: ApprovalAuditMemoryState[] = [];
-      for (const entry of candidate) {
-        const normalized = this.parseApprovalAuditFromStructuredObject(entry);
-        if (normalized) {
-          parsed.push(normalized);
-        }
-      }
-      if (parsed.length > 0) {
-        return parsed.slice(-SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT);
-      }
-    }
-    return [];
-  }
-
-  private parseApprovalAuditFromStructuredObject(
-    value: unknown,
-  ): ApprovalAuditMemoryState | undefined {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return undefined;
-    }
-    const approval = value as Record<string, unknown>;
-    const decision = this.normalizeApprovalDecision(approval.decision);
-    if (!decision) {
-      return undefined;
-    }
-    const decisionSource = this.normalizeOptionalString(approval.decisionSource);
-    const persistent =
-      typeof approval.persistent === "boolean"
-        ? approval.persistent
-        : decision === "allow-always";
-    const cacheEffect = this.normalizeOptionalString(approval.cacheEffect);
-    const projectRoot = this.normalizeOptionalString(approval.projectRoot);
-    const cacheKey = this.normalizeOptionalString(approval.cacheKey);
-    const scopeLabel = this.normalizeOptionalString(approval.scopeLabel);
-    const recordedAt = this.normalizeOptionalString(approval.recordedAt);
-    return {
-      decision,
-      decisionSource: decisionSource ?? "unknown",
-      persistent,
-      cacheEffect: cacheEffect ?? "none",
-      projectRoot: projectRoot ?? "unknown",
-      cacheKey: cacheKey ?? "unknown",
-      scopeLabel: scopeLabel ?? "unknown",
-      ...(typeof approval.lineage === "string" && approval.lineage.trim().length > 0
-        ? { lineage: approval.lineage.trim() }
-        : {}),
-      ...(typeof approval.stopReason === "string" &&
-      approval.stopReason.trim().length > 0
-        ? { stopReason: approval.stopReason.trim() }
-        : {}),
-      ...(approval.channel === "interactive" || approval.channel === "non-interactive"
-        ? { channel: approval.channel }
-        : {}),
-      ...(approval.inputKey === "y" ||
-      approval.inputKey === "a" ||
-      approval.inputKey === "n" ||
-      approval.inputKey === "other"
-        ? { inputKey: approval.inputKey }
-        : {}),
-      recordedAt: recordedAt ?? new Date(0).toISOString(),
-    };
-  }
-
-  private parseApprovalAuditFromContinuityState(
-    value: unknown,
-  ): ApprovalAuditMemoryState | undefined {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return undefined;
-    }
-    const continuity = value as Record<string, unknown>;
-    const decision = this.normalizeApprovalDecision(continuity.lastApprovalDecision);
-    if (!decision) {
-      return undefined;
-    }
-    const decisionSource = this.normalizeOptionalString(
-      continuity.lastApprovalDecisionSource,
-    );
-    const persistent =
-      typeof continuity.lastApprovalPersistent === "boolean"
-        ? continuity.lastApprovalPersistent
-        : decision === "allow-always";
-    const cacheEffect = this.normalizeOptionalString(
-      continuity.lastApprovalCacheEffect,
-    );
-    const projectRoot = this.normalizeOptionalString(
-      continuity.lastApprovalProjectRoot,
-    );
-    const cacheKey = this.normalizeOptionalString(continuity.lastApprovalCacheKey);
-    const scopeLabel = this.normalizeOptionalString(continuity.lastApprovalScope);
-    const lineage = this.normalizeOptionalString(continuity.lastApprovalLineage);
-    const stopReason = this.normalizeOptionalString(
-      continuity.lastApprovalStopReason,
-    );
-    const recordedAt = this.normalizeOptionalString(
-      continuity.lastApprovalRecordedAt,
-    );
-    return {
-      decision,
-      decisionSource: decisionSource ?? "unknown",
-      persistent,
-      cacheEffect: cacheEffect ?? "none",
-      projectRoot: projectRoot ?? "unknown",
-      cacheKey: cacheKey ?? "unknown",
-      scopeLabel: scopeLabel ?? "unknown",
-      ...(lineage ? { lineage } : {}),
-      ...(stopReason ? { stopReason } : {}),
-      ...(continuity.lastApprovalChannel === "interactive" ||
-      continuity.lastApprovalChannel === "non-interactive"
-        ? { channel: continuity.lastApprovalChannel }
-        : {}),
-      ...(continuity.lastApprovalInputKey === "y" ||
-      continuity.lastApprovalInputKey === "a" ||
-      continuity.lastApprovalInputKey === "n" ||
-      continuity.lastApprovalInputKey === "other"
-        ? { inputKey: continuity.lastApprovalInputKey }
-        : {}),
-      recordedAt: recordedAt ?? new Date(0).toISOString(),
-    };
-  }
-
-  private parseApprovalAuditFromSummary(
-    value: unknown,
-  ): ApprovalAuditMemoryState | undefined {
-    if (!Array.isArray(value)) {
-      return undefined;
-    }
-    const summaryEntries = value
-      .filter((entry): entry is string => typeof entry === "string")
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
-    if (summaryEntries.length === 0) {
-      return undefined;
-    }
-
-    const fields = new Map<string, string>();
-    const capture = (key: string, raw: string): void => {
-      const normalized = raw.trim();
-      if (!normalized || fields.has(key)) {
-        return;
-      }
-      fields.set(key, normalized);
-    };
-    for (const entry of summaryEntries) {
-      const line =
-        entry.startsWith("- ") || entry.startsWith("* ")
-          ? entry.slice(2).trim()
-          : entry;
-      const colonIndex = line.indexOf(":");
-      if (colonIndex > 0) {
-        const key = line.slice(0, colonIndex).trim().toLowerCase();
-        const rawValue = line.slice(colonIndex + 1);
-        if (
-          key.startsWith("last-approval-") ||
-          key.startsWith("last-request-scope-") ||
-          key.startsWith("last-permission-request-")
-        ) {
-          capture(key, rawValue);
-        }
-      }
-      const auditMatch = line.match(/^approval-audit:([a-z-]+)=(.+)$/i);
-      if (auditMatch?.[1] && auditMatch[2]) {
-        capture(`last-approval-${auditMatch[1].toLowerCase()}`, auditMatch[2]);
-      }
-    }
-
-    const decision = this.normalizeApprovalDecision(
-      fields.get("last-approval-decision"),
-    );
-    if (!decision) {
-      return undefined;
-    }
-    const persistentRaw = fields.get("last-approval-persistent");
-    const persistent =
-      persistentRaw !== undefined
-        ? ["yes", "true", "1"].includes(persistentRaw.toLowerCase())
-        : decision === "allow-always";
-    const channelRaw = fields.get("last-approval-channel")?.toLowerCase();
-    const inputKeyRaw = fields.get("last-approval-input-key")?.toLowerCase();
-    const decisionSource = fields.get("last-approval-decision-source");
-    const cacheEffect = fields.get("last-approval-cache-effect");
-    const projectRoot = fields.get("last-approval-project-root");
-    const cacheKey = fields.get("last-approval-cache-key");
-    const scopeLabel = fields.get("last-approval-scope");
-    const recordedAt = fields.get("last-approval-recorded-at");
-    return {
-      decision,
-      decisionSource: decisionSource ?? "unknown",
-      persistent,
-      cacheEffect: cacheEffect ?? "none",
-      projectRoot: projectRoot ?? "unknown",
-      cacheKey: cacheKey ?? "unknown",
-      scopeLabel: scopeLabel ?? "unknown",
-      ...(fields.get("last-approval-lineage")
-        ? { lineage: fields.get("last-approval-lineage")! }
-        : {}),
-      ...(fields.get("last-approval-stop-reason")
-        ? { stopReason: fields.get("last-approval-stop-reason")! }
-        : {}),
-      ...(channelRaw === "interactive" || channelRaw === "non-interactive"
-        ? { channel: channelRaw }
-        : {}),
-      ...(inputKeyRaw === "y" ||
-      inputKeyRaw === "a" ||
-      inputKeyRaw === "n" ||
-      inputKeyRaw === "other"
-        ? { inputKey: inputKeyRaw }
-        : {}),
-      recordedAt: recordedAt ?? new Date(0).toISOString(),
-    };
-  }
-
-  private parsePermissionRequestFromContinuityState(
-    value: unknown,
-  ): PermissionRequestMemoryState | undefined {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return undefined;
-    }
-    const continuity = value as Record<string, unknown>;
-    const sourceRaw = this.normalizeOptionalString(
-      continuity.lastPermissionRequestSource,
-    )?.toLowerCase();
-    const source =
-      sourceRaw === "verification-command" || sourceRaw === "approval-request"
-        ? sourceRaw
-        : undefined;
-    const result: PermissionRequestMemoryState = {
-      ...(this.normalizeOptionalString(continuity.lastPermissionRequestToolName)
-        ? {
-            toolName: this.normalizeOptionalString(
-              continuity.lastPermissionRequestToolName,
-            )!,
-          }
-        : {}),
-      ...(this.normalizeOptionalString(continuity.lastPermissionRequestOperation)
-        ? {
-            operation: this.normalizeOptionalString(
-              continuity.lastPermissionRequestOperation,
-            )!,
-          }
-        : {}),
-      ...(this.normalizeOptionalString(continuity.lastPermissionRequestTarget)
-        ? {
-            target: this.normalizeOptionalString(
-              continuity.lastPermissionRequestTarget,
-            )!,
-          }
-        : {}),
-      ...(this.normalizeOptionalString(continuity.lastPermissionRequestProcess)
-        ? {
-            process: this.normalizeOptionalString(
-              continuity.lastPermissionRequestProcess,
-            )!,
-          }
-        : {}),
-      ...(this.normalizeOptionalString(continuity.lastPermissionRequestScopeKey)
-        ? {
-            scopeKey: this.normalizeOptionalString(
-              continuity.lastPermissionRequestScopeKey,
-            )!,
-          }
-        : {}),
-      ...(this.normalizeOptionalString(continuity.lastPermissionRequestScopeLabel)
-        ? {
-            scopeLabel: this.normalizeOptionalString(
-              continuity.lastPermissionRequestScopeLabel,
-            )!,
-          }
-        : {}),
-      ...(this.normalizeOptionalString(continuity.lastPermissionRequestCacheKey)
-        ? {
-            cacheKey: this.normalizeOptionalString(
-              continuity.lastPermissionRequestCacheKey,
-            )!,
-          }
-        : {}),
-      ...(this.normalizeOptionalString(continuity.lastPermissionRequestProjectRoot)
-        ? {
-            projectRoot: this.normalizeOptionalString(
-              continuity.lastPermissionRequestProjectRoot,
-            )!,
-          }
-        : {}),
-      ...(source ? { source } : {}),
-      ...(this.normalizeOptionalString(continuity.lastPermissionRequestLineage)
-        ? {
-            lineage: this.normalizeOptionalString(
-              continuity.lastPermissionRequestLineage,
-            )!,
-          }
-        : {}),
-    };
-    return Object.keys(result).length > 0 ? result : undefined;
-  }
-
-  private parsePermissionRequestFromSummary(
-    value: unknown,
-  ): PermissionRequestMemoryState | undefined {
-    if (!Array.isArray(value)) {
-      return undefined;
-    }
-    const summaryEntries = value
-      .filter((entry): entry is string => typeof entry === "string")
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
-    if (summaryEntries.length === 0) {
-      return undefined;
-    }
-    const fields = new Map<string, string>();
-    for (const entry of summaryEntries) {
-      const line =
-        entry.startsWith("- ") || entry.startsWith("* ")
-          ? entry.slice(2).trim()
-          : entry;
-      const colonIndex = line.indexOf(":");
-      if (colonIndex <= 0) {
-        continue;
-      }
-      const key = line.slice(0, colonIndex).trim().toLowerCase();
-      if (!key.startsWith("last-permission-request-")) {
-        continue;
-      }
-      const valuePart = line.slice(colonIndex + 1).trim();
-      if (!valuePart || fields.has(key)) {
-        continue;
-      }
-      fields.set(key, valuePart);
-    }
-    const sourceRaw = fields.get("last-permission-request-source")?.toLowerCase();
-    const source =
-      sourceRaw === "verification-command" || sourceRaw === "approval-request"
-        ? sourceRaw
-        : undefined;
-    const result: PermissionRequestMemoryState = {
-      ...(fields.get("last-permission-request-tool")
-        ? { toolName: fields.get("last-permission-request-tool")! }
-        : {}),
-      ...(fields.get("last-permission-request-operation")
-        ? { operation: fields.get("last-permission-request-operation")! }
-        : {}),
-      ...(fields.get("last-permission-request-target")
-        ? { target: fields.get("last-permission-request-target")! }
-        : {}),
-      ...(fields.get("last-permission-request-process")
-        ? { process: fields.get("last-permission-request-process")! }
-        : {}),
-      ...(fields.get("last-permission-request-scope-key")
-        ? { scopeKey: fields.get("last-permission-request-scope-key")! }
-        : {}),
-      ...(fields.get("last-permission-request-scope-label")
-        ? { scopeLabel: fields.get("last-permission-request-scope-label")! }
-        : {}),
-      ...(fields.get("last-permission-request-cache-key")
-        ? { cacheKey: fields.get("last-permission-request-cache-key")! }
-        : {}),
-      ...(fields.get("last-permission-request-project-root")
-        ? { projectRoot: fields.get("last-permission-request-project-root")! }
-        : {}),
-      ...(source ? { source } : {}),
-      ...(fields.get("last-permission-request-lineage")
-        ? { lineage: fields.get("last-permission-request-lineage")! }
-        : {}),
-    };
-    return Object.keys(result).length > 0 ? result : undefined;
-  }
-
-  private normalizeApprovalDecision(
-    value: unknown,
-  ): "deny" | "allow-once" | "allow-always" | undefined {
-    if (typeof value !== "string") {
-      return undefined;
-    }
-    const normalized = value.trim().toLowerCase();
-    if (
-      normalized === "deny" ||
-      normalized === "allow-once" ||
-      normalized === "allow-always"
-    ) {
-      return normalized;
-    }
-    return undefined;
   }
 
   private normalizeOptionalString(value: unknown): string | undefined {
@@ -4171,9 +3210,10 @@ export class SessionManager {
     const now = new Date().toISOString();
     const queryCompleted =
       event.type === "query.completed" ? event : undefined;
-    const approvalAudit = this.extractApprovalAuditMemoryState(workingMemory);
-    const approvalAuditHistory =
-      this.extractApprovalAuditHistoryMemoryState(workingMemory);
+    const approvalAudit = decodeApprovalMemory(workingMemory);
+    const approvalAuditHistory = decodeApprovalMemoryHistory(workingMemory, {
+      historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
+    });
     const actionHandoffSummary = buildActionHandoffSummary(
       queryCompleted?.result.codingResult?.lastActionResultSeed,
     );
