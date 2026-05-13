@@ -17,7 +17,6 @@ import type {
   QueryRuntimeRepairSummary,
   QueryRuntimeStateSeed,
 } from "../core/query/runtimeState.js";
-import { rebaseLegacyPermissionRootsInWorkingMemory } from "../core/paths/legacyRootRebase.js";
 import {
   applyLifecycleEventToIndex,
   createEmptyLifecycleIndex,
@@ -44,10 +43,7 @@ import { applyCompactRetentionPlan } from "./compactRetentionPlanner.js";
 import {
   createEmptyCurrentSessionSelectionStore,
   parseCurrentSessionSelectionStore,
-  resolveCurrentSessionLoadFailed,
-  resolveMissingCurrentSession,
-  resolveProjectRootMismatch,
-  resolveUnselectedCurrentSession,
+  selectCurrentSession,
   type CurrentSessionSelectionResolution,
   type CurrentSessionSelectionStore,
 } from "./currentSessionSelection.js";
@@ -82,6 +78,17 @@ import {
   resolveRequestScopeMemory,
 } from "./permissionRequestMemoryCodec.js";
 import {
+  normalizeProjectBinding,
+  normalizeProjectRootKey,
+  projectSessionBinding,
+  type WorkspaceRootMode,
+} from "./projectBindingPolicy.js";
+import {
+  normalizeLegacyPermissionWorkingMemory,
+  projectRebasedSessionRoot,
+  projectRootRebase,
+} from "./projectRootRebaseProjection.js";
+import {
   deriveStoppedSessionContinuitySurface,
 } from "./stoppedSessionContinuity.js";
 
@@ -97,7 +104,7 @@ export interface SessionMessage {
   timestamp?: string;
 }
 
-export type WorkspaceRootMode = "git-root" | "direct";
+export type { WorkspaceRootMode } from "./projectBindingPolicy.js";
 
 export interface Session {
   id: string;
@@ -368,32 +375,55 @@ export class SessionManager {
     const storeReadError = this.lastCurrentSessionStoreReadError;
     const selection = store.byProjectRoot[normalizedProjectRoot];
     if (!selection?.sessionId?.trim()) {
-      return resolveUnselectedCurrentSession(projectRoot, storeReadError);
+      const unselectedProjection = selectCurrentSession({
+        projectRoot,
+        normalizedProjectRoot,
+        storeReadError,
+        selection,
+      });
+      return unselectedProjection.resolution;
     }
     if (!this.sessionExists(selection.sessionId)) {
+      const missingProjection = selectCurrentSession({
+        projectRoot,
+        normalizedProjectRoot,
+        storeReadError,
+        selection,
+        sessionExists: false,
+      });
       this.removeCurrentSessionSelection(normalizedProjectRoot);
-      return resolveMissingCurrentSession(projectRoot, selection.sessionId);
+      return missingProjection.resolution;
     }
 
     try {
       const session = this.load(selection.sessionId);
       const sessionProjectRoot = session.projectRoot || normalizedProjectRoot;
-      if (this.normalizeProjectRootKey(sessionProjectRoot) !== normalizedProjectRoot) {
-        this.removeCurrentSessionSelection(normalizedProjectRoot);
-        return resolveProjectRootMismatch(
-          projectRoot,
-          selection.sessionId,
-          sessionProjectRoot,
-        );
-      }
-      return { ok: true, session };
-    } catch (error) {
-      this.removeCurrentSessionSelection(normalizedProjectRoot);
-      return resolveCurrentSessionLoadFailed(
+      const selectedProjection = selectCurrentSession({
         projectRoot,
-        selection.sessionId,
-        error,
-      );
+        normalizedProjectRoot,
+        storeReadError,
+        selection,
+        sessionExists: true,
+        session,
+        sessionProjectRoot,
+        normalizedSessionProjectRoot: this.normalizeProjectRootKey(sessionProjectRoot),
+      });
+      if (!selectedProjection.resolution.ok) {
+        this.removeCurrentSessionSelection(normalizedProjectRoot);
+        return selectedProjection.resolution;
+      }
+      return selectedProjection.resolution;
+    } catch (error) {
+      const failedProjection = selectCurrentSession({
+        projectRoot,
+        normalizedProjectRoot,
+        storeReadError,
+        selection,
+        sessionExists: true,
+        loadError: error,
+      });
+      this.removeCurrentSessionSelection(normalizedProjectRoot);
+      return failedProjection.resolution;
     }
   }
 
@@ -449,19 +479,10 @@ export class SessionManager {
       throw new Error(`Session ${normalizedId} already exists`);
     }
     const now = new Date().toISOString();
+    const binding = projectSessionBinding({ projectRoot, options });
     const session: Session = {
       id: normalizedId,
-      projectRoot,
-      ...(options?.rootMode ? { rootMode: options.rootMode } : {}),
-      ...(options?.requestedWorkspaceRoot
-        ? { requestedWorkspaceRoot: options.requestedWorkspaceRoot }
-        : {}),
-      ...(options?.targetPathBase
-        ? { targetPathBase: options.targetPathBase }
-        : {}),
-      ...(options && Object.prototype.hasOwnProperty.call(options, "gitRoot")
-        ? { gitRoot: options.gitRoot ?? null }
-        : {}),
+      ...binding,
       title: undefined,
       createdAt: now,
       updatedAt: now,
@@ -483,19 +504,10 @@ export class SessionManager {
     },
   ): Session {
     const now = new Date().toISOString();
+    const binding = projectSessionBinding({ projectRoot, options });
     const session: Session = {
       id: this.generateSessionId(),
-      projectRoot,
-      ...(options?.rootMode ? { rootMode: options.rootMode } : {}),
-      ...(options?.requestedWorkspaceRoot
-        ? { requestedWorkspaceRoot: options.requestedWorkspaceRoot }
-        : {}),
-      ...(options?.targetPathBase
-        ? { targetPathBase: options.targetPathBase }
-        : {}),
-      ...(options && Object.prototype.hasOwnProperty.call(options, "gitRoot")
-        ? { gitRoot: options.gitRoot ?? null }
-        : {}),
+      ...binding,
       title: undefined,
       createdAt: now,
       updatedAt: now,
@@ -1210,7 +1222,7 @@ export class SessionManager {
   rebindSessionProjectRoot(sessionId: string, nextProjectRoot: string): Session {
     const session = this.load(sessionId);
     const previousRoot = session.projectRoot;
-    const normalizedRoot = path.resolve(nextProjectRoot.trim());
+    const normalizedRoot = projectRebasedSessionRoot(nextProjectRoot);
     session.projectRoot = normalizedRoot;
     session.updatedAt = new Date().toISOString();
     this.writeSessionMetadata(session);
@@ -1225,23 +1237,18 @@ export class SessionManager {
         return;
       }
 
-      const rebasedWorkingMemory = this.rebaseProjectRootInValue(
-        current.workingMemory,
+      const rebaseProjection = projectRootRebase({
+        value: current.workingMemory,
         previousRoot,
-        normalizedRoot,
-      );
-      const rebasedWorkingMemoryWithNormalizedApprovalCacheKey =
-        this.rebaseApprovalAuditCacheKeyRoot(
-          rebasedWorkingMemory,
-          normalizedRoot,
-        );
+        nextRoot: normalizedRoot,
+      });
 
       this.writeJsonFileAtomic(statePath, {
         ...current,
         projectRoot: normalizedRoot,
-        ...(rebasedWorkingMemoryWithNormalizedApprovalCacheKey !== undefined
+        ...(rebaseProjection.workingMemory !== undefined
           ? {
-              workingMemory: rebasedWorkingMemoryWithNormalizedApprovalCacheKey,
+              workingMemory: rebaseProjection.workingMemory,
             }
           : {}),
       } satisfies SessionStateSnapshot);
@@ -1261,21 +1268,21 @@ export class SessionManager {
     },
   ): Session {
     const session = this.load(sessionId);
-    const projectRoot = binding.projectRoot?.trim();
-    if (projectRoot) {
-      session.projectRoot = projectRoot;
+    const decision = normalizeProjectBinding(binding);
+    if (decision.projectRoot) {
+      session.projectRoot = decision.projectRoot;
     }
-    if (binding.rootMode) {
-      session.rootMode = binding.rootMode;
+    if (decision.rootMode) {
+      session.rootMode = decision.rootMode;
     }
-    if (binding.requestedWorkspaceRoot?.trim()) {
-      session.requestedWorkspaceRoot = binding.requestedWorkspaceRoot.trim();
+    if (decision.requestedWorkspaceRoot) {
+      session.requestedWorkspaceRoot = decision.requestedWorkspaceRoot;
     }
-    if (binding.targetPathBase?.trim()) {
-      session.targetPathBase = binding.targetPathBase.trim();
+    if (decision.targetPathBase) {
+      session.targetPathBase = decision.targetPathBase;
     }
-    if (Object.prototype.hasOwnProperty.call(binding, "gitRoot")) {
-      session.gitRoot = binding.gitRoot?.trim() || null;
+    if (Object.prototype.hasOwnProperty.call(decision, "gitRoot")) {
+      session.gitRoot = decision.gitRoot ?? null;
     }
     session.updatedAt = new Date().toISOString();
     this.writeSessionMetadata(session);
@@ -1285,11 +1292,7 @@ export class SessionManager {
   }
 
   private normalizeProjectRootKey(projectRoot: string): string {
-    const trimmed = projectRoot.trim();
-    if (!trimmed) {
-      return "";
-    }
-    return path.resolve(trimmed).toLowerCase();
+    return normalizeProjectRootKey(projectRoot);
   }
 
   private readCurrentSessionStore(): CurrentSessionSelectionStore {
@@ -1339,294 +1342,6 @@ export class SessionManager {
       schemaVersion: 1,
       byProjectRoot: nextByProjectRoot,
     });
-  }
-
-  private rebaseProjectRootInValue(
-    value: unknown,
-    previousRoot: string,
-    nextRoot: string,
-  ): unknown {
-    if (typeof value === "string") {
-      return this.replaceProjectRootInText(value, previousRoot, nextRoot);
-    }
-
-    if (Array.isArray(value)) {
-      return value.map((entry) =>
-        this.rebaseProjectRootInValue(entry, previousRoot, nextRoot),
-      );
-    }
-
-    if (value && typeof value === "object") {
-      const rebasedEntries = Object.entries(value).map(([key, entry]) => [
-        key,
-        this.rebaseProjectRootInValue(entry, previousRoot, nextRoot),
-      ]);
-      return Object.fromEntries(rebasedEntries);
-    }
-
-    return value;
-  }
-
-  private replaceProjectRootInText(
-    input: string,
-    previousRoot: string,
-    nextRoot: string,
-  ): string {
-    const previousForward = previousRoot.replaceAll("\\", "/");
-    const previousBackward = previousRoot.replaceAll("/", "\\");
-    const nextForward = nextRoot.replaceAll("\\", "/");
-    const nextBackward = nextRoot.replaceAll("/", "\\");
-    const variants: Array<[pattern: string, replacement: string]> = [
-      [previousRoot, nextRoot],
-      [previousRoot.toLowerCase(), nextRoot.toLowerCase()],
-      [previousRoot.toUpperCase(), nextRoot.toUpperCase()],
-      [previousForward, nextForward],
-      [previousForward.toLowerCase(), nextForward.toLowerCase()],
-      [previousForward.toUpperCase(), nextForward.toUpperCase()],
-      [previousBackward, nextBackward],
-      [previousBackward.toLowerCase(), nextBackward.toLowerCase()],
-      [previousBackward.toUpperCase(), nextBackward.toUpperCase()],
-    ];
-    let output = input;
-    for (const [pattern, replacement] of variants) {
-      if (!pattern) continue;
-      output = output.split(pattern).join(replacement);
-    }
-    return output;
-  }
-
-  private rebaseApprovalAuditCacheKeyRoot(
-    value: unknown,
-    nextProjectRoot: string,
-  ): unknown {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return value;
-    }
-    const normalizedCacheKeyRoot = this.normalizeProjectRootKey(nextProjectRoot);
-
-    const normalizeCacheKey = (cacheKeyValue: unknown): string | undefined => {
-      if (typeof cacheKeyValue !== "string") {
-        return undefined;
-      }
-      const cacheKey = cacheKeyValue.trim();
-      if (!cacheKey) {
-        return undefined;
-      }
-      const dividerIndex = cacheKey.indexOf("|");
-      if (dividerIndex <= 0 || dividerIndex === cacheKey.length - 1) {
-        return undefined;
-      }
-      const cacheSuffix = cacheKey.slice(dividerIndex + 1).trim();
-      if (!cacheSuffix) {
-        return undefined;
-      }
-      return `${normalizedCacheKeyRoot}|${cacheSuffix}`;
-    };
-
-    const rewriteCacheKeyObject = (input: unknown): unknown => {
-      if (!input || typeof input !== "object" || Array.isArray(input)) {
-        return input;
-      }
-      const obj = input as Record<string, unknown>;
-      let nextObj: Record<string, unknown> = obj;
-      const normalizedCacheKey = normalizeCacheKey(obj.cacheKey);
-      if (normalizedCacheKey && normalizedCacheKey !== obj.cacheKey) {
-        nextObj = { ...nextObj, cacheKey: normalizedCacheKey };
-      }
-      return nextObj;
-    };
-
-    const root = value as Record<string, unknown>;
-    let nextRoot: Record<string, unknown> = root;
-
-    const rebasedApprovalAudit = rewriteCacheKeyObject(root.approvalAudit);
-    if (rebasedApprovalAudit !== root.approvalAudit) {
-      nextRoot = { ...nextRoot, approvalAudit: rebasedApprovalAudit };
-    }
-
-    if (Array.isArray(root.approvalAuditHistory)) {
-      let changed = false;
-      const rebasedHistory = root.approvalAuditHistory.map((entry) => {
-        const rebasedEntry = rewriteCacheKeyObject(entry);
-        if (rebasedEntry !== entry) {
-          changed = true;
-        }
-        return rebasedEntry;
-      });
-      if (changed) {
-        nextRoot = { ...nextRoot, approvalAuditHistory: rebasedHistory };
-      }
-    }
-
-    if (
-      nextRoot.continuity &&
-      typeof nextRoot.continuity === "object" &&
-      !Array.isArray(nextRoot.continuity)
-    ) {
-      const continuity = nextRoot.continuity as Record<string, unknown>;
-      let nextContinuity: Record<string, unknown> = continuity;
-      const continuityKeys = [
-        "lastApprovalCacheKey",
-        "lastRequestScopeCacheKey",
-        "lastPermissionRequestCacheKey",
-      ] as const;
-      for (const key of continuityKeys) {
-        const normalized = normalizeCacheKey(continuity[key]);
-        if (normalized && normalized !== continuity[key]) {
-          nextContinuity = { ...nextContinuity, [key]: normalized };
-        }
-      }
-      const scopeCacheKeyCandidate =
-        (typeof nextContinuity.lastPermissionRequestCacheKey === "string"
-          ? nextContinuity.lastPermissionRequestCacheKey
-          : undefined) ??
-        (typeof nextContinuity.lastRequestScopeCacheKey === "string"
-          ? nextContinuity.lastRequestScopeCacheKey
-          : undefined) ??
-        (typeof nextContinuity.lastApprovalCacheKey === "string"
-          ? nextContinuity.lastApprovalCacheKey
-          : undefined);
-      if (
-        scopeCacheKeyCandidate &&
-        (typeof nextContinuity.lastPermissionRequestCacheKey !== "string" ||
-          !nextContinuity.lastPermissionRequestCacheKey.trim())
-      ) {
-        nextContinuity = {
-          ...nextContinuity,
-          lastPermissionRequestCacheKey: scopeCacheKeyCandidate,
-        };
-      }
-      const scopeLabelCandidate =
-        (typeof nextContinuity.lastPermissionRequestScopeLabel === "string"
-          ? nextContinuity.lastPermissionRequestScopeLabel
-          : undefined) ??
-        (typeof nextContinuity.lastRequestScopeLabel === "string"
-          ? nextContinuity.lastRequestScopeLabel
-          : undefined) ??
-        (typeof nextContinuity.lastApprovalScope === "string"
-          ? nextContinuity.lastApprovalScope
-          : undefined);
-      if (
-        scopeLabelCandidate &&
-        (typeof nextContinuity.lastPermissionRequestScopeLabel !== "string" ||
-          !nextContinuity.lastPermissionRequestScopeLabel.trim())
-      ) {
-        nextContinuity = {
-          ...nextContinuity,
-          lastPermissionRequestScopeLabel: scopeLabelCandidate,
-        };
-      }
-      const projectRootCandidate =
-        (typeof nextContinuity.lastPermissionRequestProjectRoot === "string"
-          ? nextContinuity.lastPermissionRequestProjectRoot
-          : undefined) ??
-        (typeof nextContinuity.lastRequestScopeProjectRoot === "string"
-          ? nextContinuity.lastRequestScopeProjectRoot
-          : undefined) ??
-        (typeof nextContinuity.lastApprovalProjectRoot === "string"
-          ? nextContinuity.lastApprovalProjectRoot
-          : undefined) ??
-        nextProjectRoot;
-      if (
-        projectRootCandidate &&
-        (typeof nextContinuity.lastPermissionRequestProjectRoot !== "string" ||
-          !nextContinuity.lastPermissionRequestProjectRoot.trim())
-      ) {
-        nextContinuity = {
-          ...nextContinuity,
-          lastPermissionRequestProjectRoot: projectRootCandidate,
-        };
-      }
-      if (
-        (typeof nextContinuity.lastPermissionRequestSource !== "string" ||
-          !nextContinuity.lastPermissionRequestSource.trim()) &&
-        (typeof nextContinuity.lastRequestScopeSource === "string" ||
-          typeof nextContinuity.lastApprovalDecision === "string")
-      ) {
-        nextContinuity = {
-          ...nextContinuity,
-          lastPermissionRequestSource:
-            typeof nextContinuity.lastRequestScopeSource === "string" &&
-            nextContinuity.lastRequestScopeSource.trim()
-              ? nextContinuity.lastRequestScopeSource
-              : "approval-request",
-        };
-      }
-      if (Array.isArray(continuity.lastApprovalHistory)) {
-        let historyChanged = false;
-        const rebasedContinuityHistory = continuity.lastApprovalHistory.map(
-          (entry) => {
-            const rebasedEntry = rewriteCacheKeyObject(entry);
-            if (rebasedEntry !== entry) {
-              historyChanged = true;
-            }
-            return rebasedEntry;
-          },
-        );
-        if (historyChanged) {
-          nextContinuity = {
-            ...nextContinuity,
-            lastApprovalHistory: rebasedContinuityHistory,
-          };
-        }
-      }
-      if (nextContinuity !== continuity) {
-        nextRoot = { ...nextRoot, continuity: nextContinuity };
-      }
-    }
-
-    return nextRoot === root
-      ? value
-      : {
-          ...nextRoot,
-          summary: this.rebaseCacheKeysInSummaryEntries(nextRoot.summary, normalizedCacheKeyRoot),
-        };
-  }
-
-  private rebaseCacheKeysInSummaryEntries(
-    summaryValue: unknown,
-    normalizedCacheKeyRoot: string,
-  ): unknown {
-    if (!Array.isArray(summaryValue)) {
-      return summaryValue;
-    }
-    let changed = false;
-    const nextSummary = summaryValue.map((entry) => {
-      if (typeof entry !== "string") {
-        return entry;
-      }
-      const line = entry.trim();
-      const normalizedLine =
-        line.startsWith("- ") || line.startsWith("* ") ? line.slice(2).trim() : line;
-      const colonIndex = normalizedLine.indexOf(":");
-      if (colonIndex <= 0) {
-        return entry;
-      }
-      const key = normalizedLine.slice(0, colonIndex).trim().toLowerCase();
-      if (
-        key !== "last-approval-cache-key" &&
-        key !== "last-request-scope-cache-key" &&
-        key !== "last-permission-request-cache-key"
-      ) {
-        return entry;
-      }
-      const valuePart = normalizedLine.slice(colonIndex + 1).trim();
-      const dividerIndex = valuePart.indexOf("|");
-      if (dividerIndex <= 0 || dividerIndex === valuePart.length - 1) {
-        return entry;
-      }
-      const suffix = valuePart.slice(dividerIndex + 1).trim();
-      if (!suffix) {
-        return entry;
-      }
-      const rebased = `${normalizedCacheKeyRoot}|${suffix}`;
-      if (rebased === valuePart) {
-        return entry;
-      }
-      changed = true;
-      return `- ${key}: ${rebased}`;
-    });
-    return changed ? nextSummary : summaryValue;
   }
 
   getRecoveryTrustBoundaryBlock(input?: {
@@ -2104,10 +1819,10 @@ export class SessionManager {
     if (!snapshot?.workingMemory) {
       return snapshot;
     }
-    const normalizedWorkingMemory = this.normalizeLegacyPermissionWorkingMemory(
-      snapshot.workingMemory,
-      session.projectRoot,
-    );
+    const normalizedWorkingMemory = normalizeLegacyPermissionWorkingMemory({
+      workingMemory: snapshot.workingMemory,
+      sessionProjectRoot: session.projectRoot,
+    });
     if (normalizedWorkingMemory === snapshot.workingMemory) {
       return snapshot;
     }
@@ -2125,10 +1840,10 @@ export class SessionManager {
         this.writeJsonFileAtomic(statePath, normalizedSnapshot);
         return;
       }
-      const rebasedLatestWorkingMemory = this.normalizeLegacyPermissionWorkingMemory(
-        latest.workingMemory,
-        session.projectRoot,
-      );
+      const rebasedLatestWorkingMemory = normalizeLegacyPermissionWorkingMemory({
+        workingMemory: latest.workingMemory,
+        sessionProjectRoot: session.projectRoot,
+      });
       if (rebasedLatestWorkingMemory === latest.workingMemory) {
         normalizedSnapshot = {
           ...latest,
@@ -2145,134 +1860,6 @@ export class SessionManager {
     });
 
     return normalizedSnapshot;
-  }
-
-  private normalizeLegacyPermissionWorkingMemory(
-    workingMemory: unknown,
-    sessionProjectRoot: string,
-  ): unknown {
-    const normalizedProjectRoot = path.resolve(sessionProjectRoot);
-    const rebasedWorkingMemory = rebaseLegacyPermissionRootsInWorkingMemory(
-      workingMemory,
-      normalizedProjectRoot,
-    );
-    return this.rebaseApprovalAuditCacheKeyRoot(
-      rebasedWorkingMemory,
-      normalizedProjectRoot,
-    );
-  }
-
-  private detectLegacyPermissionRootCandidate(
-    workingMemory: unknown,
-    sessionProjectRoot: string,
-  ): string | undefined {
-    if (!workingMemory || typeof workingMemory !== "object" || Array.isArray(workingMemory)) {
-      return undefined;
-    }
-
-    const root = workingMemory as Record<string, unknown>;
-    const continuity =
-      root.continuity && typeof root.continuity === "object" && !Array.isArray(root.continuity)
-        ? (root.continuity as Record<string, unknown>)
-        : undefined;
-
-    const summaryEntries = Array.isArray(root.summary)
-      ? root.summary.filter((entry): entry is string => typeof entry === "string")
-      : [];
-
-    const candidates = new Map<string, string>();
-    const addRootCandidate = (value: unknown): void => {
-      if (typeof value !== "string") {
-        return;
-      }
-      const trimmed = value.trim();
-      if (!trimmed || trimmed.toLowerCase() === "unknown") {
-        return;
-      }
-      if (!trimmed.includes(path.sep) && !/^[a-zA-Z]:[\\/]/.test(trimmed)) {
-        return;
-      }
-      const resolved = this.normalizeProjectRootKey(trimmed);
-      if (!resolved || resolved === this.normalizeProjectRootKey(sessionProjectRoot)) {
-        return;
-      }
-      if (!candidates.has(resolved)) {
-        candidates.set(resolved, path.resolve(trimmed));
-      }
-    };
-    const addCacheKeyCandidate = (value: unknown): void => {
-      if (typeof value !== "string") {
-        return;
-      }
-      const cacheKey = value.trim();
-      const divider = cacheKey.indexOf("|");
-      if (divider <= 0) {
-        return;
-      }
-      addRootCandidate(cacheKey.slice(0, divider));
-    };
-
-    const approvalAudit =
-      root.approvalAudit &&
-      typeof root.approvalAudit === "object" &&
-      !Array.isArray(root.approvalAudit)
-        ? (root.approvalAudit as Record<string, unknown>)
-        : undefined;
-    if (approvalAudit) {
-      addRootCandidate(approvalAudit.projectRoot);
-      addCacheKeyCandidate(approvalAudit.cacheKey);
-    }
-
-    if (Array.isArray(root.approvalAuditHistory)) {
-      for (const entry of root.approvalAuditHistory) {
-        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-          continue;
-        }
-        const record = entry as Record<string, unknown>;
-        addRootCandidate(record.projectRoot);
-        addCacheKeyCandidate(record.cacheKey);
-      }
-    }
-
-    if (continuity) {
-      addRootCandidate(continuity.lastApprovalProjectRoot);
-      addRootCandidate(continuity.lastRequestScopeProjectRoot);
-      addRootCandidate(continuity.lastPermissionRequestProjectRoot);
-      addCacheKeyCandidate(continuity.lastApprovalCacheKey);
-      addCacheKeyCandidate(continuity.lastRequestScopeCacheKey);
-      addCacheKeyCandidate(continuity.lastPermissionRequestCacheKey);
-    }
-
-    for (const line of summaryEntries) {
-      const parsed = line.match(/^-?\s*([^:]+):\s*(.+)$/);
-      if (!parsed) {
-        continue;
-      }
-      const key = parsed[1]?.trim().toLowerCase();
-      const value = parsed[2]?.trim();
-      if (!key || !value) {
-        continue;
-      }
-      if (
-        key === "last-approval-project-root" ||
-        key === "last-request-scope-project-root" ||
-        key === "last-permission-request-project-root"
-      ) {
-        addRootCandidate(value);
-      }
-      if (
-        key === "last-approval-cache-key" ||
-        key === "last-request-scope-cache-key" ||
-        key === "last-permission-request-cache-key"
-      ) {
-        addCacheKeyCandidate(value);
-      }
-    }
-
-    if (candidates.size !== 1) {
-      return undefined;
-    }
-    return [...candidates.values()][0];
   }
 
   buildPromptContinuityContext(

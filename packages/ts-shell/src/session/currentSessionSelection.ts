@@ -10,16 +10,18 @@ export interface CurrentSessionSelectionStore {
   readonly byProjectRoot: Record<string, CurrentSessionSelectionRecord>;
 }
 
+export type CurrentSessionSelectionReason =
+  | "none"
+  | "store-invalid"
+  | "missing-session"
+  | "load-failed"
+  | "project-root-mismatch";
+
 export type CurrentSessionSelectionResolution =
   | { readonly ok: true; readonly session: Session }
   | {
       readonly ok: false;
-      readonly reason:
-        | "none"
-        | "store-invalid"
-        | "missing-session"
-        | "load-failed"
-        | "project-root-mismatch";
+      readonly reason: CurrentSessionSelectionReason;
       readonly sessionId?: string;
       readonly detail: string;
     };
@@ -27,6 +29,23 @@ export type CurrentSessionSelectionResolution =
 export interface CurrentSessionStoreParseResult {
   readonly store: CurrentSessionSelectionStore;
   readonly readError: string | null;
+}
+
+export interface CurrentSessionSelectionProjection {
+  readonly resolution: CurrentSessionSelectionResolution;
+  readonly clearSelection: boolean;
+}
+
+export interface CurrentSessionSelectionInput {
+  readonly projectRoot: string;
+  readonly normalizedProjectRoot: string;
+  readonly storeReadError: string | null;
+  readonly selection?: CurrentSessionSelectionRecord;
+  readonly sessionExists?: boolean;
+  readonly session?: Session;
+  readonly sessionProjectRoot?: string;
+  readonly normalizedSessionProjectRoot?: string;
+  readonly loadError?: unknown;
 }
 
 export function createEmptyCurrentSessionSelectionStore(): CurrentSessionSelectionStore {
@@ -59,6 +78,68 @@ export function parseCurrentSessionSelectionStore(
     readError: null,
   };
 }
+
+export function selectCurrentSession(
+  input: CurrentSessionSelectionInput,
+): CurrentSessionSelectionProjection {
+  const sessionId = input.selection?.sessionId;
+  if (!sessionId?.trim()) {
+    return {
+      resolution: resolveUnselectedCurrentSession(
+        input.projectRoot,
+        input.storeReadError,
+      ),
+      clearSelection: false,
+    };
+  }
+
+  if (input.sessionExists === false) {
+    return {
+      resolution: resolveMissingCurrentSession(input.projectRoot, sessionId),
+      clearSelection: true,
+    };
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "loadError")) {
+    return {
+      resolution: resolveCurrentSessionLoadFailed(
+        input.projectRoot,
+        sessionId,
+        input.loadError,
+      ),
+      clearSelection: true,
+    };
+  }
+
+  if (input.session) {
+    const sessionProjectRoot =
+      input.sessionProjectRoot || input.session.projectRoot || input.normalizedProjectRoot;
+    if (input.normalizedSessionProjectRoot !== input.normalizedProjectRoot) {
+      return {
+        resolution: resolveProjectRootMismatch(
+          input.projectRoot,
+          sessionId,
+          sessionProjectRoot,
+        ),
+        clearSelection: true,
+      };
+    }
+    return {
+      resolution: { ok: true, session: input.session },
+      clearSelection: false,
+    };
+  }
+
+  return {
+    resolution: resolveUnselectedCurrentSession(
+      input.projectRoot,
+      input.storeReadError,
+    ),
+    clearSelection: false,
+  };
+}
+
+export const projectCurrentSessionSelection = selectCurrentSession;
 
 export function resolveUnselectedCurrentSession(
   projectRoot: string,
