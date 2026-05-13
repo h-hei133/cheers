@@ -2,7 +2,7 @@
 
 Route: 18
 Date: 2026-05-13
-Status: ownership map only
+Status: ownership map only; Route 29-33 sync
 
 This document records runtime/module ownership after the recent extraction work.
 It is based on current code, recent commits, and a narrow reference comparison.
@@ -11,16 +11,16 @@ default gates, or make a new readiness claim.
 
 ## 1. Migration Status As Of Current HEAD
 
-Current HEAD includes the runtime/session extraction series through
-`2a57077 Remove obsolete replay plan builder`, plus the Route 24-28 CLI
-extraction series through the approval prompt bridge.
+Current HEAD includes the runtime/session/CLI extraction series through
+`57fb568 Extract CLI runtime command bridge helpers`, covering the Route 29-33
+projection, planning, codec, policy, and CLI wrapper/bridge extraction work.
 
 This status is an ownership synchronization, not a release-readiness claim. The
 current large-file sizes observed in this pass are:
 
-- `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`: 11,646 lines.
-- `packages/ts-shell/src/session/SessionManager.ts`: 4,815 lines.
-- `packages/ts-shell/src/entrypoints/cli.tsx`: 3,099 lines.
+- `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`: 9,640 lines.
+- `packages/ts-shell/src/session/SessionManager.ts`: 3,442 lines.
+- `packages/ts-shell/src/entrypoints/cli.tsx`: 2,902 lines.
 
 Completed orchestration extractions:
 
@@ -31,6 +31,12 @@ Completed orchestration extractions:
 | Runtime/session handoff projection | `packages/ts-shell/src/orchestration/runtimeHandoffProjection.ts` | completed |
 | Tool execution failure/outcome projection | `packages/ts-shell/src/orchestration/toolExecutionOutcomeProjection.ts` | completed |
 | DoNext / next-action text projection | `packages/ts-shell/src/orchestration/doNextProjection.ts` | completed |
+| Provider outcome projection | `packages/ts-shell/src/orchestration/providerOutcomeProjection.ts` | completed |
+| Approval authority projection | `packages/ts-shell/src/orchestration/approvalAuthorityProjection.ts` | completed |
+| Capability boundary projection | `packages/ts-shell/src/orchestration/capabilityBoundaryProjection.ts` | completed |
+| Workflow task planner | `packages/ts-shell/src/orchestration/workflowTaskPlanner.ts` | completed |
+| Continuation planning | `packages/ts-shell/src/orchestration/continuationPlanning.ts` | completed |
+| Workflow intent projection | `packages/ts-shell/src/orchestration/workflowIntentProjection.ts` | completed |
 
 Completed session extractions:
 
@@ -42,6 +48,12 @@ Completed session extractions:
 | Mutation/planned-files continuity state | `packages/ts-shell/src/session/mutationContinuityState.ts` | completed |
 | Replay transcript/runtime seed construction | `packages/ts-shell/src/session/sessionReplayBuilder.ts` | completed |
 | Obsolete replay plan builder | `packages/ts-shell/src/session/replayPlanBuilder.ts` | removed; no runtime/test call sites |
+| Approval memory codec | `packages/ts-shell/src/session/approvalMemoryCodec.ts` | completed |
+| Permission request memory codec | `packages/ts-shell/src/session/permissionRequestMemoryCodec.ts` | completed |
+| Approval audit projection | `packages/ts-shell/src/session/approvalAuditProjection.ts` | completed |
+| Project binding policy | `packages/ts-shell/src/session/projectBindingPolicy.ts` | completed |
+| Project-root rebase projection | `packages/ts-shell/src/session/projectRootRebaseProjection.ts` | completed |
+| Current-session selection expansion | `packages/ts-shell/src/session/currentSessionSelection.ts` | completed |
 
 Completed CLI extractions:
 
@@ -57,6 +69,9 @@ Completed CLI extractions:
 | Workspace CLI surface | `packages/ts-shell/src/entrypoints/cliWorkspaceSurface.ts` | completed |
 | MCP control CLI surface | `packages/ts-shell/src/entrypoints/mcpControlCliSurface.ts` | completed |
 | Approval prompt/display bridge | `packages/ts-shell/src/entrypoints/approvalPromptBridge.ts` | completed |
+| Runtime invocation wrapper | `packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts` | completed |
+| Command execution bridge | `packages/ts-shell/src/entrypoints/cliCommandExecutionBridge.ts` | completed |
+| Interactive loop state projection | `packages/ts-shell/src/entrypoints/cliInteractiveLoopState.ts` | completed |
 
 Search checks from this pass:
 
@@ -67,7 +82,8 @@ Search checks from this pass:
 - The session extraction modules are imported by `SessionManager.ts` or focused
   tests.
 - The CLI extraction modules listed above exist, have focused tests, and are
-  imported by `cli.tsx` where runtime wiring still needs them.
+  imported by `cli.tsx` where bootstrap, command execution, authorization,
+  session switching, MCP calls, and lifecycle wiring still need them.
 - The slash-command positional fallback fix is covered in `cliArgs.test.ts`;
   reserved shell slash commands such as `/continue`, `/sessions`, `/mcp`,
   `/resume`, `/workspace`, `/help`, and `/pwd` are not treated as positional
@@ -175,10 +191,9 @@ opencode calibration:
 - Tool execution, permission metadata, write metadata, and user-visible output
   are layered concepts even when one tool implementation coordinates the
   phases.
-- Permission handling benefits from explicit request/reply/error models. That
-  supports extracting approval context from `SessionManager.ts` only if the
-  extraction remains persistence/projection-oriented and does not change
-  authorization semantics.
+- Permission handling benefits from explicit request/reply/error models. The
+  completed approval codec/projection extraction remains
+  persistence/projection-oriented and does not change authorization semantics.
 - Session persistence projectors and CLI/TUI command output are separate
   surfaces. That supports keeping `cli.tsx` as bootstrap/dispatch and avoiding
   execution details in entrypoint code.
@@ -200,16 +215,16 @@ opencode items not applicable here:
 
 Current boundary: high-level orchestration entrypoints, apply-patch route
 pre-check, integrated runner construction, query/control flow sequencing,
-provider calls and adapter setup, dispatcher calls, workflow planning, mutation
-target selection, mutation execution and verification read/write sequencing,
-continuation lineage, result handoff, and high-level orchestration wiring.
+provider calls and adapter setup, dispatcher calls, mutation route/execution,
+verification read/write sequencing, and high-level orchestration wiring.
 
 The file should continue to retain:
 
 - Query/control flow sequencing.
 - Provider calls and provider adapter setup.
 - Dispatcher calls.
-- Mutation execution and verification read/write sequencing.
+- Mutation route/execution.
+- Verification read/write sequencing.
 - High-level orchestration wiring.
 - Dependency wiring for MCP gateway, sandbox, provider mode, abort signal, and
   escalation prompt handler.
@@ -221,13 +236,12 @@ The file should not regain ownership of completed projection modules:
 - Runtime/session handoff projection.
 - Tool execution failure/outcome projection.
 - DoNext / next-action text projection.
-
-Remaining candidates to consider later:
-
-| Candidate | Target shape | Risk | Timing |
-| --- | --- | --- | --- |
-| Provider outcome projection / safe provider diagnostic projection | Pure redacted provider/model-output outcome facts | higher-risk | later |
-| Capability boundary projection, if a pure projection remains | Pure capability stop/diagnostic facts | medium/high | later |
+- Provider outcome projection.
+- Approval authority projection.
+- Capability boundary projection.
+- Workflow task planning.
+- Continuation planning.
+- Workflow intent projection.
 
 Provider call execution itself should not be listed as migration work. The
 orchestrator owns deciding when provider execution is needed and wiring the
@@ -236,23 +250,20 @@ adapter call.
 ### `SessionManager.ts`
 
 Current boundary: public session lifecycle facade, persistence reads/writes,
-locking, session loading, current session selection, project binding, recovery
-trust boundary, approval/request parsing where still tightly coupled, compact
-trigger control where lifecycle-adjacent, and calls to the extracted resume,
-compact, continuity, mutation, and replay builders.
+locking, atomic writes, session loading, recovery trust boundary,
+schema-bearing writes, compact trigger control, and calls to the extracted
+resume, compact, continuity, mutation, replay, approval, project binding, and
+current-session selection helpers.
 
 The file should continue to retain:
 
 - Public session lifecycle facade.
 - Persistence read/write timing.
-- Locking and atomic write boundaries.
+- Locks and atomic writes.
 - Session loading.
-- Current session selection facade.
-- Project binding facade.
 - Recovery trust boundary.
-- Approval/request parsing while it remains tightly coupled to durable state
-  shape.
-- Compact trigger control while it remains lifecycle-adjacent.
+- Schema-bearing writes.
+- Compact trigger control.
 
 The file should not regain ownership of completed builder modules:
 
@@ -263,32 +274,34 @@ The file should not regain ownership of completed builder modules:
 - Replay transcript/runtime seed construction.
 - `replayPlanBuilder.ts`, which was removed because it had no runtime/test call
   sites.
+- Approval memory codec.
+- Permission request memory codec.
+- Approval audit projection.
+- Project binding policy.
+- Project-root rebase projection.
+- Current-session selection expansion.
 
-Remaining candidates to consider later:
-
-| Candidate | Target shape | Risk | Timing |
-| --- | --- | --- | --- |
-| Approval context persistence / approval request parsing | Pure persistence/projection helper, no authorization changes | medium/high | later |
-| Session persistence gateway | Storage gateway over metadata/state/transcript I/O | high | later |
-| Project binding helper | Pure binding decision helper if it can be isolated | medium/high | later |
-| Current-session selection helper expansion | More selection logic outside facade, only with strong tests | medium/high | later |
+Session persistence gateway work remains high risk and should not be the next
+default extraction target without a separate architecture reassessment.
 
 ### `cli.tsx`
 
-Route 24-28 completed the low/medium-risk CLI extraction batches for argument
+Route 24-33 completed the low/medium-risk CLI extraction batches for argument
 parsing, mode dispatch, print/stdin runners, provider/workspace/MCP surfaces,
-slash command registry/help rendering, and approval prompt display bridging.
+slash command registry/help rendering, approval prompt display bridging,
+runtime invocation wrapping, command execution bridging, and prompt chrome/state
+projection.
 
 The file should continue to retain:
 
 - Process bootstrap.
-- High-level runtime/session/provider wiring.
-- Interactive loop and readline lifecycle.
+- Runtime/session/provider wiring.
 - Actual command execution.
-- Trust policy evaluation.
-- Allow-once cache and allow-always persistence.
-- Runtime handler wiring.
-- Terminal lifecycle and process exit boundary.
+- MCP gateway calls.
+- Approval authorization/persistence.
+- Session switching.
+- Readline lifecycle.
+- SIGINT/close/process exit.
 
 The file should not regain ownership of completed CLI modules:
 
@@ -300,28 +313,26 @@ The file should not regain ownership of completed CLI modules:
 - Workspace attach/status display projection.
 - MCP control-plane display projection.
 - Approval prompt/display/provenance/response text surface.
+- Runtime invocation wrapper.
+- Command execution bridge.
+- Interactive loop state projection.
 
-Remaining candidates to consider later:
-
-| Candidate | Target shape | Risk | Timing |
-| --- | --- | --- | --- |
-| Interactive/TUI loop boundary audit | Read-only boundary audit before any extraction | high | later |
-| Runtime invocation wrapper | Pure wrapper only, with strong CLI/runtime tests | medium/high | later |
-| Command execution bridge | Bridge only if command semantics and mode precedence do not change | medium/high | later |
-| Approval semantic/persistence work | Persistence/semantic split only; no authorization behavior change | high | later |
+Further CLI extraction should not be the default next move. If implementation
+continues, it must first prove that a remaining seam is a pure
+projection/wrapper and does not touch execution, persistence, lifecycle, or
+authorization.
 
 Reference calibration for CLI ownership:
 
-- The CLI entrypoint should become closer to bootstrap, mode dispatch, and
-  wiring; the completed Route 24-28 extraction moved the lower-risk typed args,
-  dispatch, runner, and display surfaces in that direction.
-- Command execution and approval semantics should not be confused with display
-  surfaces. The display bridges can stay extracted while authorization,
-  persistence, and actual command execution remain in `cli.tsx` until a
-  dedicated higher-risk route exists.
-- Interactive/TUI-related extraction is still higher risk even after args and
-  mode dispatch moved out, because readline lifecycle, mode precedence, prompt
-  transport, and process-exit behavior must remain stable.
+- The CLI entrypoint is now closer to bootstrap, wiring, command execution, and
+  lifecycle ownership. Route 24-33 moved lower-risk parsing, display, bridge,
+  wrapper, and state projection surfaces out of `cli.tsx`.
+- Command execution, MCP gateway calls, approval authorization/persistence,
+  session switching, readline lifecycle, and process exit remain entrypoint
+  boundaries.
+- Interactive/TUI-related extraction remains higher risk because readline
+  lifecycle, mode precedence, prompt transport, and process-exit behavior must
+  remain stable.
 
 ## 4. Updated Ownership Tables
 
@@ -331,30 +342,33 @@ Reference calibration for CLI ownership:
 | --- | --- | --- | --- |
 | Exported runtime entrypoints | `runMvpIntegratedFlow.ts` | keep | Composition boundary for runtime execution. |
 | Query/control flow sequencing | `runMvpIntegratedFlow.ts` | keep | Core orchestration responsibility. |
-| Provider calls / adapter setup | `runMvpIntegratedFlow.ts` | keep | Calls stay; only redacted projection may later move. |
+| Provider calls / adapter setup | `runMvpIntegratedFlow.ts` | keep | Execution and adapter wiring stay here. |
 | Dispatcher calls | `runMvpIntegratedFlow.ts` | keep | Execution wiring stays orchestration-level. |
-| Mutation execution / verification read-write sequencing | `runMvpIntegratedFlow.ts` | keep | Do not migrate into projection helpers. |
+| Mutation route/execution | `runMvpIntegratedFlow.ts` | keep | Do not migrate execution into projection helpers. |
+| Verification read/write sequencing | `runMvpIntegratedFlow.ts` | keep | Ordering remains orchestration-owned. |
 | High-level orchestration wiring | `runMvpIntegratedFlow.ts` | keep | Owns dependency assembly and turn coordination. |
 | Shell result assembly | `shellResultAssembly.ts` | completed | Pure assembly/projection owner. |
 | Runtime outcome projection | `runtimeOutcomeProjection.ts` | completed | Pure runtime coding/mutation/blocked outcome projection. |
 | Runtime/session handoff projection | `runtimeHandoffProjection.ts` | completed | Continuity and handoff facts. |
 | Tool execution failure/outcome projection | `toolExecutionOutcomeProjection.ts` | completed | Verification failure classification and next actions. |
 | DoNext / next-action text projection | `doNextProjection.ts` | completed | Target/edit execution failure wording. |
-| Provider outcome / safe diagnostic projection | future module only if pure | deferred | Higher-risk because of redaction/provider attribution. |
-| Capability boundary projection | future module only if still present and pure | deferred | Do not expand capability or taxonomy. |
+| Provider outcome projection | `providerOutcomeProjection.ts` | completed | Redacted provider/model-output outcome facts. |
+| Approval authority projection | `approvalAuthorityProjection.ts` | completed | Approval authority facts without authorization changes. |
+| Capability boundary projection | `capabilityBoundaryProjection.ts` | completed | Capability stop/diagnostic projection. |
+| Workflow task planner | `workflowTaskPlanner.ts` | completed | Workflow task planning helper. |
+| Continuation planning | `continuationPlanning.ts` | completed | Continuation planning helper. |
+| Workflow intent projection | `workflowIntentProjection.ts` | completed | Intent projection helper. |
 
 ### `SessionManager.ts`
 
 | Responsibility | Current owner | Status | Notes |
 | --- | --- | --- | --- |
 | Public session lifecycle facade | `SessionManager.ts` | keep | Existing callers depend on this API. |
-| Persistence reads/writes | `SessionManager.ts` | keep | Gateway extraction is high risk/later. |
-| Locking | `SessionManager.ts` | keep | Storage safety boundary. |
+| Persistence timing | `SessionManager.ts` | keep | Gateway extraction is high risk/later. |
+| Locks / atomic writes | `SessionManager.ts` | keep | Storage safety boundary. |
 | Session loading | `SessionManager.ts` | keep | Tied to public lifecycle facade. |
-| Current session selection | `SessionManager.ts` plus `currentSessionSelection.ts` | keep/later | Selection helper exists; broader extraction needs tests. |
-| Project binding | `SessionManager.ts` | keep/later | Helper only if pure and behavior-preserving. |
 | Recovery trust boundary | `SessionManager.ts` | keep | Lifecycle/recovery decision boundary. |
-| Approval/request parsing | `SessionManager.ts` | keep/later | Candidate only as persistence/projection helper. |
+| Schema-bearing writes | `SessionManager.ts` | keep | Durable state writes remain manager-owned. |
 | Compact trigger control | `SessionManager.ts` | keep | Lifecycle-adjacent; retention planning already moved. |
 | Resume/stopped/continue context construction | `sessionResumeContextBuilder.ts` | completed | Called from `SessionManager.ts`. |
 | Shared continuity types | `sessionContinuityTypes.ts` | completed | Shared session continuity shape. |
@@ -362,20 +376,26 @@ Reference calibration for CLI ownership:
 | Mutation/planned-files continuity state | `mutationContinuityState.ts` | completed | Preserves planned/changed/failed/verified continuity facts. |
 | Replay transcript/runtime seed construction | `sessionReplayBuilder.ts` | completed | `SessionManager.ts` delegates replay preparation. |
 | Obsolete replay plan builder | deleted | completed | No `replayPlanBuilder` or `buildReplayPlanFromSnapshot` call sites remain. |
-| Session persistence gateway | future module | deferred | High risk/later; no schema or persistence behavior change now. |
+| Approval memory codec | `approvalMemoryCodec.ts` | completed | Approval state encode/decode helper. |
+| Permission request memory codec | `permissionRequestMemoryCodec.ts` | completed | Permission request encode/decode helper. |
+| Approval audit projection | `approvalAuditProjection.ts` | completed | Audit projection helper. |
+| Project binding policy | `projectBindingPolicy.ts` | completed | Binding decision policy helper. |
+| Project-root rebase projection | `projectRootRebaseProjection.ts` | completed | Project-root rebase projection. |
+| Current-session selection expansion | `currentSessionSelection.ts` | completed | Selection helper expanded while facade stays in `SessionManager.ts`. |
+| Session persistence gateway | future module only after reassessment | deferred | High risk; not a default next extraction. |
 
 ### `cli.tsx`
 
 | Responsibility | Current owner | Status | Notes |
 | --- | --- | --- | --- |
 | Process entrypoint/bootstrap | `cli.tsx` | keep | Should remain composition root. |
-| High-level runtime/session/provider wiring | `cli.tsx` | keep | Composition root for shell runtime. |
-| Interactive loop / readline lifecycle | `cli.tsx` | keep | Higher-risk boundary; do not move casually. |
-| Actual command execution | `cli.tsx` | keep | Command semantics remain in the entrypoint path for now. |
-| Trust policy evaluation | `cli.tsx` | keep | Authorization semantics stay out of display bridges. |
-| Allow-once cache / allow-always persistence | `cli.tsx` | keep | Approval persistence semantics stay here for now. |
-| Runtime handler wiring | `cli.tsx` | keep | Owns runtime handler composition. |
-| Terminal lifecycle / process exit boundary | `cli.tsx` | keep | Entrypoint process responsibility. |
+| Runtime/session/provider wiring | `cli.tsx` | keep | Composition root for shell runtime. |
+| Actual command execution | `cli.tsx` | keep | Command semantics remain in the entrypoint path. |
+| MCP gateway calls | `cli.tsx` | keep | Gateway calls stay in entrypoint wiring. |
+| Approval authorization/persistence | `cli.tsx` | keep | Authorization and persistence semantics stay here. |
+| Session switching | `cli.tsx` | keep | Interactive session selection remains entrypoint-owned. |
+| Readline lifecycle | `cli.tsx` | keep | Higher-risk boundary; do not move casually. |
+| SIGINT/close/process exit | `cli.tsx` | keep | Entrypoint process responsibility. |
 | CLI arg parsing | `cliArgs.ts` | completed | Includes path-like positional project fallback. |
 | Slash-command positional fallback collision fix | `cliArgs.ts` | completed | Reserved shell slash commands are not project fallback. |
 | Mode dispatch | `cliModeDispatch.ts` | completed | Dispatch plan only; no mode behavior rewrite. |
@@ -386,10 +406,10 @@ Reference calibration for CLI ownership:
 | Workspace CLI surface | `cliWorkspaceSurface.ts` | completed | Workspace attach/status display projection. |
 | MCP control CLI surface | `mcpControlCliSurface.ts` | completed | MCP status/tools/doctor/blocked display projection. |
 | Approval prompt bridge | `approvalPromptBridge.ts` | completed | Display/provenance/response shaping only; no authorization changes. |
-| Interactive/TUI loop boundary audit | future audit | deferred | Later/high risk. |
-| Runtime invocation wrapper | future module only if pure | deferred | Requires strong tests. |
-| Command execution bridge | future bridge only if semantics are unchanged | deferred | Preserve mode precedence and command behavior. |
-| Approval semantic/persistence split | future module only with explicit route | deferred | Later/high risk. |
+| Runtime invocation wrapper | `cliRuntimeInvocation.ts` | completed | Wrapper preserves runtime/provider readiness behavior. |
+| Command execution bridge | `cliCommandExecutionBridge.ts` | completed | Bridge resolves repo-aware command/prompt expansion without executing actions. |
+| Interactive loop state projection | `cliInteractiveLoopState.ts` | completed | Prompt chrome/context tag projection. |
+| Interactive/TUI loop boundary audit | future audit only after reassessment | deferred | Later/high risk; not a default next extraction. |
 
 ## 5. Migration Priority Table
 
@@ -402,12 +422,24 @@ Completed P0/P1 items are no longer future work:
 | `runtimeHandoffProjection` | `runMvpIntegratedFlow.ts` | `runtimeHandoffProjection.ts` |
 | `toolExecutionOutcomeProjection` | `runMvpIntegratedFlow.ts` | `toolExecutionOutcomeProjection.ts` |
 | `doNextProjection` | `runMvpIntegratedFlow.ts` | `doNextProjection.ts` |
+| `providerOutcomeProjection` | `runMvpIntegratedFlow.ts` | `providerOutcomeProjection.ts` |
+| `approvalAuthorityProjection` | `runMvpIntegratedFlow.ts` | `approvalAuthorityProjection.ts` |
+| `capabilityBoundaryProjection` | `runMvpIntegratedFlow.ts` | `capabilityBoundaryProjection.ts` |
+| `workflowTaskPlanner` | `runMvpIntegratedFlow.ts` | `workflowTaskPlanner.ts` |
+| `continuationPlanning` | `runMvpIntegratedFlow.ts` | `continuationPlanning.ts` |
+| `workflowIntentProjection` | `runMvpIntegratedFlow.ts` | `workflowIntentProjection.ts` |
 | `sessionResumeContextBuilder` | `SessionManager.ts` | `sessionResumeContextBuilder.ts` |
 | `sessionContinuityTypes` | `SessionManager.ts` | `sessionContinuityTypes.ts` |
 | `compactRetentionPlanner` | `SessionManager.ts` | `compactRetentionPlanner.ts` |
 | `mutationContinuityState` | `SessionManager.ts` | `mutationContinuityState.ts` |
 | `sessionReplayBuilder` | `SessionManager.ts` | `sessionReplayBuilder.ts` |
 | `replayPlanBuilder` removal | `SessionManager.ts`/session replay area | deleted; no call sites |
+| `approvalMemoryCodec` | `SessionManager.ts` | `approvalMemoryCodec.ts` |
+| `permissionRequestMemoryCodec` | `SessionManager.ts` | `permissionRequestMemoryCodec.ts` |
+| `approvalAuditProjection` | `SessionManager.ts` | `approvalAuditProjection.ts` |
+| `projectBindingPolicy` | `SessionManager.ts` | `projectBindingPolicy.ts` |
+| `projectRootRebaseProjection` | `SessionManager.ts` | `projectRootRebaseProjection.ts` |
+| `currentSessionSelection` expansion | `SessionManager.ts` | `currentSessionSelection.ts` |
 | `cliArgs` | `cli.tsx` | `cliArgs.ts` |
 | Slash-command positional fallback fix | `cli.tsx`/CLI args | `cliArgs.ts` |
 | `cliModeDispatch` | `cli.tsx` | `cliModeDispatch.ts` |
@@ -418,23 +450,28 @@ Completed P0/P1 items are no longer future work:
 | `cliWorkspaceSurface` | `cli.tsx` | `cliWorkspaceSurface.ts` |
 | `mcpControlCliSurface` | `cli.tsx` | `mcpControlCliSurface.ts` |
 | `approvalPromptBridge` | `cli.tsx` | `approvalPromptBridge.ts` |
+| `cliRuntimeInvocation` | `cli.tsx` | `cliRuntimeInvocation.ts` |
+| `cliCommandExecutionBridge` | `cli.tsx` | `cliCommandExecutionBridge.ts` |
+| `cliInteractiveLoopState` | `cli.tsx` | `cliInteractiveLoopState.ts` |
 
-Remaining candidates:
+Default next direction:
 
-| Priority | Source file | Candidate module | Risk | Timing |
+| Priority | Scope | Candidate | Risk | Timing |
 | --- | --- | --- | --- | --- |
-| Later orchestration projection | `runMvpIntegratedFlow.ts` | provider outcome projection | higher-risk | later |
-| Later session helper | `SessionManager.ts` | approval context extraction | medium/high | later |
-| Later session gateway | `SessionManager.ts` | session persistence gateway | high | later |
-| Possible CLI audit | `cli.tsx` | interactive/TUI loop boundary audit | high | later/read-only first |
-| Possible CLI wrapper | `cli.tsx` | runtime invocation wrapper | medium/high | later only if pure |
-| Possible architecture reset | docs/code map | maintainability score reassessment | low | next direction candidate |
+| Next | docs/code map | architecture maintainability reassessment / score update | low | next direction |
+| Only after proof | remaining runtime/session/CLI seams | pure projection or wrapper only | medium/high | later |
+
+Do not default to continuing extraction from the three large files. Further
+implementation must first prove that the remaining seam is pure projection or
+wrapper work and does not touch execution, persistence, lifecycle, or
+authorization.
 
 ## 6. Migration Batches
 
-### Completed/Marginally Open: runMvpIntegratedFlow Batch 1
+### Completed: runMvpIntegratedFlow Projection/Planning Batches
 
-Outcome/result/handoff projection is mostly complete.
+Outcome/result/handoff/provider/capability/planning projection ownership is
+complete for the Route 29-33 scope.
 
 Completed:
 
@@ -443,19 +480,26 @@ Completed:
 - `runtimeHandoffProjection.ts`
 - `toolExecutionOutcomeProjection.ts`
 - `doNextProjection.ts`
+- `providerOutcomeProjection.ts`
+- `approvalAuthorityProjection.ts`
+- `capabilityBoundaryProjection.ts`
+- `workflowTaskPlanner.ts`
+- `continuationPlanning.ts`
+- `workflowIntentProjection.ts`
 
-Remaining from this family:
+Retained boundary: query/control flow sequencing, provider calls/adapter setup,
+dispatcher calls, mutation route/execution, verification read/write sequencing,
+and high-level orchestration wiring stay in `runMvpIntegratedFlow.ts`.
 
-- Provider outcome / safe diagnostic projection is deferred.
-- Capability boundary projection is deferred unless a clearly pure projection
-  remains.
+Stop condition for any future work in this family: do not move provider call
+execution, provider auth, writer capability, MCP core, mutation capability
+limits, verification ordering, or other execution semantics.
 
-Stop condition for this family: do not move provider call execution, provider
-auth, writer capability, MCP core, or mutation capability limits.
+### Completed: SessionManager Context/Codec/Policy Batches
 
-### Completed/Marginally Open: SessionManager Context/Compact/Continuity/Replay Batch
-
-Session context, compact, continuity, and replay ownership is mostly complete.
+Session context, compact, continuity, replay, approval codec/projection, project
+binding, project-root rebase, and current-session selection ownership is
+complete for the Route 29-33 scope.
 
 Completed:
 
@@ -465,16 +509,20 @@ Completed:
 - `mutationContinuityState.ts`
 - `sessionReplayBuilder.ts`
 - deletion of obsolete `replayPlanBuilder.ts`
+- `approvalMemoryCodec.ts`
+- `permissionRequestMemoryCodec.ts`
+- `approvalAuditProjection.ts`
+- `projectBindingPolicy.ts`
+- `projectRootRebaseProjection.ts`
+- `currentSessionSelection.ts` expansion
 
-Remaining from this family:
+Retained boundary: public lifecycle facade, persistence timing, locks/atomic
+writes, session loading, recovery trust boundary, schema-bearing writes, and
+compact trigger control stay in `SessionManager.ts`.
 
-- Approval context persistence/parsing is deferred.
-- Session lifecycle/persistence gateway work is deferred.
-- Project binding and current-session helper expansion are deferred until they
-  can be pure and well tested.
-
-Stop condition for this family: no session schema migration, new persistence
-layer, broad history compaction rewrite, or recovery trust expansion.
+Stop condition for any future work in this family: no session schema migration,
+new persistence layer, broad history compaction rewrite, recovery trust
+expansion, lifecycle rewrite, or authorization behavior change.
 
 ### Completed: CLI Args/Mode/Print/Stdin Batch
 
@@ -500,22 +548,26 @@ Completed:
 - `mcpControlCliSurface.ts`
 - `approvalPromptBridge.ts`
 
-### Deferred/High Risk: CLI Interactive/Runtime Execution Batch
+### Completed: CLI Runtime Command Bridge Batch
 
-Remaining CLI work should not start as automatic extraction. It should begin
-with a boundary audit or a narrowly testable pure wrapper.
+The Route 33 runtime invocation, command bridge, and prompt-state projection
+batch is complete.
 
-Remaining:
+Completed:
 
-- Interactive/TUI loop boundary audit: deferred/high risk.
-- Runtime invocation wrapper: only if pure and well tested.
-- Command execution bridge: only if it preserves command semantics and mode
-  precedence.
-- Approval semantic/persistence work: later/high risk.
+- `cliRuntimeInvocation.ts`
+- `cliCommandExecutionBridge.ts`
+- `cliInteractiveLoopState.ts`
 
-Stop condition for this family: no CLI grammar rewrite, UI redesign, provider
-config migration, default real-provider execution, authorization behavior
-change, or live TTY readiness claim.
+Retained boundary: process bootstrap, runtime/session/provider wiring, actual
+command execution, MCP gateway calls, approval authorization/persistence,
+session switching, readline lifecycle, and SIGINT/close/process exit stay in
+`cli.tsx`.
+
+Stop condition for any future work in this family: no CLI grammar rewrite, UI
+redesign, provider config migration, default real-provider execution,
+authorization behavior change, lifecycle migration, persistence migration, or
+live TTY readiness claim.
 
 ## 7. Validation Strategy
 
@@ -528,10 +580,22 @@ Local validation examples recently used or relevant to completed modules:
 - `rtk npm run test -w packages/ts-shell -- src/orchestration/runtimeHandoffProjection.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/orchestration/toolExecutionOutcomeProjection.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/orchestration/doNextProjection.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/orchestration/providerOutcomeProjection.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/orchestration/approvalAuthorityProjection.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/orchestration/capabilityBoundaryProjection.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/orchestration/workflowTaskPlanner.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/orchestration/continuationPlanning.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/orchestration/workflowIntentProjection.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/session/sessionResumeContextBuilder.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/session/compactRetentionPlanner.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/session/mutationContinuityState.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/session/sessionReplayBuilder.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/session/approvalMemoryCodec.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/session/permissionRequestMemoryCodec.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/session/approvalAuditProjection.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/session/projectBindingPolicy.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/session/projectRootRebaseProjection.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/session/currentSessionSelection.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/entrypoints/cliArgs.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/entrypoints/cliModeDispatch.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/entrypoints/cliPrintModeRunner.test.ts`
@@ -541,6 +605,9 @@ Local validation examples recently used or relevant to completed modules:
 - `rtk npm run test -w packages/ts-shell -- src/entrypoints/cliWorkspaceSurface.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/entrypoints/mcpControlCliSurface.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/entrypoints/approvalPromptBridge.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/entrypoints/cliRuntimeInvocation.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/entrypoints/cliCommandExecutionBridge.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/entrypoints/cliInteractiveLoopState.test.ts`
 
 Batch/full validation examples:
 
@@ -559,10 +626,10 @@ For docs-only updates, use:
 Real-provider gates remain explicit opt-in and are not part of this docs-only
 update.
 
-## 8. Recommended Next Migration
+## 8. Recommended Next Direction
 
 Recommended next direction: architecture maintainability score reassessment
-before selecting another implementation migration.
+and score update before selecting another implementation migration.
 
 Target file:
 
@@ -571,44 +638,41 @@ Target file:
 
 Target module:
 
-- None for the reassessment itself. If implementation follows, pick one of:
-  `runMvpIntegratedFlow.ts` provider outcome / safe diagnostic projection,
-  `SessionManager.ts` approval/persistence ownership audit, or a read-only
-  `cli.tsx` interactive boundary audit.
+- None for the reassessment itself.
+- If implementation follows, first prove the selected remaining seam is a pure
+  projection or wrapper and does not touch execution, persistence, lifecycle,
+  or authorization.
 
 Why now:
 
-- The recent runMvp and SessionManager P0/P1 projection/context batches are
-  mostly complete.
-- Route 24-28 completed the lower-risk CLI args/mode/runner/surface batches.
-- The remaining obvious candidates are higher risk: provider diagnostic
-  projection must preserve redaction and attribution; SessionManager approval
-  work must not change authorization or persistence semantics; CLI interactive
-  work touches readline, command execution, and terminal lifecycle.
+- Route 29-33 completed the requested runMvp, SessionManager, and CLI
+  projection/wrapper/bridge batches.
+- The remaining obvious candidates are higher risk because they are closer to
+  execution, persistence, lifecycle, or authorization boundaries.
 - A reassessment can compare the remaining hotspot size, ownership clarity,
   validation coverage, and risk before choosing the next implementation route.
 
-Best implementation candidate after reassessment:
+Default implementation recommendation:
 
-- `runMvpIntegratedFlow.ts` provider outcome / safe diagnostic projection, but
-  only if a clearly pure projection remains and can be tested without provider
-  execution, provider auth changes, or default gate changes.
+- Do not default to another extraction from `runMvpIntegratedFlow.ts`,
+  `SessionManager.ts`, or `cli.tsx`.
+- Continue implementation only after a reassessment proves a specific remaining
+  seam is pure projection/wrapper work.
 
 Allowed files for that future route:
 
-- For reassessment: docs only, unless the route explicitly asks for read-only
-  code inspection.
-- For provider outcome projection: `packages/ts-shell/src/orchestration/`
-  focused projection module and tests, with minimal wiring in
-  `runMvpIntegratedFlow.ts` only if the projection is pure.
+- For reassessment: docs/design only, unless the route explicitly asks for
+  read-only code inspection.
+- For any later implementation: the focused module and test for the proven seam,
+  with minimal wiring in the owning large file only if the seam is pure.
 
 Forbidden files for that future route:
 
 - `packages/ts-shell/src/session/SessionManager.ts`.
 - Provider/auth core.
 - MCP core.
-- `packages/ts-shell/src/entrypoints/cli.tsx`, unless the future route is a
-  read-only CLI audit.
+- `packages/ts-shell/src/entrypoints/cli.tsx`, unless a future route proves a
+  pure CLI projection/wrapper seam.
 - `scripts/*`.
 - `package.json`.
 - Default gates.
@@ -616,9 +680,9 @@ Forbidden files for that future route:
 Local validation for that future route:
 
 - For reassessment: `rtk git diff --check`.
-- For provider projection implementation: focused projection tests, relevant
-  runtime outcome/result tests, `rtk npm run verify:result-contract`,
-  `rtk npm run build -w packages/ts-shell`, and `rtk git diff --check`.
+- For later implementation: focused module tests plus the relevant runtime,
+  session, CLI, result, build, and diff checks dictated by the touched
+  boundary.
 
 Stop conditions for that future route:
 
@@ -627,12 +691,14 @@ Stop conditions for that future route:
 - Provider auth/core changes.
 - Redaction weakening.
 - Default gate changes or full real-provider execution.
-- Runtime invocation behavior changes outside a pure projection.
+- Runtime invocation behavior changes outside a pure projection/wrapper.
+- Session persistence, schema, lifecycle, or authorization changes.
+- CLI command execution, MCP gateway, approval authorization/persistence,
+  session switching, readline lifecycle, or process-exit migration.
 
-SessionManager approval/persistence ownership audit remains a valid alternate
-next direction if the goal is to continue session work. CLI interactive
-boundary audit remains valid if the goal is to continue CLI work, but it should
-start read-only and not as another extraction by default.
+SessionManager persistence ownership audit and CLI interactive boundary audit
+remain valid future reassessment topics, but they should start read-only and
+not as another extraction by default.
 
 ## 9. Readiness Claims Not Changed
 
