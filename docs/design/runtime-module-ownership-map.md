@@ -12,14 +12,15 @@ default gates, or make a new readiness claim.
 ## 1. Migration Status As Of Current HEAD
 
 Current HEAD includes the runtime/session extraction series through
-`2a57077 Remove obsolete replay plan builder`.
+`2a57077 Remove obsolete replay plan builder`, plus the Route 24-28 CLI
+extraction series through the approval prompt bridge.
 
 This status is an ownership synchronization, not a release-readiness claim. The
 current large-file sizes observed in this pass are:
 
 - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`: 11,646 lines.
 - `packages/ts-shell/src/session/SessionManager.ts`: 4,815 lines.
-- `packages/ts-shell/src/entrypoints/cli.tsx`: 3,693 lines.
+- `packages/ts-shell/src/entrypoints/cli.tsx`: 3,099 lines.
 
 Completed orchestration extractions:
 
@@ -42,6 +43,21 @@ Completed session extractions:
 | Replay transcript/runtime seed construction | `packages/ts-shell/src/session/sessionReplayBuilder.ts` | completed |
 | Obsolete replay plan builder | `packages/ts-shell/src/session/replayPlanBuilder.ts` | removed; no runtime/test call sites |
 
+Completed CLI extractions:
+
+| Responsibility | Current owner | Status |
+| --- | --- | --- |
+| Typed CLI argument parsing | `packages/ts-shell/src/entrypoints/cliArgs.ts` | completed |
+| Slash-command positional fallback collision fix | `packages/ts-shell/src/entrypoints/cliArgs.ts` | completed |
+| CLI mode dispatch | `packages/ts-shell/src/entrypoints/cliModeDispatch.ts` | completed |
+| Print mode runner | `packages/ts-shell/src/entrypoints/cliPrintModeRunner.ts` | completed |
+| Stdin mode runner | `packages/ts-shell/src/entrypoints/cliStdinModeRunner.ts` | completed |
+| Provider readiness CLI surface | `packages/ts-shell/src/entrypoints/providerReadinessCliSurface.ts` | completed |
+| Slash command registry/help surface | `packages/ts-shell/src/entrypoints/slashCommandRegistry.ts` | completed |
+| Workspace CLI surface | `packages/ts-shell/src/entrypoints/cliWorkspaceSurface.ts` | completed |
+| MCP control CLI surface | `packages/ts-shell/src/entrypoints/mcpControlCliSurface.ts` | completed |
+| Approval prompt/display bridge | `packages/ts-shell/src/entrypoints/approvalPromptBridge.ts` | completed |
+
 Search checks from this pass:
 
 - `replayPlanBuilder|buildReplayPlanFromSnapshot` has no matches under
@@ -50,9 +66,13 @@ Search checks from this pass:
   `runMvpIntegratedFlow.ts` or their focused tests.
 - The session extraction modules are imported by `SessionManager.ts` or focused
   tests.
-- No CLI extraction module names such as `cliArgs`, `cliModeDispatch`,
-  `cliPrintModeRunner`, `cliStdinModeRunner`, `slashCommandRegistry`,
-  `approvalPromptBridge`, or `providerReadinessCliSurface` exist yet.
+- The CLI extraction modules listed above exist, have focused tests, and are
+  imported by `cli.tsx` where runtime wiring still needs them.
+- The slash-command positional fallback fix is covered in `cliArgs.test.ts`;
+  reserved shell slash commands such as `/continue`, `/sessions`, `/mcp`,
+  `/resume`, `/workspace`, `/help`, and `/pwd` are not treated as positional
+  project fallback, while path-like values such as `nested/project` and
+  `/tmp/project` still are.
 
 ## 2. Reference Comparison Calibration
 
@@ -255,35 +275,53 @@ Remaining candidates to consider later:
 
 ### `cli.tsx`
 
-No runtime extraction has completed yet for `cli.tsx`; CLI extraction remains
-pending.
+Route 24-28 completed the low/medium-risk CLI extraction batches for argument
+parsing, mode dispatch, print/stdin runners, provider/workspace/MCP surfaces,
+slash command registry/help rendering, and approval prompt display bridging.
 
-The file currently remains the process entrypoint and still owns option
-parsing, startup/bootstrap, print/stdin/replay/interactive mode branching,
-slash command bridge behavior, approval prompt bridge behavior, provider
-readiness display, session switching surfaces, workspace attach/status
-rendering, MCP control-plane rendering, runtime invocation, and terminal output
-behavior.
+The file should continue to retain:
 
-Candidate modules remain:
+- Process bootstrap.
+- High-level runtime/session/provider wiring.
+- Interactive loop and readline lifecycle.
+- Actual command execution.
+- Trust policy evaluation.
+- Allow-once cache and allow-always persistence.
+- Runtime handler wiring.
+- Terminal lifecycle and process exit boundary.
 
-- `cliArgs.ts`
-- `cliModeDispatch.ts`
-- `cliPrintModeRunner.ts`
-- `cliStdinModeRunner.ts`
-- `slashCommandRegistry.ts`
-- `approvalPromptBridge.ts`
-- `providerReadinessCliSurface.ts`
+The file should not regain ownership of completed CLI modules:
+
+- CLI argument parsing and slash-command positional fallback handling.
+- CLI mode dispatch.
+- Print/stdin mode runner control.
+- Provider readiness display projection.
+- Slash command registry/help/session command map rendering.
+- Workspace attach/status display projection.
+- MCP control-plane display projection.
+- Approval prompt/display/provenance/response text surface.
+
+Remaining candidates to consider later:
+
+| Candidate | Target shape | Risk | Timing |
+| --- | --- | --- | --- |
+| Interactive/TUI loop boundary audit | Read-only boundary audit before any extraction | high | later |
+| Runtime invocation wrapper | Pure wrapper only, with strong CLI/runtime tests | medium/high | later |
+| Command execution bridge | Bridge only if command semantics and mode precedence do not change | medium/high | later |
+| Approval semantic/persistence work | Persistence/semantic split only; no authorization behavior change | high | later |
 
 Reference calibration for CLI ownership:
 
 - The CLI entrypoint should become closer to bootstrap, mode dispatch, and
-  wiring.
-- Command/slash/approval/provider-readiness display should not live long-term
-  in one entrypoint file.
-- Interactive/TUI-related extraction is higher risk and should come after args
-  and mode dispatch, because mode precedence and prompt transport must remain
-  stable.
+  wiring; the completed Route 24-28 extraction moved the lower-risk typed args,
+  dispatch, runner, and display surfaces in that direction.
+- Command execution and approval semantics should not be confused with display
+  surfaces. The display bridges can stay extracted while authorization,
+  persistence, and actual command execution remain in `cli.tsx` until a
+  dedicated higher-risk route exists.
+- Interactive/TUI-related extraction is still higher risk even after args and
+  mode dispatch moved out, because readline lifecycle, mode precedence, prompt
+  transport, and process-exit behavior must remain stable.
 
 ## 4. Updated Ownership Tables
 
@@ -331,14 +369,27 @@ Reference calibration for CLI ownership:
 | Responsibility | Current owner | Status | Notes |
 | --- | --- | --- | --- |
 | Process entrypoint/bootstrap | `cli.tsx` | keep | Should remain composition root. |
-| CLI arg parsing | `cli.tsx` | pending | Candidate `cliArgs.ts`; likely first CLI batch. |
-| Mode dispatch | `cli.tsx` | pending | Candidate `cliModeDispatch.ts`; after typed args. |
-| Print mode runner | `cli.tsx` | pending | Candidate `cliPrintModeRunner.ts`; after args/mode dispatch. |
-| Stdin mode runner | `cli.tsx` | pending | Candidate `cliStdinModeRunner.ts`; after args/mode dispatch. |
-| Slash command registry/bridge | `cli.tsx` and existing slash modules | pending | Candidate `slashCommandRegistry.ts`; avoid grammar changes. |
-| Approval prompt bridge | `cli.tsx` | pending | Candidate `approvalPromptBridge.ts`; no authorization changes. |
-| Provider readiness CLI surface | `cli.tsx` and readiness helpers | pending | Candidate `providerReadinessCliSurface.ts`; preserve redaction. |
-| Interactive/TUI loop details | `cli.tsx` | deferred | Higher-risk; later than args/mode dispatch. |
+| High-level runtime/session/provider wiring | `cli.tsx` | keep | Composition root for shell runtime. |
+| Interactive loop / readline lifecycle | `cli.tsx` | keep | Higher-risk boundary; do not move casually. |
+| Actual command execution | `cli.tsx` | keep | Command semantics remain in the entrypoint path for now. |
+| Trust policy evaluation | `cli.tsx` | keep | Authorization semantics stay out of display bridges. |
+| Allow-once cache / allow-always persistence | `cli.tsx` | keep | Approval persistence semantics stay here for now. |
+| Runtime handler wiring | `cli.tsx` | keep | Owns runtime handler composition. |
+| Terminal lifecycle / process exit boundary | `cli.tsx` | keep | Entrypoint process responsibility. |
+| CLI arg parsing | `cliArgs.ts` | completed | Includes path-like positional project fallback. |
+| Slash-command positional fallback collision fix | `cliArgs.ts` | completed | Reserved shell slash commands are not project fallback. |
+| Mode dispatch | `cliModeDispatch.ts` | completed | Dispatch plan only; no mode behavior rewrite. |
+| Print mode runner | `cliPrintModeRunner.ts` | completed | Runner surface outside entrypoint. |
+| Stdin mode runner | `cliStdinModeRunner.ts` | completed | Runner surface outside entrypoint. |
+| Provider readiness CLI surface | `providerReadinessCliSurface.ts` | completed | Preserves redaction/display boundary. |
+| Slash command registry/bridge surface | `slashCommandRegistry.ts` | completed | Registry/help/session command map rendering. |
+| Workspace CLI surface | `cliWorkspaceSurface.ts` | completed | Workspace attach/status display projection. |
+| MCP control CLI surface | `mcpControlCliSurface.ts` | completed | MCP status/tools/doctor/blocked display projection. |
+| Approval prompt bridge | `approvalPromptBridge.ts` | completed | Display/provenance/response shaping only; no authorization changes. |
+| Interactive/TUI loop boundary audit | future audit | deferred | Later/high risk. |
+| Runtime invocation wrapper | future module only if pure | deferred | Requires strong tests. |
+| Command execution bridge | future bridge only if semantics are unchanged | deferred | Preserve mode precedence and command behavior. |
+| Approval semantic/persistence split | future module only with explicit route | deferred | Later/high risk. |
 
 ## 5. Migration Priority Table
 
@@ -357,17 +408,27 @@ Completed P0/P1 items are no longer future work:
 | `mutationContinuityState` | `SessionManager.ts` | `mutationContinuityState.ts` |
 | `sessionReplayBuilder` | `SessionManager.ts` | `sessionReplayBuilder.ts` |
 | `replayPlanBuilder` removal | `SessionManager.ts`/session replay area | deleted; no call sites |
+| `cliArgs` | `cli.tsx` | `cliArgs.ts` |
+| Slash-command positional fallback fix | `cli.tsx`/CLI args | `cliArgs.ts` |
+| `cliModeDispatch` | `cli.tsx` | `cliModeDispatch.ts` |
+| `cliPrintModeRunner` | `cli.tsx` | `cliPrintModeRunner.ts` |
+| `cliStdinModeRunner` | `cli.tsx` | `cliStdinModeRunner.ts` |
+| `providerReadinessCliSurface` | `cli.tsx` | `providerReadinessCliSurface.ts` |
+| `slashCommandRegistry` | `cli.tsx` | `slashCommandRegistry.ts` |
+| `cliWorkspaceSurface` | `cli.tsx` | `cliWorkspaceSurface.ts` |
+| `mcpControlCliSurface` | `cli.tsx` | `mcpControlCliSurface.ts` |
+| `approvalPromptBridge` | `cli.tsx` | `approvalPromptBridge.ts` |
 
 Remaining candidates:
 
 | Priority | Source file | Candidate module | Risk | Timing |
 | --- | --- | --- | --- | --- |
-| Next possible CLI batch | `cli.tsx` | `cliArgs.ts` | low/medium | next |
-| Next possible CLI batch | `cli.tsx` | `cliModeDispatch.ts` | medium | after `cliArgs.ts` |
-| Later CLI runners | `cli.tsx` | `cliPrintModeRunner.ts` / `cliStdinModeRunner.ts` | medium | after args/mode dispatch |
 | Later orchestration projection | `runMvpIntegratedFlow.ts` | provider outcome projection | higher-risk | later |
 | Later session helper | `SessionManager.ts` | approval context extraction | medium/high | later |
 | Later session gateway | `SessionManager.ts` | session persistence gateway | high | later |
+| Possible CLI audit | `cli.tsx` | interactive/TUI loop boundary audit | high | later/read-only first |
+| Possible CLI wrapper | `cli.tsx` | runtime invocation wrapper | medium/high | later only if pure |
+| Possible architecture reset | docs/code map | maintainability score reassessment | low | next direction candidate |
 
 ## 6. Migration Batches
 
@@ -415,21 +476,46 @@ Remaining from this family:
 Stop condition for this family: no session schema migration, new persistence
 layer, broad history compaction rewrite, or recovery trust expansion.
 
-### Pending: CLI Mode/Command/Approval Batch
+### Completed: CLI Args/Mode/Print/Stdin Batch
 
-CLI extraction has not started.
+The lower-risk CLI control extraction batch is complete.
 
-Likely sequence:
+Completed:
 
-1. `cliArgs.ts`
-2. `cliModeDispatch.ts`
-3. Print/stdin mode runners
-4. Slash/approval/provider-readiness surfaces
-5. Interactive/TUI-related extraction only after lower-risk dispatch seams are
-   stable
+- `cliArgs.ts`
+- slash-command positional fallback fix in `cliArgs.ts`
+- `cliModeDispatch.ts`
+- `cliPrintModeRunner.ts`
+- `cliStdinModeRunner.ts`
+
+### Completed: CLI Provider/Workspace/MCP/Approval Surface Batch
+
+The CLI display/surface extraction batch is complete.
+
+Completed:
+
+- `providerReadinessCliSurface.ts`
+- `slashCommandRegistry.ts`
+- `cliWorkspaceSurface.ts`
+- `mcpControlCliSurface.ts`
+- `approvalPromptBridge.ts`
+
+### Deferred/High Risk: CLI Interactive/Runtime Execution Batch
+
+Remaining CLI work should not start as automatic extraction. It should begin
+with a boundary audit or a narrowly testable pure wrapper.
+
+Remaining:
+
+- Interactive/TUI loop boundary audit: deferred/high risk.
+- Runtime invocation wrapper: only if pure and well tested.
+- Command execution bridge: only if it preserves command semantics and mode
+  precedence.
+- Approval semantic/persistence work: later/high risk.
 
 Stop condition for this family: no CLI grammar rewrite, UI redesign, provider
-config migration, default real-provider execution, or live TTY readiness claim.
+config migration, default real-provider execution, authorization behavior
+change, or live TTY readiness claim.
 
 ## 7. Validation Strategy
 
@@ -446,6 +532,15 @@ Local validation examples recently used or relevant to completed modules:
 - `rtk npm run test -w packages/ts-shell -- src/session/compactRetentionPlanner.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/session/mutationContinuityState.test.ts`
 - `rtk npm run test -w packages/ts-shell -- src/session/sessionReplayBuilder.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/entrypoints/cliArgs.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/entrypoints/cliModeDispatch.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/entrypoints/cliPrintModeRunner.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/entrypoints/cliStdinModeRunner.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/entrypoints/providerReadinessCliSurface.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/entrypoints/slashCommandRegistry.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/entrypoints/cliWorkspaceSurface.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/entrypoints/mcpControlCliSurface.test.ts`
+- `rtk npm run test -w packages/ts-shell -- src/entrypoints/approvalPromptBridge.test.ts`
 
 Batch/full validation examples:
 
@@ -466,64 +561,78 @@ update.
 
 ## 8. Recommended Next Migration
 
-Recommended next migration: start the CLI batch with typed argument parsing.
+Recommended next direction: architecture maintainability score reassessment
+before selecting another implementation migration.
 
 Target file:
 
-- `packages/ts-shell/src/entrypoints/cli.tsx`
+- `docs/design/runtime-module-ownership-map.md` or a dedicated assessment
+  artifact if a future route explicitly allows one.
 
 Target module:
 
-- `packages/ts-shell/src/entrypoints/cliArgs.ts`
+- None for the reassessment itself. If implementation follows, pick one of:
+  `runMvpIntegratedFlow.ts` provider outcome / safe diagnostic projection,
+  `SessionManager.ts` approval/persistence ownership audit, or a read-only
+  `cli.tsx` interactive boundary audit.
 
 Why now:
 
 - The recent runMvp and SessionManager P0/P1 projection/context batches are
   mostly complete.
-- `cli.tsx` has no completed runtime extraction yet and remains 3,693 lines.
-- Reference comparison supports moving CLI entrypoints toward bootstrap, mode
-  dispatch, and wiring before extracting interactive/TUI behavior.
-- Typed args are lower risk than provider outcome projection or approval
-  context persistence because they can be tested without provider execution,
-  session schema changes, or writer behavior changes.
+- Route 24-28 completed the lower-risk CLI args/mode/runner/surface batches.
+- The remaining obvious candidates are higher risk: provider diagnostic
+  projection must preserve redaction and attribution; SessionManager approval
+  work must not change authorization or persistence semantics; CLI interactive
+  work touches readline, command execution, and terminal lifecycle.
+- A reassessment can compare the remaining hotspot size, ownership clarity,
+  validation coverage, and risk before choosing the next implementation route.
+
+Best implementation candidate after reassessment:
+
+- `runMvpIntegratedFlow.ts` provider outcome / safe diagnostic projection, but
+  only if a clearly pure projection remains and can be tested without provider
+  execution, provider auth changes, or default gate changes.
 
 Allowed files for that future route:
 
-- `packages/ts-shell/src/entrypoints/cli.tsx` for minimal wiring only.
-- `packages/ts-shell/src/entrypoints/cliArgs.ts`.
-- A focused CLI args test if needed under the existing test conventions.
+- For reassessment: docs only, unless the route explicitly asks for read-only
+  code inspection.
+- For provider outcome projection: `packages/ts-shell/src/orchestration/`
+  focused projection module and tests, with minimal wiring in
+  `runMvpIntegratedFlow.ts` only if the projection is pure.
 
 Forbidden files for that future route:
 
-- `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`.
 - `packages/ts-shell/src/session/SessionManager.ts`.
 - Provider/auth core.
 - MCP core.
+- `packages/ts-shell/src/entrypoints/cli.tsx`, unless the future route is a
+  read-only CLI audit.
 - `scripts/*`.
 - `package.json`.
 - Default gates.
 
 Local validation for that future route:
 
-- `rtk npm run verify:cli-entry`
-- `rtk npm run test -w packages/ts-shell -- src/cli-baseline.test.ts` if the
-  existing baseline still covers the parsed option behavior.
-- `rtk npm run build -w packages/ts-shell`
-- `rtk git diff --check`
+- For reassessment: `rtk git diff --check`.
+- For provider projection implementation: focused projection tests, relevant
+  runtime outcome/result tests, `rtk npm run verify:result-contract`,
+  `rtk npm run build -w packages/ts-shell`, and `rtk git diff --check`.
 
 Stop conditions for that future route:
 
-- CLI grammar rewrite.
-- Mode precedence changes.
 - Provider config or credential handling changes.
-- Runtime invocation behavior changes.
-- Approval authorization changes.
-- Interactive/TUI redesign.
+- Provider call execution migration.
+- Provider auth/core changes.
+- Redaction weakening.
+- Default gate changes or full real-provider execution.
+- Runtime invocation behavior changes outside a pure projection.
 
-Provider outcome projection remains a valid later candidate if a clearly pure,
-redacted projection remains in `runMvpIntegratedFlow.ts`. Approval context
-extraction remains a valid later candidate if it can be kept to durable
-persistence/projection shape and not authorization behavior.
+SessionManager approval/persistence ownership audit remains a valid alternate
+next direction if the goal is to continue session work. CLI interactive
+boundary audit remains valid if the goal is to continue CLI work, but it should
+start read-only and not as another extraction by default.
 
 ## 9. Readiness Claims Not Changed
 
