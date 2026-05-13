@@ -13,17 +13,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { QueryEvent } from "../core/query/events.js";
 import type {
-  ContinuationEvidenceToken,
-  ContinuationPolicyEvidence,
-  ContinuationSafety,
   QueryRuntimeRecoveryBoundary,
   QueryRuntimeRepairSummary,
   QueryRuntimeStateSeed,
-} from "../core/query/runtimeState.js";
-import {
-  buildContinuationPolicyEvidence,
-  CONTINUATION_SAFETY_POLICY,
-  resolveContinuationSafety,
 } from "../core/query/runtimeState.js";
 import { rebaseLegacyPermissionRootsInWorkingMemory } from "../core/paths/legacyRootRebase.js";
 import {
@@ -32,8 +24,6 @@ import {
   type DurableLifecycleIndex,
 } from "../core/tools/toolResultLifecycle.js";
 import type {
-  AgentExecutionOutput,
-  AgentRole,
   CodingResultSummary,
   CodingWriteEffect,
   ContinuationReason,
@@ -52,8 +42,14 @@ import {
   type CurrentSessionSelectionResolution,
   type CurrentSessionSelectionStore,
 } from "./currentSessionSelection.js";
-import { buildReplayPlanFromSnapshot } from "./replayPlanBuilder.js";
 import { buildMutationContinuityState } from "./mutationContinuityState.js";
+import {
+  buildResumeReplayInput,
+  buildSessionReplayPlan,
+  normalizeReplayTranscriptEvents,
+  prepareReplayTranscript,
+  type RuntimeSeedOptions,
+} from "./sessionReplayBuilder.js";
 import {
   buildActionHandoffSummary,
   buildSeedInfluenceHandoffSummary,
@@ -241,30 +237,6 @@ export interface ReplayPlan {
   readonly replayMessages: SessionMessage[];
   readonly continuationPrompt?: string;
   readonly requiresAssistantSentinel: boolean;
-  readonly repairSummary: QueryRuntimeRepairSummary;
-}
-
-interface RuntimeSeedOptions {
-  readonly maxTurns?: number;
-  readonly fallbackStartingRole?: AgentRole;
-}
-
-type TurnStartedQueryEvent = Extract<QueryEvent, { type: "turn.started" }>;
-type TurnCompletedQueryEvent = Extract<QueryEvent, { type: "turn.completed" }>;
-
-interface TurnPairingState {
-  readonly pairedTurns: Array<{
-    readonly started: TurnStartedQueryEvent;
-    readonly output: AgentExecutionOutput;
-  }>;
-  readonly openTurn?: TurnStartedQueryEvent;
-  readonly ignoredDuplicateTurnStarts: number;
-  readonly ignoredUnpairedTurnCompletions: number;
-  readonly ignoredRoleMismatchedTurnCompletions: number;
-}
-
-interface ReplayPreparation {
-  readonly transcriptEvents: TranscriptEvent[];
   readonly repairSummary: QueryRuntimeRepairSummary;
 }
 
@@ -1139,17 +1111,7 @@ export class SessionManager {
   }
 
   normalizeTranscriptEvents(events: TranscriptEvent[]): TranscriptEvent[] {
-    return events.filter((event) => {
-      if (
-        event.type === "message" &&
-        event.role === "assistant" &&
-        event.content.trim().length === 0
-      ) {
-        return false;
-      }
-
-      return true;
-    });
+    return normalizeReplayTranscriptEvents(events);
   }
 
   repairTranscriptEvents(
@@ -1162,294 +1124,23 @@ export class SessionManager {
   private prepareReplayTranscript(
     events: TranscriptEvent[],
     context: TranscriptRepairContext,
-  ): ReplayPreparation {
-    const repaired = [...events];
-    const baseTimestamp = new Date(context.updatedAt).getTime();
-    let syntheticOffset = 0;
-    let insertedPromptMessage = false;
-    let insertedQueryStarted = false;
-    let insertedRunInterrupted = false;
-
-    const nextSyntheticTimestamp = (): string => {
-      syntheticOffset += 1;
-      return new Date(baseTimestamp + syntheticOffset).toISOString();
-    };
-
-    if (context.pendingPrompt) {
-      const normalizedPrompt = context.pendingPrompt.trim();
-      const hasPromptMessage = repaired.some(
-        (event): event is Extract<TranscriptEvent, { type: "message" }> =>
-          event.type === "message" &&
-          event.role === "user" &&
-          event.content.trim() === normalizedPrompt,
-      );
-
-      if (!hasPromptMessage && context.state.runPhase !== "idle") {
-        const runStartedIndex = repaired.findIndex(
-          (event): event is Extract<TranscriptEvent, { type: "lifecycle" }> =>
-            event.type === "lifecycle" && event.event === "run-started",
-        );
-        const insertionIndex = runStartedIndex === -1 ? 0 : runStartedIndex + 1;
-        repaired.splice(insertionIndex, 0, {
-          type: "message",
-          role: "user",
-          content: context.pendingPrompt,
-          timestamp: nextSyntheticTimestamp(),
-        });
-        insertedPromptMessage = true;
-      }
-    }
-
-    const hasQueryStarted = repaired.some(
-      (event): event is Extract<TranscriptEvent, { type: "query-event" }> =>
-        event.type === "query-event" && event.event.type === "query.started",
-    );
-    const firstQueryEventIndex = repaired.findIndex(
-      (event) => event.type === "query-event",
-    );
-    const hasQueryPhaseEvents = repaired.some(
-      (event): event is Extract<TranscriptEvent, { type: "query-event" }> =>
-        event.type === "query-event" && event.event.type !== "query.started",
-    );
-
-    if (
-      context.state.runPhase === "turn-active" &&
-      context.pendingPrompt &&
-      hasQueryPhaseEvents &&
-      !hasQueryStarted
-    ) {
-      repaired.splice(
-        firstQueryEventIndex === -1 ? repaired.length : firstQueryEventIndex,
-        0,
-        {
-          type: "query-event",
-          event: {
-            type: "query.started",
-            sessionId: context.sessionId,
-            prompt: context.pendingPrompt,
-          },
-          timestamp: nextSyntheticTimestamp(),
-        },
-      );
-      insertedQueryStarted = true;
-    }
-
-    const interruptedTerminalQueries = repaired.filter(
-      (event): boolean =>
-        event.type === "query-event" &&
-        (event.event.type === "query.completed" ||
-          event.event.type === "query.failed"),
-    ).length;
-
-    const withoutInterruptedTerminalQueries =
-      context.state.status === "interrupted"
-        ? repaired.filter(
-            (event): boolean =>
-              event.type !== "query-event" ||
-              (event.event.type !== "query.completed" &&
-                event.event.type !== "query.failed"),
-          )
-        : repaired;
-
-    const hasRunInterrupted = withoutInterruptedTerminalQueries.some(
-      (event): event is Extract<TranscriptEvent, { type: "lifecycle" }> =>
-        event.type === "lifecycle" && event.event === "run-interrupted",
-    );
-
-    if (context.state.status === "interrupted" && !hasRunInterrupted) {
-      withoutInterruptedTerminalQueries.push({
-        type: "lifecycle",
-        event: "run-interrupted",
-        timestamp: nextSyntheticTimestamp(),
-        detail: context.pendingPrompt,
-      });
-      insertedRunInterrupted = true;
-    }
-
-    return {
-      transcriptEvents: withoutInterruptedTerminalQueries,
-      repairSummary: {
-        insertedPromptMessage,
-        insertedQueryStarted,
-        strippedInterruptedTerminalEvents:
-          context.state.status === "interrupted"
-            ? interruptedTerminalQueries
-            : 0,
-        insertedRunInterrupted,
-        ignoredDuplicateTurnStarts: 0,
-        ignoredUnpairedTurnCompletions: 0,
-        ignoredRoleMismatchedTurnCompletions: 0,
-      },
-    };
+  ) {
+    return prepareReplayTranscript(events, context);
   }
 
   getReplayPlan(sessionId: string): ReplayPlan {
-    const snapshot = this.getRecoverySnapshot(sessionId);
-    const turnPairing = this.buildTurnPairingState(snapshot.transcriptEvents);
-    return buildReplayPlanFromSnapshot(snapshot, turnPairing);
+    return buildSessionReplayPlan(this.getRecoverySnapshot(sessionId));
   }
 
   buildRuntimeStateSeed(
     sessionId: string,
     options: RuntimeSeedOptions = {},
   ): QueryRuntimeStateSeed {
-    const snapshot = this.getRecoverySnapshot(sessionId);
-    const turnPairing = this.buildTurnPairingState(snapshot.transcriptEvents);
-    const turnCompletedOutputs = turnPairing.pairedTurns.map(
-      (turn) => turn.output,
-    );
-
-    const initialPrompt =
-      snapshot.pendingPrompt ?? snapshot.lastUserMessage?.content ?? "";
-    const startingRole =
-      turnPairing.pairedTurns[0]?.started.role ??
-      turnPairing.openTurn?.role ??
-      turnCompletedOutputs[0]?.role ??
-      options.fallbackStartingRole ??
-      "planner";
-    const lastCompletedOutput =
-      turnCompletedOutputs[turnCompletedOutputs.length - 1];
-    const lastPairedTurn =
-      turnPairing.pairedTurns[turnPairing.pairedTurns.length - 1]?.started;
-    const driftSummary = {
-      ...snapshot.repairSummary,
-      ignoredDuplicateTurnStarts: turnPairing.ignoredDuplicateTurnStarts,
-      ignoredUnpairedTurnCompletions:
-        turnPairing.ignoredUnpairedTurnCompletions,
-      ignoredRoleMismatchedTurnCompletions:
-        turnPairing.ignoredRoleMismatchedTurnCompletions,
-    };
-    const driftCount =
-      driftSummary.ignoredDuplicateTurnStarts +
-      driftSummary.ignoredUnpairedTurnCompletions +
-      driftSummary.ignoredRoleMismatchedTurnCompletions;
-
-    const computedBoundary: QueryRuntimeRecoveryBoundary = turnPairing.openTurn
-      ? "mid-turn-reentry"
-      : turnPairing.pairedTurns.length > 0
-        ? "completed-turn-reentry"
-        : "fresh-entry";
-    const hasPendingLifecycle =
-      Object.keys(snapshot.pendingLifecycle.pendingApprovals).length > 0 ||
-      Object.keys(snapshot.pendingLifecycle.pendingTools).length > 0;
-    const policyEvidenceTokens: ContinuationEvidenceToken[] = [];
-    if (computedBoundary === "mid-turn-reentry") {
-      policyEvidenceTokens.push("open-turn");
-    }
-    if (turnPairing.pairedTurns.length > 0) {
-      policyEvidenceTokens.push("paired-turns");
-    }
-    if (hasPendingLifecycle) {
-      policyEvidenceTokens.push("pending-lifecycle");
-    }
-    if (driftCount > 0) {
-      policyEvidenceTokens.push("repair-drift");
-    }
-    const policyEvidence: ContinuationPolicyEvidence =
-      buildContinuationPolicyEvidence(policyEvidenceTokens);
-    const continuationSafety: ContinuationSafety = resolveContinuationSafety({
-      evidence: policyEvidence,
+    return buildResumeReplayInput({
+      sessionId,
+      snapshot: this.getRecoverySnapshot(sessionId),
+      options,
     });
-    const continuationPolicy = CONTINUATION_SAFETY_POLICY[continuationSafety];
-    const recoveryBoundary: QueryRuntimeRecoveryBoundary =
-      continuationPolicy.runtimeRecoveryBoundary;
-
-    const currentRole = continuationPolicy.resetToStartingRole
-      ? startingRole
-      : recoveryBoundary === "mid-turn-reentry"
-        ? turnPairing.openTurn!.role
-        : (lastCompletedOutput?.handoffTo ?? startingRole);
-    const turn = continuationPolicy.resetToStartingRole
-      ? 1
-      : recoveryBoundary === "mid-turn-reentry"
-        ? turnPairing.openTurn!.turn
-        : (lastPairedTurn?.turn ?? 0) + 1;
-
-    return {
-      config: {
-        sessionId,
-        initialPrompt,
-        maxTurns: options.maxTurns ?? 12,
-        startingRole,
-      },
-      currentRole,
-      turn,
-      lastContinuationReason: snapshot.lastContinuationReason,
-      pendingLifecycle: snapshot.pendingLifecycle,
-      recoveryBoundary,
-      truthBoundary: {
-        source: "durable-replay",
-        normalizedEventCount: snapshot.transcriptEvents.length,
-        pairedTurnCount: turnPairing.pairedTurns.length,
-        policyEvidence,
-        repairSummary: driftSummary,
-        continuationSafety,
-        openTurn:
-          recoveryBoundary === "mid-turn-reentry" && turnPairing.openTurn
-            ? {
-                role: turnPairing.openTurn.role,
-                turn: turnPairing.openTurn.turn,
-              }
-            : undefined,
-      },
-      derivedState: {
-        transcript: continuationPolicy.allowDerivedContext
-          ? turnCompletedOutputs
-          : [],
-      },
-    };
-  }
-
-  private buildTurnPairingState(
-    transcriptEvents: readonly TranscriptEvent[],
-  ): TurnPairingState {
-    const pairedTurns: Array<{
-      started: TurnStartedQueryEvent;
-      output: AgentExecutionOutput;
-    }> = [];
-    let openTurn: TurnStartedQueryEvent | undefined;
-    let ignoredDuplicateTurnStarts = 0;
-    let ignoredUnpairedTurnCompletions = 0;
-    let ignoredRoleMismatchedTurnCompletions = 0;
-
-    for (const event of transcriptEvents) {
-      if (event.type !== "query-event") {
-        continue;
-      }
-
-      if (event.event.type === "turn.started") {
-        if (!openTurn) {
-          openTurn = event.event;
-        } else {
-          if (
-            openTurn.role !== event.event.role ||
-            openTurn.turn !== event.event.turn
-          ) {
-            ignoredDuplicateTurnStarts += 1;
-          }
-        }
-        continue;
-      }
-
-      if (event.event.type === "turn.completed") {
-        if (openTurn && openTurn.role === event.event.output.role) {
-          pairedTurns.push({ started: openTurn, output: event.event.output });
-          openTurn = undefined;
-        } else if (openTurn) {
-          ignoredRoleMismatchedTurnCompletions += 1;
-        } else {
-          ignoredUnpairedTurnCompletions += 1;
-        }
-      }
-    }
-
-    return {
-      pairedTurns,
-      openTurn,
-      ignoredDuplicateTurnStarts,
-      ignoredUnpairedTurnCompletions,
-      ignoredRoleMismatchedTurnCompletions,
-    };
   }
 
   listSessions(): Session[] {
