@@ -12,11 +12,26 @@ import {
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import {
-  renderApprovalAuditRecord,
-  renderApprovalHeader,
-  renderApprovalPromptFacts,
+  createApprovalResponse,
+  formatAllowOnceAppliedLine,
+  formatApprovalConflictResolutionLine,
+  formatApprovalDecisionLine,
+  formatApprovalObjectLine,
+  formatApprovalPromptDecisionMenuLine,
+  formatDefaultNonInteractiveDenyLine,
+  formatExplicitApprovalComment,
+  formatInteractiveApprovalComment,
+  formatInteractiveBlockedComment,
+  formatNonInteractiveApprovalComment,
+  formatNonInteractiveApprovalPolicyLine,
+  formatNonInteractiveBlockedComment,
+  formatTrustPolicyUpdatedLine,
+  renderApprovalAuditSurface,
+  renderApprovalRequiredSurface,
+  renderCachedApprovalSurface,
   type ApprovalAuditRecord,
-} from "../core/shell/approvalPromptRenderer.js";
+  type ApprovalDecisionSource,
+} from "./approvalPromptBridge.js";
 import {
   bootstrapShellRuntime,
   SessionBootstrapError,
@@ -150,14 +165,6 @@ interface ApprovalModeObject {
   readonly executableNow: boolean;
   readonly missingFields: readonly string[];
 }
-
-type ApprovalDecisionSource =
-  | "cli-policy"
-  | "approval-mode-object"
-  | "allow-once-cache"
-  | "allow-always-policy"
-  | "default-deny"
-  | "ambiguous-stop";
 
 interface NonInteractiveApprovalDecisionPlan {
   readonly source: ApprovalDecisionSource;
@@ -1309,7 +1316,7 @@ function createCliEscalationPromptHandler(
   persistApprovalAudit?: (record: ApprovalAuditRecord) => void,
 ): (prompt: EscalationPrompt) => Promise<EscalationResponse> {
   function emitApprovalAudit(record: ApprovalAuditRecord): void {
-    renderApprovalAuditRecord(renderer, record);
+    renderApprovalAuditSurface(renderer, record);
     persistApprovalAudit?.(record);
   }
 
@@ -1416,28 +1423,23 @@ function createCliEscalationPromptHandler(
         hasAllowOnceCache,
         hasAllowAlwaysGrant,
       });
-      renderApprovalHeader(renderer, "approval-required");
-      renderApprovalPromptFacts(renderer, {
+      renderApprovalRequiredSurface(renderer, {
         prompt,
         includeRisk: true,
         decisionSource: nonInteractiveDecisionPlan.source,
+        lines: [
+          ...nonInteractiveDecisionPlan.overrideNotes.map((note) => `- ${note}`),
+          ...(approvalModeObject
+            ? [formatApprovalObjectLine("Non-interactive", approvalModeObject)]
+            : []),
+        ],
       });
-      for (const note of nonInteractiveDecisionPlan.overrideNotes) {
-        renderer.renderLine(`- ${note}`);
-      }
-      if (approvalModeObject) {
-        renderer.renderLine(
-          `Non-interactive approval object: mode=${approvalModeObject.mode}, lineage=${approvalModeObject.verifyLineage}, persistent=${approvalModeObject.persistent ? "yes" : "no"}`,
-        );
-      }
       if (nonInteractiveDecisionPlan.source === "ambiguous-stop") {
         const stopReason =
           nonInteractiveDecisionPlan.stopReason ??
           "Approval mode is ambiguous.";
         renderer.renderLine(stopReason);
-        renderer.renderLine(
-          "Resolve approval conflict explicitly with --non-interactive-approval deny|allow-once|allow-always.",
-        );
+        renderer.renderLine(formatApprovalConflictResolutionLine());
         emitApprovalAudit({
           channel: "non-interactive",
           decision: "deny",
@@ -1451,26 +1453,31 @@ function createCliEscalationPromptHandler(
           stopReason,
         });
         renderer.renderLine("");
-        return {
+        return createApprovalResponse({
           promptId: prompt.id,
           decision: "deny",
-          respondedAt: Date.now(),
-          userComment: `CLI non-interactive approval blocked: ${stopReason}`,
-        };
+          userComment: formatNonInteractiveBlockedComment(stopReason),
+        });
       }
       const resolvedDecision = nonInteractiveDecisionPlan.decision ?? "deny";
       renderer.renderLine(
-        `Non-interactive approval policy: ${resolvedDecision}${cliNonInteractiveDecision !== undefined ? " (explicit CLI)" : nonInteractiveDecisionPlan.source === "approval-mode-object" ? " (prompt approval-mode-object)" : hasCachedGrant ? " (cached grant)" : " (default deny)"}`,
+        formatNonInteractiveApprovalPolicyLine({
+          resolvedDecision,
+          cliDecision: cliNonInteractiveDecision,
+          decisionSource: nonInteractiveDecisionPlan.source,
+          hasCachedGrant,
+        }),
       );
       if (resolvedDecision === "allow-once") {
-        renderer.renderLine(
-          "Allow-once applied to this execution only (non-persistent).",
-        );
+        renderer.renderLine(formatAllowOnceAppliedLine());
       }
       if (resolvedDecision === "allow-always") {
         const persisted = trustPolicy.rememberAllowAlways(prompt, projectRoot);
         renderer.renderLine(
-          `Trust policy updated: ${persisted.scopeLabel} @ ${path.basename(projectRoot) || projectRoot}`,
+          formatTrustPolicyUpdatedLine({
+            scopeLabel: persisted.scopeLabel,
+            projectRoot,
+          }),
         );
       }
       if (nonInteractiveDecisionPlan.source === "allow-once-cache") {
@@ -1507,14 +1514,16 @@ function createCliEscalationPromptHandler(
         scopeLabel: evaluation.scopeLabel,
         lineage: approvalModeObject?.verifyLineage,
       });
-      renderer.renderLine(`Approval decision: ${resolvedDecision}`);
+      renderer.renderLine(formatApprovalDecisionLine(resolvedDecision));
       renderer.renderLine("");
-      return {
+      return createApprovalResponse({
         promptId: prompt.id,
         decision: resolvedDecision,
-        respondedAt: Date.now(),
-        userComment: `CLI non-interactive approval: ${resolvedDecision} (${nonInteractiveDecisionPlan.source})`,
-      };
+        userComment: formatNonInteractiveApprovalComment({
+          decision: resolvedDecision,
+          decisionSource: nonInteractiveDecisionPlan.source,
+        }),
+      });
     }
 
     if (approvalModeObject) {
@@ -1526,8 +1535,7 @@ function createCliEscalationPromptHandler(
       if (interactiveDecisionPlan.source === "ambiguous-stop") {
         const stopReason =
           interactiveDecisionPlan.stopReason ?? "Approval mode is ambiguous.";
-        renderApprovalHeader(renderer, "approval-required");
-        renderApprovalPromptFacts(renderer, {
+        renderApprovalRequiredSurface(renderer, {
           prompt,
           includeRisk: true,
           decisionSource: interactiveDecisionPlan.source,
@@ -1546,31 +1554,25 @@ function createCliEscalationPromptHandler(
           stopReason,
         });
         renderer.renderLine("");
-        return {
+        return createApprovalResponse({
           promptId: prompt.id,
           decision: "deny",
-          respondedAt: Date.now(),
-          userComment: `CLI interactive approval blocked: ${stopReason}`,
-        };
+          userComment: formatInteractiveBlockedComment(stopReason),
+        });
       }
       if (interactiveDecisionPlan.source === "approval-mode-object") {
         const resolvedDecision = interactiveDecisionPlan.decision ?? "deny";
-        renderApprovalHeader(renderer, "approval-required");
-        renderApprovalPromptFacts(renderer, {
+        renderApprovalRequiredSurface(renderer, {
           prompt,
           includeRisk: true,
           decisionSource: interactiveDecisionPlan.source,
+          lines: [
+            ...interactiveDecisionPlan.overrideNotes.map((note) => `- ${note}`),
+            formatApprovalObjectLine("Interactive", approvalModeObject),
+          ],
         });
-        for (const note of interactiveDecisionPlan.overrideNotes) {
-          renderer.renderLine(`- ${note}`);
-        }
-        renderer.renderLine(
-          `Interactive approval object: mode=${approvalModeObject.mode}, lineage=${approvalModeObject.verifyLineage}, persistent=${approvalModeObject.persistent ? "yes" : "no"}`,
-        );
         if (resolvedDecision === "allow-once") {
-          renderer.renderLine(
-            "Allow-once applied to this execution only (non-persistent).",
-          );
+          renderer.renderLine(formatAllowOnceAppliedLine());
         }
         if (resolvedDecision === "allow-always") {
           const persisted = trustPolicy.rememberAllowAlways(
@@ -1578,7 +1580,10 @@ function createCliEscalationPromptHandler(
             projectRoot,
           );
           renderer.renderLine(
-            `Trust policy updated: ${persisted.scopeLabel} @ ${path.basename(projectRoot) || projectRoot}`,
+            formatTrustPolicyUpdatedLine({
+              scopeLabel: persisted.scopeLabel,
+              projectRoot,
+            }),
           );
         }
         emitApprovalAudit({
@@ -1595,14 +1600,16 @@ function createCliEscalationPromptHandler(
           scopeLabel: evaluation.scopeLabel,
           lineage: approvalModeObject?.verifyLineage,
         });
-        renderer.renderLine(`Approval decision: ${resolvedDecision}`);
+        renderer.renderLine(formatApprovalDecisionLine(resolvedDecision));
         renderer.renderLine("");
-        return {
+        return createApprovalResponse({
           promptId: prompt.id,
           decision: resolvedDecision,
-          respondedAt: Date.now(),
-          userComment: `CLI interactive approval: ${resolvedDecision} (${interactiveDecisionPlan.source})`,
-        };
+          userComment: formatInteractiveApprovalComment({
+            decision: resolvedDecision,
+            decisionSource: interactiveDecisionPlan.source,
+          }),
+        });
       }
     }
 
@@ -1614,11 +1621,10 @@ function createCliEscalationPromptHandler(
         scopeLabel: evaluation.scopeLabel,
         cacheKey: evaluation.cacheKey,
       });
-      renderApprovalHeader(renderer, "cached-approval");
-      renderApprovalPromptFacts(renderer, { prompt });
-      renderer.renderLine(
-        "- Decision: allow-once (cached in current shell run)",
-      );
+      renderCachedApprovalSurface(renderer, {
+        prompt,
+        lines: ["- Decision: allow-once (cached in current shell run)"],
+      });
       emitApprovalAudit({
         channel: isNonInteractive ? "non-interactive" : "interactive",
         decision: "allow-once",
@@ -1630,12 +1636,11 @@ function createCliEscalationPromptHandler(
         scopeLabel: evaluation.scopeLabel,
       });
       renderer.renderLine("");
-      return {
+      return createApprovalResponse({
         promptId: prompt.id,
         decision: "allow-once",
-        respondedAt: Date.now(),
         userComment: "CLI auto-approval from allow-once cache",
-      };
+      });
     }
     if (evaluation.matchedGrant) {
       trustPolicy.recordLastHit({
@@ -1644,11 +1649,14 @@ function createCliEscalationPromptHandler(
         scopeLabel: evaluation.scopeLabel,
         cacheKey: evaluation.cacheKey,
       });
-      renderApprovalHeader(renderer, "cached-approval");
-      renderApprovalPromptFacts(renderer, { prompt });
-      renderer.renderLine("- Decision: allow-always (project policy match)");
-      renderer.renderLine(`- Scope: ${evaluation.scopeLabel}`);
-      renderer.renderLine(`- Rule key: ${evaluation.matchedGrant.scopeKey}`);
+      renderCachedApprovalSurface(renderer, {
+        prompt,
+        lines: [
+          "- Decision: allow-always (project policy match)",
+          `- Scope: ${evaluation.scopeLabel}`,
+          `- Rule key: ${evaluation.matchedGrant.scopeKey}`,
+        ],
+      });
       emitApprovalAudit({
         channel: isNonInteractive ? "non-interactive" : "interactive",
         decision: "allow-always",
@@ -1660,16 +1668,14 @@ function createCliEscalationPromptHandler(
         scopeLabel: evaluation.scopeLabel,
       });
       renderer.renderLine("");
-      return {
+      return createApprovalResponse({
         promptId: prompt.id,
         decision: "allow-always",
-        respondedAt: Date.now(),
         userComment: "CLI auto-approval from project allow-always trust policy",
-      };
+      });
     }
 
-    renderApprovalHeader(renderer, "approval-required");
-    renderApprovalPromptFacts(renderer, { prompt, includeRisk: true });
+    renderApprovalRequiredSurface(renderer, { prompt, includeRisk: true });
     for (const line of trustPolicy.explain(
       evaluation,
       projectRoot,
@@ -1686,21 +1692,17 @@ function createCliEscalationPromptHandler(
         "- Tip: use /view developer to see policy and full escalation details.",
       );
     }
-    renderer.renderLine(
-      "Decision: y=allow-once, a=allow-always, n=deny (default n)",
-    );
+    renderer.renderLine(formatApprovalPromptDecisionMenuLine());
 
     let decision: "deny" | "allow-once" | "allow-always";
     let decisionInputKey: "y" | "a" | "n" | "other" | undefined;
     if (isNonInteractive) {
       decision = "deny";
       decisionInputKey = "n";
-      renderer.renderLine(
-        "Non-interactive approval policy: deny (default deny)",
-      );
+      renderer.renderLine(formatDefaultNonInteractiveDenyLine());
       if (approvalModeObject) {
         renderer.renderLine(
-          `Non-interactive approval object: mode=${approvalModeObject.mode}, lineage=${approvalModeObject.verifyLineage}, persistent=${approvalModeObject.persistent ? "yes" : "no"}`,
+          formatApprovalObjectLine("Non-interactive", approvalModeObject),
         );
       }
     } else {
@@ -1723,9 +1725,7 @@ function createCliEscalationPromptHandler(
     }
 
     if (decision === "allow-once") {
-      renderer.renderLine(
-        "Allow-once applied to this execution only (non-persistent).",
-      );
+      renderer.renderLine(formatAllowOnceAppliedLine());
     }
     const interactiveWiring = applyInteractiveApprovalDecisionWiring({
       decision,
@@ -1737,7 +1737,10 @@ function createCliEscalationPromptHandler(
     if (decision === "allow-always" && interactiveWiring.persistedGrant) {
       const persisted = interactiveWiring.persistedGrant;
       renderer.renderLine(
-        `Trust policy updated: ${persisted.scopeLabel} @ ${path.basename(projectRoot) || projectRoot}`,
+        formatTrustPolicyUpdatedLine({
+          scopeLabel: persisted.scopeLabel,
+          projectRoot,
+        }),
       );
     }
     emitApprovalAudit({
@@ -1759,14 +1762,16 @@ function createCliEscalationPromptHandler(
         : {}),
     });
 
-    renderer.renderLine(`Approval decision: ${decision}`);
+    renderer.renderLine(formatApprovalDecisionLine(decision));
     renderer.renderLine("");
-    return {
+    return createApprovalResponse({
       promptId: prompt.id,
       decision,
-      respondedAt: Date.now(),
-      userComment: `CLI explicit approval: ${decision}${getApprovalModeObject?.() ? " (approval-mode-object)" : ""}`,
-    };
+      userComment: formatExplicitApprovalComment({
+        decision,
+        hasApprovalModeObject: Boolean(getApprovalModeObject?.()),
+      }),
+    });
   };
 }
 
