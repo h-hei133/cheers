@@ -41,6 +41,11 @@ import {
   type FileConstraintAssertions,
 } from "./fileConstraintAssertions.js";
 import {
+  buildAmbiguousEditInstructionReason,
+  formatEditExecutionFailure,
+  formatTargetResolutionBlockerReason,
+} from "./doNextProjection.js";
+import {
   extractConsistencyItems,
   findMissingConsistencyItems,
   normalizeComparableText,
@@ -67,11 +72,25 @@ import {
   projectRuntimeCodingOutcome,
   projectRuntimeMutationOutcome,
 } from "./runtimeOutcomeProjection.js";
+import {
+  buildActionResultSeedDecisionTrace,
+  buildPostEditVerifyContinuationLineage,
+  continuityStateAsObject,
+  hasPassedVerificationLineage,
+  mergeContinuationState,
+  type ContinuityStateLike,
+  type GroundedDeliverableMode,
+} from "./runtimeHandoffProjection.js";
 import { resolveTaskTargets } from "./targetResolution.js";
 import type {
   ResolvedTarget,
   TargetResolutionBlocker,
 } from "./targetResolution.js";
+import {
+  classifyVerificationFailure,
+  blockerNextAction,
+  inferVerificationBlockerKind,
+} from "./toolExecutionOutcomeProjection.js";
 import type { SingleFileReplacePatchResult } from "./patchMutationLane.js";
 import {
   appendApprovalRequestedEvent,
@@ -82,7 +101,6 @@ import {
 import type {
   AgentExecutionInput,
   AgentExecutionOutput,
-  CodingActionResultSeed,
   CodingPatchRecord,
   CodingResultProvenanceSummary,
   CodingResultSummary,
@@ -90,8 +108,6 @@ import type {
   CodingVerificationBlockerKind,
   CodingVerificationSummary,
   OrchestrationResult,
-  TerminalClassification,
-  TerminalReason,
 } from "./types.js";
 
 export type { ApplyPatchRuntimeRouteOptions } from "./mutationRoutingProjection.js";
@@ -564,137 +580,6 @@ function buildWorkflowDecisionTrace(plan: WorkflowTaskPlan): string[] {
   return [`decision-trace: ${parts.join(" ")}`];
 }
 
-function buildActionResultSeedDecisionTrace(
-  continuity: ContinuityStateLike,
-): string[] {
-  const seed = continuity.lastActionResultSeed;
-  if (!seed) {
-    return [];
-  }
-
-  const parts = ["seed=action-result"];
-  if (seed.actionKind) {
-    parts.push(`seedAction=${seed.actionKind}`);
-  }
-  if (seed.target?.trim()) {
-    parts.push(`seedTarget=${normalizePathLike(seed.target)}`);
-  }
-  if (seed.changedFiles?.length) {
-    parts.push(`seedChangedFiles=${seed.changedFiles.length}`);
-  }
-  if (seed.verifiedFiles?.length) {
-    parts.push(`seedVerifiedFiles=${seed.verifiedFiles.length}`);
-  }
-  if (seed.writerStarted) {
-    parts.push("seedWriterStarted=yes");
-  }
-  if (seed.writeEffect?.trim()) {
-    parts.push(`seedWriteEffect=${seed.writeEffect.trim().toLowerCase()}`);
-  }
-  if (seed.requiresUserInspection) {
-    parts.push("seedRequiresUserInspection=yes");
-  }
-  const verificationStatus = seed.verification?.status?.trim();
-  if (verificationStatus) {
-    parts.push(
-      `seedVerifyStatus=${verificationStatus
-        .toLowerCase()
-        .replace(/\s+/g, "-")}`,
-    );
-  }
-  if (seed.verification?.command?.trim()) {
-    parts.push("seedVerifyCommandInherited=yes");
-  }
-  const blockerKind =
-    seed.blockerKind?.trim() || seed.verification?.blockerKind?.trim();
-  if (blockerKind) {
-    parts.push(`seedBlocker=${blockerKind}`);
-  }
-  if (seed.reason?.trim() || seed.verification?.reason?.trim()) {
-    parts.push("seedReason=yes");
-  }
-
-  return [`decision-trace: ${parts.join(" ")}`];
-}
-
-function buildPostEditVerifyContinuationLineage(
-  continuity: ContinuityStateLike,
-): string[] | undefined {
-  const lineageFacts = getMutationVerificationLineageFacts(continuity);
-  const changedFileCount = lineageFacts.changedFiles.length;
-  if (changedFileCount <= 0) {
-    return undefined;
-  }
-
-  const verifiedFileCount = lineageFacts.verifiedFiles.length;
-  const verificationStatus = lineageFacts.verificationStatus?.trim();
-  const hasVerificationEvidence = Boolean(
-    verificationStatus ||
-      lineageFacts.verificationCommand?.trim() ||
-      lineageFacts.verificationReason?.trim() ||
-      lineageFacts.verificationBlockerKind?.trim() ||
-      verifiedFileCount > 0,
-  );
-  if (!hasVerificationEvidence) {
-    return undefined;
-  }
-
-  const lineage = [
-    "lineage=mutation-verification",
-    `changedFiles=${changedFileCount}`,
-  ];
-  if (verifiedFileCount > 0) {
-    lineage.push(`verifiedFiles=${verifiedFileCount}`);
-  }
-  if (verificationStatus) {
-    lineage.push(
-      `verifyStatus=${verificationStatus.toLowerCase().replace(/\s+/g, "-")}`,
-    );
-  }
-  if (lineageFacts.verificationCommand?.trim()) {
-    lineage.push("verifyCommandInherited=yes");
-  }
-  return lineage;
-}
-
-function hasPassedVerificationLineage(continuity: ContinuityStateLike): boolean {
-  const lineageFacts = getMutationVerificationLineageFacts(continuity);
-  if (lineageFacts.verificationStatus?.trim().toLowerCase() === "passed") {
-    return true;
-  }
-  return (continuity.lastContinuationEvidence ?? []).some((entry) =>
-    /(?:verifyStatus=passed|verify-status:passed|verify=passed)/i.test(entry),
-  );
-}
-
-function getMutationVerificationLineageFacts(continuity: ContinuityStateLike): {
-  readonly changedFiles: readonly string[];
-  readonly verifiedFiles: readonly string[];
-  readonly verificationStatus?: string;
-  readonly verificationCommand?: string;
-  readonly verificationReason?: string;
-  readonly verificationBlockerKind?: string;
-} {
-  const lineage = continuity.lastMutationVerificationLineage;
-  return {
-    changedFiles: lineage?.changedFiles?.length
-      ? lineage.changedFiles
-      : (continuity.recentChangedFiles ?? []),
-    verifiedFiles: lineage?.verifiedFiles?.length
-      ? lineage.verifiedFiles
-      : (continuity.recentVerifiedFiles ?? []),
-    verificationStatus:
-      lineage?.verification?.status ?? continuity.lastVerificationStatus,
-    verificationCommand:
-      lineage?.verification?.command ?? continuity.lastVerificationCommand,
-    verificationReason:
-      lineage?.verification?.reason ?? continuity.lastVerificationReason,
-    verificationBlockerKind:
-      lineage?.verification?.blockerKind ??
-      continuity.lastVerificationBlockerKind,
-  };
-}
-
 type ReflectiveStateQueryKind =
   | "stop-reason"
   | "explain-scope"
@@ -744,18 +629,6 @@ interface WorkflowTaskIntentSignals {
   readonly unsupportedCommand?: string;
 }
 
-interface MutationVerificationContinuityLineage {
-  readonly actionKind?: "edit-file" | "write-file";
-  readonly changedFiles?: readonly string[];
-  readonly verifiedFiles?: readonly string[];
-  readonly verification?: {
-    readonly status?: string;
-    readonly command?: string;
-    readonly reason?: string;
-    readonly blockerKind?: string;
-  };
-}
-
 interface FreshnessObservability {
   readonly notes: readonly string[];
   readonly evidence: readonly string[];
@@ -775,96 +648,6 @@ interface ToolLifecycleResult {
   readonly metadata?: Record<string, unknown>;
   readonly projection: ToolLifecycleProjection;
   readonly provenance?: CodingResultProvenanceSummary;
-}
-
-interface ApprovalAuditHistoryLike {
-  readonly decision: "deny" | "allow-once" | "allow-always";
-  readonly decisionSource?: string;
-  readonly persistent?: boolean;
-  readonly cacheEffect?: string;
-  readonly projectRoot?: string;
-  readonly cacheKey?: string;
-  readonly scopeLabel?: string;
-  readonly lineage?: string;
-  readonly stopReason?: string;
-  readonly channel?: "interactive" | "non-interactive";
-  readonly inputKey?: "y" | "a" | "n" | "other";
-  readonly recordedAt?: string;
-}
-
-interface ContinuityStateLike {
-  projectRoot?: string;
-  lastTaskKind?: CodingTaskKind;
-  lastFailure?: string;
-  lastTaskSatisfactionVerdict?: string;
-  lastGroundedDeliverableMode?: GroundedDeliverableMode;
-  lastReadDeliveredLines?: number;
-  lastReadWindowStart?: number;
-  lastReadWindowEnd?: number;
-  lastReadWindowSize?: number;
-  lastReadFragmentStart?: number;
-  lastReadFragmentEnd?: number;
-  lastReadFragmentLineIndexes?: readonly number[];
-  lastReadFragmentRanges?: readonly string[];
-  lastReadFragmentSourceWindowStart?: number;
-  lastReadFragmentSourceWindowEnd?: number;
-  lastReadFragmentFingerprint?: string;
-  lastReadFilter?: "none" | "function-definitions";
-  lastStagedRepairStepCount?: number;
-  lastStagedRepairCompletedStep?: number;
-  lastStagedRepairBlockedStep?: number;
-  lastStagedRepairNextStep?: number;
-  lastAnswerDefect?: string;
-  lastUserIntent?: string;
-  lastAssistantOutput?: string;
-  recentTargetFiles?: readonly string[];
-  recentChangedFiles?: readonly string[];
-  recentFailedFiles?: ReadonlyArray<{ path: string; reason: string }>;
-  recentVerifiedFiles?: readonly string[];
-  lastMutationVerificationLineage?: MutationVerificationContinuityLineage;
-  lastActionResultSeed?: CodingActionResultSeed;
-  lastFailureHandoffDiagnostic?: string;
-  lastSuccessHandoffDiagnostic?: string;
-  lastVerificationStatus?: string;
-  lastVerificationCommand?: string;
-  lastVerificationReason?: string;
-  lastVerificationBlockerKind?: string;
-  lastVerificationNextAction?: string;
-  lastVerificationResumeEligible?: boolean;
-  lastApprovalDecision?: "deny" | "allow-once" | "allow-always";
-  lastApprovalDecisionSource?: string;
-  lastApprovalPersistent?: boolean;
-  lastApprovalCacheEffect?: string;
-  lastApprovalProjectRoot?: string;
-  lastApprovalCacheKey?: string;
-  lastApprovalScope?: string;
-  lastApprovalLineage?: string;
-  lastApprovalStopReason?: string;
-  lastApprovalChannel?: "interactive" | "non-interactive";
-  lastApprovalInputKey?: "y" | "a" | "n" | "other";
-  lastApprovalRecordedAt?: string;
-  lastApprovalHistory?: readonly ApprovalAuditHistoryLike[];
-  lastPermissionRequestToolName?: string;
-  lastPermissionRequestOperation?: string;
-  lastPermissionRequestTarget?: string;
-  lastPermissionRequestProcess?: string;
-  lastPermissionRequestScopeKey?: string;
-  lastPermissionRequestScopeLabel?: string;
-  lastPermissionRequestCacheKey?: string;
-  lastPermissionRequestProjectRoot?: string;
-  lastPermissionRequestSource?: "verification-command" | "approval-request";
-  lastPermissionRequestLineage?: string;
-  lastRequestScopeCacheKey?: string;
-  lastRequestScopeLabel?: string;
-  lastRequestScopeProjectRoot?: string;
-  lastRequestScopeSource?: "verification-command" | "approval-request";
-  lastRepairStatus?: string;
-  lastContinuationStatus?: string;
-  lastTerminalClassification?: TerminalClassification;
-  lastTerminalReason?: TerminalReason;
-  lastContinuationEvidence?: readonly string[];
-  unresolvedItems?: readonly string[];
-  freshnessHistoryCount?: number;
 }
 
 interface ContinuationTransform {
@@ -912,8 +695,6 @@ interface VerifyContinuationObject {
   readonly executableNow: boolean;
   readonly missingFields: readonly string[];
 }
-
-type GroundedDeliverableMode = "read" | "summary" | "explain";
 
 interface GroundedDeliverableConstraints {
   summaryStyle?: "default" | "conclusion-with-evidence";
@@ -3194,255 +2975,6 @@ function extractInlineContinuityContext(prompt: string): {
     cleanPrompt: prompt.replace(match[0], "").trim(),
     inlineState,
   };
-}
-
-function mergeContinuationState(
-  structuredState: unknown,
-  inlineState: ContinuityStateLike,
-): ContinuityStateLike {
-  const structured = continuityStateAsObject(structuredState);
-  const actionResultSeed =
-    structured.lastActionResultSeed ?? inlineState.lastActionResultSeed;
-  const mutationVerificationLineage =
-    structured.lastMutationVerificationLineage ??
-    inlineState.lastMutationVerificationLineage ??
-    actionResultSeedToMutationVerificationLineage(actionResultSeed);
-  const actionResultTargetFiles = actionResultSeed?.target?.trim()
-    ? [normalizePathLike(actionResultSeed.target)]
-    : undefined;
-  return {
-    projectRoot: structured.projectRoot ?? inlineState.projectRoot,
-    lastTaskKind: structured.lastTaskKind ?? inlineState.lastTaskKind,
-    lastUserIntent: structured.lastUserIntent ?? inlineState.lastUserIntent,
-    lastAssistantOutput:
-      structured.lastAssistantOutput ?? inlineState.lastAssistantOutput,
-    lastFailure: structured.lastFailure ?? inlineState.lastFailure,
-    recentTargetFiles: structured.recentTargetFiles?.length
-      ? structured.recentTargetFiles
-      : inlineState.recentTargetFiles?.length
-        ? inlineState.recentTargetFiles
-        : actionResultTargetFiles,
-    recentChangedFiles: structured.recentChangedFiles?.length
-      ? structured.recentChangedFiles
-      : inlineState.recentChangedFiles?.length
-        ? inlineState.recentChangedFiles
-        : mutationVerificationLineage?.changedFiles,
-    recentFailedFiles: structured.recentFailedFiles?.length
-      ? structured.recentFailedFiles
-      : inlineState.recentFailedFiles,
-    recentVerifiedFiles: structured.recentVerifiedFiles?.length
-      ? structured.recentVerifiedFiles
-      : inlineState.recentVerifiedFiles?.length
-        ? inlineState.recentVerifiedFiles
-        : mutationVerificationLineage?.verifiedFiles,
-    lastMutationVerificationLineage: mutationVerificationLineage,
-    lastActionResultSeed: actionResultSeed,
-    lastFailureHandoffDiagnostic:
-      structured.lastFailureHandoffDiagnostic ??
-      inlineState.lastFailureHandoffDiagnostic,
-    lastSuccessHandoffDiagnostic:
-      structured.lastSuccessHandoffDiagnostic ??
-      inlineState.lastSuccessHandoffDiagnostic,
-    lastVerificationStatus:
-      structured.lastVerificationStatus ??
-      inlineState.lastVerificationStatus ??
-      mutationVerificationLineage?.verification?.status ??
-      actionResultSeed?.verification?.status,
-    lastVerificationCommand:
-      structured.lastVerificationCommand ??
-      inlineState.lastVerificationCommand ??
-      mutationVerificationLineage?.verification?.command ??
-      actionResultSeed?.verification?.command,
-    lastVerificationReason:
-      structured.lastVerificationReason ??
-      inlineState.lastVerificationReason ??
-      mutationVerificationLineage?.verification?.reason ??
-      actionResultSeed?.verification?.reason ??
-      actionResultSeed?.reason,
-    lastVerificationBlockerKind:
-      structured.lastVerificationBlockerKind ??
-      inlineState.lastVerificationBlockerKind ??
-      mutationVerificationLineage?.verification?.blockerKind ??
-      actionResultSeed?.verification?.blockerKind ??
-      actionResultSeed?.blockerKind,
-    lastVerificationNextAction:
-      structured.lastVerificationNextAction ??
-      inlineState.lastVerificationNextAction,
-    lastVerificationResumeEligible:
-      structured.lastVerificationResumeEligible ??
-      inlineState.lastVerificationResumeEligible,
-    lastApprovalDecision:
-      structured.lastApprovalDecision ?? inlineState.lastApprovalDecision,
-    lastApprovalDecisionSource:
-      structured.lastApprovalDecisionSource ??
-      inlineState.lastApprovalDecisionSource,
-    lastApprovalPersistent:
-      structured.lastApprovalPersistent ?? inlineState.lastApprovalPersistent,
-    lastApprovalCacheEffect:
-      structured.lastApprovalCacheEffect ?? inlineState.lastApprovalCacheEffect,
-    lastApprovalProjectRoot:
-      structured.lastApprovalProjectRoot ?? inlineState.lastApprovalProjectRoot,
-    lastApprovalCacheKey:
-      structured.lastApprovalCacheKey ?? inlineState.lastApprovalCacheKey,
-    lastApprovalScope:
-      structured.lastApprovalScope ?? inlineState.lastApprovalScope,
-    lastApprovalLineage:
-      structured.lastApprovalLineage ?? inlineState.lastApprovalLineage,
-    lastApprovalStopReason:
-      structured.lastApprovalStopReason ?? inlineState.lastApprovalStopReason,
-    lastApprovalChannel:
-      structured.lastApprovalChannel ?? inlineState.lastApprovalChannel,
-    lastApprovalInputKey:
-      structured.lastApprovalInputKey ?? inlineState.lastApprovalInputKey,
-    lastApprovalRecordedAt:
-      structured.lastApprovalRecordedAt ?? inlineState.lastApprovalRecordedAt,
-    lastApprovalHistory: structured.lastApprovalHistory?.length
-      ? structured.lastApprovalHistory
-      : inlineState.lastApprovalHistory,
-    lastPermissionRequestToolName:
-      structured.lastPermissionRequestToolName ??
-      inlineState.lastPermissionRequestToolName,
-    lastPermissionRequestOperation:
-      structured.lastPermissionRequestOperation ??
-      inlineState.lastPermissionRequestOperation,
-    lastPermissionRequestTarget:
-      structured.lastPermissionRequestTarget ??
-      inlineState.lastPermissionRequestTarget,
-    lastPermissionRequestProcess:
-      structured.lastPermissionRequestProcess ??
-      inlineState.lastPermissionRequestProcess,
-    lastPermissionRequestScopeKey:
-      structured.lastPermissionRequestScopeKey ??
-      inlineState.lastPermissionRequestScopeKey,
-    lastPermissionRequestScopeLabel:
-      structured.lastPermissionRequestScopeLabel ??
-      inlineState.lastPermissionRequestScopeLabel,
-    lastPermissionRequestCacheKey:
-      structured.lastPermissionRequestCacheKey ??
-      inlineState.lastPermissionRequestCacheKey,
-    lastPermissionRequestProjectRoot:
-      structured.lastPermissionRequestProjectRoot ??
-      inlineState.lastPermissionRequestProjectRoot,
-    lastPermissionRequestSource:
-      structured.lastPermissionRequestSource ??
-      inlineState.lastPermissionRequestSource,
-    lastPermissionRequestLineage:
-      structured.lastPermissionRequestLineage ??
-      inlineState.lastPermissionRequestLineage,
-    lastRequestScopeCacheKey:
-      structured.lastRequestScopeCacheKey ??
-      inlineState.lastRequestScopeCacheKey,
-    lastRequestScopeLabel:
-      structured.lastRequestScopeLabel ?? inlineState.lastRequestScopeLabel,
-    lastRequestScopeProjectRoot:
-      structured.lastRequestScopeProjectRoot ??
-      inlineState.lastRequestScopeProjectRoot,
-    lastRequestScopeSource:
-      structured.lastRequestScopeSource ?? inlineState.lastRequestScopeSource,
-    lastRepairStatus:
-      structured.lastRepairStatus ?? inlineState.lastRepairStatus,
-    lastContinuationStatus:
-      structured.lastContinuationStatus ?? inlineState.lastContinuationStatus,
-    lastTerminalClassification:
-      structured.lastTerminalClassification ??
-      inlineState.lastTerminalClassification,
-    lastTerminalReason:
-      structured.lastTerminalReason ?? inlineState.lastTerminalReason,
-    lastContinuationEvidence: structured.lastContinuationEvidence?.length
-      ? structured.lastContinuationEvidence
-      : inlineState.lastContinuationEvidence,
-    lastGroundedDeliverableMode:
-      structured.lastGroundedDeliverableMode ??
-      inlineState.lastGroundedDeliverableMode,
-    lastReadDeliveredLines:
-      structured.lastReadDeliveredLines ?? inlineState.lastReadDeliveredLines,
-    lastReadWindowStart:
-      structured.lastReadWindowStart ?? inlineState.lastReadWindowStart,
-    lastReadWindowEnd:
-      structured.lastReadWindowEnd ?? inlineState.lastReadWindowEnd,
-    lastReadWindowSize:
-      structured.lastReadWindowSize ?? inlineState.lastReadWindowSize,
-    lastReadFragmentStart:
-      structured.lastReadFragmentStart ?? inlineState.lastReadFragmentStart,
-    lastReadFragmentEnd:
-      structured.lastReadFragmentEnd ?? inlineState.lastReadFragmentEnd,
-    lastReadFragmentLineIndexes: structured.lastReadFragmentLineIndexes?.length
-      ? structured.lastReadFragmentLineIndexes
-      : inlineState.lastReadFragmentLineIndexes,
-    lastReadFragmentRanges: structured.lastReadFragmentRanges?.length
-      ? structured.lastReadFragmentRanges
-      : inlineState.lastReadFragmentRanges,
-    lastReadFragmentSourceWindowStart:
-      structured.lastReadFragmentSourceWindowStart ??
-      inlineState.lastReadFragmentSourceWindowStart,
-    lastReadFragmentSourceWindowEnd:
-      structured.lastReadFragmentSourceWindowEnd ??
-      inlineState.lastReadFragmentSourceWindowEnd,
-    lastReadFilter: structured.lastReadFilter ?? inlineState.lastReadFilter,
-    lastReadFragmentFingerprint:
-      structured.lastReadFragmentFingerprint ??
-      inlineState.lastReadFragmentFingerprint,
-    lastStagedRepairStepCount:
-      structured.lastStagedRepairStepCount ??
-      inlineState.lastStagedRepairStepCount,
-    lastStagedRepairCompletedStep:
-      structured.lastStagedRepairCompletedStep ??
-      inlineState.lastStagedRepairCompletedStep,
-    lastStagedRepairBlockedStep:
-      structured.lastStagedRepairBlockedStep ??
-      inlineState.lastStagedRepairBlockedStep,
-    lastStagedRepairNextStep:
-      structured.lastStagedRepairNextStep ??
-      inlineState.lastStagedRepairNextStep,
-    lastAnswerDefect:
-      structured.lastAnswerDefect ?? inlineState.lastAnswerDefect,
-    unresolvedItems: structured.unresolvedItems?.length
-      ? structured.unresolvedItems
-      : inlineState.unresolvedItems,
-    freshnessHistoryCount:
-      structured.freshnessHistoryCount ?? inlineState.freshnessHistoryCount,
-  };
-}
-
-function actionResultSeedToMutationVerificationLineage(
-  seed: CodingActionResultSeed | undefined,
-): MutationVerificationContinuityLineage | undefined {
-  if (
-    !seed ||
-    (seed.actionKind !== "edit-file" && seed.actionKind !== "write-file")
-  ) {
-    return undefined;
-  }
-
-  const changedFiles = seed.changedFiles?.length
-    ? seed.changedFiles
-    : seed.target?.trim()
-      ? [normalizePathLike(seed.target)]
-      : [];
-  const hasVerificationEvidence = Boolean(
-    seed.verification?.status?.trim() ||
-      seed.verification?.command?.trim() ||
-      seed.verification?.reason?.trim() ||
-      seed.verification?.blockerKind?.trim() ||
-      seed.verifiedFiles?.length,
-  );
-  if (changedFiles.length <= 0 || !hasVerificationEvidence) {
-    return undefined;
-  }
-
-  return {
-    actionKind: seed.actionKind,
-    changedFiles,
-    verifiedFiles: seed.verifiedFiles,
-    verification: seed.verification,
-  };
-}
-
-function continuityStateAsObject(value: unknown): ContinuityStateLike {
-  if (!value || typeof value !== "object") {
-    return {};
-  }
-  return value as ContinuityStateLike;
 }
 
 function buildFreshnessObservability(input: {
@@ -10389,86 +9921,6 @@ async function dispatchToolWithLifecycle(input: {
   };
 }
 
-function classifyVerificationFailure(input: ToolLifecycleResult): {
-  status: "failed" | "blocked";
-  reason: string;
-  blockerKind?: CodingVerificationBlockerKind;
-  nextAction?: string;
-} {
-  const reason = truncate(
-    input.projection.reason ?? input.error ?? input.output ?? "verify command failed",
-  );
-  const blockerKind =
-    input.projection.verificationBlockerKind ??
-    inferVerificationBlockerKind(input, reason);
-  if (!blockerKind) {
-    return { status: "failed", reason };
-  }
-
-  return {
-    status: "blocked",
-    reason,
-    blockerKind,
-    nextAction: input.projection.nextAction ?? blockerNextAction(blockerKind),
-  };
-}
-
-function inferVerificationBlockerKind(
-  input: { readonly metadata?: Record<string, unknown> },
-  reason: string,
-): CodingVerificationBlockerKind | undefined {
-  const normalizedReason = reason.toLowerCase();
-  const wasEscalated = input.metadata?.wasEscalated === true;
-  if (wasEscalated) {
-    return "approval-denied";
-  }
-
-  const failureKind = String(input.metadata?.failureKind ?? "").toLowerCase();
-  if (failureKind === "sandbox_preflight") {
-    return "environment-not-ready";
-  }
-  if (failureKind === "timeout" || failureKind === "cancelled") {
-    return "environment-not-ready";
-  }
-
-  if (
-    normalizedReason.includes(
-      "is not recognized as an internal or external command",
-    ) ||
-    normalizedReason.includes("command not found") ||
-    normalizedReason.includes("not found") ||
-    normalizedReason.includes("enoent")
-  ) {
-    return "missing-command";
-  }
-
-  if (
-    normalizedReason.includes("econnreset") ||
-    normalizedReason.includes("timed out") ||
-    normalizedReason.includes("network") ||
-    normalizedReason.includes("tls")
-  ) {
-    return "environment-not-ready";
-  }
-
-  return undefined;
-}
-
-function blockerNextAction(kind: CodingVerificationBlockerKind): string {
-  switch (kind) {
-    case "approval-denied":
-      return "Re-run and approve escalation for verify command execution.";
-    case "missing-command":
-      return "Install or expose the verify command in PATH, then rerun verify.";
-    case "environment-not-ready":
-      return "Resolve environment/network readiness (dependencies, connectivity, shell), then rerun verify.";
-    case "no-verify-strategy":
-      return "Provide an explicit verify intent (test/build/check) so the workflow can select a command.";
-    default:
-      return "Inspect verify stderr and rerun with an explicit verification command.";
-  }
-}
-
 function extractFencedContent(prompt: string): string | undefined {
   const match = prompt.match(/```(?:[\w.+-]+)?\n?([\s\S]*?)```/);
   const content = match?.[1]?.trim();
@@ -11925,30 +11377,6 @@ function isMutationInstructionFailure(
   return instruction.ok === false;
 }
 
-function buildAmbiguousEditInstructionReason(targetPath?: string): string {
-  const target = targetPath?.trim() || "the target file";
-  const promptRewrite = /(^|[\\/])math\.js$/i.test(target)
-    ? `For this request, rerun with a safe explicit rewrite such as: "In ${target}, replace 'return n + 2;' with 'return n * 2;'. Only modify ${target}."`
-    : `Rerun with a safe explicit rewrite such as: "In ${target}, replace '<current text>' with '<desired text>'. Only modify ${target}."`;
-  return formatEditExecutionFailure({
-    failureReason: "edit-transform-unclear",
-    explanation:
-      "Edit instruction is ambiguous: replacement not safely derivable from the prompt. No files were changed and unrelated files were not modified.",
-    nextAction: `${promptRewrite} Alternatively, provide a fenced full replacement for the target file.`,
-  });
-}
-
-function formatEditExecutionFailure(input: {
-  readonly failureReason:
-    | "edit-target-missing"
-    | "edit-transform-unclear"
-    | "patch-from-not-found";
-  readonly explanation: string;
-  readonly nextAction: string;
-}): string {
-  return `${input.failureReason}: ${input.explanation} Next action: ${input.nextAction}`;
-}
-
 function shouldBlockMutationForTargetResolution(input: {
   readonly blocker: TargetResolutionBlocker;
   readonly hasCorrectionCue: boolean;
@@ -11967,16 +11395,6 @@ function shouldBlockMutationForTargetResolution(input: {
       input.hasFencedContent ||
       input.hasReplaceDirective)
   );
-}
-
-function formatTargetResolutionBlockerReason(
-  blocker: TargetResolutionBlocker,
-): string {
-  const candidates =
-    blocker.candidates.length > 0
-      ? ` Candidates: ${blocker.candidates.join(", ")}.`
-      : "";
-  return `${blocker.code}: ${blocker.reason}${candidates} Next action: ${blocker.nextAction}`;
 }
 
 function computeLineDelta(
