@@ -8,9 +8,7 @@ import { routeSlashCommand } from "../core/commands/slashRouter.js";
 import {
   CoreMcpGateway,
   McpGatewayBlockedError,
-  describeMcpConnectionState,
 } from "../core/mcp/gateway.js";
-import type { McpClientSnapshot } from "../core/mcp/types.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import {
@@ -30,7 +28,6 @@ import {
 import {
   renderRootBindingDiagnostics,
   renderStartupSurface,
-  renderWorkspaceBindingLines,
 } from "../core/shell/startupSurfaceRenderer.js";
 import {
   resolveProviderCredential,
@@ -112,7 +109,22 @@ import { parseCliArgs, type CliOptions } from "./cliArgs.js";
 import { resolveCliMode } from "./cliModeDispatch.js";
 import { runCliPrintMode } from "./cliPrintModeRunner.js";
 import { runCliStdinMode } from "./cliStdinModeRunner.js";
+import {
+  renderRecentProjectContexts,
+  renderWorkspaceSummary,
+} from "./cliWorkspaceSurface.js";
+import {
+  renderMcpBlockedContract,
+  renderMcpDoctorControlPlane,
+  renderMcpRefreshControlPlane,
+  renderMcpStatusControlPlane,
+  renderMcpToolsControlPlane,
+} from "./mcpControlCliSurface.js";
 import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
+import {
+  renderSessionCommandMap,
+  renderUserHelp,
+} from "./slashCommandRegistry.js";
 import { openSessionsPanel } from "./sessionsPanel.js";
 
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
@@ -761,7 +773,10 @@ async function main(): Promise<void> {
       if (isShellAction(slashResult, "show-workspace")) {
         const workspaceAction = slashResult.workspaceAction ?? "status";
         if (workspaceAction === "recent") {
-          renderRecentProjectContexts(renderer, sessionManager);
+          renderRecentProjectContexts(
+            renderer,
+            sessionManager.listRecentProjectContexts(8),
+          );
           rl.prompt();
           return;
         }
@@ -865,7 +880,10 @@ async function main(): Promise<void> {
             );
             renderer.renderLine(`New project session: ${attachedSession.id}`);
             renderWorkspaceSummary(renderer, runtimeContext);
-            renderRecentProjectContexts(renderer, sessionManager);
+            renderRecentProjectContexts(
+              renderer,
+              sessionManager.listRecentProjectContexts(8),
+            );
             refreshInteractivePromptChrome();
           } catch (error) {
             renderer.renderLine(
@@ -910,13 +928,13 @@ async function main(): Promise<void> {
           renderMcpStatusControlPlane(renderer, snapshot);
         } catch (error) {
           if (error instanceof McpGatewayBlockedError) {
-            renderBlockedContract(renderer, {
+            renderMcpBlockedContract(renderer, {
               blockerKind: error.blockerKind,
               reason: error.message,
               doNext: error.doNext,
             });
           } else {
-            renderBlockedContract(renderer, {
+            renderMcpBlockedContract(renderer, {
               blockerKind: "unknown",
               reason:
                 error instanceof Error
@@ -2166,7 +2184,10 @@ async function runNonInteractivePrompt(options: {
     if (resolved.slashResult.action === "show-workspace") {
       const workspaceAction = resolved.slashResult.workspaceAction ?? "status";
       if (workspaceAction === "recent") {
-        renderRecentProjectContexts(options.renderer, options.sessionManager);
+        renderRecentProjectContexts(
+          options.renderer,
+          options.sessionManager.listRecentProjectContexts(8),
+        );
         return;
       }
 
@@ -2268,7 +2289,10 @@ async function runNonInteractivePrompt(options: {
             `New project session: ${attachedSession.id}`,
           );
           renderWorkspaceSummary(options.renderer, options.runtimeContext);
-          renderRecentProjectContexts(options.renderer, options.sessionManager);
+          renderRecentProjectContexts(
+            options.renderer,
+            options.sessionManager.listRecentProjectContexts(8),
+          );
           return;
         } catch (error) {
           options.renderer.renderLine(
@@ -2311,13 +2335,13 @@ async function runNonInteractivePrompt(options: {
         renderMcpStatusControlPlane(options.renderer, snapshot);
       } catch (error) {
         if (error instanceof McpGatewayBlockedError) {
-          renderBlockedContract(options.renderer, {
+          renderMcpBlockedContract(options.renderer, {
             blockerKind: error.blockerKind,
             reason: error.message,
             doNext: error.doNext,
           });
         } else {
-          renderBlockedContract(options.renderer, {
+          renderMcpBlockedContract(options.renderer, {
             blockerKind: "unknown",
             reason:
               error instanceof Error
@@ -2428,26 +2452,6 @@ async function resolveTurnInputForExecution(options: {
     kind: "execute",
     effectivePrompt: normalizePromptForExecution(rawPrompt),
   };
-}
-
-function renderBlockedContract(
-  renderer: StreamingRenderer,
-  input: {
-    blockerKind:
-      | "command-not-allowlisted"
-      | "environment-not-ready"
-      | "unknown";
-    reason: string;
-    doNext: string;
-  },
-): void {
-  renderer.renderLine("");
-  renderer.renderLine("Result");
-  renderer.renderLine("- Outcome: blocked");
-  renderer.renderLine(`- BlockerKind: ${input.blockerKind}`);
-  renderer.renderLine(`- Reason: ${input.reason}`);
-  renderer.renderLine(`- DoNext: ${input.doNext}`);
-  renderer.renderLine("");
 }
 
 async function executeResolvedPromptTurn(options: {
@@ -2663,53 +2667,6 @@ function buildPersistentShellPrompt(input: {
   return `[${project}|${session}|${input.agentMode}] > `;
 }
 
-function renderWorkspaceSummary(
-  renderer: StreamingRenderer,
-  runtimeContext: ShellRuntimeContext,
-): void {
-  renderer.renderLine("\nWorkspace");
-  renderer.renderLine(
-    `- Project: ${path.basename(runtimeContext.projectRoot) || runtimeContext.projectRoot}`,
-  );
-  renderer.renderLine(`- Project root: ${runtimeContext.projectRoot}`);
-  renderer.renderLine(`- Working directory: ${runtimeContext.cwd}`);
-  renderer.renderLine(
-    `- Original launch directory: ${runtimeContext.originalCwd}`,
-  );
-  renderWorkspaceBindingLines(renderer, {
-    requestedWorkspaceRoot: runtimeContext.requestedWorkspaceRoot,
-    projectRoot: runtimeContext.projectRoot,
-    rootMode: runtimeContext.rootMode,
-    targetPathBase: runtimeContext.targetPathBase,
-    gitRoot: runtimeContext.gitRoot,
-    diagnostics: runtimeContext.rootBindingDiagnostics,
-    gitContext: runtimeContext.gitContext,
-  });
-  if (runtimeContext.gitContext.insideGit) {
-    renderer.renderLine(
-      `- Git root: ${runtimeContext.gitContext.root ?? "unknown"}`,
-    );
-    renderer.renderLine(
-      `- Branch: ${runtimeContext.gitContext.branch ?? "unknown"}`,
-    );
-    renderer.renderLine(
-      `- Workspace clean: ${runtimeContext.gitContext.isClean ? "yes" : "no"}`,
-    );
-  } else {
-    renderer.renderLine("- Git: not inside a git workspace");
-  }
-  renderer.renderLine(
-    `- Active session: ${runtimeContext.session.id} [${runtimeContext.session.status}]`,
-  );
-  renderer.renderLine(
-    `- Session project binding: ${runtimeContext.session.projectRoot}`,
-  );
-  renderer.renderLine(
-    "Next actions: /workspace recent, /workspace attach <path>, /sessions",
-  );
-  renderer.renderLine("");
-}
-
 function renderLatestSessionLifecycleNotice(
   renderer: StreamingRenderer,
   lifecycleNotices?: readonly string[],
@@ -2718,38 +2675,6 @@ function renderLatestSessionLifecycleNotice(
   if (lifecycleNotice) {
     renderer.renderLine(`Session lifecycle: ${lifecycleNotice}`);
   }
-}
-
-function renderRecentProjectContexts(
-  renderer: StreamingRenderer,
-  sessionManager: SessionManager,
-): void {
-  const projectContexts = sessionManager.listRecentProjectContexts(8);
-  renderer.renderLine("\nRecent project contexts");
-  if (projectContexts.length === 0) {
-    renderer.renderLine("- No project contexts found yet.");
-    renderer.renderLine(
-      "- Start with /workspace attach <path> to bind a target project.",
-    );
-    renderer.renderLine("");
-    return;
-  }
-
-  for (const projectContext of projectContexts) {
-    const projectLabel =
-      path.basename(projectContext.projectRoot) || projectContext.projectRoot;
-    const recoverableLabel =
-      projectContext.recoverableCount > 0
-        ? `${projectContext.recoverableCount} recoverable`
-        : "no recoverable runs";
-    renderer.renderLine(
-      `- ${projectLabel}  sessions=${projectContext.sessionCount}  ${recoverableLabel}  updated=${toRelativeTime(projectContext.lastUpdatedAt)}  last=${projectContext.lastSessionId}`,
-    );
-  }
-  renderer.renderLine(
-    "Attach quickly with /workspace attach <path>. Resume the last interrupted run with /resume after switching project context.",
-  );
-  renderer.renderLine("");
 }
 
 function renderSessionSurfaceOverview(
@@ -2768,362 +2693,6 @@ function renderSessionSurfaceOverview(
     },
   );
   renderSessionCommandMap(renderer);
-}
-
-function renderSessionCommandMap(
-  renderer: StreamingRenderer,
-  options?: { compact?: boolean; includeHelpHint?: boolean },
-): void {
-  const compact = options?.compact === true;
-  const includeHelpHint = options?.includeHelpHint !== false;
-  renderer.renderLine(
-    compact ? "Session command map:" : "\nSession command map",
-  );
-  renderer.renderLine(
-    "- /sessions            open the session surface (interactive panel in TTY; overview in print/non-TTY).",
-  );
-  renderer.renderLine("- /sessions current    inspect the active session.");
-  renderer.renderLine(
-    "- /sessions list       inspect recent sessions for this project.",
-  );
-  renderer.renderLine(
-    "- /sessions switch <id|prefix|title|last> switch active session and project context.",
-  );
-  renderer.renderLine(
-    "- /resume [id|prefix|title|last] resume the best recoverable context.",
-  );
-  if (includeHelpHint) {
-    renderer.renderLine("- /help                show full command guide.");
-  }
-}
-
-function renderUserHelp(renderer: StreamingRenderer): void {
-  renderer.renderLine("\nSlash command guide");
-  renderer.renderLine("Next actions (start here):");
-  renderer.renderLine(
-    "- /sessions               inspect active + recent sessions.",
-  );
-  renderer.renderLine(
-    "- /resume                 continue best recoverable context.",
-  );
-  renderer.renderLine(
-    "- /workspace status       confirm project/workdir binding.",
-  );
-  renderer.renderLine(
-    "- /diagnose               get actionable repo next step.",
-  );
-  renderer.renderLine("");
-
-  renderer.renderLine("Command groups:");
-  renderer.renderLine("1) Session & Continuation");
-  renderer.renderLine(
-    "- /sessions               session surface entrypoint (TTY: panel, non-TTY/print: overview).",
-  );
-  renderer.renderLine(
-    "- /sessions current       active session identity and resume readiness.",
-  );
-  renderer.renderLine(
-    "- /sessions list          recent sessions for current project context.",
-  );
-  renderer.renderLine(
-    "- /sessions switch <id|prefix|title|last>   switch active session + project context.",
-  );
-  renderer.renderLine(
-    "- /resume [id|prefix|title|last] resume recoverable context by reference.",
-  );
-  renderer.renderLine(
-    "- /continue [id] [text]   resume context and optionally run immediate follow-up.",
-  );
-  renderer.renderLine("");
-
-  renderer.renderLine("2) Workspace & Navigation");
-  renderer.renderLine(
-    "- /workspace status       show current project/workdir binding.",
-  );
-  renderer.renderLine(
-    "- /workspace attach <path> attach/switch active project target.",
-  );
-  renderer.renderLine(
-    "- /workspace recent       list recently attached project contexts.",
-  );
-  renderer.renderLine("- /cd <path>              quick attach by path.");
-  renderer.renderLine(
-    "- /pwd                    print current workspace status.",
-  );
-  renderer.renderLine("");
-
-  renderer.renderLine("3) Workflow & Runtime");
-  renderer.renderLine("- /cancel                 stop only the current run.");
-  renderer.renderLine("- /build                  switch to build mode.");
-  renderer.renderLine("- /plan                   switch to plan mode.");
-  renderer.renderLine(
-    "- /mode [status|plan|build] inspect or switch agent mode.",
-  );
-  renderer.renderLine("- /view user|developer    switch output verbosity.");
-  renderer.renderLine("");
-
-  renderer.renderLine("4) Diagnostics & Integrations");
-  renderer.renderLine(
-    "- /diagnose               repo-aware diagnosis and next action.",
-  );
-  renderer.renderLine(
-    "- /model status|list|use  inspect and switch active model.",
-  );
-  renderer.renderLine(
-    "- /mcp status|tools|doctor|refresh [server] inspect and recover MCP state.",
-  );
-  renderer.renderLine(
-    "- /permissions list|explain|revoke|reset inspect trust policy state.",
-  );
-  renderer.renderLine(
-    "- /connect status|login|use|logout|set ... provider connection management.",
-  );
-  renderer.renderLine("");
-
-  renderer.renderLine("Discovery tips:");
-  renderer.renderLine(
-    "- Unknown slash commands now return this guide path with quick actions.",
-  );
-  renderer.renderLine(
-    "- Use /help any time to get back to grouped command navigation.",
-  );
-  renderer.renderLine("");
-}
-
-function renderMcpStatusControlPlane(
-  renderer: StreamingRenderer,
-  snapshot: McpClientSnapshot,
-): void {
-  const connected = snapshot.clients.filter(
-    (client) => client.type === "connected",
-  );
-  const needsAuth = snapshot.clients.filter(
-    (client) => client.type === "needs-auth",
-  );
-  const failed = snapshot.clients.filter((client) => client.type === "failed");
-  const disabled = snapshot.clients.filter(
-    (client) => client.type === "disabled",
-  );
-  const pending = snapshot.clients.filter(
-    (client) => client.type === "pending",
-  );
-
-  renderer.renderLine("\nMCP control plane");
-  renderer.renderLine(
-    `- Servers: total ${snapshot.clients.length}, connected ${connected.length}, needs-auth ${needsAuth.length}, failed ${failed.length}, pending ${pending.length}, disabled ${disabled.length}`,
-  );
-  renderer.renderLine(`- Exposed tools: ${snapshot.tools.length}`);
-  if (snapshot.clients.length === 0) {
-    renderer.renderLine("- No MCP servers configured for this project.");
-    renderer.renderLine(
-      "- Add project servers in .private-agents.mcp.json or user servers in ~/.private-agents/mcp.json.",
-    );
-    renderer.renderLine("");
-    return;
-  }
-
-  for (const client of snapshot.clients) {
-    const toolCount = snapshot.tools.filter(
-      (tool) => tool.serverName === client.name,
-    ).length;
-    const scope = client.config.scope;
-    const transport = client.config.transport;
-    const stateDescription = describeMcpConnectionState(client);
-    const executable = stateDescription.executable && toolCount > 0;
-    renderer.renderLine(
-      `- ${client.name}: ${client.type} (scope=${scope}, transport=${transport}, tools=${toolCount}, executable=${executable ? "yes" : "no"})`,
-    );
-    if (stateDescription.reason) {
-      renderer.renderLine(`  reason: ${truncate(stateDescription.reason, 140)}`);
-    }
-    if (client.type === "connected" && toolCount === 0) {
-      renderer.renderLine("  reason: MCP server is connected but exposes no tools.");
-    }
-    renderer.renderLine(`  do-next: ${stateDescription.doNext}`);
-  }
-
-  renderer.renderLine("Next actions:");
-  renderer.renderLine("- /mcp tools [server]    inspect available MCP tools.");
-  renderer.renderLine(
-    "- /mcp doctor            diagnose auth/connection failures.",
-  );
-  renderer.renderLine("- /mcp refresh [server]  reconnect all or one server.");
-  renderer.renderLine("");
-}
-
-function renderMcpRefreshControlPlane(
-  renderer: StreamingRenderer,
-  snapshot: McpClientSnapshot,
-  refreshTarget: string,
-): void {
-  if (refreshTarget !== "all") {
-    const refreshedClient = snapshot.clients.find(
-      (client) => client.name === refreshTarget,
-    );
-    if (refreshedClient && refreshedClient.type !== "connected") {
-      const stateDescription = describeMcpConnectionState(refreshedClient);
-      renderBlockedContract(renderer, {
-        blockerKind: "environment-not-ready",
-        reason:
-          stateDescription.reason ??
-          `MCP server ${refreshedClient.name} is not executable after refresh.`,
-        doNext: stateDescription.doNext,
-      });
-      return;
-    }
-  }
-
-  renderer.renderLine(
-    `\nMCP refresh complete (${refreshTarget === "all" ? "all servers" : refreshTarget}).`,
-  );
-  renderMcpStatusControlPlane(renderer, snapshot);
-}
-
-function renderMcpToolsControlPlane(
-  renderer: StreamingRenderer,
-  snapshot: McpClientSnapshot,
-  targetServer?: string,
-): void {
-  const normalizedTarget = targetServer?.trim();
-  const targetClients = normalizedTarget
-    ? snapshot.clients.filter((client) => client.name === normalizedTarget)
-    : snapshot.clients;
-  if (normalizedTarget && targetClients.length === 0) {
-    renderer.renderLine(`\nUnknown MCP server: ${normalizedTarget}`);
-    renderer.renderLine(
-      "Run /mcp status to inspect configured server names.\n",
-    );
-    return;
-  }
-
-  const tools = normalizedTarget
-    ? snapshot.tools.filter((tool) => tool.serverName === normalizedTarget)
-    : snapshot.tools;
-
-  renderer.renderLine(
-    `\nMCP tools${normalizedTarget ? ` @ ${normalizedTarget}` : ""}`,
-  );
-  if (tools.length === 0) {
-    renderer.renderLine("- No tools currently exposed.");
-    const unresolved = targetClients.filter(
-      (client) => client.type !== "connected",
-    );
-    if (unresolved.length > 0) {
-      renderer.renderLine("- Unavailable selected servers:");
-      for (const client of unresolved) {
-        const stateDescription = describeMcpConnectionState(client);
-        renderer.renderLine(
-          `  ${client.name}: ${client.type} (executable=no)`,
-        );
-        if (stateDescription.reason) {
-          renderer.renderLine(`    reason: ${truncate(stateDescription.reason, 140)}`);
-        }
-        renderer.renderLine(`    do-next: ${stateDescription.doNext}`);
-      }
-    }
-    renderer.renderLine("");
-    return;
-  }
-
-  for (const tool of tools) {
-    renderer.renderLine(`- ${tool.qualifiedName}`);
-    if (tool.description?.trim()) {
-      renderer.renderLine(`  ${truncate(tool.description.trim(), 140)}`);
-    }
-  }
-  renderer.renderLine("");
-}
-
-function renderMcpDoctorControlPlane(
-  renderer: StreamingRenderer,
-  snapshot: McpClientSnapshot,
-  targetServer?: string,
-): void {
-  const normalizedTarget = targetServer?.trim();
-  const targetClients = normalizedTarget
-    ? snapshot.clients.filter((client) => client.name === normalizedTarget)
-    : snapshot.clients;
-
-  renderer.renderLine(
-    `\nMCP doctor${normalizedTarget ? ` @ ${normalizedTarget}` : ""}`,
-  );
-  if (normalizedTarget && targetClients.length === 0) {
-    renderer.renderLine("- Unknown server:");
-    renderer.renderLine(`  reason: Unknown MCP server: ${normalizedTarget}`);
-    renderer.renderLine(
-      "  do-next: Run /mcp status to list configured servers, then retry with a valid server name.",
-    );
-    renderer.renderLine("");
-    return;
-  }
-
-  const needsAuth = targetClients.filter(
-    (client) => client.type === "needs-auth",
-  );
-  const failed = targetClients.filter((client) => client.type === "failed");
-  const pending = targetClients.filter(
-    (client) => client.type === "pending",
-  );
-  const disabled = targetClients.filter(
-    (client) => client.type === "disabled",
-  );
-
-  if (
-    needsAuth.length === 0 &&
-    failed.length === 0 &&
-    pending.length === 0 &&
-    disabled.length === 0
-  ) {
-    renderer.renderLine("- No blocking MCP issues detected.");
-    renderer.renderLine(
-      normalizedTarget
-        ? "- Selected server is connected and serving tools."
-        : "- All configured servers are connected and serving tools.",
-    );
-    renderer.renderLine("");
-    return;
-  }
-
-  const renderUnavailableClients = (
-    label: string,
-    clients: typeof targetClients,
-  ): void => {
-    if (clients.length === 0) {
-      return;
-    }
-    renderer.renderLine(label);
-    for (const client of clients) {
-      const stateDescription = describeMcpConnectionState(client);
-      renderer.renderLine(`  ${client.name}: ${client.type} (executable=no)`);
-      if (stateDescription.reason) {
-        renderer.renderLine(
-          `    reason: ${truncate(stateDescription.reason, 140)}`,
-        );
-      }
-      renderer.renderLine(`    do-next: ${stateDescription.doNext}`);
-    }
-  };
-
-  if (needsAuth.length > 0) {
-    renderUnavailableClients("- Needs auth:", needsAuth);
-  }
-  if (failed.length > 0) {
-    renderUnavailableClients("- Failed connections:", failed);
-  }
-  if (pending.length > 0) {
-    renderUnavailableClients("- Pending connections:", pending);
-  }
-  if (disabled.length > 0) {
-    renderUnavailableClients("- Disabled servers:", disabled);
-  }
-
-  renderer.renderLine("Suggested recovery flow:");
-  renderer.renderLine("- /mcp refresh all");
-  renderer.renderLine(
-    "- /connect status (if auth-backed MCP providers are involved)",
-  );
-  renderer.renderLine("- Re-check with /mcp status");
-  renderer.renderLine("");
 }
 
 function switchRuntimeSessionProjectContext(
@@ -3434,13 +3003,6 @@ function normalizePromptForExecution(prompt: string): string {
   // Guard against Windows terminal mojibake by converting fuzzy natural language
   // into a deterministic file-targeted coding task.
   return `Create a python script at ./${candidate}.py with a minimal hello world implementation.`;
-}
-
-function truncate(value: string, max: number): string {
-  if (value.length <= max) {
-    return value;
-  }
-  return `${value.slice(0, max)}...`;
 }
 
 function normalizePathForCompare(value: string): string {
