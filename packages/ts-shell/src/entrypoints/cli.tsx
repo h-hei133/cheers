@@ -112,6 +112,9 @@ import type {
 import { SessionManager } from "../session/SessionManager.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import { parseCliArgs, type CliOptions } from "./cliArgs.js";
+import { resolveCliMode } from "./cliModeDispatch.js";
+import { runCliPrintMode } from "./cliPrintModeRunner.js";
+import { runCliStdinMode } from "./cliStdinModeRunner.js";
 import { openSessionsPanel } from "./sessionsPanel.js";
 
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
@@ -284,6 +287,11 @@ async function main(): Promise<void> {
     options.promptArg,
     pipedInput,
   );
+  const cliModePlan = resolveCliMode({
+    options,
+    stdinTransportMode,
+    nonInteractivePromptCount: nonInteractivePrompts.length,
+  });
   const showStartupSurface =
     !options.printMode &&
     !options.replayFile &&
@@ -385,9 +393,9 @@ async function main(): Promise<void> {
     },
   });
 
-  if (options.replayFile) {
+  if (cliModePlan.kind === "replay") {
     await runReplayPromptScript({
-      replayFile: options.replayFile,
+      replayFile: cliModePlan.replayFile,
       sessionManager,
       runtimeContext,
       renderer,
@@ -404,59 +412,76 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (stdinTransportMode === "stream-live") {
-    await runNonTtyPromptStream({
-      sessionManager,
-      runtimeContext,
-      renderer,
-      sessionRuntime,
-      logger,
-      fallbackSessionId: recoveryCandidate?.id,
-      lifecycleNotices: bootstrap.lifecycleNotices,
-      setActiveNonInteractiveApprovalMode: (mode) => {
-        activeNonInteractiveApprovalMode = mode;
-      },
-      nonInteractiveCliApprovalMode: options.nonInteractiveApproval,
+  if (cliModePlan.kind === "stdin-stream") {
+    await runCliStdinMode({
+      mode: "stream-live",
+      runStream: () =>
+        runNonTtyPromptStream({
+          sessionManager,
+          runtimeContext,
+          renderer,
+          sessionRuntime,
+          logger,
+          fallbackSessionId: recoveryCandidate?.id,
+          lifecycleNotices: bootstrap.lifecycleNotices,
+          setActiveNonInteractiveApprovalMode: (mode) => {
+            activeNonInteractiveApprovalMode = mode;
+          },
+          nonInteractiveCliApprovalMode: options.nonInteractiveApproval,
+        }),
     });
     return;
   }
 
-  if (options.printMode || nonInteractivePrompts.length > 0) {
-    if (nonInteractivePrompts.length === 0) {
-      if (options.printMode) {
-        console.error(
-          "No prompt provided for --print mode. Pass a prompt argument or pipe stdin.",
-        );
-        process.exit(1);
-      }
-      return;
-    }
-    if (
-      pipedInput !== null &&
-      nonInteractivePrompts.length > 1 &&
-      !options.printMode
-    ) {
-      renderer.renderLine(
-        `Stdin batch mode: running ${nonInteractivePrompts.length} prompt(s) sequentially in session ${runtimeContext.session.id}.`,
-      );
-    }
-    for (const prompt of nonInteractivePrompts) {
-      await runNonInteractivePrompt({
-        prompt,
-        sessionManager,
-        runtimeContext,
-        renderer,
-        sessionRuntime,
-        logger,
-        printMode: Boolean(options.printMode),
-        fallbackSessionId: recoveryCandidate?.id,
-        lifecycleNotices: bootstrap.lifecycleNotices,
-        setActiveNonInteractiveApprovalMode: (mode) => {
-          activeNonInteractiveApprovalMode = mode;
-        },
-        nonInteractiveCliApprovalMode: options.nonInteractiveApproval,
-      });
-    }
+  if (cliModePlan.kind === "print") {
+    await runCliPrintMode({
+      prompts: nonInteractivePrompts,
+      writeError: console.error,
+      exit: process.exit,
+      runPrompt: (prompt) =>
+        runNonInteractivePrompt({
+          prompt,
+          sessionManager,
+          runtimeContext,
+          renderer,
+          sessionRuntime,
+          logger,
+          printMode: true,
+          fallbackSessionId: recoveryCandidate?.id,
+          lifecycleNotices: bootstrap.lifecycleNotices,
+          setActiveNonInteractiveApprovalMode: (mode) => {
+            activeNonInteractiveApprovalMode = mode;
+          },
+          nonInteractiveCliApprovalMode: options.nonInteractiveApproval,
+        }),
+    });
+    return;
+  }
+
+  if (cliModePlan.kind === "stdin-batch") {
+    await runCliStdinMode({
+      mode: "batch",
+      prompts: nonInteractivePrompts,
+      pipedInput,
+      sessionId: runtimeContext.session.id,
+      renderLine: (line) => renderer.renderLine(line),
+      runPrompt: (prompt) =>
+        runNonInteractivePrompt({
+          prompt,
+          sessionManager,
+          runtimeContext,
+          renderer,
+          sessionRuntime,
+          logger,
+          printMode: false,
+          fallbackSessionId: recoveryCandidate?.id,
+          lifecycleNotices: bootstrap.lifecycleNotices,
+          setActiveNonInteractiveApprovalMode: (mode) => {
+            activeNonInteractiveApprovalMode = mode;
+          },
+          nonInteractiveCliApprovalMode: options.nonInteractiveApproval,
+        }),
+    });
     return;
   }
 
