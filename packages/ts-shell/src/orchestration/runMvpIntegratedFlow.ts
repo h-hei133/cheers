@@ -63,11 +63,10 @@ import {
 } from "./patchMutationLane.js";
 import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
 import {
-  appendActionableBlockerEvidence,
-  assembleShellResult,
-  buildShellCodingResult,
-  deriveActionableBlockerContract,
-} from "./shellResultAssembly.js";
+  projectBlockedRuntimeOutcome,
+  projectRuntimeCodingOutcome,
+  projectRuntimeMutationOutcome,
+} from "./runtimeOutcomeProjection.js";
 import { resolveTaskTargets } from "./targetResolution.js";
 import type {
   ResolvedTarget,
@@ -4507,104 +4506,21 @@ async function executeWorkflowTaskPlan(input: {
 
   if (input.plan.blockedReason) {
     notes.push(`blocker: ${input.plan.blockedReason}`);
-    const blockedContract = deriveActionableBlockerContract({
-      reason: input.plan.blockedReason,
-    });
-    const blockedEvidence = [
-      ...input.freshnessObservability.evidence,
-      "workflow blocked before mutation",
-    ];
-    appendActionableBlockerEvidence(blockedEvidence, blockedContract);
-    const blockedRemainingTargets = Array.from(
-      new Set([
-        ...(input.plan.previousRemainingTargets ?? []),
-        ...(input.plan.degradedReopenCandidates ?? []),
-      ]),
-    ).filter((entry) => entry.trim().length > 0);
-    const blockedFailedEntries = input.plan.previousFailedEntries ?? [];
-    blockedEvidence.push(
-      `repair-remaining-files:${
-        blockedRemainingTargets.length > 0
-          ? blockedRemainingTargets.join(",")
-          : "(none)"
-      }`,
-    );
-    blockedEvidence.push(
-      `repair-failed-files:${
-        blockedFailedEntries.length > 0
-          ? blockedFailedEntries
-              .map(
-                (entry) =>
-                  `${entry.path}::${entry.failureCode}::${truncate(entry.reason, 80)}`,
-              )
-              .join("|")
-          : "(none)"
-      }`,
-    );
-    if (input.plan.degradedReopenReason) {
-      blockedEvidence.push(`reopen-reason:${input.plan.degradedReopenReason}`);
-    }
-    if ((input.plan.degradedReopenCandidates?.length ?? 0) > 0) {
-      blockedEvidence.push(
-        `reopen-candidates:${input.plan.degradedReopenCandidates!.join(",")}`,
-      );
-    }
-    if (input.plan.degradedReopenCandidateSource) {
-      blockedEvidence.push(
-        `reopen-candidate-source:${input.plan.degradedReopenCandidateSource}`,
-      );
-    }
-    if ((input.plan.degradedReopenCandidatePruned?.length ?? 0) > 0) {
-      blockedEvidence.push(
-        `reopen-candidate-pruned:${input.plan.degradedReopenCandidatePruned!.join("|")}`,
-      );
-    }
-    if (
-      input.plan.degradedReopenCandidates &&
-      input.plan.degradedReopenCandidates.length > 1
-    ) {
-      blockedEvidence.push("why-not-auto-select:multi-candidate-ambiguous");
-      blockedEvidence.push("repair-outcome:blocked-disambiguation");
-    }
     return {
       events,
       notes,
-      codingResult: buildShellCodingResult(input.plan.taskKind, {
-        changedFiles,
-        failedFiles: [
-          {
-            path: input.plan.targetPath ?? "(missing-target)",
-            reason: input.plan.blockedReason,
-          },
-        ],
-        patches,
-        verifiedFiles,
-        unverifiedFiles,
-        verification: {
-          status: "skipped",
-          reason: input.plan.blockedReason,
-          selectionScope: "none",
-          selectionSource: "not-requested",
-          ...(blockedContract
-            ? {
-                nextAction: blockedContract.doNext,
-              }
-            : {}),
-        },
-        repairNotes: [input.plan.blockedReason],
-        evidence: blockedEvidence,
-        taskVerdict: "insufficient-evidence",
-        taskReasons: [input.plan.blockedReason],
+      ...projectBlockedRuntimeOutcome({
+        taskKind: input.plan.taskKind,
+        blockedReason: input.plan.blockedReason,
+        targetPath: input.plan.targetPath,
+        freshnessEvidence: input.freshnessObservability.evidence,
+        previousRemainingTargets: input.plan.previousRemainingTargets,
+        previousFailedEntries: input.plan.previousFailedEntries,
+        degradedReopenReason: input.plan.degradedReopenReason,
+        degradedReopenCandidates: input.plan.degradedReopenCandidates,
+        degradedReopenCandidateSource: input.plan.degradedReopenCandidateSource,
+        degradedReopenCandidatePruned: input.plan.degradedReopenCandidatePruned,
       }),
-      userFacingOutput: blockedContract
-        ? [
-            `Task not completed: ${input.plan.blockedReason}`,
-            "Outcome: blocked",
-            `BlockerKind: ${blockedContract.blockerKind}`,
-            `Reason: ${blockedContract.reason}`,
-            `DoNext: ${blockedContract.doNext}`,
-          ].join("\n")
-        : `Task not completed: ${input.plan.blockedReason}`,
     };
   }
 
@@ -4716,7 +4632,8 @@ async function executeWorkflowTaskPlan(input: {
       return {
         events,
         notes,
-        codingResult: buildShellCodingResult(input.plan.taskKind, {
+        ...projectRuntimeCodingOutcome({
+          taskKind: input.plan.taskKind,
           changedFiles,
           failedFiles,
           patches,
@@ -4732,8 +4649,8 @@ async function executeWorkflowTaskPlan(input: {
           evidence: [`read failed: ${reason}`],
           taskVerdict: "insufficient-evidence",
           taskReasons: [inspectFailureTaskReason],
+          userFacingOutput: `Task not completed: failed to read ${input.plan.targetPath}. Reason: ${reason}`,
         }),
-        userFacingOutput: `Task not completed: failed to read ${input.plan.targetPath}. Reason: ${reason}`,
       };
     }
     originalContent = readStep.output ?? "";
@@ -4782,7 +4699,8 @@ async function executeWorkflowTaskPlan(input: {
       return {
         events,
         notes,
-        codingResult: buildShellCodingResult("read-file", {
+        ...projectRuntimeCodingOutcome({
+          taskKind: "read-file",
           changedFiles,
           failedFiles,
           patches,
@@ -4806,8 +4724,8 @@ async function executeWorkflowTaskPlan(input: {
                 ? readDelivery.output
                 : "Read step succeeded but no user-facing delivery could be produced.",
           ],
+          userFacingOutput: readDelivery.output,
         }),
-        userFacingOutput: readDelivery.output,
       };
     }
   }
@@ -4856,7 +4774,8 @@ async function executeWorkflowTaskPlan(input: {
       return {
         events,
         notes,
-        codingResult: buildShellCodingResult("inspect-files", {
+        ...projectRuntimeCodingOutcome({
+          taskKind: "inspect-files",
           changedFiles,
           failedFiles,
           patches,
@@ -4876,8 +4795,8 @@ async function executeWorkflowTaskPlan(input: {
               ? "Repository inspection executed."
               : "Repository inspection produced no candidate files for requested scope.",
           ],
+          userFacingOutput: delivery,
         }),
-        userFacingOutput: delivery,
       };
     }
     const reason = globStep.error ?? "glob failed";
@@ -4886,7 +4805,8 @@ async function executeWorkflowTaskPlan(input: {
     return {
       events,
       notes,
-      codingResult: buildShellCodingResult("inspect-files", {
+      ...projectRuntimeCodingOutcome({
+        taskKind: "inspect-files",
         changedFiles,
         failedFiles,
         patches,
@@ -4902,8 +4822,8 @@ async function executeWorkflowTaskPlan(input: {
         evidence: [`glob failed: ${reason}`],
         taskVerdict: "insufficient-evidence",
         taskReasons: ["Could not inspect repository files."],
+        userFacingOutput: `Task not completed: repository inspection failed. Reason: ${reason}`,
       }),
-      userFacingOutput: `Task not completed: repository inspection failed. Reason: ${reason}`,
     };
   }
 
@@ -4912,7 +4832,8 @@ async function executeWorkflowTaskPlan(input: {
       return {
         events,
         notes: [...notes, "repo-explain missing explicit target"],
-        codingResult: buildShellCodingResult("repo-explain", {
+        ...projectRuntimeCodingOutcome({
+          taskKind: "repo-explain",
           changedFiles,
           failedFiles: [
             {
@@ -4934,9 +4855,9 @@ async function executeWorkflowTaskPlan(input: {
           evidence,
           taskVerdict: "insufficient-evidence",
           taskReasons: ["Explanation target was not resolved."],
+          userFacingOutput:
+            "Task not completed: missing target file. Provide an explicit in-workspace file path to explain.",
         }),
-        userFacingOutput:
-          "Task not completed: missing target file. Provide an explicit in-workspace file path to explain.",
       };
     }
     const readStep = await dispatchToolWithLifecycle({
@@ -4955,7 +4876,8 @@ async function executeWorkflowTaskPlan(input: {
       return {
         events,
         notes: [...notes, `repo-explain read failed: ${reason}`],
-        codingResult: buildShellCodingResult("repo-explain", {
+        ...projectRuntimeCodingOutcome({
+          taskKind: "repo-explain",
           changedFiles,
           failedFiles: [{ path: input.plan.targetPath, reason }],
           patches,
@@ -4971,8 +4893,8 @@ async function executeWorkflowTaskPlan(input: {
           evidence: [`repo-explain read failed: ${reason}`],
           taskVerdict: "insufficient-evidence",
           taskReasons: ["Target file could not be read for explanation."],
+          userFacingOutput: `Task not completed: failed to read ${input.plan.targetPath}. Reason: ${reason}`,
         }),
-        userFacingOutput: `Task not completed: failed to read ${input.plan.targetPath}. Reason: ${reason}`,
       };
     }
     const explainOutput = buildExplainTaskDelivery(
@@ -4982,7 +4904,8 @@ async function executeWorkflowTaskPlan(input: {
     return {
       events,
       notes: [...notes, `repo-explain delivered: ${input.plan.targetPath}`],
-      codingResult: buildShellCodingResult("repo-explain", {
+      ...projectRuntimeCodingOutcome({
+        taskKind: "repo-explain",
         changedFiles,
         failedFiles,
         patches,
@@ -5000,8 +4923,8 @@ async function executeWorkflowTaskPlan(input: {
         taskReasons: [
           "Repo explanation delivered from inspected file content.",
         ],
+        userFacingOutput: explainOutput,
       }),
-      userFacingOutput: explainOutput,
     };
   }
 
@@ -5025,7 +4948,8 @@ async function executeWorkflowTaskPlan(input: {
       return {
         events,
         notes,
-        codingResult: buildShellCodingResult(input.plan.taskKind, {
+        ...projectRuntimeCodingOutcome({
+          taskKind: input.plan.taskKind,
           changedFiles,
           failedFiles,
           patches,
@@ -5043,8 +4967,8 @@ async function executeWorkflowTaskPlan(input: {
           taskReasons: [
             "No remaining related files required continuation edits.",
           ],
+          userFacingOutput: convergedMessage,
         }),
-        userFacingOutput: convergedMessage,
       };
     }
     const fenced = extractFencedContent(input.prompt);
@@ -5157,7 +5081,8 @@ async function executeWorkflowTaskPlan(input: {
         return {
           events,
           notes: [...notes, `blocker: ${reason}`],
-          codingResult: buildShellCodingResult(input.plan.taskKind, {
+          ...projectRuntimeCodingOutcome({
+            taskKind: input.plan.taskKind,
             changedFiles,
             failedFiles,
             patches,
@@ -5173,8 +5098,8 @@ async function executeWorkflowTaskPlan(input: {
             evidence,
             taskVerdict: "insufficient-evidence",
             taskReasons: [reason],
+            userFacingOutput: `Task not completed: ${reason}`,
           }),
-          userFacingOutput: `Task not completed: ${reason}`,
         };
       } else if (
         originalContent.includes(replaceDirective.to) &&
@@ -5208,7 +5133,8 @@ async function executeWorkflowTaskPlan(input: {
         return {
           events,
           notes: [...notes, `blocker: ${reason}`],
-          codingResult: buildShellCodingResult(input.plan.taskKind, {
+          ...projectRuntimeCodingOutcome({
+            taskKind: input.plan.taskKind,
             changedFiles,
             failedFiles,
             patches,
@@ -5224,8 +5150,8 @@ async function executeWorkflowTaskPlan(input: {
             evidence,
             taskVerdict: "insufficient-evidence",
             taskReasons: [reason],
+            userFacingOutput: `Task not completed: ${reason}`,
           }),
-          userFacingOutput: `Task not completed: ${reason}`,
         };
       }
     }
@@ -5282,7 +5208,8 @@ async function executeWorkflowTaskPlan(input: {
         return {
           events,
           notes: [...notes, `blocker: ${mutationInstruction.reason}`],
-          codingResult: buildShellCodingResult(input.plan.taskKind, {
+          ...projectRuntimeCodingOutcome({
+            taskKind: input.plan.taskKind,
             changedFiles,
             failedFiles,
             patches,
@@ -5298,8 +5225,8 @@ async function executeWorkflowTaskPlan(input: {
             evidence,
             taskVerdict: "insufficient-evidence",
             taskReasons: [mutationInstruction.reason],
+            userFacingOutput: `Task not completed: ${mutationInstruction.reason}`,
           }),
-          userFacingOutput: `Task not completed: ${mutationInstruction.reason}`,
         };
       }
     }
@@ -6409,7 +6336,7 @@ async function executeWorkflowTaskPlan(input: {
     );
   }
 
-  const resultContract = assembleShellResult({
+  const resultContract = projectRuntimeMutationOutcome({
     taskKind: input.plan.taskKind,
     changedFiles,
     failedFiles,
