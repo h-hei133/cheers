@@ -111,27 +111,8 @@ import type {
 } from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
+import { parseCliArgs, type CliOptions } from "./cliArgs.js";
 import { openSessionsPanel } from "./sessionsPanel.js";
-
-interface CliOptions {
-  sessionId?: string;
-  provider?:
-    | "openai"
-    | "anthropic"
-    | "openai-compatible"
-    | "google"
-    | "antigravity"
-    | "claudecode";
-  apiKey?: string;
-  projectPath?: string;
-  replayFile?: string;
-  printMode?: boolean;
-  promptArg?: string;
-  migrateSessionRoot?: boolean;
-  nonInteractiveApproval?: "deny" | "allow-once" | "allow-always";
-  applyPatchRuntimeRoute?: boolean;
-  applyPatchWorkspaceWrite?: boolean;
-}
 
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
 
@@ -208,40 +189,17 @@ async function main(): Promise<void> {
   let activeNonInteractiveApprovalMode: ApprovalModeObject | undefined;
   let pendingEscPressAt: number | null = null;
 
-  if (
-    args.length === 1 &&
-    (args[0] === "--version" || args[0] === "-v" || args[0] === "-V")
-  ) {
+  const parsedCliArgs = parseCliArgs(args, { cwd: launchCwd });
+  if (parsedCliArgs.ok === false) {
+    console.error(parsedCliArgs.error.message);
+    process.exit(parsedCliArgs.error.exitCode);
+  }
+  if (parsedCliArgs.args.versionRequested) {
     console.log("0.1.0 (ts-shell MVP)");
     return;
   }
 
-  const options: CliOptions = {};
-  const positionalArgs = args.filter((arg) => !arg.startsWith("--"));
-  const projectIdx = (() => {
-    const explicitIdx = args.indexOf("--project");
-    if (explicitIdx !== -1) {
-      return explicitIdx;
-    }
-    return args.indexOf("--attach");
-  })();
-  if (projectIdx !== -1) {
-    if (!args[projectIdx + 1]) {
-      console.error(
-        `Missing value for ${args[projectIdx]}. Example: --project D:\\path\\to\\your-project`,
-      );
-      process.exit(1);
-    }
-    options.projectPath = args[projectIdx + 1];
-  } else {
-    // npm start can parse unknown --project/--attach flags as npm configs and
-    // forward only the value as a positional arg. Accept that positional path
-    // so end users can keep using `npm start -- --project <path>`.
-    const positionalProject = positionalArgs.find((arg) => /[\\/]/.test(arg));
-    if (positionalProject) {
-      options.projectPath = positionalProject;
-    }
-  }
+  const options: CliOptions = parsedCliArgs.args.options;
 
   const runtimeBaseDir = resolveTargetProjectRoot(
     launchCwd,
@@ -251,57 +209,10 @@ async function main(): Promise<void> {
   const workspaceRoot = gitContext.root ?? runtimeBaseDir;
   const runtimeConfig = getRuntimeConfig(workspaceRoot);
 
-  if (args.includes("--doctor")) {
+  if (parsedCliArgs.args.doctorRequested) {
     printCliDoctor(workspaceRoot, launchCwd);
     return;
   }
-
-  const sessionIdIdx = args.indexOf("--session-id");
-  if (sessionIdIdx !== -1 && args[sessionIdIdx + 1]) {
-    options.sessionId = args[sessionIdIdx + 1];
-  }
-  const providerIdx = args.indexOf("--provider");
-  if (providerIdx !== -1 && args[providerIdx + 1]) {
-    const provider = args[providerIdx + 1].trim().toLowerCase();
-    if (
-      provider === "openai" ||
-      provider === "anthropic" ||
-      provider === "openai-compatible" ||
-      provider === "google" ||
-      provider === "antigravity" ||
-      provider === "claudecode"
-    ) {
-      options.provider = provider;
-    } else {
-      console.error(
-        `Invalid --provider value: ${args[providerIdx + 1]}. Expected openai, anthropic, openai-compatible, google, antigravity, or claudecode.`,
-      );
-      process.exit(1);
-    }
-  }
-  const apiKeyIdx = args.indexOf("--api-key");
-  if (apiKeyIdx !== -1 && args[apiKeyIdx + 1]) {
-    options.apiKey = args[apiKeyIdx + 1];
-  }
-  const replayIdx = args.indexOf("--replay-file");
-  if (replayIdx !== -1) {
-    const replayPath = args[replayIdx + 1];
-    if (!replayPath) {
-      console.error(
-        "Missing value for --replay-file. Example: --replay-file .\\replay.txt",
-      );
-      process.exit(1);
-    }
-    options.replayFile = replayPath;
-  }
-  options.printMode = args.includes("--print") || args.includes("-p");
-  options.migrateSessionRoot = args.includes("--migrate-session-root");
-  options.nonInteractiveApproval = parseNonInteractiveApprovalMode(args);
-  options.applyPatchRuntimeRoute = args.includes("--apply-patch-runtime-route");
-  options.applyPatchWorkspaceWrite = args.includes(
-    "--apply-patch-workspace-write",
-  );
-  options.promptArg = derivePromptArgument(args, options.projectPath);
 
   const resolveCredentialSnapshot = (): ProviderCredentialResolution =>
     resolveProviderCredential({
@@ -1832,54 +1743,6 @@ function askReadline(
   });
 }
 
-function parseNonInteractiveApprovalMode(
-  args: readonly string[],
-): "deny" | "allow-once" | "allow-always" | undefined {
-  let raw: string | undefined;
-  const idx = args.indexOf("--non-interactive-approval");
-  if (idx !== -1) {
-    raw = args[idx + 1];
-  }
-  if (!raw) {
-    const inline = args.find((arg) =>
-      arg.toLowerCase().startsWith("--non-interactive-approval="),
-    );
-    if (inline) {
-      raw = inline.split("=", 2)[1];
-    }
-  }
-  if (!raw) {
-    if (idx === -1) {
-      return undefined;
-    }
-    console.error(
-      "Missing value for --non-interactive-approval. Use deny, allow-once, or allow-always.",
-    );
-    process.exit(1);
-  }
-  const normalizedRaw = raw.trim().toLowerCase();
-  if (
-    normalizedRaw === "deny" ||
-    normalizedRaw === "allow-once" ||
-    normalizedRaw === "allow-always"
-  ) {
-    return normalizedRaw;
-  }
-  if (normalizedRaw === "n") {
-    return "deny";
-  }
-  if (normalizedRaw === "y") {
-    return "allow-once";
-  }
-  if (normalizedRaw === "a") {
-    return "allow-always";
-  }
-  console.error(
-    `Invalid --non-interactive-approval value: ${normalizedRaw}. Use deny, allow-once, or allow-always.`,
-  );
-  process.exit(1);
-}
-
 function applyPatchDecisionFromApprovalMode(
   mode: "deny" | "allow-once" | "allow-always" | undefined,
 ): ApplyPatchRuntimeRouteOptions["requestedUserDecision"] | undefined {
@@ -2775,53 +2638,6 @@ function buildPersistentShellPrompt(input: {
   const project = toProjectLabel(input.projectRoot);
   const session = toSessionShortLabel(input.sessionId);
   return `[${project}|${session}|${input.agentMode}] > `;
-}
-
-function derivePromptArgument(
-  args: string[],
-  projectPath?: string,
-): string | undefined {
-  const positional: string[] = [];
-  const valueFlags = new Set([
-    "--project",
-    "--attach",
-    "--session-id",
-    "--provider",
-    "--api-key",
-    "--replay-file",
-    "--non-interactive-approval",
-  ]);
-
-  for (let index = 0; index < args.length; index += 1) {
-    const token = args[index];
-    if (valueFlags.has(token)) {
-      index += 1;
-      continue;
-    }
-    if (token === "--") {
-      positional.push(...args.slice(index + 1));
-      break;
-    }
-    if (token.startsWith("-")) {
-      continue;
-    }
-    positional.push(token);
-  }
-
-  if (projectPath) {
-    const normalizedProject = normalizePathForCompare(projectPath);
-    const projectIdx = positional.findIndex(
-      (token) =>
-        normalizePathForCompare(path.resolve(process.cwd(), token)) ===
-          normalizedProject || token === projectPath,
-    );
-    if (projectIdx >= 0) {
-      positional.splice(projectIdx, 1);
-    }
-  }
-
-  const prompt = positional.join(" ").trim();
-  return prompt.length > 0 ? prompt : undefined;
 }
 
 function renderWorkspaceSummary(
