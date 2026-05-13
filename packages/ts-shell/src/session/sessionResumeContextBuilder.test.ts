@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CodingResultSummary } from "../orchestration/types.js";
-import type { SessionContinuitySnapshot } from "./SessionManager.js";
+import type { SessionContinuitySnapshot } from "./sessionContinuityTypes.js";
 import {
   buildActionHandoffSummary,
   buildSeedInfluenceHandoffSummary,

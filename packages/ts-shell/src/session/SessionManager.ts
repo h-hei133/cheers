@@ -34,16 +34,14 @@ import {
 import type {
   AgentExecutionOutput,
   AgentRole,
-  CodingActionResultSeed,
   CodingResultSummary,
-  CodingTaskKind,
   CodingWriteEffect,
   ContinuationReason,
   TerminalClassification,
   TerminalReason,
 } from "../orchestration/types.js";
 import { deriveActionableFailureContinuity } from "./actionableFailureContinuity.js";
-import { buildCompactContinuitySummary } from "./compactContinuitySummary.js";
+import { applyCompactRetentionPlan } from "./compactRetentionPlanner.js";
 import {
   createEmptyCurrentSessionSelectionStore,
   parseCurrentSessionSelectionStore,
@@ -55,20 +53,30 @@ import {
   type CurrentSessionSelectionStore,
 } from "./currentSessionSelection.js";
 import { buildReplayPlanFromSnapshot } from "./replayPlanBuilder.js";
+import { buildMutationContinuityState } from "./mutationContinuityState.js";
 import {
   buildActionHandoffSummary,
   buildSeedInfluenceHandoffSummary,
   buildSessionResumeContext,
   buildSessionResumeSnapshot,
   buildSuccessHandoffDiagnostic,
-  extractPathLikeTargets,
-  type SeedInfluenceDiagnostic,
 } from "./sessionResumeContextBuilder.js";
+import type {
+  ApprovalAuditMemoryState,
+  PermissionRequestMemoryState,
+  RequestScopeMemoryState,
+  SeedInfluenceDiagnostic,
+  SessionContinuitySnapshot,
+} from "./sessionContinuityTypes.js";
 import {
   deriveStoppedSessionContinuitySurface,
 } from "./stoppedSessionContinuity.js";
 
 export type { CurrentSessionSelectionResolution } from "./currentSessionSelection.js";
+export type {
+  ApprovalAuditMemoryState,
+  SessionContinuitySnapshot,
+} from "./sessionContinuityTypes.js";
 
 export interface SessionMessage {
   role: "user" | "assistant";
@@ -131,134 +139,6 @@ export interface ProjectContextSummary {
   readonly sessionCount: number;
   readonly recoverableCount: number;
   readonly lastSessionTitle?: string;
-}
-
-export interface SessionContinuitySnapshot {
-  readonly sessionId: string;
-  readonly projectRoot: string;
-  readonly lastUserIntent?: string;
-  readonly lastAssistantOutput?: string;
-  readonly lastTerminalClassification?: TerminalClassification;
-  readonly lastTerminalReason?: TerminalReason;
-  readonly lastFailure?: string;
-  readonly lastTaskKind?: CodingTaskKind;
-  readonly lastGroundedDeliverableMode?: "read" | "summary" | "explain";
-  readonly lastReadDeliveredLines?: number;
-  readonly lastReadWindowStart?: number;
-  readonly lastReadWindowEnd?: number;
-  readonly lastReadWindowSize?: number;
-  readonly lastReadFragmentStart?: number;
-  readonly lastReadFragmentEnd?: number;
-  readonly lastReadFragmentLineIndexes?: readonly number[];
-  readonly lastReadFragmentRanges?: readonly string[];
-  readonly lastReadFragmentSourceWindowStart?: number;
-  readonly lastReadFragmentSourceWindowEnd?: number;
-  readonly lastReadFragmentFingerprint?: string;
-  readonly lastReadFilter?: "none" | "function-definitions";
-  readonly lastStagedRepairStepCount?: number;
-  readonly lastStagedRepairCompletedStep?: number;
-  readonly lastStagedRepairBlockedStep?: number;
-  readonly lastStagedRepairNextStep?: number;
-  readonly lastAnswerDefect?: string;
-  readonly lastActionResultSeed?: CodingActionResultSeed;
-  readonly lastWriterStarted?: boolean;
-  readonly lastWriteEffect?: CodingWriteEffect;
-  readonly lastWriteRequiresUserInspection?: boolean;
-  readonly lastWriteEffectTarget?: string;
-  readonly lastActionHandoffSummary?: string;
-  readonly lastSeedInfluence?: SeedInfluenceDiagnostic;
-  readonly lastSeedInfluenceHandoffSummary?: string;
-  readonly lastFailureHandoffDiagnostic?: string;
-  readonly lastSuccessHandoffDiagnostic?: string;
-  readonly recentChangedFiles: readonly string[];
-  readonly recentTargetFiles: readonly string[];
-  readonly recentFailedFiles: ReadonlyArray<{ path: string; reason: string }>;
-  readonly recentVerifiedFiles: readonly string[];
-  readonly lastVerificationStatus?: string;
-  readonly lastVerificationCommand?: string;
-  readonly lastVerificationReason?: string;
-  readonly lastVerificationBlockerKind?: string;
-  readonly lastVerificationNextAction?: string;
-  readonly lastVerificationResumeEligible?: boolean;
-  readonly lastApprovalDecision?: "deny" | "allow-once" | "allow-always";
-  readonly lastApprovalDecisionSource?: string;
-  readonly lastApprovalPersistent?: boolean;
-  readonly lastApprovalCacheEffect?: string;
-  readonly lastApprovalProjectRoot?: string;
-  readonly lastApprovalCacheKey?: string;
-  readonly lastApprovalScope?: string;
-  readonly lastApprovalLineage?: string;
-  readonly lastApprovalStopReason?: string;
-  readonly lastApprovalChannel?: "interactive" | "non-interactive";
-  readonly lastApprovalInputKey?: "y" | "a" | "n" | "other";
-  readonly lastApprovalRecordedAt?: string;
-  readonly lastApprovalHistory?: readonly ApprovalAuditMemoryState[];
-  readonly lastApprovalProvenanceKind?: string;
-  readonly lastApprovalProvenanceSource?: string;
-  readonly lastApprovalProvenanceToolName?: string;
-  readonly lastApprovalProvenanceTaskId?: string;
-  readonly lastToolExecutionProvenanceKind?: string;
-  readonly lastToolExecutionProvenanceSource?: string;
-  readonly lastToolExecutionProvenanceToolName?: string;
-  readonly lastToolExecutionProvenanceTaskId?: string;
-  readonly lastToolExecutionFailureBoundary?: string;
-  readonly lastPermissionRequestToolName?: string;
-  readonly lastPermissionRequestOperation?: string;
-  readonly lastPermissionRequestTarget?: string;
-  readonly lastPermissionRequestProcess?: string;
-  readonly lastPermissionRequestScopeKey?: string;
-  readonly lastPermissionRequestScopeLabel?: string;
-  readonly lastPermissionRequestCacheKey?: string;
-  readonly lastPermissionRequestProjectRoot?: string;
-  readonly lastPermissionRequestSource?: "verification-command" | "approval-request";
-  readonly lastPermissionRequestLineage?: string;
-  readonly lastRequestScopeCacheKey?: string;
-  readonly lastRequestScopeLabel?: string;
-  readonly lastRequestScopeProjectRoot?: string;
-  readonly lastRequestScopeSource?: "verification-command" | "approval-request";
-  readonly lastRepairStatus?: string;
-  readonly lastRepairNotes: readonly string[];
-  readonly lastContinuationStatus?: string;
-  readonly lastContinuationEvidence: readonly string[];
-  readonly lastTaskSatisfactionVerdict?: string;
-  readonly lastTaskSatisfactionReasons: readonly string[];
-  readonly unresolvedItems: readonly string[];
-  readonly freshnessHistoryCount?: number;
-}
-
-export interface ApprovalAuditMemoryState {
-  readonly decision: "deny" | "allow-once" | "allow-always";
-  readonly decisionSource: string;
-  readonly persistent: boolean;
-  readonly cacheEffect: string;
-  readonly projectRoot: string;
-  readonly cacheKey: string;
-  readonly scopeLabel: string;
-  readonly lineage?: string;
-  readonly stopReason?: string;
-  readonly channel?: "interactive" | "non-interactive";
-  readonly inputKey?: "y" | "a" | "n" | "other";
-  readonly recordedAt: string;
-}
-
-interface PermissionRequestMemoryState {
-  readonly toolName?: string;
-  readonly operation?: string;
-  readonly target?: string;
-  readonly process?: string;
-  readonly scopeKey?: string;
-  readonly scopeLabel?: string;
-  readonly cacheKey?: string;
-  readonly projectRoot?: string;
-  readonly source?: "verification-command" | "approval-request";
-  readonly lineage?: string;
-}
-
-interface RequestScopeMemoryState {
-  readonly cacheKey?: string;
-  readonly scopeLabel?: string;
-  readonly projectRoot?: string;
-  readonly source?: "verification-command" | "approval-request";
 }
 
 interface SessionMetadata {
@@ -2451,32 +2331,11 @@ export class SessionManager {
     const lastUserIntent =
       recoverySnapshot.lastUserMessage?.content ??
       this.findLastTurnContent(session.turns, "user");
-    const recentTargetFilesFromHistory = recentCodingResults.flatMap((result) => [
-      ...(result.changeSet.attemptedFiles ?? []),
-      ...(result.changedFiles ?? []),
-      ...(result.verifiedFiles ?? []),
-      ...((result.failedFiles ?? []).map((entry) => entry.path)),
-    ]);
-    const recentTargetFiles = Array.from(
-      new Set([
-        ...recentTargetFilesFromHistory,
-        ...extractPathLikeTargets(lastUserIntent),
-      ]),
-    ).slice(0, 12);
-
-    const recentFailedByPath = new Map<string, string>();
-    for (const result of recentCodingResults) {
-      for (const entry of result.failedFiles ?? []) {
-        const pathCandidate = entry.path?.trim();
-        if (!pathCandidate || recentFailedByPath.has(pathCandidate)) {
-          continue;
-        }
-        recentFailedByPath.set(pathCandidate, entry.reason);
-      }
-    }
-    const recentFailedFiles = Array.from(recentFailedByPath.entries())
-      .map(([path, reason]) => ({ path, reason }))
-      .slice(0, 8);
+    const mutationContinuity = buildMutationContinuityState({
+      lastCodingResult,
+      recentCodingResults,
+      lastUserIntent,
+    });
 
     const unresolvedItems: string[] = [];
     const lastFailure =
@@ -2540,7 +2399,7 @@ export class SessionManager {
     }
     const freshnessHistoryCount =
       recentCodingResults.length +
-      recentFailedFiles.length +
+      mutationContinuity.recentFailedFiles.length +
       (lastCodingResult?.continuation.evidence.length ?? 0) +
       unresolvedItems.length;
 
@@ -2638,10 +2497,10 @@ export class SessionManager {
         ? { lastStagedRepairNextStep: stagedRepairProgress.nextStep }
         : {}),
       ...(lastAnswerDefect ? { lastAnswerDefect } : {}),
-      recentChangedFiles: (lastCodingResult?.changedFiles ?? []).slice(0, 6),
-      recentTargetFiles,
-      recentFailedFiles,
-      recentVerifiedFiles: (lastCodingResult?.verifiedFiles ?? []).slice(0, 6),
+      recentChangedFiles: mutationContinuity.recentChangedFiles,
+      recentTargetFiles: mutationContinuity.recentTargetFiles,
+      recentFailedFiles: mutationContinuity.recentFailedFiles,
+      recentVerifiedFiles: mutationContinuity.recentVerifiedFiles,
       lastVerificationStatus: lastCodingResult?.verification.status,
       lastVerificationCommand: lastCodingResult?.verification.command,
       lastVerificationReason: lastCodingResult?.verification.reason,
@@ -4618,57 +4477,33 @@ export class SessionManager {
     workingMemory: unknown,
     event: QueryEvent,
   ): unknown {
-    if (!workingMemory || typeof workingMemory !== "object" || Array.isArray(workingMemory)) {
-      return workingMemory;
-    }
-    const root = { ...(workingMemory as Record<string, unknown>) };
     const now = new Date().toISOString();
-    const previousEventCount =
-      typeof root.sourceEventCount === "number" &&
-      Number.isFinite(root.sourceEventCount)
-        ? Math.max(0, Math.floor(root.sourceEventCount))
-        : 0;
-    const previousTurnCount =
-      typeof root.sourceTurnCount === "number" &&
-      Number.isFinite(root.sourceTurnCount)
-        ? Math.max(0, Math.floor(root.sourceTurnCount))
-        : 0;
-    const turnCompleted = event.type === "query.completed";
-    const nextEventCount = previousEventCount + 1;
-    const nextTurnCount = previousTurnCount + (turnCompleted ? 1 : 0);
-    root.sourceEventCount = nextEventCount;
-    root.sourceTurnCount = nextTurnCount;
-    root.updatedAt = now;
-
-    if (
-      !turnCompleted ||
-      root.compacted === true ||
-      nextTurnCount < SessionManager.AUTO_COMPACT_TURN_THRESHOLD
-    ) {
-      return root;
-    }
-
-    const approvalAudit = this.extractApprovalAuditMemoryState(root);
-    const approvalAuditHistory = this.extractApprovalAuditHistoryMemoryState(root);
+    const queryCompleted =
+      event.type === "query.completed" ? event : undefined;
+    const approvalAudit = this.extractApprovalAuditMemoryState(workingMemory);
+    const approvalAuditHistory =
+      this.extractApprovalAuditHistoryMemoryState(workingMemory);
     const actionHandoffSummary = buildActionHandoffSummary(
-      event.result.codingResult?.lastActionResultSeed,
+      queryCompleted?.result.codingResult?.lastActionResultSeed,
     );
     const stoppedSessionContinuity = deriveStoppedSessionContinuitySurface(
-      event.result.codingResult,
+      queryCompleted?.result.codingResult,
     );
-    const seedInfluence = this.extractSeedInfluenceFromQueryResult(event.result);
+    const seedInfluence = this.extractSeedInfluenceFromQueryResult(
+      queryCompleted?.result,
+    );
     const seedInfluenceHandoffSummary = buildSeedInfluenceHandoffSummary(
-      event.result.codingResult?.lastActionResultSeed,
+      queryCompleted?.result.codingResult?.lastActionResultSeed,
       seedInfluence,
     );
-    const failureHandoffDiagnostic =
-      stoppedSessionContinuity?.failureHandoffDiagnostic;
     const successHandoffDiagnostic = buildSuccessHandoffDiagnostic(
-      event.result.codingResult,
+      queryCompleted?.result.codingResult,
     );
-    const compactSummary = buildCompactContinuitySummary({
-      summary: root.summary,
-      continuity: root.continuity,
+    return applyCompactRetentionPlan({
+      workingMemory,
+      event,
+      turnThreshold: SessionManager.AUTO_COMPACT_TURN_THRESHOLD,
+      now,
       ...(approvalAudit ? { approvalAudit } : {}),
       approvalAuditHistory,
       ...(actionHandoffSummary ? { actionHandoffSummary } : {}),
@@ -4677,19 +4512,14 @@ export class SessionManager {
         : {}),
       ...(seedInfluence ? { seedInfluence } : {}),
       ...(seedInfluenceHandoffSummary ? { seedInfluenceHandoffSummary } : {}),
-      ...(failureHandoffDiagnostic ? { failureHandoffDiagnostic } : {}),
+      ...(stoppedSessionContinuity?.failureHandoffDiagnostic
+        ? {
+            failureHandoffDiagnostic:
+              stoppedSessionContinuity.failureHandoffDiagnostic,
+          }
+        : {}),
       ...(successHandoffDiagnostic ? { successHandoffDiagnostic } : {}),
     });
-    if (compactSummary.approvalAuditHistory) {
-      root.approvalAuditHistory = compactSummary.approvalAuditHistory;
-    }
-
-    root.continuity = compactSummary.continuity;
-    root.summary = compactSummary.summary;
-    root.compacted = true;
-    root.compactReason = "auto-threshold";
-    root.compactedAt = now;
-    return root;
   }
 
   private extractSeedInfluenceFromQueryResult(

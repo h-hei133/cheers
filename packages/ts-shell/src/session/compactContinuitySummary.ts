@@ -1,25 +1,13 @@
 import type { CodingWriteEffect } from "../orchestration/types.js";
 import { mergeContinuitySummaryEntries } from "./compactSummaryFormatter.js";
+import type { ApprovalAuditMemoryState } from "./sessionContinuityTypes.js";
 
 export type CompactContinuitySeedInfluence =
   | "target-carryover"
   | "verify-signal"
   | "ignored-explicit-target";
 
-export interface CompactContinuityApprovalAudit {
-  readonly decision: "deny" | "allow-once" | "allow-always";
-  readonly decisionSource: string;
-  readonly persistent: boolean;
-  readonly cacheEffect: string;
-  readonly projectRoot: string;
-  readonly cacheKey: string;
-  readonly scopeLabel: string;
-  readonly lineage?: string;
-  readonly stopReason?: string;
-  readonly channel?: "interactive" | "non-interactive";
-  readonly inputKey?: "y" | "a" | "n" | "other";
-  readonly recordedAt: string;
-}
+export type CompactContinuityApprovalAudit = ApprovalAuditMemoryState;
 
 export interface CompactContinuityWriteState {
   readonly writerStarted?: boolean;

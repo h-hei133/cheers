@@ -1,4 +1,4 @@
-import type { SessionContinuitySnapshot } from "./SessionManager.js";
+import type { SessionContinuitySnapshot } from "./sessionContinuityTypes.js";
 
 export function formatPromptContinuityContext(
   snapshot: SessionContinuitySnapshot,

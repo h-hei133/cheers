@@ -4,13 +4,13 @@ import type {
   CodingResultSummary,
 } from "../orchestration/types.js";
 import { formatPromptContinuityContext } from "./continuityFormatter.js";
-import type { SessionContinuitySnapshot } from "./SessionManager.js";
+import type {
+  SeedInfluenceDiagnostic,
+  SessionContinuitySnapshot,
+} from "./sessionContinuityTypes.js";
 import { buildStoppedSessionFailureHandoffDiagnostic } from "./stoppedSessionContinuity.js";
 
-export type SeedInfluenceDiagnostic =
-  | "target-carryover"
-  | "verify-signal"
-  | "ignored-explicit-target";
+export type { SeedInfluenceDiagnostic } from "./sessionContinuityTypes.js";
 
 export function buildSessionResumeContext(input: {
   readonly currentPrompt: string;
