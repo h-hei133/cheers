@@ -72,6 +72,36 @@ describe("cli args parser", () => {
     expect(parsed.options.promptArg).toBe("explain status");
   });
 
+  it("preserves absolute path positional project fallback", () => {
+    const parsed = expectParsed(["/tmp/project", "explain", "status"]);
+
+    expect(parsed.options.projectPath).toBe("/tmp/project");
+    expect(parsed.options.promptArg).toBe("explain status");
+  });
+
+  it.each([
+    "/continue",
+    "/sessions",
+    "/mcp",
+    "/resume",
+    "/workspace",
+    "/help",
+    "/pwd",
+  ])("keeps reserved slash command %s out of project fallback", (command) => {
+    const parsed = expectParsed([command, "last"]);
+
+    expect(parsed.options.projectPath).toBeUndefined();
+    expect(parsed.options.promptArg).toBe(`${command} last`);
+  });
+
+  it("does not parse /continue last as project=/continue", () => {
+    const parsed = expectParsed(["/continue", "last"]);
+
+    expect(parsed.options.projectPath).toBeUndefined();
+    expect(parsed.options.promptArg).toBe("/continue last");
+    expect(isContinueRequested(parsed)).toBe(true);
+  });
+
   it("preserves provider, session, replay, print, migration, and apply-patch flags", () => {
     const parsed = expectParsed([
       "--session-id",

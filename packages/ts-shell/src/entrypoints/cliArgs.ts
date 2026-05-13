@@ -59,6 +59,16 @@ const VALUE_FLAGS = new Set([
   "--non-interactive-approval",
 ]);
 
+const RESERVED_SHELL_SLASH_COMMANDS = new Set([
+  "/continue",
+  "/sessions",
+  "/mcp",
+  "/resume",
+  "/workspace",
+  "/help",
+  "/pwd",
+]);
+
 export function parseCliArgs(
   rawArgs: readonly string[],
   parseOptions: ParseCliArgsOptions,
@@ -86,7 +96,9 @@ export function parseCliArgs(
     }
     assignOption(options, "projectPath", rawArgs[projectIdx + 1]);
   } else {
-    const positionalProject = positionalArgs.find((arg) => /[\\/]/.test(arg));
+    const positionalProject = positionalArgs.find(
+      isPositionalProjectFallbackCandidate,
+    );
     if (positionalProject) {
       assignOption(options, "projectPath", positionalProject);
     }
@@ -241,6 +253,14 @@ function getProjectFlagIndex(args: readonly string[]): number {
     return explicitIdx;
   }
   return args.indexOf("--attach");
+}
+
+function isPositionalProjectFallbackCandidate(arg: string): boolean {
+  return /[\\/]/.test(arg) && !isReservedShellSlashCommand(arg);
+}
+
+function isReservedShellSlashCommand(arg: string): boolean {
+  return RESERVED_SHELL_SLASH_COMMANDS.has(arg.trim().toLowerCase());
 }
 
 function parseNonInteractiveApprovalMode(
