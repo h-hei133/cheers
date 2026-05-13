@@ -4,7 +4,6 @@ import path from "node:path";
 import process from "node:process";
 import * as readline from "node:readline";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
-import { routeSlashCommand } from "../core/commands/slashRouter.js";
 import {
   CoreMcpGateway,
   McpGatewayBlockedError,
@@ -57,15 +56,7 @@ import {
   type StdinTransportMode,
   updateFenceState,
 } from "../core/shell/printPromptInput.js";
-import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
-import {
-  decideQueryRoute,
-  type TaskMode,
-} from "../core/query/routeDecision.js";
-import { streamLightweightChat } from "../core/query/lightweightChat.js";
-import { validateLightweightProviderCredential } from "../core/query/lightweightRoute.js";
 import { resolveSessionReference } from "../core/shell/recovery.js";
-import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
 import {
   renderCurrentSessionSurface,
   renderSessionListSurface,
@@ -105,10 +96,6 @@ import {
   recordCount,
   setGlobalTraceContext,
 } from "../observability/index.js";
-import {
-  streamMvpIntegratedFlow,
-  type ApplyPatchRuntimeRouteOptions,
-} from "../orchestration/runMvpIntegratedFlow.js";
 import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type {
@@ -121,8 +108,20 @@ import type {
 import { SessionManager } from "../session/SessionManager.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import { parseCliArgs, type CliOptions } from "./cliArgs.js";
+import {
+  buildCliCommandExecution as resolveTurnInputForExecution,
+  normalizePromptForExecution,
+} from "./cliCommandExecutionBridge.js";
+import {
+  buildPersistentShellPrompt,
+  formatCliContextTag,
+} from "./cliInteractiveLoopState.js";
 import { resolveCliMode } from "./cliModeDispatch.js";
 import { runCliPrintMode } from "./cliPrintModeRunner.js";
+import {
+  runCliRuntimeInvocation,
+  type CliApplyPatchRuntimeRouteOptions,
+} from "./cliRuntimeInvocation.js";
 import { runCliStdinMode } from "./cliStdinModeRunner.js";
 import {
   renderRecentProjectContexts,
@@ -135,22 +134,11 @@ import {
   renderMcpStatusControlPlane,
   renderMcpToolsControlPlane,
 } from "./mcpControlCliSurface.js";
-import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
 import {
   renderSessionCommandMap,
   renderUserHelp,
 } from "./slashCommandRegistry.js";
 import { openSessionsPanel } from "./sessionsPanel.js";
-
-type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
-
-type TurnInputResolution =
-  | { kind: "handled" }
-  | {
-      kind: "shell-action";
-      slashResult: Extract<SlashRouteResult, { kind: "shell-action" }>;
-    }
-  | { kind: "execute"; effectivePrompt: string };
 
 interface ApprovalModeObject {
   readonly mode: "deny" | "allow-once" | "allow-always";
@@ -1203,100 +1191,23 @@ async function* streamOrchestratedResponse(
   agentMode: "plan" | "build",
   runtimeSeed?: QueryRuntimeStateSeed,
   continuityState?: SessionContinuitySnapshot,
-  applyPatchRuntimeRoute?: ApplyPatchRuntimeRouteOptions,
+  applyPatchRuntimeRoute?: CliApplyPatchRuntimeRouteOptions,
 ) {
-  const providerMode =
-    process.env.PRIVATE_AGENTS_PROVIDER_MODE === "synthetic"
-      ? "synthetic"
-      : "real";
-  if (applyPatchRuntimeRoute) {
-    for await (const event of streamMvpIntegratedFlow({
-      sessionId,
-      prompt,
-      continuityState,
-      workspaceRoot,
-      abortSignal: signal,
-      escalationPromptHandler,
-      providerMode,
-      maxTurns,
-      realProvider: providerCredentialResolution.credential,
-      agentMode,
-      runtimeSeed,
-      applyPatchRuntimeRoute,
-    })) {
-      yield event;
-    }
-    return;
-  }
-
-  const routeDecision = decideQueryRoute({
-    prompt,
-    agentMode,
-    hasRuntimeSeed: Boolean(runtimeSeed),
-  });
-
-  if (routeDecision.route === "lightweight") {
-    const localReadiness = validateLightweightProviderCredential({
-      providerMode,
-      providerCredentialResolution,
-    });
-    if ("stopReason" in localReadiness) {
-      yield createProviderReadinessCliTerminalEvent({
-        sessionId,
-        prompt,
-        stopReason: localReadiness.stopReason,
-      });
-      return;
-    }
-    for await (const event of streamLightweightChat({
-      sessionId,
-      prompt,
-      mode: routeDecision.mode as Extract<
-        TaskMode,
-        "chat" | "analysis" | "plan"
-      >,
-      providerMode,
-      providerCredential: providerCredentialResolution.credential,
-      continuityState,
-      signal,
-    })) {
-      yield event;
-    }
-    return;
-  }
-
-  if (providerMode === "real") {
-    const readiness = await checkRealProviderReadiness({
-      provider: providerCredentialResolution.provider,
-      apiKey: providerCredentialResolution.credential?.apiKey,
-      accountAuth: providerCredentialResolution.credential?.accountAuth,
-      baseUrl: providerCredentialResolution.baseUrl,
-      model: providerCredentialResolution.model,
-    });
-    if (readiness.ok === false) {
-      yield createProviderReadinessCliTerminalEvent({
-        sessionId,
-        prompt,
-        stopReason: readiness.failure.stopReason,
-      });
-      return;
-    }
-  }
-
-  for await (const event of streamMvpIntegratedFlow({
+  const invocation = runCliRuntimeInvocation({
     sessionId,
     prompt,
-    continuityState,
     workspaceRoot,
-    abortSignal: signal,
-    escalationPromptHandler,
-    providerMode,
+    signal,
     maxTurns,
-    realProvider: providerCredentialResolution.credential,
+    escalationPromptHandler,
+    providerCredentialResolution,
     agentMode,
     runtimeSeed,
+    continuityState,
     applyPatchRuntimeRoute,
-  })) {
+    providerModeEnv: process.env.PRIVATE_AGENTS_PROVIDER_MODE,
+  });
+  for await (const event of invocation.events) {
     yield event;
   }
 }
@@ -1791,7 +1702,7 @@ function askReadline(
 
 function applyPatchDecisionFromApprovalMode(
   mode: "deny" | "allow-once" | "allow-always" | undefined,
-): ApplyPatchRuntimeRouteOptions["requestedUserDecision"] | undefined {
+): CliApplyPatchRuntimeRouteOptions["requestedUserDecision"] | undefined {
   if (mode === "deny") {
     return "denied";
   }
@@ -1933,7 +1844,10 @@ async function runNonTtyPromptStream(options: {
   nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
 }): Promise<void> {
   const contextTag = (): string =>
-    `[${toProjectLabel(options.runtimeContext.projectRoot)}|${toSessionShortLabel(options.runtimeContext.session.id)}]`;
+    formatCliContextTag({
+      projectRoot: options.runtimeContext.projectRoot,
+      sessionId: options.runtimeContext.session.id,
+    });
   options.renderer.renderLine(
     `Non-TTY stdin mode ${contextTag()}: waiting for newline-delimited prompts.`,
   );
@@ -2414,51 +2328,6 @@ async function runNonInteractivePrompt(options: {
   });
 }
 
-async function resolveTurnInputForExecution(options: {
-  prompt: string;
-  cwd: string;
-  renderer: StreamingRenderer;
-  printMode: boolean;
-  interactive: boolean;
-}): Promise<TurnInputResolution> {
-  const repoAwareResponse = resolveRepoAwarePromptResponse(
-    options.prompt,
-    options.cwd,
-  );
-  if (repoAwareResponse) {
-    options.renderer.renderLine(
-      options.printMode ? repoAwareResponse : `\n${repoAwareResponse}\n`,
-    );
-    return { kind: "handled" };
-  }
-
-  const slashResult = await routeSlashCommand(options.prompt, {
-    cwd: options.cwd,
-  });
-  if (slashResult?.kind === "local") {
-    options.renderer.renderLine(
-      options.printMode ? slashResult.output : `\n${slashResult.output}\n`,
-    );
-    return { kind: "handled" };
-  }
-
-  if (slashResult?.kind === "shell-action") {
-    return { kind: "shell-action", slashResult };
-  }
-
-  if (slashResult?.kind === "prompt" && options.interactive) {
-    options.renderer.renderLine(
-      `\nSlash command expanded into prompt:\n${slashResult.prompt}\n`,
-    );
-  }
-  const rawPrompt =
-    slashResult?.kind === "prompt" ? slashResult.prompt : options.prompt;
-  return {
-    kind: "execute",
-    effectivePrompt: normalizePromptForExecution(rawPrompt),
-  };
-}
-
 async function executeResolvedPromptTurn(options: {
   source: "interactive" | "non-interactive";
   effectivePrompt: string;
@@ -2649,27 +2518,6 @@ async function runReplayPromptScript(options: {
       nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
     });
   }
-}
-
-function toProjectLabel(projectRoot: string): string {
-  return path.basename(projectRoot) || projectRoot;
-}
-
-function toSessionShortLabel(sessionId: string): string {
-  const normalized = sessionId.startsWith("sess_")
-    ? sessionId.slice("sess_".length)
-    : sessionId;
-  return normalized.slice(0, 8);
-}
-
-function buildPersistentShellPrompt(input: {
-  projectRoot: string;
-  sessionId: string;
-  agentMode: "plan" | "build";
-}): string {
-  const project = toProjectLabel(input.projectRoot);
-  const session = toSessionShortLabel(input.sessionId);
-  return `[${project}|${session}|${input.agentMode}] > `;
 }
 
 function renderLatestSessionLifecycleNotice(
@@ -2963,51 +2811,6 @@ function isWorkspaceInfoPromptStrict(prompt: string): boolean {
       prompt,
     );
   return !hasMutationIntent;
-}
-
-function normalizePromptForExecution(prompt: string): string {
-  const normalized = prompt.toLowerCase();
-  const likelyMojibake = prompt.includes("�");
-  const currentDirCue =
-    /(?:current\s+directory|in\s+this\s+directory|当前目录|当前工作目录|在当前目录中|在本目录)/iu.test(
-      prompt,
-    );
-  const pythonCue =
-    /\bpython\b/i.test(normalized) &&
-    (/script|file|py/i.test(normalized) || /(?:脚本|目录|文件)/u.test(prompt));
-
-  if (
-    (!pythonCue || !currentDirCue) &&
-    !(likelyMojibake && /\bpython\b/i.test(normalized))
-  ) {
-    return prompt;
-  }
-
-  const asciiTokens: string[] =
-    prompt.match(/\b[A-Za-z][A-Za-z0-9_-]{1,}\b/g) ?? [];
-  const reserved = new Set([
-    "python",
-    "script",
-    "file",
-    "write",
-    "create",
-    "generate",
-    "save",
-    "current",
-    "directory",
-    "in",
-    "this",
-  ]);
-  const candidate = asciiTokens.find(
-    (token) => !reserved.has(token.toLowerCase()),
-  );
-  if (!candidate) {
-    return prompt;
-  }
-
-  // Guard against Windows terminal mojibake by converting fuzzy natural language
-  // into a deterministic file-targeted coding task.
-  return `Create a python script at ./${candidate}.py with a minimal hello world implementation.`;
 }
 
 function normalizePathForCompare(value: string): string {
