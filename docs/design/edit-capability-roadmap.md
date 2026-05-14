@@ -1,53 +1,57 @@
 # Edit Capability Roadmap
 
-Route: 49
+Route baseline: post-Route 56
 Date: 2026-05-14
-Status: consolidation only after Route 48 exactly-two mixed write support; no
-product-code, test, script, package, gate, provider, CLI, session, MCP, or
-readiness change
+Status: long-range edit capability map after Routes 50-56; documentation only.
+Route 57 has not been implemented.
 
 This document records the current edit / patch / mutation capability upper
-bound and the route sequence needed before broader edit support can be claimed.
-It is based on current target code, current target gates/docs, and the Route
-40-48 capability evidence.
+bound and the long-range route sequence needed before broader edit support can
+be claimed. It is based on current target code, current target docs, focused
+Route 50-56 evidence, and a bounded directional comparison against ClaudeCode,
+opencode, and gemini-cli.
 
-It is not a broad edit readiness claim.
+It is not a broad edit readiness claim. It keeps implemented capability,
+candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Executive Summary
+## 1. Post-Route 56 Executive Summary
 
-Current edit capability is intentionally narrow but no longer limited to
-single-file and exactly-two update writes:
+Current write capability remains intentionally narrow. The project supports a
+bounded selected-workspace write surface and still blocks broad arbitrary
+`apply_patch`, 3+ mixed writes, 4+ writes, multi-delete, multi-move, directory
+delete/move, overwrite, rollback, snapshot/revert, stale-read recovery, partial
+failure recovery, and default real-provider mutation readiness.
 
-- MVP: selected-workspace, existing-file, single-file `Update File` through the
-  explicit apply_patch runtime route.
-- Candidate: selected-workspace, single-file `Add File` create through an
-  explicit create route.
-- Candidate: selected-workspace, exactly-two existing-file `Update File`
-  through an explicit two-file write route.
-- Candidate: selected-workspace, exactly-three existing-file `Update File`
-  through an explicit three-file guarded write route.
-- Candidate: selected-workspace, guarded single-file move/rename through an
-  explicit delete/move lane.
-- Candidate: selected-workspace, guarded single-file delete through an explicit
-  delete/move lane.
-- Candidate: selected-workspace, exactly-two mixed write lanes through an
-  explicit mixed route: update + add, update + move, add + move,
-  update + delete, add + delete, and move + delete.
-- Unsupported/stopped: 3+ mixed writes, 4+ writes, broad arbitrary apply_patch
-  writes, multi-delete, multi-move, directory delete/move, overwrite,
-  outside-workspace operations, rollback, snapshot/revert, stale-read recovery,
-  partial failure recovery, fuzzy patch recovery, broad release readiness,
-  default real-provider readiness, and arbitrary mutation.
+Routes 52-56 changed the roadmap direction:
 
-The next implementation should not jump to broad apply_patch writes. The
-single recommended next route is **Route 50: broad apply_patch / 3+ mixed write
-readiness design, docs-first**. That route should decide whether rollback /
-snapshot must exist before broader writes, or whether the project should keep
-sequential no-rollback semantics for the next bounded expansion.
+- Route 50 decided not to jump directly to broad `apply_patch` or 3+ mixed
+  writes.
+- Route 52 introduced `routeScopedEditJournal` as prototype route-scoped
+  journal metadata.
+- Route 53 added `journalResultProjection`.
+- Route 54 attached journal metadata to mixed and multi-file partial failure
+  paths.
+- Route 55 evolved `journalFailureConsumer` into a shared projection entrypoint
+  and attached journal metadata to representative write/create/move/delete
+  single-file failure consumers.
+- Route 56 added `journalMetadataBoundary` and
+  `docs/design/journal-boundary-readiness.md`, centralizing metadata-only facts.
+
+The journal now improves observability across mixed, multi-file, and
+representative single-file failure paths, but it remains metadata-only,
+non-durable, and non-authoritative. It does not provide rollback authority,
+recovery authority, snapshot authority, persistence, writer authority,
+permission authority, or atomicity.
+
+The next direction should be a thicker recovery-readiness development batch:
+plan-only recovery projection, failure-state classification, blocker facts,
+limited cross-consumer wiring, and evidence that no recovery or rollback is
+executed. It should not be a tiny isolated projection route, and it should not
+add broad writes.
 
 ## 2. Current Edit Capability Inventory
 
-### Implemented
+### Implemented / Candidate Write Surfaces
 
 - Selected-workspace single-file existing `Update File`
   - Runtime owner: `packages/ts-shell/src/orchestration/mutationRoutingProjection.ts`.
@@ -56,7 +60,7 @@ sequential no-rollback semantics for the next bounded expansion.
   - Result projection: `packages/ts-shell/src/orchestration/patchResult/workspaceWriteResult.ts`.
   - Boundary: explicit runtime opt-in, explicit workspace-write opt-in,
     approved-for-write decision, workspace authority, final stale-read, writer,
-    post-write verification.
+    post-write verification, no rollback.
 
 - Selected-workspace single-file `Add File` create
   - Runtime owner: `mutationRoutingProjection.ts` dispatches
@@ -65,7 +69,7 @@ sequential no-rollback semantics for the next bounded expansion.
   - Application: `patchApplication/singleFileCreateApply.ts`.
   - Result projection: `patchResult/workspaceCreateResult.ts`.
   - Boundary: one `Add File`, parent directory pre-exists, exclusive create,
-    explicit approval, post-write readback verification.
+    explicit approval, post-write readback verification, no rollback.
 
 - Selected-workspace exactly-two existing-file `Update File`
   - Runtime owner: `mutationRoutingProjection.ts` dispatches
@@ -74,8 +78,8 @@ sequential no-rollback semantics for the next bounded expansion.
   - Application: `patchApplication/multiFileUpdateApply.ts`.
   - Result projection: `patchResult/multiFileWriteResult.ts`.
   - Boundary: exactly two distinct update targets, explicit approval naming
-    both files, all preflight/final stale-read before writer, sequential writes,
-    per-file post-write verification, no rollback.
+    both files, all preflight/final stale-read before writer, sequential
+    writes, per-file post-write verification, no rollback.
 
 - Selected-workspace exactly-three existing-file `Update File`
   - Runtime owner: `mutationRoutingProjection.ts` dispatches
@@ -145,20 +149,62 @@ sequential no-rollback semantics for the next bounded expansion.
   - Owner: `patchResult/mixedOperationReadiness.ts`,
     `patchResult/perFilePatchPlan.ts`, and unsupported route/result
     projections.
-  - Status: implemented for mixed-operation classification and Route 48
-    exactly-two mixed support while preserving 3+ mixed and broad apply_patch
-    no-write boundaries.
+  - Status: implemented for mixed-operation classification and exactly-two
+    mixed support while preserving 3+ mixed and broad `apply_patch` no-write
+    boundaries.
+
+### Route-Scoped Journal Metadata Infrastructure
+
+- Route-scoped edit journal metadata
+  - Owner: `patchResult/routeScopedEditJournal.ts`.
+  - Status: implemented as route-scoped result metadata for planned, changed,
+    failed, verified, recovered, unrecovered, and recovery-candidate file facts.
+  - Boundary: no durability, no writer authority, no permission authority, no
+    rollback, no recovery execution.
+
+- Journal result projection
+  - Owner: `patchResult/journalResultProjection.ts`.
+  - Status: implemented failure-surface projection for journal facts.
+  - Boundary: projects failure diagnostics only; `recoveryExecuted` remains
+    `false`.
+
+- Journal failure consumer entrypoint
+  - Owner: `patchResult/journalFailureConsumer.ts`.
+  - Status: shared entrypoint for building failure-result journals from
+    per-file plans and projecting them back through existing result contracts.
+  - Boundary: preserves existing `changedFiles`, `plannedFiles`, `failedFiles`,
+    writer invocation flags, delete/move invocation flags, post-write
+    verification, and terminal success/stopped/error semantics.
+
+- Journal metadata boundary helper
+  - Owner: `patchResult/journalMetadataBoundary.ts`.
+  - Status: implemented centralized metadata-only facts:
+    `writeCapability: "metadata-only"`, `rollbackAtomicityClaim: false`,
+    `recoveryExecuted: false`, and evidence strings for no runtime writer and
+    no recovery execution.
+  - Boundary: helper centralizes claims; it does not create storage, restore,
+    rollback, or write authority.
+
+- Mixed/multi/single-file failure journal coverage
+  - Mixed and multi-file partial failure paths carry journal metadata.
+  - Representative single-file write/create/move/delete failure consumers carry
+    journal metadata.
+  - Coverage is observability, not recovery authority.
 
 ### Explicitly Unsupported
 
 - 3+ mixed writes.
 - 4+ writes.
-- Broad arbitrary apply_patch writes.
+- Broad arbitrary `apply_patch` writes.
 - Multi-delete or multi-move beyond the exactly-two mixed lanes listed above.
 - Directory delete or directory move.
 - Overwrite and outside-workspace operations.
 - Broad unified diff writer.
-- Rollback, snapshot restore, or atomic multi-file recovery.
+- Durable journal storage.
+- Recovery executor.
+- Rollback executor.
+- Snapshot/revert.
+- Atomicity claim or recovery authority.
 - Fuzzy patch recovery.
 - Stale-read recovery beyond blocking and asking the user/model to re-read.
 - Partial failure automatic repair or rollback.
@@ -171,18 +217,23 @@ The project currently does not claim:
 
 - broad/general edit readiness
 - broad/general release readiness
-- broad apply_patch support
+- broad `apply_patch` support
 - arbitrary project mutation readiness
 - 3+ mixed operation write support
 - 4+ write support
 - multi-delete or multi-move support beyond the exactly-two mixed lanes
-- rollback/snapshot/revert support
-- atomic multi-file recovery
+- durable journal storage
+- recovery executor
+- rollback executor
+- snapshot/revert support
+- rollback/atomicity readiness
+- recovery authority
 - fuzzy patch support
+- stale-read recovery
 - partial failure recovery
 - external/user-configured MCP edit readiness
 - real-provider default gate readiness
-- Claude Code, opencode, or Gemini CLI parity
+- ClaudeCode, opencode, or gemini-cli parity
 
 ## 4. Current Edit Pipeline Map
 
@@ -207,8 +258,7 @@ User / CLI / provider output
    status: implemented only for single update, single add, exactly-two update,
    exactly-three update, guarded single move, guarded single delete, and
    exactly-two mixed write lanes; broad, 3+ mixed, 4+, multi-delete, and
-   multi-move apply_patch shapes are
-   explicitly unsupported.
+   multi-move apply_patch shapes are explicitly unsupported.
 -> post-write verification
    status: implemented for selected write routes; blocked/failed routes do not
    claim success.
@@ -216,355 +266,300 @@ User / CLI / provider output
    status: implemented through workspaceWriteResult.ts,
    workspaceCreateResult.ts, multiFileWriteResult.ts, workspaceMoveResult.ts,
    workspaceDeleteResult.ts, mixedFileWriteResult.ts,
-   multiFilePlanningResult.ts, mutationVerificationProjection.ts, and
-   perFilePatchPlan.ts.
+   multiFilePlanningResult.ts, mutationVerificationProjection.ts,
+   perFilePatchPlan.ts, journalResultProjection.ts, and
+   journalFailureConsumer.ts.
+-> route-scoped journal metadata construction
+   status: implemented metadata-only construction for covered failure paths.
+-> journal result projection
+   status: implemented failure-surface projection; not durability or recovery.
+-> metadata-only boundary projection
+   status: implemented through journalMetadataBoundary.ts.
+-> future recovery plan projection
+   status: not implemented; recommended next development batch.
+-> future durable storage / recovery executor
+   status: not implemented; requires separate authority and lifecycle design.
 -> session continuity
    status: implemented for changed/failed/planned surfaces covered by current
    synthetic gates; real-provider continuity is not broadly claimed.
 -> CLI/user surface
    status: implemented for focused CLI evidence and terminal/session summaries;
-   broad edit-failure UX is still incomplete.
+   broad edit-failure UX and recovery UX are still incomplete.
 ```
 
 ## 5. Evidence Table
 
 | Capability | Status | Evidence | Evidence strength | Gaps | Next route if any |
 | --- | --- | --- | --- | --- | --- |
-| Single existing-file `Update File` write | Implemented MVP/candidate surface | `mutationRoutingProjection.ts`, `workspaceWriteRoute.ts`, `singleFileUpdateApply.ts`, `workspaceWriteResult.ts`, `verify:real-user-capabilities -- --tier=mvp`, opt-in real single-file case in `verify-real-user-capabilities.mjs` | A for opt-in real smoke, B/C for deterministic gates | Not broad apply_patch; one selected file only | None for Route 49 |
-| Single `Add File` create | Implemented candidate | `workspaceCreateRoute.ts`, `singleFileCreateApply.ts`, `workspaceCreateResult.ts`, `synthetic-selected-workspace-single-file-create`, opt-in real create case | A for opt-in real smoke, B/C for synthetic | No parent directory creation; no broad mixed expansion beyond Route 48 lanes | None for Route 49 |
-| Exactly-two existing-file update write | Implemented candidate | `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `multiFileWriteResult.ts`, `synthetic-selected-workspace-two-file-update`, `verify:real-user-capabilities:two-file-cli-evidence`, opt-in real two-file case | A for opt-in real smoke, A/B for CLI/synthetic | Sequential write; partial failure may leave verified prefix; no rollback | Route 50 only if broader write design needs this risk |
-| Exactly-three existing-file update write | Implemented candidate | `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `multiFileWriteResult.ts`, `verify:real-user-capabilities:three-file-guarded-write` | B/C | Sequential write; partial failure may leave verified prefix; no rollback; non-default only | Route 50 only if broader write design needs this risk |
-| Single-file move/rename | Implemented candidate | `workspaceMoveRoute.ts`, `singleFileMoveApply.ts`, `workspaceMoveResult.ts`, `verify:real-user-capabilities:single-file-move-evidence` | B/C | One regular-file source and exclusive target only; no multi-move, directory move, overwrite, or rollback | Route 50 only if broader write design needs this risk |
-| Single-file delete | Implemented candidate | `workspaceDeleteRoute.ts`, `singleFileDeleteApply.ts`, `workspaceDeleteResult.ts`, `verify:real-user-capabilities:single-file-delete-evidence` | B/C | One existing regular-file target only; no multi-delete, directory delete, or rollback | Route 50 only if broader write design needs this risk |
-| Exactly-two mixed write lanes | Implemented candidate | `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, `verify:real-user-capabilities:mixed-operation-evidence` | B/C | Sequential parsed-order writes; partial failure may leave verified changed files and failed files; no rollback/atomicity; no 3+ mixed or broad apply_patch | Route 50 docs-first readiness design |
-| Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, Route 08 unsupported E2E, Route 11/12 continuity checks, Route 40-48 evidence scripts | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Route 50 docs-first readiness design |
-| 4+ update requests | Explicitly unsupported | `multiFileUpdatePlanning.ts` returns `too-many-update-files`; guarded-write and unsupported-patch evidence cover unsupported 4+ shapes | B/C | No write support | Route 50 docs-first readiness design |
-| 3+ mixed operations | Explicitly unsupported | `perFilePatchPlan.ts`, Route 08 unsupported E2E, `verify:real-user-capabilities:mixed-operation-evidence` keeps 3+ mixed no-write | B/C | No writer support; no rollback/atomicity decision for larger mixed sets | Route 50 docs-first readiness design |
-| Multi-delete / multi-move beyond exactly-two mixed lanes | Explicitly unsupported | `perFilePatchPlan.ts`, Route 08 unsupported E2E, single-file move/delete evidence, mixed-operation evidence keeps invalid destructive shapes no-write | B/C | No broad multi-destructive writer; directory delete/move and overwrite remain blocked | Route 50 docs-first readiness design |
-| Malformed model output | Explicitly stopped/error | `patchParsing/parser.ts`; `singleFileApplyPatchDryRun.ts` parse-failure blocked surface; `verify:real-user-capabilities:unsupported-patch-e2e` malformed scenario | B/C/D | Real-provider malformed-output dogfood remains opt-in/non-default | None for Route 49 |
-| Workspace boundary | Implemented for selected writes | `workspaceAuthority.ts`, `verifyParsedPatch()`, route-level `pathStaysInsideWorkspace()` checks | C/D/F | More generalized descriptor authority needed before broad operations | Route 50 should not widen writes |
-| Final stale-read | Implemented as blocker, not recovery | `workspaceWriteRoute.ts`, `multiFileWriteRoute.ts`, `mutationExecution.ts`, `singleFileApplyPatchFinalStaleRead.ts` | C/D | No automatic stale-read recovery; no full read-state ledger like Claude Code | Route 50 only if broader write design needs this risk |
-| Post-write verification | Implemented for selected writes | `workspaceWriteRoute.ts`, `workspaceCreateRoute.ts`, `multiFileWriteRoute.ts`, `workspaceMoveRoute.ts`, `workspaceDeleteRoute.ts`, route application modules | C/D | No rollback after post-write failure | Route 50 only if broader write design needs this risk |
-| Partial failure surface | Implemented stopped surface for multi-file routes | `multiFileUpdateApply.ts`, `multiFileWriteRoute.ts`, `multiFileWriteResult.ts`, candidate partial-failure cases | B/C | No automatic repair or rollback; user inspection required | Route 50 only if broader write design needs this risk |
-| changedFiles / failedFiles / plannedFiles | Implemented with per-file plan support | Route result modules plus `perFilePatchPlan.ts`, `sessionStateSurface.ts`, and `sessionRuntime.ts`; planned-files continuity, mixed-operation, and result-contract verifiers | B/C | 3+ mixed and broad apply_patch still need readiness design before any writer claim | Route 50 |
-| Rollback / atomicity | Explicitly unsupported | `multiFileWriteRoute.ts` says sequential write/no rollback; Route 11 verifier requires rollback/atomicity claim false | B/C | No snapshot layer in target project | Route 50 should decide prerequisite status |
+| Single existing-file `Update File` write | Implemented MVP/candidate surface | `mutationRoutingProjection.ts`, `workspaceWriteRoute.ts`, `singleFileUpdateApply.ts`, `workspaceWriteResult.ts`, opt-in real single-file case | A/B/C | Not broad `apply_patch`; one selected file only | None for Route 57 |
+| Single `Add File` create | Implemented candidate | `workspaceCreateRoute.ts`, `singleFileCreateApply.ts`, `workspaceCreateResult.ts`, synthetic and opt-in real create evidence | A/B/C | No parent directory creation; no broad mixed expansion | None for Route 57 |
+| Exactly-two existing-file update write | Implemented candidate | `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `multiFileWriteResult.ts`, synthetic and opt-in real two-file evidence | A/B/C | Sequential write; partial failure may leave verified prefix; no rollback | No expansion until recovery stance is explicit |
+| Exactly-three existing-file update write | Implemented candidate | `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `multiFileWriteResult.ts`, `verify-three-file-guarded-write.mjs` | B/C | Sequential write; partial failure may leave verified prefix; no rollback; non-default only | No expansion until recovery stance is explicit |
+| Single-file move/rename | Implemented candidate | `workspaceMoveRoute.ts`, `singleFileMoveApply.ts`, `workspaceMoveResult.ts`, `verify-single-file-move-evidence.mjs` | B/C | One regular-file source and exclusive target only; no multi-move, directory move, overwrite, or rollback | No expansion until destructive authority is explicit |
+| Single-file delete | Implemented candidate | `workspaceDeleteRoute.ts`, `singleFileDeleteApply.ts`, `workspaceDeleteResult.ts`, `verify-single-file-delete-evidence.mjs` | B/C | One existing regular-file target only; no multi-delete, directory delete, or rollback | No expansion until destructive authority is explicit |
+| Exactly-two mixed write lanes | Implemented candidate | `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, mixed-operation evidence | B/C | Sequential parsed-order writes; no rollback/atomicity; no 3+ mixed or broad `apply_patch` | Revisit after recovery-readiness batch |
+| Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, unsupported E2E and continuity checks | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Continue as consumer for Route 57 |
+| Route-scoped edit journal prototype | Implemented metadata-only projection | `routeScopedEditJournal.ts`, `routeScopedEditJournal.test.ts` | C/D | Non-durable; not recovery or writer authority | Feed Route 57 recovery plan projection |
+| Journal result projection | Implemented failure-surface projection | `journalResultProjection.ts`, `journalResultProjection.test.ts` | C/D | No recovery execution; no durable storage | Feed Route 57 recovery plan projection |
+| Mixed/multi failure journal metadata | Implemented observability coverage | `mixedFileWriteResult.ts`, `multiFileWriteResult.ts`, related focused tests | C/D | Partial failure remains unrecovered; no rollback | Keep as evidence source for Route 57 |
+| Single-file failure journal metadata | Implemented representative coverage | `workspaceWriteResult.ts`, `workspaceCreateResult.ts`, `workspaceMoveResult.ts`, `workspaceDeleteResult.ts`, focused tests | C/D | Coverage is failure metadata only; success paths are not a recovery ledger | Keep as representative wiring |
+| Journal failure consumer entrypoint | Implemented shared projection entrypoint | `journalFailureConsumer.ts` | C/D | Does not classify recovery readiness in user-facing terms yet | Extend in Route 57 only if result contracts allow |
+| Journal metadata boundary helper | Implemented centralized boundary facts | `journalMetadataBoundary.ts`, `journalMetadataBoundary.test.ts` | C/D | No durability, storage, restore, or executor | Preserve in all future recovery projection work |
+| External comparison against ClaudeCode/opencode/gemini-cli | Completed directional evidence | This roadmap and `journal-boundary-readiness.md` | E/F | Comparison is directional, not parity | Use to block unsupported recovery claims |
+| Recovery plan projection | Recommended next; not implemented | No current module | N/A | Need plan-only projection, failure-state classification, blocker facts, consumer attachment, no execution tests | Batch 57 |
+| Durable journal storage | Future; not implemented | No current storage owner/schema | N/A | Needs authority owner, lifecycle, cleanup, residue policy, recovery trust boundary | Batch 58 decision/prototype |
+| Recovery executor | Future; not implemented | No executor | N/A | Requires durable authority, original content authority, current-content inspection, no-hidden-user-edit rule | Batch 59 only if authority exists |
+| Rollback/snapshot | Future; not implemented | No target snapshot/restore layer | N/A | Needs checkpoint/file-history/storage design and user/session semantics | Batch 58+ |
+| 4+ update requests | Explicitly unsupported | `multiFileUpdatePlanning.ts`, unsupported evidence | B/C | No write support | Batch 60/61 only after recovery stance |
+| 3+ mixed operations | Explicitly unsupported | `perFilePatchPlan.ts`, unsupported E2E, mixed-operation evidence | B/C | No writer support; no larger mixed recovery/approval stance | Batch 60/61 only after recovery stance |
+| Multi-delete / multi-move beyond exactly-two mixed lanes | Explicitly unsupported | `perFilePatchPlan.ts`, unsupported E2E, single-file move/delete evidence | B/C | No broad multi-destructive writer; directory delete/move and overwrite remain blocked | Later destructive-write route |
+| Final stale-read | Implemented as blocker, not recovery | `workspaceWriteRoute.ts`, `multiFileWriteRoute.ts`, `mutationExecution.ts`, `singleFileApplyPatchFinalStaleRead.ts` | C/D | No automatic stale-read recovery; no read-state ledger | Route 57 can classify as failed-before-apply |
+| Post-write verification | Implemented for selected writes | selected write routes and application modules | C/D | No rollback after post-write failure | Route 57 can classify as applied-but-unverified |
+| Partial failure surface | Implemented stopped surface for multi-file routes | `multiFileUpdateApply.ts`, `multiFileWriteRoute.ts`, `multiFileWriteResult.ts`, candidate partial-failure cases | B/C | No automatic repair or rollback; user inspection required | Route 57 recovery-readiness projection |
+| Rollback / atomicity | Explicitly unsupported | Route result modules and journal boundary facts require false claims | B/C/D | No snapshot layer in target project | Future only after Batch 58 |
 
 Evidence strength scale: A = real-provider / real CLI / real runtime gate,
 B = synthetic E2E / golden main path, C = focused integration test, D = unit /
 contract test, E = documentation only, F = static code inference.
 
-## 6. Reference Comparison: Claude Code
+## 6. Post-Route 56 Reference Comparison
 
-Search terms used:
+Bounded scan count:
 
-- `FileEditTool`, `old_string`, `new_string`, `read first`, `stale`,
-  `permission`, `tool_result`, `is_error`, `diff`, `rejected`.
+- ClaudeCode: 4 files inspected.
+- opencode: 5 files inspected.
+- gemini-cli: 6 files inspected.
+- Total external files inspected: 15.
 
-Files/fragments read:
+Files inspected:
 
 - `/home/wang/projects/source-claudecode/tools/FileEditTool/FileEditTool.ts`
-- `/home/wang/projects/source-claudecode/tools/FileEditTool/utils.ts`
-- `/home/wang/projects/source-claudecode/tools/FileEditTool/types.ts`
-- `/home/wang/projects/source-claudecode/tools/FileEditTool/UI.tsx`
-- `/home/wang/projects/source-claudecode/services/tools/toolExecution.ts`
-
-Useful ideas:
-
-- Read-before-write is a first-class edit precondition. File edits fail if the
-  target was not read or was only partially read.
-- Stale edits are rejected when file modification time/content shows the file
-  changed after read.
-- The tool separates validation errors, permission denials, tool execution
-  errors, and successful tool results into message surfaces that re-enter the
-  query/session loop.
-- Rejected edit UI can still render a diff/preview, which is useful for
-  user-visible failure surfaces.
-- Exact replacement failures are explicit: not found, ambiguous multiple
-  matches, notebook-specific routing, file too large, and settings-file
-  validation all stop before write.
-
-Ideas rejected/deferred:
-
-- This project should not copy Claude Code's mature FileEditTool layout, file
-  history system, LSP/VSCode notification path, hook ecosystem, or full
-  interactive UI.
-- This project should not adopt read-state/session-wide edit ledgers as part
-  of the next edit route unless that route proves it can stay
-  projection/contract-only.
-
-Concrete implication:
-
-- The target should keep failed edit details visible in session surfaces before
-  adding broader writers. Route 48 broadened execution only to exactly-two
-  mixed lanes; the next route should decide broad apply_patch / 3+ mixed
-  readiness before adding another writer.
-
-## 7. Reference Comparison: opencode
-
-Search terms used:
-
-- `apply_patch`, `patch parse`, `patch verify`, `permission`, `snapshot`,
-  `revert`, `metadata`, `files`, `changed`, `failed`, `tool-error`.
-
-Files/fragments read:
-
+- `/home/wang/projects/source-claudecode/tools/FileWriteTool/FileWriteTool.ts`
+- `/home/wang/projects/source-claudecode/utils/fileHistory.ts`
+- `/home/wang/projects/source-claudecode/cli/print.ts`
 - `/home/wang/projects/opencode/packages/opencode/src/tool/apply_patch.ts`
 - `/home/wang/projects/opencode/packages/opencode/src/tool/edit.ts`
-- `/home/wang/projects/opencode/packages/opencode/src/patch/index.ts`
-- `/home/wang/projects/opencode/packages/opencode/src/permission/index.ts`
-- `/home/wang/projects/opencode/packages/opencode/src/session/processor.ts`
-- `/home/wang/projects/opencode/packages/opencode/src/session/projectors.ts`
+- `/home/wang/projects/opencode/packages/opencode/src/tool/write.ts`
+- `/home/wang/projects/opencode/packages/opencode/src/session/revert.ts`
 - `/home/wang/projects/opencode/packages/opencode/src/snapshot/index.ts`
-
-Useful ideas:
-
-- `apply_patch` is layered as parse -> per-file change model -> permission
-  request with diff metadata -> apply -> file watcher/LSP -> output summary.
-- Per-file metadata includes file path, relative path, operation type, diff,
-  additions, deletions, and move destination where relevant.
-- Permission request/reply is explicit, durable, and separate from tool
-  execution.
-- Snapshot/revert is a separate product layer around session processing, not an
-  incidental helper inside the patch tool.
-
-Ideas rejected/deferred:
-
-- Broad add/update/delete/move apply_patch writes are too large for this
-  project's next route.
-- Snapshot/revert/rollback should not be imported as a convenience patch
-  feature. It needs a separate route after the patch result representation and
-  partial-failure semantics mature.
-- opencode's server/TUI/session architecture should not be mirrored.
-
-Concrete implication:
-
-- The target has adopted a per-file patch-plan/result representation for the
-  current route set. Route 48 uses it for exactly-two mixed writes; the next
-  route should avoid snapshot/revert or broad writer support until those
-  semantics are designed explicitly.
-
-## 8. Reference Comparison: Gemini CLI
-
-Search terms used:
-
-- `edit`, `write-file`, `read-file`, `ToolResult`, `confirmation`,
-  `checkpoint`, `sandbox`, `trustedFolders`, `validatePathAccess`, `restore`.
-
-Files/fragments read:
-
 - `/home/wang/projects/gemini-cli/packages/core/src/tools/edit.ts`
 - `/home/wang/projects/gemini-cli/packages/core/src/tools/write-file.ts`
-- `/home/wang/projects/gemini-cli/packages/core/src/tools/read-file.ts`
-- `/home/wang/projects/gemini-cli/packages/core/src/tools/tools.ts`
-- `/home/wang/projects/gemini-cli/packages/core/src/utils/checkpointUtils.ts`
-- `/home/wang/projects/gemini-cli/packages/cli/src/config/trustedFolders.ts`
 - `/home/wang/projects/gemini-cli/packages/core/src/services/gitService.ts`
+- `/home/wang/projects/gemini-cli/packages/cli/src/ui/commands/restoreCommand.ts`
+- `/home/wang/projects/gemini-cli/packages/cli/src/ui/commands/rewindCommand.tsx`
+- `/home/wang/projects/gemini-cli/packages/cli/src/ui/utils/rewindFileOps.ts`
 
-Useful ideas:
+### Durable Authority Before Rollback / Restore / Recovery Claims
 
-- CLI/core separation keeps tool invocation, confirmation, execution, and
-  result display in core shapes rather than in the CLI entrypoint.
-- Edit and write tools validate workspace access before execution and return
-  structured error objects on failure.
-- Confirmation details carry diff, original content, proposed content, and
-  optional IDE-modified content.
-- Checkpointing is a separate opt-in recovery layer using git snapshots and a
-  restore command.
-- Trusted-folder and sandbox concepts are separate policy/environment layers,
-  not part of edit parsing itself.
+ClaudeCode claims file rewind only when file checkpointing is enabled and a
+matching file-history snapshot exists. Its edit/write tools separately enforce
+read-before-write and stale-read checks before writing.
 
-Ideas rejected/deferred:
+opencode separates patch/edit/write result metadata from session revert.
+Revert depends on a snapshot service that tracks a shadow git state and can
+restore or revert files from snapshot authority.
 
-- Fuzzy/regex/LLM edit correction is too broad for the target's next route.
-- Full-file write, checkpoint restore, and sandbox/trust policy expansion are
-  not appropriate as the next edit route.
-- Gemini's confirmation UI and policy update machinery should not be copied
-  into the current CLI/session files.
+gemini-cli uses edit/write tools to produce confirmation diffs and tool result
+metadata. Project restore depends on a shadow git repository and checkpoint
+JSON, while rewind file revert uses recorded tool-result display data plus
+current-content inspection.
 
-Concrete implication:
+The shared pattern is direct: rollback, restore, recovery, and checkpoint
+claims only make sense when durable checkpoint, snapshot, file history, or
+recorded original-content authority exists.
 
-- Keep CLI wiring minimal. Improve the core route/result contract first, then
-  later add user-visible failure surfaces and recovery options only after the
-  core metadata is stable.
+### Result Metadata vs Recovery Execution
 
-## 9. Lessons To Adopt
+All three references use diff/result metadata for display, permission, or
+diagnostics. They do not treat that metadata alone as durable recovery
+authority. Recovery execution is a separate action tied to file-history,
+snapshot, checkpoint, or recorded original-content data.
 
-- Treat parse, verification, permission, write, post-write verification, result
-  projection, and session continuity as separate stages.
-- Represent every file operation as metadata before any writer is reachable.
-- Keep planned, changed, failed, unchanged, and unverified files distinct.
-- Preserve failed edit outputs in the session/query loop.
-- Require explicit write authorization; never infer it from prompt text,
-  preview, dry-run, or permission-pending state.
-- Keep stale-read and post-write verification failures stopped and actionable.
-- Use per-file operation metadata before adding delete/move/3+ write support.
+This project should copy the conceptual separation, not the implementation
+shape. `routeScopedEditJournal` can describe planned, changed, failed,
+recovery-candidate, and unrecovered files, but it must not claim recovery was
+attempted or possible without a separate durable authority.
 
-## 10. Lessons Not To Adopt Yet
+### Failed-Before-Apply vs Applied-But-Unverified
 
-- Broad apply_patch writes.
-- Snapshot/revert/rollback.
-- Fuzzy patch or LLM edit correction.
-- Full-file overwrite as a general route.
-- Parent-directory creation as part of Add File.
-- CLI/TUI confirmation overhaul.
-- New provider behavior or default real-provider gates.
-- New session persistence schema for rollback/checkpoints.
+ClaudeCode and gemini-cli distinguish validation/read/stale failures from
+post-execution tool results. opencode builds per-file changes before applying
+them and exposes separate snapshot-backed revert behavior. The project should
+make this distinction explicit in future projections:
 
-## 11. Capability Gap Analysis
-
-- Before broad apply_patch:
-  - Per-file patch-plan/result representation now exists for current supported
-    and unsupported route/result paths, but it is not a broad writer contract.
-  - Missing broad unsupported-output dogfood outside deterministic real-model-
-    like fixtures.
-  - Missing a design decision for ordering, destructive confirmation,
-    rollback/snapshot, and partial failure when arbitrary patch families are
-    combined.
-
-- Before 4+ writes:
-  - Missing explicit decision whether sequential/no-rollback remains acceptable
-    beyond three files.
-  - Missing write route contracts for all-final-stale-read, per-file
-    verification, partial failure, and no rollback claim at 4+ files.
-  - Missing evidence that session/result surfaces remain understandable for
-    larger changed/failed file sets.
-
-- Before 3+ mixed operation writes:
-  - Exactly-two mixed lanes have guarded support, but larger mixed sets remain
-    unsupported.
-  - Missing proof that changedFiles, plannedFiles, failedFiles, write intents,
-    invocation flags, and post-write verification remain understandable beyond
-    two mixed operations.
-  - Missing decision on whether broader mixed destructive operations require a
-    stronger approval, rollback prerequisite, or snapshot layer before any
-    writer is reachable.
-
-- Before multi-delete / multi-move:
-  - Missing operation-specific evidence for more than one destructive target.
-  - Missing user-visible warnings and verification semantics for destructive
-    multi-target operations.
-  - Missing protected-file and partial-failure handling for destructive writes.
-
-- Before rollback/atomicity:
-  - Missing snapshot or journal design.
-  - Missing persisted transaction identifiers and recovery lifecycle.
-  - Missing cross-runtime contract decision for whether rollback belongs in TS
-    control plane or Rust execution plane.
-
-- Before stale-read recovery:
-  - Missing durable read-state ledger or route-level read-before-write contract.
-  - Missing retry semantics that do not hide user/external edits.
-  - Missing CLI/session language for "re-read required" vs "safe retry".
-
-- Before partial failure recovery:
-  - Missing per-file attempted/applied/verified/failed state model.
-  - Missing recovery route that can inspect current content without assuming
-    rollback.
-  - Missing validation that changedFiles contain only verified writes.
-
-## 12. Risk Analysis
-
-- Overclaim risk: broad apply_patch can look parseable because the parser knows
-  add/update/delete/move, but runtime writers are intentionally narrower.
-- Authorization risk: permission-pending, dry-run, or natural language approval
-  must not become write authorization.
-- Persistence risk: result/session surfaces must not label planned files as
-  changed files.
-- Partial write risk: the exactly-two and exactly-three update routes are
-  sequential, and Route 48 mixed writes are also sequential in parsed order.
-  No rollback or atomicity is claimed; partial failure may leave verified
-  `changedFiles` plus `failedFiles`, and the result surface must report both
-  accurately with user inspection required.
-- Workspace risk: single-file delete/move authority now exists, but
-  multi-destructive and mixed destructive operations would broaden authority
-  again and require a separate plan.
-- Architecture risk: adding recovery or rollback inside
-  `runMvpIntegratedFlow.ts`, `SessionManager.ts`, or `cli.tsx` would reverse the
-  recent extraction direction.
-- Provider risk: real-provider behavior must remain opt-in and redacted.
-
-## 13. Proposed Route Sequence
-
-Do not continue by default into broad apply_patch writes. The next route should
-evaluate broader write readiness before any new writer is proposed.
-
-### Route 50: Broad Apply Patch / 3+ Mixed Write Readiness Design, Docs-First
-
-- Objective: decide whether broad apply_patch / 3+ mixed support requires
-  rollback/snapshot first, or whether the project will deliberately continue
-  with sequential no-rollback semantics under a narrower route.
-- Allowed files: docs/status/design artifacts only unless the route explicitly
-  opens focused tests or projection work.
-- Forbidden files: provider/auth core, default gates, broad apply_patch writer,
-  3+ mixed writer, rollback/snapshot implementation, session lifecycle, CLI
-  lifecycle, MCP behavior, and product readiness claims.
-- Behavior boundaries: no broad apply_patch writer and no 3+ mixed writer.
-  Unsupported shapes must remain stopped/no-write unless a later route proves
-  execution, authorization, ordering, verification, partial failure, and
-  recovery boundaries.
-- Validation commands: diff checks plus any focused no-write contract checks
-  explicitly required by the route.
-- Success criteria: a concrete go/no-go decision for broader writes, explicit
-  rollback/atomicity stance, and no broad readiness claim.
-- Stop conditions: needing rollback, persistence schema migration, provider
-  behavior, CLI/session lifecycle changes, or broad apply_patch execution.
-- Readiness claim impact: no new write readiness unless a separate
-  implementation route is opened after the design.
-
-## 14. First Recommended Implementation Route
-
-Exactly one next implementation route is recommended:
-
-**Route 50: Broad Apply Patch / 3+ Mixed Write Readiness Design, Docs-First.**
-
-Why this is first:
-
-- Routes 40-48 expanded the write surface from single-file update through
-  exactly-three update, single-file create/move/delete, and exactly-two mixed
+- failed-before-apply: parse, capability, workspace, permission, preflight, or
+  stale-read blockers before a writer applies content.
+- applied-but-unverified: writer started or content may have changed, but
+  post-write verification failed or a later file failed after earlier verified
   writes.
-- The next jump, 3+ mixed or broad apply_patch, raises ordering, rollback,
-  destructive confirmation, and partial failure risks beyond the current
-  evidence.
-- A docs-first route can decide whether to build rollback/snapshot first or to
-  continue with explicitly sequential/no-rollback semantics.
 
-Non-goals for Route 50:
+This classification is useful for user/session-visible facts, but it is still
+not recovery execution.
 
-- no broad apply_patch writer
-- no 3+ mixed writer
-- no 4+ writes
-- no multi-delete or multi-move writes
-- no rollback/snapshot/revert implementation
-- no stale-read recovery
-- no partial failure recovery
-- no provider/session/CLI/MCP behavior change
-- no default gate change
-- no real-provider execution by default
+### Broad Edit Gating
 
-## 15. Validation Strategy
+ClaudeCode and gemini-cli have mature edit/write tools with confirmation,
+workspace/path policy, stale/read checks, and diff display. opencode supports a
+broader `apply_patch` tool, but it still separates parse, per-file metadata,
+permission, apply, result, and snapshot/revert. None of those paths justify
+claiming broad edit readiness in this project while durable recovery authority
+is absent and current write support remains deliberately bounded.
 
-For this docs-only Route 49 consolidation:
+### What To Copy Conceptually
+
+- Keep parse, capability, workspace, permission, write, verification, result
+  projection, journal metadata, and recovery authority as separate layers.
+- Use per-file metadata for user-visible diagnostics and permission surfaces.
+- Require durable checkpoint/snapshot/file-history/original-content authority
+  before emitting recovery or rollback capability claims.
+- Keep broad edit support gated by explicit destructive-write semantics and
+  partial-failure handling.
+
+### What To Defer
+
+- Full ClaudeCode file-history/session integration.
+- opencode snapshot/revert service.
+- gemini-cli shadow-git checkpointing and restore UX.
+- Fuzzy corrective edit application.
+- Broad arbitrary `apply_patch` write support.
+- Any parity claim with the reference repositories.
+
+## 7. Long-Range Capability Gap Map
+
+### Layer A: Observability and Projection
+
+- Recovery plan projection without execution.
+- Failed-before-apply vs applied-but-unverified classification.
+- Recovery blocker facts such as `metadata-only-journal`,
+  `no-durable-snapshot`, `no-original-content`, and `no-recovery-executor`.
+- User/session-visible failure facts that explain recovery impossible vs
+  recovery not attempted.
+- Tests proving `recoveryExecuted=false`, `rollbackAtomicityClaim=false`, and
+  no writer behavior change.
+
+### Layer B: Durable Authority Design
+
+- Decide between snapshot, checkpoint, file-history, original-content ledger,
+  or another storage seam.
+- Decide where authority should live: TypeScript control plane, Rust execution
+  plane, contracts, or a narrow storage helper.
+- Define storage lifecycle, schema/versioning, cleanup, and audit/history
+  residue rules.
+- Define trust boundaries for restoring content that may have changed after
+  the failed write.
+- Align durable authority with workspace authority rather than bypassing it.
+
+### Layer C: Recovery Execution Design
+
+- Define recovery executor preconditions.
+- Require original content authority or snapshot authority before restoration.
+- Inspect current content before any recovery action.
+- Preserve a no-hidden-user-edit rule.
+- Define partial failure recovery boundaries and what remains manual.
+- Keep recovery execution out of result metadata projection modules unless a
+  dedicated executor boundary exists.
+
+### Layer D: Larger Write Surfaces
+
+- 3+ mixed writes.
+- 4+ update writes.
+- Multi-delete and multi-move.
+- Broad arbitrary `apply_patch`.
+- Destructive approval semantics for larger mixed or destructive sets.
+- Explicit choice between sequential/no-rollback execution and
+  durable-protected execution.
+
+### Layer E: Product/User Surfaces
+
+- CLI/session failure summary.
+- Clear "re-read required" language for stale-read blockers.
+- Clear "recovery impossible" vs "recovery not attempted" language.
+- Optional future restore UX only after durable authority exists.
+- No hidden broad readiness claim in terminal or session summaries.
+
+## 8. Recommended Next Development Batch
+
+The old recommendation that "Route 50 is the single recommended next
+implementation route" is historical and obsolete.
+
+Recommended next development batch:
+
+**Batch 57: Recovery readiness projection batch**
+
+This should intentionally combine several thin slices:
+
+- recovery plan projection without execution
+- failed-before-apply / applied-but-unverified classification
+- blocker facts such as `no-durable-snapshot`, `no-original-content`,
+  `no-recovery-executor`, and `metadata-only-journal`
+- focused representative consumer attachment where result contracts allow
+- tests proving no recovery execution and no rollback claim
+- map update evidence
+- next decision between durable storage prototype and 3+ mixed readiness audit
+
+Batch 57 should be future goal-mode development work. Do not write the route
+file until that goal is opened. It must not add durable storage, recovery
+execution, rollback, snapshot, broad write capability, 3+ mixed writes, 4+
+writes, provider/session/CLI/MCP behavior changes, package script changes, or
+default gate changes.
+
+## 9. Recommended Future Sequence
+
+- Batch 57: Recovery readiness projection batch
+  - Plan-only recovery projection, failure-state classification, recovery
+    blockers, representative consumer wiring, no execution.
+
+- Batch 58: Durable authority design/prototype decision
+  - Decide between git/checkpoint/snapshot/file-history/storage seam options.
+  - Prototype non-default metadata persistence only if storage ownership,
+    cleanup, schema, residue, and workspace authority interaction are explicit.
+
+- Batch 59: Recovery executor design only or non-default prototype
+  - Only if durable authority exists.
+  - Require original-content/snapshot authority, current-content inspection,
+    no-hidden-user-edit semantics, and focused tests.
+
+- Batch 60: 3+ mixed write readiness audit
+  - Only after the recovery/rollback stance is explicit.
+  - Audit result contract, ordering, destructive approvals, partial failure,
+    unsupported surfaces, and validation requirements.
+
+- Batch 61: Narrow 3+ mixed implementation or keep blocked
+  - Implement only if Batch 60 proves the route can preserve current boundaries.
+  - Otherwise keep 3+ mixed unsupported and record blockers.
+
+- Batch 62+: Broad `apply_patch` readiness
+  - Consider only if larger mixed/write surfaces and recovery/rollback stance
+    are settled.
+  - Broad arbitrary `apply_patch` remains delayed because it combines parsing,
+    ordering, destructive semantics, permission, workspace authority,
+    verification, partial failure, recovery, and user-facing claims into a much
+    wider blast radius than current bounded writes.
+
+## 10. Validation Strategy
+
+Use the fastest validation that matches the touched layer.
+
+For docs-only roadmap updates:
 
 - `rtk git status --short --branch`
 - `rtk git diff --check`
-- `rtk npm run verify:real-user-capabilities:mixed-operation-evidence`
-- `rtk npm run verify:real-user-capabilities:three-file-guarded-write`
-- `rtk npm run verify:real-user-capabilities:single-file-move-evidence`
-- `rtk npm run verify:real-user-capabilities:single-file-delete-evidence`
-- `rtk npm run verify:real-user-capabilities:unsupported-patch-e2e`
-- `rtk npm run verify:result-contract`
-- `rtk npm run build -w packages/ts-shell`
-- `rtk npm run verify:release:deterministic`
 
-For Route 50 if opened later:
+For development batches:
 
-- docs-first readiness review before implementation
-- focused no-write/result-contract tests only if the route changes projection
-  wording or fixtures
-- no full real-provider execution unless the route explicitly opens an opt-in
-  real-provider gate
+- run minimal focused validation between tasks
+- run focused tests for touched patch/result/session modules
+- run `rtk npm run verify:result-contract` when result contracts or consumer
+  projections change
+- run `rtk npm run build -w packages/ts-shell` when code changes
+- clean audit/history residue before final status
 
-## 16. Stop Conditions
+Do not run broad/default/provider/CLI/MCP gates unless those layers are touched
+or the route explicitly opens them. Optional real-user gates should run only
+when touched behavior justifies opt-in real-provider validation, and they must
+preserve the real-provider boundary.
+
+## 11. Stop Conditions
 
 Stop and split into a separate route if the next step requires:
 
@@ -572,8 +567,10 @@ Stop and split into a separate route if the next step requires:
 - 3+ mixed operation writes
 - 4+ writes
 - multi-delete or multi-move writes
-- broad apply_patch writes
+- broad `apply_patch` writes
+- durable journal storage
 - rollback/snapshot/revert implementation
+- recovery executor
 - stale-read recovery
 - partial failure recovery
 - persistence schema changes
@@ -584,27 +581,34 @@ Stop and split into a separate route if the next step requires:
 - real-provider config inspection or default real-provider execution
 - moving control-plane semantics into Rust
 
-## 17. Readiness Claim Boundaries
+## 12. Readiness Claim Boundaries
 
-This roadmap changes no readiness claim.
+This roadmap changes no runtime readiness claim.
 
 Allowed after this document:
 
-- The project has a current edit capability upper-bound roadmap after Routes
-  40-48.
+- The project has a post-Route 56 edit capability roadmap.
 - The current implemented edit surface includes selected-workspace single-file
   update/create, exactly-two update, exactly-three update, guarded single-file
   move, guarded single-file delete, and exactly-two mixed write lanes.
-- Route 50 is the single recommended next implementation route.
+- Route-scoped edit journal metadata is attached to mixed, multi-file, and
+  representative single-file failure surfaces.
+- Journal boundary facts are centralized and remain metadata-only.
+- Batch 57 is the recommended next development direction, but it is not
+  implemented.
 
 Forbidden after this document:
 
-- broad apply_patch readiness
+- Route 57 implementation claim
+- broad `apply_patch` readiness
 - arbitrary mutation readiness
 - 3+ mixed operation write readiness
 - 4+ write readiness
 - multi-delete or multi-move readiness
+- durable journal readiness
+- recovery executor readiness
 - rollback/atomicity readiness
+- snapshot/revert readiness
 - fuzzy edit readiness
-- full Claude Code/opencode/Gemini CLI parity
+- full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
