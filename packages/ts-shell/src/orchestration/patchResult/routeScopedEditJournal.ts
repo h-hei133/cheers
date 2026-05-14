@@ -1,3 +1,5 @@
+import { routeScopedEditJournalBoundaryFacts } from "./journalMetadataBoundary.js";
+
 export type RouteScopedEditJournalOperationKind =
   | "update"
   | "create"
@@ -125,13 +127,10 @@ export function projectRouteScopedEditJournal(
     writerStarted,
     hasPartialApply,
     hasUnrecoveredApply: unrecoveredFiles.length > 0,
-    rollbackAtomicityClaim: false,
-    writeCapability: "metadata-only",
-    evidence: [
-      "route-scoped-edit-journal:metadata-only",
-      "route-scoped-edit-journal:no-runtime-writer",
-      "route-scoped-edit-journal:no-rollback-atomicity-claim",
-    ],
+    rollbackAtomicityClaim:
+      routeScopedEditJournalBoundaryFacts.rollbackAtomicityClaim,
+    writeCapability: routeScopedEditJournalBoundaryFacts.writeCapability,
+    evidence: [...routeScopedEditJournalBoundaryFacts.evidence],
   };
 }
 

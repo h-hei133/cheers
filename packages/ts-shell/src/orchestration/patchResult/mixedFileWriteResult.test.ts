@@ -83,6 +83,7 @@ describe("mixed file write result journal metadata", () => {
           },
         ],
         recoveryCandidateFiles: ["src/a.ts"],
+        unrecoveredFiles: [],
         rollbackAtomicityClaim: false,
         recoveryExecuted: false,
         writeCapability: "metadata-only",

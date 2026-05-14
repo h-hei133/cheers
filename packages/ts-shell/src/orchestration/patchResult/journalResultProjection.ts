@@ -1,3 +1,4 @@
+import { journalFailureSurfaceBoundaryFacts } from "./journalMetadataBoundary.js";
 import {
   projectRouteScopedEditJournal,
   type RouteScopedEditJournal,
@@ -48,13 +49,13 @@ export function projectJournalFailureSurface(
     writerStarted: projection.writerStarted,
     hasPartialApply: projection.hasPartialApply,
     hasUnrecoveredApply: projection.hasUnrecoveredApply,
-    rollbackAtomicityClaim: false,
-    recoveryExecuted: false,
-    writeCapability: "metadata-only",
+    rollbackAtomicityClaim:
+      journalFailureSurfaceBoundaryFacts.rollbackAtomicityClaim,
+    recoveryExecuted: journalFailureSurfaceBoundaryFacts.recoveryExecuted,
+    writeCapability: journalFailureSurfaceBoundaryFacts.writeCapability,
     evidence: [
       ...projection.evidence,
-      "route-scoped-edit-journal-result:failure-surface-only",
-      "route-scoped-edit-journal-result:recovery-not-executed",
+      ...journalFailureSurfaceBoundaryFacts.evidence,
     ],
   };
 }

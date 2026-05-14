@@ -82,11 +82,11 @@ describe("single-file apply_patch workspace write result", () => {
         plannedFiles: ["src/app.ts"],
         changedFiles: [],
         failedFiles: [
-          {
+          expect.objectContaining({
             path: "src/app.ts",
             reason: expect.stringContaining("post-write verification"),
             failureClass: "post-write-verification",
-          },
+          }),
         ],
         unrecoveredFiles: ["src/app.ts"],
         recoveryCandidateFiles: ["src/app.ts"],
@@ -158,6 +158,43 @@ describe("single-file apply_patch workspace write result", () => {
     expect(result.terminalClassification).toBe("stopped");
     expect(result.codingResult?.changedFiles).toEqual([]);
     expect(result.codingResult?.patches?.[0]?.failureCode).toBe("write-failed");
+    expect(result.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        changedFiles: [],
+        failedFiles: [
+          {
+            path: "src/app.ts",
+            reason: expect.stringContaining("Patch write failed"),
+          },
+        ],
+        writerInvoked: true,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "blocked",
+        successLike: false,
+      }),
+    );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal,
+    ).toEqual(
+      expect.objectContaining({
+        routeId: "single-file-apply-patch-workspace-write",
+        changedFiles: [],
+        failedFiles: [
+          expect.objectContaining({
+            path: "src/app.ts",
+            reason: expect.stringContaining("Patch write failed"),
+            failureClass: "write-application",
+          }),
+        ],
+        recoveryCandidateFiles: [],
+        unrecoveredFiles: [],
+        writerStarted: true,
+        rollbackAtomicityClaim: false,
+        recoveryExecuted: false,
+        writeCapability: "metadata-only",
+      }),
+    );
     expect(result.codingResult?.repair.status).toBe("failed");
     expect(result.codingResult?.continuation.status).toBe(
       "failed-after-bounded-continuation",

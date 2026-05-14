@@ -290,6 +290,7 @@ describe("multi-file apply_patch workspace write result", () => {
         recoveryCandidateFiles: ["src/a.ts", "src/b.ts"],
         rollbackAtomicityClaim: false,
         recoveryExecuted: false,
+        writeCapability: "metadata-only",
       }),
     );
     expect(result.codingResult?.lastActionResultSeed).toMatchObject({
@@ -365,13 +366,23 @@ describe("multi-file apply_patch workspace write result", () => {
       }),
     );
     expect(
-      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal?.changedFiles,
-    ).toEqual(["src/a.ts", "src/b.ts"]);
-    expect(
-      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal?.failedFiles.map(
-        (failure) => failure.path,
-      ),
-    ).toEqual(["src/c.ts"]);
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal,
+    ).toEqual(
+      expect.objectContaining({
+        changedFiles: ["src/a.ts", "src/b.ts"],
+        failedFiles: [
+          expect.objectContaining({
+            path: "src/c.ts",
+            failureClass: "write-application",
+          }),
+        ],
+        recoveryCandidateFiles: ["src/a.ts", "src/b.ts"],
+        unrecoveredFiles: [],
+        rollbackAtomicityClaim: false,
+        recoveryExecuted: false,
+        writeCapability: "metadata-only",
+      }),
+    );
   });
 });
 
