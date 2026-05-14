@@ -1,5 +1,9 @@
 import { journalFailureSurfaceBoundaryFacts } from "./journalMetadataBoundary.js";
 import {
+  projectJournalRecoveryPlan,
+  type JournalRecoveryPlanProjection,
+} from "./journalRecoveryPlanProjection.js";
+import {
   projectRouteScopedEditJournal,
   type RouteScopedEditJournal,
   type RouteScopedEditJournalFailureClass,
@@ -27,6 +31,7 @@ export interface JournalFailureSurfaceProjection {
   readonly rollbackAtomicityClaim: false;
   readonly recoveryExecuted: false;
   readonly writeCapability: "metadata-only";
+  readonly recoveryPlan: JournalRecoveryPlanProjection;
   readonly evidence: readonly string[];
 }
 
@@ -53,6 +58,7 @@ export function projectJournalFailureSurface(
       journalFailureSurfaceBoundaryFacts.rollbackAtomicityClaim,
     recoveryExecuted: journalFailureSurfaceBoundaryFacts.recoveryExecuted,
     writeCapability: journalFailureSurfaceBoundaryFacts.writeCapability,
+    recoveryPlan: projectJournalRecoveryPlan(journal),
     evidence: [
       ...projection.evidence,
       ...journalFailureSurfaceBoundaryFacts.evidence,

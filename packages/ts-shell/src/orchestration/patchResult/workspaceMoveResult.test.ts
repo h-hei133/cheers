@@ -229,6 +229,21 @@ describe("workspace move route result projection", () => {
         writeCapability: "metadata-only",
       }),
     );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan,
+    ).toEqual(
+      expect.objectContaining({
+        mode: "plan-only",
+        authority: "metadata-only",
+        recoveryExecuted: false,
+        rollbackAtomicityClaim: false,
+        recoveryCandidateFiles: ["src/to.ts"],
+        unrecoveredFiles: ["src/to.ts"],
+        failedBeforeApplyFiles: [],
+        appliedButUnverifiedFiles: ["src/to.ts"],
+      }),
+    );
     expect(result.codingResult?.changeSet).toEqual(
       expect.objectContaining({
         postRunDirtyFiles: ["src/to.ts"],

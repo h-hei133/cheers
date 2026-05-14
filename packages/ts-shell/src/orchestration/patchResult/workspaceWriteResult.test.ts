@@ -96,6 +96,21 @@ describe("single-file apply_patch workspace write result", () => {
         writeCapability: "metadata-only",
       }),
     );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan,
+    ).toEqual(
+      expect.objectContaining({
+        mode: "plan-only",
+        authority: "metadata-only",
+        recoveryExecuted: false,
+        rollbackAtomicityClaim: false,
+        recoveryCandidateFiles: ["src/app.ts"],
+        unrecoveredFiles: ["src/app.ts"],
+        failedBeforeApplyFiles: [],
+        appliedButUnverifiedFiles: ["src/app.ts"],
+      }),
+    );
     expect(result.codingResult?.repair.status).toBe("failed");
     expect(result.codingResult?.continuation.status).toBe(
       "failed-after-bounded-continuation",
@@ -380,6 +395,21 @@ describe("single-file apply_patch workspace write result", () => {
         rollbackAtomicityClaim: false,
         recoveryExecuted: false,
         writeCapability: "metadata-only",
+      }),
+    );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan,
+    ).toEqual(
+      expect.objectContaining({
+        mode: "plan-only",
+        authority: "metadata-only",
+        recoveryExecuted: false,
+        rollbackAtomicityClaim: false,
+        recoveryCandidateFiles: [],
+        unrecoveredFiles: [],
+        failedBeforeApplyFiles: ["src/app.ts"],
+        appliedButUnverifiedFiles: [],
       }),
     );
   });

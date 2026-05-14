@@ -89,6 +89,29 @@ describe("mixed file write result journal metadata", () => {
         writeCapability: "metadata-only",
       }),
     );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan,
+    ).toEqual(
+      expect.objectContaining({
+        mode: "plan-only",
+        authority: "metadata-only",
+        recoveryExecuted: false,
+        rollbackAtomicityClaim: false,
+        recoveryCandidateFiles: ["src/a.ts"],
+        unrecoveredFiles: [],
+        failedBeforeApplyFiles: ["src/new.ts"],
+        appliedButUnverifiedFiles: [],
+        appliedAndVerifiedBeforeLaterFailureFiles: ["src/a.ts"],
+        blockers: expect.arrayContaining([
+          "metadata-only-journal",
+          "no-durable-snapshot",
+          "no-original-content",
+          "no-recovery-executor",
+          "no-atomicity-authority",
+        ]),
+      }),
+    );
   });
 });
 

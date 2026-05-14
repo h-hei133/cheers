@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   journalFailureSurfaceBoundaryFacts,
+  routeScopedEditJournalRecoveryBlockers,
   routeScopedEditJournalBoundaryFacts,
 } from "./journalMetadataBoundary.js";
 
@@ -27,5 +28,16 @@ describe("journal metadata boundary facts", () => {
         "route-scoped-edit-journal-result:recovery-not-executed",
       ],
     });
+  });
+
+  it("keeps recovery blockers explicit and metadata-only", () => {
+    expect(routeScopedEditJournalRecoveryBlockers).toEqual([
+      "metadata-only-journal",
+      "no-durable-snapshot",
+      "no-original-content",
+      "no-recovery-executor",
+      "no-atomicity-authority",
+      "no-persistence-authority",
+    ]);
   });
 });

@@ -1,9 +1,10 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 56
+Route baseline: post-Route 57
 Date: 2026-05-14
-Status: long-range edit capability map after Routes 50-56; documentation only.
-Route 57 has not been implemented.
+Status: long-range edit capability map after Routes 50-57.
+Route 57 has been implemented as projection-only recovery-readiness
+diagnostics. This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
 bound and the long-range route sequence needed before broader edit support can
@@ -43,11 +44,11 @@ non-durable, and non-authoritative. It does not provide rollback authority,
 recovery authority, snapshot authority, persistence, writer authority,
 permission authority, or atomicity.
 
-The next direction should be a thicker recovery-readiness development batch:
-plan-only recovery projection, failure-state classification, blocker facts,
-limited cross-consumer wiring, and evidence that no recovery or rollback is
-executed. It should not be a tiny isolated projection route, and it should not
-add broad writes.
+Route 57 added that recovery-readiness projection batch without adding recovery
+execution: failure-state classification, plan-only recovery projection,
+metadata-only blocker facts, and representative journal-enabled consumer
+wiring. The next direction should be durable authority design/prototype
+decision work, not broad writes.
 
 ## 2. Current Edit Capability Inventory
 
@@ -180,10 +181,20 @@ add broad writes.
   - Owner: `patchResult/journalMetadataBoundary.ts`.
   - Status: implemented centralized metadata-only facts:
     `writeCapability: "metadata-only"`, `rollbackAtomicityClaim: false`,
-    `recoveryExecuted: false`, and evidence strings for no runtime writer and
-    no recovery execution.
+    `recoveryExecuted: false`, blocker facts, and evidence strings for no
+    runtime writer and no recovery execution.
   - Boundary: helper centralizes claims; it does not create storage, restore,
     rollback, or write authority.
+
+- Recovery-readiness projection
+  - Owners: `patchResult/journalFailureStateProjection.ts` and
+    `patchResult/journalRecoveryPlanProjection.ts`.
+  - Status: implemented plan-only classification and recovery diagnostics
+    attached to existing journal-enabled failure surfaces through
+    `journalResultProjection.ts`.
+  - Boundary: no file reads, no writes, no durable storage, no recovery
+    executor, no rollback executor, no snapshot/revert, no original-content
+    inference, and no changed/failed/planned field semantic change.
 
 - Mixed/multi/single-file failure journal coverage
   - Mixed and multi-file partial failure paths carry journal metadata.
@@ -275,8 +286,9 @@ User / CLI / provider output
    status: implemented failure-surface projection; not durability or recovery.
 -> metadata-only boundary projection
    status: implemented through journalMetadataBoundary.ts.
--> future recovery plan projection
-   status: not implemented; recommended next development batch.
+-> recovery-readiness projection
+   status: implemented through journalFailureStateProjection.ts and
+   journalRecoveryPlanProjection.ts; plan-only, metadata-only, non-executing.
 -> future durable storage / recovery executor
    status: not implemented; requires separate authority and lifecycle design.
 -> session continuity
@@ -297,25 +309,26 @@ User / CLI / provider output
 | Exactly-three existing-file update write | Implemented candidate | `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `multiFileWriteResult.ts`, `verify-three-file-guarded-write.mjs` | B/C | Sequential write; partial failure may leave verified prefix; no rollback; non-default only | No expansion until recovery stance is explicit |
 | Single-file move/rename | Implemented candidate | `workspaceMoveRoute.ts`, `singleFileMoveApply.ts`, `workspaceMoveResult.ts`, `verify-single-file-move-evidence.mjs` | B/C | One regular-file source and exclusive target only; no multi-move, directory move, overwrite, or rollback | No expansion until destructive authority is explicit |
 | Single-file delete | Implemented candidate | `workspaceDeleteRoute.ts`, `singleFileDeleteApply.ts`, `workspaceDeleteResult.ts`, `verify-single-file-delete-evidence.mjs` | B/C | One existing regular-file target only; no multi-delete, directory delete, or rollback | No expansion until destructive authority is explicit |
-| Exactly-two mixed write lanes | Implemented candidate | `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, mixed-operation evidence | B/C | Sequential parsed-order writes; no rollback/atomicity; no 3+ mixed or broad `apply_patch` | Revisit after recovery-readiness batch |
-| Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, unsupported E2E and continuity checks | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Continue as consumer for Route 57 |
-| Route-scoped edit journal prototype | Implemented metadata-only projection | `routeScopedEditJournal.ts`, `routeScopedEditJournal.test.ts` | C/D | Non-durable; not recovery or writer authority | Feed Route 57 recovery plan projection |
-| Journal result projection | Implemented failure-surface projection | `journalResultProjection.ts`, `journalResultProjection.test.ts` | C/D | No recovery execution; no durable storage | Feed Route 57 recovery plan projection |
-| Mixed/multi failure journal metadata | Implemented observability coverage | `mixedFileWriteResult.ts`, `multiFileWriteResult.ts`, related focused tests | C/D | Partial failure remains unrecovered; no rollback | Keep as evidence source for Route 57 |
+| Exactly-two mixed write lanes | Implemented candidate | `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, mixed-operation evidence | B/C | Sequential parsed-order writes; no rollback/atomicity; no 3+ mixed or broad `apply_patch` | Revisit only after durable authority stance is explicit |
+| Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, unsupported E2E and continuity checks | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Preserve as recovery-plan consumer |
+| Route-scoped edit journal prototype | Implemented metadata-only projection | `routeScopedEditJournal.ts`, `routeScopedEditJournal.test.ts` | C/D | Non-durable; not recovery or writer authority | Feed durable authority decision |
+| Journal result projection | Implemented failure-surface projection with recovery plan diagnostics | `journalResultProjection.ts`, `journalResultProjection.test.ts` | C/D | No recovery execution; no durable storage | Feed durable authority decision |
+| Mixed/multi failure journal metadata | Implemented observability coverage | `mixedFileWriteResult.ts`, `multiFileWriteResult.ts`, related focused tests | C/D | Partial failure remains unrecovered; no rollback | Keep as evidence source for durable authority decision |
 | Single-file failure journal metadata | Implemented representative coverage | `workspaceWriteResult.ts`, `workspaceCreateResult.ts`, `workspaceMoveResult.ts`, `workspaceDeleteResult.ts`, focused tests | C/D | Coverage is failure metadata only; success paths are not a recovery ledger | Keep as representative wiring |
-| Journal failure consumer entrypoint | Implemented shared projection entrypoint | `journalFailureConsumer.ts` | C/D | Does not classify recovery readiness in user-facing terms yet | Extend in Route 57 only if result contracts allow |
-| Journal metadata boundary helper | Implemented centralized boundary facts | `journalMetadataBoundary.ts`, `journalMetadataBoundary.test.ts` | C/D | No durability, storage, restore, or executor | Preserve in all future recovery projection work |
+| Journal failure consumer entrypoint | Implemented shared projection entrypoint | `journalFailureConsumer.ts` | C/D | Builds journal facts but recovery classification is projected downstream | Preserve existing changed/failed/planned semantics |
+| Journal metadata boundary helper | Implemented centralized boundary and blocker facts | `journalMetadataBoundary.ts`, `journalMetadataBoundary.test.ts` | C/D | No durability, storage, restore, or executor | Preserve in all future recovery work |
 | External comparison against ClaudeCode/opencode/gemini-cli | Completed directional evidence | This roadmap and `journal-boundary-readiness.md` | E/F | Comparison is directional, not parity | Use to block unsupported recovery claims |
-| Recovery plan projection | Recommended next; not implemented | No current module | N/A | Need plan-only projection, failure-state classification, blocker facts, consumer attachment, no execution tests | Batch 57 |
+| Recovery failure-state classification | Implemented projection-only diagnostics | `journalFailureStateProjection.ts`, `journalFailureStateProjection.test.ts` | D | Classification depends on existing journal facts; unknown state remains explicit when facts are insufficient | Feed durable authority decision |
+| Recovery plan projection | Implemented plan-only, metadata-only diagnostics | `journalRecoveryPlanProjection.ts`, `journalRecoveryPlanProjection.test.ts`, `journalResultProjection.ts`, focused consumer tests | C/D | No durable storage, original-content authority, recovery executor, rollback, snapshot, or persistence | Batch 58 durable authority decision |
 | Durable journal storage | Future; not implemented | No current storage owner/schema | N/A | Needs authority owner, lifecycle, cleanup, residue policy, recovery trust boundary | Batch 58 decision/prototype |
 | Recovery executor | Future; not implemented | No executor | N/A | Requires durable authority, original content authority, current-content inspection, no-hidden-user-edit rule | Batch 59 only if authority exists |
 | Rollback/snapshot | Future; not implemented | No target snapshot/restore layer | N/A | Needs checkpoint/file-history/storage design and user/session semantics | Batch 58+ |
 | 4+ update requests | Explicitly unsupported | `multiFileUpdatePlanning.ts`, unsupported evidence | B/C | No write support | Batch 60/61 only after recovery stance |
 | 3+ mixed operations | Explicitly unsupported | `perFilePatchPlan.ts`, unsupported E2E, mixed-operation evidence | B/C | No writer support; no larger mixed recovery/approval stance | Batch 60/61 only after recovery stance |
 | Multi-delete / multi-move beyond exactly-two mixed lanes | Explicitly unsupported | `perFilePatchPlan.ts`, unsupported E2E, single-file move/delete evidence | B/C | No broad multi-destructive writer; directory delete/move and overwrite remain blocked | Later destructive-write route |
-| Final stale-read | Implemented as blocker, not recovery | `workspaceWriteRoute.ts`, `multiFileWriteRoute.ts`, `mutationExecution.ts`, `singleFileApplyPatchFinalStaleRead.ts` | C/D | No automatic stale-read recovery; no read-state ledger | Route 57 can classify as failed-before-apply |
-| Post-write verification | Implemented for selected writes | selected write routes and application modules | C/D | No rollback after post-write failure | Route 57 can classify as applied-but-unverified |
-| Partial failure surface | Implemented stopped surface for multi-file routes | `multiFileUpdateApply.ts`, `multiFileWriteRoute.ts`, `multiFileWriteResult.ts`, candidate partial-failure cases | B/C | No automatic repair or rollback; user inspection required | Route 57 recovery-readiness projection |
+| Final stale-read | Implemented as blocker, not recovery | `workspaceWriteRoute.ts`, `multiFileWriteRoute.ts`, `mutationExecution.ts`, `singleFileApplyPatchFinalStaleRead.ts`, recovery-readiness tests | C/D | No automatic stale-read recovery; no read-state ledger | Durable authority decision before recovery |
+| Post-write verification | Implemented for selected writes and classified in recovery plan diagnostics | selected write routes, application modules, `journalFailureStateProjection.ts` | C/D | No rollback after post-write failure | Durable authority decision before recovery |
+| Partial failure surface | Implemented stopped surface for multi-file routes with recovery plan diagnostics | `multiFileUpdateApply.ts`, `multiFileWriteRoute.ts`, `multiFileWriteResult.ts`, candidate partial-failure cases, recovery-readiness tests | B/C/D | No automatic repair or rollback; user inspection required | Durable authority decision before larger writes |
 | Rollback / atomicity | Explicitly unsupported | Route result modules and journal boundary facts require false claims | B/C/D | No snapshot layer in target project | Future only after Batch 58 |
 
 Evidence strength scale: A = real-provider / real CLI / real runtime gate,
@@ -484,30 +497,27 @@ implementation route" is historical and obsolete.
 
 Recommended next development batch:
 
-**Batch 57: Recovery readiness projection batch**
+**Batch 58: Durable authority design/prototype decision**
 
-This should intentionally combine several thin slices:
+Route 57 confirmed that recovery diagnostics can be projected safely without
+execution, but every actionable recovery path remains blocked by absent durable
+authority. Batch 58 should decide whether the project will add a
+snapshot/checkpoint/file-history/original-content authority, where that
+authority lives, and how storage lifecycle, cleanup, residue, workspace
+authority, and trust boundaries are handled.
 
-- recovery plan projection without execution
-- failed-before-apply / applied-but-unverified classification
-- blocker facts such as `no-durable-snapshot`, `no-original-content`,
-  `no-recovery-executor`, and `metadata-only-journal`
-- focused representative consumer attachment where result contracts allow
-- tests proving no recovery execution and no rollback claim
-- map update evidence
-- next decision between durable storage prototype and 3+ mixed readiness audit
-
-Batch 57 should be future goal-mode development work. Do not write the route
-file until that goal is opened. It must not add durable storage, recovery
-execution, rollback, snapshot, broad write capability, 3+ mixed writes, 4+
-writes, provider/session/CLI/MCP behavior changes, package script changes, or
-default gate changes.
+Batch 58 should not add recovery execution by default. If it prototypes
+persistence, it should be non-default and bounded by explicit residue cleanup,
+schema, and workspace authority rules. Broad writes, 3+ mixed writes, provider,
+session, CLI, MCP, package script, and default gate changes should remain out
+of scope unless a separate route opens them.
 
 ## 9. Recommended Future Sequence
 
 - Batch 57: Recovery readiness projection batch
   - Plan-only recovery projection, failure-state classification, recovery
     blockers, representative consumer wiring, no execution.
+  - Status: implemented.
 
 - Batch 58: Durable authority design/prototype decision
   - Decide between git/checkpoint/snapshot/file-history/storage seam options.
@@ -594,12 +604,14 @@ Allowed after this document:
 - Route-scoped edit journal metadata is attached to mixed, multi-file, and
   representative single-file failure surfaces.
 - Journal boundary facts are centralized and remain metadata-only.
-- Batch 57 is the recommended next development direction, but it is not
-  implemented.
+- Route 57 recovery-readiness diagnostics are implemented as plan-only,
+  metadata-only projection: no recovery execution, no rollback claim, no
+  durable storage, and no original-content authority.
+- Batch 58 durable authority design/prototype decision is the recommended next
+  development direction.
 
 Forbidden after this document:
 
-- Route 57 implementation claim
 - broad `apply_patch` readiness
 - arbitrary mutation readiness
 - 3+ mixed operation write readiness

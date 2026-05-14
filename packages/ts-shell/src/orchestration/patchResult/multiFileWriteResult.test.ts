@@ -212,6 +212,22 @@ describe("multi-file apply_patch workspace write result", () => {
         writeCapability: "metadata-only",
       }),
     );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan,
+    ).toEqual(
+      expect.objectContaining({
+        mode: "plan-only",
+        authority: "metadata-only",
+        recoveryExecuted: false,
+        rollbackAtomicityClaim: false,
+        recoveryCandidateFiles: ["src/a.ts"],
+        unrecoveredFiles: [],
+        failedBeforeApplyFiles: ["src/b.ts"],
+        appliedButUnverifiedFiles: [],
+        appliedAndVerifiedBeforeLaterFailureFiles: ["src/a.ts"],
+      }),
+    );
     expect(result.codingResult?.lastActionResultSeed).toMatchObject({
       target: "src/b.ts",
       changedFiles: ["src/a.ts"],
@@ -291,6 +307,30 @@ describe("multi-file apply_patch workspace write result", () => {
         rollbackAtomicityClaim: false,
         recoveryExecuted: false,
         writeCapability: "metadata-only",
+      }),
+    );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan,
+    ).toEqual(
+      expect.objectContaining({
+        mode: "plan-only",
+        authority: "metadata-only",
+        recoveryExecuted: false,
+        rollbackAtomicityClaim: false,
+        recoveryCandidateFiles: ["src/a.ts", "src/b.ts"],
+        unrecoveredFiles: ["src/b.ts"],
+        failedBeforeApplyFiles: [],
+        appliedButUnverifiedFiles: ["src/b.ts"],
+        appliedAndVerifiedBeforeLaterFailureFiles: ["src/a.ts"],
+        blockers: expect.arrayContaining([
+          "metadata-only-journal",
+          "no-durable-snapshot",
+          "no-original-content",
+          "no-recovery-executor",
+          "no-atomicity-authority",
+          "no-persistence-authority",
+        ]),
       }),
     );
     expect(result.codingResult?.lastActionResultSeed).toMatchObject({
