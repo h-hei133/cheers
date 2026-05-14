@@ -28,13 +28,125 @@ export function buildWorkspaceMoveRouteResult(input: {
 }
 
 function buildCodingResult(route: WorkspaceMoveRoute): CodingResultSummary {
+  if (route.status === "moved") {
+    const reason =
+      "Single-file workspace move completed after final source/target preflight and post-write verification.";
+    const handoff = projectMutationVerificationHandoff({
+      changedFiles: route.changedFiles,
+      failedFiles: [],
+      verification: {
+        status: "passed",
+        reason,
+        selectionScope: "focused",
+        selectionSource: "auto-from-changes",
+      },
+      evidence: route.evidence,
+      targetPath: route.targetPath,
+      reason,
+      writerStarted: route.writerStarted,
+      writeEffect: route.writeEffect,
+      postWriteVerification: route.postWriteVerification,
+    });
+    return {
+      taskKind: "edit-file",
+      ...(route.perFilePatchPlan
+        ? {
+            perFilePatchPlan: projectPerFilePatchResult({
+              plan: route.perFilePatchPlan,
+              changedFiles: route.changedFiles,
+              failedFiles: [],
+              writerInvoked: route.workspaceWriterInvoked,
+              creatorInvoked: false,
+              deleteMoveInvoked: route.deleteMoveInvoked,
+              postWriteVerification: route.postWriteVerification,
+            }),
+          }
+        : {}),
+      changedFiles: [...handoff.changedFiles],
+      failedFiles: [],
+      repair: emptyRepair(),
+      continuation: {
+        status: "first-pass-success",
+        attempts: 0,
+        evidence: ["apply-patch-workspace-move-result:no-continuation"],
+      },
+      changeSet: {
+        gitAware: false,
+        preExistingDirtyFiles: [],
+        postRunDirtyFiles: [...handoff.changedFiles],
+        attemptedFiles: [...route.writeIntents],
+        changedFiles: [...handoff.changedFiles],
+        unchangedAttemptedFiles: [],
+      },
+      taskSatisfaction: {
+        verdict: handoff.taskVerdict,
+        reasons: [...handoff.taskReasons],
+        requiredEvidence: [
+          "explicit workspace write opt-in",
+          "approved-for-write decision",
+          "final source and target preflight",
+          "post-write move verification",
+        ],
+        observedEvidence: [...route.evidence],
+      },
+      verifiedFiles: [...handoff.changedFiles],
+      unverifiedFiles: [],
+      verification: {
+        status: "passed",
+        reason,
+        selectionScope: "focused",
+        selectionSource: "auto-from-changes",
+      },
+      evidence: [
+        ...route.evidence,
+        "apply-patch-workspace-move-result:coding-result-success",
+      ],
+      lastActionResultSeed: {
+        actionKind: "edit-file",
+        target: route.targetPath,
+        changedFiles: [...handoff.changedFiles],
+        verifiedFiles: [...handoff.changedFiles],
+        verification: {
+          status: "passed",
+          reason,
+        },
+      },
+      provenance: {
+        approvalDecisions: [
+          {
+            kind: "approved",
+            source: "tool-result-metadata",
+            legacyOutcome: "approved",
+            toolName: "apply_patch",
+            taskId: "single-file-apply-patch-workspace-move",
+          },
+        ],
+        toolExecutions: [
+          {
+            kind: "executed-succeeded",
+            source: "tool-runtime",
+            legacySuccess: true,
+            toolName: "apply_patch",
+            taskId: "single-file-apply-patch-workspace-move",
+          },
+        ],
+      },
+    };
+  }
+
   const target = route.targetPath ?? route.sourcePath ?? "(apply_patch)";
   const aggregateFailureTarget = "(apply_patch)";
   const reason = route.nextAction;
+  const changedFiles = [...route.changedFiles];
+  const attemptedFiles =
+    route.writeIntents.length > 0 ? [...route.writeIntents] : [aggregateFailureTarget];
+  const unchangedAttemptedFiles = attemptedFiles.filter(
+    (attemptedFile) => !changedFiles.includes(attemptedFile),
+  );
   const aggregateFailedFiles = [{ path: aggregateFailureTarget, reason }];
   const perFileFailedFiles = buildPerFileFailedFiles(route, target, reason);
   const handoff = projectMutationVerificationHandoff({
-    changedFiles: [],
+    changedFiles,
     failedFiles: aggregateFailedFiles,
     verification: {
       status: "blocked",
@@ -60,16 +172,16 @@ function buildCodingResult(route: WorkspaceMoveRoute): CodingResultSummary {
       ? {
           perFilePatchPlan: projectPerFilePatchResult({
             plan: route.perFilePatchPlan,
-            changedFiles: [],
+            changedFiles,
             failedFiles: perFileFailedFiles,
-            writerInvoked: false,
+            writerInvoked: route.workspaceWriterInvoked,
             creatorInvoked: false,
             deleteMoveInvoked: route.deleteMoveInvoked,
             postWriteVerification: route.postWriteVerification,
           }),
         }
       : {}),
-    changedFiles: [],
+    changedFiles: [...handoff.changedFiles],
     failedFiles: [...handoff.failedFiles],
     patches: [
       {
@@ -85,10 +197,15 @@ function buildCodingResult(route: WorkspaceMoveRoute): CodingResultSummary {
       attempts: 0,
       recoveredItems: [],
       failedItems: [aggregateFailureTarget],
-      notes: [
-        "No workspace move writer ran before this route stopped.",
-        "workspace move route only; no automatic repair or rollback was attempted in this lane.",
-      ],
+      notes: route.writerStarted
+        ? [
+            "Workspace move writer started, but the route stopped without a success claim.",
+            "workspace move route only; no automatic repair or rollback was attempted in this lane.",
+          ]
+        : [
+            "No workspace move writer ran before this route stopped.",
+            "workspace move route only; no automatic repair or rollback was attempted in this lane.",
+          ],
     },
     continuation: {
       status: "first-pass-success",
@@ -101,18 +218,25 @@ function buildCodingResult(route: WorkspaceMoveRoute): CodingResultSummary {
     changeSet: {
       gitAware: false,
       preExistingDirtyFiles: [],
-      postRunDirtyFiles: [],
-      attemptedFiles: [aggregateFailureTarget],
-      changedFiles: [],
-      unchangedAttemptedFiles: [aggregateFailureTarget],
+      postRunDirtyFiles: [...changedFiles],
+      attemptedFiles,
+      changedFiles: [...changedFiles],
+      unchangedAttemptedFiles,
     },
     taskSatisfaction: {
       verdict: handoff.taskVerdict,
       reasons: [...handoff.taskReasons],
       requiredEvidence: [
         "blocked workspace move route must not display write success",
-        "blocked workspace move route must not report changed files",
-        "delete/move writer flag must remain false when no move writer ran",
+        ...(route.writerStarted
+          ? [
+              "blocked workspace move route must preserve changed/failed facts when writer already ran",
+              "delete/move writer flag must remain true only for an actual move attempt",
+            ]
+          : [
+              "blocked workspace move route must not report changed files",
+              "delete/move writer flag must remain false when no move writer ran",
+            ]),
       ],
       observedEvidence: [...route.evidence],
     },
@@ -128,9 +252,13 @@ function buildCodingResult(route: WorkspaceMoveRoute): CodingResultSummary {
       ...route.evidence,
       ...handoff.actionableEvidence,
       "apply-patch-workspace-move-result:coding-result-blocked",
-      "apply-patch-workspace-move-result:changed-files-empty",
+      ...(changedFiles.length === 0
+        ? ["apply-patch-workspace-move-result:changed-files-empty"]
+        : ["apply-patch-workspace-move-result:changed-files-preserved-after-writer"]),
       "apply-patch-workspace-move-result:no-write-success",
-      "apply-patch-workspace-move-result:no-delete-move-invoked",
+      ...(route.deleteMoveInvoked
+        ? ["apply-patch-workspace-move-result:delete-move-invoked-no-success-claim"]
+        : ["apply-patch-workspace-move-result:no-delete-move-invoked"]),
     ],
     lastActionResultSeed: {
       actionKind: "edit-file",
@@ -186,6 +314,13 @@ function buildRuntimeState(input: {
 }
 
 function buildTerminalInput(route: WorkspaceMoveRoute): QueryTerminal {
+  if (route.status === "moved") {
+    return {
+      action: "terminal",
+      terminalReason: "completed",
+      terminalClassification: "success",
+    };
+  }
   return {
     action: "terminal",
     terminalReason: "stopped_error",
@@ -195,6 +330,16 @@ function buildTerminalInput(route: WorkspaceMoveRoute): QueryTerminal {
 }
 
 function buildOutput(route: WorkspaceMoveRoute): string {
+  if (route.status === "moved") {
+    return [
+      "apply_patch workspace move succeeded.",
+      `Changed: ${route.changedFiles.join(", ")}`,
+      "Move writer: invoked",
+      "Verified: source absent and target content matched original source",
+      `Next: ${route.nextAction}`,
+    ].join("\n");
+  }
+
   return [
     "apply_patch workspace move blocked before success.",
     "Changed: none",
@@ -202,6 +347,16 @@ function buildOutput(route: WorkspaceMoveRoute): string {
     `Reason: ${route.nextAction}`,
     `Next: ${route.nextAction}`,
   ].join("\n");
+}
+
+function emptyRepair(): CodingResultSummary["repair"] {
+  return {
+    status: "not-needed",
+    attempts: 0,
+    recoveredItems: [],
+    failedItems: [],
+    notes: ["workspace move route only; no repair was attempted in this lane."],
+  };
 }
 
 function buildPerFileFailedFiles(

@@ -185,7 +185,34 @@ describe("buildPerFilePatchPlan", () => {
     );
   });
 
-  it("projects move to unsupported/no-write with source and target paths", () => {
+  it("projects a pure move to a supported write intent with source and target paths", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/from.ts",
+        "*** Move to: src/to.ts",
+        "@@",
+        " from",
+        "*** End Patch",
+      ],
+      {
+        "src/from.ts": "from\n",
+      },
+    );
+
+    expectSupportedWritePlan(plan, ["src/to.ts"]);
+    expect(plan.operations[0]).toEqual(
+      expect.objectContaining({
+        operationKind: "move",
+        sourcePath: "src/from.ts",
+        targetPath: "src/to.ts",
+        supportStatus: "supported-write",
+        writeIntent: "eligible",
+      }),
+    );
+  });
+
+  it("projects move with content edits to unsupported/no-write", () => {
     const plan = planFromPatch(
       [
         "*** Begin Patch",

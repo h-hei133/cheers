@@ -14,57 +14,61 @@ afterEach(() => {
 });
 
 describe("single-file Move File selected-workspace route", () => {
-  it("recognizes an in-workspace move but safely blocks before any move writer", () => {
+  it("moves one selected workspace file after guards and verifies source removal and target content", async () => {
     const fixture = createFixture();
-    const before = snapshotFixture(fixture.workspaceRoot);
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
 
-    const result = runWorkspaceMoveRoute({
-      ...routeOptions(fixture.workspaceRoot, movePatch()),
+    const result = await runWorkspaceMoveRoute({
+      ...routeOptions(fixture.workspaceRoot, pureMovePatch()),
       readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
       directoryExists: authority.directoryExists,
       validateWriteTarget: authority.validateWriteTarget,
       validateCreateTarget: authority.validateCreateTarget,
+      moveFileExclusive: authority.moveFileExclusive,
     });
 
-    expect(result.status).toBe("blocked");
-    expect(result.blocker).toBe("move-writer-not-enabled");
+    expect(result.status).toBe("moved");
     expect(result.sourcePath).toBe("src/from.ts");
     expect(result.targetPath).toBe("src/to.ts");
-    expect(result.changedFiles).toEqual([]);
-    expect(result.failedFiles).toEqual([
-      expect.objectContaining({
-        path: "src/to.ts",
-        message:
-          "Selected-workspace Move File writer is not enabled; the route stopped after guard verification.",
-      }),
-    ]);
+    expect(result.changedFiles).toEqual(["src/to.ts"]);
+    expect(result.failedFiles).toEqual([]);
     expect(result.plannedFiles).toEqual([]);
-    expect(result.writeIntents).toEqual([]);
-    expect(result.workspaceWriterInvoked).toBe(false);
-    expect(result.deleteMoveInvoked).toBe(false);
-    expect(result.postWriteVerification).toBe("not-run");
-    expect(result.terminalClassification).toBe("stopped");
-    expect(result.terminalSuccessAllowed).toBe(false);
-    expect(result.mutationSuccessClaimAllowed).toBe(false);
+    expect(result.writeIntents).toEqual(["src/to.ts"]);
+    expect(result.workspaceWriterInvoked).toBe(true);
+    expect(result.deleteMoveInvoked).toBe(true);
+    expect(result.postWriteVerification).toBe("passed");
+    expect(result.terminalClassification).toBe("success");
+    expect(result.terminalSuccessAllowed).toBe(true);
+    expect(result.mutationSuccessClaimAllowed).toBe(true);
     expect(result.perFilePatchPlan?.operations).toEqual([
       expect.objectContaining({
         operationKind: "move",
         sourcePath: "src/from.ts",
         targetPath: "src/to.ts",
-        supportStatus: "unsupported-no-write",
-        writeIntent: "none",
+        supportStatus: "supported-write",
+        writeIntent: "eligible",
       }),
     ]);
+    expect(result.perFilePatchPlan?.summary).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/to.ts"],
+      }),
+    );
     expect(result.evidence).toEqual(
       expect.arrayContaining([
-        "apply-patch-workspace-move-route:single-file-move-guards-passed",
-        "apply-patch-workspace-move-route:move-writer-not-enabled",
-        "apply-patch-workspace-move-route:no-delete-move-invoked",
-        "apply-patch-workspace-move-route:no-rollback",
+        "apply-patch-workspace-move-route:move-writer-invoked",
+        "apply-patch-workspace-move-route:post-write-verification-passed",
+        "apply-patch-workspace-move-route:success-after-verified-move",
       ]),
     );
-    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
+      "src/existing.ts": "existing\n",
+      "src/other.ts": "other\n",
+      "src/to.ts": "from\n",
+    });
   });
 
   it.each([
@@ -100,17 +104,19 @@ describe("single-file Move File selected-workspace route", () => {
     },
   ])(
     "blocks $name before any writer or success claim",
-    ({ patchText, expectedBlocker, expectedCode }) => {
+    async ({ patchText, expectedBlocker, expectedCode }) => {
       const fixture = createFixture({ includeDirectorySource: true });
       const before = snapshotFixture(fixture.workspaceRoot);
       const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
 
-      const result = runWorkspaceMoveRoute({
+      const result = await runWorkspaceMoveRoute({
         ...routeOptions(fixture.workspaceRoot, patchText),
         readFile: authority.readFile,
+        readVerifiedFile: authority.readVerifiedFile,
         directoryExists: authority.directoryExists,
         validateWriteTarget: authority.validateWriteTarget,
         validateCreateTarget: authority.validateCreateTarget,
+        moveFileExclusive: authority.moveFileExclusive,
       });
 
       expect(result.status).toBe("blocked");
@@ -137,23 +143,67 @@ describe("single-file Move File selected-workspace route", () => {
       patchText: broadPatch(),
       expectedBlocker: "patch-parse",
     },
-  ])("keeps $name no-write", ({ patchText, expectedBlocker }) => {
+    {
+      name: "move with content changes",
+      patchText: movePatch(),
+      expectedBlocker: "patch-verification",
+    },
+  ])("keeps $name no-write", async ({ patchText, expectedBlocker }) => {
     const fixture = createFixture();
     const before = snapshotFixture(fixture.workspaceRoot);
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
 
-    const result = runWorkspaceMoveRoute({
+    const result = await runWorkspaceMoveRoute({
       ...routeOptions(fixture.workspaceRoot, patchText),
       readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
       directoryExists: authority.directoryExists,
       validateWriteTarget: authority.validateWriteTarget,
       validateCreateTarget: authority.validateCreateTarget,
+      moveFileExclusive: authority.moveFileExclusive,
     });
 
     expect(result.status).toBe("blocked");
     expect(result.blocker).toBe(expectedBlocker);
     expectNoWrite(result);
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("surfaces post-move verification failure without rollback", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+
+    const result = await runWorkspaceMoveRoute({
+      ...routeOptions(fixture.workspaceRoot, pureMovePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      validateCreateTarget: authority.validateCreateTarget,
+      moveFileExclusive: (sourcePath, targetPath) => {
+        fs.copyFileSync(
+          path.join(fixture.workspaceRoot, sourcePath),
+          path.join(fixture.workspaceRoot, targetPath),
+        );
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("post-write-verification");
+    expect(result.changedFiles).toEqual(["src/to.ts"]);
+    expect(result.failedFiles).toEqual([
+      expect.objectContaining({ path: "src/to.ts" }),
+    ]);
+    expect(result.workspaceWriterInvoked).toBe(true);
+    expect(result.deleteMoveInvoked).toBe(true);
+    expect(result.postWriteVerification).toBe("failed");
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-workspace-move-route:post-write-verification-blocked",
+        "apply-patch-workspace-move-route:no-rollback",
+        "apply-patch-workspace-move-route:writer-invoked-no-success-claim",
+      ]),
+    );
   });
 });
 
@@ -185,6 +235,25 @@ function movePatch(
     "@@",
     `-${options.fromLine ?? "from"}`,
     `+${options.toLine ?? "to"}`,
+    "*** End Patch",
+  ].join("\n");
+}
+
+function pureMovePatch(
+  options: {
+    readonly sourcePath?: string;
+    readonly targetPath?: string;
+    readonly contextLine?: string;
+  } = {},
+): string {
+  const sourcePath = options.sourcePath ?? "src/from.ts";
+  const targetPath = options.targetPath ?? "src/to.ts";
+  return [
+    "*** Begin Patch",
+    `*** Update File: ${sourcePath}`,
+    `*** Move to: ${targetPath}`,
+    "@@",
+    ` ${options.contextLine ?? "from"}`,
     "*** End Patch",
   ].join("\n");
 }
@@ -263,7 +332,7 @@ function snapshotFixture(workspaceRoot: string): Readonly<Record<string, string>
 }
 
 function expectNoWrite(
-  result: ReturnType<typeof runWorkspaceMoveRoute>,
+  result: Awaited<ReturnType<typeof runWorkspaceMoveRoute>>,
 ): void {
   expect(result.changedFiles).toEqual([]);
   expect(result.plannedFiles).toEqual([]);

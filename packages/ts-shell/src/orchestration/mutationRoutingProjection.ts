@@ -48,6 +48,10 @@ export interface MutationRoutingProjectionAuthority {
     relativePath: string,
     content: string,
   ) => void | Promise<void>;
+  readonly moveFileExclusive: (
+    sourcePath: string,
+    targetPath: string,
+  ) => void | Promise<void>;
   readonly validateWriteTarget: (
     relativePath: string,
   ) => WorkspaceWriteTargetAuthority;
@@ -124,7 +128,7 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
     }
 
     if (patchIsSingleMoveFile(rawPatchText)) {
-      const route = runWorkspaceMoveRoute({
+      const route = await runWorkspaceMoveRoute({
         workspaceRoot: input.workspaceRoot,
         rawPatchText,
         explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
@@ -135,9 +139,11 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
           : {}),
         defaultProductionRejectionUnchanged: true,
         readFile: workspaceAuthority.readFile,
+        readVerifiedFile: workspaceAuthority.readVerifiedFile,
         directoryExists: workspaceAuthority.directoryExists,
         validateWriteTarget: workspaceAuthority.validateWriteTarget,
         validateCreateTarget: workspaceAuthority.validateCreateTarget,
+        moveFileExclusive: workspaceAuthority.moveFileExclusive,
         ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
       });
       return buildWorkspaceMoveRouteResult({

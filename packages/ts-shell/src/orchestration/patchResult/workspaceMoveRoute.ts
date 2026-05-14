@@ -1,4 +1,9 @@
 import path from "node:path";
+import {
+  applySingleFileMoveIntent,
+  buildSingleFileMoveApplicationContract,
+  type SingleFileMoveApplicationContract,
+} from "../patchApplication/singleFileMoveApply.js";
 import { parseApplyPatchText } from "../patchParsing/parser.js";
 import type { PatchFailure, PatchFileOperation } from "../patchParsing/types.js";
 import { verifyParsedPatch } from "../patchVerification/verify.js";
@@ -18,7 +23,7 @@ import {
   type WorkspaceWriteFailureState,
 } from "./writeFailureState.js";
 
-export type WorkspaceMoveRouteStatus = "blocked";
+export type WorkspaceMoveRouteStatus = "moved" | "blocked";
 
 export type WorkspaceMoveRouteBlocker =
   | "runtime-opt-in-missing"
@@ -29,8 +34,10 @@ export type WorkspaceMoveRouteBlocker =
   | "target-mismatch"
   | "workspace-boundary"
   | "patch-verification"
+  | "final-stale-read"
   | "aborted-before-write"
-  | "move-writer-not-enabled";
+  | "write-application"
+  | "post-write-verification";
 
 export interface WorkspaceMoveRouteOptions {
   readonly workspaceRoot: string;
@@ -40,6 +47,7 @@ export interface WorkspaceMoveRouteOptions {
   readonly requestedUserDecision?: SingleFileApplyPatchRequestedUserDecision;
   readonly defaultProductionRejectionUnchanged: true;
   readonly readFile: (absolutePath: string) => string | undefined;
+  readonly readVerifiedFile: (relativePath: string) => string | undefined;
   readonly directoryExists?: (absolutePath: string) => boolean;
   readonly validateWriteTarget: (
     relativePath: string,
@@ -47,38 +55,73 @@ export interface WorkspaceMoveRouteOptions {
   readonly validateCreateTarget: (
     relativePath: string,
   ) => WorkspaceCreateTargetAuthority;
+  readonly moveFileExclusive: (
+    sourcePath: string,
+    targetPath: string,
+  ) => void | Promise<void>;
   readonly abortSignal?: AbortSignal;
 }
 
-export interface WorkspaceMoveRoute {
-  readonly source: "single-file-apply-patch-workspace-move-route";
-  readonly status: WorkspaceMoveRouteStatus;
-  readonly blocker: WorkspaceMoveRouteBlocker;
-  readonly sourcePath?: string;
-  readonly targetPath?: string;
-  readonly perFilePatchPlan?: PerFilePatchPlan;
-  readonly failures: readonly PatchFailure[];
-  readonly workspaceWriterInvoked: false;
-  readonly deleteMoveInvoked: false;
-  readonly writerTarget: "none";
-  readonly selectedWorkspaceWrite: false;
-  readonly writerStarted: false;
-  readonly writeEffect: WorkspaceWriteEffect;
-  readonly writeFailureState: WorkspaceWriteFailureState;
-  readonly changedFiles: readonly [];
-  readonly failedFiles: readonly PatchFailure[];
-  readonly plannedFiles: readonly [];
-  readonly writeIntents: readonly [];
-  readonly appliedPatchRecord: false;
-  readonly postWriteVerification: "not-run";
-  readonly terminalClassification: "stopped";
-  readonly terminalSuccessAllowed: false;
-  readonly mutationSuccessClaimAllowed: false;
-  readonly resultSessionStatus: "stopped";
-  readonly nextAction: string;
-  readonly doNext: string;
-  readonly evidence: readonly string[];
-}
+export type WorkspaceMoveRoute =
+  | {
+      readonly source: "single-file-apply-patch-workspace-move-route";
+      readonly status: "moved";
+      readonly sourcePath: string;
+      readonly targetPath: string;
+      readonly perFilePatchPlan?: PerFilePatchPlan;
+      readonly applicationContract: SingleFileMoveApplicationContract;
+      readonly failures: readonly [];
+      readonly workspaceWriterInvoked: true;
+      readonly deleteMoveInvoked: true;
+      readonly writerTarget: "selected-workspace";
+      readonly selectedWorkspaceWrite: true;
+      readonly writerStarted: true;
+      readonly writeEffect: "verified";
+      readonly writeFailureState: WorkspaceWriteFailureState;
+      readonly changedFiles: readonly [string];
+      readonly failedFiles: readonly [];
+      readonly plannedFiles: readonly [];
+      readonly writeIntents: readonly [string];
+      readonly appliedPatchRecord: false;
+      readonly postWriteVerification: "passed";
+      readonly terminalClassification: "success";
+      readonly terminalSuccessAllowed: true;
+      readonly mutationSuccessClaimAllowed: true;
+      readonly resultSessionStatus: "write-success";
+      readonly nextAction: string;
+      readonly doNext: string;
+      readonly evidence: readonly string[];
+    }
+  | {
+      readonly source: "single-file-apply-patch-workspace-move-route";
+      readonly status: "blocked";
+      readonly blocker: WorkspaceMoveRouteBlocker;
+      readonly sourcePath?: string;
+      readonly targetPath?: string;
+      readonly perFilePatchPlan?: PerFilePatchPlan;
+      readonly applicationContract?: SingleFileMoveApplicationContract;
+      readonly failures: readonly PatchFailure[];
+      readonly workspaceWriterInvoked: boolean;
+      readonly deleteMoveInvoked: boolean;
+      readonly writerTarget: "none" | "selected-workspace";
+      readonly selectedWorkspaceWrite: boolean;
+      readonly writerStarted: boolean;
+      readonly writeEffect: WorkspaceWriteEffect;
+      readonly writeFailureState: WorkspaceWriteFailureState;
+      readonly changedFiles: readonly string[];
+      readonly failedFiles: readonly PatchFailure[];
+      readonly plannedFiles: readonly [];
+      readonly writeIntents: readonly string[];
+      readonly appliedPatchRecord: false;
+      readonly postWriteVerification: "not-run" | "blocked" | "failed";
+      readonly terminalClassification: "stopped";
+      readonly terminalSuccessAllowed: false;
+      readonly mutationSuccessClaimAllowed: false;
+      readonly resultSessionStatus: "stopped";
+      readonly nextAction: string;
+      readonly doNext: string;
+      readonly evidence: readonly string[];
+    };
 
 export function patchIsSingleMoveFile(rawPatchText: string): boolean {
   const parsed = parseApplyPatchText(rawPatchText);
@@ -89,9 +132,9 @@ export function patchIsSingleMoveFile(rawPatchText: string): boolean {
   );
 }
 
-export function runWorkspaceMoveRoute(
+export async function runWorkspaceMoveRoute(
   options: WorkspaceMoveRouteOptions,
-): WorkspaceMoveRoute {
+): Promise<WorkspaceMoveRoute> {
   if (options.abortSignal?.aborted) {
     const writeFailureState = buildWorkspaceWriteFailureState({
       phase: "before-writer",
@@ -277,21 +320,197 @@ export function runWorkspaceMoveRoute(
     });
   }
 
-  return blocked({
-    blocker: "move-writer-not-enabled",
+  const applicationContract = buildSingleFileMoveApplicationContract(verification);
+  if (applicationContract.ok === false) {
+    return blocked({
+      blocker: "patch-verification",
+      sourcePath: moveOperation.path,
+      targetPath: moveOperation.moveTo,
+      perFilePatchPlan,
+      applicationContract,
+      failures: applicationContract.failures,
+      nextAction:
+        applicationContract.failures[0]?.nextAction ??
+        "Regenerate the single-file Move File patch.",
+      evidence: ["apply-patch-workspace-move-route:move-application-contract-blocked"],
+    });
+  }
+
+  const finalSourceAuthority = options.validateWriteTarget(moveOperation.path);
+  if (finalSourceAuthority.ok === false) {
+    return blocked({
+      blocker: "final-stale-read",
+      sourcePath: moveOperation.path,
+      targetPath: moveOperation.moveTo,
+      perFilePatchPlan,
+      applicationContract,
+      failures: [
+        patchFailureFromWriteAuthority(moveOperation.path, finalSourceAuthority),
+      ],
+      nextAction:
+        "No move writer ran. Re-read the source file and regenerate the Move File patch from current workspace state.",
+      evidence: [
+        "apply-patch-workspace-move-route:final-source-preflight-blocked",
+        "apply-patch-workspace-move-route:final-stale-read-before-writer",
+        ...finalSourceAuthority.evidence,
+      ],
+    });
+  }
+
+  const finalSourceContent = options.readVerifiedFile(moveOperation.path);
+  if (finalSourceContent !== applicationContract.moveIntent.content) {
+    return blocked({
+      blocker: "final-stale-read",
+      sourcePath: moveOperation.path,
+      targetPath: moveOperation.moveTo,
+      perFilePatchPlan,
+      applicationContract,
+      failures: [finalStaleReadFailure(moveOperation.path)],
+      nextAction:
+        "No move writer ran. Re-read the source file and regenerate the Move File patch from current content.",
+      evidence: [
+        "apply-patch-workspace-move-route:final-stale-read-blocked",
+        "apply-patch-workspace-move-route:final-stale-read-before-writer",
+      ],
+    });
+  }
+
+  const finalTargetAuthority = options.validateCreateTarget(moveOperation.moveTo);
+  if (finalTargetAuthority.ok === false) {
+    return blocked({
+      blocker: finalTargetAuthority.reason === "target-exists"
+        ? "target-mismatch"
+        : "workspace-boundary",
+      sourcePath: moveOperation.path,
+      targetPath: moveOperation.moveTo,
+      perFilePatchPlan,
+      applicationContract,
+      failures: [
+        patchFailureFromCreateAuthority(moveOperation.moveTo, finalTargetAuthority),
+      ],
+      nextAction: finalTargetAuthority.message,
+      evidence: [
+        "apply-patch-workspace-move-route:final-target-preflight-blocked",
+        ...finalTargetAuthority.evidence,
+      ],
+    });
+  }
+
+  if (options.abortSignal?.aborted) {
+    const writeFailureState = buildWorkspaceWriteFailureState({
+      phase: "before-writer",
+      targetPath: moveOperation.moveTo,
+    });
+    return blocked({
+      blocker: "aborted-before-write",
+      sourcePath: moveOperation.path,
+      targetPath: moveOperation.moveTo,
+      perFilePatchPlan,
+      applicationContract,
+      failures: [],
+      nextAction:
+        "Stop: apply_patch workspace move was aborted after final preflight but before the move writer ran.",
+      evidence: [
+        "apply-patch-workspace-move-route:aborted-before-writer",
+        ...writeFailureState.evidence,
+      ],
+      writeFailureState,
+    });
+  }
+
+  const applied = await applySingleFileMoveIntent(applicationContract, {
+    moveFileExclusive: options.moveFileExclusive,
+    readFile: options.readVerifiedFile,
+  });
+  if (applied.ok === false) {
+    const phase: WorkspaceWriteFailurePhase =
+      applied.failureKind === "post-write-verification"
+        ? "post-write-verification-failed"
+        : "writer-failed";
+    const blocker: WorkspaceMoveRouteBlocker =
+      applied.failureKind === "post-write-verification"
+        ? "post-write-verification"
+        : "write-application";
+    const writeFailureState = buildWorkspaceWriteFailureState({
+      phase,
+      targetPath: moveOperation.moveTo,
+    });
+    return blocked({
+      blocker,
+      sourcePath: moveOperation.path,
+      targetPath: moveOperation.moveTo,
+      perFilePatchPlan,
+      applicationContract,
+      failures: applied.failedFiles,
+      changedFiles: applied.changedFiles,
+      writeIntents: [moveOperation.moveTo],
+      workspaceWriterInvoked: true,
+      deleteMoveInvoked: true,
+      writerTarget: "selected-workspace",
+      selectedWorkspaceWrite: true,
+      postWriteVerification: applied.postWriteVerification,
+      nextAction:
+        "Stop: workspace move is failed or uncertain. Inspect/re-read the source and target paths before retrying; no rollback was attempted.",
+      evidence: [
+        `apply-patch-workspace-move-route:${blocker}-blocked`,
+        "apply-patch-workspace-move-route:no-rollback",
+        ...writeFailureState.evidence,
+      ],
+      writeFailureState,
+    });
+  }
+
+  const nextAction =
+    "Review the selected workspace moved file; default apply_patch remains rejected outside this explicit move entrypoint.";
+  const writeFailureState = buildWorkspaceWriteFailureState({
+    phase: "verified-write",
+    targetPath: moveOperation.moveTo,
+  });
+  return {
+    source: "single-file-apply-patch-workspace-move-route",
+    status: "moved",
     sourcePath: moveOperation.path,
     targetPath: moveOperation.moveTo,
     perFilePatchPlan,
-    failures: [moveWriterNotEnabledFailure(moveOperation)],
-    nextAction:
-      "Move File was recognized and all current guards passed, but no selected-workspace move writer is enabled in this route. No file was moved.",
+    applicationContract,
+    failures: [],
+    workspaceWriterInvoked: true,
+    deleteMoveInvoked: true,
+    writerTarget: "selected-workspace",
+    selectedWorkspaceWrite: true,
+    writerStarted: true,
+    writeEffect: "verified",
+    writeFailureState,
+    changedFiles: [moveOperation.moveTo],
+    failedFiles: [],
+    plannedFiles: [],
+    writeIntents: [moveOperation.moveTo],
+    appliedPatchRecord: false,
+    postWriteVerification: "passed",
+    terminalClassification: "success",
+    terminalSuccessAllowed: true,
+    mutationSuccessClaimAllowed: true,
+    resultSessionStatus: "write-success",
+    nextAction,
+    doNext: nextAction,
     evidence: [
-      "apply-patch-workspace-move-route:single-file-move-guards-passed",
-      "apply-patch-workspace-move-route:move-writer-not-enabled",
-      "apply-patch-workspace-move-route:no-delete-writer",
+      "apply-patch-workspace-move-route:explicit-runtime-opt-in",
+      "apply-patch-workspace-move-route:explicit-workspace-write-opt-in",
+      "apply-patch-workspace-move-route:approved-for-write",
+      "apply-patch-workspace-move-route:single-file-move-only",
+      "apply-patch-workspace-move-route:content-preserved",
+      "apply-patch-workspace-move-route:final-source-preflight-before-writer",
+      "apply-patch-workspace-move-route:final-target-missing-before-writer",
+      "apply-patch-workspace-move-route:move-writer-invoked",
+      "apply-patch-workspace-move-route:selected-workspace-write",
+      "apply-patch-workspace-move-route:post-write-verification-passed",
+      "apply-patch-workspace-move-route:success-after-verified-move",
+      "apply-patch-workspace-move-route:no-delete-operation",
       "apply-patch-workspace-move-route:no-broad-apply-patch",
+      "apply-patch-workspace-move-route:default-production-rejection-unchanged",
+      ...writeFailureState.evidence,
     ],
-  });
+  };
 }
 
 function singleMoveOperation(
@@ -330,19 +549,6 @@ function sameTargetFailure(
   };
 }
 
-function moveWriterNotEnabledFailure(
-  operation: Extract<PatchFileOperation, { kind: "move" }>,
-): PatchFailure {
-  return {
-    code: "patch-apply-plan-not-verified",
-    path: operation.moveTo,
-    message:
-      "Selected-workspace Move File writer is not enabled; the route stopped after guard verification.",
-    nextAction:
-      "Keep this as no-write move-lane evidence until a dedicated exclusive move writer is approved.",
-  };
-}
-
 function workspaceBoundaryFailure(targetPath: string): PatchFailure {
   return {
     code: "patch-verify-path-outside-workspace",
@@ -350,6 +556,17 @@ function workspaceBoundaryFailure(targetPath: string): PatchFailure {
     message: "Patch path resolves outside the workspace root.",
     nextAction:
       "Regenerate the Move File patch with source and target paths inside the selected workspace.",
+  };
+}
+
+function finalStaleReadFailure(targetPath: string): PatchFailure {
+  return {
+    code: "patch-apply-plan-not-verified",
+    path: targetPath,
+    message:
+      "Final stale-read failed before the workspace move writer started.",
+    nextAction:
+      "Re-read the source file and regenerate the Move File patch from current content.",
   };
 }
 
@@ -426,9 +643,17 @@ function blocked(input: {
   readonly sourcePath?: string;
   readonly targetPath?: string;
   readonly perFilePatchPlan?: PerFilePatchPlan;
+  readonly applicationContract?: SingleFileMoveApplicationContract;
   readonly failures: readonly PatchFailure[];
+  readonly changedFiles?: readonly string[];
+  readonly writeIntents?: readonly string[];
+  readonly workspaceWriterInvoked?: boolean;
+  readonly deleteMoveInvoked?: boolean;
+  readonly writerTarget?: "none" | "selected-workspace";
+  readonly selectedWorkspaceWrite?: boolean;
   readonly writeFailureState?: WorkspaceWriteFailureState;
   readonly failurePhase?: WorkspaceWriteFailurePhase;
+  readonly postWriteVerification?: "not-run" | "blocked" | "failed";
   readonly nextAction: string;
   readonly evidence: readonly string[];
 }): WorkspaceMoveRoute {
@@ -438,6 +663,10 @@ function blocked(input: {
       phase: input.failurePhase ?? "before-writer",
       targetPath: input.targetPath ?? input.sourcePath,
     });
+  const changedFiles = input.changedFiles ?? [];
+  const writeIntents = input.writeIntents ?? [];
+  const workspaceWriterInvoked = input.workspaceWriterInvoked ?? false;
+  const deleteMoveInvoked = input.deleteMoveInvoked ?? false;
   return {
     source: "single-file-apply-patch-workspace-move-route",
     status: "blocked",
@@ -445,20 +674,23 @@ function blocked(input: {
     ...(input.sourcePath ? { sourcePath: input.sourcePath } : {}),
     ...(input.targetPath ? { targetPath: input.targetPath } : {}),
     ...(input.perFilePatchPlan ? { perFilePatchPlan: input.perFilePatchPlan } : {}),
+    ...(input.applicationContract
+      ? { applicationContract: input.applicationContract }
+      : {}),
     failures: input.failures,
-    workspaceWriterInvoked: false,
-    deleteMoveInvoked: false,
-    writerTarget: "none",
-    selectedWorkspaceWrite: false,
-    writerStarted: false,
+    workspaceWriterInvoked,
+    deleteMoveInvoked,
+    writerTarget: input.writerTarget ?? "none",
+    selectedWorkspaceWrite: input.selectedWorkspaceWrite ?? false,
+    writerStarted: writeFailureState.writerStarted,
     writeEffect: writeFailureState.writeEffect,
     writeFailureState,
-    changedFiles: [],
+    changedFiles: [...changedFiles],
     failedFiles: input.failures,
     plannedFiles: [],
-    writeIntents: [],
+    writeIntents: [...writeIntents],
     appliedPatchRecord: false,
-    postWriteVerification: "not-run",
+    postWriteVerification: input.postWriteVerification ?? "not-run",
     terminalClassification: "stopped",
     terminalSuccessAllowed: false,
     mutationSuccessClaimAllowed: false,
@@ -471,11 +703,19 @@ function blocked(input: {
       `apply-patch-workspace-move-route:blocker:${input.blocker}`,
       `apply-patch-workspace-move-route:write-effect:${writeFailureState.writeEffect}`,
       `apply-patch-workspace-move-route:failure-phase:${writeFailureState.failurePhase}`,
-      "apply-patch-workspace-move-route:changed-files-empty",
+      ...(changedFiles.length === 0
+        ? ["apply-patch-workspace-move-route:changed-files-empty"]
+        : ["apply-patch-workspace-move-route:changed-files-verified-prefix-only"]),
       "apply-patch-workspace-move-route:planned-files-empty",
-      "apply-patch-workspace-move-route:write-intents-empty",
-      "apply-patch-workspace-move-route:no-writer-invoked",
-      "apply-patch-workspace-move-route:no-delete-move-invoked",
+      ...(writeIntents.length === 0
+        ? ["apply-patch-workspace-move-route:write-intents-empty"]
+        : ["apply-patch-workspace-move-route:write-intents-approved-target"]),
+      ...(workspaceWriterInvoked
+        ? ["apply-patch-workspace-move-route:writer-invoked-no-success-claim"]
+        : ["apply-patch-workspace-move-route:no-writer-invoked"]),
+      ...(deleteMoveInvoked
+        ? ["apply-patch-workspace-move-route:delete-move-invoked-no-success-claim"]
+        : ["apply-patch-workspace-move-route:no-delete-move-invoked"]),
       "apply-patch-workspace-move-route:no-applied-patch-record",
       "apply-patch-workspace-move-route:no-success-claim",
       "apply-patch-workspace-move-route:no-rollback",

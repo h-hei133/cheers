@@ -264,6 +264,7 @@ function buildParsedPatchPlan(
   const operations = patch.operations;
   const updateOperations = operations.filter(isUpdateOperation);
   const addOperations = operations.filter(isAddOperation);
+  const moveOperations = operations.filter(isMoveOperation);
   const deleteMoveOperations = operations.filter(
     (operation) => operation.kind === "delete" || operation.kind === "move",
   );
@@ -330,6 +331,15 @@ function buildParsedPatchPlan(
       nextAction:
         "Route may create only through explicit runtime/write opt-in, approval, exclusive create, and post-write verification.",
       operationSupportStatus: "supported-write",
+    });
+  }
+
+  if (operations.length === 1 && moveOperations.length === 1 && moveOperations[0]) {
+    return buildVerifiedMovePlan({
+      patch,
+      options,
+      operation: moveOperations[0],
+      targetFiles,
     });
   }
 
@@ -430,6 +440,80 @@ function buildParsedPatchPlan(
           "Use one Update File, one Add File, exactly two Update File operations, or exactly three Update File operations.",
       }),
     ],
+  });
+}
+
+function buildVerifiedMovePlan(input: {
+  readonly patch: ParsedPatch;
+  readonly options: PerFilePatchPlanOptions;
+  readonly operation: Extract<PatchFileOperation, { kind: "move" }>;
+  readonly targetFiles: readonly string[];
+}): PerFilePatchPlan {
+  const verification = verifyParsedPatch(input.patch, {
+    workspaceRoot: input.options.workspaceRoot,
+    readFile: input.options.readFile,
+    ...(input.options.directoryExists
+      ? { directoryExists: input.options.directoryExists }
+      : {}),
+    supportedOperations: ["move"],
+  });
+  if (verification.ok === false) {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: failureClassForVerificationFailures(verification.failures),
+      reason:
+        "Move File patch matched the guarded move route shape, but preflight verification failed before any writer was reachable.",
+      nextAction:
+        verification.failures[0]?.nextAction ??
+        "Re-read current workspace files and regenerate the Move File patch.",
+      failures: verification.failures,
+    });
+  }
+
+  const verifiedOperation = verification.plan.operations[0];
+  if (
+    !verifiedOperation ||
+    verifiedOperation.operation.kind !== "move" ||
+    verifiedOperation.originalContent !== verifiedOperation.plannedContent
+  ) {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: "unsupported-operation",
+      reason:
+        "Move File patches that also edit file content are represented as unsupported/no-write.",
+      nextAction:
+        "Regenerate a pure Move File/rename patch and use a separate approved update route for content changes.",
+      failures: [
+        patchFailure({
+          code: "patch-apply-plan-not-verified",
+          path: input.operation.moveTo,
+          message:
+            "Guarded Move File must preserve file content exactly; content edits during move are not enabled.",
+          nextAction:
+            "Use a pure Move File/rename patch before expecting the move writer.",
+        }),
+      ],
+    });
+  }
+
+  return buildVerifiedPlan({
+    patch: input.patch,
+    options: input.options,
+    supportedOperations: ["move"],
+    supportStatus: "supported-write",
+    failureClass: "none",
+    plannedFiles: [],
+    writeIntentFiles: [input.operation.moveTo],
+    targetFiles: input.targetFiles,
+    reason:
+      "Single Move File is represented as a supported write intent owned by the guarded selected-workspace move route.",
+    nextAction:
+      "Route may move only through explicit runtime/write opt-in, approval, source/target guards, exclusive move, and post-write verification.",
+    operationSupportStatus: "supported-write",
   });
 }
 
@@ -832,6 +916,12 @@ function isAddOperation(
   operation: PatchFileOperation,
 ): operation is Extract<PatchFileOperation, { kind: "add" }> {
   return operation.kind === "add";
+}
+
+function isMoveOperation(
+  operation: PatchFileOperation,
+): operation is Extract<PatchFileOperation, { kind: "move" }> {
+  return operation.kind === "move";
 }
 
 function looksLikeBroadApplyPatch(rawPatchText: string): boolean {

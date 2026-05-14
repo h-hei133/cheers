@@ -55,6 +55,7 @@ export interface WorkspaceWriteAuthority {
   ) => WorkspaceCreateTargetAuthority;
   readonly writeFile: (relativePath: string, content: string) => void;
   readonly createFileExclusive: (relativePath: string, content: string) => void;
+  readonly moveFileExclusive: (sourcePath: string, targetPath: string) => void;
 }
 
 export function createWorkspaceWriteAuthority(
@@ -306,6 +307,33 @@ export function createWorkspaceWriteAuthority(
         fs.writeFileSync(fd, content, { encoding: "utf8" });
       } finally {
         fs.closeSync(fd);
+      }
+    },
+    moveFileExclusive: (sourcePath, targetPath) => {
+      const source = validateWriteTarget(sourcePath);
+      if (source.ok === false) {
+        throw new Error(source.message);
+      }
+      const target = validateCreateTarget(targetPath);
+      if (target.ok === false) {
+        throw new Error(target.message);
+      }
+
+      try {
+        fs.linkSync(source.absolutePath, target.absolutePath);
+      } catch (error) {
+        throw new Error(
+          isFileExistsError(error)
+            ? "Refuse to move because the selected workspace target already exists."
+            : "Refuse to move because the selected workspace source could not be linked to the target.",
+        );
+      }
+
+      try {
+        fs.unlinkSync(source.absolutePath);
+      } catch {
+        // Leave the target in place and let route-level post-write verification
+        // surface the partial move facts. Route 44 does not add rollback.
       }
     },
   };

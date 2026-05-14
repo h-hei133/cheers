@@ -420,6 +420,40 @@ describe("apply_patch mutation routing projection", () => {
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
 
+  it("routes pure Move File patches through the guarded move writer", async () => {
+    const fixture = createFixture();
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, pureMoveFilePatch()),
+      getWorkspaceAuthority: () =>
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual(["src/moved.ts"]);
+    expect(result?.codingResult?.failedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/moved.ts"],
+        changedFiles: ["src/moved.ts"],
+        plannedFiles: [],
+        failedFiles: [],
+        writerInvoked: true,
+        creatorInvoked: false,
+        deleteMoveInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
+      "src/b.ts": "b = 1\n",
+      "src/moved.ts": "a = 1\n",
+    });
+  });
+
   it("keeps broad apply_patch stopped with unsupported/no-write per-file projection", async () => {
     const fixture = createFixture();
     const before = snapshotFixture(fixture.workspaceRoot);
@@ -909,6 +943,17 @@ function moveFilePatch(): string {
   ].join("\n");
 }
 
+function pureMoveFilePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "*** Move to: src/moved.ts",
+    "@@",
+    " a = 1",
+    "*** End Patch",
+  ].join("\n");
+}
+
 function broadPatch(): string {
   return [
     "diff --git a/src/a.ts b/src/a.ts",
@@ -1025,7 +1070,14 @@ function readFile(workspaceRoot: string, relativePath: string): string {
 }
 
 function snapshotFixture(workspaceRoot: string): Record<string, string> {
-  const files = ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts", "src/new.ts"];
+  const files = [
+    "src/a.ts",
+    "src/b.ts",
+    "src/c.ts",
+    "src/d.ts",
+    "src/new.ts",
+    "src/moved.ts",
+  ];
   return Object.fromEntries(
     files
       .map((file) => [file, path.join(workspaceRoot, file)] as const)

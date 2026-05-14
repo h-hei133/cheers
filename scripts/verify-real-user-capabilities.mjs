@@ -1824,6 +1824,9 @@ function ensureHome(home, provider) {
 function prepareProject(scenario) {
   fs.rmSync(scenario.projectDir, { recursive: true, force: true })
   fs.mkdirSync(scenario.projectDir, { recursive: true })
+  for (const relativePath of scenario.directories ?? []) {
+    fs.mkdirSync(path.join(scenario.projectDir, relativePath), { recursive: true })
+  }
   for (const [relativePath, content] of Object.entries(scenario.files)) {
     const absolutePath = path.join(scenario.projectDir, relativePath)
     fs.mkdirSync(path.dirname(absolutePath), { recursive: true })
@@ -10437,7 +10440,7 @@ function route08PatchScenarios() {
       ].join('\n'),
     },
     {
-      id: 'real-model-like-unsupported-move-file',
+      id: 'real-model-like-unsupported-move-with-content-edit',
       expectedClass: 'unsupported',
       files: {
         'src/a.ts': 'a\n',
@@ -10452,6 +10455,138 @@ function route08PatchScenarios() {
         '-a',
         '+aa',
         '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-move-outside-source',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: ../outside.ts',
+        '*** Move to: src/renamed.ts',
+        '@@',
+        ' outside',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-move-outside-target',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/a.ts',
+        '*** Move to: ../renamed.ts',
+        '@@',
+        ' a',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-move-missing-source',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/missing.ts',
+        '*** Move to: src/renamed.ts',
+        '@@',
+        ' missing',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-move-target-exists',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'src/renamed.ts': 'existing\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/a.ts',
+        '*** Move to: src/renamed.ts',
+        '@@',
+        ' a',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-move-same-source-target',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/a.ts',
+        '*** Move to: src/a.ts',
+        '@@',
+        ' a',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-move-directory-source',
+      expectedClass: 'unsupported',
+      directories: ['src/dir'],
+      files: {
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/dir',
+        '*** Move to: src/renamed.ts',
+        '@@',
+        ' directory',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-mixed-update-move',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'src/b.ts': 'b\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/a.ts',
+        '*** Move to: src/renamed.ts',
+        '@@',
+        ' a',
+        '*** Update File: src/b.ts',
+        '@@',
+        '-b',
+        '+bb',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-broad-move-diff',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        'diff --git a/src/a.ts b/src/renamed.ts',
+        'similarity index 100%',
+        'rename from src/a.ts',
+        'rename to src/renamed.ts',
       ].join('\n'),
     },
     {
@@ -10702,7 +10837,8 @@ async function runRoute08UnsupportedPatchE2e() {
   console.log('realProviderExecution=false')
   console.log('providerMode=synthetic-real-model-output-equivalent')
   console.log('defaultMvpAffected=false')
-  console.log('mutationCapabilityAdded=false')
+  console.log('unsupportedMutationCapabilityAdded=false')
+  console.log('guardedSingleFileMoveCapabilityAddedElsewhere=true')
   console.log('unsupportedMutationSupport=false')
   console.log(`cliCommand=${route03CommandDisplay()}`)
 
@@ -10749,7 +10885,8 @@ async function runRoute08UnsupportedPatchE2e() {
     realProviderTouched: false,
     realProviderExecution: false,
     defaultMvpAffected: false,
-    mutationCapabilityAdded: false,
+    unsupportedMutationCapabilityAdded: false,
+    guardedSingleFileMoveCapabilityAddedElsewhere: true,
     unsupportedMutationSupport: false,
     coveredCases: covered,
     results,

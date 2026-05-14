@@ -15,7 +15,68 @@ afterEach(() => {
 });
 
 describe("workspace move route result projection", () => {
-  it("projects a guarded move stop without changed files or delete/move writer flags", () => {
+  it("projects a verified move success with target changed and delete/move writer flag", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const patchText = pureMovePatch();
+
+    const route = await runWorkspaceMoveRoute({
+      workspaceRoot: fixture.workspaceRoot,
+      rawPatchText: patchText,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: "approved",
+      defaultProductionRejectionUnchanged: true,
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      validateCreateTarget: authority.validateCreateTarget,
+      moveFileExclusive: authority.moveFileExclusive,
+    });
+    const result = buildWorkspaceMoveRouteResult({
+      sessionId: "session-1",
+      prompt: patchText,
+      route,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.terminalClassification).toBe("success");
+    expect(result.codingResult?.changedFiles).toEqual(["src/to.ts"]);
+    expect(result.codingResult?.failedFiles).toEqual([]);
+    expect(result.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        changedFiles: ["src/to.ts"],
+        plannedFiles: [],
+        failedFiles: [],
+        writerInvoked: true,
+        creatorInvoked: false,
+        deleteMoveInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(result.codingResult?.changeSet).toEqual(
+      expect.objectContaining({
+        postRunDirtyFiles: ["src/to.ts"],
+        changedFiles: ["src/to.ts"],
+        unchangedAttemptedFiles: [],
+      }),
+    );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-workspace-move-result:coding-result-success",
+        "apply-patch-workspace-move-route:move-writer-invoked",
+      ]),
+    );
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
+      "src/to.ts": "from\n",
+    });
+  });
+
+  it("projects an invalid move-like stop without changed files or delete/move writer flags", async () => {
     const fixture = createFixture();
     const before = snapshotFixture(fixture.workspaceRoot);
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
@@ -29,7 +90,7 @@ describe("workspace move route result projection", () => {
       "*** End Patch",
     ].join("\n");
 
-    const route = runWorkspaceMoveRoute({
+    const route = await runWorkspaceMoveRoute({
       workspaceRoot: fixture.workspaceRoot,
       rawPatchText: patchText,
       explicitRuntimeOptIn: true,
@@ -37,9 +98,11 @@ describe("workspace move route result projection", () => {
       requestedUserDecision: "approved",
       defaultProductionRejectionUnchanged: true,
       readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
       directoryExists: authority.directoryExists,
       validateWriteTarget: authority.validateWriteTarget,
       validateCreateTarget: authority.validateCreateTarget,
+      moveFileExclusive: authority.moveFileExclusive,
     });
     const result = buildWorkspaceMoveRouteResult({
       sessionId: "session-1",
@@ -90,7 +153,92 @@ describe("workspace move route result projection", () => {
     );
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
+
+  it("projects post-write verification failure with changed facts and no success claim", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const patchText = pureMovePatch();
+
+    const route = await runWorkspaceMoveRoute({
+      workspaceRoot: fixture.workspaceRoot,
+      rawPatchText: patchText,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: "approved",
+      defaultProductionRejectionUnchanged: true,
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      validateCreateTarget: authority.validateCreateTarget,
+      moveFileExclusive: (sourcePath, targetPath) => {
+        fs.copyFileSync(
+          path.join(fixture.workspaceRoot, sourcePath),
+          path.join(fixture.workspaceRoot, targetPath),
+        );
+      },
+    });
+    const result = buildWorkspaceMoveRouteResult({
+      sessionId: "session-1",
+      prompt: patchText,
+      route,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual(["src/to.ts"]);
+    expect(result.codingResult?.failedFiles).toEqual([
+      expect.objectContaining({ path: "(apply_patch)" }),
+    ]);
+    expect(result.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "post-write-verification",
+        changedFiles: ["src/to.ts"],
+        plannedFiles: [],
+        failedFiles: [
+          expect.objectContaining({ path: "src/to.ts" }),
+        ],
+        writerInvoked: true,
+        creatorInvoked: false,
+        deleteMoveInvoked: true,
+        postWriteVerification: "failed",
+        successLike: false,
+      }),
+    );
+    expect(result.codingResult?.changeSet).toEqual(
+      expect.objectContaining({
+        postRunDirtyFiles: ["src/to.ts"],
+        changedFiles: ["src/to.ts"],
+        attemptedFiles: ["src/to.ts"],
+        unchangedAttemptedFiles: [],
+      }),
+    );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-workspace-move-result:coding-result-blocked",
+        "apply-patch-workspace-move-result:changed-files-preserved-after-writer",
+        "apply-patch-workspace-move-result:delete-move-invoked-no-success-claim",
+        "apply-patch-workspace-move-route:no-rollback",
+      ]),
+    );
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
+      "src/from.ts": "from\n",
+      "src/to.ts": "from\n",
+    });
+  });
 });
+
+function pureMovePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/from.ts",
+    "*** Move to: src/to.ts",
+    "@@",
+    " from",
+    "*** End Patch",
+  ].join("\n");
+}
 
 function createFixture(): { readonly workspaceRoot: string } {
   const workspaceRoot = fs.mkdtempSync(
