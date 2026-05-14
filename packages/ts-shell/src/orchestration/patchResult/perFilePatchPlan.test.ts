@@ -590,6 +590,176 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
+  it.each([
+    {
+      name: "update plus create",
+      patch: [
+        "*** Begin Patch",
+        "*** Update File: src/app.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** Add File: src/new.ts",
+        "+created",
+        "*** End Patch",
+      ],
+      files: { "src/app.ts": "old\n" },
+      directories: ["src"],
+      operationKinds: ["update", "create"],
+      targets: ["src/app.ts", "src/new.ts"],
+    },
+    {
+      name: "update plus delete",
+      patch: [
+        "*** Begin Patch",
+        "*** Update File: src/app.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** Delete File: src/remove.ts",
+        "*** End Patch",
+      ],
+      files: {
+        "src/app.ts": "old\n",
+        "src/remove.ts": "remove\n",
+      },
+      operationKinds: ["update", "delete"],
+      targets: ["src/app.ts", "src/remove.ts"],
+    },
+    {
+      name: "update plus move",
+      patch: [
+        "*** Begin Patch",
+        "*** Update File: src/app.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** Update File: src/from.ts",
+        "*** Move to: src/to.ts",
+        "@@",
+        " from",
+        "*** End Patch",
+      ],
+      files: {
+        "src/app.ts": "old\n",
+        "src/from.ts": "from\n",
+      },
+      operationKinds: ["update", "move"],
+      targets: ["src/app.ts", "src/to.ts"],
+    },
+    {
+      name: "create plus delete",
+      patch: [
+        "*** Begin Patch",
+        "*** Add File: src/new.ts",
+        "+created",
+        "*** Delete File: src/remove.ts",
+        "*** End Patch",
+      ],
+      files: { "src/remove.ts": "remove\n" },
+      directories: ["src"],
+      operationKinds: ["create", "delete"],
+      targets: ["src/new.ts", "src/remove.ts"],
+    },
+    {
+      name: "create plus move",
+      patch: [
+        "*** Begin Patch",
+        "*** Add File: src/new.ts",
+        "+created",
+        "*** Update File: src/from.ts",
+        "*** Move to: src/to.ts",
+        "@@",
+        " from",
+        "*** End Patch",
+      ],
+      files: { "src/from.ts": "from\n" },
+      directories: ["src"],
+      operationKinds: ["create", "move"],
+      targets: ["src/new.ts", "src/to.ts"],
+    },
+    {
+      name: "delete plus move",
+      patch: [
+        "*** Begin Patch",
+        "*** Delete File: src/remove.ts",
+        "*** Update File: src/from.ts",
+        "*** Move to: src/to.ts",
+        "@@",
+        " from",
+        "*** End Patch",
+      ],
+      files: {
+        "src/remove.ts": "remove\n",
+        "src/from.ts": "from\n",
+      },
+      operationKinds: ["delete", "move"],
+      targets: ["src/remove.ts", "src/to.ts"],
+    },
+  ])(
+    "keeps $name as mixed-operation no-write readiness evidence",
+    ({ patch, files, directories, operationKinds, targets }) => {
+      const plan = planFromPatch(patch, files, {
+        existingDirectories: directories,
+      });
+      const result = projectPerFilePatchResult({ plan });
+
+      expectUnsupportedNoWritePlan(plan, "mixed-operations");
+      expect(plan.summary.targetFiles).toEqual(targets);
+      expect(plan.summary.failedFiles.map((failure) => failure.path)).toEqual(
+        targets,
+      );
+      expect(plan.operations.map((operation) => operation.operationKind)).toEqual(
+        operationKinds,
+      );
+      expect(plan.summary.mixedOperationReadiness).toEqual(
+        expect.objectContaining({
+          isMixedOperation: true,
+          operationKinds,
+          individuallySupportedKinds: operationKinds,
+          unsupportedIndividualKinds: [],
+          blockedCombinations: [operationKinds.join("+")],
+          routeBlocker: "mixed-operation-route-not-enabled",
+          mixedWritesEnabled: false,
+          rollbackOrAtomicityClaim: "none",
+          writeAuthority: "not-granted-by-readiness-projection",
+        }),
+      );
+      expect(plan.summary.mixedOperationReadiness?.additionalPrerequisites).toEqual([
+        "transaction-rollback-decision",
+        "operation-ordering",
+        "destructive-operation-confirmation",
+        "partial-failure-semantics",
+        "post-write-verification-semantics",
+        "per-operation-authority",
+      ]);
+      expect(result).toEqual(
+        expect.objectContaining({
+          supportStatus: "unsupported-no-write",
+          failureClass: "mixed-operations",
+          writeIntentFiles: [],
+          changedFiles: [],
+          plannedFiles: [],
+          writerInvoked: false,
+          creatorInvoked: false,
+          deleteMoveInvoked: false,
+          postWriteVerification: "not-run",
+          successLike: false,
+          mixedOperationReadiness: plan.summary.mixedOperationReadiness,
+        }),
+      );
+      expect(result.evidence).toEqual(
+        expect.arrayContaining([
+          "per-file-patch-result:mixed-operation-no-write",
+          "per-file-patch-result:no-writer-invoked",
+          "per-file-patch-result:no-creator-invoked",
+          "per-file-patch-result:no-delete-move-invoked",
+          "per-file-patch-result:no-success-claim",
+        ]),
+      );
+    },
+  );
+
   it("projects duplicate update targets to unsupported/no-write before writer reachability", () => {
     const plan = planFromPatch(
       [

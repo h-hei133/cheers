@@ -7,6 +7,10 @@ import type {
   PatchOperationKind,
 } from "../patchParsing/types.js";
 import { verifyParsedPatch } from "../patchVerification/verify.js";
+import {
+  projectMixedOperationReadiness,
+  type MixedOperationReadinessProjection,
+} from "./mixedOperationReadiness.js";
 
 export type PerFilePatchOperationKind =
   | "update"
@@ -73,6 +77,7 @@ export interface PerFilePatchPlanSummary {
   readonly writerInvocationCondition:
     | "existing-explicit-route-only"
     | "never";
+  readonly mixedOperationReadiness?: MixedOperationReadinessProjection;
   readonly userVisibleReason: string;
   readonly nextAction: string;
 }
@@ -112,6 +117,7 @@ export interface PerFilePatchResultProjection {
   readonly creatorInvoked: boolean;
   readonly deleteMoveInvoked: boolean;
   readonly postWriteVerification: "passed" | "blocked" | "failed" | "not-run";
+  readonly mixedOperationReadiness?: MixedOperationReadinessProjection;
   readonly successLike: boolean;
   readonly evidence: readonly string[];
 }
@@ -194,6 +200,9 @@ export function projectPerFilePatchResult(input: {
     creatorInvoked,
     deleteMoveInvoked,
     postWriteVerification,
+    ...(input.plan.summary.mixedOperationReadiness
+      ? { mixedOperationReadiness: input.plan.summary.mixedOperationReadiness }
+      : {}),
     successLike,
     evidence: [
       "per-file-patch-result:projection-only",
@@ -216,6 +225,9 @@ export function projectPerFilePatchResult(input: {
         : []),
       ...(postWriteVerification === "failed"
         ? ["per-file-patch-result:post-write-verification-failed"]
+        : []),
+      ...(input.plan.summary.mixedOperationReadiness?.isMixedOperation
+        ? ["per-file-patch-result:mixed-operation-no-write"]
         : []),
     ],
   };
@@ -416,6 +428,28 @@ function buildParsedPatchPlan(
     });
   }
 
+  const operationKinds = new Set(
+    operations.map((operation) => operationKindFromPatchOperation(operation)),
+  );
+  const isMixedOperation = operationKinds.size > 1;
+
+  if (isMixedOperation) {
+    const failures = mixedOperationFailures(operations, options);
+    const readiness = projectMixedOperationReadiness(operations);
+    return buildUnsupportedPlan({
+      operations,
+      targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: "mixed-operations",
+      reason:
+        "Mixed apply_patch operation families are represented as unsupported/no-write even when each individual operation has an existing single-operation lane.",
+      nextAction:
+        "Split the patch into one supported operation family, or use a future dedicated mixed-operation route after authority, ordering, verification, and failure semantics are defined.",
+      failures,
+      mixedOperationReadiness: readiness,
+    });
+  }
+
   if (deleteMoveOperations.length > 0 || addOperations.length > 0) {
     const failures = unsupportedOperationFailures(operations, options);
     return buildUnsupportedPlan({
@@ -425,8 +459,7 @@ function buildParsedPatchPlan(
       failureClass: failureClassForUnsupportedOperations({
         operations,
         failures,
-        mixed:
-          operations.length > deleteMoveOperations.length || addOperations.length > 0,
+        mixed: false,
       }),
       reason:
         "Delete, move, add/update mixes, and other mixed apply_patch shapes are represented as unsupported/no-write.",
@@ -692,6 +725,7 @@ function buildUnsupportedPlan(input: {
   readonly reason: string;
   readonly nextAction: string;
   readonly failures: readonly PatchFailure[];
+  readonly mixedOperationReadiness?: MixedOperationReadinessProjection;
 }): PerFilePatchPlan {
   return {
     source: "per-file-patch-plan",
@@ -718,6 +752,9 @@ function buildUnsupportedPlan(input: {
       workspaceWriterInvoked: false,
       postWriteVerification: "not-run",
       writerInvocationCondition: "never",
+      ...(input.mixedOperationReadiness
+        ? { mixedOperationReadiness: input.mixedOperationReadiness }
+        : {}),
       userVisibleReason: input.reason,
       nextAction: input.nextAction,
     },
@@ -728,6 +765,9 @@ function buildUnsupportedPlan(input: {
       "per-file-patch-plan:no-writer-invoked",
       "per-file-patch-plan:changed-files-empty",
       "per-file-patch-plan:write-intents-empty",
+      ...(input.mixedOperationReadiness?.isMixedOperation
+        ? ["per-file-patch-plan:mixed-operation-blocker"]
+        : []),
     ],
   };
 }
@@ -872,6 +912,28 @@ function unsupportedOperationFailures(
         message: `Patch operation ${operation.kind} is unsupported by the current per-file edit route contract.`,
         nextAction:
           "Use a currently supported operation shape; delete, move, mixed, and broad apply_patch writes remain unsupported.",
+      }),
+    ];
+  });
+}
+
+function mixedOperationFailures(
+  operations: readonly PatchFileOperation[],
+  options: PerFilePatchPlanOptions,
+): readonly PatchFailure[] {
+  return operations.flatMap((operation) => {
+    const pathFailures = unsupportedOperationPathFailures(operation, options);
+    if (pathFailures.length > 0) {
+      return pathFailures;
+    }
+    const operationKind = operationKindFromPatchOperation(operation);
+    return [
+      patchFailure({
+        code: "patch-verify-operation-unsupported",
+        path: targetPathForOperation(operation),
+        message: `Mixed apply_patch operation family ${operationKind} is blocked by the mixed-operation no-write contract; no writer is reachable from this projection.`,
+        nextAction:
+          "Split the patch into one supported operation family, or wait for a dedicated mixed-operation route with authority, ordering, verification, and failure semantics.",
       }),
     ];
   });

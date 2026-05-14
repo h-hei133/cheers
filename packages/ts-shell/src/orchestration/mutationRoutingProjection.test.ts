@@ -717,6 +717,90 @@ describe("apply_patch mutation routing projection", () => {
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
 
+  it.each([
+    {
+      name: "update plus create",
+      patchText: mixedUpdateCreatePatch(),
+      operationKinds: ["update", "create"],
+    },
+    {
+      name: "update plus delete",
+      patchText: mixedPatch(),
+      operationKinds: ["update", "delete"],
+    },
+    {
+      name: "update plus move",
+      patchText: mixedUpdateMovePatch(),
+      operationKinds: ["update", "move"],
+    },
+    {
+      name: "create plus delete",
+      patchText: mixedCreateDeletePatch(),
+      operationKinds: ["create", "delete"],
+    },
+    {
+      name: "create plus move",
+      patchText: mixedCreateMovePatch(),
+      operationKinds: ["create", "move"],
+    },
+    {
+      name: "delete plus move",
+      patchText: mixedDeleteMovePatch(),
+      operationKinds: ["delete", "move"],
+    },
+  ])("keeps mixed $name stopped with no writer family invoked", async ({
+    patchText,
+    operationKinds,
+  }) => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    let writes = 0;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, patchText),
+      getWorkspaceAuthority: () =>
+        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
+          writes += 1;
+        }),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "unsupported-no-write",
+        failureClass: "mixed-operations",
+        writeIntentFiles: [],
+        changedFiles: [],
+        plannedFiles: [],
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "not-run",
+        successLike: false,
+        mixedOperationReadiness: expect.objectContaining({
+          isMixedOperation: true,
+          operationKinds,
+          individuallySupportedKinds: operationKinds,
+          unsupportedIndividualKinds: [],
+          blockedCombinations: [operationKinds.join("+")],
+          routeBlocker: "mixed-operation-route-not-enabled",
+          mixedWritesEnabled: false,
+          rollbackOrAtomicityClaim: "none",
+          writeAuthority: "not-granted-by-readiness-projection",
+        }),
+      }),
+    );
+    expect(
+      result?.codingResult?.perFilePatchPlan?.operations.map(
+        (operation) => operation.operationKind,
+      ),
+    ).toEqual(operationKinds);
+    expect(writes).toBe(0);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
   it("keeps outside-workspace delete and move patches stopped without writer reachability", async () => {
     for (const patchText of [outsideDeletePatch(), outsideMoveTargetPatch()]) {
       const fixture = createFixture();
@@ -984,6 +1068,44 @@ function mixedPatch(): string {
   ].join("\n");
 }
 
+function mixedUpdateCreatePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Add File: src/new.ts",
+    "+created",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function mixedUpdateMovePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Update File: src/b.ts",
+    "*** Move to: src/moved.ts",
+    "@@",
+    " b = 1",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function mixedCreateDeletePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Add File: src/new.ts",
+    "+created",
+    "*** Delete File: src/a.ts",
+    "*** End Patch",
+  ].join("\n");
+}
+
 function mixedCreateMovePatch(): string {
   return [
     "*** Begin Patch",
@@ -994,6 +1116,18 @@ function mixedCreateMovePatch(): string {
     "@@",
     "-a = 1",
     "+a = 2",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function mixedDeleteMovePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Delete File: src/a.ts",
+    "*** Update File: src/b.ts",
+    "*** Move to: src/moved.ts",
+    "@@",
+    " b = 1",
     "*** End Patch",
   ].join("\n");
 }
