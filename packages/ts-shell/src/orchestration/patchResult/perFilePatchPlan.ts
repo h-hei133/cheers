@@ -11,6 +11,11 @@ import {
   projectMixedOperationReadiness,
   type MixedOperationReadinessProjection,
 } from "./mixedOperationReadiness.js";
+import {
+  projectJournalFailureSurface,
+  type JournalFailureSurfaceProjection,
+} from "./journalResultProjection.js";
+import type { RouteScopedEditJournal } from "./routeScopedEditJournal.js";
 
 export type PerFilePatchOperationKind =
   | "update"
@@ -118,6 +123,7 @@ export interface PerFilePatchResultProjection {
   readonly deleteMoveInvoked: boolean;
   readonly postWriteVerification: "passed" | "blocked" | "failed" | "not-run";
   readonly mixedOperationReadiness?: MixedOperationReadinessProjection;
+  readonly routeScopedEditJournal?: JournalFailureSurfaceProjection;
   readonly successLike: boolean;
   readonly evidence: readonly string[];
 }
@@ -135,6 +141,7 @@ export function buildPerFilePatchPlan(
 
 export function projectPerFilePatchResult(input: {
   readonly plan: PerFilePatchPlan;
+  readonly routeScopedEditJournal?: RouteScopedEditJournal;
   readonly changedFiles?: readonly string[];
   readonly failedFiles?: readonly { readonly path: string; readonly reason: string }[];
   readonly writerInvoked?: boolean;
@@ -203,6 +210,13 @@ export function projectPerFilePatchResult(input: {
     ...(input.plan.summary.mixedOperationReadiness
       ? { mixedOperationReadiness: input.plan.summary.mixedOperationReadiness }
       : {}),
+    ...(input.routeScopedEditJournal
+      ? {
+          routeScopedEditJournal: projectJournalFailureSurface(
+            input.routeScopedEditJournal,
+          ),
+        }
+      : {}),
     successLike,
     evidence: [
       "per-file-patch-result:projection-only",
@@ -228,6 +242,9 @@ export function projectPerFilePatchResult(input: {
         : []),
       ...(input.plan.summary.mixedOperationReadiness?.isMixedOperation
         ? ["per-file-patch-result:mixed-operation-no-write"]
+        : []),
+      ...(input.routeScopedEditJournal
+        ? ["per-file-patch-result:route-scoped-journal-attached"]
         : []),
     ],
   };
