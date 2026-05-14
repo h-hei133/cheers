@@ -705,10 +705,11 @@ not as another extraction by default.
 This document update does not claim:
 
 - Broad release readiness.
-- 3-file writes.
-- 3+ file mutation support.
+- 4+ file mutation support.
 - Broad `apply_patch`.
-- Delete/move/rollback/fuzzy patch support.
+- Mixed operation writes.
+- Multi-delete, multi-move, rollback, or fuzzy patch support.
+- Delete/move mixed with update/create support.
 - External MCP readiness.
 - Default real-provider readiness.
 - Full runtime architecture completion.

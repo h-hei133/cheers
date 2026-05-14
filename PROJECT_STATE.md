@@ -1444,8 +1444,9 @@ Important boundaries:
    pipe-spawn interactive evidence in this environment
 2. execution success still depends on model/tool behavior; sealed real-provider
    smokes prove only their explicit isolated or selected-workspace routes
-3. multi-file edit, default production `apply_patch` write, rollback/atomic
-   write recovery, and true PTY automation remain outside the sealed evidence
+3. broad `apply_patch`, mixed operation writes, 4+ writes, multi-delete,
+   multi-move, rollback/atomic write recovery, and true PTY automation remain
+   outside the sealed evidence
 4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow`
    write route remains disabled; an explicit CLI/runMvp no-write route exists,
    an explicit workspace write entrypoint has landed with durable
@@ -1473,9 +1474,10 @@ Escalate from hardening into focused implementation when one is reproducible:
   `patch-generation-failed`, `stale-read`, and `approval-denied` is now sealed;
   do not keep expanding same-family stopped replay fixtures unless a concrete
   stopped/resume regression appears.
-- If continuing apply_patch, the next route should be a fresh blocker
-  assessment around default-route safety, rollback/atomicity, or user-workspace
-  policy rather than more continuity proof.
+- If continuing apply_patch, the next implementation route should be Route 47:
+  mixed operation write readiness evaluation and no-write contract hardening;
+  it should evaluate mixed operation support, not immediately enable mixed
+  writes.
 - Keep default production `apply_patch` enablement blocked until a separate
   review defines rollback behavior and default user-workspace safety policy.
 - Existing real-provider gates remain explicit opt-in evidence only; do not
