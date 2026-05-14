@@ -10465,8 +10465,9 @@ function route08PatchScenarios() {
       ].join('\n'),
     },
     {
-      id: 'real-model-like-unsupported-mixed-update-delete',
-      expectedClass: 'unsupported',
+      id: 'real-model-like-route48-mixed-update-delete',
+      expectedClass: 'supported-route48',
+      expectedChangedFiles: ['src/a.ts', 'src/b.ts'],
       files: {
         'src/a.ts': 'a\n',
         'src/b.ts': 'b\n',
@@ -10628,8 +10629,9 @@ function route08PatchScenarios() {
       ].join('\n'),
     },
     {
-      id: 'real-model-like-unsupported-mixed-update-move',
-      expectedClass: 'unsupported',
+      id: 'real-model-like-route48-mixed-update-move',
+      expectedClass: 'supported-route48',
+      expectedChangedFiles: ['src/a.ts', 'src/b.ts', 'src/renamed.ts'],
       files: {
         'src/a.ts': 'a\n',
         'src/b.ts': 'b\n',
@@ -10820,8 +10822,9 @@ function route08PatchScenarios() {
       ].join('\n'),
     },
     {
-      id: 'real-model-like-mixed-supported-unsupported-patch',
-      expectedClass: 'unsupported',
+      id: 'real-model-like-route48-mixed-update-delete-compat',
+      expectedClass: 'supported-route48',
+      expectedChangedFiles: ['src/a.ts', 'src/b.ts'],
       files: {
         'src/a.ts': 'a\n',
         'src/b.ts': 'b\n',
@@ -10874,13 +10877,23 @@ async function runRoute08UnsupportedPatchScenario(scenario) {
       /Outcome:\s*(stopped|error)/i.test(output) ||
       /stopped|blocked|unsupported|failed|error/i.test(output) ||
       result.code !== 0
-    const unsupportedWriteLeak = observedChanged.length > 0
+    const supportedRoute48Scenario = route08ClassForScenario(scenario) === 'supported-route48'
+    const expectedChangedFiles = scenario.expectedChangedFiles ?? []
+    const supportedRoute48ChangedFilesMatch =
+      observedChanged.join(',') === expectedChangedFiles.join(',')
+    const unsupportedWriteLeak = !supportedRoute48Scenario && observedChanged.length > 0
     const rollbackClaimed = /rollback (?:succeeded|completed)|atomic/i.test(output)
+    const safelyStoppedUnsupported =
+      !successLike && !unsupportedWriteLeak && failureVisible && !rollbackClaimed
+    const safelyCompletedRoute48 =
+      successLike && supportedRoute48ChangedFilesMatch && !rollbackClaimed
     return {
       id: scenario.id,
       outcome,
       route08Class: route08ClassForScenario(scenario),
-      status: !successLike && !unsupportedWriteLeak && failureVisible && !rollbackClaimed
+      status: (supportedRoute48Scenario
+        ? safelyCompletedRoute48
+        : safelyStoppedUnsupported)
         ? 'PASS'
         : 'FAIL',
       code: result.code,
@@ -10892,6 +10905,7 @@ async function runRoute08UnsupportedPatchScenario(scenario) {
         : 'failure reason was not visible in terminal output',
       terminalEvidence: failureVisible ? 'visible' : 'missing',
       noUnsupportedWrites: !unsupportedWriteLeak,
+      supportedRoute48ChangedFilesMatch,
       successLike,
       rollbackClaimed,
       outputTail: summarizeOutput(output),
@@ -10944,7 +10958,11 @@ async function runRoute08UnsupportedPatchE2e() {
   const failures = [
     ...results
       .filter((result) => result.status !== 'PASS')
-      .map((result) => `${result.id}: unsupported output was not safely stopped`),
+      .map((result) =>
+        result.route08Class === 'supported-route48'
+          ? `${result.id}: route48 mixed output was not safely completed`
+          : `${result.id}: unsupported output was not safely stopped`
+      ),
     ...(repoAfter.ok && repoAfter.status === repoBefore.status ? [] : ['repository status changed or was unavailable after verifier']),
   ]
   const covered = results.map((result) => result.id)

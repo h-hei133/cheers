@@ -31,6 +31,11 @@ import type {
   WorkspaceCreateTargetAuthority,
   WorkspaceWriteTargetAuthority,
 } from "./patchResult/workspaceAuthority.js";
+import { buildMixedFileWriteRouteResult } from "./patchResult/mixedFileWriteResult.js";
+import {
+  patchIsExactlyTwoMixedWriteFiles,
+  runMixedFileWriteRoute,
+} from "./patchResult/mixedFileWriteRoute.js";
 
 export interface ApplyPatchRuntimeRouteOptions {
   readonly explicitRuntimeOptIn: boolean;
@@ -178,6 +183,35 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
         ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
       });
       return buildWorkspaceDeleteRouteResult({
+        sessionId: input.sessionId,
+        prompt: input.prompt,
+        route,
+      });
+    }
+
+    if (patchIsExactlyTwoMixedWriteFiles(rawPatchText)) {
+      const route = await runMixedFileWriteRoute({
+        workspaceRoot: input.workspaceRoot,
+        rawPatchText,
+        explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
+        explicitWorkspaceWriteOptIn:
+          routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
+        ...(routeOptions.requestedUserDecision
+          ? { requestedUserDecision: routeOptions.requestedUserDecision }
+          : {}),
+        defaultProductionRejectionUnchanged: true,
+        readFile: workspaceAuthority.readFile,
+        readVerifiedFile: workspaceAuthority.readVerifiedFile,
+        directoryExists: workspaceAuthority.directoryExists,
+        validateWriteTarget: workspaceAuthority.validateWriteTarget,
+        validateCreateTarget: workspaceAuthority.validateCreateTarget,
+        writeFile: workspaceAuthority.writeFile,
+        createFileExclusive: workspaceAuthority.createFileExclusive,
+        moveFileExclusive: workspaceAuthority.moveFileExclusive,
+        deleteFile: workspaceAuthority.deleteFile,
+        ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+      });
+      return buildMixedFileWriteRouteResult({
         sessionId: input.sessionId,
         prompt: input.prompt,
         route,

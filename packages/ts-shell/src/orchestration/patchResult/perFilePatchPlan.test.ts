@@ -481,7 +481,7 @@ describe("buildPerFilePatchPlan", () => {
     },
   );
 
-  it("projects mixed supported and unsupported operations to unsupported/no-write", () => {
+  it("projects exactly-two mixed operations to supported write intents", () => {
     const plan = planFromPatch(
       [
         "*** Begin Patch",
@@ -498,21 +498,26 @@ describe("buildPerFilePatchPlan", () => {
       },
     );
 
-    expectUnsupportedNoWritePlan(plan, "mixed-operations");
+    expectSupportedWritePlan(plan, ["src/app.ts", "src/remove.ts"]);
     expect(plan.summary.targetFiles).toEqual(["src/app.ts", "src/remove.ts"]);
-    expect(plan.summary.writeIntentFiles).toEqual([]);
+    expect(plan.summary.writeIntentFiles).toEqual([
+      "src/app.ts",
+      "src/remove.ts",
+    ]);
     expect(plan.operations.map((operation) => operation.supportStatus)).toEqual([
-      "unsupported-no-write",
-      "unsupported-no-write",
+      "supported-write",
+      "supported-write",
     ]);
     expect(plan.operations).toEqual([
       expect.objectContaining({
         operationKind: "update",
-        failedFile: expect.objectContaining({ path: "src/app.ts" }),
+        targetPath: "src/app.ts",
+        writeIntent: "eligible",
       }),
       expect.objectContaining({
         operationKind: "delete",
-        failedFile: expect.objectContaining({ path: "src/remove.ts" }),
+        targetPath: "src/remove.ts",
+        writeIntent: "eligible",
       }),
     ]);
   });
@@ -555,7 +560,7 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
-  it("projects create plus move mixes to unsupported/no-write with source and target", () => {
+  it("keeps create plus move with content edits unsupported/no-write with source and target", () => {
     const plan = planFromPatch(
       [
         "*** Begin Patch",
@@ -574,7 +579,7 @@ describe("buildPerFilePatchPlan", () => {
       { existingDirectories: ["src"] },
     );
 
-    expectUnsupportedNoWritePlan(plan, "mixed-operations");
+    expectUnsupportedNoWritePlan(plan, "unsupported-operation");
     expect(plan.operations).toEqual([
       expect.objectContaining({
         operationKind: "create",
@@ -697,60 +702,37 @@ describe("buildPerFilePatchPlan", () => {
       targets: ["src/remove.ts", "src/to.ts"],
     },
   ])(
-    "keeps $name as mixed-operation no-write readiness evidence",
+    "projects $name as exactly-two mixed supported-write evidence",
     ({ patch, files, directories, operationKinds, targets }) => {
       const plan = planFromPatch(patch, files, {
         existingDirectories: directories,
       });
       const result = projectPerFilePatchResult({ plan });
 
-      expectUnsupportedNoWritePlan(plan, "mixed-operations");
+      expectSupportedWritePlan(plan, targets);
       expect(plan.summary.targetFiles).toEqual(targets);
-      expect(plan.summary.failedFiles.map((failure) => failure.path)).toEqual(
-        targets,
-      );
+      expect(plan.summary.failedFiles).toEqual([]);
       expect(plan.operations.map((operation) => operation.operationKind)).toEqual(
         operationKinds,
       );
-      expect(plan.summary.mixedOperationReadiness).toEqual(
-        expect.objectContaining({
-          isMixedOperation: true,
-          operationKinds,
-          individuallySupportedKinds: operationKinds,
-          unsupportedIndividualKinds: [],
-          blockedCombinations: [operationKinds.join("+")],
-          routeBlocker: "mixed-operation-route-not-enabled",
-          mixedWritesEnabled: false,
-          rollbackOrAtomicityClaim: "none",
-          writeAuthority: "not-granted-by-readiness-projection",
-        }),
-      );
-      expect(plan.summary.mixedOperationReadiness?.additionalPrerequisites).toEqual([
-        "transaction-rollback-decision",
-        "operation-ordering",
-        "destructive-operation-confirmation",
-        "partial-failure-semantics",
-        "post-write-verification-semantics",
-        "per-operation-authority",
-      ]);
+      expect(plan.summary.mixedOperationReadiness).toBeUndefined();
       expect(result).toEqual(
         expect.objectContaining({
-          supportStatus: "unsupported-no-write",
-          failureClass: "mixed-operations",
-          writeIntentFiles: [],
+          supportStatus: "supported-write",
+          failureClass: "none",
+          writeIntentFiles: targets,
           changedFiles: [],
           plannedFiles: [],
+          failedFiles: [],
           writerInvoked: false,
           creatorInvoked: false,
           deleteMoveInvoked: false,
           postWriteVerification: "not-run",
           successLike: false,
-          mixedOperationReadiness: plan.summary.mixedOperationReadiness,
         }),
       );
       expect(result.evidence).toEqual(
         expect.arrayContaining([
-          "per-file-patch-result:mixed-operation-no-write",
           "per-file-patch-result:no-writer-invoked",
           "per-file-patch-result:no-creator-invoked",
           "per-file-patch-result:no-delete-move-invoked",

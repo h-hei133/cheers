@@ -434,6 +434,15 @@ function buildParsedPatchPlan(
   const isMixedOperation = operationKinds.size > 1;
 
   if (isMixedOperation) {
+    if (operations.length === 2 && mixedOperationPairIsSupported(operations)) {
+      return buildVerifiedMixedPlan({
+        patch,
+        options,
+        operations,
+        targetFiles,
+      });
+    }
+
     const failures = mixedOperationFailures(operations, options);
     const readiness = projectMixedOperationReadiness(operations);
     return buildUnsupportedPlan({
@@ -487,6 +496,116 @@ function buildParsedPatchPlan(
           "Use one Update File, one Add File, exactly two Update File operations, or exactly three Update File operations.",
       }),
     ],
+  });
+}
+
+function buildVerifiedMixedPlan(input: {
+  readonly patch: ParsedPatch;
+  readonly options: PerFilePatchPlanOptions;
+  readonly operations: readonly PatchFileOperation[];
+  readonly targetFiles: readonly string[];
+}): PerFilePatchPlan {
+  const conflict = sourceTargetConflictFailure(
+    input.operations,
+    input.options.workspaceRoot,
+  );
+  if (conflict) {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: "duplicate-target",
+      reason:
+        "Exactly-two mixed apply_patch shape matched a candidate route, but source/target paths conflict.",
+      nextAction:
+        "Regenerate the mixed patch so each operation source and target path is distinct.",
+      failures: [conflict],
+    });
+  }
+
+  const directoryFailure = directoryDeleteMoveFailure(
+    input.operations,
+    input.options,
+  );
+  if (directoryFailure) {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: "verification-failed",
+      reason:
+        "Exactly-two mixed apply_patch shape matched a candidate route, but directory delete/move is not enabled.",
+      nextAction:
+        "Choose regular files for mixed delete or move operations; directory delete/move remains unsupported.",
+      failures: [directoryFailure],
+    });
+  }
+
+  const verification = verifyParsedPatch(input.patch, {
+    workspaceRoot: input.options.workspaceRoot,
+    readFile: input.options.readFile,
+    ...(input.options.directoryExists
+      ? { directoryExists: input.options.directoryExists }
+      : {}),
+    supportedOperations: ["update", "add", "delete", "move"],
+  });
+  if (verification.ok === false) {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: failureClassForVerificationFailures(verification.failures),
+      reason:
+        "Exactly-two mixed apply_patch shape matched a candidate route, but preflight verification failed before any writer was reachable.",
+      nextAction:
+        verification.failures[0]?.nextAction ??
+        "Re-read current workspace files and regenerate the mixed patch.",
+      failures: verification.failures,
+    });
+  }
+
+  const moveContentFailure = verification.plan.operations.find(
+    (operation) =>
+      operation.operation.kind === "move" &&
+      operation.originalContent !== operation.plannedContent,
+  );
+  if (moveContentFailure?.operation.kind === "move") {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: "unsupported-operation",
+      reason:
+        "Move File with content edits is represented as unsupported/no-write in the guarded mixed route.",
+      nextAction:
+        "Use a pure Move File operation and put content edits in a separate update operation on a distinct file.",
+      failures: [
+        patchFailure({
+          code: "patch-apply-plan-not-verified",
+          path: moveContentFailure.operation.moveTo,
+          message:
+            "Guarded mixed Move File must preserve file content exactly; content edits during move are not enabled.",
+          nextAction:
+            "Use a pure Move File/rename patch before expecting the mixed writer.",
+        }),
+      ],
+    });
+  }
+
+  return buildVerifiedPlan({
+    patch: input.patch,
+    options: input.options,
+    supportedOperations: ["update", "add", "delete", "move"],
+    supportStatus: "supported-write",
+    failureClass: "none",
+    plannedFiles: [],
+    writeIntentFiles: input.operations.map(targetPathForOperation),
+    targetFiles: input.targetFiles,
+    reason:
+      "Exactly-two mixed apply_patch operations are represented as supported write intents owned by the guarded mixed workspace route.",
+    nextAction:
+      "Route may write only through explicit approval naming both targets, all source/target guards, all final preflights before the first writer, parsed-order writes, and per-operation post-write verification.",
+    operationSupportStatus: "supported-write",
   });
 }
 
@@ -985,6 +1104,83 @@ function unsupportedOperationPathFailures(
     ];
   }
   return [];
+}
+
+function mixedOperationPairIsSupported(
+  operations: readonly PatchFileOperation[],
+): boolean {
+  if (operations.length !== 2) {
+    return false;
+  }
+  const kinds = operations.map((operation) => operation.kind);
+  if (new Set(kinds).size !== 2) {
+    return false;
+  }
+  const pair = [...kinds].sort().join("+");
+  return new Set([
+    "add+delete",
+    "add+move",
+    "add+update",
+    "delete+move",
+    "delete+update",
+    "move+update",
+  ]).has(pair);
+}
+
+function sourceTargetConflictFailure(
+  operations: readonly PatchFileOperation[],
+  workspaceRoot: string,
+): PatchFailure | undefined {
+  const seen = new Map<string, string>();
+  for (const operation of operations) {
+    for (const candidatePath of pathsForOperation(operation)) {
+      const key = path.resolve(workspaceRoot, candidatePath);
+      const previous = seen.get(key);
+      if (previous) {
+        return patchFailure({
+          code: "patch-apply-plan-not-verified",
+          path: candidatePath,
+          message: `Mixed apply_patch source/target path conflict: ${candidatePath} conflicts with ${previous}.`,
+          nextAction:
+            "Regenerate the mixed patch so each operation source and target path is distinct.",
+        });
+      }
+      seen.set(key, candidatePath);
+    }
+  }
+  return undefined;
+}
+
+function directoryDeleteMoveFailure(
+  operations: readonly PatchFileOperation[],
+  options: PerFilePatchPlanOptions,
+): PatchFailure | undefined {
+  if (!options.directoryExists) {
+    return undefined;
+  }
+  const directoryOperation = operations.find(
+    (operation) =>
+      (operation.kind === "delete" || operation.kind === "move") &&
+      options.directoryExists?.(
+        path.resolve(options.workspaceRoot, operation.path),
+      ) === true,
+  );
+  if (!directoryOperation) {
+    return undefined;
+  }
+  return patchFailure({
+    code: "patch-apply-plan-not-verified",
+    path: directoryOperation.path,
+    message: `Mixed apply_patch ${directoryOperation.kind} operation targets a directory.`,
+    nextAction:
+      "Choose an existing regular file; directory delete/move is not enabled.",
+  });
+}
+
+function pathsForOperation(operation: PatchFileOperation): readonly string[] {
+  return operation.kind === "move"
+    ? [operation.path, operation.moveTo]
+    : [operation.path];
 }
 
 function failureClassForUnsupportedOperations(input: {

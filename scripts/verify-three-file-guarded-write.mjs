@@ -159,7 +159,7 @@ const scenarios = [
     expectedSuccessLike: false,
   },
   {
-    id: 'mixed-update-delete-unsupported-no-write',
+    id: 'route48-mixed-update-delete-supported-write',
     files: { 'src/a.ts': 'a = 1\n', 'src/b.ts': 'b = 1\n' },
     patchText: [
       '*** Begin Patch',
@@ -170,19 +170,21 @@ const scenarios = [
       '*** Delete File: src/b.ts',
       '*** End Patch',
     ].join('\n'),
-    expectedOutcome: 'stopped',
-    expectedChangedFiles: [],
-    expectedWriteIntentFiles: [],
-    expectedFailedFiles: ['(apply_patch)'],
-    expectedPerFileFailedFiles: ['src/a.ts', 'src/b.ts'],
-    expectedPerFileSupportStatus: 'unsupported-no-write',
-    expectedPerFileFailureClass: 'mixed-operations',
+    expectedOutcome: 'success',
+    expectedChangedFiles: ['src/a.ts', 'src/b.ts'],
+    expectedWriteIntentFiles: ['src/a.ts', 'src/b.ts'],
+    expectedFailedFiles: [],
+    expectedPerFileFailedFiles: [],
+    expectedPerFileSupportStatus: 'supported-write',
+    expectedPerFileFailureClass: 'none',
     expectedOperationKinds: ['update', 'delete'],
-    expectedOperationSupportStatuses: ['unsupported-no-write', 'unsupported-no-write'],
-    expectedWriterInvoked: false,
-    expectedWriteFileCalls: 0,
-    expectedPostWriteVerification: 'not-run',
-    expectedSuccessLike: false,
+    expectedOperationSupportStatuses: ['supported-write', 'supported-write'],
+    expectedWriterInvoked: true,
+    expectedCreatorInvoked: false,
+    expectedDeleteMoveInvoked: true,
+    expectedWriteFileCalls: 1,
+    expectedPostWriteVerification: 'passed',
+    expectedSuccessLike: true,
   },
 ]
 
@@ -247,8 +249,12 @@ function runScenario(scenario) {
   if (result.json?.writerInvoked !== scenario.expectedWriterInvoked) {
     failures.push(`${scenario.id}: writerInvoked ${result.json?.writerInvoked} expected ${scenario.expectedWriterInvoked}`)
   }
-  if (result.json?.creatorInvoked !== false) failures.push(`${scenario.id}: creatorInvoked was not false`)
-  if (result.json?.deleteMoveInvoked !== false) failures.push(`${scenario.id}: deleteMoveInvoked was not false`)
+  if (result.json?.creatorInvoked !== (scenario.expectedCreatorInvoked ?? false)) {
+    failures.push(`${scenario.id}: creatorInvoked ${result.json?.creatorInvoked} expected ${scenario.expectedCreatorInvoked ?? false}`)
+  }
+  if (result.json?.deleteMoveInvoked !== (scenario.expectedDeleteMoveInvoked ?? false)) {
+    failures.push(`${scenario.id}: deleteMoveInvoked ${result.json?.deleteMoveInvoked} expected ${scenario.expectedDeleteMoveInvoked ?? false}`)
+  }
   if (result.json?.writeFileCalls !== scenario.expectedWriteFileCalls) {
     failures.push(`${scenario.id}: writeFileCalls ${result.json?.writeFileCalls ?? 'missing'} expected ${scenario.expectedWriteFileCalls}`)
   }

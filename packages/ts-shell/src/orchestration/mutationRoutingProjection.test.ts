@@ -639,39 +639,39 @@ describe("apply_patch mutation routing projection", () => {
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
 
-  it("keeps mixed supported/unsupported patches stopped with unsupported/no-write per-file projection", async () => {
+  it("routes update plus delete through the guarded mixed writer", async () => {
     const fixture = createFixture();
-    const before = snapshotFixture(fixture.workspaceRoot);
-    let writes = 0;
 
     const result = await projectApplyPatchRuntimeMutationRoute({
       ...runtimeInput(fixture.workspaceRoot, mixedPatch()),
       getWorkspaceAuthority: () =>
-        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
-          writes += 1;
-        }),
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
     });
 
-    expect(result?.status).toBe("stopped_error");
-    expect(result?.terminalClassification).toBe("stopped");
-    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual(["src/a.ts", "src/b.ts"]);
     expect(result?.codingResult?.perFilePatchPlan).toEqual(
       expect.objectContaining({
-        supportStatus: "unsupported-no-write",
-        failureClass: "mixed-operations",
-        writeIntentFiles: [],
-        writerInvoked: false,
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/a.ts", "src/b.ts"],
+        changedFiles: ["src/a.ts", "src/b.ts"],
+        failedFiles: [],
+        writerInvoked: true,
         creatorInvoked: false,
-        deleteMoveInvoked: false,
-        successLike: false,
+        deleteMoveInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
       }),
     );
     expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
-      expect.objectContaining({ operationKind: "update", writeIntent: "none" }),
-      expect.objectContaining({ operationKind: "delete", writeIntent: "none" }),
+      expect.objectContaining({ operationKind: "update", writeIntent: "eligible" }),
+      expect.objectContaining({ operationKind: "delete", writeIntent: "eligible" }),
     ]);
-    expect(writes).toBe(0);
-    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
+      "src/a.ts": "a = 2\n",
+    });
   });
 
   it("keeps mixed create plus move patches stopped before any writer", async () => {
@@ -693,7 +693,7 @@ describe("apply_patch mutation routing projection", () => {
     expect(result?.codingResult?.perFilePatchPlan).toEqual(
       expect.objectContaining({
         supportStatus: "unsupported-no-write",
-        failureClass: "mixed-operations",
+        failureClass: "unsupported-operation",
         writeIntentFiles: [],
         changedFiles: [],
         plannedFiles: [],
@@ -722,74 +722,68 @@ describe("apply_patch mutation routing projection", () => {
       name: "update plus create",
       patchText: mixedUpdateCreatePatch(),
       operationKinds: ["update", "create"],
+      targets: ["src/a.ts", "src/new.ts"],
     },
     {
       name: "update plus delete",
       patchText: mixedPatch(),
       operationKinds: ["update", "delete"],
+      targets: ["src/a.ts", "src/b.ts"],
     },
     {
       name: "update plus move",
       patchText: mixedUpdateMovePatch(),
       operationKinds: ["update", "move"],
+      targets: ["src/a.ts", "src/moved.ts"],
     },
     {
       name: "create plus delete",
       patchText: mixedCreateDeletePatch(),
       operationKinds: ["create", "delete"],
+      targets: ["src/new.ts", "src/a.ts"],
     },
     {
       name: "create plus move",
-      patchText: mixedCreateMovePatch(),
+      patchText: mixedPureCreateMovePatch(),
       operationKinds: ["create", "move"],
+      targets: ["src/new.ts", "src/moved.ts"],
     },
     {
       name: "delete plus move",
       patchText: mixedDeleteMovePatch(),
       operationKinds: ["delete", "move"],
+      targets: ["src/a.ts", "src/moved.ts"],
     },
-  ])("keeps mixed $name stopped with no writer family invoked", async ({
+  ])("routes mixed $name with accurate writer family flags", async ({
     patchText,
     operationKinds,
+    targets,
   }) => {
     const fixture = createFixture();
-    const before = snapshotFixture(fixture.workspaceRoot);
-    let writes = 0;
 
     const result = await projectApplyPatchRuntimeMutationRoute({
       ...runtimeInput(fixture.workspaceRoot, patchText),
       getWorkspaceAuthority: () =>
-        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
-          writes += 1;
-        }),
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
     });
 
-    expect(result?.status).toBe("stopped_error");
-    expect(result?.terminalClassification).toBe("stopped");
-    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual(targets);
     expect(result?.codingResult?.perFilePatchPlan).toEqual(
       expect.objectContaining({
-        supportStatus: "unsupported-no-write",
-        failureClass: "mixed-operations",
-        writeIntentFiles: [],
-        changedFiles: [],
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: targets,
+        changedFiles: targets,
         plannedFiles: [],
-        writerInvoked: false,
-        creatorInvoked: false,
-        deleteMoveInvoked: false,
-        postWriteVerification: "not-run",
-        successLike: false,
-        mixedOperationReadiness: expect.objectContaining({
-          isMixedOperation: true,
-          operationKinds,
-          individuallySupportedKinds: operationKinds,
-          unsupportedIndividualKinds: [],
-          blockedCombinations: [operationKinds.join("+")],
-          routeBlocker: "mixed-operation-route-not-enabled",
-          mixedWritesEnabled: false,
-          rollbackOrAtomicityClaim: "none",
-          writeAuthority: "not-granted-by-readiness-projection",
-        }),
+        failedFiles: [],
+        writerInvoked: true,
+        creatorInvoked: operationKinds.includes("create"),
+        deleteMoveInvoked:
+          operationKinds.includes("delete") || operationKinds.includes("move"),
+        postWriteVerification: "passed",
+        successLike: true,
       }),
     );
     expect(
@@ -797,8 +791,6 @@ describe("apply_patch mutation routing projection", () => {
         (operation) => operation.operationKind,
       ),
     ).toEqual(operationKinds);
-    expect(writes).toBe(0);
-    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
 
   it("keeps outside-workspace delete and move patches stopped without writer reachability", async () => {
@@ -1116,6 +1108,19 @@ function mixedCreateMovePatch(): string {
     "@@",
     "-a = 1",
     "+a = 2",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function mixedPureCreateMovePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Add File: src/new.ts",
+    "+created",
+    "*** Update File: src/a.ts",
+    "*** Move to: src/moved.ts",
+    "@@",
+    " a = 1",
     "*** End Patch",
   ].join("\n");
 }

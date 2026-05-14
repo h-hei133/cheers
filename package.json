@@ -69,6 +69,7 @@
     "verify:real-user-capabilities:three-file-guarded-write": "node scripts/verify-three-file-guarded-write.mjs",
     "verify:real-user-capabilities:single-file-move-evidence": "node scripts/verify-single-file-move-evidence.mjs",
     "verify:real-user-capabilities:single-file-delete-evidence": "node scripts/verify-single-file-delete-evidence.mjs",
+    "verify:real-user-capabilities:mixed-operation-evidence": "node scripts/verify-mixed-operation-evidence.mjs",
     "verify:real-user-capabilities:three-file-planning-no-write": "node scripts/verify-three-file-planning-no-write.mjs",
     "verify:real-user-capabilities:planned-files-continuity": "node scripts/verify-planned-files-continuity.mjs",
     "verify:mutation-continuity:compact": "npm run test -w packages/ts-shell -- src/session/mutationCompactContinuity.test.ts",
