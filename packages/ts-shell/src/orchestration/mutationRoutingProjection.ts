@@ -14,6 +14,11 @@ import {
   patchIsTwoOrThreeUpdateFiles,
   runMultiFileWriteRoute,
 } from "./patchResult/multiFileWriteRoute.js";
+import { buildWorkspaceMoveRouteResult } from "./patchResult/workspaceMoveResult.js";
+import {
+  patchIsSingleMoveFile,
+  runWorkspaceMoveRoute,
+} from "./patchResult/workspaceMoveRoute.js";
 import { buildWorkspaceWriteRouteResult } from "./patchResult/workspaceWriteResult.js";
 import { runWorkspaceWriteRoute } from "./patchResult/workspaceWriteRoute.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
@@ -112,6 +117,30 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
         ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
       });
       return buildMultiFileWriteRouteResult({
+        sessionId: input.sessionId,
+        prompt: input.prompt,
+        route,
+      });
+    }
+
+    if (patchIsSingleMoveFile(rawPatchText)) {
+      const route = runWorkspaceMoveRoute({
+        workspaceRoot: input.workspaceRoot,
+        rawPatchText,
+        explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
+        explicitWorkspaceWriteOptIn:
+          routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
+        ...(routeOptions.requestedUserDecision
+          ? { requestedUserDecision: routeOptions.requestedUserDecision }
+          : {}),
+        defaultProductionRejectionUnchanged: true,
+        readFile: workspaceAuthority.readFile,
+        directoryExists: workspaceAuthority.directoryExists,
+        validateWriteTarget: workspaceAuthority.validateWriteTarget,
+        validateCreateTarget: workspaceAuthority.validateCreateTarget,
+        ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+      });
+      return buildWorkspaceMoveRouteResult({
         sessionId: input.sessionId,
         prompt: input.prompt,
         route,
