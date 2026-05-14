@@ -707,9 +707,9 @@ This document update does not claim:
 - Broad release readiness.
 - 4+ file mutation support.
 - Broad `apply_patch`.
-- Mixed operation writes.
-- Multi-delete, multi-move, rollback, or fuzzy patch support.
-- Delete/move mixed with update/create support.
+- 3+ mixed operation writes.
+- Multi-delete, multi-move beyond exactly-two mixed lanes, rollback, or fuzzy
+  patch support.
 - External MCP readiness.
 - Default real-provider readiness.
 - Full runtime architecture completion.

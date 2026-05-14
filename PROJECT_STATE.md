@@ -75,13 +75,70 @@ The primary user-visible mainline is now:
 5. Result block stays minimal and actionable in compact mode
 6. Session remains ready for next turn with clear boundaries
 
-## 5. Latest Implemented Delta (through 2026-05-12)
+## 5. Latest Implemented Delta (through 2026-05-14)
 
 ### Current release-claims audit after Routes 01-08
 
 The current release/readiness claim is deliberately bounded: the project is
 limited dogfood ready and deterministic release-candidate green for the current
 verified surface. It is not broad/general release ready.
+
+### Route 48 / 49 edit capability consolidation
+
+Route 48 added guarded selected-workspace exactly-two mixed write support for
+these lanes only:
+
+- update + add
+- update + move
+- add + move
+- update + delete
+- add + delete
+- move + delete
+
+Route 49 is documentation/status consolidation only. It does not add product
+code, scripts, package scripts, default gates, provider behavior, session
+behavior, CLI behavior, MCP behavior, or readiness claims.
+
+Current implemented edit capabilities:
+
+- selected-workspace single-file update
+- selected-workspace single-file create
+- selected-workspace exactly-two update
+- selected-workspace exactly-three update
+- selected-workspace single-file move/rename
+- selected-workspace single-file delete
+- selected-workspace exactly-two mixed write lanes listed above
+
+Current implemented safety/result infrastructure:
+
+- per-file patch plan/result contract
+- per-file plan wired into route/result projections
+- malformed/unsupported/mixed fixture hardening
+- stale-read / read-before-write failure surface
+- partial/post-write verification failure surface
+- broad/delete/move/mixed no-write planning where unsupported
+- mixed-operation readiness projection
+- non-default evidence for exactly-three, move, delete, and mixed operation
+  writes
+
+Current unsupported edit capabilities remain explicit:
+
+- 3+ mixed writes
+- broad arbitrary apply_patch writes and broad unified diff writer
+- 4+ writes
+- multi-delete / multi-move beyond exactly-two mixed lanes
+- directory delete/move, overwrite, and outside-workspace operations
+- rollback, atomicity, snapshot/revert, stale-read recovery, partial failure
+  recovery, and fuzzy patch recovery
+- broad release readiness and default real-provider readiness
+
+Route 48 mixed writes are sequential in parsed patch order. No rollback or
+atomicity is claimed. A partial failure may leave verified `changedFiles` and
+separate `failedFiles`; result surfaces must report both accurately and future
+3+ mixed or broad apply_patch work requires a separate route.
+
+The single recommended next route is Route 50: broad apply_patch / 3+ mixed
+write readiness design, docs-first.
 
 ### Route 10 evaluation: 3-file planning no-write
 
@@ -137,8 +194,8 @@ Forbidden claims remain explicit:
 
 - no broad/general release readiness
 - no arbitrary project mutation readiness
-- no broad `apply_patch`, 3+ file writes, delete/move, rollback, or atomic
-  multi-file recovery readiness
+- no broad `apply_patch`, 4+ writes, 3+ mixed writes, multi-delete,
+  multi-move, rollback, or atomic multi-file recovery readiness
 - no external/user-configured MCP, remote MCP, or MCP ecosystem readiness
 - no real-provider default gate readiness or broad real-provider mutation
   readiness
@@ -1444,9 +1501,9 @@ Important boundaries:
    pipe-spawn interactive evidence in this environment
 2. execution success still depends on model/tool behavior; sealed real-provider
    smokes prove only their explicit isolated or selected-workspace routes
-3. broad `apply_patch`, mixed operation writes, 4+ writes, multi-delete,
-   multi-move, rollback/atomic write recovery, and true PTY automation remain
-   outside the sealed evidence
+3. broad `apply_patch`, 3+ mixed operation writes, 4+ writes, multi-delete,
+   multi-move beyond exactly-two mixed lanes, rollback/atomic write recovery,
+   and true PTY automation remain outside the sealed evidence
 4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow`
    write route remains disabled; an explicit CLI/runMvp no-write route exists,
    an explicit workspace write entrypoint has landed with durable
@@ -1474,10 +1531,10 @@ Escalate from hardening into focused implementation when one is reproducible:
   `patch-generation-failed`, `stale-read`, and `approval-denied` is now sealed;
   do not keep expanding same-family stopped replay fixtures unless a concrete
   stopped/resume regression appears.
-- If continuing apply_patch, the next implementation route should be Route 47:
-  mixed operation write readiness evaluation and no-write contract hardening;
-  it should evaluate mixed operation support, not immediately enable mixed
-  writes.
+- If continuing apply_patch, the next implementation route should be Route 50:
+  broad apply_patch / 3+ mixed write readiness design, docs-first. It should
+  decide rollback/snapshot versus explicit sequential/no-rollback semantics
+  before any broader writer is proposed.
 - Keep default production `apply_patch` enablement blocked until a separate
   review defines rollback behavior and default user-workspace safety policy.
 - Existing real-provider gates remain explicit opt-in evidence only; do not

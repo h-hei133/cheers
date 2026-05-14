@@ -1,13 +1,15 @@
 # Edit Capability Roadmap
 
-Route: 46
+Route: 49
 Date: 2026-05-14
-Status: consolidation only after Routes 40-45; no product-code, test, script, package, gate, provider, CLI, session, MCP, or readiness change
+Status: consolidation only after Route 48 exactly-two mixed write support; no
+product-code, test, script, package, gate, provider, CLI, session, MCP, or
+readiness change
 
 This document records the current edit / patch / mutation capability upper
 bound and the route sequence needed before broader edit support can be claimed.
 It is based on current target code, current target gates/docs, and the Route
-40-45 capability evidence.
+40-48 capability evidence.
 
 It is not a broad edit readiness claim.
 
@@ -28,17 +30,20 @@ single-file and exactly-two update writes:
   explicit delete/move lane.
 - Candidate: selected-workspace, guarded single-file delete through an explicit
   delete/move lane.
-- Unsupported/stopped: 4+ writes, broad arbitrary apply_patch writes, mixed
-  operation writes, multi-delete, multi-move, delete/move mixed with
-  update/create, rollback, snapshot/revert, stale-read recovery, partial
-  failure recovery, fuzzy patch recovery, broad release readiness, default
-  real-provider readiness, and arbitrary mutation.
+- Candidate: selected-workspace, exactly-two mixed write lanes through an
+  explicit mixed route: update + add, update + move, add + move,
+  update + delete, add + delete, and move + delete.
+- Unsupported/stopped: 3+ mixed writes, 4+ writes, broad arbitrary apply_patch
+  writes, multi-delete, multi-move, directory delete/move, overwrite,
+  outside-workspace operations, rollback, snapshot/revert, stale-read recovery,
+  partial failure recovery, fuzzy patch recovery, broad release readiness,
+  default real-provider readiness, and arbitrary mutation.
 
 The next implementation should not jump to broad apply_patch writes. The
-single recommended next route is **Route 47: mixed operation write readiness
-evaluation and no-write contract hardening**. That route should evaluate mixed
-operation support and strengthen no-write contracts; it should not immediately
-enable mixed writes.
+single recommended next route is **Route 50: broad apply_patch / 3+ mixed write
+readiness design, docs-first**. That route should decide whether rollback /
+snapshot must exist before broader writes, or whether the project should keep
+sequential no-rollback semantics for the next bounded expansion.
 
 ## 2. Current Edit Capability Inventory
 
@@ -106,6 +111,21 @@ enable mixed writes.
     regular-file target, explicit approval, post-delete verification, no
     rollback.
 
+- Selected-workspace exactly-two mixed write lanes
+  - Runtime owner: `mutationRoutingProjection.ts` dispatches
+    `patchIsExactlyTwoMixedWriteFiles()` to `runMixedFileWriteRoute()`.
+  - Write route: `patchResult/mixedFileWriteRoute.ts`.
+  - Result projection: `patchResult/mixedFileWriteResult.ts` and
+    `patchResult/perFilePatchPlan.ts`.
+  - Gate: `scripts/verify-mixed-operation-evidence.mjs`.
+  - Supported lanes: update + add, update + move, add + move, update + delete,
+    add + delete, and move + delete.
+  - Boundary: exactly two mixed operations from the guarded
+    update/create/move/delete lanes, explicit runtime opt-in, explicit
+    workspace-write opt-in, approved user decision, all preflight/final
+    preflight before writer, parsed-order sequential writes, per-file
+    post-write verification, no rollback or atomicity claim.
+
 ### No-Write Classification / Contract Infrastructure
 
 - Multi-file dry-run classification for two-file update in no-write paths
@@ -121,15 +141,23 @@ enable mixed writes.
     `failedFiles`, invocation flags, post-write verification, and terminal
     semantics.
 
+- Mixed-operation readiness and no-write projection
+  - Owner: `patchResult/mixedOperationReadiness.ts`,
+    `patchResult/perFilePatchPlan.ts`, and unsupported route/result
+    projections.
+  - Status: implemented for mixed-operation classification and Route 48
+    exactly-two mixed support while preserving 3+ mixed and broad apply_patch
+    no-write boundaries.
+
 ### Explicitly Unsupported
 
+- 3+ mixed writes.
 - 4+ writes.
 - Broad arbitrary apply_patch writes.
-- Mixed operation writes.
-- Multi-delete.
-- Multi-move.
-- Delete/move mixed with update/create.
-- Mixed add/update/delete/move patches.
+- Multi-delete or multi-move beyond the exactly-two mixed lanes listed above.
+- Directory delete or directory move.
+- Overwrite and outside-workspace operations.
+- Broad unified diff writer.
 - Rollback, snapshot restore, or atomic multi-file recovery.
 - Fuzzy patch recovery.
 - Stale-read recovery beyond blocking and asking the user/model to re-read.
@@ -145,10 +173,9 @@ The project currently does not claim:
 - broad/general release readiness
 - broad apply_patch support
 - arbitrary project mutation readiness
-- mixed operation write support
+- 3+ mixed operation write support
 - 4+ write support
-- multi-delete or multi-move support
-- delete/move mixed with update/create support
+- multi-delete or multi-move support beyond the exactly-two mixed lanes
 - rollback/snapshot/revert support
 - atomic multi-file recovery
 - fuzzy patch support
@@ -168,8 +195,8 @@ User / CLI / provider output
    status: implemented narrow dispatch in mutationRoutingProjection.ts.
 -> capability boundary check
    status: implemented for single update, single add, exactly-two update,
-   exactly-three update, single move, single delete, per-file plan projection,
-   and unsupported shapes.
+   exactly-three update, single move, single delete, exactly-two mixed write
+   lanes, per-file plan projection, and unsupported shapes.
 -> workspace boundary check
    status: implemented through workspaceAuthority.ts and path checks before
    selected-workspace writes.
@@ -178,8 +205,9 @@ User / CLI / provider output
    projection from authorizing writes.
 -> patch application / selected workspace writer
    status: implemented only for single update, single add, exactly-two update,
-   exactly-three update, guarded single move, and guarded single delete;
-   broad, mixed, 4+, multi-delete, and multi-move apply_patch shapes are
+   exactly-three update, guarded single move, guarded single delete, and
+   exactly-two mixed write lanes; broad, 3+ mixed, 4+, multi-delete, and
+   multi-move apply_patch shapes are
    explicitly unsupported.
 -> post-write verification
    status: implemented for selected write routes; blocked/failed routes do not
@@ -187,8 +215,9 @@ User / CLI / provider output
 -> result projection
    status: implemented through workspaceWriteResult.ts,
    workspaceCreateResult.ts, multiFileWriteResult.ts, workspaceMoveResult.ts,
-   workspaceDeleteResult.ts, multiFilePlanningResult.ts,
-   mutationVerificationProjection.ts, and perFilePatchPlan.ts.
+   workspaceDeleteResult.ts, mixedFileWriteResult.ts,
+   multiFilePlanningResult.ts, mutationVerificationProjection.ts, and
+   perFilePatchPlan.ts.
 -> session continuity
    status: implemented for changed/failed/planned surfaces covered by current
    synthetic gates; real-provider continuity is not broadly claimed.
@@ -201,23 +230,24 @@ User / CLI / provider output
 
 | Capability | Status | Evidence | Evidence strength | Gaps | Next route if any |
 | --- | --- | --- | --- | --- | --- |
-| Single existing-file `Update File` write | Implemented MVP/candidate surface | `mutationRoutingProjection.ts`, `workspaceWriteRoute.ts`, `singleFileUpdateApply.ts`, `workspaceWriteResult.ts`, `verify:real-user-capabilities -- --tier=mvp`, opt-in real single-file case in `verify-real-user-capabilities.mjs` | A for opt-in real smoke, B/C for deterministic gates | Not broad apply_patch; one selected file only | None |
-| Single `Add File` create | Implemented candidate | `workspaceCreateRoute.ts`, `singleFileCreateApply.ts`, `workspaceCreateResult.ts`, `synthetic-selected-workspace-single-file-create`, opt-in real create case | A for opt-in real smoke, B/C for synthetic | No parent directory creation; no update/delete/move mixing | None |
-| Exactly-two existing-file update write | Implemented candidate | `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `multiFileWriteResult.ts`, `synthetic-selected-workspace-two-file-update`, `verify:real-user-capabilities:two-file-cli-evidence`, opt-in real two-file case | A for opt-in real smoke, A/B for CLI/synthetic | Sequential write; partial failure may leave verified prefix; no rollback | Later partial-failure recovery evaluation |
-| Exactly-three existing-file update write | Implemented candidate | `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `multiFileWriteResult.ts`, `verify:real-user-capabilities:three-file-guarded-write` | B/C | Sequential write; partial failure may leave verified prefix; no rollback; non-default only | Later partial-failure recovery evaluation |
-| Single-file move/rename | Implemented candidate | `workspaceMoveRoute.ts`, `singleFileMoveApply.ts`, `workspaceMoveResult.ts`, `verify:real-user-capabilities:single-file-move-evidence` | B/C | One regular-file source and exclusive target only; no multi-move or mixed move/update writes; no rollback | Later destructive-operation hardening |
-| Single-file delete | Implemented candidate | `workspaceDeleteRoute.ts`, `singleFileDeleteApply.ts`, `workspaceDeleteResult.ts`, `verify:real-user-capabilities:single-file-delete-evidence` | B/C | One existing regular-file target only; no multi-delete or mixed delete/update writes; no rollback | Later destructive-operation hardening |
-| Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, Route 08 unsupported E2E, Route 11/12 continuity checks, Route 40-45 evidence scripts | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Route 47 mixed-operation no-write hardening |
-| 4+ update requests | Explicitly unsupported | `multiFileUpdatePlanning.ts` returns `too-many-update-files`; guarded-write and unsupported-patch evidence cover unsupported 4+ shapes | B/C | No write support | Route 47 should keep no-write contract explicit |
-| Mixed supported/unsupported patch | Explicitly unsupported | `multiFileUpdatePlanning.ts` / `perFilePatchPlan.ts` classify mixed operations as unsupported; Route 08 unsupported E2E scenarios and guarded-write evidence include mixed shapes | B/C | Need readiness evaluation before any mixed write route | Route 47 |
-| Multi-delete / multi-move / delete-move mixed with update/create | Explicitly unsupported | `perFilePatchPlan.ts`, Route 08 unsupported E2E, single-file move/delete evidence keeps invalid destructive shapes no-write | B/C | No multi-destructive or mixed destructive writer | Later only after Route 47 evaluation |
-| Malformed model output | Explicitly stopped/error | `patchParsing/parser.ts`; `singleFileApplyPatchDryRun.ts` parse-failure blocked surface; `verify:real-user-capabilities:unsupported-patch-e2e` malformed scenario | B/C/D | Real-provider malformed-output dogfood remains opt-in/non-default | Later unsupported-output dogfood |
-| Workspace boundary | Implemented for selected writes | `workspaceAuthority.ts`, `verifyParsedPatch()`, route-level `pathStaysInsideWorkspace()` checks | C/D/F | More generalized descriptor authority needed before broad operations | Route 47 should not widen writes |
-| Final stale-read | Implemented as blocker, not recovery | `workspaceWriteRoute.ts`, `multiFileWriteRoute.ts`, `mutationExecution.ts`, `singleFileApplyPatchFinalStaleRead.ts` | C/D | No automatic stale-read recovery; no full read-state ledger like Claude Code | Later stale-read route |
-| Post-write verification | Implemented for selected writes | `workspaceWriteRoute.ts`, `workspaceCreateRoute.ts`, `multiFileWriteRoute.ts`, `workspaceMoveRoute.ts`, `workspaceDeleteRoute.ts`, route application modules | C/D | No rollback after post-write failure | Later partial-failure route |
-| Partial failure surface | Implemented stopped surface for multi-file routes | `multiFileUpdateApply.ts`, `multiFileWriteRoute.ts`, `multiFileWriteResult.ts`, candidate partial-failure cases | B/C | No automatic repair or rollback; user inspection required | Later partial-failure route |
-| changedFiles / failedFiles / plannedFiles | Implemented with per-file plan support | Route result modules plus `perFilePatchPlan.ts`, `sessionStateSurface.ts`, and `sessionRuntime.ts`; planned-files continuity and result-contract verifiers | B/C | Mixed operations still need no-write hardening before any writer claim | Route 47 |
-| Rollback / atomicity | Explicitly unsupported | `multiFileWriteRoute.ts` says sequential write/no rollback; Route 11 verifier requires rollback/atomicity claim false | B/C | No snapshot layer in target project | Deferred until mature plan/result model |
+| Single existing-file `Update File` write | Implemented MVP/candidate surface | `mutationRoutingProjection.ts`, `workspaceWriteRoute.ts`, `singleFileUpdateApply.ts`, `workspaceWriteResult.ts`, `verify:real-user-capabilities -- --tier=mvp`, opt-in real single-file case in `verify-real-user-capabilities.mjs` | A for opt-in real smoke, B/C for deterministic gates | Not broad apply_patch; one selected file only | None for Route 49 |
+| Single `Add File` create | Implemented candidate | `workspaceCreateRoute.ts`, `singleFileCreateApply.ts`, `workspaceCreateResult.ts`, `synthetic-selected-workspace-single-file-create`, opt-in real create case | A for opt-in real smoke, B/C for synthetic | No parent directory creation; no broad mixed expansion beyond Route 48 lanes | None for Route 49 |
+| Exactly-two existing-file update write | Implemented candidate | `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `multiFileWriteResult.ts`, `synthetic-selected-workspace-two-file-update`, `verify:real-user-capabilities:two-file-cli-evidence`, opt-in real two-file case | A for opt-in real smoke, A/B for CLI/synthetic | Sequential write; partial failure may leave verified prefix; no rollback | Route 50 only if broader write design needs this risk |
+| Exactly-three existing-file update write | Implemented candidate | `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `multiFileWriteResult.ts`, `verify:real-user-capabilities:three-file-guarded-write` | B/C | Sequential write; partial failure may leave verified prefix; no rollback; non-default only | Route 50 only if broader write design needs this risk |
+| Single-file move/rename | Implemented candidate | `workspaceMoveRoute.ts`, `singleFileMoveApply.ts`, `workspaceMoveResult.ts`, `verify:real-user-capabilities:single-file-move-evidence` | B/C | One regular-file source and exclusive target only; no multi-move, directory move, overwrite, or rollback | Route 50 only if broader write design needs this risk |
+| Single-file delete | Implemented candidate | `workspaceDeleteRoute.ts`, `singleFileDeleteApply.ts`, `workspaceDeleteResult.ts`, `verify:real-user-capabilities:single-file-delete-evidence` | B/C | One existing regular-file target only; no multi-delete, directory delete, or rollback | Route 50 only if broader write design needs this risk |
+| Exactly-two mixed write lanes | Implemented candidate | `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, `verify:real-user-capabilities:mixed-operation-evidence` | B/C | Sequential parsed-order writes; partial failure may leave verified changed files and failed files; no rollback/atomicity; no 3+ mixed or broad apply_patch | Route 50 docs-first readiness design |
+| Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, Route 08 unsupported E2E, Route 11/12 continuity checks, Route 40-48 evidence scripts | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Route 50 docs-first readiness design |
+| 4+ update requests | Explicitly unsupported | `multiFileUpdatePlanning.ts` returns `too-many-update-files`; guarded-write and unsupported-patch evidence cover unsupported 4+ shapes | B/C | No write support | Route 50 docs-first readiness design |
+| 3+ mixed operations | Explicitly unsupported | `perFilePatchPlan.ts`, Route 08 unsupported E2E, `verify:real-user-capabilities:mixed-operation-evidence` keeps 3+ mixed no-write | B/C | No writer support; no rollback/atomicity decision for larger mixed sets | Route 50 docs-first readiness design |
+| Multi-delete / multi-move beyond exactly-two mixed lanes | Explicitly unsupported | `perFilePatchPlan.ts`, Route 08 unsupported E2E, single-file move/delete evidence, mixed-operation evidence keeps invalid destructive shapes no-write | B/C | No broad multi-destructive writer; directory delete/move and overwrite remain blocked | Route 50 docs-first readiness design |
+| Malformed model output | Explicitly stopped/error | `patchParsing/parser.ts`; `singleFileApplyPatchDryRun.ts` parse-failure blocked surface; `verify:real-user-capabilities:unsupported-patch-e2e` malformed scenario | B/C/D | Real-provider malformed-output dogfood remains opt-in/non-default | None for Route 49 |
+| Workspace boundary | Implemented for selected writes | `workspaceAuthority.ts`, `verifyParsedPatch()`, route-level `pathStaysInsideWorkspace()` checks | C/D/F | More generalized descriptor authority needed before broad operations | Route 50 should not widen writes |
+| Final stale-read | Implemented as blocker, not recovery | `workspaceWriteRoute.ts`, `multiFileWriteRoute.ts`, `mutationExecution.ts`, `singleFileApplyPatchFinalStaleRead.ts` | C/D | No automatic stale-read recovery; no full read-state ledger like Claude Code | Route 50 only if broader write design needs this risk |
+| Post-write verification | Implemented for selected writes | `workspaceWriteRoute.ts`, `workspaceCreateRoute.ts`, `multiFileWriteRoute.ts`, `workspaceMoveRoute.ts`, `workspaceDeleteRoute.ts`, route application modules | C/D | No rollback after post-write failure | Route 50 only if broader write design needs this risk |
+| Partial failure surface | Implemented stopped surface for multi-file routes | `multiFileUpdateApply.ts`, `multiFileWriteRoute.ts`, `multiFileWriteResult.ts`, candidate partial-failure cases | B/C | No automatic repair or rollback; user inspection required | Route 50 only if broader write design needs this risk |
+| changedFiles / failedFiles / plannedFiles | Implemented with per-file plan support | Route result modules plus `perFilePatchPlan.ts`, `sessionStateSurface.ts`, and `sessionRuntime.ts`; planned-files continuity, mixed-operation, and result-contract verifiers | B/C | 3+ mixed and broad apply_patch still need readiness design before any writer claim | Route 50 |
+| Rollback / atomicity | Explicitly unsupported | `multiFileWriteRoute.ts` says sequential write/no rollback; Route 11 verifier requires rollback/atomicity claim false | B/C | No snapshot layer in target project | Route 50 should decide prerequisite status |
 
 Evidence strength scale: A = real-provider / real CLI / real runtime gate,
 B = synthetic E2E / golden main path, C = focused integration test, D = unit /
@@ -265,8 +295,9 @@ Ideas rejected/deferred:
 Concrete implication:
 
 - The target should keep failed edit details visible in session surfaces before
-  adding broader writers. The next route should harden mixed-operation no-write
-  metadata and non-claims, not broaden execution.
+  adding broader writers. Route 48 broadened execution only to exactly-two
+  mixed lanes; the next route should decide broad apply_patch / 3+ mixed
+  readiness before adding another writer.
 
 ## 7. Reference Comparison: opencode
 
@@ -308,8 +339,9 @@ Ideas rejected/deferred:
 Concrete implication:
 
 - The target has adopted a per-file patch-plan/result representation for the
-  current route set. The next route should keep mixed-operation evaluation
-  no-write and avoid snapshot/revert or broad writer support.
+  current route set. Route 48 uses it for exactly-two mixed writes; the next
+  route should avoid snapshot/revert or broad writer support until those
+  semantics are designed explicitly.
 
 ## 8. Reference Comparison: Gemini CLI
 
@@ -385,8 +417,9 @@ Concrete implication:
     and unsupported route/result paths, but it is not a broad writer contract.
   - Missing broad unsupported-output dogfood outside deterministic real-model-
     like fixtures.
-  - Missing a user-visible result contract that can explain mixed partial
-    planning without sounding like success.
+  - Missing a design decision for ordering, destructive confirmation,
+    rollback/snapshot, and partial failure when arbitrary patch families are
+    combined.
 
 - Before 4+ writes:
   - Missing explicit decision whether sequential/no-rollback remains acceptable
@@ -396,13 +429,15 @@ Concrete implication:
   - Missing evidence that session/result surfaces remain understandable for
     larger changed/failed file sets.
 
-- Before mixed operation writes:
-  - Missing readiness evaluation for add/update/delete/move combinations.
+- Before 3+ mixed operation writes:
+  - Exactly-two mixed lanes have guarded support, but larger mixed sets remain
+    unsupported.
   - Missing proof that changedFiles, plannedFiles, failedFiles, write intents,
-    invocation flags, and post-write verification remain correct when operation
-    kinds differ in one patch.
-  - Missing decision on whether mixed destructive operations require a stronger
-    approval or rollback prerequisite before any writer is reachable.
+    invocation flags, and post-write verification remain understandable beyond
+    two mixed operations.
+  - Missing decision on whether broader mixed destructive operations require a
+    stronger approval, rollback prerequisite, or snapshot layer before any
+    writer is reachable.
 
 - Before multi-delete / multi-move:
   - Missing operation-specific evidence for more than one destructive target.
@@ -436,8 +471,10 @@ Concrete implication:
 - Persistence risk: result/session surfaces must not label planned files as
   changed files.
 - Partial write risk: the exactly-two and exactly-three update routes are
-  sequential and have no rollback; partial failure must remain stopped with
-  user inspection required.
+  sequential, and Route 48 mixed writes are also sequential in parsed order.
+  No rollback or atomicity is claimed; partial failure may leave verified
+  `changedFiles` plus `failedFiles`, and the result surface must report both
+  accurately with user inspection required.
 - Workspace risk: single-file delete/move authority now exists, but
   multi-destructive and mixed destructive operations would broaden authority
   again and require a separate plan.
@@ -449,54 +486,52 @@ Concrete implication:
 ## 13. Proposed Route Sequence
 
 Do not continue by default into broad apply_patch writes. The next route should
-evaluate one remaining boundary and harden no-write semantics before any new
-writer is proposed.
+evaluate broader write readiness before any new writer is proposed.
 
-### Route 47: Mixed Operation Write Readiness Evaluation And No-Write Contract Hardening
+### Route 50: Broad Apply Patch / 3+ Mixed Write Readiness Design, Docs-First
 
-- Objective: evaluate mixed add/update/delete/move operation support and harden
-  the current no-write contract for mixed shapes.
-- Allowed files: focused patchResult planning/projection modules, focused
-  tests, and non-default verifier fixtures only if the route explicitly needs
-  them.
+- Objective: decide whether broad apply_patch / 3+ mixed support requires
+  rollback/snapshot first, or whether the project will deliberately continue
+  with sequential no-rollback semantics under a narrower route.
+- Allowed files: docs/status/design artifacts only unless the route explicitly
+  opens focused tests or projection work.
 - Forbidden files: provider/auth core, default gates, broad apply_patch writer,
-  rollback/snapshot implementation, session lifecycle, CLI lifecycle, MCP
-  behavior, and product readiness claims.
-- Behavior boundaries: no mixed-operation writer by default; unsupported mixed
-  shapes must remain stopped/no-write unless a later route proves every
-  execution, authorization, verification, and recovery boundary.
-- Validation commands: focused mixed-operation tests, Route 08 unsupported E2E,
-  result-contract verification if result surface changes, and diff checks.
-- Success criteria: explicit go/no-go criteria for mixed writes, stable
-  changed/planned/failed/write-intent/invocation/post-verification semantics,
-  and no broad readiness claim.
+  3+ mixed writer, rollback/snapshot implementation, session lifecycle, CLI
+  lifecycle, MCP behavior, and product readiness claims.
+- Behavior boundaries: no broad apply_patch writer and no 3+ mixed writer.
+  Unsupported shapes must remain stopped/no-write unless a later route proves
+  execution, authorization, ordering, verification, partial failure, and
+  recovery boundaries.
+- Validation commands: diff checks plus any focused no-write contract checks
+  explicitly required by the route.
+- Success criteria: a concrete go/no-go decision for broader writes, explicit
+  rollback/atomicity stance, and no broad readiness claim.
 - Stop conditions: needing rollback, persistence schema migration, provider
   behavior, CLI/session lifecycle changes, or broad apply_patch execution.
 - Readiness claim impact: no new write readiness unless a separate
-  implementation route is opened after the evaluation.
+  implementation route is opened after the design.
 
 ## 14. First Recommended Implementation Route
 
 Exactly one next implementation route is recommended:
 
-**Route 47: Mixed Operation Write Readiness Evaluation And No-Write Contract
-Hardening.**
+**Route 50: Broad Apply Patch / 3+ Mixed Write Readiness Design, Docs-First.**
 
 Why this is first:
 
-- Routes 40-45 already moved exactly-three update, single-file move, and
-  single-file delete beyond planning into guarded candidate write support.
-- Mixed add/update/delete/move patches remain the next boundary most likely to
-  confuse result/session surfaces because supported and unsupported operation
-  kinds can appear in one patch.
-- A readiness evaluation can keep the current no-write contract stable while
-  deciding whether mixed writes require rollback, stronger approval, or a
-  different sequencing model.
+- Routes 40-48 expanded the write surface from single-file update through
+  exactly-three update, single-file create/move/delete, and exactly-two mixed
+  writes.
+- The next jump, 3+ mixed or broad apply_patch, raises ordering, rollback,
+  destructive confirmation, and partial failure risks beyond the current
+  evidence.
+- A docs-first route can decide whether to build rollback/snapshot first or to
+  continue with explicitly sequential/no-rollback semantics.
 
-Non-goals for Route 47:
+Non-goals for Route 50:
 
 - no broad apply_patch writer
-- no immediate mixed-operation writer
+- no 3+ mixed writer
 - no 4+ writes
 - no multi-delete or multi-move writes
 - no rollback/snapshot/revert implementation
@@ -508,23 +543,24 @@ Non-goals for Route 47:
 
 ## 15. Validation Strategy
 
-For this docs-only Route 46 consolidation:
+For this docs-only Route 49 consolidation:
 
 - `rtk git status --short --branch`
 - `rtk git diff --check`
+- `rtk npm run verify:real-user-capabilities:mixed-operation-evidence`
 - `rtk npm run verify:real-user-capabilities:three-file-guarded-write`
 - `rtk npm run verify:real-user-capabilities:single-file-move-evidence`
 - `rtk npm run verify:real-user-capabilities:single-file-delete-evidence`
 - `rtk npm run verify:real-user-capabilities:unsupported-patch-e2e`
 - `rtk npm run verify:result-contract`
 - `rtk npm run build -w packages/ts-shell`
+- `rtk npm run verify:release:deterministic`
 
-For Route 47 if implemented later:
+For Route 50 if opened later:
 
-- focused tests for mixed-operation plan/result contract changes
-- `rtk npm run verify:result-contract` if terminal/result semantics change
-- `rtk npm run verify:real-user-capabilities:unsupported-patch-e2e`
-- `rtk git diff --check`
+- docs-first readiness review before implementation
+- focused no-write/result-contract tests only if the route changes projection
+  wording or fixtures
 - no full real-provider execution unless the route explicitly opens an opt-in
   real-provider gate
 
@@ -533,7 +569,7 @@ For Route 47 if implemented later:
 Stop and split into a separate route if the next step requires:
 
 - new writer reachability
-- mixed operation writes
+- 3+ mixed operation writes
 - 4+ writes
 - multi-delete or multi-move writes
 - broad apply_patch writes
@@ -555,20 +591,19 @@ This roadmap changes no readiness claim.
 Allowed after this document:
 
 - The project has a current edit capability upper-bound roadmap after Routes
-  40-45.
+  40-48.
 - The current implemented edit surface includes selected-workspace single-file
   update/create, exactly-two update, exactly-three update, guarded single-file
-  move, and guarded single-file delete.
-- Route 47 is the single recommended next implementation route.
+  move, guarded single-file delete, and exactly-two mixed write lanes.
+- Route 50 is the single recommended next implementation route.
 
 Forbidden after this document:
 
 - broad apply_patch readiness
 - arbitrary mutation readiness
-- mixed operation write readiness
+- 3+ mixed operation write readiness
 - 4+ write readiness
 - multi-delete or multi-move readiness
-- delete/move mixed with update/create readiness
 - rollback/atomicity readiness
 - fuzzy edit readiness
 - full Claude Code/opencode/Gemini CLI parity
