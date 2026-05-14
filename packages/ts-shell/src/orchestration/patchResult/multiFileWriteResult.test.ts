@@ -191,6 +191,27 @@ describe("multi-file apply_patch workspace write result", () => {
         },
       }),
     ]);
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal,
+    ).toEqual(
+      expect.objectContaining({
+        source: "route-scoped-edit-journal",
+        routeId: "multi-file-apply-patch-workspace-write",
+        changedFiles: ["src/a.ts"],
+        verifiedFiles: ["src/a.ts"],
+        failedFiles: [
+          {
+            path: "src/b.ts",
+            reason: expect.stringContaining("Patch write failed"),
+            failureClass: "write-application",
+          },
+        ],
+        recoveryCandidateFiles: ["src/a.ts"],
+        rollbackAtomicityClaim: false,
+        recoveryExecuted: false,
+        writeCapability: "metadata-only",
+      }),
+    );
     expect(result.codingResult?.lastActionResultSeed).toMatchObject({
       target: "src/b.ts",
       changedFiles: ["src/a.ts"],
@@ -250,6 +271,25 @@ describe("multi-file apply_patch workspace write result", () => {
         writerInvoked: true,
         postWriteVerification: "failed",
         successLike: false,
+      }),
+    );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal,
+    ).toEqual(
+      expect.objectContaining({
+        routeId: "multi-file-apply-patch-workspace-write",
+        changedFiles: ["src/a.ts"],
+        failedFiles: [
+          {
+            path: "src/b.ts",
+            reason: expect.stringContaining("post-write verification failed"),
+            failureClass: "post-write-verification",
+          },
+        ],
+        unrecoveredFiles: ["src/b.ts"],
+        recoveryCandidateFiles: ["src/a.ts", "src/b.ts"],
+        rollbackAtomicityClaim: false,
+        recoveryExecuted: false,
       }),
     );
     expect(result.codingResult?.lastActionResultSeed).toMatchObject({
@@ -324,6 +364,14 @@ describe("multi-file apply_patch workspace write result", () => {
         successLike: false,
       }),
     );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal?.changedFiles,
+    ).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal?.failedFiles.map(
+        (failure) => failure.path,
+      ),
+    ).toEqual(["src/c.ts"]);
   });
 });
 
