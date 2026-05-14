@@ -4,6 +4,10 @@ import { buildNoPartialPatchApplicationContract } from "../patchApplication/noPa
 import { parseApplyPatchText } from "../patchParsing/parser.js";
 import type { PatchFailure, PatchFileOperation } from "../patchParsing/types.js";
 import { verifyParsedPatch } from "../patchVerification/verify.js";
+import {
+  buildPerFilePatchPlan,
+  type PerFilePatchPlan,
+} from "./perFilePatchPlan.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
 import type { WorkspaceCreateTargetAuthority } from "./workspaceAuthority.js";
 import {
@@ -54,6 +58,7 @@ export type WorkspaceCreateRoute =
       readonly source: "single-file-apply-patch-workspace-create-route";
       readonly status: "created";
       readonly targetPath: string;
+      readonly perFilePatchPlan?: PerFilePatchPlan;
       readonly workspaceWriterInvoked: true;
       readonly writerTarget: "selected-workspace";
       readonly selectedWorkspaceWrite: true;
@@ -77,6 +82,7 @@ export type WorkspaceCreateRoute =
       readonly status: "blocked";
       readonly blocker: WorkspaceCreateRouteBlocker;
       readonly targetPath?: string;
+      readonly perFilePatchPlan?: PerFilePatchPlan;
       readonly failures: readonly PatchFailure[];
       readonly workspaceWriterInvoked: boolean;
       readonly writerTarget: "none" | "selected-workspace";
@@ -136,10 +142,18 @@ export async function runWorkspaceCreateRoute(
     });
   }
 
+  const perFilePatchPlan = buildPerFilePatchPlan({
+    workspaceRoot: options.workspaceRoot,
+    rawPatchText: options.rawPatchText,
+    readFile: options.readFile,
+    directoryExists: options.directoryExists,
+  });
+
   const parsed = parseApplyPatchText(options.rawPatchText);
   if (parsed.ok === false) {
     return blocked({
       blocker: "patch-parse",
+      perFilePatchPlan,
       failures: [parsed.failure],
       nextAction: parsed.failure.nextAction,
       evidence: ["apply-patch-workspace-create-route:parse-blocked"],
@@ -150,6 +164,7 @@ export async function runWorkspaceCreateRoute(
   if (!addOperation) {
     return blocked({
       blocker: "unsupported-operation",
+      perFilePatchPlan,
       failures: [unsupportedCreateFailure(parsed.patch.operations)],
       nextAction:
         "Use exactly one Add File operation. Update, delete, move, mixed, and multi-file patches are outside this create route.",
@@ -164,6 +179,7 @@ export async function runWorkspaceCreateRoute(
     return blocked({
       blocker: "workspace-write-opt-in-missing",
       targetPath: addOperation.path,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         "Keep Add File no-write unless the selected-workspace write entrypoint is explicitly opted in.",
@@ -177,6 +193,7 @@ export async function runWorkspaceCreateRoute(
     return blocked({
       blocker: "write-decision",
       targetPath: addOperation.path,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         options.requestedUserDecision === "denied"
@@ -194,6 +211,7 @@ export async function runWorkspaceCreateRoute(
     return blocked({
       blocker: "workspace-boundary",
       targetPath: addOperation.path,
+      perFilePatchPlan,
       failures: [patchFailureFromCreateAuthority(addOperation.path, targetAuthority)],
       nextAction: targetAuthority.message,
       evidence: [
@@ -213,6 +231,7 @@ export async function runWorkspaceCreateRoute(
     return blocked({
       blocker: "patch-verification",
       targetPath: addOperation.path,
+      perFilePatchPlan,
       failures: verification.failures,
       nextAction:
         verification.failures[0]?.nextAction ??
@@ -226,6 +245,7 @@ export async function runWorkspaceCreateRoute(
     return blocked({
       blocker: "patch-verification",
       targetPath: addOperation.path,
+      perFilePatchPlan,
       failures: writeIntent.failures,
       nextAction:
         writeIntent.failures[0]?.nextAction ??
@@ -244,6 +264,7 @@ export async function runWorkspaceCreateRoute(
     return blocked({
       blocker: "target-mismatch",
       targetPath: addOperation.path,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         "Only one approval-bound Add File target may enter the workspace create route.",
@@ -255,6 +276,7 @@ export async function runWorkspaceCreateRoute(
     return blocked({
       blocker: "workspace-boundary",
       targetPath: intent.path,
+      perFilePatchPlan,
       failures: [],
       nextAction: "Refuse to create outside the selected workspace.",
       evidence: ["apply-patch-workspace-create-route:workspace-boundary-blocked"],
@@ -266,6 +288,7 @@ export async function runWorkspaceCreateRoute(
     return blocked({
       blocker: "final-create-preflight",
       targetPath: intent.path,
+      perFilePatchPlan,
       failures: [patchFailureFromCreateAuthority(intent.path, finalAuthority)],
       nextAction: finalAuthority.message,
       evidence: [
@@ -283,6 +306,7 @@ export async function runWorkspaceCreateRoute(
     return blocked({
       blocker: "aborted-before-write",
       targetPath: intent.path,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         "Stop: apply_patch workspace create was aborted after final create preflight but before the workspace writer ran.",
@@ -314,6 +338,7 @@ export async function runWorkspaceCreateRoute(
     return blocked({
       blocker,
       targetPath: intent.path,
+      perFilePatchPlan,
       failures: applied.failedFiles,
       workspaceWriterInvoked: true,
       writerTarget: "selected-workspace",
@@ -339,6 +364,7 @@ export async function runWorkspaceCreateRoute(
     source: "single-file-apply-patch-workspace-create-route",
     status: "created",
     targetPath,
+    perFilePatchPlan,
     workspaceWriterInvoked: true,
     writerTarget: "selected-workspace",
     selectedWorkspaceWrite: true,
@@ -462,6 +488,7 @@ function blocked(
   input: {
     readonly blocker: WorkspaceCreateRouteBlocker;
     readonly targetPath?: string;
+    readonly perFilePatchPlan?: PerFilePatchPlan;
     readonly failures: readonly PatchFailure[];
     readonly workspaceWriterInvoked?: boolean;
     readonly writerTarget?: "none" | "selected-workspace";
@@ -484,6 +511,7 @@ function blocked(
     status: "blocked",
     blocker: input.blocker,
     ...(input.targetPath ? { targetPath: input.targetPath } : {}),
+    ...(input.perFilePatchPlan ? { perFilePatchPlan: input.perFilePatchPlan } : {}),
     failures: input.failures,
     workspaceWriterInvoked: input.workspaceWriterInvoked ?? false,
     writerTarget: input.writerTarget ?? "none",

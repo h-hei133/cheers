@@ -8,6 +8,7 @@ import type {
   OrchestrationResult,
 } from "../types.js";
 import type { NoWriteRuntimeRoute } from "./noWriteRuntimeRoute.js";
+import { projectPerFilePatchResult } from "./perFilePatchPlan.js";
 
 export function buildNoWriteRuntimeRouteResult(input: {
   readonly sessionId: string;
@@ -42,6 +43,18 @@ function buildCodingResult(route: NoWriteRuntimeRoute): CodingResultSummary {
 
   return {
     taskKind: "edit-file",
+    ...(route.perFilePatchPlan
+      ? {
+          perFilePatchPlan: projectPerFilePatchResult({
+            plan: route.perFilePatchPlan,
+            changedFiles: [],
+            writerInvoked: false,
+            creatorInvoked: false,
+            deleteMoveInvoked: false,
+            postWriteVerification: "not-run",
+          }),
+        }
+      : {}),
     changedFiles: [],
     failedFiles: [{ path: target, reason }],
     patches: [

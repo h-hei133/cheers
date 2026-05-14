@@ -1,5 +1,9 @@
 import { buildSingleFileApplyPatchOptInDryRunRoute } from "./singleFileApplyPatchOptInDryRunRoute.js";
 import {
+  buildPerFilePatchPlan,
+  type PerFilePatchPlan,
+} from "./perFilePatchPlan.js";
+import {
   buildSingleFileApplyPatchPermissionUxRealRouteSeam,
   type SingleFileApplyPatchPermissionUxRealRouteStatus,
 } from "./singleFileApplyPatchPermissionUxRealRouteSeam.js";
@@ -36,6 +40,7 @@ export interface NoWriteRuntimeRoute {
   readonly consumesSafeRouteProjection: true;
   readonly targetPath?: string;
   readonly previewSummary?: readonly string[];
+  readonly perFilePatchPlan?: PerFilePatchPlan;
   readonly terminalClassification: "stopped";
   readonly willWrite: false;
   readonly changedFiles: readonly [];
@@ -103,6 +108,11 @@ export function buildNoWriteRuntimeRoute(
     });
   }
 
+  const perFilePatchPlan = buildPerFilePatchPlan({
+    workspaceRoot: input.workspaceRoot,
+    rawPatchText: input.rawPatchText,
+    readFile: input.readFile,
+  });
   const permissionSeam = buildSingleFileApplyPatchPermissionUxRealRouteSeam({
     routeResult: route,
     ...(input.requestedUserDecision
@@ -120,6 +130,7 @@ export function buildNoWriteRuntimeRoute(
     explicitRuntimeOptIn: true,
     targetPath: permissionSeam.targetPath,
     previewSummary: permissionSeam.previewSummary,
+    perFilePatchPlan,
     displayLines: permissionSeam.displayLines,
     nextAction: permissionSeam.nextAction,
     evidence: [
@@ -140,6 +151,7 @@ function baseRoute(input: {
   readonly explicitRuntimeOptIn: boolean;
   readonly targetPath?: string;
   readonly previewSummary?: readonly string[];
+  readonly perFilePatchPlan?: PerFilePatchPlan;
   readonly displayLines: readonly string[];
   readonly nextAction: string;
   readonly evidence: readonly string[];
@@ -155,6 +167,7 @@ function baseRoute(input: {
     consumesSafeRouteProjection: true,
     ...(input.targetPath ? { targetPath: input.targetPath } : {}),
     ...(input.previewSummary ? { previewSummary: input.previewSummary } : {}),
+    ...(input.perFilePatchPlan ? { perFilePatchPlan: input.perFilePatchPlan } : {}),
     terminalClassification: "stopped",
     willWrite: false,
     changedFiles: [],

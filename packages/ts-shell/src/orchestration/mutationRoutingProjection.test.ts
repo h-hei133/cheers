@@ -60,6 +60,20 @@ describe("apply_patch mutation routing projection", () => {
     expect(result?.status).toBe("stopped_error");
     expect(result?.terminalClassification).toBe("stopped");
     expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/a.ts"],
+        changedFiles: [],
+        plannedFiles: [],
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "not-run",
+        successLike: false,
+      }),
+    );
     expect(result?.codingResult?.evidence).toEqual(
       expect.arrayContaining([
         "apply-patch-runtime-entrypoint:no-writer-invoked",
@@ -68,6 +82,43 @@ describe("apply_patch mutation routing projection", () => {
     );
     expect(authorityRequested).toBe(false);
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("routes single Update File patches with supported-write per-file projection", async () => {
+    const fixture = createFixture();
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, singleFileUpdatePatch()),
+      getWorkspaceAuthority: () =>
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual(["src/a.ts"]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/a.ts"],
+        changedFiles: ["src/a.ts"],
+        plannedFiles: [],
+        failedFiles: [],
+        writerInvoked: true,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "update",
+        supportStatus: "supported-write",
+        targetPath: "src/a.ts",
+        writeIntent: "eligible",
+      }),
+    ]);
   });
 
   it("routes single Add File patches to the selected-workspace create projection", async () => {
@@ -82,6 +133,29 @@ describe("apply_patch mutation routing projection", () => {
     expect(result?.status).toBe("completed");
     expect(result?.terminalClassification).toBe("success");
     expect(result?.codingResult?.changedFiles).toEqual(["src/new.ts"]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/new.ts"],
+        changedFiles: ["src/new.ts"],
+        plannedFiles: [],
+        failedFiles: [],
+        writerInvoked: true,
+        creatorInvoked: true,
+        deleteMoveInvoked: false,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "create",
+        supportStatus: "supported-write",
+        targetPath: "src/new.ts",
+        writeIntent: "eligible",
+      }),
+    ]);
     expect(readFile(fixture.workspaceRoot, "src/new.ts")).toBe("created");
   });
 
@@ -99,6 +173,25 @@ describe("apply_patch mutation routing projection", () => {
     expect(result?.codingResult?.changedFiles).toEqual([
       "src/a.ts",
       "src/b.ts",
+    ]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/a.ts", "src/b.ts"],
+        changedFiles: ["src/a.ts", "src/b.ts"],
+        plannedFiles: [],
+        failedFiles: [],
+        writerInvoked: true,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
+      expect.objectContaining({ operationKind: "update", targetPath: "src/a.ts" }),
+      expect.objectContaining({ operationKind: "update", targetPath: "src/b.ts" }),
     ]);
     expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
     expect(readFile(fixture.workspaceRoot, "src/b.ts")).toBe("b = 2\n");
@@ -125,6 +218,21 @@ describe("apply_patch mutation routing projection", () => {
       "src/b.ts",
       "src/c.ts",
     ]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-planning-no-write",
+        failureClass: "none",
+        writeIntentFiles: [],
+        changedFiles: [],
+        plannedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        failedFiles: [],
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "not-run",
+        successLike: false,
+      }),
+    );
     expect(result?.finalOutput).toContain(
       "apply_patch exactly-three update planning stopped before write",
     );
@@ -149,6 +257,20 @@ describe("apply_patch mutation routing projection", () => {
     expect(result?.status).toBe("stopped_error");
     expect(result?.terminalClassification).toBe("stopped");
     expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "unsupported-no-write",
+        failureClass: "too-many-update-files",
+        writeIntentFiles: [],
+        changedFiles: [],
+        plannedFiles: [],
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "not-run",
+        successLike: false,
+      }),
+    );
     expect(writes).toBe(0);
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
@@ -169,6 +291,175 @@ describe("apply_patch mutation routing projection", () => {
     expect(result?.status).toBe("stopped_error");
     expect(result?.terminalClassification).toBe("stopped");
     expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "unsupported-no-write",
+        failureClass: "unsupported-operation",
+        writeIntentFiles: [],
+        changedFiles: [],
+        plannedFiles: [],
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "not-run",
+        successLike: false,
+      }),
+    );
+    expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "delete",
+        supportStatus: "unsupported-no-write",
+        targetPath: "src/a.ts",
+        writeIntent: "none",
+      }),
+    ]);
+    expect(writes).toBe(0);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("keeps Move File patches stopped with unsupported/no-write per-file projection", async () => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    let writes = 0;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, moveFilePatch()),
+      getWorkspaceAuthority: () =>
+        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
+          writes += 1;
+        }),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "unsupported-no-write",
+        failureClass: "unsupported-operation",
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        successLike: false,
+      }),
+    );
+    expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "move",
+        sourcePath: "src/a.ts",
+        targetPath: "src/moved.ts",
+        writeIntent: "none",
+      }),
+    ]);
+    expect(writes).toBe(0);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("keeps broad apply_patch stopped with unsupported/no-write per-file projection", async () => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    let writes = 0;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, broadPatch()),
+      getWorkspaceAuthority: () =>
+        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
+          writes += 1;
+        }),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "unsupported-no-write",
+        failureClass: "broad-apply-patch",
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        successLike: false,
+      }),
+    );
+    expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "broad",
+        supportStatus: "unsupported-no-write",
+        writeIntent: "none",
+      }),
+    ]);
+    expect(writes).toBe(0);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("keeps malformed patches stopped with invalid-model-output per-file projection", async () => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    let writes = 0;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, "not a patch"),
+      getWorkspaceAuthority: () =>
+        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
+          writes += 1;
+        }),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "invalid-model-output",
+        failureClass: "parse-failure",
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        successLike: false,
+      }),
+    );
+    expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "malformed",
+        supportStatus: "invalid-model-output",
+        writeIntent: "none",
+      }),
+    ]);
+    expect(writes).toBe(0);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("keeps mixed supported/unsupported patches stopped with unsupported/no-write per-file projection", async () => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    let writes = 0;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, mixedPatch()),
+      getWorkspaceAuthority: () =>
+        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
+          writes += 1;
+        }),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "unsupported-no-write",
+        failureClass: "mixed-operations",
+        writeIntentFiles: [],
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        successLike: false,
+      }),
+    );
+    expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
+      expect.objectContaining({ operationKind: "update", writeIntent: "none" }),
+      expect.objectContaining({ operationKind: "delete", writeIntent: "none" }),
+    ]);
     expect(writes).toBe(0);
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
@@ -290,6 +581,41 @@ function deleteFilePatch(): string {
   return [
     "*** Begin Patch",
     "*** Delete File: src/a.ts",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function moveFilePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "*** Move to: src/moved.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function broadPatch(): string {
+  return [
+    "diff --git a/src/a.ts b/src/a.ts",
+    "--- a/src/a.ts",
+    "+++ b/src/a.ts",
+    "@@ -1 +1 @@",
+    "-a = 1",
+    "+a = 2",
+  ].join("\n");
+}
+
+function mixedPatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Delete File: src/b.ts",
     "*** End Patch",
   ].join("\n");
 }

@@ -5,6 +5,10 @@ import { parseApplyPatchText } from "../patchParsing/parser.js";
 import type { PatchFailure } from "../patchParsing/types.js";
 import { verifyParsedPatch } from "../patchVerification/verify.js";
 import { buildGuardedWriteGate, type GuardedWriteGate } from "./guardedWriteGate.js";
+import {
+  buildPerFilePatchPlan,
+  type PerFilePatchPlan,
+} from "./perFilePatchPlan.js";
 import { buildSingleFileApplyPatchFinalStaleReadContract } from "./singleFileApplyPatchFinalStaleRead.js";
 import {
   buildSingleFileApplyPatchOptInDryRunRoute,
@@ -65,6 +69,7 @@ export type WorkspaceWriteRoute =
       readonly writeDecision: WriteDecisionGate;
       readonly guardedGate: GuardedWriteGate;
       readonly finalStaleRead: FinalStaleRead;
+      readonly perFilePatchPlan?: PerFilePatchPlan;
       readonly workspaceWriterInvoked: true;
       readonly writerTarget: "selected-workspace";
       readonly selectedWorkspaceWrite: true;
@@ -92,6 +97,7 @@ export type WorkspaceWriteRoute =
       readonly writeDecision?: WriteDecisionGate;
       readonly guardedGate?: GuardedWriteGate;
       readonly finalStaleRead?: FinalStaleRead;
+      readonly perFilePatchPlan?: PerFilePatchPlan;
       readonly failures: readonly PatchFailure[];
       readonly workspaceWriterInvoked: boolean;
       readonly writerTarget: "none" | "selected-workspace";
@@ -142,6 +148,12 @@ export async function runWorkspaceWriteRoute(
     });
   }
 
+  const perFilePatchPlan = buildPerFilePatchPlan({
+    workspaceRoot: options.workspaceRoot,
+    rawPatchText: options.rawPatchText,
+    readFile: options.readFile,
+  });
+
   const parsedBeforeRead = parseApplyPatchText(options.rawPatchText);
   if (
     options.explicitWorkspaceWriteOptIn &&
@@ -156,6 +168,7 @@ export async function runWorkspaceWriteRoute(
       return blocked({
         blocker: "workspace-boundary",
         targetPath: parsedBeforeRead.patch.operations[0].path,
+        perFilePatchPlan,
         failures: [],
         nextAction: targetAuthority.message,
         evidence: [
@@ -180,6 +193,7 @@ export async function runWorkspaceWriteRoute(
     return blocked({
       blocker: "dry-run",
       failures: [],
+      perFilePatchPlan,
       nextAction: dryRunRoute.nextAction,
       evidence: ["apply-patch-workspace-write-route:dry-run-rejected"],
     });
@@ -189,6 +203,7 @@ export async function runWorkspaceWriteRoute(
     return blocked({
       blocker: "dry-run",
       dryRunRoute,
+      perFilePatchPlan,
       failures: dryRunRoute.dryRun.failedFiles,
       nextAction: dryRunRoute.nextAction,
       evidence: ["apply-patch-workspace-write-route:dry-run-blocked"],
@@ -207,6 +222,7 @@ export async function runWorkspaceWriteRoute(
       blocker: "workspace-write-opt-in-missing",
       dryRunRoute,
       writeDecision,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         "Keep the runtime route no-write unless the real workspace write entrypoint is explicitly opted in.",
@@ -219,6 +235,7 @@ export async function runWorkspaceWriteRoute(
       blocker: "write-decision",
       dryRunRoute,
       writeDecision,
+      perFilePatchPlan,
       failures: [],
       nextAction: writeDecision.nextAction,
       evidence: ["apply-patch-workspace-write-route:write-decision-blocked"],
@@ -242,6 +259,7 @@ export async function runWorkspaceWriteRoute(
       dryRunRoute,
       writeDecision,
       guardedGate,
+      perFilePatchPlan,
       failures: [],
       nextAction: guardedGate.nextAction,
       evidence: ["apply-patch-workspace-write-route:guarded-gate-blocked"],
@@ -255,6 +273,7 @@ export async function runWorkspaceWriteRoute(
       dryRunRoute,
       writeDecision,
       guardedGate,
+      perFilePatchPlan,
       failures: [parsed.failure],
       nextAction: parsed.failure.nextAction,
       evidence: ["apply-patch-workspace-write-route:parse-blocked"],
@@ -272,6 +291,7 @@ export async function runWorkspaceWriteRoute(
       dryRunRoute,
       writeDecision,
       guardedGate,
+      perFilePatchPlan,
       failures: verification.failures,
       nextAction:
         verification.failures[0]?.nextAction ??
@@ -287,6 +307,7 @@ export async function runWorkspaceWriteRoute(
       dryRunRoute,
       writeDecision,
       guardedGate,
+      perFilePatchPlan,
       failures: writeIntent.failures,
       nextAction:
         writeIntent.failures[0]?.nextAction ??
@@ -307,6 +328,7 @@ export async function runWorkspaceWriteRoute(
       dryRunRoute,
       writeDecision,
       guardedGate,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         "Only one approval-bound Update File target may enter the workspace write route.",
@@ -320,6 +342,7 @@ export async function runWorkspaceWriteRoute(
       dryRunRoute,
       writeDecision,
       guardedGate,
+      perFilePatchPlan,
       failures: [],
       nextAction: "Refuse to write outside the selected workspace.",
       evidence: ["apply-patch-workspace-write-route:workspace-boundary-blocked"],
@@ -334,6 +357,7 @@ export async function runWorkspaceWriteRoute(
       dryRunRoute,
       writeDecision,
       guardedGate,
+      perFilePatchPlan,
       failures: [],
       nextAction: targetAuthority.message,
       evidence: [
@@ -357,6 +381,7 @@ export async function runWorkspaceWriteRoute(
       writeDecision,
       guardedGate,
       finalStaleRead,
+      perFilePatchPlan,
       failures: [],
       nextAction: finalStaleRead.nextAction,
       evidence: ["apply-patch-workspace-write-route:final-stale-read-blocked"],
@@ -371,6 +396,7 @@ export async function runWorkspaceWriteRoute(
       writeDecision,
       guardedGate,
       finalStaleRead,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         "No workspace write was performed because the approved patch would not change the target file.",
@@ -390,6 +416,7 @@ export async function runWorkspaceWriteRoute(
       writeDecision,
       guardedGate,
       finalStaleRead,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         "Stop: apply_patch workspace write was aborted after final stale-read but before the workspace writer ran.",
@@ -416,6 +443,7 @@ export async function runWorkspaceWriteRoute(
       writeDecision,
       guardedGate,
       finalStaleRead,
+      perFilePatchPlan,
       failures: applied.failedFiles,
       workspaceWriterInvoked: true,
       writerTarget: "selected-workspace",
@@ -443,6 +471,7 @@ export async function runWorkspaceWriteRoute(
       writeDecision,
       guardedGate,
       finalStaleRead,
+      perFilePatchPlan,
       failures: [],
       workspaceWriterInvoked: true,
       writerTarget: "selected-workspace",
@@ -465,6 +494,7 @@ export async function runWorkspaceWriteRoute(
       writeDecision,
       guardedGate,
       finalStaleRead,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         "Stop: workspace write route did not report exactly one changed file.",
@@ -486,6 +516,7 @@ export async function runWorkspaceWriteRoute(
     writeDecision,
     guardedGate,
     finalStaleRead,
+    perFilePatchPlan,
     workspaceWriterInvoked: true,
     writerTarget: "selected-workspace",
     selectedWorkspaceWrite: true,
@@ -537,6 +568,7 @@ function blocked(
     readonly writeDecision?: WriteDecisionGate;
     readonly guardedGate?: GuardedWriteGate;
     readonly finalStaleRead?: FinalStaleRead;
+    readonly perFilePatchPlan?: PerFilePatchPlan;
     readonly failures: readonly PatchFailure[];
     readonly workspaceWriterInvoked?: boolean;
     readonly writerTarget?: "none" | "selected-workspace";
@@ -563,6 +595,7 @@ function blocked(
     ...(input.writeDecision ? { writeDecision: input.writeDecision } : {}),
     ...(input.guardedGate ? { guardedGate: input.guardedGate } : {}),
     ...(input.finalStaleRead ? { finalStaleRead: input.finalStaleRead } : {}),
+    ...(input.perFilePatchPlan ? { perFilePatchPlan: input.perFilePatchPlan } : {}),
     failures: input.failures,
     workspaceWriterInvoked: input.workspaceWriterInvoked ?? false,
     writerTarget: input.writerTarget ?? "none",

@@ -1,4 +1,5 @@
 import type { QueryEvent } from '../core/query/events.js'
+import type { PerFilePatchResultProjection } from './patchResult/perFilePatchPlan.js'
 
 export type AgentRole = 'planner' | 'coder' | 'reviewer'
 export type ContinuationReason = 'handoff' | 'retryable-error'
@@ -247,6 +248,7 @@ export interface CodingResultProvenanceSummary {
 export interface CodingResultSummary {
   readonly taskKind: CodingTaskKind
   diagnosis?: CodingDiagnosisSummary
+  readonly perFilePatchPlan?: PerFilePatchResultProjection
   changedFiles: string[]
   failedFiles: Array<{ path: string; reason: string }>
   patches?: CodingPatchRecord[]

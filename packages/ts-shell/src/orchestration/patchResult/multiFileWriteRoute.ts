@@ -4,6 +4,10 @@ import { buildNoPartialPatchApplicationContract } from "../patchApplication/noPa
 import { parseApplyPatchText } from "../patchParsing/parser.js";
 import type { PatchFailure, PatchFileOperation } from "../patchParsing/types.js";
 import { verifyParsedPatch } from "../patchVerification/verify.js";
+import {
+  buildPerFilePatchPlan,
+  type PerFilePatchPlan,
+} from "./perFilePatchPlan.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
 import type { WorkspaceWriteTargetAuthority } from "./workspaceAuthority.js";
 import {
@@ -66,6 +70,7 @@ export type MultiFileWriteRoute =
       readonly status: "written";
       readonly targetPaths: readonly [string, string];
       readonly approval: Extract<MultiFileWriteApproval, { status: "approved-for-write" }>;
+      readonly perFilePatchPlan?: PerFilePatchPlan;
       readonly workspaceWriterInvoked: true;
       readonly writerTarget: "selected-workspace";
       readonly selectedWorkspaceWrite: true;
@@ -92,6 +97,7 @@ export type MultiFileWriteRoute =
       readonly targetPaths: readonly string[];
       readonly targetPath?: string;
       readonly approval: MultiFileWriteApproval;
+      readonly perFilePatchPlan?: PerFilePatchPlan;
       readonly failures: readonly PatchFailure[];
       readonly workspaceWriterInvoked: boolean;
       readonly writerTarget: "none" | "selected-workspace";
@@ -118,6 +124,7 @@ export type MultiFileWriteRoute =
       readonly blocker: "single-file-bypass";
       readonly targetPaths: readonly string[];
       readonly approval: MultiFileWriteApproval;
+      readonly perFilePatchPlan?: PerFilePatchPlan;
       readonly failures: readonly [];
       readonly workspaceWriterInvoked: false;
       readonly writerTarget: "none";
@@ -182,12 +189,19 @@ export async function runMultiFileWriteRoute(
     });
   }
 
+  const perFilePatchPlan = buildPerFilePatchPlan({
+    workspaceRoot: options.workspaceRoot,
+    rawPatchText: options.rawPatchText,
+    readFile: options.readFile,
+  });
+
   const parsed = parseApplyPatchText(options.rawPatchText);
   if (parsed.ok === false) {
     return blocked({
       blocker: "patch-parse",
       targetPaths: [],
       approval: buildApproval([], options.requestedUserDecision, false),
+      perFilePatchPlan,
       failures: [parsed.failure],
       nextAction: parsed.failure.nextAction,
       evidence: ["apply-patch-multi-file-write-route:parse-blocked"],
@@ -208,6 +222,7 @@ export async function runMultiFileWriteRoute(
     return bypassed({
       targetPaths,
       approval,
+      perFilePatchPlan,
       nextAction:
         "Single-file Update File patches remain owned by the existing single-file workspace write route.",
       evidence: ["apply-patch-multi-file-write-route:single-file-bypass"],
@@ -222,6 +237,7 @@ export async function runMultiFileWriteRoute(
       blocker: "unsupported-operation",
       targetPaths,
       approval,
+      perFilePatchPlan,
       failures: [unsupportedMultiFileWriteFailure(parsed.patch.operations)],
       nextAction:
         "Use exactly two existing-file Update File operations. Add, delete, move, mixed, and broad apply_patch shapes remain rejected.",
@@ -237,6 +253,7 @@ export async function runMultiFileWriteRoute(
       blocker: "too-many-files",
       targetPaths,
       approval,
+      perFilePatchPlan,
       failures: [
         {
           code: "patch-apply-plan-not-verified",
@@ -257,6 +274,7 @@ export async function runMultiFileWriteRoute(
       blocker: "target-mismatch",
       targetPaths,
       approval,
+      perFilePatchPlan,
       failures: [
         {
           code: "patch-apply-plan-not-verified",
@@ -277,6 +295,7 @@ export async function runMultiFileWriteRoute(
       blocker: "workspace-write-opt-in-missing",
       targetPaths,
       approval,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         "Keep multi-file Update File no-write unless the selected-workspace write entrypoint is explicitly opted in.",
@@ -291,6 +310,7 @@ export async function runMultiFileWriteRoute(
       blocker: "write-decision",
       targetPaths,
       approval,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         options.requestedUserDecision === "denied"
@@ -310,6 +330,7 @@ export async function runMultiFileWriteRoute(
         targetPaths,
         targetPath,
         approval,
+        perFilePatchPlan,
         failures: [workspaceBoundaryFailure(targetPath)],
         nextAction: "Refuse to write outside the selected workspace.",
         evidence: [
@@ -325,6 +346,7 @@ export async function runMultiFileWriteRoute(
         targetPaths,
         targetPath,
         approval,
+        perFilePatchPlan,
         failures: [patchFailureFromWriteAuthority(targetPath, targetAuthority)],
         nextAction: targetAuthority.message,
         evidence: [
@@ -345,6 +367,7 @@ export async function runMultiFileWriteRoute(
       blocker: "patch-verification",
       targetPaths,
       approval,
+      perFilePatchPlan,
       failures: verification.failures,
       nextAction:
         verification.failures[0]?.nextAction ??
@@ -359,6 +382,7 @@ export async function runMultiFileWriteRoute(
       blocker: "patch-verification",
       targetPaths,
       approval,
+      perFilePatchPlan,
       failures: writeIntent.failures,
       nextAction:
         writeIntent.failures[0]?.nextAction ??
@@ -372,6 +396,7 @@ export async function runMultiFileWriteRoute(
       blocker: "target-mismatch",
       targetPaths,
       approval,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         "Only the two approval-bound Update File targets may enter the multi-file workspace write route.",
@@ -391,6 +416,7 @@ export async function runMultiFileWriteRoute(
         targetPaths,
         targetPath,
         approval,
+        perFilePatchPlan,
         failures: [finalStaleReadFailure(targetPath)],
         nextAction:
           "No workspace writer ran. Re-read both target files and regenerate the two-file Update File patch from current content.",
@@ -410,6 +436,7 @@ export async function runMultiFileWriteRoute(
         targetPaths,
         targetPath: intent.path,
         approval,
+        perFilePatchPlan,
         failures: [],
         nextAction:
           "No multi-file workspace write was performed because at least one approved update would not change its target file.",
@@ -427,6 +454,7 @@ export async function runMultiFileWriteRoute(
       blocker: "aborted-before-write",
       targetPaths,
       approval,
+      perFilePatchPlan,
       failures: [],
       nextAction:
         "Stop: apply_patch multi-file workspace write was aborted after final stale-read but before the workspace writer ran.",
@@ -463,6 +491,7 @@ export async function runMultiFileWriteRoute(
       targetPaths,
       targetPath: failedPath,
       approval,
+      perFilePatchPlan,
       failures: applied.failedFiles,
       changedFiles: applied.changedFiles,
       writeIntents: targetPaths,
@@ -492,6 +521,7 @@ export async function runMultiFileWriteRoute(
     status: "written",
     targetPaths: [applied.changedFiles[0], applied.changedFiles[1]],
     approval,
+    perFilePatchPlan,
     workspaceWriterInvoked: true,
     writerTarget: "selected-workspace",
     selectedWorkspaceWrite: true,
@@ -645,6 +675,7 @@ function pathStaysInsideWorkspace(
 function bypassed(input: {
   readonly targetPaths: readonly string[];
   readonly approval: MultiFileWriteApproval;
+  readonly perFilePatchPlan?: PerFilePatchPlan;
   readonly nextAction: string;
   readonly evidence: readonly string[];
 }): MultiFileWriteRoute {
@@ -658,6 +689,7 @@ function bypassed(input: {
     blocker: "single-file-bypass",
     targetPaths: input.targetPaths,
     approval: input.approval,
+    ...(input.perFilePatchPlan ? { perFilePatchPlan: input.perFilePatchPlan } : {}),
     failures: [],
     workspaceWriterInvoked: false,
     writerTarget: "none",
@@ -692,6 +724,7 @@ function blocked(
     readonly targetPaths: readonly string[];
     readonly targetPath?: string;
     readonly approval: MultiFileWriteApproval;
+    readonly perFilePatchPlan?: PerFilePatchPlan;
     readonly failures: readonly PatchFailure[];
     readonly changedFiles?: readonly string[];
     readonly writeIntents?: readonly string[];
@@ -720,6 +753,7 @@ function blocked(
     targetPaths: input.targetPaths,
     ...(input.targetPath ? { targetPath: input.targetPath } : {}),
     approval: input.approval,
+    ...(input.perFilePatchPlan ? { perFilePatchPlan: input.perFilePatchPlan } : {}),
     failures: input.failures,
     workspaceWriterInvoked: input.workspaceWriterInvoked ?? false,
     writerTarget: input.writerTarget ?? "none",

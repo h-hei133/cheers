@@ -7,6 +7,7 @@ import type {
   OrchestrationResult,
 } from "../types.js";
 import { projectMutationVerificationHandoff } from "./mutationVerificationProjection.js";
+import { projectPerFilePatchResult } from "./perFilePatchPlan.js";
 import type { WorkspaceWriteRoute } from "./workspaceWriteRoute.js";
 
 export function buildWorkspaceWriteRouteResult(input: {
@@ -48,6 +49,19 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
     });
     return {
       taskKind: "edit-file",
+      ...(route.perFilePatchPlan
+        ? {
+            perFilePatchPlan: projectPerFilePatchResult({
+              plan: route.perFilePatchPlan,
+              changedFiles: route.changedFiles,
+              failedFiles: [],
+              writerInvoked: route.workspaceWriterInvoked,
+              creatorInvoked: false,
+              deleteMoveInvoked: false,
+              postWriteVerification: route.postWriteVerification,
+            }),
+          }
+        : {}),
       changedFiles: [...handoff.changedFiles],
       failedFiles: [...handoff.failedFiles],
       repair: emptyRepair(),
@@ -156,6 +170,22 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
   });
   return {
     taskKind: "edit-file",
+    ...(route.perFilePatchPlan
+      ? {
+          perFilePatchPlan: projectPerFilePatchResult({
+            plan: route.perFilePatchPlan,
+            changedFiles: [],
+            failedFiles: route.failures.map((failure) => ({
+              path: failure.path ?? target ?? "(apply_patch)",
+              reason: failure.message,
+            })),
+            writerInvoked: route.workspaceWriterInvoked,
+            creatorInvoked: false,
+            deleteMoveInvoked: false,
+            postWriteVerification: route.postWriteVerification,
+          }),
+        }
+      : {}),
     changedFiles: [...handoff.changedFiles],
     failedFiles: [...handoff.failedFiles],
     patches: [

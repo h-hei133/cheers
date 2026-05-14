@@ -4,6 +4,7 @@ import {
   type NoWriteRuntimeSource,
 } from "./patchResult/noWriteRuntimeRoute.js";
 import { buildNoWriteRuntimeRouteResult } from "./patchResult/runtimeRouteResult.js";
+import { buildPerFilePatchPlan } from "./patchResult/perFilePatchPlan.js";
 import { buildWorkspaceCreateRouteResult } from "./patchResult/workspaceCreateResult.js";
 import {
   patchIsSingleAddFile,
@@ -85,10 +86,16 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
           },
         );
         if (classification) {
+          const perFilePatchPlan = buildPerFilePatchPlan({
+            workspaceRoot: input.workspaceRoot,
+            rawPatchText,
+            readFile: input.readNoWriteRuntimeFile,
+          });
           return buildMultiFileUpdatePlanningRouteResult({
             sessionId: input.sessionId,
             prompt: input.prompt,
             classification,
+            perFilePatchPlan,
           });
         }
       }

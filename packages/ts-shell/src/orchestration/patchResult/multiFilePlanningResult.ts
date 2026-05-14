@@ -7,13 +7,21 @@ import type {
   OrchestrationResult,
 } from "../types.js";
 import type { MultiFileUpdatePlanningClassification } from "./multiFileUpdatePlanning.js";
+import {
+  projectPerFilePatchResult,
+  type PerFilePatchPlan,
+} from "./perFilePatchPlan.js";
 
 export function buildMultiFileUpdatePlanningRouteResult(input: {
   readonly sessionId: string;
   readonly prompt: string;
   readonly classification: MultiFileUpdatePlanningClassification;
+  readonly perFilePatchPlan?: PerFilePatchPlan;
 }): OrchestrationResult {
-  const codingResult = buildCodingResult(input.classification);
+  const codingResult = buildCodingResult({
+    classification: input.classification,
+    perFilePatchPlan: input.perFilePatchPlan,
+  });
   return mapTerminalToOrchestrationResult(
     buildRuntimeState({
       sessionId: input.sessionId,
@@ -25,9 +33,11 @@ export function buildMultiFileUpdatePlanningRouteResult(input: {
   );
 }
 
-function buildCodingResult(
-  classification: MultiFileUpdatePlanningClassification,
-): CodingResultSummary {
+function buildCodingResult(input: {
+  readonly classification: MultiFileUpdatePlanningClassification;
+  readonly perFilePatchPlan?: PerFilePatchPlan;
+}): CodingResultSummary {
+  const { classification } = input;
   const plannedFiles =
     classification.plannedFiles.length > 0
       ? classification.plannedFiles
@@ -56,6 +66,22 @@ function buildCodingResult(
 
   return {
     taskKind: "edit-file",
+    ...(input.perFilePatchPlan
+      ? {
+          perFilePatchPlan: projectPerFilePatchResult({
+            plan: input.perFilePatchPlan,
+            changedFiles: [],
+            failedFiles: classification.failedFiles.map((failure) => ({
+              path: failure.path ?? "(apply_patch)",
+              reason: failure.message,
+            })),
+            writerInvoked: false,
+            creatorInvoked: false,
+            deleteMoveInvoked: false,
+            postWriteVerification: "not-run",
+          }),
+        }
+      : {}),
     changedFiles: [],
     failedFiles,
     patches: failedFiles.map((failure) => ({

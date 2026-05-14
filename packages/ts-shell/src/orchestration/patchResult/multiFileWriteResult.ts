@@ -7,6 +7,7 @@ import type {
   OrchestrationResult,
 } from "../types.js";
 import { projectMutationVerificationHandoff } from "./mutationVerificationProjection.js";
+import { projectPerFilePatchResult } from "./perFilePatchPlan.js";
 import type { MultiFileWriteRoute } from "./multiFileWriteRoute.js";
 
 export function buildMultiFileWriteRouteResult(input: {
@@ -48,6 +49,19 @@ function buildCodingResult(route: MultiFileWriteRoute): CodingResultSummary {
     });
     return {
       taskKind: "edit-file",
+      ...(route.perFilePatchPlan
+        ? {
+            perFilePatchPlan: projectPerFilePatchResult({
+              plan: route.perFilePatchPlan,
+              changedFiles: route.changedFiles,
+              failedFiles: [],
+              writerInvoked: route.workspaceWriterInvoked,
+              creatorInvoked: false,
+              deleteMoveInvoked: false,
+              postWriteVerification: route.postWriteVerification,
+            }),
+          }
+        : {}),
       changedFiles: [...handoff.changedFiles],
       failedFiles: [...handoff.failedFiles],
       repair: emptyRepair(),
@@ -165,6 +179,19 @@ function buildCodingResult(route: MultiFileWriteRoute): CodingResultSummary {
 
   return {
     taskKind: "edit-file",
+    ...(route.perFilePatchPlan
+      ? {
+          perFilePatchPlan: projectPerFilePatchResult({
+            plan: route.perFilePatchPlan,
+            changedFiles: route.changedFiles,
+            failedFiles,
+            writerInvoked: route.workspaceWriterInvoked,
+            creatorInvoked: false,
+            deleteMoveInvoked: false,
+            postWriteVerification: route.postWriteVerification,
+          }),
+        }
+      : {}),
     changedFiles: [...handoff.changedFiles],
     failedFiles: [...handoff.failedFiles],
     patches: route.failedFiles.map((failure) => ({

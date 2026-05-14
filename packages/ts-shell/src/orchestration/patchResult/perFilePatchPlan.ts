@@ -86,10 +86,23 @@ export interface PerFilePatchPlanOptions {
 }
 
 export interface PerFilePatchResultProjection {
+  readonly supportStatus: PerFilePatchSupportStatus;
+  readonly failureClass: PerFilePatchFailureClass;
+  readonly operations: readonly {
+    readonly operationKind: PerFilePatchOperationKind;
+    readonly supportStatus: PerFilePatchSupportStatus;
+    readonly targetPath?: string;
+    readonly sourcePath?: string;
+    readonly writeIntent: "eligible" | "none";
+    readonly plannedFile?: string;
+  }[];
+  readonly writeIntentFiles: readonly string[];
   readonly changedFiles: readonly string[];
   readonly plannedFiles: readonly string[];
   readonly failedFiles: readonly { readonly path: string; readonly reason: string }[];
   readonly writerInvoked: boolean;
+  readonly creatorInvoked: boolean;
+  readonly deleteMoveInvoked: boolean;
   readonly postWriteVerification: "passed" | "blocked" | "failed" | "not-run";
   readonly successLike: boolean;
   readonly evidence: readonly string[];
@@ -111,6 +124,8 @@ export function projectPerFilePatchResult(input: {
   readonly changedFiles?: readonly string[];
   readonly failedFiles?: readonly { readonly path: string; readonly reason: string }[];
   readonly writerInvoked?: boolean;
+  readonly creatorInvoked?: boolean;
+  readonly deleteMoveInvoked?: boolean;
   readonly postWriteVerification?: "passed" | "blocked" | "failed" | "not-run";
 }): PerFilePatchResultProjection {
   const changedFiles = [...(input.changedFiles ?? [])];
@@ -121,6 +136,8 @@ export function projectPerFilePatchResult(input: {
       reason: failure.message,
     }));
   const writerInvoked = input.writerInvoked ?? false;
+  const creatorInvoked = input.creatorInvoked ?? false;
+  const deleteMoveInvoked = input.deleteMoveInvoked ?? false;
   const postWriteVerification = input.postWriteVerification ?? "not-run";
   const successLike =
     input.plan.summary.supportStatus === "supported-write" &&
@@ -130,10 +147,23 @@ export function projectPerFilePatchResult(input: {
     postWriteVerification === "passed";
 
   return {
+    supportStatus: input.plan.summary.supportStatus,
+    failureClass: input.plan.summary.failureClass,
+    operations: input.plan.operations.map((operation) => ({
+      operationKind: operation.operationKind,
+      supportStatus: operation.supportStatus,
+      ...(operation.targetPath ? { targetPath: operation.targetPath } : {}),
+      ...(operation.sourcePath ? { sourcePath: operation.sourcePath } : {}),
+      writeIntent: operation.writeIntent,
+      ...(operation.plannedFile ? { plannedFile: operation.plannedFile } : {}),
+    })),
+    writeIntentFiles: [...input.plan.summary.writeIntentFiles],
     changedFiles,
     plannedFiles: [...input.plan.summary.plannedFiles],
     failedFiles: [...failedFiles],
     writerInvoked,
+    creatorInvoked,
+    deleteMoveInvoked,
     postWriteVerification,
     successLike,
     evidence: [
@@ -145,6 +175,12 @@ export function projectPerFilePatchResult(input: {
       ...(writerInvoked
         ? ["per-file-patch-result:writer-invoked-by-existing-route"]
         : ["per-file-patch-result:no-writer-invoked"]),
+      ...(creatorInvoked
+        ? ["per-file-patch-result:creator-invoked-by-existing-route"]
+        : ["per-file-patch-result:no-creator-invoked"]),
+      ...(deleteMoveInvoked
+        ? ["per-file-patch-result:delete-move-invoked"]
+        : ["per-file-patch-result:no-delete-move-invoked"]),
     ],
   };
 }
