@@ -56,6 +56,7 @@ export interface WorkspaceWriteAuthority {
   readonly writeFile: (relativePath: string, content: string) => void;
   readonly createFileExclusive: (relativePath: string, content: string) => void;
   readonly moveFileExclusive: (sourcePath: string, targetPath: string) => void;
+  readonly deleteFile: (relativePath: string) => void;
 }
 
 export function createWorkspaceWriteAuthority(
@@ -334,6 +335,20 @@ export function createWorkspaceWriteAuthority(
       } catch {
         // Leave the target in place and let route-level post-write verification
         // surface the partial move facts. Route 44 does not add rollback.
+      }
+    },
+    deleteFile: (relativePath) => {
+      const target = validateWriteTarget(relativePath);
+      if (target.ok === false) {
+        throw new Error(target.message);
+      }
+
+      try {
+        fs.unlinkSync(target.absolutePath);
+      } catch {
+        throw new Error(
+          "Refuse to delete because the selected workspace target could not be unlinked.",
+        );
       }
     },
   };

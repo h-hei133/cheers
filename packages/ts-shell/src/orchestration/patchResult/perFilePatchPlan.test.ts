@@ -162,7 +162,7 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
-  it("projects delete to unsupported/no-write", () => {
+  it("projects delete to a supported write intent", () => {
     const plan = planFromPatch(
       [
         "*** Begin Patch",
@@ -174,13 +174,13 @@ describe("buildPerFilePatchPlan", () => {
       },
     );
 
-    expectUnsupportedNoWritePlan(plan, "unsupported-operation");
+    expectSupportedWritePlan(plan, ["src/remove.ts"]);
     expect(plan.operations[0]).toEqual(
       expect.objectContaining({
         operationKind: "delete",
         targetPath: "src/remove.ts",
-        supportStatus: "unsupported-no-write",
-        writeIntent: "none",
+        supportStatus: "supported-write",
+        writeIntent: "eligible",
       }),
     );
   });
@@ -788,6 +788,32 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
+  it("projects delete with a missing target to unsupported/no-write", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Delete File: src/missing.ts",
+        "*** End Patch",
+      ],
+      {},
+    );
+
+    expectUnsupportedNoWritePlan(plan, "missing-target");
+    expect(plan.summary.failedFiles).toEqual([
+      expect.objectContaining({
+        code: "patch-verify-file-missing",
+        path: "src/missing.ts",
+      }),
+    ]);
+    expect(plan.operations[0]).toEqual(
+      expect.objectContaining({
+        operationKind: "delete",
+        targetPath: "src/missing.ts",
+        failedFile: expect.objectContaining({ path: "src/missing.ts" }),
+      }),
+    );
+  });
+
   it("projects move with a missing source to unsupported/no-write", () => {
     const plan = planFromPatch(
       [
@@ -933,19 +959,17 @@ describe("buildPerFilePatchPlan", () => {
     const unsupported = planFromPatch(
       [
         "*** Begin Patch",
-        "*** Delete File: src/remove.ts",
+        "*** Delete File: src/missing.ts",
         "*** End Patch",
       ],
-      {
-        "src/remove.ts": "remove\n",
-      },
+      {},
     );
     const unsupportedResult = projectPerFilePatchResult({ plan: unsupported });
 
     expect(unsupportedResult.changedFiles).toEqual([]);
     expect(unsupportedResult.plannedFiles).toEqual([]);
     expect(unsupportedResult.failedFiles).toEqual([
-      expect.objectContaining({ path: "src/remove.ts" }),
+      expect.objectContaining({ path: "src/missing.ts" }),
     ]);
     expect(unsupportedResult.successLike).toBe(false);
   });
@@ -954,12 +978,10 @@ describe("buildPerFilePatchPlan", () => {
     const plan = planFromPatch(
       [
         "*** Begin Patch",
-        "*** Delete File: src/remove.ts",
+        "*** Delete File: src/missing.ts",
         "*** End Patch",
       ],
-      {
-        "src/remove.ts": "remove\n",
-      },
+      {},
     );
     const result = projectPerFilePatchResult({ plan });
 

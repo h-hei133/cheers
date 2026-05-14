@@ -264,6 +264,7 @@ function buildParsedPatchPlan(
   const operations = patch.operations;
   const updateOperations = operations.filter(isUpdateOperation);
   const addOperations = operations.filter(isAddOperation);
+  const deleteOperations = operations.filter(isDeleteOperation);
   const moveOperations = operations.filter(isMoveOperation);
   const deleteMoveOperations = operations.filter(
     (operation) => operation.kind === "delete" || operation.kind === "move",
@@ -331,6 +332,19 @@ function buildParsedPatchPlan(
       nextAction:
         "Route may create only through explicit runtime/write opt-in, approval, exclusive create, and post-write verification.",
       operationSupportStatus: "supported-write",
+    });
+  }
+
+  if (
+    operations.length === 1 &&
+    deleteOperations.length === 1 &&
+    deleteOperations[0]
+  ) {
+    return buildVerifiedDeletePlan({
+      patch,
+      options,
+      operation: deleteOperations[0],
+      targetFiles,
     });
   }
 
@@ -440,6 +454,79 @@ function buildParsedPatchPlan(
           "Use one Update File, one Add File, exactly two Update File operations, or exactly three Update File operations.",
       }),
     ],
+  });
+}
+
+function buildVerifiedDeletePlan(input: {
+  readonly patch: ParsedPatch;
+  readonly options: PerFilePatchPlanOptions;
+  readonly operation: Extract<PatchFileOperation, { kind: "delete" }>;
+  readonly targetFiles: readonly string[];
+}): PerFilePatchPlan {
+  if (
+    input.options.directoryExists?.(
+      path.resolve(input.options.workspaceRoot, input.operation.path),
+    ) === true
+  ) {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: "verification-failed",
+      reason:
+        "Delete File patch matched the guarded delete route shape, but the target is a directory.",
+      nextAction:
+        "Choose one existing regular file for Delete File; directory delete is not enabled.",
+      failures: [
+        patchFailure({
+          code: "patch-apply-plan-not-verified",
+          path: input.operation.path,
+          message:
+            "Guarded Delete File refuses directory targets before any writer is reachable.",
+          nextAction:
+            "Choose one existing regular file for Delete File; directory delete is not enabled.",
+        }),
+      ],
+    });
+  }
+
+  const verification = verifyParsedPatch(input.patch, {
+    workspaceRoot: input.options.workspaceRoot,
+    readFile: input.options.readFile,
+    ...(input.options.directoryExists
+      ? { directoryExists: input.options.directoryExists }
+      : {}),
+    supportedOperations: ["delete"],
+  });
+  if (verification.ok === false) {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: failureClassForVerificationFailures(verification.failures),
+      reason:
+        "Delete File patch matched the guarded delete route shape, but preflight verification failed before any writer was reachable.",
+      nextAction:
+        verification.failures[0]?.nextAction ??
+        "Re-read current workspace files and regenerate the Delete File patch.",
+      failures: verification.failures,
+    });
+  }
+
+  return buildVerifiedPlan({
+    patch: input.patch,
+    options: input.options,
+    supportedOperations: ["delete"],
+    supportStatus: "supported-write",
+    failureClass: "none",
+    plannedFiles: [],
+    writeIntentFiles: [input.operation.path],
+    targetFiles: input.targetFiles,
+    reason:
+      "Single Delete File is represented as a supported write intent owned by the guarded selected-workspace delete route.",
+    nextAction:
+      "Route may delete only through explicit runtime/write opt-in, approval, target guards, single-file unlink, and post-delete verification.",
+    operationSupportStatus: "supported-write",
   });
 }
 
@@ -916,6 +1003,12 @@ function isAddOperation(
   operation: PatchFileOperation,
 ): operation is Extract<PatchFileOperation, { kind: "add" }> {
   return operation.kind === "add";
+}
+
+function isDeleteOperation(
+  operation: PatchFileOperation,
+): operation is Extract<PatchFileOperation, { kind: "delete" }> {
+  return operation.kind === "delete";
 }
 
 function isMoveOperation(

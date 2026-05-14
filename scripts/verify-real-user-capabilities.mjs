@@ -10426,7 +10426,46 @@ function route08PatchScenarios() {
       ].join('\n'),
     },
     {
-      id: 'real-model-like-unsupported-delete-file',
+      id: 'real-model-like-unsupported-delete-outside-workspace',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Delete File: ../outside.ts',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-delete-missing-target',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Delete File: src/missing.ts',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-delete-directory-target',
+      expectedClass: 'unsupported',
+      directories: ['src/dir'],
+      files: {
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Delete File: src/dir',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-mixed-update-delete',
       expectedClass: 'unsupported',
       files: {
         'src/a.ts': 'a\n',
@@ -10435,6 +10474,40 @@ function route08PatchScenarios() {
       },
       patchText: [
         '*** Begin Patch',
+        '*** Update File: src/a.ts',
+        '@@',
+        '-a',
+        '+aa',
+        '*** Delete File: src/b.ts',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-broad-delete-diff',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        'diff --git a/src/a.ts b/src/a.ts',
+        'deleted file mode 100644',
+        '--- a/src/a.ts',
+        '+++ /dev/null',
+        '@@ -1 +0,0 @@',
+        '-a',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-duplicate-delete-target',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Delete File: src/a.ts',
         '*** Delete File: src/a.ts',
         '*** End Patch',
       ].join('\n'),
@@ -10839,6 +10912,7 @@ async function runRoute08UnsupportedPatchE2e() {
   console.log('defaultMvpAffected=false')
   console.log('unsupportedMutationCapabilityAdded=false')
   console.log('guardedSingleFileMoveCapabilityAddedElsewhere=true')
+  console.log('guardedSingleFileDeleteCapabilityAddedElsewhere=true')
   console.log('unsupportedMutationSupport=false')
   console.log(`cliCommand=${route03CommandDisplay()}`)
 
@@ -10887,6 +10961,7 @@ async function runRoute08UnsupportedPatchE2e() {
     defaultMvpAffected: false,
     unsupportedMutationCapabilityAdded: false,
     guardedSingleFileMoveCapabilityAddedElsewhere: true,
+    guardedSingleFileDeleteCapabilityAddedElsewhere: true,
     unsupportedMutationSupport: false,
     coveredCases: covered,
     results,

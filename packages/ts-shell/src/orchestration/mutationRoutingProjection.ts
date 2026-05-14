@@ -9,6 +9,11 @@ import {
   patchIsSingleAddFile,
   runWorkspaceCreateRoute,
 } from "./patchResult/workspaceCreateRoute.js";
+import { buildWorkspaceDeleteRouteResult } from "./patchResult/workspaceDeleteResult.js";
+import {
+  patchIsSingleDeleteFile,
+  runWorkspaceDeleteRoute,
+} from "./patchResult/workspaceDeleteRoute.js";
 import { buildMultiFileWriteRouteResult } from "./patchResult/multiFileWriteResult.js";
 import {
   patchIsTwoOrThreeUpdateFiles,
@@ -52,6 +57,7 @@ export interface MutationRoutingProjectionAuthority {
     sourcePath: string,
     targetPath: string,
   ) => void | Promise<void>;
+  readonly deleteFile: (relativePath: string) => void | Promise<void>;
   readonly validateWriteTarget: (
     relativePath: string,
   ) => WorkspaceWriteTargetAuthority;
@@ -147,6 +153,31 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
         ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
       });
       return buildWorkspaceMoveRouteResult({
+        sessionId: input.sessionId,
+        prompt: input.prompt,
+        route,
+      });
+    }
+
+    if (patchIsSingleDeleteFile(rawPatchText)) {
+      const route = await runWorkspaceDeleteRoute({
+        workspaceRoot: input.workspaceRoot,
+        rawPatchText,
+        explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
+        explicitWorkspaceWriteOptIn:
+          routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
+        ...(routeOptions.requestedUserDecision
+          ? { requestedUserDecision: routeOptions.requestedUserDecision }
+          : {}),
+        defaultProductionRejectionUnchanged: true,
+        readFile: workspaceAuthority.readFile,
+        readVerifiedFile: workspaceAuthority.readVerifiedFile,
+        directoryExists: workspaceAuthority.directoryExists,
+        validateWriteTarget: workspaceAuthority.validateWriteTarget,
+        deleteFile: workspaceAuthority.deleteFile,
+        ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+      });
+      return buildWorkspaceDeleteRouteResult({
         sessionId: input.sessionId,
         prompt: input.prompt,
         route,

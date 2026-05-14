@@ -340,46 +340,45 @@ describe("apply_patch mutation routing projection", () => {
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
 
-  it("keeps Delete File patches stopped before writer invocation", async () => {
+  it("routes Delete File patches through the guarded delete writer", async () => {
     const fixture = createFixture();
-    const before = snapshotFixture(fixture.workspaceRoot);
-    let writes = 0;
 
     const result = await projectApplyPatchRuntimeMutationRoute({
       ...runtimeInput(fixture.workspaceRoot, deleteFilePatch()),
       getWorkspaceAuthority: () =>
-        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
-          writes += 1;
-        }),
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
     });
 
-    expect(result?.status).toBe("stopped_error");
-    expect(result?.terminalClassification).toBe("stopped");
-    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual(["src/a.ts"]);
+    expect(result?.codingResult?.failedFiles).toEqual([]);
     expect(result?.codingResult?.perFilePatchPlan).toEqual(
       expect.objectContaining({
-        supportStatus: "unsupported-no-write",
-        failureClass: "unsupported-operation",
-        writeIntentFiles: [],
-        changedFiles: [],
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/a.ts"],
+        changedFiles: ["src/a.ts"],
         plannedFiles: [],
-        writerInvoked: false,
+        failedFiles: [],
+        writerInvoked: true,
         creatorInvoked: false,
-        deleteMoveInvoked: false,
-        postWriteVerification: "not-run",
-        successLike: false,
+        deleteMoveInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
       }),
     );
     expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
       expect.objectContaining({
         operationKind: "delete",
-        supportStatus: "unsupported-no-write",
+        supportStatus: "supported-write",
         targetPath: "src/a.ts",
-        writeIntent: "none",
+        writeIntent: "eligible",
       }),
     ]);
-    expect(writes).toBe(0);
-    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
+      "src/b.ts": "b = 1\n",
+    });
   });
 
   it("keeps Move File patches stopped with unsupported/no-write per-file projection", async () => {
@@ -801,6 +800,14 @@ function authorityWithBlockedWriter(
     createFileExclusive: () => {
       onWrite();
       throw new Error("creator must not be invoked");
+    },
+    moveFileExclusive: () => {
+      onWrite();
+      throw new Error("move writer must not be invoked");
+    },
+    deleteFile: () => {
+      onWrite();
+      throw new Error("delete writer must not be invoked");
     },
   };
 }
