@@ -121,6 +121,32 @@ describe("apply_patch mutation routing projection", () => {
     ]);
   });
 
+  it("routes fenced patch output with surrounding prose as the same supported single-file update", async () => {
+    const fixture = createFixture();
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, fencedSingleFileUpdatePatch()),
+      getWorkspaceAuthority: () =>
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual(["src/a.ts"]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/a.ts"],
+        changedFiles: ["src/a.ts"],
+        writerInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
+  });
+
   it("routes single Add File patches to the selected-workspace create projection", async () => {
     const fixture = createFixture();
 
@@ -392,6 +418,85 @@ describe("apply_patch mutation routing projection", () => {
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
 
+  it("keeps duplicate target Update File patches stopped before writer invocation", async () => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    let writes = 0;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, duplicateTargetPatch()),
+      getWorkspaceAuthority: () =>
+        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
+          writes += 1;
+        }),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "unsupported-no-write",
+        failureClass: "duplicate-target",
+        writeIntentFiles: [],
+        changedFiles: [],
+        plannedFiles: [],
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "not-run",
+        successLike: false,
+      }),
+    );
+    expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "update",
+        targetPath: "src/a.ts",
+        writeIntent: "none",
+      }),
+      expect.objectContaining({
+        operationKind: "update",
+        targetPath: "src/a.ts",
+        writeIntent: "none",
+      }),
+    ]);
+    expect(writes).toBe(0);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("keeps outside-workspace Update File patches stopped without writer invocation", async () => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    let writes = 0;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, outsideWorkspacePatch()),
+      getWorkspaceAuthority: () =>
+        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
+          writes += 1;
+        }),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "unsupported-no-write",
+        failureClass: "workspace-boundary",
+        writeIntentFiles: [],
+        changedFiles: [],
+        plannedFiles: [],
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        successLike: false,
+      }),
+    );
+    expect(writes).toBe(0);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
   it("keeps malformed patches stopped with invalid-model-output per-file projection", async () => {
     const fixture = createFixture();
     const before = snapshotFixture(fixture.workspaceRoot);
@@ -425,6 +530,39 @@ describe("apply_patch mutation routing projection", () => {
         writeIntent: "none",
       }),
     ]);
+    expect(writes).toBe(0);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("keeps success-like text with no patch stopped as invalid model output", async () => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    let writes = 0;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, "Done. I changed src/a.ts successfully."),
+      getWorkspaceAuthority: () =>
+        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
+          writes += 1;
+        }),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "invalid-model-output",
+        failureClass: "parse-failure",
+        writeIntentFiles: [],
+        changedFiles: [],
+        plannedFiles: [],
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        successLike: false,
+      }),
+    );
     expect(writes).toBe(0);
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
@@ -511,6 +649,21 @@ function singleFileUpdatePatch(): string {
   ].join("\n");
 }
 
+function fencedSingleFileUpdatePatch(): string {
+  return [
+    "Here is the patch:",
+    "```diff",
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** End Patch",
+    "```",
+    "The change is complete.",
+  ].join("\n");
+}
+
 function twoFileUpdatePatch(): string {
   return [
     "*** Begin Patch",
@@ -522,6 +675,32 @@ function twoFileUpdatePatch(): string {
     "@@",
     "-b = 1",
     "+b = 2",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function duplicateTargetPatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 2",
+    "+a = 3",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function outsideWorkspacePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: ../outside.ts",
+    "@@",
+    "-outside = 1",
+    "+outside = 2",
     "*** End Patch",
   ].join("\n");
 }

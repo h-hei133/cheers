@@ -10418,6 +10418,37 @@ function route08PatchScenarios() {
       ].join('\n'),
     },
     {
+      id: 'real-model-like-unsupported-four-file-update',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'src/b.ts': 'b\n',
+        'src/c.ts': 'c\n',
+        'src/d.ts': 'd\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/a.ts',
+        '@@',
+        '-a',
+        '+aa',
+        '*** Update File: src/b.ts',
+        '@@',
+        '-b',
+        '+bb',
+        '*** Update File: src/c.ts',
+        '@@',
+        '-c',
+        '+cc',
+        '*** Update File: src/d.ts',
+        '@@',
+        '-d',
+        '+dd',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
       id: 'real-model-like-unsupported-delete-file',
       expectedClass: 'unsupported',
       files: {
@@ -10450,6 +10481,43 @@ function route08PatchScenarios() {
       ].join('\n'),
     },
     {
+      id: 'real-model-like-unsupported-duplicate-target-update',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'src/b.ts': 'b\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/a.ts',
+        '@@',
+        '-a',
+        '+aa',
+        '*** Update File: src/a.ts',
+        '@@',
+        '-aa',
+        '+aaa',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-outside-workspace-update',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: ../outside.ts',
+        '@@',
+        '-outside',
+        '+changed',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
       id: 'real-model-like-unsupported-broad-apply-patch',
       expectedClass: 'unsupported',
       files: {
@@ -10475,6 +10543,22 @@ function route08PatchScenarios() {
       ].join('\n'),
     },
     {
+      id: 'real-model-like-unsupported-unified-diff-output',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        'diff --git a/src/a.ts b/src/a.ts',
+        '--- a/src/a.ts',
+        '+++ b/src/a.ts',
+        '@@ -1 +1 @@',
+        '-a',
+        '+aa',
+      ].join('\n'),
+    },
+    {
       id: 'real-model-like-malformed-patch-output',
       expectedClass: 'model-output',
       files: {
@@ -10488,6 +10572,69 @@ function route08PatchScenarios() {
         '@@',
         '-a',
         '+aa',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-malformed-empty-output',
+      expectedClass: 'model-output',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: ' \n\t\n ',
+    },
+    {
+      id: 'real-model-like-malformed-success-like-no-patch',
+      expectedClass: 'model-output',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: 'Done. I changed src/a.ts successfully.',
+    },
+    {
+      id: 'real-model-like-malformed-unknown-operation',
+      expectedClass: 'model-output',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Rename File: src/a.ts -> src/b.ts',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-malformed-missing-target-header',
+      expectedClass: 'model-output',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File:',
+        '@@',
+        '-a',
+        '+aa',
+        '*** End Patch',
+      ].join('\n'),
+    },
+    {
+      id: 'real-model-like-unsupported-missing-target-update',
+      expectedClass: 'unsupported',
+      files: {
+        'src/a.ts': 'a\n',
+        'LOCKED.md': 'locked\n',
+      },
+      patchText: [
+        '*** Begin Patch',
+        '*** Update File: src/missing.ts',
+        '@@',
+        '-missing',
+        '+changed',
+        '*** End Patch',
       ].join('\n'),
     },
     {

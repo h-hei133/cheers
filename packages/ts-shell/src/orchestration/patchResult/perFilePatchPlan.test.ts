@@ -252,6 +252,36 @@ describe("buildPerFilePatchPlan", () => {
     );
   });
 
+  it("accepts a fenced markdown patch with surrounding prose as the same supported update plan", () => {
+    const plan = planFromPatch(
+      [
+        "I will make the requested change.",
+        "```diff",
+        "*** Begin Patch",
+        "*** Update File: src/app.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** End Patch",
+        "```",
+        "Done.",
+      ].join("\n"),
+      {
+        "src/app.ts": "old\n",
+      },
+    );
+
+    expectSupportedWritePlan(plan, ["src/app.ts"]);
+    expect(plan.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "update",
+        targetPath: "src/app.ts",
+        supportStatus: "supported-write",
+        writeIntent: "eligible",
+      }),
+    ]);
+  });
+
   it("projects malformed patch text to invalid model output", () => {
     const plan = planFromPatch("not a patch", {});
 
@@ -278,6 +308,82 @@ describe("buildPerFilePatchPlan", () => {
     );
   });
 
+  it.each([
+    {
+      name: "success-like text without a patch",
+      rawPatchText: "Done. I updated src/app.ts successfully.",
+      expectedOperationKind: "malformed",
+    },
+    {
+      name: "empty model output",
+      rawPatchText: " \n\t\n ",
+      expectedOperationKind: "malformed",
+    },
+    {
+      name: "unknown operation kind",
+      rawPatchText: [
+        "*** Begin Patch",
+        "*** Rename File: src/a.ts -> src/b.ts",
+        "*** End Patch",
+      ].join("\n"),
+      expectedOperationKind: "unknown",
+    },
+    {
+      name: "malformed update header",
+      rawPatchText: [
+        "*** Begin Patch",
+        "*** Update File:",
+        "@@",
+        "-old",
+        "+new",
+        "*** End Patch",
+      ].join("\n"),
+      expectedOperationKind: "malformed",
+    },
+    {
+      name: "unsupported hunk body shape",
+      rawPatchText: [
+        "*** Begin Patch",
+        "*** Update File: src/app.ts",
+        "@@",
+        "old",
+        "+new",
+        "*** End Patch",
+      ].join("\n"),
+      expectedOperationKind: "malformed",
+    },
+  ])(
+    "projects $name to invalid model output without write intent",
+    ({ rawPatchText, expectedOperationKind }) => {
+      const plan = planFromPatch(rawPatchText, {
+        "src/app.ts": "old\n",
+      });
+
+      expect(plan.summary).toEqual(
+        expect.objectContaining({
+          supportStatus: "invalid-model-output",
+          failureClass: "parse-failure",
+          writeIntentFiles: [],
+          plannedFiles: [],
+          changedFiles: [],
+          willWrite: false,
+          writerInvoked: false,
+          workspaceWriterInvoked: false,
+          postWriteVerification: "not-run",
+          writerInvocationCondition: "never",
+        }),
+      );
+      expect(plan.operations[0]).toEqual(
+        expect.objectContaining({
+          operationKind: expectedOperationKind,
+          supportStatus: "invalid-model-output",
+          writeIntent: "none",
+          verificationExpectation: "not-run-invalid-model-output",
+        }),
+      );
+    },
+  );
+
   it("projects mixed supported and unsupported operations to unsupported/no-write", () => {
     const plan = planFromPatch(
       [
@@ -301,6 +407,93 @@ describe("buildPerFilePatchPlan", () => {
     expect(plan.operations.map((operation) => operation.supportStatus)).toEqual([
       "unsupported-no-write",
       "unsupported-no-write",
+    ]);
+  });
+
+  it("projects duplicate update targets to unsupported/no-write before writer reachability", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/app.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** Update File: src/app.ts",
+        "@@",
+        "-new",
+        "+newer",
+        "*** End Patch",
+      ],
+      {
+        "src/app.ts": "old\n",
+      },
+    );
+
+    expectUnsupportedNoWritePlan(plan, "duplicate-target");
+    expect(plan.summary.targetFiles).toEqual(["src/app.ts", "src/app.ts"]);
+    expect(plan.summary.failedFiles).toEqual([
+      expect.objectContaining({
+        code: "patch-apply-plan-not-verified",
+        path: "src/app.ts",
+      }),
+    ]);
+    expect(plan.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "update",
+        targetPath: "src/app.ts",
+        writeIntent: "none",
+      }),
+      expect.objectContaining({
+        operationKind: "update",
+        targetPath: "src/app.ts",
+        writeIntent: "none",
+      }),
+    ]);
+  });
+
+  it("projects paths outside the selected workspace to unsupported/no-write", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: ../outside.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** End Patch",
+      ],
+      {
+        "../outside.ts": "old\n",
+      },
+    );
+
+    expectUnsupportedNoWritePlan(plan, "workspace-boundary");
+    expect(plan.summary.failedFiles).toEqual([
+      expect.objectContaining({
+        code: "patch-verify-path-outside-workspace",
+        path: "../outside.ts",
+      }),
+    ]);
+  });
+
+  it("projects missing update targets to unsupported/no-write", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/missing.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** End Patch",
+      ],
+      {},
+    );
+
+    expectUnsupportedNoWritePlan(plan, "missing-target");
+    expect(plan.summary.failedFiles).toEqual([
+      expect.objectContaining({
+        code: "patch-verify-file-missing",
+        path: "src/missing.ts",
+      }),
     ]);
   });
 

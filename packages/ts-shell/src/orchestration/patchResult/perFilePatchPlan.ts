@@ -28,6 +28,7 @@ export type PerFilePatchFailureClass =
   | "broad-apply-patch"
   | "mixed-operations"
   | "too-many-update-files"
+  | "duplicate-target"
   | "unsupported-operation"
   | "verification-failed"
   | "workspace-boundary"
@@ -196,6 +197,33 @@ function buildParsedPatchPlan(
     (operation) => operation.kind === "delete" || operation.kind === "move",
   );
   const targetFiles = operations.map(targetPathForOperation);
+  const duplicateTargetFiles = duplicateTargets(targetFiles);
+
+  if (
+    duplicateTargetFiles.length > 0 &&
+    updateOperations.length === operations.length
+  ) {
+    return buildUnsupportedPlan({
+      operations,
+      targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: "duplicate-target",
+      reason:
+        "Duplicate apply_patch targets are represented as unsupported/no-write; writer routes require distinct target files.",
+      nextAction:
+        "Regenerate the patch with distinct target files before expecting any write route.",
+      failures: duplicateTargetFiles.map((targetPath) =>
+        patchFailure({
+          code: "patch-apply-plan-not-verified",
+          path: targetPath,
+          message:
+            "Per-file patch plan rejects duplicate target files before any writer is reachable.",
+          nextAction:
+            "Use one operation per target file, or split repeated edits into a single supported patch for that file.",
+        }),
+      ),
+    });
+  }
 
   if (
     operations.length === 1 &&
@@ -470,7 +498,11 @@ function buildInvalidPatchPlan(
   const supportStatus: PerFilePatchSupportStatus = broad
     ? "unsupported-no-write"
     : "invalid-model-output";
-  const operationKind: PerFilePatchOperationKind = broad ? "broad" : "malformed";
+  const operationKind: PerFilePatchOperationKind = broad
+    ? "broad"
+    : failure.code === "patch-parse-unsupported-operation"
+      ? "unknown"
+      : "malformed";
   const failureClass: PerFilePatchFailureClass = broad
     ? "broad-apply-patch"
     : "parse-failure";
@@ -613,6 +645,19 @@ function operationKindFromPatchOperation(
 
 function targetPathForOperation(operation: PatchFileOperation): string {
   return operation.kind === "move" ? operation.moveTo : operation.path;
+}
+
+function duplicateTargets(targetFiles: readonly string[]): readonly string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const targetFile of targetFiles) {
+    if (seen.has(targetFile)) {
+      duplicates.add(targetFile);
+    } else {
+      seen.add(targetFile);
+    }
+  }
+  return [...duplicates];
 }
 
 function isUpdateOperation(
