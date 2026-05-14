@@ -7,7 +7,10 @@ import type {
   OrchestrationResult,
 } from "../types.js";
 import { projectMutationVerificationHandoff } from "./mutationVerificationProjection.js";
-import { projectPerFilePatchResult } from "./perFilePatchPlan.js";
+import {
+  projectPerFilePatchResult,
+  type PerFilePatchFailureClass,
+} from "./perFilePatchPlan.js";
 import type { WorkspaceWriteRoute } from "./workspaceWriteRoute.js";
 
 export function buildWorkspaceWriteRouteResult(input: {
@@ -138,6 +141,11 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
 
   const target = route.targetPath ?? route.dryRunRoute?.permissionUx.baseEvidence?.targetPath;
   const reason = route.nextAction;
+  const perFileFailedFiles = buildPerFileFailedFiles({
+    route,
+    target,
+    reason,
+  });
   const writerStarted = route.writeFailureState.writerStarted;
   const writeEffect = route.writeFailureState.writeEffect;
   const recoveryNote = writerStarted
@@ -175,14 +183,14 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
           perFilePatchPlan: projectPerFilePatchResult({
             plan: route.perFilePatchPlan,
             changedFiles: [],
-            failedFiles: route.failures.map((failure) => ({
-              path: failure.path ?? target ?? "(apply_patch)",
-              reason: failure.message,
-            })),
+            failedFiles: perFileFailedFiles,
             writerInvoked: route.workspaceWriterInvoked,
             creatorInvoked: false,
             deleteMoveInvoked: false,
             postWriteVerification: route.postWriteVerification,
+            runtimeFailureClass: failureClassForWorkspaceWriteBlocker(
+              route.blocker,
+            ),
           }),
         }
       : {}),
@@ -355,6 +363,54 @@ function buildOutput(route: WorkspaceWriteRoute): string {
     `Reason: ${route.nextAction}`,
     `Next: ${route.nextAction}`,
   ].join("\n");
+}
+
+function buildPerFileFailedFiles(input: {
+  readonly route: Extract<WorkspaceWriteRoute, { status: "blocked" }>;
+  readonly target?: string;
+  readonly reason: string;
+}): readonly { readonly path: string; readonly reason: string }[] {
+  const failures = input.route.failures.map((failure) => ({
+    path: failure.path ?? input.target ?? "(apply_patch)",
+    reason: failure.message,
+  }));
+  if (failures.length > 0) {
+    return failures;
+  }
+
+  if (
+    input.route.blocker === "final-stale-read" ||
+    input.route.blocker === "write-application" ||
+    input.route.blocker === "post-write-verification"
+  ) {
+    const reason =
+      input.route.blocker === "final-stale-read"
+        ? `stale-read: ${input.reason}`
+        : input.reason;
+    return [
+      {
+        path: input.target ?? "(apply_patch)",
+        reason,
+      },
+    ];
+  }
+
+  return [];
+}
+
+function failureClassForWorkspaceWriteBlocker(
+  blocker: Extract<WorkspaceWriteRoute, { status: "blocked" }>["blocker"],
+): PerFilePatchFailureClass | undefined {
+  switch (blocker) {
+    case "final-stale-read":
+      return "stale-read";
+    case "write-application":
+      return "write-application";
+    case "post-write-verification":
+      return "post-write-verification";
+    default:
+      return undefined;
+  }
 }
 
 function emptyRepair(): CodingResultSummary["repair"] {

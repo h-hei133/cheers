@@ -114,6 +114,34 @@ describe("two-file apply_patch workspace write result", () => {
     expect(result.codingResult?.changeSet.unchangedAttemptedFiles).toEqual([
       "src/b.ts",
     ]);
+    expect(result.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        failureClass: "partial-failure",
+        changedFiles: ["src/a.ts"],
+        failedFiles: [
+          {
+            path: "src/b.ts",
+            reason: expect.stringContaining("Patch write failed"),
+          },
+        ],
+        writerInvoked: true,
+        postWriteVerification: "blocked",
+        successLike: false,
+      }),
+    );
+    expect(result.codingResult?.perFilePatchPlan?.operations).toEqual([
+      expect.objectContaining({
+        targetPath: "src/a.ts",
+        changedFile: "src/a.ts",
+      }),
+      expect.objectContaining({
+        targetPath: "src/b.ts",
+        failedFile: {
+          path: "src/b.ts",
+          reason: expect.stringContaining("Patch write failed"),
+        },
+      }),
+    ]);
     expect(result.codingResult?.lastActionResultSeed).toMatchObject({
       target: "src/b.ts",
       changedFiles: ["src/a.ts"],
@@ -160,6 +188,21 @@ describe("two-file apply_patch workspace write result", () => {
     expect(result.codingResult?.changedFiles).toEqual(["src/a.ts"]);
     expect(result.codingResult?.verifiedFiles).toEqual(["src/a.ts"]);
     expect(result.codingResult?.failedFiles[0]?.path).toBe("src/b.ts");
+    expect(result.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        failureClass: "post-write-verification",
+        changedFiles: ["src/a.ts"],
+        failedFiles: [
+          {
+            path: "src/b.ts",
+            reason: expect.stringContaining("post-write verification failed"),
+          },
+        ],
+        writerInvoked: true,
+        postWriteVerification: "failed",
+        successLike: false,
+      }),
+    );
     expect(result.codingResult?.lastActionResultSeed).toMatchObject({
       target: "src/b.ts",
       changedFiles: ["src/a.ts"],

@@ -605,6 +605,167 @@ describe("buildPerFilePatchPlan", () => {
     expect(result.writerInvoked).toBe(false);
     expect(result.successLike).toBe(false);
   });
+
+  it("projects stale-read as a stopped no-write runtime failure", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/app.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** End Patch",
+      ],
+      {
+        "src/app.ts": "old\n",
+      },
+    );
+
+    const result = projectPerFilePatchResult({
+      plan,
+      failedFiles: [
+        {
+          path: "src/app.ts",
+          reason:
+            "stale-read: Target file changed since it was read for this edit.",
+        },
+      ],
+      writerInvoked: false,
+      postWriteVerification: "not-run",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        failureClass: "stale-read",
+        changedFiles: [],
+        failedFiles: [
+          {
+            path: "src/app.ts",
+            reason:
+              "stale-read: Target file changed since it was read for this edit.",
+          },
+        ],
+        writerInvoked: false,
+        postWriteVerification: "not-run",
+        successLike: false,
+      }),
+    );
+    expect(result.operations[0]).toEqual(
+      expect.objectContaining({
+        targetPath: "src/app.ts",
+        failedFile: {
+          path: "src/app.ts",
+          reason:
+            "stale-read: Target file changed since it was read for this edit.",
+        },
+      }),
+    );
+  });
+
+  it("projects partial writer failure with only verified changed files", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/a.ts",
+        "@@",
+        "-a",
+        "+aa",
+        "*** Update File: src/b.ts",
+        "@@",
+        "-b",
+        "+bb",
+        "*** End Patch",
+      ],
+      {
+        "src/a.ts": "a\n",
+        "src/b.ts": "b\n",
+      },
+    );
+
+    const result = projectPerFilePatchResult({
+      plan,
+      changedFiles: ["src/a.ts"],
+      failedFiles: [
+        {
+          path: "src/b.ts",
+          reason: "Patch write failed: simulated second writer failure",
+        },
+      ],
+      writerInvoked: true,
+      postWriteVerification: "blocked",
+    });
+
+    expect(result.failureClass).toBe("partial-failure");
+    expect(result.changedFiles).toEqual(["src/a.ts"]);
+    expect(result.failedFiles).toEqual([
+      {
+        path: "src/b.ts",
+        reason: "Patch write failed: simulated second writer failure",
+      },
+    ]);
+    expect(result.successLike).toBe(false);
+    expect(result.evidence).toEqual(
+      expect.arrayContaining(["per-file-patch-result:partial-failure-surface"]),
+    );
+    expect(result.operations).toEqual([
+      expect.objectContaining({
+        targetPath: "src/a.ts",
+        changedFile: "src/a.ts",
+      }),
+      expect.objectContaining({
+        targetPath: "src/b.ts",
+        failedFile: {
+          path: "src/b.ts",
+          reason: "Patch write failed: simulated second writer failure",
+        },
+      }),
+    ]);
+  });
+
+  it("projects post-write verification failure without success claims", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/app.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** End Patch",
+      ],
+      {
+        "src/app.ts": "old\n",
+      },
+    );
+
+    const result = projectPerFilePatchResult({
+      plan,
+      failedFiles: [
+        {
+          path: "src/app.ts",
+          reason:
+            "Patch update post-write verification failed: readback did not match planned content.",
+        },
+      ],
+      writerInvoked: true,
+      postWriteVerification: "failed",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        failureClass: "post-write-verification",
+        changedFiles: [],
+        writerInvoked: true,
+        postWriteVerification: "failed",
+        successLike: false,
+      }),
+    );
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "per-file-patch-result:post-write-verification-failed",
+        "per-file-patch-result:no-success-claim",
+      ]),
+    );
+  });
 });
 
 function expectSupportedWritePlan(

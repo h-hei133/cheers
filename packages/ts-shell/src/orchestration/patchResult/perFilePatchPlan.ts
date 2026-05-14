@@ -32,7 +32,11 @@ export type PerFilePatchFailureClass =
   | "unsupported-operation"
   | "verification-failed"
   | "workspace-boundary"
-  | "missing-target";
+  | "missing-target"
+  | "stale-read"
+  | "write-application"
+  | "post-write-verification"
+  | "partial-failure";
 
 export type PerFilePatchVerificationExpectation =
   | "route-owned-write-preflight"
@@ -96,6 +100,8 @@ export interface PerFilePatchResultProjection {
     readonly sourcePath?: string;
     readonly writeIntent: "eligible" | "none";
     readonly plannedFile?: string;
+    readonly changedFile?: string;
+    readonly failedFile?: { readonly path: string; readonly reason: string };
   }[];
   readonly writeIntentFiles: readonly string[];
   readonly changedFiles: readonly string[];
@@ -128,6 +134,7 @@ export function projectPerFilePatchResult(input: {
   readonly creatorInvoked?: boolean;
   readonly deleteMoveInvoked?: boolean;
   readonly postWriteVerification?: "passed" | "blocked" | "failed" | "not-run";
+  readonly runtimeFailureClass?: PerFilePatchFailureClass | undefined;
 }): PerFilePatchResultProjection {
   const changedFiles = [...(input.changedFiles ?? [])];
   const failedFiles =
@@ -140,6 +147,15 @@ export function projectPerFilePatchResult(input: {
   const creatorInvoked = input.creatorInvoked ?? false;
   const deleteMoveInvoked = input.deleteMoveInvoked ?? false;
   const postWriteVerification = input.postWriteVerification ?? "not-run";
+  const failureClass =
+    input.runtimeFailureClass ??
+    deriveRuntimeFailureClass({
+      planFailureClass: input.plan.summary.failureClass,
+      changedFiles,
+      failedFiles,
+      writerInvoked,
+      postWriteVerification,
+    });
   const successLike =
     input.plan.summary.supportStatus === "supported-write" &&
     changedFiles.length > 0 &&
@@ -149,15 +165,26 @@ export function projectPerFilePatchResult(input: {
 
   return {
     supportStatus: input.plan.summary.supportStatus,
-    failureClass: input.plan.summary.failureClass,
-    operations: input.plan.operations.map((operation) => ({
-      operationKind: operation.operationKind,
-      supportStatus: operation.supportStatus,
-      ...(operation.targetPath ? { targetPath: operation.targetPath } : {}),
-      ...(operation.sourcePath ? { sourcePath: operation.sourcePath } : {}),
-      writeIntent: operation.writeIntent,
-      ...(operation.plannedFile ? { plannedFile: operation.plannedFile } : {}),
-    })),
+    failureClass,
+    operations: input.plan.operations.map((operation) => {
+      const failedFile = operation.targetPath
+        ? failedFiles.find((failure) => failure.path === operation.targetPath)
+        : undefined;
+      const changedFile =
+        operation.targetPath && changedFiles.includes(operation.targetPath)
+          ? operation.targetPath
+          : undefined;
+      return {
+        operationKind: operation.operationKind,
+        supportStatus: operation.supportStatus,
+        ...(operation.targetPath ? { targetPath: operation.targetPath } : {}),
+        ...(operation.sourcePath ? { sourcePath: operation.sourcePath } : {}),
+        writeIntent: operation.writeIntent,
+        ...(operation.plannedFile ? { plannedFile: operation.plannedFile } : {}),
+        ...(changedFile ? { changedFile } : {}),
+        ...(failedFile ? { failedFile } : {}),
+      };
+    }),
     writeIntentFiles: [...input.plan.summary.writeIntentFiles],
     changedFiles,
     plannedFiles: [...input.plan.summary.plannedFiles],
@@ -170,6 +197,7 @@ export function projectPerFilePatchResult(input: {
     evidence: [
       "per-file-patch-result:projection-only",
       `per-file-patch-result:support-status:${input.plan.summary.supportStatus}`,
+      `per-file-patch-result:failure-class:${failureClass}`,
       ...(successLike
         ? ["per-file-patch-result:success-after-verified-write"]
         : ["per-file-patch-result:no-success-claim"]),
@@ -182,8 +210,50 @@ export function projectPerFilePatchResult(input: {
       ...(deleteMoveInvoked
         ? ["per-file-patch-result:delete-move-invoked"]
         : ["per-file-patch-result:no-delete-move-invoked"]),
+      ...(changedFiles.length > 0 && failedFiles.length > 0
+        ? ["per-file-patch-result:partial-failure-surface"]
+        : []),
+      ...(postWriteVerification === "failed"
+        ? ["per-file-patch-result:post-write-verification-failed"]
+        : []),
     ],
   };
+}
+
+function deriveRuntimeFailureClass(input: {
+  readonly planFailureClass: PerFilePatchFailureClass;
+  readonly changedFiles: readonly string[];
+  readonly failedFiles: readonly { readonly path: string; readonly reason: string }[];
+  readonly writerInvoked: boolean;
+  readonly postWriteVerification: "passed" | "blocked" | "failed" | "not-run";
+}): PerFilePatchFailureClass {
+  if (input.failedFiles.length === 0) {
+    return input.planFailureClass;
+  }
+
+  if (input.postWriteVerification === "failed") {
+    return "post-write-verification";
+  }
+
+  if (input.writerInvoked && input.changedFiles.length > 0) {
+    return "partial-failure";
+  }
+
+  if (input.writerInvoked) {
+    return "write-application";
+  }
+
+  if (
+    input.failedFiles.some((failure) =>
+      failure.reason.toLowerCase().includes("stale-read"),
+    )
+  ) {
+    return "stale-read";
+  }
+
+  return input.planFailureClass === "none"
+    ? "verification-failed"
+    : input.planFailureClass;
 }
 
 function buildParsedPatchPlan(

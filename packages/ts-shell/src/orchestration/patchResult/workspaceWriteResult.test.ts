@@ -58,6 +58,21 @@ describe("single-file apply_patch workspace write result", () => {
     expect(result.codingResult?.patches?.[0]?.failureCode).toBe(
       "readback-mismatch",
     );
+    expect(result.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        failureClass: "post-write-verification",
+        changedFiles: [],
+        failedFiles: [
+          {
+            path: "src/app.ts",
+            reason: expect.stringContaining("post-write verification"),
+          },
+        ],
+        writerInvoked: true,
+        postWriteVerification: "failed",
+        successLike: false,
+      }),
+    );
     expect(result.codingResult?.repair.status).toBe("failed");
     expect(result.codingResult?.continuation.status).toBe(
       "failed-after-bounded-continuation",
@@ -216,6 +231,73 @@ describe("single-file apply_patch workspace write result", () => {
     );
     expect(fs.readFileSync(outsideTarget, "utf8")).toBe(
       "status: draft\nowner: outside-workspace\n",
+    );
+  });
+
+  it("maps final stale-read to per-file no-write failure without invoking the writer", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    let readCount = 0;
+    const route = await runWorkspaceWriteRoute({
+      workspaceRoot: fixture.workspaceRoot,
+      rawPatchText: applyPatchText,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: "approved",
+      defaultProductionRejectionUnchanged: true,
+      readFile: authority.readFile,
+      readVerifiedFile: (relativePath) => {
+        readCount += 1;
+        if (readCount === 1) {
+          fs.writeFileSync(
+            path.join(fixture.workspaceRoot, relativePath),
+            "status: draft\nowner: changed-after-approval\n",
+            "utf8",
+          );
+        }
+        return authority.readVerifiedFile(relativePath);
+      },
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: () => {
+        throw new Error("writer must stay unreachable after stale-read");
+      },
+    });
+
+    expect(route.status).toBe("blocked");
+    expect(route.blocker).toBe("final-stale-read");
+    expect(route.workspaceWriterInvoked).toBe(false);
+
+    const result = buildWorkspaceWriteRouteResult({
+      sessionId: "session-1",
+      prompt: applyPatchText,
+      route,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        failureClass: "stale-read",
+        changedFiles: [],
+        failedFiles: [
+          {
+            path: "src/app.ts",
+            reason: expect.stringContaining("stale-read"),
+          },
+        ],
+        writerInvoked: false,
+        postWriteVerification: "not-run",
+        successLike: false,
+      }),
+    );
+    expect(result.codingResult?.perFilePatchPlan?.operations[0]).toEqual(
+      expect.objectContaining({
+        targetPath: "src/app.ts",
+        failedFile: {
+          path: "src/app.ts",
+          reason: expect.stringContaining("stale-read"),
+        },
+      }),
     );
   });
 });

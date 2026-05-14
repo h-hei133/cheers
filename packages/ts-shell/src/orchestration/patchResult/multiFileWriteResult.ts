@@ -7,7 +7,10 @@ import type {
   OrchestrationResult,
 } from "../types.js";
 import { projectMutationVerificationHandoff } from "./mutationVerificationProjection.js";
-import { projectPerFilePatchResult } from "./perFilePatchPlan.js";
+import {
+  projectPerFilePatchResult,
+  type PerFilePatchFailureClass,
+} from "./perFilePatchPlan.js";
 import type { MultiFileWriteRoute } from "./multiFileWriteRoute.js";
 
 export function buildMultiFileWriteRouteResult(input: {
@@ -189,6 +192,10 @@ function buildCodingResult(route: MultiFileWriteRoute): CodingResultSummary {
             creatorInvoked: false,
             deleteMoveInvoked: false,
             postWriteVerification: route.postWriteVerification,
+            runtimeFailureClass:
+              route.status === "blocked"
+                ? failureClassForMultiFileWriteBlocker(route)
+                : undefined,
           }),
         }
       : {}),
@@ -398,6 +405,21 @@ function buildOutput(route: MultiFileWriteRoute): string {
     `Reason: ${route.nextAction}`,
     `Next: ${route.nextAction}`,
   ].join("\n");
+}
+
+function failureClassForMultiFileWriteBlocker(
+  route: Extract<MultiFileWriteRoute, { status: "blocked" }>,
+): PerFilePatchFailureClass | undefined {
+  switch (route.blocker) {
+    case "final-stale-read":
+      return "stale-read";
+    case "write-application":
+      return route.changedFiles.length > 0 ? "partial-failure" : "write-application";
+    case "post-write-verification":
+      return "post-write-verification";
+    default:
+      return undefined;
+  }
 }
 
 function emptyRepair(): CodingResultSummary["repair"] {
