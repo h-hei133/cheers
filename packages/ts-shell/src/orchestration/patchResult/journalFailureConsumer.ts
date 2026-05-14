@@ -1,7 +1,10 @@
 import type {
+  PerFilePatchFailureClass,
   PerFilePatchOperation,
   PerFilePatchPlan,
+  PerFilePatchResultProjection,
 } from "./perFilePatchPlan.js";
+import { projectPerFilePatchResult } from "./perFilePatchPlan.js";
 import type {
   RouteScopedEditJournal,
   RouteScopedEditJournalFailureClass,
@@ -40,6 +43,41 @@ export function buildJournalForFailureResult(input: {
         Boolean(operation),
       ),
   };
+}
+
+export function projectPerFilePatchFailureResultWithJournal(input: {
+  readonly routeId: string;
+  readonly plan: PerFilePatchPlan;
+  readonly changedFiles: readonly string[];
+  readonly failedFiles: readonly {
+    readonly path: string;
+    readonly reason: string;
+  }[];
+  readonly writerStarted: boolean;
+  readonly writerInvoked: boolean;
+  readonly creatorInvoked: boolean;
+  readonly deleteMoveInvoked: boolean;
+  readonly postWriteVerification: "passed" | "blocked" | "failed" | "not-run";
+  readonly runtimeFailureClass?: PerFilePatchFailureClass | undefined;
+}): PerFilePatchResultProjection {
+  return projectPerFilePatchResult({
+    plan: input.plan,
+    routeScopedEditJournal: buildJournalForFailureResult({
+      routeId: input.routeId,
+      plan: input.plan,
+      changedFiles: input.changedFiles,
+      failedFiles: input.failedFiles,
+      writerStarted: input.writerStarted,
+      postWriteVerification: input.postWriteVerification,
+    }),
+    changedFiles: input.changedFiles,
+    failedFiles: input.failedFiles,
+    writerInvoked: input.writerInvoked,
+    creatorInvoked: input.creatorInvoked,
+    deleteMoveInvoked: input.deleteMoveInvoked,
+    postWriteVerification: input.postWriteVerification,
+    runtimeFailureClass: input.runtimeFailureClass,
+  });
 }
 
 function projectOperation(input: {

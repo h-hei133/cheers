@@ -6,6 +6,7 @@ import type {
   CodingResultSummary,
   OrchestrationResult,
 } from "../types.js";
+import { projectPerFilePatchFailureResultWithJournal } from "./journalFailureConsumer.js";
 import { projectMutationVerificationHandoff } from "./mutationVerificationProjection.js";
 import { projectPerFilePatchResult } from "./perFilePatchPlan.js";
 import type { WorkspaceCreateRoute } from "./workspaceCreateRoute.js";
@@ -141,6 +142,10 @@ function buildCodingResult(route: WorkspaceCreateRoute): CodingResultSummary {
   const recoveryNote = writerStarted
     ? route.writeFailureState.nextAction
     : "No workspace writer ran before this route stopped.";
+  const failedFiles = route.failures.map((failure) => ({
+    path: failure.path ?? target ?? "(apply_patch)",
+    reason: failure.message,
+  }));
   const handoff = projectMutationVerificationHandoff({
     changedFiles: [],
     failedFiles: [
@@ -170,13 +175,12 @@ function buildCodingResult(route: WorkspaceCreateRoute): CodingResultSummary {
     taskKind: "write-file",
     ...(route.perFilePatchPlan
       ? {
-          perFilePatchPlan: projectPerFilePatchResult({
+          perFilePatchPlan: projectPerFilePatchFailureResultWithJournal({
+            routeId: "single-file-apply-patch-workspace-create",
             plan: route.perFilePatchPlan,
             changedFiles: [],
-            failedFiles: route.failures.map((failure) => ({
-              path: failure.path ?? target ?? "(apply_patch)",
-              reason: failure.message,
-            })),
+            failedFiles,
+            writerStarted,
             writerInvoked: route.workspaceWriterInvoked,
             creatorInvoked: route.workspaceWriterInvoked,
             deleteMoveInvoked: false,

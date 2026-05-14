@@ -93,6 +93,28 @@ describe("single-file Add File workspace create result", () => {
       requiresUserInspection: true,
       verification: { status: "blocked" },
     });
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal,
+    ).toEqual(
+      expect.objectContaining({
+        routeId: "single-file-apply-patch-workspace-create",
+        operationKinds: ["create"],
+        plannedFiles: ["src/new.ts"],
+        changedFiles: [],
+        failedFiles: [
+          expect.objectContaining({
+            path: "src/new.ts",
+            failureClass: "post-write-verification",
+          }),
+        ],
+        unrecoveredFiles: ["src/new.ts"],
+        recoveryCandidateFiles: ["src/new.ts"],
+        writerStarted: true,
+        rollbackAtomicityClaim: false,
+        recoveryExecuted: false,
+        writeCapability: "metadata-only",
+      }),
+    );
   });
 });
 

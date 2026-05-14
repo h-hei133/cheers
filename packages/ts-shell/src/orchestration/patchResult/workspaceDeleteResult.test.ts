@@ -195,6 +195,28 @@ describe("workspace delete route result projection", () => {
         successLike: false,
       }),
     );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal,
+    ).toEqual(
+      expect.objectContaining({
+        routeId: "single-file-apply-patch-workspace-delete",
+        operationKinds: ["delete"],
+        plannedFiles: ["src/delete-me.ts"],
+        changedFiles: [],
+        failedFiles: [
+          expect.objectContaining({
+            path: "src/delete-me.ts",
+            failureClass: "post-write-verification",
+          }),
+        ],
+        unrecoveredFiles: ["src/delete-me.ts"],
+        recoveryCandidateFiles: ["src/delete-me.ts"],
+        writerStarted: true,
+        rollbackAtomicityClaim: false,
+        recoveryExecuted: false,
+        writeCapability: "metadata-only",
+      }),
+    );
     expect(result.codingResult?.changeSet).toEqual(
       expect.objectContaining({
         postRunDirtyFiles: [],

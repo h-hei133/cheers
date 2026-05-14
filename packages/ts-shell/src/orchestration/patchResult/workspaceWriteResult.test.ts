@@ -73,6 +73,29 @@ describe("single-file apply_patch workspace write result", () => {
         successLike: false,
       }),
     );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal,
+    ).toEqual(
+      expect.objectContaining({
+        routeId: "single-file-apply-patch-workspace-write",
+        operationKinds: ["update"],
+        plannedFiles: ["src/app.ts"],
+        changedFiles: [],
+        failedFiles: [
+          {
+            path: "src/app.ts",
+            reason: expect.stringContaining("post-write verification"),
+            failureClass: "post-write-verification",
+          },
+        ],
+        unrecoveredFiles: ["src/app.ts"],
+        recoveryCandidateFiles: ["src/app.ts"],
+        writerStarted: true,
+        rollbackAtomicityClaim: false,
+        recoveryExecuted: false,
+        writeCapability: "metadata-only",
+      }),
+    );
     expect(result.codingResult?.repair.status).toBe("failed");
     expect(result.codingResult?.continuation.status).toBe(
       "failed-after-bounded-continuation",
@@ -297,6 +320,29 @@ describe("single-file apply_patch workspace write result", () => {
           path: "src/app.ts",
           reason: expect.stringContaining("stale-read"),
         },
+      }),
+    );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal,
+    ).toEqual(
+      expect.objectContaining({
+        routeId: "single-file-apply-patch-workspace-write",
+        operationKinds: ["update"],
+        plannedFiles: ["src/app.ts"],
+        changedFiles: [],
+        failedFiles: [
+          {
+            path: "src/app.ts",
+            reason: expect.stringContaining("stale-read"),
+            failureClass: "preflight",
+          },
+        ],
+        unrecoveredFiles: [],
+        recoveryCandidateFiles: [],
+        writerStarted: false,
+        rollbackAtomicityClaim: false,
+        recoveryExecuted: false,
+        writeCapability: "metadata-only",
       }),
     );
   });

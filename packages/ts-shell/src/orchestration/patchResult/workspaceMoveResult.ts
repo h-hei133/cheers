@@ -6,6 +6,7 @@ import type {
   CodingResultSummary,
   OrchestrationResult,
 } from "../types.js";
+import { projectPerFilePatchFailureResultWithJournal } from "./journalFailureConsumer.js";
 import { projectMutationVerificationHandoff } from "./mutationVerificationProjection.js";
 import { projectPerFilePatchResult } from "./perFilePatchPlan.js";
 import type { WorkspaceMoveRoute } from "./workspaceMoveRoute.js";
@@ -170,10 +171,12 @@ function buildCodingResult(route: WorkspaceMoveRoute): CodingResultSummary {
     taskKind: "edit-file",
     ...(route.perFilePatchPlan
       ? {
-          perFilePatchPlan: projectPerFilePatchResult({
+          perFilePatchPlan: projectPerFilePatchFailureResultWithJournal({
+            routeId: "single-file-apply-patch-workspace-move",
             plan: route.perFilePatchPlan,
             changedFiles,
             failedFiles: perFileFailedFiles,
+            writerStarted: route.writerStarted,
             writerInvoked: route.workspaceWriterInvoked,
             creatorInvoked: false,
             deleteMoveInvoked: route.deleteMoveInvoked,

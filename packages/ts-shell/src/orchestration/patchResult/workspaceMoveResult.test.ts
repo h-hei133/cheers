@@ -206,6 +206,29 @@ describe("workspace move route result projection", () => {
         successLike: false,
       }),
     );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal,
+    ).toEqual(
+      expect.objectContaining({
+        routeId: "single-file-apply-patch-workspace-move",
+        operationKinds: ["move"],
+        plannedFiles: ["src/to.ts"],
+        changedFiles: ["src/to.ts"],
+        verifiedFiles: ["src/to.ts"],
+        failedFiles: [
+          expect.objectContaining({
+            path: "src/to.ts",
+            failureClass: "post-write-verification",
+          }),
+        ],
+        unrecoveredFiles: ["src/to.ts"],
+        recoveryCandidateFiles: ["src/to.ts"],
+        writerStarted: true,
+        rollbackAtomicityClaim: false,
+        recoveryExecuted: false,
+        writeCapability: "metadata-only",
+      }),
+    );
     expect(result.codingResult?.changeSet).toEqual(
       expect.objectContaining({
         postRunDirtyFiles: ["src/to.ts"],
