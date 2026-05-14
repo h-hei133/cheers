@@ -156,7 +156,7 @@ describe("sessionStateSurface", () => {
         lastWriterStarted: false,
         lastWriteEffectTarget: "src/a.ts, src/b.ts, src/c.ts",
         lastVerificationReason:
-          "Exactly-three Update File patch passed planning/preflight, but 3-file writes are unsupported and no writer was reachable.",
+          "Exactly-three Update File patch passed selected-workspace planning/preflight in a no-write route; no writer was reachable.",
         lastVerificationBlockerKind: "generic-stopped",
       }),
     }).join("\n");

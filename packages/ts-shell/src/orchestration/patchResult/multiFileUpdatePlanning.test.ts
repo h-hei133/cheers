@@ -101,7 +101,7 @@ describe("classifyMultiFileUpdatePlanningNoWrite", () => {
         failedFiles: [],
       }),
     );
-    expect(result?.explanation).toContain("3-file writes are unsupported");
+    expect(result?.explanation).toContain("no-write route");
   });
 
   it("blocks four Update File operations without write metadata", () => {

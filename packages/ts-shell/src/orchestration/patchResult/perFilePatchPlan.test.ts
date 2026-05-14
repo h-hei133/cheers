@@ -85,7 +85,7 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
-  it("projects exactly-three updates to planning/no-write with planned files", () => {
+  it("projects exactly-three updates to supported write intents", () => {
     const plan = planFromPatch(
       [
         "*** Begin Patch",
@@ -110,27 +110,14 @@ describe("buildPerFilePatchPlan", () => {
       },
     );
 
-    expect(plan.summary).toEqual(
-      expect.objectContaining({
-        supportStatus: "supported-planning-no-write",
-        targetFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
-        writeIntentFiles: [],
-        plannedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
-        changedFiles: [],
-        failedFiles: [],
-        willWrite: false,
-        writerInvoked: false,
-        workspaceWriterInvoked: false,
-        writerInvocationCondition: "never",
-      }),
-    );
-    expect(plan.operations.every((operation) => operation.writeIntent === "none")).toBe(
+    expectSupportedWritePlan(plan, ["src/a.ts", "src/b.ts", "src/c.ts"]);
+    expect(plan.operations.every((operation) => operation.writeIntent === "eligible")).toBe(
       true,
     );
-    expect(plan.operations.map((operation) => operation.plannedFile)).toEqual([
-      "src/a.ts",
-      "src/b.ts",
-      "src/c.ts",
+    expect(plan.operations.map((operation) => operation.operationKind)).toEqual([
+      "update",
+      "update",
+      "update",
     ]);
   });
 
@@ -843,7 +830,7 @@ describe("buildPerFilePatchPlan", () => {
     );
   });
 
-  it("keeps changed, planned, and failed file projections distinct", () => {
+  it("keeps changed and failed file projections distinct from write-intent files", () => {
     const supported = planFromPatch(
       [
         "*** Begin Patch",
@@ -875,7 +862,7 @@ describe("buildPerFilePatchPlan", () => {
       }),
     );
 
-    const planning = planFromPatch(
+    const threeFileWrite = planFromPatch(
       [
         "*** Begin Patch",
         "*** Update File: src/a.ts",
@@ -898,18 +885,23 @@ describe("buildPerFilePatchPlan", () => {
         "src/c.ts": "c\n",
       },
     );
-    const planningResult = projectPerFilePatchResult({ plan: planning });
+    const threeFileResult = projectPerFilePatchResult({ plan: threeFileWrite });
 
-    expect(planningResult).toEqual(
+    expect(threeFileResult).toEqual(
       expect.objectContaining({
         changedFiles: [],
-        plannedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        plannedFiles: [],
         failedFiles: [],
         writerInvoked: false,
         postWriteVerification: "not-run",
         successLike: false,
       }),
     );
+    expect(threeFileResult.writeIntentFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+    ]);
 
     const unsupported = planFromPatch(
       [

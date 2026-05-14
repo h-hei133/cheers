@@ -32,8 +32,9 @@ export function buildMultiFileWriteRouteResult(input: {
 
 function buildCodingResult(route: MultiFileWriteRoute): CodingResultSummary {
   if (route.status === "written") {
+    const targetCount = route.targetPaths.length;
     const reason =
-      "Two-file workspace update completed after explicit approval, final freshness checks for both files, sequential writes, and per-file post-write verification.";
+      `${targetCount}-file workspace update completed after explicit approval, final freshness checks for all files, sequential writes, and per-file post-write verification.`;
     const handoff = projectMutationVerificationHandoff({
       changedFiles: route.changedFiles,
       failedFiles: [],
@@ -86,8 +87,8 @@ function buildCodingResult(route: MultiFileWriteRoute): CodingResultSummary {
         reasons: [...handoff.taskReasons],
         requiredEvidence: [
           "explicit workspace write opt-in",
-          "approved-for-write decision naming exactly two files",
-          "final stale-read for both files before writer",
+          `approved-for-write decision naming exactly ${targetCount} files`,
+          "final stale-read for all files before writer",
           "sequential write without rollback claim",
           "per-file post-write verification",
         ],
@@ -177,7 +178,7 @@ function buildCodingResult(route: MultiFileWriteRoute): CodingResultSummary {
       reason: failure.message,
     }));
   const recoveryNote = writerStarted
-    ? "Writer started in the multi-file route. Inspect/re-read both attempted files before retrying; no rollback was attempted."
+    ? "Writer started in the multi-file route. Inspect/re-read all attempted files before retrying; no rollback was attempted."
     : "No workspace writer ran before this route stopped.";
 
   return {

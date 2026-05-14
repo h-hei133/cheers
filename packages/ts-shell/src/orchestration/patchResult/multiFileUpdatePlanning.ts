@@ -26,7 +26,7 @@ export interface MultiFileUpdatePlanningClassification {
     | "selected-workspace exactly-three existing-file update planning/no-write";
   readonly currentSupportedCapability:
     | "planning/preflight only; writer remains single-file"
-    | "exactly-three planning/no-write only; 3-file writes remain unsupported";
+    | "exactly-three planning/no-write only in no-write runtime paths";
   readonly drivesApplyPatchExpansion: false;
   readonly willWrite: false;
   readonly writerReachable: false;
@@ -99,15 +99,15 @@ export function classifyMultiFileUpdatePlanningNoWrite(
         {
           code: "patch-apply-plan-not-verified",
           message:
-            "Multi-file update planning accepts exactly two Update File operations.",
+            "Multi-file update planning accepts exactly two or exactly three Update File operations.",
           nextAction:
-            "Reduce the patch to exactly two existing-file Update File operations, or use the exactly-three planning/no-write verifier without expecting writes.",
+            "Reduce the patch to exactly two or exactly three existing-file Update File operations.",
         },
       ],
       explanation:
-        "Multi-file update planning is intentionally capped before any 3+ file write support.",
+        "Multi-file update planning is intentionally capped before any 4+ file write support.",
       nextAction:
-        "Reduce the patch to exactly two selected-workspace existing-file Update File targets; 4+ file writes remain unsupported.",
+        "Reduce the patch to exactly two or exactly three selected-workspace existing-file Update File targets; 4+ file writes remain unsupported.",
     });
   }
 
@@ -143,9 +143,9 @@ export function classifyMultiFileUpdatePlanningNoWrite(
       blockedReason: "three-file-update-planning-no-write",
       failedFiles: [],
       explanation:
-        "Exactly-three Update File patch passed selected-workspace planning/preflight, but 3-file writes are unsupported and no writer was reachable.",
+        "Exactly-three Update File patch passed selected-workspace planning/preflight in a no-write route; no writer was reachable.",
       nextAction:
-        "No files were changed. Split this into supported smaller operations or wait for a dedicated 3-file write route before writing three files.",
+        "No files were changed. Use the explicit selected-workspace write route with approval before writing three files.",
     });
   }
 
@@ -186,7 +186,7 @@ function buildClassification(input: {
         : "selected-workspace two-file existing-file update planning/preflight",
     currentSupportedCapability:
       input.blockedReason === "three-file-update-planning-no-write"
-        ? "exactly-three planning/no-write only; 3-file writes remain unsupported"
+        ? "exactly-three planning/no-write only in no-write runtime paths"
         : "planning/preflight only; writer remains single-file",
     drivesApplyPatchExpansion: false,
     willWrite: false,

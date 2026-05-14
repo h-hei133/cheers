@@ -15,10 +15,10 @@ const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const scenarios = [
   {
     id: 'exactly-three-existing-update-planning-no-write',
-    mode: 'runtime-route',
+    mode: 'dry-run',
     patch: updatePatch(['a', 'b', 'c']),
     files: { 'src/a.ts': 'a = 1\n', 'src/b.ts': 'b = 1\n', 'src/c.ts': 'c = 1\n' },
-    expectedOutcome: 'stopped',
+    expectedOutcome: 'blocked',
     expectedClass: 'three-file-planning-no-write',
     expectedPlanned: ['src/a.ts', 'src/b.ts', 'src/c.ts'],
   },

@@ -4,7 +4,6 @@ import {
   type NoWriteRuntimeSource,
 } from "./patchResult/noWriteRuntimeRoute.js";
 import { buildNoWriteRuntimeRouteResult } from "./patchResult/runtimeRouteResult.js";
-import { buildPerFilePatchPlan } from "./patchResult/perFilePatchPlan.js";
 import { buildWorkspaceCreateRouteResult } from "./patchResult/workspaceCreateResult.js";
 import {
   patchIsSingleAddFile,
@@ -12,17 +11,11 @@ import {
 } from "./patchResult/workspaceCreateRoute.js";
 import { buildMultiFileWriteRouteResult } from "./patchResult/multiFileWriteResult.js";
 import {
-  patchIsExactlyTwoUpdateFiles,
+  patchIsTwoOrThreeUpdateFiles,
   runMultiFileWriteRoute,
 } from "./patchResult/multiFileWriteRoute.js";
-import { buildMultiFileUpdatePlanningRouteResult } from "./patchResult/multiFilePlanningResult.js";
-import {
-  classifyMultiFileUpdatePlanningNoWrite,
-  patchIsExactlyThreeUpdateFiles,
-} from "./patchResult/multiFileUpdatePlanning.js";
 import { buildWorkspaceWriteRouteResult } from "./patchResult/workspaceWriteResult.js";
 import { runWorkspaceWriteRoute } from "./patchResult/workspaceWriteRoute.js";
-import { parseApplyPatchText } from "./patchParsing/parser.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
 import type {
   WorkspaceCreateTargetAuthority,
@@ -75,32 +68,6 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
 
   const rawPatchText = routeOptions.rawPatchText ?? input.prompt;
   if (routeOptions.workspaceWrite?.explicitWorkspaceWriteOptIn) {
-    if (patchIsExactlyThreeUpdateFiles(rawPatchText)) {
-      const parsed = parseApplyPatchText(rawPatchText);
-      if (parsed.ok === true) {
-        const classification = classifyMultiFileUpdatePlanningNoWrite(
-          parsed.patch,
-          {
-            workspaceRoot: input.workspaceRoot,
-            readFile: input.readNoWriteRuntimeFile,
-          },
-        );
-        if (classification) {
-          const perFilePatchPlan = buildPerFilePatchPlan({
-            workspaceRoot: input.workspaceRoot,
-            rawPatchText,
-            readFile: input.readNoWriteRuntimeFile,
-          });
-          return buildMultiFileUpdatePlanningRouteResult({
-            sessionId: input.sessionId,
-            prompt: input.prompt,
-            classification,
-            perFilePatchPlan,
-          });
-        }
-      }
-    }
-
     const workspaceAuthority = input.getWorkspaceAuthority();
     if (patchIsSingleAddFile(rawPatchText)) {
       const route = await runWorkspaceCreateRoute({
@@ -127,7 +94,7 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
       });
     }
 
-    if (patchIsExactlyTwoUpdateFiles(rawPatchText)) {
+    if (patchIsTwoOrThreeUpdateFiles(rawPatchText)) {
       const route = await runMultiFileWriteRoute({
         workspaceRoot: input.workspaceRoot,
         rawPatchText,

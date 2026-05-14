@@ -4,21 +4,24 @@ import type {
   PatchWriteIntent,
 } from "./noPartialApply.js";
 
-export interface TwoFileUpdateApplyOptions {
+export type MultiFileUpdateTargetCount = 2 | 3;
+
+export interface MultiFileUpdateApplyOptions {
+  readonly expectedFileCount: MultiFileUpdateTargetCount;
   readonly writeFile: (path: string, content: string) => void | Promise<void>;
   readonly readFile: (path: string) => string | undefined;
 }
 
-export type TwoFileUpdateApplyFailureKind =
+export type MultiFileUpdateApplyFailureKind =
   | "write-application"
   | "post-write-verification";
 
-export type TwoFileUpdateApplyResult =
+export type MultiFileUpdateApplyResult =
   | {
       readonly ok: true;
-      readonly changedFiles: readonly [string, string];
+      readonly changedFiles: readonly string[];
       readonly failedFiles: readonly [];
-      readonly applied: readonly [PatchWriteIntent, PatchWriteIntent];
+      readonly applied: readonly PatchWriteIntent[];
       readonly postWriteVerification: "passed";
     }
   | {
@@ -26,28 +29,31 @@ export type TwoFileUpdateApplyResult =
       readonly changedFiles: readonly string[];
       readonly failedFiles: readonly PatchFailure[];
       readonly applied: readonly PatchWriteIntent[];
-      readonly failureKind: TwoFileUpdateApplyFailureKind;
+      readonly failureKind: MultiFileUpdateApplyFailureKind;
       readonly postWriteVerification: "blocked" | "failed";
     };
 
-export async function applyTwoFileUpdateIntents(
+export async function applyMultiFileUpdateIntents(
   contract: NoPartialPatchApplicationContract,
-  options: TwoFileUpdateApplyOptions,
-): Promise<TwoFileUpdateApplyResult> {
+  options: MultiFileUpdateApplyOptions,
+): Promise<MultiFileUpdateApplyResult> {
   if (contract.ok === false) {
     return fail(contract.failures, [], [], "write-application", "blocked");
   }
 
   const intents = contract.writeIntents;
-  if (intents.length !== 2 || !intents[0] || !intents[1]) {
+  if (
+    intents.length !== options.expectedFileCount ||
+    intents.some((intent) => !intent)
+  ) {
     return fail(
       [
         {
           code: "patch-apply-plan-not-verified",
           message:
-            "Patch apply only supports exactly two verified update write intents in the multi-file candidate route.",
+            `Patch apply only supports exactly ${options.expectedFileCount} verified update write intents in this multi-file candidate route.`,
           nextAction:
-            "Use exactly two verified Update File operations before applying through the multi-file route.",
+            `Use exactly ${options.expectedFileCount} verified Update File operations before applying through this multi-file route.`,
         },
       ],
       [],
@@ -57,15 +63,15 @@ export async function applyTwoFileUpdateIntents(
     );
   }
 
-  if (new Set(intents.map((intent) => intent.path)).size !== 2) {
+  if (new Set(intents.map((intent) => intent.path)).size !== intents.length) {
     return fail(
       [
         {
           code: "patch-apply-plan-not-verified",
           message:
-            "Patch apply requires two distinct update targets in the multi-file candidate route.",
+            "Patch apply requires distinct update targets in the multi-file candidate route.",
           nextAction:
-            "Regenerate the patch with exactly two distinct existing-file Update File operations.",
+            `Regenerate the patch with exactly ${options.expectedFileCount} distinct existing-file Update File operations.`,
         },
       ],
       [],
@@ -167,9 +173,9 @@ export async function applyTwoFileUpdateIntents(
 
   return {
     ok: true,
-    changedFiles: [intents[0].path, intents[1].path],
+    changedFiles: intents.map((intent) => intent.path),
     failedFiles: [],
-    applied: [intents[0], intents[1]],
+    applied: [...intents],
     postWriteVerification: "passed",
   };
 }
@@ -178,9 +184,9 @@ function fail(
   failedFiles: readonly PatchFailure[],
   changedFiles: readonly string[],
   applied: readonly PatchWriteIntent[],
-  failureKind: TwoFileUpdateApplyFailureKind,
+  failureKind: MultiFileUpdateApplyFailureKind,
   postWriteVerification: "blocked" | "failed",
-): TwoFileUpdateApplyResult {
+): MultiFileUpdateApplyResult {
   return {
     ok: false,
     changedFiles: [...changedFiles],

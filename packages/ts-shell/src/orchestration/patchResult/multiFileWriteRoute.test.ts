@@ -13,7 +13,7 @@ afterEach(() => {
   }
 });
 
-describe("two-file Update File selected-workspace write route", () => {
+describe("multi-file Update File selected-workspace write route", () => {
   it("writes exactly two existing files after explicit approval and verifies both", async () => {
     const fixture = createFixture();
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
@@ -81,14 +81,51 @@ describe("two-file Update File selected-workspace write route", () => {
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
 
-  it("blocks 3+ Update File operations without invoking the writer", async () => {
+  it("writes exactly three existing files after explicit approval and verifies all", async () => {
     const fixture = createFixture({ includeC: true });
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+
+    const result = await runMultiFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, threeFilePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: authority.writeFile,
+    });
+
+    expect(result.status).toBe("written");
+    expect(result.changedFiles).toEqual(["src/a.ts", "src/b.ts", "src/c.ts"]);
+    expect(result.failedFiles).toEqual([]);
+    expect(result.writeIntents).toEqual(["src/a.ts", "src/b.ts", "src/c.ts"]);
+    expect(result.approval).toMatchObject({
+      status: "approved-for-write",
+      targetPaths: ["src/a.ts", "src/b.ts", "src/c.ts"],
+    });
+    expect(result.writerStarted).toBe(true);
+    expect(result.workspaceWriterInvoked).toBe(true);
+    expect(result.writeEffect).toBe("verified");
+    expect(result.postWriteVerification).toBe("passed");
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
+    expect(readFile(fixture.workspaceRoot, "src/b.ts")).toBe("b = 2\n");
+    expect(readFile(fixture.workspaceRoot, "src/c.ts")).toBe("c = 2\n");
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-multi-file-write-route:exactly-three-update-files",
+        "apply-patch-multi-file-write-route:all-final-stale-read-before-writer",
+        "apply-patch-multi-file-write-route:sequential-write-no-rollback",
+        "apply-patch-multi-file-write-route:post-write-verification-passed",
+      ]),
+    );
+  });
+
+  it("blocks four Update File operations without invoking the writer", async () => {
+    const fixture = createFixture({ includeC: true, includeD: true });
     const before = snapshotFixture(fixture.workspaceRoot);
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     let writes = 0;
 
     const result = await runMultiFileWriteRoute({
-      ...routeOptions(fixture.workspaceRoot, threeFilePatch()),
+      ...routeOptions(fixture.workspaceRoot, fourFilePatch()),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       validateWriteTarget: authority.validateWriteTarget,
@@ -99,6 +136,29 @@ describe("two-file Update File selected-workspace write route", () => {
 
     expect(result.status).toBe("blocked");
     expect(result.blocker).toBe("too-many-files");
+    expectNoPreWriterLeak(result);
+    expect(writes).toBe(0);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("blocks duplicate exactly-three targets before invoking the writer", async () => {
+    const fixture = createFixture({ includeC: true });
+    const before = snapshotFixture(fixture.workspaceRoot);
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    let writes = 0;
+
+    const result = await runMultiFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, duplicateThreeFilePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: () => {
+        writes += 1;
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("target-mismatch");
     expectNoPreWriterLeak(result);
     expect(writes).toBe(0);
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
@@ -229,6 +289,45 @@ describe("two-file Update File selected-workspace write route", () => {
     }
   });
 
+  it("blocks if any exactly-three final stale-read fails before the first writer call", async () => {
+    for (const staleTarget of ["src/a.ts", "src/b.ts", "src/c.ts"]) {
+      const fixture = createFixture({ includeC: true });
+      const before = snapshotFixture(fixture.workspaceRoot);
+      const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+      let writes = 0;
+      const result = await runMultiFileWriteRoute({
+        ...routeOptions(fixture.workspaceRoot, threeFilePatch()),
+        readFile: authority.readFile,
+        readVerifiedFile: (relativePath) => {
+          if (relativePath === staleTarget) {
+            fs.writeFileSync(
+              path.join(fixture.workspaceRoot, relativePath),
+              `${relativePath} changed after approval\n`,
+              "utf8",
+            );
+          }
+          return authority.readVerifiedFile(relativePath);
+        },
+        validateWriteTarget: authority.validateWriteTarget,
+        writeFile: () => {
+          writes += 1;
+        },
+      });
+
+      expect(result.status).toBe("blocked");
+      expect(result.blocker).toBe("final-stale-read");
+      expect(result.failedFiles[0]?.path).toBe(staleTarget);
+      expect(result.changedFiles).toEqual([]);
+      expect(result.writeIntents).toEqual([]);
+      expect(result.writerStarted).toBe(false);
+      expect(writes).toBe(0);
+      expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
+        ...before,
+        [staleTarget]: `${staleTarget} changed after approval\n`,
+      });
+    }
+  });
+
   it("surfaces partial writer failure as stopped with only verified changed files", async () => {
     const fixture = createFixture();
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
@@ -289,6 +388,38 @@ describe("two-file Update File selected-workspace write route", () => {
     expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
     expect(readFile(fixture.workspaceRoot, "src/b.ts")).toBe("unexpected\n");
   });
+
+  it("surfaces exactly-three partial writer failure with verified prefix only", async () => {
+    const fixture = createFixture({ includeC: true });
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+
+    const result = await runMultiFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, threeFilePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: (relativePath, content) => {
+        if (relativePath === "src/c.ts") {
+          throw new Error("simulated third writer failure");
+        }
+        authority.writeFile(relativePath, content);
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("write-application");
+    expect(result.changedFiles).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(result.failedFiles[0]?.path).toBe("src/c.ts");
+    expect(result.writeEffect).toBe("unknown");
+    expect(result.postWriteVerification).toBe("blocked");
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
+    expect(readFile(fixture.workspaceRoot, "src/b.ts")).toBe("b = 2\n");
+    expect(readFile(fixture.workspaceRoot, "src/c.ts")).toBe("c = 1\n");
+    expect(result.evidence).toContain(
+      "apply-patch-multi-file-write-route:partial-failure-stopped",
+    );
+    expect(result.evidence).toContain("apply-patch-multi-file-write-route:no-rollback");
+  });
 });
 
 function routeOptions(
@@ -307,7 +438,7 @@ function routeOptions(
 }
 
 function createFixture(
-  options: { readonly includeC?: boolean } = {},
+  options: { readonly includeC?: boolean; readonly includeD?: boolean } = {},
 ): { readonly workspaceRoot: string } {
   const workspaceRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), "multi-file-write-route-"),
@@ -318,6 +449,9 @@ function createFixture(
   fs.writeFileSync(path.join(workspaceRoot, "src", "b.ts"), "b = 1\n", "utf8");
   if (options.includeC) {
     fs.writeFileSync(path.join(workspaceRoot, "src", "c.ts"), "c = 1\n", "utf8");
+  }
+  if (options.includeD) {
+    fs.writeFileSync(path.join(workspaceRoot, "src", "d.ts"), "d = 1\n", "utf8");
   }
   return { workspaceRoot };
 }
@@ -352,6 +486,48 @@ function threeFilePatch(): string {
     "@@",
     "-c = 1",
     "+c = 2",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function duplicateThreeFilePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Update File: src/b.ts",
+    "@@",
+    "-b = 1",
+    "+b = 2",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 2",
+    "+a = 3",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function fourFilePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Update File: src/b.ts",
+    "@@",
+    "-b = 1",
+    "+b = 2",
+    "*** Update File: src/c.ts",
+    "@@",
+    "-c = 1",
+    "+c = 2",
+    "*** Update File: src/d.ts",
+    "@@",
+    "-d = 1",
+    "+d = 2",
     "*** End Patch",
   ].join("\n");
 }

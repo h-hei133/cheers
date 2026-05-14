@@ -1,5 +1,8 @@
 import path from "node:path";
-import { applyTwoFileUpdateIntents } from "../patchApplication/twoFileUpdateApply.js";
+import {
+  applyMultiFileUpdateIntents,
+  type MultiFileUpdateTargetCount,
+} from "../patchApplication/multiFileUpdateApply.js";
 import { buildNoPartialPatchApplicationContract } from "../patchApplication/noPartialApply.js";
 import { parseApplyPatchText } from "../patchParsing/parser.js";
 import type { PatchFailure, PatchFileOperation } from "../patchParsing/types.js";
@@ -36,10 +39,14 @@ export type MultiFileWriteRouteBlocker =
   | "write-application"
   | "post-write-verification";
 
+export type MultiFileWriteTargetPaths =
+  | readonly [string, string]
+  | readonly [string, string, string];
+
 export type MultiFileWriteApproval =
   | {
       readonly status: "approved-for-write";
-      readonly targetPaths: readonly [string, string];
+      readonly targetPaths: MultiFileWriteTargetPaths;
       readonly message: string;
     }
   | {
@@ -68,7 +75,7 @@ export type MultiFileWriteRoute =
   | {
       readonly source: "multi-file-apply-patch-workspace-write-route";
       readonly status: "written";
-      readonly targetPaths: readonly [string, string];
+      readonly targetPaths: MultiFileWriteTargetPaths;
       readonly approval: Extract<MultiFileWriteApproval, { status: "approved-for-write" }>;
       readonly perFilePatchPlan?: PerFilePatchPlan;
       readonly workspaceWriterInvoked: true;
@@ -77,9 +84,9 @@ export type MultiFileWriteRoute =
       readonly writerStarted: true;
       readonly writeEffect: "verified";
       readonly writeFailureState: WorkspaceWriteFailureState;
-      readonly changedFiles: readonly [string, string];
+      readonly changedFiles: MultiFileWriteTargetPaths;
       readonly failedFiles: readonly [];
-      readonly writeIntents: readonly [string, string];
+      readonly writeIntents: MultiFileWriteTargetPaths;
       readonly appliedPatchRecord: false;
       readonly postWriteVerification: "passed";
       readonly terminalClassification: "success";
@@ -151,6 +158,16 @@ export function patchIsExactlyTwoUpdateFiles(rawPatchText: string): boolean {
   return (
     parsed.ok === true &&
     parsed.patch.operations.length === 2 &&
+    parsed.patch.operations.every((operation) => operation.kind === "update")
+  );
+}
+
+export function patchIsTwoOrThreeUpdateFiles(rawPatchText: string): boolean {
+  const parsed = parseApplyPatchText(rawPatchText);
+  return (
+    parsed.ok === true &&
+    (parsed.patch.operations.length === 2 ||
+      parsed.patch.operations.length === 3) &&
     parsed.patch.operations.every((operation) => operation.kind === "update")
   );
 }
@@ -240,7 +257,7 @@ export async function runMultiFileWriteRoute(
       perFilePatchPlan,
       failures: [unsupportedMultiFileWriteFailure(parsed.patch.operations)],
       nextAction:
-        "Use exactly two existing-file Update File operations. Add, delete, move, mixed, and broad apply_patch shapes remain rejected.",
+        "Use exactly two or exactly three existing-file Update File operations. Add, delete, move, mixed, and broad apply_patch shapes remain rejected.",
       evidence: [
         "apply-patch-multi-file-write-route:unsupported-operation",
         "apply-patch-multi-file-write-route:no-add-delete-move",
@@ -248,7 +265,7 @@ export async function runMultiFileWriteRoute(
     });
   }
 
-  if (updateOperations.length !== 2) {
+  if (updateOperations.length !== 2 && updateOperations.length !== 3) {
     return blocked({
       blocker: "too-many-files",
       targetPaths,
@@ -258,18 +275,19 @@ export async function runMultiFileWriteRoute(
         {
           code: "patch-apply-plan-not-verified",
           message:
-            "Multi-file workspace write route accepts exactly two Update File operations.",
+            "Multi-file workspace write route accepts exactly two or exactly three Update File operations.",
           nextAction:
-            "Use exactly two existing selected-workspace files; 3+ files remain outside this candidate route.",
+            "Use exactly two or exactly three existing selected-workspace files; 4+ files remain outside this candidate route.",
         },
       ],
       nextAction:
-        "Use exactly two existing selected-workspace Update File targets; keep 3+ files out of this route.",
-      evidence: ["apply-patch-multi-file-write-route:exactly-two-required"],
+        "Use exactly two or exactly three existing selected-workspace Update File targets; keep 4+ files out of this route.",
+      evidence: ["apply-patch-multi-file-write-route:two-or-three-required"],
     });
   }
 
-  if (new Set(targetPaths).size !== 2) {
+  const targetCount = updateOperations.length as MultiFileUpdateTargetCount;
+  if (new Set(targetPaths).size !== targetCount) {
     return blocked({
       blocker: "target-mismatch",
       targetPaths,
@@ -279,13 +297,13 @@ export async function runMultiFileWriteRoute(
         {
           code: "patch-apply-plan-not-verified",
           message:
-            "Multi-file workspace write route requires two distinct target files.",
+            "Multi-file workspace write route requires distinct target files.",
           nextAction:
-            "Regenerate the patch with exactly two distinct existing selected-workspace files.",
+            `Regenerate the patch with exactly ${targetCount} distinct existing selected-workspace files.`,
         },
       ],
       nextAction:
-        "Regenerate the patch with exactly two distinct existing selected-workspace files.",
+        `Regenerate the patch with exactly ${targetCount} distinct existing selected-workspace files.`,
       evidence: ["apply-patch-multi-file-write-route:distinct-targets-required"],
     });
   }
@@ -314,8 +332,8 @@ export async function runMultiFileWriteRoute(
       failures: [],
       nextAction:
         options.requestedUserDecision === "denied"
-          ? "Do not write these two files. Surface the denial and require a fresh explicit approval before any future write."
-          : "Request explicit approval for writing exactly these 2 existing files before the multi-file route can write.",
+          ? `Do not write these ${targetCount} files. Surface the denial and require a fresh explicit approval before any future write.`
+          : `Request explicit approval for writing exactly these ${targetCount} existing files before the multi-file route can write.`,
       evidence: [
         "apply-patch-multi-file-write-route:write-decision-blocked",
         "apply-patch-multi-file-write-route:explicit-approval-required",
@@ -371,7 +389,7 @@ export async function runMultiFileWriteRoute(
       failures: verification.failures,
       nextAction:
         verification.failures[0]?.nextAction ??
-        "Regenerate the two-file Update File patch against current content.",
+        `Regenerate the ${targetCount}-file Update File patch against current content.`,
       evidence: ["apply-patch-multi-file-write-route:verification-blocked"],
     });
   }
@@ -386,7 +404,7 @@ export async function runMultiFileWriteRoute(
       failures: writeIntent.failures,
       nextAction:
         writeIntent.failures[0]?.nextAction ??
-        "Regenerate the two-file Update File patch.",
+        `Regenerate the ${targetCount}-file Update File patch.`,
       evidence: ["apply-patch-multi-file-write-route:no-partial-blocked"],
     });
   }
@@ -399,7 +417,7 @@ export async function runMultiFileWriteRoute(
       perFilePatchPlan,
       failures: [],
       nextAction:
-        "Only the two approval-bound Update File targets may enter the multi-file workspace write route.",
+        "Only the approval-bound Update File targets may enter the multi-file workspace write route.",
       evidence: ["apply-patch-multi-file-write-route:target-mismatch"],
     });
   }
@@ -419,7 +437,7 @@ export async function runMultiFileWriteRoute(
         perFilePatchPlan,
         failures: [finalStaleReadFailure(targetPath)],
         nextAction:
-          "No workspace writer ran. Re-read both target files and regenerate the two-file Update File patch from current content.",
+          `No workspace writer ran. Re-read all ${targetCount} target files and regenerate the Update File patch from current content.`,
         evidence: [
           "apply-patch-multi-file-write-route:final-stale-read-blocked",
           "apply-patch-multi-file-write-route:all-final-stale-read-before-writer",
@@ -466,7 +484,8 @@ export async function runMultiFileWriteRoute(
     });
   }
 
-  const applied = await applyTwoFileUpdateIntents(writeIntent, {
+  const applied = await applyMultiFileUpdateIntents(writeIntent, {
+    expectedFileCount: targetCount,
     writeFile: options.writeFile,
     readFile: options.readVerifiedFile,
   });
@@ -511,15 +530,28 @@ export async function runMultiFileWriteRoute(
   }
 
   const nextAction =
-    "Review the two selected workspace changes; default apply_patch remains rejected outside this explicit candidate write entrypoint.";
+    `Review the ${targetCount} selected workspace changes; default apply_patch remains rejected outside this explicit candidate write entrypoint.`;
   const writeFailureState = buildWorkspaceWriteFailureState({
     phase: "verified-write",
     targetPath: applied.changedFiles.join(", "),
   });
+  const changedFiles = toSupportedTargetPaths(applied.changedFiles, targetCount);
+  if (!changedFiles) {
+    return blocked({
+      blocker: "target-mismatch",
+      targetPaths,
+      approval,
+      perFilePatchPlan,
+      failures: [],
+      nextAction:
+        "Only verified approved target files may be reported as changed by the multi-file workspace write route.",
+      evidence: ["apply-patch-multi-file-write-route:verified-target-mismatch"],
+    });
+  }
   return {
     source: "multi-file-apply-patch-workspace-write-route",
     status: "written",
-    targetPaths: [applied.changedFiles[0], applied.changedFiles[1]],
+    targetPaths: changedFiles,
     approval,
     perFilePatchPlan,
     workspaceWriterInvoked: true,
@@ -528,9 +560,9 @@ export async function runMultiFileWriteRoute(
     writerStarted: true,
     writeEffect: "verified",
     writeFailureState,
-    changedFiles: [applied.changedFiles[0], applied.changedFiles[1]],
+    changedFiles,
     failedFiles: [],
-    writeIntents: [applied.changedFiles[0], applied.changedFiles[1]],
+    writeIntents: changedFiles,
     appliedPatchRecord: false,
     postWriteVerification: "passed",
     terminalClassification: "success",
@@ -544,7 +576,7 @@ export async function runMultiFileWriteRoute(
       "apply-patch-multi-file-write-route:explicit-workspace-write-opt-in",
       "apply-patch-multi-file-write-route:approved-for-write",
       "apply-patch-multi-file-write-route:approval-targets-listed",
-      "apply-patch-multi-file-write-route:exactly-two-update-files",
+      `apply-patch-multi-file-write-route:exactly-${targetCountWord(targetCount)}-update-files`,
       "apply-patch-multi-file-write-route:existing-files-only",
       "apply-patch-multi-file-write-route:all-preflight-before-writer",
       "apply-patch-multi-file-write-route:all-final-stale-read-before-writer",
@@ -564,17 +596,16 @@ function buildApproval(
   requestedUserDecision: SingleFileApplyPatchRequestedUserDecision | undefined,
   explicitWorkspaceWriteOptIn: boolean,
 ): MultiFileWriteApproval {
+  const supportedTargetPaths = toSupportedTargetPaths(targetPaths);
   if (
     explicitWorkspaceWriteOptIn &&
     requestedUserDecision === "approved" &&
-    targetPaths.length === 2 &&
-    targetPaths[0] &&
-    targetPaths[1]
+    supportedTargetPaths
   ) {
     return {
       status: "approved-for-write",
-      targetPaths: [targetPaths[0], targetPaths[1]],
-      message: `Approved writing exactly these 2 existing files: ${targetPaths.join(", ")}`,
+      targetPaths: supportedTargetPaths,
+      message: `Approved writing exactly these ${targetPaths.length} existing files: ${targetPaths.join(", ")}`,
     };
   }
   return {
@@ -586,9 +617,9 @@ function buildApproval(
           : "pending",
     targetPaths: [...targetPaths],
     message:
-      targetPaths.length === 2
-        ? `Approval required for writing exactly these 2 existing files: ${targetPaths.join(", ")}`
-        : "Approval required for exactly two existing selected-workspace Update File targets.",
+      targetPaths.length === 2 || targetPaths.length === 3
+        ? `Approval required for writing exactly these ${targetPaths.length} existing files: ${targetPaths.join(", ")}`
+        : "Approval required for exactly two or exactly three existing selected-workspace Update File targets.",
   };
 }
 
@@ -596,7 +627,7 @@ function writeIntentMatchesTargets(
   writeIntents: readonly { path: string; kind: string }[],
   targetPaths: readonly string[],
 ): boolean {
-  if (writeIntents.length !== 2) {
+  if (writeIntents.length !== targetPaths.length) {
     return false;
   }
   return writeIntents.every(
@@ -612,7 +643,7 @@ function unsupportedMultiFileWriteFailure(
     code: "patch-verify-operation-unsupported",
     ...(operation ? { path: operation.path } : {}),
     message:
-      "Multi-file workspace write route only accepts exactly two Update File operations.",
+      "Multi-file workspace write route only accepts exactly two or exactly three Update File operations.",
     nextAction:
       "Keep add, delete, move, mixed, and broad apply_patch shapes out of this candidate write route.",
   };
@@ -624,7 +655,7 @@ function workspaceBoundaryFailure(targetPath: string): PatchFailure {
     path: targetPath,
     message: "Patch path resolves outside the workspace root.",
     nextAction:
-      "Regenerate the two-file Update File patch with paths inside the selected workspace.",
+      "Regenerate the Update File patch with paths inside the selected workspace.",
   };
 }
 
@@ -635,7 +666,7 @@ function finalStaleReadFailure(targetPath: string): PatchFailure {
     message:
       "Final stale-read failed before the multi-file workspace writer started.",
     nextAction:
-      "Re-read both target files and regenerate the two-file Update File patch from current content.",
+      "Re-read all target files and regenerate the Update File patch from current content.",
   };
 }
 
@@ -657,8 +688,36 @@ function patchFailureFromWriteAuthority(
     nextAction:
       authority.reason === "target-missing"
         ? "Re-read the workspace and regenerate the patch against existing target files."
-        : "Choose two regular existing files inside the selected workspace before using the multi-file write route.",
+        : "Choose regular existing files inside the selected workspace before using the multi-file write route.",
   };
+}
+
+function toSupportedTargetPaths(
+  targetPaths: readonly string[],
+  expectedCount?: MultiFileUpdateTargetCount,
+): MultiFileWriteTargetPaths | undefined {
+  if (
+    (expectedCount === undefined || expectedCount === 2) &&
+    targetPaths.length === 2 &&
+    targetPaths[0] &&
+    targetPaths[1]
+  ) {
+    return [targetPaths[0], targetPaths[1]];
+  }
+  if (
+    (expectedCount === undefined || expectedCount === 3) &&
+    targetPaths.length === 3 &&
+    targetPaths[0] &&
+    targetPaths[1] &&
+    targetPaths[2]
+  ) {
+    return [targetPaths[0], targetPaths[1], targetPaths[2]];
+  }
+  return undefined;
+}
+
+function targetCountWord(count: MultiFileUpdateTargetCount): "two" | "three" {
+  return count === 2 ? "two" : "three";
 }
 
 function pathStaysInsideWorkspace(

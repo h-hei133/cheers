@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoPartialPatchApplicationContract } from "./noPartialApply.js";
-import { applyTwoFileUpdateIntents } from "./twoFileUpdateApply.js";
+import { applyMultiFileUpdateIntents } from "./multiFileUpdateApply.js";
 
 const updateContract: NoPartialPatchApplicationContract = {
   ok: true,
@@ -20,11 +20,12 @@ const updateContract: NoPartialPatchApplicationContract = {
   atomicity: "verify-all-before-write",
 };
 
-describe("two-file Update File apply", () => {
+describe("multi-file Update File apply", () => {
   it("reports both changed files only after sequential writes and readback verification", async () => {
     const files = new Map<string, string>();
 
-    const result = await applyTwoFileUpdateIntents(updateContract, {
+    const result = await applyMultiFileUpdateIntents(updateContract, {
+      expectedFileCount: 2,
       writeFile: (file, content) => files.set(file, content),
       readFile: (file) => files.get(file),
     });
@@ -35,9 +36,48 @@ describe("two-file Update File apply", () => {
     expect(result.postWriteVerification).toBe("passed");
   });
 
-  it("rejects non-two-file and non-update intents before writing", async () => {
+  it("reports three changed files only after sequential writes and readback verification", async () => {
+    const files = new Map<string, string>();
+
+    const result = await applyMultiFileUpdateIntents(
+      {
+        ok: true,
+        changedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        writeIntents: [
+          {
+            path: "src/a.ts",
+            kind: "update",
+            content: "export const a = 'ready';\n",
+          },
+          {
+            path: "src/b.ts",
+            kind: "update",
+            content: "export const b = 'ready';\n",
+          },
+          {
+            path: "src/c.ts",
+            kind: "update",
+            content: "export const c = 'ready';\n",
+          },
+        ],
+        atomicity: "verify-all-before-write",
+      },
+      {
+        expectedFileCount: 3,
+        writeFile: (file, content) => files.set(file, content),
+        readFile: (file) => files.get(file),
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.changedFiles).toEqual(["src/a.ts", "src/b.ts", "src/c.ts"]);
+    expect(result.failedFiles).toEqual([]);
+    expect(result.postWriteVerification).toBe("passed");
+  });
+
+  it("rejects unexpected file counts and non-update intents before writing", async () => {
     let writes = 0;
-    const result = await applyTwoFileUpdateIntents(
+    const result = await applyMultiFileUpdateIntents(
       {
         ok: true,
         changedFiles: ["src/a.ts"],
@@ -51,6 +91,7 @@ describe("two-file Update File apply", () => {
         atomicity: "verify-all-before-write",
       },
       {
+        expectedFileCount: 2,
         writeFile: () => {
           writes += 1;
         },
@@ -67,7 +108,8 @@ describe("two-file Update File apply", () => {
   it("stops after a verified first file when the second writer fails without rollback", async () => {
     const files = new Map<string, string>();
 
-    const result = await applyTwoFileUpdateIntents(updateContract, {
+    const result = await applyMultiFileUpdateIntents(updateContract, {
+      expectedFileCount: 2,
       writeFile: (file, content) => {
         if (file === "src/b.ts") {
           throw new Error("simulated second write failure");
@@ -92,7 +134,8 @@ describe("two-file Update File apply", () => {
   it("does not include an unverified second file when readback differs", async () => {
     const files = new Map<string, string>();
 
-    const result = await applyTwoFileUpdateIntents(updateContract, {
+    const result = await applyMultiFileUpdateIntents(updateContract, {
+      expectedFileCount: 2,
       writeFile: (file, content) => files.set(file, content),
       readFile: (file) =>
         file === "src/b.ts" ? "unexpected\n" : files.get(file),

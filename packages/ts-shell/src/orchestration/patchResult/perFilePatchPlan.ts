@@ -356,16 +356,16 @@ function buildParsedPatchPlan(
       patch,
       options,
       supportedOperations: ["update"],
-      supportStatus: "supported-planning-no-write",
+      supportStatus: "supported-write",
       failureClass: "none",
-      plannedFiles: updateOperations.map((operation) => operation.path),
-      writeIntentFiles: [],
+      plannedFiles: [],
+      writeIntentFiles: updateOperations.map((operation) => operation.path),
       targetFiles,
       reason:
-        "Exactly-three Update File patch is represented as planning/no-write; 3-file writes remain unsupported.",
+        "Exactly-three existing-file Update File patch is represented as supported write intents owned by the guarded three-file route.",
       nextAction:
-        "No writer may run for exactly-three planning. Split into supported smaller operations or wait for a dedicated 3-file write route.",
-      operationSupportStatus: "supported-planning-no-write",
+        "Route may write only through explicit approval naming all three files, all final stale-reads, sequential writes, and per-file post-write verification.",
+      operationSupportStatus: "supported-write",
     });
   }
 
@@ -386,7 +386,7 @@ function buildParsedPatchPlan(
           message:
             "Per-file patch plan rejects 4+ Update File operations before any writer is reachable.",
           nextAction:
-            "Use one Update File, exactly two Update File operations, or exactly-three planning/no-write.",
+            "Use one Update File, exactly two Update File operations, or exactly three Update File operations.",
         }),
       ),
     });
@@ -427,7 +427,7 @@ function buildParsedPatchPlan(
         message:
           "Per-file patch plan could not match this patch to a supported route shape.",
         nextAction:
-          "Use one Update File, one Add File, exactly two Update File operations, or exactly-three planning/no-write.",
+          "Use one Update File, one Add File, exactly two Update File operations, or exactly three Update File operations.",
       }),
     ],
   });

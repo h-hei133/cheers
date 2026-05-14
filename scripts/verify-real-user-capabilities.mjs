@@ -10392,32 +10392,6 @@ function route08ClassForScenario(scenario) {
 function route08PatchScenarios() {
   return [
     {
-      id: 'real-model-like-unsupported-three-file-update',
-      expectedClass: 'unsupported',
-      files: {
-        'src/a.ts': 'a\n',
-        'src/b.ts': 'b\n',
-        'src/c.ts': 'c\n',
-        'LOCKED.md': 'locked\n',
-      },
-      patchText: [
-        '*** Begin Patch',
-        '*** Update File: src/a.ts',
-        '@@',
-        '-a',
-        '+aa',
-        '*** Update File: src/b.ts',
-        '@@',
-        '-b',
-        '+bb',
-        '*** Update File: src/c.ts',
-        '@@',
-        '-c',
-        '+cc',
-        '*** End Patch',
-      ].join('\n'),
-    },
-    {
       id: 'real-model-like-unsupported-four-file-update',
       expectedClass: 'unsupported',
       files: {

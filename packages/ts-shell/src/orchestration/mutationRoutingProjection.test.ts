@@ -223,34 +223,36 @@ describe("apply_patch mutation routing projection", () => {
     expect(readFile(fixture.workspaceRoot, "src/b.ts")).toBe("b = 2\n");
   });
 
-  it("projects exactly three Update File patches as stopped planning/no-write before authority construction", async () => {
+  it("projects exactly three Update File patches as no-write when workspace write is not opted in", async () => {
     const fixture = createFixture({ includeC: true });
     const before = snapshotFixture(fixture.workspaceRoot);
     let authorityRequested = false;
 
     const result = await projectApplyPatchRuntimeMutationRoute({
-      ...runtimeInput(fixture.workspaceRoot, threeFileUpdatePatch()),
+      sessionId: "session-1",
+      prompt: threeFileUpdatePatch(),
+      workspaceRoot: fixture.workspaceRoot,
+      routeOptions: {
+        explicitRuntimeOptIn: true,
+        rawPatchText: threeFileUpdatePatch(),
+        requestedUserDecision: "approved",
+      },
       getWorkspaceAuthority: () => {
         authorityRequested = true;
         throw new Error("workspace authority must not be requested");
       },
+      readNoWriteRuntimeFile: readWorkspaceFile(fixture.workspaceRoot),
     });
 
     expect(result?.status).toBe("stopped_error");
     expect(result?.terminalClassification).toBe("stopped");
     expect(result?.codingResult?.changedFiles).toEqual([]);
-    expect(result?.codingResult?.changeSet.attemptedFiles).toEqual([
-      "src/a.ts",
-      "src/b.ts",
-      "src/c.ts",
-    ]);
     expect(result?.codingResult?.perFilePatchPlan).toEqual(
       expect.objectContaining({
-        supportStatus: "supported-planning-no-write",
-        failureClass: "none",
-        writeIntentFiles: [],
+        supportStatus: "supported-write",
+        writeIntentFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
         changedFiles: [],
-        plannedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        plannedFiles: [],
         failedFiles: [],
         writerInvoked: false,
         creatorInvoked: false,
@@ -259,12 +261,49 @@ describe("apply_patch mutation routing projection", () => {
         successLike: false,
       }),
     );
-    expect(result?.finalOutput).toContain(
-      "apply_patch exactly-three update planning stopped before write",
-    );
-    expect(result?.finalOutput).toContain("Writer: not invoked");
     expect(authorityRequested).toBe(false);
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("routes exactly three Update File patches to the selected-workspace multi-file projection", async () => {
+    const fixture = createFixture({ includeC: true });
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, threeFileUpdatePatch()),
+      getWorkspaceAuthority: () =>
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+    ]);
+    expect(result?.codingResult?.changeSet.attemptedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+    ]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        changedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        plannedFiles: [],
+        failedFiles: [],
+        writerInvoked: true,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
+    expect(readFile(fixture.workspaceRoot, "src/b.ts")).toBe("b = 2\n");
+    expect(readFile(fixture.workspaceRoot, "src/c.ts")).toBe("c = 2\n");
   });
 
   it("keeps 4+ Update File patches stopped before writer invocation", async () => {

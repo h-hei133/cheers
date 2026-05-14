@@ -173,7 +173,7 @@ describe("mutation compact continuity", () => {
       "target=src/a.ts, src/b.ts, src/c.ts",
     );
     expect(snapshot.lastFailureHandoffDiagnostic).toContain(
-      "3-file writes are unsupported",
+      "no-write route",
     );
     expect(snapshot.lastSuccessHandoffDiagnostic).toBeUndefined();
     expect(context).toContain("- last-terminal: stopped (stopped_error)");
@@ -200,9 +200,9 @@ const partialStopReason =
 const partialNextAction =
   "Inspect/re-read both attempted files before retrying.";
 const threeFileStopReason =
-  "Exactly-three Update File patch passed selected-workspace planning/preflight, but 3-file writes are unsupported and no writer was reachable.";
+  "Exactly-three Update File patch passed selected-workspace planning/preflight in a no-write route; no writer was reachable.";
 const threeFileNextAction =
-  "No files were changed. Split this into supported smaller operations or wait for a dedicated 3-file write route before writing three files.";
+  "No files were changed. Use the explicit selected-workspace write route with approval before writing three files.";
 
 function createSeededMutationSession(
   manager: SessionManager,

@@ -14,7 +14,7 @@ afterEach(() => {
   }
 });
 
-describe("two-file apply_patch workspace write result", () => {
+describe("multi-file apply_patch workspace write result", () => {
   it("maps verified two-file writes to success with both changed files", async () => {
     const fixture = createFixture();
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
@@ -40,6 +40,55 @@ describe("two-file apply_patch workspace write result", () => {
     expect(result.codingResult?.lastActionResultSeed).toMatchObject({
       changedFiles: ["src/a.ts", "src/b.ts"],
       verifiedFiles: ["src/a.ts", "src/b.ts"],
+      verification: { status: "passed" },
+    });
+  });
+
+  it("maps verified three-file writes to success with all changed files", async () => {
+    const fixture = createFixture({ includeC: true });
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const route = await runMultiFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, threeFilePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: authority.writeFile,
+    });
+
+    const result = buildMultiFileWriteRouteResult({
+      sessionId: "session-1",
+      prompt: threeFilePatch(),
+      route,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.terminalClassification).toBe("success");
+    expect(result.codingResult?.changedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+    ]);
+    expect(result.codingResult?.changeSet.attemptedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+    ]);
+    expect(result.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        changedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        plannedFiles: [],
+        failedFiles: [],
+        writerInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(result.codingResult?.lastActionResultSeed).toMatchObject({
+      changedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+      verifiedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
       verification: { status: "passed" },
     });
   });
@@ -220,6 +269,62 @@ describe("two-file apply_patch workspace write result", () => {
       ]),
     );
   });
+
+  it("maps three-file partial writer failure to stopped with changed and failed files distinct", async () => {
+    const fixture = createFixture({ includeC: true });
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const route = await runMultiFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, threeFilePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: (relativePath, content) => {
+        if (relativePath === "src/c.ts") {
+          throw new Error("simulated third writer failure");
+        }
+        authority.writeFile(relativePath, content);
+      },
+    });
+
+    const result = buildMultiFileWriteRouteResult({
+      sessionId: "session-1",
+      prompt: threeFilePatch(),
+      route,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(result.codingResult?.verifiedFiles).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(result.codingResult?.failedFiles).toEqual([
+      {
+        path: "src/c.ts",
+        reason: expect.stringContaining("Patch write failed"),
+      },
+    ]);
+    expect(result.codingResult?.changeSet.changedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+    ]);
+    expect(result.codingResult?.changeSet.unchangedAttemptedFiles).toEqual([
+      "src/c.ts",
+    ]);
+    expect(result.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        failureClass: "partial-failure",
+        changedFiles: ["src/a.ts", "src/b.ts"],
+        failedFiles: [
+          {
+            path: "src/c.ts",
+            reason: expect.stringContaining("Patch write failed"),
+          },
+        ],
+        writerInvoked: true,
+        postWriteVerification: "blocked",
+        successLike: false,
+      }),
+    );
+  });
 });
 
 function routeOptions(
@@ -237,7 +342,9 @@ function routeOptions(
   };
 }
 
-function createFixture(): { readonly workspaceRoot: string } {
+function createFixture(
+  options: { readonly includeC?: boolean } = {},
+): { readonly workspaceRoot: string } {
   const workspaceRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), "multi-file-write-result-"),
   );
@@ -245,6 +352,9 @@ function createFixture(): { readonly workspaceRoot: string } {
   fs.mkdirSync(path.join(workspaceRoot, "src"), { recursive: true });
   fs.writeFileSync(path.join(workspaceRoot, "src", "a.ts"), "a = 1\n", "utf8");
   fs.writeFileSync(path.join(workspaceRoot, "src", "b.ts"), "b = 1\n", "utf8");
+  if (options.includeC) {
+    fs.writeFileSync(path.join(workspaceRoot, "src", "c.ts"), "c = 1\n", "utf8");
+  }
   return { workspaceRoot };
 }
 
@@ -259,6 +369,25 @@ function twoFilePatch(): string {
     "@@",
     "-b = 1",
     "+b = 2",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function threeFilePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Update File: src/b.ts",
+    "@@",
+    "-b = 1",
+    "+b = 2",
+    "*** Update File: src/c.ts",
+    "@@",
+    "-c = 1",
+    "+c = 2",
     "*** End Patch",
   ].join("\n");
 }
