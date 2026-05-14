@@ -601,6 +601,100 @@ describe("apply_patch mutation routing projection", () => {
     expect(writes).toBe(0);
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
+
+  it("keeps mixed create plus move patches stopped before any writer", async () => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    let writes = 0;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, mixedCreateMovePatch()),
+      getWorkspaceAuthority: () =>
+        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
+          writes += 1;
+        }),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "unsupported-no-write",
+        failureClass: "mixed-operations",
+        writeIntentFiles: [],
+        changedFiles: [],
+        plannedFiles: [],
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "not-run",
+        successLike: false,
+      }),
+    );
+    expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
+      expect.objectContaining({ operationKind: "create", writeIntent: "none" }),
+      expect.objectContaining({
+        operationKind: "move",
+        sourcePath: "src/a.ts",
+        targetPath: "src/moved.ts",
+        writeIntent: "none",
+      }),
+    ]);
+    expect(writes).toBe(0);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("keeps outside-workspace delete and move patches stopped without writer reachability", async () => {
+    for (const patchText of [outsideDeletePatch(), outsideMoveTargetPatch()]) {
+      const fixture = createFixture();
+      const before = snapshotFixture(fixture.workspaceRoot);
+      let writes = 0;
+
+      const result = await projectApplyPatchRuntimeMutationRoute({
+        ...runtimeInput(fixture.workspaceRoot, patchText),
+        getWorkspaceAuthority: () =>
+          authorityWithBlockedWriter(fixture.workspaceRoot, () => {
+            writes += 1;
+          }),
+      });
+
+      expect(result?.status).toBe("stopped_error");
+      expect(result?.terminalClassification).toBe("stopped");
+      expect(result?.codingResult?.changedFiles).toEqual([]);
+      expect(result?.codingResult?.perFilePatchPlan).toEqual(
+        expect.objectContaining({
+          supportStatus: "unsupported-no-write",
+          failureClass: "workspace-boundary",
+          writeIntentFiles: [],
+          changedFiles: [],
+          plannedFiles: [],
+          writerInvoked: false,
+          creatorInvoked: false,
+          deleteMoveInvoked: false,
+          postWriteVerification: "not-run",
+          successLike: false,
+        }),
+      );
+      expect(result?.codingResult?.perFilePatchPlan?.failedFiles).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: "../outside.ts",
+            reason: "Patch path resolves outside the workspace root.",
+          }),
+        ]),
+      );
+      expect(result?.codingResult?.perFilePatchPlan?.operations).toEqual([
+        expect.objectContaining({
+          failedFile: expect.objectContaining({
+            reason: "Patch path resolves outside the workspace root.",
+          }),
+        }),
+      ]);
+      expect(writes).toBe(0);
+      expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+    }
+  });
 });
 
 function runtimeInput(workspaceRoot: string, rawPatchText: string) {
@@ -795,6 +889,40 @@ function mixedPatch(): string {
     "-a = 1",
     "+a = 2",
     "*** Delete File: src/b.ts",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function mixedCreateMovePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Add File: src/new.ts",
+    "+created",
+    "*** Update File: src/a.ts",
+    "*** Move to: src/moved.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function outsideDeletePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Delete File: ../outside.ts",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function outsideMoveTargetPatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "*** Move to: ../outside.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
     "*** End Patch",
   ].join("\n");
 }

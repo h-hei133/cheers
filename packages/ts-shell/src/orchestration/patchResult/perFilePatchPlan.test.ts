@@ -252,6 +252,89 @@ describe("buildPerFilePatchPlan", () => {
     );
   });
 
+  it("projects broad apply_patch with multiple targets without write intent", () => {
+    const plan = planFromPatch(
+      [
+        "diff --git a/src/app.ts b/src/app.ts",
+        "--- a/src/app.ts",
+        "+++ b/src/app.ts",
+        "@@ -1 +1 @@",
+        "-old",
+        "+new",
+        "diff --git a/src/other.ts b/src/other.ts",
+        "--- a/src/other.ts",
+        "+++ b/src/other.ts",
+        "@@ -1 +1 @@",
+        "-other",
+        "+changed",
+      ],
+      {
+        "src/app.ts": "old\n",
+        "src/other.ts": "other\n",
+      },
+    );
+
+    expectUnsupportedNoWritePlan(plan, "broad-apply-patch");
+    expect(plan.summary.targetFiles).toEqual(["src/app.ts", "src/other.ts"]);
+    expect(plan.summary.writeIntentFiles).toEqual([]);
+    expect(plan.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "broad",
+        targetPath: "src/app.ts",
+        writeIntent: "none",
+      }),
+      expect.objectContaining({
+        operationKind: "broad",
+        targetPath: "src/other.ts",
+        writeIntent: "none",
+      }),
+    ]);
+  });
+
+  it("projects broad apply_patch with an external target as unsupported/no-write", () => {
+    const plan = planFromPatch(
+      [
+        "diff --git a/src/app.ts b/src/app.ts",
+        "--- a/src/app.ts",
+        "+++ b/src/app.ts",
+        "@@ -1 +1 @@",
+        "-old",
+        "+new",
+        "diff --git a/../outside.ts b/../outside.ts",
+        "--- a/../outside.ts",
+        "+++ b/../outside.ts",
+        "@@ -1 +1 @@",
+        "-outside",
+        "+changed",
+      ],
+      {
+        "src/app.ts": "old\n",
+      },
+    );
+
+    expectUnsupportedNoWritePlan(plan, "broad-apply-patch");
+    expect(plan.summary.targetFiles).toEqual(["src/app.ts", "../outside.ts"]);
+    expect(plan.summary.failedFiles).toEqual([
+      expect.objectContaining({
+        code: "patch-apply-plan-not-verified",
+        path: "src/app.ts",
+      }),
+      expect.objectContaining({
+        code: "patch-verify-path-outside-workspace",
+        path: "../outside.ts",
+      }),
+    ]);
+    expect(plan.operations[1]).toEqual(
+      expect.objectContaining({
+        operationKind: "broad",
+        targetPath: "../outside.ts",
+        failedFile: expect.objectContaining({
+          code: "patch-verify-path-outside-workspace",
+        }),
+      }),
+    );
+  });
+
   it("accepts a fenced markdown patch with surrounding prose as the same supported update plan", () => {
     const plan = planFromPatch(
       [
@@ -408,6 +491,89 @@ describe("buildPerFilePatchPlan", () => {
       "unsupported-no-write",
       "unsupported-no-write",
     ]);
+    expect(plan.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "update",
+        failedFile: expect.objectContaining({ path: "src/app.ts" }),
+      }),
+      expect.objectContaining({
+        operationKind: "delete",
+        failedFile: expect.objectContaining({ path: "src/remove.ts" }),
+      }),
+    ]);
+  });
+
+  it("projects update, create, and delete mixes to per-file unsupported/no-write facts", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/app.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** Add File: src/new.ts",
+        "+created",
+        "*** Delete File: src/remove.ts",
+        "*** End Patch",
+      ],
+      {
+        "src/app.ts": "old\n",
+        "src/remove.ts": "remove\n",
+      },
+      { existingDirectories: ["src"] },
+    );
+
+    expectUnsupportedNoWritePlan(plan, "mixed-operations");
+    expect(plan.summary.targetFiles).toEqual([
+      "src/app.ts",
+      "src/new.ts",
+      "src/remove.ts",
+    ]);
+    expect(plan.summary.failedFiles.map((failure) => failure.path)).toEqual([
+      "src/app.ts",
+      "src/new.ts",
+      "src/remove.ts",
+    ]);
+    expect(plan.operations).toEqual([
+      expect.objectContaining({ operationKind: "update", writeIntent: "none" }),
+      expect.objectContaining({ operationKind: "create", writeIntent: "none" }),
+      expect.objectContaining({ operationKind: "delete", writeIntent: "none" }),
+    ]);
+  });
+
+  it("projects create plus move mixes to unsupported/no-write with source and target", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Add File: src/new.ts",
+        "+created",
+        "*** Update File: src/from.ts",
+        "*** Move to: src/to.ts",
+        "@@",
+        "-from",
+        "+to",
+        "*** End Patch",
+      ],
+      {
+        "src/from.ts": "from\n",
+      },
+      { existingDirectories: ["src"] },
+    );
+
+    expectUnsupportedNoWritePlan(plan, "mixed-operations");
+    expect(plan.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "create",
+        targetPath: "src/new.ts",
+        writeIntent: "none",
+      }),
+      expect.objectContaining({
+        operationKind: "move",
+        sourcePath: "src/from.ts",
+        targetPath: "src/to.ts",
+        writeIntent: "none",
+      }),
+    ]);
   });
 
   it("projects duplicate update targets to unsupported/no-write before writer reachability", () => {
@@ -451,6 +617,61 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
+  it("projects duplicate delete and move targets to unsupported/no-write", () => {
+    const duplicateDelete = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Delete File: src/remove.ts",
+        "*** Delete File: src/remove.ts",
+        "*** End Patch",
+      ],
+      {
+        "src/remove.ts": "remove\n",
+      },
+    );
+    const duplicateMoveTarget = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/a.ts",
+        "*** Move to: src/same.ts",
+        "@@",
+        "-a",
+        "+aa",
+        "*** Update File: src/b.ts",
+        "*** Move to: src/same.ts",
+        "@@",
+        "-b",
+        "+bb",
+        "*** End Patch",
+      ],
+      {
+        "src/a.ts": "a\n",
+        "src/b.ts": "b\n",
+      },
+    );
+
+    expectUnsupportedNoWritePlan(duplicateDelete, "duplicate-target");
+    expect(duplicateDelete.summary.failedFiles).toEqual([
+      expect.objectContaining({ path: "src/remove.ts" }),
+    ]);
+    expectUnsupportedNoWritePlan(duplicateMoveTarget, "duplicate-target");
+    expect(duplicateMoveTarget.summary.failedFiles).toEqual([
+      expect.objectContaining({ path: "src/same.ts" }),
+    ]);
+    expect(duplicateMoveTarget.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "move",
+        sourcePath: "src/a.ts",
+        targetPath: "src/same.ts",
+      }),
+      expect.objectContaining({
+        operationKind: "move",
+        sourcePath: "src/b.ts",
+        targetPath: "src/same.ts",
+      }),
+    ]);
+  });
+
   it("projects paths outside the selected workspace to unsupported/no-write", () => {
     const plan = planFromPatch(
       [
@@ -475,6 +696,62 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
+  it("projects outside-workspace delete and move paths to unsupported/no-write", () => {
+    const deletePlan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Delete File: ../outside.ts",
+        "*** End Patch",
+      ],
+      {},
+    );
+    const moveSourcePlan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: ../outside.ts",
+        "*** Move to: src/to.ts",
+        "@@",
+        "-outside",
+        "+to",
+        "*** End Patch",
+      ],
+      {},
+    );
+    const moveTargetPlan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/from.ts",
+        "*** Move to: ../outside.ts",
+        "@@",
+        "-from",
+        "+to",
+        "*** End Patch",
+      ],
+      {
+        "src/from.ts": "from\n",
+      },
+    );
+
+    for (const plan of [deletePlan, moveSourcePlan, moveTargetPlan]) {
+      expectUnsupportedNoWritePlan(plan, "workspace-boundary");
+      expect(plan.summary.failedFiles).toEqual([
+        expect.objectContaining({
+          code: "patch-verify-path-outside-workspace",
+        }),
+      ]);
+    }
+    expect(moveTargetPlan.operations[0]).toEqual(
+      expect.objectContaining({
+        operationKind: "move",
+        sourcePath: "src/from.ts",
+        targetPath: "../outside.ts",
+        failedFile: expect.objectContaining({
+          path: "../outside.ts",
+        }),
+      }),
+    );
+  });
+
   it("projects missing update targets to unsupported/no-write", () => {
     const plan = planFromPatch(
       [
@@ -495,6 +772,75 @@ describe("buildPerFilePatchPlan", () => {
         path: "src/missing.ts",
       }),
     ]);
+  });
+
+  it("projects move with a missing source to unsupported/no-write", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/missing.ts",
+        "*** Move to: src/to.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** End Patch",
+      ],
+      {},
+    );
+
+    expectUnsupportedNoWritePlan(plan, "missing-target");
+    expect(plan.summary.failedFiles).toEqual([
+      expect.objectContaining({
+        code: "patch-verify-file-missing",
+        path: "src/missing.ts",
+      }),
+    ]);
+    expect(plan.operations[0]).toEqual(
+      expect.objectContaining({
+        operationKind: "move",
+        sourcePath: "src/missing.ts",
+        targetPath: "src/to.ts",
+        failedFile: expect.objectContaining({ path: "src/missing.ts" }),
+      }),
+    );
+  });
+
+  it("projects move with a missing destination as invalid model output", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/from.ts",
+        "*** Move to:",
+        "@@",
+        "-from",
+        "+to",
+        "*** End Patch",
+      ],
+      {
+        "src/from.ts": "from\n",
+      },
+    );
+
+    expect(plan.summary).toEqual(
+      expect.objectContaining({
+        supportStatus: "invalid-model-output",
+        failureClass: "parse-failure",
+        writeIntentFiles: [],
+        changedFiles: [],
+        failedFiles: [
+          expect.objectContaining({
+            code: "patch-parse-invalid-format",
+          }),
+        ],
+      }),
+    );
+    expect(plan.operations[0]).toEqual(
+      expect.objectContaining({
+        operationKind: "malformed",
+        supportStatus: "invalid-model-output",
+        writeIntent: "none",
+      }),
+    );
   });
 
   it("keeps changed, planned, and failed file projections distinct", () => {

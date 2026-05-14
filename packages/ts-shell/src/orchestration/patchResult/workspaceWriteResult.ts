@@ -370,10 +370,16 @@ function buildPerFileFailedFiles(input: {
   readonly target?: string;
   readonly reason: string;
 }): readonly { readonly path: string; readonly reason: string }[] {
-  const failures = input.route.failures.map((failure) => ({
-    path: failure.path ?? input.target ?? "(apply_patch)",
-    reason: failure.message,
-  }));
+  const failures = dedupeFailures([
+    ...input.route.failures.map((failure) => ({
+      path: failure.path ?? input.target ?? "(apply_patch)",
+      reason: failure.message,
+    })),
+    ...(input.route.perFilePatchPlan?.summary.failedFiles.map((failure) => ({
+      path: failure.path ?? input.target ?? "(apply_patch)",
+      reason: failure.message,
+    })) ?? []),
+  ]);
   if (failures.length > 0) {
     return failures;
   }
@@ -396,6 +402,20 @@ function buildPerFileFailedFiles(input: {
   }
 
   return [];
+}
+
+function dedupeFailures(
+  failures: readonly { readonly path: string; readonly reason: string }[],
+): readonly { readonly path: string; readonly reason: string }[] {
+  const seen = new Set<string>();
+  return failures.filter((failure) => {
+    const key = `${failure.path}\u0000${failure.reason}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 function failureClassForWorkspaceWriteBlocker(

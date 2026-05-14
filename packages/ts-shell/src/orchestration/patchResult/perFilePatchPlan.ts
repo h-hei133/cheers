@@ -1,3 +1,4 @@
+import path from "node:path";
 import { parseApplyPatchText } from "../patchParsing/parser.js";
 import type {
   ParsedPatch,
@@ -120,7 +121,7 @@ export function buildPerFilePatchPlan(
 ): PerFilePatchPlan {
   const parsed = parseApplyPatchText(options.rawPatchText);
   if (parsed.ok === false) {
-    return buildInvalidPatchPlan(options.rawPatchText, parsed.failure);
+    return buildInvalidPatchPlan(options, parsed.failure);
   }
 
   return buildParsedPatchPlan(parsed.patch, options);
@@ -269,10 +270,7 @@ function buildParsedPatchPlan(
   const targetFiles = operations.map(targetPathForOperation);
   const duplicateTargetFiles = duplicateTargets(targetFiles);
 
-  if (
-    duplicateTargetFiles.length > 0 &&
-    updateOperations.length === operations.length
-  ) {
+  if (duplicateTargetFiles.length > 0) {
     return buildUnsupportedPlan({
       operations,
       targetFiles,
@@ -395,19 +393,22 @@ function buildParsedPatchPlan(
   }
 
   if (deleteMoveOperations.length > 0 || addOperations.length > 0) {
+    const failures = unsupportedOperationFailures(operations, options);
     return buildUnsupportedPlan({
       operations,
       targetFiles,
       supportStatus: "unsupported-no-write",
-      failureClass:
-        operations.length > deleteMoveOperations.length || addOperations.length > 0
-          ? "mixed-operations"
-          : "unsupported-operation",
+      failureClass: failureClassForUnsupportedOperations({
+        operations,
+        failures,
+        mixed:
+          operations.length > deleteMoveOperations.length || addOperations.length > 0,
+      }),
       reason:
         "Delete, move, add/update mixes, and other mixed apply_patch shapes are represented as unsupported/no-write.",
       nextAction:
         "Regenerate the patch as one supported operation family; delete, move, mixed, and broad apply_patch writes remain unsupported.",
-      failures: unsupportedOperationFailures(operations),
+      failures,
     });
   }
 
@@ -561,10 +562,10 @@ function buildUnsupportedPlan(input: {
 }
 
 function buildInvalidPatchPlan(
-  rawPatchText: string,
+  options: PerFilePatchPlanOptions,
   failure: PatchFailure,
 ): PerFilePatchPlan {
-  const broad = looksLikeBroadApplyPatch(rawPatchText);
+  const broad = looksLikeBroadApplyPatch(options.rawPatchText);
   const supportStatus: PerFilePatchSupportStatus = broad
     ? "unsupported-no-write"
     : "invalid-model-output";
@@ -582,36 +583,59 @@ function buildInvalidPatchPlan(
   const nextAction = broad
     ? "Use the current bounded apply_patch shape instead of broad apply_patch or unified-diff input."
     : failure.nextAction;
-  const failedFile = patchFailure({
-    ...failure,
-    path: failure.path ?? "(apply_patch)",
-    message: broad ? reason : failure.message,
-    nextAction,
-  });
+  const broadTargets = broadPatchTargets(options.rawPatchText);
+  const broadFailures = broad
+    ? broadTargets.map((targetPath) => broadPatchFailure(targetPath, options, reason, nextAction))
+    : [];
+  const failedFiles =
+    broad && broadFailures.length > 0
+      ? broadFailures
+      : [
+          patchFailure({
+            ...failure,
+            path: failure.path ?? "(apply_patch)",
+            message: broad ? reason : failure.message,
+            nextAction,
+          }),
+        ];
+  const operations =
+    broad && broadTargets.length > 0
+      ? broadTargets.map((targetPath, index) => ({
+          operationKind,
+          supportStatus,
+          targetPath,
+          writeIntent: "none" as const,
+          failedFile: failedFiles[index],
+          verificationExpectation: "not-run-unsupported" as const,
+          userVisibleReason: reason,
+        }))
+      : [
+          {
+            operationKind,
+            supportStatus,
+            targetPath: failedFiles[0]?.path,
+            writeIntent: "none" as const,
+            failedFile: failedFiles[0],
+            verificationExpectation: broad
+              ? ("not-run-unsupported" as const)
+              : ("not-run-invalid-model-output" as const),
+            userVisibleReason: reason,
+          },
+        ];
 
   return {
     source: "per-file-patch-plan",
-    operations: [
-      {
-        operationKind,
-        supportStatus,
-        targetPath: failedFile.path,
-        writeIntent: "none",
-        failedFile,
-        verificationExpectation: broad
-          ? "not-run-unsupported"
-          : "not-run-invalid-model-output",
-        userVisibleReason: reason,
-      },
-    ],
+    operations,
     summary: {
       supportStatus,
       failureClass,
-      targetFiles: failedFile.path ? [failedFile.path] : [],
+      targetFiles: failedFiles
+        .map((failedFile) => failedFile.path)
+        .filter((failedPath): failedPath is string => Boolean(failedPath)),
       writeIntentFiles: [],
       plannedFiles: [],
       changedFiles: [],
-      failedFiles: [failedFile],
+      failedFiles,
       willWrite: false,
       writerInvoked: false,
       workspaceWriterInvoked: false,
@@ -663,10 +687,14 @@ function perFileOperationFromPatchOperation(input: {
 
 function unsupportedOperationFailures(
   operations: readonly PatchFileOperation[],
+  options: PerFilePatchPlanOptions,
 ): readonly PatchFailure[] {
-  return operations
-    .filter((operation) => operation.kind !== "update")
-    .map((operation) =>
+  return operations.flatMap((operation) => {
+    const pathFailures = unsupportedOperationPathFailures(operation, options);
+    if (pathFailures.length > 0) {
+      return pathFailures;
+    }
+    return [
       patchFailure({
         code: "patch-verify-operation-unsupported",
         path: targetPathForOperation(operation),
@@ -674,14 +702,78 @@ function unsupportedOperationFailures(
         nextAction:
           "Use a currently supported operation shape; delete, move, mixed, and broad apply_patch writes remain unsupported.",
       }),
-    );
+    ];
+  });
 }
 
 function failureForOperation(
   failures: readonly PatchFailure[],
   operation: PatchFileOperation,
 ): PatchFailure | undefined {
-  return failures.find((failure) => failure.path === targetPathForOperation(operation));
+  return failures.find(
+    (failure) =>
+      failure.path === targetPathForOperation(operation) ||
+      (operation.kind === "move" && failure.path === operation.path),
+  );
+}
+
+function unsupportedOperationPathFailures(
+  operation: PatchFileOperation,
+  options: PerFilePatchPlanOptions,
+): readonly PatchFailure[] {
+  const sourcePath = operation.path;
+  const targetPath = targetPathForOperation(operation);
+  const failures: PatchFailure[] = [];
+  const sourceBoundary = workspacePathFailure(sourcePath, options.workspaceRoot);
+  if (sourceBoundary) {
+    failures.push(sourceBoundary);
+  }
+  if (operation.kind === "move") {
+    const targetBoundary = workspacePathFailure(targetPath, options.workspaceRoot);
+    if (targetBoundary) {
+      failures.push(targetBoundary);
+    }
+  }
+  if (failures.length > 0) {
+    return failures;
+  }
+  if (
+    (operation.kind === "delete" || operation.kind === "move") &&
+    options.readFile(path.resolve(options.workspaceRoot, sourcePath)) === undefined
+  ) {
+    return [
+      patchFailure({
+        code: "patch-verify-file-missing",
+        path: sourcePath,
+        message: `Patch ${operation.kind} source file is missing.`,
+        nextAction:
+          "Re-read the selected workspace and regenerate the patch against an existing source file.",
+      }),
+    ];
+  }
+  return [];
+}
+
+function failureClassForUnsupportedOperations(input: {
+  readonly operations: readonly PatchFileOperation[];
+  readonly failures: readonly PatchFailure[];
+  readonly mixed: boolean;
+}): PerFilePatchFailureClass {
+  if (
+    !input.mixed &&
+    input.failures.some(
+      (failure) => failure.code === "patch-verify-path-outside-workspace",
+    )
+  ) {
+    return "workspace-boundary";
+  }
+  if (
+    !input.mixed &&
+    input.failures.some((failure) => failure.code === "patch-verify-file-missing")
+  ) {
+    return "missing-target";
+  }
+  return input.mixed ? "mixed-operations" : "unsupported-operation";
 }
 
 function failureClassForVerificationFailures(
@@ -746,6 +838,66 @@ function looksLikeBroadApplyPatch(rawPatchText: string): boolean {
   return /(^|\n)(diff --git\s+|---\s+\S+|\+\+\+\s+\S+|@@\s+-\d)/.test(
     rawPatchText,
   );
+}
+
+function broadPatchTargets(rawPatchText: string): readonly string[] {
+  const targets = new Set<string>();
+  for (const line of rawPatchText.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n")) {
+    const gitMatch = /^diff --git\s+\S+\s+(\S+)\s*$/.exec(line.trim());
+    if (gitMatch?.[1]) {
+      addBroadTarget(targets, gitMatch[1]);
+      continue;
+    }
+    const newFileMatch = /^\+\+\+\s+(\S+)\s*$/.exec(line.trim());
+    if (newFileMatch?.[1]) {
+      addBroadTarget(targets, newFileMatch[1]);
+    }
+  }
+  return [...targets];
+}
+
+function addBroadTarget(targets: Set<string>, rawTarget: string): void {
+  if (rawTarget === "/dev/null") {
+    return;
+  }
+  targets.add(rawTarget.replace(/^[ab]\//, ""));
+}
+
+function broadPatchFailure(
+  targetPath: string,
+  options: PerFilePatchPlanOptions,
+  reason: string,
+  nextAction: string,
+): PatchFailure {
+  const boundaryFailure = workspacePathFailure(targetPath, options.workspaceRoot);
+  if (boundaryFailure) {
+    return boundaryFailure;
+  }
+  return patchFailure({
+    code: "patch-apply-plan-not-verified",
+    path: targetPath,
+    message: reason,
+    nextAction,
+  });
+}
+
+function workspacePathFailure(
+  patchPath: string,
+  workspaceRoot: string,
+): PatchFailure | undefined {
+  const absoluteRoot = path.resolve(workspaceRoot);
+  const absolutePath = path.resolve(absoluteRoot, patchPath);
+  const relative = path.relative(absoluteRoot, absolutePath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    return patchFailure({
+      code: "patch-verify-path-outside-workspace",
+      path: patchPath,
+      message: "Patch path resolves outside the workspace root.",
+      nextAction:
+        "Regenerate the patch with paths relative to the active workspace.",
+    });
+  }
+  return undefined;
 }
 
 function patchFailure(input: PatchFailure): PatchFailure {
