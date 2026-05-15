@@ -1,4 +1,5 @@
 import path from "node:path";
+import { normalizeBoundedBroadPatchText } from "../patchParsing/boundedBroadPatchNormalizer.js";
 import { parseApplyPatchText } from "../patchParsing/parser.js";
 import type { PatchFileOperation } from "../patchParsing/types.js";
 import {
@@ -42,6 +43,7 @@ export type BoundedApplyPatchCandidateProjection =
       readonly status: "candidate";
       readonly operationCount: number;
       readonly operationFamily: BoundedApplyPatchCandidateOperationFamily;
+      readonly normalizedRawPatchText: string;
       readonly normalizedOperations: readonly BoundedApplyPatchNormalizedOperation[];
       readonly affectedPaths: readonly string[];
       readonly approvalPaths: readonly string[];
@@ -50,6 +52,7 @@ export type BoundedApplyPatchCandidateProjection =
   | {
       readonly status: "unsupported";
       readonly operationCount: number;
+      readonly normalizedRawPatchText?: string;
       readonly normalizedOperations: readonly BoundedApplyPatchNormalizedOperation[];
       readonly affectedPaths: readonly string[];
       readonly approvalPaths: readonly string[];
@@ -65,20 +68,26 @@ export interface BoundedApplyPatchCandidateOptions {
 export function classifyBoundedApplyPatchCandidate(
   options: BoundedApplyPatchCandidateOptions,
 ): BoundedApplyPatchCandidateProjection {
-  const parsed = parseApplyPatchText(options.rawPatchText);
+  const broadNormalization = normalizeBoundedBroadPatchText(options.rawPatchText);
+  const rawPatchText =
+    broadNormalization.status === "normalized"
+      ? broadNormalization.normalizedRawPatchText
+      : options.rawPatchText;
+  const parsed = parseApplyPatchText(rawPatchText);
   if (parsed.ok === false) {
     const broadShape = looksLikeUnifiedDiff(options.rawPatchText);
     return unsupported({
       operationCount: 0,
       normalizedOperations: [],
       rejectionReason: broadShape
-        ? "unsupportedBroadShape"
+        ? rejectionReasonFromBroadNormalization(broadNormalization)
         : "unsupportedFuzzyPatch",
       evidence: [
         "bounded-apply-patch-candidate:parse-blocked",
         broadShape
-          ? "bounded-apply-patch-candidate:unified-diff-not-normalized"
+          ? "bounded-apply-patch-candidate:broad-patch-not-normalized"
           : "bounded-apply-patch-candidate:parser-supported-shape-required",
+        ...broadNormalization.evidence,
       ],
     });
   }
@@ -90,6 +99,7 @@ export function classifyBoundedApplyPatchCandidate(
   if (isTooManyBoundedWriteOperations(operationCount)) {
     return unsupported({
       operationCount,
+      normalizedRawPatchText: rawPatchText,
       normalizedOperations,
       rejectionReason: "unsupportedTooManyOperations",
       evidence: [
@@ -103,6 +113,7 @@ export function classifyBoundedApplyPatchCandidate(
   if (directoryOperation) {
     return unsupported({
       operationCount,
+      normalizedRawPatchText: rawPatchText,
       normalizedOperations,
       rejectionReason: "unsupportedDirectoryOperation",
       evidence: [
@@ -117,6 +128,7 @@ export function classifyBoundedApplyPatchCandidate(
   if (workspaceBoundaryFailure) {
     return unsupported({
       operationCount,
+      normalizedRawPatchText: rawPatchText,
       normalizedOperations,
       rejectionReason: "unsupportedWorkspaceBoundary",
       evidence: [
@@ -129,6 +141,7 @@ export function classifyBoundedApplyPatchCandidate(
   if (hasMoveWithContentEdit(operations)) {
     return unsupported({
       operationCount,
+      normalizedRawPatchText: rawPatchText,
       normalizedOperations,
       rejectionReason: "unsupportedDestructiveShape",
       evidence: [
@@ -140,6 +153,7 @@ export function classifyBoundedApplyPatchCandidate(
   if (hasPathConflict(normalizedOperations)) {
     return unsupported({
       operationCount,
+      normalizedRawPatchText: rawPatchText,
       normalizedOperations,
       rejectionReason: "unsupportedPathConflict",
       evidence: [
@@ -153,6 +167,7 @@ export function classifyBoundedApplyPatchCandidate(
   if (!operationFamily) {
     return unsupported({
       operationCount,
+      normalizedRawPatchText: rawPatchText,
       normalizedOperations,
       rejectionReason: "unsupportedBroadShape",
       evidence: [
@@ -165,21 +180,28 @@ export function classifyBoundedApplyPatchCandidate(
     status: "candidate",
     operationCount,
     operationFamily,
+    normalizedRawPatchText: rawPatchText,
     normalizedOperations,
     affectedPaths: affectedPathsFor(normalizedOperations),
     approvalPaths: approvalPathsFor(normalizedOperations),
     evidence: [
-      "bounded-apply-patch-candidate:parser-supported-shape",
+      broadNormalization.status === "normalized"
+        ? "bounded-apply-patch-candidate:broad-patch-normalized"
+        : "bounded-apply-patch-candidate:parser-supported-shape",
       `bounded-apply-patch-candidate:operation-count:${operationCount}`,
       `bounded-apply-patch-candidate:family:${operationFamily}`,
       "bounded-apply-patch-candidate:routes-existing-small-n-writers",
       "bounded-apply-patch-candidate:no-broad-arbitrary-claim",
+      ...(broadNormalization.status === "normalized"
+        ? broadNormalization.evidence
+        : []),
     ],
   };
 }
 
 function unsupported(input: {
   readonly operationCount: number;
+  readonly normalizedRawPatchText?: string;
   readonly normalizedOperations: readonly BoundedApplyPatchNormalizedOperation[];
   readonly rejectionReason: BoundedApplyPatchCandidateRejectionReason;
   readonly evidence: readonly string[];
@@ -187,6 +209,9 @@ function unsupported(input: {
   return {
     status: "unsupported",
     operationCount: input.operationCount,
+    ...(input.normalizedRawPatchText
+      ? { normalizedRawPatchText: input.normalizedRawPatchText }
+      : {}),
     normalizedOperations: input.normalizedOperations,
     affectedPaths: affectedPathsFor(input.normalizedOperations),
     approvalPaths: approvalPathsFor(input.normalizedOperations),
@@ -335,4 +360,24 @@ function looksLikeUnifiedDiff(rawPatchText: string): boolean {
     rawPatchText.includes("\n--- ") ||
     rawPatchText.includes("\n+++ ")
   );
+}
+
+function rejectionReasonFromBroadNormalization(
+  result: ReturnType<typeof normalizeBoundedBroadPatchText>,
+): BoundedApplyPatchCandidateRejectionReason {
+  if (result.status === "normalized") {
+    return "unsupportedBroadShape";
+  }
+  switch (result.rejectionReason) {
+    case "unsupported-binary-patch":
+    case "unsupported-mode-change":
+    case "unsupported-rename-content-edit":
+      return "unsupportedDestructiveShape";
+    case "unsupported-directory-operation":
+      return "unsupportedDirectoryOperation";
+    case "unsupported-fuzzy-patch":
+      return "unsupportedFuzzyPatch";
+    default:
+      return "unsupportedBroadShape";
+  }
 }

@@ -1,10 +1,12 @@
 # Bounded Broad Apply Patch Candidate
 
-Status: Route 67 implemented for parser-supported bounded `apply_patch`
-candidates that normalize to existing selected-workspace small-N write lanes.
-This is not broad arbitrary `apply_patch`, 9+ writes, directory operations,
-overwrite, fuzzy patch, automatic recovery, atomic rollback, provider/session/
-MCP, package-script, default-gate, or default persistence readiness.
+Status: Route 67 implemented parser-supported bounded `apply_patch`
+candidates. Route 68 added a safe git-style broad patch parser/normalizer
+subset that converts supported unified-diff sections into the same existing
+selected-workspace small-N write lanes. This is not broad arbitrary
+`apply_patch`, 9+ writes, directory operations, overwrite, fuzzy patch,
+automatic recovery, atomic rollback, provider/session/MCP, package-script,
+default-gate, or default persistence readiness.
 
 ## Post-Route 66 Baseline
 
@@ -178,7 +180,13 @@ Residual risks:
 - Larger destructive or arbitrary-N policies still need separate approval,
   recovery, and product-surface decisions.
 
-Recommended next route: Route 68 should harden unsupported broad-shape UX and
-classification if users need clearer explanations. A 9+ / arbitrary-N policy
-decision should remain separate and should not proceed without a stronger
-approval/recovery stance.
+Route 68 note: `boundedBroadPatchNormalizer.ts` now accepts a small git-style
+subset for update/add/delete/pure-rename sections and passes normalized marker
+patch text into the Route 67 candidate classifier and existing guarded routes.
+Unsupported arbitrary shapes, 9+, fuzzy, mode, binary, path-conflict,
+outside-workspace, and overwrite boundaries remain blocked.
+
+Recommended next route: Route 69 should harden unsupported broad-shape UX if
+users need clearer explanations. A 9+ / arbitrary-N policy decision should
+remain separate and should not proceed without a stronger approval/recovery
+stance.

@@ -70,6 +70,29 @@ describe("parseApplyPatchText", () => {
     }
   });
 
+  it("parses pure move operations without requiring a content hunk", () => {
+    const result = parseApplyPatchText(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/from.ts",
+        "*** Move to: src/to.ts",
+        "*** End Patch",
+      ].join("\n"),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.patch.operations).toEqual([
+        {
+          kind: "move",
+          path: "src/from.ts",
+          moveTo: "src/to.ts",
+          hunks: [],
+        },
+      ]);
+    }
+  });
+
   it("returns structured failure for missing begin/end markers", () => {
     const result = parseApplyPatchText("*** Update File: src/app.ts");
 

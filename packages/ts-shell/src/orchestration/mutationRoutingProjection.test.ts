@@ -86,6 +86,47 @@ describe("apply_patch mutation routing projection", () => {
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
 
+  it("projects normalized git-style broad patches as no-write plans without write authority", async () => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    let authorityRequested = false;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      sessionId: "session-1",
+      prompt: gitUpdatePatch("src/a.ts", "a", 1, 2),
+      workspaceRoot: fixture.workspaceRoot,
+      routeOptions: {
+        explicitRuntimeOptIn: true,
+        rawPatchText: gitUpdatePatch("src/a.ts", "a", 1, 2),
+        requestedUserDecision: "approved",
+      },
+      getWorkspaceAuthority: () => {
+        authorityRequested = true;
+        throw new Error("workspace authority must not be requested");
+      },
+      readNoWriteRuntimeFile: readWorkspaceFile(fixture.workspaceRoot),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        writeIntentFiles: ["src/a.ts"],
+        changedFiles: [],
+        plannedFiles: [],
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "not-run",
+        successLike: false,
+      }),
+    );
+    expect(authorityRequested).toBe(false);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
   it("routes single Update File patches with supported-write per-file projection", async () => {
     const fixture = createFixture();
 
@@ -121,6 +162,30 @@ describe("apply_patch mutation routing projection", () => {
         writeIntent: "eligible",
       }),
     ]);
+  });
+
+  it("routes normalized git-style update patches through the existing single update path", async () => {
+    const fixture = createFixture();
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, gitUpdatePatch("src/a.ts", "a", 1, 2)),
+      getWorkspaceAuthority: () =>
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual(["src/a.ts"]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        changedFiles: ["src/a.ts"],
+        writerInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
   });
 
   it("routes fenced patch output with surrounding prose as the same supported single-file update", async () => {
@@ -185,6 +250,73 @@ describe("apply_patch mutation routing projection", () => {
       }),
     ]);
     expect(readFile(fixture.workspaceRoot, "src/new.ts")).toBe("created");
+  });
+
+  it("routes normalized git-style add, delete, and pure rename patches through existing guarded paths", async () => {
+    {
+      const fixture = createFixture();
+      const result = await projectApplyPatchRuntimeMutationRoute({
+        ...runtimeInput(fixture.workspaceRoot, gitAddPatch("src/new.ts", "created")),
+        getWorkspaceAuthority: () =>
+          createWorkspaceWriteAuthority(fixture.workspaceRoot),
+      });
+      expect(result?.status).toBe("completed");
+      expect(result?.codingResult?.changedFiles).toEqual(["src/new.ts"]);
+      expect(result?.codingResult?.perFilePatchPlan).toEqual(
+        expect.objectContaining({
+          creatorInvoked: true,
+          deleteMoveInvoked: false,
+          postWriteVerification: "passed",
+        }),
+      );
+      expect(readFile(fixture.workspaceRoot, "src/new.ts")).toBe("created");
+    }
+
+    {
+      const fixture = createFixture();
+      const result = await projectApplyPatchRuntimeMutationRoute({
+        ...runtimeInput(fixture.workspaceRoot, gitDeletePatch("src/a.ts", "a = 1")),
+        getWorkspaceAuthority: () =>
+          createWorkspaceWriteAuthority(fixture.workspaceRoot),
+      });
+      expect(result?.status).toBe("completed");
+      expect(result?.codingResult?.changedFiles).toEqual(["src/a.ts"]);
+      expect(result?.codingResult?.perFilePatchPlan).toEqual(
+        expect.objectContaining({
+          creatorInvoked: false,
+          deleteMoveInvoked: true,
+          postWriteVerification: "passed",
+        }),
+      );
+      expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
+        "src/b.ts": "b = 1\n",
+      });
+    }
+
+    {
+      const fixture = createFixture();
+      const result = await projectApplyPatchRuntimeMutationRoute({
+        ...runtimeInput(
+          fixture.workspaceRoot,
+          gitPureRenamePatch("src/a.ts", "src/moved.ts"),
+        ),
+        getWorkspaceAuthority: () =>
+          createWorkspaceWriteAuthority(fixture.workspaceRoot),
+      });
+      expect(result?.status).toBe("completed");
+      expect(result?.codingResult?.changedFiles).toEqual(["src/moved.ts"]);
+      expect(result?.codingResult?.perFilePatchPlan).toEqual(
+        expect.objectContaining({
+          creatorInvoked: false,
+          deleteMoveInvoked: true,
+          postWriteVerification: "passed",
+        }),
+      );
+      expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
+        "src/b.ts": "b = 1\n",
+        "src/moved.ts": "a = 1\n",
+      });
+    }
   });
 
   it("routes exactly two Update File patches to the selected-workspace multi-file projection", async () => {
@@ -253,6 +385,63 @@ describe("apply_patch mutation routing projection", () => {
             const record = await readRecoveryAuthorityRecord({
               ledgerRoot,
               authorityId: "route67-five-update",
+              recordId: "update-1-src-a.ts",
+            });
+            firstWriteSawRecords = Boolean(record);
+          }
+          await authority.writeFile(relativePath, content);
+        },
+      }),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.codingResult?.changedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+      "src/e.ts",
+    ]);
+    expect(result?.codingResult?.recoverySurface).toEqual(
+      expect.objectContaining({
+        recoveryAvailable: true,
+        explicitRestoreAvailable: true,
+        recoveryExecuted: false,
+        atomicRollbackAvailable: false,
+      }),
+    );
+    expect(firstWriteSawRecords).toBe(true);
+  });
+
+  it("captures recovery authority before writer start for normalized git-style broad patches", async () => {
+    const fixture = createFixture({ includeC: true, includeD: true });
+    fs.writeFileSync(
+      path.join(fixture.workspaceRoot, "src", "e.ts"),
+      "e = 1\n",
+      "utf8",
+    );
+    const ledgerRoot = createLedgerRoot();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    let firstWriteSawRecords = false;
+
+    const patchText = gitUpdatePatchBatch(["a", "b", "c", "d", "e"]);
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, patchText),
+      routeOptions: {
+        ...runtimeInput(fixture.workspaceRoot, patchText).routeOptions,
+        recoveryAuthority: {
+          mode: "non-default",
+          ledgerRoot,
+          authorityId: "route68-git-five-update",
+        },
+      },
+      getWorkspaceAuthority: () => ({
+        ...authority,
+        writeFile: async (relativePath, content) => {
+          if (!firstWriteSawRecords) {
+            const record = await readRecoveryAuthorityRecord({
+              ledgerRoot,
+              authorityId: "route68-git-five-update",
               recordId: "update-1-src-a.ts",
             });
             firstWriteSawRecords = Boolean(record);
@@ -418,6 +607,46 @@ describe("apply_patch mutation routing projection", () => {
         writeIntentFiles: [],
         changedFiles: [],
         plannedFiles: [],
+        writerInvoked: false,
+        creatorInvoked: false,
+        deleteMoveInvoked: false,
+        postWriteVerification: "not-run",
+        successLike: false,
+      }),
+    );
+    expect(writes).toBe(0);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
+  });
+
+  it("keeps 9+ normalized git-style patches stopped before writer invocation", async () => {
+    const fixture = createFixture({ includeC: true, includeD: true });
+    for (const file of ["e", "f", "g", "h", "i"]) {
+      fs.writeFileSync(
+        path.join(fixture.workspaceRoot, "src", `${file}.ts`),
+        `${file} = 1\n`,
+        "utf8",
+      );
+    }
+    const before = snapshotFixture(fixture.workspaceRoot);
+    let writes = 0;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(
+        fixture.workspaceRoot,
+        gitUpdatePatchBatch(["a", "b", "c", "d", "e", "f", "g", "h", "i"]),
+      ),
+      getWorkspaceAuthority: () =>
+        authorityWithBlockedWriter(fixture.workspaceRoot, () => {
+          writes += 1;
+        }),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual([]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "unsupported-no-write",
         writerInvoked: false,
         creatorInvoked: false,
         deleteMoveInvoked: false,
@@ -812,6 +1041,100 @@ describe("apply_patch mutation routing projection", () => {
     expect(restore.restored).toBe(true);
     expect(restore.rollbackAtomicityClaim).toBe(false);
     expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 1\n");
+  });
+
+  it("stops a partial normalized git-style broad patch and supports explicit restore without automatic rollback", async () => {
+    const fixture = createFixture();
+    const ledgerRoot = createLedgerRoot();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const patchText = [
+      gitUpdatePatch("src/a.ts", "a", 1, 2),
+      gitAddPatch("src/new.ts", "created"),
+    ].join("\n");
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, patchText),
+      routeOptions: {
+        ...runtimeInput(fixture.workspaceRoot, patchText).routeOptions,
+        recoveryAuthority: {
+          mode: "non-default",
+          ledgerRoot,
+          authorityId: "route68-git-mixed-restore",
+        },
+      },
+      getWorkspaceAuthority: () => ({
+        ...authority,
+        createFileExclusive: () => {
+          throw new Error("simulated create failure");
+        },
+      }),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual(["src/a.ts"]);
+    expect(result?.codingResult?.recoverySurface).toEqual(
+      expect.objectContaining({
+        recoveryAvailable: true,
+        explicitRestoreAvailable: true,
+        recoveryExecuted: false,
+        atomicRollbackAvailable: false,
+      }),
+    );
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
+
+    const restore = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route68-git-mixed-restore",
+      recordId: "update-1-src-a.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/a.ts",
+    });
+    expect(restore.restored).toBe(true);
+    expect(restore.rollbackAtomicityClaim).toBe(false);
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 1\n");
+  });
+
+  it("routes 8 normalized git-style mixed operations through bounded small-N routes", async () => {
+    const fixture = createFixture({ includeC: true, includeD: true });
+    fs.writeFileSync(path.join(fixture.workspaceRoot, "src", "e.ts"), "e = 1\n");
+    fs.writeFileSync(path.join(fixture.workspaceRoot, "src", "f.ts"), "f = 1\n");
+    fs.writeFileSync(path.join(fixture.workspaceRoot, "src", "g.ts"), "g = 1\n");
+
+    const patchText = [
+      gitUpdatePatchBatch(["a", "b", "c", "d", "e"]),
+      gitAddPatch("src/new.ts", "created"),
+      gitDeletePatch("src/f.ts", "f = 1"),
+      gitPureRenamePatch("src/g.ts", "src/moved.ts"),
+    ].join("\n");
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, patchText),
+      getWorkspaceAuthority: () =>
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+      "src/e.ts",
+      "src/new.ts",
+      "src/f.ts",
+      "src/moved.ts",
+    ]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        writerInvoked: true,
+        creatorInvoked: true,
+        deleteMoveInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
   });
 
   it("routes exactly-three mixed operations through the guarded mixed writer", async () => {
@@ -1299,12 +1622,61 @@ function pureMoveFilePatch(): string {
 
 function broadPatch(): string {
   return [
-    "diff --git a/src/a.ts b/src/a.ts",
-    "--- a/src/a.ts",
-    "+++ b/src/a.ts",
+    "diff --git a/src/a.bin b/src/a.bin",
+    "Binary files differ",
+  ].join("\n");
+}
+
+function gitUpdatePatch(
+  filePath: string,
+  variableName: string,
+  before: number,
+  after: number,
+): string {
+  return [
+    `diff --git a/${filePath} b/${filePath}`,
+    `--- a/${filePath}`,
+    `+++ b/${filePath}`,
     "@@ -1 +1 @@",
-    "-a = 1",
-    "+a = 2",
+    `-${variableName} = ${before}`,
+    `+${variableName} = ${after}`,
+  ].join("\n");
+}
+
+function gitUpdatePatchBatch(files: readonly string[]): string {
+  return files
+    .map((file) => gitUpdatePatch(`src/${file}.ts`, file, 1, 2))
+    .join("\n");
+}
+
+function gitAddPatch(filePath: string, content: string): string {
+  return [
+    `diff --git a/${filePath} b/${filePath}`,
+    "new file mode 100644",
+    "--- /dev/null",
+    `+++ b/${filePath}`,
+    "@@ -0,0 +1 @@",
+    `+${content}`,
+  ].join("\n");
+}
+
+function gitDeletePatch(filePath: string, content: string): string {
+  return [
+    `diff --git a/${filePath} b/${filePath}`,
+    "deleted file mode 100644",
+    `--- a/${filePath}`,
+    "+++ /dev/null",
+    "@@ -1 +0,0 @@",
+    `-${content}`,
+  ].join("\n");
+}
+
+function gitPureRenamePatch(sourcePath: string, targetPath: string): string {
+  return [
+    `diff --git a/${sourcePath} b/${targetPath}`,
+    "similarity index 100%",
+    `rename from ${sourcePath}`,
+    `rename to ${targetPath}`,
   ].join("\n");
 }
 
@@ -1527,6 +1899,11 @@ function snapshotFixture(workspaceRoot: string): Record<string, string> {
     "src/b.ts",
     "src/c.ts",
     "src/d.ts",
+    "src/e.ts",
+    "src/f.ts",
+    "src/g.ts",
+    "src/h.ts",
+    "src/i.ts",
     "src/new.ts",
     "src/moved.ts",
     "src/moved-a.ts",

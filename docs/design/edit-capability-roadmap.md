@@ -1,8 +1,8 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 67
+Route baseline: post-Route 68
 Date: 2026-05-15
-Status: long-range edit capability map after Routes 50-67.
+Status: long-range edit capability map after Routes 50-68.
 Routes 59-66 have implemented a narrow explicit non-default original-content
 authority loop, explicit restore surface, bounded exactly-three mixed write
 expansion, bounded destructive multi-delete/multi-move support, and bounded
@@ -10,6 +10,9 @@ small-N write support with cap 8, plus explicit restore UX/CLI surface.
 Route 67 added bounded broad `apply_patch` candidate classification and routing
 for parser-supported 1-8 operation shapes that normalize to existing guarded
 small-N write lanes.
+Route 68 added a bounded broad patch parser/normalizer for a safe git-style
+unified-diff subset and feeds normalized 1-8 candidates into those same guarded
+routes.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -126,10 +129,23 @@ single-file, update-only, mixed, delete-only, and move-only routes. The
 classifier is projection-only: it does not read, write, approve, persist, or
 recover. Existing route code still owns workspace authority, approval,
 preflight, recovery-authority capture, writer execution, and result
-projection. 9+ operations, unified diff/arbitrary broad patches, directory
+projection. At the Route 67 boundary, 9+ operations, unified diff/arbitrary
+broad patches, directory
 delete/move, path conflicts, move-with-content-edit destructive shapes,
 overwrite, fuzzy patch, automatic recovery, atomic rollback, and broad
 `apply_patch` readiness remain unsupported.
+
+Route 68 removed the next parser/shape blocker for a safe subset. It added
+`patchParsing/boundedBroadPatchNormalizer.ts`, which parses git-style
+update/add/delete/pure-rename sections and serializes them into existing
+marker-style operations before routing. The normalizer is still pure:
+no file read, no write, no approval, no persistence, no restore execution, no
+fuzzy apply, and no broad arbitrary patch engine. Safe 1-8 normalized payloads
+reuse existing guarded routes and recovery-authority capture. 9+ payloads,
+binary patches, mode changes, rename-with-content-edit, malformed/unsupported
+hunks, directory/path conflicts, overwrite, fuzzy patch, automatic recovery,
+atomic rollback, and broad arbitrary `apply_patch` readiness remain
+unsupported.
 
 ## 2. Current Edit Capability Inventory
 
@@ -203,14 +219,19 @@ overwrite, fuzzy patch, automatic recovery, atomic rollback, and broad
 
 - Bounded broad `apply_patch` candidates
   - Runtime owner: `mutationRoutingProjection.ts` classifies safe
-    parser-supported payloads through `boundedApplyPatchCandidate.ts`.
+    parser-supported and Route 68 normalized git-style payloads through
+    `boundedApplyPatchCandidate.ts`.
+  - Parser/normalizer owner:
+    `patchParsing/boundedBroadPatchNormalizer.ts` converts the safe git-style
+    subset into existing marker-style operations.
   - Route owners: existing single-file routes for count 1,
     `multiFileWriteRoute.ts` for 2-8 update-only, and
     `mixedFileWriteRoute.ts` for 2-8 mixed/delete-only/move-only.
-  - Design evidence: `docs/design/bounded-broad-apply-patch-candidate.md`.
-  - Boundary: classification-only normalization into existing guarded routes;
-    no broad arbitrary parser, no 9+ writes, no directory delete/move, no
-    overwrite, no fuzzy patch, no automatic recovery, and no atomic rollback.
+  - Design evidence: `docs/design/bounded-broad-apply-patch-candidate.md` and
+    `docs/design/bounded-broad-patch-parser-normalizer.md`.
+  - Boundary: parse/normalize only into existing guarded routes; no broad
+    arbitrary parser, no 9+ writes, no directory delete/move, no overwrite, no
+    fuzzy patch, no automatic recovery, and no atomic rollback.
 
 - Selected-workspace guarded single-file move/rename
   - Runtime owner: `mutationRoutingProjection.ts` dispatches the single-file
@@ -411,6 +432,7 @@ overwrite, fuzzy patch, automatic recovery, atomic rollback, and broad
 - 9+ mixed writes.
 - 9+ update writes.
 - Broad arbitrary `apply_patch` writes.
+- Broad arbitrary git/unified diff writes outside the Route 68 safe subset.
 - Broad multi-delete or multi-move beyond the bounded mixed lanes listed above.
 - Directory delete or directory move.
 - Overwrite and outside-workspace operations.
@@ -455,10 +477,12 @@ The project currently does not claim:
 ```text
 User / CLI / provider output
 -> model output parsing
-   status: implemented for apply_patch markers/add/update/delete/move parse;
-   malformed output explicitly stopped.
+   status: implemented for apply_patch markers/add/update/delete/move parse
+   and Route 68 safe git-style broad patch normalization; malformed output
+   explicitly stopped.
 -> mutation routing
-   status: implemented narrow dispatch in mutationRoutingProjection.ts.
+   status: implemented narrow dispatch in mutationRoutingProjection.ts;
+   normalized broad patch text is routed only through existing guarded paths.
 -> capability boundary check
    status: implemented for single update, single add, exactly-two update,
    exactly-three update, single move, single delete, exactly-two mixed write
@@ -525,7 +549,8 @@ User / CLI / provider output
 | Exactly-four bounded write lanes | Implemented candidate; superseded by bounded small-N cap 8 | `mutationRoutingProjection.ts`, `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `mixedFileWriteRoute.ts`, `perFilePatchPlan.ts`, `mixedOperationReadiness.ts`, `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-exactly-four-write-surface.md` | C/D/E | Historical exact-four slice; current cap is 8; no 9+ writes, broad `apply_patch`, automatic recovery, or rollback | Preserve as regression evidence |
 | Bounded multi-delete / multi-move lanes | Implemented candidate under bounded small-N cap 8 | `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-destructive-multi-delete-move.md`, `docs/design/bounded-exactly-four-write-surface.md` | C/D/E | 2-8 delete-only or move-only operations only; no 9+ writes, directory delete/move, overwrite, swaps/cycles, automatic recovery, or rollback | Larger-write readiness audit only if justified |
 | Bounded small-N write policy | Implemented candidate | `boundedWritePolicy.ts`, `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `mixedFileWriteRoute.ts`, `perFilePatchPlan.ts`, `mixedOperationReadiness.ts`, focused route/planning/readiness tests, `docs/design/bounded-small-n-write-policy.md` | C/D/E | Cap 8 only; no 9+ writes, broad `apply_patch`, automatic recovery, or rollback | Stop count-by-count expansion; prefer restore UX or larger-write readiness audit |
-| Bounded broad `apply_patch` candidates | Implemented candidate | `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `boundedApplyPatchCandidate.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-broad-apply-patch-candidate.md` | C/D/E | Parser-supported 1-8 operations only; no unified diff/arbitrary broad patch, 9+ writes, directory operations, overwrite, fuzzy patch, automatic recovery, or rollback | Route 68 unsupported-shape UX hardening or separate 9+ policy decision |
+| Bounded broad `apply_patch` candidates | Implemented candidate | `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `boundedApplyPatchCandidate.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-broad-apply-patch-candidate.md` | C/D/E | Parser-supported or Route 68 normalized 1-8 operations only; no arbitrary broad patch, 9+ writes, directory operations, overwrite, fuzzy patch, automatic recovery, or rollback | Route 69 unsupported-shape UX hardening or separate 9+ policy decision |
+| Bounded broad patch parser/normalizer | Implemented safe subset | `patchParsing/boundedBroadPatchNormalizer.ts`, `boundedBroadPatchNormalizer.test.ts`, `parser.ts`, `parser.test.ts`, `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `docs/design/bounded-broad-patch-parser-normalizer.md` | C/D/E | Git-style update/add/delete/pure-rename subset only; binary, mode, malformed, fuzzy, rename-with-content, 9+, directory/path conflicts, overwrite, and arbitrary broad shapes remain blocked | Route 69 unsupported broad-shape UX hardening if needed |
 | 8-operation recovery-authority drills | Implemented explicit drill evidence | `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts` | C/D | Explicit primitive only; no automatic recovery, session restore command, or atomic rollback | User/session explicit restore UX if product priority |
 | Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, unsupported E2E and continuity checks | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Preserve as recovery-plan consumer |
 | Route-scoped edit journal prototype | Implemented metadata-only projection | `routeScopedEditJournal.ts`, `routeScopedEditJournal.test.ts` | C/D | Non-durable; not recovery or writer authority | Feed original-content ledger prototype if safe |
@@ -809,11 +834,25 @@ is the default. Execute requires explicit intent. Provider/MCP behavior,
 package scripts, default gates, 9+ writes, broad `apply_patch`, default
 persistence, automatic recovery, and atomic rollback remain unchanged.
 
-Recommended next direction: do not continue count expansion by default. Choose
-Route 68 broad `apply_patch` unsupported-shape UX hardening if users need
-clearer blocked-shape explanations, or a separate 9+ / arbitrary-N policy
-decision if there is a concrete larger-write need. Do not treat Route 67 as
-broad arbitrary `apply_patch` readiness.
+Implemented Route 68 batch:
+
+**Batch 68: Bounded broad patch parser/normalizer**
+
+Route 68 added a pure git-style broad patch parser/normalizer for update,
+add, delete, and pure-rename sections that can be represented as existing
+marker-style operations. It routes safe normalized 1-8 candidates through the
+existing guarded single-file, multi-file, mixed, delete, and move routes. It
+also preserves non-default recovery-authority capture and explicit restore
+drill evidence for representative normalized candidates. It does not add fuzzy
+patching, arbitrary broad patch application, 9+ writes, automatic recovery,
+atomic rollback, provider/session/MCP changes, package scripts, default gates,
+or default persistence.
+
+Recommended next direction: Route 69 should be unsupported broad-shape UX
+hardening if users need clearer blocked-shape explanations. A 9+ /
+arbitrary-N policy decision remains separate and should not proceed without a
+stronger approval/recovery stance. Do not treat Route 68 as broad arbitrary
+`apply_patch` readiness.
 
 ## 9. Recommended Future Sequence
 
@@ -890,7 +929,15 @@ broad arbitrary `apply_patch` readiness.
     operations, overwrite, fuzzy patch, automatic recovery, atomic rollback,
     and broad readiness remain unsupported.
 
-- Batch 68: Unsupported broad-shape UX hardening or 9+ policy decision
+- Batch 68: Bounded broad patch parser/normalizer implementation
+  - Status: implemented as a pure parser/normalizer for safe git-style
+    update/add/delete/pure-rename sections, normalized into existing guarded
+    1-8 operation routes.
+  - 9+ writes, arbitrary broad patches, binary/mode/fuzzy patches,
+    rename-with-content-edit, directory/path conflicts, overwrite, automatic
+    recovery, and rollback remain unsupported.
+
+- Batch 69: Unsupported broad-shape UX hardening or 9+ policy decision
   - Prefer clearer unsupported-shape diagnostics if broad patches are being
     submitted and blocked.
   - Consider 9+ / arbitrary-N only with concrete need and proof that approval,
@@ -997,6 +1044,9 @@ Allowed after this document:
 - Route 67 bounded broad `apply_patch` candidate support is implemented for
   parser-supported 1-8 operation payloads that normalize to existing guarded
   route families.
+- Route 68 bounded broad patch parser/normalizer support is implemented for a
+  safe git-style update/add/delete/pure-rename subset that normalizes into
+  existing guarded 1-8 route families.
 
 Forbidden after this document:
 

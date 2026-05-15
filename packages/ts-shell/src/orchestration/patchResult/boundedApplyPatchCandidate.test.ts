@@ -102,7 +102,7 @@ describe("bounded apply_patch candidate classifier", () => {
     }
   });
 
-  it("blocks broad diff, path conflicts, outside-workspace, directory, and content-edit move shapes", () => {
+  it("classifies safe git-style broad diff as normalized bounded candidates", () => {
     expect(
       classifyBoundedApplyPatchCandidate({
         rawPatchText: [
@@ -117,8 +117,32 @@ describe("bounded apply_patch candidate classifier", () => {
       }),
     ).toEqual(
       expect.objectContaining({
+        status: "candidate",
+        operationCount: 1,
+        operationFamily: "single",
+        normalizedRawPatchText: expect.stringContaining(
+          "*** Update File: src/a.ts",
+        ),
+        evidence: expect.arrayContaining([
+          "bounded-apply-patch-candidate:broad-patch-normalized",
+        ]),
+      }),
+    );
+  });
+
+  it("blocks unsupported broad shapes, path conflicts, outside-workspace, directory, and content-edit move shapes", () => {
+    expect(
+      classifyBoundedApplyPatchCandidate({
+        rawPatchText: [
+          "diff --git a/src/a.bin b/src/a.bin",
+          "Binary files differ",
+        ].join("\n"),
+        workspaceRoot: "/workspace",
+      }),
+    ).toEqual(
+      expect.objectContaining({
         status: "unsupported",
-        rejectionReason: "unsupportedBroadShape",
+        rejectionReason: "unsupportedDestructiveShape",
       }),
     );
 

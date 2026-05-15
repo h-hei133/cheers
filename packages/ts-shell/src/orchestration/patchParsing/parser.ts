@@ -215,7 +215,7 @@ function parseUpdateOperation(
     index = hunk.nextIndex;
   }
 
-  if (hunks.length === 0) {
+  if (hunks.length === 0 && !moveTo) {
     return operationFailure(
       "patch-parse-invalid-format",
       "Update file operation did not contain any hunks.",

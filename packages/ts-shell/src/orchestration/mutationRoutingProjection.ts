@@ -99,15 +99,16 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
       workspaceRoot: input.workspaceRoot,
       rawPatchText,
     });
+    const routePatchText = boundedCandidate.normalizedRawPatchText ?? rawPatchText;
     if (
       boundedCandidate.status === "candidate" &&
       boundedCandidate.operationFamily === "single" &&
       boundedCandidate.normalizedOperations[0]?.kind === "create" &&
-      patchIsSingleAddFile(rawPatchText)
+      patchIsSingleAddFile(routePatchText)
     ) {
       const route = await runWorkspaceCreateRoute({
         workspaceRoot: input.workspaceRoot,
-        rawPatchText,
+        rawPatchText: routePatchText,
         explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
         explicitWorkspaceWriteOptIn:
           routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
@@ -135,11 +136,11 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
     if (
       boundedCandidate.status === "candidate" &&
       boundedCandidate.operationFamily === "update-only" &&
-      patchIsTwoThreeOrFourUpdateFiles(rawPatchText)
+      patchIsTwoThreeOrFourUpdateFiles(routePatchText)
     ) {
       const route = await runMultiFileWriteRoute({
         workspaceRoot: input.workspaceRoot,
-        rawPatchText,
+        rawPatchText: routePatchText,
         explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
         explicitWorkspaceWriteOptIn:
           routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
@@ -167,11 +168,11 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
       boundedCandidate.status === "candidate" &&
       boundedCandidate.operationFamily === "single" &&
       boundedCandidate.normalizedOperations[0]?.kind === "move" &&
-      patchIsSingleMoveFile(rawPatchText)
+      patchIsSingleMoveFile(routePatchText)
     ) {
       const route = await runWorkspaceMoveRoute({
         workspaceRoot: input.workspaceRoot,
-        rawPatchText,
+        rawPatchText: routePatchText,
         explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
         explicitWorkspaceWriteOptIn:
           routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
@@ -201,11 +202,11 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
       boundedCandidate.status === "candidate" &&
       boundedCandidate.operationFamily === "single" &&
       boundedCandidate.normalizedOperations[0]?.kind === "delete" &&
-      patchIsSingleDeleteFile(rawPatchText)
+      patchIsSingleDeleteFile(routePatchText)
     ) {
       const route = await runWorkspaceDeleteRoute({
         workspaceRoot: input.workspaceRoot,
-        rawPatchText,
+        rawPatchText: routePatchText,
         explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
         explicitWorkspaceWriteOptIn:
           routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
@@ -233,11 +234,11 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
     if (
       boundedCandidate.status === "candidate" &&
       routeUsesMixedWriteRoute(boundedCandidate) &&
-      patchIsTwoThreeOrFourMixedWriteFiles(rawPatchText)
+      patchIsTwoThreeOrFourMixedWriteFiles(routePatchText)
     ) {
       const route = await runMixedFileWriteRoute({
         workspaceRoot: input.workspaceRoot,
-        rawPatchText,
+        rawPatchText: routePatchText,
         explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
         explicitWorkspaceWriteOptIn:
           routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
@@ -268,7 +269,7 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
 
     const route = await runWorkspaceWriteRoute({
       workspaceRoot: input.workspaceRoot,
-      rawPatchText,
+      rawPatchText: routePatchText,
       explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
       explicitWorkspaceWriteOptIn:
         routeOptions.workspaceWrite.explicitWorkspaceWriteOptIn,
@@ -294,7 +295,10 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
 
   const route = buildNoWriteRuntimeRoute({
     workspaceRoot: input.workspaceRoot,
-    rawPatchText,
+    rawPatchText: classifyBoundedApplyPatchCandidate({
+      workspaceRoot: input.workspaceRoot,
+      rawPatchText,
+    }).normalizedRawPatchText ?? rawPatchText,
     explicitRuntimeOptIn: routeOptions.explicitRuntimeOptIn,
     ...(routeOptions.requestedUserDecision
       ? { requestedUserDecision: routeOptions.requestedUserDecision }
