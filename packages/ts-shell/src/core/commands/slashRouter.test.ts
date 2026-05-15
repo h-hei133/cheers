@@ -60,6 +60,48 @@ describe("slash router (W4)", () => {
     }
   });
 
+  it("routes local compact command without persistence side effects", async () => {
+    const result = await routeSlashCommand("/compact", {
+      cwd: workspaceRoot,
+    });
+    expect(result).toBeTruthy();
+    expect(result?.kind).toBe("local");
+    if (result?.kind === "local") {
+      expect(result.output).toContain("Compact v2 handoff generated");
+      expect(result.output).toContain("Markdown handoff");
+      expect(result.output).toContain("- Persistence: none");
+      expect(result.output).toContain("- Provider/model call: none");
+      expect(result.output).toContain("- Recovery execution: none");
+      expect(result.output).toContain("closeout-candidate");
+      expect(result.output).not.toContain("Unknown slash command");
+    }
+    expect(fs.readdirSync(workspaceRoot)).toEqual([]);
+  });
+
+  it("routes compact JSON mode and rejects invalid compact args", async () => {
+    const jsonResult = await routeSlashCommand("/compact json", {
+      cwd: workspaceRoot,
+    });
+    expect(jsonResult?.kind).toBe("local");
+    if (jsonResult?.kind === "local") {
+      expect(JSON.parse(jsonResult.output)).toEqual(
+        expect.objectContaining({
+          packetVersion: "compact-v2",
+          source: "session-handoff",
+        }),
+      );
+    }
+
+    const invalidResult = await routeSlashCommand("/compact --execute", {
+      cwd: workspaceRoot,
+    });
+    expect(invalidResult?.kind).toBe("local");
+    if (invalidResult?.kind === "local") {
+      expect(invalidResult.output).toContain("- Outcome: blocked");
+      expect(invalidResult.output).toContain("compact-command-mutating-flag");
+    }
+  });
+
   it("routes every visible registry command name and alias without falling through to unknown", async () => {
     const registry = createCommandRegistry(workspaceRoot);
     const visibleCommands = Array.from(registry.values()).filter(

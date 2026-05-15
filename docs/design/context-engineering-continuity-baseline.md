@@ -1,6 +1,7 @@
 # Context Engineering Continuity Baseline
 
-Status: Route 74 baseline candidate; Route 75 Compact v2 packet implemented.
+Status: Route 74 baseline candidate; Route 75 Compact v2 packet implemented;
+Route 76 command integration added.
 Date: 2026-05-15
 
 ## Post-Edit-Closeout Baseline
@@ -9,6 +10,12 @@ Route 73 sealed the bounded selected-workspace edit surface as a closeout
 candidate. Route 74 starts the next phase by defining a compact-safe context
 substrate for future compact, project memory, startup warm context, sidebar,
 undo/restore UX, and sandbox-policy routes.
+
+Route 76 adds a preview-only `/compact` command surface for the Compact v2
+packet and markdown handoff. It keeps the context projection pure and still
+does not add memory storage, sidebar UI, startup cache, provider/model
+summarization, SessionManager schema changes, restore execution, automatic
+recovery, atomic rollback, or edit runtime changes.
 
 This route is not a memory implementation, sidebar UI, startup cache, provider
 change, MCP change, compact rewrite, SessionManager schema change, edit runtime
@@ -212,6 +219,9 @@ What Route 74 should not implement:
 - `packages/ts-shell/src/core/context/contextLayerModel.ts`
 - `packages/ts-shell/src/core/context/contextContinuityManifest.ts`
 - `packages/ts-shell/src/core/context/contextStateProjection.ts`
+- `packages/ts-shell/src/core/context/compactCommandContract.ts`
+- `packages/ts-shell/src/core/context/compactCommandRunner.ts`
+- `packages/ts-shell/src/core/context/compactSessionSurface.ts`
 
 The modules are pure. They do not perform file I/O, provider access, MCP
 discovery, persistence, session schema migration, edit routing, write execution,

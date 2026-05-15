@@ -1,6 +1,6 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 75
+Route baseline: post-Route 76
 Date: 2026-05-15
 Status: long-range edit capability map after Routes 50-73; edit capability is
 now a closeout candidate for the bounded selected-workspace surface.
@@ -44,6 +44,12 @@ focused continuity tests proving edit closeout, mutation evidence, recovery
 references, validation status, constraints, and next action survive compact
 without raw content or secrets. Live compact/session runtime integration remains
 deferred to Route 76.
+Route 76 adds a preview-only `/compact` command surface for Compact v2 route
+continuity: command contract, pure command runner, session-facing formatter,
+`/compact` registration with `/handoff` alias, JSON output mode, and focused
+tests. It does not compact runtime history, persist memory, change
+SessionManager schema, call a provider/model, execute restore, add sidebar UI,
+add startup cache, or change edit behavior.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -55,7 +61,7 @@ opencode, and gemini-cli.
 It is not a broad edit readiness claim. It keeps implemented capability,
 candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Post-Route 75 Executive Summary
+## 1. Post-Route 76 Executive Summary
 
 Current write capability remains intentionally narrow. The project supports a
 bounded selected-workspace write surface and still blocks broad arbitrary
@@ -99,10 +105,10 @@ compatibility gauntlet, readiness, manifest, and restore core surfaces. The
 result contract remains a required final validation gate run separately.
 
 Routes 57-73 are therefore complete for this edit capability phase. Route 74
-uses that sealed state as context-engineering input, and Route 75 makes it
-survive compact as structured handoff state. The sealed state is
-closeout-candidate, not broad edit readiness and not reference-repo feature
-parity.
+uses that sealed state as context-engineering input, Route 75 makes it survive
+compact as structured handoff state, and Route 76 exposes that handoff through a
+preview-only `/compact` command. The sealed state is closeout-candidate, not
+broad edit readiness and not reference-repo feature parity.
 
 Routes 52-56 changed the roadmap direction:
 

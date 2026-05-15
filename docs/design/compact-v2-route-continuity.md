@@ -1,6 +1,6 @@
 # Compact v2 Route Continuity
 
-Status: Route 75 implemented candidate.
+Status: Route 75 implemented candidate; Route 76 command integration added.
 Date: 2026-05-15
 
 ## Post-Route 74 Baseline
@@ -224,12 +224,16 @@ Memory candidates, sidebar facts, and startup warm candidates remain labels.
 They are not persisted, ranked, displayed in UI, or cached at startup by Route
 75.
 
-Recommended next route: Route 76 Compact v2 session integration.
+Route 76 note: `compactCommandContract.ts`, `compactCommandRunner.ts`,
+`compactSessionSurface.ts`, and the `/compact` local command now expose this
+packet through the command surface as a preview-only handoff. The command
+renders markdown by default and can return structured JSON. It still does not
+compact runtime history, persist memory, change SessionManager schema, call a
+provider/model, execute restore, add sidebar UI, add startup cache, or change
+edit behavior.
 
-Reason: the packet and renderer now exist, but the live compact/session path is
-still deliberately untouched. A later route can add a narrow formatter
-invocation where compact/session summary is already explicit, without changing
-SessionManager persistence schema or broad lifecycle behavior.
+Recommended next route: Project memory candidate extraction, unless command
+polish becomes the immediate product need.
 
 ## Non-Goals
 
@@ -248,11 +252,12 @@ Route 75 does not implement:
 
 ## Residual Risks
 
-- The packet is not yet emitted by live compact commands.
-- Future session integration must choose an explicit compact/session surface
-  without widening lifecycle behavior.
+- Runtime history compaction remains separate from the preview-only handoff
+  command.
+- Future command polish may add richer arguments, but should keep mutation,
+  persistence, provider/model calls, and recovery execution out of the default
+  command path.
 - Future memory extraction must rank and persist only stable memory candidates
   under a separate policy.
 - Future sidebar/startup routes should consume the existing labels rather than
   introduce a separate taxonomy.
-

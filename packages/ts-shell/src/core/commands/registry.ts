@@ -1,4 +1,5 @@
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { runCompactLocalCommand } from "./compactCommandRuntime.js";
 import { runConnectCommand } from "./connectCommandRuntime.js";
 import { runModelCommand } from "./modelCommandRuntime.js";
 import { runRestoreLocalCommand } from "./restoreCommandRuntime.js";
@@ -55,6 +56,15 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (_args, context) => runDiagnoseCommand(context),
+    },
+    {
+      name: "compact",
+      aliases: ["handoff"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runCompactLocalCommand(args, context),
     },
     {
       name: "connect",
