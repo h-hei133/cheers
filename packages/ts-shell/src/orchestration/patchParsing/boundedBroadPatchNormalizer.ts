@@ -3,6 +3,10 @@ import type {
   PatchHunk,
   PatchLineChange,
 } from "./types.js";
+import {
+  broadPatchUnsupportedEvidence,
+  type BroadPatchUnsupportedReason,
+} from "./broadPatchUnsupportedReason.js";
 
 export type BoundedBroadPatchNormalizerStatus =
   | "normalized"
@@ -15,17 +19,9 @@ export type BoundedBroadPatchSourceFormat =
   | "unknown";
 
 export type BoundedBroadPatchRejectionReason =
-  | "not-broad-patch"
+  | BroadPatchUnsupportedReason
   | "unsupported-broad-shape"
   | "unsupported-unified-diff"
-  | "unsupported-fuzzy-patch"
-  | "unsupported-binary-patch"
-  | "unsupported-mode-change"
-  | "unsupported-symlink-patch"
-  | "unsupported-submodule-patch"
-  | "unsupported-directory-operation"
-  | "unsupported-rename-content-edit"
-  | "unsupported-rename-with-content-edit"
   | "malformed-broad-patch";
 
 export type BoundedBroadPatchNormalizerResult =
@@ -64,6 +60,7 @@ interface FileMetadata {
   readonly hasModeChange: boolean;
   readonly hasSymlink: boolean;
   readonly hasSubmodule: boolean;
+  readonly hasCopy: boolean;
   readonly hasUnsupportedMetadata: boolean;
   readonly hunkStartIndex?: number;
 }
@@ -108,7 +105,7 @@ export function normalizeBoundedBroadPatchText(
     if (parsed.status !== "normalized") {
       return parsed;
     }
-    operations.push(parsed.operation);
+    operations.push(...parsed.operations);
   }
 
   return {
@@ -131,7 +128,7 @@ export function normalizeBoundedBroadPatchText(
 type ParsedFileSection =
   | {
       readonly status: "normalized";
-      readonly operation: PatchFileOperation;
+      readonly operations: readonly PatchFileOperation[];
     }
   | Extract<
       BoundedBroadPatchNormalizerResult,
@@ -172,6 +169,14 @@ function parseFileSection(section: FileSection): ParsedFileSection {
       ["bounded-broad-patch-normalizer:submodule-patch-blocked"],
     );
   }
+  if (metadata.hasCopy) {
+    return rejection(
+      "unsupported",
+      "git-unified-diff",
+      "unsupported-copy-patch",
+      ["bounded-broad-patch-normalizer:copy-patch-blocked"],
+    );
+  }
   if (metadata.hasUnsupportedMetadata) {
     return rejection(
       "unsupported",
@@ -198,14 +203,6 @@ function parseFileSection(section: FileSection): ParsedFileSection {
         ["bounded-broad-patch-normalizer:rename-metadata-incomplete"],
       );
     }
-    if (hasHunks) {
-      return rejection(
-        "unsupported",
-        "git-unified-diff",
-        "unsupported-rename-with-content-edit",
-        ["bounded-broad-patch-normalizer:rename-content-edit-blocked"],
-      );
-    }
     if (!metadata.similarity100 || metadata.hasNon100Similarity) {
       return rejection(
         "unsupported",
@@ -214,14 +211,38 @@ function parseFileSection(section: FileSection): ParsedFileSection {
         ["bounded-broad-patch-normalizer:rename-similarity-not-exact"],
       );
     }
+    if (hasHunks) {
+      const hunks = parseUnifiedHunks(hunkLines);
+      if (hunks.ok === false) {
+        return hunks.result;
+      }
+      return {
+        status: "normalized",
+        operations: [
+          {
+            kind: "move",
+            path: metadata.renameFrom,
+            moveTo: metadata.renameTo,
+            hunks: [],
+          },
+          {
+            kind: "update",
+            path: metadata.renameTo,
+            hunks: hunks.hunks,
+          },
+        ],
+      };
+    }
     return {
       status: "normalized",
-      operation: {
-        kind: "move",
-        path: metadata.renameFrom,
-        moveTo: metadata.renameTo,
-        hunks: [],
-      },
+      operations: [
+        {
+          kind: "move",
+          path: metadata.renameFrom,
+          moveTo: metadata.renameTo,
+          hunks: [],
+        },
+      ],
     };
   }
 
@@ -238,7 +259,7 @@ function parseFileSection(section: FileSection): ParsedFileSection {
     }
     return {
       status: "normalized",
-      operation: { kind: "add", path: newPath, content: content.content },
+    operations: [{ kind: "add", path: newPath, content: content.content }],
     };
   }
 
@@ -249,7 +270,7 @@ function parseFileSection(section: FileSection): ParsedFileSection {
     }
     return {
       status: "normalized",
-      operation: { kind: "delete", path: oldPath },
+    operations: [{ kind: "delete", path: oldPath }],
     };
   }
 
@@ -268,7 +289,7 @@ function parseFileSection(section: FileSection): ParsedFileSection {
   }
   return {
     status: "normalized",
-    operation: { kind: "update", path: oldPath, hunks: hunks.hunks },
+    operations: [{ kind: "update", path: oldPath, hunks: hunks.hunks }],
   };
 }
 
@@ -283,6 +304,7 @@ function parseFileMetadata(section: FileSection): FileMetadata {
   let hasModeChange = false;
   let hasSymlink = false;
   let hasSubmodule = false;
+  let hasCopy = false;
   let hasUnsupportedMetadata = false;
   let hunkStartIndex: number | undefined;
 
@@ -330,6 +352,7 @@ function parseFileMetadata(section: FileSection): FileMetadata {
       continue;
     }
     if (line.startsWith("copy from ") || line.startsWith("copy to ")) {
+      hasCopy = true;
       hasUnsupportedMetadata = true;
       continue;
     }
@@ -368,6 +391,7 @@ function parseFileMetadata(section: FileSection): FileMetadata {
     hasModeChange,
     hasSymlink,
     hasSubmodule,
+    hasCopy,
     hasUnsupportedMetadata,
     ...(hunkStartIndex !== undefined ? { hunkStartIndex } : {}),
   };
@@ -402,6 +426,17 @@ function parseUnifiedHunks(
           "git-unified-diff",
           "malformed-broad-patch",
           ["bounded-broad-patch-normalizer:expected-hunk-header"],
+        ),
+      };
+    }
+    if (!isSupportedGitHunkHeader(header)) {
+      return {
+        ok: false,
+        result: rejection(
+          "unsupported",
+          "git-unified-diff",
+          "unsupported-ambiguous-hunk",
+          ["bounded-broad-patch-normalizer:ambiguous-hunk-header-blocked"],
         ),
       };
     }
@@ -457,6 +492,10 @@ function parseUnifiedHunks(
   }
 
   return { ok: true, hunks };
+}
+
+function isSupportedGitHunkHeader(header: string): boolean {
+  return /^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/.test(header);
 }
 
 function parseAddedFileContent(
@@ -645,11 +684,24 @@ function rejection(
     rejectionReason,
     evidence: [
       ...evidence,
+      ...(isSharedBroadReason(rejectionReason)
+        ? [broadPatchUnsupportedEvidence(rejectionReason)]
+        : []),
       "bounded-broad-patch-normalizer:no-file-read",
       "bounded-broad-patch-normalizer:no-write-authority",
       "bounded-broad-patch-normalizer:no-recovery-execution",
     ],
   };
+}
+
+function isSharedBroadReason(
+  reason: BoundedBroadPatchRejectionReason,
+): reason is BroadPatchUnsupportedReason {
+  return (
+    reason !== "unsupported-broad-shape" &&
+    reason !== "unsupported-unified-diff" &&
+    reason !== "malformed-broad-patch"
+  );
 }
 
 function normalizeLineEndings(rawPatchText: string): string {

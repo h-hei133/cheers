@@ -3,11 +3,11 @@ import { classifyBoundedApplyPatchCandidate } from "./boundedApplyPatchCandidate
 
 describe("bounded apply_patch candidate classifier", () => {
   it("classifies single update/create/delete/move operations as existing single-route candidates", () => {
-    for (const [patchText, kind, targetPath] of [
-      [singleUpdatePatch(), "update", "src/a.ts"],
-      [singleCreatePatch(), "create", "src/new.ts"],
-      [singleDeletePatch(), "delete", "src/a.ts"],
-      [singleMovePatch(), "move", "src/moved.ts"],
+    for (const [patchText, kind, targetPath, approvalPaths] of [
+      [singleUpdatePatch(), "update", "src/a.ts", ["src/a.ts"]],
+      [singleCreatePatch(), "create", "src/new.ts", ["src/new.ts"]],
+      [singleDeletePatch(), "delete", "src/a.ts", ["src/a.ts"]],
+      [singleMovePatch(), "move", "src/moved.ts", ["src/a.ts", "src/moved.ts"]],
     ] as const) {
       const projection = classifyBoundedApplyPatchCandidate({
         rawPatchText: patchText,
@@ -19,7 +19,7 @@ describe("bounded apply_patch candidate classifier", () => {
           status: "candidate",
           operationCount: 1,
           operationFamily: "single",
-          approvalPaths: [targetPath],
+          approvalPaths,
         }),
       );
       expect(projection.normalizedOperations[0]).toEqual(
@@ -156,6 +156,30 @@ describe("bounded apply_patch candidate classifier", () => {
     );
   });
 
+  it("classifies safe git-style rename-with-content-edit as decomposed bounded mixed candidate", () => {
+    expect(
+      classifyBoundedApplyPatchCandidate({
+        rawPatchText: renameWithContentEditPatch(),
+        workspaceRoot: "/workspace",
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        status: "candidate",
+        operationCount: 2,
+        operationFamily: "mixed",
+        affectedPaths: ["src/a.ts", "src/b.ts"],
+        approvalPaths: ["src/a.ts", "src/b.ts"],
+        normalizedOperations: [
+          { kind: "move", sourcePath: "src/a.ts", targetPath: "src/b.ts" },
+          { kind: "update", targetPath: "src/b.ts" },
+        ],
+        normalizedRawPatchText: expect.stringContaining(
+          "*** Update File: src/b.ts",
+        ),
+      }),
+    );
+  });
+
   it("blocks unsupported broad shapes, path conflicts, outside-workspace, directory, and content-edit move shapes", () => {
     expect(
       classifyBoundedApplyPatchCandidate({
@@ -231,6 +255,70 @@ describe("bounded apply_patch candidate classifier", () => {
         rejectionReason: "unsupportedDestructiveShape",
       }),
     );
+  });
+
+  it("covers a realistic broad patch fixture gauntlet without authorizing writes", () => {
+    const supported = [
+      { patchText: gitUpdatePatchBatch(["a", "b"]), count: 2, family: "update-only" },
+      { patchText: [gitAddPatch("src/new.ts", "created"), gitDeletePatch("src/old.ts", "old")].join("\n"), count: 2, family: "mixed" },
+      { patchText: gitPureRenamePatch("src/from.ts", "src/to.ts"), count: 1, family: "single" },
+      { patchText: renameWithContentEditPatch(), count: 2, family: "mixed" },
+      { patchText: gitUpdatePatchBatch(Array.from({ length: 32 }, (_, index) => `file-${index + 1}`)), count: 32, family: "update-only" },
+      { patchText: mixedBroadPatch(), count: 4, family: "mixed" },
+      { patchText: multiHunkGitPatch(), count: 1, family: "single" },
+    ] as const;
+
+    for (const fixture of supported) {
+      expect(
+        classifyBoundedApplyPatchCandidate({
+          rawPatchText: fixture.patchText,
+          workspaceRoot: "/workspace",
+        }),
+      ).toEqual(
+        expect.objectContaining({
+          status: "candidate",
+          operationCount: fixture.count,
+          operationFamily: fixture.family,
+          evidence: expect.arrayContaining([
+            "bounded-apply-patch-candidate:broad-patch-normalized",
+            "bounded-apply-patch-candidate:no-broad-arbitrary-claim",
+          ]),
+        }),
+      );
+    }
+
+    const blocked = [
+      { patchText: gitUpdatePatchBatch(Array.from({ length: 33 }, (_, index) => `file-${index + 1}`)), reason: "unsupportedTooManyOperations" },
+      { patchText: binaryBroadPatch(), reason: "unsupportedDestructiveShape" },
+      { patchText: modeBroadPatch(), reason: "unsupportedDestructiveShape" },
+      { patchText: symlinkBroadPatch(), reason: "unsupportedDestructiveShape" },
+      { patchText: submoduleBroadPatch(), reason: "unsupportedDestructiveShape" },
+      { patchText: copyBroadPatch(), reason: "unsupportedBroadShape" },
+      { patchText: malformedBroadPatch(), reason: "unsupportedBroadShape" },
+      { patchText: ambiguousHunkBroadPatch(), reason: "unsupportedBroadShape" },
+      { patchText: fuzzyLikeBroadPatch(), reason: "unsupportedBroadShape" },
+      { patchText: directoryBroadPatch(), reason: "unsupportedDirectoryOperation" },
+      { patchText: duplicateTargetPatch(), reason: "unsupportedPathConflict" },
+      { patchText: outsideWorkspaceGitPatch(), reason: "unsupportedWorkspaceBoundary" },
+    ] as const;
+
+    for (const fixture of blocked) {
+      expect(
+        classifyBoundedApplyPatchCandidate({
+          rawPatchText: fixture.patchText,
+          workspaceRoot: "/workspace",
+        }),
+      ).toEqual(
+        expect.objectContaining({
+          status: "unsupported",
+          rejectionReason: fixture.reason,
+          evidence: expect.arrayContaining([
+            "bounded-apply-patch-candidate:no-write-authority",
+            "bounded-apply-patch-candidate:no-recovery-execution",
+          ]),
+        }),
+      );
+    }
   });
 });
 
@@ -335,6 +423,77 @@ function mixedPatch(count: number): string {
   ].join("\n");
 }
 
+function gitUpdatePatch(fileStem: string): string {
+  return [
+    `diff --git a/src/${fileStem}.ts b/src/${fileStem}.ts`,
+    `--- a/src/${fileStem}.ts`,
+    `+++ b/src/${fileStem}.ts`,
+    "@@ -1 +1 @@",
+    `-${fileStem} = 1`,
+    `+${fileStem} = 2`,
+  ].join("\n");
+}
+
+function gitUpdatePatchBatch(files: readonly string[]): string {
+  return files.map(gitUpdatePatch).join("\n");
+}
+
+function gitAddPatch(filePath: string, content: string): string {
+  return [
+    `diff --git a/${filePath} b/${filePath}`,
+    "new file mode 100644",
+    "--- /dev/null",
+    `+++ b/${filePath}`,
+    "@@ -0,0 +1 @@",
+    `+${content}`,
+  ].join("\n");
+}
+
+function gitDeletePatch(filePath: string, content: string): string {
+  return [
+    `diff --git a/${filePath} b/${filePath}`,
+    "deleted file mode 100644",
+    `--- a/${filePath}`,
+    "+++ /dev/null",
+    "@@ -1 +0,0 @@",
+    `-${content}`,
+  ].join("\n");
+}
+
+function gitPureRenamePatch(fromPath: string, toPath: string): string {
+  return [
+    `diff --git a/${fromPath} b/${toPath}`,
+    "similarity index 100%",
+    `rename from ${fromPath}`,
+    `rename to ${toPath}`,
+  ].join("\n");
+}
+
+function mixedBroadPatch(): string {
+  return [
+    gitUpdatePatch("a"),
+    gitAddPatch("src/new.ts", "created"),
+    gitDeletePatch("src/old.ts", "old"),
+    gitPureRenamePatch("src/from.ts", "src/to.ts"),
+  ].join("\n");
+}
+
+function multiHunkGitPatch(): string {
+  return [
+    "diff --git a/src/a.ts b/src/a.ts",
+    "--- a/src/a.ts",
+    "+++ b/src/a.ts",
+    "@@ -1,2 +1,2 @@",
+    " keep one",
+    "-a = 1",
+    "+a = 2",
+    "@@ -8,2 +8,2 @@",
+    " keep two",
+    "-b = 1",
+    "+b = 2",
+  ].join("\n");
+}
+
 function duplicateTargetPatch(): string {
   return [
     "*** Begin Patch",
@@ -358,5 +517,111 @@ function outsideWorkspacePatch(): string {
     "-outside = 1",
     "+outside = 2",
     "*** End Patch",
+  ].join("\n");
+}
+
+function renameWithContentEditPatch(): string {
+  return [
+    "diff --git a/src/a.ts b/src/b.ts",
+    "similarity index 100%",
+    "rename from src/a.ts",
+    "rename to src/b.ts",
+    "--- a/src/a.ts",
+    "+++ b/src/b.ts",
+    "@@ -1 +1 @@",
+    "-a = 1",
+    "+a = 2",
+  ].join("\n");
+}
+
+function binaryBroadPatch(): string {
+  return ["diff --git a/src/a.bin b/src/a.bin", "Binary files differ"].join("\n");
+}
+
+function modeBroadPatch(): string {
+  return [
+    "diff --git a/src/a.ts b/src/a.ts",
+    "old mode 100644",
+    "new mode 100755",
+  ].join("\n");
+}
+
+function symlinkBroadPatch(): string {
+  return [
+    "diff --git a/src/link b/src/link",
+    "new file mode 120000",
+    "--- /dev/null",
+    "+++ b/src/link",
+    "@@ -0,0 +1 @@",
+    "+target",
+  ].join("\n");
+}
+
+function submoduleBroadPatch(): string {
+  return [
+    "diff --git a/vendor/lib b/vendor/lib",
+    "new file mode 160000",
+    "--- /dev/null",
+    "+++ b/vendor/lib",
+    "@@ -0,0 +1 @@",
+    "+160000",
+  ].join("\n");
+}
+
+function copyBroadPatch(): string {
+  return [
+    "diff --git a/src/a.ts b/src/b.ts",
+    "similarity index 100%",
+    "copy from src/a.ts",
+    "copy to src/b.ts",
+  ].join("\n");
+}
+
+function malformedBroadPatch(): string {
+  return ["diff --git a/src/a.ts b/src/a.ts", "--- a/src/a.ts"].join("\n");
+}
+
+function ambiguousHunkBroadPatch(): string {
+  return [
+    "diff --git a/src/a.ts b/src/a.ts",
+    "--- a/src/a.ts",
+    "+++ b/src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+  ].join("\n");
+}
+
+function fuzzyLikeBroadPatch(): string {
+  return [
+    "diff --git a/src/a.ts b/src/a.ts",
+    "--- a/src/a.ts",
+    "+++ b/src/a.ts",
+    "@@ -1 +1 @@",
+    "-a = 1",
+    "\\ No newline at end of file",
+    "+a = 2",
+  ].join("\n");
+}
+
+function directoryBroadPatch(): string {
+  return [
+    "diff --git a/src/dir/ b/src/dir/",
+    "--- a/src/dir/",
+    "+++ b/src/dir/",
+    "@@ -1 +1 @@",
+    "-old",
+    "+new",
+  ].join("\n");
+}
+
+function outsideWorkspaceGitPatch(): string {
+  return [
+    "diff --git a/../outside.ts b/../outside.ts",
+    "--- a/../outside.ts",
+    "+++ b/../outside.ts",
+    "@@ -1 +1 @@",
+    "-outside = 1",
+    "+outside = 2",
   ].join("\n");
 }

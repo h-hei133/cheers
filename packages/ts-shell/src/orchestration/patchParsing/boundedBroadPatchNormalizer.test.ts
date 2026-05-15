@@ -129,7 +129,42 @@ describe("normalizeBoundedBroadPatchText", () => {
     }
   });
 
-  it("blocks binary, mode change, rename-with-content, symlink, submodule, no-newline markers, and malformed sections", () => {
+  it("decomposes safe rename-with-content-edit into move then target update", () => {
+    const result = normalizeBoundedBroadPatchText(renameWithContentEditPatch());
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: "normalized",
+        operationCount: 2,
+        affectedPaths: ["src/a.ts", "src/b.ts"],
+      }),
+    );
+    if (result.status === "normalized") {
+      expect(result.normalizedOperations).toEqual([
+        {
+          kind: "move",
+          path: "src/a.ts",
+          moveTo: "src/b.ts",
+          hunks: [],
+        },
+        expect.objectContaining({
+          kind: "update",
+          path: "src/b.ts",
+        }),
+      ]);
+      expect(result.normalizedRawPatchText).toContain(
+        "*** Update File: src/a.ts\n*** Move to: src/b.ts",
+      );
+      expect(result.normalizedRawPatchText).toContain(
+        "*** Update File: src/b.ts",
+      );
+      expect(result.evidence).toContain(
+        "bounded-broad-patch-normalizer:operation-count:2",
+      );
+    }
+  });
+
+  it("blocks binary, mode change, symlink, submodule, copy, no-newline markers, and malformed sections", () => {
     for (const [patchText, rejectionReason] of [
       [
         ["diff --git a/src/a.bin b/src/a.bin", "Binary files differ"].join("\n"),
@@ -142,20 +177,6 @@ describe("normalizeBoundedBroadPatchText", () => {
           "new mode 100755",
         ].join("\n"),
         "unsupported-mode-change",
-      ],
-      [
-        [
-          "diff --git a/src/a.ts b/src/b.ts",
-          "similarity index 80%",
-          "rename from src/a.ts",
-          "rename to src/b.ts",
-          "--- a/src/a.ts",
-          "+++ b/src/b.ts",
-          "@@ -1 +1 @@",
-          "-a = 1",
-          "+a = 2",
-        ].join("\n"),
-        "unsupported-rename-with-content-edit",
       ],
       [
         [
@@ -178,6 +199,15 @@ describe("normalizeBoundedBroadPatchText", () => {
           "+160000",
         ].join("\n"),
         "unsupported-submodule-patch",
+      ],
+      [
+        [
+          "diff --git a/src/a.ts b/src/b.ts",
+          "similarity index 100%",
+          "copy from src/a.ts",
+          "copy to src/b.ts",
+        ].join("\n"),
+        "unsupported-copy-patch",
       ],
       [
         [
@@ -204,4 +234,85 @@ describe("normalizeBoundedBroadPatchText", () => {
       );
     }
   });
+
+  it("keeps unsafe rename-with-content-edit shapes blocked", () => {
+    for (const [patchText, rejectionReason] of [
+      [
+        [
+          "diff --git a/src/a.ts b/src/b.ts",
+          "similarity index 80%",
+          "rename from src/a.ts",
+          "rename to src/b.ts",
+          "--- a/src/a.ts",
+          "+++ b/src/b.ts",
+          "@@ -1 +1 @@",
+          "-a = 1",
+          "+a = 2",
+        ].join("\n"),
+        "unsupported-broad-shape",
+      ],
+      [
+        [
+          "diff --git a/src/a.ts b/src/b.ts",
+          "similarity index 100%",
+          "rename from src/a.ts",
+          "rename to src/b.ts",
+          "old mode 100644",
+          "new mode 100755",
+          "--- a/src/a.ts",
+          "+++ b/src/b.ts",
+          "@@ -1 +1 @@",
+          "-a = 1",
+          "+a = 2",
+        ].join("\n"),
+        "unsupported-mode-change",
+      ],
+      [
+        [
+          "diff --git a/src/a.bin b/src/b.bin",
+          "similarity index 100%",
+          "rename from src/a.bin",
+          "rename to src/b.bin",
+          "Binary files a/src/a.bin and b/src/b.bin differ",
+        ].join("\n"),
+        "unsupported-binary-patch",
+      ],
+      [
+        [
+          "diff --git a/src/a.ts b/src/b.ts",
+          "similarity index 100%",
+          "rename from src/a.ts",
+          "rename to src/b.ts",
+          "--- a/src/a.ts",
+          "+++ b/src/b.ts",
+          "@@ -1 +1 @@",
+          "-a = 1",
+          "\\ No newline at end of file",
+          "+a = 2",
+        ].join("\n"),
+        "unsupported-unified-diff",
+      ],
+    ] as const) {
+      expect(normalizeBoundedBroadPatchText(patchText)).toEqual(
+        expect.objectContaining({
+          status: expect.stringMatching(/unsupported|malformed/),
+          rejectionReason,
+        }),
+      );
+    }
+  });
 });
+
+function renameWithContentEditPatch(): string {
+  return [
+    "diff --git a/src/a.ts b/src/b.ts",
+    "similarity index 100%",
+    "rename from src/a.ts",
+    "rename to src/b.ts",
+    "--- a/src/a.ts",
+    "+++ b/src/b.ts",
+    "@@ -1 +1 @@",
+    "-a = 1",
+    "+a = 2",
+  ].join("\n");
+}

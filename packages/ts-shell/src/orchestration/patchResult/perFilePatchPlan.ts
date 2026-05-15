@@ -304,7 +304,7 @@ function buildParsedPatchPlan(
     (operation) => operation.kind === "delete" || operation.kind === "move",
   );
   const targetFiles = operations.map(targetPathForOperation);
-  const duplicateTargetFiles = duplicateTargets(targetFiles);
+  const duplicateTargetFiles = duplicateTargetsForOperations(operations);
 
   if (duplicateTargetFiles.length > 0) {
     return buildUnsupportedPlan({
@@ -583,7 +583,12 @@ function buildVerifiedMixedPlan(input: {
       : {}),
     supportedOperations: ["update", "add", "delete", "move"],
   });
-  if (verification.ok === false) {
+  const verificationOnlyBlockedByMoveTargetUpdate =
+    verification.ok === false &&
+    verification.failures.every((failure) =>
+      isMoveTargetUpdateMissingFailure(input.operations, failure),
+    );
+  if (verification.ok === false && !verificationOnlyBlockedByMoveTargetUpdate) {
     return buildUnsupportedPlan({
       operations: input.patch.operations,
       targetFiles: input.targetFiles,
@@ -598,11 +603,11 @@ function buildVerifiedMixedPlan(input: {
     });
   }
 
-  const moveContentFailure = verification.plan.operations.find(
+  const moveContentFailure = verification.ok === true ? verification.plan.operations.find(
     (operation) =>
       operation.operation.kind === "move" &&
       operation.originalContent !== operation.plannedContent,
-  );
+  ) : undefined;
   if (moveContentFailure?.operation.kind === "move") {
     return buildUnsupportedPlan({
       operations: input.patch.operations,
@@ -641,6 +646,18 @@ function buildVerifiedMixedPlan(input: {
       "Route may write only through explicit approval naming all targets, all source/target guards, all final preflights before the first writer, parsed-order writes, and per-operation post-write verification.",
     operationSupportStatus: "supported-write",
   });
+}
+
+function isMoveTargetUpdateMissingFailure(
+  operations: readonly PatchFileOperation[],
+  failure: PatchFailure,
+): boolean {
+  if (failure.code !== "patch-verify-file-missing" || !failure.path) {
+    return false;
+  }
+  return operations.some((operation, index) =>
+    isMoveTargetUpdateDependency(operations, index, failure.path),
+  );
 }
 
 function buildVerifiedDeletePlan(input: {
@@ -963,6 +980,13 @@ function buildVerifiedPlan(input: {
     supportedOperations: input.supportedOperations,
   });
   if (verification.ok === false) {
+    const verificationOnlyBlockedByMoveTargetUpdate = verification.failures.every(
+      (failure) =>
+        isMoveTargetUpdateMissingFailure(input.patch.operations, failure),
+    );
+    if (verificationOnlyBlockedByMoveTargetUpdate) {
+      return buildSupportedPlanWithoutVerification(input);
+    }
     return buildUnsupportedPlan({
       operations: input.patch.operations,
       targetFiles: input.targetFiles,
@@ -977,6 +1001,20 @@ function buildVerifiedPlan(input: {
     });
   }
 
+  return buildSupportedPlanWithoutVerification(input);
+}
+
+function buildSupportedPlanWithoutVerification(input: {
+  readonly patch: ParsedPatch;
+  readonly supportStatus: PerFilePatchSupportStatus;
+  readonly operationSupportStatus: PerFilePatchSupportStatus;
+  readonly failureClass: PerFilePatchFailureClass;
+  readonly targetFiles: readonly string[];
+  readonly writeIntentFiles: readonly string[];
+  readonly plannedFiles: readonly string[];
+  readonly reason: string;
+  readonly nextAction: string;
+}): PerFilePatchPlan {
   return {
     source: "per-file-patch-plan",
     operations: input.patch.operations.map((operation) =>
@@ -1316,11 +1354,15 @@ function sourceTargetConflictFailure(
   workspaceRoot: string,
 ): PatchFailure | undefined {
   const seen = new Map<string, string>();
-  for (const operation of operations) {
+  for (let index = 0; index < operations.length; index += 1) {
+    const operation = operations[index]!;
     for (const candidatePath of pathsForOperation(operation)) {
       const key = path.resolve(workspaceRoot, candidatePath);
       const previous = seen.get(key);
       if (previous) {
+        if (isMoveTargetUpdateDependency(operations, index, candidatePath)) {
+          continue;
+        }
         return patchFailure({
           code: "patch-apply-plan-not-verified",
           path: candidatePath,
@@ -1333,6 +1375,25 @@ function sourceTargetConflictFailure(
     }
   }
   return undefined;
+}
+
+function isMoveTargetUpdateDependency(
+  operations: readonly PatchFileOperation[],
+  index: number,
+  candidatePath: string,
+): boolean {
+  const operation = operations[index];
+  const previous = operations[index - 1];
+  return (
+    operation?.kind === "update" &&
+    previous?.kind === "move" &&
+    normalizePathKey(operation.path) === normalizePathKey(candidatePath) &&
+    normalizePathKey(previous.moveTo) === normalizePathKey(candidatePath)
+  );
+}
+
+function normalizePathKey(relativePath: string): string {
+  return path.normalize(relativePath).replaceAll("\\", "/");
 }
 
 function directoryDeleteMoveFailure(
@@ -1422,12 +1483,17 @@ function targetPathForOperation(operation: PatchFileOperation): string {
   return operation.kind === "move" ? operation.moveTo : operation.path;
 }
 
-function duplicateTargets(targetFiles: readonly string[]): readonly string[] {
+function duplicateTargetsForOperations(
+  operations: readonly PatchFileOperation[],
+): readonly string[] {
   const seen = new Set<string>();
   const duplicates = new Set<string>();
-  for (const targetFile of targetFiles) {
+  for (let index = 0; index < operations.length; index += 1) {
+    const targetFile = targetPathForOperation(operations[index]!);
     if (seen.has(targetFile)) {
-      duplicates.add(targetFile);
+      if (!isMoveTargetUpdateDependency(operations, index, targetFile)) {
+        duplicates.add(targetFile);
+      }
     } else {
       seen.add(targetFile);
     }

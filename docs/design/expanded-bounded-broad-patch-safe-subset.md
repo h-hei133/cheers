@@ -1,7 +1,7 @@
 # Expanded Bounded Broad Patch Safe Subset
 
-Status: Route 69 implemented. This is a bounded safe-subset expansion after
-Route 68, not broad arbitrary `apply_patch` readiness.
+Status: Route 70 implemented on top of the Route 69 bounded safe subset. This
+is still not broad arbitrary `apply_patch` readiness.
 
 ## Post-Route 68 Baseline
 
@@ -100,14 +100,15 @@ Still blocked:
 
 ## Rename-With-Content-Edit Decision
 
-Rename-with-content-edit remains blocked with
-`unsupported-rename-with-content-edit`.
+Route 70 supports only the safe git-style 100 percent similarity
+rename-with-content-edit shape by decomposing it into a pure move followed
+immediately by an update on the moved target.
 
-The existing move route explicitly requires content-preserving move semantics.
-Decomposing a broad rename-with-content-edit into move plus update would reuse
-the target path across operations, complicate recovery-authority capture and
-partial-failure explanation, and require a new deterministic execution policy.
-That belongs in a separate route if it becomes the next real blocker.
+The existing move route still requires content-preserving move semantics. The
+new support is owned by the broad normalizer plus the guarded mixed route's
+narrow move-target update dependency. It does not enable move-with-hunks,
+arbitrary path-changing updates, lower-similarity renames, copy metadata,
+overwrite, fuzzy patching, automatic recovery, or rollback.
 
 ## Multi-Hunk Update Decision
 
@@ -145,7 +146,8 @@ Focused evidence added or updated:
 
 - cap policy tests cover 8, 9, 16, 32 supported and 33 blocked
 - normalizer tests cover 32 git-style sections, multi-hunk update preservation,
-  and binary/mode/symlink/submodule/rename-with-content blockers
+  rename-with-content decomposition, and binary/mode/symlink/submodule/copy
+  blockers
 - candidate tests cover 9/16/32 supported families and 33 too-many blockers
 - route/planning tests cover representative 9/16/32 update, mixed, delete-only,
   and move-only paths
@@ -158,11 +160,12 @@ Focused evidence added or updated:
 Residual risks:
 
 - 32 is still a bounded cap, not arbitrary broad patch readiness.
-- rename-with-content-edit remains intentionally blocked.
+- rename-with-content-edit is supported only as the Route 70 move plus target
+  update decomposition.
 - binary/mode/symlink/submodule/copy shapes remain unsupported.
 - recovery remains explicit and non-default; there is no automatic rollback.
 
-Recommended next route: broad unsupported-shape hardening and user-facing
-explanations, unless rename-with-content-edit becomes the highest-value
-remaining parser gap. Arbitrary broad `apply_patch` should stay delayed until a
-separate readiness map proves permission, recovery, and result semantics.
+Recommended next route: broad unsupported-shape UX hardening only if blocked
+patches need clearer user-facing diagnostics. Arbitrary broad `apply_patch`
+should stay delayed until a separate readiness map proves permission, recovery,
+and result semantics.

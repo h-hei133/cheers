@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { normalizeBoundedBroadPatchText } from "../patchParsing/boundedBroadPatchNormalizer.js";
 import { readRecoveryAuthorityRecord } from "../patchRecovery/recoveryAuthorityStore.js";
 import { restoreRecoveryAuthorityRecord } from "../patchRecovery/restorePrimitive.js";
 import { createWorkspaceWriteAuthority } from "./workspaceAuthority.js";
@@ -16,6 +17,116 @@ afterEach(() => {
 });
 
 describe("mixed selected-workspace write route", () => {
+  it("writes decomposed rename-with-content-edit through move then update with recovery authority", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+    const patchText = normalizedBroadPatch(renameWithContentEditBroadPatch());
+
+    const result = await runMixedFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, patchText),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      validateCreateTarget: authority.validateCreateTarget,
+      writeFile: authority.writeFile,
+      createFileExclusive: authority.createFileExclusive,
+      moveFileExclusive: authority.moveFileExclusive,
+      deleteFile: authority.deleteFile,
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-rename-content",
+      },
+    });
+
+    expect(result.status).toBe("written");
+    expect(result.changedFiles).toEqual(["src/to.ts", "src/to.ts"]);
+    expect(result.writeIntents).toEqual(["src/to.ts", "src/to.ts"]);
+    expect(result.failedFiles).toEqual([]);
+    expect(result.deleteMoveInvoked).toBe(true);
+    expect(result.creatorInvoked).toBe(false);
+    expect(result.workspaceWriterInvoked).toBe(true);
+    expect(result.postWriteVerification).toBe("passed");
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(3);
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-mixed-file-write-route:parsed-order-write-no-rollback",
+        "apply-patch-mixed-file-write-route:post-write-verification-passed",
+      ]),
+    );
+    expect(readFile(fixture.workspaceRoot, "src/from.ts")).toBeUndefined();
+    expect(readFile(fixture.workspaceRoot, "src/to.ts")).toBe("renamed\n");
+
+    const updateRecord = await readRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-rename-content",
+      recordId: "update-2-src-to.ts",
+    });
+    expect(updateRecord?.beforeState).toBe("exists");
+    expect(updateRecord?.expectedCurrentState).toBe("exists");
+  });
+
+  it("restores decomposed rename-with-content changed prefix after update failure and blocks hidden edits", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+    const patchText = normalizedBroadPatch(renameWithContentEditBroadPatch());
+
+    const result = await runMixedFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, patchText),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      validateCreateTarget: authority.validateCreateTarget,
+      writeFile: () => {
+        throw new Error("simulated update failure");
+      },
+      createFileExclusive: authority.createFileExclusive,
+      moveFileExclusive: authority.moveFileExclusive,
+      deleteFile: authority.deleteFile,
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-rename-content-restore",
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.changedFiles).toEqual(["src/to.ts"]);
+    expect(result.failedFiles[0]?.path).toBe("src/to.ts");
+    expect(result.postWriteVerification).toBe("blocked");
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(3);
+    expect(readFile(fixture.workspaceRoot, "src/from.ts")).toBeUndefined();
+    expect(readFile(fixture.workspaceRoot, "src/to.ts")).toBe("from\n");
+
+    const restoreTarget = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-rename-content-restore",
+      recordId: "move-target-1-src-to.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/to.ts",
+    });
+    expect(restoreTarget.restored).toBe(true);
+    expect(restoreTarget.rollbackAtomicityClaim).toBe(false);
+    expect(readFile(fixture.workspaceRoot, "src/to.ts")).toBeUndefined();
+
+    fs.writeFileSync(path.join(fixture.workspaceRoot, "src", "to.ts"), "hidden\n", "utf8");
+    const blockedRestore = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-rename-content-restore",
+      recordId: "move-target-1-src-to.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/to.ts",
+    });
+    expect(blockedRestore.restored).toBe(false);
+    expect(blockedRestore.blockedReason).toBe("current-content-hash-mismatch");
+  });
+
   it("writes update plus create after approval and verifies both operations", async () => {
     const fixture = createFixture();
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
@@ -1442,6 +1553,29 @@ function readFile(workspaceRoot: string, relativePath: string): string | undefin
   } catch {
     return undefined;
   }
+}
+
+function normalizedBroadPatch(rawPatchText: string): string {
+  const result = normalizeBoundedBroadPatchText(rawPatchText);
+  expect(result.status).toBe("normalized");
+  if (result.status !== "normalized") {
+    throw new Error("expected normalized broad patch");
+  }
+  return result.normalizedRawPatchText;
+}
+
+function renameWithContentEditBroadPatch(): string {
+  return [
+    "diff --git a/src/from.ts b/src/to.ts",
+    "similarity index 100%",
+    "rename from src/from.ts",
+    "rename to src/to.ts",
+    "--- a/src/from.ts",
+    "+++ b/src/to.ts",
+    "@@ -1 +1 @@",
+    "-from",
+    "+renamed",
+  ].join("\n");
 }
 
 function updateCreatePatch(): string {

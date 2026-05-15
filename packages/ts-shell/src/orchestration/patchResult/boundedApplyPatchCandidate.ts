@@ -304,16 +304,35 @@ function hasPathConflict(
   operations: readonly BoundedApplyPatchNormalizedOperation[],
 ): boolean {
   const seen = new Set<string>();
-  for (const operation of operations) {
+  for (let index = 0; index < operations.length; index += 1) {
+    const operation = operations[index]!;
     for (const relativePath of pathsForConflictCheck(operation)) {
       const key = normalizePathKey(relativePath);
       if (seen.has(key)) {
+        if (isMoveTargetUpdateDependency(operations, index, relativePath)) {
+          continue;
+        }
         return true;
       }
       seen.add(key);
     }
   }
   return false;
+}
+
+function isMoveTargetUpdateDependency(
+  operations: readonly BoundedApplyPatchNormalizedOperation[],
+  index: number,
+  relativePath: string,
+): boolean {
+  const operation = operations[index];
+  const previous = operations[index - 1];
+  return (
+    operation?.kind === "update" &&
+    previous?.kind === "move" &&
+    normalizePathKey(operation.targetPath) === normalizePathKey(relativePath) &&
+    normalizePathKey(previous.targetPath) === normalizePathKey(relativePath)
+  );
 }
 
 function pathsForConflictCheck(
@@ -333,7 +352,7 @@ function affectedPathsFor(
 function approvalPathsFor(
   operations: readonly BoundedApplyPatchNormalizedOperation[],
 ): readonly string[] {
-  return unique(operations.map((operation) => operation.targetPath));
+  return unique(operations.flatMap(pathsForConflictCheck));
 }
 
 function unique(paths: readonly string[]): readonly string[] {

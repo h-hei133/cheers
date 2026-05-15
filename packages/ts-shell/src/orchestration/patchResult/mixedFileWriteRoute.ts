@@ -7,12 +7,14 @@ import {
 import { buildNoPartialPatchApplicationContract } from "../patchApplication/noPartialApply.js";
 import { parseApplyPatchText } from "../patchParsing/parser.js";
 import type {
+  ParsedPatch,
   PatchFailure,
   PatchFileOperation,
+  PatchHunk,
   PatchOperationKind,
+  PatchVerificationResult,
   VerifiedPatchFileOperation,
 } from "../patchParsing/types.js";
-import { verifyParsedPatch } from "../patchVerification/verify.js";
 import {
   buildPerFilePatchPlan,
   type PerFilePatchPlan,
@@ -365,11 +367,10 @@ export async function runMixedFileWriteRoute(
     });
   }
 
-  const verification = verifyParsedPatch(parsed.patch, {
+  const verification = verifyMixedPatchWithMoveUpdateDependencies(parsed.patch, {
     workspaceRoot: options.workspaceRoot,
     readFile: options.readFile,
     directoryExists: options.directoryExists,
-    supportedOperations: ["update", "add", "move", "delete"],
   });
   if (verification.ok === false) {
     return blocked({
@@ -397,7 +398,7 @@ export async function runMixedFileWriteRoute(
       perFilePatchPlan,
       failures: [moveContentFailure],
       nextAction:
-        "Regenerate a pure Move File operation and keep content edits in a separate update operation on a distinct file.",
+        "Regenerate a pure Move File operation and keep content edits in the immediately following update operation on the move target.",
       evidence: [
         "apply-patch-mixed-file-write-route:move-content-edit-blocked",
       ],
@@ -755,11 +756,15 @@ function firstPathConflict(
   operations: readonly PatchFileOperation[],
 ): PatchFailure | undefined {
   const seen = new Map<string, string>();
-  for (const operation of operations) {
+  for (let index = 0; index < operations.length; index += 1) {
+    const operation = operations[index]!;
     for (const candidatePath of operationPaths(operation)) {
       const key = path.resolve(workspaceRoot, candidatePath);
       const previous = seen.get(key);
       if (previous) {
+        if (isMoveTargetUpdateDependency(operations, index, candidatePath)) {
+          continue;
+        }
         return {
           code: "patch-apply-plan-not-verified",
           path: candidatePath,
@@ -785,7 +790,8 @@ function firstAuthorityFailure(
       readonly evidence: readonly string[];
     }
   | undefined {
-  for (const operation of operations) {
+  for (let index = 0; index < operations.length; index += 1) {
+    const operation = operations[index]!;
     for (const candidatePath of operationPaths(operation)) {
       if (!pathStaysInsideWorkspace(options.workspaceRoot, candidatePath)) {
         return {
@@ -818,6 +824,10 @@ function firstAuthorityFailure(
       continue;
     }
 
+    if (isMoveTargetUpdateDependency(operations, index, operation.path)) {
+      continue;
+    }
+
     const source = options.validateWriteTarget(operation.path);
     if (source.ok === false) {
       return writeAuthorityFailure(operation.path, source);
@@ -833,6 +843,381 @@ function firstAuthorityFailure(
   return undefined;
 }
 
+function isMoveTargetUpdateDependency(
+  operations: readonly PatchFileOperation[],
+  index: number,
+  candidatePath: string,
+): boolean {
+  const operation = operations[index];
+  const previous = operations[index - 1];
+  return (
+    operation?.kind === "update" &&
+    previous?.kind === "move" &&
+    path.normalize(operation.path) === path.normalize(candidatePath) &&
+    path.normalize(previous.moveTo) === path.normalize(candidatePath)
+  );
+}
+
+function verifyMixedPatchWithMoveUpdateDependencies(
+  patch: ParsedPatch,
+  options: Pick<
+    MixedFileWriteRouteOptions,
+    "workspaceRoot" | "readFile" | "directoryExists"
+  >,
+): PatchVerificationResult {
+  const verified: VerifiedPatchFileOperation[] = [];
+  const plannedContentByPath = new Map<string, string | undefined>();
+
+  for (let index = 0; index < patch.operations.length; index += 1) {
+    const operation = patch.operations[index]!;
+    const verifiedOperation = verifyMixedOperationInParsedOrder({
+      operation,
+      index,
+      operations: patch.operations,
+      options,
+      plannedContentByPath,
+    });
+    if (verifiedOperation.ok === false) {
+      return {
+        ok: false,
+        failures: verifiedOperation.failures,
+        changedFiles: [],
+      };
+    }
+    verified.push(verifiedOperation.operation);
+    updatePlannedContentMap(plannedContentByPath, verifiedOperation.operation);
+  }
+
+  return {
+    ok: true,
+    plan: {
+      parsedPatch: patch,
+      operations: verified,
+      atomicity: "verify-all-before-write",
+    },
+    warnings: [],
+  };
+}
+
+type MixedOperationVerification =
+  | { readonly ok: true; readonly operation: VerifiedPatchFileOperation }
+  | { readonly ok: false; readonly failures: readonly PatchFailure[] };
+
+function verifyMixedOperationInParsedOrder(input: {
+  readonly operation: PatchFileOperation;
+  readonly index: number;
+  readonly operations: readonly PatchFileOperation[];
+  readonly options: Pick<
+    MixedFileWriteRouteOptions,
+    "workspaceRoot" | "readFile" | "directoryExists"
+  >;
+  readonly plannedContentByPath: Map<string, string | undefined>;
+}): MixedOperationVerification {
+  const { operation, options } = input;
+  const absolutePath = path.resolve(options.workspaceRoot, operation.path);
+
+  switch (operation.kind) {
+    case "add": {
+      if (options.directoryExists?.(path.dirname(absolutePath)) === false) {
+        return { ok: false, failures: [addParentMissingFailure(operation.path)] };
+      }
+      if (contentForPath(input.plannedContentByPath, operation.path, options) !== undefined) {
+        return { ok: false, failures: [fileAlreadyExistsFailure(operation.path)] };
+      }
+      return {
+        ok: true,
+        operation: {
+          operation,
+          plannedContent: operation.content,
+          additions: countLines(operation.content),
+          deletions: 0,
+        },
+      };
+    }
+    case "delete": {
+      const originalContent = contentForPath(
+        input.plannedContentByPath,
+        operation.path,
+        options,
+      );
+      if (originalContent === undefined) {
+        return { ok: false, failures: [missingFileFailure(operation.path)] };
+      }
+      return {
+        ok: true,
+        operation: {
+          operation,
+          originalContent,
+          plannedContent: "",
+          additions: 0,
+          deletions: countLines(originalContent),
+        },
+      };
+    }
+    case "move": {
+      const targetContent = contentForPath(
+        input.plannedContentByPath,
+        operation.moveTo,
+        options,
+      );
+      if (targetContent !== undefined) {
+        return { ok: false, failures: [fileAlreadyExistsFailure(operation.moveTo)] };
+      }
+      const originalContent = contentForPath(
+        input.plannedContentByPath,
+        operation.path,
+        options,
+      );
+      if (originalContent === undefined) {
+        return { ok: false, failures: [missingFileFailure(operation.path)] };
+      }
+      const hunked = applyVerifiedHunks(operation, originalContent);
+      if (hunked.ok === false) {
+        return { ok: false, failures: [{ ...hunked.failure, path: operation.path }] };
+      }
+      return {
+        ok: true,
+        operation: {
+          operation,
+          originalContent,
+          plannedContent: hunked.content,
+          additions: hunked.additions,
+          deletions: hunked.deletions,
+        },
+      };
+    }
+    case "update": {
+      const originalContent = contentForPath(
+        input.plannedContentByPath,
+        operation.path,
+        options,
+      );
+      if (originalContent === undefined) {
+        return { ok: false, failures: [missingFileFailure(operation.path)] };
+      }
+      const hunked = applyVerifiedHunks(operation, originalContent);
+      if (hunked.ok === false) {
+        return { ok: false, failures: [{ ...hunked.failure, path: operation.path }] };
+      }
+      return {
+        ok: true,
+        operation: {
+          operation,
+          originalContent,
+          plannedContent: hunked.content,
+          additions: hunked.additions,
+          deletions: hunked.deletions,
+        },
+      };
+    }
+  }
+}
+
+function contentForPath(
+  plannedContentByPath: Map<string, string | undefined>,
+  relativePath: string,
+  options: Pick<MixedFileWriteRouteOptions, "workspaceRoot" | "readFile">,
+): string | undefined {
+  const key = normalizePathKey(relativePath);
+  if (plannedContentByPath.has(key)) {
+    return plannedContentByPath.get(key);
+  }
+  return options.readFile(path.resolve(options.workspaceRoot, relativePath));
+}
+
+function updatePlannedContentMap(
+  plannedContentByPath: Map<string, string | undefined>,
+  operation: VerifiedPatchFileOperation,
+): void {
+  switch (operation.operation.kind) {
+    case "add":
+    case "update":
+      plannedContentByPath.set(
+        normalizePathKey(operation.operation.path),
+        operation.plannedContent ?? "",
+      );
+      return;
+    case "delete":
+      plannedContentByPath.set(normalizePathKey(operation.operation.path), undefined);
+      return;
+    case "move":
+      plannedContentByPath.set(normalizePathKey(operation.operation.path), undefined);
+      plannedContentByPath.set(
+        normalizePathKey(operation.operation.moveTo),
+        operation.plannedContent ?? operation.originalContent,
+      );
+      return;
+  }
+}
+
+function normalizePathKey(relativePath: string): string {
+  return path.normalize(relativePath).replaceAll("\\", "/");
+}
+
+type HunkApplication =
+  | {
+      readonly ok: true;
+      readonly content: string;
+      readonly additions: number;
+      readonly deletions: number;
+    }
+  | { readonly ok: false; readonly failure: PatchFailure };
+
+function applyVerifiedHunks(
+  operation: Extract<PatchFileOperation, { kind: "update" | "move" }>,
+  originalContent: string,
+): HunkApplication {
+  let plannedContent = originalContent;
+  let additions = 0;
+  let deletions = 0;
+
+  for (const hunk of operation.hunks) {
+    const replacement = applyOneHunk(plannedContent, hunk);
+    if (replacement.ok === false) {
+      return replacement;
+    }
+    plannedContent = replacement.content;
+    additions += replacement.additions;
+    deletions += replacement.deletions;
+  }
+
+  return { ok: true, content: plannedContent, additions, deletions };
+}
+
+function applyOneHunk(content: string, hunk: PatchHunk): HunkApplication {
+  const oldLines = hunk.lines
+    .filter((line) => line.kind === "context" || line.kind === "remove")
+    .map((line) => line.text);
+  const newLines = hunk.lines
+    .filter((line) => line.kind === "context" || line.kind === "add")
+    .map((line) => line.text);
+  if (oldLines.length === 0) {
+    return {
+      ok: false,
+      failure: {
+        code: "patch-verify-hunk-context-missing",
+        message: "Patch hunk does not include any existing context to match.",
+        nextAction:
+          "Regenerate the patch with enough existing target lines for verification.",
+      },
+    };
+  }
+
+  const contentLines = splitContentLines(content);
+  const matches = findLineSequenceMatches(contentLines, oldLines);
+  if (matches.length === 0) {
+    return {
+      ok: false,
+      failure: {
+        code: "patch-verify-hunk-context-missing",
+        message: "Patch hunk context was not found in the target content.",
+        nextAction:
+          "Re-read the target file and regenerate the patch from current content.",
+      },
+    };
+  }
+  if (matches.length > 1) {
+    return {
+      ok: false,
+      failure: {
+        code: "patch-verify-hunk-context-ambiguous",
+        message: "Patch hunk context matched multiple locations.",
+        nextAction:
+          "Regenerate the patch with more surrounding context for a unique match.",
+      },
+    };
+  }
+
+  const match = matches[0]!;
+  const nextLines = [
+    ...contentLines.slice(0, match),
+    ...newLines,
+    ...contentLines.slice(match + oldLines.length),
+  ];
+  return {
+    ok: true,
+    content: joinContentLines(nextLines, content.endsWith("\n")),
+    additions: hunk.lines.filter((line) => line.kind === "add").length,
+    deletions: hunk.lines.filter((line) => line.kind === "remove").length,
+  };
+}
+
+function splitContentLines(content: string): string[] {
+  const lines = content.split("\n");
+  if (lines.at(-1) === "") {
+    return lines.slice(0, -1);
+  }
+  return lines;
+}
+
+function joinContentLines(lines: readonly string[], trailingNewline: boolean) {
+  const content = lines.join("\n");
+  return trailingNewline ? `${content}\n` : content;
+}
+
+function findLineSequenceMatches(
+  haystack: readonly string[],
+  needle: readonly string[],
+): number[] {
+  const matches: number[] = [];
+  if (needle.length === 0 || needle.length > haystack.length) {
+    return matches;
+  }
+
+  for (let index = 0; index <= haystack.length - needle.length; index += 1) {
+    let found = true;
+    for (let offset = 0; offset < needle.length; offset += 1) {
+      if (haystack[index + offset] !== needle[offset]) {
+        found = false;
+        break;
+      }
+    }
+    if (found) {
+      matches.push(index);
+    }
+  }
+  return matches;
+}
+
+function countLines(content: string): number {
+  if (content.length === 0) {
+    return 0;
+  }
+  return content.split("\n").filter((line, index, lines) => {
+    return !(index === lines.length - 1 && line === "");
+  }).length;
+}
+
+function missingFileFailure(relativePath: string): PatchFailure {
+  return {
+    code: "patch-verify-file-missing",
+    path: relativePath,
+    message: "Patch target file does not exist.",
+    nextAction:
+      "Re-read the workspace and regenerate the patch against an existing target.",
+  };
+}
+
+function fileAlreadyExistsFailure(relativePath: string): PatchFailure {
+  return {
+    code: "patch-verify-file-already-exists",
+    path: relativePath,
+    message: "Patch target already exists.",
+    nextAction: "Regenerate the patch with a non-existing add or move target.",
+  };
+}
+
+function addParentMissingFailure(relativePath: string): PatchFailure {
+  return {
+    code: "patch-add-file-parent-missing",
+    path: relativePath,
+    message:
+      "Add File patch parent directory is missing; creating directories is not enabled.",
+    nextAction:
+      "Create parent directories through a separate approved capability before considering a file add route.",
+  };
+}
+
 function firstFinalPreflightFailure(
   options: MixedFileWriteRouteOptions,
   operations: readonly VerifiedPatchFileOperation[],
@@ -844,7 +1229,9 @@ function firstFinalPreflightFailure(
       readonly evidence: readonly string[];
     }
   | undefined {
-  for (const operation of operations) {
+  const patchOperations = operations.map((operation) => operation.operation);
+  for (let index = 0; index < operations.length; index += 1) {
+    const operation = operations[index]!;
     const patchOperation = operation.operation;
     if (patchOperation.kind === "add") {
       const target = options.validateCreateTarget(patchOperation.path);
@@ -857,6 +1244,10 @@ function firstFinalPreflightFailure(
           evidence: failure.evidence,
         };
       }
+      continue;
+    }
+
+    if (isMoveTargetUpdateDependency(patchOperations, index, patchOperation.path)) {
       continue;
     }
 

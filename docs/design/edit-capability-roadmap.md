@@ -1,8 +1,8 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 69
+Route baseline: post-Route 70
 Date: 2026-05-15
-Status: long-range edit capability map after Routes 50-69.
+Status: long-range edit capability map after Routes 50-70.
 Routes 59-66 have implemented a narrow explicit non-default original-content
 authority loop, explicit restore surface, bounded exactly-three mixed write
 expansion, bounded destructive multi-delete/multi-move support, and bounded
@@ -13,10 +13,13 @@ guarded small-N write lanes.
 Route 68 added a bounded broad patch parser/normalizer for a safe git-style
 unified-diff subset and feeds normalized bounded candidates into those same
 guarded routes.
-Route 69 lifted the bounded cap to 32, expanded the safe normalizer evidence for
-larger multi-file and multi-hunk payloads, and kept 33+, arbitrary broad,
-fuzzy, binary, mode, symlink, submodule, copy, directory, overwrite, and
-rename-with-content-edit shapes blocked.
+Route 69 lifted the bounded cap to 32 and expanded the safe normalizer evidence
+for larger multi-file and multi-hunk payloads.
+Route 70 added safe git-style rename-with-content-edit decomposition into a
+pure move plus immediate target update, centralized unsupported broad-shape
+reason metadata, and added a broad fixture gauntlet. It still keeps 33+,
+arbitrary broad, fuzzy, binary, mode, symlink, submodule, copy, directory,
+overwrite, automatic recovery, and atomic rollback blocked.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -28,14 +31,21 @@ opencode, and gemini-cli.
 It is not a broad edit readiness claim. It keeps implemented capability,
 candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Post-Route 69 Executive Summary
+## 1. Post-Route 70 Executive Summary
 
 Current write capability remains intentionally narrow. The project supports a
 bounded selected-workspace write surface and still blocks broad arbitrary
 `apply_patch`, 33+ writes, broad multi-delete, broad multi-move, directory
-delete/move, overwrite, rename-with-content-edit, rollback, snapshot/revert,
-stale-read recovery, partial failure recovery, and default real-provider
-mutation readiness.
+delete/move, overwrite, rollback, snapshot/revert, stale-read recovery,
+automatic partial failure recovery, and default real-provider mutation
+readiness.
+
+Route 70 closed the main Route 69 parser/readiness gap by supporting the narrow
+safe rename-with-content-edit shape: a 100 percent similarity git-style rename
+with exact hunks now normalizes to move plus immediate target update and routes
+through the existing guarded mixed route. The route still owns workspace
+authority, approval, final preflight, recovery-authority capture, parsed-order
+execution, and post-write verification.
 
 Routes 52-56 changed the roadmap direction:
 
@@ -570,8 +580,10 @@ User / CLI / provider output
 | Exactly-four bounded write lanes | Implemented candidate; superseded by bounded small-N cap 32 | `mutationRoutingProjection.ts`, `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `mixedFileWriteRoute.ts`, `perFilePatchPlan.ts`, `mixedOperationReadiness.ts`, `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-exactly-four-write-surface.md` | C/D/E | Historical exact-four slice; current cap is 32; no 33+ writes, broad `apply_patch`, automatic recovery, or rollback | Preserve as regression evidence |
 | Bounded multi-delete / multi-move lanes | Implemented candidate under bounded small-N cap 32 | `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-destructive-multi-delete-move.md`, `docs/design/bounded-exactly-four-write-surface.md` | C/D/E | 2-32 delete-only or move-only operations only; no 33+ writes, directory delete/move, overwrite, swaps/cycles, automatic recovery, or rollback | Unsupported-shape UX hardening or rename-with-content readiness only if justified |
 | Bounded small-N write policy | Implemented candidate | `boundedWritePolicy.ts`, `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `mixedFileWriteRoute.ts`, `perFilePatchPlan.ts`, `mixedOperationReadiness.ts`, focused route/planning/readiness tests, `docs/design/bounded-small-n-write-policy.md` | C/D/E | Cap 32 only; no 33+ writes, broad `apply_patch`, automatic recovery, or rollback | Preserve cap; do not jump to arbitrary-N without separate readiness proof |
-| Bounded broad `apply_patch` candidates | Implemented candidate | `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `boundedApplyPatchCandidate.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-broad-apply-patch-candidate.md`, `docs/design/expanded-bounded-broad-patch-safe-subset.md` | C/D/E | Parser-supported or Route 68/69 normalized 1-32 operations only; no arbitrary broad patch, 33+ writes, directory operations, overwrite, fuzzy patch, automatic recovery, or rollback | Unsupported-shape UX hardening or rename-with-content readiness if needed |
-| Bounded broad patch parser/normalizer | Implemented expanded safe subset | `patchParsing/boundedBroadPatchNormalizer.ts`, `boundedBroadPatchNormalizer.test.ts`, `parser.ts`, `parser.test.ts`, `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `docs/design/bounded-broad-patch-parser-normalizer.md`, `docs/design/expanded-bounded-broad-patch-safe-subset.md` | C/D/E | Git-style update/add/delete/pure-rename and exact multi-hunk update subset only; binary, mode, symlink, submodule, copy, malformed, fuzzy, rename-with-content, 33+, directory/path conflicts, overwrite, and arbitrary broad shapes remain blocked | Unsupported-shape UX hardening if needed |
+| Bounded broad `apply_patch` candidates | Implemented candidate | `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `boundedApplyPatchCandidate.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-broad-apply-patch-candidate.md`, `docs/design/expanded-bounded-broad-patch-safe-subset.md`, `docs/design/rename-content-and-broad-shape-gauntlet.md` | C/D/E | Parser-supported or Route 68-70 normalized 1-32 operations only; no arbitrary broad patch, 33+ writes, directory operations, overwrite, fuzzy patch, automatic recovery, or rollback | Unsupported-shape UX hardening only if needed |
+| Bounded broad patch parser/normalizer | Implemented expanded safe subset | `patchParsing/boundedBroadPatchNormalizer.ts`, `boundedBroadPatchNormalizer.test.ts`, `parser.ts`, `parser.test.ts`, `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `docs/design/bounded-broad-patch-parser-normalizer.md`, `docs/design/expanded-bounded-broad-patch-safe-subset.md`, `docs/design/rename-content-and-broad-shape-gauntlet.md` | C/D/E | Git-style update/add/delete/pure-rename, safe rename-with-content decomposition, and exact multi-hunk update subset only; binary, mode, symlink, submodule, copy, malformed, fuzzy, 33+, directory/path conflicts, overwrite, and arbitrary broad shapes remain blocked | Unsupported-shape UX hardening if needed |
+| Rename-with-content-edit decomposition | Implemented bounded candidate | `boundedBroadPatchNormalizer.ts`, `mixedFileWriteRoute.ts`, `perFilePatchPlan.ts`, `boundedApplyPatchCandidate.test.ts`, `mixedFileWriteRoute.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/rename-content-and-broad-shape-gauntlet.md` | C/D/E | Only 100 percent similarity git-style rename plus exact hunks; operation count is move plus update; no lower-similarity rename, move-with-hunks, overwrite, fuzzy patch, automatic recovery, or rollback | Preserve narrow dependency; do not generalize without separate route |
+| Broad unsupported-shape taxonomy and gauntlet | Implemented projection/test hardening | `patchParsing/broadPatchUnsupportedReason.ts`, `broadPatchUnsupportedReason.test.ts`, `boundedBroadPatchNormalizer.test.ts`, `boundedApplyPatchCandidate.test.ts`, `docs/design/rename-content-and-broad-shape-gauntlet.md` | C/D/E | Reason metadata is no-write evidence only; user-facing result shape remains bounded by existing contracts | Optional UX projection polish only if needed |
 | 8-operation recovery-authority drills | Implemented explicit drill evidence | `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts` | C/D | Explicit primitive only; no automatic recovery, session restore command, or atomic rollback | User/session explicit restore UX if product priority |
 | Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, unsupported E2E and continuity checks | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Preserve as recovery-plan consumer |
 | Route-scoped edit journal prototype | Implemented metadata-only projection | `routeScopedEditJournal.ts`, `routeScopedEditJournal.test.ts` | C/D | Non-durable; not recovery or writer authority | Feed original-content ledger prototype if safe |
@@ -983,13 +995,22 @@ broad arbitrary `apply_patch` remain delayed.
   - 33+ writes, arbitrary broad patches, rename-with-content-edit, fuzzy patch,
     automatic recovery, and rollback remain unsupported.
 
-- Batch 70: Unsupported broad-shape UX hardening
-  - Prefer clearer unsupported-shape diagnostics if broad patches are being
-    submitted and blocked.
-  - Rename-with-content-edit should remain separate unless it becomes the main
-    remaining blocker.
+- Batch 70: Rename-with-content decomposition and broad-shape gauntlet
+  - Status: implemented safe 100 percent similarity git-style
+    rename-with-content-edit as move plus immediate target update, centralized
+    unsupported broad-shape reason metadata, and added supported/blocked broad
+    fixture gauntlet evidence.
+  - 33+ writes, arbitrary broad patches, fuzzy patch, binary/mode/symlink/
+    submodule/copy, directory operations, overwrite, automatic recovery, and
+    rollback remain unsupported.
 
-- Batch 71+: Broad arbitrary `apply_patch` readiness map
+- Batch 71: Unsupported broad-shape UX hardening, only if needed
+  - Prefer clearer unsupported-shape diagnostics if real blocked broad patches
+    are confusing users.
+  - Do not add new write surface unless the remaining shape is proven to be a
+    pure projection/wrapper gap.
+
+- Batch 72+: Broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are
     settled.
   - Broad arbitrary `apply_patch` remains delayed because it combines parsing,

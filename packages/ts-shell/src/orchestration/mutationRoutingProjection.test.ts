@@ -1137,6 +1137,42 @@ describe("apply_patch mutation routing projection", () => {
     );
   });
 
+  it("routes normalized git-style rename-with-content-edit through bounded mixed path", async () => {
+    const fixture = createFixture();
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(
+        fixture.workspaceRoot,
+        gitRenameWithContentEditPatch("src/a.ts", "src/renamed.ts", "a", 1, 2),
+      ),
+      getWorkspaceAuthority: () =>
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual([
+      "src/renamed.ts",
+      "src/renamed.ts",
+    ]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        changedFiles: ["src/renamed.ts", "src/renamed.ts"],
+        failedFiles: [],
+        writerInvoked: true,
+        creatorInvoked: false,
+        deleteMoveInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
+      "src/b.ts": "b = 1\n",
+      "src/renamed.ts": "a = 2\n",
+    });
+  });
+
   it("routes exactly-three mixed operations through the guarded mixed writer", async () => {
     const fixture = createFixture();
 
@@ -1649,6 +1685,26 @@ function gitUpdatePatchBatch(files: readonly string[]): string {
     .join("\n");
 }
 
+function gitRenameWithContentEditPatch(
+  fromPath: string,
+  toPath: string,
+  name: string,
+  before: number,
+  after: number,
+): string {
+  return [
+    `diff --git a/${fromPath} b/${toPath}`,
+    "similarity index 100%",
+    `rename from ${fromPath}`,
+    `rename to ${toPath}`,
+    `--- a/${fromPath}`,
+    `+++ b/${toPath}`,
+    "@@ -1 +1 @@",
+    `-${name} = ${before}`,
+    `+${name} = ${after}`,
+  ].join("\n");
+}
+
 function fileStem(index: number): string {
   return index < 26 ? "abcdefghijklmnopqrstuvwxyz"[index] ?? "" : `file-${index + 1}`;
 }
@@ -1909,6 +1965,7 @@ function snapshotFixture(workspaceRoot: string): Record<string, string> {
     "src/h.ts",
     "src/i.ts",
     "src/new.ts",
+    "src/renamed.ts",
     "src/moved.ts",
     "src/moved-a.ts",
     "src/moved-b.ts",
