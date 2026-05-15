@@ -47,7 +47,8 @@ export type MultiFileWriteRouteBlocker =
 
 export type MultiFileWriteTargetPaths =
   | readonly [string, string]
-  | readonly [string, string, string];
+  | readonly [string, string, string]
+  | readonly [string, string, string, string];
 
 export type MultiFileWriteApproval =
   | {
@@ -172,11 +173,16 @@ export function patchIsExactlyTwoUpdateFiles(rawPatchText: string): boolean {
 }
 
 export function patchIsTwoOrThreeUpdateFiles(rawPatchText: string): boolean {
+  return patchIsTwoThreeOrFourUpdateFiles(rawPatchText);
+}
+
+export function patchIsTwoThreeOrFourUpdateFiles(rawPatchText: string): boolean {
   const parsed = parseApplyPatchText(rawPatchText);
   return (
     parsed.ok === true &&
     (parsed.patch.operations.length === 2 ||
-      parsed.patch.operations.length === 3) &&
+      parsed.patch.operations.length === 3 ||
+      parsed.patch.operations.length === 4) &&
     parsed.patch.operations.every((operation) => operation.kind === "update")
   );
 }
@@ -266,7 +272,7 @@ export async function runMultiFileWriteRoute(
       perFilePatchPlan,
       failures: [unsupportedMultiFileWriteFailure(parsed.patch.operations)],
       nextAction:
-        "Use exactly two or exactly three existing-file Update File operations. Add, delete, move, mixed, and broad apply_patch shapes remain rejected.",
+        "Use exactly two, exactly three, or exactly four existing-file Update File operations. Add, delete, move, mixed, and broad apply_patch shapes remain rejected.",
       evidence: [
         "apply-patch-multi-file-write-route:unsupported-operation",
         "apply-patch-multi-file-write-route:no-add-delete-move",
@@ -274,7 +280,7 @@ export async function runMultiFileWriteRoute(
     });
   }
 
-  if (updateOperations.length !== 2 && updateOperations.length !== 3) {
+  if (!multiFileUpdateCountIsEnabled(updateOperations.length)) {
     return blocked({
       blocker: "too-many-files",
       targetPaths,
@@ -284,14 +290,14 @@ export async function runMultiFileWriteRoute(
         {
           code: "patch-apply-plan-not-verified",
           message:
-            "Multi-file workspace write route accepts exactly two or exactly three Update File operations.",
+            "Multi-file workspace write route accepts exactly two, exactly three, or exactly four Update File operations.",
           nextAction:
-            "Use exactly two or exactly three existing selected-workspace files; 4+ files remain outside this candidate route.",
+            "Use exactly two, exactly three, or exactly four existing selected-workspace files; 5+ files remain outside this candidate route.",
         },
       ],
       nextAction:
-        "Use exactly two or exactly three existing selected-workspace Update File targets; keep 4+ files out of this route.",
-      evidence: ["apply-patch-multi-file-write-route:two-or-three-required"],
+        "Use exactly two, exactly three, or exactly four existing selected-workspace Update File targets; keep 5+ files out of this route.",
+      evidence: ["apply-patch-multi-file-write-route:two-three-or-four-required"],
     });
   }
 
@@ -495,7 +501,7 @@ export async function runMultiFileWriteRoute(
 
   const recoveryAuthorityCapture =
     options.recoveryAuthority &&
-    (targetCount === 2 || targetCount === 3)
+    multiFileUpdateCountIsEnabled(targetCount)
       ? await captureRecoveryAuthorityRecords({
           store: options.recoveryAuthority,
           records: writeIntent.writeIntents.map((intent, index) => {
@@ -666,9 +672,9 @@ function buildApproval(
           : "pending",
     targetPaths: [...targetPaths],
     message:
-      targetPaths.length === 2 || targetPaths.length === 3
+      multiFileUpdateCountIsEnabled(targetPaths.length)
         ? `Approval required for writing exactly these ${targetPaths.length} existing files: ${targetPaths.join(", ")}`
-        : "Approval required for exactly two or exactly three existing selected-workspace Update File targets.",
+        : "Approval required for exactly two, exactly three, or exactly four existing selected-workspace Update File targets.",
   };
 }
 
@@ -692,7 +698,7 @@ function unsupportedMultiFileWriteFailure(
     code: "patch-verify-operation-unsupported",
     ...(operation ? { path: operation.path } : {}),
     message:
-      "Multi-file workspace write route only accepts exactly two or exactly three Update File operations.",
+      "Multi-file workspace write route only accepts exactly two, exactly three, or exactly four Update File operations.",
     nextAction:
       "Keep add, delete, move, mixed, and broad apply_patch shapes out of this candidate write route.",
   };
@@ -762,11 +768,25 @@ function toSupportedTargetPaths(
   ) {
     return [targetPaths[0], targetPaths[1], targetPaths[2]];
   }
+  if (
+    (expectedCount === undefined || expectedCount === 4) &&
+    targetPaths.length === 4 &&
+    targetPaths[0] &&
+    targetPaths[1] &&
+    targetPaths[2] &&
+    targetPaths[3]
+  ) {
+    return [targetPaths[0], targetPaths[1], targetPaths[2], targetPaths[3]];
+  }
   return undefined;
 }
 
-function targetCountWord(count: MultiFileUpdateTargetCount): "two" | "three" {
-  return count === 2 ? "two" : "three";
+function targetCountWord(count: MultiFileUpdateTargetCount): "two" | "three" | "four" {
+  return count === 2 ? "two" : count === 3 ? "three" : "four";
+}
+
+function multiFileUpdateCountIsEnabled(count: number): count is MultiFileUpdateTargetCount {
+  return count === 2 || count === 3 || count === 4;
 }
 
 function pathStaysInsideWorkspace(

@@ -306,13 +306,44 @@ describe("apply_patch mutation routing projection", () => {
     expect(readFile(fixture.workspaceRoot, "src/c.ts")).toBe("c = 2\n");
   });
 
-  it("keeps 4+ Update File patches stopped before writer invocation", async () => {
+  it("routes exactly four Update File patches to the selected-workspace multi-file projection", async () => {
+    const fixture = createFixture({ includeC: true, includeD: true });
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, fourFileUpdatePatch()),
+      getWorkspaceAuthority: () =>
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+    ]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts"],
+        changedFiles: ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts"],
+        writerInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(readFile(fixture.workspaceRoot, "src/d.ts")).toBe("d = 2\n");
+  });
+
+  it("keeps 5+ Update File patches stopped before writer invocation", async () => {
     const fixture = createFixture({ includeC: true, includeD: true });
     const before = snapshotFixture(fixture.workspaceRoot);
     let writes = 0;
 
     const result = await projectApplyPatchRuntimeMutationRoute({
-      ...runtimeInput(fixture.workspaceRoot, fourFileUpdatePatch()),
+      ...runtimeInput(fixture.workspaceRoot, fiveFileUpdatePatch()),
       getWorkspaceAuthority: () =>
         authorityWithBlockedWriter(fixture.workspaceRoot, () => {
           writes += 1;
@@ -1091,6 +1122,33 @@ function fourFileUpdatePatch(): string {
     "@@",
     "-d = 1",
     "+d = 2",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function fiveFileUpdatePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Update File: src/b.ts",
+    "@@",
+    "-b = 1",
+    "+b = 2",
+    "*** Update File: src/c.ts",
+    "@@",
+    "-c = 1",
+    "+c = 2",
+    "*** Update File: src/d.ts",
+    "@@",
+    "-d = 1",
+    "+d = 2",
+    "*** Update File: src/e.ts",
+    "@@",
+    "-e = 1",
+    "+e = 2",
     "*** End Patch",
   ].join("\n");
 }

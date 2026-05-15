@@ -158,6 +158,10 @@ export function patchIsExactlyTwoMixedWriteFiles(rawPatchText: string): boolean 
 }
 
 export function patchIsTwoOrThreeMixedWriteFiles(rawPatchText: string): boolean {
+  return patchIsTwoThreeOrFourMixedWriteFiles(rawPatchText);
+}
+
+export function patchIsTwoThreeOrFourMixedWriteFiles(rawPatchText: string): boolean {
   const parsed = parseApplyPatchText(rawPatchText);
   if (
     parsed.ok === false ||
@@ -244,10 +248,10 @@ export async function runMixedFileWriteRoute(
       perFilePatchPlan,
       failures: [unsupportedMixedFailure(operations)],
       nextAction:
-        "Use exactly two or exactly three mixed operations from the guarded update/create/move/delete lanes, or exactly two or exactly three destructive delete-only/move-only operations. Other same-family, 4+, and broad patches stay outside this route.",
+        "Use exactly two, exactly three, or exactly four mixed operations from the guarded update/create/move/delete lanes, or exactly two, exactly three, or exactly four destructive delete-only/move-only operations. Other same-family, 5+, and broad patches stay outside this route.",
       evidence: [
         "apply-patch-mixed-file-write-route:unsupported-operation",
-        "apply-patch-mixed-file-write-route:bounded-two-or-three-operation-required",
+        "apply-patch-mixed-file-write-route:bounded-two-three-or-four-operation-required",
       ],
     });
   }
@@ -276,7 +280,7 @@ export async function runMixedFileWriteRoute(
       perFilePatchPlan,
       failures: [targetMismatchFailure()],
       nextAction:
-        "Regenerate the mixed patch with exactly two or exactly three operation targets.",
+        "Regenerate the mixed patch with exactly two, exactly three, or exactly four operation targets.",
       evidence: ["apply-patch-mixed-file-write-route:target-count-mismatch"],
     });
   }
@@ -456,8 +460,7 @@ export async function runMixedFileWriteRoute(
           buildRecoveryAuthorityRecordsForOperation({
             operation,
             index,
-            includeMoveTargetAbsenceRecord:
-              sameFamilyDestructiveKind(operationKinds) === "move",
+            includeMoveTargetAbsenceRecord: operation.operation.kind === "move",
           }),
         ),
       })
@@ -595,7 +598,7 @@ export async function runMixedFileWriteRoute(
       "apply-patch-mixed-file-write-route:post-write-verification-passed",
       "apply-patch-mixed-file-write-route:success-after-verified-write",
       "apply-patch-mixed-file-write-route:no-rollback",
-      "apply-patch-mixed-file-write-route:no-4-plus-mixed",
+      "apply-patch-mixed-file-write-route:no-5-plus-mixed",
       "apply-patch-mixed-file-write-route:no-broad-apply-patch",
       "apply-patch-mixed-file-write-route:default-production-rejection-unchanged",
       ...writeFailureState.evidence,
@@ -604,7 +607,7 @@ export async function runMixedFileWriteRoute(
 }
 
 function mixedOperationCountIsEnabled(count: number): boolean {
-  return count === 2 || count === 3;
+  return count === 2 || count === 3 || count === 4;
 }
 
 function mixedCombinationIsEnabled(kinds: readonly PatchOperationKind[]): boolean {
@@ -1070,7 +1073,7 @@ function buildApproval(
     message:
       mixedOperationCountIsEnabled(targetPaths.length)
         ? `Approval required for writing exactly these mixed operation targets: ${targetPaths.join(", ")}`
-        : "Approval required for exactly two or exactly three selected-workspace mixed operation targets.",
+        : "Approval required for exactly two, exactly three, or exactly four selected-workspace mixed operation targets.",
   };
 }
 
@@ -1094,9 +1097,9 @@ function unsupportedMixedFailure(
     code: "patch-verify-operation-unsupported",
     ...(operation ? { path: targetPathForOperation(operation) } : {}),
     message:
-      "Bounded workspace write route only accepts exactly two or exactly three supported mixed operations, delete-only operations, or move-only operations.",
+      "Bounded workspace write route only accepts exactly two, exactly three, or exactly four supported mixed operations, delete-only operations, or move-only operations.",
     nextAction:
-      "Keep broad apply_patch, unsupported same-family, 4+ mixed/destructive, malformed, and unknown operation shapes out of this candidate write route.",
+      "Keep broad apply_patch, unsupported same-family, 5+ mixed/destructive, malformed, and unknown operation shapes out of this candidate write route.",
   };
 }
 
@@ -1104,9 +1107,9 @@ function targetMismatchFailure(): PatchFailure {
   return {
     code: "patch-apply-plan-not-verified",
     message:
-      "Mixed workspace write route requires exactly two or exactly three distinct operation targets.",
+      "Mixed workspace write route requires exactly two, exactly three, or exactly four distinct operation targets.",
     nextAction:
-      "Regenerate the patch with exactly two or exactly three distinct selected-workspace operation targets.",
+      "Regenerate the patch with exactly two, exactly three, or exactly four distinct selected-workspace operation targets.",
   };
 }
 

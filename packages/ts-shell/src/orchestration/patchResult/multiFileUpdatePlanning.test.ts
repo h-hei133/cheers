@@ -104,7 +104,7 @@ describe("classifyMultiFileUpdatePlanningNoWrite", () => {
     expect(result?.explanation).toContain("no-write route");
   });
 
-  it("blocks four Update File operations without write metadata", () => {
+  it("classifies exactly four existing Update File operations as planning/no-write", () => {
     const result = classify(
       [
         "*** Begin Patch",
@@ -134,9 +134,20 @@ describe("classifyMultiFileUpdatePlanningNoWrite", () => {
       },
     );
 
-    expectNoWriteBlocked(result, "too-many-update-files");
-    expect(result?.wouldChangeFiles).toEqual([]);
-    expect(result?.failedFiles[0]?.code).toBe("patch-apply-plan-not-verified");
+    expectNoWriteBlocked(result, "four-file-update-planning-no-write");
+    expect(result?.plannedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+    ]);
+    expect(result?.wouldChangeFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+    ]);
+    expect(result?.failedFiles).toEqual([]);
   });
 
   it("blocks Add File mixed with Update File as unsupported mixed operations", () => {

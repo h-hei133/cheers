@@ -6,6 +6,7 @@ import { buildPatchPreview } from "./preview.js";
 export type MultiFileUpdatePlanningBlockedReason =
   | "multi-file-update-write-not-enabled"
   | "three-file-update-planning-no-write"
+  | "four-file-update-planning-no-write"
   | "too-many-update-files"
   | "mixed-operations-not-enabled"
   | "workspace-boundary"
@@ -23,10 +24,12 @@ export interface MultiFileUpdatePlanningClassification {
   readonly blockedReason: MultiFileUpdatePlanningBlockedReason;
   readonly expectedCapability:
     | "selected-workspace two-file existing-file update planning/preflight"
-    | "selected-workspace exactly-three existing-file update planning/no-write";
+    | "selected-workspace exactly-three existing-file update planning/no-write"
+    | "selected-workspace exactly-four existing-file update planning/no-write";
   readonly currentSupportedCapability:
     | "planning/preflight only; writer remains single-file"
-    | "exactly-three planning/no-write only in no-write runtime paths";
+    | "exactly-three planning/no-write only in no-write runtime paths"
+    | "exactly-four planning/no-write only in no-write runtime paths";
   readonly drivesApplyPatchExpansion: false;
   readonly willWrite: false;
   readonly writerReachable: false;
@@ -89,7 +92,7 @@ export function classifyMultiFileUpdatePlanningNoWrite(
     });
   }
 
-  if (updateOperations.length > 3) {
+  if (updateOperations.length > 4) {
     return buildClassification({
       targetPaths,
       plannedFiles: [],
@@ -99,15 +102,15 @@ export function classifyMultiFileUpdatePlanningNoWrite(
         {
           code: "patch-apply-plan-not-verified",
           message:
-            "Multi-file update planning accepts exactly two or exactly three Update File operations.",
+            "Multi-file update planning accepts exactly two, exactly three, or exactly four Update File operations.",
           nextAction:
-            "Reduce the patch to exactly two or exactly three existing-file Update File operations.",
+            "Reduce the patch to exactly two, exactly three, or exactly four existing-file Update File operations.",
         },
       ],
       explanation:
-        "Multi-file update planning is intentionally capped before any 4+ file write support.",
+        "Multi-file update planning is intentionally capped before any 5+ file write support.",
       nextAction:
-        "Reduce the patch to exactly two or exactly three selected-workspace existing-file Update File targets; 4+ file writes remain unsupported.",
+        "Reduce the patch to exactly two, exactly three, or exactly four selected-workspace existing-file Update File targets; 5+ file writes remain unsupported.",
     });
   }
 
@@ -149,6 +152,20 @@ export function classifyMultiFileUpdatePlanningNoWrite(
     });
   }
 
+  if (updateOperations.length === 4) {
+    return buildClassification({
+      targetPaths,
+      plannedFiles: targetPaths,
+      wouldChangeFiles: preview.changedFiles,
+      blockedReason: "four-file-update-planning-no-write",
+      failedFiles: [],
+      explanation:
+        "Exactly-four Update File patch passed selected-workspace planning/preflight in a no-write route; no writer was reachable.",
+      nextAction:
+        "No files were changed. Use the explicit selected-workspace write route with approval before writing four files.",
+    });
+  }
+
   return buildClassification({
     targetPaths,
     plannedFiles: targetPaths,
@@ -181,11 +198,15 @@ function buildClassification(input: {
     wouldChangeFiles: input.wouldChangeFiles,
     blockedReason: input.blockedReason,
     expectedCapability:
-      input.blockedReason === "three-file-update-planning-no-write"
+      input.blockedReason === "four-file-update-planning-no-write"
+        ? "selected-workspace exactly-four existing-file update planning/no-write"
+        : input.blockedReason === "three-file-update-planning-no-write"
         ? "selected-workspace exactly-three existing-file update planning/no-write"
         : "selected-workspace two-file existing-file update planning/preflight",
     currentSupportedCapability:
-      input.blockedReason === "three-file-update-planning-no-write"
+      input.blockedReason === "four-file-update-planning-no-write"
+        ? "exactly-four planning/no-write only in no-write runtime paths"
+        : input.blockedReason === "three-file-update-planning-no-write"
         ? "exactly-three planning/no-write only in no-write runtime paths"
         : "planning/preflight only; writer remains single-file",
     drivesApplyPatchExpansion: false,

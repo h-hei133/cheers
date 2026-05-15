@@ -3,7 +3,7 @@ import { projectMixedOperationReadiness } from "./mixedOperationReadiness.js";
 import type { PatchFileOperation } from "../patchParsing/types.js";
 
 describe("projectMixedOperationReadiness", () => {
-  it("projects mixed operation blockers without granting write authority", () => {
+  it("recognizes bounded exactly-four mixed route support without granting write authority", () => {
     const readiness = projectMixedOperationReadiness([
       updateOperation("src/a.ts"),
       addOperation("src/new.ts"),
@@ -17,17 +17,10 @@ describe("projectMixedOperationReadiness", () => {
       operationCount: 4,
       individuallySupportedKinds: ["update", "create", "delete", "move"],
       unsupportedIndividualKinds: [],
-      blockedCombinations: ["update+create+delete+move"],
-      routeBlocker: "mixed-operation-route-not-enabled",
-      additionalPrerequisites: [
-        "transaction-rollback-decision",
-        "operation-ordering",
-        "destructive-operation-confirmation",
-        "partial-failure-semantics",
-        "post-write-verification-semantics",
-        "per-operation-authority",
-      ],
-      mixedWritesEnabled: false,
+      blockedCombinations: [],
+      routeBlocker: "none",
+      additionalPrerequisites: [],
+      mixedWritesEnabled: true,
       rollbackOrAtomicityClaim: "none",
       writeAuthority: "not-granted-by-readiness-projection",
     });

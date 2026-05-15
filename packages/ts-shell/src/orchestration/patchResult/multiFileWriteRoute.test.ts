@@ -194,19 +194,19 @@ describe("multi-file Update File selected-workspace write route", () => {
     );
   });
 
-  it("restores a verified exactly-three prefix file after partial failure and blocks hidden edits", async () => {
-    const fixture = createFixture({ includeC: true });
+  it("restores a verified exactly-four prefix file after partial failure and blocks hidden edits", async () => {
+    const fixture = createFixture({ includeC: true, includeD: true });
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     const ledgerRoot = createLedgerRoot();
 
     const result = await runMultiFileWriteRoute({
-      ...routeOptions(fixture.workspaceRoot, threeFilePatch()),
+      ...routeOptions(fixture.workspaceRoot, fourFilePatch()),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       validateWriteTarget: authority.validateWriteTarget,
       writeFile: (relativePath, content) => {
-        if (relativePath === "src/c.ts") {
-          throw new Error("simulated third writer failure");
+        if (relativePath === "src/d.ts") {
+          throw new Error("simulated fourth writer failure");
         }
         authority.writeFile(relativePath, content);
       },
@@ -220,8 +220,8 @@ describe("multi-file Update File selected-workspace write route", () => {
     expect(result.status).toBe("blocked");
     expect(result.blocker).toBe("write-application");
     expect(result.recoveryAuthorityCapture?.status).toBe("captured");
-    expect(result.changedFiles).toEqual(["src/a.ts", "src/b.ts"]);
-    expect(result.failedFiles[0]?.path).toBe("src/c.ts");
+    expect(result.changedFiles).toEqual(["src/a.ts", "src/b.ts", "src/c.ts"]);
+    expect(result.failedFiles[0]?.path).toBe("src/d.ts");
     expect(result.postWriteVerification).toBe("blocked");
 
     const restore = await restoreRecoveryAuthorityRecord({
@@ -251,14 +251,69 @@ describe("multi-file Update File selected-workspace write route", () => {
     expect(blockedRestore.blockedReason).toBe("current-content-hash-mismatch");
   });
 
-  it("blocks four Update File operations without invoking the writer", async () => {
+  it("writes exactly four existing files after explicit approval and captures originals before writing", async () => {
     const fixture = createFixture({ includeC: true, includeD: true });
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+    let firstWriteSawAllRecords = false;
+
+    const result = await runMultiFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, fourFilePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: async (relativePath, content) => {
+        if (!firstWriteSawAllRecords) {
+          const records = await Promise.all(
+            ["a", "b", "c", "d"].map((name, index) =>
+              readRecoveryAuthorityRecord({
+                ledgerRoot,
+                authorityId: "route-four-update",
+                recordId: `update-${index + 1}-src-${name}.ts`,
+              }),
+            ),
+          );
+          firstWriteSawAllRecords = records.every(Boolean);
+        }
+        await authority.writeFile(relativePath, content);
+      },
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-four-update",
+      },
+    });
+
+    expect(result.status).toBe("written");
+    expect(result.changedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+    ]);
+    expect(result.failedFiles).toEqual([]);
+    expect(result.postWriteVerification).toBe("passed");
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(4);
+    expect(firstWriteSawAllRecords).toBe(true);
+    expect(readFile(fixture.workspaceRoot, "src/d.ts")).toBe("d = 2\n");
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-multi-file-write-route:exactly-four-update-files",
+        "apply-patch-multi-file-write-route:all-final-stale-read-before-writer",
+        "apply-patch-multi-file-write-route:sequential-write-no-rollback",
+      ]),
+    );
+  });
+
+  it("blocks five Update File operations without invoking the writer", async () => {
+    const fixture = createFixture({ includeC: true, includeD: true, includeE: true });
     const before = snapshotFixture(fixture.workspaceRoot);
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     let writes = 0;
 
     const result = await runMultiFileWriteRoute({
-      ...routeOptions(fixture.workspaceRoot, fourFilePatch()),
+      ...routeOptions(fixture.workspaceRoot, fiveFilePatch()),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       validateWriteTarget: authority.validateWriteTarget,
@@ -579,7 +634,11 @@ function createLedgerRoot(): string {
 }
 
 function createFixture(
-  options: { readonly includeC?: boolean; readonly includeD?: boolean } = {},
+  options: {
+    readonly includeC?: boolean;
+    readonly includeD?: boolean;
+    readonly includeE?: boolean;
+  } = {},
 ): { readonly workspaceRoot: string } {
   const workspaceRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), "multi-file-write-route-"),
@@ -593,6 +652,9 @@ function createFixture(
   }
   if (options.includeD) {
     fs.writeFileSync(path.join(workspaceRoot, "src", "d.ts"), "d = 1\n", "utf8");
+  }
+  if (options.includeE) {
+    fs.writeFileSync(path.join(workspaceRoot, "src", "e.ts"), "e = 1\n", "utf8");
   }
   return { workspaceRoot };
 }
@@ -669,6 +731,33 @@ function fourFilePatch(): string {
     "@@",
     "-d = 1",
     "+d = 2",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function fiveFilePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Update File: src/b.ts",
+    "@@",
+    "-b = 1",
+    "+b = 2",
+    "*** Update File: src/c.ts",
+    "@@",
+    "-c = 1",
+    "+c = 2",
+    "*** Update File: src/d.ts",
+    "@@",
+    "-d = 1",
+    "+d = 2",
+    "*** Update File: src/e.ts",
+    "@@",
+    "-e = 1",
+    "+e = 2",
     "*** End Patch",
   ].join("\n");
 }

@@ -121,7 +121,7 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
-  it("projects 3+ update beyond exactly-three to unsupported/no-write", () => {
+  it("projects exactly-four updates to supported write intents", () => {
     const plan = planFromPatch(
       [
         "*** Begin Patch",
@@ -151,15 +151,15 @@ describe("buildPerFilePatchPlan", () => {
       },
     );
 
-    expectUnsupportedNoWritePlan(plan, "too-many-update-files");
-    expect(plan.summary.writeIntentFiles).toEqual([]);
-    expect(plan.summary.plannedFiles).toEqual([]);
-    expect(plan.summary.failedFiles.map((failure) => failure.path)).toEqual([
+    expectSupportedWritePlan(plan, ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts"]);
+    expect(plan.summary.writeIntentFiles).toEqual([
       "src/a.ts",
       "src/b.ts",
       "src/c.ts",
       "src/d.ts",
     ]);
+    expect(plan.summary.plannedFiles).toEqual([]);
+    expect(plan.summary.failedFiles).toEqual([]);
   });
 
   it("projects delete to a supported write intent", () => {
@@ -276,7 +276,7 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
-  it("keeps 4+ delete-only operations unsupported/no-write", () => {
+  it("projects exactly-four delete-only operations to supported destructive write intents", () => {
     const plan = planFromPatch(
       [
         "*** Begin Patch",
@@ -294,8 +294,13 @@ describe("buildPerFilePatchPlan", () => {
       },
     );
 
-    expectUnsupportedNoWritePlan(plan, "unsupported-operation");
-    expect(plan.summary.writeIntentFiles).toEqual([]);
+    expectSupportedWritePlan(plan, ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts"]);
+    expect(plan.summary.writeIntentFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+    ]);
   });
 
   it("projects move with content edits to unsupported/no-write", () => {
@@ -647,7 +652,7 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
-  it("keeps 4+ mixed operations unsupported/no-write", () => {
+  it("projects exactly-four mixed operations to supported write intents", () => {
     const plan = planFromPatch(
       [
         "*** Begin Patch",
@@ -672,15 +677,19 @@ describe("buildPerFilePatchPlan", () => {
       { existingDirectories: ["src"] },
     );
 
-    expectUnsupportedNoWritePlan(plan, "mixed-operations");
-    expect(plan.summary.writeIntentFiles).toEqual([]);
-    expect(plan.summary.mixedOperationReadiness).toEqual(
-      expect.objectContaining({
-        operationCount: 4,
-        routeBlocker: "mixed-operation-route-not-enabled",
-        mixedWritesEnabled: false,
-      }),
-    );
+    expectSupportedWritePlan(plan, [
+      "src/app.ts",
+      "src/new.ts",
+      "src/remove.ts",
+      "src/to.ts",
+    ]);
+    expect(plan.summary.writeIntentFiles).toEqual([
+      "src/app.ts",
+      "src/new.ts",
+      "src/remove.ts",
+      "src/to.ts",
+    ]);
+    expect(plan.summary.mixedOperationReadiness).toBeUndefined();
   });
 
   it("keeps create plus move with content edits unsupported/no-write with source and target", () => {

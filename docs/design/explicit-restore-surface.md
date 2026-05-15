@@ -20,7 +20,7 @@ Before this route, the project already had:
 - no default persistence
 - no automatic recovery
 - no atomic rollback
-- no broad `apply_patch`, 4+ mixed, 4+ write, broad multi-delete, or
+- no broad `apply_patch`, 5+ mixed, 5+ write, broad multi-delete, or
   broad multi-move
   support
 
@@ -188,9 +188,9 @@ cleanup hook, no default persistence root, and no provider/CLI/MCP residue.
 - snapshot/revert backend
 - git integration
 - broad `apply_patch`
-- 4+ mixed writes
-- 4+ writes
-- broad multi-delete or multi-move beyond the bounded Route 63 lanes
+- 5+ mixed writes
+- 5+ writes
+- broad multi-delete or multi-move beyond the bounded Route 64 lanes
 - provider/session/CLI/MCP behavior changes
 - package script or default gate changes
 
@@ -199,9 +199,12 @@ cleanup hook, no default persistence root, and no provider/CLI/MCP residue.
 Route 63 update: selected-workspace exactly-two/exactly-three delete-only and
 move-only batches are now implemented with optional non-default
 recovery-authority capture and destructive partial-failure restore evidence.
-4+ writes, broad `apply_patch`, automatic recovery, and atomic rollback remain
+Route 64 update: selected-workspace exactly-four update, mixed, delete-only,
+and move-only batches are now implemented with optional non-default
+recovery-authority capture and exactly-four partial-failure restore drills.
+5+ writes, broad `apply_patch`, automatic recovery, and atomic rollback remain
 unsupported.
 
-Recommended next route: 4-operation bounded write readiness only if Route 63
-evidence remains stable, or CLI/session explicit restore UX if operator
+Recommended next route: 5-operation/small-N bounded write policy only if Route
+64 evidence remains stable, or CLI/session explicit restore UX if operator
 visibility becomes the higher product priority.

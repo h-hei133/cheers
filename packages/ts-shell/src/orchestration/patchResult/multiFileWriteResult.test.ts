@@ -464,6 +464,86 @@ describe("multi-file apply_patch workspace write result", () => {
       }),
     );
   });
+
+  it("maps four-file partial writer failure to stopped with plan-only recovery metadata", async () => {
+    const fixture = createFixture({ includeC: true, includeD: true });
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const route = await runMultiFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, fourFilePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: (relativePath, content) => {
+        if (relativePath === "src/d.ts") {
+          throw new Error("simulated fourth writer failure");
+        }
+        authority.writeFile(relativePath, content);
+      },
+    });
+
+    const result = buildMultiFileWriteRouteResult({
+      sessionId: "session-1",
+      prompt: fourFilePatch(),
+      route,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+    ]);
+    expect(result.codingResult?.failedFiles[0]?.path).toBe("src/d.ts");
+    expect(result.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        failureClass: "partial-failure",
+        writeIntentFiles: ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts"],
+        changedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        writerInvoked: true,
+        postWriteVerification: "blocked",
+        successLike: false,
+      }),
+    );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal,
+    ).toEqual(
+      expect.objectContaining({
+        operationCount: 4,
+        plannedFiles: ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts"],
+        changedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        failedFiles: [
+          expect.objectContaining({
+            path: "src/d.ts",
+            failureClass: "write-application",
+          }),
+        ],
+        recoveryCandidateFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        rollbackAtomicityClaim: false,
+        recoveryExecuted: false,
+        writeCapability: "metadata-only",
+      }),
+    );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan,
+    ).toEqual(
+      expect.objectContaining({
+        mode: "plan-only",
+        authority: "metadata-only",
+        recoveryExecuted: false,
+        rollbackAtomicityClaim: false,
+        recoveryCandidateFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+        failedBeforeApplyFiles: ["src/d.ts"],
+        appliedButUnverifiedFiles: [],
+        appliedAndVerifiedBeforeLaterFailureFiles: [
+          "src/a.ts",
+          "src/b.ts",
+          "src/c.ts",
+        ],
+      }),
+    );
+  });
 });
 
 function routeOptions(
@@ -482,7 +562,7 @@ function routeOptions(
 }
 
 function createFixture(
-  options: { readonly includeC?: boolean } = {},
+  options: { readonly includeC?: boolean; readonly includeD?: boolean } = {},
 ): { readonly workspaceRoot: string } {
   const workspaceRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), "multi-file-write-result-"),
@@ -493,6 +573,9 @@ function createFixture(
   fs.writeFileSync(path.join(workspaceRoot, "src", "b.ts"), "b = 1\n", "utf8");
   if (options.includeC) {
     fs.writeFileSync(path.join(workspaceRoot, "src", "c.ts"), "c = 1\n", "utf8");
+  }
+  if (options.includeD) {
+    fs.writeFileSync(path.join(workspaceRoot, "src", "d.ts"), "d = 1\n", "utf8");
   }
   return { workspaceRoot };
 }
@@ -527,6 +610,29 @@ function threeFilePatch(): string {
     "@@",
     "-c = 1",
     "+c = 2",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function fourFilePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Update File: src/b.ts",
+    "@@",
+    "-b = 1",
+    "+b = 2",
+    "*** Update File: src/c.ts",
+    "@@",
+    "-c = 1",
+    "+c = 2",
+    "*** Update File: src/d.ts",
+    "@@",
+    "-d = 1",
+    "+d = 2",
     "*** End Patch",
   ].join("\n");
 }

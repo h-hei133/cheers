@@ -52,7 +52,9 @@ export function projectMixedOperationReadiness(
   const isMixedOperation = operationKinds.length > 1;
   const mixedWritesEnabled =
     isMixedOperation &&
-    (operations.length === 2 || operations.length === 3) &&
+    (operations.length === 2 ||
+      operations.length === 3 ||
+      operations.length === 4) &&
     operationKinds.every((kind) => currentSingleOperationLanes.has(kind));
   const blocked = isMixedOperation && !mixedWritesEnabled;
   return {

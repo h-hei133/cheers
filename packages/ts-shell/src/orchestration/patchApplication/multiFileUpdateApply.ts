@@ -4,7 +4,7 @@ import type {
   PatchWriteIntent,
 } from "./noPartialApply.js";
 
-export type MultiFileUpdateTargetCount = 2 | 3;
+export type MultiFileUpdateTargetCount = 2 | 3 | 4;
 
 export interface MultiFileUpdateApplyOptions {
   readonly expectedFileCount: MultiFileUpdateTargetCount;

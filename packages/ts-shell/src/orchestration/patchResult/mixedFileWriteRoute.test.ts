@@ -147,7 +147,7 @@ describe("mixed selected-workspace write route", () => {
     expect(result.evidence).toEqual(
       expect.arrayContaining([
         "apply-patch-mixed-file-write-route:exactly-3-mixed-operations",
-        "apply-patch-mixed-file-write-route:no-4-plus-mixed",
+        "apply-patch-mixed-file-write-route:no-5-plus-mixed",
         "apply-patch-mixed-file-write-route:no-broad-apply-patch",
       ]),
     );
@@ -312,7 +312,7 @@ describe("mixed selected-workspace write route", () => {
     expect(result.status).toBe("blocked");
     expect(result.blocker).toBe("write-application");
     expect(result.recoveryAuthorityCapture?.status).toBe("captured");
-    expect(result.recoveryAuthorityCapture?.records).toHaveLength(3);
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(4);
     expect(result.changedFiles).toEqual(["src/a.ts", "src/remove.ts"]);
     expect(result.failedFiles[0]?.path).toBe("src/to.ts");
     expect(result.deleteMoveInvoked).toBe(true);
@@ -426,14 +426,124 @@ describe("mixed selected-workspace write route", () => {
     );
   });
 
-  it("keeps 4+ mixed operations blocked with no default recovery-authority capture", async () => {
+  it("writes exactly-four mixed operations and captures all before-states before writing", async () => {
     const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+
+    const result = await runMixedFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, fourMixedPatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      validateCreateTarget: authority.validateCreateTarget,
+      writeFile: authority.writeFile,
+      createFileExclusive: authority.createFileExclusive,
+      moveFileExclusive: authority.moveFileExclusive,
+      deleteFile: authority.deleteFile,
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-four-mixed",
+      },
+    });
+
+    expect(result.status).toBe("written");
+    expect(result.changedFiles).toEqual([
+      "src/a.ts",
+      "src/new.ts",
+      "src/remove.ts",
+      "src/to.ts",
+    ]);
+    expect(result.creatorInvoked).toBe(true);
+    expect(result.deleteMoveInvoked).toBe(true);
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(5);
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
+    expect(readFile(fixture.workspaceRoot, "src/new.ts")).toBe("created");
+    expect(readFile(fixture.workspaceRoot, "src/remove.ts")).toBeUndefined();
+    expect(readFile(fixture.workspaceRoot, "src/to.ts")).toBe("from\n");
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-mixed-file-write-route:exactly-4-mixed-operations",
+        "apply-patch-mixed-file-write-route:no-5-plus-mixed",
+      ]),
+    );
+  });
+
+  it("restores exactly-four mixed changed records after partial failure without automatic rollback", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+
+    const result = await runMixedFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, fourMixedPatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      validateCreateTarget: authority.validateCreateTarget,
+      writeFile: authority.writeFile,
+      createFileExclusive: authority.createFileExclusive,
+      moveFileExclusive: () => {
+        throw new Error("simulated fourth mixed move failure");
+      },
+      deleteFile: authority.deleteFile,
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-four-mixed-restore",
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("write-application");
+    expect(result.changedFiles).toEqual(["src/a.ts", "src/new.ts", "src/remove.ts"]);
+    expect(result.failedFiles[0]?.path).toBe("src/to.ts");
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(5);
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
+    expect(readFile(fixture.workspaceRoot, "src/new.ts")).toBe("created");
+    expect(readFile(fixture.workspaceRoot, "src/remove.ts")).toBeUndefined();
+
+    const restoreUpdate = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-four-mixed-restore",
+      recordId: "update-1-src-a.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/a.ts",
+    });
+    expect(restoreUpdate.restored).toBe(true);
+    expect(restoreUpdate.rollbackAtomicityClaim).toBe(false);
+
+    const restoreCreate = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-four-mixed-restore",
+      recordId: "create-2-src-new.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/new.ts",
+    });
+    expect(restoreCreate.restored).toBe(true);
+    expect(restoreCreate.rollbackAtomicityClaim).toBe(false);
+    expect(readFile(fixture.workspaceRoot, "src/new.ts")).toBeUndefined();
+  });
+
+  it("keeps five mixed operations blocked with no default recovery-authority capture", async () => {
+    const fixture = createFixture({
+      files: {
+        "src/a.ts": "a = 1\n",
+        "src/b.ts": "b = 1\n",
+        "src/from.ts": "from\n",
+        "src/remove.ts": "remove\n",
+      },
+    });
     const before = snapshotFixture(fixture.workspaceRoot);
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     let writes = 0;
 
     const result = await runMixedFileWriteRoute({
-      ...routeOptions(fixture.workspaceRoot, fourMixedPatch()),
+      ...routeOptions(fixture.workspaceRoot, fiveMixedPatch()),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       directoryExists: authority.directoryExists,
@@ -458,9 +568,6 @@ describe("mixed selected-workspace write route", () => {
     expect(result.recoveryAuthorityCapture).toBeUndefined();
     expect(result.workspaceWriterInvoked).toBe(false);
     expect(result.changedFiles).toEqual([]);
-    expect(result.failedFiles).toEqual([
-      expect.objectContaining({ path: "src/a.ts" }),
-    ]);
     expect(writes).toBe(0);
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
@@ -582,12 +689,13 @@ describe("mixed selected-workspace write route", () => {
     }
   });
 
-  it("writes exactly-three delete-only operations after approval and captures all originals before deleting", async () => {
+  it("writes exactly-four delete-only operations after approval and captures all originals before deleting", async () => {
     const fixture = createFixture({
       files: {
         "src/remove-a.ts": "a\n",
         "src/remove-b.ts": "b\n",
         "src/remove-c.ts": "c\n",
+        "src/remove-d.ts": "d\n",
       },
     });
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
@@ -595,7 +703,7 @@ describe("mixed selected-workspace write route", () => {
     let firstDeleteSawRecords = false;
 
     const result = await runMixedFileWriteRoute({
-      ...routeOptions(fixture.workspaceRoot, threeDeletePatch()),
+      ...routeOptions(fixture.workspaceRoot, fourDeletePatch()),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       directoryExists: authority.directoryExists,
@@ -628,11 +736,12 @@ describe("mixed selected-workspace write route", () => {
       "src/remove-a.ts",
       "src/remove-b.ts",
       "src/remove-c.ts",
+      "src/remove-d.ts",
     ]);
     expect(result.deleteMoveInvoked).toBe(true);
     expect(result.postWriteVerification).toBe("passed");
     expect(result.recoveryAuthorityCapture?.status).toBe("captured");
-    expect(result.recoveryAuthorityCapture?.records).toHaveLength(3);
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(4);
     expect(firstDeleteSawRecords).toBe(true);
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual({});
     expect(result.evidence).toEqual(
@@ -643,18 +752,20 @@ describe("mixed selected-workspace write route", () => {
     );
   });
 
-  it("writes exactly-two move-only operations and captures source plus target recovery authority", async () => {
+  it("writes exactly-four move-only operations and captures source plus target recovery authority", async () => {
     const fixture = createFixture({
       files: {
         "src/from-a.ts": "a\n",
         "src/from-b.ts": "b\n",
+        "src/from-c.ts": "c\n",
+        "src/from-d.ts": "d\n",
       },
     });
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     const ledgerRoot = createLedgerRoot();
 
     const result = await runMixedFileWriteRoute({
-      ...routeOptions(fixture.workspaceRoot, twoMovePatch()),
+      ...routeOptions(fixture.workspaceRoot, fourMovePatch()),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       directoryExists: authority.directoryExists,
@@ -672,7 +783,12 @@ describe("mixed selected-workspace write route", () => {
     });
 
     expect(result.status).toBe("written");
-    expect(result.changedFiles).toEqual(["src/to-a.ts", "src/to-b.ts"]);
+    expect(result.changedFiles).toEqual([
+      "src/to-a.ts",
+      "src/to-b.ts",
+      "src/to-c.ts",
+      "src/to-d.ts",
+    ]);
     expect(result.deleteMoveInvoked).toBe(true);
     expect(result.recoveryAuthorityCapture?.status).toBe("captured");
     expect(result.recoveryAuthorityCapture?.records).toEqual(
@@ -689,25 +805,29 @@ describe("mixed selected-workspace write route", () => {
         }),
       ]),
     );
-    expect(result.recoveryAuthorityCapture?.records).toHaveLength(4);
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(8);
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
       "src/to-a.ts": "a\n",
       "src/to-b.ts": "b\n",
+      "src/to-c.ts": "c\n",
+      "src/to-d.ts": "d\n",
     });
   });
 
-  it("restores a delete-only prefix after partial failure and blocks hidden recreation", async () => {
+  it("restores an exactly-four delete-only prefix after partial failure and blocks hidden recreation", async () => {
     const fixture = createFixture({
       files: {
         "src/remove-a.ts": "a\n",
         "src/remove-b.ts": "b\n",
+        "src/remove-c.ts": "c\n",
+        "src/remove-d.ts": "d\n",
       },
     });
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     const ledgerRoot = createLedgerRoot();
 
     const result = await runMixedFileWriteRoute({
-      ...routeOptions(fixture.workspaceRoot, twoDeletePatch()),
+      ...routeOptions(fixture.workspaceRoot, fourDeletePatch()),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       directoryExists: authority.directoryExists,
@@ -717,7 +837,7 @@ describe("mixed selected-workspace write route", () => {
       createFileExclusive: authority.createFileExclusive,
       moveFileExclusive: authority.moveFileExclusive,
       deleteFile: async (relativePath) => {
-        if (relativePath === "src/remove-b.ts") {
+        if (relativePath === "src/remove-d.ts") {
           throw new Error("simulated delete failure");
         }
         await authority.deleteFile(relativePath);
@@ -730,8 +850,12 @@ describe("mixed selected-workspace write route", () => {
     });
 
     expect(result.status).toBe("blocked");
-    expect(result.changedFiles).toEqual(["src/remove-a.ts"]);
-    expect(result.failedFiles[0]?.path).toBe("src/remove-b.ts");
+    expect(result.changedFiles).toEqual([
+      "src/remove-a.ts",
+      "src/remove-b.ts",
+      "src/remove-c.ts",
+    ]);
+    expect(result.failedFiles[0]?.path).toBe("src/remove-d.ts");
     expect(result.recoveryAuthorityCapture?.status).toBe("captured");
 
     const restore = await restoreRecoveryAuthorityRecord({
@@ -760,18 +884,20 @@ describe("mixed selected-workspace write route", () => {
     expect(blockedRestore.blockedReason).toBe("current-state-mismatch");
   });
 
-  it("restores a move-only prefix after partial failure and blocks hidden target edits", async () => {
+  it("restores an exactly-four move-only prefix after partial failure and blocks hidden target edits", async () => {
     const fixture = createFixture({
       files: {
         "src/from-a.ts": "a\n",
         "src/from-b.ts": "b\n",
+        "src/from-c.ts": "c\n",
+        "src/from-d.ts": "d\n",
       },
     });
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     const ledgerRoot = createLedgerRoot();
 
     const result = await runMixedFileWriteRoute({
-      ...routeOptions(fixture.workspaceRoot, twoMovePatch()),
+      ...routeOptions(fixture.workspaceRoot, fourMovePatch()),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       directoryExists: authority.directoryExists,
@@ -780,7 +906,7 @@ describe("mixed selected-workspace write route", () => {
       writeFile: authority.writeFile,
       createFileExclusive: authority.createFileExclusive,
       moveFileExclusive: async (sourcePath, targetPath) => {
-        if (sourcePath === "src/from-b.ts") {
+        if (sourcePath === "src/from-d.ts") {
           throw new Error("simulated move failure");
         }
         await authority.moveFileExclusive(sourcePath, targetPath);
@@ -795,10 +921,10 @@ describe("mixed selected-workspace write route", () => {
 
     expect(result.status).toBe("blocked");
     expect(result.blocker).toBe("write-application");
-    expect(result.changedFiles).toEqual(["src/to-a.ts"]);
-    expect(result.failedFiles[0]?.path).toBe("src/to-b.ts");
+    expect(result.changedFiles).toEqual(["src/to-a.ts", "src/to-b.ts", "src/to-c.ts"]);
+    expect(result.failedFiles[0]?.path).toBe("src/to-d.ts");
     expect(result.recoveryAuthorityCapture?.status).toBe("captured");
-    expect(result.recoveryAuthorityCapture?.records).toHaveLength(4);
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(8);
     expect(result.postWriteVerification).toBe("blocked");
 
     const restoreSource = await restoreRecoveryAuthorityRecord({
@@ -843,8 +969,8 @@ describe("mixed selected-workspace write route", () => {
 
   it("keeps destructive unsupported shapes blocked before any writer", async () => {
     const cases = [
-      { patchText: fourDeletePatch(), blocker: "unsupported-operation" },
-      { patchText: fourMovePatch(), blocker: "unsupported-operation" },
+      { patchText: fiveDeletePatch(), blocker: "unsupported-operation" },
+      { patchText: fiveMovePatch(), blocker: "unsupported-operation" },
       { patchText: duplicateMoveTargetPatch(), blocker: "target-mismatch" },
       { patchText: moveSwapPatch(), blocker: "target-mismatch" },
     ] as const;
@@ -1095,6 +1221,28 @@ function fourMixedPatch(): string {
   ].join("\n");
 }
 
+function fiveMixedPatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Update File: src/b.ts",
+    "@@",
+    "-b = 1",
+    "+b = 2",
+    "*** Add File: src/new.ts",
+    "+created",
+    "*** Delete File: src/remove.ts",
+    "*** Update File: src/from.ts",
+    "*** Move to: src/to.ts",
+    "@@",
+    " from",
+    "*** End Patch",
+  ].join("\n");
+}
+
 function createDeletePatch(): string {
   return [
     "*** Begin Patch",
@@ -1215,6 +1363,18 @@ function fourDeletePatch(): string {
   ].join("\n");
 }
 
+function fiveDeletePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Delete File: src/remove-a.ts",
+    "*** Delete File: src/remove-b.ts",
+    "*** Delete File: src/remove-c.ts",
+    "*** Delete File: src/remove-d.ts",
+    "*** Delete File: src/remove-e.ts",
+    "*** End Patch",
+  ].join("\n");
+}
+
 function twoMovePatch(): string {
   return [
     "*** Begin Patch",
@@ -1249,6 +1409,33 @@ function fourMovePatch(): string {
     "*** Move to: src/to-d.ts",
     "@@",
     " d",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function fiveMovePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/from-a.ts",
+    "*** Move to: src/to-a.ts",
+    "@@",
+    " a",
+    "*** Update File: src/from-b.ts",
+    "*** Move to: src/to-b.ts",
+    "@@",
+    " b",
+    "*** Update File: src/from-c.ts",
+    "*** Move to: src/to-c.ts",
+    "@@",
+    " c",
+    "*** Update File: src/from-d.ts",
+    "*** Move to: src/to-d.ts",
+    "@@",
+    " d",
+    "*** Update File: src/from-e.ts",
+    "*** Move to: src/to-e.ts",
+    "@@",
+    " e",
     "*** End Patch",
   ].join("\n");
 }

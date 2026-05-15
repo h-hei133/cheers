@@ -16,7 +16,7 @@ import {
 } from "./patchResult/workspaceDeleteRoute.js";
 import { buildMultiFileWriteRouteResult } from "./patchResult/multiFileWriteResult.js";
 import {
-  patchIsTwoOrThreeUpdateFiles,
+  patchIsTwoThreeOrFourUpdateFiles,
   runMultiFileWriteRoute,
 } from "./patchResult/multiFileWriteRoute.js";
 import { buildWorkspaceMoveRouteResult } from "./patchResult/workspaceMoveResult.js";
@@ -33,7 +33,7 @@ import type {
 } from "./patchResult/workspaceAuthority.js";
 import { buildMixedFileWriteRouteResult } from "./patchResult/mixedFileWriteResult.js";
 import {
-  patchIsTwoOrThreeMixedWriteFiles,
+  patchIsTwoThreeOrFourMixedWriteFiles,
   runMixedFileWriteRoute,
 } from "./patchResult/mixedFileWriteRoute.js";
 
@@ -114,7 +114,7 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
       });
     }
 
-    if (patchIsTwoOrThreeUpdateFiles(rawPatchText)) {
+    if (patchIsTwoThreeOrFourUpdateFiles(rawPatchText)) {
       const route = await runMultiFileWriteRoute({
         workspaceRoot: input.workspaceRoot,
         rawPatchText,
@@ -189,7 +189,7 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
       });
     }
 
-    if (patchIsTwoOrThreeMixedWriteFiles(rawPatchText)) {
+    if (patchIsTwoThreeOrFourMixedWriteFiles(rawPatchText)) {
       const route = await runMixedFileWriteRoute({
         workspaceRoot: input.workspaceRoot,
         rawPatchText,

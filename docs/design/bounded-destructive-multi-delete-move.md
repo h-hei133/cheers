@@ -1,9 +1,10 @@
 # Bounded Destructive Multi-Delete / Multi-Move
 
-Status: Route 63 implemented for selected-workspace exactly-two and
-exactly-three delete-only and move-only batches. This is not broad
-`apply_patch`, 4+ writes, automatic recovery, atomic rollback, or default
-durable persistence readiness.
+Status: Route 63 implemented selected-workspace exactly-two and exactly-three
+delete-only and move-only batches. Route 64 later extended the same bounded
+destructive surface to exactly-four delete-only and move-only batches. This is
+not broad `apply_patch`, 5+ writes, automatic recovery, atomic rollback, or
+default durable persistence readiness.
 
 ## Baseline
 
@@ -59,7 +60,8 @@ mixed-route safety skeleton to accept same-family destructive batches:
 - exactly-three move-only
 
 The route remains selected-workspace only and requires explicit runtime opt-in,
-explicit workspace-write opt-in, and an approved user decision. It rejects:
+explicit workspace-write opt-in, and an approved user decision. Route 63
+rejected:
 
 - 4+ delete-only or move-only operations
 - directory delete and directory move
@@ -71,6 +73,9 @@ explicit workspace-write opt-in, and an approved user decision. It rejects:
 - outside-workspace source or target paths
 - move-with-content-edit in destructive move-only batches
 - broad arbitrary `apply_patch`
+
+Route 64 later opened exactly-four delete-only and move-only batches under the
+same constraints. 5+ delete-only and move-only batches remain rejected.
 
 ## Route Semantics
 
@@ -124,12 +129,13 @@ Restore drills:
 
 Route 63 does not add automatic recovery, transaction rollback, snapshot/git
 checkpoint integration, stale-read recovery, partial failure recovery, broad
-`apply_patch`, 4+ writes, provider/session/CLI/MCP behavior, package scripts,
-or default gates.
+`apply_patch`, provider/session/CLI/MCP behavior, package scripts, or default
+gates. Route 64 adds exactly-four destructive batches only; 5+ delete-only and
+move-only batches remain blocked.
 
 ## Next Direction
 
 If the bounded destructive evidence stays stable, the next route can evaluate
-4-operation bounded write readiness. If operator recovery is the stronger
+5-operation/small-N bounded write policy. If operator recovery is the stronger
 product blocker, prefer user/session explicit restore UX before widening the
 write surface again.

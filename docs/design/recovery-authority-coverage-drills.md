@@ -27,6 +27,10 @@ Route 63 later extended the bounded destructive surface to exactly-two and
 exactly-three delete-only and move-only batches. The same explicit non-default
 authority boundary applies, with no automatic recovery or rollback.
 
+Route 64 later extended the bounded surface to exactly-four update, mixed,
+delete-only, and move-only batches, with matching non-default
+recovery-authority capture and explicit partial-failure restore drills.
+
 ## Implementation Notes
 
 - `packages/ts-shell/src/orchestration/patchResult/workspaceMoveRoute.ts`
@@ -62,6 +66,8 @@ Focused tests now prove:
   file one file at a time.
 - bounded destructive move-only capture records source-exists and target-absent
   facts before the first move writer.
+- exactly-four update, mixed, delete-only, and move-only partial failures keep
+  explicit restore per-file and non-atomic.
 - current-content mismatch blocks hidden-user-edit overwrite.
 - rollbackAtomicityClaim stays false outside the route result.
 
@@ -98,7 +104,7 @@ route.
 
 ## Next Direction
 
-Route 63 implemented bounded destructive multi-delete/multi-move support. The
-next likely development batch is 4-operation bounded write readiness if the
+Route 64 implemented bounded exactly-four write support. The next likely
+development batch is a 5-operation/small-N bounded write policy decision if the
 evidence remains stable, or a separate CLI/session restore UX route if
 user-visible restore commands become the higher product priority.
