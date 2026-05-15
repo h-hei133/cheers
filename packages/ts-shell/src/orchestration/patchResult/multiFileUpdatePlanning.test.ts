@@ -33,7 +33,8 @@ describe("classifyMultiFileUpdatePlanningNoWrite", () => {
         classificationMode: "synthetic-no-write",
         targetPaths: ["src/a.ts", "src/b.ts"],
         wouldChangeFiles: ["src/a.ts", "src/b.ts"],
-        blockedReason: "multi-file-update-write-not-enabled",
+        plannedFiles: ["src/a.ts", "src/b.ts"],
+        blockedReason: "bounded-update-planning-no-write",
         willWrite: false,
         writerReachable: false,
         changedFiles: [],
@@ -42,7 +43,7 @@ describe("classifyMultiFileUpdatePlanningNoWrite", () => {
         drivesApplyPatchExpansion: false,
       }),
     );
-    expect(result?.nextAction).toContain("candidate no-write evidence");
+    expect(result?.nextAction).toContain("explicit selected-workspace write route");
   });
 
   it("leaves a single Update File patch on the existing single-file path", () => {

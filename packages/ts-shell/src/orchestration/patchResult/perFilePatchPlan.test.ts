@@ -1437,7 +1437,154 @@ describe("buildPerFilePatchPlan", () => {
       ]),
     );
   });
+
+  it("projects eight update-only operations to supported write intents", () => {
+    const plan = planFromPatch(boundedUpdatePatch(8), updateFiles(8));
+
+    expectSupportedWritePlan(plan, [
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+      "src/e.ts",
+      "src/f.ts",
+      "src/g.ts",
+      "src/h.ts",
+    ]);
+  });
+
+  it("projects nine update-only operations as unsupported/no-write", () => {
+    const plan = planFromPatch(boundedUpdatePatch(9), updateFiles(9));
+
+    expectUnsupportedNoWritePlan(plan, "too-many-update-files");
+    expect(plan.summary.writeIntentFiles).toEqual([]);
+  });
+
+  it("projects eight mixed operations to supported write intents", () => {
+    const plan = planFromPatch(
+      eightMixedPatch(),
+      {
+        "src/a.ts": "a = 1\n",
+        "src/b.ts": "b = 1\n",
+        "src/c.ts": "c = 1\n",
+        "src/remove-a.ts": "remove a\n",
+        "src/remove-b.ts": "remove b\n",
+        "src/from-a.ts": "move a\n",
+      },
+      { existingDirectories: ["src"] },
+    );
+
+    expectSupportedWritePlan(plan, [
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/new-a.ts",
+      "src/new-b.ts",
+      "src/remove-a.ts",
+      "src/remove-b.ts",
+      "src/to-a.ts",
+    ]);
+  });
+
+  it("projects nine mixed operations as unsupported/no-write", () => {
+    const plan = planFromPatch(nineMixedPatch(), {
+      "src/a.ts": "a = 1\n",
+      "src/b.ts": "b = 1\n",
+      "src/c.ts": "c = 1\n",
+      "src/d.ts": "d = 1\n",
+      "src/remove.ts": "remove\n",
+      "src/from.ts": "from\n",
+    });
+
+    expectUnsupportedNoWritePlan(plan, "mixed-operations");
+    expect(plan.summary.mixedOperationReadiness?.operationCount).toBe(9);
+  });
 });
+
+function boundedUpdatePatch(count: number): string[] {
+  return [
+    "*** Begin Patch",
+    ..."abcdefghi".slice(0, count).split("").flatMap((file) => [
+      `*** Update File: src/${file}.ts`,
+      "@@",
+      `-${file} = 1`,
+      `+${file} = 2`,
+    ]),
+    "*** End Patch",
+  ];
+}
+
+function updateFiles(count: number): Record<string, string> {
+  return Object.fromEntries(
+    "abcdefghi"
+      .slice(0, count)
+      .split("")
+      .map((file) => [`src/${file}.ts`, `${file} = 1\n`]),
+  );
+}
+
+function eightMixedPatch(): string[] {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Update File: src/b.ts",
+    "@@",
+    "-b = 1",
+    "+b = 2",
+    "*** Update File: src/c.ts",
+    "@@",
+    "-c = 1",
+    "+c = 2",
+    "*** Add File: src/new-a.ts",
+    "+created a",
+    "*** Add File: src/new-b.ts",
+    "+created b",
+    "*** Delete File: src/remove-a.ts",
+    "*** Delete File: src/remove-b.ts",
+    "*** Update File: src/from-a.ts",
+    "*** Move to: src/to-a.ts",
+    "@@",
+    " move a",
+    "*** End Patch",
+  ];
+}
+
+function nineMixedPatch(): string[] {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Update File: src/b.ts",
+    "@@",
+    "-b = 1",
+    "+b = 2",
+    "*** Update File: src/c.ts",
+    "@@",
+    "-c = 1",
+    "+c = 2",
+    "*** Update File: src/d.ts",
+    "@@",
+    "-d = 1",
+    "+d = 2",
+    "*** Add File: src/new-a.ts",
+    "+created a",
+    "*** Add File: src/new-b.ts",
+    "+created b",
+    "*** Add File: src/new-c.ts",
+    "+created c",
+    "*** Delete File: src/remove.ts",
+    "*** Update File: src/from.ts",
+    "*** Move to: src/to.ts",
+    "@@",
+    " from",
+    "*** End Patch",
+  ];
+}
 
 function expectSupportedWritePlan(
   plan: ReturnType<typeof buildPerFilePatchPlan>,

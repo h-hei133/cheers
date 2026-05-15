@@ -306,14 +306,128 @@ describe("multi-file Update File selected-workspace write route", () => {
     );
   });
 
-  it("blocks five Update File operations without invoking the writer", async () => {
+  it("writes five Update File operations under the bounded small-N policy", async () => {
     const fixture = createFixture({ includeC: true, includeD: true, includeE: true });
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+
+    const result = await runMultiFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, fiveFilePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: authority.writeFile,
+    });
+
+    expect(result.status).toBe("written");
+    expect(result.changedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+      "src/e.ts",
+    ]);
+    expect(result.failedFiles).toEqual([]);
+    expect(result.postWriteVerification).toBe("passed");
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-multi-file-write-route:bounded-5-update-files",
+        "apply-patch-multi-file-write-route:sequential-write-no-rollback",
+      ]),
+    );
+  });
+
+  it("restores an eight-file update prefix after partial failure and blocks hidden edits", async () => {
+    const fixture = createFixture({
+      includeC: true,
+      includeD: true,
+      includeE: true,
+      extraFiles: {
+        "src/f.ts": "f = 1\n",
+        "src/g.ts": "g = 1\n",
+        "src/h.ts": "h = 1\n",
+      },
+    });
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+
+    const result = await runMultiFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, boundedUpdatePatch(8)),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: (relativePath, content) => {
+        if (relativePath === "src/h.ts") {
+          throw new Error("simulated eighth writer failure");
+        }
+        authority.writeFile(relativePath, content);
+      },
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-eight-update-restore",
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("write-application");
+    expect(result.changedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+      "src/e.ts",
+      "src/f.ts",
+      "src/g.ts",
+    ]);
+    expect(result.failedFiles[0]?.path).toBe("src/h.ts");
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(8);
+    expect(result.postWriteVerification).toBe("blocked");
+
+    const restore = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-eight-update-restore",
+      recordId: "update-1-src-a.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/a.ts",
+    });
+    expect(restore.restored).toBe(true);
+    expect(restore.rollbackAtomicityClaim).toBe(false);
+
+    fs.writeFileSync(
+      path.join(fixture.workspaceRoot, "src", "a.ts"),
+      "hidden-user-edit\n",
+      "utf8",
+    );
+    const blockedRestore = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-eight-update-restore",
+      recordId: "update-1-src-a.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/a.ts",
+    });
+    expect(blockedRestore.restored).toBe(false);
+    expect(blockedRestore.blockedReason).toBe("current-content-hash-mismatch");
+  });
+
+  it("blocks nine Update File operations without invoking the writer", async () => {
+    const fixture = createFixture({
+      includeC: true,
+      includeD: true,
+      includeE: true,
+      extraFiles: {
+        "src/f.ts": "f = 1\n",
+        "src/g.ts": "g = 1\n",
+        "src/h.ts": "h = 1\n",
+        "src/i.ts": "i = 1\n",
+      },
+    });
     const before = snapshotFixture(fixture.workspaceRoot);
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     let writes = 0;
 
     const result = await runMultiFileWriteRoute({
-      ...routeOptions(fixture.workspaceRoot, fiveFilePatch()),
+      ...routeOptions(fixture.workspaceRoot, boundedUpdatePatch(9)),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       validateWriteTarget: authority.validateWriteTarget,
@@ -638,6 +752,7 @@ function createFixture(
     readonly includeC?: boolean;
     readonly includeD?: boolean;
     readonly includeE?: boolean;
+    readonly extraFiles?: Record<string, string>;
   } = {},
 ): { readonly workspaceRoot: string } {
   const workspaceRoot = fs.mkdtempSync(
@@ -655,6 +770,11 @@ function createFixture(
   }
   if (options.includeE) {
     fs.writeFileSync(path.join(workspaceRoot, "src", "e.ts"), "e = 1\n", "utf8");
+  }
+  for (const [relativePath, content] of Object.entries(options.extraFiles ?? {})) {
+    const absolutePath = path.join(workspaceRoot, relativePath);
+    fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+    fs.writeFileSync(absolutePath, content, "utf8");
   }
   return { workspaceRoot };
 }
@@ -736,28 +856,19 @@ function fourFilePatch(): string {
 }
 
 function fiveFilePatch(): string {
+  return boundedUpdatePatch(5);
+}
+
+function boundedUpdatePatch(count: number): string {
+  const files = "abcdefghi".slice(0, count).split("");
   return [
     "*** Begin Patch",
-    "*** Update File: src/a.ts",
-    "@@",
-    "-a = 1",
-    "+a = 2",
-    "*** Update File: src/b.ts",
-    "@@",
-    "-b = 1",
-    "+b = 2",
-    "*** Update File: src/c.ts",
-    "@@",
-    "-c = 1",
-    "+c = 2",
-    "*** Update File: src/d.ts",
-    "@@",
-    "-d = 1",
-    "+d = 2",
-    "*** Update File: src/e.ts",
-    "@@",
-    "-e = 1",
-    "+e = 2",
+    ...files.flatMap((file) => [
+      `*** Update File: src/${file}.ts`,
+      "@@",
+      `-${file} = 1`,
+      `+${file} = 2`,
+    ]),
     "*** End Patch",
   ].join("\n");
 }

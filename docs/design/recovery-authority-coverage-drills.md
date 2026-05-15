@@ -31,6 +31,13 @@ Route 64 later extended the bounded surface to exactly-four update, mixed,
 delete-only, and move-only batches, with matching non-default
 recovery-authority capture and explicit partial-failure restore drills.
 
+Route 65 later replaced exact count-by-count expansion with a bounded small-N
+policy capped at 8 operations. Representative 8-operation update-only, mixed,
+delete-only, and move-only partial-failure drills prove captured authority can
+be restored explicitly one record at a time while hidden current-content or
+current-state changes block restore. No automatic recovery or rollback was
+added.
+
 ## Implementation Notes
 
 - `packages/ts-shell/src/orchestration/patchResult/workspaceMoveRoute.ts`
@@ -68,6 +75,8 @@ Focused tests now prove:
   facts before the first move writer.
 - exactly-four update, mixed, delete-only, and move-only partial failures keep
   explicit restore per-file and non-atomic.
+- representative 8-operation update-only, mixed, delete-only, and move-only
+  partial failures keep explicit restore per-file and non-atomic.
 - current-content mismatch blocks hidden-user-edit overwrite.
 - rollbackAtomicityClaim stays false outside the route result.
 
@@ -104,7 +113,7 @@ route.
 
 ## Next Direction
 
-Route 64 implemented bounded exactly-four write support. The next likely
-development batch is a 5-operation/small-N bounded write policy decision if the
-evidence remains stable, or a separate CLI/session restore UX route if
-user-visible restore commands become the higher product priority.
+Route 65 implemented bounded small-N write support with cap 8. Do not continue
+count-by-count expansion by default. The next likely development direction is
+either user/session explicit restore UX or a larger-write readiness audit only
+if a concrete need justifies going beyond cap 8.

@@ -3,8 +3,9 @@ import type {
   NoPartialPatchApplicationContract,
   PatchWriteIntent,
 } from "./noPartialApply.js";
+import { isBoundedWriteOperationCount } from "../patchResult/boundedWritePolicy.js";
 
-export type MultiFileUpdateTargetCount = 2 | 3 | 4;
+export type MultiFileUpdateTargetCount = number;
 
 export interface MultiFileUpdateApplyOptions {
   readonly expectedFileCount: MultiFileUpdateTargetCount;
@@ -44,16 +45,17 @@ export async function applyMultiFileUpdateIntents(
   const intents = contract.writeIntents;
   if (
     intents.length !== options.expectedFileCount ||
-    intents.some((intent) => !intent)
+    intents.some((intent) => !intent) ||
+    !isBoundedWriteOperationCount(options.expectedFileCount)
   ) {
     return fail(
       [
         {
           code: "patch-apply-plan-not-verified",
           message:
-            `Patch apply only supports exactly ${options.expectedFileCount} verified update write intents in this multi-file candidate route.`,
+            `Patch apply only supports ${options.expectedFileCount} verified update write intents within the bounded small-N route.`,
           nextAction:
-            `Use exactly ${options.expectedFileCount} verified Update File operations before applying through this multi-file route.`,
+            `Use 2-8 verified Update File operations before applying through this multi-file route.`,
         },
       ],
       [],
@@ -71,7 +73,7 @@ export async function applyMultiFileUpdateIntents(
           message:
             "Patch apply requires distinct update targets in the multi-file candidate route.",
           nextAction:
-            `Regenerate the patch with exactly ${options.expectedFileCount} distinct existing-file Update File operations.`,
+            "Regenerate the patch with 2-8 distinct existing-file Update File operations.",
         },
       ],
       [],
@@ -91,7 +93,7 @@ export async function applyMultiFileUpdateIntents(
             message:
               "Multi-file patch apply only supports verified Update File operations.",
             nextAction:
-              "Keep add, delete, move, and mixed operations out of the two-file update route.",
+              "Keep add, delete, move, and mixed operations out of the bounded update-only route.",
           },
         ],
         [],
@@ -109,7 +111,7 @@ export async function applyMultiFileUpdateIntents(
             message:
               "Multi-file patch apply requires verified replacement content for each update target.",
             nextAction:
-              "Re-run patch verification and ensure both updates have planned content.",
+              "Re-run patch verification and ensure every update has planned content.",
           },
         ],
         [],
@@ -137,7 +139,7 @@ export async function applyMultiFileUpdateIntents(
                 ? `Patch write failed: ${error.message}`
                 : "Patch write failed.",
             nextAction:
-              "Inspect/re-read both attempted files before retrying; no rollback was attempted.",
+              "Inspect/re-read all attempted files before retrying; no rollback was attempted.",
           },
         ],
         changedFiles,
@@ -157,7 +159,7 @@ export async function applyMultiFileUpdateIntents(
             message:
               "Patch update post-write verification failed: readback did not match planned content.",
             nextAction:
-              "Inspect/re-read both attempted files before retrying; no rollback was attempted.",
+              "Inspect/re-read all attempted files before retrying; no rollback was attempted.",
           },
         ],
         changedFiles,

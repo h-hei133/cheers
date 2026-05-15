@@ -48,6 +48,53 @@ describe("projectMixedOperationReadiness", () => {
     });
   });
 
+  it("recognizes bounded eight-operation mixed route support without granting write authority", () => {
+    const readiness = projectMixedOperationReadiness([
+      updateOperation("src/a.ts"),
+      updateOperation("src/b.ts"),
+      addOperation("src/new-a.ts"),
+      addOperation("src/new-b.ts"),
+      deleteOperation("src/remove-a.ts"),
+      deleteOperation("src/remove-b.ts"),
+      moveOperation("src/from-a.ts", "src/to-a.ts"),
+      moveOperation("src/from-b.ts", "src/to-b.ts"),
+    ]);
+
+    expect(readiness).toMatchObject({
+      isMixedOperation: true,
+      operationKinds: ["update", "create", "delete", "move"],
+      operationCount: 8,
+      blockedCombinations: [],
+      routeBlocker: "none",
+      mixedWritesEnabled: true,
+      rollbackOrAtomicityClaim: "none",
+      writeAuthority: "not-granted-by-readiness-projection",
+    });
+  });
+
+  it("keeps nine-operation mixed batches blocked by readiness projection", () => {
+    const readiness = projectMixedOperationReadiness([
+      updateOperation("src/a.ts"),
+      updateOperation("src/b.ts"),
+      addOperation("src/new-a.ts"),
+      addOperation("src/new-b.ts"),
+      deleteOperation("src/remove-a.ts"),
+      deleteOperation("src/remove-b.ts"),
+      moveOperation("src/from-a.ts", "src/to-a.ts"),
+      moveOperation("src/from-b.ts", "src/to-b.ts"),
+      updateOperation("src/c.ts"),
+    ]);
+
+    expect(readiness).toMatchObject({
+      isMixedOperation: true,
+      operationCount: 9,
+      routeBlocker: "mixed-operation-route-not-enabled",
+      mixedWritesEnabled: false,
+      rollbackOrAtomicityClaim: "none",
+      writeAuthority: "not-granted-by-readiness-projection",
+    });
+  });
+
   it("keeps single-operation families out of the mixed blocker path", () => {
     const readiness = projectMixedOperationReadiness([
       updateOperation("src/a.ts"),

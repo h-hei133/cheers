@@ -5,6 +5,11 @@ mixed, delete-only, and move-only batches. This is not broad `apply_patch`,
 5+ writes, automatic recovery, atomic rollback, provider/session/CLI/MCP
 behavior, package-script, or default-gate readiness.
 
+Route 65 note: the active bounded policy now supports selected-workspace
+2-8 update-only, mixed, delete-only, and move-only batches through a central
+cap. This document remains the Route 64 exactly-four evidence record; use
+`docs/design/bounded-small-n-write-policy.md` for the current cap-8 boundary.
+
 ## Post-Route 63 Baseline
 
 Before Route 64, the project supported selected-workspace single

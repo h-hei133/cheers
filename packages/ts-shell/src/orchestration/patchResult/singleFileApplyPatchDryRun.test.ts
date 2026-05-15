@@ -107,8 +107,9 @@ describe("buildSingleFileApplyPatchDryRun", () => {
       expect.objectContaining({
         capability: "multi-file-update-candidate-no-write",
         tier: "candidate",
-        blockedReason: "multi-file-update-write-not-enabled",
+        blockedReason: "bounded-update-planning-no-write",
         wouldChangeFiles: ["src/a.ts", "src/b.ts"],
+        plannedFiles: ["src/a.ts", "src/b.ts"],
         failedFiles: [],
         changedFiles: [],
         writeIntents: [],

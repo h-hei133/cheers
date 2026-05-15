@@ -20,9 +20,14 @@ Before this route, the project already had:
 - no default persistence
 - no automatic recovery
 - no atomic rollback
-- no broad `apply_patch`, 5+ mixed, 5+ write, broad multi-delete, or
+- no broad `apply_patch`, 9+ mixed, 9+ write, broad multi-delete, or
   broad multi-move
   support
+
+Route 65 note: bounded small-N write support now covers 2-8 update-only,
+mixed, delete-only, and move-only batches. The restore surface remains explicit
+and non-default; no CLI/session restore command, automatic recovery, rollback,
+or default persistence was added.
 
 Route 61 makes captured authority inspectable and intentionally executable
 through a separate bridge. Default write routes still do not run recovery.

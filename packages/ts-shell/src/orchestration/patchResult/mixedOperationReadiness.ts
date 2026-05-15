@@ -2,6 +2,7 @@ import type {
   PatchFileOperation,
   PatchOperationKind,
 } from "../patchParsing/types.js";
+import { isBoundedWriteOperationCount } from "./boundedWritePolicy.js";
 
 export type MixedOperationKind = "update" | "create" | "delete" | "move";
 
@@ -52,9 +53,7 @@ export function projectMixedOperationReadiness(
   const isMixedOperation = operationKinds.length > 1;
   const mixedWritesEnabled =
     isMixedOperation &&
-    (operations.length === 2 ||
-      operations.length === 3 ||
-      operations.length === 4) &&
+    isBoundedWriteOperationCount(operations.length) &&
     operationKinds.every((kind) => currentSingleOperationLanes.has(kind));
   const blocked = isMixedOperation && !mixedWritesEnabled;
   return {

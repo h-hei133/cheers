@@ -16,6 +16,11 @@ import {
   type JournalFailureSurfaceProjection,
 } from "./journalResultProjection.js";
 import type { RouteScopedEditJournal } from "./routeScopedEditJournal.js";
+import {
+  MAX_BOUNDED_WRITE_OPERATIONS,
+  isBoundedWriteOperationCount,
+  isTooManyBoundedWriteOperations,
+} from "./boundedWritePolicy.js";
 
 export type PerFilePatchOperationKind =
   | "update"
@@ -387,7 +392,7 @@ function buildParsedPatchPlan(
   }
 
   if (
-    (operations.length === 2 || operations.length === 3 || operations.length === 4) &&
+    isBoundedWriteOperationCount(operations.length) &&
     deleteOperations.length === operations.length
   ) {
     return buildVerifiedDestructiveDeletePlan({
@@ -399,7 +404,7 @@ function buildParsedPatchPlan(
   }
 
   if (
-    (operations.length === 2 || operations.length === 3 || operations.length === 4) &&
+    isBoundedWriteOperationCount(operations.length) &&
     moveOperations.length === operations.length
   ) {
     return buildVerifiedDestructiveMovePlan({
@@ -410,7 +415,10 @@ function buildParsedPatchPlan(
     });
   }
 
-  if (operations.length === 2 && updateOperations.length === 2) {
+  if (
+    isBoundedWriteOperationCount(operations.length) &&
+    updateOperations.length === operations.length
+  ) {
     return buildVerifiedPlan({
       patch,
       options,
@@ -421,50 +429,17 @@ function buildParsedPatchPlan(
       writeIntentFiles: updateOperations.map((operation) => operation.path),
       targetFiles,
       reason:
-        "Exactly-two existing-file Update File patch is represented as supported write intents owned by the existing two-file route.",
+        `Bounded small-N existing-file Update File patch is represented as supported write intents owned by the guarded 2-${MAX_BOUNDED_WRITE_OPERATIONS} file route.`,
       nextAction:
-        "Route may write only through explicit approval naming both files, all final stale-reads, sequential writes, and per-file post-write verification.",
+        "Route may write only through explicit approval naming all files, all final stale-reads, sequential writes, and per-file post-write verification.",
       operationSupportStatus: "supported-write",
     });
   }
 
-  if (operations.length === 3 && updateOperations.length === 3) {
-    return buildVerifiedPlan({
-      patch,
-      options,
-      supportedOperations: ["update"],
-      supportStatus: "supported-write",
-      failureClass: "none",
-      plannedFiles: [],
-      writeIntentFiles: updateOperations.map((operation) => operation.path),
-      targetFiles,
-      reason:
-        "Exactly-three existing-file Update File patch is represented as supported write intents owned by the guarded three-file route.",
-      nextAction:
-        "Route may write only through explicit approval naming all three files, all final stale-reads, sequential writes, and per-file post-write verification.",
-      operationSupportStatus: "supported-write",
-    });
-  }
-
-  if (operations.length === 4 && updateOperations.length === 4) {
-    return buildVerifiedPlan({
-      patch,
-      options,
-      supportedOperations: ["update"],
-      supportStatus: "supported-write",
-      failureClass: "none",
-      plannedFiles: [],
-      writeIntentFiles: updateOperations.map((operation) => operation.path),
-      targetFiles,
-      reason:
-        "Exactly-four existing-file Update File patch is represented as supported write intents owned by the guarded four-file route.",
-      nextAction:
-        "Route may write only through explicit approval naming all four files, all final stale-reads, sequential writes, and per-file post-write verification.",
-      operationSupportStatus: "supported-write",
-    });
-  }
-
-  if (updateOperations.length > 4 && updateOperations.length === operations.length) {
+  if (
+    isTooManyBoundedWriteOperations(updateOperations.length) &&
+    updateOperations.length === operations.length
+  ) {
     return buildUnsupportedPlan({
       operations,
       targetFiles,
@@ -479,9 +454,9 @@ function buildParsedPatchPlan(
           code: "patch-apply-plan-not-verified",
           path: operation.path,
           message:
-            "Per-file patch plan rejects 5+ Update File operations before any writer is reachable.",
+            `Per-file patch plan rejects ${MAX_BOUNDED_WRITE_OPERATIONS + 1}+ Update File operations before any writer is reachable.`,
           nextAction:
-            "Use one Update File, exactly two, exactly three, or exactly four Update File operations.",
+            `Use one Update File or 2-${MAX_BOUNDED_WRITE_OPERATIONS} Update File operations.`,
         }),
       ),
     });
@@ -510,9 +485,9 @@ function buildParsedPatchPlan(
       supportStatus: "unsupported-no-write",
       failureClass: "mixed-operations",
       reason:
-        "Mixed apply_patch operation families outside the bounded exactly-two, exactly-three, or exactly-four route are represented as unsupported/no-write even when each individual operation has an existing single-operation lane.",
+        `Mixed apply_patch operation families outside the bounded 2-${MAX_BOUNDED_WRITE_OPERATIONS} route are represented as unsupported/no-write even when each individual operation has an existing single-operation lane.`,
       nextAction:
-        "Use exactly two, exactly three, or exactly four supported mixed operations, split the patch into one supported operation family, or keep the broader shape out of the writer route.",
+        `Use 2-${MAX_BOUNDED_WRITE_OPERATIONS} supported mixed operations, split the patch into one supported operation family, or keep the broader shape out of the writer route.`,
       failures,
       mixedOperationReadiness: readiness,
     });
@@ -661,7 +636,7 @@ function buildVerifiedMixedPlan(input: {
     writeIntentFiles: input.operations.map(targetPathForOperation),
     targetFiles: input.targetFiles,
     reason:
-      "Exactly-two, exactly-three, or exactly-four mixed apply_patch operations are represented as supported write intents owned by the guarded mixed workspace route.",
+      `Bounded 2-${MAX_BOUNDED_WRITE_OPERATIONS} mixed apply_patch operations are represented as supported write intents owned by the guarded mixed workspace route.`,
     nextAction:
       "Route may write only through explicit approval naming all targets, all source/target guards, all final preflights before the first writer, parsed-order writes, and per-operation post-write verification.",
     operationSupportStatus: "supported-write",
@@ -849,7 +824,7 @@ function buildVerifiedDestructiveDeletePlan(input: {
     writeIntentFiles: input.operations.map((operation) => operation.path),
     targetFiles: input.targetFiles,
     reason:
-      "Exactly-two, exactly-three, or exactly-four Delete File operations are represented as supported write intents owned by the guarded bounded destructive workspace route.",
+      `Bounded 2-${MAX_BOUNDED_WRITE_OPERATIONS} Delete File operations are represented as supported write intents owned by the guarded bounded destructive workspace route.`,
     nextAction:
       "Route may delete only through explicit approval naming all targets, workspace guards, all final preflights before the first delete, parsed-order deletes, and per-file post-delete verification.",
     operationSupportStatus: "supported-write",
@@ -959,7 +934,7 @@ function buildVerifiedDestructiveMovePlan(input: {
     writeIntentFiles: input.operations.map((operation) => operation.moveTo),
     targetFiles: input.targetFiles,
     reason:
-      "Exactly-two, exactly-three, or exactly-four Move File operations are represented as supported write intents owned by the guarded bounded destructive workspace route.",
+      `Bounded 2-${MAX_BOUNDED_WRITE_OPERATIONS} Move File operations are represented as supported write intents owned by the guarded bounded destructive workspace route.`,
     nextAction:
       "Route may move only through explicit approval naming all sources and targets, workspace guards, all final preflights before the first move, parsed-order moves, and per-file post-move verification.",
     operationSupportStatus: "supported-write",
@@ -1319,7 +1294,7 @@ function unsupportedOperationPathFailures(
 function mixedOperationCombinationIsSupported(
   operations: readonly PatchFileOperation[],
 ): boolean {
-  if (operations.length !== 2 && operations.length !== 3 && operations.length !== 4) {
+  if (!isBoundedWriteOperationCount(operations.length)) {
     return false;
   }
   const kinds = operations.map((operation) => operation.kind);

@@ -337,13 +337,13 @@ describe("apply_patch mutation routing projection", () => {
     expect(readFile(fixture.workspaceRoot, "src/d.ts")).toBe("d = 2\n");
   });
 
-  it("keeps 5+ Update File patches stopped before writer invocation", async () => {
+  it("keeps 9+ Update File patches stopped before writer invocation", async () => {
     const fixture = createFixture({ includeC: true, includeD: true });
     const before = snapshotFixture(fixture.workspaceRoot);
     let writes = 0;
 
     const result = await projectApplyPatchRuntimeMutationRoute({
-      ...runtimeInput(fixture.workspaceRoot, fiveFileUpdatePatch()),
+      ...runtimeInput(fixture.workspaceRoot, nineFileUpdatePatch()),
       getWorkspaceAuthority: () =>
         authorityWithBlockedWriter(fixture.workspaceRoot, () => {
           writes += 1;
@@ -1127,28 +1127,23 @@ function fourFileUpdatePatch(): string {
 }
 
 function fiveFileUpdatePatch(): string {
+  return boundedFileUpdatePatch(5);
+}
+
+function nineFileUpdatePatch(): string {
+  return boundedFileUpdatePatch(9);
+}
+
+function boundedFileUpdatePatch(count: number): string {
+  const files = "abcdefghi".slice(0, count).split("");
   return [
     "*** Begin Patch",
-    "*** Update File: src/a.ts",
-    "@@",
-    "-a = 1",
-    "+a = 2",
-    "*** Update File: src/b.ts",
-    "@@",
-    "-b = 1",
-    "+b = 2",
-    "*** Update File: src/c.ts",
-    "@@",
-    "-c = 1",
-    "+c = 2",
-    "*** Update File: src/d.ts",
-    "@@",
-    "-d = 1",
-    "+d = 2",
-    "*** Update File: src/e.ts",
-    "@@",
-    "-e = 1",
-    "+e = 2",
+    ...files.flatMap((file) => [
+      `*** Update File: src/${file}.ts`,
+      "@@",
+      `-${file} = 1`,
+      `+${file} = 2`,
+    ]),
     "*** End Patch",
   ].join("\n");
 }
