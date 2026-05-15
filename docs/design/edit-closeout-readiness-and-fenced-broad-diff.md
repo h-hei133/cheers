@@ -1,6 +1,7 @@
 # Edit Closeout Readiness And Fenced Broad Diff
 
-Status: Route 72 implemented.
+Status: Route 72 implemented; Route 73 sealed the bounded edit surface as a
+closeout candidate.
 Date: 2026-05-15
 
 ## Post-Route 71 Baseline
@@ -162,7 +163,13 @@ No-write and dry-run states remain non-authorizing.
 
 ## Next-Route Decision Criteria
 
-Recommended next route: Route 73 edit capability closeout map and seal.
+Route 73 follow-up: the bounded edit surface is now represented by
+`editCapabilityCloseoutManifest.ts`, verified by
+`verify:edit-capability-closeout`, and documented in
+`docs/design/edit-capability-closeout-seal.md`.
+
+Recommended next phase: context engineering kickoff, with undo/restore product
+polish as the narrower alternative if restore UX becomes the product priority.
 
 Use a targeted blocker route only if Route 72 validation reveals a concrete
 regression in supported bounded behavior. Do not move to broad arbitrary

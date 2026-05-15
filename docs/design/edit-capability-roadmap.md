@@ -1,8 +1,9 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 72
+Route baseline: post-Route 73
 Date: 2026-05-15
-Status: long-range edit capability map after Routes 50-72.
+Status: long-range edit capability map after Routes 50-73; edit capability is
+now a closeout candidate for the bounded selected-workspace surface.
 Routes 59-66 have implemented a narrow explicit non-default original-content
 authority loop, explicit restore surface, bounded exactly-three mixed write
 expansion, bounded destructive multi-delete/multi-move support, and bounded
@@ -29,6 +30,10 @@ bounded parser/normalizer/route flow, a pure edit capability readiness model,
 and a focused edit closeout verifier. It did not add arbitrary broad
 `apply_patch`, fuzzy patching, 33+ writes, automatic recovery, atomic rollback,
 provider/session/CLI/MCP changes, or default persistence.
+Route 73 sealed the current edit phase as a closeout candidate by adding a
+machine-checkable closeout manifest, expanding readiness coverage, strengthening
+`verify:edit-capability-closeout`, and documenting practical parity/non-parity
+against ClaudeCode, opencode, and gemini-cli.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -40,7 +45,7 @@ opencode, and gemini-cli.
 It is not a broad edit readiness claim. It keeps implemented capability,
 candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Post-Route 72 Executive Summary
+## 1. Post-Route 73 Executive Summary
 
 Current write capability remains intentionally narrow. The project supports a
 bounded selected-workspace write surface and still blocks broad arbitrary
@@ -72,6 +77,20 @@ candidates, and any fenced content that the existing bounded normalizer rejects.
 The route also added `editCapabilityReadiness.ts` and
 `verify-edit-capability-closeout.mjs` as closeout evidence. This is a targeted
 model-output compatibility improvement, not new writer authority.
+
+Route 73 turned that evidence into a closeout seal: `editCapabilityReadiness.ts`
+now covers the full supported/non-default/blocked envelope, and
+`editCapabilityCloseoutManifest.ts` exposes a machine-checkable
+closeout-candidate manifest with no automatic recovery, no atomic rollback, no
+default persistence, and arbitrary broad `apply_patch` blocked by design.
+`verify:edit-capability-closeout` now covers parser, fenced extraction,
+normalizer, unsupported taxonomy, bounded candidate classification, cap policy,
+compatibility gauntlet, readiness, manifest, and restore core surfaces. The
+result contract remains a required final validation gate run separately.
+
+Routes 57-73 are therefore complete for this edit capability phase. The sealed
+state is closeout-candidate, not broad edit readiness and not reference-repo
+feature parity.
 
 Routes 52-56 changed the roadmap direction:
 
@@ -612,8 +631,9 @@ User / CLI / provider output
 | Broad unsupported-shape taxonomy and gauntlet | Implemented projection/test hardening | `patchParsing/broadPatchUnsupportedReason.ts`, `broadPatchUnsupportedReason.test.ts`, `boundedBroadPatchNormalizer.test.ts`, `boundedApplyPatchCandidate.test.ts`, `docs/design/rename-content-and-broad-shape-gauntlet.md` | C/D/E | Reason metadata is no-write evidence only; user-facing result shape remains bounded by existing contracts | Optional UX projection polish only if needed |
 | Realistic edit compatibility gauntlet | Implemented Route 71/72 compatibility evidence | `patchResult/editCompatibilityGauntlet.test.ts`, `docs/design/realistic-edit-compatibility-gauntlet.md`, `boundedApplyPatchCandidate.ts`, `boundedBroadPatchNormalizer.ts`, `fencedPatchExtractor.ts`, `mutationRoutingProjection.ts`, recovery store/restore primitives | C/D/E | Gauntlet adds evidence and fenced extraction coverage, not new writer authority; arbitrary broad, fuzzy, binary/mode/symlink/submodule, 33+, automatic recovery, and rollback remain blocked | Route 73 closeout map/seal if validation remains green |
 | Fenced bounded broad diff extraction | Implemented targeted parser compatibility | `patchParsing/fencedPatchExtractor.ts`, `fencedPatchExtractor.test.ts`, `boundedBroadPatchNormalizer.ts`, `boundedApplyPatchCandidate.test.ts`, `editCompatibilityGauntlet.test.ts`, `docs/design/edit-closeout-readiness-and-fenced-broad-diff.md` | C/D/E | Supports one clear fenced git-style diff only; multiple/incomplete/non-patch/nested/prose-multiple candidates remain blocked; no arbitrary prose parser | Preserve as compatibility shim; do not widen without route |
-| Edit capability readiness model | Implemented pure closeout classification | `patchResult/editCapabilityReadiness.ts`, `editCapabilityReadiness.test.ts`, `docs/design/edit-closeout-readiness-and-fenced-broad-diff.md` | D/E | Classification only; no routing, writer, provider, session, persistence, recovery, or rollback behavior | Use in closeout/seal documentation |
-| Edit capability closeout verifier | Implemented focused local verifier | `scripts/verify-edit-capability-closeout.mjs`, `package.json`, focused parser/candidate/gauntlet/readiness tests | D/E | Not a default release gate; does not run provider/CLI/MCP/real-provider gates | Run when edit closeout evidence is touched |
+| Edit capability readiness model | Implemented pure closeout classification | `patchResult/editCapabilityReadiness.ts`, `editCapabilityReadiness.test.ts`, `docs/design/edit-closeout-readiness-and-fenced-broad-diff.md`, `docs/design/edit-capability-closeout-seal.md` | D/E | Classification only; no routing, writer, provider, session, persistence, recovery, or rollback behavior | Preserve as closeout source of truth |
+| Edit capability closeout manifest | Implemented machine-checkable closeout artifact | `patchResult/editCapabilityCloseoutManifest.ts`, `editCapabilityCloseoutManifest.test.ts`, `editCapabilityReadiness.ts`, `docs/design/edit-capability-closeout-seal.md` | D/E | Manifest is evidence and boundary data only; no runtime routing or writer behavior | Keep aligned with readiness and verifier |
+| Edit capability closeout verifier | Implemented focused local verifier | `scripts/verify-edit-capability-closeout.mjs`, `package.json`, parser/fenced/normalizer/taxonomy/candidate/cap/gauntlet/readiness/manifest/restore tests | D/E | Not a default release gate; does not run provider/CLI/MCP/real-provider gates; result-contract runs separately in final validation | Run when edit closeout evidence is touched |
 | 8-operation recovery-authority drills | Implemented explicit drill evidence | `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts` | C/D | Explicit primitive only; no automatic recovery, session restore command, or atomic rollback | User/session explicit restore UX if product priority |
 | Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, unsupported E2E and continuity checks | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Preserve as recovery-plan consumer |
 | Route-scoped edit journal prototype | Implemented metadata-only projection | `routeScopedEditJournal.ts`, `routeScopedEditJournal.test.ts` | C/D | Non-durable; not recovery or writer authority | Feed original-content ledger prototype if safe |
@@ -622,7 +642,7 @@ User / CLI / provider output
 | Single-file failure journal metadata | Implemented representative coverage | `workspaceWriteResult.ts`, `workspaceCreateResult.ts`, `workspaceMoveResult.ts`, `workspaceDeleteResult.ts`, focused tests | C/D | Coverage is failure metadata only; success paths are not a recovery ledger | Keep as representative wiring |
 | Journal failure consumer entrypoint | Implemented shared projection entrypoint | `journalFailureConsumer.ts` | C/D | Builds journal facts but recovery classification is projected downstream | Preserve existing changed/failed/planned semantics |
 | Journal metadata boundary helper | Implemented centralized boundary and blocker facts | `journalMetadataBoundary.ts`, `journalMetadataBoundary.test.ts` | C/D | No durability, storage, restore, or executor | Preserve in all future recovery work |
-| External comparison against ClaudeCode/opencode/gemini-cli | Completed directional evidence | This roadmap and `journal-boundary-readiness.md` | E/F | Comparison is directional, not parity | Use to block unsupported recovery claims |
+| External comparison against ClaudeCode/opencode/gemini-cli | Completed directional and closeout parity evidence | This roadmap, `journal-boundary-readiness.md`, `docs/design/edit-capability-closeout-seal.md` | E/F | Comparison is feature-level only; full parity is not claimed | Use to block unsupported recovery and broad edit claims |
 | Recovery failure-state classification | Implemented projection-only diagnostics | `journalFailureStateProjection.ts`, `journalFailureStateProjection.test.ts` | D | Classification depends on existing journal facts; unknown state remains explicit when facts are insufficient | Feed original-content ledger prototype if safe |
 | Recovery plan projection | Implemented plan-only diagnostics with absent-authority and captured non-default authority modes | `journalRecoveryPlanProjection.ts`, `journalRecoveryPlanProjection.test.ts`, `journalResultProjection.ts`, focused consumer tests | C/D | No automatic recovery executor, rollback, snapshot, or default persistence | Preserve while expanding non-default coverage |
 | Durable authority descriptor | Implemented active absent-authority descriptor plus captured original-content ledger descriptor | `journalDurableAuthority.ts`, `journalDurableAuthority.test.ts` | D | Captured authority is non-default only; no git or snapshot authority | Preserve no-default boundary |
@@ -1090,9 +1110,12 @@ recovery/rollback stance are explicitly re-audited.
     remain unsupported.
 
 - Batch 73: Edit capability closeout map and seal
-  - Recommended next if final Route 72 validation remains green.
-  - Should consolidate default/non-default readiness and document the stop
-    condition before context-engineering or broader product work.
+  - Status: implemented as closeout-candidate seal with design document,
+    manifest, readiness alignment, strengthened closeout verifier, and
+    parity/non-parity evidence.
+  - Current bounded edit capability can be treated as sealed for planning.
+    Restore product polish remains optional; broad arbitrary `apply_patch`
+    remains outside closeout.
 
 - Batch 74+: Broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are
@@ -1101,6 +1124,11 @@ recovery/rollback stance are explicitly re-audited.
     ordering, destructive semantics, permission, workspace authority,
     verification, partial failure, recovery, and user-facing claims into a much
     wider blast radius than current bounded candidates.
+
+- Recommended next phase: Context engineering kickoff
+  - Use the sealed bounded edit surface as a stable substrate.
+  - Alternative: undo/restore product polish if richer user-facing restore UX
+    is prioritized before context work.
 
 ## 10. Validation Strategy
 

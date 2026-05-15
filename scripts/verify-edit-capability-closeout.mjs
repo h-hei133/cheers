@@ -7,11 +7,19 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 const testTargets = [
+  'src/orchestration/patchParsing/parser.test.ts',
   'src/orchestration/patchParsing/fencedPatchExtractor.test.ts',
   'src/orchestration/patchParsing/boundedBroadPatchNormalizer.test.ts',
+  'src/orchestration/patchParsing/broadPatchUnsupportedReason.test.ts',
   'src/orchestration/patchResult/boundedApplyPatchCandidate.test.ts',
+  'src/orchestration/patchResult/boundedWritePolicy.test.ts',
   'src/orchestration/patchResult/editCompatibilityGauntlet.test.ts',
   'src/orchestration/patchResult/editCapabilityReadiness.test.ts',
+  'src/orchestration/patchResult/editCapabilityCloseoutManifest.test.ts',
+  'src/orchestration/patchRecovery/restoreCommandContract.test.ts',
+  'src/orchestration/patchRecovery/restoreCommandRunner.test.ts',
+  'src/orchestration/patchRecovery/restoreExecutionBridge.test.ts',
+  'src/orchestration/patchRecovery/restorePreview.test.ts',
 ]
 
 console.log('gate name=edit-capability-closeout')
@@ -41,11 +49,9 @@ function run(command, args) {
     const child = spawn(command, args, {
       cwd: repoRoot,
       env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: 'inherit',
       shell: false,
     })
-    child.stdout.pipe(process.stdout)
-    child.stderr.pipe(process.stderr)
     child.on('close', (code) => resolve(code ?? 1))
     child.on('error', () => resolve(3))
   })

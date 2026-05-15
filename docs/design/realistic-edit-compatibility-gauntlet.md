@@ -1,7 +1,8 @@
 # Realistic Edit Compatibility Gauntlet
 
 Status: Route 71 implemented as a focused compatibility gauntlet; Route 72
-extended it with fenced git-style broad diff coverage.
+extended it with fenced git-style broad diff coverage; Route 73 uses it as
+closeout verifier evidence.
 Date: 2026-05-15
 
 ## Post-Route 70 Baseline
@@ -222,6 +223,7 @@ atomic rollback.
 Next-route decision criteria:
 
 - If current bounded behavior remains stable, Route 73 should be an edit
-  capability closeout map and seal.
-- If blocked-shape explanations are confusing, Route 73 can polish user/session
+  capability closeout map and seal. Status: implemented as closeout-candidate
+  evidence.
+- If blocked-shape explanations are confusing, a future route can polish user/session
   unsupported edit explanations without changing write capability.
