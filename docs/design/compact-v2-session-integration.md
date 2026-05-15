@@ -1,6 +1,6 @@
 # Compact v2 Session Integration
 
-Status: Route 76 implemented candidate.
+Status: Route 76 implemented candidate; Route 77 live checkpoint added.
 Date: 2026-05-15
 
 ## Scope
@@ -155,6 +155,19 @@ The command path preserves Route 75 redaction behavior:
 The command output does not imply memory write, persistence, automatic restore,
 or edit rollback.
 
+## Route 77 Note
+
+Route 77 adds a live in-memory Compact v2 checkpoint behind the existing
+`/compact` and `/handoff` command path. The user command stays simple:
+running `/compact` still renders the handoff, and it now also updates the
+latest session-scoped checkpoint. JSON output remains available for the
+structured packet path.
+
+The checkpoint is not persisted, not stored in memory, not injected into the
+query loop, and not sent to a provider/model. A separate future-turn adapter can
+produce candidate model-facing context from the checkpoint, but Route 78 owns
+actual injection.
+
 ## Integration Status
 
 Implemented:
@@ -182,5 +195,5 @@ Deferred:
 - provider/model summarization
 - recovery execution from compact output
 
-Recommended next route: Project memory candidate extraction, unless command
-polish becomes the immediate product need.
+Recommended next route: Route 78 actual future-turn injection from live Compact
+v2 checkpoint.

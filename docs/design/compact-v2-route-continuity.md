@@ -1,6 +1,7 @@
 # Compact v2 Route Continuity
 
-Status: Route 75 implemented candidate; Route 76 command integration added.
+Status: Route 75 implemented candidate; Route 76 command integration added;
+Route 77 live checkpoint added.
 Date: 2026-05-15
 
 ## Post-Route 74 Baseline
@@ -232,8 +233,14 @@ compact runtime history, persist memory, change SessionManager schema, call a
 provider/model, execute restore, add sidebar UI, add startup cache, or change
 edit behavior.
 
-Recommended next route: Project memory candidate extraction, unless command
-polish becomes the immediate product need.
+Route 77 note: `/compact` and `/handoff` now create/update an in-memory latest
+Compact v2 checkpoint. The checkpoint stores the redacted packet, rendered
+markdown, survivor labels, redactions, warnings, and command source. A
+future-turn adapter can produce candidate model-facing context from that
+checkpoint, but it remains `candidate-only` and `not-injected`.
+
+Recommended next route: Route 78 actual future-turn injection from live Compact
+v2 checkpoint.
 
 ## Non-Goals
 
@@ -254,6 +261,8 @@ Route 75 does not implement:
 
 - Runtime history compaction remains separate from the preview-only handoff
   command.
+- Future-turn adapter output is available but not injected into query/provider
+  context yet.
 - Future command polish may add richer arguments, but should keep mutation,
   persistence, provider/model calls, and recovery execution out of the default
   command path.

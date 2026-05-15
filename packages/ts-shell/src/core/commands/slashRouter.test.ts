@@ -2,6 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  createCompactLiveCheckpointStore,
+  getLatestCompactCheckpoint,
+} from "../context/compactLiveCheckpoint.js";
 import { createCommandRegistry, listVisibleCommands } from "./registry.js";
 import { routeSlashCommand } from "./slashRouter.js";
 
@@ -61,8 +65,14 @@ describe("slash router (W4)", () => {
   });
 
   it("routes local compact command without persistence side effects", async () => {
+    const compactCheckpointStore = createCompactLiveCheckpointStore({
+      now: () => "2026-05-15T00:00:00.000Z",
+      nextId: () => "checkpoint-slash-1",
+    });
     const result = await routeSlashCommand("/compact", {
       cwd: workspaceRoot,
+      sessionId: "sess_slash",
+      compactCheckpointStore,
     });
     expect(result).toBeTruthy();
     expect(result?.kind).toBe("local");
@@ -72,15 +82,29 @@ describe("slash router (W4)", () => {
       expect(result.output).toContain("- Persistence: none");
       expect(result.output).toContain("- Provider/model call: none");
       expect(result.output).toContain("- Recovery execution: none");
+      expect(result.output).toContain("Compact checkpoint");
+      expect(result.output).toContain("- Checkpoint id: checkpoint-slash-1");
+      expect(result.output).toContain("- Future-turn adapter: ready-for-adapter");
+      expect(result.output).toContain("- Injection: not-yet-injected");
       expect(result.output).toContain("closeout-candidate");
       expect(result.output).not.toContain("Unknown slash command");
     }
+    expect(
+      getLatestCompactCheckpoint(compactCheckpointStore, "session:sess_slash")
+        ?.checkpointId,
+    ).toBe("checkpoint-slash-1");
     expect(fs.readdirSync(workspaceRoot)).toEqual([]);
   });
 
   it("routes compact JSON mode and rejects invalid compact args", async () => {
+    const compactCheckpointStore = createCompactLiveCheckpointStore({
+      now: () => "2026-05-15T00:00:00.000Z",
+      nextId: () => "checkpoint-json",
+    });
     const jsonResult = await routeSlashCommand("/compact json", {
       cwd: workspaceRoot,
+      sessionId: "sess_json",
+      compactCheckpointStore,
     });
     expect(jsonResult?.kind).toBe("local");
     if (jsonResult?.kind === "local") {
@@ -91,15 +115,55 @@ describe("slash router (W4)", () => {
         }),
       );
     }
+    expect(
+      getLatestCompactCheckpoint(compactCheckpointStore, "session:sess_json")
+        ?.checkpointId,
+    ).toBe("checkpoint-json");
 
     const invalidResult = await routeSlashCommand("/compact --execute", {
       cwd: workspaceRoot,
+      compactCheckpointStore,
     });
     expect(invalidResult?.kind).toBe("local");
     if (invalidResult?.kind === "local") {
       expect(invalidResult.output).toContain("- Outcome: blocked");
       expect(invalidResult.output).toContain("compact-command-mutating-flag");
     }
+  });
+
+  it("routes /handoff alias to the same compact checkpoint path and supersedes latest", async () => {
+    let checkpointIndex = 0;
+    const compactCheckpointStore = createCompactLiveCheckpointStore({
+      now: () => "2026-05-15T00:00:00.000Z",
+      nextId: () => {
+        checkpointIndex += 1;
+        return `checkpoint-alias-${checkpointIndex}`;
+      },
+    });
+    const first = await routeSlashCommand("/compact", {
+      cwd: workspaceRoot,
+      sessionId: "sess_alias",
+      compactCheckpointStore,
+    });
+    const second = await routeSlashCommand("/handoff", {
+      cwd: workspaceRoot,
+      sessionId: "sess_alias",
+      compactCheckpointStore,
+    });
+
+    expect(first?.kind).toBe("local");
+    expect(second?.kind).toBe("local");
+    if (second?.kind === "local") {
+      expect(second.output).toContain("- Checkpoint id: checkpoint-alias-2");
+      expect(second.output).toContain("- Source command: /handoff");
+    }
+    expect(compactCheckpointStore.getById("checkpoint-alias-1")?.status).toBe(
+      "superseded",
+    );
+    expect(
+      getLatestCompactCheckpoint(compactCheckpointStore, "session:sess_alias")
+        ?.checkpointId,
+    ).toBe("checkpoint-alias-2");
   });
 
   it("routes every visible registry command name and alias without falling through to unknown", async () => {

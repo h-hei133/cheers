@@ -35,7 +35,10 @@ export async function routeSlashCommand(
     };
   }
 
-  return command.execute(args, context);
+  return command.execute(args, {
+    ...context,
+    rawCommandName: rawName,
+  });
 }
 
 function buildUnknownSlashOutput(

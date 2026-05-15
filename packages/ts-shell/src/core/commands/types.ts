@@ -1,7 +1,12 @@
+import type { CompactLiveCheckpointStore } from '../context/compactLiveCheckpoint.js'
+
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
 export interface CommandContext {
   readonly cwd: string
+  readonly sessionId?: string
+  readonly rawCommandName?: string
+  readonly compactCheckpointStore?: CompactLiveCheckpointStore
 }
 
 export interface LocalCommandResult {

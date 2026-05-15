@@ -1,6 +1,6 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 76
+Route baseline: post-Route 77
 Date: 2026-05-15
 Status: long-range edit capability map after Routes 50-73; edit capability is
 now a closeout candidate for the bounded selected-workspace surface.
@@ -50,6 +50,12 @@ continuity: command contract, pure command runner, session-facing formatter,
 tests. It does not compact runtime history, persist memory, change
 SessionManager schema, call a provider/model, execute restore, add sidebar UI,
 add startup cache, or change edit behavior.
+Route 77 adds an in-memory latest Compact v2 checkpoint behind `/compact` and
+`/handoff`, plus a future-turn adapter that can produce candidate model-facing
+context without injecting it. It does not persist, add memory/sidebar/startup,
+change SessionManager schema, call a provider/model, inject future-turn
+context, execute restore, add automatic recovery, add atomic rollback, or change
+edit behavior.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -61,7 +67,7 @@ opencode, and gemini-cli.
 It is not a broad edit readiness claim. It keeps implemented capability,
 candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Post-Route 76 Executive Summary
+## 1. Post-Route 77 Executive Summary
 
 Current write capability remains intentionally narrow. The project supports a
 bounded selected-workspace write surface and still blocks broad arbitrary
@@ -107,8 +113,10 @@ result contract remains a required final validation gate run separately.
 Routes 57-73 are therefore complete for this edit capability phase. Route 74
 uses that sealed state as context-engineering input, Route 75 makes it survive
 compact as structured handoff state, and Route 76 exposes that handoff through a
-preview-only `/compact` command. The sealed state is closeout-candidate, not
-broad edit readiness and not reference-repo feature parity.
+preview-only `/compact` command. Route 77 keeps that command simple while
+creating a live in-memory checkpoint and a candidate-only future-turn adapter.
+The sealed state is closeout-candidate, not broad edit readiness and not
+reference-repo feature parity.
 
 Routes 52-56 changed the roadmap direction:
 
@@ -1160,12 +1168,31 @@ recovery/rollback stance are explicitly re-audited.
     change, edit runtime change, automatic recovery, or atomic rollback was
     added.
 
-- Recommended next phase: Route 76 Compact v2 session integration
-  - Wire the Compact v2 packet or markdown renderer into the existing
-    compact/session summary surface only where explicit and narrow.
+- Batch 76: Compact v2 session integration
+  - Status: implemented as `/compact` and `/handoff`, compact command contract,
+    pure command runner, session-facing formatter, JSON packet mode, and
+    focused command/surface tests.
+  - The command remains preview-only and does not compact runtime history,
+    persist memory, call a provider/model, execute restore, or change edit
+    behavior.
+
+- Batch 77: Compact live checkpoint and future-turn adapter
+  - Status: implemented as an in-memory latest checkpoint model, checkpoint
+    surface, future-turn candidate adapter, and `/compact` checkpoint update
+    path.
+  - The adapter reports `candidate-only` and `not-injected`; actual query-loop
+    injection remains deferred.
   - Do not change SessionManager persistence schema, package scripts, default
     gates, provider/MCP behavior, edit runtime behavior, memory storage,
     sidebar UI, startup cache, automatic recovery, or atomic rollback.
+
+- Recommended next phase: Route 78 actual future-turn injection from live
+  Compact v2 checkpoint
+  - Inject the candidate adapter output only through an explicit, tested query
+    continuity path.
+  - Preserve no persistence, no provider/MCP behavior changes beyond the
+    intended prompt context, no SessionManager schema changes, no memory
+    storage, no automatic recovery, and no atomic rollback.
 
 - Future broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are

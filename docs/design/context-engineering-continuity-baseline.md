@@ -1,7 +1,7 @@
 # Context Engineering Continuity Baseline
 
 Status: Route 74 baseline candidate; Route 75 Compact v2 packet implemented;
-Route 76 command integration added.
+Route 76 command integration added; Route 77 live checkpoint added.
 Date: 2026-05-15
 
 ## Post-Edit-Closeout Baseline
@@ -16,6 +16,13 @@ packet and markdown handoff. It keeps the context projection pure and still
 does not add memory storage, sidebar UI, startup cache, provider/model
 summarization, SessionManager schema changes, restore execution, automatic
 recovery, atomic rollback, or edit runtime changes.
+
+Route 77 adds an in-memory latest Compact v2 checkpoint and a future-turn
+adapter that can create candidate context from it. The adapter is not injected
+into the query loop or provider/model context. The checkpoint is not persisted
+and does not add memory storage, sidebar UI, startup cache, SessionManager
+schema changes, restore execution, automatic recovery, atomic rollback, or edit
+runtime changes.
 
 This route is not a memory implementation, sidebar UI, startup cache, provider
 change, MCP change, compact rewrite, SessionManager schema change, edit runtime
@@ -222,6 +229,9 @@ What Route 74 should not implement:
 - `packages/ts-shell/src/core/context/compactCommandContract.ts`
 - `packages/ts-shell/src/core/context/compactCommandRunner.ts`
 - `packages/ts-shell/src/core/context/compactSessionSurface.ts`
+- `packages/ts-shell/src/core/context/compactLiveCheckpoint.ts`
+- `packages/ts-shell/src/core/context/compactFutureTurnAdapter.ts`
+- `packages/ts-shell/src/core/context/compactCheckpointSurface.ts`
 
 The modules are pure. They do not perform file I/O, provider access, MCP
 discovery, persistence, session schema migration, edit routing, write execution,
@@ -294,16 +304,16 @@ scope.
 
 ## Session Hook Status
 
-Deferred. The existing session surfaces already render current-session and
-stopped-continuation facts. Route 74 keeps the context projection as a pure
-testable substrate, and Route 75 adds the packet/renderer. A future route can
-add a narrow session surface hook after choosing an explicit compact/session
-integration point.
+Partially wired. The existing session surfaces already render current-session
+and stopped-continuation facts. Route 74 keeps the context projection as a pure
+testable substrate, Route 75 adds the packet/renderer, Route 76 exposes the
+command surface, and Route 77 adds an in-memory latest compact checkpoint plus
+a candidate-only future-turn adapter. Actual future-turn injection remains
+deferred.
 
 ## Residual Risks
 
-- The projection does not yet feed live compact or `/sessions current`; it is
-  deliberately a pure baseline.
+- The live compact checkpoint does not yet feed future query/provider context.
 - Future memory extraction still needs ranking, persistence boundaries, and
   user controls.
 - Future sidebar state should consume `sidebarFacts` rather than inventing a
@@ -313,8 +323,10 @@ integration point.
 
 ## Next Recommendation
 
-Recommended next route: Route 76 Compact v2 session integration.
+Recommended next route: Route 78 actual future-turn injection from live Compact
+v2 checkpoint.
 
-Reason: context layers, compact survivors, redactions, edit/recovery facts, and
-the Compact v2 packet/renderer are now machine-checkable enough to wire a live
-compact/session integration without reopening edit runtime behavior.
+Reason: context layers, compact survivors, redactions, edit/recovery facts,
+Compact v2 packet rendering, the live checkpoint, and the candidate-only
+adapter are now machine-checkable enough to wire future-turn injection without
+reopening edit runtime behavior.
