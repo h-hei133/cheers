@@ -1,9 +1,10 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 58
+Route baseline: post-Route 59
 Date: 2026-05-15
-Status: long-range edit capability map after Routes 50-58.
-Route 58 has been implemented as durable-authority seam/readiness diagnostics.
+Status: long-range edit capability map after Routes 50-59.
+Route 59 has implemented a narrow explicit non-default original-content
+authority loop.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -51,9 +52,14 @@ wiring.
 
 Route 58 selected original-content authority as the smallest viable durable
 authority direction and added seam/readiness diagnostics without storage or
-execution. The next direction should be a non-default original-content ledger
-prototype only if storage, cleanup, redaction, workspace authority, and
-current-content inspection policy are explicit. Broad writes remain delayed.
+execution.
+
+Route 59 implemented that direction as a minimum explicit non-default loop:
+metadata-only manifests plus hash-named content blobs, guarded per-file restore
+primitive, and pre-write capture for single update, single delete, exactly-two
+update, and single create. This is still not automatic recovery, default
+persistence, snapshot/rollback, broad writes, or product restore UX. Broad
+writes remain delayed.
 
 ## 2. Current Edit Capability Inventory
 
@@ -211,6 +217,17 @@ current-content inspection policy are explicit. Broad writes remain delayed.
     no file IO, git calls, snapshot, durable persistence, recovery execution,
     rollback execution, or writer behavior changes.
 
+- Minimum recovery authority loop
+  - Owners: `patchRecovery/recoveryAuthorityStore.ts`,
+    `patchRecovery/restorePrimitive.ts`, and optional route wiring in
+    `workspaceWriteRoute.ts`, `workspaceDeleteRoute.ts`,
+    `multiFileWriteRoute.ts`, and `workspaceCreateRoute.ts`.
+  - Status: implemented explicit non-default original-content authority
+    capture and guarded per-file restore primitive.
+  - Boundary: no default persistence, no automatic capture, no automatic
+    recovery, no rollback/atomicity claim, no snapshot/git integration, no
+    provider/session/CLI/MCP behavior, no broad writes, no 3+ mixed writes.
+
 - Mixed/multi/single-file failure journal coverage
   - Mixed and multi-file partial failure paths carry journal metadata.
   - Representative single-file write/create/move/delete failure consumers carry
@@ -339,12 +356,16 @@ User / CLI / provider output
 | Journal metadata boundary helper | Implemented centralized boundary and blocker facts | `journalMetadataBoundary.ts`, `journalMetadataBoundary.test.ts` | C/D | No durability, storage, restore, or executor | Preserve in all future recovery work |
 | External comparison against ClaudeCode/opencode/gemini-cli | Completed directional evidence | This roadmap and `journal-boundary-readiness.md` | E/F | Comparison is directional, not parity | Use to block unsupported recovery claims |
 | Recovery failure-state classification | Implemented projection-only diagnostics | `journalFailureStateProjection.ts`, `journalFailureStateProjection.test.ts` | D | Classification depends on existing journal facts; unknown state remains explicit when facts are insufficient | Feed original-content ledger prototype if safe |
-| Recovery plan projection | Implemented plan-only, metadata-only diagnostics with durable authority absence | `journalRecoveryPlanProjection.ts`, `journalRecoveryPlanProjection.test.ts`, `journalResultProjection.ts`, focused consumer tests | C/D | No durable storage, original-content storage, recovery executor, rollback, snapshot, or persistence | Batch 59 original-content ledger prototype if safe |
-| Durable authority descriptor | Implemented active absent-authority descriptor plus inactive future options | `journalDurableAuthority.ts`, `journalDurableAuthority.test.ts` | D | No storage, no file IO, no git, no snapshot; options are design-only | Batch 59 original-content ledger prototype if safe |
-| Original-content authority seam | Implemented pure requirement/record/restore-eligibility model | `journalOriginalContentAuthority.ts`, `journalOriginalContentAuthority.test.ts` | D | No content storage, no current-content inspection, no restore executor | Batch 59 original-content ledger prototype if safe |
-| Recovery readiness projection | Implemented nested `recoveryPlan.recoveryReadiness` diagnostics | `journalRecoveryReadinessProjection.ts`, `journalRecoveryReadinessProjection.test.ts`, representative consumer tests | C/D | Can only explain absent authority; cannot recover | Batch 59 or Batch 60 depending on storage readiness |
-| Durable journal storage | Future; not implemented | No current storage owner/schema | N/A | Needs authority owner, lifecycle, cleanup, residue policy, recovery trust boundary | Batch 59 only if non-default policy is explicit |
-| Recovery executor | Future; not implemented | No executor | N/A | Requires durable authority, original content authority, current-content inspection, no-hidden-user-edit rule | After Batch 59 only if authority exists |
+| Recovery plan projection | Implemented plan-only diagnostics with absent-authority and captured non-default authority modes | `journalRecoveryPlanProjection.ts`, `journalRecoveryPlanProjection.test.ts`, `journalResultProjection.ts`, focused consumer tests | C/D | No automatic recovery executor, rollback, snapshot, or default persistence | Preserve while expanding non-default coverage |
+| Durable authority descriptor | Implemented active absent-authority descriptor plus captured original-content ledger descriptor | `journalDurableAuthority.ts`, `journalDurableAuthority.test.ts` | D | Captured authority is non-default only; no git or snapshot authority | Preserve no-default boundary |
+| Original-content authority seam | Implemented requirement/record/restore-eligibility model with captured-record diagnostics | `journalOriginalContentAuthority.ts`, `journalOriginalContentAuthority.test.ts` | D | Restore requires explicit primitive call; no automatic executor | Expand coverage or UX after Route 59 |
+| Recovery readiness projection | Implemented nested `recoveryPlan.recoveryReadiness` diagnostics | `journalRecoveryReadinessProjection.ts`, `journalRecoveryReadinessProjection.test.ts`, representative consumer tests | C/D | Can reflect explicit restore eligibility, but cannot execute recovery | Batch 60 coverage or UX decision |
+| Recovery authority store | Implemented explicit non-default prototype | `patchRecovery/recoveryAuthorityStore.ts`, `recoveryAuthorityStore.test.ts` | C/D | No default storage; no session lifecycle; stores original content only under explicit temp/root option | Expand coverage or UX only after boundary review |
+| Explicit restore primitive | Implemented guarded per-file primitive | `patchRecovery/restorePrimitive.ts`, `restorePrimitive.test.ts` | C/D | No automatic recovery; no transaction rollback; no CLI/session surface | Product restore UX design or remaining narrow coverage |
+| Non-default writer preflight capture | Implemented for single update/delete/create and exactly-two update | `workspaceWriteRoute.ts`, `workspaceDeleteRoute.ts`, `workspaceCreateRoute.ts`, `multiFileWriteRoute.ts`, focused route tests | C/D | Not wired to move, exactly-three update, mixed lanes, or partial failure surfaces | Batch 60 capture coverage expansion |
+| Current-content guard | Implemented in explicit restore primitive | `restorePrimitive.ts`, `restorePrimitive.test.ts` | C/D | Guard is available only when restore is explicitly invoked | Future restore UX/executor design |
+| Durable journal storage | Partially implemented as explicit non-default authority ledger; not default/session durable | `recoveryAuthorityStore.ts`, cleanup/purge tests | C/D | No default persistence, no SessionManager storage, no provider/session surface | Keep non-default until lifecycle is designed |
+| Recovery executor | Future; not implemented | No automatic executor | N/A | Requires product surface, workspace authority at call time, no-hidden-user-edit rule | After capture coverage/UX decision |
 | Rollback/snapshot | Future; not implemented | No target snapshot/restore layer | N/A | Needs checkpoint/file-history/storage design and user/session semantics | Batch 59+ |
 | 4+ update requests | Explicitly unsupported | `multiFileUpdatePlanning.ts`, unsupported evidence | B/C | No write support | Batch 60/61 only after recovery stance |
 | 3+ mixed operations | Explicitly unsupported | `perFilePatchPlan.ts`, unsupported E2E, mixed-operation evidence | B/C | No writer support; no larger mixed recovery/approval stance | Batch 60/61 only after recovery stance |
@@ -520,19 +541,16 @@ implementation route" is historical and obsolete.
 
 Recommended next development batch:
 
-**Batch 59: Original-content ledger non-default storage prototype**
+**Batch 60: Expand non-default capture coverage or design explicit restore UX**
 
-Route 58 selected original-content authority as the smallest viable durable
-authority direction and modeled it without storage or execution. Batch 59
-should prototype a non-default original-content ledger only if storage
-location, schema, cleanup, residue handling, redaction, workspace authority,
-and current-content inspection policy are explicit.
+Route 59 proved the minimum store/capture/restore loop without changing default
+runtime behavior. The next batch should either expand non-default pre-write
+capture to remaining narrow lanes and representative partial-failure surfaces,
+or design a user-visible explicit restore surface around the existing primitive.
 
-Batch 59 should not add recovery execution by default. It should capture
-durable authority in a non-default seam and prove that recovery remains
-unavailable until a separate executor route exists. Broad writes, 3+ mixed
-writes, provider, session, CLI, MCP, package script, and default gate changes
-should remain out of scope unless a separate route opens them.
+Batch 60 should still avoid broad writes, 3+ mixed implementation, provider,
+session, CLI, MCP, package-script, and default-gate changes unless the route
+explicitly opens one of those layers.
 
 ## 9. Recommended Future Sequence
 
@@ -551,22 +569,30 @@ should remain out of scope unless a separate route opens them.
   - Require storage ownership, cleanup, schema, residue, redaction, workspace
     authority, current-content inspection, and tests proving no recovery
     execution.
+  - Status: implemented as explicit non-default store, capture wiring, and
+    guarded per-file restore primitive.
 
-- Batch 60: Recovery executor design only or keep recovery blocked
-  - Only if durable authority exists after Batch 59.
+- Batch 60: Remaining narrow capture coverage or explicit restore UX design
+  - Expand non-default capture to move, exactly-three update, mixed lanes, and
+    representative partial-failure surfaces, or define a user-visible explicit
+    restore UX over the primitive.
+  - Keep automatic recovery and default persistence absent.
+
+- Batch 61: Recovery executor design only or keep recovery blocked
+  - Only if durable authority coverage and product surface are explicit.
   - Require original-content/snapshot authority, current-content inspection,
     no-hidden-user-edit semantics, and focused tests.
 
-- Batch 61: 3+ mixed write readiness audit
+- Batch 62: 3+ mixed write readiness audit
   - Only after the recovery/rollback stance is explicit.
   - Audit result contract, ordering, destructive approvals, partial failure,
     unsupported surfaces, and validation requirements.
 
-- Batch 62: Narrow 3+ mixed implementation or keep blocked
-  - Implement only if Batch 61 proves the route can preserve current boundaries.
+- Batch 63: Narrow 3+ mixed implementation or keep blocked
+  - Implement only if the audit proves the route can preserve current boundaries.
   - Otherwise keep 3+ mixed unsupported and record blockers.
 
-- Batch 63+: Broad `apply_patch` readiness
+- Batch 64+: Broad `apply_patch` readiness
   - Consider only if larger mixed/write surfaces and recovery/rollback stance
     are settled.
   - Broad arbitrary `apply_patch` remains delayed because it combines parsing,
@@ -638,8 +664,12 @@ Allowed after this document:
 - Route 58 durable authority seam/readiness diagnostics are implemented:
   current authority remains `none` / `absent` / `persistence: none`, and
   original-content requirements are modeled without storing content.
-- Batch 59 original-content ledger non-default storage prototype is the
-  recommended next development direction.
+- Route 59 explicit non-default recovery authority loop is implemented:
+  original-content authority records can be captured under caller-provided
+  ledger roots and explicit per-file restore can be invoked with current-content
+  guards.
+- Batch 60 remaining narrow capture coverage or explicit restore UX design is
+  the recommended next development direction.
 
 Forbidden after this document:
 

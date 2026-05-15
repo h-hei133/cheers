@@ -4,6 +4,7 @@ import {
   type RouteScopedEditJournalRecoveryBlocker,
 } from "./journalMetadataBoundary.js";
 import {
+  buildCapturedOriginalContentLedgerAuthority,
   buildCurrentJournalDurableAuthority,
   type JournalDurableAuthorityDescriptor,
 } from "./journalDurableAuthority.js";
@@ -45,11 +46,21 @@ export interface JournalRecoveryPlanProjection {
 
 export function projectJournalRecoveryPlan(
   journal: RouteScopedEditJournal,
+  options?: {
+    readonly originalContentAuthorityRecords?: readonly OriginalContentAuthorityProjection["records"][number][];
+  },
 ): JournalRecoveryPlanProjection {
   const journalProjection = projectRouteScopedEditJournal(journal);
   const failureState = projectJournalFailureState(journal);
-  const durableAuthority = buildCurrentJournalDurableAuthority();
-  const originalContentAuthority = projectOriginalContentAuthority({ journal });
+  const records = options?.originalContentAuthorityRecords ?? [];
+  const durableAuthority =
+    records.length > 0
+      ? buildCapturedOriginalContentLedgerAuthority()
+      : buildCurrentJournalDurableAuthority();
+  const originalContentAuthority = projectOriginalContentAuthority({
+    journal,
+    records,
+  });
   const basePlan = {
     mode: "plan-only" as const,
     blockers: [...routeScopedEditJournalRecoveryBlockers],
@@ -66,6 +77,7 @@ export function projectJournalRecoveryPlan(
     journal,
     recoveryPlan: basePlan,
     durableAuthority,
+    originalContentAuthority,
   });
 
   return {

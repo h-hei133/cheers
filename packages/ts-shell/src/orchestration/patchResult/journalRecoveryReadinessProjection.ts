@@ -14,9 +14,12 @@ export interface JournalRecoveryReadinessProjection {
   readonly authorityKind: JournalDurableAuthorityDescriptor["authorityKind"];
   readonly authorityAvailability: JournalDurableAuthorityDescriptor["availability"];
   readonly persistence: JournalDurableAuthorityDescriptor["persistence"];
-  readonly canRecover: false;
+  readonly canRecover: boolean;
   readonly canRollback: false;
-  readonly canRestoreOriginalContent: false;
+  readonly canRestoreOriginalContent: boolean;
+  readonly canAttemptExplicitRestore: boolean;
+  readonly canRecoverAutomatically: false;
+  readonly canRollbackAtomically: false;
   readonly requiresDurableAuthority: boolean;
   readonly originalContentRequirements: OriginalContentAuthorityProjection["requirements"];
   readonly restoreEligibility: OriginalContentAuthorityProjection["restoreEligibility"];
@@ -31,12 +34,15 @@ export function projectJournalRecoveryReadiness(input: {
     "mode" | "blockers" | "evidence"
   >;
   readonly durableAuthority?: JournalDurableAuthorityDescriptor;
+  readonly originalContentAuthority?: OriginalContentAuthorityProjection;
 }): JournalRecoveryReadinessProjection {
   const durableAuthority =
     input.durableAuthority ?? buildCurrentJournalDurableAuthority();
-  const originalContentAuthority = projectOriginalContentAuthority({
-    journal: input.journal,
-  });
+  const originalContentAuthority =
+    input.originalContentAuthority ??
+    projectOriginalContentAuthority({
+      journal: input.journal,
+    });
   const blockers = unique([
     ...input.recoveryPlan.blockers,
     ...durableAuthority.blockers,
@@ -48,9 +54,13 @@ export function projectJournalRecoveryReadiness(input: {
     authorityKind: durableAuthority.authorityKind,
     authorityAvailability: durableAuthority.availability,
     persistence: durableAuthority.persistence,
-    canRecover: false,
+    canRecover: durableAuthority.canRecover,
     canRollback: false,
-    canRestoreOriginalContent: false,
+    canRestoreOriginalContent: durableAuthority.canRestoreOriginalContent,
+    canAttemptExplicitRestore:
+      originalContentAuthority.restoreEligibility.canAttemptExplicitRestore,
+    canRecoverAutomatically: false,
+    canRollbackAtomically: false,
     requiresDurableAuthority: true,
     originalContentRequirements: [
       ...originalContentAuthority.requirements,

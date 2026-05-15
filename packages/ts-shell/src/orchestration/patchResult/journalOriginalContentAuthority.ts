@@ -37,13 +37,17 @@ export interface OriginalContentAuthorityRecord {
   readonly operationKind: RouteScopedEditJournalOperationKind;
   readonly beforeContentHash?: string;
   readonly beforeContentAvailable: boolean;
+  readonly expectedCurrentState?: "exists" | "absent" | "unknown";
   readonly expectedCurrentContentHash?: string;
   readonly capturedAtPhase: OriginalContentCapturePhase;
   readonly persistence: OriginalContentPersistence;
 }
 
 export interface RestoreEligibilityDiagnostic {
-  readonly canAttemptRestore: false;
+  readonly canAttemptRestore: boolean;
+  readonly canAttemptExplicitRestore: boolean;
+  readonly canRecoverAutomatically: false;
+  readonly canRollbackAtomically: false;
   readonly blockers: readonly string[];
   readonly missing: readonly string[];
   readonly evidence: readonly string[];
@@ -120,21 +124,34 @@ export function projectRestoreEligibilityDiagnostic(input: {
       records,
     }),
   });
+  const canAttemptExplicitRestore = missing.length === 0;
 
   return {
-    canAttemptRestore: false,
-    blockers: [
-      "no-original-content",
-      "no-persistence-authority",
-      "no-current-content-inspection",
-      "no-recovery-executor",
-    ],
+    canAttemptRestore: canAttemptExplicitRestore,
+    canAttemptExplicitRestore,
+    canRecoverAutomatically: false,
+    canRollbackAtomically: false,
+    blockers: canAttemptExplicitRestore
+      ? ["no-automatic-recovery-executor", "no-atomicity-authority"]
+      : [
+          "no-original-content",
+          "no-persistence-authority",
+          "no-current-content-inspection",
+          "no-recovery-executor",
+        ],
     missing,
-    evidence: [
-      "journal-original-content-restore:cannot-attempt",
-      "journal-original-content-restore:no-file-io",
-      "journal-original-content-restore:no-content-authority",
-    ],
+    evidence: canAttemptExplicitRestore
+      ? [
+          "journal-original-content-restore:can-attempt-explicit-restore",
+          "journal-original-content-restore:current-content-guard-represented",
+          "journal-original-content-restore:no-automatic-recovery",
+          "journal-original-content-restore:no-rollback",
+        ]
+      : [
+          "journal-original-content-restore:cannot-attempt",
+          "journal-original-content-restore:no-file-io",
+          "journal-original-content-restore:no-content-authority",
+        ],
   };
 }
 
@@ -156,7 +173,7 @@ function deriveAuthorityStatus(input: {
       (record) =>
         record.beforeContentAvailable &&
         record.capturedAtPhase === "pre-write" &&
-        record.persistence === "durable",
+        (record.persistence === "durable" || record.persistence === "non-default"),
     )
   ) {
     return "content-authority-present";
@@ -173,30 +190,66 @@ function missingRestoreInputs(input: {
   readonly status: OriginalContentAuthorityStatus;
 }): readonly string[] {
   const missing = new Set<string>();
-  if (input.status === "missing") {
-    missing.add("original-content-authority");
+  for (const requirement of input.requirements) {
+    const record = input.records.find(
+      (candidate) =>
+        candidate.filePath === requirement.filePath &&
+        candidate.operationKind === requirement.operationKind,
+    );
+    if (!record) {
+      missing.add("original-content-authority");
+      if (requirement.requiresOriginalContent) {
+        missing.add("restorable-original-content");
+      }
+      if (requirement.requiresPersistence) {
+        missing.add("durable-persistence");
+      }
+      if (requirement.requiresCurrentContentCheck) {
+        missing.add("current-content-inspection");
+      }
+      if (requirement.requiresWorkspaceAuthority) {
+        missing.add("restore-workspace-authority");
+      }
+      continue;
+    }
+    if (
+      requirement.requiresOriginalContent &&
+      !record.beforeContentAvailable
+    ) {
+      missing.add("restorable-original-content");
+    }
+    if (
+      requirement.requiresPersistence &&
+      record.persistence !== "durable" &&
+      record.persistence !== "non-default"
+    ) {
+      missing.add("durable-persistence");
+    }
+    if (
+      requirement.requiresCurrentContentCheck &&
+      (record.expectedCurrentState === undefined ||
+        record.expectedCurrentState === "unknown")
+    ) {
+      missing.add("current-content-inspection");
+    }
+    if (
+      requirement.requiresCurrentContentCheck &&
+      record.expectedCurrentState === "exists" &&
+      !record.expectedCurrentContentHash
+    ) {
+      missing.add("current-content-hash");
+    }
+    if (requirement.requiresWorkspaceAuthority) {
+      // The route-level restore primitive still has to validate workspace
+      // authority at call time; captured records only make the guard possible.
+    }
   }
   if (input.status === "hash-only") {
     missing.add("restorable-original-content");
   }
-  if (input.requirements.some((requirement) => requirement.requiresPersistence)) {
-    missing.add("durable-persistence");
+  if (input.records.length === 0) {
+    missing.add("recovery-executor");
   }
-  if (
-    input.requirements.some(
-      (requirement) => requirement.requiresCurrentContentCheck,
-    )
-  ) {
-    missing.add("current-content-inspection");
-  }
-  if (
-    input.requirements.some(
-      (requirement) => requirement.requiresWorkspaceAuthority,
-    )
-  ) {
-    missing.add("restore-workspace-authority");
-  }
-  missing.add("recovery-executor");
   return [...missing];
 }
 

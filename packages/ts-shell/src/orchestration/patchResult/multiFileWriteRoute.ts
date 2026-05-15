@@ -1,5 +1,10 @@
 import path from "node:path";
 import {
+  captureRecoveryAuthorityRecords,
+  type RecoveryAuthorityCaptureBatchResult,
+  type RecoveryAuthorityStoreConfig,
+} from "../patchRecovery/recoveryAuthorityStore.js";
+import {
   applyMultiFileUpdateIntents,
   type MultiFileUpdateTargetCount,
 } from "../patchApplication/multiFileUpdateApply.js";
@@ -36,6 +41,7 @@ export type MultiFileWriteRouteBlocker =
   | "final-stale-read"
   | "no-op"
   | "aborted-before-write"
+  | "recovery-authority-capture"
   | "write-application"
   | "post-write-verification";
 
@@ -68,6 +74,7 @@ export interface MultiFileWriteRouteOptions {
     relativePath: string,
   ) => WorkspaceWriteTargetAuthority;
   readonly writeFile: (relativePath: string, content: string) => void | Promise<void>;
+  readonly recoveryAuthority?: RecoveryAuthorityStoreConfig;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -78,6 +85,7 @@ export type MultiFileWriteRoute =
       readonly targetPaths: MultiFileWriteTargetPaths;
       readonly approval: Extract<MultiFileWriteApproval, { status: "approved-for-write" }>;
       readonly perFilePatchPlan?: PerFilePatchPlan;
+      readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
       readonly workspaceWriterInvoked: true;
       readonly writerTarget: "selected-workspace";
       readonly selectedWorkspaceWrite: true;
@@ -105,6 +113,7 @@ export type MultiFileWriteRoute =
       readonly targetPath?: string;
       readonly approval: MultiFileWriteApproval;
       readonly perFilePatchPlan?: PerFilePatchPlan;
+      readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
       readonly failures: readonly PatchFailure[];
       readonly workspaceWriterInvoked: boolean;
       readonly writerTarget: "none" | "selected-workspace";
@@ -484,6 +493,43 @@ export async function runMultiFileWriteRoute(
     });
   }
 
+  const recoveryAuthorityCapture =
+    options.recoveryAuthority && targetCount === 2
+      ? await captureRecoveryAuthorityRecords({
+          store: options.recoveryAuthority,
+          records: writeIntent.writeIntents.map((intent, index) => {
+            const originalContent = verification.plan.operations.find(
+              (operation) => operation.operation.path === intent.path,
+            )?.originalContent;
+            return {
+              recordId: recordIdForPath("update", intent.path, index),
+              workspaceRelativePath: intent.path,
+              operationKind: "update" as const,
+              beforeState: "exists" as const,
+              beforeContent: originalContent,
+              expectedCurrentState: "exists" as const,
+              expectedCurrentContent: intent.content,
+            };
+          }),
+        })
+      : undefined;
+  if (recoveryAuthorityCapture?.status === "blocked") {
+    return blocked({
+      blocker: "recovery-authority-capture",
+      targetPaths,
+      approval,
+      perFilePatchPlan,
+      failures: [],
+      recoveryAuthorityCapture,
+      nextAction:
+        "No multi-file writer ran because recovery authority capture failed before the first write.",
+      evidence: [
+        "apply-patch-multi-file-write-route:recovery-authority-capture-blocked",
+        ...recoveryAuthorityCapture.evidence,
+      ],
+    });
+  }
+
   const applied = await applyMultiFileUpdateIntents(writeIntent, {
     expectedFileCount: targetCount,
     writeFile: options.writeFile,
@@ -511,6 +557,7 @@ export async function runMultiFileWriteRoute(
       targetPath: failedPath,
       approval,
       perFilePatchPlan,
+      recoveryAuthorityCapture,
       failures: applied.failedFiles,
       changedFiles: applied.changedFiles,
       writeIntents: targetPaths,
@@ -554,6 +601,7 @@ export async function runMultiFileWriteRoute(
     targetPaths: changedFiles,
     approval,
     perFilePatchPlan,
+    ...(recoveryAuthorityCapture ? { recoveryAuthorityCapture } : {}),
     workspaceWriterInvoked: true,
     writerTarget: "selected-workspace",
     selectedWorkspaceWrite: true,
@@ -731,6 +779,10 @@ function pathStaysInsideWorkspace(
   );
 }
 
+function recordIdForPath(kind: string, targetPath: string, index: number): string {
+  return `${kind}-${index + 1}-${targetPath.replaceAll(/[^A-Za-z0-9._-]/g, "-")}`;
+}
+
 function bypassed(input: {
   readonly targetPaths: readonly string[];
   readonly approval: MultiFileWriteApproval;
@@ -784,6 +836,7 @@ function blocked(
     readonly targetPath?: string;
     readonly approval: MultiFileWriteApproval;
     readonly perFilePatchPlan?: PerFilePatchPlan;
+    readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
     readonly failures: readonly PatchFailure[];
     readonly changedFiles?: readonly string[];
     readonly writeIntents?: readonly string[];
@@ -813,6 +866,9 @@ function blocked(
     ...(input.targetPath ? { targetPath: input.targetPath } : {}),
     approval: input.approval,
     ...(input.perFilePatchPlan ? { perFilePatchPlan: input.perFilePatchPlan } : {}),
+    ...(input.recoveryAuthorityCapture
+      ? { recoveryAuthorityCapture: input.recoveryAuthorityCapture }
+      : {}),
     failures: input.failures,
     workspaceWriterInvoked: input.workspaceWriterInvoked ?? false,
     writerTarget: input.writerTarget ?? "none",

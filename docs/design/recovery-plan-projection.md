@@ -1,9 +1,9 @@
 # Recovery Plan Projection
 
-Route baseline: Route 58
+Route baseline: Route 59
 Date: 2026-05-15
-Status: implemented projection-only recovery-readiness diagnostics with
-durable-authority seam diagnostics.
+Status: implemented recovery-readiness diagnostics with explicit non-default
+captured-authority diagnostics; no automatic recovery or rollback claim.
 
 This note records the Route 57 recovery-readiness batch. It is operational
 evidence, not a recovery design claim.
@@ -185,6 +185,27 @@ without changing recovery execution:
 Recovery remains non-executing. Rollback, snapshot, file IO, git calls,
 durable persistence, and writer behavior changes remain absent.
 
-Current next decision after Route 58: Batch 59 original-content ledger
-non-default storage prototype, only if storage, cleanup, redaction, workspace
-authority, and current-content inspection policy are explicit.
+## Route 59 Note
+
+Route 59 added an explicit non-default original-content authority loop:
+
+- `patchRecovery/recoveryAuthorityStore.ts` stores metadata-only manifests and
+  hash-named content blobs under caller-provided `ledgerRoot`.
+- `patchRecovery/restorePrimitive.ts` provides an explicit guarded per-file
+  restore primitive with current-state/content checks.
+- single update, single delete, exactly-two update, and single create can
+  capture pre-write authority only when a non-default `recoveryAuthority` option
+  is passed.
+- `recoveryPlan` can now reflect captured non-default original-content ledger
+  authority when records are supplied to the projection helper.
+
+The projection still preserves:
+
+- `mode: "plan-only"`
+- `recoveryExecuted: false`
+- `rollbackAtomicityClaim: false`
+- `canRecoverAutomatically: false`
+- `canRollbackAtomically: false`
+
+Default runtime paths remain metadata-only/no-authority because existing callers
+do not pass non-default recovery authority options.

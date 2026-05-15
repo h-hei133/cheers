@@ -1,5 +1,10 @@
 import path from "node:path";
 import {
+  captureRecoveryAuthorityRecords,
+  type RecoveryAuthorityCaptureBatchResult,
+  type RecoveryAuthorityStoreConfig,
+} from "../patchRecovery/recoveryAuthorityStore.js";
+import {
   applySingleFileDeleteIntent,
   buildSingleFileDeleteApplicationContract,
   type SingleFileDeleteApplicationContract,
@@ -32,6 +37,7 @@ export type WorkspaceDeleteRouteBlocker =
   | "patch-verification"
   | "final-stale-read"
   | "aborted-before-write"
+  | "recovery-authority-capture"
   | "write-application"
   | "post-write-verification";
 
@@ -49,6 +55,7 @@ export interface WorkspaceDeleteRouteOptions {
     relativePath: string,
   ) => WorkspaceWriteTargetAuthority;
   readonly deleteFile: (relativePath: string) => void | Promise<void>;
+  readonly recoveryAuthority?: RecoveryAuthorityStoreConfig;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -58,6 +65,7 @@ export type WorkspaceDeleteRoute =
       readonly status: "deleted";
       readonly targetPath: string;
       readonly perFilePatchPlan?: PerFilePatchPlan;
+      readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
       readonly applicationContract: SingleFileDeleteApplicationContract;
       readonly failures: readonly [];
       readonly workspaceWriterInvoked: true;
@@ -87,6 +95,7 @@ export type WorkspaceDeleteRoute =
       readonly blocker: WorkspaceDeleteRouteBlocker;
       readonly targetPath?: string;
       readonly perFilePatchPlan?: PerFilePatchPlan;
+      readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
       readonly applicationContract?: SingleFileDeleteApplicationContract;
       readonly failures: readonly PatchFailure[];
       readonly workspaceWriterInvoked: boolean;
@@ -339,6 +348,38 @@ export async function runWorkspaceDeleteRoute(
     });
   }
 
+  const recoveryAuthorityCapture = options.recoveryAuthority
+    ? await captureRecoveryAuthorityRecords({
+        store: options.recoveryAuthority,
+        records: [
+          {
+            recordId: recordIdForPath("delete", deleteOperation.path),
+            workspaceRelativePath: deleteOperation.path,
+            operationKind: "delete",
+            beforeState: "exists",
+            beforeContent: finalTargetContent,
+            expectedCurrentState: "absent",
+          },
+        ],
+      })
+    : undefined;
+  if (recoveryAuthorityCapture?.status === "blocked") {
+    return blocked({
+      blocker: "recovery-authority-capture",
+      targetPath: deleteOperation.path,
+      perFilePatchPlan,
+      applicationContract,
+      recoveryAuthorityCapture,
+      failures: [],
+      nextAction:
+        "No delete writer ran because recovery authority capture failed before the write.",
+      evidence: [
+        "apply-patch-workspace-delete-route:recovery-authority-capture-blocked",
+        ...recoveryAuthorityCapture.evidence,
+      ],
+    });
+  }
+
   const applied = await applySingleFileDeleteIntent(applicationContract, {
     deleteFile: options.deleteFile,
     readFile: options.readVerifiedFile,
@@ -361,6 +402,7 @@ export async function runWorkspaceDeleteRoute(
       targetPath: deleteOperation.path,
       perFilePatchPlan,
       applicationContract,
+      recoveryAuthorityCapture,
       failures: applied.failedFiles,
       changedFiles: applied.changedFiles,
       writeIntents: [deleteOperation.path],
@@ -391,6 +433,7 @@ export async function runWorkspaceDeleteRoute(
     status: "deleted",
     targetPath: deleteOperation.path,
     perFilePatchPlan,
+    ...(recoveryAuthorityCapture ? { recoveryAuthorityCapture } : {}),
     applicationContract,
     failures: [],
     workspaceWriterInvoked: true,
@@ -504,10 +547,15 @@ function pathStaysInsideWorkspace(workspaceRoot: string, candidatePath: string):
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
+function recordIdForPath(kind: string, targetPath: string): string {
+  return `${kind}-${targetPath.replaceAll(/[^A-Za-z0-9._-]/g, "-")}`;
+}
+
 function blocked(input: {
   readonly blocker: WorkspaceDeleteRouteBlocker;
   readonly targetPath?: string;
   readonly perFilePatchPlan?: PerFilePatchPlan;
+  readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
   readonly applicationContract?: SingleFileDeleteApplicationContract;
   readonly failures: readonly PatchFailure[];
   readonly changedFiles?: readonly string[];
@@ -537,6 +585,9 @@ function blocked(input: {
     blocker: input.blocker,
     ...(input.targetPath ? { targetPath: input.targetPath } : {}),
     ...(input.perFilePatchPlan ? { perFilePatchPlan: input.perFilePatchPlan } : {}),
+    ...(input.recoveryAuthorityCapture
+      ? { recoveryAuthorityCapture: input.recoveryAuthorityCapture }
+      : {}),
     ...(input.applicationContract
       ? { applicationContract: input.applicationContract }
       : {}),

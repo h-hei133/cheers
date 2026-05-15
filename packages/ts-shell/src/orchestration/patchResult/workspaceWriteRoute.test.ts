@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { readRecoveryAuthorityRecord } from "../patchRecovery/recoveryAuthorityStore.js";
 import { createWorkspaceWriteAuthority } from "./workspaceAuthority.js";
 import { runWorkspaceWriteRoute } from "./workspaceWriteRoute.js";
 
@@ -68,6 +69,83 @@ describe("single-file apply_patch real workspace write route", () => {
         "apply-patch-workspace-write-route:success-after-verified-write",
       ]),
     );
+    expect("recoveryAuthorityCapture" in result).toBe(false);
+  });
+
+  it("captures original content only under explicit non-default recovery authority", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+
+    const result = await runWorkspaceWriteRoute({
+      workspaceRoot: fixture.workspaceRoot,
+      rawPatchText: applyPatchText,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: "approved",
+      defaultProductionRejectionUnchanged: true,
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: authority.writeFile,
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-write",
+      },
+    });
+
+    expect(result.status).toBe("written");
+    expect(result.changedFiles).toEqual(["src/app.ts"]);
+    expect(result.postWriteVerification).toBe("passed");
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    const record = result.recoveryAuthorityCapture?.records[0];
+    expect(record).toEqual(
+      expect.objectContaining({
+        workspaceRelativePath: "src/app.ts",
+        operationKind: "update",
+        beforeState: "exists",
+        expectedCurrentState: "exists",
+        capturedAtPhase: "pre-write",
+        persistence: "non-default",
+      }),
+    );
+    expect(await readRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-write",
+      recordId: "update-src-app.ts",
+    })).toEqual(record);
+  });
+
+  it("blocks before writer when explicit recovery authority capture fails", async () => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+
+    const result = await runWorkspaceWriteRoute({
+      workspaceRoot: fixture.workspaceRoot,
+      rawPatchText: applyPatchText,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: "approved",
+      defaultProductionRejectionUnchanged: true,
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: () => {
+        throw new Error("writer must stay unreachable after capture failure");
+      },
+      recoveryAuthority: {
+        mode: "non-default",
+        authorityId: "route-write",
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("recovery-authority-capture");
+    expect(result.recoveryAuthorityCapture?.status).toBe("blocked");
+    expectNoBlockedWriteLeak(result);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
 
   it("keeps allow-once approval no-write without explicit workspace write opt-in", async () => {
@@ -431,6 +509,12 @@ function createFixture(
   }
   fs.writeFileSync(path.join(workspaceRoot, "LOCKED.md"), "do not modify\n", "utf8");
   return { workspaceRoot };
+}
+
+function createLedgerRoot(): string {
+  const ledgerRoot = fs.mkdtempSync(path.join(os.tmpdir(), "recovery-ledger-"));
+  tempRoots.push(ledgerRoot);
+  return ledgerRoot;
 }
 
 function readFile(workspaceRoot: string, relativePath: string): string {

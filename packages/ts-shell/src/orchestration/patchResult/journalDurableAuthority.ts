@@ -137,6 +137,36 @@ export function buildCurrentJournalDurableAuthority(): JournalDurableAuthorityDe
   };
 }
 
+export function buildCapturedOriginalContentLedgerAuthority(): JournalDurableAuthorityDescriptor {
+  return {
+    authorityKind: "original-content-ledger",
+    availability: "available",
+    persistence: "non-default",
+    canRecover: false,
+    canRollback: false,
+    canRestoreOriginalContent: true,
+    canVerifyCurrentContent: true,
+    blockers: ["no-automatic-recovery-executor", "no-atomicity-authority"],
+    evidence: [
+      "journal-durable-authority:original-content-ledger:captured",
+      "journal-durable-authority:persistence:non-default",
+      "journal-durable-authority:explicit-restore-primitive-required",
+      "journal-durable-authority:no-automatic-recovery",
+      "journal-durable-authority:no-rollback",
+    ],
+    requiredBeforeRecovery: [
+      "explicit restore primitive invocation",
+      "current-content guard must pass",
+      "workspace authority for restore target",
+    ],
+    requiredBeforeRollback: [
+      "atomic rollback authority or durable snapshot",
+      "rollback executor boundary",
+      "user/session-visible rollback semantics",
+    ],
+  };
+}
+
 function futureOption(
   input: Pick<
     JournalDurableAuthorityOption,

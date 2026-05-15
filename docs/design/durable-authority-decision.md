@@ -1,9 +1,10 @@
 # Durable Authority Decision
 
-Route baseline: Route 58
+Route baseline: Route 59
 Date: 2026-05-15
-Status: implemented seam/readiness model only; no durable storage or recovery
-execution.
+Status: explicit non-default original-content authority store and restore
+primitive implemented; no default persistence, automatic recovery, rollback, or
+snapshot execution.
 
 This document records the Batch 58 durable-authority decision. It guides the
 next recovery routes, but it is not a recovery, rollback, snapshot, or broad
@@ -119,18 +120,18 @@ session lifecycle, tracked-file state, backup storage, and rewind UX.
 
 ## Recommended Direction
 
-Recommended next durable authority route: Batch 59 original-content ledger
-non-default storage prototype.
+Route 59 update: Batch 59 implemented the original-content ledger as an
+explicit non-default storage prototype.
 
-Route 58 selected original-content authority as the smallest viable durable
-authority direction, but did not implement storage. The next route should
-prototype a non-default original-content ledger only if it can define storage
-location, schema, cleanup, residue behavior, redaction, workspace authority,
-and current-content inspection without touching default writer behavior.
+The prototype lives under `patchRecovery/recoveryAuthorityStore.ts` and
+`patchRecovery/restorePrimitive.ts`. Narrow write routes can opt in by passing
+an explicit `recoveryAuthority` option with `mode: "non-default"`, `ledgerRoot`,
+and `authorityId`. Current default runtime paths do not pass that option and
+therefore do not create recovery authority records.
 
 Broad writes remain delayed because larger write surfaces would increase
-partial-failure and destructive-write risk while recovery authority is still
-absent.
+partial-failure and destructive-write risk while the recovery authority loop is
+still narrow and lacks a product/session surface.
 
 ## Route 58 Prototype Surface
 
@@ -150,23 +151,40 @@ Implemented seam/readiness files:
 
 ## Still Forbidden
 
-Route 58 does not add:
+Route 59 still does not add:
 
-- durable persistence.
-- original content storage.
-- file reads or current-content reads.
-- file writes.
+- default durable persistence.
+- automatic original content storage.
+- automatic recovery.
+- recovery executor.
+- rollback executor.
+- snapshot/checkpoint/git integration.
+- provider/session/CLI/MCP behavior changes.
+- broad write surfaces.
+
+Route 59 adds only:
+
+- explicit non-default original-content ledger storage under caller-provided
+  `ledgerRoot`.
+- explicit guarded per-file restore primitive for tests/future routes.
+- non-default pre-write capture for single update, single delete,
+  exactly-two update, and single create.
+- recoveryPlan diagnostics that can show captured non-default authority without
+  claiming automatic recovery or rollback.
+
+It still does not add:
+
+- default file reads or current-content reads outside explicit capture/restore
+  paths.
+- automatic file writes for recovery.
 - git calls.
-- snapshots or restore.
-- recovery execution.
-- rollback execution.
+- snapshot/checkpoint restore UX or automatic restore.
 - writer behavior changes.
 - new write surfaces.
-- provider/session/CLI/MCP behavior changes.
 
 ## Next-Route Decision Criteria
 
-Choose Batch 59 original-content ledger prototype only if the route can answer:
+Choose the next route only if it can answer:
 
 - where non-default original content is stored.
 - how records are scoped to route/session/workspace.
@@ -176,5 +194,6 @@ Choose Batch 59 original-content ledger prototype only if the route can answer:
 - how current-content inspection prevents hidden user-edit overwrite.
 - how result projection remains separate from recovery execution.
 
-If those answers are not ready, defer durable authority and run Batch 60: 3+
-mixed write readiness audit under explicit no-recovery semantics.
+If those answers are not ready, defer product recovery and either expand
+non-default capture coverage across remaining narrow routes or run a 3+ mixed
+write readiness audit under explicit no-automatic-recovery semantics.

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { readRecoveryAuthorityRecord } from "../patchRecovery/recoveryAuthorityStore.js";
 import { createWorkspaceWriteAuthority } from "./workspaceAuthority.js";
 import { runWorkspaceCreateRoute } from "./workspaceCreateRoute.js";
 
@@ -51,6 +52,45 @@ describe("single-file Add File selected-workspace create route", () => {
         "apply-patch-workspace-create-route:success-after-verified-create",
       ]),
     );
+    expect("recoveryAuthorityCapture" in result).toBe(false);
+  });
+
+  it("captures absent-before create authority only under explicit recovery authority", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+
+    const result = await runWorkspaceCreateRoute({
+      ...routeOptions(fixture.workspaceRoot, addPatch("src/new.ts", "ready")),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateCreateTarget: authority.validateCreateTarget,
+      createFileExclusive: authority.createFileExclusive,
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-create",
+      },
+    });
+
+    expect(result.status).toBe("created");
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    const record = result.recoveryAuthorityCapture?.records[0];
+    expect(record).toEqual(
+      expect.objectContaining({
+        workspaceRelativePath: "src/new.ts",
+        operationKind: "create",
+        beforeState: "absent",
+        expectedCurrentState: "exists",
+      }),
+    );
+    expect(record?.beforeContentRef).toBeUndefined();
+    expect(await readRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-create",
+      recordId: "create-src-new.ts",
+    })).toEqual(record);
   });
 
   it("blocks an existing target without overwriting or reporting changed files", async () => {
@@ -273,6 +313,12 @@ function createFixture(): { readonly workspaceRoot: string } {
   fs.writeFileSync(path.join(workspaceRoot, "src", "app.ts"), "draft\n", "utf8");
   fs.writeFileSync(path.join(workspaceRoot, "LOCKED.md"), "do not modify\n", "utf8");
   return { workspaceRoot };
+}
+
+function createLedgerRoot(): string {
+  const ledgerRoot = fs.mkdtempSync(path.join(os.tmpdir(), "recovery-ledger-"));
+  tempRoots.push(ledgerRoot);
+  return ledgerRoot;
 }
 
 function readFile(workspaceRoot: string, relativePath: string): string {

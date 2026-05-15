@@ -63,6 +63,72 @@ describe("journal recovery plan projection", () => {
       ]),
     );
   });
+
+  it("reflects explicit non-default captured authority without automatic recovery or rollback", () => {
+    const projection = projectJournalRecoveryPlan(
+      journal({
+        routeId: "route-captured-authority",
+        operations: [
+          {
+            operationId: "op-1",
+            operationKind: "update",
+            targetPath: "src/a.ts",
+            planned: true,
+            writerStarted: true,
+            applied: true,
+            verified: true,
+            recoveryCandidate: true,
+          },
+        ],
+      }),
+      {
+        originalContentAuthorityRecords: [
+          {
+            filePath: "src/a.ts",
+            operationKind: "update",
+            beforeContentHash: "before-hash",
+            beforeContentAvailable: true,
+            expectedCurrentState: "exists",
+            expectedCurrentContentHash: "after-hash",
+            capturedAtPhase: "pre-write",
+            persistence: "non-default",
+          },
+        ],
+      },
+    );
+
+    expect(projection.recoveryExecuted).toBe(false);
+    expect(projection.rollbackAtomicityClaim).toBe(false);
+    expect(projection.durableAuthority).toEqual(
+      expect.objectContaining({
+        authorityKind: "original-content-ledger",
+        availability: "available",
+        persistence: "non-default",
+        canRecover: false,
+        canRollback: false,
+        canRestoreOriginalContent: true,
+        canVerifyCurrentContent: true,
+      }),
+    );
+    expect(projection.originalContentAuthority.status).toBe(
+      "content-authority-present",
+    );
+    expect(
+      projection.originalContentAuthority.restoreEligibility
+        .canAttemptExplicitRestore,
+    ).toBe(true);
+    expect(
+      projection.originalContentAuthority.restoreEligibility
+        .canRecoverAutomatically,
+    ).toBe(false);
+    expect(
+      projection.originalContentAuthority.restoreEligibility
+        .canRollbackAtomically,
+    ).toBe(false);
+    expect(projection.recoveryReadiness.canAttemptExplicitRestore).toBe(true);
+    expect(projection.recoveryReadiness.canRecoverAutomatically).toBe(false);
+    expect(projection.recoveryReadiness.canRollbackAtomically).toBe(false);
+  });
 });
 
 function journal(input: RouteScopedEditJournal): RouteScopedEditJournal {

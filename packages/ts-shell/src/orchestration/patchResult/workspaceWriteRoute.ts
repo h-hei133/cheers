@@ -1,4 +1,9 @@
 import path from "node:path";
+import {
+  captureRecoveryAuthorityRecords,
+  type RecoveryAuthorityCaptureBatchResult,
+  type RecoveryAuthorityStoreConfig,
+} from "../patchRecovery/recoveryAuthorityStore.js";
 import { applySingleFileUpdateIntent } from "../patchApplication/singleFileUpdateApply.js";
 import { buildNoPartialPatchApplicationContract } from "../patchApplication/noPartialApply.js";
 import { parseApplyPatchText } from "../patchParsing/parser.js";
@@ -38,6 +43,7 @@ export type WorkspaceWriteRouteBlocker =
   | "workspace-boundary"
   | "final-stale-read"
   | "aborted-before-write"
+  | "recovery-authority-capture"
   | "no-op"
   | "write-application"
   | "post-write-verification";
@@ -55,6 +61,7 @@ export interface WorkspaceWriteRouteOptions {
     relativePath: string,
   ) => WorkspaceWriteTargetAuthority;
   readonly writeFile: (relativePath: string, content: string) => void | Promise<void>;
+  readonly recoveryAuthority?: RecoveryAuthorityStoreConfig;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -70,6 +77,7 @@ export type WorkspaceWriteRoute =
       readonly guardedGate: GuardedWriteGate;
       readonly finalStaleRead: FinalStaleRead;
       readonly perFilePatchPlan?: PerFilePatchPlan;
+      readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
       readonly workspaceWriterInvoked: true;
       readonly writerTarget: "selected-workspace";
       readonly selectedWorkspaceWrite: true;
@@ -98,6 +106,7 @@ export type WorkspaceWriteRoute =
       readonly guardedGate?: GuardedWriteGate;
       readonly finalStaleRead?: FinalStaleRead;
       readonly perFilePatchPlan?: PerFilePatchPlan;
+      readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
       readonly failures: readonly PatchFailure[];
       readonly workspaceWriterInvoked: boolean;
       readonly writerTarget: "none" | "selected-workspace";
@@ -428,6 +437,42 @@ export async function runWorkspaceWriteRoute(
     });
   }
 
+  const recoveryAuthorityCapture = options.recoveryAuthority
+    ? await captureRecoveryAuthorityRecords({
+        store: options.recoveryAuthority,
+        records: [
+          {
+            recordId: recordIdForPath("update", intent.path),
+            workspaceRelativePath: intent.path,
+            operationKind: "update",
+            beforeState: "exists",
+            beforeContent: finalContent,
+            expectedCurrentState: "exists",
+            expectedCurrentContent: intent.content,
+          },
+        ],
+      })
+    : undefined;
+  if (recoveryAuthorityCapture?.status === "blocked") {
+    return blocked({
+      blocker: "recovery-authority-capture",
+      targetPath: intent.path,
+      dryRunRoute,
+      writeDecision,
+      guardedGate,
+      finalStaleRead,
+      perFilePatchPlan,
+      recoveryAuthorityCapture,
+      failures: [],
+      nextAction:
+        "No workspace writer ran because recovery authority capture failed before the write.",
+      evidence: [
+        "apply-patch-workspace-write-route:recovery-authority-capture-blocked",
+        ...recoveryAuthorityCapture.evidence,
+      ],
+    });
+  }
+
   const applied = await applySingleFileUpdateIntent(writeIntent, {
     writeFile: options.writeFile,
   });
@@ -444,6 +489,7 @@ export async function runWorkspaceWriteRoute(
       guardedGate,
       finalStaleRead,
       perFilePatchPlan,
+      recoveryAuthorityCapture,
       failures: applied.failedFiles,
       workspaceWriterInvoked: true,
       writerTarget: "selected-workspace",
@@ -472,6 +518,7 @@ export async function runWorkspaceWriteRoute(
       guardedGate,
       finalStaleRead,
       perFilePatchPlan,
+      recoveryAuthorityCapture,
       failures: [],
       workspaceWriterInvoked: true,
       writerTarget: "selected-workspace",
@@ -517,6 +564,7 @@ export async function runWorkspaceWriteRoute(
     guardedGate,
     finalStaleRead,
     perFilePatchPlan,
+    ...(recoveryAuthorityCapture ? { recoveryAuthorityCapture } : {}),
     workspaceWriterInvoked: true,
     writerTarget: "selected-workspace",
     selectedWorkspaceWrite: true,
@@ -560,6 +608,10 @@ function pathStaysInsideWorkspace(
   );
 }
 
+function recordIdForPath(kind: string, targetPath: string): string {
+  return `${kind}-${targetPath.replaceAll(/[^A-Za-z0-9._-]/g, "-")}`;
+}
+
 function blocked(
   input: {
     readonly blocker: WorkspaceWriteRouteBlocker;
@@ -569,6 +621,7 @@ function blocked(
     readonly guardedGate?: GuardedWriteGate;
     readonly finalStaleRead?: FinalStaleRead;
     readonly perFilePatchPlan?: PerFilePatchPlan;
+    readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
     readonly failures: readonly PatchFailure[];
     readonly workspaceWriterInvoked?: boolean;
     readonly writerTarget?: "none" | "selected-workspace";
@@ -596,6 +649,9 @@ function blocked(
     ...(input.guardedGate ? { guardedGate: input.guardedGate } : {}),
     ...(input.finalStaleRead ? { finalStaleRead: input.finalStaleRead } : {}),
     ...(input.perFilePatchPlan ? { perFilePatchPlan: input.perFilePatchPlan } : {}),
+    ...(input.recoveryAuthorityCapture
+      ? { recoveryAuthorityCapture: input.recoveryAuthorityCapture }
+      : {}),
     failures: input.failures,
     workspaceWriterInvoked: input.workspaceWriterInvoked ?? false,
     writerTarget: input.writerTarget ?? "none",

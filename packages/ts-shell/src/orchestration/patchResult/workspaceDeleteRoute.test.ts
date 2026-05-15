@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { readRecoveryAuthorityRecord } from "../patchRecovery/recoveryAuthorityStore.js";
 import { createWorkspaceWriteAuthority } from "./workspaceAuthority.js";
 import { runWorkspaceDeleteRoute } from "./workspaceDeleteRoute.js";
 
@@ -64,6 +65,45 @@ describe("single-file Delete File selected-workspace route", () => {
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
       "src/other.ts": "other\n",
     });
+    expect("recoveryAuthorityCapture" in result).toBe(false);
+  });
+
+  it("captures deleted file original content only under explicit recovery authority", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+
+    const result = await runWorkspaceDeleteRoute({
+      ...routeOptions(fixture.workspaceRoot, deletePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      deleteFile: authority.deleteFile,
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-delete",
+      },
+    });
+
+    expect(result.status).toBe("deleted");
+    expect(result.changedFiles).toEqual(["src/delete-me.ts"]);
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    const record = result.recoveryAuthorityCapture?.records[0];
+    expect(record).toEqual(
+      expect.objectContaining({
+        workspaceRelativePath: "src/delete-me.ts",
+        operationKind: "delete",
+        beforeState: "exists",
+        expectedCurrentState: "absent",
+      }),
+    );
+    expect(await readRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-delete",
+      recordId: "delete-src-delete-me.ts",
+    })).toEqual(record);
   });
 
   it.each([
@@ -253,6 +293,12 @@ function createFixture(
     fs.mkdirSync(path.join(workspaceRoot, "src", "dir"), { recursive: true });
   }
   return { workspaceRoot };
+}
+
+function createLedgerRoot(): string {
+  const ledgerRoot = fs.mkdtempSync(path.join(os.tmpdir(), "recovery-ledger-"));
+  tempRoots.push(ledgerRoot);
+  return ledgerRoot;
 }
 
 function snapshotFixture(workspaceRoot: string): Readonly<Record<string, string>> {

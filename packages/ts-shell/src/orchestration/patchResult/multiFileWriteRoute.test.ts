@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { readRecoveryAuthorityRecord } from "../patchRecovery/recoveryAuthorityStore.js";
 import { createWorkspaceWriteAuthority } from "./workspaceAuthority.js";
 import { runMultiFileWriteRoute } from "./multiFileWriteRoute.js";
 
@@ -48,6 +49,50 @@ describe("multi-file Update File selected-workspace write route", () => {
         "apply-patch-multi-file-write-route:post-write-verification-passed",
       ]),
     );
+    expect("recoveryAuthorityCapture" in result).toBe(false);
+  });
+
+  it("captures both exactly-two update originals before the first writer starts", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+    let firstWriteSawBothRecords = false;
+
+    const result = await runMultiFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, twoFilePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: async (relativePath, content) => {
+        if (!firstWriteSawBothRecords) {
+          const first = await readRecoveryAuthorityRecord({
+            ledgerRoot,
+            authorityId: "route-two-update",
+            recordId: "update-1-src-a.ts",
+          });
+          const second = await readRecoveryAuthorityRecord({
+            ledgerRoot,
+            authorityId: "route-two-update",
+            recordId: "update-2-src-b.ts",
+          });
+          firstWriteSawBothRecords = Boolean(first && second);
+        }
+        authority.writeFile(relativePath, content);
+      },
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-two-update",
+      },
+    });
+
+    expect(result.status).toBe("written");
+    expect(firstWriteSawBothRecords).toBe(true);
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(2);
+    expect(result.changedFiles).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(result.failedFiles).toEqual([]);
+    expect(result.postWriteVerification).toBe("passed");
   });
 
   it("bypasses single-file Update File patches so the single-file route can own them", async () => {
@@ -620,6 +665,12 @@ function hunkMismatchPatch(): string {
 
 function readFile(workspaceRoot: string, relativePath: string): string {
   return fs.readFileSync(path.join(workspaceRoot, relativePath), "utf8");
+}
+
+function createLedgerRoot(): string {
+  const ledgerRoot = fs.mkdtempSync(path.join(os.tmpdir(), "recovery-ledger-"));
+  tempRoots.push(ledgerRoot);
+  return ledgerRoot;
 }
 
 function snapshotFixture(workspaceRoot: string): Record<string, string> {
