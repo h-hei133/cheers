@@ -1,22 +1,22 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 59
+Route baseline: post-Route 60
 Date: 2026-05-15
-Status: long-range edit capability map after Routes 50-59.
-Route 59 has implemented a narrow explicit non-default original-content
-authority loop.
+Status: long-range edit capability map after Routes 50-60.
+Routes 59-60 have implemented a narrow explicit non-default original-content
+authority loop with coverage drills.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
 bound and the long-range route sequence needed before broader edit support can
 be claimed. It is based on current target code, current target docs, focused
-Route 50-56 evidence, and a bounded directional comparison against ClaudeCode,
+Route 50-60 evidence, and a bounded directional comparison against ClaudeCode,
 opencode, and gemini-cli.
 
 It is not a broad edit readiness claim. It keeps implemented capability,
 candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Post-Route 56 Executive Summary
+## 1. Post-Route 60 Executive Summary
 
 Current write capability remains intentionally narrow. The project supports a
 bounded selected-workspace write surface and still blocks broad arbitrary
@@ -57,9 +57,11 @@ execution.
 Route 59 implemented that direction as a minimum explicit non-default loop:
 metadata-only manifests plus hash-named content blobs, guarded per-file restore
 primitive, and pre-write capture for single update, single delete, exactly-two
-update, and single create. This is still not automatic recovery, default
-persistence, snapshot/rollback, broad writes, or product restore UX. Broad
-writes remain delayed.
+update, and single create. Route 60 extended that loop to single move,
+exactly-three update, and exactly-two mixed lanes where clean, plus explicit
+partial-failure restore drills with current-content guards. This is still not
+automatic recovery, default persistence, snapshot/rollback, broad writes, or
+product restore UX. Broad writes remain delayed.
 
 ## 2. Current Edit Capability Inventory
 
@@ -359,11 +361,12 @@ User / CLI / provider output
 | Recovery plan projection | Implemented plan-only diagnostics with absent-authority and captured non-default authority modes | `journalRecoveryPlanProjection.ts`, `journalRecoveryPlanProjection.test.ts`, `journalResultProjection.ts`, focused consumer tests | C/D | No automatic recovery executor, rollback, snapshot, or default persistence | Preserve while expanding non-default coverage |
 | Durable authority descriptor | Implemented active absent-authority descriptor plus captured original-content ledger descriptor | `journalDurableAuthority.ts`, `journalDurableAuthority.test.ts` | D | Captured authority is non-default only; no git or snapshot authority | Preserve no-default boundary |
 | Original-content authority seam | Implemented requirement/record/restore-eligibility model with captured-record diagnostics | `journalOriginalContentAuthority.ts`, `journalOriginalContentAuthority.test.ts` | D | Restore requires explicit primitive call; no automatic executor | Expand coverage or UX after Route 59 |
-| Recovery readiness projection | Implemented nested `recoveryPlan.recoveryReadiness` diagnostics | `journalRecoveryReadinessProjection.ts`, `journalRecoveryReadinessProjection.test.ts`, representative consumer tests | C/D | Can reflect explicit restore eligibility, but cannot execute recovery | Batch 60 coverage or UX decision |
+| Recovery readiness projection | Implemented nested `recoveryPlan.recoveryReadiness` diagnostics | `journalRecoveryReadinessProjection.ts`, `journalRecoveryReadinessProjection.test.ts`, representative consumer tests | C/D | Can reflect explicit restore eligibility, but cannot execute recovery | Batch 61 explicit restore surface design |
 | Recovery authority store | Implemented explicit non-default prototype | `patchRecovery/recoveryAuthorityStore.ts`, `recoveryAuthorityStore.test.ts` | C/D | No default storage; no session lifecycle; stores original content only under explicit temp/root option | Expand coverage or UX only after boundary review |
 | Explicit restore primitive | Implemented guarded per-file primitive | `patchRecovery/restorePrimitive.ts`, `restorePrimitive.test.ts` | C/D | No automatic recovery; no transaction rollback; no CLI/session surface | Product restore UX design or remaining narrow coverage |
-| Non-default writer preflight capture | Implemented for single update/delete/create and exactly-two update | `workspaceWriteRoute.ts`, `workspaceDeleteRoute.ts`, `workspaceCreateRoute.ts`, `multiFileWriteRoute.ts`, focused route tests | C/D | Not wired to move, exactly-three update, mixed lanes, or partial failure surfaces | Batch 60 capture coverage expansion |
+| Non-default writer preflight capture | Implemented for single update/delete/create, exactly-two update, exactly-three update, single move, and exactly-two mixed lanes where clean | `workspaceWriteRoute.ts`, `workspaceDeleteRoute.ts`, `workspaceCreateRoute.ts`, `workspaceMoveRoute.ts`, `multiFileWriteRoute.ts`, `mixedFileWriteRoute.ts`, focused route tests | C/D | Narrow surface only; broad `apply_patch`, 3+ mixed, 4+, multi-delete, and multi-move remain out of scope | Batch 61 explicit restore surface design or 3+ mixed audit |
 | Current-content guard | Implemented in explicit restore primitive | `restorePrimitive.ts`, `restorePrimitive.test.ts` | C/D | Guard is available only when restore is explicitly invoked | Future restore UX/executor design |
+| Partial-failure restore drills | Implemented for exactly-three update and exactly-two mixed partial failures | `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts`, `restorePrimitive.test.ts` | C/D | Restore remains explicit and non-atomic; no automatic recovery or rollback claim | Batch 61 explicit restore surface design |
 | Durable journal storage | Partially implemented as explicit non-default authority ledger; not default/session durable | `recoveryAuthorityStore.ts`, cleanup/purge tests | C/D | No default persistence, no SessionManager storage, no provider/session surface | Keep non-default until lifecycle is designed |
 | Recovery executor | Future; not implemented | No automatic executor | N/A | Requires product surface, workspace authority at call time, no-hidden-user-edit rule | After capture coverage/UX decision |
 | Rollback/snapshot | Future; not implemented | No target snapshot/restore layer | N/A | Needs checkpoint/file-history/storage design and user/session semantics | Batch 59+ |
@@ -379,7 +382,7 @@ Evidence strength scale: A = real-provider / real CLI / real runtime gate,
 B = synthetic E2E / golden main path, C = focused integration test, D = unit /
 contract test, E = documentation only, F = static code inference.
 
-## 6. Post-Route 56 Reference Comparison
+## 6. Post-Route 60 Reference Comparison
 
 Bounded scan count:
 
@@ -541,14 +544,15 @@ implementation route" is historical and obsolete.
 
 Recommended next development batch:
 
-**Batch 60: Expand non-default capture coverage or design explicit restore UX**
+**Batch 61: User/session-visible explicit restore surface design**
 
-Route 59 proved the minimum store/capture/restore loop without changing default
-runtime behavior. The next batch should either expand non-default pre-write
-capture to remaining narrow lanes and representative partial-failure surfaces,
-or design a user-visible explicit restore surface around the existing primitive.
+Route 60 proved the minimum store/capture/restore loop plus explicit
+partial-failure drills without changing default runtime behavior. The next
+batch should decide whether to expose the existing explicit restore primitive
+to user/session-facing surfaces, or keep it internal while a 3+ mixed audit is
+handled separately.
 
-Batch 60 should still avoid broad writes, 3+ mixed implementation, provider,
+Batch 61 should still avoid broad writes, 3+ mixed implementation, provider,
 session, CLI, MCP, package-script, and default-gate changes unless the route
 explicitly opens one of those layers.
 
@@ -572,27 +576,32 @@ explicitly opens one of those layers.
   - Status: implemented as explicit non-default store, capture wiring, and
     guarded per-file restore primitive.
 
-- Batch 60: Remaining narrow capture coverage or explicit restore UX design
-  - Expand non-default capture to move, exactly-three update, mixed lanes, and
-    representative partial-failure surfaces, or define a user-visible explicit
-    restore UX over the primitive.
+- Batch 60: Remaining narrow capture coverage and restore drills
+  - Status: implemented as single move, exactly-three update, exactly-two
+    mixed capture coverage, and explicit partial-failure restore drills.
   - Keep automatic recovery and default persistence absent.
 
-- Batch 61: Recovery executor design only or keep recovery blocked
+- Batch 61: User/session-visible explicit restore surface design
+  - Define a visible restore action around the existing primitive without
+    turning it into automatic recovery.
+  - Require explicit authority selection, current-content guard language, and
+    no hidden user-edit overwrite behavior.
+
+- Batch 62: Recovery executor design only or keep recovery blocked
   - Only if durable authority coverage and product surface are explicit.
   - Require original-content/snapshot authority, current-content inspection,
     no-hidden-user-edit semantics, and focused tests.
 
-- Batch 62: 3+ mixed write readiness audit
+- Batch 63: 3+ mixed write readiness audit
   - Only after the recovery/rollback stance is explicit.
   - Audit result contract, ordering, destructive approvals, partial failure,
     unsupported surfaces, and validation requirements.
 
-- Batch 63: Narrow 3+ mixed implementation or keep blocked
+- Batch 64: Narrow 3+ mixed implementation or keep blocked
   - Implement only if the audit proves the route can preserve current boundaries.
   - Otherwise keep 3+ mixed unsupported and record blockers.
 
-- Batch 64+: Broad `apply_patch` readiness
+- Batch 65+: Broad `apply_patch` readiness
   - Consider only if larger mixed/write surfaces and recovery/rollback stance
     are settled.
   - Broad arbitrary `apply_patch` remains delayed because it combines parsing,
@@ -668,8 +677,11 @@ Allowed after this document:
   original-content authority records can be captured under caller-provided
   ledger roots and explicit per-file restore can be invoked with current-content
   guards.
-- Batch 60 remaining narrow capture coverage or explicit restore UX design is
-  the recommended next development direction.
+- Route 60 explicit non-default capture coverage and restore drills are
+  implemented for single move, exactly-three update, and exactly-two mixed
+  lanes.
+- Batch 61 user/session-visible explicit restore surface design is the
+  recommended next development direction.
 
 Forbidden after this document:
 

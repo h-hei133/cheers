@@ -159,9 +159,22 @@ Focused tests cover:
 - recoveryPlan can reflect captured non-default authority while
   `recoveryExecuted=false` and `rollbackAtomicityClaim=false`.
 
+## Route 60 Note
+
+Route 60 expanded the non-default capture loop across the remaining narrow
+supported write surfaces:
+
+- single move capture coverage
+- exactly-three update capture coverage
+- exactly-two mixed capture coverage where the route remains clean
+- explicit partial-failure restore drills with current-content guards
+
+The restore primitive remains explicit and non-atomic. Recovery still does not
+run automatically, and default runtime behavior remains unchanged.
+
 ## Next Direction
 
-Recommended next batch: expand non-default capture coverage to remaining narrow
-routes and representative partial-failure surfaces, or design a product surface
-for explicit restore. Broad writes should remain delayed until the recovery
-authority loop has coverage and UX boundaries beyond isolated tests.
+Recommended next batch: explicit restore UX over the existing primitive, or a
+3+ mixed readiness audit if the project wants to keep the current boundary.
+Broad writes should remain delayed until the recovery authority loop has both
+user-facing restore language and a deliberate stance on larger mixed writes.

@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { readRecoveryAuthorityRecord } from "../patchRecovery/recoveryAuthorityStore.js";
+import { restoreRecoveryAuthorityRecord } from "../patchRecovery/restorePrimitive.js";
 import { createWorkspaceWriteAuthority } from "./workspaceAuthority.js";
 import { runMultiFileWriteRoute } from "./multiFileWriteRoute.js";
 
@@ -129,13 +130,40 @@ describe("multi-file Update File selected-workspace write route", () => {
   it("writes exactly three existing files after explicit approval and verifies all", async () => {
     const fixture = createFixture({ includeC: true });
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+    let firstWriteSawAllRecords = false;
 
     const result = await runMultiFileWriteRoute({
       ...routeOptions(fixture.workspaceRoot, threeFilePatch()),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       validateWriteTarget: authority.validateWriteTarget,
-      writeFile: authority.writeFile,
+      writeFile: async (relativePath, content) => {
+        if (!firstWriteSawAllRecords) {
+          const first = await readRecoveryAuthorityRecord({
+            ledgerRoot,
+            authorityId: "route-three-update",
+            recordId: "update-1-src-a.ts",
+          });
+          const second = await readRecoveryAuthorityRecord({
+            ledgerRoot,
+            authorityId: "route-three-update",
+            recordId: "update-2-src-b.ts",
+          });
+          const third = await readRecoveryAuthorityRecord({
+            ledgerRoot,
+            authorityId: "route-three-update",
+            recordId: "update-3-src-c.ts",
+          });
+          firstWriteSawAllRecords = Boolean(first && second && third);
+        }
+        await authority.writeFile(relativePath, content);
+      },
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-three-update",
+      },
     });
 
     expect(result.status).toBe("written");
@@ -150,6 +178,9 @@ describe("multi-file Update File selected-workspace write route", () => {
     expect(result.workspaceWriterInvoked).toBe(true);
     expect(result.writeEffect).toBe("verified");
     expect(result.postWriteVerification).toBe("passed");
+    expect(firstWriteSawAllRecords).toBe(true);
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(3);
     expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
     expect(readFile(fixture.workspaceRoot, "src/b.ts")).toBe("b = 2\n");
     expect(readFile(fixture.workspaceRoot, "src/c.ts")).toBe("c = 2\n");
@@ -161,6 +192,63 @@ describe("multi-file Update File selected-workspace write route", () => {
         "apply-patch-multi-file-write-route:post-write-verification-passed",
       ]),
     );
+  });
+
+  it("restores a verified exactly-three prefix file after partial failure and blocks hidden edits", async () => {
+    const fixture = createFixture({ includeC: true });
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+
+    const result = await runMultiFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, threeFilePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: (relativePath, content) => {
+        if (relativePath === "src/c.ts") {
+          throw new Error("simulated third writer failure");
+        }
+        authority.writeFile(relativePath, content);
+      },
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-three-restore",
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("write-application");
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.changedFiles).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(result.failedFiles[0]?.path).toBe("src/c.ts");
+    expect(result.postWriteVerification).toBe("blocked");
+
+    const restore = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-three-restore",
+      recordId: "update-1-src-a.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/a.ts",
+    });
+    expect(restore.restored).toBe(true);
+    expect(restore.rollbackAtomicityClaim).toBe(false);
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 1\n");
+
+    fs.writeFileSync(
+      path.join(fixture.workspaceRoot, "src", "a.ts"),
+      "hidden-user-edit\n",
+      "utf8",
+    );
+    const blockedRestore = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-three-restore",
+      recordId: "update-1-src-a.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/a.ts",
+    });
+    expect(blockedRestore.restored).toBe(false);
+    expect(blockedRestore.blockedReason).toBe("current-content-hash-mismatch");
   });
 
   it("blocks four Update File operations without invoking the writer", async () => {
@@ -482,6 +570,14 @@ function routeOptions(
   };
 }
 
+function createLedgerRoot(): string {
+  const ledgerRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), "multi-file-ledger-"),
+  );
+  tempRoots.push(ledgerRoot);
+  return ledgerRoot;
+}
+
 function createFixture(
   options: { readonly includeC?: boolean; readonly includeD?: boolean } = {},
 ): { readonly workspaceRoot: string } {
@@ -665,12 +761,6 @@ function hunkMismatchPatch(): string {
 
 function readFile(workspaceRoot: string, relativePath: string): string {
   return fs.readFileSync(path.join(workspaceRoot, relativePath), "utf8");
-}
-
-function createLedgerRoot(): string {
-  const ledgerRoot = fs.mkdtempSync(path.join(os.tmpdir(), "recovery-ledger-"));
-  tempRoots.push(ledgerRoot);
-  return ledgerRoot;
 }
 
 function snapshotFixture(workspaceRoot: string): Record<string, string> {

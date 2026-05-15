@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { readRecoveryAuthorityRecord } from "../patchRecovery/recoveryAuthorityStore.js";
 import { createWorkspaceWriteAuthority } from "./workspaceAuthority.js";
 import { runWorkspaceMoveRoute } from "./workspaceMoveRoute.js";
 
@@ -17,6 +18,8 @@ describe("single-file Move File selected-workspace route", () => {
   it("moves one selected workspace file after guards and verifies source removal and target content", async () => {
     const fixture = createFixture();
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+    let firstWriteSawRecord = false;
 
     const result = await runWorkspaceMoveRoute({
       ...routeOptions(fixture.workspaceRoot, pureMovePatch()),
@@ -25,7 +28,22 @@ describe("single-file Move File selected-workspace route", () => {
       directoryExists: authority.directoryExists,
       validateWriteTarget: authority.validateWriteTarget,
       validateCreateTarget: authority.validateCreateTarget,
-      moveFileExclusive: authority.moveFileExclusive,
+      moveFileExclusive: async (sourcePath, targetPath) => {
+        if (!firstWriteSawRecord) {
+          const record = await readRecoveryAuthorityRecord({
+            ledgerRoot,
+            authorityId: "route-move",
+            recordId: "move-src-from.ts",
+          });
+          firstWriteSawRecord = Boolean(record);
+        }
+        await authority.moveFileExclusive(sourcePath, targetPath);
+      },
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-move",
+      },
     });
 
     expect(result.status).toBe("moved");
@@ -41,6 +59,16 @@ describe("single-file Move File selected-workspace route", () => {
     expect(result.terminalClassification).toBe("success");
     expect(result.terminalSuccessAllowed).toBe(true);
     expect(result.mutationSuccessClaimAllowed).toBe(true);
+    expect(firstWriteSawRecord).toBe(true);
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.recoveryAuthorityCapture?.records).toEqual([
+      expect.objectContaining({
+        workspaceRelativePath: "src/from.ts",
+        operationKind: "move",
+        beforeState: "exists",
+        expectedCurrentState: "absent",
+      }),
+    ]);
     expect(result.perFilePatchPlan?.operations).toEqual([
       expect.objectContaining({
         operationKind: "move",
@@ -216,6 +244,14 @@ function routeOptions(workspaceRoot: string, rawPatchText: string) {
     requestedUserDecision: "approved" as const,
     defaultProductionRejectionUnchanged: true as const,
   };
+}
+
+function createLedgerRoot(): string {
+  const ledgerRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), "workspace-move-ledger-"),
+  );
+  tempRoots.push(ledgerRoot);
+  return ledgerRoot;
 }
 
 function movePatch(

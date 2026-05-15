@@ -1,5 +1,10 @@
 import path from "node:path";
 import {
+  captureRecoveryAuthorityRecords,
+  type RecoveryAuthorityCaptureBatchResult,
+  type RecoveryAuthorityStoreConfig,
+} from "../patchRecovery/recoveryAuthorityStore.js";
+import {
   applySingleFileMoveIntent,
   buildSingleFileMoveApplicationContract,
   type SingleFileMoveApplicationContract,
@@ -36,6 +41,7 @@ export type WorkspaceMoveRouteBlocker =
   | "patch-verification"
   | "final-stale-read"
   | "aborted-before-write"
+  | "recovery-authority-capture"
   | "write-application"
   | "post-write-verification";
 
@@ -59,6 +65,7 @@ export interface WorkspaceMoveRouteOptions {
     sourcePath: string,
     targetPath: string,
   ) => void | Promise<void>;
+  readonly recoveryAuthority?: RecoveryAuthorityStoreConfig;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -70,6 +77,7 @@ export type WorkspaceMoveRoute =
       readonly targetPath: string;
       readonly perFilePatchPlan?: PerFilePatchPlan;
       readonly applicationContract: SingleFileMoveApplicationContract;
+      readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
       readonly failures: readonly [];
       readonly workspaceWriterInvoked: true;
       readonly deleteMoveInvoked: true;
@@ -100,6 +108,7 @@ export type WorkspaceMoveRoute =
       readonly targetPath?: string;
       readonly perFilePatchPlan?: PerFilePatchPlan;
       readonly applicationContract?: SingleFileMoveApplicationContract;
+      readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
       readonly failures: readonly PatchFailure[];
       readonly workspaceWriterInvoked: boolean;
       readonly deleteMoveInvoked: boolean;
@@ -418,6 +427,39 @@ export async function runWorkspaceMoveRoute(
     });
   }
 
+  const recoveryAuthorityCapture = options.recoveryAuthority
+    ? await captureRecoveryAuthorityRecords({
+        store: options.recoveryAuthority,
+        records: [
+          {
+            recordId: recordIdForPath("move", moveOperation.path),
+            workspaceRelativePath: moveOperation.path,
+            operationKind: "move",
+            beforeState: "exists",
+            beforeContent: finalSourceContent,
+            expectedCurrentState: "absent",
+          },
+        ],
+      })
+    : undefined;
+  if (recoveryAuthorityCapture?.status === "blocked") {
+    return blocked({
+      blocker: "recovery-authority-capture",
+      sourcePath: moveOperation.path,
+      targetPath: moveOperation.moveTo,
+      perFilePatchPlan,
+      applicationContract,
+      recoveryAuthorityCapture,
+      failures: [],
+      nextAction:
+        "No move writer ran because recovery authority capture failed before the write.",
+      evidence: [
+        "apply-patch-workspace-move-route:recovery-authority-capture-blocked",
+        ...recoveryAuthorityCapture.evidence,
+      ],
+    });
+  }
+
   const applied = await applySingleFileMoveIntent(applicationContract, {
     moveFileExclusive: options.moveFileExclusive,
     readFile: options.readVerifiedFile,
@@ -441,6 +483,7 @@ export async function runWorkspaceMoveRoute(
       targetPath: moveOperation.moveTo,
       perFilePatchPlan,
       applicationContract,
+      recoveryAuthorityCapture,
       failures: applied.failedFiles,
       changedFiles: applied.changedFiles,
       writeIntents: [moveOperation.moveTo],
@@ -473,6 +516,7 @@ export async function runWorkspaceMoveRoute(
     targetPath: moveOperation.moveTo,
     perFilePatchPlan,
     applicationContract,
+    ...(recoveryAuthorityCapture ? { recoveryAuthorityCapture } : {}),
     failures: [],
     workspaceWriterInvoked: true,
     deleteMoveInvoked: true,
@@ -508,9 +552,9 @@ export async function runWorkspaceMoveRoute(
       "apply-patch-workspace-move-route:no-delete-operation",
       "apply-patch-workspace-move-route:no-broad-apply-patch",
       "apply-patch-workspace-move-route:default-production-rejection-unchanged",
-      ...writeFailureState.evidence,
-    ],
-  };
+    ...writeFailureState.evidence,
+  ],
+};
 }
 
 function singleMoveOperation(
@@ -535,6 +579,10 @@ function unsupportedMoveFailure(
     nextAction:
       "Use one Move File patch for one existing regular source file and one missing target. Keep delete, mixed, multi-file, and broad apply_patch shapes out of this route.",
   };
+}
+
+function recordIdForPath(kind: string, targetPath: string): string {
+  return `${kind}-${targetPath.replaceAll(/[^A-Za-z0-9._-]/g, "-")}`;
 }
 
 function sameTargetFailure(
@@ -644,6 +692,7 @@ function blocked(input: {
   readonly targetPath?: string;
   readonly perFilePatchPlan?: PerFilePatchPlan;
   readonly applicationContract?: SingleFileMoveApplicationContract;
+  readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
   readonly failures: readonly PatchFailure[];
   readonly changedFiles?: readonly string[];
   readonly writeIntents?: readonly string[];
@@ -676,6 +725,9 @@ function blocked(input: {
     ...(input.perFilePatchPlan ? { perFilePatchPlan: input.perFilePatchPlan } : {}),
     ...(input.applicationContract
       ? { applicationContract: input.applicationContract }
+      : {}),
+    ...(input.recoveryAuthorityCapture
+      ? { recoveryAuthorityCapture: input.recoveryAuthorityCapture }
       : {}),
     failures: input.failures,
     workspaceWriterInvoked,

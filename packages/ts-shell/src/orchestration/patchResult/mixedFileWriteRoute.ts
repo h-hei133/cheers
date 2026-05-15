@@ -1,4 +1,9 @@
 import path from "node:path";
+import {
+  captureRecoveryAuthorityRecords,
+  type RecoveryAuthorityCaptureBatchResult,
+  type RecoveryAuthorityStoreConfig,
+} from "../patchRecovery/recoveryAuthorityStore.js";
 import { buildNoPartialPatchApplicationContract } from "../patchApplication/noPartialApply.js";
 import { parseApplyPatchText } from "../patchParsing/parser.js";
 import type {
@@ -37,6 +42,7 @@ export type MixedFileWriteRouteBlocker =
   | "patch-verification"
   | "final-preflight"
   | "aborted-before-write"
+  | "recovery-authority-capture"
   | "write-application"
   | "post-write-verification";
 
@@ -80,6 +86,7 @@ export interface MixedFileWriteRouteOptions {
     targetPath: string,
   ) => void | Promise<void>;
   readonly deleteFile: (relativePath: string) => void | Promise<void>;
+  readonly recoveryAuthority?: RecoveryAuthorityStoreConfig;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -91,6 +98,7 @@ export type MixedFileWriteRoute =
       readonly operationKinds: readonly PatchOperationKind[];
       readonly approval: Extract<MixedFileWriteApproval, { status: "approved-for-write" }>;
       readonly perFilePatchPlan?: PerFilePatchPlan;
+      readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
       readonly workspaceWriterInvoked: true;
       readonly creatorInvoked: boolean;
       readonly deleteMoveInvoked: boolean;
@@ -121,6 +129,7 @@ export type MixedFileWriteRoute =
       readonly operationKinds: readonly PatchOperationKind[];
       readonly approval: MixedFileWriteApproval;
       readonly perFilePatchPlan?: PerFilePatchPlan;
+      readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
       readonly failures: readonly PatchFailure[];
       readonly workspaceWriterInvoked: boolean;
       readonly creatorInvoked: boolean;
@@ -433,6 +442,32 @@ export async function runMixedFileWriteRoute(
     });
   }
 
+  const recoveryAuthorityCapture = options.recoveryAuthority
+    ? await captureRecoveryAuthorityRecords({
+        store: options.recoveryAuthority,
+        records: verification.plan.operations.map((operation, index) =>
+          buildRecoveryAuthorityRecord(operation, index),
+        ),
+      })
+    : undefined;
+  if (recoveryAuthorityCapture?.status === "blocked") {
+    return blocked({
+      blocker: "recovery-authority-capture",
+      targetPaths,
+      operationKinds,
+      approval,
+      perFilePatchPlan,
+      recoveryAuthorityCapture,
+      failures: [],
+      nextAction:
+        "No mixed workspace writer ran because recovery authority capture failed before the write.",
+      evidence: [
+        "apply-patch-mixed-file-write-route:recovery-authority-capture-blocked",
+        ...recoveryAuthorityCapture.evidence,
+      ],
+    });
+  }
+
   const applied = await applyMixedOperations(options, verification.plan.operations);
   if (applied.ok === false) {
     const phase: WorkspaceWriteFailurePhase =
@@ -455,6 +490,7 @@ export async function runMixedFileWriteRoute(
       operationKinds,
       approval,
       perFilePatchPlan,
+      recoveryAuthorityCapture,
       failures: applied.failedFiles,
       changedFiles: applied.changedFiles,
       writeIntents: targetPaths,
@@ -505,6 +541,7 @@ export async function runMixedFileWriteRoute(
     operationKinds,
     approval,
     perFilePatchPlan,
+    ...(recoveryAuthorityCapture ? { recoveryAuthorityCapture } : {}),
     workspaceWriterInvoked: true,
     creatorInvoked: operationKinds.includes("add"),
     deleteMoveInvoked:
@@ -564,6 +601,62 @@ function mixedPairIsEnabled(kinds: readonly PatchOperationKind[]): boolean {
 
 function targetPathForOperation(operation: PatchFileOperation): string {
   return operation.kind === "move" ? operation.moveTo : operation.path;
+}
+
+function buildRecoveryAuthorityRecord(
+  operation: VerifiedPatchFileOperation,
+  index: number,
+): Parameters<typeof captureRecoveryAuthorityRecords>[0]["records"][number] {
+  const path = capturePathForOperation(operation);
+  const recoveryKind =
+    operation.operation.kind === "add" ? "create" : operation.operation.kind;
+  const common = {
+    recordId: recordIdForPath(recoveryKind, path, index),
+    workspaceRelativePath: path,
+    operationKind: recoveryKind,
+  } as const;
+
+  switch (operation.operation.kind) {
+    case "update":
+      return {
+        ...common,
+        beforeState: "exists",
+        beforeContent: operation.originalContent,
+        expectedCurrentState: "exists",
+        expectedCurrentContent: operation.plannedContent,
+      };
+    case "add":
+      return {
+        ...common,
+        beforeState: "absent",
+        expectedCurrentState: "exists",
+        expectedCurrentContent: operation.plannedContent,
+      };
+    case "delete":
+      return {
+        ...common,
+        beforeState: "exists",
+        beforeContent: operation.originalContent,
+        expectedCurrentState: "absent",
+      };
+    case "move":
+      return {
+        ...common,
+        beforeState: "exists",
+        beforeContent: operation.originalContent,
+        expectedCurrentState: "absent",
+      };
+  }
+}
+
+function capturePathForOperation(operation: VerifiedPatchFileOperation): string {
+  return operation.operation.kind === "move"
+    ? operation.operation.path
+    : operation.operation.path;
+}
+
+function recordIdForPath(kind: string, targetPath: string, index: number): string {
+  return `${kind}-${index + 1}-${targetPath.replaceAll(/[^A-Za-z0-9._-]/g, "-")}`;
 }
 
 function operationPaths(operation: PatchFileOperation): readonly string[] {
@@ -1057,6 +1150,7 @@ function blocked(input: {
   readonly operationKinds: readonly PatchOperationKind[];
   readonly approval: MixedFileWriteApproval;
   readonly perFilePatchPlan?: PerFilePatchPlan;
+  readonly recoveryAuthorityCapture?: RecoveryAuthorityCaptureBatchResult;
   readonly failures: readonly PatchFailure[];
   readonly changedFiles?: readonly string[];
   readonly writeIntents?: readonly string[];
@@ -1091,6 +1185,9 @@ function blocked(input: {
     operationKinds: input.operationKinds,
     approval: input.approval,
     ...(input.perFilePatchPlan ? { perFilePatchPlan: input.perFilePatchPlan } : {}),
+    ...(input.recoveryAuthorityCapture
+      ? { recoveryAuthorityCapture: input.recoveryAuthorityCapture }
+      : {}),
     failures: input.failures,
     workspaceWriterInvoked,
     creatorInvoked,

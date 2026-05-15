@@ -494,7 +494,8 @@ export async function runMultiFileWriteRoute(
   }
 
   const recoveryAuthorityCapture =
-    options.recoveryAuthority && targetCount === 2
+    options.recoveryAuthority &&
+    (targetCount === 2 || targetCount === 3)
       ? await captureRecoveryAuthorityRecords({
           store: options.recoveryAuthority,
           records: writeIntent.writeIntents.map((intent, index) => {
