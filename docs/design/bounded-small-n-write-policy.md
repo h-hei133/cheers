@@ -6,6 +6,11 @@ mixed, delete-only, and move-only batches with cap 8. This is not broad
 provider/session/CLI/MCP, package-script, default-gate, or default persistence
 readiness.
 
+Route 67 note: parser-supported `apply_patch` payloads with 1-8 operations may
+now be classified as bounded candidates and routed into these same guarded
+lanes. This does not change the cap, writer semantics, recovery semantics, or
+the unsupported status of broad arbitrary `apply_patch`.
+
 ## Post-Route 64 Baseline
 
 Before Route 65, the selected-workspace write surface supported single

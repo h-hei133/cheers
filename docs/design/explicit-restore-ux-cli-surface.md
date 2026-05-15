@@ -195,8 +195,8 @@ Focused tests cover:
 
 ## Next Route Decision Criteria
 
-Route 67 should not widen writes just because an explicit restore command now
-exists. Prefer broad `apply_patch` readiness split only if the cap-8 surface is
-stable and result/session surfaces explain partial failures clearly. If UX
-gaps remain, a narrower Route 67 should polish CLI restore command ergonomics
-before broad write readiness.
+Route 67 widened only the bounded candidate classifier/routing layer: safe
+parser-supported 1-8 `apply_patch` payloads can reuse existing guarded write
+lanes and non-default recovery-authority capture. It did not add automatic
+recovery, rollback, default persistence, or broad arbitrary `apply_patch`.
+Future restore polish should remain separate from larger write-surface policy.

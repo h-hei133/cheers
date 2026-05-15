@@ -6,6 +6,8 @@ import {
   projectApplyPatchRuntimeMutationRoute,
   type MutationRoutingProjectionAuthority,
 } from "./mutationRoutingProjection.js";
+import { readRecoveryAuthorityRecord } from "./patchRecovery/recoveryAuthorityStore.js";
+import { restoreRecoveryAuthorityRecord } from "./patchRecovery/restorePrimitive.js";
 import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
 
 const tempRoots: string[] = [];
@@ -221,6 +223,62 @@ describe("apply_patch mutation routing projection", () => {
     ]);
     expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
     expect(readFile(fixture.workspaceRoot, "src/b.ts")).toBe("b = 2\n");
+  });
+
+  it("captures recovery authority for a bounded apply_patch candidate before writer start", async () => {
+    const fixture = createFixture({ includeC: true, includeD: true });
+    fs.writeFileSync(
+      path.join(fixture.workspaceRoot, "src", "e.ts"),
+      "e = 1\n",
+      "utf8",
+    );
+    const ledgerRoot = createLedgerRoot();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    let firstWriteSawRecords = false;
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, fiveFileUpdatePatch()),
+      routeOptions: {
+        ...runtimeInput(fixture.workspaceRoot, fiveFileUpdatePatch()).routeOptions,
+        recoveryAuthority: {
+          mode: "non-default",
+          ledgerRoot,
+          authorityId: "route67-five-update",
+        },
+      },
+      getWorkspaceAuthority: () => ({
+        ...authority,
+        writeFile: async (relativePath, content) => {
+          if (!firstWriteSawRecords) {
+            const record = await readRecoveryAuthorityRecord({
+              ledgerRoot,
+              authorityId: "route67-five-update",
+              recordId: "update-1-src-a.ts",
+            });
+            firstWriteSawRecords = Boolean(record);
+          }
+          await authority.writeFile(relativePath, content);
+        },
+      }),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.codingResult?.changedFiles).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+      "src/e.ts",
+    ]);
+    expect(result?.codingResult?.recoverySurface).toEqual(
+      expect.objectContaining({
+        recoveryAvailable: true,
+        explicitRestoreAvailable: true,
+        recoveryExecuted: false,
+        atomicRollbackAvailable: false,
+      }),
+    );
+    expect(firstWriteSawRecords).toBe(true);
   });
 
   it("projects exactly three Update File patches as no-write when workspace write is not opted in", async () => {
@@ -703,6 +761,57 @@ describe("apply_patch mutation routing projection", () => {
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
       "src/a.ts": "a = 2\n",
     });
+  });
+
+  it("stops a partial bounded apply_patch candidate and supports explicit restore without automatic rollback", async () => {
+    const fixture = createFixture();
+    const ledgerRoot = createLedgerRoot();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, mixedUpdateCreatePatch()),
+      routeOptions: {
+        ...runtimeInput(fixture.workspaceRoot, mixedUpdateCreatePatch()).routeOptions,
+        recoveryAuthority: {
+          mode: "non-default",
+          ledgerRoot,
+          authorityId: "route67-mixed-restore",
+        },
+      },
+      getWorkspaceAuthority: () => ({
+        ...authority,
+        createFileExclusive: () => {
+          throw new Error("simulated create failure");
+        },
+      }),
+    });
+
+    expect(result?.status).toBe("stopped_error");
+    expect(result?.terminalClassification).toBe("stopped");
+    expect(result?.codingResult?.changedFiles).toEqual(["src/a.ts"]);
+    expect(result?.codingResult?.failedFiles).toEqual([
+      expect.objectContaining({ path: "src/new.ts" }),
+    ]);
+    expect(result?.codingResult?.recoverySurface).toEqual(
+      expect.objectContaining({
+        recoveryAvailable: true,
+        explicitRestoreAvailable: true,
+        recoveryExecuted: false,
+        atomicRollbackAvailable: false,
+      }),
+    );
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
+
+    const restore = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route67-mixed-restore",
+      recordId: "update-1-src-a.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/a.ts",
+    });
+    expect(restore.restored).toBe(true);
+    expect(restore.rollbackAtomicityClaim).toBe(false);
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 1\n");
   });
 
   it("routes exactly-three mixed operations through the guarded mixed writer", async () => {
@@ -1381,6 +1490,14 @@ function createFixture(
     );
   }
   return { workspaceRoot };
+}
+
+function createLedgerRoot(): string {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "mutation-routing-ledger-"),
+  );
+  tempRoots.push(root);
+  return root;
 }
 
 function readWorkspaceFile(

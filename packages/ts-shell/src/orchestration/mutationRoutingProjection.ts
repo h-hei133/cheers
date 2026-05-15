@@ -31,11 +31,16 @@ import type {
   WorkspaceCreateTargetAuthority,
   WorkspaceWriteTargetAuthority,
 } from "./patchResult/workspaceAuthority.js";
+import {
+  classifyBoundedApplyPatchCandidate,
+  type BoundedApplyPatchCandidateProjection,
+} from "./patchResult/boundedApplyPatchCandidate.js";
 import { buildMixedFileWriteRouteResult } from "./patchResult/mixedFileWriteResult.js";
 import {
   patchIsTwoThreeOrFourMixedWriteFiles,
   runMixedFileWriteRoute,
 } from "./patchResult/mixedFileWriteRoute.js";
+import type { RecoveryAuthorityStoreConfig } from "./patchRecovery/recoveryAuthorityStore.js";
 
 export interface ApplyPatchRuntimeRouteOptions {
   readonly explicitRuntimeOptIn: boolean;
@@ -45,6 +50,7 @@ export interface ApplyPatchRuntimeRouteOptions {
   readonly workspaceWrite?: {
     readonly explicitWorkspaceWriteOptIn: boolean;
   };
+  readonly recoveryAuthority?: RecoveryAuthorityStoreConfig;
 }
 
 export interface MutationRoutingProjectionAuthority {
@@ -89,7 +95,16 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
   const rawPatchText = routeOptions.rawPatchText ?? input.prompt;
   if (routeOptions.workspaceWrite?.explicitWorkspaceWriteOptIn) {
     const workspaceAuthority = input.getWorkspaceAuthority();
-    if (patchIsSingleAddFile(rawPatchText)) {
+    const boundedCandidate = classifyBoundedApplyPatchCandidate({
+      workspaceRoot: input.workspaceRoot,
+      rawPatchText,
+    });
+    if (
+      boundedCandidate.status === "candidate" &&
+      boundedCandidate.operationFamily === "single" &&
+      boundedCandidate.normalizedOperations[0]?.kind === "create" &&
+      patchIsSingleAddFile(rawPatchText)
+    ) {
       const route = await runWorkspaceCreateRoute({
         workspaceRoot: input.workspaceRoot,
         rawPatchText,
@@ -105,6 +120,9 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
         directoryExists: workspaceAuthority.directoryExists,
         validateCreateTarget: workspaceAuthority.validateCreateTarget,
         createFileExclusive: workspaceAuthority.createFileExclusive,
+        ...(routeOptions.recoveryAuthority
+          ? { recoveryAuthority: routeOptions.recoveryAuthority }
+          : {}),
         ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
       });
       return buildWorkspaceCreateRouteResult({
@@ -114,7 +132,11 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
       });
     }
 
-    if (patchIsTwoThreeOrFourUpdateFiles(rawPatchText)) {
+    if (
+      boundedCandidate.status === "candidate" &&
+      boundedCandidate.operationFamily === "update-only" &&
+      patchIsTwoThreeOrFourUpdateFiles(rawPatchText)
+    ) {
       const route = await runMultiFileWriteRoute({
         workspaceRoot: input.workspaceRoot,
         rawPatchText,
@@ -129,6 +151,9 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
         readVerifiedFile: workspaceAuthority.readVerifiedFile,
         validateWriteTarget: workspaceAuthority.validateWriteTarget,
         writeFile: workspaceAuthority.writeFile,
+        ...(routeOptions.recoveryAuthority
+          ? { recoveryAuthority: routeOptions.recoveryAuthority }
+          : {}),
         ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
       });
       return buildMultiFileWriteRouteResult({
@@ -138,7 +163,12 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
       });
     }
 
-    if (patchIsSingleMoveFile(rawPatchText)) {
+    if (
+      boundedCandidate.status === "candidate" &&
+      boundedCandidate.operationFamily === "single" &&
+      boundedCandidate.normalizedOperations[0]?.kind === "move" &&
+      patchIsSingleMoveFile(rawPatchText)
+    ) {
       const route = await runWorkspaceMoveRoute({
         workspaceRoot: input.workspaceRoot,
         rawPatchText,
@@ -155,6 +185,9 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
         validateWriteTarget: workspaceAuthority.validateWriteTarget,
         validateCreateTarget: workspaceAuthority.validateCreateTarget,
         moveFileExclusive: workspaceAuthority.moveFileExclusive,
+        ...(routeOptions.recoveryAuthority
+          ? { recoveryAuthority: routeOptions.recoveryAuthority }
+          : {}),
         ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
       });
       return buildWorkspaceMoveRouteResult({
@@ -164,7 +197,12 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
       });
     }
 
-    if (patchIsSingleDeleteFile(rawPatchText)) {
+    if (
+      boundedCandidate.status === "candidate" &&
+      boundedCandidate.operationFamily === "single" &&
+      boundedCandidate.normalizedOperations[0]?.kind === "delete" &&
+      patchIsSingleDeleteFile(rawPatchText)
+    ) {
       const route = await runWorkspaceDeleteRoute({
         workspaceRoot: input.workspaceRoot,
         rawPatchText,
@@ -180,6 +218,9 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
         directoryExists: workspaceAuthority.directoryExists,
         validateWriteTarget: workspaceAuthority.validateWriteTarget,
         deleteFile: workspaceAuthority.deleteFile,
+        ...(routeOptions.recoveryAuthority
+          ? { recoveryAuthority: routeOptions.recoveryAuthority }
+          : {}),
         ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
       });
       return buildWorkspaceDeleteRouteResult({
@@ -189,7 +230,11 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
       });
     }
 
-    if (patchIsTwoThreeOrFourMixedWriteFiles(rawPatchText)) {
+    if (
+      boundedCandidate.status === "candidate" &&
+      routeUsesMixedWriteRoute(boundedCandidate) &&
+      patchIsTwoThreeOrFourMixedWriteFiles(rawPatchText)
+    ) {
       const route = await runMixedFileWriteRoute({
         workspaceRoot: input.workspaceRoot,
         rawPatchText,
@@ -209,6 +254,9 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
         createFileExclusive: workspaceAuthority.createFileExclusive,
         moveFileExclusive: workspaceAuthority.moveFileExclusive,
         deleteFile: workspaceAuthority.deleteFile,
+        ...(routeOptions.recoveryAuthority
+          ? { recoveryAuthority: routeOptions.recoveryAuthority }
+          : {}),
         ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
       });
       return buildMixedFileWriteRouteResult({
@@ -232,6 +280,9 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
       readVerifiedFile: workspaceAuthority.readVerifiedFile,
       validateWriteTarget: workspaceAuthority.validateWriteTarget,
       writeFile: workspaceAuthority.writeFile,
+      ...(routeOptions.recoveryAuthority
+        ? { recoveryAuthority: routeOptions.recoveryAuthority }
+        : {}),
       ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
     });
     return buildWorkspaceWriteRouteResult({
@@ -257,4 +308,14 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
     prompt: input.prompt,
     route,
   });
+}
+
+function routeUsesMixedWriteRoute(
+  candidate: Extract<BoundedApplyPatchCandidateProjection, { status: "candidate" }>,
+): boolean {
+  return (
+    candidate.operationFamily === "mixed" ||
+    candidate.operationFamily === "delete-only" ||
+    candidate.operationFamily === "move-only"
+  );
 }
