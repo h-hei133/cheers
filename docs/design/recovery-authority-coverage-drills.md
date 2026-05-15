@@ -66,8 +66,23 @@ Still absent:
 - automatic recovery claim
 - atomic rollback claim
 
+## Route 61 Note
+
+Route 61 built the operational explicit restore surface above these drills:
+
+- authority inspection lists captured records under an explicit ledger root.
+- restore preview checks current workspace state/content before any write.
+- explicit restore execution bridge runs preview first and restores only
+  eligible records through the existing primitive.
+- recovery surface projection can describe captured authority without claiming
+  automatic recovery, rollback, or route-result recovery execution.
+
+The drills remain explicit. No default write route invokes restore
+automatically, and no session/CLI lifecycle integration was added in this
+route.
+
 ## Next Direction
 
-The next likely development batch is explicit restore UX over the existing
-primitive, or a separate 3+ mixed readiness audit if the project wants to keep
-the surface narrow.
+The next likely development batch is a 3+ mixed readiness audit, or a separate
+CLI/session restore UX route if user-visible restore commands become the higher
+product priority.

@@ -367,6 +367,10 @@ User / CLI / provider output
 | Non-default writer preflight capture | Implemented for single update/delete/create, exactly-two update, exactly-three update, single move, and exactly-two mixed lanes where clean | `workspaceWriteRoute.ts`, `workspaceDeleteRoute.ts`, `workspaceCreateRoute.ts`, `workspaceMoveRoute.ts`, `multiFileWriteRoute.ts`, `mixedFileWriteRoute.ts`, focused route tests | C/D | Narrow surface only; broad `apply_patch`, 3+ mixed, 4+, multi-delete, and multi-move remain out of scope | Batch 61 explicit restore surface design or 3+ mixed audit |
 | Current-content guard | Implemented in explicit restore primitive | `restorePrimitive.ts`, `restorePrimitive.test.ts` | C/D | Guard is available only when restore is explicitly invoked | Future restore UX/executor design |
 | Partial-failure restore drills | Implemented for exactly-three update and exactly-two mixed partial failures | `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts`, `restorePrimitive.test.ts` | C/D | Restore remains explicit and non-atomic; no automatic recovery or rollback claim | Batch 61 explicit restore surface design |
+| Recovery authority index | Implemented explicit non-default inspection surface | `patchRecovery/recoveryAuthorityIndex.ts`, `recoveryAuthorityIndex.test.ts` | C/D | Metadata only; no raw content, workspace reads, default ledger, or session surface | Feed future CLI/session restore UX if needed |
+| Restore preview | Implemented explicit eligibility preview | `patchRecovery/restorePreview.ts`, `restorePreview.test.ts` | C/D | Requires explicit ledger/workspace/record selection; no writes or automatic recovery | Preserve as bridge precondition |
+| Explicit restore execution bridge | Implemented guarded explicit bridge | `patchRecovery/restoreExecutionBridge.ts`, `restoreExecutionBridge.test.ts` | C/D | Non-atomic per-file/set restore only; no default route invocation, CLI command, or rollback | 3+ mixed readiness audit or optional UX route |
+| Recovery summary projection | Implemented core projection helper | `patchRecovery/recoverySurfaceProjection.ts`, `recoverySurfaceProjection.test.ts` | D | Not wired into session/CLI lifecycle in Route 61 | Future user/session restore UX route if prioritized |
 | Durable journal storage | Partially implemented as explicit non-default authority ledger; not default/session durable | `recoveryAuthorityStore.ts`, cleanup/purge tests | C/D | No default persistence, no SessionManager storage, no provider/session surface | Keep non-default until lifecycle is designed |
 | Recovery executor | Future; not implemented | No automatic executor | N/A | Requires product surface, workspace authority at call time, no-hidden-user-edit rule | After capture coverage/UX decision |
 | Rollback/snapshot | Future; not implemented | No target snapshot/restore layer | N/A | Needs checkpoint/file-history/storage design and user/session semantics | Batch 59+ |
@@ -542,19 +546,22 @@ is absent and current write support remains deliberately bounded.
 The old recommendation that "Route 50 is the single recommended next
 implementation route" is historical and obsolete.
 
-Recommended next development batch:
+Implemented Route 61 batch:
 
-**Batch 61: User/session-visible explicit restore surface design**
+**Batch 61: Explicit restore surface and execution bridge**
 
-Route 60 proved the minimum store/capture/restore loop plus explicit
-partial-failure drills without changing default runtime behavior. The next
-batch should decide whether to expose the existing explicit restore primitive
-to user/session-facing surfaces, or keep it internal while a 3+ mixed audit is
-handled separately.
+Route 61 added a core explicit restore surface without changing default runtime
+behavior:
 
-Batch 61 should still avoid broad writes, 3+ mixed implementation, provider,
-session, CLI, MCP, package-script, and default-gate changes unless the route
-explicitly opens one of those layers.
+- recovery authority index
+- restore preview with current-content guard
+- explicit restore execution bridge
+- recovery summary projection
+
+CLI/session command wiring was intentionally deferred because it would touch
+command parsing, lifecycle, and user-facing persistence semantics. The next
+development direction should be a 3+ mixed readiness audit unless product UX
+prioritizes a dedicated explicit restore command first.
 
 ## 9. Recommended Future Sequence
 
@@ -581,21 +588,23 @@ explicitly opens one of those layers.
     mixed capture coverage, and explicit partial-failure restore drills.
   - Keep automatic recovery and default persistence absent.
 
-- Batch 61: User/session-visible explicit restore surface design
-  - Define a visible restore action around the existing primitive without
-    turning it into automatic recovery.
-  - Require explicit authority selection, current-content guard language, and
-    no hidden user-edit overwrite behavior.
+- Batch 61: Explicit restore surface and execution bridge
+  - Status: implemented as core recovery authority index, restore preview,
+    explicit execution bridge, and recovery summary projection.
+  - CLI/session visible command surface remains deferred.
 
-- Batch 62: Recovery executor design only or keep recovery blocked
-  - Only if durable authority coverage and product surface are explicit.
-  - Require original-content/snapshot authority, current-content inspection,
-    no-hidden-user-edit semantics, and focused tests.
-
-- Batch 63: 3+ mixed write readiness audit
-  - Only after the recovery/rollback stance is explicit.
+- Batch 62: 3+ mixed write readiness audit
   - Audit result contract, ordering, destructive approvals, partial failure,
-    unsupported surfaces, and validation requirements.
+    explicit restore authority, unsupported surfaces, and validation
+    requirements.
+  - Keep implementation blocked unless the audit proves current boundaries
+    remain coherent.
+
+- Batch 63: User/session explicit restore UX, if prioritized
+  - Add a narrow preview-first command or session-visible surface around the
+    Route 61 bridge.
+  - Require explicit ledger/workspace/authority/record selection and an
+    execute flag for writes.
 
 - Batch 64: Narrow 3+ mixed implementation or keep blocked
   - Implement only if the audit proves the route can preserve current boundaries.
@@ -680,8 +689,11 @@ Allowed after this document:
 - Route 60 explicit non-default capture coverage and restore drills are
   implemented for single move, exactly-three update, and exactly-two mixed
   lanes.
-- Batch 61 user/session-visible explicit restore surface design is the
-  recommended next development direction.
+- Route 61 core explicit restore surface is implemented: authority index,
+  restore preview, explicit execution bridge, and recovery summary projection.
+- Batch 62 3+ mixed write readiness audit is the recommended next development
+  direction unless a dedicated CLI/session explicit restore UX becomes the
+  higher priority.
 
 Forbidden after this document:
 

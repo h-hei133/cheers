@@ -172,9 +172,26 @@ supported write surfaces:
 The restore primitive remains explicit and non-atomic. Recovery still does not
 run automatically, and default runtime behavior remains unchanged.
 
+## Route 61 Note
+
+Route 61 added the core explicit restore surface over the existing primitive:
+
+- `patchRecovery/recoveryAuthorityIndex.ts` lists explicit non-default
+  authority namespaces and records without raw content.
+- `patchRecovery/restorePreview.ts` previews selected records with workspace
+  current-content guards and no writes.
+- `patchRecovery/restoreExecutionBridge.ts` runs preview first and then invokes
+  the guarded restore primitive only in explicit execute mode.
+- `patchRecovery/recoverySurfaceProjection.ts` summarizes captured authority as
+  explicit restore only, with `automaticRecoveryAvailable=false`,
+  `atomicRollbackAvailable=false`, and `recoveryExecuted=false`.
+
+CLI/session command wiring remains deferred. Default runtime behavior,
+provider/MCP behavior, package scripts, automatic recovery, atomic rollback,
+and broad write support remain unchanged.
+
 ## Next Direction
 
-Recommended next batch: explicit restore UX over the existing primitive, or a
-3+ mixed readiness audit if the project wants to keep the current boundary.
-Broad writes should remain delayed until the recovery authority loop has both
-user-facing restore language and a deliberate stance on larger mixed writes.
+Recommended next batch: a 3+ mixed readiness audit, unless product UX now needs
+a dedicated CLI/session explicit restore command. Broad writes should remain
+delayed until larger mixed writes have a clear recovery and rollback stance.
