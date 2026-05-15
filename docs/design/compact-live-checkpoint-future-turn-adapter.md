@@ -1,6 +1,6 @@
 # Compact Live Checkpoint and Future-Turn Adapter
 
-Status: Route 77 implemented candidate.
+Status: Route 77 implemented candidate; Route 78 injection implemented.
 Date: 2026-05-15
 
 ## Scope
@@ -51,9 +51,8 @@ Reference answers:
 4. This project should copy the conceptual separation: a latest compact
    checkpoint with redacted packet/markdown for status, plus a separate adapter
    that can create candidate future-turn context without injecting it.
-5. Route 78 should own actual query-loop/provider context injection, ordering
-   relative to prompt continuity, and any runtime behavior that consumes the
-   checkpoint automatically.
+5. Route 78 owns the local query-loop injection point and ordering relative to
+   prompt continuity. The adapter itself remains provider-call-free.
 
 ## Current `/compact` Behavior
 
@@ -122,6 +121,21 @@ persistence, no hidden reasoning projection, no restore execution, no automatic
 recovery, and no atomic rollback. Blocked-by-design edit facts and
 explicit-only restore facts survive in the candidate payload.
 
+## Route 78 Note
+
+Route 78 keeps the Route 77 checkpoint and adapter model intact, but adds an
+in-memory `compactInjectionState` store and an injection planner. `/compact`
+and `/handoff` now mark the latest checkpoint pending for next normal turn
+injection. `ShellSessionRuntime.executePrompt` consumes the pending checkpoint
+once and prepends formatted compact-safe context to the model-facing prompt
+without persisting that injected context into session history.
+
+The adapter still performs no provider/model call and no persistence. The
+Route 78 formatter excludes raw recovery content, raw original content,
+secrets, provider credentials, and hidden reasoning while preserving edit
+closeout facts, mutation evidence, recovery references, validation status,
+constraints, and next action.
+
 ## Checkpoint Surface
 
 `packages/ts-shell/src/core/context/compactCheckpointSurface.ts` renders concise
@@ -134,7 +148,8 @@ user/session status:
 - compact survivor count
 - redaction and warning counts
 - future-turn adapter readiness
-- not-yet-injected status
+- pending, injected, consumed, superseded, invalid, or no-checkpoint injection
+  status
 - next action
 
 The surface does not dump raw packet JSON or hidden packet content. JSON packet
@@ -142,7 +157,7 @@ mode remains the Route 76 dev-oriented output path.
 
 ## Safety Guarantees
 
-Route 77 preserves:
+Routes 77-78 preserve:
 
 - no persistence or memory storage
 - no SessionManager schema changes
@@ -151,22 +166,11 @@ Route 77 preserves:
 - no package script/default gate changes
 - no sidebar UI or startup cache
 - no edit runtime changes
-- no actual future-turn injection
+- one-shot next-normal-turn injection from the pending live checkpoint
 - no automatic recovery
 - no atomic rollback
 - no raw recovery content, raw original content, secrets, provider
   credentials, or hidden reasoning in checkpoints or adapter payloads
 
-## Route 78 Ownership
-
-Route 78 should decide:
-
-- how the latest checkpoint is selected for the next turn
-- where candidate adapter context is inserted relative to prompt continuity
-- how to avoid duplicate context when multiple compact checkpoints exist
-- how terminal/session surfaces explain injected versus merely available
-  compact context
-- which focused tests prove provider/model input receives the candidate safely
-
-Recommended next route: Route 78 actual future-turn injection from live Compact
-v2 checkpoint.
+Recommended next route: Route 79 quality/merge hardening for Compact v2
+injection.

@@ -560,6 +560,7 @@ async function main(): Promise<void> {
         renderer,
         printMode: false,
         interactive: true,
+        sessionId: runtimeContext.session.id,
       });
       if (resolved.kind === "handled") {
         rl.prompt();
@@ -1995,6 +1996,7 @@ async function runNonInteractivePrompt(options: {
     renderer: options.renderer,
     printMode: options.printMode,
     interactive: false,
+    sessionId: options.runtimeContext.session.id,
   });
   if (resolved.kind === "handled") {
     return;

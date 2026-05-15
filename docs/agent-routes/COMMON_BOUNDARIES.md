@@ -9,6 +9,9 @@ current capability limits, current phase status, or route completion state here.
 Those facts belong in `docs/design/*`, machine-checkable manifests, or the
 route document that needs them.
 
+When a future route needs a narrower or broader boundary, write that exception
+in the route document itself and explain why the route owns that behavior.
+
 ## Default Boundaries
 
 - Do not commit or push unless the user explicitly asks.
@@ -42,6 +45,10 @@ Route documents may require compact-safe references, ids, summaries, or
 redaction evidence, but they should not require raw sensitive material to
 survive in docs, compact summaries, manifests, or logs.
 
+If the route touches a sensitive path, restate the route-specific data boundary
+there. Do not depend on this common file as the only protection for a new
+sensitive behavior.
+
 ## What Stays Route-Specific
 
 Keep route-specific details in the individual route or the relevant design
@@ -54,4 +61,3 @@ document, including:
 - route-specific allowed files
 - route-specific stop conditions
 - route-specific validation commands
-

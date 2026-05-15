@@ -64,6 +64,40 @@ describe("CLI command execution bridge", () => {
     expect(output.lines).toEqual(["\nProject root: /workspace\n"]);
   });
 
+  it("passes session-scoped compact stores to slash commands", async () => {
+    const output = renderer();
+    const contextSeen: unknown[] = [];
+    const resolved = await buildCliCommandExecution(
+      {
+        prompt: "/compact",
+        cwd: "/workspace",
+        renderer: output as StreamingRenderer,
+        printMode: false,
+        interactive: true,
+        sessionId: "sess_bridge",
+        compactCheckpointStore: "checkpoint-store" as never,
+        compactInjectionStateStore: "injection-store" as never,
+      },
+      {
+        routeSlashCommand: async (_prompt, context) => {
+          contextSeen.push(context);
+          return { kind: "local", output: "compact output" };
+        },
+        resolveRepoAwarePromptResponse: () => null,
+      },
+    );
+
+    expect(resolved).toEqual({ kind: "handled" });
+    expect(contextSeen).toEqual([
+      expect.objectContaining({
+        cwd: "/workspace",
+        sessionId: "sess_bridge",
+        compactCheckpointStore: "checkpoint-store",
+        compactInjectionStateStore: "injection-store",
+      }),
+    ]);
+  });
+
   it("passes shell actions back to cli.tsx without executing them", async () => {
     const output = renderer();
     const slashResult = {

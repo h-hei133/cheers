@@ -9,6 +9,16 @@ import type {
   SessionContinuitySnapshot,
   SessionManager,
 } from "../../session/SessionManager.js";
+import {
+  DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
+  getLatestCompactCheckpoint,
+  type CompactLiveCheckpointStore,
+} from "../context/compactLiveCheckpoint.js";
+import {
+  DEFAULT_COMPACT_INJECTION_STATE_STORE,
+  type CompactInjectionStateStore,
+} from "../context/compactInjectionState.js";
+import { planCompactFutureTurnInjection } from "../context/compactFutureTurnInjection.js";
 import type { QueryEvent } from "../query/events.js";
 import type { QueryRuntimeStateSeed } from "../query/runtimeState.js";
 import { formatExplicitRestoreSummaryLines } from "./restoreSurfaceSummary.js";
@@ -23,6 +33,8 @@ export interface SessionRuntimeDependencies {
     runtimeSeed?: QueryRuntimeStateSeed,
     continuityState?: SessionContinuitySnapshot,
   ) => AsyncIterable<QueryEvent>;
+  readonly compactCheckpointStore?: CompactLiveCheckpointStore;
+  readonly compactInjectionStateStore?: CompactInjectionStateStore;
 }
 
 export class ShellSessionRuntime {
@@ -130,6 +142,10 @@ export class ShellSessionRuntime {
               : undefined;
       }
 
+      const promptForModel = !options?.runtimeSeed
+        ? this.buildPromptWithCompactInjection(sessionId, prompt)
+        : prompt;
+
       if (!options?.runtimeSeed) {
         this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt);
       }
@@ -149,7 +165,7 @@ export class ShellSessionRuntime {
       }
 
       for await (const event of this.deps.runPrompt(
-        prompt,
+        promptForModel,
         signal,
         options?.runtimeSeed,
         continuityState,
@@ -458,6 +474,53 @@ export class ShellSessionRuntime {
     }
   }
 
+  private buildPromptWithCompactInjection(
+    sessionId: string,
+    prompt: string,
+  ): string {
+    const sessionScopeId = compactSessionScopeId(sessionId);
+    const checkpointStore =
+      this.deps.compactCheckpointStore ?? DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE;
+    const injectionStateStore =
+      this.deps.compactInjectionStateStore ??
+      DEFAULT_COMPACT_INJECTION_STATE_STORE;
+    const checkpoint = getLatestCompactCheckpoint(
+      checkpointStore,
+      sessionScopeId,
+    );
+    const injectionState = injectionStateStore.get(sessionScopeId);
+    const plan = planCompactFutureTurnInjection({
+      checkpoint,
+      injectionState,
+      markInjected: ({ sessionScopeId: scopeId, checkpointId }) =>
+        injectionStateStore.markInjected({
+          sessionScopeId: scopeId,
+          checkpointId,
+        }),
+      markConsumed: ({ sessionScopeId: scopeId, checkpointId }) =>
+        injectionStateStore.markConsumed({
+          sessionScopeId: scopeId,
+          checkpointId,
+        }),
+      markInvalid: ({ sessionScopeId: scopeId, checkpointId, reason }) =>
+        injectionStateStore.markInvalid({
+          sessionScopeId: scopeId,
+          checkpointId,
+          reason,
+        }),
+    });
+    if (!plan.shouldInject || !plan.injectedContext) {
+      return prompt;
+    }
+    return [
+      plan.injectedContext,
+      "",
+      "<user_request>",
+      prompt,
+      "</user_request>",
+    ].join("\n");
+  }
+
   cancelCurrentRun(): void {
     this.currentRunController?.abort();
     this.stateMachine.interruptRun();
@@ -467,6 +530,10 @@ export class ShellSessionRuntime {
     this.stateMachine.terminate();
     this.deps.sessionManager.saveTerminated(sessionId);
   }
+}
+
+function compactSessionScopeId(sessionId: string): string {
+  return `session:${sessionId}`;
 }
 
 function parseRunCommandAllowlistBlockContext(

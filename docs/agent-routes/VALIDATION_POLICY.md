@@ -51,7 +51,9 @@ Final validation should usually include:
 - `rtk git status --short --branch`
 
 Routes should add route-specific final commands only when they are directly
-connected to the touched capability.
+connected to the touched capability. Do not list current route-specific tests
+or verifiers here as permanent requirements; keep those in the route or the
+capability design document that owns them.
 
 ## Failures and Residue
 
@@ -63,4 +65,5 @@ connected to the touched capability.
   produced by validation.
 - Do not run provider, default, or MCP gates unless the route explicitly
   requires them.
-
+- If a validation command writes audit residue while proving an unrelated
+  failure, restore only that generated residue and report the failure boundary.

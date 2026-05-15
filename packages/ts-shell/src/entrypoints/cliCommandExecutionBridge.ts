@@ -1,4 +1,6 @@
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
+import type { CompactInjectionStateStore } from "../core/context/compactInjectionState.js";
+import type { CompactLiveCheckpointStore } from "../core/context/compactLiveCheckpoint.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
 import type { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 
@@ -18,6 +20,9 @@ export interface BuildCliCommandExecutionInput {
   readonly renderer: StreamingRenderer;
   readonly printMode: boolean;
   readonly interactive: boolean;
+  readonly sessionId?: string;
+  readonly compactCheckpointStore?: CompactLiveCheckpointStore;
+  readonly compactInjectionStateStore?: CompactInjectionStateStore;
 }
 
 export interface CliCommandExecutionBridge {
@@ -47,6 +52,9 @@ export async function buildCliCommandExecution(
 
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
     cwd: input.cwd,
+    sessionId: input.sessionId,
+    compactCheckpointStore: input.compactCheckpointStore,
+    compactInjectionStateStore: input.compactInjectionStateStore,
   });
   if (slashResult?.kind === "local") {
     input.renderer.renderLine(

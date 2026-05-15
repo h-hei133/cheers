@@ -1,6 +1,7 @@
 # Compact v2 Session Integration
 
-Status: Route 76 implemented candidate; Route 77 live checkpoint added.
+Status: Route 76 implemented candidate; Route 77 live checkpoint added; Route
+78 future-turn injection added.
 Date: 2026-05-15
 
 ## Scope
@@ -168,6 +169,20 @@ query loop, and not sent to a provider/model. A separate future-turn adapter can
 produce candidate model-facing context from the checkpoint, but Route 78 owns
 actual injection.
 
+## Route 78 Note
+
+Route 78 keeps the `/compact` and `/handoff` user interface simple while making
+the live checkpoint operational. The command runtime now marks the latest
+checkpoint pending for injection, and the CLI command bridge passes the current
+session id into slash command context so `/compact` uses `session:<id>` scope
+instead of falling back to cwd scope.
+
+The next normal `ShellSessionRuntime.executePrompt` call consumes that pending
+checkpoint once. It sends the query/runtime path a prompt prefixed with
+compact-safe injected context while persisting the original user prompt barrier
+unchanged. Local command-only turns are handled before `executePrompt`, so they
+do not consume pending injection.
+
 ## Integration Status
 
 Implemented:
@@ -176,6 +191,9 @@ Implemented:
 - `compactCommandRunner.ts`
 - `compactSessionSurface.ts`
 - `compactCommandRuntime.ts`
+- `compactInjectionState.ts`
+- `compactInjectedContextFormatter.ts`
+- `compactFutureTurnInjection.ts`
 - `/compact` local command registration
 - `/handoff` alias
 - focused tests for contract, runner, session surface, slash registration,
@@ -195,5 +213,5 @@ Deferred:
 - provider/model summarization
 - recovery execution from compact output
 
-Recommended next route: Route 78 actual future-turn injection from live Compact
-v2 checkpoint.
+Recommended next route: Route 79 quality/merge hardening for Compact v2
+injection.

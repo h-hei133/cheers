@@ -6,6 +6,7 @@ import {
   createCompactLiveCheckpointStore,
   getLatestCompactCheckpoint,
 } from "../context/compactLiveCheckpoint.js";
+import { createCompactInjectionStateStore } from "../context/compactInjectionState.js";
 import { createCommandRegistry, listVisibleCommands } from "./registry.js";
 import { routeSlashCommand } from "./slashRouter.js";
 
@@ -69,10 +70,14 @@ describe("slash router (W4)", () => {
       now: () => "2026-05-15T00:00:00.000Z",
       nextId: () => "checkpoint-slash-1",
     });
+    const compactInjectionStateStore = createCompactInjectionStateStore({
+      now: () => "2026-05-15T00:00:00.000Z",
+    });
     const result = await routeSlashCommand("/compact", {
       cwd: workspaceRoot,
       sessionId: "sess_slash",
       compactCheckpointStore,
+      compactInjectionStateStore,
     });
     expect(result).toBeTruthy();
     expect(result?.kind).toBe("local");
@@ -85,7 +90,9 @@ describe("slash router (W4)", () => {
       expect(result.output).toContain("Compact checkpoint");
       expect(result.output).toContain("- Checkpoint id: checkpoint-slash-1");
       expect(result.output).toContain("- Future-turn adapter: ready-for-adapter");
-      expect(result.output).toContain("- Injection: not-yet-injected");
+      expect(result.output).toContain(
+        "- Injection status: checkpoint pending injection",
+      );
       expect(result.output).toContain("closeout-candidate");
       expect(result.output).not.toContain("Unknown slash command");
     }
@@ -93,6 +100,9 @@ describe("slash router (W4)", () => {
       getLatestCompactCheckpoint(compactCheckpointStore, "session:sess_slash")
         ?.checkpointId,
     ).toBe("checkpoint-slash-1");
+    expect(
+      compactInjectionStateStore.get("session:sess_slash").injectionStatus,
+    ).toBe("pending");
     expect(fs.readdirSync(workspaceRoot)).toEqual([]);
   });
 
@@ -140,15 +150,20 @@ describe("slash router (W4)", () => {
         return `checkpoint-alias-${checkpointIndex}`;
       },
     });
+    const compactInjectionStateStore = createCompactInjectionStateStore({
+      now: () => "2026-05-15T00:00:00.000Z",
+    });
     const first = await routeSlashCommand("/compact", {
       cwd: workspaceRoot,
       sessionId: "sess_alias",
       compactCheckpointStore,
+      compactInjectionStateStore,
     });
     const second = await routeSlashCommand("/handoff", {
       cwd: workspaceRoot,
       sessionId: "sess_alias",
       compactCheckpointStore,
+      compactInjectionStateStore,
     });
 
     expect(first?.kind).toBe("local");
@@ -164,6 +179,45 @@ describe("slash router (W4)", () => {
       getLatestCompactCheckpoint(compactCheckpointStore, "session:sess_alias")
         ?.checkpointId,
     ).toBe("checkpoint-alias-2");
+    expect(compactInjectionStateStore.get("session:sess_alias")).toEqual(
+      expect.objectContaining({
+        injectionStatus: "pending",
+        checkpointId: "checkpoint-alias-2",
+        sourceCommand: "/handoff",
+      }),
+    );
+  });
+
+  it("does not consume pending compact injection on command-only turns", async () => {
+    const compactCheckpointStore = createCompactLiveCheckpointStore({
+      now: () => "2026-05-15T00:00:00.000Z",
+      nextId: () => "checkpoint-command-only",
+    });
+    const compactInjectionStateStore = createCompactInjectionStateStore({
+      now: () => "2026-05-15T00:00:00.000Z",
+    });
+    await routeSlashCommand("/compact", {
+      cwd: workspaceRoot,
+      sessionId: "sess_command_only",
+      compactCheckpointStore,
+      compactInjectionStateStore,
+    });
+    const commandOnly = await routeSlashCommand("/model", {
+      cwd: workspaceRoot,
+      sessionId: "sess_command_only",
+      compactCheckpointStore,
+      compactInjectionStateStore,
+    });
+
+    expect(commandOnly?.kind).toBe("local");
+    expect(
+      compactInjectionStateStore.get("session:sess_command_only"),
+    ).toEqual(
+      expect.objectContaining({
+        injectionStatus: "pending",
+        checkpointId: "checkpoint-command-only",
+      }),
+    );
   });
 
   it("routes every visible registry command name and alias without falling through to unknown", async () => {

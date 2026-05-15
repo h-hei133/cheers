@@ -1,5 +1,9 @@
 # Route XX: Title
 
+Use this as a delta-format route template. Link stable route discipline and the
+current design baseline instead of copying current project status into every
+route.
+
 ## Goal
 
 Short description of this route.
@@ -30,7 +34,7 @@ Short description of this route.
 4. Task four.
 5. Task five.
 
-Add up to 8 concise tasks when needed.
+Use 5-8 concise tasks. Split or defer the route if it needs more.
 
 ## Validation
 
@@ -51,4 +55,3 @@ List only route-specific validation beyond
 5. Risks / blockers
 6. Next route recommendation
 7. Proposed commit message
-

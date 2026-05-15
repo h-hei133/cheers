@@ -1,6 +1,6 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 77
+Route baseline: post-Route 78
 Date: 2026-05-15
 Status: long-range edit capability map after Routes 50-73; edit capability is
 now a closeout candidate for the bounded selected-workspace surface.
@@ -56,6 +56,16 @@ context without injecting it. It does not persist, add memory/sidebar/startup,
 change SessionManager schema, call a provider/model, inject future-turn
 context, execute restore, add automatic recovery, add atomic rollback, or change
 edit behavior.
+Route 78 wires actual next-normal-turn Compact v2 injection: `/compact` and
+`/handoff` mark the latest live checkpoint pending, `ShellSessionRuntime`
+injects compact-safe context into the model-facing prompt once, and the
+injection state is consumed without persisting the injected block into session
+history. It preserves no memory/sidebar/startup, no provider/MCP/package/default
+gate changes, no SessionManager schema change, no edit runtime change, no
+automatic recovery, no atomic rollback, and no raw content or secret exposure.
+Recommended Route 79 focus: quality/merge hardening for Compact v2 injection,
+including repeated compaction behavior, session summary coherence, and compact
+packet quality scoring before any memory candidate phase.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -115,6 +125,7 @@ uses that sealed state as context-engineering input, Route 75 makes it survive
 compact as structured handoff state, and Route 76 exposes that handoff through a
 preview-only `/compact` command. Route 77 keeps that command simple while
 creating a live in-memory checkpoint and a candidate-only future-turn adapter.
+Route 78 consumes that checkpoint once on the next normal model turn.
 The sealed state is closeout-candidate, not broad edit readiness and not
 reference-repo feature parity.
 
@@ -1180,19 +1191,19 @@ recovery/rollback stance are explicitly re-audited.
   - Status: implemented as an in-memory latest checkpoint model, checkpoint
     surface, future-turn candidate adapter, and `/compact` checkpoint update
     path.
-  - The adapter reports `candidate-only` and `not-injected`; actual query-loop
-    injection remains deferred.
+  - Route 78 now consumes the adapter output once from the next normal runtime
+    prompt when the checkpoint is pending.
   - Do not change SessionManager persistence schema, package scripts, default
     gates, provider/MCP behavior, edit runtime behavior, memory storage,
     sidebar UI, startup cache, automatic recovery, or atomic rollback.
 
-- Recommended next phase: Route 78 actual future-turn injection from live
-  Compact v2 checkpoint
-  - Inject the candidate adapter output only through an explicit, tested query
-    continuity path.
-  - Preserve no persistence, no provider/MCP behavior changes beyond the
-    intended prompt context, no SessionManager schema changes, no memory
-    storage, no automatic recovery, and no atomic rollback.
+- Recommended next phase: Route 79 quality/merge hardening for Compact v2
+  injection
+  - Harden repeated compact/merge behavior, session summary coherence, injected
+    packet quality checks, and final polish before any memory candidate phase.
+  - Preserve no persistence, no provider/MCP behavior changes, no SessionManager
+    schema changes, no memory storage, no automatic recovery, and no atomic
+    rollback.
 
 - Future broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are

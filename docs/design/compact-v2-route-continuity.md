@@ -1,7 +1,7 @@
 # Compact v2 Route Continuity
 
 Status: Route 75 implemented candidate; Route 76 command integration added;
-Route 77 live checkpoint added.
+Route 77 live checkpoint added; Route 78 future-turn injection added.
 Date: 2026-05-15
 
 ## Post-Route 74 Baseline
@@ -239,8 +239,16 @@ markdown, survivor labels, redactions, warnings, and command source. A
 future-turn adapter can produce candidate model-facing context from that
 checkpoint, but it remains `candidate-only` and `not-injected`.
 
-Recommended next route: Route 78 actual future-turn injection from live Compact
-v2 checkpoint.
+Route 78 note: `/compact` and `/handoff` now mark the latest live checkpoint
+pending for next normal turn injection. The next normal runtime prompt receives
+the compact-safe handoff facts once, then the checkpoint injection state becomes
+consumed. The injected context preserves route/task, edit closeout, mutation,
+recovery references, validation, constraints, redactions, warnings, and next
+action without raw content, secrets, persistence, memory write, provider calls,
+automatic recovery, or atomic rollback.
+
+Recommended next route: Route 79 quality/merge hardening for Compact v2
+injection.
 
 ## Non-Goals
 
@@ -261,8 +269,8 @@ Route 75 does not implement:
 
 - Runtime history compaction remains separate from the preview-only handoff
   command.
-- Future-turn adapter output is available but not injected into query/provider
-  context yet.
+- Future-turn injection is operational but has not yet had quality/merge
+  hardening across repeated compaction and long-session coherence.
 - Future command polish may add richer arguments, but should keep mutation,
   persistence, provider/model calls, and recovery execution out of the default
   command path.

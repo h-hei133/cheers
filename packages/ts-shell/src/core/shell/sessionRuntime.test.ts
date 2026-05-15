@@ -5,6 +5,12 @@ import { describe, expect, it } from "vitest";
 import { createLongSessionContinuityFixture } from "../../session/__tests__/longSessionContinuityFixtures.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { seedWriterStartedStoppedRecoveryContextSession } from "../../test-utils/stoppedRecoveryFixture.js";
+import { runCompactCommand } from "../context/compactCommandRunner.js";
+import { createCompactInjectionStateStore } from "../context/compactInjectionState.js";
+import {
+  createCompactLiveCheckpointStore,
+  updateLatestCompactCheckpoint,
+} from "../context/compactLiveCheckpoint.js";
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
 describe("shell session runtime (W5)", () => {
@@ -69,6 +75,126 @@ describe("shell session runtime (W5)", () => {
       "turn:sess_1:assistant:done:hello",
       "completed:sess_1",
     ]);
+  });
+
+  it("injects pending compact context into the next normal prompt exactly once", async () => {
+    const calls: string[] = [];
+    const promptsSeenByModel: string[] = [];
+    const compactCheckpointStore = createCompactLiveCheckpointStore({
+      now: () => "2026-05-15T00:00:00.000Z",
+      nextId: () => "checkpoint-runtime",
+    });
+    const compactInjectionStateStore = createCompactInjectionStateStore({
+      now: () => "2026-05-15T00:00:00.000Z",
+    });
+    const compactResult = runCompactCommand({
+      mode: "render",
+      source: "route",
+      generatedAt: "2026-05-15T00:00:00.000Z",
+      routeInfo: {
+        routeId: "78",
+        name: "Compact v2 future-turn injection",
+        nextAction: "Continue runtime integration.",
+        forbiddenScope: ["provider/MCP", "SessionManager schema"],
+      },
+      taskGoal: {
+        objective: "Inject compact context once.",
+        constraints: ["no persistence"],
+      },
+      mutationEvidence: {
+        changedFiles: ["src/changed.ts"],
+        rawOriginalContent: "RAW_MUTATION_CONTENT",
+      },
+      recoverySummary: {
+        recoveryAvailable: true,
+        explicitRestoreAvailable: true,
+        recoveryAuthorityId: "authority-runtime",
+        rawOriginalContent: "RAW_RECOVERY_CONTENT",
+      },
+      validationEvidence: {
+        testsRun: ["sessionRuntime.test.ts"],
+        resultContractStatus: "passed",
+        fullCommandOutput: "sk-secret-output",
+      },
+      secretValues: ["sk-secret-output"],
+    });
+    const checkpoint = updateLatestCompactCheckpoint(compactCheckpointStore, {
+      sessionScopeId: "session:sess_runtime_compact",
+      sourceCommand: "/compact",
+      result: compactResult,
+    });
+    compactInjectionStateStore.markPending({
+      sessionScopeId: "session:sess_runtime_compact",
+      checkpointId: checkpoint.checkpointId,
+      sourceCommand: "/compact",
+    });
+    const runtime = new ShellSessionRuntime({
+      compactCheckpointStore,
+      compactInjectionStateStore,
+      sessionManager: {
+        persistUserPromptBarrier(sessionId: string, prompt: string) {
+          calls.push(`barrier:${sessionId}:${prompt}`);
+        },
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted(sessionId: string) {
+          calls.push(`completed:${sessionId}`);
+        },
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine() {},
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* (prompt) {
+        promptsSeenByModel.push(prompt);
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_runtime_compact",
+              initialPrompt: prompt,
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "done",
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_runtime_compact", "continue task");
+    await runtime.executePrompt("sess_runtime_compact", "continue again");
+
+    expect(calls).toEqual([
+      "barrier:sess_runtime_compact:continue task",
+      "completed:sess_runtime_compact",
+      "barrier:sess_runtime_compact:continue again",
+      "completed:sess_runtime_compact",
+    ]);
+    expect(promptsSeenByModel[0]).toContain("<compact_v2_injected_context>");
+    expect(promptsSeenByModel[0]).toContain("authority-runtime");
+    expect(promptsSeenByModel[0]).toContain("arbitrary-broad-apply-patch");
+    expect(promptsSeenByModel[0]).toContain("<user_request>\ncontinue task");
+    expect(promptsSeenByModel[0]).not.toContain("RAW_MUTATION_CONTENT");
+    expect(promptsSeenByModel[0]).not.toContain("RAW_RECOVERY_CONTENT");
+    expect(promptsSeenByModel[0]).not.toContain("sk-secret-output");
+    expect(promptsSeenByModel[1]).toBe("continue again");
+    expect(
+      compactInjectionStateStore.get("session:sess_runtime_compact"),
+    ).toEqual(
+      expect.objectContaining({
+        injectionStatus: "consumed",
+        injectionCount: 1,
+      }),
+    );
   });
 
   it("renders print mode answer before compact result boundary", async () => {

@@ -1,14 +1,16 @@
 import type { CompactLiveCheckpoint } from "./compactLiveCheckpoint.js";
+import type { CompactInjectionState } from "./compactInjectionState.js";
 
 export function formatCompactCheckpointStatus(
   checkpoint: CompactLiveCheckpoint | undefined,
+  injectionState?: CompactInjectionState,
 ): string {
   if (!checkpoint) {
     return [
       "Compact checkpoint",
       "- Latest: none",
       "- Future-turn adapter: not-ready",
-      "- Injection: not-yet-injected",
+      "- Injection status: no checkpoint",
       "- Next action: Run /compact to create a live checkpoint.",
     ].join("\n");
   }
@@ -30,7 +32,37 @@ export function formatCompactCheckpointStatus(
     `- Redactions: ${checkpoint.redactions.length}`,
     `- Warnings: ${checkpoint.warnings.length}`,
     "- Future-turn adapter: ready-for-adapter",
-    "- Injection: not-yet-injected",
+    `- Injection status: ${formatInjectionStatus(checkpoint, injectionState)}`,
     `- Next action: ${checkpoint.packetSummary.nextAction ?? "continue normally; Route 78 will wire injection"}`,
   ].join("\n");
+}
+
+function formatInjectionStatus(
+  checkpoint: CompactLiveCheckpoint,
+  injectionState: CompactInjectionState | undefined,
+): string {
+  if (checkpoint.status === "superseded") {
+    return "checkpoint superseded";
+  }
+  if (checkpoint.status === "invalid") {
+    return "checkpoint invalid";
+  }
+  if (checkpoint.status === "cleared") {
+    return "no checkpoint";
+  }
+  if (!injectionState || injectionState.checkpointId !== checkpoint.checkpointId) {
+    return "not pending";
+  }
+  switch (injectionState.injectionStatus) {
+    case "pending":
+      return "checkpoint pending injection";
+    case "injected":
+      return "checkpoint injected";
+    case "consumed":
+      return "checkpoint consumed";
+    case "invalid":
+      return "checkpoint invalid";
+    case "none":
+      return "not pending";
+  }
 }

@@ -26,6 +26,9 @@ These repositories are read-only references. Do not modify them.
   targeted comparison is enough.
 - If a route does not benefit from a reference scan, it may explicitly skip the
   scan and say why.
+- Treat the scan as evidence for responsibility boundaries and product
+  semantics. Do not use it as permission to port a reference repository's
+  structure wholesale.
 
 ## What To Record
 
@@ -40,4 +43,5 @@ Route design notes should record:
 - local design implications
 
 Avoid recording unrelated reference details that do not affect the route.
-
+Avoid turning scan notes into current project status; route status belongs in
+the active route, design notes, or closeout manifest.

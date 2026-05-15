@@ -1,7 +1,8 @@
 # Context Engineering Continuity Baseline
 
 Status: Route 74 baseline candidate; Route 75 Compact v2 packet implemented;
-Route 76 command integration added; Route 77 live checkpoint added.
+Route 76 command integration added; Route 77 live checkpoint added; Route 78
+future-turn injection added.
 Date: 2026-05-15
 
 ## Post-Edit-Closeout Baseline
@@ -23,6 +24,11 @@ into the query loop or provider/model context. The checkpoint is not persisted
 and does not add memory storage, sidebar UI, startup cache, SessionManager
 schema changes, restore execution, automatic recovery, atomic rollback, or edit
 runtime changes.
+
+Route 78 adds an in-memory injection state and a narrow next-normal-turn
+runtime hook. A pending checkpoint is injected into the model-facing prompt once
+and then consumed. The original user prompt remains the persisted session
+barrier, and command-only turns do not consume pending injection.
 
 This route is not a memory implementation, sidebar UI, startup cache, provider
 change, MCP change, compact rewrite, SessionManager schema change, edit runtime
@@ -232,6 +238,9 @@ What Route 74 should not implement:
 - `packages/ts-shell/src/core/context/compactLiveCheckpoint.ts`
 - `packages/ts-shell/src/core/context/compactFutureTurnAdapter.ts`
 - `packages/ts-shell/src/core/context/compactCheckpointSurface.ts`
+- `packages/ts-shell/src/core/context/compactInjectionState.ts`
+- `packages/ts-shell/src/core/context/compactInjectedContextFormatter.ts`
+- `packages/ts-shell/src/core/context/compactFutureTurnInjection.ts`
 
 The modules are pure. They do not perform file I/O, provider access, MCP
 discovery, persistence, session schema migration, edit routing, write execution,
@@ -308,12 +317,13 @@ Partially wired. The existing session surfaces already render current-session
 and stopped-continuation facts. Route 74 keeps the context projection as a pure
 testable substrate, Route 75 adds the packet/renderer, Route 76 exposes the
 command surface, and Route 77 adds an in-memory latest compact checkpoint plus
-a candidate-only future-turn adapter. Actual future-turn injection remains
-deferred.
+Route 78 consumes a pending checkpoint once from the next normal runtime prompt.
+Quality/merge hardening remains deferred.
 
 ## Residual Risks
 
-- The live compact checkpoint does not yet feed future query/provider context.
+- Compact v2 injection is operational but still needs repeated-compaction merge
+  hardening and quality checks.
 - Future memory extraction still needs ranking, persistence boundaries, and
   user controls.
 - Future sidebar state should consume `sidebarFacts` rather than inventing a
@@ -323,10 +333,10 @@ deferred.
 
 ## Next Recommendation
 
-Recommended next route: Route 78 actual future-turn injection from live Compact
-v2 checkpoint.
+Recommended next route: Route 79 quality/merge hardening for Compact v2
+injection.
 
 Reason: context layers, compact survivors, redactions, edit/recovery facts,
 Compact v2 packet rendering, the live checkpoint, and the candidate-only
-adapter are now machine-checkable enough to wire future-turn injection without
+adapter are now machine-checkable enough to harden injection quality without
 reopening edit runtime behavior.

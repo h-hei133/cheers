@@ -7,6 +7,10 @@ import {
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
   updateLatestCompactCheckpoint,
 } from "../context/compactLiveCheckpoint.js";
+import {
+  DEFAULT_COMPACT_INJECTION_STATE_STORE,
+  markCompactCheckpointPendingInjection,
+} from "../context/compactInjectionState.js";
 import { runCompactCommand } from "../context/compactCommandRunner.js";
 import { formatCompactSessionSurface } from "../context/compactSessionSurface.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
@@ -27,12 +31,23 @@ export async function runCompactLocalCommand(
       },
     });
     const result = runCompactCommand(request);
+    const sessionScopeId = compactSessionScopeId(context);
     const checkpoint = updateLatestCompactCheckpoint(
       context.compactCheckpointStore ?? DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
       {
-        sessionScopeId: compactSessionScopeId(context),
+        sessionScopeId,
         sourceCommand: compactSourceCommand(context.rawCommandName),
         result,
+      },
+    );
+    const injectionState = markCompactCheckpointPendingInjection(
+      context.compactInjectionStateStore ??
+        DEFAULT_COMPACT_INJECTION_STATE_STORE,
+      {
+        sessionScopeId,
+        checkpointId: checkpoint.checkpointId,
+        sourceCommand: checkpoint.sourceCommand,
+        createdAt: checkpoint.createdAt,
       },
     );
     return {
@@ -42,7 +57,7 @@ export async function runCompactLocalCommand(
           ? result.json
           : [
               formatCompactSessionSurface(result),
-              formatCompactCheckpointStatus(checkpoint),
+              formatCompactCheckpointStatus(checkpoint, injectionState),
             ].join("\n\n"),
     };
   } catch (error) {
