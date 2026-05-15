@@ -11,6 +11,7 @@ import type {
 } from "../../session/SessionManager.js";
 import type { QueryEvent } from "../query/events.js";
 import type { QueryRuntimeStateSeed } from "../query/runtimeState.js";
+import { formatExplicitRestoreSummaryLines } from "./restoreSurfaceSummary.js";
 import { ShellStateMachine } from "./stateMachine.js";
 
 export interface SessionRuntimeDependencies {
@@ -891,6 +892,9 @@ function renderCodingResultContract(
     if (failureSummary) {
       renderer.renderLine(`- Failure reason: ${failureSummary}`);
     }
+    for (const line of formatExplicitRestoreSummaryLines(codingResult)) {
+      renderer.renderLine(line);
+    }
     renderer.renderLine(`- Verification: ${verificationStatus}`);
     const verificationDetail = buildVerificationStatusDetail(codingResult);
     if (verificationDetail) {
@@ -933,6 +937,9 @@ function renderCodingResultContract(
     renderer.renderLine(
       `- Unverified files: ${codingResult.unverifiedFiles.map((entry) => `${entry.path} (${entry.reason})`).join("; ")}`,
     );
+  }
+  for (const line of formatExplicitRestoreSummaryLines(codingResult)) {
+    renderer.renderLine(line);
   }
   if ((codingResult.patches?.length ?? 0) > 0) {
     renderer.renderLine(

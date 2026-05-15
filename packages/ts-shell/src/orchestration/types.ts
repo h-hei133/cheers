@@ -1,4 +1,5 @@
 import type { QueryEvent } from '../core/query/events.js'
+import type { RecoverySurfaceSummary } from './patchRecovery/recoverySurfaceProjection.js'
 import type { PerFilePatchResultProjection } from './patchResult/perFilePatchPlan.js'
 
 export type AgentRole = 'planner' | 'coder' | 'reviewer'
@@ -249,6 +250,7 @@ export interface CodingResultSummary {
   readonly taskKind: CodingTaskKind
   diagnosis?: CodingDiagnosisSummary
   readonly perFilePatchPlan?: PerFilePatchResultProjection
+  readonly recoverySurface?: RecoverySurfaceSummary
   changedFiles: string[]
   failedFiles: Array<{ path: string; reason: string }>
   patches?: CodingPatchRecord[]

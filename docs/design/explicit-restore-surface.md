@@ -2,7 +2,7 @@
 
 Route baseline: Route 61
 Date: 2026-05-15
-Status: implemented core explicit restore surface; CLI/session command surface deferred.
+Status: core explicit restore surface implemented; Route 66 adds user-operable CLI/session restore UX.
 
 This document records the Route 61 explicit restore surface on top of the
 Route 59-60 recovery authority loop. It is not automatic recovery, not
@@ -26,8 +26,14 @@ Before this route, the project already had:
 
 Route 65 note: bounded small-N write support now covers 2-8 update-only,
 mixed, delete-only, and move-only batches. The restore surface remains explicit
-and non-default; no CLI/session restore command, automatic recovery, rollback,
-or default persistence was added.
+and non-default; no automatic recovery, rollback, or default persistence was
+added.
+
+Route 66 note: explicit restore UX is now available through
+`restoreCommandContract.ts`, `restoreCommandRunner.ts`, the `/restore` local
+command surface, and session/user recovery summary lines. Preview remains the
+safe default. Execute requires explicit intent. Restore output is separate from
+normal route results, and route result `recoveryExecuted` remains false.
 
 Route 61 makes captured authority inspectable and intentionally executable
 through a separate bridge. Default write routes still do not run recovery.
@@ -169,15 +175,17 @@ rollback.
 
 ## User / Session Surface Decision
 
-Route 61 keeps CLI/session integration deferred.
+Route 66 wires the core recovery surface into a narrow user-operable path:
 
-Reason: the clean local boundary is the core recovery surface. Adding a command
-or session lifecycle field now would touch command parsing, terminal/session
-visibility, persistence expectations, and user-facing restore authority
-language. That should be a separate route if product UX is still desired.
+- `/restore preview ...` inspects the explicit ledger and current workspace
+  state without writing.
+- `/restore execute ... --execute` runs the guarded bridge only after explicit
+  execute intent.
+- failed coding-result summaries can mention guarded restore preview
+  availability when captured authority exists.
 
-The implemented summary projection is ready for a future session/CLI consumer,
-but it is not automatically attached to default runtime behavior.
+This remains a separate restore command path. Default write routes still do not
+run recovery automatically.
 
 ## Cleanup / Residue Policy
 
@@ -193,10 +201,9 @@ cleanup hook, no default persistence root, and no provider/CLI/MCP residue.
 - snapshot/revert backend
 - git integration
 - broad `apply_patch`
-- 5+ mixed writes
-- 5+ writes
-- broad multi-delete or multi-move beyond the bounded Route 64 lanes
-- provider/session/CLI/MCP behavior changes
+- 9+ writes
+- broad multi-delete or multi-move beyond the bounded small-N cap
+- provider/MCP behavior changes
 - package script or default gate changes
 
 ## Next Route Decision Criteria
@@ -204,12 +211,12 @@ cleanup hook, no default persistence root, and no provider/CLI/MCP residue.
 Route 63 update: selected-workspace exactly-two/exactly-three delete-only and
 move-only batches are now implemented with optional non-default
 recovery-authority capture and destructive partial-failure restore evidence.
-Route 64 update: selected-workspace exactly-four update, mixed, delete-only,
+Route 65 update: selected-workspace bounded 2-8 update, mixed, delete-only,
 and move-only batches are now implemented with optional non-default
-recovery-authority capture and exactly-four partial-failure restore drills.
-5+ writes, broad `apply_patch`, automatic recovery, and atomic rollback remain
+recovery-authority capture and representative partial-failure restore drills.
+9+ writes, broad `apply_patch`, automatic recovery, and atomic rollback remain
 unsupported.
 
-Recommended next route: 5-operation/small-N bounded write policy only if Route
-64 evidence remains stable, or CLI/session explicit restore UX if operator
-visibility becomes the higher product priority.
+Recommended next route: CLI restore command polish if operator ergonomics are
+still weak, or a broad `apply_patch` readiness split only if bounded cap-8
+behavior and explicit restore UX remain stable.

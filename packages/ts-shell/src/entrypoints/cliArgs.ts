@@ -61,6 +61,7 @@ const VALUE_FLAGS = new Set([
 
 const RESERVED_SHELL_SLASH_COMMANDS = new Set([
   "/continue",
+  "/restore",
   "/sessions",
   "/mcp",
   "/resume",

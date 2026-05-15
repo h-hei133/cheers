@@ -2,6 +2,7 @@ import { mapTerminalToOrchestrationResult } from "../../core/query/resultMapper.
 import type { QueryRuntimeState } from "../../core/query/runtimeState.js";
 import type { QueryTerminal } from "../../core/query/transitions.js";
 import { createEmptyLifecycleIndex } from "../../core/tools/toolResultLifecycle.js";
+import { projectRecoverySurfaceSummary } from "../patchRecovery/recoverySurfaceProjection.js";
 import type {
   CodingResultSummary,
   OrchestrationResult,
@@ -53,6 +54,14 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
     });
     return {
       taskKind: "edit-file",
+      ...(route.recoveryAuthorityCapture
+        ? {
+            recoverySurface: projectRecoverySurfaceSummary({
+              routeId: "single-file-apply-patch-workspace-write",
+              recoveryAuthorityCapture: route.recoveryAuthorityCapture,
+            }),
+          }
+        : {}),
       ...(route.perFilePatchPlan
         ? {
             perFilePatchPlan: projectPerFilePatchResult({
@@ -179,6 +188,14 @@ function buildCodingResult(route: WorkspaceWriteRoute): CodingResultSummary {
   });
   return {
     taskKind: "edit-file",
+    ...(route.recoveryAuthorityCapture
+      ? {
+          recoverySurface: projectRecoverySurfaceSummary({
+            routeId: "single-file-apply-patch-workspace-write",
+            recoveryAuthorityCapture: route.recoveryAuthorityCapture,
+          }),
+        }
+      : {}),
     ...(route.perFilePatchPlan
       ? {
           perFilePatchPlan: projectPerFilePatchFailureResultWithJournal({

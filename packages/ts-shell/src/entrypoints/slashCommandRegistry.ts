@@ -31,6 +31,11 @@ export const SLASH_COMMANDS = [
     summary: "resume context and optionally run an immediate follow-up",
   },
   {
+    name: "restore",
+    group: "session",
+    summary: "preview or execute guarded recovery authority restore",
+  },
+  {
     name: "workspace",
     aliases: ["where", "project"],
     group: "workspace",
@@ -193,6 +198,12 @@ export function renderUserHelp(renderer: SlashCommandLineRenderer): void {
   );
   renderer.renderLine(
     "- /continue [id] [text]   resume context and optionally run immediate follow-up.",
+  );
+  renderer.renderLine(
+    "- /restore preview --ledger-root <path> --authority-id <id> --all   preview guarded restore eligibility.",
+  );
+  renderer.renderLine(
+    "- /restore execute --ledger-root <path> --authority-id <id> --all --execute   explicitly restore eligible records.",
   );
   renderer.renderLine("");
 

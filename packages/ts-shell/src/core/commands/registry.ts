@@ -1,6 +1,7 @@
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { runConnectCommand } from "./connectCommandRuntime.js";
 import { runModelCommand } from "./modelCommandRuntime.js";
+import { runRestoreLocalCommand } from "./restoreCommandRuntime.js";
 import {
   runDiagnoseCommand,
   runDoctorCommand,
@@ -72,6 +73,14 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: false,
       execute: (args, context) => runModelCommand(args, context),
+    },
+    {
+      name: "restore",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: false,
+      execute: (args, context) => runRestoreLocalCommand(args, context),
     },
     {
       name: "resume",
