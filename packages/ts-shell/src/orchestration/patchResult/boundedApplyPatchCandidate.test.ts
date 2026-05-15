@@ -156,6 +156,40 @@ describe("bounded apply_patch candidate classifier", () => {
     );
   });
 
+  it("classifies fenced git-style broad diffs through the existing bounded route contract", () => {
+    expect(
+      classifyBoundedApplyPatchCandidate({
+        rawPatchText: [
+          "Here is the patch:",
+          "```diff",
+          "diff --git a/src/a.ts b/src/a.ts",
+          "--- a/src/a.ts",
+          "+++ b/src/a.ts",
+          "@@ -1 +1 @@",
+          "-a = 1",
+          "+a = 2",
+          "```",
+        ].join("\n"),
+        workspaceRoot: "/workspace",
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        status: "candidate",
+        operationCount: 1,
+        operationFamily: "single",
+        affectedPaths: ["src/a.ts"],
+        normalizedRawPatchText: expect.stringContaining(
+          "*** Update File: src/a.ts",
+        ),
+        evidence: expect.arrayContaining([
+          "fenced-patch-extractor:single-fenced-patch-extracted",
+          "bounded-apply-patch-candidate:broad-patch-normalized",
+          "bounded-apply-patch-candidate:no-broad-arbitrary-claim",
+        ]),
+      }),
+    );
+  });
+
   it("classifies safe git-style rename-with-content-edit as decomposed bounded mixed candidate", () => {
     expect(
       classifyBoundedApplyPatchCandidate({
@@ -300,6 +334,7 @@ describe("bounded apply_patch candidate classifier", () => {
       { patchText: directoryBroadPatch(), reason: "unsupportedDirectoryOperation" },
       { patchText: duplicateTargetPatch(), reason: "unsupportedPathConflict" },
       { patchText: outsideWorkspaceGitPatch(), reason: "unsupportedWorkspaceBoundary" },
+      { patchText: fencedPatch(gitUpdatePatchBatch(["a"]), "diff", true), reason: "unsupportedBroadShape" },
     ] as const;
 
     for (const fixture of blocked) {
@@ -624,4 +659,13 @@ function outsideWorkspaceGitPatch(): string {
     "-outside = 1",
     "+outside = 2",
   ].join("\n");
+}
+
+function fencedPatch(
+  patchText: string,
+  language = "diff",
+  duplicate = false,
+): string {
+  const fence = [`\`\`\`${language}`, patchText, "```"].join("\n");
+  return duplicate ? [fence, fence].join("\n") : fence;
 }

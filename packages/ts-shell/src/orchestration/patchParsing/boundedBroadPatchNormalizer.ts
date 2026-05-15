@@ -7,6 +7,7 @@ import {
   broadPatchUnsupportedEvidence,
   type BroadPatchUnsupportedReason,
 } from "./broadPatchUnsupportedReason.js";
+import { extractFencedPatchText } from "./fencedPatchExtractor.js";
 
 export type BoundedBroadPatchNormalizerStatus =
   | "normalized"
@@ -68,7 +69,29 @@ interface FileMetadata {
 export function normalizeBoundedBroadPatchText(
   rawPatchText: string,
 ): BoundedBroadPatchNormalizerResult {
-  const normalized = normalizeLineEndings(rawPatchText).trim();
+  const fencedExtraction = extractFencedPatchText(rawPatchText);
+  if (fencedExtraction.status === "unsupported") {
+    return rejection(
+      "unsupported",
+      "unknown",
+      "unsupported-broad-shape",
+      fencedExtraction.evidence,
+    );
+  }
+  if (fencedExtraction.status === "malformed") {
+    return rejection(
+      "malformed",
+      "unknown",
+      "malformed-broad-patch",
+      fencedExtraction.evidence,
+    );
+  }
+
+  const broadPatchText =
+    fencedExtraction.status === "extracted"
+      ? fencedExtraction.extractedPatch
+      : rawPatchText;
+  const normalized = normalizeLineEndings(broadPatchText).trim();
   if (normalized.includes("*** Begin Patch")) {
     return {
       status: "unsupported",
@@ -77,7 +100,10 @@ export function normalizeBoundedBroadPatchText(
       operationCount: 0,
       affectedPaths: [],
       rejectionReason: "not-broad-patch",
-      evidence: ["bounded-broad-patch-normalizer:marker-patch-bypassed"],
+      evidence: [
+        ...fencedExtraction.evidence,
+        "bounded-broad-patch-normalizer:marker-patch-bypassed",
+      ],
     };
   }
   if (!looksLikeGitUnifiedDiff(normalized)) {
@@ -88,13 +114,17 @@ export function normalizeBoundedBroadPatchText(
       operationCount: 0,
       affectedPaths: [],
       rejectionReason: "not-broad-patch",
-      evidence: ["bounded-broad-patch-normalizer:not-git-unified-diff"],
+      evidence: [
+        ...fencedExtraction.evidence,
+        "bounded-broad-patch-normalizer:not-git-unified-diff",
+      ],
     };
   }
 
   const sections = splitGitDiffSections(normalized);
   if (sections.length === 0) {
     return rejection("malformed", "git-unified-diff", "malformed-broad-patch", [
+      ...fencedExtraction.evidence,
       "bounded-broad-patch-normalizer:missing-diff-git-section",
     ]);
   }
@@ -116,6 +146,7 @@ export function normalizeBoundedBroadPatchText(
     operationCount: operations.length,
     affectedPaths: affectedPathsFor(operations),
     evidence: [
+      ...fencedExtraction.evidence,
       "bounded-broad-patch-normalizer:git-unified-diff-normalized",
       `bounded-broad-patch-normalizer:operation-count:${operations.length}`,
       "bounded-broad-patch-normalizer:no-file-read",

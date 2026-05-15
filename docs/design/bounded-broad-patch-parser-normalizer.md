@@ -2,7 +2,9 @@
 
 Status: Route 70 expanded the Route 69 safe git-style unified-diff subset with
 safe rename-with-content decomposition and a centralized unsupported reason
-taxonomy. This is not broad arbitrary `apply_patch` readiness.
+taxonomy. Route 72 added one-clear-fence git-style broad diff extraction into
+the same bounded normalizer flow. This is not broad arbitrary `apply_patch`
+readiness.
 
 ## Post-Route 67 Baseline
 
@@ -15,6 +17,11 @@ The Route 68 target is a pure parser/normalizer step. It does not read files,
 write files, ask approval, persist recovery state, execute restore, or claim
 rollback. Safe normalized output is marker-style patch text that existing
 single-file, multi-file, mixed, delete, and move routes already understand.
+
+Route 72 adds `fencedPatchExtractor.ts` before normalization. The extractor is
+also pure: it reads no files, writes no files, grants no write authority, and
+executes no recovery. It only unwraps one clearly fenced git-style diff before
+the existing bounded normalizer decides whether the payload is supported.
 
 ## Bounded Reference Scan
 
@@ -92,6 +99,9 @@ Supported parser subset:
   expectations.
 - Operation count 1-32. Count 33+ remains blocked by the existing bounded write
   policy after normalization.
+- One clearly fenced git-style diff block, with `diff`, `patch`, `text`, or
+  unlabeled fences when the content clearly looks like a diff. The extracted
+  content must still fit the same safe subset above.
 
 The normalizer also lets the existing marker parser accept a pure move with no
 content hunk. Verification already treats that as a no-content-change move and
@@ -116,6 +126,9 @@ Still blocked:
   paths.
 - Overwrite, still enforced by create/move target authorities.
 - Fuzzy patch, best-effort hunk application, and arbitrary broad patch input.
+- Multiple fenced blocks, incomplete fences, non-patch code fences,
+  nested/ambiguous fences, and prose with another patch candidate outside the
+  fence.
 
 ## Normalization Model
 
@@ -171,9 +184,11 @@ transaction, snapshot, or default persistence was added.
 Focused validation added:
 
 - `boundedBroadPatchNormalizer.test.ts`
+- `fencedPatchExtractor.test.ts`
 - `parser.test.ts`
 - `boundedApplyPatchCandidate.test.ts`
 - `mutationRoutingProjection.test.ts`
+- `editCompatibilityGauntlet.test.ts`
 
 Representative evidence:
 
@@ -185,6 +200,9 @@ Representative evidence:
 - binary/mode/symlink/submodule/copy/malformed/no-newline shapes remain blocked
 - rename-with-content-edit normalizes to move plus target update and routes
   through the guarded mixed route
+- one clear fenced git-style diff normalizes and routes through the same
+  guarded bounded path
+- ambiguous fenced/prose patch candidates remain no-write
 - non-default recovery-authority capture works for a normalized broad
   candidate
 - explicit restore can repair a representative partial normalized broad

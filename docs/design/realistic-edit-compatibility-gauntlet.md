@@ -1,6 +1,7 @@
 # Realistic Edit Compatibility Gauntlet
 
-Status: Route 71 implemented as a focused compatibility gauntlet.
+Status: Route 71 implemented as a focused compatibility gauntlet; Route 72
+extended it with fenced git-style broad diff coverage.
 Date: 2026-05-15
 
 ## Post-Route 70 Baseline
@@ -96,12 +97,19 @@ Covered supported shapes:
 - git-style pure rename
 - git-style rename-with-content-edit
 - git-style mixed multi-file patch within cap
+- fenced git-style single update
+- fenced git-style add file
+- fenced git-style delete file
+- fenced git-style pure rename
+- fenced git-style rename-with-content-edit
+- fenced git-style mixed multi-file patch within cap
+- fenced git-style 32-operation update-only batch
 - model output with prose around marker patch
 - fenced marker patch block
 
-Fenced git-style broad diffs remain blocked. Supporting them would require a
-new extraction rule for broad diff payloads, and Route 71 did not open a broad
-parser rewrite.
+Route 72 now supports one clearly fenced git-style broad diff by extracting the
+fenced payload and feeding it to the existing bounded normalizer. This does not
+open arbitrary prose parsing or broad arbitrary `apply_patch`.
 
 ## Blocked Fixture Categories
 
@@ -125,6 +133,14 @@ Covered blocked shapes:
 - unsupported newline-sensitive shape
 - rename-with-content-edit over cap
 - rename-with-content-edit with unsupported metadata
+- multiple fenced patch blocks
+- incomplete fenced patch
+- non-patch code fence
+- fenced 33-operation patch
+- fenced binary patch
+- fenced mode/chmod patch
+- fenced fuzzy/no-newline unsupported shape
+- prose with two patch candidates
 
 Blocked assertions require `no-write-authority` and `no-recovery-execution`
 evidence. They do not reach writer execution, do not capture recovery
@@ -139,7 +155,9 @@ Parser and normalizer coverage:
 - unsupported broad metadata maps through the existing reason taxonomy
 - fenced marker patches and prose-wrapped marker patches are accepted because
   the marker parser searches for begin/end markers in order
-- fenced git-style broad diffs are intentionally malformed/blocked
+- one clear fenced git-style broad diff is extracted and normalized through the
+  same bounded broad patch normalizer
+- ambiguous fenced/prose shapes remain no-write
 
 Candidate and routing coverage:
 
@@ -181,31 +199,29 @@ remains false.
 
 ## Compatibility Summary
 
-- Supported fixture categories: 15.
-- Blocked fixture categories: 18.
-- Executable route representatives: 4.
+- Supported fixture categories: 22.
+- Blocked fixture categories: 26.
+- Executable route representatives: 6.
 - Recovery-authority capture representatives: 2.
 - Restore drill representatives: 3.
 - Runtime code fixes required by Route 71: none.
 
 The existing Route 70 implementation already satisfied the bounded realistic
-shapes after the gauntlet was added. The only uncovered realistic shape was
-fenced git-style broad diff extraction; Route 71 records it as blocked because
-supporting it would widen broad parser behavior.
+shapes after the Route 71 gauntlet was added. Route 72 added a targeted fenced
+git-style broad diff extractor and proved the supported fenced shapes plus the
+blocked ambiguous/prose shapes.
 
 ## Closeout Implications
 
-Route 71 improves confidence that the bounded edit surface handles realistic
-agent output categories without claiming broad edit readiness. It does not
-change provider, session, CLI, MCP, package scripts, default gates, default
-persistence, automatic recovery, or atomic rollback.
+Route 71/72 improve confidence that the bounded edit surface handles realistic
+agent output categories without claiming broad edit readiness. Route 72 adds a
+focused package script for closeout verification, but does not change provider,
+session, CLI, MCP, default gates, default persistence, automatic recovery, or
+atomic rollback.
 
 Next-route decision criteria:
 
-- If current bounded behavior remains stable, Route 72 should be an edit
-  capability closeout map and default/non-default readiness decision.
-- If fenced git-style broad diff extraction becomes a real user blocker,
-  Route 72 can be a targeted parser gap route, still no fuzzy or arbitrary
-  broad apply.
-- If blocked-shape explanations are confusing, Route 72 can polish user/session
+- If current bounded behavior remains stable, Route 73 should be an edit
+  capability closeout map and seal.
+- If blocked-shape explanations are confusing, Route 73 can polish user/session
   unsupported edit explanations without changing write capability.

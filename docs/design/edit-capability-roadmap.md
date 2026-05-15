@@ -1,8 +1,8 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 71
+Route baseline: post-Route 72
 Date: 2026-05-15
-Status: long-range edit capability map after Routes 50-71.
+Status: long-range edit capability map after Routes 50-72.
 Routes 59-66 have implemented a narrow explicit non-default original-content
 authority loop, explicit restore surface, bounded exactly-three mixed write
 expansion, bounded destructive multi-delete/multi-move support, and bounded
@@ -24,6 +24,11 @@ Route 71 added a realistic edit compatibility gauntlet across parser,
 normalizer, bounded candidate classification, mutation routing, no-write
 surfaces, non-default recovery-authority capture, and explicit restore drills.
 It did not add new write capability.
+Route 72 added safe fenced git-style broad diff extraction into the existing
+bounded parser/normalizer/route flow, a pure edit capability readiness model,
+and a focused edit closeout verifier. It did not add arbitrary broad
+`apply_patch`, fuzzy patching, 33+ writes, automatic recovery, atomic rollback,
+provider/session/CLI/MCP changes, or default persistence.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -35,7 +40,7 @@ opencode, and gemini-cli.
 It is not a broad edit readiness claim. It keeps implemented capability,
 candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Post-Route 71 Executive Summary
+## 1. Post-Route 72 Executive Summary
 
 Current write capability remains intentionally narrow. The project supports a
 bounded selected-workspace write surface and still blocks broad arbitrary
@@ -51,15 +56,22 @@ through the existing guarded mixed route. The route still owns workspace
 authority, approval, final preflight, recovery-authority capture, parsed-order
 execution, and post-write verification.
 
-Route 71 then validated that surface against realistic agent-output shapes
+Route 71 validated that surface against realistic agent-output shapes
 inspired by ClaudeCode, opencode, gemini-cli, and generic model output. The
 gauntlet covers marker patches, git-style safe-subset diffs, prose/fenced
 marker output, rename-content decomposition, 32-operation bounded payloads,
 unsupported broad metadata, malformed input, no-write surfaces, non-default
 recovery-authority capture, and explicit restore drills. It found no runtime
-writer gap requiring code changes. Fenced git-style broad diff extraction
-remains intentionally blocked because supporting it would widen broad parser
-behavior.
+writer gap requiring code changes.
+
+Route 72 then closed the only concrete Route 71 parser gap by extracting one
+clearly fenced git-style broad diff and handing it to the existing bounded
+normalizer. The new extractor blocks multiple fenced blocks, incomplete
+fences, non-patch fences, nested/ambiguous fences, prose with multiple patch
+candidates, and any fenced content that the existing bounded normalizer rejects.
+The route also added `editCapabilityReadiness.ts` and
+`verify-edit-capability-closeout.mjs` as closeout evidence. This is a targeted
+model-output compatibility improvement, not new writer authority.
 
 Routes 52-56 changed the roadmap direction:
 
@@ -598,7 +610,10 @@ User / CLI / provider output
 | Bounded broad patch parser/normalizer | Implemented expanded safe subset | `patchParsing/boundedBroadPatchNormalizer.ts`, `boundedBroadPatchNormalizer.test.ts`, `parser.ts`, `parser.test.ts`, `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `docs/design/bounded-broad-patch-parser-normalizer.md`, `docs/design/expanded-bounded-broad-patch-safe-subset.md`, `docs/design/rename-content-and-broad-shape-gauntlet.md` | C/D/E | Git-style update/add/delete/pure-rename, safe rename-with-content decomposition, and exact multi-hunk update subset only; binary, mode, symlink, submodule, copy, malformed, fuzzy, 33+, directory/path conflicts, overwrite, and arbitrary broad shapes remain blocked | Unsupported-shape UX hardening if needed |
 | Rename-with-content-edit decomposition | Implemented bounded candidate | `boundedBroadPatchNormalizer.ts`, `mixedFileWriteRoute.ts`, `perFilePatchPlan.ts`, `boundedApplyPatchCandidate.test.ts`, `mixedFileWriteRoute.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/rename-content-and-broad-shape-gauntlet.md` | C/D/E | Only 100 percent similarity git-style rename plus exact hunks; operation count is move plus update; no lower-similarity rename, move-with-hunks, overwrite, fuzzy patch, automatic recovery, or rollback | Preserve narrow dependency; do not generalize without separate route |
 | Broad unsupported-shape taxonomy and gauntlet | Implemented projection/test hardening | `patchParsing/broadPatchUnsupportedReason.ts`, `broadPatchUnsupportedReason.test.ts`, `boundedBroadPatchNormalizer.test.ts`, `boundedApplyPatchCandidate.test.ts`, `docs/design/rename-content-and-broad-shape-gauntlet.md` | C/D/E | Reason metadata is no-write evidence only; user-facing result shape remains bounded by existing contracts | Optional UX projection polish only if needed |
-| Realistic edit compatibility gauntlet | Implemented Route 71 compatibility evidence | `patchResult/editCompatibilityGauntlet.test.ts`, `docs/design/realistic-edit-compatibility-gauntlet.md`, `boundedApplyPatchCandidate.ts`, `boundedBroadPatchNormalizer.ts`, `mutationRoutingProjection.ts`, recovery store/restore primitives | C/D/E | Fenced git-style broad diffs remain blocked; gauntlet adds evidence, not new writer authority | Route 72 closeout map/default-readiness decision, or targeted parser gap only if justified |
+| Realistic edit compatibility gauntlet | Implemented Route 71/72 compatibility evidence | `patchResult/editCompatibilityGauntlet.test.ts`, `docs/design/realistic-edit-compatibility-gauntlet.md`, `boundedApplyPatchCandidate.ts`, `boundedBroadPatchNormalizer.ts`, `fencedPatchExtractor.ts`, `mutationRoutingProjection.ts`, recovery store/restore primitives | C/D/E | Gauntlet adds evidence and fenced extraction coverage, not new writer authority; arbitrary broad, fuzzy, binary/mode/symlink/submodule, 33+, automatic recovery, and rollback remain blocked | Route 73 closeout map/seal if validation remains green |
+| Fenced bounded broad diff extraction | Implemented targeted parser compatibility | `patchParsing/fencedPatchExtractor.ts`, `fencedPatchExtractor.test.ts`, `boundedBroadPatchNormalizer.ts`, `boundedApplyPatchCandidate.test.ts`, `editCompatibilityGauntlet.test.ts`, `docs/design/edit-closeout-readiness-and-fenced-broad-diff.md` | C/D/E | Supports one clear fenced git-style diff only; multiple/incomplete/non-patch/nested/prose-multiple candidates remain blocked; no arbitrary prose parser | Preserve as compatibility shim; do not widen without route |
+| Edit capability readiness model | Implemented pure closeout classification | `patchResult/editCapabilityReadiness.ts`, `editCapabilityReadiness.test.ts`, `docs/design/edit-closeout-readiness-and-fenced-broad-diff.md` | D/E | Classification only; no routing, writer, provider, session, persistence, recovery, or rollback behavior | Use in closeout/seal documentation |
+| Edit capability closeout verifier | Implemented focused local verifier | `scripts/verify-edit-capability-closeout.mjs`, `package.json`, focused parser/candidate/gauntlet/readiness tests | D/E | Not a default release gate; does not run provider/CLI/MCP/real-provider gates | Run when edit closeout evidence is touched |
 | 8-operation recovery-authority drills | Implemented explicit drill evidence | `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts` | C/D | Explicit primitive only; no automatic recovery, session restore command, or atomic rollback | User/session explicit restore UX if product priority |
 | Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, unsupported E2E and continuity checks | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Preserve as recovery-plan consumer |
 | Route-scoped edit journal prototype | Implemented metadata-only projection | `routeScopedEditJournal.ts`, `routeScopedEditJournal.test.ts` | C/D | Non-durable; not recovery or writer authority | Feed original-content ledger prototype if safe |
@@ -938,12 +953,22 @@ supported categories and 18 blocked categories, with executable route
 representatives and restore drills. It did not require runtime writer changes
 and did not open fenced git-style broad diff extraction.
 
-Recommended next direction: Route 72 should be an edit capability closeout map
-and default/non-default readiness decision if this bounded surface is stable.
-Use a targeted parser gap route only if fenced git-style broad diff extraction
-becomes a proven user blocker. Use a user/session unsupported edit explanation
-polish route only if no-write explanations are the main product gap. Do not
-move to arbitrary broad `apply_patch`.
+Implemented Route 72 batch:
+
+**Batch 72: Edit closeout readiness and fenced broad diff extraction**
+
+Route 72 implemented a pure fenced patch extractor for one clear fenced
+git-style broad diff and wired it into the existing bounded normalizer and
+candidate route flow. It extended the compatibility gauntlet with fenced
+supported and blocked fixtures, added a pure readiness classification helper,
+and added a focused closeout verifier. It preserved cap 32, no-write/dry-run
+non-authorization, arbitrary broad/fuzzy/binary/mode/symlink/submodule
+blocking, no automatic recovery, and no atomic rollback.
+
+Recommended next direction: Route 73 should be an edit capability closeout map
+and seal if Route 72 validation remains green. Do not move to arbitrary broad
+`apply_patch`; that remains delayed until larger write surfaces and durable
+recovery/rollback stance are explicitly re-audited.
 
 ## 9. Recommended Future Sequence
 
@@ -1051,19 +1076,25 @@ move to arbitrary broad `apply_patch`.
   - Status: implemented as a focused fixture harness plus design record across
     parser, normalizer, candidate classification, routing, no-write surfaces,
     non-default recovery-authority capture, and explicit restore drills.
-  - It found no runtime writer gap. Fenced git-style broad diff extraction
-    remains blocked rather than opening a broader parser.
+  - It found no runtime writer gap. Route 72 later implemented the targeted
+    fenced git-style broad diff extraction gap without opening a broader
+    parser.
 
-- Batch 72: Edit capability closeout map and default/non-default readiness
-  decision
-  - Recommended if the bounded Route 71 gauntlet remains green.
-  - Alternative: a targeted parser gap follow-up only if fenced git-style broad
-    diff extraction is proven useful and can be implemented without fuzzy or
-    arbitrary broad apply.
-  - Alternative: user/session unsupported edit explanation polish if blocked
-    fixture explanations are the main remaining product gap.
+- Batch 72: Edit closeout readiness and fenced broad diff extraction
+  - Status: implemented as targeted fenced git-style broad diff extraction,
+    Route 72 gauntlet expansion, pure edit capability readiness model, and
+    focused closeout verifier.
+  - Multiple fenced blocks, incomplete fences, non-patch fences, prose with
+    multiple patch candidates, 33+ writes, arbitrary broad patches, fuzzy
+    patch, binary/mode/symlink/submodule/copy, automatic recovery, and rollback
+    remain unsupported.
 
-- Batch 73+: Broad arbitrary `apply_patch` readiness map
+- Batch 73: Edit capability closeout map and seal
+  - Recommended next if final Route 72 validation remains green.
+  - Should consolidate default/non-default readiness and document the stop
+    condition before context-engineering or broader product work.
+
+- Batch 74+: Broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are
     settled.
   - Broad arbitrary `apply_patch` remains delayed because it combines parsing,
@@ -1084,6 +1115,8 @@ For development batches:
 
 - run minimal focused validation between tasks
 - run focused tests for touched patch/result/session modules
+- run `rtk npm run verify:edit-capability-closeout` when parser/candidate/
+  gauntlet/readiness closeout evidence changes
 - run `rtk npm run verify:result-contract` when result contracts or consumer
   projections change
 - run `rtk npm run build -w packages/ts-shell` when code changes

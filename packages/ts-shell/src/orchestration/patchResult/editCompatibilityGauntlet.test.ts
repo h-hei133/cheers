@@ -58,6 +58,13 @@ describe("realistic edit compatibility gauntlet", () => {
       supportedCase("git pure rename", "git-style-diff", gitPureRenamePatch("src/from.ts", "src/to.ts"), "single", 1, ["src/from.ts", "src/to.ts"]),
       supportedCase("git rename with content edit", "git-style-diff", gitRenameWithContentEditPatch("src/from.ts", "src/to.ts", "from", "renamed"), "mixed", 2, ["src/from.ts", "src/to.ts"]),
       supportedCase("git mixed multi-file", "git-style-diff", gitMixedPatch(), "mixed", 4, ["src/a.ts", "src/new.ts", "src/remove.ts", "src/from.ts", "src/to.ts"]),
+      supportedCase("fenced git single update", "model-output-with-prose", fencedGitPatch(gitUpdatePatch("src/a.ts", "a = 1", "a = 2")), "single", 1, ["src/a.ts"]),
+      supportedCase("fenced git add file", "model-output-with-prose", fencedGitPatch(gitAddPatch("src/new.ts", "created"), "patch"), "single", 1, ["src/new.ts"]),
+      supportedCase("fenced git delete file", "model-output-with-prose", fencedGitPatch(gitDeletePatch("src/remove.ts", "remove"), "text"), "single", 1, ["src/remove.ts"]),
+      supportedCase("fenced git pure rename", "model-output-with-prose", fencedGitPatch(gitPureRenamePatch("src/from.ts", "src/to.ts"), ""), "single", 1, ["src/from.ts", "src/to.ts"]),
+      supportedCase("fenced git rename with content edit", "model-output-with-prose", fencedGitPatch(gitRenameWithContentEditPatch("src/from.ts", "src/to.ts", "from", "renamed")), "mixed", 2, ["src/from.ts", "src/to.ts"]),
+      supportedCase("fenced git mixed multi-file", "model-output-with-prose", fencedGitPatch(gitMixedPatch()), "mixed", 4, ["src/a.ts", "src/new.ts", "src/remove.ts", "src/from.ts", "src/to.ts"]),
+      supportedCase("fenced git 32 update-only", "model-output-with-prose", fencedGitPatch(gitUpdatePatchBatch(32)), "update-only", 32, generatedUpdatePaths(32)),
       supportedCase("marker prose wrapped", "model-output-with-prose", proseWrappedMarkerPatch(), "single", 1, ["src/a.ts"]),
       supportedCase("marker fenced patch block", "model-output-with-prose", fencedMarkerPatch(), "single", 1, ["src/a.ts"]),
     ];
@@ -108,6 +115,14 @@ describe("realistic edit compatibility gauntlet", () => {
       blockedCase("unsupported newline-sensitive shape", "git-style-diff", gitNoNewlinePatch(), 0, "unsupportedBroadShape", []),
       blockedCase("rename-content over cap", "git-style-diff", [gitRenameWithContentEditPatch("src/from.ts", "src/to.ts", "from", "renamed"), gitUpdatePatchBatch(31)].join("\n"), 33, "unsupportedTooManyOperations", ["src/from.ts", "src/to.ts", ...generatedUpdatePaths(31)]),
       blockedCase("rename-content unsupported metadata", "unsupported-metadata", ["diff --git a/src/from.ts b/src/to.ts", "similarity index 100%", "rename from src/from.ts", "rename to src/to.ts", "old mode 100644", "new mode 100755", "--- a/src/from.ts", "+++ b/src/to.ts", "@@ -1 +1 @@", "-from", "+renamed"].join("\n"), 0, "unsupportedDestructiveShape", []),
+      blockedCase("multiple fenced patch blocks", "model-output-with-prose", [fencedGitPatch(gitUpdatePatch("src/a.ts", "a = 1", "a = 2")), fencedGitPatch(gitUpdatePatch("src/b.ts", "b = 1", "b = 2"))].join("\n"), 0, "unsupportedBroadShape", []),
+      blockedCase("incomplete fenced patch", "model-output-with-prose", ["```diff", gitUpdatePatch("src/a.ts", "a = 1", "a = 2")].join("\n"), 0, "unsupportedBroadShape", []),
+      blockedCase("non-patch code fence", "model-output-with-prose", ["```ts", "const value = 1;", "```"].join("\n"), 0, "unsupportedFuzzyPatch", []),
+      blockedCase("fenced 33 operation patch", "model-output-with-prose", fencedGitPatch(gitUpdatePatchBatch(33)), 33, "unsupportedTooManyOperations", generatedUpdatePaths(33)),
+      blockedCase("fenced binary patch", "model-output-with-prose", fencedGitPatch(["diff --git a/src/a.bin b/src/a.bin", "Binary files differ"].join("\n")), 0, "unsupportedDestructiveShape", []),
+      blockedCase("fenced mode patch", "model-output-with-prose", fencedGitPatch(["diff --git a/src/a.ts b/src/a.ts", "old mode 100644", "new mode 100755"].join("\n")), 0, "unsupportedDestructiveShape", []),
+      blockedCase("fenced fuzzy/no-newline unsupported shape", "model-output-with-prose", fencedGitPatch(gitNoNewlinePatch()), 0, "unsupportedBroadShape", []),
+      blockedCase("prose with two patch candidates", "model-output-with-prose", [gitUpdatePatch("src/a.ts", "a = 1", "a = 2"), fencedGitPatch(gitUpdatePatch("src/b.ts", "b = 1", "b = 2"))].join("\n"), 0, "unsupportedBroadShape", []),
     ];
 
     for (const fixture of blocked) {
@@ -132,15 +147,19 @@ describe("realistic edit compatibility gauntlet", () => {
     }
   });
 
-  it("documents that fenced git-style broad diffs remain blocked instead of opening broad extraction", () => {
+  it("normalizes fenced git-style broad diffs through existing bounded extraction", () => {
     const result = normalizeBoundedBroadPatchText(
       ["```diff", gitUpdatePatch("src/a.ts", "a = 1", "a = 2"), "```"].join("\n"),
     );
 
     expect(result).toEqual(
       expect.objectContaining({
-        status: "malformed",
-        rejectionReason: "malformed-broad-patch",
+        status: "normalized",
+        operationCount: 1,
+        affectedPaths: ["src/a.ts"],
+        evidence: expect.arrayContaining([
+          "fenced-patch-extractor:single-fenced-patch-extracted",
+        ]),
       }),
     );
   });
@@ -190,6 +209,26 @@ describe("realistic edit compatibility gauntlet", () => {
       initialFiles: { "src/a.ts": "a = 1\n", "src/b.ts": "b = 1\n" },
       expectedChangedFiles: ["src/a.ts", "src/b.ts"],
       expectedSnapshot: {},
+    });
+
+    await expectExecutableRoute({
+      name: "fenced git single update",
+      patchText: fencedGitPatch(gitUpdatePatch("src/a.ts", "a = 1", "a = 2")),
+      initialFiles: { "src/a.ts": "a = 1\n" },
+      expectedChangedFiles: ["src/a.ts"],
+      expectedSnapshot: { "src/a.ts": "a = 2\n" },
+    });
+
+    await expectExecutableRoute({
+      name: "fenced git mixed update/add/delete/move",
+      patchText: fencedGitPatch(gitMixedPatch()),
+      initialFiles: {
+        "src/a.ts": "a = 1\n",
+        "src/remove.ts": "remove\n",
+        "src/from.ts": "from\n",
+      },
+      expectedChangedFiles: ["src/a.ts", "src/new.ts", "src/remove.ts", "src/to.ts"],
+      expectedSnapshot: { "src/a.ts": "a = 2\n", "src/new.ts": "created", "src/to.ts": "from\n" },
     });
   });
 
@@ -671,6 +710,10 @@ function proseWrappedMarkerPatch(): string {
 
 function fencedMarkerPatch(): string {
   return ["```diff", markerUpdatePatch(), "```"].join("\n");
+}
+
+function fencedGitPatch(patchText: string, language = "diff"): string {
+  return [`\`\`\`${language}`, patchText, "```"].join("\n");
 }
 
 function gitUpdatePatch(filePath: string, oldLine: string, newLine: string): string {

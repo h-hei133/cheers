@@ -89,6 +89,34 @@ describe("normalizeBoundedBroadPatchText", () => {
     );
   });
 
+  it("extracts a single fenced git-style broad diff before normalization", () => {
+    const result = normalizeBoundedBroadPatchText(
+      [
+        "Apply this diff:",
+        "```diff",
+        "diff --git a/src/a.ts b/src/a.ts",
+        "--- a/src/a.ts",
+        "+++ b/src/a.ts",
+        "@@ -1 +1 @@",
+        "-a = 1",
+        "+a = 2",
+        "```",
+      ].join("\n"),
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: "normalized",
+        operationCount: 1,
+        affectedPaths: ["src/a.ts"],
+        evidence: expect.arrayContaining([
+          "fenced-patch-extractor:single-fenced-patch-extracted",
+          "bounded-broad-patch-normalizer:git-unified-diff-normalized",
+        ]),
+      }),
+    );
+  });
+
   it("preserves multi-hunk updates as exact marker hunks", () => {
     const result = normalizeBoundedBroadPatchText(
       [
@@ -233,6 +261,40 @@ describe("normalizeBoundedBroadPatchText", () => {
         }),
       );
     }
+  });
+
+  it("blocks ambiguous fenced patch extraction before normalization", () => {
+    const result = normalizeBoundedBroadPatchText(
+      [
+        "```diff",
+        "diff --git a/src/a.ts b/src/a.ts",
+        "--- a/src/a.ts",
+        "+++ b/src/a.ts",
+        "@@ -1 +1 @@",
+        "-a = 1",
+        "+a = 2",
+        "```",
+        "```diff",
+        "diff --git a/src/b.ts b/src/b.ts",
+        "--- a/src/b.ts",
+        "+++ b/src/b.ts",
+        "@@ -1 +1 @@",
+        "-b = 1",
+        "+b = 2",
+        "```",
+      ].join("\n"),
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: "unsupported",
+        rejectionReason: "unsupported-broad-shape",
+        evidence: expect.arrayContaining([
+          "fenced-patch-extractor:multiple-fenced-blocks-blocked",
+          "bounded-broad-patch-normalizer:no-write-authority",
+        ]),
+      }),
+    );
   });
 
   it("keeps unsafe rename-with-content-edit shapes blocked", () => {
