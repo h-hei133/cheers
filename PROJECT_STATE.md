@@ -11,9 +11,10 @@
   projection, stopped-session continuity projection, selected-workspace
   cross-process resume evidence, CLI entry parity, and isolated
   real-provider readiness smoke gating, release-core durability/MCP hard gates,
-  and deterministic release meta-gate layering are stage-sealed; next
-  implementation should be chosen from current main-path blockers instead of
-  extending the same continuity proof family without a new regression.
+  deterministic release meta-gate layering, and bounded selected-workspace edit
+  capability closeout are stage-sealed; next implementation should be chosen
+  from current main-path blockers instead of extending the same continuity or
+  edit-surface proof family without a new regression.
 
 What this stage is **not**:
 
@@ -75,7 +76,7 @@ The primary user-visible mainline is now:
 5. Result block stays minimal and actionable in compact mode
 6. Session remains ready for next turn with clear boundaries
 
-## 5. Latest Implemented Delta (through 2026-05-14)
+## 5. Latest Implemented Delta (through 2026-05-15)
 
 ### Current release-claims audit after Routes 01-08
 
@@ -83,62 +84,71 @@ The current release/readiness claim is deliberately bounded: the project is
 limited dogfood ready and deterministic release-candidate green for the current
 verified surface. It is not broad/general release ready.
 
-### Route 48 / 49 edit capability consolidation
+### Route 73 edit capability closeout candidate
 
-Route 48 added guarded selected-workspace exactly-two mixed write support for
-these lanes only:
+Route 73 seals the current bounded selected-workspace edit phase as a closeout
+candidate. It does not add a major edit feature. It documents the supported
+envelope, adds a machine-checkable closeout manifest, strengthens the focused
+closeout verifier, and records a bounded parity/non-parity scan against
+ClaudeCode, opencode, and gemini-cli.
 
-- update + add
-- update + move
-- add + move
-- update + delete
-- add + delete
-- move + delete
+Current default-ready edit candidates:
 
-Route 49 is documentation/status consolidation only. It does not add product
-code, scripts, package scripts, default gates, provider behavior, session
-behavior, CLI behavior, MCP behavior, or readiness claims.
+- selected-workspace single-file update/create/delete/move
+- bounded 2-32 update-only writes
+- bounded 2-32 mixed writes
+- bounded 2-32 delete-only writes
+- bounded 2-32 move-only writes
+- bounded marker-style `apply_patch` candidates
+- bounded git-style broad patch safe subset
+- one clear fenced bounded git-style broad diff safe subset
+- 100 percent similarity rename-with-content decomposition into move plus
+  immediate target update
+- unsupported broad-shape taxonomy and no-write projection
 
-Current implemented edit capabilities:
+These capabilities are still approval- and workspace-authority-gated.
+Default-ready does not mean prompt text authorizes writes, and it does not mean
+arbitrary broad `apply_patch` readiness.
 
-- selected-workspace single-file update
-- selected-workspace single-file create
-- selected-workspace exactly-two update
-- selected-workspace exactly-three update
-- selected-workspace single-file move/rename
-- selected-workspace single-file delete
-- selected-workspace exactly-two mixed write lanes listed above
+Current non-default / explicit-opt-in surfaces:
 
-Current implemented safety/result infrastructure:
+- recovery-authority capture
+- persistent recovery authority ledger
+- restore preview
+- explicit restore execute
+- local `/restore` execute path
 
-- per-file patch plan/result contract
-- per-file plan wired into route/result projections
-- malformed/unsupported/mixed fixture hardening
-- stale-read / read-before-write failure surface
-- partial/post-write verification failure surface
-- broad/delete/move/mixed no-write planning where unsupported
-- mixed-operation readiness projection
-- non-default evidence for exactly-three, move, delete, and mixed operation
-  writes
+Current blocked-by-design edit capabilities remain explicit:
 
-Current unsupported edit capabilities remain explicit:
+- 33+ writes
+- arbitrary broad `apply_patch`
+- fuzzy patch
+- binary patch
+- mode/chmod patch
+- symlink patch
+- submodule patch
+- copy metadata
+- directory operations
+- overwrite/path conflict expansion
+- automatic recovery
+- atomic rollback
+- default durable recovery persistence
+- provider/MCP edit behavior changes
 
-- 3+ mixed writes
-- broad arbitrary apply_patch writes and broad unified diff writer
-- 4+ writes
-- multi-delete / multi-move beyond exactly-two mixed lanes
-- directory delete/move, overwrite, and outside-workspace operations
-- rollback, atomicity, snapshot/revert, stale-read recovery, partial failure
-  recovery, and fuzzy patch recovery
-- broad release readiness and default real-provider readiness
+Current machine-checkable closeout evidence:
 
-Route 48 mixed writes are sequential in parsed patch order. No rollback or
-atomicity is claimed. A partial failure may leave verified `changedFiles` and
-separate `failedFiles`; result surfaces must report both accurately and future
-3+ mixed or broad apply_patch work requires a separate route.
+- `packages/ts-shell/src/orchestration/patchResult/editCapabilityReadiness.ts`
+- `packages/ts-shell/src/orchestration/patchResult/editCapabilityCloseoutManifest.ts`
+- `npm run verify:edit-capability-closeout`
+- `docs/design/edit-capability-closeout-seal.md`
 
-The single recommended next route is Route 50: broad apply_patch / 3+ mixed
-write readiness design, docs-first.
+The closeout verifier is focused deterministic edit-surface evidence. It does
+not run provider, default, MCP, or real-provider gates. Result-contract remains
+an independent final validation surface rather than a nested verifier child.
+
+Recommended next phase: context engineering kickoff. Do not keep expanding the
+edit surface unless a concrete closeout blocker or user-facing regression is
+found.
 
 ### Route 10 evaluation: 3-file planning no-write
 
@@ -194,8 +204,9 @@ Forbidden claims remain explicit:
 
 - no broad/general release readiness
 - no arbitrary project mutation readiness
-- no broad `apply_patch`, 4+ writes, 3+ mixed writes, multi-delete,
-  multi-move, rollback, or atomic multi-file recovery readiness
+- no arbitrary broad `apply_patch`, 33+ writes, fuzzy patch, automatic
+  recovery, atomic rollback, default durable recovery persistence, or
+  provider/MCP edit readiness
 - no external/user-configured MCP, remote MCP, or MCP ecosystem readiness
 - no real-provider default gate readiness or broad real-provider mutation
   readiness
@@ -1501,9 +1512,9 @@ Important boundaries:
    pipe-spawn interactive evidence in this environment
 2. execution success still depends on model/tool behavior; sealed real-provider
    smokes prove only their explicit isolated or selected-workspace routes
-3. broad `apply_patch`, 3+ mixed operation writes, 4+ writes, multi-delete,
-   multi-move beyond exactly-two mixed lanes, rollback/atomic write recovery,
-   and true PTY automation remain outside the sealed evidence
+3. arbitrary broad `apply_patch`, 33+ writes, fuzzy patch, automatic recovery,
+   atomic rollback, default durable recovery persistence, provider/MCP edit
+   behavior changes, and true PTY automation remain outside the sealed evidence
 4. production single-file `apply_patch` default CLI / `runMvpIntegratedFlow`
    write route remains disabled; an explicit CLI/runMvp no-write route exists,
    an explicit workspace write entrypoint has landed with durable
@@ -1531,10 +1542,11 @@ Escalate from hardening into focused implementation when one is reproducible:
   `patch-generation-failed`, `stale-read`, and `approval-denied` is now sealed;
   do not keep expanding same-family stopped replay fixtures unless a concrete
   stopped/resume regression appears.
-- If continuing apply_patch, the next implementation route should be Route 50:
-  broad apply_patch / 3+ mixed write readiness design, docs-first. It should
-  decide rollback/snapshot versus explicit sequential/no-rollback semantics
-  before any broader writer is proposed.
+- The bounded edit capability phase is now a Route 73 closeout candidate. Do
+  not continue expanding edit/apply_patch capability unless a concrete
+  closeout blocker or user-facing regression appears.
+- The recommended next phase is context engineering kickoff, not another
+  same-family edit-surface expansion.
 - Keep default production `apply_patch` enablement blocked until a separate
   review defines rollback behavior and default user-workspace safety policy.
 - Existing real-provider gates remain explicit opt-in evidence only; do not
