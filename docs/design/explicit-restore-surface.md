@@ -190,17 +190,18 @@ cleanup hook, no default persistence root, and no provider/CLI/MCP residue.
 - broad `apply_patch`
 - 4+ mixed writes
 - 4+ writes
-- broad multi-delete or multi-move
+- broad multi-delete or multi-move beyond the bounded Route 63 lanes
 - provider/session/CLI/MCP behavior changes
 - package script or default gate changes
 
 ## Next Route Decision Criteria
 
-Route 62 update: selected-workspace exactly-three mixed writes are now
-implemented with optional non-default recovery-authority capture and
-representative partial-failure restore drills. 4+ mixed, broad `apply_patch`,
-automatic recovery, and atomic rollback remain unsupported.
+Route 63 update: selected-workspace exactly-two/exactly-three delete-only and
+move-only batches are now implemented with optional non-default
+recovery-authority capture and destructive partial-failure restore evidence.
+4+ writes, broad `apply_patch`, automatic recovery, and atomic rollback remain
+unsupported.
 
-Recommended next route: destructive multi-delete/multi-move readiness if the
-next blocker is destructive semantics, or CLI/session explicit restore UX if
-operator visibility becomes the higher product priority.
+Recommended next route: 4-operation bounded write readiness only if Route 63
+evidence remains stable, or CLI/session explicit restore UX if operator
+visibility becomes the higher product priority.

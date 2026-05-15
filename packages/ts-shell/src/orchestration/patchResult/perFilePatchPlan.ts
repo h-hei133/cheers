@@ -386,6 +386,30 @@ function buildParsedPatchPlan(
     });
   }
 
+  if (
+    (operations.length === 2 || operations.length === 3) &&
+    deleteOperations.length === operations.length
+  ) {
+    return buildVerifiedDestructiveDeletePlan({
+      patch,
+      options,
+      operations: deleteOperations,
+      targetFiles,
+    });
+  }
+
+  if (
+    (operations.length === 2 || operations.length === 3) &&
+    moveOperations.length === operations.length
+  ) {
+    return buildVerifiedDestructiveMovePlan({
+      patch,
+      options,
+      operations: moveOperations,
+      targetFiles,
+    });
+  }
+
   if (operations.length === 2 && updateOperations.length === 2) {
     return buildVerifiedPlan({
       patch,
@@ -769,6 +793,157 @@ function buildVerifiedMovePlan(input: {
       "Single Move File is represented as a supported write intent owned by the guarded selected-workspace move route.",
     nextAction:
       "Route may move only through explicit runtime/write opt-in, approval, source/target guards, exclusive move, and post-write verification.",
+    operationSupportStatus: "supported-write",
+  });
+}
+
+function buildVerifiedDestructiveDeletePlan(input: {
+  readonly patch: ParsedPatch;
+  readonly options: PerFilePatchPlanOptions;
+  readonly operations: readonly Extract<PatchFileOperation, { kind: "delete" }>[];
+  readonly targetFiles: readonly string[];
+}): PerFilePatchPlan {
+  const directoryFailure = directoryDeleteMoveFailure(
+    input.patch.operations,
+    input.options,
+  );
+  if (directoryFailure) {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: "verification-failed",
+      reason:
+        "Bounded multi-delete apply_patch shape matched a candidate route, but directory delete is not enabled.",
+      nextAction:
+        "Choose regular files for bounded multi-delete operations; directory delete remains unsupported.",
+      failures: [directoryFailure],
+    });
+  }
+
+  return buildVerifiedPlan({
+    patch: input.patch,
+    options: input.options,
+    supportedOperations: ["delete"],
+    supportStatus: "supported-write",
+    failureClass: "none",
+    plannedFiles: [],
+    writeIntentFiles: input.operations.map((operation) => operation.path),
+    targetFiles: input.targetFiles,
+    reason:
+      "Exactly-two or exactly-three Delete File operations are represented as supported write intents owned by the guarded bounded destructive workspace route.",
+    nextAction:
+      "Route may delete only through explicit approval naming all targets, workspace guards, all final preflights before the first delete, parsed-order deletes, and per-file post-delete verification.",
+    operationSupportStatus: "supported-write",
+  });
+}
+
+function buildVerifiedDestructiveMovePlan(input: {
+  readonly patch: ParsedPatch;
+  readonly options: PerFilePatchPlanOptions;
+  readonly operations: readonly Extract<PatchFileOperation, { kind: "move" }>[];
+  readonly targetFiles: readonly string[];
+}): PerFilePatchPlan {
+  const conflict = sourceTargetConflictFailure(
+    input.patch.operations,
+    input.options.workspaceRoot,
+  );
+  if (conflict) {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: "duplicate-target",
+      reason:
+        "Bounded multi-move apply_patch shape matched a candidate route, but source/target paths conflict.",
+      nextAction:
+        "Regenerate the multi-move patch so every source and target path is distinct; swaps and cycles remain unsupported.",
+      failures: [conflict],
+    });
+  }
+
+  const directoryFailure = directoryDeleteMoveFailure(
+    input.patch.operations,
+    input.options,
+  );
+  if (directoryFailure) {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: "verification-failed",
+      reason:
+        "Bounded multi-move apply_patch shape matched a candidate route, but directory move is not enabled.",
+      nextAction:
+        "Choose regular files for bounded multi-move operations; directory move remains unsupported.",
+      failures: [directoryFailure],
+    });
+  }
+
+  const verification = verifyParsedPatch(input.patch, {
+    workspaceRoot: input.options.workspaceRoot,
+    readFile: input.options.readFile,
+    ...(input.options.directoryExists
+      ? { directoryExists: input.options.directoryExists }
+      : {}),
+    supportedOperations: ["move"],
+  });
+  if (verification.ok === false) {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: failureClassForVerificationFailures(verification.failures),
+      reason:
+        "Bounded multi-move apply_patch shape matched a candidate route, but preflight verification failed before any writer was reachable.",
+      nextAction:
+        verification.failures[0]?.nextAction ??
+        "Re-read current workspace files and regenerate the Move File patch.",
+      failures: verification.failures,
+    });
+  }
+
+  const moveContentFailure = verification.plan.operations.find(
+    (operation) =>
+      operation.operation.kind === "move" &&
+      operation.originalContent !== operation.plannedContent,
+  );
+  if (moveContentFailure?.operation.kind === "move") {
+    return buildUnsupportedPlan({
+      operations: input.patch.operations,
+      targetFiles: input.targetFiles,
+      supportStatus: "unsupported-no-write",
+      failureClass: "unsupported-operation",
+      reason:
+        "Bounded multi-move patches that also edit file content are represented as unsupported/no-write.",
+      nextAction:
+        "Regenerate pure Move File/rename operations and use separate approved update routes for content changes.",
+      failures: [
+        patchFailure({
+          code: "patch-apply-plan-not-verified",
+          path: moveContentFailure.operation.moveTo,
+          message:
+            "Guarded multi-move must preserve file content exactly; content edits during move are not enabled.",
+          nextAction:
+            "Use pure Move File/rename patches before expecting the move writer.",
+        }),
+      ],
+    });
+  }
+
+  return buildVerifiedPlan({
+    patch: input.patch,
+    options: input.options,
+    supportedOperations: ["move"],
+    supportStatus: "supported-write",
+    failureClass: "none",
+    plannedFiles: [],
+    writeIntentFiles: input.operations.map((operation) => operation.moveTo),
+    targetFiles: input.targetFiles,
+    reason:
+      "Exactly-two or exactly-three Move File operations are represented as supported write intents owned by the guarded bounded destructive workspace route.",
+    nextAction:
+      "Route may move only through explicit approval naming all sources and targets, workspace guards, all final preflights before the first move, parsed-order moves, and per-file post-move verification.",
     operationSupportStatus: "supported-write",
   });
 }

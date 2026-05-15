@@ -1,11 +1,11 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 62
+Route baseline: post-Route 63
 Date: 2026-05-15
-Status: long-range edit capability map after Routes 50-62.
-Routes 59-62 have implemented a narrow explicit non-default original-content
-authority loop, explicit restore surface, and bounded exactly-three mixed
-write expansion.
+Status: long-range edit capability map after Routes 50-63.
+Routes 59-63 have implemented a narrow explicit non-default original-content
+authority loop, explicit restore surface, bounded exactly-three mixed write
+expansion, and bounded destructive multi-delete/multi-move support.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -17,7 +17,7 @@ opencode, and gemini-cli.
 It is not a broad edit readiness claim. It keeps implemented capability,
 candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Post-Route 62 Executive Summary
+## 1. Post-Route 63 Executive Summary
 
 Current write capability remains intentionally narrow. The project supports a
 bounded selected-workspace write surface and still blocks broad arbitrary
@@ -74,6 +74,17 @@ workspace authority, final stale-read, per-operation verification, non-default
 recovery-authority capture, route-scoped journal metadata, plan-only recovery
 diagnostics, no automatic recovery, and no atomic rollback. 4+ mixed operations
 and broad arbitrary `apply_patch` remain blocked.
+
+Route 63 implemented bounded same-family destructive batches for
+selected-workspace exactly-two/exactly-three delete-only and move-only shapes.
+It reuses the guarded bounded route/result surface: explicit approval,
+workspace authority for every destructive source/target, directory and
+overwrite rejection, final preflight before the first writer, parsed-order
+sequential execution, per-operation verification, non-default recovery-authority
+capture, partial-failure restore drills, no automatic recovery, and no atomic
+rollback. 4+ writes, broad arbitrary `apply_patch`, directory delete/move,
+multi-delete/multi-move beyond this bounded surface, and provider/session/CLI/MCP
+behavior remain blocked.
 
 ## 2. Current Edit Capability Inventory
 
@@ -172,6 +183,24 @@ and broad arbitrary `apply_patch` remain blocked.
     paths, all preflight/final preflight before writer, parsed-order
     sequential writes, per-file post-write verification, optional non-default
     recovery-authority capture before writer, no automatic recovery, and no
+    rollback or atomicity claim.
+
+- Selected-workspace bounded destructive delete-only / move-only lanes
+  - Runtime owner: `mutationRoutingProjection.ts` dispatches exactly-two and
+    exactly-three destructive same-family shapes through the guarded bounded
+    route after single-operation routes are considered.
+  - Write route: `patchResult/mixedFileWriteRoute.ts`.
+  - Result projection: `patchResult/mixedFileWriteResult.ts` and
+    `patchResult/perFilePatchPlan.ts`.
+  - Design evidence:
+    `docs/design/bounded-destructive-multi-delete-move.md`.
+  - Supported lanes: exactly-two/exactly-three delete-only and
+    exactly-two/exactly-three move-only operations.
+  - Boundary: selected-workspace explicit route only, approval required,
+    regular-file delete/move only, no directories, no overwrite, no reused
+    source/target paths, no swaps/cycles, final preflight before writer,
+    parsed-order sequential execution, per-operation verification, optional
+    non-default recovery-authority capture, no automatic recovery, and no
     rollback or atomicity claim.
 
 ### No-Write Classification / Contract Infrastructure
@@ -381,7 +410,8 @@ User / CLI / provider output
 | Single-file move/rename | Implemented candidate | `workspaceMoveRoute.ts`, `singleFileMoveApply.ts`, `workspaceMoveResult.ts`, `verify-single-file-move-evidence.mjs` | B/C | One regular-file source and exclusive target only; no multi-move, directory move, overwrite, or rollback | No expansion until destructive authority is explicit |
 | Single-file delete | Implemented candidate | `workspaceDeleteRoute.ts`, `singleFileDeleteApply.ts`, `workspaceDeleteResult.ts`, `verify-single-file-delete-evidence.mjs` | B/C | One existing regular-file target only; no multi-delete, directory delete, or rollback | No expansion until destructive authority is explicit |
 | Exactly-two mixed write lanes | Implemented candidate | `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, mixed-operation evidence | B/C | Sequential parsed-order writes; no rollback/atomicity; no 4+ mixed or broad `apply_patch` | Revisit only after bounded mixed/destructive authority stance is explicit |
-| Exactly-three mixed write lanes | Implemented candidate | `mutationRoutingProjection.ts`, `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedOperationReadiness.ts`, `mixedFileWriteRoute.test.ts`, `mixedFileWriteResult.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/exactly-three-mixed-write-implementation.md` | C/D/E | Sequential parsed-order writes; no rollback/atomicity; no 4+ mixed or broad `apply_patch`; restore remains explicit | Destructive multi-delete/multi-move readiness or user/session restore UX |
+| Exactly-three mixed write lanes | Implemented candidate | `mutationRoutingProjection.ts`, `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedOperationReadiness.ts`, `mixedFileWriteRoute.test.ts`, `mixedFileWriteResult.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/exactly-three-mixed-write-implementation.md` | C/D/E | Sequential parsed-order writes; no rollback/atomicity; no 4+ mixed or broad `apply_patch`; restore remains explicit | 4-operation readiness or user/session restore UX |
+| Bounded multi-delete / multi-move lanes | Implemented candidate | `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-destructive-multi-delete-move.md` | C/D/E | Exactly two/three delete-only or move-only only; no 4+ writes, directory delete/move, overwrite, swaps/cycles, automatic recovery, or rollback | 4-operation readiness or user/session restore UX |
 | Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, unsupported E2E and continuity checks | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Preserve as recovery-plan consumer |
 | Route-scoped edit journal prototype | Implemented metadata-only projection | `routeScopedEditJournal.ts`, `routeScopedEditJournal.test.ts` | C/D | Non-durable; not recovery or writer authority | Feed original-content ledger prototype if safe |
 | Journal result projection | Implemented failure-surface projection with recovery plan diagnostics | `journalResultProjection.ts`, `journalResultProjection.test.ts` | C/D | No recovery execution; no durable storage | Feed original-content ledger prototype if safe |
@@ -397,9 +427,9 @@ User / CLI / provider output
 | Recovery readiness projection | Implemented nested `recoveryPlan.recoveryReadiness` diagnostics | `journalRecoveryReadinessProjection.ts`, `journalRecoveryReadinessProjection.test.ts`, representative consumer tests | C/D | Can reflect explicit restore eligibility, but cannot execute recovery | Batch 61 explicit restore surface design |
 | Recovery authority store | Implemented explicit non-default prototype | `patchRecovery/recoveryAuthorityStore.ts`, `recoveryAuthorityStore.test.ts` | C/D | No default storage; no session lifecycle; stores original content only under explicit temp/root option | Expand coverage or UX only after boundary review |
 | Explicit restore primitive | Implemented guarded per-file primitive | `patchRecovery/restorePrimitive.ts`, `restorePrimitive.test.ts` | C/D | No automatic recovery; no transaction rollback; no CLI/session surface | Product restore UX design or remaining narrow coverage |
-| Non-default writer preflight capture | Implemented for single update/delete/create, exactly-two update, exactly-three update, single move, exactly-two mixed, and exactly-three mixed lanes where clean | `workspaceWriteRoute.ts`, `workspaceDeleteRoute.ts`, `workspaceCreateRoute.ts`, `workspaceMoveRoute.ts`, `multiFileWriteRoute.ts`, `mixedFileWriteRoute.ts`, focused route tests | C/D | Narrow surface only; broad `apply_patch`, 4+ mixed, 4+ update, broad multi-delete, and broad multi-move remain out of scope | Destructive multi-delete/multi-move readiness or user/session restore UX |
+| Non-default writer preflight capture | Implemented for single update/delete/create, exactly-two update, exactly-three update, single move, exactly-two mixed, exactly-three mixed, and bounded multi-delete/multi-move lanes where clean | `workspaceWriteRoute.ts`, `workspaceDeleteRoute.ts`, `workspaceCreateRoute.ts`, `workspaceMoveRoute.ts`, `multiFileWriteRoute.ts`, `mixedFileWriteRoute.ts`, focused route tests | C/D | Narrow surface only; broad `apply_patch`, 4+ mixed, 4+ update, and broad multi-delete/multi-move remain out of scope | 4-operation readiness or user/session restore UX |
 | Current-content guard | Implemented in explicit restore primitive | `restorePrimitive.ts`, `restorePrimitive.test.ts` | C/D | Guard is available only when restore is explicitly invoked | Future restore UX/executor design |
-| Partial-failure restore drills | Implemented for exactly-three update, exactly-two mixed, and representative exactly-three mixed partial failures | `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts`, `restorePrimitive.test.ts` | C/D | Restore remains explicit and non-atomic; no automatic recovery or rollback claim | User/session restore UX or destructive mixed readiness |
+| Partial-failure restore drills | Implemented for exactly-three update, exactly-two mixed, representative exactly-three mixed, and bounded destructive delete partial failures | `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts`, `restorePrimitive.test.ts` | C/D | Restore remains explicit and non-atomic; no automatic recovery or rollback claim | User/session restore UX or 4-operation readiness |
 | Recovery authority index | Implemented explicit non-default inspection surface | `patchRecovery/recoveryAuthorityIndex.ts`, `recoveryAuthorityIndex.test.ts` | C/D | Metadata only; no raw content, workspace reads, default ledger, or session surface | Feed future CLI/session restore UX if needed |
 | Restore preview | Implemented explicit eligibility preview | `patchRecovery/restorePreview.ts`, `restorePreview.test.ts` | C/D | Requires explicit ledger/workspace/record selection; no writes or automatic recovery | Preserve as bridge precondition |
 | Explicit restore execution bridge | Implemented guarded explicit bridge | `patchRecovery/restoreExecutionBridge.ts`, `restoreExecutionBridge.test.ts` | C/D | Non-atomic per-file/set restore only; no default route invocation, CLI command, or rollback | Optional user/session restore UX route |
@@ -409,7 +439,7 @@ User / CLI / provider output
 | Rollback/snapshot | Future; not implemented | No target snapshot/restore layer | N/A | Needs checkpoint/file-history/storage design and user/session semantics | Batch 59+ |
 | 4+ update requests | Explicitly unsupported | `multiFileUpdatePlanning.ts`, unsupported evidence | B/C | No write support | Batch 60/61 only after recovery stance |
 | 4+ mixed operations | Explicitly unsupported | `perFilePatchPlan.ts`, `mixedFileWriteRoute.ts`, focused 4+ blocked tests, mixed-operation evidence | B/C | No writer support; no broader mixed recovery/approval stance | Later bounded 4-operation readiness only if justified |
-| Multi-delete / multi-move beyond bounded mixed lanes | Explicitly unsupported as broad destructive features | `perFilePatchPlan.ts`, unsupported E2E, single-file move/delete evidence, bounded mixed tests | B/C | No broad multi-destructive writer; directory delete/move and overwrite remain blocked | Later destructive-write route |
+| Multi-delete / multi-move beyond bounded Route 63 lanes | Explicitly unsupported as broad destructive features | `perFilePatchPlan.ts`, unsupported E2E, single-file move/delete evidence, bounded mixed/destructive tests | B/C | No 4+ or broad multi-destructive writer; directory delete/move, overwrite, swaps/cycles remain blocked | 4-operation readiness only if justified |
 | Final stale-read | Implemented as blocker, not recovery | `workspaceWriteRoute.ts`, `multiFileWriteRoute.ts`, `mutationExecution.ts`, `singleFileApplyPatchFinalStaleRead.ts`, recovery-readiness tests | C/D | No automatic stale-read recovery; no read-state ledger | Original-content ledger prototype before recovery |
 | Post-write verification | Implemented for selected writes and classified in recovery plan diagnostics | selected write routes, application modules, `journalFailureStateProjection.ts`, durable authority seam tests | C/D | No rollback after post-write failure | Original-content ledger prototype before recovery |
 | Partial failure surface | Implemented stopped surface for multi-file routes with recovery plan diagnostics | `multiFileUpdateApply.ts`, `multiFileWriteRoute.ts`, `multiFileWriteResult.ts`, candidate partial-failure cases, recovery-readiness tests | B/C/D | No automatic repair or rollback; user inspection required | Original-content ledger or explicit no-recovery audit |
@@ -611,6 +641,22 @@ destructive multi-delete/multi-move readiness route if destructive semantics
 are the next blocker, or user/session explicit restore UX if operator-visible
 restore controls become the higher product priority.
 
+Implemented Route 63 batch:
+
+**Batch 63: Bounded destructive multi-delete/multi-move implementation**
+
+Route 63 enabled selected-workspace exactly-two/exactly-three delete-only and
+move-only batches under the same explicit route boundary: approval, workspace
+authority, directory/overwrite/path-reuse rejection, final preflight before the
+first writer, parsed-order execution, per-operation verification, optional
+non-default recovery-authority capture, no automatic recovery, and no atomic
+rollback. 4+ writes and broad `apply_patch` remain unsupported.
+
+The next direction should still not jump directly to broad `apply_patch`.
+Choose 4-operation bounded write readiness only if the Route 63 destructive
+evidence remains stable; choose user/session explicit restore UX if
+operator-visible restore controls are now the stronger product blocker.
+
 ## 9. Recommended Future Sequence
 
 - Batch 57: Recovery readiness projection batch
@@ -647,15 +693,16 @@ restore controls become the higher product priority.
     drills.
   - 4+ mixed and broad `apply_patch` remain unsupported.
 
-- Batch 63: Destructive multi-delete/multi-move readiness, or user/session
-  explicit restore UX
-  - Choose destructive readiness if exactly-three mixed evidence shows the next
-    blocker is destructive-operation approval/result semantics.
-  - Choose restore UX if larger writes are blocked by lack of operator-visible
-    preview/execute restore controls.
+- Batch 63: Bounded destructive multi-delete/multi-move implementation
+  - Status: implemented as selected-workspace exactly-two/exactly-three
+    delete-only and move-only support with non-default recovery-authority
+    capture and destructive partial-failure restore evidence.
+  - 4+ writes, broad `apply_patch`, directory delete/move, overwrite,
+    automatic recovery, and rollback remain unsupported.
 
 - Batch 64: Narrow 4-operation bounded write readiness or keep blocked
-  - Consider only if Batch 63 leaves destructive/restore UX boundaries clear.
+  - Consider only if Batch 63 evidence stays stable and destructive/restore UX
+    boundaries remain clear.
   - Keep 4+ mixed blocked unless approval, ordering, partial failure, and
     explicit restore evidence are coherent.
 

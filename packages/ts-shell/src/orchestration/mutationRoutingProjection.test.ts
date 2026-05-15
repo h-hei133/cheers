@@ -710,6 +710,68 @@ describe("apply_patch mutation routing projection", () => {
     });
   });
 
+  it("routes exactly-two delete-only operations through the guarded destructive writer", async () => {
+    const fixture = createFixture();
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, twoDeletePatch()),
+      getWorkspaceAuthority: () =>
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/a.ts", "src/b.ts"],
+        changedFiles: ["src/a.ts", "src/b.ts"],
+        failedFiles: [],
+        writerInvoked: true,
+        creatorInvoked: false,
+        deleteMoveInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual({});
+  });
+
+  it("routes exactly-two move-only operations through the guarded destructive writer", async () => {
+    const fixture = createFixture();
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, twoMovePatch()),
+      getWorkspaceAuthority: () =>
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual([
+      "src/moved-a.ts",
+      "src/moved-b.ts",
+    ]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/moved-a.ts", "src/moved-b.ts"],
+        changedFiles: ["src/moved-a.ts", "src/moved-b.ts"],
+        failedFiles: [],
+        writerInvoked: true,
+        creatorInvoked: false,
+        deleteMoveInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(readFile(fixture.workspaceRoot, "src/moved-a.ts")).toBe("a = 1\n");
+    expect(readFile(fixture.workspaceRoot, "src/moved-b.ts")).toBe("b = 1\n");
+  });
+
   it("keeps mixed create plus move patches stopped before any writer", async () => {
     const fixture = createFixture();
     const before = snapshotFixture(fixture.workspaceRoot);
@@ -1187,6 +1249,30 @@ function mixedDeleteMovePatch(): string {
   ].join("\n");
 }
 
+function twoDeletePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Delete File: src/a.ts",
+    "*** Delete File: src/b.ts",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function twoMovePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "*** Move to: src/moved-a.ts",
+    "@@",
+    " a = 1",
+    "*** Update File: src/b.ts",
+    "*** Move to: src/moved-b.ts",
+    "@@",
+    " b = 1",
+    "*** End Patch",
+  ].join("\n");
+}
+
 function outsideDeletePatch(): string {
   return [
     "*** Begin Patch",
@@ -1273,6 +1359,8 @@ function snapshotFixture(workspaceRoot: string): Record<string, string> {
     "src/d.ts",
     "src/new.ts",
     "src/moved.ts",
+    "src/moved-a.ts",
+    "src/moved-b.ts",
   ];
   return Object.fromEntries(
     files

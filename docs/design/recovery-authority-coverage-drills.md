@@ -23,6 +23,10 @@ non-durable, and non-automatic.
 Route 62 later extended the mixed lane from exactly-two to exactly-three where
 the same selected-workspace boundaries held.
 
+Route 63 later extended the bounded destructive surface to exactly-two and
+exactly-three delete-only and move-only batches. The same explicit non-default
+authority boundary applies, with no automatic recovery or rollback.
+
 ## Implementation Notes
 
 - `packages/ts-shell/src/orchestration/patchResult/workspaceMoveRoute.ts`
@@ -30,8 +34,9 @@ the same selected-workspace boundaries held.
 - `packages/ts-shell/src/orchestration/patchResult/multiFileWriteRoute.ts`
   now captures exactly-three update records in addition to exactly-two update.
 - `packages/ts-shell/src/orchestration/patchResult/mixedFileWriteRoute.ts`
-  captures the supported exactly-two and exactly-three mixed lanes where the
-  route remains clean.
+  captures the supported exactly-two/exactly-three mixed lanes and the bounded
+  exactly-two/exactly-three delete-only and move-only lanes where the route
+  remains clean.
 - `packages/ts-shell/src/orchestration/patchRecovery/restorePrimitive.ts`
   remains the explicit guarded restore entrypoint and still enforces
   current-state/current-content checks.
@@ -53,6 +58,10 @@ Focused tests now prove:
 - exactly-two mixed partial failure can be restored one file at a time.
 - representative exactly-three mixed partial failures can restore changed
   prefix files one file at a time.
+- bounded destructive delete-only partial failure can restore a deleted prefix
+  file one file at a time.
+- bounded destructive move-only capture records source-exists and target-absent
+  facts before the first move writer.
 - current-content mismatch blocks hidden-user-edit overwrite.
 - rollbackAtomicityClaim stays false outside the route result.
 
@@ -89,7 +98,7 @@ route.
 
 ## Next Direction
 
-Route 62 implemented the 3-operation mixed readiness and bounded write
-expansion. The next likely development batch is destructive
-multi-delete/multi-move readiness, or a separate CLI/session restore UX route
-if user-visible restore commands become the higher product priority.
+Route 63 implemented bounded destructive multi-delete/multi-move support. The
+next likely development batch is 4-operation bounded write readiness if the
+evidence remains stable, or a separate CLI/session restore UX route if
+user-visible restore commands become the higher product priority.

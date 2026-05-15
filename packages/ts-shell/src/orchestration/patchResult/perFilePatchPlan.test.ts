@@ -212,6 +212,92 @@ describe("buildPerFilePatchPlan", () => {
     );
   });
 
+  it("projects exactly-three delete-only operations to supported destructive write intents", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Delete File: src/a.ts",
+        "*** Delete File: src/b.ts",
+        "*** Delete File: src/c.ts",
+        "*** End Patch",
+      ],
+      {
+        "src/a.ts": "a\n",
+        "src/b.ts": "b\n",
+        "src/c.ts": "c\n",
+      },
+    );
+
+    expectSupportedWritePlan(plan, ["src/a.ts", "src/b.ts", "src/c.ts"]);
+    expect(plan.operations.map((operation) => operation.operationKind)).toEqual([
+      "delete",
+      "delete",
+      "delete",
+    ]);
+    expect(plan.operations.every((operation) => operation.writeIntent === "eligible")).toBe(
+      true,
+    );
+  });
+
+  it("projects exactly-two move-only operations to supported destructive write intents", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/from-a.ts",
+        "*** Move to: src/to-a.ts",
+        "@@",
+        " a",
+        "*** Update File: src/from-b.ts",
+        "*** Move to: src/to-b.ts",
+        "@@",
+        " b",
+        "*** End Patch",
+      ],
+      {
+        "src/from-a.ts": "a\n",
+        "src/from-b.ts": "b\n",
+      },
+    );
+
+    expectSupportedWritePlan(plan, ["src/to-a.ts", "src/to-b.ts"]);
+    expect(plan.operations).toEqual([
+      expect.objectContaining({
+        operationKind: "move",
+        sourcePath: "src/from-a.ts",
+        targetPath: "src/to-a.ts",
+        writeIntent: "eligible",
+      }),
+      expect.objectContaining({
+        operationKind: "move",
+        sourcePath: "src/from-b.ts",
+        targetPath: "src/to-b.ts",
+        writeIntent: "eligible",
+      }),
+    ]);
+  });
+
+  it("keeps 4+ delete-only operations unsupported/no-write", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Delete File: src/a.ts",
+        "*** Delete File: src/b.ts",
+        "*** Delete File: src/c.ts",
+        "*** Delete File: src/d.ts",
+        "*** End Patch",
+      ],
+      {
+        "src/a.ts": "a\n",
+        "src/b.ts": "b\n",
+        "src/c.ts": "c\n",
+        "src/d.ts": "d\n",
+      },
+    );
+
+    expectUnsupportedNoWritePlan(plan, "unsupported-operation");
+    expect(plan.summary.writeIntentFiles).toEqual([]);
+  });
+
   it("projects move with content edits to unsupported/no-write", () => {
     const plan = planFromPatch(
       [

@@ -166,7 +166,7 @@ export function patchIsTwoOrThreeMixedWriteFiles(rawPatchText: string): boolean 
     return false;
   }
   const kinds = parsed.patch.operations.map((operation) => operation.kind);
-  return new Set(kinds).size > 1 && mixedCombinationIsEnabled(kinds);
+  return boundedOperationCombinationIsEnabled(kinds);
 }
 
 export async function runMixedFileWriteRoute(
@@ -235,10 +235,7 @@ export async function runMixedFileWriteRoute(
     options.explicitWorkspaceWriteOptIn,
   );
 
-  if (
-    !mixedOperationCountIsEnabled(operations.length) ||
-    new Set(operationKinds).size <= 1
-  ) {
+  if (!boundedOperationCombinationIsEnabled(operationKinds)) {
     return blocked({
       blocker: "unsupported-operation",
       targetPaths,
@@ -247,15 +244,15 @@ export async function runMixedFileWriteRoute(
       perFilePatchPlan,
       failures: [unsupportedMixedFailure(operations)],
       nextAction:
-        "Use exactly two or exactly three mixed operations from the guarded update/create/move/delete lanes. Same-family, 4+ mixed, and broad patches stay outside this route.",
+        "Use exactly two or exactly three mixed operations from the guarded update/create/move/delete lanes, or exactly two or exactly three destructive delete-only/move-only operations. Other same-family, 4+, and broad patches stay outside this route.",
       evidence: [
         "apply-patch-mixed-file-write-route:unsupported-operation",
-        "apply-patch-mixed-file-write-route:bounded-two-or-three-mixed-required",
+        "apply-patch-mixed-file-write-route:bounded-two-or-three-operation-required",
       ],
     });
   }
 
-  if (!mixedCombinationIsEnabled(operationKinds)) {
+  if (!boundedOperationCombinationIsEnabled(operationKinds)) {
     return blocked({
       blocker: "unsupported-operation",
       targetPaths,
@@ -455,8 +452,13 @@ export async function runMixedFileWriteRoute(
   const recoveryAuthorityCapture = options.recoveryAuthority
     ? await captureRecoveryAuthorityRecords({
         store: options.recoveryAuthority,
-        records: verification.plan.operations.map((operation, index) =>
-          buildRecoveryAuthorityRecord(operation, index),
+        records: verification.plan.operations.flatMap((operation, index) =>
+          buildRecoveryAuthorityRecordsForOperation({
+            operation,
+            index,
+            includeMoveTargetAbsenceRecord:
+              sameFamilyDestructiveKind(operationKinds) === "move",
+          }),
         ),
       })
     : undefined;
@@ -576,7 +578,14 @@ export async function runMixedFileWriteRoute(
       "apply-patch-mixed-file-write-route:explicit-runtime-opt-in",
       "apply-patch-mixed-file-write-route:explicit-workspace-write-opt-in",
       "apply-patch-mixed-file-write-route:approved-for-write",
-      `apply-patch-mixed-file-write-route:exactly-${operationKinds.length}-mixed-operations`,
+      `apply-patch-mixed-file-write-route:exactly-${operationKinds.length}-bounded-operations`,
+      ...(sameFamilyDestructiveKind(operationKinds)
+        ? [
+            `apply-patch-mixed-file-write-route:bounded-${sameFamilyDestructiveKind(operationKinds)}-only`,
+          ]
+        : [
+            `apply-patch-mixed-file-write-route:exactly-${operationKinds.length}-mixed-operations`,
+          ]),
       `apply-patch-mixed-file-write-route:operation-combination:${operationKinds.join("+")}`,
       "apply-patch-mixed-file-write-route:all-preflight-before-writer",
       "apply-patch-mixed-file-write-route:all-final-preflight-before-writer",
@@ -612,8 +621,59 @@ function mixedCombinationIsEnabled(kinds: readonly PatchOperationKind[]): boolea
   );
 }
 
+function boundedOperationCombinationIsEnabled(
+  kinds: readonly PatchOperationKind[],
+): boolean {
+  if (!mixedOperationCountIsEnabled(kinds.length)) {
+    return false;
+  }
+  if (mixedCombinationIsEnabled(kinds)) {
+    return true;
+  }
+  return Boolean(sameFamilyDestructiveKind(kinds));
+}
+
+function sameFamilyDestructiveKind(
+  kinds: readonly PatchOperationKind[],
+): "delete" | "move" | undefined {
+  if (!mixedOperationCountIsEnabled(kinds.length) || new Set(kinds).size !== 1) {
+    return undefined;
+  }
+  const [kind] = kinds;
+  return kind === "delete" || kind === "move" ? kind : undefined;
+}
+
 function targetPathForOperation(operation: PatchFileOperation): string {
   return operation.kind === "move" ? operation.moveTo : operation.path;
+}
+
+function buildRecoveryAuthorityRecordsForOperation(input: {
+  readonly operation: VerifiedPatchFileOperation;
+  readonly index: number;
+  readonly includeMoveTargetAbsenceRecord: boolean;
+}): readonly Parameters<typeof captureRecoveryAuthorityRecords>[0]["records"][number][] {
+  const record = buildRecoveryAuthorityRecord(input.operation, input.index);
+  if (
+    input.includeMoveTargetAbsenceRecord &&
+    input.operation.operation.kind === "move"
+  ) {
+    return [
+      record,
+      {
+        recordId: recordIdForPath(
+          "move-target",
+          input.operation.operation.moveTo,
+          input.index,
+        ),
+        workspaceRelativePath: input.operation.operation.moveTo,
+        operationKind: "move",
+        beforeState: "absent",
+        expectedCurrentState: "exists",
+        expectedCurrentContent: input.operation.originalContent,
+      },
+    ];
+  }
+  return [record];
 }
 
 function buildRecoveryAuthorityRecord(
@@ -1034,9 +1094,9 @@ function unsupportedMixedFailure(
     code: "patch-verify-operation-unsupported",
     ...(operation ? { path: targetPathForOperation(operation) } : {}),
     message:
-      "Mixed workspace write route only accepts exactly two or exactly three supported mixed operations.",
+      "Bounded workspace write route only accepts exactly two or exactly three supported mixed operations, delete-only operations, or move-only operations.",
     nextAction:
-      "Keep broad apply_patch, same-family, 4+ mixed, malformed, and unknown operation shapes out of this candidate write route.",
+      "Keep broad apply_patch, unsupported same-family, 4+ mixed/destructive, malformed, and unknown operation shapes out of this candidate write route.",
   };
 }
 
