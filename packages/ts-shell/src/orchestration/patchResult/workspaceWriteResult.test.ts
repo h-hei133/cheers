@@ -111,6 +111,19 @@ describe("single-file apply_patch workspace write result", () => {
         appliedButUnverifiedFiles: ["src/app.ts"],
       }),
     );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan.recoveryReadiness,
+    ).toEqual(
+      expect.objectContaining({
+        authorityKind: "none",
+        authorityAvailability: "absent",
+        persistence: "none",
+        canRecover: false,
+        canRollback: false,
+        canRestoreOriginalContent: false,
+      }),
+    );
     expect(result.codingResult?.repair.status).toBe("failed");
     expect(result.codingResult?.continuation.status).toBe(
       "failed-after-bounded-continuation",
@@ -410,6 +423,30 @@ describe("single-file apply_patch workspace write result", () => {
         unrecoveredFiles: [],
         failedBeforeApplyFiles: ["src/app.ts"],
         appliedButUnverifiedFiles: [],
+      }),
+    );
+    const recoveryPlan =
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan;
+    expect(recoveryPlan?.originalContentAuthority.requirements).toEqual([
+      expect.objectContaining({
+        filePath: "src/app.ts",
+        operationKind: "update",
+        requiresOriginalContent: true,
+        requiresCurrentContentCheck: true,
+        requiresWorkspaceAuthority: true,
+        requiresPersistence: true,
+      }),
+    ]);
+    expect(recoveryPlan?.recoveryReadiness.restoreEligibility).toEqual(
+      expect.objectContaining({
+        canAttemptRestore: false,
+        blockers: expect.arrayContaining([
+          "no-original-content",
+          "no-persistence-authority",
+          "no-current-content-inspection",
+          "no-recovery-executor",
+        ]),
       }),
     );
   });

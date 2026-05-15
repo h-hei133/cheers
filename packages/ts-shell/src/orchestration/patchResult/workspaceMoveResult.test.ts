@@ -244,6 +244,32 @@ describe("workspace move route result projection", () => {
         appliedButUnverifiedFiles: ["src/to.ts"],
       }),
     );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan.originalContentAuthority.requirements,
+    ).toEqual([
+      expect.objectContaining({
+        filePath: "src/to.ts",
+        operationKind: "move",
+        requiresOriginalContent: true,
+        requiresCurrentContentCheck: true,
+        requiresWorkspaceAuthority: true,
+        requiresPersistence: true,
+      }),
+    ]);
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan.recoveryReadiness,
+    ).toEqual(
+      expect.objectContaining({
+        authorityKind: "none",
+        authorityAvailability: "absent",
+        persistence: "none",
+        canRecover: false,
+        canRollback: false,
+        canRestoreOriginalContent: false,
+      }),
+    );
     expect(result.codingResult?.changeSet).toEqual(
       expect.objectContaining({
         postRunDirtyFiles: ["src/to.ts"],

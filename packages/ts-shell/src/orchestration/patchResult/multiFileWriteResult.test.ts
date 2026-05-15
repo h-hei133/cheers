@@ -228,6 +228,20 @@ describe("multi-file apply_patch workspace write result", () => {
         appliedAndVerifiedBeforeLaterFailureFiles: ["src/a.ts"],
       }),
     );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan.recoveryReadiness,
+    ).toEqual(
+      expect.objectContaining({
+        authorityKind: "none",
+        authorityAvailability: "absent",
+        persistence: "none",
+        canRecover: false,
+        canRollback: false,
+        canRestoreOriginalContent: false,
+        requiresDurableAuthority: true,
+      }),
+    );
     expect(result.codingResult?.lastActionResultSeed).toMatchObject({
       target: "src/b.ts",
       changedFiles: ["src/a.ts"],
@@ -332,6 +346,32 @@ describe("multi-file apply_patch workspace write result", () => {
           "no-persistence-authority",
         ]),
       }),
+    );
+    const recoveryPlan =
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan;
+    expect(recoveryPlan?.durableAuthority.persistence).toBe("none");
+    expect(recoveryPlan?.durableAuthority.canRecover).toBe(false);
+    expect(recoveryPlan?.durableAuthority.canRollback).toBe(false);
+    expect(recoveryPlan?.originalContentAuthority.status).toBe("missing");
+    expect(recoveryPlan?.originalContentAuthority.restoreEligibility).toEqual(
+      expect.objectContaining({
+        canAttemptRestore: false,
+        missing: expect.arrayContaining([
+          "original-content-authority",
+          "durable-persistence",
+          "current-content-inspection",
+          "recovery-executor",
+        ]),
+      }),
+    );
+    expect(recoveryPlan?.recoveryReadiness.blockers).toEqual(
+      expect.arrayContaining([
+        "no-durable-authority",
+        "no-current-content-inspection",
+        "no-original-content",
+        "no-persistence-authority",
+      ]),
     );
     expect(result.codingResult?.lastActionResultSeed).toMatchObject({
       target: "src/b.ts",

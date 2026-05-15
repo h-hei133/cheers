@@ -112,6 +112,46 @@ describe("mixed file write result journal metadata", () => {
         ]),
       }),
     );
+    const recoveryPlan =
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan;
+    expect(recoveryPlan?.durableAuthority).toEqual(
+      expect.objectContaining({
+        authorityKind: "none",
+        availability: "absent",
+        persistence: "none",
+        canRecover: false,
+        canRollback: false,
+        canRestoreOriginalContent: false,
+        canVerifyCurrentContent: false,
+      }),
+    );
+    expect(recoveryPlan?.originalContentAuthority.requirements).toEqual([
+      expect.objectContaining({
+        filePath: "src/a.ts",
+        operationKind: "update",
+        requiresOriginalContent: true,
+      }),
+      expect.objectContaining({
+        filePath: "src/new.ts",
+        operationKind: "create",
+        requiresOriginalContent: false,
+      }),
+    ]);
+    expect(recoveryPlan?.recoveryReadiness).toEqual(
+      expect.objectContaining({
+        authorityKind: "none",
+        authorityAvailability: "absent",
+        persistence: "none",
+        canRecover: false,
+        canRollback: false,
+        canRestoreOriginalContent: false,
+        requiresDurableAuthority: true,
+      }),
+    );
+    expect(
+      recoveryPlan?.recoveryReadiness.restoreEligibility.canAttemptRestore,
+    ).toBe(false);
   });
 });
 

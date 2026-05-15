@@ -4,9 +4,21 @@ import {
   type RouteScopedEditJournalRecoveryBlocker,
 } from "./journalMetadataBoundary.js";
 import {
+  buildCurrentJournalDurableAuthority,
+  type JournalDurableAuthorityDescriptor,
+} from "./journalDurableAuthority.js";
+import {
   projectJournalFailureState,
   type JournalFailureStateProjection,
 } from "./journalFailureStateProjection.js";
+import {
+  projectOriginalContentAuthority,
+  type OriginalContentAuthorityProjection,
+} from "./journalOriginalContentAuthority.js";
+import {
+  projectJournalRecoveryReadiness,
+  type JournalRecoveryReadinessProjection,
+} from "./journalRecoveryReadinessProjection.js";
 import {
   projectRouteScopedEditJournal,
   type RouteScopedEditJournal,
@@ -25,6 +37,9 @@ export interface JournalRecoveryPlanProjection {
   readonly appliedAndVerifiedBeforeLaterFailureFiles: readonly string[];
   readonly unknownApplicationStateFiles: readonly string[];
   readonly blockers: readonly RouteScopedEditJournalRecoveryBlocker[];
+  readonly durableAuthority: JournalDurableAuthorityDescriptor;
+  readonly originalContentAuthority: OriginalContentAuthorityProjection;
+  readonly recoveryReadiness: JournalRecoveryReadinessProjection;
   readonly evidence: readonly string[];
 }
 
@@ -33,10 +48,29 @@ export function projectJournalRecoveryPlan(
 ): JournalRecoveryPlanProjection {
   const journalProjection = projectRouteScopedEditJournal(journal);
   const failureState = projectJournalFailureState(journal);
+  const durableAuthority = buildCurrentJournalDurableAuthority();
+  const originalContentAuthority = projectOriginalContentAuthority({ journal });
+  const basePlan = {
+    mode: "plan-only" as const,
+    blockers: [...routeScopedEditJournalRecoveryBlockers],
+    evidence: [
+      "route-scoped-edit-journal-recovery-plan:plan-only",
+      "route-scoped-edit-journal-recovery-plan:no-recovery-execution",
+      "route-scoped-edit-journal-recovery-plan:no-rollback",
+      "route-scoped-edit-journal-recovery-plan:no-snapshot",
+      ...failureState.evidence,
+      ...journalFailureSurfaceBoundaryFacts.evidence,
+    ],
+  };
+  const recoveryReadiness = projectJournalRecoveryReadiness({
+    journal,
+    recoveryPlan: basePlan,
+    durableAuthority,
+  });
 
   return {
     source: "route-scoped-edit-journal-recovery-plan",
-    mode: "plan-only",
+    mode: basePlan.mode,
     authority: journalFailureSurfaceBoundaryFacts.writeCapability,
     recoveryExecuted: journalFailureSurfaceBoundaryFacts.recoveryExecuted,
     rollbackAtomicityClaim:
@@ -51,15 +85,11 @@ export function projectJournalRecoveryPlan(
     unknownApplicationStateFiles: [
       ...failureState.unknownApplicationStateFiles,
     ],
-    blockers: [...routeScopedEditJournalRecoveryBlockers],
-    evidence: [
-      "route-scoped-edit-journal-recovery-plan:plan-only",
-      "route-scoped-edit-journal-recovery-plan:no-recovery-execution",
-      "route-scoped-edit-journal-recovery-plan:no-rollback",
-      "route-scoped-edit-journal-recovery-plan:no-snapshot",
-      ...failureState.evidence,
-      ...journalFailureSurfaceBoundaryFacts.evidence,
-    ],
+    blockers: basePlan.blockers,
+    durableAuthority,
+    originalContentAuthority,
+    recoveryReadiness,
+    evidence: basePlan.evidence,
   };
 }
 

@@ -1,8 +1,9 @@
 # Recovery Plan Projection
 
-Route baseline: Route 57
-Date: 2026-05-14
-Status: implemented projection-only recovery-readiness diagnostics.
+Route baseline: Route 58
+Date: 2026-05-15
+Status: implemented projection-only recovery-readiness diagnostics with
+durable-authority seam diagnostics.
 
 This note records the Route 57 recovery-readiness batch. It is operational
 evidence, not a recovery design claim.
@@ -152,7 +153,7 @@ writer flags, post-write verification, and stopped/success semantics.
 - No broad `apply_patch`, 3+ mixed, 4+ write, multi-delete, or multi-move
   readiness.
 
-## Next Decision
+## Route 57 Next Decision
 
 Recommended next route: Batch 58 durable authority design/prototype decision.
 
@@ -161,3 +162,29 @@ durable authority. The next decision should choose whether the project wants a
 durable snapshot/checkpoint/file-history/original-content authority prototype,
 or whether larger mixed-write readiness should remain blocked until that
 authority stance is settled.
+
+## Route 58 Note
+
+Route 58 added a durable authority seam and original-content authority seam
+without changing recovery execution:
+
+- `journalDurableAuthority.ts` describes the current active authority as
+  absent: `authorityKind: "none"`, `availability: "absent"`,
+  `persistence: "none"`, `canRecover: false`, `canRollback: false`, and
+  `canRestoreOriginalContent: false`.
+- `journalOriginalContentAuthority.ts` models capture requirements and restore
+  eligibility diagnostics without reading files, storing content, persisting
+  records, or attempting restore.
+- `journalRecoveryReadinessProjection.ts` combines recovery-plan facts,
+  durable authority absence, original-content requirements, restore
+  eligibility, blockers, and evidence.
+- `recoveryPlan` now carries `durableAuthority`,
+  `originalContentAuthority`, and `recoveryReadiness` diagnostics under the
+  existing journal failure surface.
+
+Recovery remains non-executing. Rollback, snapshot, file IO, git calls,
+durable persistence, and writer behavior changes remain absent.
+
+Current next decision after Route 58: Batch 59 original-content ledger
+non-default storage prototype, only if storage, cleanup, redaction, workspace
+authority, and current-content inspection policy are explicit.
