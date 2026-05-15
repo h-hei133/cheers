@@ -66,9 +66,9 @@ describe("normalizeBoundedBroadPatchText", () => {
     }
   });
 
-  it("normalizes exactly 8 operations and leaves the count boundary to candidate routing", () => {
+  it("normalizes exactly 32 operations and leaves the count boundary to candidate routing", () => {
     const result = normalizeBoundedBroadPatchText(
-      Array.from({ length: 8 }, (_, index) => {
+      Array.from({ length: 32 }, (_, index) => {
         const file = `src/file-${index + 1}.ts`;
         return [
           `diff --git a/${file} b/${file}`,
@@ -84,12 +84,52 @@ describe("normalizeBoundedBroadPatchText", () => {
     expect(result).toEqual(
       expect.objectContaining({
         status: "normalized",
-        operationCount: 8,
+        operationCount: 32,
       }),
     );
   });
 
-  it("blocks binary, mode change, rename-with-content, no-newline markers, and malformed sections", () => {
+  it("preserves multi-hunk updates as exact marker hunks", () => {
+    const result = normalizeBoundedBroadPatchText(
+      [
+        "diff --git a/src/a.ts b/src/a.ts",
+        "index 111..222 100644",
+        "--- a/src/a.ts",
+        "+++ b/src/a.ts",
+        "@@ -1,2 +1,2 @@",
+        " keep one",
+        "-a = 1",
+        "+a = 2",
+        "@@ -8,2 +8,2 @@",
+        " keep two",
+        "-b = 1",
+        "+b = 2",
+      ].join("\n"),
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: "normalized",
+        operationCount: 1,
+      }),
+    );
+    if (result.status === "normalized") {
+      expect(result.normalizedOperations[0]).toEqual(
+        expect.objectContaining({
+          kind: "update",
+          path: "src/a.ts",
+          hunks: expect.arrayContaining([
+            expect.objectContaining({ changeContext: "-1,2 +1,2 @@" }),
+            expect.objectContaining({ changeContext: "-8,2 +8,2 @@" }),
+          ]),
+        }),
+      );
+      expect(result.normalizedRawPatchText).toContain("@@ -1,2 +1,2 @@");
+      expect(result.normalizedRawPatchText).toContain("@@ -8,2 +8,2 @@");
+    }
+  });
+
+  it("blocks binary, mode change, rename-with-content, symlink, submodule, no-newline markers, and malformed sections", () => {
     for (const [patchText, rejectionReason] of [
       [
         ["diff --git a/src/a.bin b/src/a.bin", "Binary files differ"].join("\n"),
@@ -109,8 +149,35 @@ describe("normalizeBoundedBroadPatchText", () => {
           "similarity index 80%",
           "rename from src/a.ts",
           "rename to src/b.ts",
+          "--- a/src/a.ts",
+          "+++ b/src/b.ts",
+          "@@ -1 +1 @@",
+          "-a = 1",
+          "+a = 2",
         ].join("\n"),
-        "unsupported-broad-shape",
+        "unsupported-rename-with-content-edit",
+      ],
+      [
+        [
+          "diff --git a/src/link b/src/link",
+          "new file mode 120000",
+          "--- /dev/null",
+          "+++ b/src/link",
+          "@@ -0,0 +1 @@",
+          "+target",
+        ].join("\n"),
+        "unsupported-symlink-patch",
+      ],
+      [
+        [
+          "diff --git a/vendor/lib b/vendor/lib",
+          "new file mode 160000",
+          "--- /dev/null",
+          "+++ b/vendor/lib",
+          "@@ -0,0 +1 @@",
+          "+160000",
+        ].join("\n"),
+        "unsupported-submodule-patch",
       ],
       [
         [

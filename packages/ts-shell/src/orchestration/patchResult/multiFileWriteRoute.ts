@@ -175,7 +175,7 @@ export function patchIsExactlyTwoUpdateFiles(rawPatchText: string): boolean {
 }
 
 export function patchIsTwoOrThreeUpdateFiles(rawPatchText: string): boolean {
-  return patchIsTwoThreeOrFourUpdateFiles(rawPatchText);
+  return patchIsBoundedUpdateFiles(rawPatchText);
 }
 
 export function patchIsTwoThreeOrFourUpdateFiles(rawPatchText: string): boolean {

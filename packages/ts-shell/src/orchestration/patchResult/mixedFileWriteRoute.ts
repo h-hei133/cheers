@@ -162,10 +162,14 @@ export function patchIsExactlyTwoMixedWriteFiles(rawPatchText: string): boolean 
 }
 
 export function patchIsTwoOrThreeMixedWriteFiles(rawPatchText: string): boolean {
-  return patchIsTwoThreeOrFourMixedWriteFiles(rawPatchText);
+  return patchIsBoundedMixedWriteFiles(rawPatchText);
 }
 
 export function patchIsTwoThreeOrFourMixedWriteFiles(rawPatchText: string): boolean {
+  return patchIsBoundedMixedWriteFiles(rawPatchText);
+}
+
+export function patchIsBoundedMixedWriteFiles(rawPatchText: string): boolean {
   const parsed = parseApplyPatchText(rawPatchText);
   if (
     parsed.ok === false ||

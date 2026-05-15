@@ -372,6 +372,9 @@ function rejectionReasonFromBroadNormalization(
     case "unsupported-binary-patch":
     case "unsupported-mode-change":
     case "unsupported-rename-content-edit":
+    case "unsupported-rename-with-content-edit":
+    case "unsupported-symlink-patch":
+    case "unsupported-submodule-patch":
       return "unsupportedDestructiveShape";
     case "unsupported-directory-operation":
       return "unsupportedDirectoryOperation";

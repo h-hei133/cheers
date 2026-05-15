@@ -1,15 +1,19 @@
 # Bounded Small-N Write Policy
 
-Status: Route 65 implemented for selected-workspace bounded small-N update,
-mixed, delete-only, and move-only batches with cap 8. This is not broad
-`apply_patch`, 9+ writes, automatic recovery, atomic rollback,
+Status: Route 69 expanded the selected-workspace bounded small-N update,
+mixed, delete-only, and move-only batches from cap 8 to cap 32. This is not
+broad arbitrary `apply_patch`, automatic recovery, atomic rollback,
 provider/session/CLI/MCP, package-script, default-gate, or default persistence
 readiness.
 
-Route 67 note: parser-supported `apply_patch` payloads with 1-8 operations may
-now be classified as bounded candidates and routed into these same guarded
-lanes. This does not change the cap, writer semantics, recovery semantics, or
-the unsupported status of broad arbitrary `apply_patch`.
+Route 67 note: parser-supported `apply_patch` payloads with bounded operation
+counts may be classified as bounded candidates and routed into these same
+guarded lanes. Route 69 changed the cap; writer semantics, recovery semantics,
+and the unsupported status of broad arbitrary `apply_patch` remain unchanged.
+
+Route 69 note: the central cap is now 32. Parser-supported and Route 68/69
+normalized safe-subset payloads with 1-32 operations may route through existing
+guarded lanes. Counts 33+ remain unsupported/no-write.
 
 ## Post-Route 64 Baseline
 
@@ -22,10 +26,10 @@ without improving the underlying boundary.
 Route 65 replaces that exact-count policy with one central bounded policy:
 
 - `MIN_MULTI_WRITE_OPERATIONS = 2`
-- `MAX_BOUNDED_WRITE_OPERATIONS = 8`
+- `MAX_BOUNDED_WRITE_OPERATIONS = 32`
 - count 1 remains owned by existing single-file routes
-- counts 2-8 are bounded multi-operation candidates
-- counts 9+ remain unsupported/no-write
+- counts 2-32 are bounded multi-operation candidates
+- counts 33+ remain unsupported/no-write
 
 ## Reference Scan
 
@@ -61,11 +65,11 @@ Directional findings:
 
 Supported operation families, all selected-workspace only:
 
-- update-only batches with 2-8 distinct existing regular files
-- mixed batches with 2-8 operations from existing guarded kinds:
+- update-only batches with 2-32 distinct existing regular files
+- mixed batches with 2-32 operations from existing guarded kinds:
   update, add/create, delete, move
-- delete-only batches with 2-8 distinct existing regular files
-- move-only batches with 2-8 distinct existing sources and absent targets
+- delete-only batches with 2-32 distinct existing regular files
+- move-only batches with 2-32 distinct existing sources and absent targets
 
 All supported lanes preserve:
 
@@ -86,7 +90,7 @@ All supported lanes preserve:
 
 Still unsupported:
 
-- 9+ writes
+- 33+ writes
 - broad arbitrary `apply_patch`
 - directory delete/move
 - overwrite moves or creates
@@ -112,7 +116,7 @@ Still unsupported:
 - Recovery drills:
   `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts`
 
-Focused tests cover 5 and 8 supported cases, 9+ blocked cases, and
+Focused tests cover 5, 8, 9, 16, and 32 supported cases, 33+ blocked cases, and
 representative 8-operation partial-failure restore drills for update-only,
 mixed, delete-only, and move-only lanes. Restore drills call the explicit
 restore primitive after partial failure; no route invokes recovery
@@ -122,7 +126,7 @@ automatically.
 
 Do not continue count-by-count expansion. The next route should choose between:
 
-- a larger-write readiness audit only if 9+ has a specific user-facing need and
+- a larger-write readiness audit only if 33+ has a specific user-facing need and
   approval/recovery/result surfaces can still stay understandable; or
 - user/session explicit restore UX, since recovery authority now exists only as
   non-default explicit capture and primitive execution.

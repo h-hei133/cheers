@@ -413,18 +413,21 @@ describe("apply_patch mutation routing projection", () => {
     expect(firstWriteSawRecords).toBe(true);
   });
 
-  it("captures recovery authority before writer start for normalized git-style broad patches", async () => {
+  it("captures recovery authority before writer start for 16 normalized git-style broad patches", async () => {
     const fixture = createFixture({ includeC: true, includeD: true });
-    fs.writeFileSync(
-      path.join(fixture.workspaceRoot, "src", "e.ts"),
-      "e = 1\n",
-      "utf8",
-    );
+    const files = Array.from({ length: 16 }, (_, index) => fileStem(index));
+    for (const file of files.slice(4)) {
+      fs.writeFileSync(
+        path.join(fixture.workspaceRoot, "src", `${file}.ts`),
+        `${file} = 1\n`,
+        "utf8",
+      );
+    }
     const ledgerRoot = createLedgerRoot();
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     let firstWriteSawRecords = false;
 
-    const patchText = gitUpdatePatchBatch(["a", "b", "c", "d", "e"]);
+    const patchText = gitUpdatePatchBatch(files);
     const result = await projectApplyPatchRuntimeMutationRoute({
       ...runtimeInput(fixture.workspaceRoot, patchText),
       routeOptions: {
@@ -432,7 +435,7 @@ describe("apply_patch mutation routing projection", () => {
         recoveryAuthority: {
           mode: "non-default",
           ledgerRoot,
-          authorityId: "route68-git-five-update",
+          authorityId: "route69-git-sixteen-update",
         },
       },
       getWorkspaceAuthority: () => ({
@@ -441,7 +444,7 @@ describe("apply_patch mutation routing projection", () => {
           if (!firstWriteSawRecords) {
             const record = await readRecoveryAuthorityRecord({
               ledgerRoot,
-              authorityId: "route68-git-five-update",
+              authorityId: "route69-git-sixteen-update",
               recordId: "update-1-src-a.ts",
             });
             firstWriteSawRecords = Boolean(record);
@@ -452,13 +455,9 @@ describe("apply_patch mutation routing projection", () => {
     });
 
     expect(result?.status).toBe("completed");
-    expect(result?.codingResult?.changedFiles).toEqual([
-      "src/a.ts",
-      "src/b.ts",
-      "src/c.ts",
-      "src/d.ts",
-      "src/e.ts",
-    ]);
+    expect(result?.codingResult?.changedFiles).toEqual(
+      files.map((file) => `src/${file}.ts`),
+    );
     expect(result?.codingResult?.recoverySurface).toEqual(
       expect.objectContaining({
         recoveryAvailable: true,
@@ -584,13 +583,13 @@ describe("apply_patch mutation routing projection", () => {
     expect(readFile(fixture.workspaceRoot, "src/d.ts")).toBe("d = 2\n");
   });
 
-  it("keeps 9+ Update File patches stopped before writer invocation", async () => {
+  it("keeps 33 Update File patches stopped before writer invocation", async () => {
     const fixture = createFixture({ includeC: true, includeD: true });
     const before = snapshotFixture(fixture.workspaceRoot);
     let writes = 0;
 
     const result = await projectApplyPatchRuntimeMutationRoute({
-      ...runtimeInput(fixture.workspaceRoot, nineFileUpdatePatch()),
+      ...runtimeInput(fixture.workspaceRoot, beyondCapFileUpdatePatch()),
       getWorkspaceAuthority: () =>
         authorityWithBlockedWriter(fixture.workspaceRoot, () => {
           writes += 1;
@@ -618,9 +617,10 @@ describe("apply_patch mutation routing projection", () => {
     expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
 
-  it("keeps 9+ normalized git-style patches stopped before writer invocation", async () => {
+  it("keeps 33 normalized git-style patches stopped before writer invocation", async () => {
     const fixture = createFixture({ includeC: true, includeD: true });
-    for (const file of ["e", "f", "g", "h", "i"]) {
+    const files = Array.from({ length: 33 }, (_, index) => fileStem(index));
+    for (const file of files.slice(4)) {
       fs.writeFileSync(
         path.join(fixture.workspaceRoot, "src", `${file}.ts`),
         `${file} = 1\n`,
@@ -633,7 +633,7 @@ describe("apply_patch mutation routing projection", () => {
     const result = await projectApplyPatchRuntimeMutationRoute({
       ...runtimeInput(
         fixture.workspaceRoot,
-        gitUpdatePatchBatch(["a", "b", "c", "d", "e", "f", "g", "h", "i"]),
+        gitUpdatePatchBatch(files),
       ),
       getWorkspaceAuthority: () =>
         authorityWithBlockedWriter(fixture.workspaceRoot, () => {
@@ -1562,12 +1562,12 @@ function fiveFileUpdatePatch(): string {
   return boundedFileUpdatePatch(5);
 }
 
-function nineFileUpdatePatch(): string {
-  return boundedFileUpdatePatch(9);
+function beyondCapFileUpdatePatch(): string {
+  return boundedFileUpdatePatch(33);
 }
 
 function boundedFileUpdatePatch(count: number): string {
-  const files = "abcdefghi".slice(0, count).split("");
+  const files = Array.from({ length: count }, (_, index) => fileStem(index));
   return [
     "*** Begin Patch",
     ...files.flatMap((file) => [
@@ -1647,6 +1647,10 @@ function gitUpdatePatchBatch(files: readonly string[]): string {
   return files
     .map((file) => gitUpdatePatch(`src/${file}.ts`, file, 1, 2))
     .join("\n");
+}
+
+function fileStem(index: number): string {
+  return index < 26 ? "abcdefghijklmnopqrstuvwxyz"[index] ?? "" : `file-${index + 1}`;
 }
 
 function gitAddPatch(filePath: string, content: string): string {

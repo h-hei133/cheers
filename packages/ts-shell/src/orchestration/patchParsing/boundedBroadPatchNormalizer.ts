@@ -21,8 +21,11 @@ export type BoundedBroadPatchRejectionReason =
   | "unsupported-fuzzy-patch"
   | "unsupported-binary-patch"
   | "unsupported-mode-change"
+  | "unsupported-symlink-patch"
+  | "unsupported-submodule-patch"
   | "unsupported-directory-operation"
   | "unsupported-rename-content-edit"
+  | "unsupported-rename-with-content-edit"
   | "malformed-broad-patch";
 
 export type BoundedBroadPatchNormalizerResult =
@@ -56,8 +59,11 @@ interface FileMetadata {
   readonly renameFrom?: string;
   readonly renameTo?: string;
   readonly similarity100: boolean;
+  readonly hasNon100Similarity: boolean;
   readonly hasBinary: boolean;
   readonly hasModeChange: boolean;
+  readonly hasSymlink: boolean;
+  readonly hasSubmodule: boolean;
   readonly hasUnsupportedMetadata: boolean;
   readonly hunkStartIndex?: number;
 }
@@ -150,6 +156,22 @@ function parseFileSection(section: FileSection): ParsedFileSection {
       ["bounded-broad-patch-normalizer:mode-change-blocked"],
     );
   }
+  if (metadata.hasSymlink) {
+    return rejection(
+      "unsupported",
+      "git-unified-diff",
+      "unsupported-symlink-patch",
+      ["bounded-broad-patch-normalizer:symlink-patch-blocked"],
+    );
+  }
+  if (metadata.hasSubmodule) {
+    return rejection(
+      "unsupported",
+      "git-unified-diff",
+      "unsupported-submodule-patch",
+      ["bounded-broad-patch-normalizer:submodule-patch-blocked"],
+    );
+  }
   if (metadata.hasUnsupportedMetadata) {
     return rejection(
       "unsupported",
@@ -168,7 +190,7 @@ function parseFileSection(section: FileSection): ParsedFileSection {
   const hasHunks = hunkLines.length > 0;
 
   if (metadata.renameFrom || metadata.renameTo) {
-    if (!metadata.renameFrom || !metadata.renameTo || !metadata.similarity100) {
+    if (!metadata.renameFrom || !metadata.renameTo) {
       return rejection(
         "unsupported",
         "git-unified-diff",
@@ -176,12 +198,20 @@ function parseFileSection(section: FileSection): ParsedFileSection {
         ["bounded-broad-patch-normalizer:rename-metadata-incomplete"],
       );
     }
-    if (hasHunks || oldPath || newPath) {
+    if (hasHunks) {
       return rejection(
         "unsupported",
         "git-unified-diff",
-        "unsupported-rename-content-edit",
+        "unsupported-rename-with-content-edit",
         ["bounded-broad-patch-normalizer:rename-content-edit-blocked"],
+      );
+    }
+    if (!metadata.similarity100 || metadata.hasNon100Similarity) {
+      return rejection(
+        "unsupported",
+        "git-unified-diff",
+        "unsupported-broad-shape",
+        ["bounded-broad-patch-normalizer:rename-similarity-not-exact"],
       );
     }
     return {
@@ -248,8 +278,11 @@ function parseFileMetadata(section: FileSection): FileMetadata {
   let renameFrom: string | undefined;
   let renameTo: string | undefined;
   let similarity100 = false;
+  let hasNon100Similarity = false;
   let hasBinary = false;
   let hasModeChange = false;
+  let hasSymlink = false;
+  let hasSubmodule = false;
   let hasUnsupportedMetadata = false;
   let hunkStartIndex: number | undefined;
 
@@ -265,9 +298,26 @@ function parseFileMetadata(section: FileSection): FileMetadata {
     }
     if (
       line.startsWith("old mode ") ||
-      line.startsWith("new mode ") ||
-      line.startsWith("deleted mode ")
+      line.startsWith("new mode ")
     ) {
+      hasModeChange = true;
+      continue;
+    }
+    if (
+      line.startsWith("new file mode ") ||
+      line.startsWith("deleted file mode ")
+    ) {
+      const mode = line.split(/\s+/).at(-1) ?? "";
+      if (mode === "120000") {
+        hasSymlink = true;
+      } else if (mode === "160000") {
+        hasSubmodule = true;
+      } else if (mode !== "100644" && mode !== "100755") {
+        hasModeChange = true;
+      }
+      continue;
+    }
+    if (line.startsWith("deleted mode ")) {
       hasModeChange = true;
       continue;
     }
@@ -276,6 +326,10 @@ function parseFileMetadata(section: FileSection): FileMetadata {
       continue;
     }
     if (line.startsWith("similarity index ")) {
+      hasNon100Similarity = true;
+      continue;
+    }
+    if (line.startsWith("copy from ") || line.startsWith("copy to ")) {
       hasUnsupportedMetadata = true;
       continue;
     }
@@ -295,11 +349,7 @@ function parseFileMetadata(section: FileSection): FileMetadata {
       newPath = parseFileMarkerPath(line.slice("+++ ".length).trim());
       continue;
     }
-    if (
-      line.startsWith("index ") ||
-      line.startsWith("new file mode ") ||
-      line.startsWith("deleted file mode ")
-    ) {
+    if (line.startsWith("index ")) {
       continue;
     }
     if (line.trim() !== "") {
@@ -313,8 +363,11 @@ function parseFileMetadata(section: FileSection): FileMetadata {
     ...(renameFrom !== undefined ? { renameFrom } : {}),
     ...(renameTo !== undefined ? { renameTo } : {}),
     similarity100,
+    hasNon100Similarity,
     hasBinary,
     hasModeChange,
+    hasSymlink,
+    hasSubmodule,
     hasUnsupportedMetadata,
     ...(hunkStartIndex !== undefined ? { hunkStartIndex } : {}),
   };

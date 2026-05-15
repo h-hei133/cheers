@@ -639,23 +639,45 @@ describe("mixed selected-workspace write route", () => {
     expect(result.postWriteVerification).toBe("passed");
   });
 
-  it("keeps nine mixed operations blocked with no default recovery-authority capture", async () => {
+  it.each([16, 32])(
+    "writes %i mixed operations under the bounded small-N policy",
+    async (count) => {
+      const patch = generatedMixedPatch(count);
+      const fixture = createFixture({ files: generatedMixedFiles(count) });
+      const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+
+      const result = await runMixedFileWriteRoute({
+        ...routeOptions(fixture.workspaceRoot, patch),
+        readFile: authority.readFile,
+        readVerifiedFile: authority.readVerifiedFile,
+        directoryExists: authority.directoryExists,
+        validateWriteTarget: authority.validateWriteTarget,
+        validateCreateTarget: authority.validateCreateTarget,
+        writeFile: authority.writeFile,
+        createFileExclusive: authority.createFileExclusive,
+        moveFileExclusive: authority.moveFileExclusive,
+        deleteFile: authority.deleteFile,
+      });
+
+      expect(result.status).toBe("written");
+      expect(result.changedFiles).toHaveLength(count);
+      expect(result.failedFiles).toEqual([]);
+      expect(result.postWriteVerification).toBe("passed");
+      expect(result.recoveryAuthorityCapture).toBeUndefined();
+      expect(result.workspaceWriterInvoked).toBe(true);
+    },
+  );
+
+  it("keeps 33 mixed operations blocked with no default recovery-authority capture", async () => {
     const fixture = createFixture({
-      files: {
-        "src/a.ts": "a = 1\n",
-        "src/b.ts": "b = 1\n",
-        "src/c.ts": "c = 1\n",
-        "src/d.ts": "d = 1\n",
-        "src/from.ts": "from\n",
-        "src/remove.ts": "remove\n",
-      },
+      files: generatedMixedFiles(33),
     });
     const before = snapshotFixture(fixture.workspaceRoot);
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     let writes = 0;
 
     const result = await runMixedFileWriteRoute({
-      ...routeOptions(fixture.workspaceRoot, nineMixedPatch()),
+      ...routeOptions(fixture.workspaceRoot, generatedMixedPatch(33)),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       directoryExists: authority.directoryExists,
@@ -929,8 +951,14 @@ describe("mixed selected-workspace write route", () => {
   it.each([
     { family: "delete-only", count: 5, patchText: deletePatch(5) },
     { family: "delete-only", count: 8, patchText: deletePatch(8) },
+    { family: "delete-only", count: 9, patchText: deletePatch(9) },
+    { family: "delete-only", count: 16, patchText: deletePatch(16) },
+    { family: "delete-only", count: 32, patchText: deletePatch(32) },
     { family: "move-only", count: 5, patchText: movePatch(5) },
     { family: "move-only", count: 8, patchText: movePatch(8) },
+    { family: "move-only", count: 9, patchText: movePatch(9) },
+    { family: "move-only", count: 16, patchText: movePatch(16) },
+    { family: "move-only", count: 32, patchText: movePatch(32) },
   ])("writes $count $family operations under the bounded small-N policy", async ({
     family,
     count,
@@ -1243,8 +1271,8 @@ describe("mixed selected-workspace write route", () => {
 
   it("keeps destructive unsupported shapes blocked before any writer", async () => {
     const cases = [
-      { patchText: nineDeletePatch(), blocker: "unsupported-operation" },
-      { patchText: nineMovePatch(), blocker: "unsupported-operation" },
+      { patchText: beyondCapDeletePatch(), blocker: "unsupported-operation" },
+      { patchText: beyondCapMovePatch(), blocker: "unsupported-operation" },
       { patchText: duplicateMoveTargetPatch(), blocker: "target-mismatch" },
       { patchText: moveSwapPatch(), blocker: "target-mismatch" },
     ] as const;
@@ -1252,14 +1280,8 @@ describe("mixed selected-workspace write route", () => {
     for (const testCase of cases) {
       const fixture = createFixture({
         files: {
-          "src/from-a.ts": "a\n",
-          "src/from-b.ts": "b\n",
-          "src/from-c.ts": "c\n",
-          "src/from-d.ts": "d\n",
-          "src/remove-a.ts": "a\n",
-          "src/remove-b.ts": "b\n",
-          "src/remove-c.ts": "c\n",
-          "src/remove-d.ts": "d\n",
+          ...fromFiles(33),
+          ...removeFiles(33),
         },
       });
       const before = snapshotFixture(fixture.workspaceRoot);
@@ -1546,40 +1568,6 @@ function eightMixedPatch(): string {
   ].join("\n");
 }
 
-function nineMixedPatch(): string {
-  return [
-    "*** Begin Patch",
-    "*** Update File: src/a.ts",
-    "@@",
-    "-a = 1",
-    "+a = 2",
-    "*** Update File: src/b.ts",
-    "@@",
-    "-b = 1",
-    "+b = 2",
-    "*** Update File: src/c.ts",
-    "@@",
-    "-c = 1",
-    "+c = 2",
-    "*** Update File: src/d.ts",
-    "@@",
-    "-d = 1",
-    "+d = 2",
-    "*** Add File: src/new-a.ts",
-    "+created a",
-    "*** Add File: src/new-b.ts",
-    "+created b",
-    "*** Add File: src/new-c.ts",
-    "+created c",
-    "*** Delete File: src/remove.ts",
-    "*** Update File: src/from.ts",
-    "*** Move to: src/to.ts",
-    "@@",
-    " from",
-    "*** End Patch",
-  ].join("\n");
-}
-
 function createDeletePatch(): string {
   return [
     "*** Begin Patch",
@@ -1704,15 +1692,17 @@ function fiveDeletePatch(): string {
   return deletePatch(5);
 }
 
-function nineDeletePatch(): string {
-  return deletePatch(9);
+function beyondCapDeletePatch(): string {
+  return deletePatch(33);
 }
 
 function deletePatch(count: number): string {
-  const suffixes = "abcdefghi".slice(0, count).split("");
   return [
     "*** Begin Patch",
-    ...suffixes.map((suffix) => `*** Delete File: src/remove-${suffix}.ts`),
+    ...Array.from({ length: count }, (_, index) => {
+      const suffix = fileSuffix(index);
+      return `*** Delete File: src/remove-${suffix}.ts`;
+    }),
     "*** End Patch",
   ].join("\n");
 }
@@ -1759,15 +1749,14 @@ function fiveMovePatch(): string {
   return movePatch(5);
 }
 
-function nineMovePatch(): string {
-  return movePatch(9);
+function beyondCapMovePatch(): string {
+  return movePatch(33);
 }
 
 function movePatch(count: number): string {
-  const suffixes = "abcdefghi".slice(0, count).split("");
   return [
     "*** Begin Patch",
-    ...suffixes.flatMap((suffix) => [
+    ...Array.from({ length: count }, (_, index) => fileSuffix(index)).flatMap((suffix) => [
       `*** Update File: src/from-${suffix}.ts`,
       `*** Move to: src/to-${suffix}.ts`,
       "@@",
@@ -1809,18 +1798,68 @@ function moveSwapPatch(): string {
 
 function removeFiles(count: number): Record<string, string> {
   return Object.fromEntries(
-    "abcdefghi"
-      .slice(0, count)
-      .split("")
-      .map((suffix) => [`src/remove-${suffix}.ts`, `${suffix}\n`]),
+    Array.from({ length: count }, (_, index) => {
+      const suffix = fileSuffix(index);
+      return [`src/remove-${suffix}.ts`, `${suffix}\n`];
+    }),
   );
 }
 
 function fromFiles(count: number): Record<string, string> {
   return Object.fromEntries(
-    "abcdefghi"
-      .slice(0, count)
-      .split("")
-      .map((suffix) => [`src/from-${suffix}.ts`, `${suffix}\n`]),
+    Array.from({ length: count }, (_, index) => {
+      const suffix = fileSuffix(index);
+      return [`src/from-${suffix}.ts`, `${suffix}\n`];
+    }),
   );
+}
+
+function generatedMixedPatch(count: number): string {
+  return [
+    "*** Begin Patch",
+    ...Array.from({ length: count }, (_, index) => {
+      const suffix = fileSuffix(index);
+      const mod = index % 4;
+      if (mod === 0) {
+        return [
+          `*** Update File: src/update-${suffix}.ts`,
+          "@@",
+          `-${suffix} = 1`,
+          `+${suffix} = 2`,
+        ];
+      }
+      if (mod === 1) {
+        return [`*** Add File: src/new-${suffix}.ts`, `+new ${suffix}`];
+      }
+      if (mod === 2) {
+        return [`*** Delete File: src/remove-${suffix}.ts`];
+      }
+      return [
+        `*** Update File: src/from-${suffix}.ts`,
+        `*** Move to: src/to-${suffix}.ts`,
+        "@@",
+        ` ${suffix}`,
+      ];
+    }).flat(),
+    "*** End Patch",
+  ].join("\n");
+}
+
+function generatedMixedFiles(count: number): Record<string, string> {
+  const files: Record<string, string> = {};
+  for (let index = 0; index < count; index += 1) {
+    const suffix = fileSuffix(index);
+    if (index % 4 === 0) {
+      files[`src/update-${suffix}.ts`] = `${suffix} = 1\n`;
+    } else if (index % 4 === 2) {
+      files[`src/remove-${suffix}.ts`] = `${suffix}\n`;
+    } else if (index % 4 === 3) {
+      files[`src/from-${suffix}.ts`] = `${suffix}\n`;
+    }
+  }
+  return files;
+}
+
+function fileSuffix(index: number): string {
+  return index < 26 ? "abcdefghijklmnopqrstuvwxyz"[index] ?? "" : `file-${index + 1}`;
 }

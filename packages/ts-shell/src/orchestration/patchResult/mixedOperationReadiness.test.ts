@@ -72,22 +72,19 @@ describe("projectMixedOperationReadiness", () => {
     });
   });
 
-  it("keeps nine-operation mixed batches blocked by readiness projection", () => {
+  it("keeps 33-operation mixed batches blocked by readiness projection", () => {
     const readiness = projectMixedOperationReadiness([
-      updateOperation("src/a.ts"),
-      updateOperation("src/b.ts"),
+      ...Array.from({ length: 30 }, (_, index) =>
+        updateOperation(`src/update-${index + 1}.ts`),
+      ),
       addOperation("src/new-a.ts"),
-      addOperation("src/new-b.ts"),
       deleteOperation("src/remove-a.ts"),
-      deleteOperation("src/remove-b.ts"),
       moveOperation("src/from-a.ts", "src/to-a.ts"),
-      moveOperation("src/from-b.ts", "src/to-b.ts"),
-      updateOperation("src/c.ts"),
     ]);
 
     expect(readiness).toMatchObject({
       isMixedOperation: true,
-      operationCount: 9,
+      operationCount: 33,
       routeBlocker: "mixed-operation-route-not-enabled",
       mixedWritesEnabled: false,
       rollbackOrAtomicityClaim: "none",

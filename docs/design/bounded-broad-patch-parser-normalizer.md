@@ -1,8 +1,8 @@
 # Bounded Broad Patch Parser Normalizer
 
-Status: Route 68 implemented for a safe git-style unified-diff subset that can
-be normalized into existing guarded 1-8 `apply_patch` operations. This is not
-broad arbitrary `apply_patch` readiness.
+Status: Route 69 expanded the Route 68 safe git-style unified-diff subset so
+it can normalize larger bounded candidates into existing guarded 1-32
+`apply_patch` operations. This is not broad arbitrary `apply_patch` readiness.
 
 ## Post-Route 67 Baseline
 
@@ -84,7 +84,9 @@ Supported parser subset:
 - Git-style pure rename:
   `similarity index 100%`, `rename from`, and `rename to`, with no content
   hunk.
-- Operation count 1-8. Count 9+ remains blocked by the existing bounded write
+- Multi-hunk updates when exact marker hunks can preserve the old/new
+  expectations.
+- Operation count 1-32. Count 33+ remains blocked by the existing bounded write
   policy after normalization.
 
 The normalizer also lets the existing marker parser accept a pure move with no
@@ -95,9 +97,11 @@ the move route owns source/target authority and post-write verification.
 
 Still blocked:
 
-- 9+ operations.
+- 33+ operations.
 - Binary patch.
 - Mode-only or chmod-style changes.
+- Symlink and submodule mode patches.
+- Copy/copy-with-content metadata.
 - Rename with content edits or similarity below 100%.
 - `/dev/null` add hunks containing non-add lines.
 - Delete hunks containing non-remove lines.
@@ -166,10 +170,10 @@ Representative evidence:
 
 - single git-style update normalizes and routes to the existing update path
 - git-style add/delete/pure rename route through existing guarded paths
-- five-file and eight-operation git-style payloads route through bounded
+- five-file, eight-operation, and larger 9/16/32 representative payloads route through bounded
   small-N lanes
-- 9+ git-style payload remains stopped before writer invocation
-- binary/mode/malformed/rename-with-content/no-newline shapes remain blocked
+- 33+ git-style payload remains stopped before writer invocation
+- binary/mode/symlink/submodule/malformed/rename-with-content/no-newline shapes remain blocked
 - non-default recovery-authority capture works for a normalized broad
   candidate
 - explicit restore can repair a representative partial normalized broad
@@ -182,11 +186,12 @@ Residual risks:
 - This is still a small syntactic subset, not a general patch engine.
 - Exact hunk matching is still handled by the existing verifier; no fuzzy
   matching was added.
-- Cap 8 remains the write boundary.
-- Larger arbitrary patch and 9+ policies still require separate approval,
+- Cap 32 remains the write boundary.
+- Larger arbitrary patch and 33+ policies still require separate approval,
   recovery, result, and product-surface decisions.
 
-Recommended Route 69: unsupported broad-shape UX hardening if blocked broad
-patches need clearer user-facing diagnostics. A 9+ / arbitrary-N policy route
-should remain separate and should require explicit proof that approval,
-recovery authority, partial failure, and result semantics remain understandable.
+Recommended next route: unsupported broad-shape UX hardening if blocked broad
+patches need clearer user-facing diagnostics. Rename-with-content-edit should
+remain separate unless it becomes the main user-facing blocker. Arbitrary-N
+policy work should require explicit proof that approval, recovery authority,
+partial failure, and result semantics remain understandable.

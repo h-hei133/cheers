@@ -1,5 +1,5 @@
 export const MIN_MULTI_WRITE_OPERATIONS = 2;
-export const MAX_BOUNDED_WRITE_OPERATIONS = 8;
+export const MAX_BOUNDED_WRITE_OPERATIONS = 32;
 
 export type BoundedWriteOperationFamily =
   | "update-only"

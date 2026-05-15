@@ -16,7 +16,7 @@ import {
 } from "./patchResult/workspaceDeleteRoute.js";
 import { buildMultiFileWriteRouteResult } from "./patchResult/multiFileWriteResult.js";
 import {
-  patchIsTwoThreeOrFourUpdateFiles,
+  patchIsBoundedUpdateFiles,
   runMultiFileWriteRoute,
 } from "./patchResult/multiFileWriteRoute.js";
 import { buildWorkspaceMoveRouteResult } from "./patchResult/workspaceMoveResult.js";
@@ -37,7 +37,7 @@ import {
 } from "./patchResult/boundedApplyPatchCandidate.js";
 import { buildMixedFileWriteRouteResult } from "./patchResult/mixedFileWriteResult.js";
 import {
-  patchIsTwoThreeOrFourMixedWriteFiles,
+  patchIsBoundedMixedWriteFiles,
   runMixedFileWriteRoute,
 } from "./patchResult/mixedFileWriteRoute.js";
 import type { RecoveryAuthorityStoreConfig } from "./patchRecovery/recoveryAuthorityStore.js";
@@ -136,7 +136,7 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
     if (
       boundedCandidate.status === "candidate" &&
       boundedCandidate.operationFamily === "update-only" &&
-      patchIsTwoThreeOrFourUpdateFiles(routePatchText)
+      patchIsBoundedUpdateFiles(routePatchText)
     ) {
       const route = await runMultiFileWriteRoute({
         workspaceRoot: input.workspaceRoot,
@@ -234,7 +234,7 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
     if (
       boundedCandidate.status === "candidate" &&
       routeUsesMixedWriteRoute(boundedCandidate) &&
-      patchIsTwoThreeOrFourMixedWriteFiles(routePatchText)
+      patchIsBoundedMixedWriteFiles(routePatchText)
     ) {
       const route = await runMixedFileWriteRoute({
         workspaceRoot: input.workspaceRoot,

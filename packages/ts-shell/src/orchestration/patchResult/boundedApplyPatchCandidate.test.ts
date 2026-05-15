@@ -28,7 +28,7 @@ describe("bounded apply_patch candidate classifier", () => {
     }
   });
 
-  it("classifies 2, 5, and 8 operation supported families", () => {
+  it("classifies 2, 5, 8, 9, 16, and 32 operation supported families", () => {
     expect(
       classifyBoundedApplyPatchCandidate({
         rawPatchText: updatePatch(5),
@@ -44,13 +44,26 @@ describe("bounded apply_patch candidate classifier", () => {
 
     expect(
       classifyBoundedApplyPatchCandidate({
-        rawPatchText: mixedPatch(8),
+        rawPatchText: updatePatch(32),
         workspaceRoot: "/workspace",
       }),
     ).toEqual(
       expect.objectContaining({
         status: "candidate",
-        operationCount: 8,
+        operationCount: 32,
+        operationFamily: "update-only",
+      }),
+    );
+
+    expect(
+      classifyBoundedApplyPatchCandidate({
+        rawPatchText: mixedPatch(16),
+        workspaceRoot: "/workspace",
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        status: "candidate",
+        operationCount: 16,
         operationFamily: "mixed",
       }),
     );
@@ -70,20 +83,33 @@ describe("bounded apply_patch candidate classifier", () => {
 
     expect(
       classifyBoundedApplyPatchCandidate({
-        rawPatchText: movePatch(8),
+        rawPatchText: deletePatch(9),
         workspaceRoot: "/workspace",
       }),
     ).toEqual(
       expect.objectContaining({
         status: "candidate",
-        operationCount: 8,
+        operationCount: 9,
+        operationFamily: "delete-only",
+      }),
+    );
+
+    expect(
+      classifyBoundedApplyPatchCandidate({
+        rawPatchText: movePatch(32),
+        workspaceRoot: "/workspace",
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        status: "candidate",
+        operationCount: 32,
         operationFamily: "move-only",
       }),
     );
   });
 
-  it("blocks 9+ update and mixed candidates without write authority", () => {
-    for (const patchText of [updatePatch(9), mixedPatch(9)]) {
+  it("blocks 33+ update and mixed candidates without write authority", () => {
+    for (const patchText of [updatePatch(33), mixedPatch(33)]) {
       expect(
         classifyBoundedApplyPatchCandidate({
           rawPatchText: patchText,
@@ -92,7 +118,7 @@ describe("bounded apply_patch candidate classifier", () => {
       ).toEqual(
         expect.objectContaining({
           status: "unsupported",
-          operationCount: 9,
+          operationCount: 33,
           rejectionReason: "unsupportedTooManyOperations",
           evidence: expect.arrayContaining([
             "bounded-apply-patch-candidate:no-write-authority",

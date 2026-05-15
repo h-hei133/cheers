@@ -1,18 +1,22 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 68
+Route baseline: post-Route 69
 Date: 2026-05-15
-Status: long-range edit capability map after Routes 50-68.
+Status: long-range edit capability map after Routes 50-69.
 Routes 59-66 have implemented a narrow explicit non-default original-content
 authority loop, explicit restore surface, bounded exactly-three mixed write
 expansion, bounded destructive multi-delete/multi-move support, and bounded
-small-N write support with cap 8, plus explicit restore UX/CLI surface.
+small-N write support, plus explicit restore UX/CLI surface.
 Route 67 added bounded broad `apply_patch` candidate classification and routing
-for parser-supported 1-8 operation shapes that normalize to existing guarded
-small-N write lanes.
+for parser-supported bounded operation shapes that normalize to existing
+guarded small-N write lanes.
 Route 68 added a bounded broad patch parser/normalizer for a safe git-style
-unified-diff subset and feeds normalized 1-8 candidates into those same guarded
-routes.
+unified-diff subset and feeds normalized bounded candidates into those same
+guarded routes.
+Route 69 lifted the bounded cap to 32, expanded the safe normalizer evidence for
+larger multi-file and multi-hunk payloads, and kept 33+, arbitrary broad,
+fuzzy, binary, mode, symlink, submodule, copy, directory, overwrite, and
+rename-with-content-edit shapes blocked.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -24,13 +28,14 @@ opencode, and gemini-cli.
 It is not a broad edit readiness claim. It keeps implemented capability,
 candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Post-Route 66 Executive Summary
+## 1. Post-Route 69 Executive Summary
 
 Current write capability remains intentionally narrow. The project supports a
 bounded selected-workspace write surface and still blocks broad arbitrary
-`apply_patch`, 9+ writes, broad multi-delete, broad multi-move, directory
-delete/move, overwrite, rollback, snapshot/revert, stale-read recovery, partial
-failure recovery, and default real-provider mutation readiness.
+`apply_patch`, 33+ writes, broad multi-delete, broad multi-move, directory
+delete/move, overwrite, rename-with-content-edit, rollback, snapshot/revert,
+stale-read recovery, partial failure recovery, and default real-provider
+mutation readiness.
 
 Routes 52-56 changed the roadmap direction:
 
@@ -80,8 +85,8 @@ audit passed. It keeps parsed-order sequential execution, explicit approval,
 workspace authority, final stale-read, per-operation verification, non-default
 recovery-authority capture, route-scoped journal metadata, plan-only recovery
 diagnostics, no automatic recovery, and no atomic rollback. Routes 64-65 later
-opened exactly-four and then bounded 2-8 mixed operations; 9+ mixed operations
-and broad arbitrary `apply_patch` remain blocked.
+opened exactly-four and then bounded mixed operations; Route 69 lifted the cap
+to 32. 33+ mixed operations and broad arbitrary `apply_patch` remain blocked.
 
 Route 63 implemented bounded same-family destructive batches for
 selected-workspace exactly-two/exactly-three delete-only and move-only shapes.
@@ -90,7 +95,8 @@ workspace authority for every destructive source/target, directory and
 overwrite rejection, final preflight before the first writer, parsed-order
 sequential execution, per-operation verification, non-default recovery-authority
 capture, partial-failure restore drills, no automatic recovery, and no atomic
-rollback. Routes 64-65 later opened exactly-four and then bounded 2-8 writes; 9+ writes, broad arbitrary `apply_patch`, directory delete/move,
+rollback. Routes 64-65 later opened exactly-four and then bounded writes;
+Route 69 lifted the cap to 32. 33+ writes, broad arbitrary `apply_patch`, directory delete/move,
 multi-delete/multi-move beyond this bounded surface, and provider/session/CLI/MCP
 behavior remain blocked.
 
@@ -100,7 +106,8 @@ explicit approval over all affected paths, selected-workspace authority, final
 stale-read/preflight before writer start, parsed-order sequential execution,
 per-file/per-operation verification, non-default recovery-authority capture,
 explicit partial-failure restore drills, no automatic recovery, and no atomic
-rollback. Route 65 later opened bounded 2-8 writes; 9+ writes, broad arbitrary `apply_patch`, directory delete/move,
+rollback. Route 65 later opened bounded writes; Route 69 lifted the cap to 32.
+33+ writes, broad arbitrary `apply_patch`, directory delete/move,
 overwrite, path reuse, provider/session/CLI/MCP changes, package scripts, and
 default gates remain blocked.
 
@@ -109,8 +116,8 @@ Selected-workspace update-only, mixed, delete-only, and move-only batches now
 support 2-8 guarded operations through the existing explicit approval,
 workspace authority, final preflight, sequential writer, per-file verification,
 non-default recovery-authority capture, journal/recovery-plan diagnostics, and
-explicit restore drill boundaries. 9+ writes and broad arbitrary `apply_patch`
-remain blocked. This is still not automatic recovery, atomic rollback, default
+explicit restore drill boundaries. Route 69 later lifted the cap to 32; 33+
+writes and broad arbitrary `apply_patch` remain blocked. This is still not automatic recovery, atomic rollback, default
 persistence, provider/session/CLI/MCP behavior, package-script, or default-gate
 readiness.
 
@@ -121,10 +128,10 @@ the safe default. Execute requires explicit intent. Restore output is separate
 from normal edit route results, and route result `recoveryExecuted` remains
 false. There is still no automatic recovery, atomic rollback, default
 persistence, provider/MCP change, package script change, broad `apply_patch`,
-or 9+ write support.
+or 33+ write support.
 
 Route 67 added the first bounded broad `apply_patch` candidate path. It
-classifies parser-supported 1-8 operation payloads into existing guarded
+classifies parser-supported bounded operation payloads into existing guarded
 single-file, update-only, mixed, delete-only, and move-only routes. The
 classifier is projection-only: it does not read, write, approve, persist, or
 recover. Existing route code still owns workspace authority, approval,
@@ -140,12 +147,24 @@ Route 68 removed the next parser/shape blocker for a safe subset. It added
 update/add/delete/pure-rename sections and serializes them into existing
 marker-style operations before routing. The normalizer is still pure:
 no file read, no write, no approval, no persistence, no restore execution, no
-fuzzy apply, and no broad arbitrary patch engine. Safe 1-8 normalized payloads
-reuse existing guarded routes and recovery-authority capture. 9+ payloads,
+fuzzy apply, and no broad arbitrary patch engine. Safe normalized payloads
+reuse existing guarded routes and recovery-authority capture. At the Route 68
+boundary, 9+ payloads,
 binary patches, mode changes, rename-with-content-edit, malformed/unsupported
 hunks, directory/path conflicts, overwrite, fuzzy patch, automatic recovery,
 atomic rollback, and broad arbitrary `apply_patch` readiness remain
 unsupported.
+
+Route 69 lifted the central bounded policy cap from 8 to 32. Parser-supported
+and normalized git-style safe-subset payloads now route 1-32 operations through
+the same guarded single-file, update-only, mixed, delete-only, and move-only
+lanes. The normalizer preserves multi-hunk updates when they can be represented
+as exact marker hunks, and it blocks metadata-only or unsafe broad shapes with
+more precise reasons, including symlink, submodule, copy metadata, and
+rename-with-content-edit. Counts 33+, arbitrary broad patches, fuzzy patches,
+binary/mode/symlink/submodule/copy shapes, directory operations, overwrite,
+automatic recovery, atomic rollback, provider/session/CLI/MCP behavior, package
+scripts, and default gates remain unsupported.
 
 ## 2. Current Edit Capability Inventory
 
@@ -205,33 +224,35 @@ unsupported.
     recovery-authority capture, no automatic recovery, and no rollback.
 
 - Selected-workspace bounded small-N existing-file `Update File`
-  - Runtime owner: `mutationRoutingProjection.ts` dispatches bounded 2-8
+  - Runtime owner: `mutationRoutingProjection.ts` dispatches bounded 2-32
     update-only shapes to `runMultiFileWriteRoute()`.
   - Write route/application: `patchResult/multiFileWriteRoute.ts` and
     `patchApplication/multiFileUpdateApply.ts`.
   - Result projection: `patchResult/multiFileWriteResult.ts` and
     `patchResult/perFilePatchPlan.ts`.
   - Design evidence: `docs/design/bounded-small-n-write-policy.md`.
-  - Boundary: 2-8 distinct existing-file update targets, explicit approval
+  - Boundary: 2-32 distinct existing-file update targets, explicit approval
     naming all files, all final stale-reads before writer start, sequential
     writes, per-file verification, optional non-default recovery-authority
     capture, explicit restore drills, no automatic recovery, and no rollback.
 
 - Bounded broad `apply_patch` candidates
   - Runtime owner: `mutationRoutingProjection.ts` classifies safe
-    parser-supported and Route 68 normalized git-style payloads through
+    parser-supported and Route 68/69 normalized git-style payloads through
     `boundedApplyPatchCandidate.ts`.
   - Parser/normalizer owner:
     `patchParsing/boundedBroadPatchNormalizer.ts` converts the safe git-style
     subset into existing marker-style operations.
   - Route owners: existing single-file routes for count 1,
-    `multiFileWriteRoute.ts` for 2-8 update-only, and
-    `mixedFileWriteRoute.ts` for 2-8 mixed/delete-only/move-only.
+    `multiFileWriteRoute.ts` for 2-32 update-only, and
+    `mixedFileWriteRoute.ts` for 2-32 mixed/delete-only/move-only.
   - Design evidence: `docs/design/bounded-broad-apply-patch-candidate.md` and
-    `docs/design/bounded-broad-patch-parser-normalizer.md`.
+    `docs/design/bounded-broad-patch-parser-normalizer.md`, plus
+    `docs/design/expanded-bounded-broad-patch-safe-subset.md`.
   - Boundary: parse/normalize only into existing guarded routes; no broad
-    arbitrary parser, no 9+ writes, no directory delete/move, no overwrite, no
-    fuzzy patch, no automatic recovery, and no atomic rollback.
+    arbitrary parser, no 33+ writes, no directory delete/move, no overwrite, no
+    rename-with-content-edit, no fuzzy patch, no automatic recovery, and no
+    atomic rollback.
 
 - Selected-workspace guarded single-file move/rename
   - Runtime owner: `mutationRoutingProjection.ts` dispatches the single-file
@@ -323,12 +344,12 @@ unsupported.
     rollback or atomicity claim.
 
 - Selected-workspace bounded small-N mixed/delete-only/move-only lanes
-  - Runtime owner: `mutationRoutingProjection.ts` dispatches bounded 2-8
+  - Runtime owner: `mutationRoutingProjection.ts` dispatches bounded 2-32
     guarded operation shapes to `runMixedFileWriteRoute()`.
   - Write route/result: `patchResult/mixedFileWriteRoute.ts`,
     `patchResult/mixedFileWriteResult.ts`, and `patchResult/perFilePatchPlan.ts`.
   - Design evidence: `docs/design/bounded-small-n-write-policy.md`.
-  - Boundary: 2-8 update/create/delete/move operations or same-family
+  - Boundary: 2-32 update/create/delete/move operations or same-family
     delete-only/move-only batches, selected-workspace source/target authority,
     directory/overwrite/path-reuse/swap/cycle rejection, final preflight before
     writer start, parsed-order writes, per-operation verification, optional
@@ -354,8 +375,8 @@ unsupported.
   - Owner: `patchResult/mixedOperationReadiness.ts`,
     `patchResult/perFilePatchPlan.ts`, and unsupported route/result
     projections.
-  - Status: implemented for mixed-operation classification and bounded 2-8
-    mixed support while preserving 9+ mixed and broad `apply_patch` no-write
+  - Status: implemented for mixed-operation classification and bounded 2-32
+    mixed support while preserving 33+ mixed and broad `apply_patch` no-write
     boundaries.
 
 ### Route-Scoped Journal Metadata Infrastructure
@@ -419,7 +440,7 @@ unsupported.
     capture and guarded per-file restore primitive.
   - Boundary: no default persistence, no automatic capture, no automatic
     recovery, no rollback/atomicity claim, no snapshot/git integration, no
-    provider/session/CLI/MCP behavior, no broad writes, no 9+ mixed writes.
+    provider/session/CLI/MCP behavior, no broad writes, no 33+ mixed writes.
 
 - Mixed/multi/single-file failure journal coverage
   - Mixed and multi-file partial failure paths carry journal metadata.
@@ -429,10 +450,10 @@ unsupported.
 
 ### Explicitly Unsupported
 
-- 9+ mixed writes.
-- 9+ update writes.
+- 33+ mixed writes.
+- 33+ update writes.
 - Broad arbitrary `apply_patch` writes.
-- Broad arbitrary git/unified diff writes outside the Route 68 safe subset.
+- Broad arbitrary git/unified diff writes outside the Route 68/69 safe subset.
 - Broad multi-delete or multi-move beyond the bounded mixed lanes listed above.
 - Directory delete or directory move.
 - Overwrite and outside-workspace operations.
@@ -456,8 +477,8 @@ The project currently does not claim:
 - broad/general release readiness
 - broad `apply_patch` support
 - arbitrary project mutation readiness
-- 9+ mixed operation write support
-- 9+ write support
+- 33+ mixed operation write support
+- 33+ write support
 - broad multi-delete or multi-move support beyond the bounded mixed lanes
 - durable journal storage
 - recovery executor
@@ -497,7 +518,7 @@ User / CLI / provider output
 -> patch application / selected workspace writer
    status: implemented only for single update, single add, exactly-two update,
    exactly-three update, guarded single move, guarded single delete, and
-   bounded 2-8 mixed write lanes; broad, 9+ mixed, 9+ update,
+   bounded mixed write lanes up to cap 32; broad, 33+ mixed, 33+ update,
    broad multi-delete, and broad multi-move apply_patch shapes are explicitly
    unsupported.
 -> post-write verification
@@ -546,11 +567,11 @@ User / CLI / provider output
 | Single-file delete | Implemented candidate | `workspaceDeleteRoute.ts`, `singleFileDeleteApply.ts`, `workspaceDeleteResult.ts`, `verify-single-file-delete-evidence.mjs` | B/C | One existing regular-file target only; no multi-delete, directory delete, or rollback | No expansion until destructive authority is explicit |
 | Exactly-two mixed write lanes | Implemented candidate | `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, mixed-operation evidence | B/C | Sequential parsed-order writes; no rollback/atomicity; no broad `apply_patch` | Revisit only after bounded mixed/destructive authority stance is explicit |
 | Exactly-three mixed write lanes | Implemented candidate | `mutationRoutingProjection.ts`, `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedOperationReadiness.ts`, `mixedFileWriteRoute.test.ts`, `mixedFileWriteResult.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/exactly-three-mixed-write-implementation.md` | C/D/E | Sequential parsed-order writes; no rollback/atomicity; no broad `apply_patch`; restore remains explicit | User/session restore UX or small-N policy decision |
-| Exactly-four bounded write lanes | Implemented candidate; superseded by bounded small-N cap 8 | `mutationRoutingProjection.ts`, `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `mixedFileWriteRoute.ts`, `perFilePatchPlan.ts`, `mixedOperationReadiness.ts`, `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-exactly-four-write-surface.md` | C/D/E | Historical exact-four slice; current cap is 8; no 9+ writes, broad `apply_patch`, automatic recovery, or rollback | Preserve as regression evidence |
-| Bounded multi-delete / multi-move lanes | Implemented candidate under bounded small-N cap 8 | `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-destructive-multi-delete-move.md`, `docs/design/bounded-exactly-four-write-surface.md` | C/D/E | 2-8 delete-only or move-only operations only; no 9+ writes, directory delete/move, overwrite, swaps/cycles, automatic recovery, or rollback | Larger-write readiness audit only if justified |
-| Bounded small-N write policy | Implemented candidate | `boundedWritePolicy.ts`, `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `mixedFileWriteRoute.ts`, `perFilePatchPlan.ts`, `mixedOperationReadiness.ts`, focused route/planning/readiness tests, `docs/design/bounded-small-n-write-policy.md` | C/D/E | Cap 8 only; no 9+ writes, broad `apply_patch`, automatic recovery, or rollback | Stop count-by-count expansion; prefer restore UX or larger-write readiness audit |
-| Bounded broad `apply_patch` candidates | Implemented candidate | `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `boundedApplyPatchCandidate.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-broad-apply-patch-candidate.md` | C/D/E | Parser-supported or Route 68 normalized 1-8 operations only; no arbitrary broad patch, 9+ writes, directory operations, overwrite, fuzzy patch, automatic recovery, or rollback | Route 69 unsupported-shape UX hardening or separate 9+ policy decision |
-| Bounded broad patch parser/normalizer | Implemented safe subset | `patchParsing/boundedBroadPatchNormalizer.ts`, `boundedBroadPatchNormalizer.test.ts`, `parser.ts`, `parser.test.ts`, `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `docs/design/bounded-broad-patch-parser-normalizer.md` | C/D/E | Git-style update/add/delete/pure-rename subset only; binary, mode, malformed, fuzzy, rename-with-content, 9+, directory/path conflicts, overwrite, and arbitrary broad shapes remain blocked | Route 69 unsupported broad-shape UX hardening if needed |
+| Exactly-four bounded write lanes | Implemented candidate; superseded by bounded small-N cap 32 | `mutationRoutingProjection.ts`, `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `mixedFileWriteRoute.ts`, `perFilePatchPlan.ts`, `mixedOperationReadiness.ts`, `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-exactly-four-write-surface.md` | C/D/E | Historical exact-four slice; current cap is 32; no 33+ writes, broad `apply_patch`, automatic recovery, or rollback | Preserve as regression evidence |
+| Bounded multi-delete / multi-move lanes | Implemented candidate under bounded small-N cap 32 | `mixedFileWriteRoute.ts`, `mixedFileWriteResult.ts`, `perFilePatchPlan.ts`, `mixedFileWriteRoute.test.ts`, `perFilePatchPlan.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-destructive-multi-delete-move.md`, `docs/design/bounded-exactly-four-write-surface.md` | C/D/E | 2-32 delete-only or move-only operations only; no 33+ writes, directory delete/move, overwrite, swaps/cycles, automatic recovery, or rollback | Unsupported-shape UX hardening or rename-with-content readiness only if justified |
+| Bounded small-N write policy | Implemented candidate | `boundedWritePolicy.ts`, `multiFileWriteRoute.ts`, `multiFileUpdateApply.ts`, `mixedFileWriteRoute.ts`, `perFilePatchPlan.ts`, `mixedOperationReadiness.ts`, focused route/planning/readiness tests, `docs/design/bounded-small-n-write-policy.md` | C/D/E | Cap 32 only; no 33+ writes, broad `apply_patch`, automatic recovery, or rollback | Preserve cap; do not jump to arbitrary-N without separate readiness proof |
+| Bounded broad `apply_patch` candidates | Implemented candidate | `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `boundedApplyPatchCandidate.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/bounded-broad-apply-patch-candidate.md`, `docs/design/expanded-bounded-broad-patch-safe-subset.md` | C/D/E | Parser-supported or Route 68/69 normalized 1-32 operations only; no arbitrary broad patch, 33+ writes, directory operations, overwrite, fuzzy patch, automatic recovery, or rollback | Unsupported-shape UX hardening or rename-with-content readiness if needed |
+| Bounded broad patch parser/normalizer | Implemented expanded safe subset | `patchParsing/boundedBroadPatchNormalizer.ts`, `boundedBroadPatchNormalizer.test.ts`, `parser.ts`, `parser.test.ts`, `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `docs/design/bounded-broad-patch-parser-normalizer.md`, `docs/design/expanded-bounded-broad-patch-safe-subset.md` | C/D/E | Git-style update/add/delete/pure-rename and exact multi-hunk update subset only; binary, mode, symlink, submodule, copy, malformed, fuzzy, rename-with-content, 33+, directory/path conflicts, overwrite, and arbitrary broad shapes remain blocked | Unsupported-shape UX hardening if needed |
 | 8-operation recovery-authority drills | Implemented explicit drill evidence | `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts` | C/D | Explicit primitive only; no automatic recovery, session restore command, or atomic rollback | User/session explicit restore UX if product priority |
 | Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, unsupported E2E and continuity checks | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Preserve as recovery-plan consumer |
 | Route-scoped edit journal prototype | Implemented metadata-only projection | `routeScopedEditJournal.ts`, `routeScopedEditJournal.test.ts` | C/D | Non-durable; not recovery or writer authority | Feed original-content ledger prototype if safe |
@@ -567,7 +588,7 @@ User / CLI / provider output
 | Recovery readiness projection | Implemented nested `recoveryPlan.recoveryReadiness` diagnostics | `journalRecoveryReadinessProjection.ts`, `journalRecoveryReadinessProjection.test.ts`, representative consumer tests | C/D | Can reflect explicit restore eligibility, but cannot execute recovery | Batch 61 explicit restore surface design |
 | Recovery authority store | Implemented explicit non-default prototype | `patchRecovery/recoveryAuthorityStore.ts`, `recoveryAuthorityStore.test.ts` | C/D | No default storage; no session lifecycle; stores original content only under explicit temp/root option | Expand coverage or UX only after boundary review |
 | Explicit restore primitive | Implemented guarded per-file primitive | `patchRecovery/restorePrimitive.ts`, `restorePrimitive.test.ts` | C/D | No automatic recovery; no transaction rollback; no CLI/session surface | Product restore UX design or remaining narrow coverage |
-| Non-default writer preflight capture | Implemented for single update/delete/create/move and bounded 2-8 update/mixed/delete/move lanes where clean | `workspaceWriteRoute.ts`, `workspaceDeleteRoute.ts`, `workspaceCreateRoute.ts`, `workspaceMoveRoute.ts`, `multiFileWriteRoute.ts`, `mixedFileWriteRoute.ts`, focused route tests | C/D | Narrow surface only; broad `apply_patch`, 9+ writes, and broad multi-delete/multi-move remain out of scope | CLI restore polish or larger-write readiness audit |
+| Non-default writer preflight capture | Implemented for single update/delete/create/move and bounded 2-32 update/mixed/delete/move lanes where clean | `workspaceWriteRoute.ts`, `workspaceDeleteRoute.ts`, `workspaceCreateRoute.ts`, `workspaceMoveRoute.ts`, `multiFileWriteRoute.ts`, `mixedFileWriteRoute.ts`, focused route tests | C/D | Narrow surface only; arbitrary broad `apply_patch`, 33+ writes, and broad multi-delete/multi-move remain out of scope | CLI restore polish or unsupported-shape hardening |
 | Current-content guard | Implemented in explicit restore primitive | `restorePrimitive.ts`, `restorePrimitive.test.ts` | C/D | Guard is available only when restore is explicitly invoked | Future restore UX/executor design |
 | Partial-failure restore drills | Implemented for exactly-four update, exactly-four mixed, exactly-four delete-only, exactly-four move-only, earlier mixed/update lanes, and bounded destructive partial failures | `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts`, `restorePrimitive.test.ts` | C/D | Restore remains explicit and non-atomic; no automatic recovery or rollback claim | User/session restore UX or small-N policy decision |
 | Recovery authority index | Implemented explicit non-default inspection surface | `patchRecovery/recoveryAuthorityIndex.ts`, `recoveryAuthorityIndex.test.ts` | C/D | Metadata only; no raw content, workspace reads, default ledger, or session surface | Feed future CLI/session restore UX if needed |
@@ -580,9 +601,9 @@ User / CLI / provider output
 | Durable journal storage | Partially implemented as explicit non-default authority ledger; not default/session durable | `recoveryAuthorityStore.ts`, cleanup/purge tests | C/D | No default persistence, no SessionManager storage, no provider/session surface | Keep non-default until lifecycle is designed |
 | Recovery executor | Future; not implemented | No automatic executor | N/A | Requires product surface, workspace authority at call time, no-hidden-user-edit rule | After capture coverage/UX decision |
 | Rollback/snapshot | Future; not implemented | No target snapshot/restore layer | N/A | Needs checkpoint/file-history/storage design and user/session semantics | Batch 59+ |
-| 9+ update requests | Explicitly unsupported | `multiFileWriteRoute.ts`, `perFilePatchPlan.ts`, focused unsupported evidence | B/C | No write support above cap 8 | Larger-write readiness audit only if justified |
-| 9+ mixed/destructive operations | Explicitly unsupported | `perFilePatchPlan.ts`, `mixedFileWriteRoute.ts`, focused 9+ blocked tests, mixed-operation evidence | B/C | No writer support above cap 8; no broader arbitrary-N recovery/approval stance | Larger-write readiness audit only if justified |
-| Multi-delete / multi-move beyond bounded Route 65 lanes | Explicitly unsupported as broad destructive features | `perFilePatchPlan.ts`, unsupported E2E, single-file move/delete evidence, bounded mixed/destructive tests | B/C | No 9+ or broad multi-destructive writer; directory delete/move, overwrite, swaps/cycles remain blocked | Larger-write readiness audit only if justified |
+| 33+ update requests | Explicitly unsupported | `multiFileWriteRoute.ts`, `perFilePatchPlan.ts`, focused unsupported evidence | B/C | No write support above cap 32 | Arbitrary-N readiness audit only if justified |
+| 33+ mixed/destructive operations | Explicitly unsupported | `perFilePatchPlan.ts`, `mixedFileWriteRoute.ts`, focused 33+ blocked tests, mixed-operation evidence | B/C | No writer support above cap 32; no broader arbitrary-N recovery/approval stance | Arbitrary-N readiness audit only if justified |
+| Multi-delete / multi-move beyond bounded Route 69 lanes | Explicitly unsupported as broad destructive features | `perFilePatchPlan.ts`, unsupported E2E, single-file move/delete evidence, bounded mixed/destructive tests | B/C | No 33+ or broad multi-destructive writer; directory delete/move, overwrite, swaps/cycles remain blocked | Arbitrary-N readiness audit only if justified |
 | Final stale-read | Implemented as blocker, not recovery | `workspaceWriteRoute.ts`, `multiFileWriteRoute.ts`, `mutationExecution.ts`, `singleFileApplyPatchFinalStaleRead.ts`, recovery-readiness tests | C/D | No automatic stale-read recovery; no read-state ledger | Original-content ledger prototype before recovery |
 | Post-write verification | Implemented for selected writes and classified in recovery plan diagnostics | selected write routes, application modules, `journalFailureStateProjection.ts`, durable authority seam tests | C/D | No rollback after post-write failure | Original-content ledger prototype before recovery |
 | Partial failure surface | Implemented stopped surface for multi-file routes with recovery plan diagnostics | `multiFileUpdateApply.ts`, `multiFileWriteRoute.ts`, `multiFileWriteResult.ts`, candidate partial-failure cases, recovery-readiness tests | B/C/D | No automatic repair or rollback; user inspection required | Original-content ledger or explicit no-recovery audit |
@@ -731,8 +752,8 @@ is absent and current write support remains deliberately bounded.
 
 ### Layer D: Larger Write Surfaces
 
-- 9+ mixed writes.
-- 9+ update writes.
+- 33+ mixed writes.
+- 33+ update writes.
 - Multi-delete and multi-move beyond the bounded small-N cap.
 - Broad arbitrary `apply_patch`.
 - Destructive approval semantics for larger mixed or destructive sets.
@@ -777,7 +798,8 @@ explicit approval, workspace authority, final stale-read, parsed-order
 sequential execution, per-operation verification, optional non-default
 recovery-authority capture, journal/recovery-plan diagnostics, no automatic
 recovery, and no atomic rollback. Routes 64-65 later opened exactly-four and
-then bounded 2-8 mixed; 9+ mixed and broad `apply_patch` remain blocked.
+bounded mixed lanes, and Route 69 lifted the cap to 32; 33+ mixed and broad
+`apply_patch` remain blocked.
 
 The next direction should not jump to broad `apply_patch`. Choose either a
 destructive multi-delete/multi-move readiness route if destructive semantics
@@ -793,8 +815,9 @@ move-only batches under the same explicit route boundary: approval, workspace
 authority, directory/overwrite/path-reuse rejection, final preflight before the
 first writer, parsed-order execution, per-operation verification, optional
 non-default recovery-authority capture, no automatic recovery, and no atomic
-rollback. Routes 64-65 later opened exactly-four and then bounded 2-8
-destructive batches; 9+ writes and broad `apply_patch` remain unsupported.
+rollback. Routes 64-65 later opened exactly-four and bounded destructive
+batches, and Route 69 lifted the cap to 32; 33+ writes and broad `apply_patch`
+remain unsupported.
 
 The next direction should still not jump directly to broad `apply_patch`.
 
@@ -808,8 +831,8 @@ approval, workspace authority, final stale-read/preflight before writer start,
 parsed-order execution, per-file/per-operation verification, optional
 non-default recovery-authority capture, explicit partial-failure restore
 drills, no automatic recovery, and no atomic rollback. Route 65 later replaced
-count-by-count expansion with bounded 2-8 support; 9+ writes and broad
-`apply_patch` remain unsupported.
+count-by-count expansion with bounded support, and Route 69 lifted that bounded
+cap to 32; 33+ writes and broad `apply_patch` remain unsupported.
 
 Implemented Route 65 batch:
 
@@ -819,8 +842,9 @@ Route 65 enabled selected-workspace update-only, mixed, delete-only, and
 move-only batches with a cap of 8. It centralized the count policy, preserved
 approval/workspace/preflight/verification/result semantics, added
 representative 8-operation recovery-authority and restore drills, and kept 9+
-writes and broad `apply_patch` blocked. Do not continue count-by-count
-expansion by default.
+writes and broad `apply_patch` blocked at that route boundary. Route 69 later lifted the cap to 32
+after focused route/planning evidence. Do not continue count-by-count expansion
+by default.
 
 Implemented Route 66 batch:
 
@@ -831,7 +855,7 @@ without adding automatic recovery or rollback. It added a restore command
 contract, command runner, local `/restore` preview/execute command, and
 session/user recovery summary lines for captured-authority failures. Preview
 is the default. Execute requires explicit intent. Provider/MCP behavior,
-package scripts, default gates, 9+ writes, broad `apply_patch`, default
+package scripts, default gates, 33+ writes, broad `apply_patch`, default
 persistence, automatic recovery, and atomic rollback remain unchanged.
 
 Implemented Route 68 batch:
@@ -840,19 +864,31 @@ Implemented Route 68 batch:
 
 Route 68 added a pure git-style broad patch parser/normalizer for update,
 add, delete, and pure-rename sections that can be represented as existing
-marker-style operations. It routes safe normalized 1-8 candidates through the
+marker-style operations. It routes safe normalized bounded candidates through the
 existing guarded single-file, multi-file, mixed, delete, and move routes. It
 also preserves non-default recovery-authority capture and explicit restore
 drill evidence for representative normalized candidates. It does not add fuzzy
-patching, arbitrary broad patch application, 9+ writes, automatic recovery,
+patching, arbitrary broad patch application, 33+ writes, automatic recovery,
 atomic rollback, provider/session/MCP changes, package scripts, default gates,
 or default persistence.
 
-Recommended next direction: Route 69 should be unsupported broad-shape UX
-hardening if users need clearer blocked-shape explanations. A 9+ /
-arbitrary-N policy decision remains separate and should not proceed without a
-stronger approval/recovery stance. Do not treat Route 68 as broad arbitrary
-`apply_patch` readiness.
+Implemented Route 69 batch:
+
+**Batch 69: Expanded bounded broad patch safe subset**
+
+Route 69 lifted the bounded cap to 32, kept 33+ operations blocked, preserved
+existing guarded route ownership, and expanded normalizer evidence for larger
+multi-file and exact multi-hunk git-style updates. It kept
+rename-with-content-edit blocked because the current move route is
+content-preserving and a move-plus-update decomposition needs a separate
+execution/recovery decision. Binary, mode, symlink, submodule, copy, fuzzy,
+directory, overwrite, automatic recovery, atomic rollback, provider/session/MCP,
+package script, and default-gate changes remain unsupported.
+
+Recommended next direction: unsupported broad-shape UX hardening if users need
+clearer blocked-shape explanations. Rename-with-content-edit may be a separate
+route only if it becomes the main remaining parser blocker. Arbitrary-N and
+broad arbitrary `apply_patch` remain delayed.
 
 ## 9. Recommended Future Sequence
 
@@ -888,15 +924,16 @@ stronger approval/recovery stance. Do not treat Route 68 as broad arbitrary
   - Status: implemented as selected-workspace exactly-three mixed write support
     with non-default recovery-authority capture and partial-failure restore
     drills.
-  - Routes 64-65 later opened exactly-four and bounded 2-8 mixed; 9+ mixed and
+  - Routes 64-65 later opened exactly-four and bounded mixed; Route 69 lifted
+    the cap to 32. 33+ mixed and
     broad `apply_patch` remain unsupported.
 
 - Batch 63: Bounded destructive multi-delete/multi-move implementation
   - Status: implemented as selected-workspace exactly-two/exactly-three
     delete-only and move-only support with non-default recovery-authority
     capture and destructive partial-failure restore evidence.
-  - Routes 64-65 later opened exactly-four and bounded 2-8 destructive
-    batches; 9+ writes, broad
+  - Routes 64-65 later opened exactly-four and bounded destructive batches;
+    Route 69 lifted the cap to 32. 33+ writes, broad
     `apply_patch`, directory delete/move, overwrite,
     automatic recovery, and rollback remain unsupported.
 
@@ -904,47 +941,55 @@ stronger approval/recovery stance. Do not treat Route 68 as broad arbitrary
   - Status: implemented as selected-workspace exactly-four update, mixed,
     delete-only, and move-only support with non-default recovery-authority
     capture and exactly-four partial-failure restore drills.
-  - Route 65 later opened bounded 2-8 writes; 9+ writes, broad `apply_patch`,
+  - Route 65 later opened bounded writes; Route 69 lifted the cap to 32.
+    33+ writes, broad `apply_patch`,
     directory delete/move, overwrite,
     automatic recovery, and rollback remain unsupported.
 
 - Batch 65: Bounded small-N write policy implementation
-  - Status: implemented with cap 8 for update-only, mixed, delete-only, and
-    move-only batches plus representative 8-operation restore drills.
-  - 9+ writes, broad `apply_patch`, automatic recovery, and rollback remain
+  - Status: implemented with cap 8, later lifted by Route 69 to cap 32, for
+    update-only, mixed, delete-only, and move-only batches.
+  - 33+ writes, broad `apply_patch`, automatic recovery, and rollback remain
     unsupported.
 
 - Batch 66: Explicit restore UX and CLI/session surface
   - Status: implemented as restore command contract, command runner, local
     `/restore` preview/execute command, and session/user recovery summary.
   - Preview is default; execute requires explicit intent; no automatic
-    recovery, rollback, provider/MCP change, default persistence, 9+ writes,
+    recovery, rollback, provider/MCP change, default persistence, 33+ writes,
     or broad `apply_patch`.
 
 - Batch 67: Bounded broad `apply_patch` candidate implementation
   - Status: implemented as classifier/routing support for parser-supported
-    1-8 operation payloads that normalize to existing guarded single-file,
+    bounded operation payloads that normalize to existing guarded single-file,
     update-only, mixed, delete-only, and move-only lanes.
-  - 9+ operations, arbitrary unified diff/broad patch shapes, directory
+  - 33+ operations, arbitrary unified diff/broad patch shapes, directory
     operations, overwrite, fuzzy patch, automatic recovery, atomic rollback,
     and broad readiness remain unsupported.
 
 - Batch 68: Bounded broad patch parser/normalizer implementation
   - Status: implemented as a pure parser/normalizer for safe git-style
     update/add/delete/pure-rename sections, normalized into existing guarded
-    1-8 operation routes.
-  - 9+ writes, arbitrary broad patches, binary/mode/fuzzy patches,
+    bounded operation routes.
+  - Route 69 later expanded the cap and multi-hunk evidence.
+  - 33+ writes, arbitrary broad patches, binary/mode/fuzzy patches,
     rename-with-content-edit, directory/path conflicts, overwrite, automatic
     recovery, and rollback remain unsupported.
 
-- Batch 69: Unsupported broad-shape UX hardening or 9+ policy decision
+- Batch 69: Expanded bounded broad patch safe subset
+  - Status: implemented with cap 32, larger safe normalized payloads, exact
+    multi-hunk update preservation, and explicit blockers for metadata-only or
+    unsafe broad shapes.
+  - 33+ writes, arbitrary broad patches, rename-with-content-edit, fuzzy patch,
+    automatic recovery, and rollback remain unsupported.
+
+- Batch 70: Unsupported broad-shape UX hardening
   - Prefer clearer unsupported-shape diagnostics if broad patches are being
     submitted and blocked.
-  - Consider 9+ / arbitrary-N only with concrete need and proof that approval,
-    recovery authority, partial failure, and result semantics remain
-    understandable beyond the current cap.
+  - Rename-with-content-edit should remain separate unless it becomes the main
+    remaining blocker.
 
-- Batch 69+: Broad arbitrary `apply_patch` readiness map
+- Batch 71+: Broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are
     settled.
   - Broad arbitrary `apply_patch` remains delayed because it combines parsing,
@@ -980,8 +1025,8 @@ preserve the real-provider boundary.
 Stop and split into a separate route if the next step requires:
 
 - new writer reachability
-- 9+ mixed operation writes
-- 9+ writes
+- 33+ mixed operation writes
+- 33+ writes
 - broad multi-delete or multi-move writes beyond the bounded small-N cap
 - broad `apply_patch` writes
 - durable journal storage
@@ -1036,25 +1081,28 @@ Allowed after this document:
   selected-workspace update, mixed, delete-only, and move-only batches, with
   non-default recovery-authority capture and explicit partial-failure restore
   drills.
-- Route 65 bounded small-N write policy is implemented with cap 8 for
-  update-only, mixed, delete-only, and move-only batches.
+- Route 65 bounded small-N write policy was implemented with cap 8; Route 69
+  lifted the current cap to 32 for update-only, mixed, delete-only, and
+  move-only batches.
 - Route 66 explicit restore UX is implemented through a restore command
   contract, command runner, local `/restore` command, and session/user recovery
   summary. Preview is default and execute requires explicit intent.
 - Route 67 bounded broad `apply_patch` candidate support is implemented for
-  parser-supported 1-8 operation payloads that normalize to existing guarded
+  parser-supported bounded operation payloads that normalize to existing guarded
   route families.
 - Route 68 bounded broad patch parser/normalizer support is implemented for a
   safe git-style update/add/delete/pure-rename subset that normalizes into
-  existing guarded 1-8 route families.
+  existing guarded route families.
+- Route 69 expanded that bounded surface to cap 32 and added larger
+  safe-subset, multi-hunk, and metadata-blocker evidence.
 
 Forbidden after this document:
 
 - broad `apply_patch` readiness
 - arbitrary unified diff / broad patch write readiness
 - arbitrary mutation readiness
-- 9+ mixed operation write readiness
-- 9+ write readiness
+- 33+ mixed operation write readiness
+- 33+ write readiness
 - broad multi-delete or multi-move readiness beyond the bounded small-N cap
 - durable journal readiness
 - recovery executor readiness

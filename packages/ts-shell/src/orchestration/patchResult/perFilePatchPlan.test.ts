@@ -1453,8 +1453,14 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
-  it("projects nine update-only operations as unsupported/no-write", () => {
-    const plan = planFromPatch(boundedUpdatePatch(9), updateFiles(9));
+  it("projects 32 update-only operations to supported write intents", () => {
+    const plan = planFromPatch(boundedUpdatePatch(32), updateFiles(32));
+
+    expectSupportedWritePlan(plan, updatePaths(32));
+  });
+
+  it("projects 33 update-only operations as unsupported/no-write", () => {
+    const plan = planFromPatch(boundedUpdatePatch(33), updateFiles(33));
 
     expectUnsupportedNoWritePlan(plan, "too-many-update-files");
     expect(plan.summary.writeIntentFiles).toEqual([]);
@@ -1486,25 +1492,28 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
-  it("projects nine mixed operations as unsupported/no-write", () => {
-    const plan = planFromPatch(nineMixedPatch(), {
-      "src/a.ts": "a = 1\n",
-      "src/b.ts": "b = 1\n",
-      "src/c.ts": "c = 1\n",
-      "src/d.ts": "d = 1\n",
-      "src/remove.ts": "remove\n",
-      "src/from.ts": "from\n",
-    });
+  it("projects 32 mixed operations to supported write intents", () => {
+    const plan = planFromPatch(
+      generatedMixedPatch(32),
+      generatedMixedFiles(32),
+      { existingDirectories: ["src"] },
+    );
+
+    expectSupportedWritePlan(plan, generatedMixedTargets(32));
+  });
+
+  it("projects 33 mixed operations as unsupported/no-write", () => {
+    const plan = planFromPatch(generatedMixedPatch(33), generatedMixedFiles(33));
 
     expectUnsupportedNoWritePlan(plan, "mixed-operations");
-    expect(plan.summary.mixedOperationReadiness?.operationCount).toBe(9);
+    expect(plan.summary.mixedOperationReadiness?.operationCount).toBe(33);
   });
 });
 
 function boundedUpdatePatch(count: number): string[] {
   return [
     "*** Begin Patch",
-    ..."abcdefghi".slice(0, count).split("").flatMap((file) => [
+    ...Array.from({ length: count }, (_, index) => fileSuffix(index)).flatMap((file) => [
       `*** Update File: src/${file}.ts`,
       "@@",
       `-${file} = 1`,
@@ -1516,10 +1525,17 @@ function boundedUpdatePatch(count: number): string[] {
 
 function updateFiles(count: number): Record<string, string> {
   return Object.fromEntries(
-    "abcdefghi"
-      .slice(0, count)
-      .split("")
-      .map((file) => [`src/${file}.ts`, `${file} = 1\n`]),
+    updatePaths(count).map((file) => {
+      const stem = file.slice("src/".length, -".ts".length);
+      return [file, `${stem} = 1\n`];
+    }),
+  );
+}
+
+function updatePaths(count: number): readonly string[] {
+  return Array.from(
+    { length: count },
+    (_, index) => `src/${fileSuffix(index)}.ts`,
   );
 }
 
@@ -1552,38 +1568,71 @@ function eightMixedPatch(): string[] {
   ];
 }
 
-function nineMixedPatch(): string[] {
+function generatedMixedPatch(count: number): string[] {
   return [
     "*** Begin Patch",
-    "*** Update File: src/a.ts",
-    "@@",
-    "-a = 1",
-    "+a = 2",
-    "*** Update File: src/b.ts",
-    "@@",
-    "-b = 1",
-    "+b = 2",
-    "*** Update File: src/c.ts",
-    "@@",
-    "-c = 1",
-    "+c = 2",
-    "*** Update File: src/d.ts",
-    "@@",
-    "-d = 1",
-    "+d = 2",
-    "*** Add File: src/new-a.ts",
-    "+created a",
-    "*** Add File: src/new-b.ts",
-    "+created b",
-    "*** Add File: src/new-c.ts",
-    "+created c",
-    "*** Delete File: src/remove.ts",
-    "*** Update File: src/from.ts",
-    "*** Move to: src/to.ts",
-    "@@",
-    " from",
+    ...Array.from({ length: count }, (_, index) => {
+      const suffix = fileSuffix(index);
+      const mod = index % 4;
+      if (mod === 0) {
+        return [
+          `*** Update File: src/update-${suffix}.ts`,
+          "@@",
+          `-${suffix} = 1`,
+          `+${suffix} = 2`,
+        ];
+      }
+      if (mod === 1) {
+        return [`*** Add File: src/new-${suffix}.ts`, `+created ${suffix}`];
+      }
+      if (mod === 2) {
+        return [`*** Delete File: src/remove-${suffix}.ts`];
+      }
+      return [
+        `*** Update File: src/from-${suffix}.ts`,
+        `*** Move to: src/to-${suffix}.ts`,
+        "@@",
+        ` ${suffix}`,
+      ];
+    }).flat(),
     "*** End Patch",
   ];
+}
+
+function generatedMixedFiles(count: number): Record<string, string> {
+  const files: Record<string, string> = {};
+  for (let index = 0; index < count; index += 1) {
+    const suffix = fileSuffix(index);
+    if (index % 4 === 0) {
+      files[`src/update-${suffix}.ts`] = `${suffix} = 1\n`;
+    } else if (index % 4 === 2) {
+      files[`src/remove-${suffix}.ts`] = `${suffix}\n`;
+    } else if (index % 4 === 3) {
+      files[`src/from-${suffix}.ts`] = `${suffix}\n`;
+    }
+  }
+  return files;
+}
+
+function generatedMixedTargets(count: number): readonly string[] {
+  return Array.from({ length: count }, (_, index) => {
+    const suffix = fileSuffix(index);
+    const mod = index % 4;
+    if (mod === 0) {
+      return `src/update-${suffix}.ts`;
+    }
+    if (mod === 1) {
+      return `src/new-${suffix}.ts`;
+    }
+    if (mod === 2) {
+      return `src/remove-${suffix}.ts`;
+    }
+    return `src/to-${suffix}.ts`;
+  });
+}
+
+function fileSuffix(index: number): string {
+  return index < 26 ? "abcdefghijklmnopqrstuvwxyz"[index] ?? "" : `file-${index + 1}`;
 }
 
 function expectSupportedWritePlan(

@@ -306,12 +306,14 @@ describe("multi-file Update File selected-workspace write route", () => {
     );
   });
 
-  it("writes five Update File operations under the bounded small-N policy", async () => {
-    const fixture = createFixture({ includeC: true, includeD: true, includeE: true });
+  it.each([5, 9, 16, 32])(
+    "writes %i Update File operations under the bounded small-N policy",
+    async (count) => {
+    const fixture = createUpdateFixture(count);
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
 
     const result = await runMultiFileWriteRoute({
-      ...routeOptions(fixture.workspaceRoot, fiveFilePatch()),
+      ...routeOptions(fixture.workspaceRoot, boundedUpdatePatch(count)),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       validateWriteTarget: authority.validateWriteTarget,
@@ -319,22 +321,17 @@ describe("multi-file Update File selected-workspace write route", () => {
     });
 
     expect(result.status).toBe("written");
-    expect(result.changedFiles).toEqual([
-      "src/a.ts",
-      "src/b.ts",
-      "src/c.ts",
-      "src/d.ts",
-      "src/e.ts",
-    ]);
+    expect(result.changedFiles).toEqual(updatePaths(count));
     expect(result.failedFiles).toEqual([]);
     expect(result.postWriteVerification).toBe("passed");
     expect(result.evidence).toEqual(
       expect.arrayContaining([
-        "apply-patch-multi-file-write-route:bounded-5-update-files",
+        `apply-patch-multi-file-write-route:bounded-${count}-update-files`,
         "apply-patch-multi-file-write-route:sequential-write-no-rollback",
       ]),
     );
-  });
+    },
+  );
 
   it("restores an eight-file update prefix after partial failure and blocks hidden edits", async () => {
     const fixture = createFixture({
@@ -410,24 +407,14 @@ describe("multi-file Update File selected-workspace write route", () => {
     expect(blockedRestore.blockedReason).toBe("current-content-hash-mismatch");
   });
 
-  it("blocks nine Update File operations without invoking the writer", async () => {
-    const fixture = createFixture({
-      includeC: true,
-      includeD: true,
-      includeE: true,
-      extraFiles: {
-        "src/f.ts": "f = 1\n",
-        "src/g.ts": "g = 1\n",
-        "src/h.ts": "h = 1\n",
-        "src/i.ts": "i = 1\n",
-      },
-    });
+  it("blocks 33 Update File operations without invoking the writer", async () => {
+    const fixture = createUpdateFixture(33);
     const before = snapshotFixture(fixture.workspaceRoot);
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     let writes = 0;
 
     const result = await runMultiFileWriteRoute({
-      ...routeOptions(fixture.workspaceRoot, boundedUpdatePatch(9)),
+      ...routeOptions(fixture.workspaceRoot, boundedUpdatePatch(33)),
       readFile: authority.readFile,
       readVerifiedFile: authority.readVerifiedFile,
       validateWriteTarget: authority.validateWriteTarget,
@@ -855,15 +842,10 @@ function fourFilePatch(): string {
   ].join("\n");
 }
 
-function fiveFilePatch(): string {
-  return boundedUpdatePatch(5);
-}
-
 function boundedUpdatePatch(count: number): string {
-  const files = "abcdefghi".slice(0, count).split("");
   return [
     "*** Begin Patch",
-    ...files.flatMap((file) => [
+    ...Array.from({ length: count }, (_, index) => fileStem(index)).flatMap((file) => [
       `*** Update File: src/${file}.ts`,
       "@@",
       `-${file} = 1`,
@@ -871,6 +853,33 @@ function boundedUpdatePatch(count: number): string {
     ]),
     "*** End Patch",
   ].join("\n");
+}
+
+function createUpdateFixture(count: number): { readonly workspaceRoot: string } {
+  return createFixture({
+    includeC: count >= 3,
+    includeD: count >= 4,
+    includeE: count >= 5,
+    extraFiles: Object.fromEntries(
+      updatePaths(count)
+        .slice(5)
+        .map((relativePath) => {
+          const stem = path.basename(relativePath, ".ts");
+          return [relativePath, `${stem} = 1\n`];
+        }),
+    ),
+  });
+}
+
+function updatePaths(count: number): readonly string[] {
+  return Array.from(
+    { length: count },
+    (_, index) => `src/${fileStem(index)}.ts`,
+  );
+}
+
+function fileStem(index: number): string {
+  return index < 26 ? "abcdefghijklmnopqrstuvwxyz"[index] ?? "" : `file-${index + 1}`;
 }
 
 function mixedAddPatch(): string {
