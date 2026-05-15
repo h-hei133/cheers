@@ -451,7 +451,7 @@ function buildParsedPatchPlan(
   const isMixedOperation = operationKinds.size > 1;
 
   if (isMixedOperation) {
-    if (operations.length === 2 && mixedOperationPairIsSupported(operations)) {
+    if (mixedOperationCombinationIsSupported(operations)) {
       return buildVerifiedMixedPlan({
         patch,
         options,
@@ -468,9 +468,9 @@ function buildParsedPatchPlan(
       supportStatus: "unsupported-no-write",
       failureClass: "mixed-operations",
       reason:
-        "Mixed apply_patch operation families are represented as unsupported/no-write even when each individual operation has an existing single-operation lane.",
+        "Mixed apply_patch operation families outside the bounded exactly-two or exactly-three route are represented as unsupported/no-write even when each individual operation has an existing single-operation lane.",
       nextAction:
-        "Split the patch into one supported operation family, or use a future dedicated mixed-operation route after authority, ordering, verification, and failure semantics are defined.",
+        "Use exactly two or exactly three supported mixed operations, split the patch into one supported operation family, or keep the broader shape out of the writer route.",
       failures,
       mixedOperationReadiness: readiness,
     });
@@ -533,7 +533,7 @@ function buildVerifiedMixedPlan(input: {
       supportStatus: "unsupported-no-write",
       failureClass: "duplicate-target",
       reason:
-        "Exactly-two mixed apply_patch shape matched a candidate route, but source/target paths conflict.",
+        "Bounded mixed apply_patch shape matched a candidate route, but source/target paths conflict.",
       nextAction:
         "Regenerate the mixed patch so each operation source and target path is distinct.",
       failures: [conflict],
@@ -551,7 +551,7 @@ function buildVerifiedMixedPlan(input: {
       supportStatus: "unsupported-no-write",
       failureClass: "verification-failed",
       reason:
-        "Exactly-two mixed apply_patch shape matched a candidate route, but directory delete/move is not enabled.",
+        "Bounded mixed apply_patch shape matched a candidate route, but directory delete/move is not enabled.",
       nextAction:
         "Choose regular files for mixed delete or move operations; directory delete/move remains unsupported.",
       failures: [directoryFailure],
@@ -573,7 +573,7 @@ function buildVerifiedMixedPlan(input: {
       supportStatus: "unsupported-no-write",
       failureClass: failureClassForVerificationFailures(verification.failures),
       reason:
-        "Exactly-two mixed apply_patch shape matched a candidate route, but preflight verification failed before any writer was reachable.",
+        "Bounded mixed apply_patch shape matched a candidate route, but preflight verification failed before any writer was reachable.",
       nextAction:
         verification.failures[0]?.nextAction ??
         "Re-read current workspace files and regenerate the mixed patch.",
@@ -619,9 +619,9 @@ function buildVerifiedMixedPlan(input: {
     writeIntentFiles: input.operations.map(targetPathForOperation),
     targetFiles: input.targetFiles,
     reason:
-      "Exactly-two mixed apply_patch operations are represented as supported write intents owned by the guarded mixed workspace route.",
+      "Exactly-two or exactly-three mixed apply_patch operations are represented as supported write intents owned by the guarded mixed workspace route.",
     nextAction:
-      "Route may write only through explicit approval naming both targets, all source/target guards, all final preflights before the first writer, parsed-order writes, and per-operation post-write verification.",
+      "Route may write only through explicit approval naming all targets, all source/target guards, all final preflights before the first writer, parsed-order writes, and per-operation post-write verification.",
     operationSupportStatus: "supported-write",
   });
 }
@@ -1123,25 +1123,24 @@ function unsupportedOperationPathFailures(
   return [];
 }
 
-function mixedOperationPairIsSupported(
+function mixedOperationCombinationIsSupported(
   operations: readonly PatchFileOperation[],
 ): boolean {
-  if (operations.length !== 2) {
+  if (operations.length !== 2 && operations.length !== 3) {
     return false;
   }
   const kinds = operations.map((operation) => operation.kind);
-  if (new Set(kinds).size !== 2) {
+  if (new Set(kinds).size <= 1) {
     return false;
   }
-  const pair = [...kinds].sort().join("+");
-  return new Set([
-    "add+delete",
-    "add+move",
-    "add+update",
-    "delete+move",
-    "delete+update",
-    "move+update",
-  ]).has(pair);
+  return kinds.every((kind) =>
+    new Set<PatchOperationKind>([
+      "add",
+      "delete",
+      "move",
+      "update",
+    ]).has(kind),
+  );
 }
 
 function sourceTargetConflictFailure(

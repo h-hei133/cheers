@@ -22,7 +22,7 @@ export interface MixedOperationReadinessProjection {
   readonly blockedCombinations: readonly string[];
   readonly routeBlocker: "mixed-operation-route-not-enabled" | "none";
   readonly additionalPrerequisites: readonly MixedOperationReadinessPrerequisite[];
-  readonly mixedWritesEnabled: false;
+  readonly mixedWritesEnabled: boolean;
   readonly rollbackOrAtomicityClaim: "none";
   readonly writeAuthority: "not-granted-by-readiness-projection";
 }
@@ -50,6 +50,11 @@ export function projectMixedOperationReadiness(
     operations.map(operationKindForPatchOperation),
   );
   const isMixedOperation = operationKinds.length > 1;
+  const mixedWritesEnabled =
+    isMixedOperation &&
+    (operations.length === 2 || operations.length === 3) &&
+    operationKinds.every((kind) => currentSingleOperationLanes.has(kind));
+  const blocked = isMixedOperation && !mixedWritesEnabled;
   return {
     isMixedOperation,
     operationKinds,
@@ -60,16 +65,16 @@ export function projectMixedOperationReadiness(
     unsupportedIndividualKinds: operationKinds.filter(
       (kind) => !currentSingleOperationLanes.has(kind),
     ),
-    blockedCombinations: isMixedOperation
+    blockedCombinations: blocked
       ? [operationKinds.join("+")]
       : [],
-    routeBlocker: isMixedOperation
+    routeBlocker: blocked
       ? "mixed-operation-route-not-enabled"
       : "none",
-    additionalPrerequisites: isMixedOperation
+    additionalPrerequisites: blocked
       ? mixedWritePrerequisites
       : [],
-    mixedWritesEnabled: false,
+    mixedWritesEnabled,
     rollbackOrAtomicityClaim: "none",
     writeAuthority: "not-granted-by-readiness-projection",
   };

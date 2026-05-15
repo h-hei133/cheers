@@ -153,6 +153,99 @@ describe("mixed file write result journal metadata", () => {
       recoveryPlan?.recoveryReadiness.restoreEligibility.canAttemptRestore,
     ).toBe(false);
   });
+
+  it("projects exactly-three mixed partial failure with planned files and plan-only recovery metadata", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+
+    const route = await runMixedFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, updateCreateDeletePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      validateCreateTarget: authority.validateCreateTarget,
+      writeFile: authority.writeFile,
+      createFileExclusive: authority.createFileExclusive,
+      moveFileExclusive: authority.moveFileExclusive,
+      deleteFile: () => {
+        throw new Error("simulated delete failure");
+      },
+    });
+
+    const result = buildMixedFileWriteRouteResult({
+      sessionId: "session-1",
+      prompt: updateCreateDeletePatch(),
+      route,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.codingResult?.changedFiles).toEqual([
+      "src/a.ts",
+      "src/new.ts",
+    ]);
+    expect(result.codingResult?.failedFiles).toEqual([
+      {
+        path: "src/remove.ts",
+        reason: expect.stringContaining("Patch mixed write failed"),
+      },
+    ]);
+    expect(result.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        failureClass: "partial-failure",
+        writeIntentFiles: ["src/a.ts", "src/new.ts", "src/remove.ts"],
+        plannedFiles: [],
+        changedFiles: ["src/a.ts", "src/new.ts"],
+        failedFiles: [
+          {
+            path: "src/remove.ts",
+            reason: expect.stringContaining("Patch mixed write failed"),
+          },
+        ],
+        writerInvoked: true,
+        creatorInvoked: true,
+        deleteMoveInvoked: true,
+        postWriteVerification: "blocked",
+        successLike: false,
+      }),
+    );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal,
+    ).toEqual(
+      expect.objectContaining({
+        operationCount: 3,
+        plannedFiles: ["src/a.ts", "src/new.ts", "src/remove.ts"],
+        changedFiles: ["src/a.ts", "src/new.ts"],
+        failedFiles: [
+          expect.objectContaining({
+            path: "src/remove.ts",
+            failureClass: "write-application",
+          }),
+        ],
+        recoveryCandidateFiles: ["src/a.ts", "src/new.ts"],
+        rollbackAtomicityClaim: false,
+        recoveryExecuted: false,
+        writeCapability: "metadata-only",
+      }),
+    );
+    expect(
+      result.codingResult?.perFilePatchPlan?.routeScopedEditJournal
+        ?.recoveryPlan,
+    ).toEqual(
+      expect.objectContaining({
+        mode: "plan-only",
+        authority: "metadata-only",
+        recoveryExecuted: false,
+        rollbackAtomicityClaim: false,
+        recoveryCandidateFiles: ["src/a.ts", "src/new.ts"],
+        failedBeforeApplyFiles: ["src/remove.ts"],
+        appliedAndVerifiedBeforeLaterFailureFiles: [
+          "src/a.ts",
+          "src/new.ts",
+        ],
+      }),
+    );
+  });
 });
 
 function routeOptions(workspaceRoot: string, rawPatchText: string) {
@@ -173,6 +266,11 @@ function createFixture(): { readonly workspaceRoot: string } {
   tempRoots.push(workspaceRoot);
   fs.mkdirSync(path.join(workspaceRoot, "src"), { recursive: true });
   fs.writeFileSync(path.join(workspaceRoot, "src", "a.ts"), "a = 1\n", "utf8");
+  fs.writeFileSync(
+    path.join(workspaceRoot, "src", "remove.ts"),
+    "remove\n",
+    "utf8",
+  );
   return { workspaceRoot };
 }
 
@@ -185,6 +283,20 @@ function updateCreatePatch(): string {
     "+a = 2",
     "*** Add File: src/new.ts",
     "+created",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function updateCreateDeletePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Add File: src/new.ts",
+    "+created",
+    "*** Delete File: src/remove.ts",
     "*** End Patch",
   ].join("\n");
 }

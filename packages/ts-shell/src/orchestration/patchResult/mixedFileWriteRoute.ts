@@ -46,7 +46,7 @@ export type MixedFileWriteRouteBlocker =
   | "write-application"
   | "post-write-verification";
 
-export type MixedFileWriteTargetPaths = readonly [string, string];
+export type MixedFileWriteTargetPaths = readonly string[];
 
 export type MixedFileWriteApproval =
   | {
@@ -154,12 +154,19 @@ export type MixedFileWriteRoute =
     };
 
 export function patchIsExactlyTwoMixedWriteFiles(rawPatchText: string): boolean {
+  return patchIsTwoOrThreeMixedWriteFiles(rawPatchText);
+}
+
+export function patchIsTwoOrThreeMixedWriteFiles(rawPatchText: string): boolean {
   const parsed = parseApplyPatchText(rawPatchText);
-  if (parsed.ok === false || parsed.patch.operations.length !== 2) {
+  if (
+    parsed.ok === false ||
+    !mixedOperationCountIsEnabled(parsed.patch.operations.length)
+  ) {
     return false;
   }
   const kinds = parsed.patch.operations.map((operation) => operation.kind);
-  return new Set(kinds).size === 2 && mixedPairIsEnabled(kinds);
+  return new Set(kinds).size > 1 && mixedCombinationIsEnabled(kinds);
 }
 
 export async function runMixedFileWriteRoute(
@@ -228,7 +235,10 @@ export async function runMixedFileWriteRoute(
     options.explicitWorkspaceWriteOptIn,
   );
 
-  if (operations.length !== 2 || new Set(operationKinds).size !== 2) {
+  if (
+    !mixedOperationCountIsEnabled(operations.length) ||
+    new Set(operationKinds).size <= 1
+  ) {
     return blocked({
       blocker: "unsupported-operation",
       targetPaths,
@@ -237,15 +247,15 @@ export async function runMixedFileWriteRoute(
       perFilePatchPlan,
       failures: [unsupportedMixedFailure(operations)],
       nextAction:
-        "Use exactly two mixed operations from the guarded update/create/move/delete lanes. Same-family and 3+ mixed patches stay outside this route.",
+        "Use exactly two or exactly three mixed operations from the guarded update/create/move/delete lanes. Same-family, 4+ mixed, and broad patches stay outside this route.",
       evidence: [
         "apply-patch-mixed-file-write-route:unsupported-operation",
-        "apply-patch-mixed-file-write-route:exactly-two-mixed-required",
+        "apply-patch-mixed-file-write-route:bounded-two-or-three-mixed-required",
       ],
     });
   }
 
-  if (!mixedPairIsEnabled(operationKinds)) {
+  if (!mixedCombinationIsEnabled(operationKinds)) {
     return blocked({
       blocker: "unsupported-operation",
       targetPaths,
@@ -254,12 +264,12 @@ export async function runMixedFileWriteRoute(
       perFilePatchPlan,
       failures: [unsupportedMixedFailure(operations)],
       nextAction:
-        "This mixed operation pair is not enabled by the guarded exactly-two mixed write route.",
-      evidence: ["apply-patch-mixed-file-write-route:mixed-pair-not-enabled"],
+        "This mixed operation combination is not enabled by the guarded bounded mixed write route.",
+      evidence: ["apply-patch-mixed-file-write-route:mixed-combination-not-enabled"],
     });
   }
 
-  const supportedTargetPaths = toExactlyTwoTargetPaths(targetPaths);
+  const supportedTargetPaths = toSupportedTargetPaths(targetPaths);
   if (!supportedTargetPaths) {
     return blocked({
       blocker: "target-mismatch",
@@ -269,7 +279,7 @@ export async function runMixedFileWriteRoute(
       perFilePatchPlan,
       failures: [targetMismatchFailure()],
       nextAction:
-        "Regenerate the mixed patch with exactly two operation targets.",
+        "Regenerate the mixed patch with exactly two or exactly three operation targets.",
       evidence: ["apply-patch-mixed-file-write-route:target-count-mismatch"],
     });
   }
@@ -320,7 +330,7 @@ export async function runMixedFileWriteRoute(
       nextAction:
         options.requestedUserDecision === "denied"
           ? "Do not write these mixed operations. Surface the denial and require fresh explicit approval before any future write."
-          : "Request explicit approval for writing exactly these two mixed operation targets before the mixed route can write.",
+          : "Request explicit approval for writing exactly these mixed operation targets before the mixed route can write.",
       evidence: [
         "apply-patch-mixed-file-write-route:write-decision-blocked",
         "apply-patch-mixed-file-write-route:explicit-approval-required",
@@ -362,7 +372,7 @@ export async function runMixedFileWriteRoute(
       failures: verification.failures,
       nextAction:
         verification.failures[0]?.nextAction ??
-        "Regenerate the exactly-two mixed patch against current workspace state.",
+        "Regenerate the bounded mixed patch against current workspace state.",
       evidence: ["apply-patch-mixed-file-write-route:verification-blocked"],
     });
   }
@@ -396,7 +406,7 @@ export async function runMixedFileWriteRoute(
       failures: writeIntent.failures,
       nextAction:
         writeIntent.failures[0]?.nextAction ??
-        "Regenerate the exactly-two mixed patch.",
+        "Regenerate the bounded mixed patch.",
       evidence: ["apply-patch-mixed-file-write-route:no-partial-blocked"],
     });
   }
@@ -502,7 +512,7 @@ export async function runMixedFileWriteRoute(
       selectedWorkspaceWrite: true,
       postWriteVerification: applied.postWriteVerification,
       nextAction:
-        "Stop: mixed workspace write is partial or uncertain. Inspect/re-read both attempted paths before retrying; no rollback was attempted.",
+        "Stop: mixed workspace write is partial or uncertain. Inspect/re-read all attempted paths before retrying; no rollback was attempted.",
       evidence: [
         `apply-patch-mixed-file-write-route:${blocker}-blocked`,
         "apply-patch-mixed-file-write-route:parsed-order-write-no-rollback",
@@ -513,7 +523,7 @@ export async function runMixedFileWriteRoute(
     });
   }
 
-  const changedFiles = toExactlyTwoTargetPaths(applied.changedFiles);
+  const changedFiles = toSupportedTargetPaths(applied.changedFiles);
   if (!changedFiles) {
     return blocked({
       blocker: "target-mismatch",
@@ -523,13 +533,13 @@ export async function runMixedFileWriteRoute(
       perFilePatchPlan,
       failures: [targetMismatchFailure()],
       nextAction:
-        "Only the two approved mixed operation targets may be reported as changed.",
+        "Only the approved mixed operation targets may be reported as changed.",
       evidence: ["apply-patch-mixed-file-write-route:verified-target-mismatch"],
     });
   }
 
   const nextAction =
-    "Review the two selected workspace mixed-operation changes; default apply_patch remains rejected outside this explicit candidate write entrypoint.";
+    "Review the selected workspace mixed-operation changes; default apply_patch remains rejected outside this explicit candidate write entrypoint.";
   const writeFailureState = buildWorkspaceWriteFailureState({
     phase: "verified-write",
     targetPath: changedFiles.join(", "),
@@ -566,8 +576,8 @@ export async function runMixedFileWriteRoute(
       "apply-patch-mixed-file-write-route:explicit-runtime-opt-in",
       "apply-patch-mixed-file-write-route:explicit-workspace-write-opt-in",
       "apply-patch-mixed-file-write-route:approved-for-write",
-      "apply-patch-mixed-file-write-route:exactly-two-mixed-operations",
-      `apply-patch-mixed-file-write-route:operation-pair:${operationKinds.join("+")}`,
+      `apply-patch-mixed-file-write-route:exactly-${operationKinds.length}-mixed-operations`,
+      `apply-patch-mixed-file-write-route:operation-combination:${operationKinds.join("+")}`,
       "apply-patch-mixed-file-write-route:all-preflight-before-writer",
       "apply-patch-mixed-file-write-route:all-final-preflight-before-writer",
       "apply-patch-mixed-file-write-route:parsed-order-write-no-rollback",
@@ -576,7 +586,7 @@ export async function runMixedFileWriteRoute(
       "apply-patch-mixed-file-write-route:post-write-verification-passed",
       "apply-patch-mixed-file-write-route:success-after-verified-write",
       "apply-patch-mixed-file-write-route:no-rollback",
-      "apply-patch-mixed-file-write-route:no-3-plus-mixed",
+      "apply-patch-mixed-file-write-route:no-4-plus-mixed",
       "apply-patch-mixed-file-write-route:no-broad-apply-patch",
       "apply-patch-mixed-file-write-route:default-production-rejection-unchanged",
       ...writeFailureState.evidence,
@@ -584,19 +594,22 @@ export async function runMixedFileWriteRoute(
   };
 }
 
-function mixedPairIsEnabled(kinds: readonly PatchOperationKind[]): boolean {
-  if (kinds.length !== 2 || new Set(kinds).size !== 2) {
+function mixedOperationCountIsEnabled(count: number): boolean {
+  return count === 2 || count === 3;
+}
+
+function mixedCombinationIsEnabled(kinds: readonly PatchOperationKind[]): boolean {
+  if (!mixedOperationCountIsEnabled(kinds.length) || new Set(kinds).size <= 1) {
     return false;
   }
-  const pair = [...kinds].sort().join("+");
-  return new Set([
-    "add+delete",
-    "add+move",
-    "add+update",
-    "delete+move",
-    "delete+update",
-    "move+update",
-  ]).has(pair);
+  return kinds.every((kind) =>
+    new Set<PatchOperationKind>([
+      "add",
+      "delete",
+      "move",
+      "update",
+    ]).has(kind),
+  );
 }
 
 function targetPathForOperation(operation: PatchFileOperation): string {
@@ -858,8 +871,8 @@ async function applyMixedOperations(
   operations: readonly VerifiedPatchFileOperation[],
 ): Promise<MixedApplyResult> {
   const changedFiles: string[] = [];
-  // Route 48 intentionally uses parsed patch order after all preflight checks.
-  // Conflict guards make the two operations independent, so preserving parsed
+  // Route 48/62 intentionally uses parsed patch order after all preflight checks.
+  // Conflict guards make the bounded operations independent, so preserving parsed
   // order is deterministic without implying rollback or atomicity.
   for (const operation of operations) {
     const applied = await applyOneOperation(options, operation);
@@ -942,7 +955,7 @@ async function applyOneOperation(
               ? `Patch mixed write failed: ${error.message}`
               : "Patch mixed write failed.",
           nextAction:
-            "Inspect/re-read both attempted paths before retrying; no rollback was attempted.",
+            "Inspect/re-read all attempted paths before retrying; no rollback was attempted.",
         },
       ],
       postWriteVerification: "blocked",
@@ -962,7 +975,7 @@ function postWriteFailure(
         path: targetPath,
         message: `Patch mixed ${operation} post-write verification failed.`,
         nextAction:
-          "Inspect/re-read both attempted paths before retrying; no rollback was attempted.",
+          "Inspect/re-read all attempted paths before retrying; no rollback was attempted.",
       },
     ],
     postWriteVerification: "failed",
@@ -974,7 +987,7 @@ function buildApproval(
   requestedUserDecision: SingleFileApplyPatchRequestedUserDecision | undefined,
   explicitWorkspaceWriteOptIn: boolean,
 ): MixedFileWriteApproval {
-  const supportedTargetPaths = toExactlyTwoTargetPaths(targetPaths);
+  const supportedTargetPaths = toSupportedTargetPaths(targetPaths);
   if (
     explicitWorkspaceWriteOptIn &&
     requestedUserDecision === "approved" &&
@@ -983,7 +996,7 @@ function buildApproval(
     return {
       status: "approved-for-write",
       targetPaths: supportedTargetPaths,
-      message: `Approved writing exactly these two mixed operation targets: ${targetPaths.join(", ")}`,
+      message: `Approved writing exactly these mixed operation targets: ${targetPaths.join(", ")}`,
     };
   }
   return {
@@ -995,17 +1008,20 @@ function buildApproval(
           : "pending",
     targetPaths: [...targetPaths],
     message:
-      targetPaths.length === 2
-        ? `Approval required for writing exactly these two mixed operation targets: ${targetPaths.join(", ")}`
-        : "Approval required for exactly two selected-workspace mixed operation targets.",
+      mixedOperationCountIsEnabled(targetPaths.length)
+        ? `Approval required for writing exactly these mixed operation targets: ${targetPaths.join(", ")}`
+        : "Approval required for exactly two or exactly three selected-workspace mixed operation targets.",
   };
 }
 
-function toExactlyTwoTargetPaths(
+function toSupportedTargetPaths(
   targetPaths: readonly string[],
 ): MixedFileWriteTargetPaths | undefined {
-  if (targetPaths.length === 2 && targetPaths[0] && targetPaths[1]) {
-    return [targetPaths[0], targetPaths[1]];
+  if (
+    mixedOperationCountIsEnabled(targetPaths.length) &&
+    targetPaths.every(Boolean)
+  ) {
+    return [...targetPaths];
   }
   return undefined;
 }
@@ -1018,9 +1034,9 @@ function unsupportedMixedFailure(
     code: "patch-verify-operation-unsupported",
     ...(operation ? { path: targetPathForOperation(operation) } : {}),
     message:
-      "Mixed workspace write route only accepts exactly two supported mixed operations.",
+      "Mixed workspace write route only accepts exactly two or exactly three supported mixed operations.",
     nextAction:
-      "Keep broad apply_patch, same-family, 3+ mixed, malformed, and unknown operation shapes out of this candidate write route.",
+      "Keep broad apply_patch, same-family, 4+ mixed, malformed, and unknown operation shapes out of this candidate write route.",
   };
 }
 
@@ -1028,9 +1044,9 @@ function targetMismatchFailure(): PatchFailure {
   return {
     code: "patch-apply-plan-not-verified",
     message:
-      "Mixed workspace write route requires exactly two distinct operation targets.",
+      "Mixed workspace write route requires exactly two or exactly three distinct operation targets.",
     nextAction:
-      "Regenerate the patch with exactly two distinct selected-workspace operation targets.",
+      "Regenerate the patch with exactly two or exactly three distinct selected-workspace operation targets.",
   };
 }
 

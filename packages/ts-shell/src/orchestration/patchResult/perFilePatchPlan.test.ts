@@ -522,7 +522,7 @@ describe("buildPerFilePatchPlan", () => {
     ]);
   });
 
-  it("projects update, create, and delete mixes to per-file unsupported/no-write facts", () => {
+  it("projects update, create, and delete mixes to supported exactly-three write intents", () => {
     const plan = planFromPatch(
       [
         "*** Begin Patch",
@@ -542,22 +542,59 @@ describe("buildPerFilePatchPlan", () => {
       { existingDirectories: ["src"] },
     );
 
-    expectUnsupportedNoWritePlan(plan, "mixed-operations");
+    expectSupportedWritePlan(plan, ["src/app.ts", "src/new.ts", "src/remove.ts"]);
     expect(plan.summary.targetFiles).toEqual([
       "src/app.ts",
       "src/new.ts",
       "src/remove.ts",
     ]);
-    expect(plan.summary.failedFiles.map((failure) => failure.path)).toEqual([
+    expect(plan.summary.writeIntentFiles).toEqual([
       "src/app.ts",
       "src/new.ts",
       "src/remove.ts",
     ]);
+    expect(plan.summary.failedFiles).toEqual([]);
     expect(plan.operations).toEqual([
-      expect.objectContaining({ operationKind: "update", writeIntent: "none" }),
-      expect.objectContaining({ operationKind: "create", writeIntent: "none" }),
-      expect.objectContaining({ operationKind: "delete", writeIntent: "none" }),
+      expect.objectContaining({ operationKind: "update", writeIntent: "eligible" }),
+      expect.objectContaining({ operationKind: "create", writeIntent: "eligible" }),
+      expect.objectContaining({ operationKind: "delete", writeIntent: "eligible" }),
     ]);
+  });
+
+  it("keeps 4+ mixed operations unsupported/no-write", () => {
+    const plan = planFromPatch(
+      [
+        "*** Begin Patch",
+        "*** Update File: src/app.ts",
+        "@@",
+        "-old",
+        "+new",
+        "*** Add File: src/new.ts",
+        "+created",
+        "*** Delete File: src/remove.ts",
+        "*** Update File: src/from.ts",
+        "*** Move to: src/to.ts",
+        "@@",
+        " from",
+        "*** End Patch",
+      ],
+      {
+        "src/app.ts": "old\n",
+        "src/remove.ts": "remove\n",
+        "src/from.ts": "from\n",
+      },
+      { existingDirectories: ["src"] },
+    );
+
+    expectUnsupportedNoWritePlan(plan, "mixed-operations");
+    expect(plan.summary.writeIntentFiles).toEqual([]);
+    expect(plan.summary.mixedOperationReadiness).toEqual(
+      expect.objectContaining({
+        operationCount: 4,
+        routeBlocker: "mixed-operation-route-not-enabled",
+        mixedWritesEnabled: false,
+      }),
+    );
   });
 
   it("keeps create plus move with content edits unsupported/no-write with source and target", () => {

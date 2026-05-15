@@ -33,6 +33,28 @@ describe("projectMixedOperationReadiness", () => {
     });
   });
 
+  it("recognizes bounded exactly-three mixed route support without granting write authority", () => {
+    const readiness = projectMixedOperationReadiness([
+      updateOperation("src/a.ts"),
+      addOperation("src/new.ts"),
+      deleteOperation("src/old.ts"),
+    ]);
+
+    expect(readiness).toEqual({
+      isMixedOperation: true,
+      operationKinds: ["update", "create", "delete"],
+      operationCount: 3,
+      individuallySupportedKinds: ["update", "create", "delete"],
+      unsupportedIndividualKinds: [],
+      blockedCombinations: [],
+      routeBlocker: "none",
+      additionalPrerequisites: [],
+      mixedWritesEnabled: true,
+      rollbackOrAtomicityClaim: "none",
+      writeAuthority: "not-granted-by-readiness-projection",
+    });
+  });
+
   it("keeps single-operation families out of the mixed blocker path", () => {
     const readiness = projectMixedOperationReadiness([
       updateOperation("src/a.ts"),

@@ -20,7 +20,8 @@ Before this route, the project already had:
 - no default persistence
 - no automatic recovery
 - no atomic rollback
-- no broad `apply_patch`, 3+ mixed, 4+ write, multi-delete, or multi-move
+- no broad `apply_patch`, 4+ mixed, 4+ write, broad multi-delete, or
+  broad multi-move
   support
 
 Route 61 makes captured authority inspectable and intentionally executable
@@ -187,18 +188,19 @@ cleanup hook, no default persistence root, and no provider/CLI/MCP residue.
 - snapshot/revert backend
 - git integration
 - broad `apply_patch`
-- 3+ mixed writes
+- 4+ mixed writes
 - 4+ writes
-- multi-delete or multi-move
+- broad multi-delete or multi-move
 - provider/session/CLI/MCP behavior changes
 - package script or default gate changes
 
 ## Next Route Decision Criteria
 
-Recommended next route: 3+ mixed write readiness audit, unless product UX wants
-to prioritize a CLI/session explicit restore command first.
+Route 62 update: selected-workspace exactly-three mixed writes are now
+implemented with optional non-default recovery-authority capture and
+representative partial-failure restore drills. 4+ mixed, broad `apply_patch`,
+automatic recovery, and atomic rollback remain unsupported.
 
-Choose user/session restore UX if the next blocker is operator visibility.
-Choose 3+ mixed readiness audit if the core restore surface is enough for now
-and the project wants to decide whether larger mixed writes can preserve the
-same explicit recovery boundary.
+Recommended next route: destructive multi-delete/multi-move readiness if the
+next blocker is destructive semantics, or CLI/session explicit restore UX if
+operator visibility becomes the higher product priority.

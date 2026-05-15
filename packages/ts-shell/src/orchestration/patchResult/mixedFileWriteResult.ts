@@ -34,7 +34,7 @@ export function buildMixedFileWriteRouteResult(input: {
 function buildCodingResult(route: MixedFileWriteRoute): CodingResultSummary {
   if (route.status === "written") {
     const reason =
-      "Exactly-two mixed workspace write completed after explicit approval, all preflight checks, parsed-order writes, and per-operation post-write verification.";
+      "Bounded mixed workspace write completed after explicit approval, all preflight checks, parsed-order writes, and per-operation post-write verification.";
     const handoff = projectMutationVerificationHandoff({
       changedFiles: route.changedFiles,
       failedFiles: [],
@@ -87,7 +87,7 @@ function buildCodingResult(route: MixedFileWriteRoute): CodingResultSummary {
         reasons: [...handoff.taskReasons],
         requiredEvidence: [
           "explicit workspace write opt-in",
-          "approved-for-write decision naming exactly two mixed targets",
+          "approved-for-write decision naming all mixed targets",
           "all source/target conflicts rejected",
           "all final preflight before writer",
           "parsed-order writes without rollback claim",
@@ -186,7 +186,7 @@ function buildCodingResult(route: MixedFileWriteRoute): CodingResultSummary {
           ? [target]
           : [];
   const recoveryNote = writerStarted
-    ? "Writer started in the mixed route. Inspect/re-read both attempted paths before retrying; no rollback was attempted."
+    ? "Writer started in the mixed route. Inspect/re-read all attempted paths before retrying; no rollback was attempted."
     : "No workspace writer ran before this route stopped.";
 
   return {
@@ -401,7 +401,7 @@ function buildOutput(route: MixedFileWriteRoute): string {
       "apply_patch mixed workspace write succeeded.",
       `Changed: ${route.changedFiles.join(", ")}`,
       "Writer: selected-workspace",
-      "Verified: both mixed operations passed post-write verification",
+      "Verified: all mixed operations passed post-write verification",
       "Rollback: not attempted",
       `Next: ${route.nextAction}`,
     ].join("\n");

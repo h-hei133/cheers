@@ -33,7 +33,7 @@ import type {
 } from "./patchResult/workspaceAuthority.js";
 import { buildMixedFileWriteRouteResult } from "./patchResult/mixedFileWriteResult.js";
 import {
-  patchIsExactlyTwoMixedWriteFiles,
+  patchIsTwoOrThreeMixedWriteFiles,
   runMixedFileWriteRoute,
 } from "./patchResult/mixedFileWriteRoute.js";
 
@@ -189,7 +189,7 @@ export async function projectApplyPatchRuntimeMutationRoute(input: {
       });
     }
 
-    if (patchIsExactlyTwoMixedWriteFiles(rawPatchText)) {
+    if (patchIsTwoOrThreeMixedWriteFiles(rawPatchText)) {
       const route = await runMixedFileWriteRoute({
         workspaceRoot: input.workspaceRoot,
         rawPatchText,

@@ -20,6 +20,9 @@ It also added explicit partial-failure restore drills with current-content
 guards. Recovery authority remains explicit, non-default, metadata-only,
 non-durable, and non-automatic.
 
+Route 62 later extended the mixed lane from exactly-two to exactly-three where
+the same selected-workspace boundaries held.
+
 ## Implementation Notes
 
 - `packages/ts-shell/src/orchestration/patchResult/workspaceMoveRoute.ts`
@@ -27,7 +30,8 @@ non-durable, and non-automatic.
 - `packages/ts-shell/src/orchestration/patchResult/multiFileWriteRoute.ts`
   now captures exactly-three update records in addition to exactly-two update.
 - `packages/ts-shell/src/orchestration/patchResult/mixedFileWriteRoute.ts`
-  captures the supported exactly-two mixed lanes where the route remains clean.
+  captures the supported exactly-two and exactly-three mixed lanes where the
+  route remains clean.
 - `packages/ts-shell/src/orchestration/patchRecovery/restorePrimitive.ts`
   remains the explicit guarded restore entrypoint and still enforces
   current-state/current-content checks.
@@ -47,6 +51,8 @@ Focused tests now prove:
 
 - exactly-three update partial failure can be restored one file at a time.
 - exactly-two mixed partial failure can be restored one file at a time.
+- representative exactly-three mixed partial failures can restore changed
+  prefix files one file at a time.
 - current-content mismatch blocks hidden-user-edit overwrite.
 - rollbackAtomicityClaim stays false outside the route result.
 
@@ -83,6 +89,7 @@ route.
 
 ## Next Direction
 
-The next likely development batch is a 3+ mixed readiness audit, or a separate
-CLI/session restore UX route if user-visible restore commands become the higher
-product priority.
+Route 62 implemented the 3-operation mixed readiness and bounded write
+expansion. The next likely development batch is destructive
+multi-delete/multi-move readiness, or a separate CLI/session restore UX route
+if user-visible restore commands become the higher product priority.

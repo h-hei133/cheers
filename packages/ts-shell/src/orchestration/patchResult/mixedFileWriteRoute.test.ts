@@ -15,7 +15,7 @@ afterEach(() => {
   }
 });
 
-describe("mixed exactly-two selected-workspace write route", () => {
+describe("mixed selected-workspace write route", () => {
   it("writes update plus create after approval and verifies both operations", async () => {
     const fixture = createFixture();
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
@@ -69,10 +69,86 @@ describe("mixed exactly-two selected-workspace write route", () => {
     expect(readFile(fixture.workspaceRoot, "src/new.ts")).toBe("created");
     expect(result.evidence).toEqual(
       expect.arrayContaining([
-        "apply-patch-mixed-file-write-route:exactly-two-mixed-operations",
+        "apply-patch-mixed-file-write-route:exactly-2-mixed-operations",
         "apply-patch-mixed-file-write-route:all-final-preflight-before-writer",
         "apply-patch-mixed-file-write-route:parsed-order-write-no-rollback",
         "apply-patch-mixed-file-write-route:post-write-verification-passed",
+      ]),
+    );
+  });
+
+  it("writes update plus create plus delete after approval and captures all recovery authority before writing", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+    let firstWriteSawRecords = false;
+
+    const result = await runMixedFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, updateCreateDeletePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      validateCreateTarget: authority.validateCreateTarget,
+      writeFile: async (relativePath, content) => {
+        if (!firstWriteSawRecords) {
+          const updateRecord = await readRecoveryAuthorityRecord({
+            ledgerRoot,
+            authorityId: "route-mixed-three",
+            recordId: "update-1-src-a.ts",
+          });
+          const createRecord = await readRecoveryAuthorityRecord({
+            ledgerRoot,
+            authorityId: "route-mixed-three",
+            recordId: "create-2-src-new.ts",
+          });
+          const deleteRecord = await readRecoveryAuthorityRecord({
+            ledgerRoot,
+            authorityId: "route-mixed-three",
+            recordId: "delete-3-src-remove.ts",
+          });
+          firstWriteSawRecords = Boolean(
+            updateRecord && createRecord && deleteRecord,
+          );
+        }
+        await authority.writeFile(relativePath, content);
+      },
+      createFileExclusive: authority.createFileExclusive,
+      moveFileExclusive: authority.moveFileExclusive,
+      deleteFile: authority.deleteFile,
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-mixed-three",
+      },
+    });
+
+    expect(result.status).toBe("written");
+    expect(result.changedFiles).toEqual([
+      "src/a.ts",
+      "src/new.ts",
+      "src/remove.ts",
+    ]);
+    expect(result.failedFiles).toEqual([]);
+    expect(result.writeIntents).toEqual([
+      "src/a.ts",
+      "src/new.ts",
+      "src/remove.ts",
+    ]);
+    expect(result.creatorInvoked).toBe(true);
+    expect(result.deleteMoveInvoked).toBe(true);
+    expect(result.postWriteVerification).toBe("passed");
+    expect(firstWriteSawRecords).toBe(true);
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(3);
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 2\n");
+    expect(readFile(fixture.workspaceRoot, "src/new.ts")).toBe("created");
+    expect(readFile(fixture.workspaceRoot, "src/remove.ts")).toBeUndefined();
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "apply-patch-mixed-file-write-route:exactly-3-mixed-operations",
+        "apply-patch-mixed-file-write-route:no-4-plus-mixed",
+        "apply-patch-mixed-file-write-route:no-broad-apply-patch",
       ]),
     );
   });
@@ -134,6 +210,123 @@ describe("mixed exactly-two selected-workspace write route", () => {
     });
     expect(blockedRestore.restored).toBe(false);
     expect(blockedRestore.blockedReason).toBe("current-content-hash-mismatch");
+  });
+
+  it("restores exactly-three update/create prefix after delete failure and blocks hidden create edits", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+
+    const result = await runMixedFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, updateCreateDeletePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      validateCreateTarget: authority.validateCreateTarget,
+      writeFile: authority.writeFile,
+      createFileExclusive: authority.createFileExclusive,
+      moveFileExclusive: authority.moveFileExclusive,
+      deleteFile: () => {
+        throw new Error("simulated delete failure");
+      },
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-mixed-three-restore",
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("write-application");
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(3);
+    expect(result.changedFiles).toEqual(["src/a.ts", "src/new.ts"]);
+    expect(result.failedFiles[0]?.path).toBe("src/remove.ts");
+    expect(result.postWriteVerification).toBe("blocked");
+
+    const restoreUpdate = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-mixed-three-restore",
+      recordId: "update-1-src-a.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/a.ts",
+    });
+    expect(restoreUpdate.restored).toBe(true);
+    expect(restoreUpdate.rollbackAtomicityClaim).toBe(false);
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("a = 1\n");
+
+    const restoreCreate = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-mixed-three-restore",
+      recordId: "create-2-src-new.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/new.ts",
+    });
+    expect(restoreCreate.restored).toBe(true);
+    expect(readFile(fixture.workspaceRoot, "src/new.ts")).toBeUndefined();
+
+    fs.writeFileSync(
+      path.join(fixture.workspaceRoot, "src", "new.ts"),
+      "hidden-user-edit\n",
+      "utf8",
+    );
+    const blockedCreateRestore = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-mixed-three-restore",
+      recordId: "create-2-src-new.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/new.ts",
+    });
+    expect(blockedCreateRestore.restored).toBe(false);
+    expect(blockedCreateRestore.blockedReason).toBe(
+      "current-content-hash-mismatch",
+    );
+  });
+
+  it("restores exactly-three update/delete prefix after move failure without atomic rollback claim", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRoot = createLedgerRoot();
+
+    const result = await runMixedFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, updateDeleteMovePatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      validateCreateTarget: authority.validateCreateTarget,
+      writeFile: authority.writeFile,
+      createFileExclusive: authority.createFileExclusive,
+      moveFileExclusive: () => {
+        throw new Error("simulated move failure");
+      },
+      deleteFile: authority.deleteFile,
+      recoveryAuthority: {
+        mode: "non-default",
+        ledgerRoot,
+        authorityId: "route-mixed-three-move-restore",
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("write-application");
+    expect(result.recoveryAuthorityCapture?.status).toBe("captured");
+    expect(result.recoveryAuthorityCapture?.records).toHaveLength(3);
+    expect(result.changedFiles).toEqual(["src/a.ts", "src/remove.ts"]);
+    expect(result.failedFiles[0]?.path).toBe("src/to.ts");
+    expect(result.deleteMoveInvoked).toBe(true);
+
+    const restoreDelete = await restoreRecoveryAuthorityRecord({
+      ledgerRoot,
+      authorityId: "route-mixed-three-move-restore",
+      recordId: "delete-2-src-remove.ts",
+      workspaceRoot: fixture.workspaceRoot,
+      workspaceRelativePath: "src/remove.ts",
+    });
+    expect(restoreDelete.restored).toBe(true);
+    expect(restoreDelete.rollbackAtomicityClaim).toBe(false);
+    expect(readFile(fixture.workspaceRoot, "src/remove.ts")).toBe("remove\n");
   });
 
   it("blocks update missing, create overwrite, duplicate paths, and outside paths before any writer", async () => {
@@ -231,6 +424,45 @@ describe("mixed exactly-two selected-workspace write route", () => {
         "apply-patch-mixed-file-write-route:parsed-order-write-no-rollback",
       ]),
     );
+  });
+
+  it("keeps 4+ mixed operations blocked with no default recovery-authority capture", async () => {
+    const fixture = createFixture();
+    const before = snapshotFixture(fixture.workspaceRoot);
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    let writes = 0;
+
+    const result = await runMixedFileWriteRoute({
+      ...routeOptions(fixture.workspaceRoot, fourMixedPatch()),
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      directoryExists: authority.directoryExists,
+      validateWriteTarget: authority.validateWriteTarget,
+      validateCreateTarget: authority.validateCreateTarget,
+      writeFile: () => {
+        writes += 1;
+      },
+      createFileExclusive: () => {
+        writes += 1;
+      },
+      moveFileExclusive: () => {
+        writes += 1;
+      },
+      deleteFile: () => {
+        writes += 1;
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blocker).toBe("unsupported-operation");
+    expect(result.recoveryAuthorityCapture).toBeUndefined();
+    expect(result.workspaceWriterInvoked).toBe(false);
+    expect(result.changedFiles).toEqual([]);
+    expect(result.failedFiles).toEqual([
+      expect.objectContaining({ path: "src/a.ts" }),
+    ]);
+    expect(writes).toBe(0);
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual(before);
   });
 
   it("writes update plus move and create plus move with pure move operations", async () => {
@@ -498,6 +730,54 @@ function updateDeletePatch(): string {
     "-a = 1",
     "+a = 2",
     "*** Delete File: src/remove.ts",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function updateCreateDeletePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Add File: src/new.ts",
+    "+created",
+    "*** Delete File: src/remove.ts",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function updateDeleteMovePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Delete File: src/remove.ts",
+    "*** Update File: src/from.ts",
+    "*** Move to: src/to.ts",
+    "@@",
+    " from",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function fourMixedPatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Add File: src/new.ts",
+    "+created",
+    "*** Delete File: src/remove.ts",
+    "*** Update File: src/from.ts",
+    "*** Move to: src/to.ts",
+    "@@",
+    " from",
     "*** End Patch",
   ].join("\n");
 }

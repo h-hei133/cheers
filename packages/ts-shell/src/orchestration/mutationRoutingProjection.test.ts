@@ -674,6 +674,42 @@ describe("apply_patch mutation routing projection", () => {
     });
   });
 
+  it("routes exactly-three mixed operations through the guarded mixed writer", async () => {
+    const fixture = createFixture();
+
+    const result = await projectApplyPatchRuntimeMutationRoute({
+      ...runtimeInput(fixture.workspaceRoot, mixedUpdateCreateDeletePatch()),
+      getWorkspaceAuthority: () =>
+        createWorkspaceWriteAuthority(fixture.workspaceRoot),
+    });
+
+    expect(result?.status).toBe("completed");
+    expect(result?.terminalClassification).toBe("success");
+    expect(result?.codingResult?.changedFiles).toEqual([
+      "src/a.ts",
+      "src/new.ts",
+      "src/b.ts",
+    ]);
+    expect(result?.codingResult?.perFilePatchPlan).toEqual(
+      expect.objectContaining({
+        supportStatus: "supported-write",
+        failureClass: "none",
+        writeIntentFiles: ["src/a.ts", "src/new.ts", "src/b.ts"],
+        changedFiles: ["src/a.ts", "src/new.ts", "src/b.ts"],
+        failedFiles: [],
+        writerInvoked: true,
+        creatorInvoked: true,
+        deleteMoveInvoked: true,
+        postWriteVerification: "passed",
+        successLike: true,
+      }),
+    );
+    expect(snapshotFixture(fixture.workspaceRoot)).toEqual({
+      "src/a.ts": "a = 2\n",
+      "src/new.ts": "created",
+    });
+  });
+
   it("keeps mixed create plus move patches stopped before any writer", async () => {
     const fixture = createFixture();
     const before = snapshotFixture(fixture.workspaceRoot);
@@ -1069,6 +1105,20 @@ function mixedUpdateCreatePatch(): string {
     "+a = 2",
     "*** Add File: src/new.ts",
     "+created",
+    "*** End Patch",
+  ].join("\n");
+}
+
+function mixedUpdateCreateDeletePatch(): string {
+  return [
+    "*** Begin Patch",
+    "*** Update File: src/a.ts",
+    "@@",
+    "-a = 1",
+    "+a = 2",
+    "*** Add File: src/new.ts",
+    "+created",
+    "*** Delete File: src/b.ts",
     "*** End Patch",
   ].join("\n");
 }
