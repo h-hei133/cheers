@@ -1,6 +1,6 @@
 # Context Engineering Continuity Baseline
 
-Status: Route 74 baseline candidate.
+Status: Route 74 baseline candidate; Route 75 Compact v2 packet implemented.
 Date: 2026-05-15
 
 ## Post-Edit-Closeout Baseline
@@ -266,12 +266,29 @@ Focused tests cover:
 - memory candidates distinct from route transient facts
 - sidebar facts and tool/MCP/skills placeholders without discovery
 
+## Route 75 Compact v2 Note
+
+Route 75 added a pure Compact v2 handoff layer on top of this baseline:
+
+- `compactContinuityPacket.ts` defines the structured packet shape.
+- `compactRedactionPolicy.ts` enforces compact-safe redaction.
+- `routeContinuityHandoff.ts` builds packets from Route 74 projection plus
+  route, edit closeout, recovery, mutation, and validation inputs.
+- `compactHandoffRenderer.ts` renders copyable compact-safe markdown.
+
+The integration into live compact/session runtime remains deferred because the
+existing compact/session surfaces are lifecycle-coupled. Route 75 keeps memory
+storage, sidebar UI, startup cache, SessionManager schema changes, provider/MCP
+behavior, edit runtime changes, automatic recovery, and atomic rollback out of
+scope.
+
 ## Session Hook Status
 
 Deferred. The existing session surfaces already render current-session and
-stopped-continuation facts. Route 74 keeps the new context projection as a pure
-testable substrate. A future route can add a narrow session surface hook after
-the projection shape proves stable.
+stopped-continuation facts. Route 74 keeps the context projection as a pure
+testable substrate, and Route 75 adds the packet/renderer. A future route can
+add a narrow session surface hook after choosing an explicit compact/session
+integration point.
 
 ## Residual Risks
 
@@ -286,8 +303,8 @@ the projection shape proves stable.
 
 ## Next Recommendation
 
-Recommended next route: Route 75 Compact v2 route continuity.
+Recommended next route: Route 76 Compact v2 session integration.
 
-Reason: context layers, compact survivors, redactions, and edit/recovery facts
-are now machine-checkable enough to wire a compact continuation route without
-reopening edit runtime behavior.
+Reason: context layers, compact survivors, redactions, edit/recovery facts, and
+the Compact v2 packet/renderer are now machine-checkable enough to wire a live
+compact/session integration without reopening edit runtime behavior.

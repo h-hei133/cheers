@@ -1,6 +1,6 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 74
+Route baseline: post-Route 75
 Date: 2026-05-15
 Status: long-range edit capability map after Routes 50-73; edit capability is
 now a closeout candidate for the bounded selected-workspace surface.
@@ -38,6 +38,12 @@ Route 74 starts context engineering by adding a context continuity design note,
 typed context layer model, machine-checkable continuity manifest, compact-safe
 context projection, and focused tests for edit/recovery/mutation survivability
 without reopening edit runtime behavior.
+Route 75 adds Compact v2 route continuity: a structured compact handoff packet,
+redaction policy, route handoff builder, compact-safe markdown renderer, and
+focused continuity tests proving edit closeout, mutation evidence, recovery
+references, validation status, constraints, and next action survive compact
+without raw content or secrets. Live compact/session runtime integration remains
+deferred to Route 76.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -49,7 +55,7 @@ opencode, and gemini-cli.
 It is not a broad edit readiness claim. It keeps implemented capability,
 candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Post-Route 73 Executive Summary
+## 1. Post-Route 75 Executive Summary
 
 Current write capability remains intentionally narrow. The project supports a
 bounded selected-workspace write surface and still blocks broad arbitrary
@@ -93,7 +99,8 @@ compatibility gauntlet, readiness, manifest, and restore core surfaces. The
 result contract remains a required final validation gate run separately.
 
 Routes 57-73 are therefore complete for this edit capability phase. Route 74
-uses that sealed state as context-engineering input. The sealed state is
+uses that sealed state as context-engineering input, and Route 75 makes it
+survive compact as structured handoff state. The sealed state is
 closeout-candidate, not broad edit readiness and not reference-repo feature
 parity.
 
@@ -1135,19 +1142,32 @@ recovery/rollback stance are explicitly re-audited.
     SessionManager schema, compact rewrite, edit runtime behavior, automatic
     recovery, or atomic rollback was added.
 
-- Batch 75+: Broad arbitrary `apply_patch` readiness map
+- Batch 75: Compact v2 route continuity
+  - Status: implemented as a structured compact continuity packet,
+    deterministic redaction policy, route handoff builder, compact-safe
+    markdown renderer, and focused survivability tests.
+  - Edit closeout, mutation evidence, recovery references, validation status,
+    constraints, forbidden scope, stop conditions, and next action now survive
+    compact as structured facts without raw content or secrets.
+  - Live compact/session runtime integration remains deferred; no memory system,
+    sidebar UI, startup cache, SessionManager schema change, provider/MCP
+    change, edit runtime change, automatic recovery, or atomic rollback was
+    added.
+
+- Recommended next phase: Route 76 Compact v2 session integration
+  - Wire the Compact v2 packet or markdown renderer into the existing
+    compact/session summary surface only where explicit and narrow.
+  - Do not change SessionManager persistence schema, package scripts, default
+    gates, provider/MCP behavior, edit runtime behavior, memory storage,
+    sidebar UI, startup cache, automatic recovery, or atomic rollback.
+
+- Future broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are
     settled.
   - Broad arbitrary `apply_patch` remains delayed because it combines parsing,
     ordering, destructive semantics, permission, workspace authority,
     verification, partial failure, recovery, and user-facing claims into a much
     wider blast radius than current bounded candidates.
-
-- Recommended next phase: Compact v2 route continuity
-  - Use the Route 74 context layers and compact-survivor facts as the stable
-    substrate.
-  - Alternative: undo/restore product polish if richer user-facing restore UX
-    is prioritized before compact work.
 
 ## 10. Validation Strategy
 
