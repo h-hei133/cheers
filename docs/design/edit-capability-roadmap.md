@@ -1,8 +1,8 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 70
+Route baseline: post-Route 71
 Date: 2026-05-15
-Status: long-range edit capability map after Routes 50-70.
+Status: long-range edit capability map after Routes 50-71.
 Routes 59-66 have implemented a narrow explicit non-default original-content
 authority loop, explicit restore surface, bounded exactly-three mixed write
 expansion, bounded destructive multi-delete/multi-move support, and bounded
@@ -20,6 +20,10 @@ pure move plus immediate target update, centralized unsupported broad-shape
 reason metadata, and added a broad fixture gauntlet. It still keeps 33+,
 arbitrary broad, fuzzy, binary, mode, symlink, submodule, copy, directory,
 overwrite, automatic recovery, and atomic rollback blocked.
+Route 71 added a realistic edit compatibility gauntlet across parser,
+normalizer, bounded candidate classification, mutation routing, no-write
+surfaces, non-default recovery-authority capture, and explicit restore drills.
+It did not add new write capability.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -31,7 +35,7 @@ opencode, and gemini-cli.
 It is not a broad edit readiness claim. It keeps implemented capability,
 candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Post-Route 70 Executive Summary
+## 1. Post-Route 71 Executive Summary
 
 Current write capability remains intentionally narrow. The project supports a
 bounded selected-workspace write surface and still blocks broad arbitrary
@@ -46,6 +50,16 @@ with exact hunks now normalizes to move plus immediate target update and routes
 through the existing guarded mixed route. The route still owns workspace
 authority, approval, final preflight, recovery-authority capture, parsed-order
 execution, and post-write verification.
+
+Route 71 then validated that surface against realistic agent-output shapes
+inspired by ClaudeCode, opencode, gemini-cli, and generic model output. The
+gauntlet covers marker patches, git-style safe-subset diffs, prose/fenced
+marker output, rename-content decomposition, 32-operation bounded payloads,
+unsupported broad metadata, malformed input, no-write surfaces, non-default
+recovery-authority capture, and explicit restore drills. It found no runtime
+writer gap requiring code changes. Fenced git-style broad diff extraction
+remains intentionally blocked because supporting it would widen broad parser
+behavior.
 
 Routes 52-56 changed the roadmap direction:
 
@@ -584,6 +598,7 @@ User / CLI / provider output
 | Bounded broad patch parser/normalizer | Implemented expanded safe subset | `patchParsing/boundedBroadPatchNormalizer.ts`, `boundedBroadPatchNormalizer.test.ts`, `parser.ts`, `parser.test.ts`, `boundedApplyPatchCandidate.ts`, `mutationRoutingProjection.ts`, `docs/design/bounded-broad-patch-parser-normalizer.md`, `docs/design/expanded-bounded-broad-patch-safe-subset.md`, `docs/design/rename-content-and-broad-shape-gauntlet.md` | C/D/E | Git-style update/add/delete/pure-rename, safe rename-with-content decomposition, and exact multi-hunk update subset only; binary, mode, symlink, submodule, copy, malformed, fuzzy, 33+, directory/path conflicts, overwrite, and arbitrary broad shapes remain blocked | Unsupported-shape UX hardening if needed |
 | Rename-with-content-edit decomposition | Implemented bounded candidate | `boundedBroadPatchNormalizer.ts`, `mixedFileWriteRoute.ts`, `perFilePatchPlan.ts`, `boundedApplyPatchCandidate.test.ts`, `mixedFileWriteRoute.test.ts`, `mutationRoutingProjection.test.ts`, `docs/design/rename-content-and-broad-shape-gauntlet.md` | C/D/E | Only 100 percent similarity git-style rename plus exact hunks; operation count is move plus update; no lower-similarity rename, move-with-hunks, overwrite, fuzzy patch, automatic recovery, or rollback | Preserve narrow dependency; do not generalize without separate route |
 | Broad unsupported-shape taxonomy and gauntlet | Implemented projection/test hardening | `patchParsing/broadPatchUnsupportedReason.ts`, `broadPatchUnsupportedReason.test.ts`, `boundedBroadPatchNormalizer.test.ts`, `boundedApplyPatchCandidate.test.ts`, `docs/design/rename-content-and-broad-shape-gauntlet.md` | C/D/E | Reason metadata is no-write evidence only; user-facing result shape remains bounded by existing contracts | Optional UX projection polish only if needed |
+| Realistic edit compatibility gauntlet | Implemented Route 71 compatibility evidence | `patchResult/editCompatibilityGauntlet.test.ts`, `docs/design/realistic-edit-compatibility-gauntlet.md`, `boundedApplyPatchCandidate.ts`, `boundedBroadPatchNormalizer.ts`, `mutationRoutingProjection.ts`, recovery store/restore primitives | C/D/E | Fenced git-style broad diffs remain blocked; gauntlet adds evidence, not new writer authority | Route 72 closeout map/default-readiness decision, or targeted parser gap only if justified |
 | 8-operation recovery-authority drills | Implemented explicit drill evidence | `multiFileWriteRoute.test.ts`, `mixedFileWriteRoute.test.ts` | C/D | Explicit primitive only; no automatic recovery, session restore command, or atomic rollback | User/session explicit restore UX if product priority |
 | Per-file patch plan/result contract | Implemented route/result infrastructure | `perFilePatchPlan.ts`, route/result projections, `verify:result-contract`, unsupported E2E and continuity checks | B/C/D | Still bounded to known supported/unsupported shapes; not broad write readiness | Preserve as recovery-plan consumer |
 | Route-scoped edit journal prototype | Implemented metadata-only projection | `routeScopedEditJournal.ts`, `routeScopedEditJournal.test.ts` | C/D | Non-durable; not recovery or writer authority | Feed original-content ledger prototype if safe |
@@ -902,6 +917,34 @@ clearer blocked-shape explanations. Rename-with-content-edit may be a separate
 route only if it becomes the main remaining parser blocker. Arbitrary-N and
 broad arbitrary `apply_patch` remain delayed.
 
+Implemented Route 70 batch:
+
+**Batch 70: Rename-with-content decomposition and broad-shape gauntlet**
+
+Route 70 implemented the narrow safe git-style rename-with-content-edit
+decomposition, centralized unsupported broad-shape reasons, and proved the
+supported/blocked broad fixture set. It preserved cap 32, guarded route
+ownership, no automatic recovery, no atomic rollback, and no arbitrary broad
+`apply_patch`.
+
+Implemented Route 71 batch:
+
+**Batch 71: Realistic edit compatibility gauntlet**
+
+Route 71 added a reusable realistic fixture harness across parser,
+normalizer, candidate classification, mutation routing, no-write surfaces,
+recovery-authority capture, and explicit restore drills. It covers 15
+supported categories and 18 blocked categories, with executable route
+representatives and restore drills. It did not require runtime writer changes
+and did not open fenced git-style broad diff extraction.
+
+Recommended next direction: Route 72 should be an edit capability closeout map
+and default/non-default readiness decision if this bounded surface is stable.
+Use a targeted parser gap route only if fenced git-style broad diff extraction
+becomes a proven user blocker. Use a user/session unsupported edit explanation
+polish route only if no-write explanations are the main product gap. Do not
+move to arbitrary broad `apply_patch`.
+
 ## 9. Recommended Future Sequence
 
 - Batch 57: Recovery readiness projection batch
@@ -1004,13 +1047,23 @@ broad arbitrary `apply_patch` remain delayed.
     submodule/copy, directory operations, overwrite, automatic recovery, and
     rollback remain unsupported.
 
-- Batch 71: Unsupported broad-shape UX hardening, only if needed
-  - Prefer clearer unsupported-shape diagnostics if real blocked broad patches
-    are confusing users.
-  - Do not add new write surface unless the remaining shape is proven to be a
-    pure projection/wrapper gap.
+- Batch 71: Realistic edit compatibility gauntlet
+  - Status: implemented as a focused fixture harness plus design record across
+    parser, normalizer, candidate classification, routing, no-write surfaces,
+    non-default recovery-authority capture, and explicit restore drills.
+  - It found no runtime writer gap. Fenced git-style broad diff extraction
+    remains blocked rather than opening a broader parser.
 
-- Batch 72+: Broad arbitrary `apply_patch` readiness map
+- Batch 72: Edit capability closeout map and default/non-default readiness
+  decision
+  - Recommended if the bounded Route 71 gauntlet remains green.
+  - Alternative: a targeted parser gap follow-up only if fenced git-style broad
+    diff extraction is proven useful and can be implemented without fuzzy or
+    arbitrary broad apply.
+  - Alternative: user/session unsupported edit explanation polish if blocked
+    fixture explanations are the main remaining product gap.
+
+- Batch 73+: Broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are
     settled.
   - Broad arbitrary `apply_patch` remains delayed because it combines parsing,
@@ -1116,6 +1169,11 @@ Allowed after this document:
   existing guarded route families.
 - Route 69 expanded that bounded surface to cap 32 and added larger
   safe-subset, multi-hunk, and metadata-blocker evidence.
+- Route 70 safe rename-with-content-edit decomposition is implemented for 100
+  percent similarity git-style rename sections with exact hunks.
+- Route 71 realistic edit compatibility gauntlet is implemented as evidence
+  across parser, bounded candidate classification, routing, no-write surfaces,
+  non-default recovery-authority capture, and explicit restore drills.
 
 Forbidden after this document:
 

@@ -1,7 +1,8 @@
 # Expanded Bounded Broad Patch Safe Subset
 
-Status: Route 70 implemented on top of the Route 69 bounded safe subset. This
-is still not broad arbitrary `apply_patch` readiness.
+Status: Route 70 implemented on top of the Route 69 bounded safe subset; Route
+71 added realistic compatibility gauntlet evidence. This is still not broad
+arbitrary `apply_patch` readiness.
 
 ## Post-Route 68 Baseline
 
@@ -144,6 +145,9 @@ Existing routes preserve:
 
 Focused evidence added or updated:
 
+- Route 71 `patchResult/editCompatibilityGauntlet.test.ts` covers realistic
+  supported and blocked marker/git/model-output fixture categories, executable
+  route slices, recovery-authority capture, and explicit restore drills
 - cap policy tests cover 8, 9, 16, 32 supported and 33 blocked
 - normalizer tests cover 32 git-style sections, multi-hunk update preservation,
   rename-with-content decomposition, and binary/mode/symlink/submodule/copy

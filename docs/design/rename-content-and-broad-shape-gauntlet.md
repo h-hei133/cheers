@@ -1,6 +1,6 @@
 # Rename Content And Broad Shape Gauntlet
 
-Status: Route 70 implemented.
+Status: Route 70 implemented; Route 71 compatibility gauntlet added.
 Date: 2026-05-15
 
 ## Post-Route 69 Baseline
@@ -162,6 +162,16 @@ Rename-with-content-edit is supported only for exact 100 percent similarity
 git-style rename metadata and exact hunks. 33+ operations, fuzzy patch,
 binary/mode/symlink/submodule/copy, directory operations, overwrite, automatic
 recovery, and atomic rollback remain blocked.
+
+## Route 71 Compatibility Note
+
+Route 71 added `docs/design/realistic-edit-compatibility-gauntlet.md` and
+`patchResult/editCompatibilityGauntlet.test.ts`. The gauntlet reuses this Route
+70 rename-content fixture as one realistic supported category, adds executable
+route coverage, verifies non-default recovery-authority capture, and drills
+explicit restore after move succeeds and target update fails. It also keeps
+fenced git-style broad diff extraction blocked rather than widening broad
+parser behavior.
 
 Next recommendation: harden user-facing unsupported reason projection only if
 blocked broad patches are confusing in real use. Do not move to broad arbitrary
