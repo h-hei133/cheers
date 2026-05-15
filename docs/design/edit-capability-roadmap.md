@@ -1,6 +1,6 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 73
+Route baseline: post-Route 74
 Date: 2026-05-15
 Status: long-range edit capability map after Routes 50-73; edit capability is
 now a closeout candidate for the bounded selected-workspace surface.
@@ -34,6 +34,10 @@ Route 73 sealed the current edit phase as a closeout candidate by adding a
 machine-checkable closeout manifest, expanding readiness coverage, strengthening
 `verify:edit-capability-closeout`, and documenting practical parity/non-parity
 against ClaudeCode, opencode, and gemini-cli.
+Route 74 starts context engineering by adding a context continuity design note,
+typed context layer model, machine-checkable continuity manifest, compact-safe
+context projection, and focused tests for edit/recovery/mutation survivability
+without reopening edit runtime behavior.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -88,9 +92,10 @@ normalizer, unsupported taxonomy, bounded candidate classification, cap policy,
 compatibility gauntlet, readiness, manifest, and restore core surfaces. The
 result contract remains a required final validation gate run separately.
 
-Routes 57-73 are therefore complete for this edit capability phase. The sealed
-state is closeout-candidate, not broad edit readiness and not reference-repo
-feature parity.
+Routes 57-73 are therefore complete for this edit capability phase. Route 74
+uses that sealed state as context-engineering input. The sealed state is
+closeout-candidate, not broad edit readiness and not reference-repo feature
+parity.
 
 Routes 52-56 changed the roadmap direction:
 
@@ -1117,7 +1122,20 @@ recovery/rollback stance are explicitly re-audited.
     Restore product polish remains optional; broad arbitrary `apply_patch`
     remains outside closeout.
 
-- Batch 74+: Broad arbitrary `apply_patch` readiness map
+- Batch 74: Context engineering baseline and continuity map
+  - Status: implemented as a context-engineering baseline with
+    `docs/design/context-engineering-continuity-baseline.md`,
+    `core/context/contextLayerModel.ts`,
+    `core/context/contextContinuityManifest.ts`, and
+    `core/context/contextStateProjection.ts`.
+  - Route 73 edit closeout, mutation evidence, recovery/restore references,
+    memory candidates, sidebar facts, and startup warm candidates now have a
+    compact-safe projection surface.
+  - No memory system, sidebar UI, startup cache, provider/MCP behavior,
+    SessionManager schema, compact rewrite, edit runtime behavior, automatic
+    recovery, or atomic rollback was added.
+
+- Batch 75+: Broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are
     settled.
   - Broad arbitrary `apply_patch` remains delayed because it combines parsing,
@@ -1125,10 +1143,11 @@ recovery/rollback stance are explicitly re-audited.
     verification, partial failure, recovery, and user-facing claims into a much
     wider blast radius than current bounded candidates.
 
-- Recommended next phase: Context engineering kickoff
-  - Use the sealed bounded edit surface as a stable substrate.
+- Recommended next phase: Compact v2 route continuity
+  - Use the Route 74 context layers and compact-survivor facts as the stable
+    substrate.
   - Alternative: undo/restore product polish if richer user-facing restore UX
-    is prioritized before context work.
+    is prioritized before compact work.
 
 ## 10. Validation Strategy
 
