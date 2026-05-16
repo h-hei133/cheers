@@ -7,6 +7,7 @@ import {
   getLatestCompactCheckpoint,
 } from "../context/compactLiveCheckpoint.js";
 import { createCompactInjectionStateStore } from "../context/compactInjectionState.js";
+import { createProjectMemoryInjectionStateStore } from "../context/projectMemoryInjectionState.js";
 import { createProjectMemoryLocalStore } from "../context/projectMemoryLocalStore.js";
 import { createProjectMemoryReviewStateStore } from "../context/projectMemoryReviewState.js";
 import { createCommandRegistry, listVisibleCommands } from "./registry.js";
@@ -318,6 +319,59 @@ describe("slash router (W4)", () => {
       expect(deleted.output).toContain("- Outcome: deleted");
     }
     expect(await projectMemoryStore.get("pmr:slash-delete")).toBeUndefined();
+  });
+
+  it("routes /memory use as explicit next-turn injection staging", async () => {
+    const memoryStoreRoot = path.join(workspaceRoot, ".memory-use-test");
+    const projectMemoryStore = createProjectMemoryLocalStore({
+      ref: { mode: "test-only", root: memoryStoreRoot },
+    });
+    const projectMemoryInjectionStateStore = createProjectMemoryInjectionStateStore({
+      nextId: () => "pmi:slash-use",
+    });
+    await projectMemoryStore.write({
+      storeRef: projectMemoryStore.ref,
+      record: {
+        id: "pmr:slash-use",
+        version: 1,
+        createdAt: "2026-05-16T00:00:00.000Z",
+        candidateId: "pmc:slash-use",
+        candidateKind: "project-fact",
+        retentionClass: "project-scoped-candidate",
+        approvedAt: "2026-05-16T00:00:00.000Z",
+        approvedBySourceCommand: "/memory",
+        memoryText: "Project memory use stages next-turn context explicitly.",
+        evidence: ["route85:slash-router"],
+        source: "system-derived",
+        sourcePacket: "route85-test",
+        routeReferences: ["route85"],
+        safety: "safe",
+        redactions: [],
+      },
+    });
+
+    const result = await routeSlashCommand("/memory use next-turn context", {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_use",
+      projectMemoryStore,
+      projectMemoryInjectionStateStore,
+    });
+
+    expect(result?.kind).toBe("local");
+    if (result?.kind === "local") {
+      expect(result.output).toContain("Project memory use");
+      expect(result.output).toContain("- Outcome: staged");
+      expect(result.output).toContain("- Injection status: pending");
+      expect(result.output).toContain("Future-turn injection: explicit staged use only");
+    }
+    expect(projectMemoryInjectionStateStore.get("session:sess_memory_use")).toEqual(
+      expect.objectContaining({
+        injectionStatus: "pending",
+        memoryInjectionId: "pmi:slash-use",
+        mode: "recall",
+        query: "next-turn context",
+      }),
+    );
   });
 
   it("routes compact JSON mode and rejects invalid compact args", async () => {

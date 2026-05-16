@@ -335,7 +335,10 @@ stored memory back into context. Route 83 adds user-triggered recall/search and
 wake-up preview over that store, still without automatic context injection.
 Route 84 adds explicit invalidation/delete lifecycle controls for records in
 that store; invalidated/deleted records are filtered out of recall and wake-up,
-and memory still is not automatically loaded into prompt context.
+and memory still is not automatically loaded into prompt context. Route 85 adds
+explicit `/memory use` staging and one-shot next-normal-turn memory injection;
+`/memory wake` and `/memory recall` remain preview-only, and memory injection is
+not automatic.
 
 ## Residual Risks
 
@@ -344,9 +347,10 @@ and memory still is not automatically loaded into prompt context.
   the current session, Route 82 can explicitly save approved safe candidates to
   a supplied local store, Route 83 can recall/search saved records and render a
   wake-up preview, and Route 84 can invalidate/delete stored records. Automatic
-  loading and future-turn memory injection remain deferred.
-- Future memory storage still needs explicit opt-in controls before it can
-  affect prompt context.
+  loading remains deferred. Route 85 can inject project memory once only after
+  explicit `/memory use`.
+- Future memory storage still needs quality/merge hardening before broader
+  loading surfaces.
 - Future sidebar state should consume `sidebarFacts` rather than inventing a
   separate taxonomy.
 - Future startup warm context should consume `startupWarmCandidates` only after
@@ -354,13 +358,13 @@ and memory still is not automatically loaded into prompt context.
 
 ## Next Recommendation
 
-Recommended next route: Route 85 explicit opt-in wake-up/future-turn injection
-if lifecycle UX remains stable, or memory store lifecycle hardening if
-invalidation/delete exposes store gaps.
+Recommended next route: Route 86 memory injection quality/merge hardening if
+explicit injection remains stable, or memory startup/sidebar design only after
+the user-controlled injection path is hardened.
 
 Reason: context layers, compact survivors, redactions, edit/recovery facts,
 Compact v2 packet rendering, the live checkpoint, the candidate-only adapter,
 Route 80 candidate extraction, Route 81 session-scoped review state, Route 82
-explicit save path, Route 83 deterministic retrieval/wake preview, and Route 84
-lifecycle controls are now machine-checkable enough to plan opt-in injection
-separately.
+explicit save path, Route 83 deterministic retrieval/wake preview, Route 84
+lifecycle controls, and Route 85 explicit memory injection are now
+machine-checkable enough to plan quality/merge hardening separately.

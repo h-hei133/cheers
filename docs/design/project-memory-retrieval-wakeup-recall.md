@@ -135,3 +135,17 @@ Route 84 adds explicit lifecycle filtering below recall and wake-up:
 
 The Route 83 deterministic ranking rules are unchanged after lifecycle
 filtering.
+
+## Route 85 Note
+
+Route 85 keeps recall/search/wake-up as preview commands. Injection requires a
+separate explicit command:
+
+- `/memory use` stages wake-up preview content for one next normal turn.
+- `/memory use <query>` stages recall results for one next normal turn.
+- The future-turn planner reruns wake-up/retrieval against the local store, so
+  invalidated and deleted records stay filtered.
+
+Retrieval remains deterministic and local: no provider/model calls, vector DB,
+ChromaDB, embeddings, semantic rerank, startup cache, sidebar UI, or automatic
+memory injection.

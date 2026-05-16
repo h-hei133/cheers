@@ -89,11 +89,12 @@ content/secret exposure out of scope.
 Route 82 adds explicit local project memory save for approved safe candidates.
 Route 83 adds deterministic recall/search and wake-up preview over the supplied
 store. Route 84 adds explicit invalidation/delete lifecycle controls before any
-memory auto-injection. These routes remain outside edit runtime capability and
-do not change provider/MCP behavior, package/default gates, SessionManager
-schema, edit behavior, recovery behavior, or rollback stance.
-Recommended Route 85 focus: explicit opt-in wake-up/future-turn injection only
-if lifecycle UX remains stable; otherwise harden memory store lifecycle.
+memory auto-injection. Route 85 adds explicit `/memory use` staging and one-shot
+future-turn memory injection. These routes remain outside edit runtime
+capability and do not change provider/MCP behavior, package/default gates,
+SessionManager schema, edit behavior, recovery behavior, or rollback stance.
+Recommended Route 86 focus: memory injection quality/merge hardening if
+explicit injection remains stable; otherwise harden memory store lifecycle.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -1263,6 +1264,20 @@ recovery/rollback stance are explicitly re-audited.
     after lifecycle filtering remains stable; otherwise memory store lifecycle
     hardening.
 
+- Batch 85: Explicit project memory future-turn injection
+  - Status: implemented as in-memory session-scoped injection state,
+    future-turn adapter, injected context formatter, injection planner,
+    `/memory use` command contract/runner/surface, and a narrow
+    `ShellSessionRuntime` next-normal-turn hook.
+  - `/memory wake` and `/memory recall <query>` remain preview-only. Only
+    `/memory use` or `/memory use <query>` stages one next-turn injection.
+  - This route does not add automatic memory injection, startup auto-load,
+    cross-session auto-loading, startup cache, sidebar UI, provider/model
+    calls, vector DB, ChromaDB, embeddings, provider/MCP/package/default gate
+    changes, SessionManager schema changes, edit runtime changes, automatic
+    recovery, or atomic rollback.
+  - Recommended next phase: Route 86 memory injection quality/merge hardening.
+
 - Future broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are
     settled.
@@ -1387,6 +1402,9 @@ Allowed after this document:
 - Route 84 context-memory work adds explicit invalidation/delete lifecycle UX
   for the same local store. It remains outside edit runtime and does not change
   edit capability, rollback, recovery execution, or default mutation readiness.
+- Route 85 context-memory work adds explicit one-shot future-turn injection via
+  `/memory use`. It remains outside edit runtime and does not change edit
+  capability, rollback, recovery execution, or default mutation readiness.
 
 Forbidden after this document:
 
@@ -1404,7 +1422,7 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 85 recommendation for memory work: design explicit opt-in
-wake-up/future-turn injection only if Route 84 lifecycle filtering remains
-stable; otherwise harden memory store lifecycle. Do not treat Route 82, Route
-83, or Route 84 as edit-capability expansions.
+Route 86 recommendation for memory work: harden memory injection quality/merge
+behavior if Route 85 explicit injection remains stable; otherwise harden memory
+store lifecycle. Do not treat Route 82, Route 83, Route 84, or Route 85 as
+edit-capability expansions.

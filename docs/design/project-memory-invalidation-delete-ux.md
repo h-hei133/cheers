@@ -133,3 +133,19 @@ records cannot enter recall or wake-up.
 
 If lifecycle behavior exposes store corruption, concurrency, or audit gaps,
 choose memory store lifecycle hardening before injection.
+
+## Route 85 Note
+
+Route 85 adds explicit `/memory use` staging after lifecycle controls:
+
+- `/memory wake` and `/memory recall <query>` remain preview-only.
+- `/memory use` stages wake-up memory context for the next normal turn.
+- `/memory use <query>` stages deterministic recall context for the next normal
+  turn.
+- Runtime re-reads through normal retrieval/wake-up paths, so invalidated and
+  deleted records remain excluded before injection.
+
+Route 85 does not add automatic cleanup, startup auto-load, cross-session
+auto-loading, startup cache, sidebar UI, MCP memory tools, provider/model
+retrieval, vector DB, ChromaDB, embeddings, SessionManager schema changes, edit
+runtime changes, automatic recovery, or atomic rollback.

@@ -19,6 +19,12 @@ import {
   type CompactInjectionStateStore,
 } from "../context/compactInjectionState.js";
 import { planCompactFutureTurnInjection } from "../context/compactFutureTurnInjection.js";
+import {
+  DEFAULT_PROJECT_MEMORY_INJECTION_STATE_STORE,
+  type ProjectMemoryInjectionStateStore,
+} from "../context/projectMemoryInjectionState.js";
+import { planProjectMemoryFutureTurnInjection } from "../context/projectMemoryFutureTurnInjection.js";
+import type { ProjectMemoryStore } from "../context/projectMemoryStoreContract.js";
 import type { QueryEvent } from "../query/events.js";
 import type { QueryRuntimeStateSeed } from "../query/runtimeState.js";
 import { formatExplicitRestoreSummaryLines } from "./restoreSurfaceSummary.js";
@@ -35,6 +41,8 @@ export interface SessionRuntimeDependencies {
   ) => AsyncIterable<QueryEvent>;
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
+  readonly projectMemoryInjectionStateStore?: ProjectMemoryInjectionStateStore;
+  readonly projectMemoryStore?: ProjectMemoryStore;
 }
 
 export class ShellSessionRuntime {
@@ -143,7 +151,7 @@ export class ShellSessionRuntime {
       }
 
       const promptForModel = !options?.runtimeSeed
-        ? this.buildPromptWithCompactInjection(sessionId, prompt)
+        ? await this.buildPromptWithFutureTurnInjections(sessionId, prompt)
         : prompt;
 
       if (!options?.runtimeSeed) {
@@ -474,6 +482,20 @@ export class ShellSessionRuntime {
     }
   }
 
+  private async buildPromptWithFutureTurnInjections(
+    sessionId: string,
+    prompt: string,
+  ): Promise<string> {
+    const compactInjectedPrompt = this.buildPromptWithCompactInjection(
+      sessionId,
+      prompt,
+    );
+    return this.buildPromptWithProjectMemoryInjection(
+      sessionId,
+      compactInjectedPrompt,
+    );
+  }
+
   private buildPromptWithCompactInjection(
     sessionId: string,
     prompt: string,
@@ -523,6 +545,47 @@ export class ShellSessionRuntime {
       prompt,
       "</user_request>",
     ].join("\n");
+  }
+
+  private async buildPromptWithProjectMemoryInjection(
+    sessionId: string,
+    prompt: string,
+  ): Promise<string> {
+    const sessionScopeId = compactSessionScopeId(sessionId);
+    const injectionStateStore =
+      this.deps.projectMemoryInjectionStateStore ??
+      DEFAULT_PROJECT_MEMORY_INJECTION_STATE_STORE;
+    const injectionState = injectionStateStore.get(sessionScopeId);
+    const plan = await planProjectMemoryFutureTurnInjection({
+      memoryStore: this.deps.projectMemoryStore,
+      injectionState,
+      markInjected: ({ sessionScopeId: scopeId, memoryInjectionId }) =>
+        injectionStateStore.markInjected({
+          sessionScopeId: scopeId,
+          memoryInjectionId,
+        }),
+      markConsumed: ({ sessionScopeId: scopeId, memoryInjectionId }) =>
+        injectionStateStore.markConsumed({
+          sessionScopeId: scopeId,
+          memoryInjectionId,
+        }),
+      markInvalid: ({ sessionScopeId: scopeId, memoryInjectionId, reason }) =>
+        injectionStateStore.markInvalid({
+          sessionScopeId: scopeId,
+          memoryInjectionId,
+          reason,
+        }),
+    });
+    if (!plan.shouldInject || !plan.injectedContext) {
+      return prompt;
+    }
+    if (prompt.includes("\n\n<user_request>")) {
+      return prompt.replace(
+        "\n\n<user_request>",
+        `\n\n${plan.injectedContext}\n\n<user_request>`,
+      );
+    }
+    return [plan.injectedContext, "", prompt].join("\n");
   }
 
   cancelCurrentRun(): void {

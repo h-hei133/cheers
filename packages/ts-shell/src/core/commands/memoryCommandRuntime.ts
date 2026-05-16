@@ -19,6 +19,11 @@ import {
 } from "../context/projectMemoryDeleteCommandContract.js";
 import { runProjectMemoryDeleteCommand } from "../context/projectMemoryDeleteCommandRunner.js";
 import {
+  parseProjectMemoryUseCommandArgs,
+  ProjectMemoryUseCommandContractError,
+} from "../context/projectMemoryUseCommandContract.js";
+import { runProjectMemoryUseCommand } from "../context/projectMemoryUseCommandRunner.js";
+import {
   parseProjectMemorySaveCommandArgs,
   ProjectMemorySaveCommandContractError,
 } from "../context/projectMemorySaveCommandContract.js";
@@ -45,6 +50,19 @@ export async function runMemoryLocalCommand(
       const result = await runProjectMemoryRecallCommand({
         request,
         memoryStore: context.projectMemoryStore,
+      });
+      return {
+        kind: "local",
+        output: result.output,
+      };
+    }
+    if (args[0] === "use") {
+      const request = parseProjectMemoryUseCommandArgs(args);
+      const result = await runProjectMemoryUseCommand({
+        request,
+        sessionScopeId: reviewSessionId,
+        memoryStore: context.projectMemoryStore,
+        injectionStateStore: context.projectMemoryInjectionStateStore,
       });
       return {
         kind: "local",
@@ -114,6 +132,8 @@ function formatMemoryReviewCommandError(error: unknown): string {
       ? error.code
       : error instanceof ProjectMemoryDeleteCommandContractError
         ? error.code
+      : error instanceof ProjectMemoryUseCommandContractError
+        ? error.code
       : error instanceof ProjectMemorySaveCommandContractError
         ? error.code
       : "memory-review-command-error";
@@ -122,6 +142,8 @@ function formatMemoryReviewCommandError(error: unknown): string {
       ? "Project memory recall"
       : error instanceof ProjectMemoryDeleteCommandContractError
       ? "Project memory lifecycle"
+      : error instanceof ProjectMemoryUseCommandContractError
+      ? "Project memory use"
       : error instanceof ProjectMemorySaveCommandContractError
       ? "Project memory store"
       : "Project memory review",
@@ -132,6 +154,6 @@ function formatMemoryReviewCommandError(error: unknown): string {
     "- Memory written: no",
     "- Auto-load: no",
     "- Auto-injected: no",
-    "- DoNext: Retry with /memory, /memory approve <candidate-id>, /memory reject <candidate-id>, /memory save <candidate-id>, /memory recall <query>, /memory wake, /memory invalidate <record-id>, /memory delete <record-id>, or /memory status.",
+    "- DoNext: Retry with /memory, /memory approve <candidate-id>, /memory reject <candidate-id>, /memory save <candidate-id>, /memory recall <query>, /memory wake, /memory use, /memory use <query>, /memory invalidate <record-id>, /memory delete <record-id>, or /memory status.",
   ].join("\n");
 }

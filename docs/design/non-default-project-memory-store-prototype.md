@@ -164,3 +164,14 @@ Route 84 turns the reserved lifecycle fields into explicit local-store controls:
 The route still does not choose a default store path, auto-load records, inject
 future-turn context, add startup cache/sidebar UI, call providers/models, add
 MCP tools, or add vector DB/ChromaDB/embedding search.
+
+## Route 85 Note
+
+Route 85 uses the same explicit local store as the source for `/memory use`.
+The store remains non-default: if no runtime/test harness supplies it,
+`/memory use` blocks clearly. Injection state is in-memory and session-scoped;
+the store does not persist pending injection state.
+
+Route 85 does not add a default path, startup auto-load, cross-session
+auto-loading, provider/model calls, MCP tools, sidebar UI, startup cache,
+vector DB, ChromaDB, or embeddings.

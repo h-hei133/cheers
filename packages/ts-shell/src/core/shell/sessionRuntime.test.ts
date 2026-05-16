@@ -11,6 +11,8 @@ import {
   createCompactLiveCheckpointStore,
   updateLatestCompactCheckpoint,
 } from "../context/compactLiveCheckpoint.js";
+import { createProjectMemoryInjectionStateStore } from "../context/projectMemoryInjectionState.js";
+import { createProjectMemoryLocalStore } from "../context/projectMemoryLocalStore.js";
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
 describe("shell session runtime (W5)", () => {
@@ -194,6 +196,148 @@ describe("shell session runtime (W5)", () => {
         injectionStatus: "consumed",
         injectionCount: 1,
       }),
+    );
+  });
+
+  it("injects explicit project memory after compact context and only once", async () => {
+    const calls: string[] = [];
+    const promptsSeenByModel: string[] = [];
+    const compactCheckpointStore = createCompactLiveCheckpointStore({
+      now: () => "2026-05-16T04:00:00.000Z",
+      nextId: () => "checkpoint-memory-coexist",
+    });
+    const compactInjectionStateStore = createCompactInjectionStateStore({
+      now: () => "2026-05-16T04:00:00.000Z",
+    });
+    const compactResult = runCompactCommand({
+      mode: "render",
+      source: "route",
+      generatedAt: "2026-05-16T04:00:00.000Z",
+      routeInfo: {
+        routeId: "85",
+        name: "Memory injection coexistence",
+        nextAction: "Inject memory after compact.",
+      },
+      taskGoal: {
+        objective: "Prove deterministic injection order.",
+      },
+      validationEvidence: {
+        testsRun: ["sessionRuntime.test.ts"],
+      },
+    });
+    const checkpoint = updateLatestCompactCheckpoint(compactCheckpointStore, {
+      sessionScopeId: "session:sess_memory_coexist",
+      sourceCommand: "/compact",
+      result: compactResult,
+    });
+    compactInjectionStateStore.markPending({
+      sessionScopeId: "session:sess_memory_coexist",
+      checkpointId: checkpoint.checkpointId,
+      sourceCommand: "/compact",
+    });
+
+    const memoryStoreRoot = fs.mkdtempSync(path.join(os.tmpdir(), "project-memory-runtime-"));
+    const projectMemoryStore = createProjectMemoryLocalStore({
+      ref: { mode: "test-only", root: memoryStoreRoot },
+    });
+    await projectMemoryStore.write({
+      storeRef: projectMemoryStore.ref,
+      record: {
+        id: "pmr:runtime-memory",
+        version: 1,
+        createdAt: "2026-05-16T04:00:00.000Z",
+        candidateId: "pmc:runtime-memory",
+        candidateKind: "project-fact",
+        retentionClass: "project-scoped-candidate",
+        approvedAt: "2026-05-16T04:00:00.000Z",
+        approvedBySourceCommand: "/memory",
+        memoryText: "Runtime memory injection is explicit and one-shot.",
+        evidence: ["route85:runtime"],
+        source: "system-derived",
+        sourcePacket: "route85-test",
+        routeReferences: ["route85"],
+        safety: "safe",
+        redactions: [],
+      },
+    });
+    const projectMemoryInjectionStateStore = createProjectMemoryInjectionStateStore({
+      nextId: () => "pmi:runtime-memory",
+    });
+    projectMemoryInjectionStateStore.markPending({
+      sessionScopeId: "session:sess_memory_coexist",
+      sourceCommand: "/memory use",
+      mode: "recall",
+      query: "runtime memory",
+      recordIds: ["pmr:runtime-memory"],
+    });
+
+    const runtime = new ShellSessionRuntime({
+      compactCheckpointStore,
+      compactInjectionStateStore,
+      projectMemoryStore,
+      projectMemoryInjectionStateStore,
+      sessionManager: {
+        persistUserPromptBarrier(sessionId: string, prompt: string) {
+          calls.push(`barrier:${sessionId}:${prompt}`);
+        },
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted(sessionId: string) {
+          calls.push(`completed:${sessionId}`);
+        },
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine() {},
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* (prompt) {
+        promptsSeenByModel.push(prompt);
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_memory_coexist",
+              initialPrompt: prompt,
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "done",
+          },
+        };
+      },
+    });
+
+    try {
+      await runtime.executePrompt("sess_memory_coexist", "continue with memory");
+      await runtime.executePrompt("sess_memory_coexist", "second prompt");
+    } finally {
+      fs.rmSync(memoryStoreRoot, { recursive: true, force: true });
+    }
+
+    expect(promptsSeenByModel[0]).toContain("<compact_v2_injected_context>");
+    expect(promptsSeenByModel[0]).toContain("<project_memory_context>");
+    expect(
+      promptsSeenByModel[0].indexOf("<compact_v2_injected_context>"),
+    ).toBeLessThan(promptsSeenByModel[0].indexOf("<project_memory_context>"));
+    expect(promptsSeenByModel[0]).toContain("Runtime memory injection is explicit and one-shot.");
+    expect(promptsSeenByModel[0]).toContain("<user_request>\ncontinue with memory");
+    expect(promptsSeenByModel[1]).toBe("second prompt");
+    expect(calls).toEqual([
+      "barrier:sess_memory_coexist:continue with memory",
+      "completed:sess_memory_coexist",
+      "barrier:sess_memory_coexist:second prompt",
+      "completed:sess_memory_coexist",
+    ]);
+    expect(projectMemoryInjectionStateStore.get("session:sess_memory_coexist")).toEqual(
+      expect.objectContaining({ injectionStatus: "consumed" }),
     );
   });
 
