@@ -639,6 +639,8 @@ describe("slash router (W4)", () => {
     if (result?.kind === "local") {
       expect(result.output).toContain("Visible agent state");
       expect(result.output).toContain("State preview only: no actual sidebar UI exists yet.");
+      expect(result.output).toContain("Recent activity");
+      expect(result.output).toContain("/sidebar");
       expect(result.output).toContain("no provider/model call");
       expect(result.output).toContain("no dynamic MCP/skills discovery");
       expect(result.output).toContain("no automatic memory/startup injection");

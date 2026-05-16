@@ -154,6 +154,11 @@ consumer. This does not add startup auto-load, model-context injection, cache
 discovery, or a sidebar UI; it only lets `/sidebar` summarize supplied warm
 cache health/cache facts alongside edit, compact, memory, and validation state.
 
+Route 89 note: `/sidebar` can also show a sanitized warmup activity event when
+explicit warm cache health/read results are supplied. This remains status-only:
+no startup auto-load, model-context injection, cache discovery, or provider
+call is added.
+
 Choose startup warm cache session integration only if a caller can provide an
 explicit cache root and the startup surface remains status/read-only.
 

@@ -149,12 +149,20 @@ changing `/status` because `/status` is already an alias for workflow git
 status. `/sidebar` does not persist state, call providers/models, discover MCP
 or skills, or change session schema.
 
+## Route 89 Event Note
+
+Route 89 adds a pure sidebar event model, explicit-input event bridge, recent
+activity projection, and quality checks. `/sidebar` can now render a concise
+`Recent activity` section when sanitized events are provided. This does not add
+a real sidebar UI, dynamic discovery, provider/model calls, persistence, schema
+changes, or raw event payload rendering.
+
 ## Deferred
 
 Defer these to future routes:
 
 - actual sidebar UI/TUI/React panel
-- event-log bridge or live event aggregation
+- live event aggregation from runtime/session internals
 - dynamic MCP/skills discovery
 - startup/session auto-load
 - model-context injection changes

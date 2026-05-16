@@ -349,6 +349,11 @@ text renderer, and explicit `/sidebar` preview command. It consumes supplied
 edit, compact, memory, warmup, validation, and tool-availability facts without
 adding a UI, persistence, dynamic MCP/skills discovery, provider/model calls,
 or automatic memory/startup injection.
+Route 89 adds a pure sidebar event model, explicit-input event bridge, recent
+activity projection, quality checks, and concise `Recent activity` rendering in
+`/sidebar`. It does not capture live runtime events by default and still avoids
+UI, persistence, discovery, provider/model calls, schema changes, and raw
+content in rendered state/events.
 
 ## Residual Risks
 
@@ -379,7 +384,8 @@ Compact v2 packet rendering, the live checkpoint, the candidate-only adapter,
 Route 80 candidate extraction, Route 81 session-scoped review state, Route 82
 explicit save path, Route 83 deterministic retrieval/wake preview, Route 84
 lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
-  quality/merge hardening, Route 87 explicit warm cache status, and Route 88
-  visible sidebar state projection are now machine-checkable enough to plan
-  event-log/sidebar UI, startup-read integration, or
+  quality/merge hardening, Route 87 explicit warm cache status, Route 88
+  visible sidebar state projection, and Route 89 sidebar event/activity bridge
+  are now machine-checkable enough to plan sidebar UI, live event capture,
+  startup-read integration, or
 retrieval-quality work separately.

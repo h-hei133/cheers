@@ -52,6 +52,28 @@ export interface SidebarNextAction {
   readonly evidence: readonly string[];
 }
 
+export interface SidebarActivityItem {
+  readonly id: string;
+  readonly timestamp?: string;
+  readonly kind: string;
+  readonly severity: SidebarSeverity;
+  readonly source: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly nextAction?: string;
+  readonly evidence: readonly string[];
+}
+
+export interface SidebarRecentActivity {
+  readonly events: readonly SidebarActivityItem[];
+  readonly maxVisibleEvents: number;
+  readonly droppedEventCount: number;
+  readonly dedupedEventCount: number;
+  readonly hasHiddenDeveloperEvents: boolean;
+  readonly latestNextAction?: string;
+  readonly evidence: readonly string[];
+}
+
 export interface SidebarStateSnapshot {
   readonly snapshotVersion: typeof SIDEBAR_STATE_SNAPSHOT_VERSION;
   readonly generatedAt?: string;
@@ -59,6 +81,7 @@ export interface SidebarStateSnapshot {
   readonly facts: readonly SidebarFact[];
   readonly notices: readonly SidebarNotice[];
   readonly nextActions: readonly SidebarNextAction[];
+  readonly recentActivity?: SidebarRecentActivity;
   readonly redactions: readonly string[];
   readonly safety: {
     readonly readOnly: true;
@@ -80,6 +103,7 @@ export interface SidebarStateSnapshotInput {
   readonly facts?: readonly SidebarFact[];
   readonly notices?: readonly SidebarNotice[];
   readonly nextActions?: readonly SidebarNextAction[];
+  readonly recentActivity?: SidebarRecentActivity;
   readonly redactions?: readonly string[];
   readonly evidence?: readonly string[];
 }
@@ -129,6 +153,9 @@ export function createSidebarStateSnapshot(
   const nextActions = uniqueById(
     (input.nextActions ?? []).map((action) => sanitizeNextAction(action, redactions)),
   );
+  const recentActivity = input.recentActivity
+    ? sanitizeRecentActivity(input.recentActivity, redactions)
+    : undefined;
   return {
     snapshotVersion: SIDEBAR_STATE_SNAPSHOT_VERSION,
     generatedAt: input.generatedAt,
@@ -136,6 +163,7 @@ export function createSidebarStateSnapshot(
     facts,
     notices,
     nextActions,
+    recentActivity,
     redactions: Array.from(redactions).sort(),
     safety: {
       readOnly: true,
@@ -239,6 +267,31 @@ function sanitizeNextAction(
     label: sanitizeSidebarText(action.label, redactions, 80),
     summary: sanitizeSidebarText(action.summary, redactions),
     evidence: unique(action.evidence.map((item) => sanitizeSidebarText(item, redactions, 120))),
+  };
+}
+
+function sanitizeRecentActivity(
+  activity: SidebarRecentActivity,
+  redactions: Set<string>,
+): SidebarRecentActivity {
+  return {
+    ...activity,
+    events: uniqueById(activity.events.map((event) => ({
+      ...event,
+      id: normalizeToken(event.id, "sidebar-activity"),
+      kind: sanitizeSidebarText(event.kind, redactions, 80),
+      source: sanitizeSidebarText(event.source, redactions, 80),
+      title: sanitizeSidebarText(event.title, redactions, 100),
+      summary: sanitizeSidebarText(event.summary, redactions),
+      nextAction: event.nextAction
+        ? sanitizeSidebarText(event.nextAction, redactions)
+        : undefined,
+      evidence: unique(event.evidence.map((item) => sanitizeSidebarText(item, redactions, 120))),
+    }))),
+    latestNextAction: activity.latestNextAction
+      ? sanitizeSidebarText(activity.latestNextAction, redactions)
+      : undefined,
+    evidence: unique(activity.evidence.map((item) => sanitizeSidebarText(item, redactions, 120))),
   };
 }
 

@@ -5,6 +5,8 @@ import type { ProjectMemoryRecord, ProjectMemoryStoreHealth } from "./projectMem
 import type { ProjectMemoryReviewState } from "./projectMemoryReviewState.js";
 import type { StartupWarmContextCache } from "./startupWarmContextCache.js";
 import type { StartupWarmContextCacheHealth } from "./startupWarmContextHealth.js";
+import { projectSidebarActivity } from "./sidebarActivityProjection.js";
+import type { SidebarEvent } from "./sidebarEventModel.js";
 import {
   createSidebarStateSnapshot,
   sanitizeSidebarText,
@@ -61,6 +63,9 @@ export interface SidebarStateProjectionInput {
     readonly fullCommandOutput?: string;
   };
   readonly toolAvailability?: SidebarToolAvailabilityInput;
+  readonly events?: readonly SidebarEvent[];
+  readonly maxVisibleActivityEvents?: number;
+  readonly bridgeDroppedEventCount?: number;
   readonly warnings?: ReadonlyArray<{ readonly id: string; readonly message: string; readonly source?: SidebarSource }>;
   readonly blockers?: ReadonlyArray<{ readonly id: string; readonly message: string; readonly source?: SidebarSource }>;
   readonly nextAction?: string;
@@ -86,7 +91,7 @@ export function projectSidebarState(
 
   collectRawContentRedactions(input, redactions);
 
-  return createSidebarStateSnapshot({
+  const baseSnapshot = createSidebarStateSnapshot({
     generatedAt: input.generatedAt,
     title: "Visible agent state preview",
     facts,
@@ -100,6 +105,18 @@ export function projectSidebarState(
       "sidebar-state-projection:no-provider-call",
       "sidebar-state-projection:no-auto-injection",
     ],
+  });
+  if (!input.events) {
+    return baseSnapshot;
+  }
+  return createSidebarStateSnapshot({
+    ...baseSnapshot,
+    recentActivity: projectSidebarActivity({
+      snapshot: baseSnapshot,
+      events: input.events,
+      maxVisibleEvents: input.maxVisibleActivityEvents,
+      bridgeDroppedEventCount: input.bridgeDroppedEventCount,
+    }),
   });
 }
 
