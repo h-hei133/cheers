@@ -4,6 +4,7 @@ import { runConnectCommand } from "./connectCommandRuntime.js";
 import { runMemoryLocalCommand } from "./memoryCommandRuntime.js";
 import { runModelCommand } from "./modelCommandRuntime.js";
 import { runRestoreLocalCommand } from "./restoreCommandRuntime.js";
+import { runSidebarLocalCommand } from "./sidebarCommandRuntime.js";
 import { runWarmupLocalCommand } from "./warmupCommandRuntime.js";
 import {
   runDiagnoseCommand,
@@ -83,6 +84,14 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runWarmupLocalCommand(args, context),
+    },
+    {
+      name: "sidebar",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runSidebarLocalCommand(args, context),
     },
     {
       name: "connect",

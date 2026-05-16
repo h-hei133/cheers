@@ -6,11 +6,28 @@ copying implementation code.
 
 ## Reference Repositories
 
+Coding-agent baselines:
+
 - ClaudeCode: `/home/wang/projects/source-claudecode`
 - opencode: `/home/wang/projects/opencode`
 - gemini-cli: `/home/wang/projects/gemini-cli`
 
-These repositories are read-only references. Do not modify them.
+Memory/context references:
+
+- MemPalace: `/home/wang/projects/mempalace`
+- Mem0: `/home/wang/projects/mem0`
+- Graphiti: `/home/wang/projects/graphiti`
+
+Browser/tooling/product references:
+
+- Stagehand: `/home/wang/projects/stagehand`
+- browser-use: `/home/wang/projects/browser-use`, when present locally
+- Playwright MCP: `/home/wang/projects/playwright-mcp`
+- OpenHands: `/home/wang/projects/OpenHands`
+
+These repositories are read-only references. Do not modify them. A route should
+select only the relevant 1-4 primary references instead of scanning the full
+pool by default.
 
 ## Scan Discipline
 
@@ -19,11 +36,16 @@ These repositories are read-only references. Do not modify them.
 - Each route should provide its own search keywords and file budget.
 - Default budget should be small, usually 8-16 external files total unless the
   route justifies more.
+- Route docs should name the primary references, focus questions, and maximum
+  file budget before scanning.
 - Record architecture patterns, product semantics, data boundaries, and local
   implications.
 - Do not copy implementation code verbatim.
 - Do not over-scan or perform broad reference repository audits when a small
   targeted comparison is enough.
+- Do not scan all reference families by default; use memory/context references
+  for memory quality routes, browser/tooling references for browser/tool
+  surfaces, and coding-agent baselines for CLI/session/tool semantics.
 - If a route does not benefit from a reference scan, it may explicitly skip the
   scan and say why.
 - Treat the scan as evidence for responsibility boundaries and product

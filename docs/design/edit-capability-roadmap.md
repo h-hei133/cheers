@@ -1415,6 +1415,12 @@ Allowed after this document:
   summaries. It remains outside edit runtime, does not auto-load into model
   context or future turns, and does not change edit capability, rollback,
   recovery execution, or default mutation readiness.
+- Route 88 context/surface work adds a read-only sidebar state model,
+  projection, compact renderer, and `/sidebar` preview for supplied
+  edit/compact/memory/warmup/validation/tool facts. It remains outside edit
+  runtime, adds no actual sidebar UI, does not discover MCP/skills dynamically,
+  and does not change edit capability, rollback, recovery execution, or default
+  mutation readiness.
 
 Forbidden after this document:
 
@@ -1432,7 +1438,8 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 88 recommendation for memory work: choose sidebar state model, startup
-warm cache session-read integration, or memory retrieval quality/ranking
-hardening based on the next user-visible blocker. Do not treat Route 82, Route
-83, Route 84, Route 85, Route 86, or Route 87 as edit-capability expansions.
+Route 89 recommendation: choose sidebar state quality / event-log bridge,
+actual sidebar UI/TUI prototype, startup warm cache session-read integration,
+or memory retrieval quality/ranking hardening based on the next user-visible
+blocker. Do not treat Route 82, Route 83, Route 84, Route 85, Route 86, Route
+87, or Route 88 as edit-capability expansions.

@@ -149,6 +149,11 @@ Still deferred:
 
 ## Next-Route Criteria
 
+Route 88 note: startup warm cache state now has a read-only sidebar projection
+consumer. This does not add startup auto-load, model-context injection, cache
+discovery, or a sidebar UI; it only lets `/sidebar` summarize supplied warm
+cache health/cache facts alongside edit, compact, memory, and validation state.
+
 Choose startup warm cache session integration only if a caller can provide an
 explicit cache root and the startup surface remains status/read-only.
 

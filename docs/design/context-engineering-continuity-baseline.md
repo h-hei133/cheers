@@ -344,6 +344,11 @@ detection, and quality checks that block unsupported auto-load/provider claims.
 Route 87 adds an explicit, discardable startup warm context cache prototype for
 safe edit/compact/memory/validation/route summaries. It does not auto-load the
 cache into prompts, future turns, or model context.
+Route 88 adds a pure sidebar/visible-agent-state model, projection, compact
+text renderer, and explicit `/sidebar` preview command. It consumes supplied
+edit, compact, memory, warmup, validation, and tool-availability facts without
+adding a UI, persistence, dynamic MCP/skills discovery, provider/model calls,
+or automatic memory/startup injection.
 
 ## Residual Risks
 
@@ -374,6 +379,7 @@ Compact v2 packet rendering, the live checkpoint, the candidate-only adapter,
 Route 80 candidate extraction, Route 81 session-scoped review state, Route 82
 explicit save path, Route 83 deterministic retrieval/wake preview, Route 84
 lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
-quality/merge hardening, and Route 87 explicit warm cache status are now
-machine-checkable enough to plan sidebar, startup-read integration, or
+  quality/merge hardening, Route 87 explicit warm cache status, and Route 88
+  visible sidebar state projection are now machine-checkable enough to plan
+  event-log/sidebar UI, startup-read integration, or
 retrieval-quality work separately.

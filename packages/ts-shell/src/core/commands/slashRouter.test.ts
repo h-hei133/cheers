@@ -629,6 +629,23 @@ describe("slash router (W4)", () => {
     }
   });
 
+  it("routes /sidebar as a read-only visible state preview", async () => {
+    const result = await routeSlashCommand("/sidebar", {
+      cwd: workspaceRoot,
+      sessionId: "sess_sidebar",
+    });
+
+    expect(result?.kind).toBe("local");
+    if (result?.kind === "local") {
+      expect(result.output).toContain("Visible agent state");
+      expect(result.output).toContain("State preview only: no actual sidebar UI exists yet.");
+      expect(result.output).toContain("no provider/model call");
+      expect(result.output).toContain("no dynamic MCP/skills discovery");
+      expect(result.output).toContain("no automatic memory/startup injection");
+      expect(result.output).not.toContain("Unknown slash command");
+    }
+  });
+
   it("returns a readable local error for unknown slash commands", async () => {
     const result = await routeSlashCommand("/unknown-cmd", {
       cwd: workspaceRoot,
