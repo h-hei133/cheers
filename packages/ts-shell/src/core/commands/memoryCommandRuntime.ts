@@ -9,6 +9,11 @@ import {
 } from "../context/projectMemoryReviewCommandContract.js";
 import { runProjectMemoryReviewCommand } from "../context/projectMemoryReviewCommandRunner.js";
 import {
+  parseProjectMemoryRecallCommandArgs,
+  ProjectMemoryRecallCommandContractError,
+} from "../context/projectMemoryRecallCommandContract.js";
+import { runProjectMemoryRecallCommand } from "../context/projectMemoryRecallCommandRunner.js";
+import {
   parseProjectMemorySaveCommandArgs,
   ProjectMemorySaveCommandContractError,
 } from "../context/projectMemorySaveCommandContract.js";
@@ -30,6 +35,17 @@ export async function runMemoryLocalCommand(
     const candidates = latest
       ? extractProjectMemoryCandidates({ compactPacket: latest.packet })
       : [];
+    if (args[0] === "recall" || args[0] === "search" || args[0] === "wake") {
+      const request = parseProjectMemoryRecallCommandArgs(args);
+      const result = await runProjectMemoryRecallCommand({
+        request,
+        memoryStore: context.projectMemoryStore,
+      });
+      return {
+        kind: "local",
+        output: result.output,
+      };
+    }
     if (args[0] === "save" || args[0] === "status") {
       const request = parseProjectMemorySaveCommandArgs(args);
       const result = await runProjectMemorySaveCommand({
@@ -78,11 +94,15 @@ function formatMemoryReviewCommandError(error: unknown): string {
   const blocker =
     error instanceof ProjectMemoryReviewCommandContractError
       ? error.code
+      : error instanceof ProjectMemoryRecallCommandContractError
+        ? error.code
       : error instanceof ProjectMemorySaveCommandContractError
         ? error.code
       : "memory-review-command-error";
   return [
-    error instanceof ProjectMemorySaveCommandContractError
+    error instanceof ProjectMemoryRecallCommandContractError
+      ? "Project memory recall"
+      : error instanceof ProjectMemorySaveCommandContractError
       ? "Project memory store"
       : "Project memory review",
     "Result",
@@ -91,7 +111,7 @@ function formatMemoryReviewCommandError(error: unknown): string {
     `- Reason: ${reason}`,
     "- Memory written: no",
     "- Auto-load: no",
-    "- Retrieval / wake-up / recall: not enabled",
-    "- DoNext: Retry with /memory, /memory approve <candidate-id>, /memory reject <candidate-id>, /memory save <candidate-id>, or /memory status.",
+    "- Auto-injected: no",
+    "- DoNext: Retry with /memory, /memory approve <candidate-id>, /memory reject <candidate-id>, /memory save <candidate-id>, /memory recall <query>, /memory wake, or /memory status.",
   ].join("\n");
 }

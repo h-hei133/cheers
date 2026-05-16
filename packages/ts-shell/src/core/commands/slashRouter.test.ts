@@ -207,6 +207,58 @@ describe("slash router (W4)", () => {
     expect(fs.existsSync(path.join(memoryStoreRoot, "project-memory.jsonl"))).toBe(true);
   });
 
+  it("routes /memory recall and /memory wake over a supplied local store without auto injection", async () => {
+    const memoryStoreRoot = path.join(workspaceRoot, ".memory-recall-test");
+    const projectMemoryStore = createProjectMemoryLocalStore({
+      ref: { mode: "test-only", root: memoryStoreRoot },
+    });
+    await projectMemoryStore.write({
+      storeRef: projectMemoryStore.ref,
+      record: {
+        id: "pmr:slash-recall",
+        version: 1,
+        createdAt: "2026-05-16T00:00:00.000Z",
+        candidateId: "pmc:slash-recall",
+        candidateKind: "project-fact",
+        retentionClass: "project-scoped-candidate",
+        approvedAt: "2026-05-16T00:00:00.000Z",
+        approvedBySourceCommand: "/memory",
+        memoryText: "Project memory recall uses deterministic local search.",
+        evidence: ["route83:slash-router"],
+        source: "system-derived",
+        sourcePacket: "route83-test",
+        routeReferences: ["route83"],
+        safety: "safe",
+        redactions: [],
+      },
+    });
+
+    const recall = await routeSlashCommand("/memory recall deterministic search", {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_recall",
+      projectMemoryStore,
+    });
+    expect(recall?.kind).toBe("local");
+    if (recall?.kind === "local") {
+      expect(recall.output).toContain("Project memory recall");
+      expect(recall.output).toContain("Result count: 1");
+      expect(recall.output).toContain("Auto-injected: no");
+      expect(recall.output).toContain("Future-turn injection: not enabled");
+    }
+
+    const wake = await routeSlashCommand("/memory wake", {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_recall",
+      projectMemoryStore,
+    });
+    expect(wake?.kind).toBe("local");
+    if (wake?.kind === "local") {
+      expect(wake.output).toContain("Project memory wake-up preview");
+      expect(wake.output).toContain("Startup cache: not enabled");
+      expect(wake.output).toContain("Auto-injected: no");
+    }
+  });
+
   it("routes compact JSON mode and rejects invalid compact args", async () => {
     const compactCheckpointStore = createCompactLiveCheckpointStore({
       now: () => "2026-05-15T00:00:00.000Z",

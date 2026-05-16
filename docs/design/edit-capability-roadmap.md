@@ -1363,6 +1363,10 @@ Allowed after this document:
   store prototype for session-approved safe candidates. It is outside the edit
   runtime and does not change edit capability, rollback, recovery execution, or
   default mutation readiness.
+- Route 83 context-memory work adds deterministic recall/search and wake-up
+  preview over the explicit local store. It remains outside edit runtime and
+  does not change edit capability, rollback, recovery execution, or default
+  mutation readiness.
 
 Forbidden after this document:
 
@@ -1380,7 +1384,7 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 83 recommendation for memory work: continue with retrieval/wake-up/recall
-design only if explicit save remains safe, or add invalidation/delete UX first
-if stored-record lifecycle becomes the next blocker. Do not treat Route 82 as
-an edit-capability expansion.
+Route 84 recommendation for memory work: add invalidation/delete UX first if
+stored-record lifecycle is the next blocker, or design opt-in wake-up/future-turn
+injection if preview behavior is stable enough for user-controlled loading. Do
+not treat Route 82 or Route 83 as edit-capability expansions.

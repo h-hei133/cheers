@@ -331,17 +331,19 @@ candidate extraction, quality, and surface layer for project memory candidates
 without storage. Route 81 adds session-scoped review/approval state and a
 `/memory` review command without persistence. Route 82 adds a non-default
 explicit local store prototype for reviewed candidates only; it does not load
-stored memory back into context.
+stored memory back into context. Route 83 adds user-triggered recall/search and
+wake-up preview over that store, still without automatic context injection.
 
 ## Residual Risks
 
 - Compact v2 injection is operational with focused quality/merge guards, Route
   80 can preview memory candidates, Route 81 can approve/reject candidates for
   the current session, and Route 82 can explicitly save approved safe
-  candidates to a supplied local store. Retrieval, ranking, wake-up, recall,
-  and automatic loading remain deferred.
-- Future memory storage still needs retrieval ranking, invalidation/delete UX,
-  and user controls before it can affect prompt context.
+  candidates to a supplied local store. Route 83 can recall/search saved
+  records and render a wake-up preview. Automatic loading and future-turn
+  injection remain deferred.
+- Future memory storage still needs invalidation/delete UX and explicit opt-in
+  controls before it can affect prompt context.
 - Future sidebar state should consume `sidebarFacts` rather than inventing a
   separate taxonomy.
 - Future startup warm context should consume `startupWarmCandidates` only after
@@ -349,12 +351,12 @@ stored memory back into context.
 
 ## Next Recommendation
 
-Recommended next route: Route 83 memory retrieval / wake-up / recall design if
-explicit store behavior remains safe, or memory store invalidation/delete UX if
-lifecycle management is the next blocker.
+Recommended next route: Route 84 memory invalidation/delete UX if stale records
+are the next safety gap, or opt-in wake-up/future-turn injection if preview
+behavior is stable enough for user-controlled loading.
 
 Reason: context layers, compact survivors, redactions, edit/recovery facts,
 Compact v2 packet rendering, the live checkpoint, the candidate-only adapter,
-Route 80 candidate extraction, Route 81 session-scoped review state, and Route
-82 explicit save path are now machine-checkable enough to plan retrieval or
-record lifecycle separately.
+Route 80 candidate extraction, Route 81 session-scoped review state, Route 82
+explicit save path, and Route 83 deterministic retrieval/wake preview are now
+machine-checkable enough to plan lifecycle or opt-in injection separately.

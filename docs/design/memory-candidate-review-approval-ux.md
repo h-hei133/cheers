@@ -202,3 +202,10 @@ The save path preserves review-before-write, blocks pending/rejected/unsafe/raw
 or secret-looking candidates, and does not add retrieval, wake-up, recall,
 startup cache, sidebar UI, provider/MCP behavior, SessionManager schema
 changes, or edit runtime changes.
+
+## Route 83 Note
+
+Route 83 keeps review and save semantics unchanged. It adds read-only
+`/memory recall <query>`, `/memory search <query>`, and `/memory wake` surfaces
+over records that were already saved through explicit Route 82 commands. Review
+state still does not auto-write, auto-load, or inject memory into future turns.

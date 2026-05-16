@@ -135,3 +135,17 @@ Deferred work:
 Choose retrieval/wake-up/recall only after the explicit save path remains safe
 under review-before-write tests. If stored records need lifecycle controls
 first, choose invalidation/delete UX before retrieval.
+
+## Route 83 Note
+
+Route 83 adds deterministic read-only retrieval on top of this store:
+
+- `/memory recall <query>` and `/memory search <query>` search saved approved
+  records.
+- `/memory wake` renders a bounded project wake-up preview.
+- Retrieval requires an explicit local store supplied by the runtime/test
+  harness.
+
+Route 83 does not write memory, choose a default store path, auto-load records,
+inject future-turn context, add startup cache/sidebar UI, call providers/models,
+or add vector DB/ChromaDB/embedding search.

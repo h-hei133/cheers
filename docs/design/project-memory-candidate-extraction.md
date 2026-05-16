@@ -247,3 +247,10 @@ passed Route 81 review. Candidate extraction remains preview-only: extraction
 does not write memory, choose a store path, load cross-session records, or
 enable retrieval. The save path consumes candidates plus session review state
 and writes only approved safe summaries to an explicitly supplied local store.
+
+## Route 83 Note
+
+Route 83 reads saved records for deterministic recall and wake-up preview.
+Candidate extraction still does not search memory, load stored records, or
+inject memory into future turns. Retrieval operates only on records that were
+explicitly saved after review.
