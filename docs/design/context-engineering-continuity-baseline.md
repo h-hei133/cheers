@@ -328,13 +328,15 @@ command surface, Route 77 adds an in-memory latest compact checkpoint, Route 78
 consumes a pending checkpoint once from the next normal runtime prompt, and
 Route 79 hardens repeated compact quality/merge behavior. Route 80 adds a pure
 candidate extraction, quality, and surface layer for project memory candidates
-without storage.
+without storage. Route 81 adds session-scoped review/approval state and a
+`/memory` review command without persistence.
 
 ## Residual Risks
 
 - Compact v2 injection is operational with focused quality/merge guards, and
-  Route 80 can preview memory candidates, but durable memory storage still
-  needs separate review, ranking, and persistence policy.
+  Route 80 can preview memory candidates. Route 81 can approve/reject
+  candidates for the current session only, but durable memory storage still
+  needs separate ranking and persistence policy.
 - Future memory storage still needs ranking, persistence boundaries, and user
   controls.
 - Future sidebar state should consume `sidebarFacts` rather than inventing a
@@ -344,9 +346,10 @@ without storage.
 
 ## Next Recommendation
 
-Recommended next route: Route 81 memory candidate review / approval UX.
+Recommended next route: Route 82 project memory store prototype only if review
+UX remains stable; otherwise Route 82 should polish `/memory`.
 
 Reason: context layers, compact survivors, redactions, edit/recovery facts,
 Compact v2 packet rendering, the live checkpoint, the candidate-only adapter,
-and Route 80 candidate extraction are now machine-checkable enough to design
-review authority before any memory store exists.
+Route 80 candidate extraction, and Route 81 session-scoped review state are now
+machine-checkable enough to plan storage separately.

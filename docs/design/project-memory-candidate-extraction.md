@@ -224,3 +224,18 @@ useful but need human selection before storage.
 
 Choose a memory store prototype only after review boundaries are explicit and
 candidate quality can reject unsafe or ambiguous facts reliably.
+
+## Route 81 Note
+
+Route 81 adds session-scoped review and approval UX on top of these candidates:
+
+- `projectMemoryReviewState.ts`
+- `projectMemoryReviewCommandContract.ts`
+- `projectMemoryReviewCommandRunner.ts`
+- `projectMemoryReviewSurface.ts`
+- `/memory` local command registration
+
+Approvals and rejections remain session-scoped only. They do not persist memory,
+load cross-session memory, add retrieval/wake-up/recall, add a startup cache,
+add sidebar UI, change provider/MCP behavior, change SessionManager schema, or
+change edit runtime behavior.

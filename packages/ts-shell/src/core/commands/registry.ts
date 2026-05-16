@@ -1,6 +1,7 @@
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { runCompactLocalCommand } from "./compactCommandRuntime.js";
 import { runConnectCommand } from "./connectCommandRuntime.js";
+import { runMemoryLocalCommand } from "./memoryCommandRuntime.js";
 import { runModelCommand } from "./modelCommandRuntime.js";
 import { runRestoreLocalCommand } from "./restoreCommandRuntime.js";
 import {
@@ -65,6 +66,14 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runCompactLocalCommand(args, context),
+    },
+    {
+      name: "memory",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runMemoryLocalCommand(args, context),
     },
     {
       name: "connect",

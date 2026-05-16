@@ -1,5 +1,6 @@
 import type { CompactLiveCheckpointStore } from '../context/compactLiveCheckpoint.js'
 import type { CompactInjectionStateStore } from '../context/compactInjectionState.js'
+import type { ProjectMemoryReviewStateStore } from '../context/projectMemoryReviewState.js'
 
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
@@ -9,6 +10,7 @@ export interface CommandContext {
   readonly rawCommandName?: string
   readonly compactCheckpointStore?: CompactLiveCheckpointStore
   readonly compactInjectionStateStore?: CompactInjectionStateStore
+  readonly projectMemoryReviewStateStore?: ProjectMemoryReviewStateStore
 }
 
 export interface LocalCommandResult {

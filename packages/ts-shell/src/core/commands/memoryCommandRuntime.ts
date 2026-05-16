@@ -1,0 +1,71 @@
+import {
+  getLatestCompactCheckpoint,
+  DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
+} from "../context/compactLiveCheckpoint.js";
+import { extractProjectMemoryCandidates } from "../context/projectMemoryCandidateExtractor.js";
+import {
+  parseProjectMemoryReviewCommandArgs,
+  ProjectMemoryReviewCommandContractError,
+} from "../context/projectMemoryReviewCommandContract.js";
+import { runProjectMemoryReviewCommand } from "../context/projectMemoryReviewCommandRunner.js";
+import {
+  DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE,
+} from "../context/projectMemoryReviewState.js";
+import type { CommandContext, LocalCommandResult } from "./types.js";
+
+export async function runMemoryLocalCommand(
+  args: string[],
+  context: CommandContext,
+): Promise<LocalCommandResult> {
+  try {
+    const request = parseProjectMemoryReviewCommandArgs(args);
+    const reviewSessionId = memoryReviewSessionScopeId(context);
+    const compactStore =
+      context.compactCheckpointStore ?? DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE;
+    const latest = getLatestCompactCheckpoint(compactStore, reviewSessionId);
+    const candidates = latest
+      ? extractProjectMemoryCandidates({ compactPacket: latest.packet })
+      : [];
+    const result = runProjectMemoryReviewCommand({
+      request,
+      reviewSessionId,
+      candidates,
+      store:
+        context.projectMemoryReviewStateStore ??
+        DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE,
+      sourceCommand: "/memory",
+    });
+    return {
+      kind: "local",
+      output: result.output,
+    };
+  } catch (error) {
+    return {
+      kind: "local",
+      output: formatMemoryReviewCommandError(error),
+    };
+  }
+}
+
+function memoryReviewSessionScopeId(context: CommandContext): string {
+  return context.sessionId ? `session:${context.sessionId}` : `cwd:${context.cwd}`;
+}
+
+function formatMemoryReviewCommandError(error: unknown): string {
+  const reason =
+    error instanceof Error ? error.message : "Unknown memory review command error.";
+  const blocker =
+    error instanceof ProjectMemoryReviewCommandContractError
+      ? error.code
+      : "memory-review-command-error";
+  return [
+    "Project memory review",
+    "Result",
+    "- Outcome: blocked",
+    `- BlockerKind: ${blocker}`,
+    `- Reason: ${reason}`,
+    "- Memory written: no",
+    "- Persistence: not enabled",
+    "- DoNext: Retry with /memory, /memory approve <candidate-id>, or /memory reject <candidate-id>.",
+  ].join("\n");
+}

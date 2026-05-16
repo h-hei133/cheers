@@ -1,6 +1,6 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 80
+Route baseline: post-Route 81
 Date: 2026-05-16
 Status: long-range edit capability map after Routes 50-73; edit capability is
 now a closeout candidate for the bounded selected-workspace surface.
@@ -78,8 +78,16 @@ cross-session loading, startup cache, sidebar UI, provider/MCP changes,
 package/default gate changes, SessionManager schema changes, edit runtime
 changes, automatic recovery, atomic rollback, and raw content/secret exposure
 out of scope.
-Recommended Route 81 focus: memory candidate review / approval UX before any
-persistent memory store.
+Route 81 adds session-scoped memory candidate review/approval UX through
+in-memory review state, command contract, command runner, surface renderer, and
+`/memory` registration. Approvals and rejections are not persisted and do not
+write/delete memory. It keeps vector DB/backend, automatic writes,
+cross-session loading, retrieval/wake-up/recall, startup cache, sidebar UI,
+provider/MCP changes, package/default gates, SessionManager schema changes,
+edit runtime changes, automatic recovery, atomic rollback, and raw
+content/secret exposure out of scope.
+Recommended Route 82 focus: project memory store prototype only after review
+UX remains stable; otherwise polish `/memory`.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -91,7 +99,7 @@ opencode, and gemini-cli.
 It is not a broad edit readiness claim. It keeps implemented capability,
 candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Post-Route 80 Executive Summary
+## 1. Post-Route 81 Executive Summary
 
 Current write capability remains intentionally narrow. The project supports a
 bounded selected-workspace write surface and still blocks broad arbitrary
@@ -1226,8 +1234,17 @@ recovery/rollback stance are explicitly re-audited.
     cross-session memory, add startup cache, add sidebar UI, change
     SessionManager schema, change provider/MCP/package/default gates, change
     edit runtime, add automatic recovery, or add atomic rollback.
-  - Recommended next phase: Route 81 memory candidate review / approval UX
-    before any memory store.
+
+- Batch 81: Memory candidate review / approval UX
+  - Status: implemented as in-memory review state, `/memory` command contract,
+    command runner, review surface, and slash command registration.
+  - Approve/reject decisions are session-scoped only. They do not write
+    persistent memory, delete persistent memory, load cross-session memory, add
+    retrieval/wake-up/recall, add startup cache, add sidebar UI, change
+    SessionManager schema, change provider/MCP/package/default gates, change
+    edit runtime, add automatic recovery, or add atomic rollback.
+  - Recommended next phase: Route 82 project memory store prototype only after
+    review/approval UX remains stable; otherwise polish `/memory`.
 
 - Future broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are

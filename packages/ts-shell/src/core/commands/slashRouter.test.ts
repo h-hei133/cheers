@@ -7,6 +7,7 @@ import {
   getLatestCompactCheckpoint,
 } from "../context/compactLiveCheckpoint.js";
 import { createCompactInjectionStateStore } from "../context/compactInjectionState.js";
+import { createProjectMemoryReviewStateStore } from "../context/projectMemoryReviewState.js";
 import { createCommandRegistry, listVisibleCommands } from "./registry.js";
 import { routeSlashCommand } from "./slashRouter.js";
 
@@ -87,6 +88,7 @@ describe("slash router (W4)", () => {
       expect(result.output).toContain("- Persistence: none");
       expect(result.output).toContain("- Provider/model call: none");
       expect(result.output).toContain("- Recovery execution: none");
+      expect(result.output).toContain("run /memory to review candidates");
       expect(result.output).toContain("Compact checkpoint");
       expect(result.output).toContain("- Checkpoint id: checkpoint-slash-1");
       expect(result.output).toContain("- Future-turn adapter: ready-for-adapter");
@@ -103,6 +105,39 @@ describe("slash router (W4)", () => {
     expect(
       compactInjectionStateStore.get("session:sess_slash").injectionStatus,
     ).toBe("pending");
+    expect(fs.readdirSync(workspaceRoot)).toEqual([]);
+  });
+
+  it("routes /memory to session-scoped candidate review without persistence", async () => {
+    const compactCheckpointStore = createCompactLiveCheckpointStore({
+      now: () => "2026-05-16T00:00:00.000Z",
+      nextId: () => "checkpoint-memory-review",
+    });
+    const projectMemoryReviewStateStore = createProjectMemoryReviewStateStore({
+      now: () => "2026-05-16T00:00:00.000Z",
+    });
+    await routeSlashCommand("/compact", {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_review",
+      compactCheckpointStore,
+    });
+
+    const result = await routeSlashCommand("/memory", {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_review",
+      compactCheckpointStore,
+      projectMemoryReviewStateStore,
+    });
+
+    expect(result?.kind).toBe("local");
+    if (result?.kind === "local") {
+      expect(result.output).toContain("Project memory review");
+      expect(result.output).toContain("- Memory written: no");
+      expect(result.output).toContain("- Persistence: not enabled");
+      expect(result.output).toContain("- Retrieval / wake-up / recall: not enabled");
+      expect(result.output).toContain("closeout-candidate");
+      expect(result.output).not.toContain("Unknown slash command");
+    }
     expect(fs.readdirSync(workspaceRoot)).toEqual([]);
   });
 

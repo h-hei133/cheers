@@ -27,6 +27,7 @@ export function formatCompactSessionSurface(
     `- Redactions: ${packet.redactions.length}`,
     `- Warnings: ${packet.warnings.length}`,
     `- Memory candidates: ${summarizeProjectMemoryCandidates(result.memoryCandidates)}`,
+    "- Review: run /memory to review candidates; no memory is written by /compact.",
     `- Next action: ${packet.route.nextAction ?? packet.taskGoal.nextAction ?? "not recorded"}`,
     "",
     renderProjectMemoryCandidateSurface({
