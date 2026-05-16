@@ -186,3 +186,19 @@ work.
 
 Route 82 should be a project memory store prototype only if review state,
 approval/rejection behavior, and safety boundaries are stable.
+
+## Route 82 Note
+
+Route 82 adds a non-default explicit local store prototype after review:
+
+- `/memory` remains the non-persistent review/list path.
+- `/memory approve ...` and `/memory reject ...` remain session-scoped review
+  decisions.
+- `/memory save <candidate-id>` and `/memory save approved` can persist only
+  approved safe candidates when an explicit local store is supplied.
+- `/memory status` reports store status without loading memory into context.
+
+The save path preserves review-before-write, blocks pending/rejected/unsafe/raw
+or secret-looking candidates, and does not add retrieval, wake-up, recall,
+startup cache, sidebar UI, provider/MCP behavior, SessionManager schema
+changes, or edit runtime changes.

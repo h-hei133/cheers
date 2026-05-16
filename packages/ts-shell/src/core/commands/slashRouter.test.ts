@@ -7,6 +7,7 @@ import {
   getLatestCompactCheckpoint,
 } from "../context/compactLiveCheckpoint.js";
 import { createCompactInjectionStateStore } from "../context/compactInjectionState.js";
+import { createProjectMemoryLocalStore } from "../context/projectMemoryLocalStore.js";
 import { createProjectMemoryReviewStateStore } from "../context/projectMemoryReviewState.js";
 import { createCommandRegistry, listVisibleCommands } from "./registry.js";
 import { routeSlashCommand } from "./slashRouter.js";
@@ -139,6 +140,71 @@ describe("slash router (W4)", () => {
       expect(result.output).not.toContain("Unknown slash command");
     }
     expect(fs.readdirSync(workspaceRoot)).toEqual([]);
+  });
+
+  it("routes explicit /memory save approved to a supplied local store only after approval", async () => {
+    const compactCheckpointStore = createCompactLiveCheckpointStore({
+      now: () => "2026-05-16T00:00:00.000Z",
+      nextId: () => "checkpoint-memory-save",
+    });
+    const projectMemoryReviewStateStore = createProjectMemoryReviewStateStore({
+      now: () => "2026-05-16T00:00:00.000Z",
+    });
+    const memoryStoreRoot = path.join(workspaceRoot, ".memory-store-test");
+    const projectMemoryStore = createProjectMemoryLocalStore({
+      ref: { mode: "test-only", root: memoryStoreRoot },
+    });
+    await routeSlashCommand("/compact", {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_save",
+      compactCheckpointStore,
+    });
+    const review = await routeSlashCommand("/memory", {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_save",
+      compactCheckpointStore,
+      projectMemoryReviewStateStore,
+    });
+    expect(review?.kind).toBe("local");
+    const candidateId = review?.kind === "local"
+      ? review.output.match(/- (pmc:[^ ]+) /)?.[1]
+      : undefined;
+    expect(candidateId).toBeTruthy();
+
+    const blocked = await routeSlashCommand(`/memory save ${candidateId}`, {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_save",
+      compactCheckpointStore,
+      projectMemoryReviewStateStore,
+      projectMemoryStore,
+    });
+    expect(blocked?.kind).toBe("local");
+    if (blocked?.kind === "local") {
+      expect(blocked.output).toContain("- Memory written: no");
+    }
+
+    await routeSlashCommand(`/memory approve ${candidateId}`, {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_save",
+      compactCheckpointStore,
+      projectMemoryReviewStateStore,
+    });
+    const saved = await routeSlashCommand("/memory save approved", {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_save",
+      compactCheckpointStore,
+      projectMemoryReviewStateStore,
+      projectMemoryStore,
+    });
+
+    expect(saved?.kind).toBe("local");
+    if (saved?.kind === "local") {
+      expect(saved.output).toContain("Project memory store");
+      expect(saved.output).toContain("- Memory written: yes");
+      expect(saved.output).toContain("- Auto-load: no");
+      expect(saved.output).toContain("- Retrieval / wake-up / recall: not enabled");
+    }
+    expect(fs.existsSync(path.join(memoryStoreRoot, "project-memory.jsonl"))).toBe(true);
   });
 
   it("routes compact JSON mode and rejects invalid compact args", async () => {

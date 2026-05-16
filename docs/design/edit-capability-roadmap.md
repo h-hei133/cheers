@@ -1359,6 +1359,10 @@ Allowed after this document:
 - Route 71 realistic edit compatibility gauntlet is implemented as evidence
   across parser, bounded candidate classification, routing, no-write surfaces,
   non-default recovery-authority capture, and explicit restore drills.
+- Route 82 context-memory work adds a non-default explicit local project memory
+  store prototype for session-approved safe candidates. It is outside the edit
+  runtime and does not change edit capability, rollback, recovery execution, or
+  default mutation readiness.
 
 Forbidden after this document:
 
@@ -1375,3 +1379,8 @@ Forbidden after this document:
 - fuzzy edit readiness
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
+
+Route 83 recommendation for memory work: continue with retrieval/wake-up/recall
+design only if explicit save remains safe, or add invalidation/delete UX first
+if stored-record lifecycle becomes the next blocker. Do not treat Route 82 as
+an edit-capability expansion.

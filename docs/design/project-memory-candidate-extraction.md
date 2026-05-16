@@ -239,3 +239,11 @@ Approvals and rejections remain session-scoped only. They do not persist memory,
 load cross-session memory, add retrieval/wake-up/recall, add a startup cache,
 add sidebar UI, change provider/MCP behavior, change SessionManager schema, or
 change edit runtime behavior.
+
+## Route 82 Note
+
+Route 82 adds the first explicit local store prototype for candidates that have
+passed Route 81 review. Candidate extraction remains preview-only: extraction
+does not write memory, choose a store path, load cross-session records, or
+enable retrieval. The save path consumes candidates plus session review state
+and writes only approved safe summaries to an explicitly supplied local store.
