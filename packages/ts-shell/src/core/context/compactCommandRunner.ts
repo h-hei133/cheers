@@ -7,11 +7,19 @@ import {
   type CompactCommandRequest,
   type CompactCommandRequestInput,
 } from "./compactCommandContract.js";
+import { extractProjectMemoryCandidates } from "./projectMemoryCandidateExtractor.js";
+import type { ProjectMemoryCandidate } from "./projectMemoryCandidate.js";
+import {
+  evaluateProjectMemoryCandidateQuality,
+  type ProjectMemoryCandidateQualityResult,
+} from "./projectMemoryCandidateQuality.js";
 import { buildRouteContinuityHandoffPacket } from "./routeContinuityHandoff.js";
 
 export interface CompactCommandRunResult {
   readonly request: CompactCommandRequest;
   readonly packet: ReturnType<typeof buildRouteContinuityHandoffPacket>;
+  readonly memoryCandidates: readonly ProjectMemoryCandidate[];
+  readonly memoryCandidateQuality: ProjectMemoryCandidateQualityResult;
   readonly markdown?: string;
   readonly json?: string;
   readonly warnings: readonly string[];
@@ -43,6 +51,12 @@ export function runCompactCommand(
     secretValues: request.secretValues,
     unsafeInputs: request.unsafeInputs,
   });
+  const memoryCandidates = extractProjectMemoryCandidates({
+    compactPacket: packet,
+    validationEvidence: request.validationEvidence,
+  });
+  const memoryCandidateQuality =
+    evaluateProjectMemoryCandidateQuality(memoryCandidates);
   const markdown = request.includeMarkdown
     ? renderCompactHandoffMarkdown(packet)
     : undefined;
@@ -51,6 +65,8 @@ export function runCompactCommand(
   return {
     request,
     packet,
+    memoryCandidates,
+    memoryCandidateQuality,
     markdown,
     json,
     warnings: packet.warnings.map((warning) => `${warning.id}: ${warning.message}`),

@@ -1,7 +1,7 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 79
-Date: 2026-05-15
+Route baseline: post-Route 80
+Date: 2026-05-16
 Status: long-range edit capability map after Routes 50-73; edit capability is
 now a closeout candidate for the bounded selected-workspace surface.
 Routes 59-66 have implemented a narrow explicit non-default original-content
@@ -71,9 +71,15 @@ deduped/capped while preserving critical safety facts. It keeps memory,
 sidebar, startup, provider/MCP, package/default gates, SessionManager schema,
 edit runtime, automatic recovery, atomic rollback, and raw content/secret
 exposure out of scope.
-Recommended Route 80 focus: project memory candidate extraction, including
-ranking, persistence boundaries, and user controls only after Compact v2
-injection quality/merge is stable.
+Route 80 starts the memory phase without storage: it adds a pure project memory
+candidate model, extractor, quality checks, and session-facing candidate
+preview from Compact v2/context/session evidence. It keeps automatic writes,
+cross-session loading, startup cache, sidebar UI, provider/MCP changes,
+package/default gate changes, SessionManager schema changes, edit runtime
+changes, automatic recovery, atomic rollback, and raw content/secret exposure
+out of scope.
+Recommended Route 81 focus: memory candidate review / approval UX before any
+persistent memory store.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -85,7 +91,7 @@ opencode, and gemini-cli.
 It is not a broad edit readiness claim. It keeps implemented capability,
 candidate capability, and unsupported/non-claimed capability separate.
 
-## 1. Post-Route 77 Executive Summary
+## 1. Post-Route 80 Executive Summary
 
 Current write capability remains intentionally narrow. The project supports a
 bounded selected-workspace write surface and still blocks broad arbitrary
@@ -1206,13 +1212,22 @@ recovery/rollback stance are explicitly re-audited.
     gates, provider/MCP behavior, edit runtime behavior, memory storage,
     sidebar UI, startup cache, automatic recovery, or atomic rollback.
 
-- Recommended next phase: Route 79 quality/merge hardening for Compact v2
-  injection
-  - Harden repeated compact/merge behavior, session summary coherence, injected
-    packet quality checks, and final polish before any memory candidate phase.
-  - Preserve no persistence, no provider/MCP behavior changes, no SessionManager
-    schema changes, no memory storage, no automatic recovery, and no atomic
-    rollback.
+- Batch 79: Compact v2 quality/merge hardening
+  - Status: implemented as repeated-compact merge policy, stale checkpoint
+    blocking, continuity quality checks, and injected-context budget/dedupe.
+  - Preserves no persistence, no provider/MCP behavior changes, no
+    SessionManager schema changes, no memory storage, no automatic recovery,
+    and no atomic rollback.
+
+- Batch 80: Project memory candidate extraction
+  - Status: implemented as pure candidate model, extractor, quality checks, and
+    session-facing preview summary.
+  - Candidate extraction is non-persistent. It does not write memory, load
+    cross-session memory, add startup cache, add sidebar UI, change
+    SessionManager schema, change provider/MCP/package/default gates, change
+    edit runtime, add automatic recovery, or add atomic rollback.
+  - Recommended next phase: Route 81 memory candidate review / approval UX
+    before any memory store.
 
 - Future broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are

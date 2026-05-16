@@ -245,6 +245,10 @@ What Route 74 should not implement:
 - `packages/ts-shell/src/core/context/compactInjectionState.ts`
 - `packages/ts-shell/src/core/context/compactInjectedContextFormatter.ts`
 - `packages/ts-shell/src/core/context/compactFutureTurnInjection.ts`
+- `packages/ts-shell/src/core/context/projectMemoryCandidate.ts`
+- `packages/ts-shell/src/core/context/projectMemoryCandidateExtractor.ts`
+- `packages/ts-shell/src/core/context/projectMemoryCandidateQuality.ts`
+- `packages/ts-shell/src/core/context/projectMemoryCandidateSurface.ts`
 
 The modules are pure. They do not perform file I/O, provider access, MCP
 discovery, persistence, session schema migration, edit routing, write execution,
@@ -322,14 +326,17 @@ and stopped-continuation facts. Route 74 keeps the context projection as a pure
 testable substrate, Route 75 adds the packet/renderer, Route 76 exposes the
 command surface, Route 77 adds an in-memory latest compact checkpoint, Route 78
 consumes a pending checkpoint once from the next normal runtime prompt, and
-Route 79 hardens repeated compact quality/merge behavior.
+Route 79 hardens repeated compact quality/merge behavior. Route 80 adds a pure
+candidate extraction, quality, and surface layer for project memory candidates
+without storage.
 
 ## Residual Risks
 
-- Compact v2 injection is operational with focused quality/merge guards, but
-  durable memory extraction still needs separate ranking and persistence policy.
-- Future memory extraction still needs ranking, persistence boundaries, and
-  user controls.
+- Compact v2 injection is operational with focused quality/merge guards, and
+  Route 80 can preview memory candidates, but durable memory storage still
+  needs separate review, ranking, and persistence policy.
+- Future memory storage still needs ranking, persistence boundaries, and user
+  controls.
 - Future sidebar state should consume `sidebarFacts` rather than inventing a
   separate taxonomy.
 - Future startup warm context should consume `startupWarmCandidates` only after
@@ -337,9 +344,9 @@ Route 79 hardens repeated compact quality/merge behavior.
 
 ## Next Recommendation
 
-Recommended next route: Route 80 project memory candidate extraction.
+Recommended next route: Route 81 memory candidate review / approval UX.
 
 Reason: context layers, compact survivors, redactions, edit/recovery facts,
-Compact v2 packet rendering, the live checkpoint, and the candidate-only
-adapter are now machine-checkable enough to start memory candidate extraction
-without reopening edit runtime behavior.
+Compact v2 packet rendering, the live checkpoint, the candidate-only adapter,
+and Route 80 candidate extraction are now machine-checkable enough to design
+review authority before any memory store exists.

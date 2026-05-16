@@ -163,6 +163,13 @@ consumed checkpoint cannot inject again.
 
 ## Route 80 Boundary
 
-Route 80 should own project memory candidate extraction only after this
-quality/merge layer is stable. Memory work should decide ranking, persistence,
-user controls, startup loading, and long-lived project facts separately.
+Route 80 owns project memory candidate extraction after this quality/merge
+layer. It adds pure candidate model, extractor, quality checks, and a
+session-facing preview summary. It does not add memory storage, automatic
+writes, cross-session loading, startup cache, sidebar UI, provider/MCP changes,
+SessionManager schema changes, edit runtime changes, automatic recovery, or
+atomic rollback.
+
+Route 81 should own review/approval UX before any persistent memory store.
+Ranking, persistence, user controls, startup loading, and long-lived project
+facts remain separate decisions.

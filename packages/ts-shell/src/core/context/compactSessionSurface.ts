@@ -1,4 +1,8 @@
 import type { CompactCommandRunResult } from "./compactCommandRunner.js";
+import {
+  renderProjectMemoryCandidateSurface,
+  summarizeProjectMemoryCandidates,
+} from "./projectMemoryCandidateSurface.js";
 
 export function formatCompactSessionSurface(
   result: CompactCommandRunResult,
@@ -22,7 +26,13 @@ export function formatCompactSessionSurface(
     `- Validation status: ${summarizeValidation(packet)}`,
     `- Redactions: ${packet.redactions.length}`,
     `- Warnings: ${packet.warnings.length}`,
+    `- Memory candidates: ${summarizeProjectMemoryCandidates(result.memoryCandidates)}`,
     `- Next action: ${packet.route.nextAction ?? packet.taskGoal.nextAction ?? "not recorded"}`,
+    "",
+    renderProjectMemoryCandidateSurface({
+      candidates: result.memoryCandidates,
+      quality: result.memoryCandidateQuality,
+    }),
     "",
     "Redactions / warnings",
     ...redactionLines(result),
