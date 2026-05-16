@@ -354,6 +354,11 @@ activity projection, quality checks, and concise `Recent activity` rendering in
 `/sidebar`. It does not capture live runtime events by default and still avoids
 UI, persistence, discovery, provider/model calls, schema changes, and raw
 content in rendered state/events.
+Route 90 adds session-scoped in-memory live sidebar event capture for local
+command results from `/compact`, `/memory`, and `/warmup`, plus `/sidebar`
+consumption of that bounded activity. It still avoids UI, persistence,
+dynamic discovery, provider/model calls, SessionManager schema changes,
+startup/model auto-injection, and raw content in captured or rendered events.
 
 ## Residual Risks
 
@@ -386,6 +391,6 @@ explicit save path, Route 83 deterministic retrieval/wake preview, Route 84
 lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   quality/merge hardening, Route 87 explicit warm cache status, Route 88
   visible sidebar state projection, and Route 89 sidebar event/activity bridge
-  are now machine-checkable enough to plan sidebar UI, live event capture,
-  startup-read integration, or
+  plus Route 90 live command activity capture are now machine-checkable enough
+  to plan sidebar UI, live event quality polish, startup-read integration, or
 retrieval-quality work separately.

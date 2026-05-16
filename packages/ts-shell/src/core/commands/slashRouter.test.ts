@@ -10,6 +10,7 @@ import { createCompactInjectionStateStore } from "../context/compactInjectionSta
 import { createProjectMemoryInjectionStateStore } from "../context/projectMemoryInjectionState.js";
 import { createProjectMemoryLocalStore } from "../context/projectMemoryLocalStore.js";
 import { createProjectMemoryReviewStateStore } from "../context/projectMemoryReviewState.js";
+import { createSidebarLiveEventStore } from "../context/sidebarLiveEventStore.js";
 import { createStartupWarmContextCacheStore } from "../context/startupWarmContextHealth.js";
 import { createCommandRegistry, listVisibleCommands } from "./registry.js";
 import { routeSlashCommand } from "./slashRouter.js";
@@ -373,6 +374,146 @@ describe("slash router (W4)", () => {
         query: "next-turn context",
       }),
     );
+  });
+
+  it("captures compact, memory, and warmup command activity for /sidebar", async () => {
+    const sidebarLiveEventStore = createSidebarLiveEventStore({
+      now: () => "2026-05-16T00:00:00.000Z",
+    });
+    const compactCheckpointStore = createCompactLiveCheckpointStore({
+      now: () => "2026-05-16T00:00:00.000Z",
+      nextId: () => "checkpoint-sidebar-live",
+    });
+    const projectMemoryReviewStateStore = createProjectMemoryReviewStateStore({
+      now: () => "2026-05-16T00:00:00.000Z",
+    });
+    const projectMemoryInjectionStateStore = createProjectMemoryInjectionStateStore({
+      nextId: () => "pmi:sidebar-live",
+    });
+    const memoryStoreRoot = path.join(workspaceRoot, ".memory-sidebar-live");
+    const projectMemoryStore = createProjectMemoryLocalStore({
+      ref: { mode: "test-only", root: memoryStoreRoot },
+    });
+    const cacheRoot = fs.mkdtempSync(path.join(os.tmpdir(), "slash-sidebar-warmup-"));
+    const startupWarmContextCacheStore = createStartupWarmContextCacheStore({
+      ref: {
+        mode: "test-only",
+        projectRoot: workspaceRoot,
+        cacheRoot,
+      },
+    });
+    try {
+      await routeSlashCommand("/compact", {
+        cwd: workspaceRoot,
+        sessionId: "sess_sidebar_live",
+        compactCheckpointStore,
+        sidebarLiveEventStore,
+      });
+      const review = await routeSlashCommand("/memory", {
+        cwd: workspaceRoot,
+        sessionId: "sess_sidebar_live",
+        compactCheckpointStore,
+        projectMemoryReviewStateStore,
+        sidebarLiveEventStore,
+      });
+      const candidateId = review?.kind === "local"
+        ? review.output.match(/- (pmc:[^ ]+) /)?.[1]
+        : undefined;
+      expect(candidateId).toBeTruthy();
+      await routeSlashCommand(`/memory approve ${candidateId}`, {
+        cwd: workspaceRoot,
+        sessionId: "sess_sidebar_live",
+        compactCheckpointStore,
+        projectMemoryReviewStateStore,
+        sidebarLiveEventStore,
+      });
+      await routeSlashCommand("/memory save approved", {
+        cwd: workspaceRoot,
+        sessionId: "sess_sidebar_live",
+        compactCheckpointStore,
+        projectMemoryReviewStateStore,
+        projectMemoryStore,
+        sidebarLiveEventStore,
+      });
+      const savedRecordId = (await projectMemoryStore.list()).records[0]?.id;
+      expect(savedRecordId).toBeTruthy();
+      await routeSlashCommand("/memory recall deterministic", {
+        cwd: workspaceRoot,
+        sessionId: "sess_sidebar_live",
+        projectMemoryStore,
+        sidebarLiveEventStore,
+      });
+      await routeSlashCommand("/memory use deterministic", {
+        cwd: workspaceRoot,
+        sessionId: "sess_sidebar_live",
+        projectMemoryStore,
+        projectMemoryInjectionStateStore,
+        sidebarLiveEventStore,
+      });
+      await routeSlashCommand(`/memory invalidate ${savedRecordId} stale`, {
+        cwd: workspaceRoot,
+        sessionId: "sess_sidebar_live",
+        projectMemoryStore,
+        sidebarLiveEventStore,
+      });
+      await routeSlashCommand(`/memory delete ${savedRecordId} remove`, {
+        cwd: workspaceRoot,
+        sessionId: "sess_sidebar_live",
+        projectMemoryStore,
+        sidebarLiveEventStore,
+      });
+      await routeSlashCommand("/warmup status", {
+        cwd: workspaceRoot,
+        sessionId: "sess_sidebar_live",
+        startupWarmContextCacheStore,
+        sidebarLiveEventStore,
+      });
+      await routeSlashCommand("/warmup rebuild", {
+        cwd: workspaceRoot,
+        sessionId: "sess_sidebar_live",
+        startupWarmContextCacheStore,
+        sidebarLiveEventStore,
+      });
+
+      const sidebar = await routeSlashCommand("/sidebar", {
+        cwd: workspaceRoot,
+        sessionId: "sess_sidebar_live",
+        compactCheckpointStore,
+        projectMemoryReviewStateStore,
+        projectMemoryInjectionStateStore,
+        projectMemoryStore,
+        startupWarmContextCacheStore,
+        sidebarLiveEventStore,
+      });
+
+      const capturedTitles = sidebarLiveEventStore
+        .listRecent({
+          sessionScopeId: "session:sess_sidebar_live",
+          maxEvents: 20,
+        })
+        .events.map((event) => event.title);
+      expect(capturedTitles).toEqual(
+        expect.arrayContaining([
+          "Compact checkpoint",
+          "Memory saved",
+          "Memory recalled",
+          "Memory use staged",
+          "Memory lifecycle",
+          "Warmup status",
+          "Warmup rebuilt",
+        ]),
+      );
+
+      expect(sidebar?.kind).toBe("local");
+      if (sidebar?.kind === "local") {
+        expect(sidebar.output).toContain("Recent activity");
+        expect(sidebar.output).toContain("Warmup rebuilt");
+        expect(sidebar.output).not.toContain("Project memory recall uses deterministic local search.");
+        expect(sidebar.output).toContain("Raw content/secrets/hidden reasoning: excluded");
+      }
+    } finally {
+      fs.rmSync(cacheRoot, { recursive: true, force: true });
+    }
   });
 
   it("routes compact JSON mode and rejects invalid compact args", async () => {

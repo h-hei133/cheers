@@ -162,3 +162,12 @@ runtime events instead of explicit bridge inputs.
 
 Choose memory retrieval ranking hardening if the product surface is good
 enough and recall quality is the next blocker.
+
+## Route 90 Live Capture Note
+
+Route 90 keeps the explicit-input bridge as a pure adapter, then adds a
+separate session-scoped live event store and command event sink for `/compact`,
+`/memory`, and `/warmup` command results. `/sidebar` now reads bounded live
+activity from the current session store. The bridge remains useful for tests
+and future adapters, but live command capture does not persist raw event logs or
+call providers/models.

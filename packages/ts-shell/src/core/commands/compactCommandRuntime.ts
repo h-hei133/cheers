@@ -13,6 +13,7 @@ import {
 } from "../context/compactInjectionState.js";
 import { runCompactCommand } from "../context/compactCommandRunner.js";
 import { formatCompactSessionSurface } from "../context/compactSessionSurface.js";
+import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 export async function runCompactLocalCommand(
@@ -50,7 +51,7 @@ export async function runCompactLocalCommand(
         createdAt: checkpoint.createdAt,
       },
     );
-    return {
+    const localResult: LocalCommandResult = {
       kind: "local",
       output:
         result.request.mode === "json" && result.json
@@ -60,11 +61,23 @@ export async function runCompactLocalCommand(
               formatCompactCheckpointStatus(checkpoint, injectionState),
             ].join("\n\n"),
     };
+    emitCommandResultToSidebar(context, {
+      command: compactSourceCommand(context.rawCommandName),
+      args,
+      result: localResult,
+    });
+    return localResult;
   } catch (error) {
-    return {
+    const localResult: LocalCommandResult = {
       kind: "local",
       output: formatCompactCommandError(error),
     };
+    emitCommandResultToSidebar(context, {
+      command: compactSourceCommand(context.rawCommandName),
+      args,
+      result: localResult,
+    });
+    return localResult;
   }
 }
 

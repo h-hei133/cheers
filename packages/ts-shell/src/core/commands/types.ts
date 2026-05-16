@@ -4,6 +4,8 @@ import type { ProjectMemoryReviewStateStore } from '../context/projectMemoryRevi
 import type { ProjectMemoryInjectionStateStore } from '../context/projectMemoryInjectionState.js'
 import type { ProjectMemoryStore } from '../context/projectMemoryStoreContract.js'
 import type { StartupWarmContextCacheStore } from '../context/startupWarmContextHealth.js'
+import type { SidebarEventSink } from '../context/sidebarEventSink.js'
+import type { SidebarLiveEventStore } from '../context/sidebarLiveEventStore.js'
 
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
@@ -17,6 +19,8 @@ export interface CommandContext {
   readonly projectMemoryInjectionStateStore?: ProjectMemoryInjectionStateStore
   readonly projectMemoryStore?: ProjectMemoryStore
   readonly startupWarmContextCacheStore?: StartupWarmContextCacheStore
+  readonly sidebarEventSink?: SidebarEventSink
+  readonly sidebarLiveEventStore?: SidebarLiveEventStore
 }
 
 export interface LocalCommandResult {

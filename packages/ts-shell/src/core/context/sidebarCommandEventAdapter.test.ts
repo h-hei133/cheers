@@ -1,0 +1,138 @@
+import { describe, expect, it } from "vitest";
+import {
+  adaptCommandResultToSidebarEvent,
+  emitSidebarCommandResult,
+} from "./sidebarCommandEventAdapter.js";
+import { createSidebarEventSink } from "./sidebarEventSink.js";
+import { createSidebarLiveEventStore } from "./sidebarLiveEventStore.js";
+
+describe("sidebar command event adapter", () => {
+  it("maps compact, memory, and warmup outputs to concise events", () => {
+    const compact = adaptCommandResultToSidebarEvent({
+      command: "/compact",
+      args: [],
+      result: {
+        kind: "local",
+        output: [
+          "Compact v2 handoff generated",
+          "Result",
+          "- Outcome: created",
+          "- Checkpoint id: checkpoint-1",
+          "- Persistence: none",
+        ].join("\n"),
+      },
+    });
+    expect(compact).toEqual(
+      expect.objectContaining({
+        kind: "compact",
+        severity: "success",
+        title: "Compact checkpoint",
+      }),
+    );
+    expect(compact.summary).toContain("Checkpoint id: checkpoint-1");
+
+    const memory = adaptCommandResultToSidebarEvent({
+      command: "/memory",
+      args: ["use", "secret", "query"],
+      result: {
+        kind: "local",
+        output: [
+          "Project memory use",
+          "Result",
+          "- Outcome: staged",
+          "- Injection status: pending",
+          "Project memory recall uses deterministic local search.",
+        ].join("\n"),
+      },
+    });
+    expect(memory.title).toBe("Memory use staged");
+    expect(memory.summary).toContain("Injection status: pending");
+    expect(memory.summary).not.toContain("deterministic local search");
+
+    const warmup = adaptCommandResultToSidebarEvent({
+      command: "/warmup",
+      args: ["rebuild"],
+      result: {
+        kind: "local",
+        output: [
+          "Startup warm context",
+          "Result",
+          "- Outcome: rebuilt",
+          "- Provider/model call: none",
+          "- Startup auto-load: no",
+        ].join("\n"),
+      },
+    });
+    expect(warmup).toEqual(
+      expect.objectContaining({
+        kind: "warmup",
+        severity: "success",
+        title: "Warmup rebuilt",
+      }),
+    );
+  });
+
+  it("emits blocked results as preserved blocker events without raw output", () => {
+    const store = createSidebarLiveEventStore();
+    const sink = createSidebarEventSink({
+      sessionScopeId: "session:adapter",
+      store,
+    });
+
+    emitSidebarCommandResult(sink, {
+      command: "/memory",
+      args: ["save"],
+      result: {
+        kind: "local",
+        output: [
+          "Project memory store",
+          "Result",
+          "- Outcome: blocked",
+          "- BlockerKind: memory-save-missing-target",
+          "RAW_MEMORY_CONTENT sk-secret1234567890 hidden reasoning",
+        ].join("\n"),
+      },
+    });
+
+    const events = store.listRecent({ sessionScopeId: "session:adapter" }).events;
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: "memory",
+        severity: "blocked",
+        title: "Memory saved",
+      }),
+    ]);
+    expect(JSON.stringify(events)).not.toContain("RAW_MEMORY_CONTENT");
+    expect(JSON.stringify(events)).not.toContain("sk-secret");
+    expect(JSON.stringify(events)).not.toContain("hidden reasoning");
+  });
+
+  it("swallows non-safety sink failures", () => {
+    expect(() =>
+      emitSidebarCommandResult(
+        {
+          emitUserVisible: () => {
+            throw new Error("sink unavailable");
+          },
+          emitDeveloperOnly: () => {
+            throw new Error("sink unavailable");
+          },
+          emitWarning: () => {
+            throw new Error("sink unavailable");
+          },
+          emitBlocker: () => {
+            throw new Error("sink unavailable");
+          },
+        },
+        {
+          command: "/warmup",
+          args: ["status"],
+          result: {
+            kind: "local",
+            output: "Startup warm context\nResult\n- Outcome: status",
+          },
+        },
+      ),
+    ).not.toThrow();
+  });
+});

@@ -157,6 +157,15 @@ activity projection, and quality checks. `/sidebar` can now render a concise
 a real sidebar UI, dynamic discovery, provider/model calls, persistence, schema
 changes, or raw event payload rendering.
 
+## Route 90 Live Activity Note
+
+Route 90 adds a session-scoped in-memory live event store and command event
+sink. `/sidebar` reads the current session's bounded live command activity
+while continuing to render the same read-only state sections. Live events are
+sanitized summaries only; developer-only events are hidden by default, and no
+sidebar UI, persistence, dynamic discovery, provider/model call, or session
+schema change is added.
+
 ## Deferred
 
 Defer these to future routes:

@@ -3,6 +3,7 @@ import {
   StartupWarmCommandContractError,
 } from "../context/startupWarmCommandContract.js";
 import { runStartupWarmCommand } from "../context/startupWarmCommandRunner.js";
+import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 export async function runWarmupLocalCommand(
@@ -17,15 +18,27 @@ export async function runWarmupLocalCommand(
       cacheStore: context.startupWarmContextCacheStore,
       memoryStore: context.projectMemoryStore,
     });
-    return {
+    const localResult: LocalCommandResult = {
       kind: "local",
       output: result.output,
     };
+    emitCommandResultToSidebar(context, {
+      command: "/warmup",
+      args,
+      result: localResult,
+    });
+    return localResult;
   } catch (error) {
-    return {
+    const localResult: LocalCommandResult = {
       kind: "local",
       output: formatWarmupCommandError(error),
     };
+    emitCommandResultToSidebar(context, {
+      command: "/warmup",
+      args,
+      result: localResult,
+    });
+    return localResult;
   }
 }
 

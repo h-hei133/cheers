@@ -1427,6 +1427,12 @@ Allowed after this document:
   capture live runtime events by default, does not discover MCP/skills
   dynamically, and does not change edit capability, rollback, recovery
   execution, or default mutation readiness.
+- Route 90 context/surface work adds session-scoped in-memory live sidebar
+  event capture for `/compact`, `/memory`, and `/warmup` local command results
+  and makes `/sidebar` read bounded live activity. It remains outside edit
+  runtime, adds no actual sidebar UI, persistence, dynamic discovery,
+  provider/model calls, SessionManager schema change, automatic recovery, or
+  default mutation readiness.
 
 Forbidden after this document:
 
@@ -1444,8 +1450,8 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 90 recommendation: choose actual sidebar UI/TUI prototype, sidebar
-session integration/live event capture, startup warm cache session-read
-integration, or memory retrieval quality/ranking hardening based on the next
-user-visible blocker. Do not treat Route 82, Route 83, Route 84, Route 85,
-Route 86, Route 87, Route 88, or Route 89 as edit-capability expansions.
+Route 91 recommendation: choose actual sidebar UI/TUI prototype, sidebar live
+event quality/polish, startup warm cache session-read integration, or memory
+retrieval quality/ranking hardening based on the next user-visible blocker. Do
+not treat Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88,
+Route 89, or Route 90 as edit-capability expansions.

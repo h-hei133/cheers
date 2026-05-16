@@ -1,14 +1,17 @@
 import { getLatestCompactCheckpoint } from "../context/compactLiveCheckpoint.js";
-import { bridgeSidebarEvents } from "../context/sidebarEventBridge.js";
 import { projectSidebarState } from "../context/sidebarStateProjection.js";
 import { renderSidebarStateSurface } from "../context/sidebarStateSurface.js";
+import {
+  sidebarLiveEventStoreForContext,
+  sidebarSessionScopeId,
+} from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 export async function runSidebarLocalCommand(
   _args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const sessionScopeId = `session:${context.sessionId ?? "command-preview"}`;
+  const sessionScopeId = sidebarSessionScopeId(context);
   const compactCheckpoint = context.compactCheckpointStore
     ? getLatestCompactCheckpoint(context.compactCheckpointStore, sessionScopeId)
     : undefined;
@@ -27,55 +30,9 @@ export async function runSidebarLocalCommand(
   const startupWarmRead = context.startupWarmContextCacheStore
     ? await context.startupWarmContextCacheStore.read()
     : undefined;
-  const bridgedEvents = bridgeSidebarEvents({
-    commandResults: [{
-      command: "/sidebar",
-      outcome: "status",
-      summary: "Rendered visible state preview with recent activity bridge.",
-    }],
-    compact: compactCheckpoint || compactInjectionState
-      ? {
-          checkpointId: compactCheckpoint?.checkpointId ?? compactInjectionState?.checkpointId,
-          checkpointStatus: compactCheckpoint?.status,
-          injectionStatus: compactInjectionState?.injectionStatus,
-        }
-      : undefined,
-    memory: [
-      ...(projectMemoryReviewState
-        ? [{
-            action: "review" as const,
-            status: "available",
-            recordCount: projectMemoryReviewState.latestCandidates.length,
-          }]
-        : []),
-      ...(projectMemoryInjectionState && projectMemoryInjectionState.injectionStatus !== "none"
-        ? [{
-            action: "use" as const,
-            status: projectMemoryInjectionState.injectionStatus,
-            recordCount: projectMemoryInjectionState.recordIds.length,
-            query: projectMemoryInjectionState.query,
-          }]
-        : []),
-      ...(projectMemoryRecords
-        ? [{
-            action: "recall" as const,
-            status: "active-records",
-            recordCount: projectMemoryRecords.length,
-          }]
-        : []),
-    ],
-    warmup: startupWarmHealth
-      ? {
-          outcome: "status",
-          found: startupWarmHealth.found,
-          staleness: startupWarmHealth.staleness,
-        }
-      : undefined,
-    route: {
-      status: "sidebar event bridge preview",
-      nextAction: "Use route-specific docs and focused tests to decide the next implementation step.",
-    },
-    tools: [{ label: "/sidebar", status: "available" }],
+  const liveEvents = sidebarLiveEventStoreForContext(context).listRecent({
+    sessionScopeId,
+    maxEvents: 20,
   });
 
   const snapshot = projectSidebarState({
@@ -108,8 +65,8 @@ export async function runSidebarLocalCommand(
         },
       ],
     },
-    events: bridgedEvents.events,
-    bridgeDroppedEventCount: bridgedEvents.droppedEventCount,
+    events: liveEvents.events,
+    bridgeDroppedEventCount: liveEvents.droppedEventCount,
     nextAction: "Use route-specific docs and focused tests to decide the next implementation step.",
   });
 

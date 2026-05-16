@@ -31,6 +31,7 @@ import { runProjectMemorySaveCommand } from "../context/projectMemorySaveCommand
 import {
   DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE,
 } from "../context/projectMemoryReviewState.js";
+import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 export async function runMemoryLocalCommand(
@@ -51,10 +52,16 @@ export async function runMemoryLocalCommand(
         request,
         memoryStore: context.projectMemoryStore,
       });
-      return {
+      const localResult: LocalCommandResult = {
         kind: "local",
         output: result.output,
       };
+      emitCommandResultToSidebar(context, {
+        command: "/memory",
+        args,
+        result: localResult,
+      });
+      return localResult;
     }
     if (args[0] === "use") {
       const request = parseProjectMemoryUseCommandArgs(args);
@@ -64,10 +71,16 @@ export async function runMemoryLocalCommand(
         memoryStore: context.projectMemoryStore,
         injectionStateStore: context.projectMemoryInjectionStateStore,
       });
-      return {
+      const localResult: LocalCommandResult = {
         kind: "local",
         output: result.output,
       };
+      emitCommandResultToSidebar(context, {
+        command: "/memory",
+        args,
+        result: localResult,
+      });
+      return localResult;
     }
     if (args[0] === "invalidate" || args[0] === "delete") {
       const request = parseProjectMemoryDeleteCommandArgs(args);
@@ -75,10 +88,16 @@ export async function runMemoryLocalCommand(
         request,
         memoryStore: context.projectMemoryStore,
       });
-      return {
+      const localResult: LocalCommandResult = {
         kind: "local",
         output: result.output,
       };
+      emitCommandResultToSidebar(context, {
+        command: "/memory",
+        args,
+        result: localResult,
+      });
+      return localResult;
     }
     if (args[0] === "save" || args[0] === "status") {
       const request = parseProjectMemorySaveCommandArgs(args);
@@ -91,10 +110,16 @@ export async function runMemoryLocalCommand(
           DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE,
         memoryStore: context.projectMemoryStore,
       });
-      return {
+      const localResult: LocalCommandResult = {
         kind: "local",
         output: result.output,
       };
+      emitCommandResultToSidebar(context, {
+        command: "/memory",
+        args,
+        result: localResult,
+      });
+      return localResult;
     }
     const request = parseProjectMemoryReviewCommandArgs(args);
     const result = runProjectMemoryReviewCommand({
@@ -106,15 +131,27 @@ export async function runMemoryLocalCommand(
         DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE,
       sourceCommand: "/memory",
     });
-    return {
+    const localResult: LocalCommandResult = {
       kind: "local",
       output: result.output,
     };
+    emitCommandResultToSidebar(context, {
+      command: "/memory",
+      args,
+      result: localResult,
+    });
+    return localResult;
   } catch (error) {
-    return {
+    const localResult: LocalCommandResult = {
       kind: "local",
       output: formatMemoryReviewCommandError(error),
     };
+    emitCommandResultToSidebar(context, {
+      command: "/memory",
+      args,
+      result: localResult,
+    });
+    return localResult;
   }
 }
 
