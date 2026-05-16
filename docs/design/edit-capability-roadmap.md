@@ -1410,6 +1410,11 @@ Allowed after this document:
   conflict detection, injected-context budget, and quality checks. It remains
   outside edit runtime and does not change edit capability, rollback, recovery
   execution, or default mutation readiness.
+- Route 87 context-memory work adds an explicit project-scoped startup warm
+  context cache prototype for safe edit/compact/memory/validation/route
+  summaries. It remains outside edit runtime, does not auto-load into model
+  context or future turns, and does not change edit capability, rollback,
+  recovery execution, or default mutation readiness.
 
 Forbidden after this document:
 
@@ -1427,7 +1432,7 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 87 recommendation for memory work: choose startup warm context cache,
-sidebar state model, or memory retrieval quality/ranking hardening based on the
-next user-visible blocker. Do not treat Route 82, Route 83, Route 84, Route 85,
-or Route 86 as edit-capability expansions.
+Route 88 recommendation for memory work: choose sidebar state model, startup
+warm cache session-read integration, or memory retrieval quality/ranking
+hardening based on the next user-visible blocker. Do not treat Route 82, Route
+83, Route 84, Route 85, Route 86, or Route 87 as edit-capability expansions.

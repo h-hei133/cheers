@@ -3,6 +3,7 @@ import type { CompactInjectionStateStore } from '../context/compactInjectionStat
 import type { ProjectMemoryReviewStateStore } from '../context/projectMemoryReviewState.js'
 import type { ProjectMemoryInjectionStateStore } from '../context/projectMemoryInjectionState.js'
 import type { ProjectMemoryStore } from '../context/projectMemoryStoreContract.js'
+import type { StartupWarmContextCacheStore } from '../context/startupWarmContextHealth.js'
 
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
@@ -15,6 +16,7 @@ export interface CommandContext {
   readonly projectMemoryReviewStateStore?: ProjectMemoryReviewStateStore
   readonly projectMemoryInjectionStateStore?: ProjectMemoryInjectionStateStore
   readonly projectMemoryStore?: ProjectMemoryStore
+  readonly startupWarmContextCacheStore?: StartupWarmContextCacheStore
 }
 
 export interface LocalCommandResult {

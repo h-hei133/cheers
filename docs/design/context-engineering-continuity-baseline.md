@@ -341,6 +341,9 @@ explicit `/memory use` staging and one-shot next-normal-turn memory injection;
 not automatic. Route 86 hardens that explicit injection path with stale-record
 filtering, record-id dedupe, injected-context budget, conservative conflict
 detection, and quality checks that block unsupported auto-load/provider claims.
+Route 87 adds an explicit, discardable startup warm context cache prototype for
+safe edit/compact/memory/validation/route summaries. It does not auto-load the
+cache into prompts, future turns, or model context.
 
 ## Residual Risks
 
@@ -351,9 +354,10 @@ detection, and quality checks that block unsupported auto-load/provider claims.
   wake-up preview, and Route 84 can invalidate/delete stored records. Automatic
   loading remains deferred. Route 85 can inject project memory once only after
   explicit `/memory use`, and Route 86 adds quality/merge guards around that
-  injection path.
-- Future memory startup/sidebar work still needs a separate route before
-  broader loading surfaces.
+  injection path. Route 87 can explicitly build/read a local warm cache status
+  file, but startup loading and automatic injection remain deferred.
+- Future sidebar work and any startup auto-load still need separate routes
+  before broader loading surfaces.
 - Future sidebar state should consume `sidebarFacts` rather than inventing a
   separate taxonomy.
 - Future startup warm context should consume `startupWarmCandidates` only after
@@ -361,14 +365,15 @@ detection, and quality checks that block unsupported auto-load/provider claims.
 
 ## Next Recommendation
 
-Recommended next route: startup warm context cache design, sidebar state model,
-or memory retrieval quality/ranking hardening, depending on which user-visible
-memory path becomes the next blocker.
+Recommended next route: sidebar state model, startup warm cache session
+integration, or memory retrieval quality/ranking hardening, depending on which
+user-visible memory path becomes the next blocker.
 
 Reason: context layers, compact survivors, redactions, edit/recovery facts,
 Compact v2 packet rendering, the live checkpoint, the candidate-only adapter,
 Route 80 candidate extraction, Route 81 session-scoped review state, Route 82
 explicit save path, Route 83 deterministic retrieval/wake preview, Route 84
 lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
-quality/merge hardening are now machine-checkable enough to plan startup,
-sidebar, or retrieval-quality work separately.
+quality/merge hardening, and Route 87 explicit warm cache status are now
+machine-checkable enough to plan sidebar, startup-read integration, or
+retrieval-quality work separately.

@@ -163,3 +163,12 @@ future-turn injection hardening after `/memory use`:
   caveats
 - clear structured conflicts block injection; uncertain route status
   differences warn only
+
+## Route 87 Note
+
+Route 87 lets an explicit startup warm cache builder consume active approved
+memory records or the wake-up preview as safe summary input. Recall/search and
+wake-up remain deterministic, local, and user-triggered. Invalidated/deleted
+records must not be cached as active facts, and the warm cache does not enable
+startup auto-load, automatic memory injection, provider/model calls, vector DB,
+ChromaDB, embeddings, or sidebar UI.

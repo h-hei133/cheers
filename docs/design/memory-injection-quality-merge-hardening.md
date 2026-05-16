@@ -188,7 +188,7 @@ context after Compact v2 has already planned its own injection.
 
 Still deferred:
 
-- startup warm context cache
+- startup warm context cache auto-loading
 - sidebar state model
 - vector DB / ChromaDB / embeddings
 - semantic LLM rerank
@@ -209,3 +209,11 @@ need a shared visible status model.
 
 Choose memory retrieval quality/ranking hardening if deterministic recall
 quality, not injection safety, becomes the next blocker.
+
+## Route 87 Note
+
+Route 87 adds a separate startup warm context cache for safe summaries and
+status display. It consumes memory wake-up summaries only as explicit,
+discardable cache input; it does not change `/memory use`, future-turn memory
+injection, Compact v2 ordering, conflict detection, or memory injection quality
+rules.

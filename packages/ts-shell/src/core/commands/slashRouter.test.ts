@@ -10,6 +10,7 @@ import { createCompactInjectionStateStore } from "../context/compactInjectionSta
 import { createProjectMemoryInjectionStateStore } from "../context/projectMemoryInjectionState.js";
 import { createProjectMemoryLocalStore } from "../context/projectMemoryLocalStore.js";
 import { createProjectMemoryReviewStateStore } from "../context/projectMemoryReviewState.js";
+import { createStartupWarmContextCacheStore } from "../context/startupWarmContextHealth.js";
 import { createCommandRegistry, listVisibleCommands } from "./registry.js";
 import { routeSlashCommand } from "./slashRouter.js";
 
@@ -590,6 +591,41 @@ describe("slash router (W4)", () => {
     if (result?.kind === "shell-action") {
       expect(result.action).toBe("resume-session");
       expect(result.sessionId).toBe("sess_123");
+    }
+  });
+
+  it("routes /warmup status and rebuild without future-turn injection", async () => {
+    const cacheRoot = fs.mkdtempSync(path.join(os.tmpdir(), "slash-warmup-cache-"));
+    const startupWarmContextCacheStore = createStartupWarmContextCacheStore({
+      ref: {
+        mode: "test-only",
+        projectRoot: workspaceRoot,
+        cacheRoot,
+      },
+    });
+    try {
+      const status = await routeSlashCommand("/warmup status", {
+        cwd: workspaceRoot,
+        startupWarmContextCacheStore,
+      });
+      expect(status?.kind).toBe("local");
+      if (status?.kind === "local") {
+        expect(status.output).toContain("- Injected into model: no");
+        expect(status.output).toContain("- Startup auto-load: no");
+      }
+
+      const rebuild = await routeSlashCommand("/warmup rebuild", {
+        cwd: workspaceRoot,
+        startupWarmContextCacheStore,
+      });
+      expect(rebuild?.kind).toBe("local");
+      if (rebuild?.kind === "local") {
+        expect(rebuild.output).toContain("- Outcome: rebuilt");
+        expect(rebuild.output).toContain("- Provider/model call: none");
+      }
+      expect((await startupWarmContextCacheStore.read()).found).toBe(true);
+    } finally {
+      fs.rmSync(cacheRoot, { recursive: true, force: true });
     }
   });
 
