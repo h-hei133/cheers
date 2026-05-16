@@ -3,6 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import type {
   ProjectMemoryListResult,
+  ProjectMemoryLifecycleTombstone,
+  ProjectMemoryDeleteRequest,
+  ProjectMemoryDeleteResult,
+  ProjectMemoryInvalidateRequest,
+  ProjectMemoryInvalidateResult,
+  ProjectMemoryListOptions,
   ProjectMemoryRecord,
   ProjectMemoryRecordId,
   ProjectMemoryStore,
@@ -27,11 +33,17 @@ export function createProjectMemoryLocalStore(
     async write(request) {
       return writeRecord(ref, request);
     },
-    async list() {
-      return readRecords(ref);
+    async list(options) {
+      return readRecords(ref, options);
     },
     async get(id) {
-      return (await readRecords(ref)).records.find((record) => record.id === id);
+      return (await readRecords(ref, { includeInvalidated: true })).records.find((record) => record.id === id);
+    },
+    async invalidate(request) {
+      return invalidateRecord(ref, request);
+    },
+    async delete(request) {
+      return deleteRecord(ref, request);
     },
     async health() {
       return storeHealth(ref);
@@ -105,17 +117,163 @@ function writeRecord(
   };
 }
 
-function readRecords(ref: ProjectMemoryStoreRef): ProjectMemoryListResult {
+function invalidateRecord(
+  ref: ProjectMemoryStoreRef,
+  request: ProjectMemoryInvalidateRequest,
+): ProjectMemoryInvalidateResult {
+  if (!projectMemoryStoreRefIsWritable(ref)) {
+    return {
+      invalidated: false,
+      skipped: false,
+      blocker: "Explicit local memory store root is required.",
+      evidence: [
+        "project-memory-local-store:invalidate-blocked",
+        "project-memory-local-store:explicit-store-required",
+      ],
+    };
+  }
+  const recordsFile = recordsFileFor(ref);
+  const existing = readRecordsSync(ref, { includeInvalidated: true }).find(
+    (record) => record.id === request.recordId,
+  );
+  if (!existing) {
+    return {
+      invalidated: false,
+      skipped: false,
+      blocker: `Unknown project memory record id: ${request.recordId}`,
+      evidence: [
+        "project-memory-local-store:invalidate-missing-record",
+        "project-memory-local-store:no-auto-cleanup",
+      ],
+    };
+  }
+  if (existing.invalidatedAt) {
+    return {
+      record: existing,
+      invalidated: false,
+      skipped: true,
+      blocker: `Project memory record ${request.recordId} is already invalidated.`,
+      evidence: [
+        "project-memory-local-store:invalidate-already-invalidated",
+        "project-memory-local-store:no-auto-cleanup",
+      ],
+    };
+  }
+  fs.mkdirSync(path.dirname(recordsFile), { recursive: true });
+  appendLifecycleTombstone(ref, {
+    entryKind: "project-memory-lifecycle",
+    version: 1,
+    recordId: request.recordId,
+    operation: "invalidate",
+    createdAt: request.invalidatedAt,
+    sourceCommand: request.sourceCommand,
+    reason: sanitizeLifecycleReason(request.reason),
+  });
   return {
-    records: readRecordsSync(ref),
+    record: {
+      ...existing,
+      invalidatedAt: request.invalidatedAt,
+      invalidationReason: sanitizeLifecycleReason(request.reason),
+      invalidatedBySourceCommand: request.sourceCommand,
+    },
+    invalidated: true,
+    skipped: false,
+    evidence: [
+      "project-memory-local-store:invalidate-tombstone-append",
+      "project-memory-local-store:explicit-user-action",
+      "project-memory-local-store:no-provider-call",
+      "project-memory-local-store:no-auto-cleanup",
+    ],
+  };
+}
+
+function deleteRecord(
+  ref: ProjectMemoryStoreRef,
+  request: ProjectMemoryDeleteRequest,
+): ProjectMemoryDeleteResult {
+  if (!projectMemoryStoreRefIsWritable(ref)) {
+    return {
+      recordId: request.recordId,
+      deleted: false,
+      skipped: false,
+      blocker: "Explicit local memory store root is required.",
+      evidence: [
+        "project-memory-local-store:delete-blocked",
+        "project-memory-local-store:explicit-store-required",
+      ],
+    };
+  }
+  const recordsFile = recordsFileFor(ref);
+  const entries = readEntriesSync(ref);
+  const existing = foldProjectMemoryEntries(entries, { includeInvalidated: true }).find(
+    (record) => record.id === request.recordId,
+  );
+  if (!existing) {
+    return {
+      recordId: request.recordId,
+      deleted: false,
+      skipped: false,
+      blocker: `Unknown project memory record id: ${request.recordId}`,
+      evidence: [
+        "project-memory-local-store:delete-missing-record",
+        "project-memory-local-store:no-auto-cleanup",
+      ],
+    };
+  }
+  const retained = entries.filter((entry) => !entryTargetsRecord(entry, request.recordId));
+  const tombstone: ProjectMemoryLifecycleTombstone = {
+    entryKind: "project-memory-lifecycle",
+    version: 1,
+    recordId: request.recordId,
+    operation: "delete",
+    createdAt: request.deletedAt,
+    sourceCommand: request.sourceCommand,
+    reason: sanitizeLifecycleReason(request.reason),
+  };
+  fs.mkdirSync(path.dirname(recordsFile), { recursive: true });
+  const payload = [...retained, tombstone].map((entry) => JSON.stringify(entry)).join("\n");
+  fs.writeFileSync(recordsFile, `${payload}\n`, "utf8");
+  return {
+    recordId: request.recordId,
+    deleted: true,
+    skipped: false,
+    deletedAt: request.deletedAt,
+    evidence: [
+      "project-memory-local-store:delete-rewrite-with-tombstone",
+      "project-memory-local-store:record-content-removed",
+      "project-memory-local-store:explicit-user-action",
+      "project-memory-local-store:no-provider-call",
+      "project-memory-local-store:no-auto-cleanup",
+    ],
+  };
+}
+
+function readRecords(
+  ref: ProjectMemoryStoreRef,
+  options: ProjectMemoryListOptions = {},
+): ProjectMemoryListResult {
+  return {
+    records: readRecordsSync(ref, options),
     evidence: [
       "project-memory-local-store:list",
+      options.includeInvalidated
+        ? "project-memory-local-store:include-invalidated-explicit"
+        : "project-memory-local-store:exclude-invalidated-default",
       "project-memory-local-store:no-retrieval-injection",
     ],
   };
 }
 
-function readRecordsSync(ref: ProjectMemoryStoreRef): ProjectMemoryRecord[] {
+function readRecordsSync(
+  ref: ProjectMemoryStoreRef,
+  options: ProjectMemoryListOptions = {},
+): ProjectMemoryRecord[] {
+  return foldProjectMemoryEntries(readEntriesSync(ref), options);
+}
+
+type ProjectMemoryStoreEntry = ProjectMemoryRecord | ProjectMemoryLifecycleTombstone;
+
+function readEntriesSync(ref: ProjectMemoryStoreRef): ProjectMemoryStoreEntry[] {
   if (!projectMemoryStoreRefIsWritable(ref)) {
     return [];
   }
@@ -128,7 +286,59 @@ function readRecordsSync(ref: ProjectMemoryStoreRef): ProjectMemoryRecord[] {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => JSON.parse(line) as ProjectMemoryRecord);
+    .map((line) => JSON.parse(line) as ProjectMemoryStoreEntry);
+}
+
+function foldProjectMemoryEntries(
+  entries: readonly ProjectMemoryStoreEntry[],
+  options: ProjectMemoryListOptions,
+): ProjectMemoryRecord[] {
+  const records = new Map<ProjectMemoryRecordId, ProjectMemoryRecord>();
+  const deleted = new Set<ProjectMemoryRecordId>();
+  for (const entry of entries) {
+    if (isLifecycleTombstone(entry)) {
+      if (entry.operation === "delete") {
+        records.delete(entry.recordId);
+        deleted.add(entry.recordId);
+        continue;
+      }
+      if (deleted.has(entry.recordId)) {
+        continue;
+      }
+      const record = records.get(entry.recordId);
+      if (record) {
+        records.set(entry.recordId, {
+          ...record,
+          invalidatedAt: entry.createdAt,
+          invalidationReason: entry.reason,
+          invalidatedBySourceCommand: entry.sourceCommand,
+        });
+      }
+      continue;
+    }
+    deleted.delete(entry.id);
+    records.set(entry.id, entry);
+  }
+  return Array.from(records.values()).filter(
+    (record) => options.includeInvalidated || !record.invalidatedAt,
+  );
+}
+
+function isLifecycleTombstone(
+  entry: ProjectMemoryStoreEntry,
+): entry is ProjectMemoryLifecycleTombstone {
+  return (entry as { readonly entryKind?: string }).entryKind === "project-memory-lifecycle";
+}
+
+function entryTargetsRecord(entry: ProjectMemoryStoreEntry, recordId: ProjectMemoryRecordId): boolean {
+  return isLifecycleTombstone(entry) ? entry.recordId === recordId : entry.id === recordId;
+}
+
+function appendLifecycleTombstone(
+  ref: ProjectMemoryStoreRef,
+  tombstone: ProjectMemoryLifecycleTombstone,
+): void {
+  fs.appendFileSync(recordsFileFor(ref), `${JSON.stringify(tombstone)}\n`, "utf8");
 }
 
 function storeHealth(ref: ProjectMemoryStoreRef): ProjectMemoryStoreHealth {
@@ -149,7 +359,7 @@ function storeHealth(ref: ProjectMemoryStoreRef): ProjectMemoryStoreHealth {
     mode: ref.mode,
     ok: true,
     writable: true,
-    recordCount: readRecordsSync(ref).length,
+    recordCount: readRecordsSync(ref, { includeInvalidated: true }).length,
     storeRoot: ref.root,
     recordsFile,
     detail: "Explicit local JSONL memory store is configured.",
@@ -187,6 +397,18 @@ function recordHasForbiddenContent(record: ProjectMemoryRecord): boolean {
     record.structuredFact?.object ?? "",
   ];
   return values.some((value) => containsRawContent(value) || containsSecret(value) || containsHiddenReasoning(value));
+}
+
+function sanitizeLifecycleReason(reason: string | undefined): string | undefined {
+  const compact = reason?.replace(/\s+/g, " ").trim();
+  if (!compact) {
+    return undefined;
+  }
+  return compact
+    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[REDACTED]")
+    .replace(/\bRAW_[A-Z0-9_]+\b/g, "[REDACTED_RAW]")
+    .replace(/\b(hidden reasoning|chain[- ]?of[- ]?thought)\b/gi, "[REDACTED_REASONING]")
+    .slice(0, 240);
 }
 
 function containsRawContent(value: string): boolean {

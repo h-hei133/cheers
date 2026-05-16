@@ -120,3 +120,18 @@ Recommended next route depends on the next blocker:
 - memory invalidation/delete UX if stale records become the safety gap
 - opt-in wake-up/future-turn injection if preview is stable and user-controlled
 - startup warm context cache only after explicit opt-in semantics are designed
+
+## Route 84 Note
+
+Route 84 adds explicit lifecycle filtering below recall and wake-up:
+
+- invalidated records are excluded from normal recall, search, and wake-up
+  preview by default
+- an internal/test include-invalidated option can inspect invalidated records
+- deleted records never appear in recall, search, wake-up, or
+  include-invalidated retrieval
+- lifecycle commands do not write prompt context, call providers/models, create
+  a startup cache, or enable future-turn memory injection
+
+The Route 83 deterministic ranking rules are unchanged after lifecycle
+filtering.

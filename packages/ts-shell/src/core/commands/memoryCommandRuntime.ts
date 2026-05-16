@@ -14,6 +14,11 @@ import {
 } from "../context/projectMemoryRecallCommandContract.js";
 import { runProjectMemoryRecallCommand } from "../context/projectMemoryRecallCommandRunner.js";
 import {
+  parseProjectMemoryDeleteCommandArgs,
+  ProjectMemoryDeleteCommandContractError,
+} from "../context/projectMemoryDeleteCommandContract.js";
+import { runProjectMemoryDeleteCommand } from "../context/projectMemoryDeleteCommandRunner.js";
+import {
   parseProjectMemorySaveCommandArgs,
   ProjectMemorySaveCommandContractError,
 } from "../context/projectMemorySaveCommandContract.js";
@@ -38,6 +43,17 @@ export async function runMemoryLocalCommand(
     if (args[0] === "recall" || args[0] === "search" || args[0] === "wake") {
       const request = parseProjectMemoryRecallCommandArgs(args);
       const result = await runProjectMemoryRecallCommand({
+        request,
+        memoryStore: context.projectMemoryStore,
+      });
+      return {
+        kind: "local",
+        output: result.output,
+      };
+    }
+    if (args[0] === "invalidate" || args[0] === "delete") {
+      const request = parseProjectMemoryDeleteCommandArgs(args);
+      const result = await runProjectMemoryDeleteCommand({
         request,
         memoryStore: context.projectMemoryStore,
       });
@@ -95,6 +111,8 @@ function formatMemoryReviewCommandError(error: unknown): string {
     error instanceof ProjectMemoryReviewCommandContractError
       ? error.code
       : error instanceof ProjectMemoryRecallCommandContractError
+      ? error.code
+      : error instanceof ProjectMemoryDeleteCommandContractError
         ? error.code
       : error instanceof ProjectMemorySaveCommandContractError
         ? error.code
@@ -102,6 +120,8 @@ function formatMemoryReviewCommandError(error: unknown): string {
   return [
     error instanceof ProjectMemoryRecallCommandContractError
       ? "Project memory recall"
+      : error instanceof ProjectMemoryDeleteCommandContractError
+      ? "Project memory lifecycle"
       : error instanceof ProjectMemorySaveCommandContractError
       ? "Project memory store"
       : "Project memory review",
@@ -112,6 +132,6 @@ function formatMemoryReviewCommandError(error: unknown): string {
     "- Memory written: no",
     "- Auto-load: no",
     "- Auto-injected: no",
-    "- DoNext: Retry with /memory, /memory approve <candidate-id>, /memory reject <candidate-id>, /memory save <candidate-id>, /memory recall <query>, /memory wake, or /memory status.",
+    "- DoNext: Retry with /memory, /memory approve <candidate-id>, /memory reject <candidate-id>, /memory save <candidate-id>, /memory recall <query>, /memory wake, /memory invalidate <record-id>, /memory delete <record-id>, or /memory status.",
   ].join("\n");
 }

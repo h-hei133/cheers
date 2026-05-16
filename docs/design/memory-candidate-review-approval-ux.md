@@ -209,3 +209,14 @@ Route 83 keeps review and save semantics unchanged. It adds read-only
 `/memory recall <query>`, `/memory search <query>`, and `/memory wake` surfaces
 over records that were already saved through explicit Route 82 commands. Review
 state still does not auto-write, auto-load, or inject memory into future turns.
+
+## Route 84 Note
+
+Route 84 keeps candidate review and approval session-scoped. It adds lifecycle
+commands only for records that already exist in the explicit local store:
+
+- `/memory invalidate <record-id> [reason...]`
+- `/memory delete <record-id> [reason...]`
+
+These commands do not approve candidates, save pending candidates, auto-write
+review state, auto-load memory, or inject future-turn context.

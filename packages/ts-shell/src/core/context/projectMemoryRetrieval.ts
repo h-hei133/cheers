@@ -18,6 +18,7 @@ export interface ProjectMemoryRetrievalRequest {
   readonly query?: string;
   readonly filters?: ProjectMemoryRetrievalFilters;
   readonly maxResults?: number;
+  readonly includeInvalidated?: boolean;
 }
 
 export interface ProjectMemoryRetrievalMatch {
@@ -44,7 +45,9 @@ export async function retrieveProjectMemoryRecords(
   store: ProjectMemoryStore,
   request: ProjectMemoryRetrievalRequest = {},
 ): Promise<ProjectMemoryRetrievalResult> {
-  const list = await store.list();
+  const list = await store.list({
+    includeInvalidated: request.includeInvalidated === true,
+  });
   const query = normalizeQuery(request.query);
   const filters = request.filters ?? {};
   const maxResults = boundedMaxResults(request.maxResults);
@@ -70,6 +73,9 @@ export async function retrieveProjectMemoryRecords(
       "project-memory-retrieval:no-vector-db",
       "project-memory-retrieval:no-provider-call",
       "project-memory-retrieval:no-auto-injection",
+      request.includeInvalidated === true
+        ? "project-memory-retrieval:include-invalidated-explicit"
+        : "project-memory-retrieval:exclude-invalidated-default",
     ],
   };
 }

@@ -149,3 +149,18 @@ Route 83 adds deterministic read-only retrieval on top of this store:
 Route 83 does not write memory, choose a default store path, auto-load records,
 inject future-turn context, add startup cache/sidebar UI, call providers/models,
 or add vector DB/ChromaDB/embedding search.
+
+## Route 84 Note
+
+Route 84 turns the reserved lifecycle fields into explicit local-store controls:
+
+- `/memory invalidate <record-id> [reason...]` appends a no-content tombstone
+  and excludes the record from normal lists, recall, search, and wake-up.
+- `/memory delete <record-id> [reason...]` removes local record content from
+  the JSONL store and leaves only a no-content delete tombstone.
+- `get(id)` and explicit include-invalidated test paths can inspect
+  invalidation metadata; deleted records are not returned.
+
+The route still does not choose a default store path, auto-load records, inject
+future-turn context, add startup cache/sidebar UI, call providers/models, add
+MCP tools, or add vector DB/ChromaDB/embedding search.

@@ -333,17 +333,20 @@ without storage. Route 81 adds session-scoped review/approval state and a
 explicit local store prototype for reviewed candidates only; it does not load
 stored memory back into context. Route 83 adds user-triggered recall/search and
 wake-up preview over that store, still without automatic context injection.
+Route 84 adds explicit invalidation/delete lifecycle controls for records in
+that store; invalidated/deleted records are filtered out of recall and wake-up,
+and memory still is not automatically loaded into prompt context.
 
 ## Residual Risks
 
 - Compact v2 injection is operational with focused quality/merge guards, Route
   80 can preview memory candidates, Route 81 can approve/reject candidates for
-  the current session, and Route 82 can explicitly save approved safe
-  candidates to a supplied local store. Route 83 can recall/search saved
-  records and render a wake-up preview. Automatic loading and future-turn
-  injection remain deferred.
-- Future memory storage still needs invalidation/delete UX and explicit opt-in
-  controls before it can affect prompt context.
+  the current session, Route 82 can explicitly save approved safe candidates to
+  a supplied local store, Route 83 can recall/search saved records and render a
+  wake-up preview, and Route 84 can invalidate/delete stored records. Automatic
+  loading and future-turn memory injection remain deferred.
+- Future memory storage still needs explicit opt-in controls before it can
+  affect prompt context.
 - Future sidebar state should consume `sidebarFacts` rather than inventing a
   separate taxonomy.
 - Future startup warm context should consume `startupWarmCandidates` only after
@@ -351,12 +354,13 @@ wake-up preview over that store, still without automatic context injection.
 
 ## Next Recommendation
 
-Recommended next route: Route 84 memory invalidation/delete UX if stale records
-are the next safety gap, or opt-in wake-up/future-turn injection if preview
-behavior is stable enough for user-controlled loading.
+Recommended next route: Route 85 explicit opt-in wake-up/future-turn injection
+if lifecycle UX remains stable, or memory store lifecycle hardening if
+invalidation/delete exposes store gaps.
 
 Reason: context layers, compact survivors, redactions, edit/recovery facts,
 Compact v2 packet rendering, the live checkpoint, the candidate-only adapter,
 Route 80 candidate extraction, Route 81 session-scoped review state, Route 82
-explicit save path, and Route 83 deterministic retrieval/wake preview are now
-machine-checkable enough to plan lifecycle or opt-in injection separately.
+explicit save path, Route 83 deterministic retrieval/wake preview, and Route 84
+lifecycle controls are now machine-checkable enough to plan opt-in injection
+separately.

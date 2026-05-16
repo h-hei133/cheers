@@ -86,8 +86,14 @@ cross-session loading, retrieval/wake-up/recall, startup cache, sidebar UI,
 provider/MCP changes, package/default gates, SessionManager schema changes,
 edit runtime changes, automatic recovery, atomic rollback, and raw
 content/secret exposure out of scope.
-Recommended Route 82 focus: project memory store prototype only after review
-UX remains stable; otherwise polish `/memory`.
+Route 82 adds explicit local project memory save for approved safe candidates.
+Route 83 adds deterministic recall/search and wake-up preview over the supplied
+store. Route 84 adds explicit invalidation/delete lifecycle controls before any
+memory auto-injection. These routes remain outside edit runtime capability and
+do not change provider/MCP behavior, package/default gates, SessionManager
+schema, edit behavior, recovery behavior, or rollback stance.
+Recommended Route 85 focus: explicit opt-in wake-up/future-turn injection only
+if lifecycle UX remains stable; otherwise harden memory store lifecycle.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -1246,6 +1252,17 @@ recovery/rollback stance are explicitly re-audited.
   - Recommended next phase: Route 82 project memory store prototype only after
     review/approval UX remains stable; otherwise polish `/memory`.
 
+- Batch 82-84: Explicit project memory store, retrieval, and lifecycle
+  - Status: implemented as non-default local JSONL save, deterministic
+    recall/search/wake-up preview, and explicit invalidate/delete commands.
+  - These routes do not add automatic memory injection, cross-session
+    auto-loading, startup cache, sidebar UI, provider/model calls,
+    provider/MCP/package/default gate changes, SessionManager schema changes,
+    edit runtime changes, automatic recovery, or atomic rollback.
+  - Recommended next phase: Route 85 opt-in future-turn memory injection only
+    after lifecycle filtering remains stable; otherwise memory store lifecycle
+    hardening.
+
 - Future broad arbitrary `apply_patch` readiness map
   - Consider only if larger write surfaces and recovery/rollback stance are
     settled.
@@ -1367,6 +1384,9 @@ Allowed after this document:
   preview over the explicit local store. It remains outside edit runtime and
   does not change edit capability, rollback, recovery execution, or default
   mutation readiness.
+- Route 84 context-memory work adds explicit invalidation/delete lifecycle UX
+  for the same local store. It remains outside edit runtime and does not change
+  edit capability, rollback, recovery execution, or default mutation readiness.
 
 Forbidden after this document:
 
@@ -1384,7 +1404,7 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 84 recommendation for memory work: add invalidation/delete UX first if
-stored-record lifecycle is the next blocker, or design opt-in wake-up/future-turn
-injection if preview behavior is stable enough for user-controlled loading. Do
-not treat Route 82 or Route 83 as edit-capability expansions.
+Route 85 recommendation for memory work: design explicit opt-in
+wake-up/future-turn injection only if Route 84 lifecycle filtering remains
+stable; otherwise harden memory store lifecycle. Do not treat Route 82, Route
+83, or Route 84 as edit-capability expansions.

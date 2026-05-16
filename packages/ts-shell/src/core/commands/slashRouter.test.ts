@@ -259,6 +259,67 @@ describe("slash router (W4)", () => {
     }
   });
 
+  it("routes /memory invalidate and delete over a supplied local store", async () => {
+    const memoryStoreRoot = path.join(workspaceRoot, ".memory-delete-test");
+    const projectMemoryStore = createProjectMemoryLocalStore({
+      ref: { mode: "test-only", root: memoryStoreRoot },
+    });
+    await projectMemoryStore.write({
+      storeRef: projectMemoryStore.ref,
+      record: {
+        id: "pmr:slash-delete",
+        version: 1,
+        createdAt: "2026-05-16T00:00:00.000Z",
+        candidateId: "pmc:slash-delete",
+        candidateKind: "project-fact",
+        retentionClass: "project-scoped-candidate",
+        approvedAt: "2026-05-16T00:00:00.000Z",
+        approvedBySourceCommand: "/memory",
+        memoryText: "Project memory lifecycle commands are explicit.",
+        evidence: ["route84:slash-router"],
+        source: "system-derived",
+        sourcePacket: "route84-test",
+        routeReferences: ["route84"],
+        safety: "safe",
+        redactions: [],
+      },
+    });
+
+    const invalidated = await routeSlashCommand("/memory invalidate pmr:slash-delete superseded", {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_delete",
+      projectMemoryStore,
+    });
+    expect(invalidated?.kind).toBe("local");
+    if (invalidated?.kind === "local") {
+      expect(invalidated.output).toContain("Project memory invalidate");
+      expect(invalidated.output).toContain("- Outcome: invalidated");
+      expect(invalidated.output).toContain("Auto-injected: no");
+    }
+
+    const recall = await routeSlashCommand("/memory recall lifecycle", {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_delete",
+      projectMemoryStore,
+    });
+    expect(recall?.kind).toBe("local");
+    if (recall?.kind === "local") {
+      expect(recall.output).toContain("Result count: 0");
+    }
+
+    const deleted = await routeSlashCommand("/memory delete pmr:slash-delete remove", {
+      cwd: workspaceRoot,
+      sessionId: "sess_memory_delete",
+      projectMemoryStore,
+    });
+    expect(deleted?.kind).toBe("local");
+    if (deleted?.kind === "local") {
+      expect(deleted.output).toContain("Project memory delete");
+      expect(deleted.output).toContain("- Outcome: deleted");
+    }
+    expect(await projectMemoryStore.get("pmr:slash-delete")).toBeUndefined();
+  });
+
   it("routes compact JSON mode and rejects invalid compact args", async () => {
     const compactCheckpointStore = createCompactLiveCheckpointStore({
       now: () => "2026-05-15T00:00:00.000Z",
