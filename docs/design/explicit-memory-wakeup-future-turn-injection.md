@@ -118,13 +118,22 @@ Still deferred:
 - MCP memory tools
 - vector DB / ChromaDB / embeddings
 - provider/model retrieval or reranking
-- memory injection quality/merge hardening beyond one-shot staging
+
+## Route 86 Note
+
+Route 86 adds quality/merge hardening around the Route 85 injection path:
+
+- repeated `/memory use` keeps latest explicit staging semantics
+- invalidated/deleted records are rechecked and filtered immediately before
+  injection
+- injected memory context is deduped and budgeted while preserving safety
+  caveats
+- clear deterministic structured-memory conflicts block injection before
+  consumption
+- unsupported automatic injection, startup auto-load, or provider retrieval
+  claims fail quality checks
 
 ## Next-Route Criteria
-
-Route 86 should harden memory injection quality/merge behavior if explicit
-injection works but needs better budgeting, stale-pending handling, or
-multi-source merge policy.
 
 Choose startup warm cache or sidebar state only after explicit injection remains
 stable and user-controlled.

@@ -1,11 +1,22 @@
 import {
   adaptProjectMemoryRecallForFutureTurn,
   adaptProjectMemoryWakeupForFutureTurn,
+  type ProjectMemoryFutureTurnCandidateContext,
 } from "./projectMemoryFutureTurnAdapter.js";
+import { applyProjectMemoryInjectedContextBudget } from "./projectMemoryInjectedContextBudget.js";
 import { formatProjectMemoryInjectedContext } from "./projectMemoryInjectedContextFormatter.js";
+import {
+  planProjectMemoryInjectionMerge,
+  type ProjectMemoryPendingRecordLifecycle,
+} from "./projectMemoryInjectionMergePolicy.js";
 import type { ProjectMemoryInjectionState } from "./projectMemoryInjectionState.js";
+import { evaluateProjectMemoryInjectionQuality } from "./projectMemoryInjectionQuality.js";
+import { detectProjectMemoryConflicts } from "./projectMemoryConflictDetection.js";
 import { retrieveProjectMemoryRecords } from "./projectMemoryRetrieval.js";
-import type { ProjectMemoryStore } from "./projectMemoryStoreContract.js";
+import type {
+  ProjectMemoryRecord,
+  ProjectMemoryStore,
+} from "./projectMemoryStoreContract.js";
 import { buildProjectMemoryWakeupPreview } from "./projectMemoryWakeup.js";
 
 export interface ProjectMemoryFutureTurnInjectionPlan {
@@ -32,6 +43,7 @@ export interface PlanProjectMemoryFutureTurnInjectionInput {
     readonly memoryInjectionId?: string;
     readonly reason: string;
   }) => ProjectMemoryInjectionState;
+  readonly maxInjectedContextChars?: number;
 }
 
 export async function planProjectMemoryFutureTurnInjection(
@@ -59,19 +71,10 @@ export async function planProjectMemoryFutureTurnInjection(
     ]);
   }
 
-  const candidate =
-    state.mode === "wake"
-      ? adaptProjectMemoryWakeupForFutureTurn({
-          injectionId: state.memoryInjectionId,
-          wakeup: await buildProjectMemoryWakeupPreview(input.memoryStore),
-        })
-      : adaptProjectMemoryRecallForFutureTurn({
-          injectionId: state.memoryInjectionId,
-          retrieval: await retrieveProjectMemoryRecords(input.memoryStore, {
-            query: state.query,
-            maxResults: 5,
-          }),
-        });
+  const { candidate, selectedRecords } = await buildCurrentCandidate({
+    memoryStore: input.memoryStore,
+    state,
+  });
 
   if (candidate.recordIds.length === 0) {
     return invalid(input, "memory-records-empty", "No injectable project memory records were found.", [
@@ -86,11 +89,51 @@ export async function planProjectMemoryFutureTurnInjection(
     ]);
   }
 
-  const injectedContext = formatProjectMemoryInjectedContext(candidate);
-  if (containsUnsafeContent(injectedContext)) {
+  const lifecycle = await resolvePendingRecordLifecycle(input.memoryStore, state.recordIds);
+  const conflicts = detectProjectMemoryConflicts({ records: selectedRecords });
+  const merge = planProjectMemoryInjectionMerge({
+    injectionState: state,
+    candidate,
+    pendingRecordLifecycle: lifecycle,
+    conflictDetection: conflicts,
+  });
+  if (merge.mergeStatus === "fail") {
+    return invalid(
+      input,
+      "memory-injection-merge-failed",
+      merge.blockers.map((blocker) => blocker.message).join("; "),
+      [...baseEvidence, ...candidate.evidence, ...merge.evidence],
+      [...merge.warnings, ...merge.blockers],
+    );
+  }
+
+  const formattedContext = formatProjectMemoryInjectedContext(merge.candidate);
+  const quality = evaluateProjectMemoryInjectionQuality({
+    candidate: merge.candidate,
+    injectedContext: formattedContext,
+    conflictDetection: conflicts,
+    maxInjectedContextChars: input.maxInjectedContextChars,
+  });
+  if (quality.qualityStatus === "fail") {
+    return invalid(
+      input,
+      "memory-injection-quality-failed",
+      quality.blockers.map((blocker) => blocker.message).join("; "),
+      [...baseEvidence, ...candidate.evidence, ...merge.evidence, ...quality.evidence],
+      [...merge.warnings, ...quality.warnings, ...quality.blockers],
+    );
+  }
+
+  const budget = applyProjectMemoryInjectedContextBudget(formattedContext, {
+    maxChars: input.maxInjectedContextChars,
+  });
+  if (containsUnsafeContent(budget.context)) {
     return invalid(input, "unsafe-injected-context", "Formatted project memory context contained unsafe raw-looking content.", [
       ...baseEvidence,
       ...candidate.evidence,
+      ...merge.evidence,
+      ...quality.evidence,
+      ...budget.evidence,
     ]);
   }
 
@@ -104,12 +147,19 @@ export async function planProjectMemoryFutureTurnInjection(
   });
   return {
     shouldInject: true,
-    injectedContext,
+    injectedContext: budget.context,
     updatedInjectionState,
-    warnings: candidate.warnings,
+    warnings: [
+      ...merge.candidate.warnings,
+      ...quality.warnings,
+      ...budget.warnings,
+    ],
     evidence: [
       ...baseEvidence,
-      ...candidate.evidence,
+      ...merge.candidate.evidence,
+      ...merge.evidence,
+      ...quality.evidence,
+      ...budget.evidence,
       "project-memory-future-turn-injection:injected-once",
       "project-memory-future-turn-injection:consumed",
     ],
@@ -121,6 +171,7 @@ function invalid(
   id: string,
   message: string,
   evidence: readonly string[],
+  extraWarnings: readonly { readonly id: string; readonly message: string }[] = [],
 ): ProjectMemoryFutureTurnInjectionPlan {
   const updated =
     input.markInvalid?.({
@@ -128,7 +179,7 @@ function invalid(
       memoryInjectionId: input.injectionState.memoryInjectionId,
       reason: message,
     }) ?? input.injectionState;
-  return skip(updated, id, message, evidence);
+  return skip(updated, id, message, evidence, extraWarnings);
 }
 
 function skip(
@@ -136,16 +187,72 @@ function skip(
   id: string,
   message: string,
   evidence: readonly string[],
+  extraWarnings: readonly { readonly id: string; readonly message: string }[] = [],
 ): ProjectMemoryFutureTurnInjectionPlan {
   return {
     shouldInject: false,
     updatedInjectionState: state,
-    warnings: [{ id, message }],
+    warnings: [{ id, message }, ...extraWarnings],
     evidence: [...evidence, `project-memory-future-turn-injection:skip:${id}`],
   };
 }
 
 function containsUnsafeContent(value: string): boolean {
-  return /\bRAW_[A-Z0-9_]+\b/.test(value) ||
-    /\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/.test(value);
+  return value
+    .split(/\r?\n/)
+    .filter((line) => !/\b(excluded|redacted|redactions?)\b/i.test(line))
+    .some((line) =>
+      /\bRAW_[A-Z0-9_]+\b/.test(line) ||
+      /\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/.test(line) ||
+      /\b(hidden reasoning|chain[- ]?of[- ]?thought)\b/i.test(line),
+    );
+}
+
+async function buildCurrentCandidate(input: {
+  readonly memoryStore: ProjectMemoryStore;
+  readonly state: ProjectMemoryInjectionState;
+}): Promise<{
+  readonly candidate: ProjectMemoryFutureTurnCandidateContext;
+  readonly selectedRecords: readonly ProjectMemoryRecord[];
+}> {
+  if (input.state.mode === "wake") {
+    const wakeup = await buildProjectMemoryWakeupPreview(input.memoryStore);
+    return {
+      candidate: adaptProjectMemoryWakeupForFutureTurn({
+        injectionId: input.state.memoryInjectionId ?? "project-memory-pending",
+        wakeup,
+      }),
+      selectedRecords: [...wakeup.l0.records, ...wakeup.l1.records].filter(
+        (record) => !record.invalidatedAt,
+      ),
+    };
+  }
+  const retrieval = await retrieveProjectMemoryRecords(input.memoryStore, {
+    query: input.state.query,
+    maxResults: 5,
+  });
+  return {
+    candidate: adaptProjectMemoryRecallForFutureTurn({
+      injectionId: input.state.memoryInjectionId ?? "project-memory-pending",
+      retrieval,
+    }),
+    selectedRecords: retrieval.matches
+      .map((match) => match.record)
+      .filter((record) => !record.invalidatedAt),
+  };
+}
+
+async function resolvePendingRecordLifecycle(
+  memoryStore: ProjectMemoryStore,
+  recordIds: readonly string[],
+): Promise<readonly ProjectMemoryPendingRecordLifecycle[]> {
+  const result: ProjectMemoryPendingRecordLifecycle[] = [];
+  for (const recordId of Array.from(new Set(recordIds))) {
+    const record = await memoryStore.get(recordId);
+    result.push({
+      recordId,
+      status: !record ? "deleted" : record.invalidatedAt ? "invalidated" : "active",
+    });
+  }
+  return result;
 }

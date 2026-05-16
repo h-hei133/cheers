@@ -173,3 +173,11 @@ atomic rollback.
 Route 81 should own review/approval UX before any persistent memory store.
 Ranking, persistence, user controls, startup loading, and long-lived project
 facts remain separate decisions.
+
+## Route 86 Note
+
+Route 86 applies the same quality/merge pattern to explicit project memory
+future-turn injection. Compact v2 remains first in runtime injection order and
+keeps its own checkpoint state, merge policy, quality checks, and budget. Project
+memory then runs separate memory-specific stale-record filtering, conflict
+detection, quality checks, and budget/dedupe before the original user request.

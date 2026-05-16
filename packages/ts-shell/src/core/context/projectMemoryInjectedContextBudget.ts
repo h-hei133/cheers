@@ -1,0 +1,127 @@
+export interface ProjectMemoryInjectedContextBudgetOptions {
+  readonly maxChars?: number;
+  readonly maxListItems?: number;
+}
+
+export interface ProjectMemoryInjectedContextBudgetResult {
+  readonly context: string;
+  readonly estimatedSize: number;
+  readonly originalSize: number;
+  readonly overBudget: boolean;
+  readonly omittedLineCount: number;
+  readonly warnings: readonly {
+    readonly id: string;
+    readonly message: string;
+  }[];
+  readonly evidence: readonly string[];
+}
+
+const DEFAULT_MAX_CHARS = 10_000;
+const DEFAULT_MAX_LIST_ITEMS = 10;
+
+export function applyProjectMemoryInjectedContextBudget(
+  context: string,
+  options: ProjectMemoryInjectedContextBudgetOptions = {},
+): ProjectMemoryInjectedContextBudgetResult {
+  const maxChars = options.maxChars ?? DEFAULT_MAX_CHARS;
+  const maxListItems = options.maxListItems ?? DEFAULT_MAX_LIST_ITEMS;
+  const dedupedLines = dedupeLines(context.split("\n"));
+  const listCappedLines = capListItems(dedupedLines, maxListItems);
+  const listCappedContext = listCappedLines.join("\n");
+  if (listCappedContext.length <= maxChars) {
+    return {
+      context: listCappedContext,
+      estimatedSize: listCappedContext.length,
+      originalSize: context.length,
+      overBudget: context.length > maxChars,
+      omittedLineCount: dedupedLines.length - listCappedLines.length,
+      warnings:
+        context.length > maxChars
+          ? [{
+              id: "project-memory-injected-context-list-capped",
+              message: "Injected memory context list entries were capped before final budget check.",
+            }]
+          : [],
+      evidence: [
+        "project-memory-injected-context-budget:deduped",
+        "project-memory-injected-context-budget:list-capped",
+      ],
+    };
+  }
+
+  const critical = listCappedLines.filter(isCriticalLine);
+  const remaining = listCappedLines.filter((line) => !isCriticalLine(line));
+  const kept: string[] = [];
+  for (const line of [...listCappedLines.slice(0, 5), ...critical, ...remaining]) {
+    if (kept.includes(line)) {
+      continue;
+    }
+    const next = [...kept, line].join("\n");
+    if (next.length > maxChars && !isCriticalLine(line)) {
+      continue;
+    }
+    kept.push(line);
+  }
+  if (!kept.includes("</project_memory_context>")) {
+    kept.push("- Budget: non-critical memory lines omitted; critical safety facts preserved.");
+    kept.push("</project_memory_context>");
+  }
+  const budgeted = kept.join("\n");
+  return {
+    context: budgeted,
+    estimatedSize: budgeted.length,
+    originalSize: context.length,
+    overBudget: true,
+    omittedLineCount: listCappedLines.length - kept.length,
+    warnings: [{
+      id: "project-memory-injected-context-over-budget",
+      message: `Injected memory context was reduced from ${context.length} to ${budgeted.length} chars.`,
+    }],
+    evidence: [
+      "project-memory-injected-context-budget:deduped",
+      "project-memory-injected-context-budget:list-capped",
+      "project-memory-injected-context-budget:over-budget-trimmed",
+      "project-memory-injected-context-budget:critical-facts-preserved",
+    ],
+  };
+}
+
+function dedupeLines(lines: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const line of lines) {
+    const key = line.trim();
+    if (key && seen.has(key)) {
+      continue;
+    }
+    if (key) {
+      seen.add(key);
+    }
+    result.push(line);
+  }
+  return result;
+}
+
+function capListItems(lines: readonly string[], maxListItems: number): string[] {
+  const result: string[] = [];
+  let currentListCount = 0;
+  for (const line of lines) {
+    const isListItem = /^- /.test(line) || /^  - /.test(line);
+    if (!isListItem || isCriticalLine(line)) {
+      currentListCount = isListItem ? currentListCount + 1 : 0;
+      result.push(line);
+      continue;
+    }
+    currentListCount += 1;
+    if (currentListCount <= maxListItems) {
+      result.push(line);
+    } else if (currentListCount === maxListItems + 1) {
+      result.push("- ... additional memory entries omitted by budget");
+    }
+  }
+  return result;
+}
+
+function isCriticalLine(line: string): boolean {
+  return /^(<project_memory_context>|<\/project_memory_context>|Source:|Injection:|Mode:|Query:|Records selected:|Selected records|Constraints \/ caveats|Next action|Safety|Evidence references|Redactions \/ warnings|- Use this memory|- Invalidated and deleted|- Automatic memory injection: no|- Startup auto-load: no|- Provider retrieval: no|- Vector search|- Raw file content|- This context does not grant|- Budget:)/i.test(line);
+}

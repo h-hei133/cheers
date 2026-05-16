@@ -149,3 +149,11 @@ Route 85 does not add automatic cleanup, startup auto-load, cross-session
 auto-loading, startup cache, sidebar UI, MCP memory tools, provider/model
 retrieval, vector DB, ChromaDB, embeddings, SessionManager schema changes, edit
 runtime changes, automatic recovery, or atomic rollback.
+
+## Route 86 Note
+
+Route 86 strengthens the lifecycle boundary at injection time. A pending
+`/memory use` stores selected ids, but the planner resolves those ids again
+before the next normal turn consumes the injection. Invalidated and deleted
+records are filtered from injected memory context and reported as concise
+warnings; if no active records remain, injection is blocked and marked invalid.

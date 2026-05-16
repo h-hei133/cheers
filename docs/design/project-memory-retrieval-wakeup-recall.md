@@ -149,3 +149,17 @@ separate explicit command:
 Retrieval remains deterministic and local: no provider/model calls, vector DB,
 ChromaDB, embeddings, semantic rerank, startup cache, sidebar UI, or automatic
 memory injection.
+
+## Route 86 Note
+
+Route 86 keeps recall/search/wake-up ranking deterministic and local, but adds
+future-turn injection hardening after `/memory use`:
+
+- the planner reruns retrieval/wake-up and resolves staged record ids before
+  injection
+- invalidated/deleted records are filtered from injected context
+- selected records are deduped by id
+- over-budget injected memory context is trimmed without dropping safety
+  caveats
+- clear structured conflicts block injection; uncertain route status
+  differences warn only

@@ -1405,6 +1405,11 @@ Allowed after this document:
 - Route 85 context-memory work adds explicit one-shot future-turn injection via
   `/memory use`. It remains outside edit runtime and does not change edit
   capability, rollback, recovery execution, or default mutation readiness.
+- Route 86 context-memory work adds quality/merge hardening for that explicit
+  injection path: stale lifecycle filtering, record-id dedupe, conservative
+  conflict detection, injected-context budget, and quality checks. It remains
+  outside edit runtime and does not change edit capability, rollback, recovery
+  execution, or default mutation readiness.
 
 Forbidden after this document:
 
@@ -1422,7 +1427,7 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 86 recommendation for memory work: harden memory injection quality/merge
-behavior if Route 85 explicit injection remains stable; otherwise harden memory
-store lifecycle. Do not treat Route 82, Route 83, Route 84, or Route 85 as
-edit-capability expansions.
+Route 87 recommendation for memory work: choose startup warm context cache,
+sidebar state model, or memory retrieval quality/ranking hardening based on the
+next user-visible blocker. Do not treat Route 82, Route 83, Route 84, Route 85,
+or Route 86 as edit-capability expansions.
