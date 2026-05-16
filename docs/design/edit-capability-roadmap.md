@@ -1,6 +1,6 @@
 # Edit Capability Roadmap
 
-Route baseline: post-Route 78
+Route baseline: post-Route 79
 Date: 2026-05-15
 Status: long-range edit capability map after Routes 50-73; edit capability is
 now a closeout candidate for the bounded selected-workspace surface.
@@ -63,9 +63,17 @@ injection state is consumed without persisting the injected block into session
 history. It preserves no memory/sidebar/startup, no provider/MCP/package/default
 gate changes, no SessionManager schema change, no edit runtime change, no
 automatic recovery, no atomic rollback, and no raw content or secret exposure.
-Recommended Route 79 focus: quality/merge hardening for Compact v2 injection,
-including repeated compaction behavior, session summary coherence, and compact
-packet quality scoring before any memory candidate phase.
+Route 79 adds focused Compact v2 quality/merge hardening: latest pending
+checkpoint wins, stale
+checkpoints are blocked, stable survivor labels can carry forward, continuity
+quality checks run before consumption, and over-budget injected context is
+deduped/capped while preserving critical safety facts. It keeps memory,
+sidebar, startup, provider/MCP, package/default gates, SessionManager schema,
+edit runtime, automatic recovery, atomic rollback, and raw content/secret
+exposure out of scope.
+Recommended Route 80 focus: project memory candidate extraction, including
+ranking, persistence boundaries, and user controls only after Compact v2
+injection quality/merge is stable.
 This is still not broad edit readiness.
 
 This document records the current edit / patch / mutation capability upper
@@ -125,7 +133,8 @@ uses that sealed state as context-engineering input, Route 75 makes it survive
 compact as structured handoff state, and Route 76 exposes that handoff through a
 preview-only `/compact` command. Route 77 keeps that command simple while
 creating a live in-memory checkpoint and a candidate-only future-turn adapter.
-Route 78 consumes that checkpoint once on the next normal model turn.
+Route 78 consumes that checkpoint once on the next normal model turn, and
+Route 79 hardens repeated compact quality/merge around that injection path.
 The sealed state is closeout-candidate, not broad edit readiness and not
 reference-repo feature parity.
 

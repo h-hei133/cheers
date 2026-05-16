@@ -1,7 +1,13 @@
 import type { CompactFutureTurnCandidateContext } from "./compactFutureTurnAdapter.js";
 
+export interface CompactInjectedContextFormatterOptions {
+  readonly mergedCompactSurvivorFacts?: readonly string[];
+  readonly qualityWarnings?: readonly string[];
+}
+
 export function formatCompactInjectedContext(
   candidate: CompactFutureTurnCandidateContext,
+  options: CompactInjectedContextFormatterOptions = {},
 ): string {
   const facts = candidate.structuredFacts;
   return [
@@ -72,6 +78,12 @@ export function formatCompactInjectedContext(
     "Constraints",
     list("Constraints / forbidden scope", facts.constraints),
     "",
+    "Merged compact survivor facts",
+    list(
+      "Stable survivor facts",
+      options.mergedCompactSurvivorFacts ?? [],
+    ),
+    "",
     "Redactions / warnings",
     list(
       "Redactions",
@@ -79,7 +91,10 @@ export function formatCompactInjectedContext(
     ),
     list(
       "Warnings",
-      candidate.warnings.map((entry) => `${entry.id}: ${entry.message}`),
+      [
+        ...candidate.warnings.map((entry) => `${entry.id}: ${entry.message}`),
+        ...(options.qualityWarnings ?? []),
+      ],
     ),
     "",
     "Safety",

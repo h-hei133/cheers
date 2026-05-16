@@ -489,8 +489,12 @@ export class ShellSessionRuntime {
       sessionScopeId,
     );
     const injectionState = injectionStateStore.get(sessionScopeId);
+    const previousCheckpoint = injectionState.supersededCheckpointIds[0]
+      ? checkpointStore.getById(injectionState.supersededCheckpointIds[0])
+      : undefined;
     const plan = planCompactFutureTurnInjection({
       checkpoint,
+      previousCheckpoint,
       injectionState,
       markInjected: ({ sessionScopeId: scopeId, checkpointId }) =>
         injectionStateStore.markInjected({

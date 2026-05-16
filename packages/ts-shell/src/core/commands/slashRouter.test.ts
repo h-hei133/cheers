@@ -220,6 +220,57 @@ describe("slash router (W4)", () => {
     );
   });
 
+  it("creates a fresh pending checkpoint after a prior checkpoint was consumed", async () => {
+    let checkpointIndex = 0;
+    const compactCheckpointStore = createCompactLiveCheckpointStore({
+      now: () => "2026-05-16T00:00:00.000Z",
+      nextId: () => {
+        checkpointIndex += 1;
+        return `checkpoint-fresh-${checkpointIndex}`;
+      },
+    });
+    const compactInjectionStateStore = createCompactInjectionStateStore({
+      now: () => "2026-05-16T00:00:00.000Z",
+    });
+    await routeSlashCommand("/compact", {
+      cwd: workspaceRoot,
+      sessionId: "sess_fresh_after_consumed",
+      compactCheckpointStore,
+      compactInjectionStateStore,
+    });
+    compactInjectionStateStore.markInjected({
+      sessionScopeId: "session:sess_fresh_after_consumed",
+      checkpointId: "checkpoint-fresh-1",
+    });
+    compactInjectionStateStore.markConsumed({
+      sessionScopeId: "session:sess_fresh_after_consumed",
+      checkpointId: "checkpoint-fresh-1",
+    });
+    const fresh = await routeSlashCommand("/compact", {
+      cwd: workspaceRoot,
+      sessionId: "sess_fresh_after_consumed",
+      compactCheckpointStore,
+      compactInjectionStateStore,
+    });
+
+    expect(fresh?.kind).toBe("local");
+    if (fresh?.kind === "local") {
+      expect(fresh.output).toContain("- Checkpoint id: checkpoint-fresh-2");
+      expect(fresh.output).toContain(
+        "- Injection status: checkpoint pending injection",
+      );
+    }
+    expect(
+      compactInjectionStateStore.get("session:sess_fresh_after_consumed"),
+    ).toEqual(
+      expect.objectContaining({
+        injectionStatus: "pending",
+        checkpointId: "checkpoint-fresh-2",
+        injectionCount: 0,
+      }),
+    );
+  });
+
   it("routes every visible registry command name and alias without falling through to unknown", async () => {
     const registry = createCommandRegistry(workspaceRoot);
     const visibleCommands = Array.from(registry.values()).filter(

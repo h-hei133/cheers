@@ -16,6 +16,7 @@ export interface CompactInjectionState {
   readonly consumedAt?: string;
   readonly injectionCount: number;
   readonly sourceCommand?: CompactCheckpointSourceCommand;
+  readonly supersededCheckpointIds: readonly string[];
   readonly warnings: readonly {
     readonly id: string;
     readonly message: string;
@@ -80,9 +81,7 @@ export function createCompactInjectionStateStore(
     markPending(input) {
       const previous = get(input.sessionScopeId);
       const warnings =
-        previous.injectionStatus === "pending" &&
-        previous.checkpointId &&
-        previous.checkpointId !== input.checkpointId
+        previous.checkpointId && previous.checkpointId !== input.checkpointId
           ? [
               {
                 id: "pending-checkpoint-superseded",
@@ -97,6 +96,10 @@ export function createCompactInjectionStateStore(
         createdAt: input.createdAt ?? now(),
         injectionCount: 0,
         sourceCommand: input.sourceCommand,
+        supersededCheckpointIds:
+          previous.checkpointId && previous.checkpointId !== input.checkpointId
+            ? [previous.checkpointId, ...previous.supersededCheckpointIds]
+            : previous.supersededCheckpointIds,
         warnings,
         persistence: "none",
         providerCall: "none",
@@ -204,6 +207,7 @@ function emptyState(sessionScopeId: string): CompactInjectionState {
     sessionScopeId,
     injectionStatus: "none",
     injectionCount: 0,
+    supersededCheckpointIds: [],
     warnings: [],
     persistence: "none",
     providerCall: "none",

@@ -1,7 +1,7 @@
 # Compact v2 Future-Turn Injection
 
-Status: Route 78 implemented candidate.
-Date: 2026-05-15
+Status: Route 78 implemented candidate; Route 79 quality/merge hardening added.
+Date: 2026-05-16
 
 ## Scope
 
@@ -132,12 +132,18 @@ SessionManager migration or persisted data cleanup is required.
 
 ## Deferred Work
 
-- quality scoring for injected compact packets
-- richer merge behavior when a user compacts repeatedly across long sessions
-- session summary coherence polish
+- session summary coherence polish beyond the focused Route 79 guards
 - memory candidate extraction and storage
 - sidebar UI
 - startup warm cache
 
-Recommended next route: Route 79 quality/merge hardening for Compact v2
-injection.
+## Route 79 Note
+
+Route 79 adds pure merge, quality, and budget helpers before the Route 78
+planner consumes injection state. Repeated `/compact` now keeps the latest
+pending checkpoint authoritative, carries only stable survivor labels from
+older checkpoints, blocks stale current checkpoints, runs continuity quality
+checks, dedupes/caps overlong injected context, and consumes state only after a
+safe budgeted context is ready.
+
+Recommended next route: Route 80 project memory candidate extraction.

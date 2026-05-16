@@ -197,6 +197,122 @@ describe("shell session runtime (W5)", () => {
     );
   });
 
+  it("injects only the latest repeated compact checkpoint and can inject a fresh checkpoint after consumption", async () => {
+    const promptsSeenByModel: string[] = [];
+    const compactCheckpointStore = createCompactLiveCheckpointStore({
+      now: () => "2026-05-16T00:00:00.000Z",
+      nextId: (() => {
+        let id = 0;
+        return () => {
+          id += 1;
+          return `checkpoint-repeat-${id}`;
+        };
+      })(),
+    });
+    const compactInjectionStateStore = createCompactInjectionStateStore({
+      now: () => "2026-05-16T00:00:00.000Z",
+    });
+    const makeCheckpoint = (routeId: string, changedFile: string) =>
+      updateLatestCompactCheckpoint(compactCheckpointStore, {
+        sessionScopeId: "session:sess_runtime_repeat",
+        sourceCommand: "/compact",
+        result: runCompactCommand({
+          mode: "render",
+          source: "route",
+          generatedAt: "2026-05-16T00:00:00.000Z",
+          routeInfo: {
+            routeId,
+            name: `Route ${routeId}`,
+            nextAction: `Continue ${routeId}.`,
+          },
+          taskGoal: {
+            objective: `Objective ${routeId}.`,
+          },
+          mutationEvidence: {
+            changedFiles: [changedFile],
+          },
+          validationEvidence: {
+            resultContractStatus: "passed",
+          },
+        }),
+      });
+    const first = makeCheckpoint("78", "src/old.ts");
+    compactInjectionStateStore.markPending({
+      sessionScopeId: "session:sess_runtime_repeat",
+      checkpointId: first.checkpointId,
+      sourceCommand: "/compact",
+    });
+    const second = makeCheckpoint("79", "src/new.ts");
+    compactInjectionStateStore.markPending({
+      sessionScopeId: "session:sess_runtime_repeat",
+      checkpointId: second.checkpointId,
+      sourceCommand: "/compact",
+    });
+    const runtime = new ShellSessionRuntime({
+      compactCheckpointStore,
+      compactInjectionStateStore,
+      sessionManager: {
+        persistUserPromptBarrier() {},
+        markTurnActive() {},
+        appendQueryEvent() {},
+        addTurn() {},
+        saveCompleted() {},
+        saveInterrupted() {},
+        saveError() {},
+        saveTerminated() {},
+      } as never,
+      renderer: {
+        renderLine() {},
+        renderChunk() {},
+      } as never,
+      runPrompt: async function* (prompt) {
+        promptsSeenByModel.push(prompt);
+        yield {
+          type: "query.completed",
+          result: {
+            status: "completed",
+            terminalReason: "completed",
+            terminalClassification: "success",
+            transcript: [],
+            sharedContext: {
+              sessionId: "sess_runtime_repeat",
+              initialPrompt: prompt,
+              notes: [],
+              handoffs: [],
+            },
+            finalOutput: "done",
+          },
+        };
+      },
+    });
+
+    await runtime.executePrompt("sess_runtime_repeat", "first normal turn");
+    await runtime.executePrompt("sess_runtime_repeat", "second normal turn");
+    const third = makeCheckpoint("80", "src/fresh.ts");
+    compactInjectionStateStore.markPending({
+      sessionScopeId: "session:sess_runtime_repeat",
+      checkpointId: third.checkpointId,
+      sourceCommand: "/compact",
+    });
+    await runtime.executePrompt("sess_runtime_repeat", "third normal turn");
+
+    expect(promptsSeenByModel[0]).toContain("Route: 79 Route 79");
+    expect(promptsSeenByModel[0]).toContain("src/new.ts");
+    expect(promptsSeenByModel[0]).not.toContain("src/old.ts");
+    expect(promptsSeenByModel[1]).toBe("second normal turn");
+    expect(promptsSeenByModel[2]).toContain("Route: 80 Route 80");
+    expect(promptsSeenByModel[2]).toContain("src/fresh.ts");
+    expect(
+      compactInjectionStateStore.get("session:sess_runtime_repeat"),
+    ).toEqual(
+      expect.objectContaining({
+        injectionStatus: "consumed",
+        checkpointId: third.checkpointId,
+        injectionCount: 1,
+      }),
+    );
+  });
+
   it("renders print mode answer before compact result boundary", async () => {
     const renderedLines: string[] = [];
     const runtime = new ShellSessionRuntime({

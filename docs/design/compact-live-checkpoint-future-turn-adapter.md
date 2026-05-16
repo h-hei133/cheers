@@ -157,7 +157,7 @@ mode remains the Route 76 dev-oriented output path.
 
 ## Safety Guarantees
 
-Routes 77-78 preserve:
+Routes 77-79 preserve:
 
 - no persistence or memory storage
 - no SessionManager schema changes
@@ -167,10 +167,15 @@ Routes 77-78 preserve:
 - no sidebar UI or startup cache
 - no edit runtime changes
 - one-shot next-normal-turn injection from the pending live checkpoint
+- repeated compact merge, quality, and budget checks before injection consumes
+  pending state
 - no automatic recovery
 - no atomic rollback
 - no raw recovery content, raw original content, secrets, provider
   credentials, or hidden reasoning in checkpoints or adapter payloads
 
-Recommended next route: Route 79 quality/merge hardening for Compact v2
-injection.
+Route 79 adds `compactInjectionMergePolicy.ts`,
+`compactContinuityQuality.ts`, and `compactInjectedContextBudget.ts` around
+the Route 78 planner. The adapter still stays pure and provider-call-free.
+
+Recommended next route: Route 80 project memory candidate extraction.

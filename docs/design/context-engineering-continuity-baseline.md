@@ -2,7 +2,7 @@
 
 Status: Route 74 baseline candidate; Route 75 Compact v2 packet implemented;
 Route 76 command integration added; Route 77 live checkpoint added; Route 78
-future-turn injection added.
+future-turn injection added; Route 79 quality/merge hardening added.
 Date: 2026-05-15
 
 ## Post-Edit-Closeout Baseline
@@ -29,6 +29,10 @@ Route 78 adds an in-memory injection state and a narrow next-normal-turn
 runtime hook. A pending checkpoint is injected into the model-facing prompt once
 and then consumed. The original user prompt remains the persisted session
 barrier, and command-only turns do not consume pending injection.
+
+Route 79 adds pure merge, quality, and budget checks around that injection path.
+It blocks stale checkpoint injection, dedupes repeated compact context, carries
+only stable survivor labels, and preserves critical safety facts under budget.
 
 This route is not a memory implementation, sidebar UI, startup cache, provider
 change, MCP change, compact rewrite, SessionManager schema change, edit runtime
@@ -316,14 +320,14 @@ scope.
 Partially wired. The existing session surfaces already render current-session
 and stopped-continuation facts. Route 74 keeps the context projection as a pure
 testable substrate, Route 75 adds the packet/renderer, Route 76 exposes the
-command surface, and Route 77 adds an in-memory latest compact checkpoint plus
-Route 78 consumes a pending checkpoint once from the next normal runtime prompt.
-Quality/merge hardening remains deferred.
+command surface, Route 77 adds an in-memory latest compact checkpoint, Route 78
+consumes a pending checkpoint once from the next normal runtime prompt, and
+Route 79 hardens repeated compact quality/merge behavior.
 
 ## Residual Risks
 
-- Compact v2 injection is operational but still needs repeated-compaction merge
-  hardening and quality checks.
+- Compact v2 injection is operational with focused quality/merge guards, but
+  durable memory extraction still needs separate ranking and persistence policy.
 - Future memory extraction still needs ranking, persistence boundaries, and
   user controls.
 - Future sidebar state should consume `sidebarFacts` rather than inventing a
@@ -333,10 +337,9 @@ Quality/merge hardening remains deferred.
 
 ## Next Recommendation
 
-Recommended next route: Route 79 quality/merge hardening for Compact v2
-injection.
+Recommended next route: Route 80 project memory candidate extraction.
 
 Reason: context layers, compact survivors, redactions, edit/recovery facts,
 Compact v2 packet rendering, the live checkpoint, and the candidate-only
-adapter are now machine-checkable enough to harden injection quality without
-reopening edit runtime behavior.
+adapter are now machine-checkable enough to start memory candidate extraction
+without reopening edit runtime behavior.

@@ -1,7 +1,8 @@
 # Compact v2 Route Continuity
 
 Status: Route 75 implemented candidate; Route 76 command integration added;
-Route 77 live checkpoint added; Route 78 future-turn injection added.
+Route 77 live checkpoint added; Route 78 future-turn injection added; Route 79
+quality/merge hardening added.
 Date: 2026-05-15
 
 ## Post-Route 74 Baseline
@@ -247,8 +248,13 @@ recovery references, validation, constraints, redactions, warnings, and next
 action without raw content, secrets, persistence, memory write, provider calls,
 automatic recovery, or atomic rollback.
 
-Recommended next route: Route 79 quality/merge hardening for Compact v2
-injection.
+Route 79 note: repeated compact use is now guarded by an in-memory merge
+policy, continuity quality checks, and injected context budget/dedupe. Latest
+pending checkpoint facts win, stale checkpoints are blocked, stable survivor
+labels can carry forward, and state is consumed only after a safe budgeted
+context is ready.
+
+Recommended next route: Route 80 project memory candidate extraction.
 
 ## Non-Goals
 
@@ -269,8 +275,8 @@ Route 75 does not implement:
 
 - Runtime history compaction remains separate from the preview-only handoff
   command.
-- Future-turn injection is operational but has not yet had quality/merge
-  hardening across repeated compaction and long-session coherence.
+- Future-turn injection has focused quality/merge hardening, but durable memory
+  extraction and ranking remain separate future work.
 - Future command polish may add richer arguments, but should keep mutation,
   persistence, provider/model calls, and recovery execution out of the default
   command path.
