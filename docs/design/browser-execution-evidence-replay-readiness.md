@@ -202,3 +202,13 @@ runner execution. Replay readiness can become `replay-ready` only for executed,
 safe, local-fixture skill actions with complete sandbox, allowlist, and
 confirmation decisions. Missing binding still reports `replay-needs-skill-runner`;
 unsafe or malformed skill output remains blocked and never triggers replay.
+
+## Route 107 Explicit Replay Note
+
+Route 107 turns replay readiness into an explicit local/test replay prototype.
+Replay-ready receipts can produce in-memory cache entries, but replay still
+requires `/browser replay <receipt-id>` plus current runner, sandbox,
+allowlist, confirmation, and binding revalidation. Replay-generated receipts
+link back to the source receipt/cache entry and use source `replay`; no
+automatic replay, persistent cache, external network, provider/model call, MCP
+launch, or raw evidence surface is added.

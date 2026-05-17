@@ -513,3 +513,14 @@ context persistence and startup/model injection: no dynamic discovery, MCP
 launch, Playwright dependency, external network, provider/model call,
 SessionManager schema change, memory persistence behavior change, automatic
 recovery, atomic rollback, or raw skill/page output is added.
+
+## Route 107 Explicit Replay Note
+
+Route 107 adds an explicit in-memory browser action cache and replay prototype
+for replay-ready local/test receipts. Replay cache entries are safe summaries
+derived from receipts, and replay execution requires an explicit command plus
+current runner/gate revalidation. It remains outside context persistence and
+startup/model injection: no automatic replay, persistent cache, external
+network, dynamic discovery, MCP launch, provider/model call, SessionManager
+schema change, automatic recovery, atomic rollback, or raw browser evidence is
+added.

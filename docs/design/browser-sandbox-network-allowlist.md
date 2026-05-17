@@ -264,3 +264,12 @@ whose metadata and binding preserve `local-fixture-no-network`, allowlist
 targets remain blocked, and unsafe capability claims, arbitrary JavaScript,
 auth/payment/destructive actions, file upload/download, screenshot/OCR, MCP
 launch, provider/model calls, and raw runner/page output remain out of scope.
+
+## Route 107 Explicit Replay Note
+
+Route 107 replay revalidates sandbox authority, network allowlist, and
+confirmation records before execution. A cached receipt snapshot is not replay
+authority. Replay remains limited to local-fixture observe/extract/local
+navigate, and external URLs, auth/payment/destructive actions, upload/download,
+screenshot/OCR, arbitrary JavaScript, MCP launch, provider/model calls, and raw
+runner/page output remain blocked.

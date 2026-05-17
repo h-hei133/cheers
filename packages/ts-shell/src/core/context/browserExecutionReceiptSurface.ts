@@ -13,6 +13,7 @@ export function renderBrowserExecutionReceiptSurface(
     `- Mode: ${receipt.executionMode}`,
     `- Runner: ${sanitizeBrowserText(`${receipt.runnerId} (${receipt.runnerSource})`, 160)}`,
     `- Skill runner: ${receipt.skillRunnerId ? `${sanitizeBrowserText(receipt.skillRunnerId, 120)} (${receipt.skillRunnerStatus ?? "unknown"})` : "none"}`,
+    `- Replay source: ${receipt.replaySourceReceiptId ? `${sanitizeBrowserText(receipt.replaySourceReceiptId, 140)} via ${sanitizeBrowserText(receipt.replayCacheEntryId ?? "unknown-cache", 140)}` : "none"}`,
     `- Evidence summary: ${evidenceSummary(receipt)}`,
     `- Replay readiness: ${receipt.replayReadiness.status}`,
     `- Redactions/warnings: ${redactionsAndWarnings(receipt)}`,

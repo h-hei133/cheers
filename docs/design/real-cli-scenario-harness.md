@@ -209,3 +209,13 @@ summarize skill id, binding mode, receipt status, and replay readiness without
 raw runner stdout/stderr, raw manifest content, raw page content, secrets,
 network access, MCP launch, provider/model calls, or cross-process sidebar
 persistence.
+
+## Route 107 Explicit Replay Note
+
+Route 107 uses in-process harness scenarios for execute-then-replay because the
+action cache is intentionally in-memory and non-persistent. CLI command
+coverage can assert `/browser replay status` and argument behavior, but
+cross-process replay continuity is deferred unless a future route explicitly
+adds safe persistence. Reports summarize replay source/new receipt state
+without raw runner stdout/stderr, raw manifest content, raw page content, or
+secrets.

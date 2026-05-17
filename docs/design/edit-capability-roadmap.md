@@ -1551,6 +1551,14 @@ Allowed after this document:
   change, external network, provider/model call, persistent browser session,
   CLI lifecycle rewrite, SessionManager schema change, automatic recovery,
   rollback, or default mutation readiness.
+- Route 107 browser/tooling work adds receipt-backed in-memory browser action
+  cache entries and explicit local/test replay behind current runner, sandbox,
+  allowlist, and confirmation revalidation. It remains outside edit runtime,
+  with no automatic replay, cache persistence, external network, dynamic
+  discovery, MCP launch, Playwright dependency, package/default gate change,
+  provider/model call, persistent browser session, CLI lifecycle rewrite,
+  SessionManager schema change, automatic recovery, rollback, or default
+  mutation readiness.
 
 Forbidden after this document:
 
@@ -1568,12 +1576,12 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 107 recommendation: choose browser action cache/replay design if
-skill-managed local/test execution stays stable, choose browser runner
-UX/report polish if receipt output needs more compression, or choose
-skill-managed runner packaging/registry only if explicit binding remains too
-manual. Do not treat
+Route 108 recommendation: choose browser replay UX/report polish if explicit
+replay output needs compression, choose browser action self-healing design if
+Stagehand-like repair should be scoped, choose external-network browser
+execution only after local replay receipts remain stable, or choose persistent
+action cache decision only if safe persistence becomes necessary. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
 Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, Route 104, or
-Route 105, or Route 106 as edit-capability expansions.
+Route 105, Route 106, or Route 107 as edit-capability expansions.

@@ -275,3 +275,12 @@ readiness. Missing binding, invalid metadata, timeout, malformed response, and
 unsafe output remain warning/blocker summaries. No sidebar persistence, raw
 runner output, MCP launch, provider/model call, dynamic discovery, or
 startup/model injection is added.
+
+## Route 107 Explicit Replay Note
+
+Route 107 labels `/browser replay ...` command output as `Browser replay` on
+the existing sanitized command-result event path. Replay success and replay
+blocked states summarize source receipt, cache entry, revalidation status, new
+receipt id, and executed yes/no. No sidebar persistence, raw evidence, dynamic
+discovery, MCP launch, provider/model call, automatic replay, or startup/model
+injection is added.

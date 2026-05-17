@@ -26,6 +26,7 @@ export type BrowserExecutionReceiptStatus =
 export type BrowserExecutionReceiptSource =
   | "external-runner"
   | "skill-managed"
+  | "replay"
   | "local-fixture"
   | "fake-test"
   | "playwright-local-unavailable"
@@ -48,6 +49,9 @@ export interface BrowserExecutionReceipt {
   readonly fixtureId: string;
   readonly skillRunnerId?: string;
   readonly skillRunnerStatus?: string;
+  readonly replaySourceReceiptId?: BrowserExecutionReceiptId;
+  readonly replayCacheEntryId?: string;
+  readonly replayedFromSource?: BrowserExecutionReceiptSource;
   readonly sandboxDecision: string;
   readonly allowlistDecision: string;
   readonly confirmationDecision: string;
@@ -68,6 +72,8 @@ export function createBrowserExecutionReceipt(input: {
   readonly executorResult: BrowserExecutorResult;
   readonly skillRunnerMetadata?: BrowserSkillRunnerMetadata;
   readonly skillRunnerReadiness?: BrowserSkillRunnerReadiness;
+  readonly replaySourceReceipt?: BrowserExecutionReceipt;
+  readonly replayCacheEntryId?: string;
   readonly now?: () => string;
 }): BrowserExecutionReceipt {
   const evidenceBundle = createBrowserEvidenceBundle({
@@ -104,7 +110,7 @@ export function createBrowserExecutionReceipt(input: {
     version: "browser-execution-receipt/v1",
     createdAt: input.now?.() ?? "2026-05-17T00:00:00.000Z",
     status,
-    source: receiptSource(input.executorResult),
+    source: input.replaySourceReceipt ? "replay" : receiptSource(input.executorResult),
     visibility: "user-visible",
     actionKind: input.request.actionKind,
     executionMode: input.request.mode,
@@ -117,6 +123,9 @@ export function createBrowserExecutionReceipt(input: {
       ? sanitizeBrowserText(input.skillRunnerMetadata.runnerId, 120)
       : undefined,
     skillRunnerStatus: input.skillRunnerReadiness?.status,
+    replaySourceReceiptId: input.replaySourceReceipt?.receiptId,
+    replayCacheEntryId: input.replayCacheEntryId,
+    replayedFromSource: input.replaySourceReceipt?.source,
     sandboxDecision: sanitizeBrowserText(sandboxDecision, 120),
     allowlistDecision: sanitizeBrowserText(allowlistDecision, 120),
     confirmationDecision: sanitizeBrowserText(confirmationDecision, 120),

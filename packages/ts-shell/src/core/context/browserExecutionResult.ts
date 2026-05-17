@@ -28,6 +28,8 @@ export function createBrowserExecutionResult(input: {
   readonly executorResult: BrowserExecutorResult;
   readonly skillRunnerMetadata?: BrowserSkillRunnerMetadata;
   readonly skillRunnerReadiness?: BrowserSkillRunnerReadiness;
+  readonly replaySourceReceipt?: BrowserExecutionReceipt;
+  readonly replayCacheEntryId?: string;
   readonly now?: () => string;
 }): BrowserExecutionResult {
   const receipt = createBrowserExecutionReceipt({
@@ -36,6 +38,8 @@ export function createBrowserExecutionResult(input: {
     executorResult: input.executorResult,
     skillRunnerMetadata: input.skillRunnerMetadata,
     skillRunnerReadiness: input.skillRunnerReadiness,
+    replaySourceReceipt: input.replaySourceReceipt,
+    replayCacheEntryId: input.replayCacheEntryId,
     now: input.now,
   });
   return {

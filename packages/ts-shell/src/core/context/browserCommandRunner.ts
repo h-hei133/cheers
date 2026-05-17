@@ -13,11 +13,13 @@ import {
   runBrowserExecutionCommand,
   type BrowserExecutionCommandRunResult,
 } from "./browserExecutionCommandRunner.js";
+import type { BrowserActionCache } from "./browserActionCache.js";
 import type { BrowserExecutor } from "./browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
 import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
 import { renderBrowserSkillRunnerSurface } from "./browserSkillRunnerSurface.js";
+import { runBrowserReplayCommand } from "./browserReplayCommandRunner.js";
 
 export interface BrowserCommandRunResult {
   readonly output: string;
@@ -102,6 +104,7 @@ export async function runBrowserCommandAsync(input: {
   readonly browserNetworkAllowlist?: BrowserNetworkAllowlist;
   readonly browserExecutionConfirmations?: readonly BrowserExecutionConfirmationRecord[];
   readonly browserCliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary;
+  readonly browserActionCache?: BrowserActionCache;
   readonly now?: () => string;
 }): Promise<BrowserCommandRunResult | BrowserExecutionCommandRunResult> {
   if (input.contract.mode === "execute") {
@@ -119,6 +122,32 @@ export async function runBrowserCommandAsync(input: {
     }
     return runBrowserExecutionCommand({
       request: input.contract.execution,
+      executor: input.browserExecutor,
+      sandboxAuthority: input.browserSandboxAuthority,
+      networkAllowlist: input.browserNetworkAllowlist,
+      confirmations: input.browserExecutionConfirmations,
+      cliExecutionBridgeSummary: input.browserCliExecutionBridgeSummary,
+      actionCache: input.browserActionCache,
+      now: input.now,
+    });
+  }
+  if (input.contract.mode === "replay") {
+    if (!input.contract.replay) {
+      return {
+        output: [
+          "Browser replay",
+          "Result",
+          "- Outcome: blocked",
+          "- BlockerKind: invalid-browser-replay",
+          "- Reason: Missing browser replay request.",
+          "- DoNext: Use /browser replay status or /browser replay <receipt-id>.",
+        ].join("\n"),
+        evidence: ["browser-command-runner:missing-replay-request"],
+      };
+    }
+    return runBrowserReplayCommand({
+      request: input.contract.replay,
+      actionCache: input.browserActionCache,
       executor: input.browserExecutor,
       sandboxAuthority: input.browserSandboxAuthority,
       networkAllowlist: input.browserNetworkAllowlist,

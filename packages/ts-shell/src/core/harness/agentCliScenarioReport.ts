@@ -37,7 +37,7 @@ function summarizeBrowserExecutionEvidence(
 ): string {
   const outputs = result.steps
     .map((step) => step.process.output.combined)
-    .filter((output) => /Browser execution/i.test(output));
+    .filter((output) => /Browser execution|Browser replay/i.test(output));
   if (outputs.length === 0) {
     return "none";
   }
@@ -50,6 +50,7 @@ function summarizeBrowserExecutionEvidence(
   const validManifest = outputs.some((output) => /Manifest status:\s*valid/i.test(output));
   const missingManifest = outputs.some((output) => /Manifest status:\s*missing/i.test(output));
   const receipt = outputs.find((output) => /Browser execution receipt/i.test(output));
+  const replay = outputs.find((output) => /Browser replay/i.test(output));
   const receiptStatus = receipt?.match(/^- Status:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
   const replayReadiness = receipt?.match(/^- Replay readiness:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
   const skillMetadata = outputs.some((output) => /Skill-managed browser runner/i.test(output));
@@ -69,6 +70,7 @@ function summarizeBrowserExecutionEvidence(
     `manifest=${validManifest ? "valid" : invalidManifest ? "invalid" : missingManifest ? "missing" : "unknown"}`,
     `receipt=${receiptStatus}`,
     `replay=${replayReadiness}`,
+    `replayCommand=${replay ? replay.match(/^- Replay status:\s*(.+)$/im)?.[1]?.trim() ?? "present" : "none"}`,
     `skill=${skillMetadata ? skillReadiness : "none"}`,
     `binding=${skillBinding}`,
     `dependency=${dependencyDecision}`,

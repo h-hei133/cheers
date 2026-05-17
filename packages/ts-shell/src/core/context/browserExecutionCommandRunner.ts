@@ -28,6 +28,7 @@ import {
   hasBrowserSkillExecutionEvidence,
   renderBrowserSkillExecutionSurface,
 } from "./browserSkillExecutionSurface.js";
+import type { BrowserActionCache } from "./browserActionCache.js";
 
 export interface BrowserExecutionCommandRunResult {
   readonly output: string;
@@ -41,6 +42,7 @@ export async function runBrowserExecutionCommand(input: {
   readonly networkAllowlist?: BrowserNetworkAllowlist;
   readonly confirmations?: readonly BrowserExecutionConfirmationRecord[];
   readonly cliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary;
+  readonly actionCache?: BrowserActionCache;
   readonly now?: () => string;
 }): Promise<BrowserExecutionCommandRunResult> {
   const executor = input.executor ?? NOOP_BROWSER_EXECUTOR;
@@ -88,6 +90,9 @@ export async function runBrowserExecutionCommand(input: {
     skillRunnerReadiness: input.cliExecutionBridgeSummary?.skillRunnerReadiness,
     now: input.now,
   });
+  const cacheResult = result.receipt.replayReadiness.status === "replay-ready"
+    ? input.actionCache?.addReceipt(result.receipt)
+    : undefined;
   return {
     output: [
       renderBrowserExecutionSurface(result),
@@ -118,11 +123,22 @@ export async function runBrowserExecutionCommand(input: {
       }),
       "",
       renderBrowserCliExecutionBridgeSummary(input.cliExecutionBridgeSummary),
+      ...(input.actionCache
+        ? [
+            "",
+            "Browser action cache",
+            `- Cache write: ${cacheResult?.ok ? "yes" : "no"}`,
+            `- Cache status: ${result.receipt.replayReadiness.status}`,
+            "- Persistence: none",
+            "- Automatic replay: no",
+          ]
+        : []),
     ].join("\n"),
     evidence: [
       ...result.evidence,
       ...preflight.evidence,
       ...(input.cliExecutionBridgeSummary?.evidence ?? []),
+      ...(cacheResult?.ok ? cacheResult.evidence : []),
       "browser-execution-command-runner:non-default",
       "browser-execution-command-runner:no-mcp-launch",
       "browser-execution-command-runner:no-provider-or-model-call",

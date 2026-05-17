@@ -164,6 +164,9 @@ function titleForCommand(
     if (subcommand === "execute") {
       return "Browser execution";
     }
+    if (subcommand === "replay") {
+      return "Browser replay";
+    }
     return "Browser status";
   }
   if (family === "sidebar") {

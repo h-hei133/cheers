@@ -127,3 +127,12 @@ skill execution needs stronger replay semantics.
 Alternative Route 107: skill-managed browser runner UX/report polish if the
 new execution surface is too verbose, or external-network browser execution
 design only after local/test skill execution remains stable.
+
+## Route 107 Explicit Replay Note
+
+Route 107 adds receipt-backed action cache entries and explicit replay for
+local/test skill-managed receipts. Skill-managed replay still requires a
+current explicit binding, current sandbox/allowlist/confirmation records, and a
+replay-ready source receipt. It adds no automatic replay, cache persistence,
+dynamic discovery, MCP launch, provider/model call, external network, package
+change, or raw skill/page output.

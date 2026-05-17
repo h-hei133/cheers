@@ -233,3 +233,11 @@ runner only`, no MCP launch, and no provider/model call. The harness remains an
 evidence/assertion layer; temp runner processes belong to scenario fixtures and
 do not add dynamic discovery, browser runtime ownership, persistence, or raw
 runner output reporting.
+
+## Route 107 Explicit Replay Note
+
+Route 107 adds replay scenarios as evidence-only harness coverage. The harness
+can run execute-then-replay in process with an explicit in-memory cache and
+current runner context, and it can report replay status safely. It does not add
+browser runtime ownership, cross-process cache persistence, automatic replay,
+dynamic discovery, MCP launch, provider/model calls, or raw runner output.

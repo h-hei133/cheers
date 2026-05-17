@@ -213,3 +213,11 @@ and an explicit matching binding before an executor is constructed. Metadata
 alone still reports `future-execution-required`, and the bridge adds no dynamic
 discovery, MCP launch, Playwright dependency, provider/model call, external
 network, default execution, persistent browser session, or raw runner output.
+
+## Route 107 Explicit Replay Note
+
+Route 107 adds replay on top of receipt-backed cache entries for both raw
+external-runner and skill-managed local/test paths. Replay reuses the current
+explicit runner bridge only after current gates are revalidated; it does not
+persist cache entries, infer runner authority from old receipts, launch MCP,
+use external network, call providers/models, or expose raw runner output.
