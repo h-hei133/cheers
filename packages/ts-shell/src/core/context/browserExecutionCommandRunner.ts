@@ -5,6 +5,10 @@ import {
   type BrowserExecutor,
 } from "./browserExecutor.js";
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
+import {
+  renderBrowserCliExecutionBridgeSummary,
+  type BrowserCliExecutionBridgeSummary,
+} from "./browserCliExecutionBridge.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import { createBrowserExecutionResult } from "./browserExecutionResult.js";
 import { renderBrowserExecutionSurface } from "./browserExecutionSurface.js";
@@ -26,6 +30,7 @@ export async function runBrowserExecutionCommand(input: {
   readonly sandboxAuthority?: BrowserSandboxAuthority;
   readonly networkAllowlist?: BrowserNetworkAllowlist;
   readonly confirmations?: readonly BrowserExecutionConfirmationRecord[];
+  readonly cliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary;
   readonly now?: () => string;
 }): Promise<BrowserExecutionCommandRunResult> {
   const executor = input.executor ?? NOOP_BROWSER_EXECUTOR;
@@ -71,10 +76,13 @@ export async function runBrowserExecutionCommand(input: {
       renderBrowserSandboxSurface(preflight, result.executed),
       "",
       renderBrowserExecutionLifecycleSurface({ result, preflight }),
+      "",
+      renderBrowserCliExecutionBridgeSummary(input.cliExecutionBridgeSummary),
     ].join("\n"),
     evidence: [
       ...result.evidence,
       ...preflight.evidence,
+      ...(input.cliExecutionBridgeSummary?.evidence ?? []),
       "browser-execution-command-runner:non-default",
       "browser-execution-command-runner:no-mcp-launch",
       "browser-execution-command-runner:no-provider-or-model-call",

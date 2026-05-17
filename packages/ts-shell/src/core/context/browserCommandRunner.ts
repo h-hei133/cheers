@@ -3,6 +3,7 @@ import { renderBrowserActionPreview } from "./browserActionPreview.js";
 import { createBrowserCapabilityState, type BrowserCapabilityState } from "./browserCapabilityModel.js";
 import { renderBrowserCapabilitySurface } from "./browserCapabilitySurface.js";
 import type { BrowserCommandContract } from "./browserCommandContract.js";
+import type { BrowserCliExecutionBridgeSummary } from "./browserCliExecutionBridge.js";
 import { runBrowserDryRunHarness } from "./browserDryRunHarness.js";
 import { renderBrowserDryRunSurface } from "./browserDryRunSurface.js";
 import {
@@ -84,6 +85,7 @@ export async function runBrowserCommandAsync(input: {
   readonly browserSandboxAuthority?: BrowserSandboxAuthority;
   readonly browserNetworkAllowlist?: BrowserNetworkAllowlist;
   readonly browserExecutionConfirmations?: readonly BrowserExecutionConfirmationRecord[];
+  readonly browserCliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary;
   readonly now?: () => string;
 }): Promise<BrowserCommandRunResult | BrowserExecutionCommandRunResult> {
   if (input.contract.mode === "execute") {
@@ -105,6 +107,7 @@ export async function runBrowserCommandAsync(input: {
       sandboxAuthority: input.browserSandboxAuthority,
       networkAllowlist: input.browserNetworkAllowlist,
       confirmations: input.browserExecutionConfirmations,
+      cliExecutionBridgeSummary: input.browserCliExecutionBridgeSummary,
       now: input.now,
     });
   }

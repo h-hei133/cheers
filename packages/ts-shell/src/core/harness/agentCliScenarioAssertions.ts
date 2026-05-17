@@ -33,6 +33,8 @@ export function evaluateAgentCliAssertion(input: {
       return passIf(assertion, process.output.combinedLineCount <= (assertion.maxLines ?? 0), `Output exceeded ${assertion.maxLines ?? 0} lines.`);
     case "executed-no":
       return passIf(assertion, /Executed:\s*no/i.test(output), "Command did not report Executed: no.");
+    case "executed-yes":
+      return passIf(assertion, /Executed:\s*yes/i.test(output), "Command did not report Executed: yes.");
     case "browser-execution-blocked":
       return passIf(assertion, /Browser execution/i.test(output) && /Outcome:\s*blocked/i.test(output), "Browser execution was not blocked.");
     case "sidebar-panel-exists":
@@ -124,7 +126,18 @@ function hasNoProviderBrowserNetworkEvidence(value: string): boolean {
       return false;
     }
   }
-  return !/executed:\s*yes|browser process:\s*(launched|started)|real browser execution:\s*yes/i.test(value);
+  const localFixtureExecution =
+    /Mode:\s*local-fixture/i.test(value) &&
+    /Browser process:\s*local fixture only/i.test(value) &&
+    /MCP discovery\/launch:\s*none/i.test(value) &&
+    /Provider\/model call:\s*none/i.test(value);
+  if (/browser process:\s*(launched|started)|real browser execution:\s*yes/i.test(value)) {
+    return false;
+  }
+  if (/executed:\s*yes/i.test(value) && !localFixtureExecution) {
+    return false;
+  }
+  return true;
 }
 
 function requiredText(assertion: AgentCliAssertion): string {

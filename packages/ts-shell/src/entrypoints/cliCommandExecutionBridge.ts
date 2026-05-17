@@ -1,4 +1,6 @@
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
+import { createBrowserCliExecutionBridge } from "../core/context/browserCliExecutionBridge.js";
+import { loadBrowserCliExecutorInjectionFromEnv } from "../core/context/browserCliExecutorInjection.js";
 import type { CompactInjectionStateStore } from "../core/context/compactInjectionState.js";
 import type { CompactLiveCheckpointStore } from "../core/context/compactLiveCheckpoint.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
@@ -23,6 +25,7 @@ export interface BuildCliCommandExecutionInput {
   readonly sessionId?: string;
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
+  readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
 export interface CliCommandExecutionBridge {
@@ -50,11 +53,15 @@ export async function buildCliCommandExecution(
     return { kind: "handled" };
   }
 
+  const browserCliExecutionBridge = createBrowserCliExecutionBridge(
+    loadBrowserCliExecutorInjectionFromEnv({ env: input.env }),
+  );
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
     cwd: input.cwd,
     sessionId: input.sessionId,
     compactCheckpointStore: input.compactCheckpointStore,
     compactInjectionStateStore: input.compactInjectionStateStore,
+    ...browserCliExecutionBridge,
   });
   if (slashResult?.kind === "local") {
     input.renderer.renderLine(

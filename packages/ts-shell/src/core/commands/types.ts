@@ -8,6 +8,7 @@ import type { BrowserExecutor } from '../context/browserExecutor.js'
 import type { BrowserExecutionConfirmationRecord } from '../context/browserExecutionConfirmation.js'
 import type { BrowserNetworkAllowlist } from '../context/browserNetworkAllowlist.js'
 import type { BrowserSandboxAuthority } from '../context/browserSandboxAuthority.js'
+import type { BrowserCliExecutionBridgeSummary } from '../context/browserCliExecutionBridge.js'
 import type { SidebarEventSink } from '../context/sidebarEventSink.js'
 import type { SidebarLiveEventStore } from '../context/sidebarLiveEventStore.js'
 
@@ -27,6 +28,7 @@ export interface CommandContext {
   readonly browserSandboxAuthority?: BrowserSandboxAuthority
   readonly browserNetworkAllowlist?: BrowserNetworkAllowlist
   readonly browserExecutionConfirmations?: readonly BrowserExecutionConfirmationRecord[]
+  readonly browserCliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary
   readonly sidebarEventSink?: SidebarEventSink
   readonly sidebarLiveEventStore?: SidebarLiveEventStore
 }

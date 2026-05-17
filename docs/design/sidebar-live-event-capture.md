@@ -227,3 +227,10 @@ fixture execution success is summarized as a `Browser execution` event with
 sanitized command output and lifecycle lines. The event store remains
 session-scoped and in-memory, with no raw browser payload, persistence, MCP
 launch, dynamic discovery, provider/model call, or startup/model injection.
+
+## Route 100 Real CLI Bridge Note
+
+Route 100 does not add cross-process sidebar persistence. Real CLI scenarios
+assert the sanitized command output and injection summary instead of forcing
+in-memory sidebar events to survive separate child processes. The existing
+in-process `/browser` command-result event path remains the sidebar model.

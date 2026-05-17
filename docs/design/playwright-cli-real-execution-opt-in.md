@@ -119,9 +119,12 @@ In-process scenario coverage proves:
 Real CLI scenario coverage proves:
 
 - default `/browser execute observe` remains blocked through the child process
+- Route 100 can explicitly inject a valid local-fixture manifest through the
+  CLI harness and execute observe/extract without launching Playwright, MCP,
+  providers, models, or network
 
-Local fixture execution through the real CLI is deferred because executor
-injection through CLI would require a new explicit bridge and lifecycle policy.
+Local fixture execution through the real CLI is now limited to the Route 100
+test-local manifest bridge. Real Playwright execution remains deferred.
 
 ## Blocked Until Later Routes
 
@@ -134,12 +137,13 @@ Still blocked:
 - persistent browser sessions
 - MCP launch or dynamic MCP discovery
 - provider/model calls
-- CLI executor injection bridge
+- real Playwright CLI execution bridge
 
 ## Route 100 Recommendation
 
-Choose Route 100 CLI executor injection bridge if local fixture execution needs
-to be proven through a real CLI child process.
+Route 100 adds the CLI executor injection bridge for local-fixture execution
+only. Choose Route 101 real Playwright CLI local-only execution only if the
+manifest bridge remains stable and lifecycle gates can stay explicit.
 
 Choose external-network browser execution opt-in only after local execution,
 redaction, lifecycle, and scenario evidence remain stable.

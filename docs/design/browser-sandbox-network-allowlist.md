@@ -209,3 +209,12 @@ executor. Read-only observe/extract can execute only when the executor and
 local-fixture authority are injected. External navigation remains blocked by
 the allowlist/preflight path; no external network, MCP launch, persistent
 browser session, provider/model call, or raw browser content is added.
+
+## Route 100 CLI Manifest Bridge Note
+
+Route 100 lets the real CLI harness inject that same local-fixture authority
+through a validated temp manifest. The manifest may list only
+`local-fixture://` origins and read-only local fixture actions. External URL
+navigation still blocks through existing preflight and confirmation gates, and
+the bridge adds no real browser process, MCP launch, network access,
+provider/model call, persistence, or raw browser content.

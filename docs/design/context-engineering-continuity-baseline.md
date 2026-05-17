@@ -413,6 +413,13 @@ adds no default browser execution, external-network browsing, MCP launch,
 provider/model call, persistent browser session, SessionManager schema change,
 startup/model auto-injection, memory persistence behavior change, CLI lifecycle
 rewrite, or raw content/secrets/hidden reasoning in evidence.
+Route 100 bridges that local-fixture path into the real CLI scenario harness
+through an explicit temp manifest env pointer. It still adds no default
+browser execution, real Playwright launch, MCP launch/discovery, network
+access, provider/model call, browser session persistence, SessionManager
+schema change, startup/model auto-injection, memory persistence behavior
+change, CLI lifecycle rewrite, or raw manifest/content/secrets/hidden
+reasoning in output.
 
 ## Residual Risks
 
@@ -452,7 +459,7 @@ lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   boundary, Route 94 non-executing browser dry-run planning, and Route 95
   scenario harness foundation, Route 96 non-default browser execution seam,
   Route 97 browser sandbox/allowlist preflight, Route 98 real CLI scenario
-  process evidence, and Route 99 local-fixture execution are now
-  machine-checkable enough to plan CLI executor injection, external browser
-  opt-in, sandbox lifecycle hardening,
+  process evidence, Route 99 local-fixture execution, and Route 100 real CLI
+  local-fixture injection are now machine-checkable enough to plan external
+  browser opt-in, sandbox lifecycle hardening,
   startup-read integration, or retrieval-quality work separately.

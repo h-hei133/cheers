@@ -1492,6 +1492,13 @@ Allowed after this document:
   MCP launch/discovery, provider/model calls, persistent browser session, CLI
   lifecycle rewrite, SessionManager schema change, automatic recovery,
   rollback, or default mutation readiness.
+- Route 100 browser/tooling work adds an explicit test-local manifest bridge
+  so the real CLI scenario harness can inject the local-fixture executor for
+  observe/extract success and external URL blocking evidence. It remains
+  outside edit runtime, adds no default browser execution, real Playwright
+  launch, MCP launch/discovery, network access, provider/model calls,
+  persistent browser session, CLI lifecycle rewrite, SessionManager schema
+  change, automatic recovery, rollback, or default mutation readiness.
 
 Forbidden after this document:
 
@@ -1509,11 +1516,11 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 100 recommendation: choose a CLI executor injection bridge if local
-fixture execution must be proven through a real CLI child process, external
-network browser execution opt-in only after local execution/redaction evidence
-stays stable, or browser action cache/replay design if repeatability should
-come before external network. Do not treat
+Route 101 recommendation: choose real Playwright CLI local-only execution only
+after the Route 100 manifest bridge stays stable, choose browser execution
+report hardening if CLI evidence needs more polish, or choose browser action
+cache/replay design if repeatability should come before external network. Do
+not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
-Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, or Route
-97, Route 98, or Route 99 as edit-capability expansions.
+Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
+Route 98, Route 99, or Route 100 as edit-capability expansions.

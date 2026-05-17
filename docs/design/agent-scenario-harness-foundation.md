@@ -176,3 +176,11 @@ Route 99 extends in-process scenarios to allow explicitly marked
 `browser-local-fixture-execution` evidence. This keeps local fixture execution
 separate from fake/test execution while preserving the default safety check
 that rejects unexpected `Executed: yes` browser claims.
+
+## Route 100 Real CLI Local Fixture Note
+
+Route 100 keeps the in-process harness unchanged and extends only the separate
+real CLI scenario harness with explicit local-fixture manifest injection. The
+shared CLI safety check now accepts `Executed: yes` only when the output also
+proves `Mode: local-fixture`, `Browser process: local fixture only`, no MCP
+launch, and no provider/model call.

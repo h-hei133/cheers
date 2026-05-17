@@ -83,6 +83,7 @@ export type AgentCliAssertionKind =
   | "output-has-section"
   | "output-line-count-under"
   | "executed-no"
+  | "executed-yes"
   | "browser-execution-blocked"
   | "sidebar-panel-exists"
   | "no-raw-content-or-secrets"

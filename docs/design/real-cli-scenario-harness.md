@@ -149,3 +149,12 @@ observe` path. Local-fixture execution is covered in-process because injecting
 a non-default browser executor through the CLI requires a dedicated bridge and
 lifecycle policy. That bridge is the recommended Route 100 path if CLI-level
 local execution evidence becomes the next blocker.
+
+## Route 100 Local Fixture CLI Bridge Note
+
+Route 100 adds explicit test-local manifest env support for browser CLI
+scenarios. The harness can write a temp local-fixture manifest, pass only its
+path to the child process, and assert observe/extract success plus external
+URL blocking through the real CLI. Reports remain summarized and sanitized; no
+raw manifest content, provider/model call, browser launch, MCP launch, network
+access, or SessionManager schema change is added.
