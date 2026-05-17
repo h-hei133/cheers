@@ -174,3 +174,11 @@ output and extends browser execution reports with a compact dependency field.
 The harness still records summarized process evidence only; it does not install
 Playwright, launch a browser, launch MCP, call providers/models, or persist
 cross-process sidebar state.
+
+## Route 103 External Runner Scenario Note
+
+Route 103 extends the real CLI scenario harness with temp external runner
+scripts and manifests. Scenarios cover default blocked, observe/extract
+success, external URL blocked, malformed response, timeout, and unsafe output.
+Reports remain summarized: they include runner mode/source/status but not raw
+stdout/stderr, raw manifest content, raw page content, or secrets.

@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { createBrowserCliExecutionBridge } from "./browserCliExecutionBridge.js";
 import {
+  BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV,
   BROWSER_CLI_LOCAL_FIXTURE_MANIFEST_ENV,
   loadBrowserCliExecutorInjectionFromEnv,
 } from "./browserCliExecutorInjection.js";
+import {
+  createBrowserExternalRunnerManifest,
+  serializeBrowserExternalRunnerManifest,
+} from "./browserExternalRunnerManifest.js";
 import {
   createBrowserLocalFixtureManifest,
   serializeBrowserLocalFixtureManifest,
@@ -71,5 +76,46 @@ describe("browser CLI execution bridge", () => {
     expect(bridge.browserCliExecutionBridgeSummary.evidence).toContain(
       "browser-cli-execution-bridge:playwright-local-requested",
     );
+  });
+
+  it("constructs external runner executor context only for an explicit runner manifest", async () => {
+    const manifest = createBrowserExternalRunnerManifest({
+      runnerCommand: {
+        command: process.execPath,
+        args: ["/tmp/route103-runner.cjs"],
+      },
+    });
+    const bridge = createBrowserCliExecutionBridge(
+      loadBrowserCliExecutorInjectionFromEnv({
+        env: { [BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV]: "/tmp/external-runner.json" },
+        readFile: () => serializeBrowserExternalRunnerManifest(manifest),
+      }),
+    );
+
+    expect(bridge.browserExecutor?.kind).toBe("external-runner");
+    expect(bridge.browserSandboxAuthority?.mode).toBe("local-fixture");
+    expect(bridge.browserCliExecutionBridgeSummary.executionMode).toBe("test-local");
+    expect(bridge.browserCliExecutionBridgeSummary.evidence).toContain(
+      "browser-cli-execution-bridge:external-runner-created",
+    );
+  });
+
+  it("keeps skill-managed manifests as an explicit future policy boundary", async () => {
+    const manifest = createBrowserExternalRunnerManifest({
+      source: "skill-managed",
+      runnerMode: "skill-managed",
+      runnerId: "skill:browser-runner",
+      runnerRef: "skill:browser-runner",
+    });
+    const bridge = createBrowserCliExecutionBridge(
+      loadBrowserCliExecutorInjectionFromEnv({
+        env: { [BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV]: "/tmp/skill-runner.json" },
+        readFile: () => serializeBrowserExternalRunnerManifest(manifest),
+      }),
+    );
+
+    expect(bridge.browserExecutor?.kind).toBe("external-runner");
+    expect(bridge.browserCliExecutionBridgeSummary.executionMode).toBe("skill-managed");
+    expect(bridge.browserCliExecutionBridgeSummary.externalRunnerStatus).toBe("future-skill-required");
   });
 });

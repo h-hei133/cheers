@@ -7,7 +7,7 @@ describe("browser external runner policy", () => {
 
     expect(decision.status).toBe("blocked-missing-config");
     expect(decision.allowed).toBe(false);
-    expect(decision.evidence).toContain("browser-external-runner-policy:no-process-spawn");
+    expect(decision.evidence).toContain("browser-external-runner-policy:no-default-process-spawn");
   });
 
   it("allows explicit local/test manifest config", () => {

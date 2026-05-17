@@ -5,7 +5,8 @@ export type BrowserExecutorKind =
   | "fake-test"
   | "local-fixture"
   | "playwright-local"
-  | "explicit-local";
+  | "explicit-local"
+  | "external-runner";
 export type BrowserExecutorStatus = "executed" | "blocked" | "failed" | "skipped";
 
 export interface BrowserExecutorContext {

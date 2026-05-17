@@ -112,7 +112,7 @@ function decision(
     evidence: [
       `browser-external-runner-policy:decision:${status}`,
       "browser-external-runner-policy:disabled-by-default",
-      "browser-external-runner-policy:no-process-spawn",
+      "browser-external-runner-policy:no-default-process-spawn",
       "browser-external-runner-policy:no-external-network",
       "browser-external-runner-policy:no-raw-config",
     ],

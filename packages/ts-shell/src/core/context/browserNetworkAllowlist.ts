@@ -130,7 +130,12 @@ export function decideBrowserNetworkAllowlist(input: {
   }
   if (!target.scheme || !["https", "http"].includes(target.scheme)) {
     if (
-      (input.request.mode === "local-fixture" || input.request.mode === "playwright-local") &&
+      (
+        input.request.mode === "local-fixture" ||
+        input.request.mode === "playwright-local" ||
+        input.request.mode === "test-local" ||
+        input.request.mode === "external-local"
+      ) &&
       target.scheme === "local-fixture"
     ) {
       return decision("allowed", target, allowlist, {

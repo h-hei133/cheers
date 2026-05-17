@@ -1516,6 +1516,15 @@ Allowed after this document:
   external network, MCP launch/discovery, provider/model calls, persistent
   browser session, CLI lifecycle rewrite, SessionManager schema change,
   automatic recovery, rollback, or default mutation readiness.
+- Route 103 browser/tooling work adds an explicit manifest-scoped external
+  runner protocol, manifest validator, skill-managed policy boundary, process
+  adapter, executor, surface, CLI bridge integration, sidebar/report
+  summaries, and real CLI scenarios for success, malformed response, timeout,
+  unsafe output, and external URL blocking. It remains outside edit runtime,
+  adds no package dependency, default browser execution, external network, MCP
+  launch/discovery, provider/model calls, persistent browser session, CLI
+  lifecycle rewrite, SessionManager schema change, automatic recovery,
+  rollback, or default mutation readiness.
 
 Forbidden after this document:
 
@@ -1533,12 +1542,12 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 103 recommendation: choose a browser external runner / skill-managed
-execution bridge if local Playwright execution should advance without package
-mutation, choose browser execution report hardening if CLI evidence needs more
-polish, or choose browser action cache/replay design if repeatability should
-come before external network. Do not treat
+Route 104 recommendation: choose browser external runner evidence/report
+hardening if CLI evidence needs more polish, choose skill-managed runner
+metadata prototype if the skill-managed boundary should become real, or choose
+browser action cache/replay design if repeatability should come before
+external network. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
-Route 98, Route 99, Route 100, Route 101, or Route 102 as edit-capability
-expansions.
+Route 98, Route 99, Route 100, Route 101, Route 102, or Route 103 as
+edit-capability expansions.

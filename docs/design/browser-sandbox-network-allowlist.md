@@ -234,3 +234,10 @@ runner policy surfaces. The chosen policy is external-runner-only; package
 dependency and browser binary install remain deferred. External runner config
 is allowed only when its allowlist is `none` and its scope is
 local-fixture-only.
+
+## Route 103 External Runner Bridge Note
+
+Route 103 lets `test-local` and `external-local` modes share the
+`local-fixture://` navigation exception, but only through a validated external
+runner manifest. HTTP/HTTPS targets remain blocked by the existing
+default-deny allowlist, so the bridge adds no external-network browsing.

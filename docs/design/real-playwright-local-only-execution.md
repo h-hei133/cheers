@@ -180,3 +180,11 @@ continues to report deterministic unavailable unless an explicit local/test
 runner is injected. `/browser status`, `/browser execute`, CLI bridge output,
 sidebar summaries, and scenario reports now surface the dependency decision
 and external runner policy.
+
+## Route 103 External Runner Bridge Note
+
+Route 103 keeps `playwright-local` unchanged and adds a separate external
+runner executor path. The new path can execute only through an explicit
+external-runner manifest and local/test process adapter; it still reports no
+browser process launch, no Playwright dependency, no MCP launch, no external
+network, and no raw page or runner content.

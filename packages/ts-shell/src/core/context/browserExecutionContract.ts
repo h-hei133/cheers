@@ -11,6 +11,9 @@ export type BrowserExecutionMode =
   | "local-fixture"
   | "playwright-local"
   | "explicit-local"
+  | "external-local"
+  | "skill-managed"
+  | "test-local"
   | "future-runtime";
 
 export type BrowserExecutionActionKind = Extract<

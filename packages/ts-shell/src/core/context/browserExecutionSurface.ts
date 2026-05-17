@@ -35,6 +35,9 @@ function browserProcessLabel(kind: BrowserExecutionResult["executorResult"]["exe
   if (kind === "playwright-local") {
     return "playwright local only";
   }
+  if (kind === "external-runner") {
+    return "not launched";
+  }
   return "not launched";
 }
 

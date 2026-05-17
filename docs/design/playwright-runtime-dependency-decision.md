@@ -174,3 +174,12 @@ Alternative next routes:
 - Playwright dependency integration only if package/runtime footprint becomes
   acceptable
 - browser action cache/replay design if local repeatability should come first
+
+## Route 103 External Runner Bridge Note
+
+Route 103 implements the external-runner bridge without changing the package
+decision. A validated manifest can point `/browser execute` at an explicit
+test/local runner process for local-fixture observe/extract evidence, while
+default execution, Playwright dependency, browser binary install, external
+network, MCP launch, provider/model calls, and raw runner output remain
+blocked.

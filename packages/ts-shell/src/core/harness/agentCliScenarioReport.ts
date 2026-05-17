@@ -45,6 +45,7 @@ function summarizeBrowserExecutionEvidence(
   const executedNo = outputs.some((output) => /Executed:\s*no/i.test(output));
   const localFixture = outputs.some((output) => /Mode:\s*local-fixture/i.test(output));
   const playwrightLocal = outputs.some((output) => /Mode:\s*playwright-local/i.test(output));
+  const externalRunner = outputs.some((output) => /Mode:\s*(test-local|external-local|skill-managed)/i.test(output));
   const invalidManifest = outputs.some((output) => /Manifest status:\s*invalid/i.test(output));
   const validManifest = outputs.some((output) => /Manifest status:\s*valid/i.test(output));
   const missingManifest = outputs.some((output) => /Manifest status:\s*missing/i.test(output));
@@ -54,7 +55,7 @@ function summarizeBrowserExecutionEvidence(
   return [
     "present",
     `executed=${executedYes ? "yes" : executedNo ? "no" : "unknown"}`,
-    `mode=${playwrightLocal ? "playwright-local" : localFixture ? "local-fixture" : "disabled"}`,
+    `mode=${externalRunner ? "external-runner" : playwrightLocal ? "playwright-local" : localFixture ? "local-fixture" : "disabled"}`,
     `manifest=${validManifest ? "valid" : invalidManifest ? "invalid" : missingManifest ? "missing" : "unknown"}`,
     `dependency=${dependencyDecision}`,
   ].join("; ");

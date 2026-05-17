@@ -151,3 +151,12 @@ sandbox authority, no external allowlist, and safe-summary evidence are
 allowed. The bridge summary now includes dependency decision and external
 runner policy, while still exposing no raw manifest content or default runner
 path.
+
+## Route 103 External Runner Manifest Note
+
+Route 103 adds a second explicit env pointer for external runner manifests:
+`PRIVATE_AGENTS_BROWSER_EXTERNAL_RUNNER_MANIFEST`. When present, the CLI bridge
+validates the manifest, creates an external runner executor, and keeps the
+same local-fixture sandbox and no-network allowlist. Missing or invalid
+manifests remain disabled/blocked, and local-fixture plus `playwright-local`
+manifest paths continue to work.

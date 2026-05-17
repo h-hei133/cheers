@@ -15,6 +15,7 @@ import {
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import { createBrowserExecutionResult } from "./browserExecutionResult.js";
 import { renderBrowserExecutionSurface } from "./browserExecutionSurface.js";
+import { renderBrowserExternalRunnerSurface } from "./browserExternalRunnerSurface.js";
 import { renderBrowserExecutionLifecycleSurface } from "./browserExecutionLifecycleSurface.js";
 import { decideBrowserExecutionPolicy } from "./browserExecutionPolicy.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
@@ -48,6 +49,8 @@ export async function runBrowserExecutionCommand(input: {
             ? "playwright-local"
           : executor.kind === "explicit-local"
             ? "explicit-local"
+          : executor.kind === "external-runner"
+            ? "test-local"
             : input.request.mode,
   } as BrowserExecutionRequest;
   const policy = decideBrowserExecutionPolicy({
@@ -77,6 +80,9 @@ export async function runBrowserExecutionCommand(input: {
   return {
     output: [
       renderBrowserExecutionSurface(result),
+      ...(executor.kind === "external-runner"
+        ? ["", renderBrowserExternalRunnerSurface(result)]
+        : []),
       "",
       renderBrowserSandboxSurface(preflight, result.executed),
       "",

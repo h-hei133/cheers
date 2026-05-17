@@ -437,6 +437,15 @@ network, MCP launch/discovery, provider/model call, browser session
 persistence, SessionManager schema change, startup/model auto-injection,
 memory persistence behavior change, CLI lifecycle rewrite, or raw runner
 config/content/secrets/hidden reasoning in output.
+Route 103 adds a manifest-scoped browser external runner bridge with protocol,
+manifest, skill-managed policy boundary, process adapter, executor, surface,
+CLI bridge integration, sidebar-safe summaries, and real CLI scenarios for
+success/block/failure cases. It still adds no Playwright dependency, default
+browser execution, external network, MCP launch/discovery, provider/model
+call, persistent browser session, SessionManager schema change,
+startup/model auto-injection, memory persistence behavior change, CLI
+lifecycle rewrite, or raw runner/page content/secrets/hidden reasoning in
+output.
 
 ## Residual Risks
 
@@ -478,7 +487,8 @@ lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   Route 97 browser sandbox/allowlist preflight, Route 98 real CLI scenario
   process evidence, Route 99 local-fixture execution, Route 100 real CLI
   local-fixture injection, Route 101 Playwright local unavailable/bridge
-  hardening, and Route 102 external-runner-only dependency policy are now
+  hardening, Route 102 external-runner-only dependency policy, and Route 103
+  manifest-scoped external runner bridge are now
   machine-checkable enough to plan skill-managed runner bridges, external
   browser opt-in, sandbox lifecycle hardening,
   startup-read integration, or retrieval-quality work separately.

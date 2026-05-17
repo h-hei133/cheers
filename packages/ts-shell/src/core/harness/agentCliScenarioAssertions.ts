@@ -136,10 +136,16 @@ function hasNoProviderBrowserNetworkEvidence(value: string): boolean {
     /Browser process:\s*playwright local only/i.test(value) &&
     /MCP discovery\/launch:\s*none/i.test(value) &&
     /Provider\/model call:\s*none/i.test(value);
+  const externalRunnerExecution =
+    /Mode:\s*(test-local|external-local|skill-managed)/i.test(value) &&
+    /External browser runner/i.test(value) &&
+    /Browser process:\s*not launched/i.test(value) &&
+    /MCP discovery\/launch:\s*none/i.test(value) &&
+    /Provider\/model call:\s*none/i.test(value);
   if (/browser process:\s*(launched|started)|real browser execution:\s*yes/i.test(value)) {
     return false;
   }
-  if (/executed:\s*yes/i.test(value) && !localFixtureExecution && !playwrightLocalExecution) {
+  if (/executed:\s*yes/i.test(value) && !localFixtureExecution && !playwrightLocalExecution && !externalRunnerExecution) {
     return false;
   }
   return true;

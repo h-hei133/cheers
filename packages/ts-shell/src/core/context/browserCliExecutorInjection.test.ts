@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV,
   BROWSER_CLI_LOCAL_FIXTURE_MANIFEST_ENV,
   loadBrowserCliExecutorInjectionFromEnv,
 } from "./browserCliExecutorInjection.js";
+import {
+  createBrowserExternalRunnerManifest,
+  serializeBrowserExternalRunnerManifest,
+} from "./browserExternalRunnerManifest.js";
 import {
   createBrowserLocalFixtureManifest,
   serializeBrowserLocalFixtureManifest,
@@ -50,6 +55,23 @@ describe("browser CLI executor injection loader", () => {
     expect(result.status).toBe("valid");
     expect(result.manifest?.executorMode).toBe("playwright-local");
     expect(result.evidence).toContain("browser-cli-executor-injection:test-local-only");
+  });
+
+  it("loads and validates an explicit external runner manifest", () => {
+    const manifest = createBrowserExternalRunnerManifest({
+      runnerCommand: {
+        command: process.execPath,
+        args: ["/tmp/route103-runner.cjs"],
+      },
+    });
+    const result = loadBrowserCliExecutorInjectionFromEnv({
+      env: { [BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV]: "/tmp/external-runner.json" },
+      readFile: () => serializeBrowserExternalRunnerManifest(manifest),
+    });
+
+    expect(result.status).toBe("valid");
+    expect(result.externalRunnerManifest?.runnerMode).toBe("test-local");
+    expect(result.evidence).toContain("browser-cli-executor-injection:external-runner-valid");
   });
 
   it("rejects missing and invalid manifests without leaking raw content", () => {

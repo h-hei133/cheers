@@ -200,3 +200,11 @@ Route 102 adds dependency-policy assertions to browser CLI scenarios:
 `playwright-local` output must explain the dependency decision, local-fixture
 execution remains unaffected, and report summaries include dependency state.
 This changes harness evidence only, not execution authority.
+
+## Route 103 External Runner Harness Note
+
+Route 103 extends the shared CLI safety check to recognize explicit external
+runner execution only when output proves `Mode: test-local` or
+`external-local`, `External browser runner`, `Browser process: not launched`,
+no MCP launch, and no provider/model call. The in-process harness remains
+unchanged; the real CLI harness owns temp runner process scenarios.

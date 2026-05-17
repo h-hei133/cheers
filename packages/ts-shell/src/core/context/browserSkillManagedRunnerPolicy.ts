@@ -1,0 +1,96 @@
+import type { BrowserExternalRunnerAction } from "./browserExternalRunnerProtocol.js";
+
+export interface BrowserSkillManagedRunnerMetadata {
+  readonly skillId: string;
+  readonly runnerCapability: "browser-external-runner";
+  readonly fixtureScope: "local-fixture-only";
+  readonly allowedActions: readonly BrowserExternalRunnerAction[];
+  readonly evidenceContract: "safe-summary-only";
+  readonly sandboxContract: "local-fixture-no-network";
+}
+
+export interface BrowserSkillManagedRunnerPolicy {
+  readonly dynamicDiscovery: "disabled";
+  readonly mcpLaunch: "none";
+  readonly execution: "metadata-only";
+}
+
+export type BrowserSkillManagedRunnerDecisionStatus =
+  | "allowed"
+  | "blocked-no-skill"
+  | "blocked-dynamic-discovery"
+  | "blocked-unsafe-scope"
+  | "future-skill-required";
+
+export interface BrowserSkillManagedRunnerDecision {
+  readonly status: BrowserSkillManagedRunnerDecisionStatus;
+  readonly allowed: boolean;
+  readonly reason: string;
+  readonly nextAction: string;
+  readonly evidence: readonly string[];
+  readonly warnings: readonly string[];
+}
+
+export function decideBrowserSkillManagedRunnerPolicy(input: {
+  readonly metadata?: BrowserSkillManagedRunnerMetadata;
+  readonly dynamicDiscoveryRequested?: boolean;
+} = {}): BrowserSkillManagedRunnerDecision {
+  if (input.dynamicDiscoveryRequested) {
+    return decision("blocked-dynamic-discovery", {
+      reason: "Skill-managed browser runner does not allow dynamic skill or MCP discovery.",
+      nextAction: "Provide explicit skill metadata in a route-scoped manifest.",
+      warnings: ["browser-skill-managed-runner-policy:dynamic-discovery-blocked"],
+    });
+  }
+  if (!input.metadata) {
+    return decision("future-skill-required", {
+      reason: "Skill-managed browser runner requires explicit future skill metadata.",
+      nextAction: "Keep skill-managed mode as a policy boundary until Route 104 supplies metadata.",
+    });
+  }
+  if (
+    input.metadata.runnerCapability !== "browser-external-runner" ||
+    input.metadata.fixtureScope !== "local-fixture-only" ||
+    input.metadata.evidenceContract !== "safe-summary-only" ||
+    input.metadata.sandboxContract !== "local-fixture-no-network"
+  ) {
+    return decision("blocked-unsafe-scope", {
+      reason: "Skill metadata must be local-fixture scoped with safe-summary evidence and no network.",
+      nextAction: "Use explicit local-fixture metadata before allowing skill-managed execution.",
+      warnings: ["browser-skill-managed-runner-policy:unsafe-scope"],
+    });
+  }
+  if (input.metadata.allowedActions.length === 0) {
+    return decision("blocked-no-skill", {
+      reason: "Skill metadata does not expose any safe browser runner actions.",
+      nextAction: "Declare observe/extract/navigate-local capability in explicit metadata.",
+    });
+  }
+  return decision("allowed", {
+    reason: "Explicit skill metadata satisfies the future skill-managed browser runner contract.",
+    nextAction: "Run only through a manifest-scoped local fixture runner.",
+  });
+}
+
+function decision(
+  status: BrowserSkillManagedRunnerDecisionStatus,
+  input: {
+    readonly reason: string;
+    readonly nextAction: string;
+    readonly warnings?: readonly string[];
+  },
+): BrowserSkillManagedRunnerDecision {
+  return {
+    status,
+    allowed: status === "allowed",
+    reason: input.reason,
+    nextAction: input.nextAction,
+    evidence: [
+      `browser-skill-managed-runner-policy:decision:${status}`,
+      "browser-skill-managed-runner-policy:no-dynamic-discovery",
+      "browser-skill-managed-runner-policy:no-mcp-launch",
+      "browser-skill-managed-runner-policy:metadata-only",
+    ],
+    warnings: input.warnings ?? [],
+  };
+}
