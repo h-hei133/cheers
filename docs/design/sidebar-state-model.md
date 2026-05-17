@@ -166,11 +166,21 @@ sanitized summaries only; developer-only events are hidden by default, and no
 sidebar UI, persistence, dynamic discovery, provider/model call, or session
 schema change is added.
 
+## Route 91 Panel Note
+
+Route 91 adds a TUI-ready panel model, layout builder, ASCII renderer,
+panel-specific quality checks, and explicit `/sidebar panel`, `/sidebar
+compact`, and `/sidebar detail` command modes. The original `/sidebar` preview
+still works. The panel consumes the same sanitized snapshot and live activity
+store; it adds no always-on UI, persistence, discovery, provider/model call,
+SessionManager schema change, startup/model auto-injection, or raw content
+rendering.
+
 ## Deferred
 
 Defer these to future routes:
 
-- actual sidebar UI/TUI/React panel
+- always-on sidebar UI/TUI/React panel
 - live event aggregation from runtime/session internals
 - dynamic MCP/skills discovery
 - startup/session auto-load

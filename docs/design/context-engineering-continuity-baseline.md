@@ -359,6 +359,12 @@ command results from `/compact`, `/memory`, and `/warmup`, plus `/sidebar`
 consumption of that bounded activity. It still avoids UI, persistence,
 dynamic discovery, provider/model calls, SessionManager schema changes,
 startup/model auto-injection, and raw content in captured or rendered events.
+Route 91 adds an explicit terminal panel prototype on the same sidebar
+snapshot and live activity substrate via `/sidebar panel`, `/sidebar compact`,
+and `/sidebar detail`, while preserving the original `/sidebar` preview. It
+still avoids always-on UI, persistence, dynamic discovery, provider/model
+calls, SessionManager schema changes, startup/model auto-injection, and raw
+content in panel output.
 
 ## Residual Risks
 
@@ -380,9 +386,10 @@ startup/model auto-injection, and raw content in captured or rendered events.
 
 ## Next Recommendation
 
-Recommended next route: sidebar state model, startup warm cache session
-integration, or memory retrieval quality/ranking hardening, depending on which
-user-visible memory path becomes the next blocker.
+Recommended next route: sidebar panel live/runtime polish, an always-on
+sidebar/TUI experiment, startup warm cache session integration, or memory
+retrieval quality/ranking hardening, depending on which user-visible path
+becomes the next blocker.
 
 Reason: context layers, compact survivors, redactions, edit/recovery facts,
 Compact v2 packet rendering, the live checkpoint, the candidate-only adapter,
@@ -391,6 +398,7 @@ explicit save path, Route 83 deterministic retrieval/wake preview, Route 84
 lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   quality/merge hardening, Route 87 explicit warm cache status, Route 88
   visible sidebar state projection, and Route 89 sidebar event/activity bridge
-  plus Route 90 live command activity capture are now machine-checkable enough
-  to plan sidebar UI, live event quality polish, startup-read integration, or
-retrieval-quality work separately.
+  plus Route 90 live command activity capture and Route 91 explicit terminal
+  panel rendering are now machine-checkable enough to plan always-on sidebar
+  UI, live event quality polish, startup-read integration, or retrieval-quality
+  work separately.

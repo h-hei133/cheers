@@ -171,3 +171,11 @@ separate session-scoped live event store and command event sink for `/compact`,
 activity from the current session store. The bridge remains useful for tests
 and future adapters, but live command capture does not persist raw event logs or
 call providers/models.
+
+## Route 91 Panel Note
+
+Route 91 uses the bridge/activity projection contract as the input discipline
+for a bounded terminal panel. Panel layout keeps activity separate from task,
+status, blockers, and next action; developer-only events remain hidden by
+default. The panel does not broaden the event bridge into persistence, dynamic
+discovery, provider/model calls, raw payload rendering, or an always-on UI.

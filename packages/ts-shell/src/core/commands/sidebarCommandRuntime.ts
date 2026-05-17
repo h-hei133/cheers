@@ -1,4 +1,6 @@
 import { getLatestCompactCheckpoint } from "../context/compactLiveCheckpoint.js";
+import { parseSidebarPanelCommandArgs } from "../context/sidebarPanelCommandContract.js";
+import { runSidebarPanelCommand } from "../context/sidebarPanelCommandRunner.js";
 import { projectSidebarState } from "../context/sidebarStateProjection.js";
 import { renderSidebarStateSurface } from "../context/sidebarStateSurface.js";
 import {
@@ -8,9 +10,16 @@ import {
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 export async function runSidebarLocalCommand(
-  _args: string[],
+  args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const parsed = parseSidebarPanelCommandArgs(args);
+  if (!parsed.ok || !parsed.contract) {
+    return {
+      kind: "local",
+      output: parsed.errorOutput ?? "Unsupported /sidebar arguments.",
+    };
+  }
   const sessionScopeId = sidebarSessionScopeId(context);
   const compactCheckpoint = context.compactCheckpointStore
     ? getLatestCompactCheckpoint(context.compactCheckpointStore, sessionScopeId)
@@ -69,6 +78,14 @@ export async function runSidebarLocalCommand(
     bridgeDroppedEventCount: liveEvents.droppedEventCount,
     nextAction: "Use route-specific docs and focused tests to decide the next implementation step.",
   });
+
+  if (parsed.contract.mode === "panel") {
+    const panel = runSidebarPanelCommand({ snapshot, contract: parsed.contract });
+    return {
+      kind: "local",
+      output: panel.output,
+    };
+  }
 
   return {
     kind: "local",

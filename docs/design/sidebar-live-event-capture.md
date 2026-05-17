@@ -152,11 +152,20 @@ Recent activity now comes from the live event store for the current session
 scope. Empty live activity still renders a valid current-state preview with
 `Recent activity` set to `none`.
 
+## Route 91 Panel Note
+
+Route 91 keeps the Route 90 live event store as the only live activity source
+for sidebar command output. `/sidebar panel`, `/sidebar compact`, and
+`/sidebar detail` render a bounded terminal panel from the same sanitized
+recent activity. The panel is explicit and read-only; it does not add an
+always-on UI, persistence, dynamic discovery, provider/model calls, schema
+changes, raw event payload rendering, or automatic memory/startup injection.
+
 ## Deferred
 
 Still deferred:
 
-- actual sidebar UI/TUI/React panel
+- always-on sidebar UI/TUI/React panel
 - persistent event store
 - dynamic MCP/skills discovery
 - provider/model calls

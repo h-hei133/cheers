@@ -1433,6 +1433,12 @@ Allowed after this document:
   runtime, adds no actual sidebar UI, persistence, dynamic discovery,
   provider/model calls, SessionManager schema change, automatic recovery, or
   default mutation readiness.
+- Route 91 context/surface work adds an explicit terminal sidebar panel
+  prototype with a panel model, layout builder, renderer, command contract, and
+  `/sidebar panel|compact|detail` modes while preserving the existing
+  `/sidebar` preview. It remains outside edit runtime, adds no always-on UI,
+  persistence, dynamic discovery, provider/model calls, SessionManager schema
+  change, automatic recovery, or default mutation readiness.
 
 Forbidden after this document:
 
@@ -1450,8 +1456,8 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 91 recommendation: choose actual sidebar UI/TUI prototype, sidebar live
-event quality/polish, startup warm cache session-read integration, or memory
-retrieval quality/ranking hardening based on the next user-visible blocker. Do
-not treat Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88,
-Route 89, or Route 90 as edit-capability expansions.
+Route 92 recommendation: choose sidebar panel live/runtime polish, an actual
+always-on TUI/sidebar experiment, startup warm cache session-read integration,
+or memory retrieval quality/ranking hardening based on the next user-visible
+blocker. Do not treat Route 82, Route 83, Route 84, Route 85, Route 86, Route
+87, Route 88, Route 89, Route 90, or Route 91 as edit-capability expansions.

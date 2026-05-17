@@ -789,6 +789,68 @@ describe("slash router (W4)", () => {
     }
   });
 
+  it("routes /sidebar panel modes without changing the default preview", async () => {
+    const sidebarLiveEventStore = createSidebarLiveEventStore({
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+    sidebarLiveEventStore.append({
+      sessionScopeId: "session:sess_sidebar_panel",
+      event: {
+        kind: "memory",
+        severity: "success",
+        visibility: "user-visible",
+        source: "memory",
+        title: "Memory saved",
+        summary: "status: saved; raw content excluded",
+      },
+    });
+
+    const panel = await routeSlashCommand("/sidebar panel", {
+      cwd: workspaceRoot,
+      sessionId: "sess_sidebar_panel",
+      sidebarLiveEventStore,
+    });
+    const compact = await routeSlashCommand("/sidebar compact", {
+      cwd: workspaceRoot,
+      sessionId: "sess_sidebar_panel",
+      sidebarLiveEventStore,
+    });
+    const detail = await routeSlashCommand("/sidebar detail", {
+      cwd: workspaceRoot,
+      sessionId: "sess_sidebar_panel",
+      sidebarLiveEventStore,
+    });
+    const invalid = await routeSlashCommand("/sidebar always-on", {
+      cwd: workspaceRoot,
+      sessionId: "sess_sidebar_panel",
+      sidebarLiveEventStore,
+    });
+
+    expect(panel?.kind).toBe("local");
+    if (panel?.kind === "local") {
+      expect(panel.output).toContain("[Recent activity]");
+      expect(panel.output).toContain("Memory saved");
+      expect(panel.output).toContain("Preview panel: explicit read-only command");
+      expect(panel.output).toContain("No provider/model calls");
+      expect(panel.output).not.toContain("State preview only: no actual sidebar UI exists yet.");
+    }
+    expect(compact?.kind).toBe("local");
+    if (compact?.kind === "local") {
+      expect(compact.output.split("\n").length).toBeLessThanOrEqual(28);
+      expect(compact.output).toContain("[Next]");
+    }
+    expect(detail?.kind).toBe("local");
+    if (detail?.kind === "local") {
+      expect(detail.output).toContain("[Boundary]");
+    }
+    expect(invalid?.kind).toBe("local");
+    if (invalid?.kind === "local") {
+      expect(invalid.output).toContain("- Outcome: blocked");
+      expect(invalid.output).toContain("invalid-sidebar-args");
+      expect(invalid.output).toContain("/sidebar panel");
+    }
+  });
+
   it("returns a readable local error for unknown slash commands", async () => {
     const result = await routeSlashCommand("/unknown-cmd", {
       cwd: workspaceRoot,
