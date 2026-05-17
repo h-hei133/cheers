@@ -1582,13 +1582,14 @@ cache with lock/lease handling, atomic writes, recovery, integrity scanning,
 repair, retention, compaction, and safe status/report summaries. Route 110
 adds bounded real CLI multi-process stress evidence for concurrent execute
 writes, status/replay during lock contention, busy compact, stale lock repair,
-corrupt/unsafe repair, and post-stress integrity. Route 111 recommendation:
-choose browser replay UX/report polish if hardened cache output needs
-compression, choose browser action self-healing design only after replay
-remains stable, and choose external-network browser execution only after local
-persistent replay remains stable. Do not treat
+corrupt/unsafe repair, and post-stress integrity. Route 111 adds preview-only
+browser replay repair readiness and self-healing preview for blocked replay
+failures; it adds no auto-repair, no auto-replay, and no external network.
+Route 112 recommendation: choose browser replay UX/report polish, or
+preview-only browser action self-healing design before any execution route. Do
+not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
 Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, Route 104, or
-Route 105, Route 106, Route 107, Route 108, Route 109, or Route 110 as
-edit-capability expansions.
+Route 105, Route 106, Route 107, Route 108, Route 109, Route 110, or Route 111
+as edit-capability expansions.

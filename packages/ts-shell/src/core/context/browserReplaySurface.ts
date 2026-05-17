@@ -1,12 +1,19 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import type { BrowserReplayExecutionResult } from "./browserReplayExecutor.js";
+import { classifyBrowserReplayFailure } from "./browserReplayFailureClassifier.js";
 import type { BrowserReplayPlan } from "./browserReplayPlanner.js";
+import { createBrowserReplayRepairPreview } from "./browserReplayRepairPreview.js";
+import { decideBrowserReplayRepairReadiness } from "./browserReplayRepairReadiness.js";
+import { renderBrowserReplayRepairSurface } from "./browserReplayRepairSurface.js";
 
 export function renderBrowserReplaySurface(input: {
   readonly plan: BrowserReplayPlan;
   readonly execution?: BrowserReplayExecutionResult;
 }): string {
   const receipt = input.execution?.receipt;
+  const repairPreview = input.plan.willExecute
+    ? undefined
+    : repairPreviewForPlan(input.plan);
   return [
     "Browser replay",
     "Result",
@@ -23,12 +30,14 @@ export function renderBrowserReplaySurface(input: {
     `- Replay readiness: ${receipt?.replayReadiness.status ?? input.plan.policy.status}`,
     `- Redactions/warnings: ${summarize([...input.plan.warnings, ...(input.execution?.warnings ?? [])])}`,
     `- Executed: ${input.execution?.executed ? "yes" : "no"}`,
+    `- Repair needed: ${repairPreview ? "yes" : "no"}`,
     "- Automatic replay: no",
     "- Persistence: none",
     "- Provider/model call: none",
     "- MCP discovery/launch: none",
     "- Network access: local-fixture only",
     `- Next action: ${safe(receipt?.nextAction ?? input.plan.nextAction, 240)}`,
+    ...(repairPreview ? ["", renderBrowserReplayRepairSurface(repairPreview)] : []),
   ].join("\n");
 }
 
@@ -64,4 +73,13 @@ function summarize(values: readonly string[]): string {
 
 function safe(value: string, maxLength = 160): string {
   return sanitizeBrowserText(value.replace(/\s+/g, " "), maxLength);
+}
+
+function repairPreviewForPlan(plan: BrowserReplayPlan) {
+  const failure = classifyBrowserReplayFailure({ plan });
+  const readiness = decideBrowserReplayRepairReadiness({ failure });
+  if (readiness.status === "repair-not-applicable" && failure.kind === "none") {
+    return undefined;
+  }
+  return createBrowserReplayRepairPreview({ plan, failure, readiness });
 }

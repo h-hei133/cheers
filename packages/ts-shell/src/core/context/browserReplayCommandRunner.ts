@@ -117,6 +117,10 @@ export async function runBrowserReplayCommand(input: {
   const persistentRecord = !memoryEntry && input.request.receiptId
     ? input.receiptCacheStore?.get(input.request.receiptId)
     : undefined;
+  const persistentListRecord = !persistentRecord && input.request.receiptId
+    ? input.receiptCacheStore?.list().records.find((record) => record.receiptId === input.request.receiptId)
+    : persistentRecord;
+  const cacheHealth = inspectBrowserReceiptCacheHealth(input.receiptCacheStore);
   const entry = memoryEntry ?? persistentRecord?.cacheEntry;
   const sourceReceipt = entry
     ? input.actionCache?.getReceipt(entry.sourceReceiptId) ?? persistentRecord?.receipt
@@ -129,6 +133,9 @@ export async function runBrowserReplayCommand(input: {
     sandboxConfirmed: Boolean(input.sandboxAuthority),
     allowlistConfirmed: Boolean(input.networkAllowlist),
     confirmationRecorded: Boolean(input.confirmations?.some((confirmation) => confirmation.status === "confirmed")),
+    cacheRecordStatus: persistentListRecord?.status,
+    cacheIntegrityStatus: cacheHealth.integrityStatus,
+    skillMetadataAvailable: Boolean(input.cliExecutionBridgeSummary?.skillRunnerMetadata),
   });
   const execution = await executeBrowserReplay({
     plan,

@@ -72,6 +72,7 @@ function summarizeBrowserExecutionEvidence(
     `receipt=${receiptStatus}`,
     `replay=${replayReadiness}`,
     `replayCommand=${replay ? replay.match(/^- Replay status:\s*(.+)$/im)?.[1]?.trim() ?? "present" : "none"}`,
+    `repair=${replay ? replay.match(/^- Repair readiness:\s*(.+)$/im)?.[1]?.trim() ?? replay.match(/^- Repair needed:\s*(.+)$/im)?.[1]?.trim() ?? "none" : "none"}`,
     `receiptCache=${cache ? cache.match(/^- Cache status:\s*(.+)$/im)?.[1]?.trim() ?? "present" : "none"}`,
     `cacheIntegrity=${cache ? cache.match(/^- Integrity:\s*(.+)$/im)?.[1]?.trim() ?? "unknown" : "none"}`,
     `cacheCompaction=${cache ? cache.match(/^- Records before\/after:\s*(.+)$/im)?.[1]?.trim() ?? "none" : "none"}`,

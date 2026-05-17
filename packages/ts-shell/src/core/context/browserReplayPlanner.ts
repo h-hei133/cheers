@@ -8,6 +8,8 @@ import {
   decideBrowserReplayPolicy,
   type BrowserReplayPolicyDecision,
 } from "./browserReplayPolicy.js";
+import type { BrowserPersistentReceiptCacheRecordStatus } from "./browserPersistentReceiptCache.js";
+import type { BrowserReceiptCacheIntegrityStatus } from "./browserReceiptCacheIntegrity.js";
 
 export interface BrowserReplayPlan {
   readonly replayPlanId: string;
@@ -23,6 +25,9 @@ export interface BrowserReplayPlan {
   readonly warnings: readonly string[];
   readonly nextAction: string;
   readonly willExecute: boolean;
+  readonly cacheRecordStatus?: BrowserPersistentReceiptCacheRecordStatus;
+  readonly cacheIntegrityStatus?: BrowserReceiptCacheIntegrityStatus;
+  readonly skillMetadataAvailable?: boolean;
   readonly request?: BrowserExecutionRequest;
   readonly evidence: readonly string[];
 }
@@ -35,6 +40,9 @@ export function planBrowserReplay(input: {
   readonly sandboxConfirmed?: boolean;
   readonly allowlistConfirmed?: boolean;
   readonly confirmationRecorded?: boolean;
+  readonly cacheRecordStatus?: BrowserPersistentReceiptCacheRecordStatus;
+  readonly cacheIntegrityStatus?: BrowserReceiptCacheIntegrityStatus;
+  readonly skillMetadataAvailable?: boolean;
 }): BrowserReplayPlan {
   const policy = decideBrowserReplayPolicy({
     entry: input.entry,
@@ -69,6 +77,9 @@ export function planBrowserReplay(input: {
     warnings: policy.warnings,
     nextAction: policy.nextAction,
     willExecute: policy.allowed,
+    cacheRecordStatus: input.cacheRecordStatus,
+    cacheIntegrityStatus: input.cacheIntegrityStatus,
+    skillMetadataAvailable: input.skillMetadataAvailable,
     request,
     evidence: [
       ...policy.evidence,

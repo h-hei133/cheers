@@ -1,4 +1,5 @@
 import type { BrowserReceiptCacheStore, BrowserReceiptCacheStoreHealth } from "./browserReceiptCacheStore.js";
+import type { BrowserReceiptCacheIntegrityStatus } from "./browserReceiptCacheIntegrity.js";
 
 export type BrowserReceiptCacheHealthStatus = "missing" | "configured" | "invalid";
 
@@ -14,7 +15,7 @@ export interface BrowserReceiptCacheHealth {
   readonly unsafeCount: number;
   readonly duplicateActiveCount: number;
   readonly overBudgetCount: number;
-  readonly integrityStatus: string;
+  readonly integrityStatus: BrowserReceiptCacheIntegrityStatus;
   readonly lockStatus: string;
   readonly lastUpdatedAt?: string;
   readonly warnings: readonly string[];
