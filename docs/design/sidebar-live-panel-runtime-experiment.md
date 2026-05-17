@@ -193,3 +193,11 @@ ordinary sidebar tool availability input. Live panel frames can show browser
 status and `/browser` activity from the existing sanitized event store, but no
 browser execution, MCP launch/discovery, provider/model call, persistence, or
 raw browser content is added.
+
+## Route 95 Scenario Harness Note
+
+Route 95 adds Agent Scenario Harness coverage for sidebar-visible evidence
+across compact, memory, browser dry-run, and warmup flows. The harness consumes
+the same session-scoped in-memory sidebar event store and does not add an
+always-on UI, event persistence, dynamic discovery, provider/model calls, or raw
+event rendering.

@@ -383,6 +383,12 @@ still adds no browser execution, Playwright launch, MCP launch/discovery,
 website navigation, network access, provider/model call, browser session
 persistence, SessionManager schema change, startup/model auto-injection, or raw
 browser content rendering.
+Route 95 adds a deterministic Agent Scenario Harness foundation over existing
+local command runtimes and future-turn planners. It can run compact, memory,
+sidebar, browser dry-run, and warmup scenarios with sanitized evidence reports,
+but still adds no provider/model call, real browser execution, CLI lifecycle
+rewrite, SessionManager schema change, persistent harness state, automatic
+recovery, or raw content/secrets/hidden reasoning in reports.
 
 ## Residual Risks
 
@@ -419,6 +425,7 @@ lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   visible sidebar state projection, Route 89 sidebar event/activity bridge,
   Route 90 live command activity capture, Route 91 explicit terminal panel
   rendering, Route 92 bounded watch frames, Route 93 preview-only browser
-  boundary, and Route 94 non-executing browser dry-run planning are now
-  machine-checkable enough to plan browser execution prototypes, startup-read
-  integration, or retrieval-quality work separately.
+  boundary, Route 94 non-executing browser dry-run planning, and Route 95
+  scenario harness foundation are now machine-checkable enough to plan browser
+  execution prototypes, real CLI scenario verification, sandbox harness work,
+  startup-read integration, or retrieval-quality work separately.

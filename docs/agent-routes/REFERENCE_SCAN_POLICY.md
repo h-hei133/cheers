@@ -25,6 +25,17 @@ Browser/tooling/product references:
 - Playwright MCP: `/home/wang/projects/playwright-mcp`
 - OpenHands: `/home/wang/projects/OpenHands`
 
+Harness / eval / scenario references:
+
+- Inspect AI: `/home/wang/projects/inspect_ai`
+- mini-swe-agent: `/home/wang/projects/mini-swe-agent`
+
+Inspect AI is the primary reference for task/eval/log/scorer architecture.
+mini-swe-agent is the primary reference for compact coding-agent trajectory
+harnesses. Use them when a route touches scenario regression, eval harnesses,
+task runners, long-horizon behavior, or agent QA; do not scan them for
+unrelated routes.
+
 These repositories are read-only references. Do not modify them. A route should
 select only the relevant 1-4 primary references instead of scanning the full
 pool by default.
@@ -45,7 +56,8 @@ pool by default.
   targeted comparison is enough.
 - Do not scan all reference families by default; use memory/context references
   for memory quality routes, browser/tooling references for browser/tool
-  surfaces, and coding-agent baselines for CLI/session/tool semantics.
+  surfaces, harness/eval/scenario references for agent QA routes, and
+  coding-agent baselines for CLI/session/tool semantics.
 - If a route does not benefit from a reference scan, it may explicitly skip the
   scan and say why.
 - Treat the scan as evidence for responsibility boundaries and product

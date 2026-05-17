@@ -1,0 +1,147 @@
+# Agent Scenario Harness Foundation
+
+Route 95 adds a deterministic local scenario harness for cross-capability
+regression evidence. It is a test and design foundation, not a production
+runtime path.
+
+## Reference Scan
+
+Files inspected within the Route 95 budget:
+
+- Inspect AI:
+  - `/home/wang/projects/inspect_ai/src/inspect_ai/_eval/task/task.py`
+  - `/home/wang/projects/inspect_ai/src/inspect_ai/_eval/task/run.py`
+  - `/home/wang/projects/inspect_ai/src/inspect_ai/log/_log.py`
+  - `/home/wang/projects/inspect_ai/src/inspect_ai/scorer/_scorer.py`
+  - `/home/wang/projects/inspect_ai/src/inspect_ai/dataset/_dataset.py`
+  - `/home/wang/projects/inspect_ai/src/inspect_ai/solver/_task_state.py`
+- mini-swe-agent:
+  - `/home/wang/projects/mini-swe-agent/src/minisweagent/agents/default.py`
+  - `/home/wang/projects/mini-swe-agent/src/minisweagent/environments/local.py`
+  - `/home/wang/projects/mini-swe-agent/tests/conftest.py`
+  - `/home/wang/projects/mini-swe-agent/tests/run/test_local.py`
+  - `/home/wang/projects/mini-swe-agent/src/minisweagent/run/utilities/inspector.py`
+- OpenHands:
+  - `/home/wang/projects/OpenHands/openhands/app_server/event/event_service.py`
+  - `/home/wang/projects/OpenHands/openhands/app_server/event/event_service_base.py`
+  - `/home/wang/projects/OpenHands/openhands/app_server/event/filesystem_event_service.py`
+  - `/home/wang/projects/OpenHands/frontend/src/types/v1/core/openhands-event.ts`
+  - `/home/wang/projects/OpenHands/frontend/src/utils/handle-event-for-ui.ts`
+  - `/home/wang/projects/OpenHands/frontend/src/components/features/chat/event-message.tsx`
+
+Inspect AI contributes the separation between task/sample definition, runner
+state, logs, and scorer-style assertions. The local harness mirrors that by
+keeping `AgentScenario`, step results, assertions, safety checks, and reports
+as separate concepts.
+
+mini-swe-agent contributes the compact trajectory idea: a run is a sequence of
+messages/actions/observations that can be saved, inspected, and replayed in
+tests with deterministic model outputs. Route 95 uses that shape without model
+calls by making slash commands and simulated user turns the trajectory steps.
+
+OpenHands contributes the event evidence model: session events should be
+append-only, searchable, summarized for UI, and replaced or deduped only at the
+presentation layer. Route 95 keeps sidebar evidence in the existing in-memory
+event store and reports sanitized summaries only.
+
+## Current Validation Landscape
+
+Existing validation is strong but capability-specific:
+
+- compact future-turn injection tests
+- project memory review/store/recall/use/lifecycle tests
+- startup warm cache command tests
+- sidebar state/event/panel/watch tests
+- browser preview and dry-run tests
+- result-contract and edit-capability closeout verifiers
+
+The gap is a reusable scenario layer that can prove multi-step behavior across
+those systems without spawning the production CLI or calling providers.
+
+## Scenario Model
+
+`AgentScenario` is the task definition. It names a scenario, metadata, ordered
+steps, and expected final assertions.
+
+`AgentScenarioStep` is one unit in the trajectory:
+
+- `command`: invokes an existing local slash command runtime through
+  `routeSlashCommand`.
+- `simulated-user-turn`: exercises future-turn compact and memory injection
+  planners without provider/model calls.
+- `assertion`: evaluates a focused output or state assertion.
+- `fixture`: seeds deterministic test-only context.
+- `checkpoint`: records a scenario milestone and next action.
+
+`AgentScenarioResult` is the log. It carries step outputs, assertions, safety
+checks, sidebar events, evidence, blockers, next action, and redactions.
+
+## Assertions And Reports
+
+Assertions are scorer-like checks over outputs, sidebar events, and scenario
+evidence. Route 95 includes output contains/does-not-contain/section/budget
+checks, sidebar event checks, compact and memory one-shot checks, memory
+lifecycle exclusion, browser `Executed: no`, next-action, and validation-status
+checks.
+
+Reports are deterministic summaries. They include scenario id/name, status,
+steps run, output summaries, assertion totals, safety check totals, sidebar
+event count, compact/memory/warmup/browser evidence presence, blockers, next
+action, and redactions. Reports do not include raw command blobs beyond short
+sanitized previews.
+
+## Safety Model
+
+The harness rejects reports or step outputs that expose raw-content markers,
+secret-looking tokens, provider credential-looking strings, hidden reasoning
+markers, unexpected automatic recovery claims, atomic rollback claims, browser
+execution claims, memory auto-injection claims, or startup auto-load claims.
+
+The runner itself does not:
+
+- call providers or models
+- execute a real browser
+- launch Playwright or MCP
+- access network
+- spawn the production CLI
+- change SessionManager schema
+- persist harness state
+- change package scripts or default gates
+- execute edits outside existing test fixtures
+
+## Fixture Strategy
+
+Fixtures create explicit temp roots, deterministic clocks, deterministic ids,
+in-memory compact/sidebar/review/injection stores, a test-only project memory
+store, and a test-only startup warm cache store. Disk writes are limited to the
+explicit temporary workspace roots required by existing local store APIs.
+
+## Route 95 Artifacts
+
+Code:
+
+- `packages/ts-shell/src/core/harness/agentScenarioModel.ts`
+- `packages/ts-shell/src/core/harness/agentScenarioFixtures.ts`
+- `packages/ts-shell/src/core/harness/agentScenarioRunner.ts`
+- `packages/ts-shell/src/core/harness/agentScenarioAssertions.ts`
+- `packages/ts-shell/src/core/harness/agentScenarioSafety.ts`
+- `packages/ts-shell/src/core/harness/agentScenarioReport.ts`
+- `packages/ts-shell/src/core/harness/agentScenarioExamples.test.ts`
+
+Initial scenarios cover:
+
+- compact + memory + sidebar continuity
+- memory lifecycle safety
+- browser dry-run visibility
+- warmup cache preview
+
+## Deferred
+
+Deferred to later routes:
+
+- real CLI scenario harness with process spawn evidence
+- browser runtime harness and real Playwright evidence
+- sandbox execution harness
+- long-session benchmark harness
+- output quality harness with richer scoring
+- persistence or cross-session scenario history

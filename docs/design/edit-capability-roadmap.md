@@ -1459,6 +1459,11 @@ Allowed after this document:
   network access, provider/model calls, browser session persistence,
   SessionManager schema change, automatic recovery, or default mutation
   readiness.
+- Route 95 harness work adds a deterministic Agent Scenario Harness foundation
+  for local compact, memory, sidebar, browser dry-run, and warmup scenarios. It
+  remains outside edit runtime, adds no provider/model calls, browser
+  execution, CLI lifecycle rewrite, SessionManager schema change, harness
+  persistence, automatic recovery, rollback, or default mutation readiness.
 
 Forbidden after this document:
 
@@ -1476,10 +1481,9 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 95 recommendation: choose Playwright CLI/Skills non-default execution
-prototype, Playwright MCP capability adapter, Stagehand-like action cache
-design, browser sandbox executor contract, startup warm cache session-read
-integration, or memory retrieval quality/ranking hardening based on the next
-user-visible blocker. Do not treat Route 82, Route 83, Route 84, Route 85,
-Route 86, Route 87, Route 88, Route 89, Route 90, Route 91, Route 92, Route 93,
-or Route 94 as edit-capability expansions.
+Route 96 recommendation: choose Playwright CLI/Skills non-default execution
+prototype if browser execution is next, real CLI scenario harness if process
+spawn evidence is next, or sandbox harness foundation if execution should wait
+for stronger isolation coverage. Do not treat Route 82, Route 83, Route 84,
+Route 85, Route 86, Route 87, Route 88, Route 89, Route 90, Route 91, Route 92,
+Route 93, Route 94, or Route 95 as edit-capability expansions.

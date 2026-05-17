@@ -185,12 +185,14 @@ Route 94 does not:
 - render raw browser content, secrets, provider credentials, hidden reasoning,
   or raw content blobs
 
-## Route 95 Options
+## Route 95 Scenario Harness Note
 
-Best next route: **Route 95: Playwright CLI/Skills non-default execution
-prototype**.
+Route 95 adds an Agent Scenario Harness foundation and includes a browser
+dry-run visibility scenario. That scenario runs `/browser dry-run ...`, renders
+`/sidebar`, asserts `Executed: no`, and confirms no browser execution claim is
+reported.
 
-Route 95 should own:
+The next browser execution route should still own:
 
 - explicit opt-in browser execution command shape
 - isolated browser sandbox contract
