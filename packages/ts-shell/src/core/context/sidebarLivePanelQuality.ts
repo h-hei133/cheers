@@ -44,7 +44,7 @@ export function checkSidebarLivePanelQuality(input: {
     nextActionVisible: base.checks.hasNextAction,
     outputWidthRespected: lines.every((line) => line.length <= input.frame.panel.budget.maxWidth) ? "pass" as const : "fail" as const,
     outputLineBudgetRespected: lines.length <= input.frame.panel.budget.maxLines ? "pass" as const : "warn" as const,
-    noRawContentLeak: /\bRAW_[A-Z0-9_]+\b|\braw (file|recovery|memory|event|content) content\b/i.test(encoded)
+    noRawContentLeak: /\bRAW_[A-Z0-9_]+\b|\braw content\b|\braw (file|recovery|memory|event|content) content\b/i.test(encoded)
       ? "fail" as const
       : "pass" as const,
     noSecretLeak: /\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/.test(encoded)

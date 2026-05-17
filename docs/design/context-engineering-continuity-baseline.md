@@ -370,6 +370,12 @@ sanitized snapshot and session-scoped in-memory live event store. It renders
 frame metadata and recent activity without adding an always-on UI, TUI loop,
 persistence, dynamic discovery, provider/model calls, SessionManager schema
 changes, startup/model auto-injection, or raw content in live panel output.
+Route 93 adds a preview-only browser capability boundary, `/browser` status
+and action preview command, readiness classifier, and sidebar browser tooling
+placeholder. It adds no browser execution, Playwright launch, MCP
+launch/discovery, website navigation, provider/model call, browser session
+persistence, SessionManager schema change, startup/model auto-injection, or raw
+browser content rendering.
 
 ## Residual Risks
 
@@ -391,10 +397,11 @@ changes, startup/model auto-injection, or raw content in live panel output.
 
 ## Next Recommendation
 
-Recommended next route: sidebar runtime polish / always-on TUI decision,
-browser capability boundary, startup warm cache session integration, or memory
-retrieval quality/ranking hardening, depending on which user-visible path
-becomes the next blocker.
+Recommended next route: browser sandbox/runtime decision and non-executing
+dry-run harness, Playwright CLI/Skills integration prototype, Playwright MCP
+capability adapter, Stagehand-like action cache design, startup warm cache
+session integration, or memory retrieval quality/ranking hardening, depending
+on which user-visible path becomes the next blocker.
 
 Reason: context layers, compact survivors, redactions, edit/recovery facts,
 Compact v2 packet rendering, the live checkpoint, the candidate-only adapter,
@@ -404,6 +411,6 @@ lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   quality/merge hardening, Route 87 explicit warm cache status, Route 88
   visible sidebar state projection, Route 89 sidebar event/activity bridge,
   Route 90 live command activity capture, Route 91 explicit terminal panel
-  rendering, and Route 92 bounded watch frames are now machine-checkable enough
-  to plan always-on sidebar UI, browser capability boundaries, startup-read
-  integration, or retrieval-quality work separately.
+  rendering, Route 92 bounded watch frames, and Route 93 preview-only browser
+  boundary are now machine-checkable enough to plan browser dry-run/runtime
+  selection, startup-read integration, or retrieval-quality work separately.

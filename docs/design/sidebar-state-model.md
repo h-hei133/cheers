@@ -186,6 +186,13 @@ add an actual sidebar UI, persistence, discovery, provider/model calls,
 SessionManager schema changes, startup/model auto-injection, or raw content
 rendering.
 
+## Route 93 Browser Note
+
+Route 93 adds a preview-only browser capability placeholder to the existing
+Tools section. Browser status is supplied explicitly; `/sidebar` does not
+discover MCP servers, launch Playwright, start browser sessions, call
+providers/models, persist browser state, or render raw browser content.
+
 ## Deferred
 
 Defer these to future routes:

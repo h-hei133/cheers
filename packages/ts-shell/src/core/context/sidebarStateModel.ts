@@ -216,7 +216,7 @@ export function sanitizeSidebarText(
       redactions.add("raw-marker");
       return "[REDACTED_RAW]";
     })
-    .replace(/\braw (file|recovery|content|memory|event) content\b/gi, () => {
+    .replace(/\b(raw content|raw (file|recovery|content|memory|event) content)\b/gi, () => {
       redactions.add("raw-content-label");
       return "[REDACTED_RAW_CONTENT]";
     })

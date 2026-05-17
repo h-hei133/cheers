@@ -185,3 +185,11 @@ browser/tool capability status becomes the next visible gap.
 
 Choose memory retrieval ranking hardening if memory recall quality is the next
 blocker.
+
+## Route 93 Browser Note
+
+Route 93 keeps `/sidebar watch` unchanged and adds browser capability facts as
+ordinary sidebar tool availability input. Live panel frames can show browser
+status and `/browser` activity from the existing sanitized event store, but no
+browser execution, MCP launch/discovery, provider/model call, persistence, or
+raw browser content is added.

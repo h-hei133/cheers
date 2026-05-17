@@ -1445,6 +1445,13 @@ Allowed after this document:
   always-on UI, terminal repaint loop, persistence, dynamic discovery,
   provider/model calls, SessionManager schema change, automatic recovery, or
   default mutation readiness.
+- Route 93 browser/tooling work adds a preview-only browser capability model,
+  action contract, readiness classifier, preview renderer, `/browser` command,
+  and sidebar browser tooling placeholder. It remains outside edit runtime,
+  adds no browser execution, Playwright launch, MCP launch/discovery, website
+  navigation, provider/model calls, browser session persistence,
+  SessionManager schema change, automatic recovery, or default mutation
+  readiness.
 
 Forbidden after this document:
 
@@ -1462,9 +1469,10 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 93 recommendation: choose sidebar runtime polish / always-on TUI
-decision, browser capability boundary, startup warm cache session-read
-integration, or memory retrieval quality/ranking hardening based on the next
-user-visible blocker. Do not treat Route 82, Route 83, Route 84, Route 85,
-Route 86, Route 87, Route 88, Route 89, Route 90, Route 91, or Route 92 as
-edit-capability expansions.
+Route 94 recommendation: choose browser sandbox/runtime decision and
+non-executing dry-run harness, Playwright CLI/Skills integration prototype,
+Playwright MCP capability adapter, Stagehand-like action cache design, startup
+warm cache session-read integration, or memory retrieval quality/ranking
+hardening based on the next user-visible blocker. Do not treat Route 82, Route
+83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89, Route 90,
+Route 91, Route 92, or Route 93 as edit-capability expansions.

@@ -68,7 +68,10 @@ function normalizeCommand(command: string): string {
   return command.startsWith("/") ? command : `/${command}`;
 }
 
-function commandFamily(command: string): "compact" | "memory" | "warmup" | "sidebar" | "restore" | "command" {
+function commandFamily(command: string): "browser" | "compact" | "memory" | "warmup" | "sidebar" | "restore" | "command" {
+  if (command === "/browser") {
+    return "browser";
+  }
   if (command === "/compact" || command === "/handoff") {
     return "compact";
   }
@@ -100,6 +103,9 @@ function kindForFamily(
   if (family === "warmup") {
     return "warmup";
   }
+  if (family === "browser") {
+    return "tool";
+  }
   if (family === "restore") {
     return subcommand === "execute" ? "warning" : "command";
   }
@@ -115,6 +121,9 @@ function sourceForFamily(family: ReturnType<typeof commandFamily>): SidebarEvent
   }
   if (family === "warmup") {
     return "warmup";
+  }
+  if (family === "browser") {
+    return "tool-availability";
   }
   return "slash-command";
 }
@@ -144,6 +153,9 @@ function titleForCommand(
   }
   if (family === "warmup") {
     return subcommand === "rebuild" ? "Warmup rebuilt" : "Warmup status";
+  }
+  if (family === "browser") {
+    return subcommand === "preview" ? "Browser preview" : "Browser status";
   }
   if (family === "sidebar") {
     return "Sidebar rendered";
@@ -198,5 +210,5 @@ function summarizeCommandOutput(outcome: string, output: string): string {
 }
 
 function isSafeSummaryLine(line: string): boolean {
-  return /^- (Outcome|BlockerKind|Memory written|Auto-load|Auto-injected|Injected into model|Startup auto-load|Provider\/model call|Persistence|Recovery execution|Future-turn injection|Injection status|Checkpoint id|Result count|Cache status|Staleness|DoNext):/i.test(line);
+  return /^- (Outcome|BlockerKind|Memory written|Auto-load|Auto-injected|Injected into model|Startup auto-load|Provider\/model call|Persistence|Recovery execution|Future-turn injection|Injection status|Checkpoint id|Result count|Cache status|Staleness|Browser capability|Action|Target|Risk|Readiness|Executed|Browser process|MCP discovery\/launch|DoNext):/i.test(line);
 }

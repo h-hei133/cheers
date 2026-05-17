@@ -908,6 +908,61 @@ describe("slash router (W4)", () => {
     }
   });
 
+  it("routes /browser status and preview without browser execution", async () => {
+    const sidebarLiveEventStore = createSidebarLiveEventStore({
+      now: () => "2026-05-18T00:00:00.000Z",
+    });
+
+    const status = await routeSlashCommand("/browser", {
+      cwd: workspaceRoot,
+      sessionId: "sess_browser",
+      sidebarLiveEventStore,
+    });
+    const preview = await routeSlashCommand("/browser preview navigate https://example.com", {
+      cwd: workspaceRoot,
+      sessionId: "sess_browser",
+      sidebarLiveEventStore,
+    });
+    const blocked = await routeSlashCommand("/browser preview payment checkout", {
+      cwd: workspaceRoot,
+      sessionId: "sess_browser",
+      sidebarLiveEventStore,
+    });
+    const sidebar = await routeSlashCommand("/sidebar", {
+      cwd: workspaceRoot,
+      sessionId: "sess_browser",
+      sidebarLiveEventStore,
+    });
+
+    expect(status?.kind).toBe("local");
+    if (status?.kind === "local") {
+      expect(status.output).toContain("Browser capability status");
+      expect(status.output).toContain("- Browser capability: preview-only");
+      expect(status.output).toContain("- Browser process: not launched");
+      expect(status.output).toContain("- Provider/model call: none");
+    }
+    expect(preview?.kind).toBe("local");
+    if (preview?.kind === "local") {
+      expect(preview.output).toContain("Browser action preview");
+      expect(preview.output).toContain("- Action: navigate");
+      expect(preview.output).toContain("- Readiness: supported-preview");
+      expect(preview.output).toContain("- Executed: no");
+    }
+    expect(blocked?.kind).toBe("local");
+    if (blocked?.kind === "local") {
+      expect(blocked.output).toContain("- Outcome: blocked");
+      expect(blocked.output).toContain("- Readiness: blocked-payment");
+      expect(blocked.output).toContain("- Executed: no");
+    }
+    expect(sidebar?.kind).toBe("local");
+    if (sidebar?.kind === "local") {
+      expect(sidebar.output).toContain("Browser capability");
+      expect(sidebar.output).toContain("preview-only; no browser/MCP launch");
+      expect(sidebar.output).toContain("Browser preview");
+      expect(sidebar.output).not.toContain("Unknown slash command");
+    }
+  });
+
   it("returns a readable local error for unknown slash commands", async () => {
     const result = await routeSlashCommand("/unknown-cmd", {
       cwd: workspaceRoot,

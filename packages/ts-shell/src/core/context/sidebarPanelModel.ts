@@ -145,7 +145,7 @@ export function sanitizePanelText(value: string, maxLength = 320): string {
     .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[REDACTED_SECRET]")
     .replace(/\b(api key|token|authorization|provider credential|provider config|secret)\b/gi, "[REDACTED_SECRET_LABEL]")
     .replace(/\bRAW_[A-Z0-9_]+\b/g, "[REDACTED_RAW]")
-    .replace(/\braw (file|recovery|content|memory|event) content\b/gi, "[REDACTED_RAW_CONTENT]")
+    .replace(/\b(raw content|raw (file|recovery|content|memory|event) content)\b/gi, "[REDACTED_RAW_CONTENT]")
     .replace(/\b(hidden reasoning|chain[- ]?of[- ]?thought)\b/gi, "[REDACTED_REASONING]");
   if (sanitized.length > maxLength) {
     sanitized = `${sanitized.slice(0, Math.max(0, maxLength - 3))}...`;

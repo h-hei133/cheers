@@ -1,4 +1,5 @@
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { runBrowserLocalCommand } from "./browserCommandRuntime.js";
 import { runCompactLocalCommand } from "./compactCommandRuntime.js";
 import { runConnectCommand } from "./connectCommandRuntime.js";
 import { runMemoryLocalCommand } from "./memoryCommandRuntime.js";
@@ -84,6 +85,14 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runWarmupLocalCommand(args, context),
+    },
+    {
+      name: "browser",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runBrowserLocalCommand(args, context),
     },
     {
       name: "sidebar",

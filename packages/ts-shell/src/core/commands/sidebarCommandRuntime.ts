@@ -1,4 +1,5 @@
 import { getLatestCompactCheckpoint } from "../context/compactLiveCheckpoint.js";
+import { browserCapabilitySidebarToolItem } from "../context/browserCapabilitySurface.js";
 import { parseSidebarLivePanelCommandArgs } from "../context/sidebarLivePanelCommandContract.js";
 import { runSidebarLivePanelCommand } from "../context/sidebarLivePanelCommandRunner.js";
 import { parseSidebarPanelCommandArgs } from "../context/sidebarPanelCommandContract.js";
@@ -78,6 +79,7 @@ export async function runSidebarLocalCommand(
           evidence: ["sidebar-command:registered"],
         },
       ],
+      browserTooling: [browserCapabilitySidebarToolItem()],
     },
     events: liveEvents.events,
     bridgeDroppedEventCount: liveEvents.droppedEventCount,
