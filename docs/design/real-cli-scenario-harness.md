@@ -182,3 +182,11 @@ scripts and manifests. Scenarios cover default blocked, observe/extract
 success, external URL blocked, malformed response, timeout, and unsafe output.
 Reports remain summarized: they include runner mode/source/status but not raw
 stdout/stderr, raw manifest content, raw page content, or secrets.
+
+## Route 104 Evidence Receipt Note
+
+Route 104 extends real CLI browser scenarios with receipt assertions for
+success, external URL blocking, malformed response, timeout, and unsafe output.
+Reports now summarize receipt status and replay readiness, still without raw
+stdout/stderr, raw manifest content, raw page content, secrets, persistence, or
+cross-process sidebar assumptions.

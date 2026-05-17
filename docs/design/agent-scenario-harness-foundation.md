@@ -208,3 +208,10 @@ runner execution only when output proves `Mode: test-local` or
 `external-local`, `External browser runner`, `Browser process: not launched`,
 no MCP launch, and no provider/model call. The in-process harness remains
 unchanged; the real CLI harness owns temp runner process scenarios.
+
+## Route 104 Evidence Receipt Note
+
+Route 104 adds receipt-specific harness assertions for browser execution
+output. They check receipt existence, status, executed state, replay readiness,
+safe output, decision context, local/test scope, and next action without
+changing the scenario runner into a browser runtime or persistence layer.

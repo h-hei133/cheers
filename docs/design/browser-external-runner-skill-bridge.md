@@ -187,3 +187,11 @@ Alternative Route 104 options:
   come next
 - external-network browser execution design only after local external runner
   evidence remains stable
+
+## Route 104 Evidence Receipt Note
+
+Route 104 keeps the Route 103 external runner bridge explicit and local/test
+scoped, then normalizes its output into browser execution receipts, evidence
+bundles, safety classification, and replay-readiness metadata. Receipts are
+evidence records only: they do not execute replay, persist action cache data,
+launch Playwright/MCP, call providers/models, or expose raw runner/page content.

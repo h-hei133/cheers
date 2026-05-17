@@ -1,4 +1,5 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
+import { renderBrowserExecutionReceiptInlineSummary } from "./browserExecutionReceiptSurface.js";
 import type { BrowserExecutionResult } from "./browserExecutionResult.js";
 
 export function renderBrowserExecutionSurface(
@@ -19,6 +20,8 @@ export function renderBrowserExecutionSurface(
     "- Persistence: none",
     "- Raw content: excluded",
     `- Evidence: ${renderEvidence(result)}`,
+    `- Receipt: ${renderBrowserExecutionReceiptInlineSummary(result.receipt)}`,
+    `- Replay readiness: ${result.receipt.replayReadiness.status}`,
     `- Warnings/blockers: ${renderWarnings(result)}`,
     `- Next action: ${sanitizeBrowserText(result.nextAction)}`,
   ];

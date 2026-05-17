@@ -49,6 +49,9 @@ function summarizeBrowserExecutionEvidence(
   const invalidManifest = outputs.some((output) => /Manifest status:\s*invalid/i.test(output));
   const validManifest = outputs.some((output) => /Manifest status:\s*valid/i.test(output));
   const missingManifest = outputs.some((output) => /Manifest status:\s*missing/i.test(output));
+  const receipt = outputs.find((output) => /Browser execution receipt/i.test(output));
+  const receiptStatus = receipt?.match(/^- Status:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const replayReadiness = receipt?.match(/^- Replay readiness:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
   const dependencyDecision = outputs.find((output) => /Dependency decision:\s*external-runner-only/i.test(output))
     ? "external-runner-only"
     : "unknown";
@@ -57,6 +60,8 @@ function summarizeBrowserExecutionEvidence(
     `executed=${executedYes ? "yes" : executedNo ? "no" : "unknown"}`,
     `mode=${externalRunner ? "external-runner" : playwrightLocal ? "playwright-local" : localFixture ? "local-fixture" : "disabled"}`,
     `manifest=${validManifest ? "valid" : invalidManifest ? "invalid" : missingManifest ? "missing" : "unknown"}`,
+    `receipt=${receiptStatus}`,
+    `replay=${replayReadiness}`,
     `dependency=${dependencyDecision}`,
   ].join("; ");
 }

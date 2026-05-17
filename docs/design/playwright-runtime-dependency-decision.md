@@ -183,3 +183,10 @@ test/local runner process for local-fixture observe/extract evidence, while
 default execution, Playwright dependency, browser binary install, external
 network, MCP launch, provider/model calls, and raw runner output remain
 blocked.
+
+## Route 104 Evidence Receipt Note
+
+Route 104 does not change the dependency decision. Browser execution evidence is
+now summarized through receipts and replay-readiness metadata, but no Playwright
+package, browser binary install, MCP launch, external network, provider/model
+call, or raw evidence surface is added.

@@ -15,6 +15,7 @@ import {
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import { createBrowserExecutionResult } from "./browserExecutionResult.js";
 import { renderBrowserExecutionSurface } from "./browserExecutionSurface.js";
+import { renderBrowserExecutionReceiptSurface } from "./browserExecutionReceiptSurface.js";
 import { renderBrowserExternalRunnerSurface } from "./browserExternalRunnerSurface.js";
 import { renderBrowserExecutionLifecycleSurface } from "./browserExecutionLifecycleSurface.js";
 import { decideBrowserExecutionPolicy } from "./browserExecutionPolicy.js";
@@ -76,6 +77,7 @@ export async function runBrowserExecutionCommand(input: {
     request,
     policy,
     executorResult,
+    now: input.now,
   });
   return {
     output: [
@@ -83,6 +85,8 @@ export async function runBrowserExecutionCommand(input: {
       ...(executor.kind === "external-runner"
         ? ["", renderBrowserExternalRunnerSurface(result)]
         : []),
+      "",
+      renderBrowserExecutionReceiptSurface(result.receipt),
       "",
       renderBrowserSandboxSurface(preflight, result.executed),
       "",

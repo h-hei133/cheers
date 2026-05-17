@@ -1525,6 +1525,15 @@ Allowed after this document:
   launch/discovery, provider/model calls, persistent browser session, CLI
   lifecycle rewrite, SessionManager schema change, automatic recovery,
   rollback, or default mutation readiness.
+- Route 104 browser/tooling work adds stable browser execution receipts,
+  evidence bundles, safety classification, replay-readiness metadata, receipt
+  surfaces, sidebar/report summaries, harness receipt assertions, and real CLI
+  scenarios for success, external URL blocking, malformed response, timeout,
+  and unsafe output. It remains evidence-only and outside edit runtime, with no
+  replay execution, action cache persistence, package dependency, default
+  browser execution, external network, MCP launch/discovery, provider/model
+  calls, persistent browser session, CLI lifecycle rewrite, SessionManager
+  schema change, automatic recovery, rollback, or default mutation readiness.
 
 Forbidden after this document:
 
@@ -1542,12 +1551,11 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 104 recommendation: choose browser external runner evidence/report
-hardening if CLI evidence needs more polish, choose skill-managed runner
-metadata prototype if the skill-managed boundary should become real, or choose
-browser action cache/replay design if repeatability should come before
-external network. Do not treat
+Route 105 recommendation: choose skill-managed browser runner metadata
+prototype if receipts stay stable, choose browser action cache/replay design if
+repeatability should come next, or choose browser evidence report polish if
+receipt output needs more compression. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
-Route 98, Route 99, Route 100, Route 101, Route 102, or Route 103 as
+Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, or Route 104 as
 edit-capability expansions.

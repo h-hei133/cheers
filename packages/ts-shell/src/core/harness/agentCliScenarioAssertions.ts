@@ -6,6 +6,7 @@ import type {
   AgentCliScenarioStepResult,
   AgentCliScenarioStatus,
 } from "./agentCliScenarioModel.js";
+import { evaluateBrowserExecutionReceiptAssertion } from "./browserExecutionReceiptAssertions.js";
 
 export function evaluateAgentCliAssertion(input: {
   readonly assertion: AgentCliAssertion;
@@ -37,6 +38,15 @@ export function evaluateAgentCliAssertion(input: {
       return passIf(assertion, /Executed:\s*yes/i.test(output), "Command did not report Executed: yes.");
     case "browser-execution-blocked":
       return passIf(assertion, /Browser execution/i.test(output) && /Outcome:\s*blocked/i.test(output), "Browser execution was not blocked.");
+    case "browser-receipt-exists":
+    case "browser-receipt-status":
+    case "browser-receipt-executed":
+    case "browser-receipt-replay-readiness":
+    case "browser-receipt-safe":
+    case "browser-receipt-decisions":
+    case "browser-receipt-local-test-scoped":
+    case "browser-receipt-next-action":
+      return evaluateBrowserExecutionReceiptAssertion({ assertion, process });
     case "sidebar-panel-exists":
       return passIf(assertion, /Visible agent state panel/i.test(output), "Sidebar panel output was not observed.");
     case "no-raw-content-or-secrets":

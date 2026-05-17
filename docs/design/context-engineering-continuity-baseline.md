@@ -487,8 +487,9 @@ lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   Route 97 browser sandbox/allowlist preflight, Route 98 real CLI scenario
   process evidence, Route 99 local-fixture execution, Route 100 real CLI
   local-fixture injection, Route 101 Playwright local unavailable/bridge
-  hardening, Route 102 external-runner-only dependency policy, and Route 103
-  manifest-scoped external runner bridge are now
+  hardening, Route 102 external-runner-only dependency policy, Route 103
+  manifest-scoped external runner bridge, and Route 104 browser execution
+  receipts/replay-readiness evidence are now
   machine-checkable enough to plan skill-managed runner bridges, external
   browser opt-in, sandbox lifecycle hardening,
   startup-read integration, or retrieval-quality work separately.

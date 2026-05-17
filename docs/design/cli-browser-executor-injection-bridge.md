@@ -160,3 +160,10 @@ validates the manifest, creates an external runner executor, and keeps the
 same local-fixture sandbox and no-network allowlist. Missing or invalid
 manifests remain disabled/blocked, and local-fixture plus `playwright-local`
 manifest paths continue to work.
+
+## Route 104 Evidence Receipt Note
+
+Route 104 keeps CLI injection manifest-scoped and explicit while adding receipt
+summaries to `/browser execute` output and scenario reports. The bridge still
+does not persist runner/cache state, launch Playwright/MCP, use external
+network, call providers/models, or expose raw manifest, runner, or page content.

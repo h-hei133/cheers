@@ -241,3 +241,10 @@ Route 103 lets `test-local` and `external-local` modes share the
 `local-fixture://` navigation exception, but only through a validated external
 runner manifest. HTTP/HTTPS targets remain blocked by the existing
 default-deny allowlist, so the bridge adds no external-network browsing.
+
+## Route 104 Evidence Receipt Note
+
+Route 104 records sandbox, allowlist, and confirmation decisions in browser
+execution receipts and uses them for replay-readiness classification.
+HTTP/HTTPS targets remain blocked, replay is not executed, and no new network,
+MCP, provider/model, persistence, or raw evidence surface is added.

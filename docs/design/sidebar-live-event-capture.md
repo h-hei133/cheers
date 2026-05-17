@@ -249,3 +249,11 @@ Route 102 adds the browser runtime dependency decision to the existing browser
 tool/status summary. The sidebar model remains session-scoped and sanitized:
 no raw runner config, persistence, dynamic discovery, MCP launch,
 provider/model call, or startup/model injection is added.
+
+## Route 104 Evidence Receipt Note
+
+Route 104 lets the existing `/browser` command-result event adapter summarize
+receipt-safe lines such as receipt id, status, replay readiness, executed
+state, and next action. Sidebar events remain sanitized, session-scoped, and
+in-memory; no raw evidence, persistence, MCP launch, provider/model call, or
+startup/model injection is added.

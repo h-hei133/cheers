@@ -188,3 +188,11 @@ runner executor path. The new path can execute only through an explicit
 external-runner manifest and local/test process adapter; it still reports no
 browser process launch, no Playwright dependency, no MCP launch, no external
 network, and no raw page or runner content.
+
+## Route 104 Evidence Receipt Note
+
+Route 104 leaves real Playwright execution unchanged. The added receipt,
+evidence bundle, and replay-readiness surfaces classify local/test browser
+execution output only, with no replay execution, Playwright dependency,
+external-network access, MCP launch, provider/model call, persistent browser
+session, or raw evidence exposure.
