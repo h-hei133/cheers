@@ -177,7 +177,6 @@ Tests:
 
 Deferred to a future route:
 
-- browser sandbox/runtime selection
 - Playwright CLI/Skills execution
 - Playwright MCP adapter and server lifecycle
 - Stagehand-like action cache/replay design
@@ -185,10 +184,16 @@ Deferred to a future route:
 - auth/payment/destructive browser automation policy
 - browser session persistence
 
-## Next Route Criteria
+## Route 94 Dry-Run Note
 
-Choose browser sandbox/runtime decision and non-executing dry-run harness if
-this boundary is stable and execution planning is next.
+Route 94 adds a non-executing browser dry-run harness and runtime decision
+model. `/browser dry-run ...` can render a future execution plan, preferred
+runtime candidate, sandbox requirements, expected evidence, blocked risks, and
+`Executed: no`. It still does not launch Playwright, launch/discover MCP,
+navigate websites, call network, call providers/models, persist browser
+sessions, capture screenshots/OCR/snapshots, or expose raw browser content.
+
+## Next Route Criteria
 
 Choose Playwright CLI/Skills integration prototype if deterministic local CLI
 execution is preferred.

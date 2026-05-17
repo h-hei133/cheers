@@ -908,7 +908,7 @@ describe("slash router (W4)", () => {
     }
   });
 
-  it("routes /browser status and preview without browser execution", async () => {
+  it("routes /browser status, preview, and dry-run without browser execution", async () => {
     const sidebarLiveEventStore = createSidebarLiveEventStore({
       now: () => "2026-05-18T00:00:00.000Z",
     });
@@ -924,6 +924,11 @@ describe("slash router (W4)", () => {
       sidebarLiveEventStore,
     });
     const blocked = await routeSlashCommand("/browser preview payment checkout", {
+      cwd: workspaceRoot,
+      sessionId: "sess_browser",
+      sidebarLiveEventStore,
+    });
+    const dryRun = await routeSlashCommand("/browser dry-run click Checkout button", {
       cwd: workspaceRoot,
       sessionId: "sess_browser",
       sidebarLiveEventStore,
@@ -954,11 +959,21 @@ describe("slash router (W4)", () => {
       expect(blocked.output).toContain("- Readiness: blocked-payment");
       expect(blocked.output).toContain("- Executed: no");
     }
+    expect(dryRun?.kind).toBe("local");
+    if (dryRun?.kind === "local") {
+      expect(dryRun.output).toContain("Browser dry-run");
+      expect(dryRun.output).toContain("- Requested action: click");
+      expect(dryRun.output).toContain("- Sandbox decision: future-confirmation-required");
+      expect(dryRun.output).toContain("- Executed: no");
+      expect(dryRun.output).toContain("- Browser process: not launched");
+      expect(dryRun.output).toContain("- Provider/model call: none");
+    }
     expect(sidebar?.kind).toBe("local");
     if (sidebar?.kind === "local") {
       expect(sidebar.output).toContain("Browser capability");
       expect(sidebar.output).toContain("preview-only; no browser/MCP launch");
       expect(sidebar.output).toContain("Browser preview");
+      expect(sidebar.output).toContain("Browser dry-run");
       expect(sidebar.output).not.toContain("Unknown slash command");
     }
   });

@@ -193,6 +193,14 @@ Tools section. Browser status is supplied explicitly; `/sidebar` does not
 discover MCP servers, launch Playwright, start browser sessions, call
 providers/models, persist browser state, or render raw browser content.
 
+## Route 94 Browser Dry-Run Note
+
+Route 94 lets sanitized `/browser dry-run ...` command results appear as
+ordinary sidebar recent activity. The sidebar may show the dry-run runtime
+recommendation and sandbox decision as text from the local command output, but
+it still does not discover tools, launch browser/MCP runtimes, persist browser
+state, call providers/models, or render raw browser content.
+
 ## Deferred
 
 Defer these to future routes:

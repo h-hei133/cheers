@@ -170,6 +170,15 @@ remain hidden by default. The watch output is bounded to deterministic frames
 and does not add persistence, provider/model calls, dynamic discovery, schema
 changes, or a terminal repaint loop.
 
+## Route 94 Browser Dry-Run Note
+
+Route 94 extends browser command activity to include `/browser dry-run ...`.
+Events are still produced by the existing command adapter, stored only in the
+session-scoped in-memory live event store, and summarized through allowlisted
+sanitized lines. No browser/MCP launch, dynamic discovery, persistence,
+provider/model call, raw browser content, or raw event payload rendering is
+added.
+
 ## Deferred
 
 Still deferred:

@@ -3,6 +3,8 @@ import { renderBrowserActionPreview } from "./browserActionPreview.js";
 import { createBrowserCapabilityState, type BrowserCapabilityState } from "./browserCapabilityModel.js";
 import { renderBrowserCapabilitySurface } from "./browserCapabilitySurface.js";
 import type { BrowserCommandContract } from "./browserCommandContract.js";
+import { runBrowserDryRunHarness } from "./browserDryRunHarness.js";
+import { renderBrowserDryRunSurface } from "./browserDryRunSurface.js";
 
 export interface BrowserCommandRunResult {
   readonly output: string;
@@ -36,6 +38,21 @@ export function runBrowserCommand(input: {
         "- DoNext: Use /browser preview navigate <url>, extract <goal>, click <target>, or type <target> <text>.",
       ].join("\n"),
       evidence: ["browser-command-runner:missing-preview-action"],
+    };
+  }
+  if (input.contract.mode === "dry-run") {
+    const dryRun = runBrowserDryRunHarness({ contract: action, capability });
+    const surface = renderBrowserDryRunSurface(dryRun.plan);
+    return {
+      output: surface.output,
+      evidence: [
+        ...dryRun.evidence,
+        ...surface.evidence,
+        "browser-command-runner:dry-run",
+        "browser-command-runner:no-browser-execution",
+        "browser-command-runner:no-provider-or-model-call",
+        "browser-command-runner:no-persistence",
+      ],
     };
   }
   const readiness = classifyBrowserActionReadiness({ contract: action, capability });

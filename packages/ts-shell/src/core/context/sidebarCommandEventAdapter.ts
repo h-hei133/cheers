@@ -155,7 +155,13 @@ function titleForCommand(
     return subcommand === "rebuild" ? "Warmup rebuilt" : "Warmup status";
   }
   if (family === "browser") {
-    return subcommand === "preview" ? "Browser preview" : "Browser status";
+    if (subcommand === "preview") {
+      return "Browser preview";
+    }
+    if (subcommand === "dry-run") {
+      return "Browser dry-run";
+    }
+    return "Browser status";
   }
   if (family === "sidebar") {
     return "Sidebar rendered";
@@ -210,5 +216,5 @@ function summarizeCommandOutput(outcome: string, output: string): string {
 }
 
 function isSafeSummaryLine(line: string): boolean {
-  return /^- (Outcome|BlockerKind|Memory written|Auto-load|Auto-injected|Injected into model|Startup auto-load|Provider\/model call|Persistence|Recovery execution|Future-turn injection|Injection status|Checkpoint id|Result count|Cache status|Staleness|Browser capability|Action|Target|Risk|Readiness|Executed|Browser process|MCP discovery\/launch|DoNext):/i.test(line);
+  return /^- (Outcome|BlockerKind|Memory written|Auto-load|Auto-injected|Injected into model|Startup auto-load|Provider\/model call|Persistence|Recovery execution|Future-turn injection|Injection status|Checkpoint id|Result count|Cache status|Staleness|Browser capability|Action|Requested action|Target|Risk|Readiness|Recommended future runtime|Sandbox decision|Blocked risks|Executed|Browser process|MCP discovery\/launch|Network access|DoNext|Next action):/i.test(line);
 }
