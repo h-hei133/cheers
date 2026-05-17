@@ -152,10 +152,22 @@ function hasNoProviderBrowserNetworkEvidence(value: string): boolean {
     /Browser process:\s*not launched/i.test(value) &&
     /MCP discovery\/launch:\s*none/i.test(value) &&
     /Provider\/model call:\s*none/i.test(value);
+  const skillRunnerExecution =
+    /Mode:\s*skill-managed/i.test(value) &&
+    /Skill-managed browser execution/i.test(value) &&
+    /Browser process:\s*skill-managed local\/test runner only/i.test(value) &&
+    /MCP discovery\/launch:\s*none/i.test(value) &&
+    /Provider\/model call:\s*none/i.test(value);
   if (/browser process:\s*(launched|started)|real browser execution:\s*yes/i.test(value)) {
     return false;
   }
-  if (/executed:\s*yes/i.test(value) && !localFixtureExecution && !playwrightLocalExecution && !externalRunnerExecution) {
+  if (
+    /executed:\s*yes/i.test(value) &&
+    !localFixtureExecution &&
+    !playwrightLocalExecution &&
+    !externalRunnerExecution &&
+    !skillRunnerExecution
+  ) {
     return false;
   }
   return true;

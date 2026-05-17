@@ -17,6 +17,8 @@ import {
   type BrowserSkillRunnerReadiness,
 } from "./browserSkillRunnerReadiness.js";
 import type { BrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
+import type { BrowserSkillRunnerBinding } from "./browserSkillRunnerBinding.js";
+import { BrowserSkillExecutionExecutor } from "./browserSkillExecutionExecutor.js";
 import {
   decideBrowserRuntimeDependencyPolicy,
 } from "./browserRuntimeDependencyPolicy.js";
@@ -49,6 +51,7 @@ export interface BrowserCliExecutionBridgeSummary {
   readonly dependencyDecision: string;
   readonly externalRunnerStatus: BrowserExternalRunnerDecision["status"];
   readonly skillRunnerMetadata?: BrowserSkillRunnerMetadata;
+  readonly skillRunnerBinding?: BrowserSkillRunnerBinding;
   readonly skillRunnerReadiness?: BrowserSkillRunnerReadiness;
   readonly reason: string;
   readonly evidence: readonly string[];
@@ -128,9 +131,18 @@ export function createBrowserCliExecutionBridge(
     if (manifest.runnerMode === "skill-managed") {
       const skillRunnerReadiness = classifyBrowserSkillRunnerReadiness({
         metadata: manifest.skillRunnerMetadata,
-        futureExecutionRequired: !!manifest.skillRunnerMetadata,
+        futureExecutionRequired: !!manifest.skillRunnerMetadata && !manifest.skillRunnerBinding,
       });
+      const skillExecutor = manifest.skillRunnerMetadata && manifest.skillRunnerBinding
+        ? new BrowserSkillExecutionExecutor({
+            metadata: manifest.skillRunnerMetadata,
+            binding: manifest.skillRunnerBinding,
+            fixture: injection.fixture,
+            authority,
+          })
+        : undefined;
       return {
+        browserExecutor: skillExecutor,
         browserSandboxAuthority: createBrowserSandboxAuthority({
           mode: "local-fixture",
         }),
@@ -148,20 +160,27 @@ export function createBrowserCliExecutionBridge(
           manifestStatus: "valid",
           executionMode: "skill-managed",
           dependencyDecision: browserRuntimeDependencySummary(decideBrowserRuntimeDependencyPolicy()),
-          externalRunnerStatus: manifest.skillRunnerMetadata
-            ? "future-execution-required"
+          externalRunnerStatus: manifest.skillRunnerBinding
+            ? "allowed"
+            : manifest.skillRunnerMetadata
+              ? "future-execution-required"
             : "future-skill-required",
           skillRunnerMetadata: manifest.skillRunnerMetadata,
+          skillRunnerBinding: manifest.skillRunnerBinding,
           skillRunnerReadiness,
-          reason: manifest.skillRunnerMetadata
+          reason: manifest.skillRunnerBinding
+            ? "Skill-managed runner metadata and explicit local/test binding are valid."
+            : manifest.skillRunnerMetadata
             ? "Skill-managed runner metadata is valid; execution waits for an explicit future bridge."
             : "Skill-managed runner manifest is policy-only until explicit metadata is provided.",
           evidence: [
             ...injection.evidence,
             ...externalRunnerDecision.evidence,
             ...skillRunnerReadiness.evidence,
-            "browser-cli-execution-bridge:skill-runner-metadata-only",
-            "browser-cli-execution-bridge:no-skill-execution",
+            manifest.skillRunnerBinding
+              ? "browser-cli-execution-bridge:skill-runner-created"
+              : "browser-cli-execution-bridge:skill-runner-metadata-only",
+            ...(manifest.skillRunnerBinding ? [] : ["browser-cli-execution-bridge:no-skill-execution"]),
             "browser-cli-execution-bridge:no-playwright-dependency",
             "browser-cli-execution-bridge:no-mcp-launch",
           ],
@@ -308,6 +327,7 @@ export function renderBrowserCliExecutionBridgeSummary(
     `- Dependency decision: ${value.dependencyDecision}`,
     `- External runner policy: ${value.externalRunnerStatus}`,
     `- Skill metadata status: ${value.skillRunnerReadiness?.status ?? (value.skillRunnerMetadata ? "metadata-ready" : "unavailable")}`,
+    `- Skill binding mode: ${value.skillRunnerBinding?.mode ?? "none"}`,
     `- Playwright availability: ${value.playwrightAvailabilityStatus ?? "not-requested"}`,
     `- Executor source: ${value.executorSource}`,
     `- Manifest status: ${value.manifestStatus}`,

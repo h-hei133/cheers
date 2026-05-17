@@ -210,15 +210,17 @@ function severityForOutcome(
 
 function summarizeCommandOutput(outcome: string, output: string): string {
   const skillMetadata = output.match(/^- Metadata status:\s*(.+)$/im)?.[0]?.trim();
+  const skillBinding = output.match(/^- Binding mode:\s*(.+)$/im)?.[0]?.trim() ??
+    output.match(/^- Skill binding mode:\s*(.+)$/im)?.[0]?.trim();
   const details = output
     .split("\n")
     .map((line) => line.trim())
     .filter(isSafeSummaryLine)
     .slice(0, 5)
     .join("; ");
-  return `${outcome}: ${[skillMetadata, details].filter(Boolean).join("; ") || "completed; raw output excluded"}`;
+  return `${outcome}: ${[skillMetadata, skillBinding, details].filter(Boolean).join("; ") || "completed; raw output excluded"}`;
 }
 
 function isSafeSummaryLine(line: string): boolean {
-  return /^- (Outcome|BlockerKind|Memory written|Auto-load|Auto-injected|Injected into model|Startup auto-load|Provider\/model call|Persistence|Recovery execution|Future-turn injection|Injection status|Checkpoint id|Result count|Cache status|Staleness|Browser capability|Action|Requested action|Target|Risk|Readiness|Recommended future runtime|Sandbox decision|Blocked risks|Preflight status|Sandbox authority|Network allowlist|Confirmation status|Evidence requirements|Blockers\/warnings|Executed|Browser process|MCP discovery\/launch|Network access|Receipt|Receipt id|Status|Mode|Runner|Skill runner|Skill id\/name|Metadata status|Supported actions|Blocked actions|Evidence contract|Sandbox contract|Replay contract|Execution|Evidence summary|Replay readiness|Redactions\/warnings|DoNext|Next action):/i.test(line);
+  return /^- (Outcome|BlockerKind|Memory written|Auto-load|Auto-injected|Injected into model|Startup auto-load|Provider\/model call|Persistence|Recovery execution|Future-turn injection|Injection status|Checkpoint id|Result count|Cache status|Staleness|Browser capability|Action|Requested action|Target|Risk|Readiness|Recommended future runtime|Sandbox decision|Blocked risks|Preflight status|Sandbox authority|Network allowlist|Confirmation status|Evidence requirements|Blockers\/warnings|Executed|Browser process|MCP discovery\/launch|Network access|Receipt|Receipt id|Status|Source|Mode|Runner|Skill runner|Skill id\/name|Metadata status|Skill binding mode|Binding mode|Supported actions|Blocked actions|Evidence contract|Sandbox contract|Replay contract|Execution|Execution status|Evidence summary|Receipt status|Replay readiness|Redactions\/warnings|DoNext|Next action):/i.test(line);
 }

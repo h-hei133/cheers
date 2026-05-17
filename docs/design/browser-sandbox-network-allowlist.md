@@ -255,3 +255,12 @@ Route 105 skill runner metadata must declare `local-fixture-no-network`,
 allowlist `none`, and safe-summary evidence. Valid metadata does not weaken
 preflight: HTTP/HTTPS targets remain blocked and no skill, MCP, browser, or
 network execution is enabled.
+
+## Route 106 Skill Execution Bridge Note
+
+Route 106 allows skill-managed execution only for explicit local/test bindings
+whose metadata and binding preserve `local-fixture-no-network`, allowlist
+`none`, safe-summary evidence, and read-only local fixture actions. HTTP/HTTPS
+targets remain blocked, and unsafe capability claims, arbitrary JavaScript,
+auth/payment/destructive actions, file upload/download, screenshot/OCR, MCP
+launch, provider/model calls, and raw runner/page output remain out of scope.

@@ -197,3 +197,11 @@ Route 105 does not change the external-runner-only dependency decision. It adds
 skill-managed metadata/readiness surfaces only; no Playwright package, browser
 binary install, MCP launch/discovery, external network, provider/model call, or
 default browser execution is added.
+
+## Route 106 Skill Execution Bridge Note
+
+Route 106 keeps the external-runner-only dependency decision. Skill-managed
+execution runs only through an explicit local/test runner binding supplied by a
+manifest; it does not add a Playwright package, browser binary install, MCP
+server launch, dynamic discovery, external network, provider/model call,
+default browser execution, or package/default-gate change.

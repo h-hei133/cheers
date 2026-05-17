@@ -41,6 +41,9 @@ function browserProcessLabel(kind: BrowserExecutionResult["executorResult"]["exe
   if (kind === "external-runner") {
     return "not launched";
   }
+  if (kind === "skill-runner") {
+    return "skill-managed local/test runner only";
+  }
   return "not launched";
 }
 

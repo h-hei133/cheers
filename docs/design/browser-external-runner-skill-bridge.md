@@ -203,3 +203,13 @@ external runner manifests may still create explicit test/local process
 executors. Skill-managed manifests can carry validated skill runner metadata,
 but they create no executor and report `future-execution-required` until a
 separate execution bridge route exists.
+
+## Route 106 Skill Execution Bridge Note
+
+Route 106 adds a separate skill-managed execution bridge on top of the existing
+local/test process adapter. Raw external runner manifests still use the Route
+103 external-runner path; skill-managed manifests must include valid metadata
+and an explicit matching binding before an executor is constructed. Metadata
+alone still reports `future-execution-required`, and the bridge adds no dynamic
+discovery, MCP launch, Playwright dependency, provider/model call, external
+network, default execution, persistent browser session, or raw runner output.

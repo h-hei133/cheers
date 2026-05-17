@@ -8,6 +8,7 @@ export function renderBrowserExecutionReceiptSurface(
     "Browser execution receipt",
     `- Receipt id: ${sanitizeBrowserText(receipt.receiptId, 140)}`,
     `- Status: ${receipt.status}`,
+    `- Source: ${receipt.source}`,
     `- Action: ${receipt.actionKind}`,
     `- Mode: ${receipt.executionMode}`,
     `- Runner: ${sanitizeBrowserText(`${receipt.runnerId} (${receipt.runnerSource})`, 160)}`,

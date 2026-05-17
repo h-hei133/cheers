@@ -24,6 +24,10 @@ import { runBrowserRuntimePreflight } from "./browserRuntimePreflight.js";
 import { renderBrowserSandboxSurface } from "./browserSandboxSurface.js";
 import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
 import { renderBrowserSkillRunnerSurface } from "./browserSkillRunnerSurface.js";
+import {
+  hasBrowserSkillExecutionEvidence,
+  renderBrowserSkillExecutionSurface,
+} from "./browserSkillExecutionSurface.js";
 
 export interface BrowserExecutionCommandRunResult {
   readonly output: string;
@@ -53,6 +57,8 @@ export async function runBrowserExecutionCommand(input: {
             ? "explicit-local"
           : executor.kind === "external-runner"
             ? "test-local"
+            : executor.kind === "skill-runner"
+              ? "skill-managed"
             : input.request.mode,
   } as BrowserExecutionRequest;
   const policy = decideBrowserExecutionPolicy({
@@ -87,6 +93,9 @@ export async function runBrowserExecutionCommand(input: {
       renderBrowserExecutionSurface(result),
       ...(executor.kind === "external-runner"
         ? ["", renderBrowserExternalRunnerSurface(result)]
+        : []),
+      ...(hasBrowserSkillExecutionEvidence(result)
+        ? ["", renderBrowserSkillExecutionSurface(result)]
         : []),
       "",
       renderBrowserExecutionReceiptSurface(result.receipt),

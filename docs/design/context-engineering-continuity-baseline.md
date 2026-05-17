@@ -502,3 +502,14 @@ coverage. It remains metadata-only: no dynamic discovery, skill execution,
 MCP launch, Playwright dependency, provider/model call, external network,
 persistence, startup/model auto-injection, SessionManager schema change, or raw
 metadata/content/secrets surface is added.
+
+## Route 106 Skill Execution Bridge Note
+
+Route 106 adds explicit skill-managed browser runner execution for local/test
+bindings only. It introduces a safe request/response protocol, binding
+validator, execution bridge, executor, surface, receipt/replay integration,
+sidebar/report summaries, and real CLI scenario coverage. It remains outside
+context persistence and startup/model injection: no dynamic discovery, MCP
+launch, Playwright dependency, external network, provider/model call,
+SessionManager schema change, memory persistence behavior change, automatic
+recovery, atomic rollback, or raw skill/page output is added.

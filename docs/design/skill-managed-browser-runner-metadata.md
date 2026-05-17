@@ -166,3 +166,12 @@ and execution receipts.
 
 Alternative Route 106: browser action cache/replay design, if replay metadata
 should be formalized before skill execution.
+
+## Route 106 Execution Bridge Note
+
+Route 106 adds explicit local/test skill runner binding and execution. Metadata
+alone still does not authorize execution; a valid binding must match the
+metadata id/version and safe action subset. Skill-managed execution remains
+local-fixture-only, safe-summary-only, no dynamic discovery, no MCP/provider/
+model call, no Playwright dependency, no external network, and no raw skill or
+page output.

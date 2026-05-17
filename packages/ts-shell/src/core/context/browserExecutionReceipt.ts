@@ -25,6 +25,7 @@ export type BrowserExecutionReceiptStatus =
   | "unsafe-output";
 export type BrowserExecutionReceiptSource =
   | "external-runner"
+  | "skill-managed"
   | "local-fixture"
   | "fake-test"
   | "playwright-local-unavailable"
@@ -96,8 +97,7 @@ export function createBrowserExecutionReceipt(input: {
     confirmationDecision,
     runnerId,
     manifestId,
-    skillRunnerRequired: input.skillRunnerReadiness?.status === "future-execution-required" ||
-      input.skillRunnerReadiness?.status === "metadata-ready",
+    skillRunnerRequired: input.skillRunnerReadiness?.status === "future-execution-required",
   });
   return {
     receiptId: deterministicBrowserExecutionReceiptId(input.request.requestId, status, input.executorResult.executorKind),
@@ -176,6 +176,9 @@ function receiptStatus(result: BrowserExecutorResult): BrowserExecutionReceiptSt
 function receiptSource(result: BrowserExecutorResult): BrowserExecutionReceiptSource {
   if (result.executorKind === "external-runner") {
     return "external-runner";
+  }
+  if (result.executorKind === "skill-runner" || evidenceValue(result, "skill execution") === "skill-managed") {
+    return "skill-managed";
   }
   if (result.executorKind === "local-fixture" || result.executorKind === "explicit-local") {
     return "local-fixture";

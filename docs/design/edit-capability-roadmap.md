@@ -1543,6 +1543,14 @@ Allowed after this document:
   external network, provider/model call, persistent browser session, CLI
   lifecycle rewrite, SessionManager schema change, automatic recovery,
   rollback, or default mutation readiness.
+- Route 106 browser/tooling work adds explicit skill-managed local/test runner
+  execution behind matching metadata and binding, with safe protocol,
+  execution bridge, executor, receipt/replay integration, sidebar/report
+  summaries, and real CLI scenarios. It remains outside edit runtime, with no
+  dynamic discovery, MCP launch, Playwright dependency, package/default gate
+  change, external network, provider/model call, persistent browser session,
+  CLI lifecycle rewrite, SessionManager schema change, automatic recovery,
+  rollback, or default mutation readiness.
 
 Forbidden after this document:
 
@@ -1560,11 +1568,12 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 106 recommendation: choose skill-managed browser runner execution bridge
-if metadata/readiness stays stable, choose browser action cache/replay design if
-repeatability should come next, or choose browser evidence report polish if
-receipt output needs more compression. Do not treat
+Route 107 recommendation: choose browser action cache/replay design if
+skill-managed local/test execution stays stable, choose browser runner
+UX/report polish if receipt output needs more compression, or choose
+skill-managed runner packaging/registry only if explicit binding remains too
+manual. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
 Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, Route 104, or
-Route 105 as edit-capability expansions.
+Route 105, or Route 106 as edit-capability expansions.

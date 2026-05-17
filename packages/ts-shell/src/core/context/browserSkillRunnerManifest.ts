@@ -5,6 +5,10 @@ import {
   type BrowserSkillRunnerMetadata,
 } from "./browserSkillRunnerMetadata.js";
 import {
+  validateBrowserSkillRunnerBinding,
+  type BrowserSkillRunnerBinding,
+} from "./browserSkillRunnerBinding.js";
+import {
   classifyBrowserSkillRunnerReadiness,
   type BrowserSkillRunnerReadiness,
 } from "./browserSkillRunnerReadiness.js";
@@ -16,6 +20,7 @@ export interface BrowserSkillRunnerManifest {
   readonly manifestVersion: typeof BROWSER_SKILL_RUNNER_MANIFEST_VERSION;
   readonly source: "cli-harness" | "explicit-local-config" | "test-only";
   readonly skillRunnerMetadata: BrowserSkillRunnerMetadata;
+  readonly skillRunnerBinding?: BrowserSkillRunnerBinding;
   readonly allowedActions: readonly string[];
   readonly fixtureScope: "local-fixture-only";
   readonly sandboxContract: "local-fixture-no-network";
@@ -46,6 +51,7 @@ export type BrowserSkillRunnerManifestValidationResult =
 export function createBrowserSkillRunnerManifest(input: {
   readonly source?: BrowserSkillRunnerManifest["source"];
   readonly metadata?: BrowserSkillRunnerMetadata;
+  readonly binding?: BrowserSkillRunnerBinding;
   readonly actions?: readonly string[];
   readonly timeoutMs?: number;
   readonly outputBudgetBytes?: number;
@@ -55,6 +61,7 @@ export function createBrowserSkillRunnerManifest(input: {
     manifestVersion: BROWSER_SKILL_RUNNER_MANIFEST_VERSION,
     source: input.source ?? "cli-harness",
     skillRunnerMetadata: metadata,
+    skillRunnerBinding: input.binding,
     allowedActions: metadata.supportedActions,
     fixtureScope: "local-fixture-only",
     sandboxContract: "local-fixture-no-network",
@@ -100,6 +107,12 @@ export function validateBrowserSkillRunnerManifest(
   if (metadataResult.ok === false) {
     return invalid(metadataResult.reason, metadataResult.evidence);
   }
+  const bindingResult = value.skillRunnerBinding !== undefined
+    ? validateBrowserSkillRunnerBinding(value.skillRunnerBinding, metadataResult.metadata)
+    : undefined;
+  if (bindingResult?.ok === false) {
+    return invalid(bindingResult.reason, bindingResult.evidence);
+  }
   const allowedActions = Array.isArray(value.allowedActions)
     ? value.allowedActions.filter((item): item is string => typeof item === "string")
     : [];
@@ -116,6 +129,7 @@ export function validateBrowserSkillRunnerManifest(
     manifestVersion: BROWSER_SKILL_RUNNER_MANIFEST_VERSION,
     source: value.source,
     skillRunnerMetadata: metadataResult.metadata,
+    skillRunnerBinding: bindingResult?.ok ? bindingResult.binding : undefined,
     allowedActions: allowedActions.map((action) => sanitizeBrowserText(action, 80)),
     fixtureScope: "local-fixture-only",
     sandboxContract: "local-fixture-no-network",
@@ -135,6 +149,7 @@ export function validateBrowserSkillRunnerManifest(
     readiness,
     evidence: [
       ...metadataResult.evidence,
+      ...(bindingResult?.ok ? bindingResult.evidence : []),
       ...readiness.evidence,
       "browser-skill-runner-manifest:validated",
       "browser-skill-runner-manifest:metadata-only",

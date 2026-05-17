@@ -265,3 +265,13 @@ Route 105 adds sanitized skill-managed metadata lines to the existing
 status, supported/blocked actions, contracts, execution disabled, and next
 action. They do not expose raw metadata and do not add persistence, MCP launch,
 provider/model calls, browser execution, or startup/model injection.
+
+## Route 106 Skill Execution Bridge Note
+
+Route 106 keeps `/browser` on the existing sanitized command-result event path.
+Skill-managed local/test execution can appear as a `Browser execution` event
+with skill id, binding mode, execution status, receipt status, and replay
+readiness. Missing binding, invalid metadata, timeout, malformed response, and
+unsafe output remain warning/blocker summaries. No sidebar persistence, raw
+runner output, MCP launch, provider/model call, dynamic discovery, or
+startup/model injection is added.

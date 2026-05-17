@@ -7,6 +7,9 @@ import { BrowserExternalRunnerExecutor } from "../context/browserExternalRunnerE
 import { validateBrowserExternalRunnerManifest } from "../context/browserExternalRunnerManifest.js";
 import { createBrowserSkillRunnerMetadata } from "../context/browserSkillRunnerMetadata.js";
 import { classifyBrowserSkillRunnerReadiness } from "../context/browserSkillRunnerReadiness.js";
+import { createBrowserSkillExecutionScenarioFixture } from "../harness/browserSkillExecutionScenarioFixtures.js";
+import { createBrowserCliExecutionBridge } from "../context/browserCliExecutionBridge.js";
+import { loadBrowserCliExecutorInjectionFromEnv } from "../context/browserCliExecutorInjection.js";
 import { createBrowserExternalRunnerScenarioFixture } from "../harness/browserExternalRunnerScenarioFixtures.js";
 
 describe("browser local command runtime", () => {
@@ -123,5 +126,42 @@ describe("browser local command runtime", () => {
       includeDeveloperOnly: true,
     }).events;
     expect(events[0]?.summary).toContain("Metadata status");
+  });
+
+  it("emits a sanitized sidebar event for skill-managed runner execution", async () => {
+    const fixture = createBrowserSkillExecutionScenarioFixture();
+    try {
+      const bridge = createBrowserCliExecutionBridge(
+        loadBrowserCliExecutorInjectionFromEnv({
+          env: fixture.env,
+        }),
+      );
+      const sidebarLiveEventStore = createSidebarLiveEventStore({
+        now: () => "2026-05-17T00:00:00.000Z",
+        nextId: () => "sidebar-event:test",
+      });
+      const result = await runBrowserLocalCommand(["execute", "observe", "local-fixture://route106-demo"], {
+        cwd: "/tmp/browser-command-runtime-test",
+        sessionId: "browser-runtime-test",
+        sidebarLiveEventStore,
+        browserExecutor: bridge.browserExecutor,
+        browserSandboxAuthority: bridge.browserSandboxAuthority,
+        browserNetworkAllowlist: bridge.browserNetworkAllowlist,
+        browserExecutionConfirmations: bridge.browserExecutionConfirmations,
+        browserCliExecutionBridgeSummary: bridge.browserCliExecutionBridgeSummary,
+      });
+
+      expect(result.output).toContain("Skill-managed browser execution");
+      expect(result.output).toContain("- Executed: yes");
+      const events = sidebarLiveEventStore.listRecent({
+        sessionScopeId: "session:browser-runtime-test",
+        includeDeveloperOnly: true,
+      }).events;
+      expect(events.map((event) => event.title)).toContain("Browser execution");
+      expect(events[0]?.summary).toContain("Binding mode");
+      expect(JSON.stringify(events)).not.toContain("RAW_");
+    } finally {
+      fixture.cleanup();
+    }
   });
 });

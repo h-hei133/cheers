@@ -223,3 +223,13 @@ runner scenarios assert metadata status, future-execution-required blocking,
 unsafe capability rejection, receipt/replay linkage, and report summaries
 without adding skill execution, dynamic discovery, browser runtime, MCP launch,
 or persistence behavior to the harness.
+
+## Route 106 Skill Execution Bridge Note
+
+Route 106 lets the harness recognize explicit skill-managed local/test
+execution only when command output proves `Mode: skill-managed`,
+`Skill-managed browser execution`, `Browser process: skill-managed local/test
+runner only`, no MCP launch, and no provider/model call. The harness remains an
+evidence/assertion layer; temp runner processes belong to scenario fixtures and
+do not add dynamic discovery, browser runtime ownership, persistence, or raw
+runner output reporting.

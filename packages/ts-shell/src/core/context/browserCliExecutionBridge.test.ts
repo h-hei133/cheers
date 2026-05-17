@@ -14,6 +14,7 @@ import {
   serializeBrowserLocalFixtureManifest,
 } from "./browserLocalFixtureManifest.js";
 import { createBrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
+import { createBrowserSkillRunnerBinding } from "./browserSkillRunnerBinding.js";
 
 describe("browser CLI execution bridge", () => {
   it("keeps execution disabled when injection is absent", () => {
@@ -146,6 +147,40 @@ describe("browser CLI execution bridge", () => {
     expect(bridge.browserCliExecutionBridgeSummary.externalRunnerStatus).toBe("future-execution-required");
     expect(bridge.browserCliExecutionBridgeSummary.evidence).toContain(
       "browser-cli-execution-bridge:no-skill-execution",
+    );
+  });
+
+  it("constructs a skill execution executor only for explicit skill binding", async () => {
+    const metadata = createBrowserSkillRunnerMetadata({
+      runnerId: "skill:browser-runner",
+      skillId: "skill:browser-runner",
+    });
+    const manifest = createBrowserExternalRunnerManifest({
+      source: "skill-managed",
+      runnerMode: "skill-managed",
+      runnerId: "skill:browser-runner",
+      runnerRef: "skill:browser-runner",
+      skillRunnerMetadata: metadata,
+      skillRunnerBinding: createBrowserSkillRunnerBinding({
+        metadata,
+        runnerCommand: {
+          command: process.execPath,
+          args: ["/tmp/route106-skill-runner.cjs"],
+        },
+      }),
+    });
+    const bridge = createBrowserCliExecutionBridge(
+      loadBrowserCliExecutorInjectionFromEnv({
+        env: { [BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV]: "/tmp/skill-runner.json" },
+        readFile: () => serializeBrowserExternalRunnerManifest(manifest),
+      }),
+    );
+
+    expect(bridge.browserExecutor?.kind).toBe("skill-runner");
+    expect(bridge.browserCliExecutionBridgeSummary.externalRunnerStatus).toBe("allowed");
+    expect(bridge.browserCliExecutionBridgeSummary.skillRunnerBinding?.mode).toBe("test-local-process");
+    expect(bridge.browserCliExecutionBridgeSummary.evidence).toContain(
+      "browser-cli-execution-bridge:skill-runner-created",
     );
   });
 });

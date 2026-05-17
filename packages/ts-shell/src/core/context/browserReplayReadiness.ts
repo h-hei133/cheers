@@ -168,7 +168,7 @@ function readinessStatus(input: {
 }
 
 function isLocalOrTestScoped(mode: BrowserExecutionMode, safeUrl: string): boolean {
-  return ["fake-test", "local-fixture", "playwright-local", "test-local", "external-local"].includes(mode) &&
+  return ["fake-test", "local-fixture", "playwright-local", "test-local", "external-local", "skill-managed"].includes(mode) &&
     !safeUrl.startsWith("external-url:");
 }
 

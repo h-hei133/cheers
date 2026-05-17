@@ -194,3 +194,11 @@ and adds `replay-needs-skill-runner` for metadata-ready but non-executable
 skill-managed results. Metadata readiness does not imply replay readiness:
 replay execution remains `not-started`, persistence remains `none`, and no
 skill, MCP, provider/model, Playwright, or browser process is launched.
+
+## Route 106 Skill Execution Receipt Note
+
+Route 106 sets receipt source to `skill-managed` for explicit local/test skill
+runner execution. Replay readiness can become `replay-ready` only for executed,
+safe, local-fixture skill actions with complete sandbox, allowlist, and
+confirmation decisions. Missing binding still reports `replay-needs-skill-runner`;
+unsafe or malformed skill output remains blocked and never triggers replay.

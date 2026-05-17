@@ -4,6 +4,7 @@ import {
   validateBrowserExternalRunnerManifest,
 } from "./browserExternalRunnerManifest.js";
 import { createBrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
+import { createBrowserSkillRunnerBinding } from "./browserSkillRunnerBinding.js";
 
 describe("browser external runner manifest", () => {
   it("validates safe test-local runner manifests", () => {
@@ -53,5 +54,36 @@ describe("browser external runner manifest", () => {
 
     expect(validateBrowserExternalRunnerManifest(manifest).ok).toBe(true);
     expect(validateBrowserExternalRunnerManifest(unsafe).ok).toBe(false);
+  });
+
+  it("accepts explicit skill runner binding only when it matches metadata", () => {
+    const metadata = createBrowserSkillRunnerMetadata({
+      runnerId: "skill:browser-runner",
+      skillId: "skill:browser-runner",
+    });
+    const manifest = createBrowserExternalRunnerManifest({
+      source: "skill-managed",
+      runnerMode: "skill-managed",
+      runnerId: "skill:browser-runner",
+      runnerRef: "skill:browser-runner",
+      skillRunnerMetadata: metadata,
+      skillRunnerBinding: createBrowserSkillRunnerBinding({
+        metadata,
+        runnerCommand: {
+          command: process.execPath,
+          args: ["/tmp/route106-skill-runner.cjs"],
+        },
+      }),
+    });
+    const mismatch = {
+      ...manifest,
+      skillRunnerBinding: {
+        ...manifest.skillRunnerBinding,
+        skillRunnerId: "skill:other",
+      },
+    };
+
+    expect(validateBrowserExternalRunnerManifest(manifest).ok).toBe(true);
+    expect(validateBrowserExternalRunnerManifest(mismatch).ok).toBe(false);
   });
 });

@@ -55,6 +55,10 @@ function summarizeBrowserExecutionEvidence(
   const skillMetadata = outputs.some((output) => /Skill-managed browser runner/i.test(output));
   const skillReadiness = outputs.find((output) => /Skill-managed browser runner/i.test(output))
     ?.match(/^- Metadata status:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const skillExecution = outputs.find((output) => /Skill-managed browser execution/i.test(output));
+  const skillBinding = skillExecution?.match(/^- Binding mode:\s*(.+)$/im)?.[1]?.trim() ??
+    outputs.find((output) => /Skill binding mode:/i.test(output))?.match(/^- Skill binding mode:\s*(.+)$/im)?.[1]?.trim() ??
+    "none";
   const dependencyDecision = outputs.find((output) => /Dependency decision:\s*external-runner-only/i.test(output))
     ? "external-runner-only"
     : "unknown";
@@ -66,6 +70,7 @@ function summarizeBrowserExecutionEvidence(
     `receipt=${receiptStatus}`,
     `replay=${replayReadiness}`,
     `skill=${skillMetadata ? skillReadiness : "none"}`,
+    `binding=${skillBinding}`,
     `dependency=${dependencyDecision}`,
   ].join("; ");
 }

@@ -198,3 +198,14 @@ external runner manifest env path. They cover no metadata, valid metadata,
 future-execution-required execute output, unsafe metadata rejection, and compact
 report summaries without raw manifest content, skill execution, MCP launch,
 network access, provider/model calls, or cross-process sidebar persistence.
+
+## Route 106 Skill Execution Bridge Note
+
+Route 106 extends real CLI browser scenarios with temp skill runner bindings and
+scripts. Scenarios cover default blocked, valid metadata without binding,
+skill-managed observe/extract success, external URL blocking, unsafe
+capability rejection, malformed response, timeout, and unsafe output. Reports
+summarize skill id, binding mode, receipt status, and replay readiness without
+raw runner stdout/stderr, raw manifest content, raw page content, secrets,
+network access, MCP launch, provider/model calls, or cross-process sidebar
+persistence.
