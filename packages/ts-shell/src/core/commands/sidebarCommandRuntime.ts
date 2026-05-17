@@ -1,4 +1,6 @@
 import { getLatestCompactCheckpoint } from "../context/compactLiveCheckpoint.js";
+import { parseSidebarLivePanelCommandArgs } from "../context/sidebarLivePanelCommandContract.js";
+import { runSidebarLivePanelCommand } from "../context/sidebarLivePanelCommandRunner.js";
 import { parseSidebarPanelCommandArgs } from "../context/sidebarPanelCommandContract.js";
 import { runSidebarPanelCommand } from "../context/sidebarPanelCommandRunner.js";
 import { projectSidebarState } from "../context/sidebarStateProjection.js";
@@ -13,7 +15,10 @@ export async function runSidebarLocalCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const parsed = parseSidebarPanelCommandArgs(args);
+  const liveParsed = args[0] === "watch" || args[0] === "live"
+    ? parseSidebarLivePanelCommandArgs(args)
+    : undefined;
+  const parsed = liveParsed ?? parseSidebarPanelCommandArgs(args);
   if (!parsed.ok || !parsed.contract) {
     return {
       kind: "local",
@@ -78,6 +83,19 @@ export async function runSidebarLocalCommand(
     bridgeDroppedEventCount: liveEvents.droppedEventCount,
     nextAction: "Use route-specific docs and focused tests to decide the next implementation step.",
   });
+
+  if (parsed.contract.mode === "watch") {
+    const watch = runSidebarLivePanelCommand({
+      snapshot,
+      sessionScopeId,
+      eventStore: sidebarLiveEventStoreForContext(context),
+      contract: parsed.contract,
+    });
+    return {
+      kind: "local",
+      output: watch.output,
+    };
+  }
 
   if (parsed.contract.mode === "panel") {
     const panel = runSidebarPanelCommand({ snapshot, contract: parsed.contract });

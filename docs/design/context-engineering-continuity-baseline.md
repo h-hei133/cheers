@@ -365,6 +365,11 @@ and `/sidebar detail`, while preserving the original `/sidebar` preview. It
 still avoids always-on UI, persistence, dynamic discovery, provider/model
 calls, SessionManager schema changes, startup/model auto-injection, and raw
 content in panel output.
+Route 92 adds `/sidebar watch` as a bounded live-frame experiment over the same
+sanitized snapshot and session-scoped in-memory live event store. It renders
+frame metadata and recent activity without adding an always-on UI, TUI loop,
+persistence, dynamic discovery, provider/model calls, SessionManager schema
+changes, startup/model auto-injection, or raw content in live panel output.
 
 ## Residual Risks
 
@@ -386,8 +391,8 @@ content in panel output.
 
 ## Next Recommendation
 
-Recommended next route: sidebar panel live/runtime polish, an always-on
-sidebar/TUI experiment, startup warm cache session integration, or memory
+Recommended next route: sidebar runtime polish / always-on TUI decision,
+browser capability boundary, startup warm cache session integration, or memory
 retrieval quality/ranking hardening, depending on which user-visible path
 becomes the next blocker.
 
@@ -397,8 +402,8 @@ Route 80 candidate extraction, Route 81 session-scoped review state, Route 82
 explicit save path, Route 83 deterministic retrieval/wake preview, Route 84
 lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   quality/merge hardening, Route 87 explicit warm cache status, Route 88
-  visible sidebar state projection, and Route 89 sidebar event/activity bridge
-  plus Route 90 live command activity capture and Route 91 explicit terminal
-  panel rendering are now machine-checkable enough to plan always-on sidebar
-  UI, live event quality polish, startup-read integration, or retrieval-quality
-  work separately.
+  visible sidebar state projection, Route 89 sidebar event/activity bridge,
+  Route 90 live command activity capture, Route 91 explicit terminal panel
+  rendering, and Route 92 bounded watch frames are now machine-checkable enough
+  to plan always-on sidebar UI, browser capability boundaries, startup-read
+  integration, or retrieval-quality work separately.

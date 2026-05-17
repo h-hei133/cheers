@@ -161,6 +161,15 @@ recent activity. The panel is explicit and read-only; it does not add an
 always-on UI, persistence, dynamic discovery, provider/model calls, schema
 changes, raw event payload rendering, or automatic memory/startup injection.
 
+## Route 92 Watch Note
+
+Route 92 lets `/sidebar watch` read the same session-scoped in-memory event
+store as `/sidebar` and `/sidebar panel`. The live panel asks the store for
+developer-only events only to account for hidden activity; developer payloads
+remain hidden by default. The watch output is bounded to deterministic frames
+and does not add persistence, provider/model calls, dynamic discovery, schema
+changes, or a terminal repaint loop.
+
 ## Deferred
 
 Still deferred:

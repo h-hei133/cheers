@@ -851,6 +851,63 @@ describe("slash router (W4)", () => {
     }
   });
 
+  it("routes /sidebar watch as a bounded live panel without changing snapshot panel", async () => {
+    const sidebarLiveEventStore = createSidebarLiveEventStore({
+      now: () => "2026-05-17T05:00:00.000Z",
+    });
+    sidebarLiveEventStore.appendMany({
+      sessionScopeId: "session:sess_sidebar_watch",
+      events: [
+        {
+          kind: "command",
+          severity: "success",
+          visibility: "user-visible",
+          source: "slash-command",
+          title: "Compact checkpoint",
+          summary: "status: generated; raw content excluded",
+        },
+        {
+          kind: "warning",
+          severity: "warning",
+          visibility: "developer-only",
+          source: "route",
+          title: "developer-only raw event",
+          summary: "hidden by default",
+        },
+      ],
+    });
+
+    const watch = await routeSlashCommand("/sidebar watch", {
+      cwd: workspaceRoot,
+      sessionId: "sess_sidebar_watch",
+      sidebarLiveEventStore,
+    });
+    const snapshot = await routeSlashCommand("/sidebar panel", {
+      cwd: workspaceRoot,
+      sessionId: "sess_sidebar_watch",
+      sidebarLiveEventStore,
+    });
+
+    expect(watch?.kind).toBe("local");
+    if (watch?.kind === "local") {
+      expect(watch.output).toContain("Sidebar live/watch preview");
+      expect(watch.output).toContain("[Live frame]");
+      expect(watch.output).toContain("Frame: #1");
+      expect(watch.output).toContain("Compact checkpoint");
+      expect(watch.output).toContain("Developer-only sidebar events are hidden by default.");
+      expect(watch.output).not.toContain("developer-only raw event");
+      expect(watch.output.split("\n").length).toBeLessThanOrEqual(42);
+      expect(watch.output).not.toContain("State preview only: no actual sidebar UI exists yet.");
+    }
+
+    expect(snapshot?.kind).toBe("local");
+    if (snapshot?.kind === "local") {
+      expect(snapshot.output).toContain("Preview panel: explicit read-only command");
+      expect(snapshot.output).not.toContain("[Live frame]");
+      expect(snapshot.output).not.toContain("Sidebar live/watch preview");
+    }
+  });
+
   it("returns a readable local error for unknown slash commands", async () => {
     const result = await routeSlashCommand("/unknown-cmd", {
       cwd: workspaceRoot,

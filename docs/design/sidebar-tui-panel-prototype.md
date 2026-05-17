@@ -153,6 +153,14 @@ Tests:
 - slash-router tests proving `/sidebar` preview still works and panel modes
   route explicitly
 
+## Route 92 Live Watch Note
+
+Route 92 keeps the Route 91 snapshot panel commands stable and adds
+`/sidebar watch` as an explicit bounded live-frame experiment. The watch panel
+uses the same sanitized snapshot and session-scoped in-memory event store, adds
+frame metadata, and remains ASCII, read-only, non-persistent, and ANSI-free by
+default. It is not an always-on UI or TUI app.
+
 ## Deferred
 
 Still deferred:

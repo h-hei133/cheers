@@ -176,6 +176,16 @@ store; it adds no always-on UI, persistence, discovery, provider/model call,
 SessionManager schema change, startup/model auto-injection, or raw content
 rendering.
 
+## Route 92 Watch Note
+
+Route 92 adds a live/watch panel frame model on top of the same
+`SidebarStateSnapshot`. The model records frame number, updatedAt, event
+counts, warning counts, and blocker counts while preserving the existing
+snapshot sections. `/sidebar watch` remains explicit and read-only; it does not
+add an actual sidebar UI, persistence, discovery, provider/model calls,
+SessionManager schema changes, startup/model auto-injection, or raw content
+rendering.
+
 ## Deferred
 
 Defer these to future routes:

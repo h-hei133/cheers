@@ -7,6 +7,7 @@ export const SIDEBAR_PANEL_MODEL_VERSION = "sidebar-panel-v1" as const;
 
 export type SidebarPanelSectionId =
   | "header"
+  | "live-frame"
   | SidebarSection
   | "activity"
   | "footer";

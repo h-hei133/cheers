@@ -1439,6 +1439,12 @@ Allowed after this document:
   `/sidebar` preview. It remains outside edit runtime, adds no always-on UI,
   persistence, dynamic discovery, provider/model calls, SessionManager schema
   change, automatic recovery, or default mutation readiness.
+- Route 92 context/surface work adds `/sidebar watch` as a bounded live-frame
+  experiment over the existing sanitized sidebar snapshot and session-scoped
+  in-memory live event store. It remains outside edit runtime, adds no
+  always-on UI, terminal repaint loop, persistence, dynamic discovery,
+  provider/model calls, SessionManager schema change, automatic recovery, or
+  default mutation readiness.
 
 Forbidden after this document:
 
@@ -1456,8 +1462,9 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 92 recommendation: choose sidebar panel live/runtime polish, an actual
-always-on TUI/sidebar experiment, startup warm cache session-read integration,
-or memory retrieval quality/ranking hardening based on the next user-visible
-blocker. Do not treat Route 82, Route 83, Route 84, Route 85, Route 86, Route
-87, Route 88, Route 89, Route 90, or Route 91 as edit-capability expansions.
+Route 93 recommendation: choose sidebar runtime polish / always-on TUI
+decision, browser capability boundary, startup warm cache session-read
+integration, or memory retrieval quality/ranking hardening based on the next
+user-visible blocker. Do not treat Route 82, Route 83, Route 84, Route 85,
+Route 86, Route 87, Route 88, Route 89, Route 90, Route 91, or Route 92 as
+edit-capability expansions.
