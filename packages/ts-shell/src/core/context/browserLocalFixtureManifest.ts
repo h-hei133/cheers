@@ -15,7 +15,7 @@ export type BrowserLocalFixtureManifestVersion =
 export type BrowserLocalFixtureManifestSource = "cli-harness" | "test-only";
 export type BrowserLocalFixtureManifestExecutorMode =
   | "local-fixture"
-  | "fake-test";
+  | "playwright-local";
 
 export interface BrowserLocalFixtureManifestEntry {
   readonly id: string;
@@ -128,8 +128,8 @@ export function validateBrowserLocalFixtureManifest(
   if (value.source !== "cli-harness" && value.source !== "test-only") {
     return invalid("Manifest source must be cli-harness or test-only.");
   }
-  if (value.executorMode !== "local-fixture") {
-    return invalid("Manifest executor mode must be local-fixture.");
+  if (value.executorMode !== "local-fixture" && value.executorMode !== "playwright-local") {
+    return invalid("Manifest executor mode must be local-fixture or playwright-local.");
   }
   if (!Array.isArray(value.fixtures) || value.fixtures.length !== 1) {
     return invalid("Manifest must include exactly one local fixture.");
@@ -166,7 +166,7 @@ export function validateBrowserLocalFixtureManifest(
   const manifest: BrowserLocalFixtureManifest = {
     version: BROWSER_LOCAL_FIXTURE_MANIFEST_VERSION,
     source: value.source,
-    executorMode: "local-fixture",
+    executorMode: value.executorMode,
     fixtures: [fixture.entry],
     allowedLocalOrigins: value.allowedLocalOrigins,
     sandbox: {

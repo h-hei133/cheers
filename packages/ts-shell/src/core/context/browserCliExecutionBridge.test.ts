@@ -43,4 +43,28 @@ describe("browser CLI execution bridge", () => {
       "browser-cli-execution-bridge:no-playwright-process",
     );
   });
+
+  it("constructs playwright-local executor context only for an explicit manifest mode", async () => {
+    const manifest = createBrowserLocalFixtureManifest({
+      executorMode: "playwright-local",
+      fixture: {
+        id: "fixture:route101",
+        url: "local-fixture://route101",
+        textSummary: "Safe route 101 content.",
+      },
+    });
+    const bridge = createBrowserCliExecutionBridge(
+      loadBrowserCliExecutorInjectionFromEnv({
+        env: { [BROWSER_CLI_LOCAL_FIXTURE_MANIFEST_ENV]: "/tmp/manifest.json" },
+        readFile: () => serializeBrowserLocalFixtureManifest(manifest),
+      }),
+    );
+
+    expect(bridge.browserExecutor?.kind).toBe("playwright-local");
+    expect(bridge.browserSandboxAuthority?.mode).toBe("local-fixture");
+    expect(bridge.browserCliExecutionBridgeSummary.executionMode).toBe("playwright-local");
+    expect(bridge.browserCliExecutionBridgeSummary.evidence).toContain(
+      "browser-cli-execution-bridge:playwright-local-requested",
+    );
+  });
 });

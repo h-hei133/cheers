@@ -6,6 +6,8 @@ import { FakeBrowserExecutor, NOOP_BROWSER_EXECUTOR } from "./browserExecutor.js
 import { decideBrowserExecutionPolicy } from "./browserExecutionPolicy.js";
 import { createBrowserSandboxAuthority } from "./browserSandboxAuthority.js";
 import { BrowserPlaywrightCliLocalFixtureExecutor } from "./browserPlaywrightCliExecutor.js";
+import { createBrowserPlaywrightAvailability } from "./browserPlaywrightAvailability.js";
+import { BrowserPlaywrightLocalExecutor } from "./browserPlaywrightLocalExecutor.js";
 
 describe("browser execution command runner", () => {
   it("blocks /browser execute without an injected executor", async () => {
@@ -74,6 +76,49 @@ describe("browser execution command runner", () => {
     expect(result.output).toContain("- Executed: yes");
     expect(result.output).not.toContain("<body");
     expect(result.output).not.toContain("github_pat_");
+  });
+
+  it("reports playwright-local unavailable without default browser launch", async () => {
+    const parsed = parseBrowserCommandArgs(["execute", "observe"]);
+    const result = await runBrowserCommandAsync({
+      contract: parsed.contract!,
+      browserExecutor: new BrowserPlaywrightLocalExecutor(),
+      browserSandboxAuthority: createBrowserSandboxAuthority({ mode: "local-fixture" }),
+    });
+
+    expect(result.output).toContain("- Outcome: skipped");
+    expect(result.output).toContain("- Mode: playwright-local");
+    expect(result.output).toContain("- Runtime: playwright-local unavailable");
+    expect(result.output).toContain("- Executed: no");
+    expect(result.output).toContain("availability=unavailable");
+    expect(result.output).toContain("cleanup=not-started");
+    expect(result.output).toContain("- MCP discovery/launch: none");
+  });
+
+  it("runs playwright-local through an injected local runner only", async () => {
+    const parsed = parseBrowserCommandArgs(["execute", "extract", "headline"]);
+    const result = await runBrowserCommandAsync({
+      contract: parsed.contract!,
+      browserExecutor: new BrowserPlaywrightLocalExecutor({
+        availabilityChecker: () => createBrowserPlaywrightAvailability({
+          status: "available",
+          runtimeKind: "module",
+        }),
+        runner: () => ({
+          safeExtractionSummary: "Injected local Playwright summary.",
+          stdout: "<main>sk-testsecret123</main>",
+          stderr: "",
+        }),
+      }),
+      browserSandboxAuthority: createBrowserSandboxAuthority({ mode: "local-fixture" }),
+    });
+
+    expect(result.output).toContain("- Outcome: executed");
+    expect(result.output).toContain("- Mode: playwright-local");
+    expect(result.output).toContain("- Browser process: playwright local only");
+    expect(result.output).toContain("- Executed: yes");
+    expect(result.output).toContain("Injected local Playwright summary.");
+    expect(result.output).not.toContain("sk-testsecret123");
   });
 
   it("runs local fixture navigation without external network", async () => {

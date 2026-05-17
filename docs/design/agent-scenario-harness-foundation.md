@@ -184,3 +184,11 @@ real CLI scenario harness with explicit local-fixture manifest injection. The
 shared CLI safety check now accepts `Executed: yes` only when the output also
 proves `Mode: local-fixture`, `Browser process: local fixture only`, no MCP
 launch, and no provider/model call.
+
+## Route 101 Playwright Local Note
+
+Route 101 extends the shared CLI safety check to recognize explicit
+`playwright-local` local-only execution evidence when it is paired with
+`Browser process: playwright local only`, no MCP launch, and no provider/model
+call. The real CLI route currently exercises the unavailable path; injected
+runner success remains covered by focused context tests.

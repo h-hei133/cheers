@@ -41,6 +41,8 @@ export async function runBrowserExecutionCommand(input: {
         ? "fake-test"
         : executor.kind === "local-fixture"
           ? "local-fixture"
+          : executor.kind === "playwright-local"
+            ? "playwright-local"
           : executor.kind === "explicit-local"
             ? "explicit-local"
             : input.request.mode,

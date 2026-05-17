@@ -34,6 +34,24 @@ describe("browser CLI executor injection loader", () => {
     expect(result.redactions).toEqual([]);
   });
 
+  it("loads a manifest that explicitly requests playwright-local mode", () => {
+    const manifest = createBrowserLocalFixtureManifest({
+      executorMode: "playwright-local",
+      fixture: {
+        id: "fixture:route101",
+        url: "local-fixture://route101",
+      },
+    });
+    const result = loadBrowserCliExecutorInjectionFromEnv({
+      env: { [BROWSER_CLI_LOCAL_FIXTURE_MANIFEST_ENV]: "/tmp/manifest.json" },
+      readFile: () => serializeBrowserLocalFixtureManifest(manifest),
+    });
+
+    expect(result.status).toBe("valid");
+    expect(result.manifest?.executorMode).toBe("playwright-local");
+    expect(result.evidence).toContain("browser-cli-executor-injection:test-local-only");
+  });
+
   it("rejects missing and invalid manifests without leaking raw content", () => {
     const missing = loadBrowserCliExecutorInjectionFromEnv({
       env: { [BROWSER_CLI_LOCAL_FIXTURE_MANIFEST_ENV]: "/tmp/missing.json" },
@@ -51,5 +69,20 @@ describe("browser CLI executor injection loader", () => {
     expect(invalid.status).toBe("invalid-manifest");
     expect(invalid.reason).not.toContain("<main>");
     expect(invalid.redactions).toContain("manifest-content");
+  });
+
+  it("rejects unsupported manifest executor modes safely", () => {
+    const manifest = {
+      ...createBrowserLocalFixtureManifest(),
+      executorMode: "external-browser",
+    };
+    const result = loadBrowserCliExecutorInjectionFromEnv({
+      env: { [BROWSER_CLI_LOCAL_FIXTURE_MANIFEST_ENV]: "/tmp/manifest.json" },
+      readFile: () => `${JSON.stringify(manifest)}\n`,
+    });
+
+    expect(result.status).toBe("invalid-manifest");
+    expect(result.reason).toContain("executor mode");
+    expect(result.warnings).toContain("browser-cli-executor-injection:blocked");
   });
 });

@@ -44,13 +44,14 @@ function summarizeBrowserExecutionEvidence(
   const executedYes = outputs.some((output) => /Executed:\s*yes/i.test(output));
   const executedNo = outputs.some((output) => /Executed:\s*no/i.test(output));
   const localFixture = outputs.some((output) => /Mode:\s*local-fixture/i.test(output));
+  const playwrightLocal = outputs.some((output) => /Mode:\s*playwright-local/i.test(output));
   const invalidManifest = outputs.some((output) => /Manifest status:\s*invalid/i.test(output));
   const validManifest = outputs.some((output) => /Manifest status:\s*valid/i.test(output));
   const missingManifest = outputs.some((output) => /Manifest status:\s*missing/i.test(output));
   return [
     "present",
     `executed=${executedYes ? "yes" : executedNo ? "no" : "unknown"}`,
-    `mode=${localFixture ? "local-fixture" : "disabled"}`,
+    `mode=${playwrightLocal ? "playwright-local" : localFixture ? "local-fixture" : "disabled"}`,
     `manifest=${validManifest ? "valid" : invalidManifest ? "invalid" : missingManifest ? "missing" : "unknown"}`,
   ].join("; ");
 }

@@ -131,10 +131,15 @@ function hasNoProviderBrowserNetworkEvidence(value: string): boolean {
     /Browser process:\s*local fixture only/i.test(value) &&
     /MCP discovery\/launch:\s*none/i.test(value) &&
     /Provider\/model call:\s*none/i.test(value);
+  const playwrightLocalExecution =
+    /Mode:\s*playwright-local/i.test(value) &&
+    /Browser process:\s*playwright local only/i.test(value) &&
+    /MCP discovery\/launch:\s*none/i.test(value) &&
+    /Provider\/model call:\s*none/i.test(value);
   if (/browser process:\s*(launched|started)|real browser execution:\s*yes/i.test(value)) {
     return false;
   }
-  if (/executed:\s*yes/i.test(value) && !localFixtureExecution) {
+  if (/executed:\s*yes/i.test(value) && !localFixtureExecution && !playwrightLocalExecution) {
     return false;
   }
   return true;

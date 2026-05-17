@@ -133,3 +133,12 @@ If the fixture bridge remains stable, Route 101 should choose one of:
   diagnostics before real runtime work
 - external-network browser execution design only after local execution
   evidence and redaction stay stable
+
+## Route 101 Playwright Local Note
+
+Route 101 extends the manifest executor mode to `playwright-local`. The CLI
+bridge can construct a Playwright local executor only from a valid explicit
+manifest, but the default child process still has no injected runtime checker
+or runner, so it reports deterministic unavailable evidence with `Executed:
+no`. The local-fixture mode remains unchanged, and unsupported executor modes
+block safely.

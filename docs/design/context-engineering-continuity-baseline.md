@@ -420,6 +420,14 @@ access, provider/model call, browser session persistence, SessionManager
 schema change, startup/model auto-injection, memory persistence behavior
 change, CLI lifecycle rewrite, or raw manifest/content/secrets/hidden
 reasoning in output.
+Route 101 adds a `playwright-local` manifest mode plus availability, lifecycle,
+evidence, and executor models for local-fixture-only Playwright execution. It
+defaults to deterministic unavailable without an injected checker/runner and
+still adds no package dependency, default browser execution, external network,
+MCP launch/discovery, provider/model call, browser session persistence,
+SessionManager schema change, startup/model auto-injection, memory persistence
+behavior change, CLI lifecycle rewrite, or raw page/content/secrets/hidden
+reasoning in output.
 
 ## Residual Risks
 
@@ -459,7 +467,8 @@ lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   boundary, Route 94 non-executing browser dry-run planning, and Route 95
   scenario harness foundation, Route 96 non-default browser execution seam,
   Route 97 browser sandbox/allowlist preflight, Route 98 real CLI scenario
-  process evidence, Route 99 local-fixture execution, and Route 100 real CLI
-  local-fixture injection are now machine-checkable enough to plan external
-  browser opt-in, sandbox lifecycle hardening,
+  process evidence, Route 99 local-fixture execution, Route 100 real CLI
+  local-fixture injection, and Route 101 Playwright local unavailable/bridge
+  hardening are now machine-checkable enough to plan Playwright dependency
+  decisions, external browser opt-in, sandbox lifecycle hardening,
   startup-read integration, or retrieval-quality work separately.

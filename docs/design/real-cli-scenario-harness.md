@@ -158,3 +158,11 @@ path to the child process, and assert observe/extract success plus external
 URL blocking through the real CLI. Reports remain summarized and sanitized; no
 raw manifest content, provider/model call, browser launch, MCP launch, network
 access, or SessionManager schema change is added.
+
+## Route 101 Playwright Local Note
+
+Route 101 reuses the real CLI scenario harness to pass a manifest whose
+executor mode is `playwright-local`. The harness asserts default blocked,
+unavailable runtime, external URL blocked, and compact report evidence. It
+does not assume cross-process sidebar persistence and does not embed raw
+stdout/stderr or raw manifest content in the report.

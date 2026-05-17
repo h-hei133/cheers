@@ -32,13 +32,16 @@ function browserProcessLabel(kind: BrowserExecutionResult["executorResult"]["exe
   if (kind === "local-fixture") {
     return "local fixture only";
   }
+  if (kind === "playwright-local") {
+    return "playwright local only";
+  }
   return "not launched";
 }
 
 function renderEvidence(result: BrowserExecutionResult): string {
   const values = result.executorResult.evidence
     .map((item) => `${sanitizeBrowserText(item.label)}=${sanitizeBrowserText(item.value)}`)
-    .slice(0, 6);
+    .slice(0, 14);
   return values.length > 0 ? values.join("; ") : "none";
 }
 

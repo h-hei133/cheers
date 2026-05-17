@@ -4,6 +4,7 @@ export type BrowserExecutorKind =
   | "noop"
   | "fake-test"
   | "local-fixture"
+  | "playwright-local"
   | "explicit-local";
 export type BrowserExecutorStatus = "executed" | "blocked" | "failed" | "skipped";
 

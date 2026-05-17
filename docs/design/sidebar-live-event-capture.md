@@ -234,3 +234,11 @@ Route 100 does not add cross-process sidebar persistence. Real CLI scenarios
 assert the sanitized command output and injection summary instead of forcing
 in-memory sidebar events to survive separate child processes. The existing
 in-process `/browser` command-result event path remains the sidebar model.
+
+## Route 101 Playwright Local Note
+
+Route 101 keeps the same `/browser` command-result event path. Playwright
+local unavailable, blocked, or injected-success results are represented in the
+sanitized command output and lifecycle evidence; no sidebar persistence,
+always-on UI, dynamic discovery, raw event payload, MCP launch, provider/model
+call, or startup/model injection is added.

@@ -20,6 +20,7 @@ export interface BrowserCliLocalFixtureManifestFixture {
 
 export function createBrowserCliLocalFixtureManifestFixture(input: {
   readonly prefix?: string;
+  readonly executorMode?: BrowserLocalFixtureManifest["executorMode"];
   readonly unsafeManifest?: unknown;
 } = {}): BrowserCliLocalFixtureManifestFixture {
   const root = fs.mkdtempSync(
@@ -28,6 +29,7 @@ export function createBrowserCliLocalFixtureManifestFixture(input: {
   const manifestPath = path.join(root, "browser-local-fixture-manifest.json");
   const manifest = createBrowserLocalFixtureManifest({
     source: "cli-harness",
+    executorMode: input.executorMode,
     fixture: {
       id: "fixture:route100-demo",
       title: "Route 100 local fixture",

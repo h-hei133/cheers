@@ -150,3 +150,12 @@ redaction, lifecycle, and scenario evidence remain stable.
 
 Choose browser action cache/replay if Stagehand-like repeatability should come
 before external network.
+
+## Route 101 Playwright Local Note
+
+Route 101 adds a `playwright-local` executor mode and availability/lifecycle
+models, but does not add a Playwright dependency or launch a browser by
+default. With no explicit checker/runner, the executor returns unavailable
+with sanitized evidence and `Executed: no`. Tests can inject a deterministic
+local runner to prove the execution contract without changing package
+dependencies.

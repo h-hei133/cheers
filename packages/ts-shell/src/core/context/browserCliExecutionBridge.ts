@@ -8,6 +8,15 @@ import {
   BrowserPlaywrightCliLocalFixtureExecutor,
 } from "./browserPlaywrightCliExecutor.js";
 import {
+  BrowserPlaywrightLocalExecutor,
+} from "./browserPlaywrightLocalExecutor.js";
+import type {
+  BrowserPlaywrightAvailabilityChecker,
+} from "./browserPlaywrightAvailability.js";
+import type {
+  BrowserPlaywrightLocalRunner,
+} from "./browserPlaywrightLifecycle.js";
+import {
   createBrowserSandboxAuthority,
 } from "./browserSandboxAuthority.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
@@ -19,7 +28,8 @@ import type {
 export interface BrowserCliExecutionBridgeSummary {
   readonly executorSource: "none" | "cli-harness" | "test-only";
   readonly manifestStatus: "missing" | "valid" | "invalid";
-  readonly executionMode: "disabled" | "local-fixture";
+  readonly executionMode: "disabled" | "local-fixture" | "playwright-local";
+  readonly playwrightAvailabilityStatus?: "available" | "unavailable" | "disabled" | "blocked-by-policy" | "not-checked";
   readonly reason: string;
   readonly evidence: readonly string[];
   readonly warnings: readonly string[];
@@ -36,6 +46,10 @@ export interface BrowserCliExecutionBridgeContext {
 
 export function createBrowserCliExecutionBridge(
   injection: BrowserCliExecutorInjection,
+  options: {
+    readonly playwrightAvailabilityChecker?: BrowserPlaywrightAvailabilityChecker;
+    readonly playwrightLocalRunner?: BrowserPlaywrightLocalRunner;
+  } = {},
 ): BrowserCliExecutionBridgeContext {
   if (injection.status !== "valid" || !injection.fixture || !injection.manifest) {
     return {
@@ -54,11 +68,20 @@ export function createBrowserCliExecutionBridge(
     mode: "local-fixture",
     allowedFixtureIds: [injection.fixture.fixtureId],
   });
+  const executionMode = injection.manifest.executorMode;
+  const browserExecutor: BrowserExecutor = executionMode === "playwright-local"
+    ? new BrowserPlaywrightLocalExecutor({
+        fixture: injection.fixture,
+        authority,
+        availabilityChecker: options.playwrightAvailabilityChecker,
+        runner: options.playwrightLocalRunner,
+      })
+    : new BrowserPlaywrightCliLocalFixtureExecutor({
+        fixture: injection.fixture,
+        authority,
+      });
   return {
-    browserExecutor: new BrowserPlaywrightCliLocalFixtureExecutor({
-      fixture: injection.fixture,
-      authority,
-    }),
+    browserExecutor,
     browserSandboxAuthority: createBrowserSandboxAuthority({
       mode: "local-fixture",
     }),
@@ -74,12 +97,17 @@ export function createBrowserCliExecutionBridge(
     browserCliExecutionBridgeSummary: {
       executorSource: injection.source,
       manifestStatus: "valid",
-      executionMode: "local-fixture",
-      reason: "CLI harness supplied an explicit local fixture executor.",
+      executionMode,
+      playwrightAvailabilityStatus: executionMode === "playwright-local" ? "not-checked" : undefined,
+      reason: executionMode === "playwright-local"
+        ? "CLI harness supplied an explicit Playwright local fixture executor request."
+        : "CLI harness supplied an explicit local fixture executor.",
       evidence: [
         ...injection.evidence,
         "browser-cli-execution-bridge:executor-created",
-        "browser-cli-execution-bridge:no-playwright-process",
+        executionMode === "playwright-local"
+          ? "browser-cli-execution-bridge:playwright-local-requested"
+          : "browser-cli-execution-bridge:no-playwright-process",
         "browser-cli-execution-bridge:no-mcp-launch",
       ],
       warnings: injection.warnings,
@@ -103,13 +131,14 @@ export function renderBrowserCliExecutionBridgeSummary(
   return [
     "Browser executor injection",
     `- Execution mode: ${value.executionMode}`,
+    `- Playwright availability: ${value.playwrightAvailabilityStatus ?? "not-requested"}`,
     `- Executor source: ${value.executorSource}`,
     `- Manifest status: ${value.manifestStatus}`,
     `- Reason: ${value.reason}`,
     `- Evidence summary: ${value.evidence.slice(0, 4).join("; ") || "none"}`,
     `- Redactions: ${value.redactions.length === 0 ? "none" : value.redactions.join(", ")}`,
     `- Next action: ${
-      value.executionMode === "local-fixture"
+      value.executionMode === "local-fixture" || value.executionMode === "playwright-local"
         ? "Run only local-fixture observe/extract/navigation scenarios."
         : "Keep browser execution blocked unless an explicit valid local fixture manifest is provided."
     }`,

@@ -9,6 +9,7 @@ export type BrowserExecutionMode =
   | "disabled"
   | "fake-test"
   | "local-fixture"
+  | "playwright-local"
   | "explicit-local"
   | "future-runtime";
 

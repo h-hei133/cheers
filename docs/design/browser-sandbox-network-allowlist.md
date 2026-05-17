@@ -218,3 +218,11 @@ through a validated temp manifest. The manifest may list only
 navigation still blocks through existing preflight and confirmation gates, and
 the bridge adds no real browser process, MCP launch, network access,
 provider/model call, persistence, or raw browser content.
+
+## Route 101 Playwright Local Note
+
+Route 101 lets `playwright-local` share the local-fixture sandbox and
+`local-fixture://` navigation exception. HTTP/HTTPS targets remain blocked by
+the existing default-deny allowlist. The route adds no external network, MCP
+launch, persistent browser session, auth/payment/destructive/upload/download
+actions, screenshot/OCR, or raw browser content.
