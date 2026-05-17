@@ -220,3 +220,10 @@ an explicit cache root or manifest is provided. Persisted receipts remain
 evidence, not authority: replay still revalidates current runner, sandbox,
 allowlist, confirmation, and runtime preflight. Invalidated/deleted records are
 not replayable.
+
+## Route 109 Persistent Cache Hardening Note
+
+Route 109 adds recovery, integrity, repair, retention, and compaction around
+persisted receipt evidence. Unsafe or corrupt records are counted and skipped
+without raw content in command output, reports, or sidebar events. Tombstones
+continue to block replay after compaction.

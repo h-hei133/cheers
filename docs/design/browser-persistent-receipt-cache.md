@@ -1,6 +1,6 @@
 # Browser Persistent Receipt Cache
 
-Status: Route 108 implemented candidate.
+Status: Route 108 implemented candidate; Route 109 hardening implemented candidate.
 Date: 2026-05-17
 
 ## Scope
@@ -95,9 +95,10 @@ The optional UX is intentionally narrow:
 Both mutation commands require explicit cache context and manifest operations.
 They append sanitized tombstones and do not output raw cache content.
 
-## Route 109 Recommendation
+## Route 109 Hardening Note
 
-Recommended Route 109: browser replay UX/report polish if cache/replay output
-is too noisy. If persistence behavior proves brittle, choose persistent cache
-hardening for locking, cleanup, and corruption recovery. Self-healing and
-external-network browser execution remain separate future routes.
+Route 109 adds explicit cache lock/lease handling, atomic temp-file plus rename
+writes, recovery reads, integrity scans, retention, repair, and compaction for
+the Route 108 JSONL cache. The cache remains explicit-only and sanitized-only;
+replay still revalidates current runner, sandbox, allowlist, confirmation, and
+runtime preflight.

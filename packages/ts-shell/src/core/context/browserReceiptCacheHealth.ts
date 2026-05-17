@@ -11,6 +11,11 @@ export interface BrowserReceiptCacheHealth {
   readonly invalidatedCount: number;
   readonly deletedCount: number;
   readonly corruptedCount: number;
+  readonly unsafeCount: number;
+  readonly duplicateActiveCount: number;
+  readonly overBudgetCount: number;
+  readonly integrityStatus: string;
+  readonly lockStatus: string;
   readonly lastUpdatedAt?: string;
   readonly warnings: readonly string[];
   readonly blockers: readonly string[];
@@ -30,6 +35,11 @@ export function inspectBrowserReceiptCacheHealth(
       invalidatedCount: 0,
       deletedCount: 0,
       corruptedCount: 0,
+      unsafeCount: 0,
+      duplicateActiveCount: 0,
+      overBudgetCount: 0,
+      integrityStatus: "empty",
+      lockStatus: "missing",
       warnings: [],
       blockers: [],
       evidence: [
@@ -48,6 +58,11 @@ export function inspectBrowserReceiptCacheHealth(
     invalidatedCount: health.invalidatedCount,
     deletedCount: health.deletedCount,
     corruptedCount: health.corruptedCount,
+    unsafeCount: health.unsafeCount,
+    duplicateActiveCount: health.duplicateActiveCount,
+    overBudgetCount: health.overBudgetCount,
+    integrityStatus: health.integrity.integrityStatus,
+    lockStatus: health.lock.status,
     lastUpdatedAt: health.lastUpdatedAt,
     warnings: health.warnings,
     blockers: health.blockers,

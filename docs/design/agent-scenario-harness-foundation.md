@@ -248,3 +248,10 @@ Route 108 extends browser replay scenarios with explicit persistent cache
 fixtures. The scenarios prove execute-write, fresh-store replay, invalidated
 or deleted cache blocking, no-cache status behavior, and unsafe/corrupted
 record rejection without adding default persistence.
+
+## Route 109 Persistent Cache Hardening Note
+
+Route 109 adds persistent cache hardening scenarios for corrupt JSONL lines,
+unsafe records, duplicate active records, deleted/invalidated tombstones,
+over-budget caches, busy/stale locks, repair, compaction, execute-write, and
+cross-process replay after compaction.

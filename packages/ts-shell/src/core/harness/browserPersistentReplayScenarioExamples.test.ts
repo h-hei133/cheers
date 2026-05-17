@@ -109,7 +109,7 @@ describe("browser persistent replay scenario examples", () => {
       fs.writeFileSync(file, "{\"version\":\"browser-persistent-receipt-cache/v1\",\"receiptId\":\"bad\",\"status\":\"active\",\"evidenceSummary\":\"RAW_SECRET\"}\n", "utf8"),
     );
     const status = await runCommand("/browser replay cache status", fixture);
-    expect(status.output).toContain("Corrupted/skipped records: 1");
+    expect(status.output).toContain("Unsafe/skipped records: 1");
     expect(status.output).not.toContain("RAW_SECRET");
   });
 

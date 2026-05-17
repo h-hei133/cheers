@@ -16,6 +16,11 @@ export function renderBrowserReceiptCacheSurface(input: {
     `- Replayable records: ${input.health.replayableCount}`,
     `- Invalidated/deleted records: ${input.health.invalidatedCount + input.health.deletedCount}`,
     `- Corrupted/skipped records: ${input.health.corruptedCount}`,
+    `- Unsafe/skipped records: ${input.health.unsafeCount}`,
+    `- Duplicate active records: ${input.health.duplicateActiveCount}`,
+    `- Over-budget records: ${input.health.overBudgetCount}`,
+    `- Integrity: ${input.health.integrityStatus}`,
+    `- Lock: ${input.health.lockStatus}`,
     `- Readable: ${input.health.readable ? "yes" : "no"}`,
     `- Writable: ${input.health.writable ? "yes" : "no"}`,
     `- Last update: ${input.health.lastUpdatedAt ?? "none"}`,
@@ -34,6 +39,12 @@ function nextAction(health: BrowserReceiptCacheHealth): string {
   }
   if (health.status === "invalid") {
     return "Fix the explicit cache manifest/root before relying on persistent replay.";
+  }
+  if (health.integrityStatus === "unsafe" || health.integrityStatus === "corrupted") {
+    return "Run /browser replay cache repair or delete the explicit cache root after review.";
+  }
+  if (health.duplicateActiveCount > 0 || health.overBudgetCount > 0) {
+    return "Run /browser replay cache compact to remove superseded sanitized records.";
   }
   if (health.replayableCount === 0) {
     return "Run an explicit replay-ready local/test browser execution to write a cache record.";

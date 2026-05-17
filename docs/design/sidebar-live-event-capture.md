@@ -291,3 +291,11 @@ Route 108 surfaces persistent browser receipt cache status through existing
 sanitized command-result summaries. Browser execution/replay events may mention
 cache write/read status and receipt ids, but never raw cache records, raw
 runner output, raw page content, secrets, or cross-process sidebar state.
+
+## Route 109 Persistent Cache Hardening Note
+
+Route 109 allows browser cache status, compact, and repair outputs to appear as
+safe sidebar command summaries. Integrity, lock, records-before/after, removed
+records, and tombstone counts are allowed summary fields; raw corrupt lines,
+unsafe records, runner output, screenshots, secrets, and hidden reasoning remain
+excluded.

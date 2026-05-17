@@ -130,3 +130,10 @@ an explicit cache manifest or root. Persistent records do not bypass replay
 policy or runtime preflight, and raw evidence, secrets, external network,
 dynamic discovery, MCP launch, provider/model calls, and automatic replay
 remain blocked.
+
+## Route 109 Persistent Cache Hardening Note
+
+Route 109 keeps the replay policy unchanged while hardening the explicit
+persistent cache beneath it. Corrupt, unsafe, deleted, invalidated, duplicate,
+and compacted records are treated as cache evidence only; none bypass current
+runner, sandbox, allowlist, confirmation, or runtime preflight checks.

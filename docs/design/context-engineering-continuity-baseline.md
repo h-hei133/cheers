@@ -529,3 +529,10 @@ Route 108 adds explicit sanitized browser receipt cache persistence for
 cross-process local/test replay, but it remains outside context persistence and
 startup/model injection. Cache records are discardable replay artifacts, not
 SessionManager state or automatic context.
+
+## Route 109 Persistent Cache Hardening Note
+
+Route 109 hardens that explicit browser cache with lock, recovery, integrity,
+repair, retention, and compaction. The cache remains outside Compact v2 packet
+semantics: no raw cache content, browser evidence, secrets, or cache records are
+auto-injected into future model context.

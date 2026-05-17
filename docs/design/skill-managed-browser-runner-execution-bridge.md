@@ -143,3 +143,10 @@ Route 108 allows skill-managed local/test replay-ready receipts to be written
 to an explicit sanitized persistent cache. A later replay still requires a
 current skill binding and current sandbox/allowlist/confirmation gates; cached
 skill metadata does not create dynamic discovery or replay authority.
+
+## Route 109 Persistent Cache Hardening Note
+
+Route 109 hardens the explicit persistent cache used by skill-managed local/test
+receipts with lock, recovery, integrity, repair, retention, and compaction
+summaries. Skill runner binding and replay authority remain current runtime
+checks; cache records do not become a dynamic skill registry.

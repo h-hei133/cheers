@@ -87,6 +87,32 @@ export async function runBrowserReplayCommand(input: {
       ],
     };
   }
+  if (input.request.mode === "cache-compact" || input.request.mode === "cache-repair") {
+    const maintenance = input.request.mode === "cache-compact"
+      ? input.receiptCacheStore?.compact()
+      : input.receiptCacheStore?.repair();
+    const action = input.request.mode.replace("cache-", "");
+    return {
+      output: [
+        "Browser replay",
+        "Result",
+        `- Outcome: ${maintenance?.blockers.length ? "blocked" : action}`,
+        `- Cache action: ${action}`,
+        `- Records before/after: ${maintenance?.report ? `${maintenance.report.recordsBefore}/${maintenance.report.recordsAfter}` : "none"}`,
+        `- Records removed: ${maintenance?.report?.recordsRemoved ?? 0}`,
+        `- Tombstones kept: ${maintenance?.report?.tombstonesKept ?? 0}`,
+        "- Persistence: explicit only",
+        "- Raw evidence stored: no",
+        "- Automatic replay: no",
+        `- Blockers/warnings: ${[...(maintenance?.blockers ?? []), ...(maintenance?.warnings ?? [])].join("; ") || "none"}`,
+        `- Next action: ${maintenance?.report?.nextAction ?? "Provide an explicit writable receipt cache."}`,
+      ].join("\n"),
+      evidence: [
+        ...(maintenance?.evidence ?? ["browser-replay-command-runner:persistent-cache-maintenance-blocked"]),
+        "browser-replay-command-runner:explicit-cache-maintenance",
+      ],
+    };
+  }
   const memoryEntry = input.request.receiptId && input.actionCache?.get(input.request.receiptId);
   const persistentRecord = !memoryEntry && input.request.receiptId
     ? input.receiptCacheStore?.get(input.request.receiptId)

@@ -280,3 +280,9 @@ Route 108 persistent cache records keep sandbox, allowlist, and confirmation
 snapshots as evidence only. Replay from cache still reruns current replay
 policy and runtime preflight before execution; invalidated/deleted cache
 records, external URLs, and unsafe browser actions remain blocked.
+
+## Route 109 Persistent Cache Hardening Note
+
+Route 109 adds integrity and compaction around the persistent cache without
+weakening sandbox or network boundaries. Corrupt, unsafe, stale, deleted, or
+invalidated records are reported as counts and do not authorize replay.

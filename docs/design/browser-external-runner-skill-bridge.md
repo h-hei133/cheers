@@ -229,3 +229,10 @@ external-runner and skill-managed replay paths. The cache stores sanitized
 receipt/cache-entry summaries only; it does not store raw runner stdout/stderr,
 does not infer runner authority, and does not replace current runner manifest
 validation.
+
+## Route 109 Persistent Cache Hardening Note
+
+Route 109 adds lock/lease, recovery, integrity, repair, retention, and
+compaction for the explicit persistent cache. External-runner receipts remain
+safe summaries only, and persistent cache reads still require current bridge,
+sandbox, allowlist, confirmation, and preflight revalidation.

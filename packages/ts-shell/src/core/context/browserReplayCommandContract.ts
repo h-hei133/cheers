@@ -1,6 +1,13 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 
-export type BrowserReplayCommandMode = "status" | "replay" | "cache-status" | "cache-invalidate" | "cache-delete";
+export type BrowserReplayCommandMode =
+  | "status"
+  | "replay"
+  | "cache-status"
+  | "cache-invalidate"
+  | "cache-delete"
+  | "cache-compact"
+  | "cache-repair";
 
 export interface BrowserReplayCommandRequest {
   readonly mode: BrowserReplayCommandMode;
@@ -21,6 +28,15 @@ export function parseBrowserReplayCommandArgs(
   if (args[0] === "cache") {
     if (args.length === 1 || args[1] === "status") {
       return { ok: true, request: { mode: "cache-status", sourceCommand: "/browser replay" } };
+    }
+    if (args[1] === "compact" || args[1] === "repair") {
+      return {
+        ok: true,
+        request: {
+          mode: args[1] === "compact" ? "cache-compact" : "cache-repair",
+          sourceCommand: "/browser replay",
+        },
+      };
     }
     if (args[1] === "invalidate" || args[1] === "delete") {
       const receiptId = sanitizeBrowserText(args.slice(2).join(" "), 180);

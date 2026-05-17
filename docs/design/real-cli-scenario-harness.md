@@ -226,3 +226,10 @@ Route 108 adds explicit CLI harness cache roots/manifests so one CLI command
 can write a sanitized replay-ready receipt and a later command can replay it
 with current runner gates. The cache remains local/test scoped, discardable,
 and disabled unless explicitly configured.
+
+## Route 109 Persistent Cache Hardening Note
+
+Route 109 extends CLI harness scenarios to cover corrupt/unsafe cache records,
+duplicate compaction, tombstone preservation, busy/stale locks, repair, and
+cross-process replay after compaction. Scenario reports summarize integrity and
+compaction counts without raw cache content.
