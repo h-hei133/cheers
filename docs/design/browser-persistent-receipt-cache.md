@@ -102,3 +102,10 @@ writes, recovery reads, integrity scans, retention, repair, and compaction for
 the Route 108 JSONL cache. The cache remains explicit-only and sanitized-only;
 replay still revalidates current runner, sandbox, allowlist, confirmation, and
 runtime preflight.
+
+## Route 110 Multiprocess Stress Note
+
+Route 110 adds real CLI child-process stress evidence for the same explicit
+cache root model. Multi-process scenarios use temporary roots and local/test
+runner manifests only, then assert final integrity and lock summaries without
+adding default cache persistence or automatic replay.

@@ -150,3 +150,10 @@ Route 109 hardens the explicit persistent cache used by skill-managed local/test
 receipts with lock, recovery, integrity, repair, retention, and compaction
 summaries. Skill runner binding and replay authority remain current runtime
 checks; cache records do not become a dynamic skill registry.
+
+## Route 110 Multiprocess Stress Note
+
+Route 110 stress scenarios use explicit local/test runner manifests and cache
+roots only. Multi-process cache evidence does not add dynamic skill discovery,
+MCP launch, persistent skill registry state, or replay authority from cached
+metadata.

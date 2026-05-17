@@ -149,3 +149,11 @@ Alternative Route 110 choices:
   remains stable
 - deeper cache concurrency stress testing, if real multi-process contention
   needs stronger evidence than deterministic lock-file simulations
+
+## Route 110 Multiprocess Stress Note
+
+Route 110 adds bounded real CLI child-process stress around the explicit
+persistent cache. It covers concurrent execute writes, status/replay while a
+lock-holder child process simulates an in-flight write, compact under busy
+lock, stale lock repair, corrupt/unsafe repair, and post-stress integrity
+reporting without changing cache defaults or storing raw evidence.

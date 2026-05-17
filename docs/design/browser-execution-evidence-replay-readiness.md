@@ -227,3 +227,10 @@ Route 109 adds recovery, integrity, repair, retention, and compaction around
 persisted receipt evidence. Unsafe or corrupt records are counted and skipped
 without raw content in command output, reports, or sidebar events. Tombstones
 continue to block replay after compaction.
+
+## Route 110 Multiprocess Stress Note
+
+Route 110 adds child-process stress evidence that replay-ready receipt records
+remain sanitized and inspectable after concurrent execute writes, lock
+contention, repair, and compaction. Readiness remains evidence only, not replay
+authority.

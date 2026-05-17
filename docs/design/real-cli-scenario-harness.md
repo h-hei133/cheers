@@ -233,3 +233,10 @@ Route 109 extends CLI harness scenarios to cover corrupt/unsafe cache records,
 duplicate compaction, tombstone preservation, busy/stale locks, repair, and
 cross-process replay after compaction. Scenario reports summarize integrity and
 compaction counts without raw cache content.
+
+## Route 110 Multiprocess Stress Note
+
+Route 110 adds a real CLI multi-process stress harness for the explicit browser
+cache. It launches bounded child processes for concurrent execute writes,
+status/replay during lock contention, compact under busy lock, stale lock
+repair, and post-stress integrity checks.

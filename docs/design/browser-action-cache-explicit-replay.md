@@ -137,3 +137,10 @@ Route 109 keeps the replay policy unchanged while hardening the explicit
 persistent cache beneath it. Corrupt, unsafe, deleted, invalidated, duplicate,
 and compacted records are treated as cache evidence only; none bypass current
 runner, sandbox, allowlist, confirmation, or runtime preflight checks.
+
+## Route 110 Multiprocess Stress Note
+
+Route 110 proves explicit replay/cache behavior under bounded real CLI
+multi-process stress. Concurrent writes and maintenance commands still produce
+only evidence records; replay remains an explicit command and must pass current
+policy and runtime gates.

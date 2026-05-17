@@ -299,3 +299,10 @@ safe sidebar command summaries. Integrity, lock, records-before/after, removed
 records, and tombstone counts are allowed summary fields; raw corrupt lines,
 unsafe records, runner output, screenshots, secrets, and hidden reasoning remain
 excluded.
+
+## Route 110 Multiprocess Stress Note
+
+Route 110 stress reports reuse safe command/report summaries and do not assume
+cross-process sidebar persistence. Process roles, exit counts, lock state, and
+integrity counts are safe summary data; raw child stdout/stderr and cache lines
+remain excluded.

@@ -286,3 +286,10 @@ records, external URLs, and unsafe browser actions remain blocked.
 Route 109 adds integrity and compaction around the persistent cache without
 weakening sandbox or network boundaries. Corrupt, unsafe, stale, deleted, or
 invalidated records are reported as counts and do not authorize replay.
+
+## Route 110 Multiprocess Stress Note
+
+Route 110 proves cache behavior under bounded child-process contention while
+preserving the same sandbox and network model. Stress processes use local/test
+fixtures, no external network, and no cache record can bypass current sandbox,
+allowlist, confirmation, or preflight checks.

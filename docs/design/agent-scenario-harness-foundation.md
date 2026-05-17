@@ -255,3 +255,10 @@ Route 109 adds persistent cache hardening scenarios for corrupt JSONL lines,
 unsafe records, duplicate active records, deleted/invalidated tombstones,
 over-budget caches, busy/stale locks, repair, compaction, execute-write, and
 cross-process replay after compaction.
+
+## Route 110 Multiprocess Stress Note
+
+Route 110 adds harness-level multi-process scenario types, temp fixtures, a
+bounded child-process runner, reusable cache safety assertions, and concise
+stress reports. The harness remains evidence collection only and does not own
+browser runtime behavior.

@@ -236,3 +236,10 @@ Route 109 adds lock/lease, recovery, integrity, repair, retention, and
 compaction for the explicit persistent cache. External-runner receipts remain
 safe summaries only, and persistent cache reads still require current bridge,
 sandbox, allowlist, confirmation, and preflight revalidation.
+
+## Route 110 Multiprocess Stress Note
+
+Route 110 reuses the external-runner CLI harness to spawn bounded local/test
+child processes against one explicit cache root. The runner remains local/test
+only and no raw runner stdout/stderr, external network, provider/model call, or
+MCP behavior is added.

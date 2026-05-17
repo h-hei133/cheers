@@ -536,3 +536,9 @@ Route 109 hardens that explicit browser cache with lock, recovery, integrity,
 repair, retention, and compaction. The cache remains outside Compact v2 packet
 semantics: no raw cache content, browser evidence, secrets, or cache records are
 auto-injected into future model context.
+
+## Route 110 Multiprocess Stress Note
+
+Route 110 adds real CLI multi-process stress evidence for the explicit browser
+cache but keeps all cache files and stress reports outside model context,
+startup auto-load, memory injection, and Compact v2 packets.
