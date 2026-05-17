@@ -1,5 +1,5 @@
 import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
-import { runBrowserCommand } from "../context/browserCommandRunner.js";
+import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
 import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
@@ -8,10 +8,16 @@ export async function runBrowserLocalCommand(
   context: CommandContext,
 ): Promise<LocalCommandResult> {
   const parsed = parseBrowserCommandArgs(args);
+  const runResult = parsed.ok && parsed.contract
+    ? await runBrowserCommandAsync({
+        contract: parsed.contract,
+        browserExecutor: context.browserExecutor,
+      })
+    : undefined;
   const result: LocalCommandResult = parsed.ok && parsed.contract
     ? {
         kind: "local",
-        output: runBrowserCommand({ contract: parsed.contract }).output,
+        output: runResult?.output ?? "Unsupported /browser arguments.",
       }
     : {
         kind: "local",

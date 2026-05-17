@@ -4,6 +4,7 @@ import type { ProjectMemoryReviewStateStore } from '../context/projectMemoryRevi
 import type { ProjectMemoryInjectionStateStore } from '../context/projectMemoryInjectionState.js'
 import type { ProjectMemoryStore } from '../context/projectMemoryStoreContract.js'
 import type { StartupWarmContextCacheStore } from '../context/startupWarmContextHealth.js'
+import type { BrowserExecutor } from '../context/browserExecutor.js'
 import type { SidebarEventSink } from '../context/sidebarEventSink.js'
 import type { SidebarLiveEventStore } from '../context/sidebarLiveEventStore.js'
 
@@ -19,6 +20,7 @@ export interface CommandContext {
   readonly projectMemoryInjectionStateStore?: ProjectMemoryInjectionStateStore
   readonly projectMemoryStore?: ProjectMemoryStore
   readonly startupWarmContextCacheStore?: StartupWarmContextCacheStore
+  readonly browserExecutor?: BrowserExecutor
   readonly sidebarEventSink?: SidebarEventSink
   readonly sidebarLiveEventStore?: SidebarLiveEventStore
 }

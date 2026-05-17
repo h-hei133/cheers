@@ -1,10 +1,15 @@
 import { parseBrowserPreviewActionArgs, type BrowserActionContract } from "./browserActionContract.js";
+import {
+  parseBrowserExecutionCommandArgs,
+  type BrowserExecutionCommandParseResult,
+} from "./browserExecutionCommandContract.js";
 
-export type BrowserCommandMode = "status" | "preview" | "dry-run";
+export type BrowserCommandMode = "status" | "preview" | "dry-run" | "execute";
 
 export interface BrowserCommandContract {
   readonly mode: BrowserCommandMode;
   readonly action?: BrowserActionContract;
+  readonly execution?: BrowserExecutionCommandParseResult["request"];
 }
 
 export interface BrowserCommandParseResult {
@@ -18,6 +23,23 @@ export function parseBrowserCommandArgs(args: readonly string[]): BrowserCommand
     return {
       ok: true,
       contract: { mode: "status" },
+    };
+  }
+  if (args[0] === "execute") {
+    const parsed = parseBrowserExecutionCommandArgs(args);
+    if (!parsed.ok || !parsed.request) {
+      return {
+        ok: false,
+        errorOutput: parsed.errorOutput,
+      };
+    }
+    return {
+      ok: true,
+      contract: {
+        mode: "execute",
+        action: parsed.request.action,
+        execution: parsed.request,
+      },
     };
   }
   if (args[0] !== "preview" && args[0] !== "dry-run") {
@@ -47,7 +69,7 @@ function invalidBrowserArgs(value: string): BrowserCommandParseResult {
       "- Outcome: blocked",
       "- BlockerKind: invalid-browser-args",
       `- Reason: Unsupported /browser argument: ${value || "(empty)"}`,
-      "- DoNext: Use /browser, /browser status, /browser preview <action>, or /browser dry-run <action>.",
+      "- DoNext: Use /browser, /browser status, /browser preview <action>, /browser dry-run <action>, or /browser execute <action>.",
       "",
       "Supported /browser forms:",
       "- /browser",
@@ -60,6 +82,9 @@ function invalidBrowserArgs(value: string): BrowserCommandParseResult {
       "- /browser dry-run extract <goal>",
       "- /browser dry-run click <target>",
       "- /browser dry-run type <target> <text>",
+      "- /browser execute navigate <url>",
+      "- /browser execute observe",
+      "- /browser execute extract <goal>",
     ].join("\n"),
   };
 }

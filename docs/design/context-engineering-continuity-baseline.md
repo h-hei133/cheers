@@ -389,6 +389,12 @@ sidebar, browser dry-run, and warmup scenarios with sanitized evidence reports,
 but still adds no provider/model call, real browser execution, CLI lifecycle
 rewrite, SessionManager schema change, persistent harness state, automatic
 recovery, or raw content/secrets/hidden reasoning in reports.
+Route 96 adds a non-default browser execution seam for `/browser execute ...`.
+The default path has no executor and blocks with `Executed: no`; scenario tests
+may inject a fake/test executor for sanitized read-only evidence. It still adds
+no real browser launch, MCP launch/discovery, provider/model call, persistent
+browser session, SessionManager schema change, startup/model auto-injection, or
+raw browser content rendering.
 
 ## Residual Risks
 
@@ -426,6 +432,7 @@ lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   Route 90 live command activity capture, Route 91 explicit terminal panel
   rendering, Route 92 bounded watch frames, Route 93 preview-only browser
   boundary, Route 94 non-executing browser dry-run planning, and Route 95
-  scenario harness foundation are now machine-checkable enough to plan browser
-  execution prototypes, real CLI scenario verification, sandbox harness work,
+  scenario harness foundation, and Route 96 non-default browser execution seam
+  are now machine-checkable enough to plan real CLI scenario verification,
+  browser sandbox hardening, sandbox harness work,
   startup-read integration, or retrieval-quality work separately.

@@ -161,6 +161,9 @@ function titleForCommand(
     if (subcommand === "dry-run") {
       return "Browser dry-run";
     }
+    if (subcommand === "execute") {
+      return "Browser execution";
+    }
     return "Browser status";
   }
   if (family === "sidebar") {

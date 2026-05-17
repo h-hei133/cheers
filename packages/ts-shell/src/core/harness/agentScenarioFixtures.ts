@@ -8,6 +8,7 @@ import { createProjectMemoryLocalStore } from "../context/projectMemoryLocalStor
 import { createProjectMemoryReviewStateStore } from "../context/projectMemoryReviewState.js";
 import type { ProjectMemoryRecord } from "../context/projectMemoryStoreContract.js";
 import { createSidebarLiveEventStore } from "../context/sidebarLiveEventStore.js";
+import type { BrowserExecutor } from "../context/browserExecutor.js";
 import { createStartupWarmContextCacheStore } from "../context/startupWarmContextHealth.js";
 import type { CommandContext } from "../commands/types.js";
 import {
@@ -26,6 +27,7 @@ export function createAgentScenarioFixtureContext(input: {
   readonly scenarioId: string;
   readonly workspaceRoot?: string;
   readonly sessionId?: string;
+  readonly browserExecutor?: BrowserExecutor;
 }): AgentScenarioFixtureContext {
   const workspaceRoot =
     input.workspaceRoot ??
@@ -76,6 +78,7 @@ export function createAgentScenarioFixtureContext(input: {
     projectMemoryInjectionStateStore,
     projectMemoryStore,
     startupWarmContextCacheStore,
+    browserExecutor: input.browserExecutor,
     sidebarLiveEventStore,
   };
   return {

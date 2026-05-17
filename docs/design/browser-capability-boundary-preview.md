@@ -203,3 +203,10 @@ main browser boundary.
 
 Choose Stagehand-like action cache design if preview/cache/replay should be
 modeled before runtime execution.
+
+## Route 96 Execution Seam Note
+
+Route 96 adds `/browser execute navigate|observe|extract` as a non-default
+execution branch. The default command path still has no executor and therefore
+blocks execution. Preview and dry-run surfaces stay unchanged, and real
+Playwright/MCP/browser runtime work remains deferred to a later sandbox route.

@@ -1464,6 +1464,13 @@ Allowed after this document:
   remains outside edit runtime, adds no provider/model calls, browser
   execution, CLI lifecycle rewrite, SessionManager schema change, harness
   persistence, automatic recovery, rollback, or default mutation readiness.
+- Route 96 browser/tooling work adds a non-default browser execution contract,
+  policy, executor interface, fake/test executor, Playwright CLI plan-only
+  adapter seam, `/browser execute ...` runner, sidebar activity, and scenario
+  harness coverage. It remains outside edit runtime, adds no default browser
+  execution, real Playwright launch, MCP launch/discovery, provider/model
+  calls, browser session persistence, SessionManager schema change, automatic
+  recovery, rollback, or default mutation readiness.
 
 Forbidden after this document:
 
@@ -1481,9 +1488,10 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 96 recommendation: choose Playwright CLI/Skills non-default execution
-prototype if browser execution is next, real CLI scenario harness if process
-spawn evidence is next, or sandbox harness foundation if execution should wait
-for stronger isolation coverage. Do not treat Route 82, Route 83, Route 84,
-Route 85, Route 86, Route 87, Route 88, Route 89, Route 90, Route 91, Route 92,
-Route 93, Route 94, or Route 95 as edit-capability expansions.
+Route 97 recommendation: choose browser sandbox hardening and network allowlist
+if real browser execution is next, real CLI scenario harness if process-spawn
+evidence is next, or Playwright CLI real execution opt-in only after sandbox
+and confirmation policy are explicit. Do not treat Route 82, Route 83, Route
+84, Route 85, Route 86, Route 87, Route 88, Route 89, Route 90, Route 91,
+Route 92, Route 93, Route 94, Route 95, or Route 96 as edit-capability
+expansions.

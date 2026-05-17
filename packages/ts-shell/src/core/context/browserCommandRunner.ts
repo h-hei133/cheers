@@ -5,6 +5,11 @@ import { renderBrowserCapabilitySurface } from "./browserCapabilitySurface.js";
 import type { BrowserCommandContract } from "./browserCommandContract.js";
 import { runBrowserDryRunHarness } from "./browserDryRunHarness.js";
 import { renderBrowserDryRunSurface } from "./browserDryRunSurface.js";
+import {
+  runBrowserExecutionCommand,
+  type BrowserExecutionCommandRunResult,
+} from "./browserExecutionCommandRunner.js";
+import type { BrowserExecutor } from "./browserExecutor.js";
 
 export interface BrowserCommandRunResult {
   readonly output: string;
@@ -67,4 +72,35 @@ export function runBrowserCommand(input: {
       "browser-command-runner:no-persistence",
     ],
   };
+}
+
+export async function runBrowserCommandAsync(input: {
+  readonly contract: BrowserCommandContract;
+  readonly capability?: BrowserCapabilityState;
+  readonly browserExecutor?: BrowserExecutor;
+  readonly now?: () => string;
+}): Promise<BrowserCommandRunResult | BrowserExecutionCommandRunResult> {
+  if (input.contract.mode === "execute") {
+    if (!input.contract.execution) {
+      return {
+        output: [
+          "Result",
+          "- Outcome: blocked",
+          "- BlockerKind: invalid-browser-execute",
+          "- Reason: Missing browser execution request.",
+          "- DoNext: Use /browser execute navigate <url>, observe, or extract <goal>.",
+        ].join("\n"),
+        evidence: ["browser-command-runner:missing-execution-request"],
+      };
+    }
+    return runBrowserExecutionCommand({
+      request: input.contract.execution,
+      executor: input.browserExecutor,
+      now: input.now,
+    });
+  }
+  return runBrowserCommand({
+    contract: input.contract,
+    capability: input.capability,
+  });
 }

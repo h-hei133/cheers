@@ -202,3 +202,12 @@ developer-only toggles become the next blocker.
 
 Choose memory retrieval ranking hardening if `/sidebar` is sufficient and
 memory recall quality is the more user-visible issue.
+
+## Route 96 Browser Execution Note
+
+Route 96 extends `/browser` sidebar activity to include `/browser execute ...`.
+The event title is `Browser execution`; blocked execution remains a blocker
+event and fake/test execution success remains a sanitized command summary. The
+event path still uses the session-scoped in-memory live store and does not add
+persistence, dynamic discovery, raw browser payloads, provider/model calls, MCP
+launch, or startup/model auto-injection.

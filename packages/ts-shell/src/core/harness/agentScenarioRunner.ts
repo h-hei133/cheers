@@ -43,7 +43,9 @@ export async function runAgentScenario(input: {
     warnings.push(...result.warnings);
     blockers.push(...result.blockers);
     if (result.output) {
-      const checks = runAgentScenarioSafetyChecks(result.output);
+      const checks = runAgentScenarioSafetyChecks(result.output, {
+        expectBrowserExecution: input.scenario.metadata?.capability?.includes("browser-fake-execution") === true,
+      });
       safetyChecks.push(...checks);
       blockers.push(...checks.filter((check) => check.status !== "passed").map((check) => check.message));
     }
@@ -78,7 +80,12 @@ export async function runAgentScenario(input: {
     steps.flatMap((step) => step.evidence),
     assertions.flatMap((assertion) => assertion.evidence),
     safetyChecks.flatMap((check) => check.evidence),
-    ["agent-scenario-runner:no-provider-call", "agent-scenario-runner:no-browser-execution"],
+    [
+      "agent-scenario-runner:no-provider-call",
+      input.scenario.metadata?.capability?.includes("browser-fake-execution") === true
+        ? "agent-scenario-runner:fake-browser-execution-only"
+        : "agent-scenario-runner:no-browser-execution",
+    ],
   ]);
   return {
     scenarioId: input.scenario.id,

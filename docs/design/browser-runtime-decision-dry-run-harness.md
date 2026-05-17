@@ -209,3 +209,12 @@ Alternatives:
   contract-only route before any runtime.
 - Stagehand-like action cache design if observe/cache/replay semantics should
   be modeled before execution.
+
+## Route 96 Execution Seam Note
+
+Route 96 keeps Route 94 dry-run behavior non-executing and adds a separate
+non-default `/browser execute ...` seam. Without an explicitly injected
+executor, execution is blocked with `Executed: no`. A fake/test executor can
+exercise read-only harness scenarios, while the Playwright CLI adapter remains
+plan-only and does not launch a browser, MCP server, provider, model, network,
+or persistent browser session.

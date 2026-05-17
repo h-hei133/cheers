@@ -145,3 +145,12 @@ Deferred to later routes:
 - long-session benchmark harness
 - output quality harness with richer scoring
 - persistence or cross-session scenario history
+
+## Route 96 Browser Execution Note
+
+Route 96 extends the harness with browser execution scenarios while keeping
+real browser execution out of the default safety model. The default scenario
+asserts `/browser execute ...` is blocked without an executor. A separate
+fake/test scenario injects `FakeBrowserExecutor`, marks
+`browser-fake-execution` in metadata, and verifies sanitized `Executed: yes`
+evidence without launching Playwright, MCP, providers, models, or network.
