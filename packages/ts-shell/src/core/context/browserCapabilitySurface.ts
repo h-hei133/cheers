@@ -3,6 +3,10 @@ import {
   sanitizeBrowserText,
   type BrowserCapabilityState,
 } from "./browserCapabilityModel.js";
+import {
+  browserRuntimeDependencySummary,
+  renderBrowserRuntimeAvailabilitySurface,
+} from "./browserRuntimeAvailabilitySurface.js";
 
 export function renderBrowserCapabilitySurface(
   state: BrowserCapabilityState = createBrowserCapabilityState(),
@@ -20,6 +24,11 @@ export function renderBrowserCapabilitySurface(
     "- Persistence: none",
     `- Preview actions: ${state.supportedPreviewActions.join(", ")}`,
     `- Blocked actions: ${state.blockedActions.join(", ")}`,
+    "",
+    renderBrowserRuntimeAvailabilitySurface({
+      availability: "unavailable",
+      currentMode: "status",
+    }),
     "",
     "Backend candidates:",
     ...state.backendCandidates.map((backend) =>
@@ -42,11 +51,12 @@ export function browserCapabilitySidebarToolItem(
     status: state.status === "blocked" || state.status === "unavailable"
       ? "unavailable" as const
       : "deferred" as const,
-    summary: `${state.status}; preview-only; no browser/MCP launch or provider/model call.`,
+    summary: `${state.status}; ${browserRuntimeDependencySummary()}; preview-only; no browser/MCP launch or provider/model call.`,
     evidence: [
       "browser-capability-surface:sidebar-placeholder",
       "browser-capability-surface:no-discovery",
       "browser-capability-surface:no-browser-execution",
+      "browser-capability-surface:runtime-dependency-policy",
     ],
   };
 }

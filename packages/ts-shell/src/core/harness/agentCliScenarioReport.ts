@@ -48,10 +48,14 @@ function summarizeBrowserExecutionEvidence(
   const invalidManifest = outputs.some((output) => /Manifest status:\s*invalid/i.test(output));
   const validManifest = outputs.some((output) => /Manifest status:\s*valid/i.test(output));
   const missingManifest = outputs.some((output) => /Manifest status:\s*missing/i.test(output));
+  const dependencyDecision = outputs.find((output) => /Dependency decision:\s*external-runner-only/i.test(output))
+    ? "external-runner-only"
+    : "unknown";
   return [
     "present",
     `executed=${executedYes ? "yes" : executedNo ? "no" : "unknown"}`,
     `mode=${playwrightLocal ? "playwright-local" : localFixture ? "local-fixture" : "disabled"}`,
     `manifest=${validManifest ? "valid" : invalidManifest ? "invalid" : missingManifest ? "missing" : "unknown"}`,
+    `dependency=${dependencyDecision}`,
   ].join("; ");
 }

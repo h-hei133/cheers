@@ -166,3 +166,11 @@ executor mode is `playwright-local`. The harness asserts default blocked,
 unavailable runtime, external URL blocked, and compact report evidence. It
 does not assume cross-process sidebar persistence and does not embed raw
 stdout/stderr or raw manifest content in the report.
+
+## Route 102 Dependency Policy Note
+
+Route 102 adds real CLI coverage for `/browser status` dependency policy
+output and extends browser execution reports with a compact dependency field.
+The harness still records summarized process evidence only; it does not install
+Playwright, launch a browser, launch MCP, call providers/models, or persist
+cross-process sidebar state.

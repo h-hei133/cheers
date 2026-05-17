@@ -242,3 +242,10 @@ local unavailable, blocked, or injected-success results are represented in the
 sanitized command output and lifecycle evidence; no sidebar persistence,
 always-on UI, dynamic discovery, raw event payload, MCP launch, provider/model
 call, or startup/model injection is added.
+
+## Route 102 Dependency Policy Note
+
+Route 102 adds the browser runtime dependency decision to the existing browser
+tool/status summary. The sidebar model remains session-scoped and sanitized:
+no raw runner config, persistence, dynamic discovery, MCP launch,
+provider/model call, or startup/model injection is added.

@@ -428,6 +428,15 @@ MCP launch/discovery, provider/model call, browser session persistence,
 SessionManager schema change, startup/model auto-injection, memory persistence
 behavior change, CLI lifecycle rewrite, or raw page/content/secrets/hidden
 reasoning in output.
+Route 102 chooses `external-runner-only` as the Playwright runtime dependency
+policy, adds external runner policy and runtime availability surfaces, and
+shows the decision in `/browser status`, `/browser execute`, CLI bridge
+summaries, sidebar summaries, and scenario reports. It still adds no package
+dependency, browser binary install, default browser execution, external
+network, MCP launch/discovery, provider/model call, browser session
+persistence, SessionManager schema change, startup/model auto-injection,
+memory persistence behavior change, CLI lifecycle rewrite, or raw runner
+config/content/secrets/hidden reasoning in output.
 
 ## Residual Risks
 
@@ -468,7 +477,8 @@ lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   scenario harness foundation, Route 96 non-default browser execution seam,
   Route 97 browser sandbox/allowlist preflight, Route 98 real CLI scenario
   process evidence, Route 99 local-fixture execution, Route 100 real CLI
-  local-fixture injection, and Route 101 Playwright local unavailable/bridge
-  hardening are now machine-checkable enough to plan Playwright dependency
-  decisions, external browser opt-in, sandbox lifecycle hardening,
+  local-fixture injection, Route 101 Playwright local unavailable/bridge
+  hardening, and Route 102 external-runner-only dependency policy are now
+  machine-checkable enough to plan skill-managed runner bridges, external
+  browser opt-in, sandbox lifecycle hardening,
   startup-read integration, or retrieval-quality work separately.

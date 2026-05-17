@@ -20,6 +20,9 @@ describe("browser execution command runner", () => {
     expect(result.output).toContain("- Browser process: not launched");
     expect(result.output).toContain("- MCP discovery/launch: none");
     expect(result.output).toContain("- Provider/model call: none");
+    expect(result.output).toContain("Browser runtime dependency");
+    expect(result.output).toContain("- Decision: external-runner-only");
+    expect(result.output).toContain("- Browser execution default: disabled");
     expect(result.evidence).toContain("browser-execution-command-runner:no-mcp-launch");
   });
 
@@ -92,6 +95,8 @@ describe("browser execution command runner", () => {
     expect(result.output).toContain("- Executed: no");
     expect(result.output).toContain("availability=unavailable");
     expect(result.output).toContain("cleanup=not-started");
+    expect(result.output).toContain("- Decision: external-runner-only");
+    expect(result.output).toContain("- External runner policy: blocked-missing-config");
     expect(result.output).toContain("- MCP discovery/launch: none");
   });
 

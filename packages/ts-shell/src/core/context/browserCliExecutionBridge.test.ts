@@ -18,6 +18,8 @@ describe("browser CLI execution bridge", () => {
     expect(bridge.browserExecutor).toBeUndefined();
     expect(bridge.browserCliExecutionBridgeSummary.executionMode).toBe("disabled");
     expect(bridge.browserCliExecutionBridgeSummary.manifestStatus).toBe("missing");
+    expect(bridge.browserCliExecutionBridgeSummary.dependencyDecision).toContain("external-runner-only");
+    expect(bridge.browserCliExecutionBridgeSummary.externalRunnerStatus).toBe("blocked-missing-config");
   });
 
   it("constructs local fixture executor context only for a valid manifest", async () => {
@@ -39,6 +41,7 @@ describe("browser CLI execution bridge", () => {
     expect(bridge.browserSandboxAuthority?.mode).toBe("local-fixture");
     expect(bridge.browserNetworkAllowlist?.allowedOrigins).toEqual([]);
     expect(bridge.browserCliExecutionBridgeSummary.executorSource).toBe("cli-harness");
+    expect(bridge.browserCliExecutionBridgeSummary.externalRunnerStatus).toBe("allowed");
     expect(bridge.browserCliExecutionBridgeSummary.evidence).toContain(
       "browser-cli-execution-bridge:no-playwright-process",
     );
@@ -63,6 +66,8 @@ describe("browser CLI execution bridge", () => {
     expect(bridge.browserExecutor?.kind).toBe("playwright-local");
     expect(bridge.browserSandboxAuthority?.mode).toBe("local-fixture");
     expect(bridge.browserCliExecutionBridgeSummary.executionMode).toBe("playwright-local");
+    expect(bridge.browserCliExecutionBridgeSummary.dependencyDecision).toContain("external-runner-only");
+    expect(bridge.browserCliExecutionBridgeSummary.externalRunnerStatus).toBe("allowed");
     expect(bridge.browserCliExecutionBridgeSummary.evidence).toContain(
       "browser-cli-execution-bridge:playwright-local-requested",
     );

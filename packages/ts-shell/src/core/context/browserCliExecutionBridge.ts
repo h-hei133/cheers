@@ -2,8 +2,18 @@ import {
   createBrowserLocalExecutionAuthority,
 } from "./browserLocalExecutionAuthority.js";
 import {
+  decideBrowserExternalRunnerPolicy,
+  type BrowserExternalRunnerDecision,
+} from "./browserExternalRunnerPolicy.js";
+import {
   createBrowserNetworkAllowlist,
 } from "./browserNetworkAllowlist.js";
+import {
+  browserRuntimeDependencySummary,
+} from "./browserRuntimeAvailabilitySurface.js";
+import {
+  decideBrowserRuntimeDependencyPolicy,
+} from "./browserRuntimeDependencyPolicy.js";
 import {
   BrowserPlaywrightCliLocalFixtureExecutor,
 } from "./browserPlaywrightCliExecutor.js";
@@ -30,6 +40,8 @@ export interface BrowserCliExecutionBridgeSummary {
   readonly manifestStatus: "missing" | "valid" | "invalid";
   readonly executionMode: "disabled" | "local-fixture" | "playwright-local";
   readonly playwrightAvailabilityStatus?: "available" | "unavailable" | "disabled" | "blocked-by-policy" | "not-checked";
+  readonly dependencyDecision: string;
+  readonly externalRunnerStatus: BrowserExternalRunnerDecision["status"];
   readonly reason: string;
   readonly evidence: readonly string[];
   readonly warnings: readonly string[];
@@ -52,11 +64,14 @@ export function createBrowserCliExecutionBridge(
   } = {},
 ): BrowserCliExecutionBridgeContext {
   if (injection.status !== "valid" || !injection.fixture || !injection.manifest) {
+    const missingRunner = decideBrowserExternalRunnerPolicy();
     return {
       browserCliExecutionBridgeSummary: {
         executorSource: injection.source,
         manifestStatus: injection.manifestStatus,
         executionMode: "disabled",
+        dependencyDecision: browserRuntimeDependencySummary(),
+        externalRunnerStatus: missingRunner.status,
         reason: injection.reason,
         evidence: injection.evidence,
         warnings: injection.warnings,
@@ -69,6 +84,35 @@ export function createBrowserCliExecutionBridge(
     allowedFixtureIds: [injection.fixture.fixtureId],
   });
   const executionMode = injection.manifest.executorMode;
+  const externalRunnerDecision = decideBrowserExternalRunnerPolicy({
+    source: "cli-harness-manifest",
+    runnerId: `${injection.manifest.source}:${executionMode}`,
+    executorMode: executionMode,
+    fixtureScope: "local-fixture-only",
+    sandboxAuthority: "local-fixture",
+    allowlist: "none",
+    evidenceRedactionMode: "safe-summary-only",
+  });
+  if (!externalRunnerDecision.allowed) {
+    return {
+      browserCliExecutionBridgeSummary: {
+        executorSource: injection.source,
+        manifestStatus: "valid",
+        executionMode: "disabled",
+        playwrightAvailabilityStatus: executionMode === "playwright-local" ? "unavailable" : undefined,
+        dependencyDecision: browserRuntimeDependencySummary(),
+        externalRunnerStatus: externalRunnerDecision.status,
+        reason: externalRunnerDecision.reason,
+        evidence: [
+          ...injection.evidence,
+          ...externalRunnerDecision.evidence,
+          "browser-cli-execution-bridge:external-runner-blocked",
+        ],
+        warnings: [...injection.warnings, ...externalRunnerDecision.warnings],
+        redactions: injection.redactions,
+      },
+    };
+  }
   const browserExecutor: BrowserExecutor = executionMode === "playwright-local"
     ? new BrowserPlaywrightLocalExecutor({
         fixture: injection.fixture,
@@ -99,12 +143,15 @@ export function createBrowserCliExecutionBridge(
       manifestStatus: "valid",
       executionMode,
       playwrightAvailabilityStatus: executionMode === "playwright-local" ? "not-checked" : undefined,
+      dependencyDecision: browserRuntimeDependencySummary(decideBrowserRuntimeDependencyPolicy()),
+      externalRunnerStatus: externalRunnerDecision.status,
       reason: executionMode === "playwright-local"
         ? "CLI harness supplied an explicit Playwright local fixture executor request."
         : "CLI harness supplied an explicit local fixture executor.",
       evidence: [
         ...injection.evidence,
         "browser-cli-execution-bridge:executor-created",
+        ...externalRunnerDecision.evidence,
         executionMode === "playwright-local"
           ? "browser-cli-execution-bridge:playwright-local-requested"
           : "browser-cli-execution-bridge:no-playwright-process",
@@ -124,6 +171,8 @@ export function renderBrowserCliExecutionBridgeSummary(
     manifestStatus: "missing",
     executionMode: "disabled",
     reason: "No CLI browser executor injection was provided.",
+    dependencyDecision: browserRuntimeDependencySummary(),
+    externalRunnerStatus: "blocked-missing-config" as const,
     evidence: [],
     warnings: [],
     redactions: [],
@@ -131,6 +180,8 @@ export function renderBrowserCliExecutionBridgeSummary(
   return [
     "Browser executor injection",
     `- Execution mode: ${value.executionMode}`,
+    `- Dependency decision: ${value.dependencyDecision}`,
+    `- External runner policy: ${value.externalRunnerStatus}`,
     `- Playwright availability: ${value.playwrightAvailabilityStatus ?? "not-requested"}`,
     `- Executor source: ${value.executorSource}`,
     `- Manifest status: ${value.manifestStatus}`,

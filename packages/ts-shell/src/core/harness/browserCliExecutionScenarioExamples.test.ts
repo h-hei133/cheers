@@ -165,7 +165,7 @@ describe("browser CLI execution scenario examples", () => {
     expect(agentCliAssertionFailures(result)).toEqual([]);
     expect(result.status).toBe("passed");
     expect(renderAgentCliScenarioReport(result)).toContain(
-      "Browser execution evidence: present; executed=yes; mode=local-fixture; manifest=valid",
+      "Browser execution evidence: present; executed=yes; mode=local-fixture; manifest=valid; dependency=external-runner-only",
     );
   });
 

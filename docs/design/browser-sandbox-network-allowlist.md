@@ -226,3 +226,11 @@ Route 101 lets `playwright-local` share the local-fixture sandbox and
 the existing default-deny allowlist. The route adds no external network, MCP
 launch, persistent browser session, auth/payment/destructive/upload/download
 actions, screenshot/OCR, or raw browser content.
+
+## Route 102 Dependency Policy Note
+
+Route 102 keeps the same network boundary while adding dependency and external
+runner policy surfaces. The chosen policy is external-runner-only; package
+dependency and browser binary install remain deferred. External runner config
+is allowed only when its allowlist is `none` and its scope is
+local-fixture-only.

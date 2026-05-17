@@ -20,6 +20,9 @@ describe("browser capability command runner", () => {
     expect(output).toContain("- Browser process: not launched");
     expect(output).toContain("- MCP discovery/launch: none");
     expect(output).toContain("- Provider/model call: none");
+    expect(output).toContain("Browser runtime dependency");
+    expect(output).toContain("- Decision: external-runner-only");
+    expect(output).toContain("- Browser execution default: disabled");
     expect(output).toContain("Playwright CLI/Skills");
     expect(output).toContain("Playwright MCP");
     expect(output).toContain("Stagehand-like split");
@@ -100,7 +103,9 @@ describe("browser capability command runner", () => {
     expect(item.label).toBe("Browser capability");
     expect(item.status).toBe("deferred");
     expect(item.summary).toContain("preview-only");
+    expect(item.summary).toContain("external-runner-only");
     expect(item.summary).toContain("no browser/MCP launch");
+    expect(item.evidence).toContain("browser-capability-surface:runtime-dependency-policy");
   });
 
   it("prefers Playwright CLI/Skills as the deterministic future runtime without launching it", () => {

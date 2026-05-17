@@ -171,3 +171,12 @@ Alternative next routes:
   repeatable before external browsing
 - external-network browser execution design only after local Playwright
   execution is truly available
+
+## Route 102 Dependency Decision Note
+
+Route 102 chooses `external-runner-only` for the current Playwright runtime
+dependency policy and leaves package files untouched. `playwright-local`
+continues to report deterministic unavailable unless an explicit local/test
+runner is injected. `/browser status`, `/browser execute`, CLI bridge output,
+sidebar summaries, and scenario reports now surface the dependency decision
+and external runner policy.

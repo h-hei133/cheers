@@ -142,3 +142,12 @@ manifest, but the default child process still has no injected runtime checker
 or runner, so it reports deterministic unavailable evidence with `Executed:
 no`. The local-fixture mode remains unchanged, and unsupported executor modes
 block safely.
+
+## Route 102 Dependency Policy Note
+
+Route 102 evaluates every valid manifest through an external runner policy.
+Only local/test manifest sources with local-fixture scope, local-fixture
+sandbox authority, no external allowlist, and safe-summary evidence are
+allowed. The bridge summary now includes dependency decision and external
+runner policy, while still exposing no raw manifest content or default runner
+path.

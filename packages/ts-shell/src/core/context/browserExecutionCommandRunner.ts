@@ -9,6 +9,9 @@ import {
   renderBrowserCliExecutionBridgeSummary,
   type BrowserCliExecutionBridgeSummary,
 } from "./browserCliExecutionBridge.js";
+import {
+  renderBrowserRuntimeAvailabilitySurface,
+} from "./browserRuntimeAvailabilitySurface.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import { createBrowserExecutionResult } from "./browserExecutionResult.js";
 import { renderBrowserExecutionSurface } from "./browserExecutionSurface.js";
@@ -79,6 +82,12 @@ export async function runBrowserExecutionCommand(input: {
       "",
       renderBrowserExecutionLifecycleSurface({ result, preflight }),
       "",
+      renderBrowserRuntimeAvailabilitySurface({
+        availability: availabilityFromExecutorResult(executorResult),
+        currentMode: request.mode,
+        nextAction: executorResult.error?.message,
+      }),
+      "",
       renderBrowserCliExecutionBridgeSummary(input.cliExecutionBridgeSummary),
     ].join("\n"),
     evidence: [
@@ -90,4 +99,17 @@ export async function runBrowserExecutionCommand(input: {
       "browser-execution-command-runner:no-provider-or-model-call",
     ],
   };
+}
+
+function availabilityFromExecutorResult(
+  result: Awaited<ReturnType<BrowserExecutor["execute"]>>,
+): string {
+  const availability = result.evidence.find((item) => item.label === "availability")?.value;
+  if (availability) {
+    return availability;
+  }
+  if (result.executorKind === "local-fixture" || result.executorKind === "fake-test") {
+    return "not-required";
+  }
+  return result.executed ? "available" : "unavailable";
 }

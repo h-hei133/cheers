@@ -192,3 +192,11 @@ Route 101 extends the shared CLI safety check to recognize explicit
 `Browser process: playwright local only`, no MCP launch, and no provider/model
 call. The real CLI route currently exercises the unavailable path; injected
 runner success remains covered by focused context tests.
+
+## Route 102 Dependency Policy Note
+
+Route 102 adds dependency-policy assertions to browser CLI scenarios:
+`/browser status` must show `external-runner-only`, unavailable
+`playwright-local` output must explain the dependency decision, local-fixture
+execution remains unaffected, and report summaries include dependency state.
+This changes harness evidence only, not execution authority.

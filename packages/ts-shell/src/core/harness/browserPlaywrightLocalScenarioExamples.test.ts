@@ -64,6 +64,37 @@ describe("browser Playwright local real CLI scenario examples", () => {
     expect(result.status).toBe("passed");
   });
 
+  it("shows runtime dependency policy through /browser status", async () => {
+    const scenario: AgentCliScenario = {
+      id: "cli-browser-runtime-dependency-status",
+      name: "browser status includes runtime dependency decision",
+      metadata: { route: "102", capability: ["browser", "real-cli", "runtime-dependency-status"] },
+      steps: [
+        {
+          id: "status",
+          kind: "cli-command",
+          prompt: "/browser status",
+          assertions: [
+            { id: "status-section", kind: "stdout-contains", text: "Browser runtime dependency" },
+            { id: "decision", kind: "stdout-contains", text: "Decision: external-runner-only" },
+            { id: "default-disabled", kind: "stdout-contains", text: "Browser execution default: disabled" },
+            { id: "executed-no", kind: "executed-no" },
+          ],
+        },
+      ],
+      expectedOutcome: { status: "passed" },
+    };
+
+    const result = await runAgentCliScenario({
+      scenario,
+      projectPath: projectRoot(),
+      homeDir: tempRoot("private-agents-cli-route102-home-"),
+    });
+
+    expect(agentCliAssertionFailures(result)).toEqual([]);
+    expect(result.status).toBe("passed");
+  });
+
   it("reports playwright-local unavailable safely with an explicit manifest", async () => {
     const fixture = createBrowserCliLocalFixtureManifestFixture({
       executorMode: "playwright-local",
@@ -84,6 +115,7 @@ describe("browser Playwright local real CLI scenario examples", () => {
             { id: "mode", kind: "stdout-contains", text: "Mode: playwright-local" },
             { id: "runtime", kind: "stdout-contains", text: "Runtime: playwright-local unavailable" },
             { id: "availability", kind: "stdout-contains", text: "availability=unavailable" },
+            { id: "dependency", kind: "stdout-contains", text: "Decision: external-runner-only" },
             { id: "cleanup", kind: "stdout-contains", text: "cleanup=not-started" },
             { id: "no-raw", kind: "no-raw-content-or-secrets" },
           ],
@@ -171,7 +203,7 @@ describe("browser Playwright local real CLI scenario examples", () => {
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
     expect(renderAgentCliScenarioReport(result)).toContain(
-      "Browser execution evidence: present; executed=no; mode=playwright-local; manifest=valid",
+      "Browser execution evidence: present; executed=no; mode=playwright-local; manifest=valid; dependency=external-runner-only",
     );
   });
 });
