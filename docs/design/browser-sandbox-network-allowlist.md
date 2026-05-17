@@ -193,3 +193,11 @@ proven before browser launch.
 
 Choose Route 98 browser sandbox lifecycle hardening if allowlist,
 confirmation, cleanup, or status surfaces need more polish first.
+
+## Route 98 Real CLI Scenario Note
+
+Route 98 chooses the real CLI scenario harness path. It proves browser dry-run
+and blocked execute output through a child process while preserving the Route
+97 preflight boundary: no real browser launch, no network access, no
+Playwright/MCP launch, no provider/model call, and no raw browser content in
+reports.

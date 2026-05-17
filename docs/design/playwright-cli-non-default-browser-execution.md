@@ -210,3 +210,10 @@ runtime preflight, and evidence policy in front of the Route 96 executor seam.
 Executor invocation is now gated by preflight. The fake/test executor can run
 only when fake-test authority, allowlist, and required confirmation pass; real
 Playwright/MCP/browser/network execution remains unavailable.
+
+## Route 98 Real CLI Scenario Note
+
+Route 98 adds process-level CLI evidence before any real Playwright execution.
+The new CLI scenarios assert that `/browser dry-run ...` remains non-executing
+and `/browser execute ...` remains blocked by the existing gates when reached
+through the actual CLI child process.

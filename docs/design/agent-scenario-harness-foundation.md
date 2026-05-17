@@ -161,3 +161,11 @@ Route 97 adds sandbox-specific browser scenarios for missing authority,
 missing allowlist, fake/test preflight success, and dry-run sandbox
 requirements. Fake/test execution remains explicitly marked in metadata so the
 harness can reject accidental real browser execution claims.
+
+## Route 98 Real CLI Scenario Note
+
+Route 98 adds a separate process-spawn CLI scenario harness for command-only
+real CLI evidence. It complements this in-process harness by asserting stdout,
+stderr, exit, timeout, report, and safety evidence from the actual CLI child
+process. The two harnesses remain separate so the CLI runner does not become a
+second runtime implementation.

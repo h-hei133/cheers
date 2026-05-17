@@ -1478,6 +1478,12 @@ Allowed after this document:
   MCP launch/discovery, provider/model calls, browser session persistence,
   SessionManager schema change, automatic recovery, rollback, or default
   mutation readiness.
+- Route 98 harness work adds a real CLI scenario harness for command-only
+  process-spawn evidence over browser dry-run, blocked browser execute,
+  sidebar panel, and warmup status. It remains outside edit runtime, adds no
+  provider/model calls, real browser launch, network access, MCP
+  launch/discovery, CLI lifecycle rewrite, SessionManager schema change,
+  automatic recovery, rollback, or default mutation readiness.
 
 Forbidden after this document:
 
@@ -1495,10 +1501,11 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 98 recommendation: choose Playwright CLI real execution opt-in only if
-the sandbox/allowlist/confirmation gates remain stable, real CLI scenario
-harness if process-spawn evidence should come first, or browser sandbox
-lifecycle hardening if cleanup/status surfaces need more work. Do not treat
+Route 99 recommendation: choose Playwright CLI real execution opt-in only if
+the sandbox/allowlist/confirmation gates remain stable and Route 98 process
+evidence stays deterministic, CLI scenario harness polish if richer safe
+command trajectories are needed first, or browser sandbox lifecycle hardening
+if cleanup/status surfaces need more work. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, or Route
-97 as edit-capability expansions.
+97, or Route 98 as edit-capability expansions.
