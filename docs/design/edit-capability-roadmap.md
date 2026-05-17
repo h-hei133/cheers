@@ -1585,11 +1585,14 @@ writes, status/replay during lock contention, busy compact, stale lock repair,
 corrupt/unsafe repair, and post-stress integrity. Route 111 adds preview-only
 browser replay repair readiness and self-healing preview for blocked replay
 failures; it adds no auto-repair, no auto-replay, and no external network.
-Route 112 recommendation: choose browser replay UX/report polish, or
-preview-only browser action self-healing design before any execution route. Do
-not treat
+Route 112 adds proposal-only browser action self-healing metadata for blocked
+replay failures, including proposal kind, confidence, patch reference, report,
+sidebar, and scenario coverage. It adds no repair apply, no automatic replay,
+and no browser execution change. Recommended Route 113: explicit self-healing
+apply design only if it remains user-reviewed and metadata-safe, otherwise
+replay UX/report polish. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
-Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, Route 104, or
-Route 105, Route 106, Route 107, Route 108, Route 109, Route 110, or Route 111
-as edit-capability expansions.
+Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, Route 104,
+Route 105, Route 106, Route 107, Route 108, Route 109, Route 110, Route 111, or
+Route 112 as edit-capability expansions.

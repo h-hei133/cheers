@@ -107,6 +107,33 @@ describe("sidebar command event adapter", () => {
     expect(JSON.stringify(events)).not.toContain("hidden reasoning");
   });
 
+  it("summarizes browser self-healing proposals without raw output", () => {
+    const event = adaptCommandResultToSidebarEvent({
+      command: "/browser",
+      args: ["replay"],
+      result: {
+        kind: "local",
+        output: [
+          "Browser replay",
+          "Result",
+          "- Outcome: blocked",
+          "- Repair readiness: repair-needs-runner",
+          "Browser self-healing proposal",
+          "- Proposal: add-runner-binding",
+          "- Confidence: high",
+          "- Proposed patch: runner-binding-patch",
+          "RAW_BROWSER_EVIDENCE sk-secret1234567890 hidden reasoning",
+        ].join("\n"),
+      },
+    });
+
+    expect(event.title).toBe("Browser replay");
+    expect(event.summary).toContain("Proposal: add-runner-binding");
+    expect(event.summary).toContain("Confidence: high");
+    expect(event.summary).not.toContain("RAW_BROWSER_EVIDENCE");
+    expect(event.summary).not.toContain("sk-secret");
+  });
+
   it("swallows non-safety sink failures", () => {
     expect(() =>
       emitSidebarCommandResult(

@@ -7,6 +7,8 @@ export interface BrowserReplayRepairPreview {
   readonly cacheEntryId: string;
   readonly failureKind: string;
   readonly repairReadiness: BrowserReplayRepairReadiness["status"];
+  readonly selfHealingProposalId?: string;
+  readonly selfHealingConfidence?: string;
   readonly proposedSafeRepairStep: string;
   readonly requiredUserAction: string;
   readonly requiredCondition: string;
@@ -27,6 +29,8 @@ export function createBrowserReplayRepairPreview(input: {
     cacheEntryId: input.plan.cacheEntryId,
     failureKind: input.failure.kind,
     repairReadiness: input.readiness.status,
+    selfHealingProposalId: undefined,
+    selfHealingConfidence: undefined,
     proposedSafeRepairStep: proposedStep(input.readiness),
     requiredUserAction: input.readiness.nextAction,
     requiredCondition: input.readiness.requiredGate,

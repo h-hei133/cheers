@@ -73,6 +73,7 @@ function summarizeBrowserExecutionEvidence(
     `replay=${replayReadiness}`,
     `replayCommand=${replay ? replay.match(/^- Replay status:\s*(.+)$/im)?.[1]?.trim() ?? "present" : "none"}`,
     `repair=${replay ? replay.match(/^- Repair readiness:\s*(.+)$/im)?.[1]?.trim() ?? replay.match(/^- Repair needed:\s*(.+)$/im)?.[1]?.trim() ?? "none" : "none"}`,
+    `selfHealing=${replay ? summarizeSelfHealing(replay) : "none"}`,
     `receiptCache=${cache ? cache.match(/^- Cache status:\s*(.+)$/im)?.[1]?.trim() ?? "present" : "none"}`,
     `cacheIntegrity=${cache ? cache.match(/^- Integrity:\s*(.+)$/im)?.[1]?.trim() ?? "unknown" : "none"}`,
     `cacheCompaction=${cache ? cache.match(/^- Records before\/after:\s*(.+)$/im)?.[1]?.trim() ?? "none" : "none"}`,
@@ -80,4 +81,13 @@ function summarizeBrowserExecutionEvidence(
     `binding=${skillBinding}`,
     `dependency=${dependencyDecision}`,
   ].join("; ");
+}
+
+function summarizeSelfHealing(output: string): string {
+  const proposal = output.match(/^- Proposal:\s*(.+)$/im)?.[1]?.trim();
+  const confidence = output.match(/^- Confidence:\s*(.+)$/im)?.[1]?.trim();
+  if (!proposal) {
+    return "none";
+  }
+  return `${proposal}${confidence ? `/${confidence}` : ""}`;
 }

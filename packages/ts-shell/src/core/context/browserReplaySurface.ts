@@ -5,6 +5,8 @@ import type { BrowserReplayPlan } from "./browserReplayPlanner.js";
 import { createBrowserReplayRepairPreview } from "./browserReplayRepairPreview.js";
 import { decideBrowserReplayRepairReadiness } from "./browserReplayRepairReadiness.js";
 import { renderBrowserReplayRepairSurface } from "./browserReplayRepairSurface.js";
+import { planBrowserSelfHealingProposal } from "./browserSelfHealingPlanner.js";
+import { renderBrowserSelfHealingSurface } from "./browserSelfHealingSurface.js";
 
 export function renderBrowserReplaySurface(input: {
   readonly plan: BrowserReplayPlan;
@@ -14,6 +16,9 @@ export function renderBrowserReplaySurface(input: {
   const repairPreview = input.plan.willExecute
     ? undefined
     : repairPreviewForPlan(input.plan);
+  const selfHealingProposal = repairPreview
+    ? planBrowserSelfHealingProposal({ plan: input.plan })
+    : undefined;
   return [
     "Browser replay",
     "Result",
@@ -37,7 +42,8 @@ export function renderBrowserReplaySurface(input: {
     "- MCP discovery/launch: none",
     "- Network access: local-fixture only",
     `- Next action: ${safe(receipt?.nextAction ?? input.plan.nextAction, 240)}`,
-    ...(repairPreview ? ["", renderBrowserReplayRepairSurface(repairPreview)] : []),
+    ...(repairPreview ? ["", renderBrowserReplayRepairSurface(repairPreview, selfHealingProposal)] : []),
+    ...(selfHealingProposal ? ["", renderBrowserSelfHealingSurface(selfHealingProposal)] : []),
   ].join("\n");
 }
 
