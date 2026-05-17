@@ -13,6 +13,11 @@ import {
   browserRuntimeDependencySummary,
 } from "./browserRuntimeAvailabilitySurface.js";
 import {
+  classifyBrowserSkillRunnerReadiness,
+  type BrowserSkillRunnerReadiness,
+} from "./browserSkillRunnerReadiness.js";
+import type { BrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
+import {
   decideBrowserRuntimeDependencyPolicy,
 } from "./browserRuntimeDependencyPolicy.js";
 import {
@@ -43,6 +48,8 @@ export interface BrowserCliExecutionBridgeSummary {
   readonly playwrightAvailabilityStatus?: "available" | "unavailable" | "disabled" | "blocked-by-policy" | "not-checked";
   readonly dependencyDecision: string;
   readonly externalRunnerStatus: BrowserExternalRunnerDecision["status"];
+  readonly skillRunnerMetadata?: BrowserSkillRunnerMetadata;
+  readonly skillRunnerReadiness?: BrowserSkillRunnerReadiness;
   readonly reason: string;
   readonly evidence: readonly string[];
   readonly warnings: readonly string[];
@@ -118,6 +125,51 @@ export function createBrowserCliExecutionBridge(
         },
       };
     }
+    if (manifest.runnerMode === "skill-managed") {
+      const skillRunnerReadiness = classifyBrowserSkillRunnerReadiness({
+        metadata: manifest.skillRunnerMetadata,
+        futureExecutionRequired: !!manifest.skillRunnerMetadata,
+      });
+      return {
+        browserSandboxAuthority: createBrowserSandboxAuthority({
+          mode: "local-fixture",
+        }),
+        browserNetworkAllowlist: createBrowserNetworkAllowlist({
+          allowedOrigins: [],
+          allowPrivateNetworkInTest: false,
+          evidence: [
+            "browser-cli-execution-bridge:skill-runner-local-fixture-only",
+            "browser-cli-execution-bridge:no-external-network",
+          ],
+        }),
+        browserExecutionConfirmations: [{ kind: "sandbox", status: "confirmed" }],
+        browserCliExecutionBridgeSummary: {
+          executorSource: injection.source,
+          manifestStatus: "valid",
+          executionMode: "skill-managed",
+          dependencyDecision: browserRuntimeDependencySummary(decideBrowserRuntimeDependencyPolicy()),
+          externalRunnerStatus: manifest.skillRunnerMetadata
+            ? "future-execution-required"
+            : "future-skill-required",
+          skillRunnerMetadata: manifest.skillRunnerMetadata,
+          skillRunnerReadiness,
+          reason: manifest.skillRunnerMetadata
+            ? "Skill-managed runner metadata is valid; execution waits for an explicit future bridge."
+            : "Skill-managed runner manifest is policy-only until explicit metadata is provided.",
+          evidence: [
+            ...injection.evidence,
+            ...externalRunnerDecision.evidence,
+            ...skillRunnerReadiness.evidence,
+            "browser-cli-execution-bridge:skill-runner-metadata-only",
+            "browser-cli-execution-bridge:no-skill-execution",
+            "browser-cli-execution-bridge:no-playwright-dependency",
+            "browser-cli-execution-bridge:no-mcp-launch",
+          ],
+          warnings: [...injection.warnings, ...skillRunnerReadiness.warnings],
+          redactions: injection.redactions,
+        },
+      };
+    }
     const browserExecutor: BrowserExecutor = new BrowserExternalRunnerExecutor({
       manifest,
       fixture: injection.fixture,
@@ -142,12 +194,8 @@ export function createBrowserCliExecutionBridge(
         manifestStatus: "valid",
         executionMode: manifest.runnerMode,
         dependencyDecision: browserRuntimeDependencySummary(decideBrowserRuntimeDependencyPolicy()),
-        externalRunnerStatus: manifest.runnerMode === "skill-managed"
-          ? "future-skill-required"
-          : externalRunnerDecision.status,
-        reason: manifest.runnerMode === "skill-managed"
-          ? "Skill-managed runner manifest is policy-only until explicit metadata is provided."
-          : "CLI harness supplied an explicit external browser runner manifest.",
+        externalRunnerStatus: externalRunnerDecision.status,
+        reason: "CLI harness supplied an explicit external browser runner manifest.",
         evidence: [
           ...injection.evidence,
           ...externalRunnerDecision.evidence,
@@ -259,6 +307,7 @@ export function renderBrowserCliExecutionBridgeSummary(
     `- Execution mode: ${value.executionMode}`,
     `- Dependency decision: ${value.dependencyDecision}`,
     `- External runner policy: ${value.externalRunnerStatus}`,
+    `- Skill metadata status: ${value.skillRunnerReadiness?.status ?? (value.skillRunnerMetadata ? "metadata-ready" : "unavailable")}`,
     `- Playwright availability: ${value.playwrightAvailabilityStatus ?? "not-requested"}`,
     `- Executor source: ${value.executorSource}`,
     `- Manifest status: ${value.manifestStatus}`,
@@ -269,6 +318,8 @@ export function renderBrowserCliExecutionBridgeSummary(
       value.executionMode === "local-fixture" || value.executionMode === "playwright-local"
       || value.executionMode === "test-local" || value.executionMode === "external-local"
         ? "Run only local-fixture observe/extract/navigation scenarios."
+        : value.executionMode === "skill-managed"
+          ? "Keep skill-managed execution blocked until an explicit future execution bridge exists."
         : "Keep browser execution blocked unless an explicit valid local fixture manifest is provided."
     }`,
   ].join("\n");

@@ -1,4 +1,9 @@
 import type { BrowserExternalRunnerAction } from "./browserExternalRunnerProtocol.js";
+import {
+  classifyBrowserSkillRunnerReadiness,
+  type BrowserSkillRunnerReadiness,
+} from "./browserSkillRunnerReadiness.js";
+import type { BrowserSkillRunnerMetadata as Route105BrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
 
 export interface BrowserSkillManagedRunnerMetadata {
   readonly skillId: string;
@@ -20,19 +25,22 @@ export type BrowserSkillManagedRunnerDecisionStatus =
   | "blocked-no-skill"
   | "blocked-dynamic-discovery"
   | "blocked-unsafe-scope"
-  | "future-skill-required";
+  | "future-skill-required"
+  | "future-execution-required"
+  | "metadata-ready";
 
 export interface BrowserSkillManagedRunnerDecision {
   readonly status: BrowserSkillManagedRunnerDecisionStatus;
   readonly allowed: boolean;
   readonly reason: string;
   readonly nextAction: string;
+  readonly skillRunnerReadiness?: BrowserSkillRunnerReadiness;
   readonly evidence: readonly string[];
   readonly warnings: readonly string[];
 }
 
 export function decideBrowserSkillManagedRunnerPolicy(input: {
-  readonly metadata?: BrowserSkillManagedRunnerMetadata;
+  readonly metadata?: BrowserSkillManagedRunnerMetadata | Route105BrowserSkillRunnerMetadata;
   readonly dynamicDiscoveryRequested?: boolean;
 } = {}): BrowserSkillManagedRunnerDecision {
   if (input.dynamicDiscoveryRequested) {
@@ -45,7 +53,18 @@ export function decideBrowserSkillManagedRunnerPolicy(input: {
   if (!input.metadata) {
     return decision("future-skill-required", {
       reason: "Skill-managed browser runner requires explicit future skill metadata.",
-      nextAction: "Keep skill-managed mode as a policy boundary until Route 104 supplies metadata.",
+      nextAction: "Provide explicit Route 105 skill runner metadata; no skill execution is enabled by default.",
+    });
+  }
+  if ("metadataVersion" in input.metadata) {
+    const readiness = classifyBrowserSkillRunnerReadiness({
+      metadata: input.metadata,
+      futureExecutionRequired: true,
+    });
+    return decision(readiness.status === "future-execution-required" ? "future-execution-required" : "metadata-ready", {
+      reason: "Explicit skill runner metadata is valid, but skill-managed execution is not implemented.",
+      nextAction: readiness.nextAction,
+      skillRunnerReadiness: readiness,
     });
   }
   if (
@@ -77,6 +96,7 @@ function decision(
   input: {
     readonly reason: string;
     readonly nextAction: string;
+    readonly skillRunnerReadiness?: BrowserSkillRunnerReadiness;
     readonly warnings?: readonly string[];
   },
 ): BrowserSkillManagedRunnerDecision {
@@ -85,6 +105,7 @@ function decision(
     allowed: status === "allowed",
     reason: input.reason,
     nextAction: input.nextAction,
+    skillRunnerReadiness: input.skillRunnerReadiness,
     evidence: [
       `browser-skill-managed-runner-policy:decision:${status}`,
       "browser-skill-managed-runner-policy:no-dynamic-discovery",

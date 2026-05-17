@@ -5,6 +5,8 @@ import { FakeBrowserExecutor } from "../context/browserExecutor.js";
 import { createBrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
 import { BrowserExternalRunnerExecutor } from "../context/browserExternalRunnerExecutor.js";
 import { validateBrowserExternalRunnerManifest } from "../context/browserExternalRunnerManifest.js";
+import { createBrowserSkillRunnerMetadata } from "../context/browserSkillRunnerMetadata.js";
+import { classifyBrowserSkillRunnerReadiness } from "../context/browserSkillRunnerReadiness.js";
 import { createBrowserExternalRunnerScenarioFixture } from "../harness/browserExternalRunnerScenarioFixtures.js";
 
 describe("browser local command runtime", () => {
@@ -81,5 +83,45 @@ describe("browser local command runtime", () => {
     } finally {
       fixture.cleanup();
     }
+  });
+
+  it("surfaces skill-managed metadata status without executing skills", async () => {
+    const metadata = createBrowserSkillRunnerMetadata();
+    const readiness = classifyBrowserSkillRunnerReadiness({
+      metadata,
+      futureExecutionRequired: true,
+    });
+    const sidebarLiveEventStore = createSidebarLiveEventStore({
+      now: () => "2026-05-17T00:00:00.000Z",
+      nextId: () => "sidebar-event:test",
+    });
+    const result = await runBrowserLocalCommand(["execute", "observe"], {
+      cwd: "/tmp/browser-command-runtime-test",
+      sessionId: "browser-runtime-test",
+      sidebarLiveEventStore,
+      browserCliExecutionBridgeSummary: {
+        executorSource: "cli-harness",
+        manifestStatus: "valid",
+        executionMode: "skill-managed",
+        dependencyDecision: "external-runner-only; packageMutation=none; defaultExecution=disabled",
+        externalRunnerStatus: "future-execution-required",
+        skillRunnerMetadata: metadata,
+        skillRunnerReadiness: readiness,
+        reason: "Skill-managed runner metadata is valid; execution waits for an explicit future bridge.",
+        evidence: readiness.evidence,
+        warnings: [],
+        redactions: [],
+      },
+    });
+
+    expect(result.output).toContain("Skill-managed browser runner");
+    expect(result.output).toContain("- Execution: not enabled");
+    expect(result.output).toContain("- Executed: no");
+    expect(result.output).toContain("- Replay readiness: replay-needs-skill-runner");
+    const events = sidebarLiveEventStore.listRecent({
+      sessionScopeId: "session:browser-runtime-test",
+      includeDeveloperOnly: true,
+    }).events;
+    expect(events[0]?.summary).toContain("Metadata status");
   });
 });

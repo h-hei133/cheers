@@ -190,3 +190,10 @@ Route 104 does not change the dependency decision. Browser execution evidence is
 now summarized through receipts and replay-readiness metadata, but no Playwright
 package, browser binary install, MCP launch, external network, provider/model
 call, or raw evidence surface is added.
+
+## Route 105 Skill Runner Metadata Note
+
+Route 105 does not change the external-runner-only dependency decision. It adds
+skill-managed metadata/readiness surfaces only; no Playwright package, browser
+binary install, MCP launch/discovery, external network, provider/model call, or
+default browser execution is added.

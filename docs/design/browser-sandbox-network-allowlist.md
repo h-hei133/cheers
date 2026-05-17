@@ -248,3 +248,10 @@ Route 104 records sandbox, allowlist, and confirmation decisions in browser
 execution receipts and uses them for replay-readiness classification.
 HTTP/HTTPS targets remain blocked, replay is not executed, and no new network,
 MCP, provider/model, persistence, or raw evidence surface is added.
+
+## Route 105 Skill Runner Metadata Note
+
+Route 105 skill runner metadata must declare `local-fixture-no-network`,
+allowlist `none`, and safe-summary evidence. Valid metadata does not weaken
+preflight: HTTP/HTTPS targets remain blocked and no skill, MCP, browser, or
+network execution is enabled.

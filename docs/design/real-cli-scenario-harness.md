@@ -190,3 +190,11 @@ success, external URL blocking, malformed response, timeout, and unsafe output.
 Reports now summarize receipt status and replay readiness, still without raw
 stdout/stderr, raw manifest content, raw page content, secrets, persistence, or
 cross-process sidebar assumptions.
+
+## Route 105 Skill Runner Metadata Note
+
+Route 105 real CLI scenarios pass explicit skill metadata through the existing
+external runner manifest env path. They cover no metadata, valid metadata,
+future-execution-required execute output, unsafe metadata rejection, and compact
+report summaries without raw manifest content, skill execution, MCP launch,
+network access, provider/model calls, or cross-process sidebar persistence.

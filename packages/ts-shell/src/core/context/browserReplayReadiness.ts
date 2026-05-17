@@ -7,6 +7,7 @@ export type BrowserReplayReadinessStatus =
   | "replay-ready"
   | "replay-blocked"
   | "replay-needs-confirmation"
+  | "replay-needs-skill-runner"
   | "replay-needs-runner"
   | "replay-unsafe"
   | "replay-not-applicable";
@@ -41,6 +42,7 @@ export function classifyBrowserReplayReadiness(input: {
   readonly confirmationDecision: string;
   readonly runnerId?: string;
   readonly manifestId?: string;
+  readonly skillRunnerRequired?: boolean;
 }): BrowserReplayReadiness {
   const reasons: string[] = [];
   const localOrTestScoped = isLocalOrTestScoped(input.mode, input.evidenceBundle.safeUrl);
@@ -78,6 +80,9 @@ export function classifyBrowserReplayReadiness(input: {
   if (!runnerRecorded) {
     reasons.push("missing-explicit-runner");
   }
+  if (input.skillRunnerRequired) {
+    reasons.push("missing-skill-runner-execution-bridge");
+  }
   if (input.evidenceBundle.safeUrl === "external-url:redacted") {
     reasons.push("external-url-blocked");
   }
@@ -90,6 +95,7 @@ export function classifyBrowserReplayReadiness(input: {
     unsafe,
     statusAllowsReplay,
     runnerRecorded,
+    skillRunnerRequired: input.skillRunnerRequired ?? false,
     decisionsRecorded,
     replaySafeAction,
     localOrTestScoped,
@@ -132,6 +138,7 @@ function readinessStatus(input: {
   readonly unsafe: boolean;
   readonly statusAllowsReplay: boolean;
   readonly runnerRecorded: boolean;
+  readonly skillRunnerRequired: boolean;
   readonly decisionsRecorded: boolean;
   readonly replaySafeAction: boolean;
   readonly localOrTestScoped: boolean;
@@ -140,7 +147,13 @@ function readinessStatus(input: {
     return "replay-unsafe";
   }
   if (!input.statusAllowsReplay) {
+    if (input.skillRunnerRequired) {
+      return "replay-needs-skill-runner";
+    }
     return "replay-blocked";
+  }
+  if (input.skillRunnerRequired) {
+    return "replay-needs-skill-runner";
   }
   if (!input.runnerRecorded) {
     return "replay-needs-runner";
@@ -165,6 +178,9 @@ function nextActionFor(status: BrowserReplayReadinessStatus): string {
   }
   if (status === "replay-needs-runner") {
     return "Record an explicit local/test runner before considering replay.";
+  }
+  if (status === "replay-needs-skill-runner") {
+    return "Implement an explicit skill-managed runner bridge before considering replay.";
   }
   if (status === "replay-needs-confirmation") {
     return "Record sandbox, allowlist, and confirmation decisions before considering replay.";

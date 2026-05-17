@@ -23,6 +23,7 @@ import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
 import { runBrowserRuntimePreflight } from "./browserRuntimePreflight.js";
 import { renderBrowserSandboxSurface } from "./browserSandboxSurface.js";
 import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
+import { renderBrowserSkillRunnerSurface } from "./browserSkillRunnerSurface.js";
 
 export interface BrowserExecutionCommandRunResult {
   readonly output: string;
@@ -77,6 +78,8 @@ export async function runBrowserExecutionCommand(input: {
     request,
     policy,
     executorResult,
+    skillRunnerMetadata: input.cliExecutionBridgeSummary?.skillRunnerMetadata,
+    skillRunnerReadiness: input.cliExecutionBridgeSummary?.skillRunnerReadiness,
     now: input.now,
   });
   return {
@@ -87,6 +90,13 @@ export async function runBrowserExecutionCommand(input: {
         : []),
       "",
       renderBrowserExecutionReceiptSurface(result.receipt),
+      ...(input.cliExecutionBridgeSummary?.skillRunnerMetadata || input.cliExecutionBridgeSummary?.skillRunnerReadiness
+        ? ["", renderBrowserSkillRunnerSurface({
+            metadata: input.cliExecutionBridgeSummary.skillRunnerMetadata,
+            readiness: input.cliExecutionBridgeSummary.skillRunnerReadiness,
+            fallbackReason: input.cliExecutionBridgeSummary.reason,
+          })]
+        : []),
       "",
       renderBrowserSandboxSurface(preflight, result.executed),
       "",

@@ -195,3 +195,11 @@ scoped, then normalizes its output into browser execution receipts, evidence
 bundles, safety classification, and replay-readiness metadata. Receipts are
 evidence records only: they do not execute replay, persist action cache data,
 launch Playwright/MCP, call providers/models, or expose raw runner/page content.
+
+## Route 105 Skill Runner Metadata Note
+
+Route 105 keeps raw external runner mode and skill-managed mode distinct. Raw
+external runner manifests may still create explicit test/local process
+executors. Skill-managed manifests can carry validated skill runner metadata,
+but they create no executor and report `future-execution-required` until a
+separate execution bridge route exists.

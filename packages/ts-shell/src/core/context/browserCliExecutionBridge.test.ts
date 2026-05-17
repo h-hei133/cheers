@@ -13,6 +13,7 @@ import {
   createBrowserLocalFixtureManifest,
   serializeBrowserLocalFixtureManifest,
 } from "./browserLocalFixtureManifest.js";
+import { createBrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
 
 describe("browser CLI execution bridge", () => {
   it("keeps execution disabled when injection is absent", () => {
@@ -100,7 +101,7 @@ describe("browser CLI execution bridge", () => {
     );
   });
 
-  it("keeps skill-managed manifests as an explicit future policy boundary", async () => {
+  it("keeps skill-managed manifests without metadata as an explicit future policy boundary", async () => {
     const manifest = createBrowserExternalRunnerManifest({
       source: "skill-managed",
       runnerMode: "skill-managed",
@@ -114,8 +115,37 @@ describe("browser CLI execution bridge", () => {
       }),
     );
 
-    expect(bridge.browserExecutor?.kind).toBe("external-runner");
+    expect(bridge.browserExecutor).toBeUndefined();
     expect(bridge.browserCliExecutionBridgeSummary.executionMode).toBe("skill-managed");
     expect(bridge.browserCliExecutionBridgeSummary.externalRunnerStatus).toBe("future-skill-required");
+  });
+
+  it("loads valid skill runner metadata while keeping execution unavailable", async () => {
+    const manifest = createBrowserExternalRunnerManifest({
+      source: "skill-managed",
+      runnerMode: "skill-managed",
+      runnerId: "skill:browser-runner",
+      runnerRef: "skill:browser-runner",
+      skillRunnerMetadata: createBrowserSkillRunnerMetadata({
+        runnerId: "skill:browser-runner",
+        skillId: "skill:browser-runner",
+        actions: ["observe", "extract"],
+      }),
+    });
+    const bridge = createBrowserCliExecutionBridge(
+      loadBrowserCliExecutorInjectionFromEnv({
+        env: { [BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV]: "/tmp/skill-runner.json" },
+        readFile: () => serializeBrowserExternalRunnerManifest(manifest),
+      }),
+    );
+
+    expect(bridge.browserExecutor).toBeUndefined();
+    expect(bridge.browserCliExecutionBridgeSummary.skillRunnerReadiness?.status).toBe(
+      "future-execution-required",
+    );
+    expect(bridge.browserCliExecutionBridgeSummary.externalRunnerStatus).toBe("future-execution-required");
+    expect(bridge.browserCliExecutionBridgeSummary.evidence).toContain(
+      "browser-cli-execution-bridge:no-skill-execution",
+    );
   });
 });

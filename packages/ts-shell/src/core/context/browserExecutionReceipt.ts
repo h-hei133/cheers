@@ -10,6 +10,8 @@ import {
   classifyBrowserReplayReadiness,
   type BrowserReplayReadiness,
 } from "./browserReplayReadiness.js";
+import type { BrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
+import type { BrowserSkillRunnerReadiness } from "./browserSkillRunnerReadiness.js";
 
 export type BrowserExecutionReceiptId = string;
 export type BrowserExecutionReceiptVersion = "browser-execution-receipt/v1";
@@ -43,6 +45,8 @@ export interface BrowserExecutionReceipt {
   readonly manifestId: string;
   readonly manifestSource: string;
   readonly fixtureId: string;
+  readonly skillRunnerId?: string;
+  readonly skillRunnerStatus?: string;
   readonly sandboxDecision: string;
   readonly allowlistDecision: string;
   readonly confirmationDecision: string;
@@ -61,6 +65,8 @@ export function createBrowserExecutionReceipt(input: {
   readonly request: BrowserExecutionRequest;
   readonly policy: BrowserExecutionPolicyDecision;
   readonly executorResult: BrowserExecutorResult;
+  readonly skillRunnerMetadata?: BrowserSkillRunnerMetadata;
+  readonly skillRunnerReadiness?: BrowserSkillRunnerReadiness;
   readonly now?: () => string;
 }): BrowserExecutionReceipt {
   const evidenceBundle = createBrowserEvidenceBundle({
@@ -90,6 +96,8 @@ export function createBrowserExecutionReceipt(input: {
     confirmationDecision,
     runnerId,
     manifestId,
+    skillRunnerRequired: input.skillRunnerReadiness?.status === "future-execution-required" ||
+      input.skillRunnerReadiness?.status === "metadata-ready",
   });
   return {
     receiptId: deterministicBrowserExecutionReceiptId(input.request.requestId, status, input.executorResult.executorKind),
@@ -105,13 +113,17 @@ export function createBrowserExecutionReceipt(input: {
     manifestId: sanitizeBrowserText(manifestId, 120),
     manifestSource: sanitizeBrowserText(manifestSource, 120),
     fixtureId: sanitizeBrowserText(fixtureId, 120),
+    skillRunnerId: input.skillRunnerMetadata?.runnerId
+      ? sanitizeBrowserText(input.skillRunnerMetadata.runnerId, 120)
+      : undefined,
+    skillRunnerStatus: input.skillRunnerReadiness?.status,
     sandboxDecision: sanitizeBrowserText(sandboxDecision, 120),
     allowlistDecision: sanitizeBrowserText(allowlistDecision, 120),
     confirmationDecision: sanitizeBrowserText(confirmationDecision, 120),
     evidenceBundle,
     replayReadiness,
     redactions: unique([...evidenceBundle.redactions, ...input.executorResult.evidence.filter((item) => item.label === "redaction").map((item) => item.value)]),
-    warnings: unique([...evidenceBundle.warnings, ...input.executorResult.warnings]),
+    warnings: unique([...evidenceBundle.warnings, ...input.executorResult.warnings, ...(input.skillRunnerReadiness?.warnings ?? [])]),
     nextAction: replayReadiness.nextAction,
     executed: input.executorResult.executed,
     rawContent: "excluded",

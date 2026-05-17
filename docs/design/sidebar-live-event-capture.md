@@ -257,3 +257,11 @@ receipt-safe lines such as receipt id, status, replay readiness, executed
 state, and next action. Sidebar events remain sanitized, session-scoped, and
 in-memory; no raw evidence, persistence, MCP launch, provider/model call, or
 startup/model injection is added.
+
+## Route 105 Skill Runner Metadata Note
+
+Route 105 adds sanitized skill-managed metadata lines to the existing
+`/browser` command-result event path. Sidebar summaries may show metadata
+status, supported/blocked actions, contracts, execution disabled, and next
+action. They do not expose raw metadata and do not add persistence, MCP launch,
+provider/model calls, browser execution, or startup/model injection.

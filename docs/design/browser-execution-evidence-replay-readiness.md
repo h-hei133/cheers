@@ -186,3 +186,11 @@ Alternative Route 105 choices:
   usage
 - external-network browser execution design only after local/test receipt safety
   and replay-readiness remain stable
+
+## Route 105 Skill Runner Metadata Note
+
+Route 105 lets receipts reference explicit skill runner metadata when present
+and adds `replay-needs-skill-runner` for metadata-ready but non-executable
+skill-managed results. Metadata readiness does not imply replay readiness:
+replay execution remains `not-started`, persistence remains `none`, and no
+skill, MCP, provider/model, Playwright, or browser process is launched.

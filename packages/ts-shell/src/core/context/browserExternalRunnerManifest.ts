@@ -11,6 +11,10 @@ import {
   type BrowserExternalRunnerAction,
   type BrowserExternalRunnerMode,
 } from "./browserExternalRunnerProtocol.js";
+import {
+  validateBrowserSkillRunnerMetadata,
+  type BrowserSkillRunnerMetadata,
+} from "./browserSkillRunnerMetadata.js";
 
 export const BROWSER_EXTERNAL_RUNNER_MANIFEST_VERSION =
   "browser-external-runner-manifest/v1" as const;
@@ -45,6 +49,7 @@ export interface BrowserExternalRunnerManifest {
   readonly runnerId: string;
   readonly runnerCommand?: BrowserExternalRunnerCommand;
   readonly runnerRef?: string;
+  readonly skillRunnerMetadata?: BrowserSkillRunnerMetadata;
   readonly fixture: BrowserExternalRunnerManifestFixture;
   readonly allowedActions: readonly BrowserExternalRunnerAction[];
   readonly sandboxAuthority: "local-fixture";
@@ -84,6 +89,7 @@ export function createBrowserExternalRunnerManifest(input: {
   readonly runnerId?: string;
   readonly runnerCommand?: BrowserExternalRunnerCommand;
   readonly runnerRef?: string;
+  readonly skillRunnerMetadata?: BrowserSkillRunnerMetadata;
   readonly fixture?: Partial<BrowserExternalRunnerManifestFixture>;
   readonly timeoutMs?: number;
   readonly outputBudgetBytes?: number;
@@ -103,6 +109,7 @@ export function createBrowserExternalRunnerManifest(input: {
     runnerId: sanitizeRunnerId(input.runnerId ?? "route103-test-local-runner"),
     runnerCommand: input.runnerCommand,
     runnerRef: input.runnerRef,
+    skillRunnerMetadata: input.skillRunnerMetadata,
     fixture: {
       id: fixture.fixtureId,
       kind: fixture.fixtureKind,
@@ -153,6 +160,12 @@ export function validateBrowserExternalRunnerManifest(
   if (value.runnerMode === "skill-managed" && !stringValue(value.runnerRef)) {
     return invalid("Skill-managed runner manifest requires an explicit runner reference.");
   }
+  const skillRunnerMetadataResult = value.runnerMode === "skill-managed" && value.skillRunnerMetadata !== undefined
+    ? validateBrowserSkillRunnerMetadata(value.skillRunnerMetadata)
+    : undefined;
+  if (skillRunnerMetadataResult?.ok === false) {
+    return invalid(skillRunnerMetadataResult.reason);
+  }
   const runnerId = sanitizeRunnerId(stringValue(value.runnerId) ?? "external-runner");
   if (browserExternalRunnerHasForbiddenContent(runnerId)) {
     return invalid("External runner id contains unsafe content.");
@@ -198,6 +211,7 @@ export function validateBrowserExternalRunnerManifest(
     runnerId,
     runnerCommand,
     runnerRef: stringValue(value.runnerRef),
+    skillRunnerMetadata: skillRunnerMetadataResult?.ok ? skillRunnerMetadataResult.metadata : undefined,
     fixture: fixture.entry,
     allowedActions: allowedActions as BrowserExternalRunnerAction[],
     sandboxAuthority: "local-fixture",
@@ -223,6 +237,7 @@ export function validateBrowserExternalRunnerManifest(
     evidence: [
       "browser-external-runner-manifest:validated",
       `browser-external-runner-manifest:mode:${manifest.runnerMode}`,
+      ...(manifest.skillRunnerMetadata ? ["browser-external-runner-manifest:skill-runner-metadata"] : []),
       "browser-external-runner-manifest:local-fixture-only",
       "browser-external-runner-manifest:no-external-network",
       "browser-external-runner-manifest:no-raw-content",

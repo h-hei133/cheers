@@ -11,7 +11,8 @@ export type BrowserExternalRunnerDecisionStatus =
   | "blocked-missing-config"
   | "blocked-unsafe-source"
   | "blocked-unsupported-mode"
-  | "future-skill-required";
+  | "future-skill-required"
+  | "future-execution-required";
 
 export interface BrowserExternalRunnerConfig {
   readonly source: BrowserExternalRunnerSource;

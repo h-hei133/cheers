@@ -215,3 +215,11 @@ Route 104 adds receipt-specific harness assertions for browser execution
 output. They check receipt existence, status, executed state, replay readiness,
 safe output, decision context, local/test scope, and next action without
 changing the scenario runner into a browser runtime or persistence layer.
+
+## Route 105 Skill Runner Metadata Note
+
+Route 105 keeps the scenario harness as evidence collection only. Browser skill
+runner scenarios assert metadata status, future-execution-required blocking,
+unsafe capability rejection, receipt/replay linkage, and report summaries
+without adding skill execution, dynamic discovery, browser runtime, MCP launch,
+or persistence behavior to the harness.

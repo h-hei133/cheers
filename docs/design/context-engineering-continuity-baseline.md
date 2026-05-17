@@ -493,3 +493,12 @@ lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   machine-checkable enough to plan skill-managed runner bridges, external
   browser opt-in, sandbox lifecycle hardening,
   startup-read integration, or retrieval-quality work separately.
+
+## Route 105 Skill Runner Metadata Note
+
+Route 105 adds explicit skill-managed browser runner metadata, capability,
+manifest, readiness, surface, receipt/replay, sidebar, and CLI scenario
+coverage. It remains metadata-only: no dynamic discovery, skill execution,
+MCP launch, Playwright dependency, provider/model call, external network,
+persistence, startup/model auto-injection, SessionManager schema change, or raw
+metadata/content/secrets surface is added.

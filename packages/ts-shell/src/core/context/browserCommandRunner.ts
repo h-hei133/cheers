@@ -3,7 +3,10 @@ import { renderBrowserActionPreview } from "./browserActionPreview.js";
 import { createBrowserCapabilityState, type BrowserCapabilityState } from "./browserCapabilityModel.js";
 import { renderBrowserCapabilitySurface } from "./browserCapabilitySurface.js";
 import type { BrowserCommandContract } from "./browserCommandContract.js";
-import type { BrowserCliExecutionBridgeSummary } from "./browserCliExecutionBridge.js";
+import {
+  renderBrowserCliExecutionBridgeSummary,
+  type BrowserCliExecutionBridgeSummary,
+} from "./browserCliExecutionBridge.js";
 import { runBrowserDryRunHarness } from "./browserDryRunHarness.js";
 import { renderBrowserDryRunSurface } from "./browserDryRunSurface.js";
 import {
@@ -14,6 +17,7 @@ import type { BrowserExecutor } from "./browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
 import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
+import { renderBrowserSkillRunnerSurface } from "./browserSkillRunnerSurface.js";
 
 export interface BrowserCommandRunResult {
   readonly output: string;
@@ -23,13 +27,25 @@ export interface BrowserCommandRunResult {
 export function runBrowserCommand(input: {
   readonly contract: BrowserCommandContract;
   readonly capability?: BrowserCapabilityState;
+  readonly browserCliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary;
 }): BrowserCommandRunResult {
   const capability = input.capability ?? createBrowserCapabilityState();
   if (input.contract.mode === "status") {
     return {
-      output: renderBrowserCapabilitySurface(capability),
+      output: [
+        renderBrowserCapabilitySurface(capability),
+        "",
+        renderBrowserSkillRunnerSurface({
+          metadata: input.browserCliExecutionBridgeSummary?.skillRunnerMetadata,
+          readiness: input.browserCliExecutionBridgeSummary?.skillRunnerReadiness,
+          fallbackReason: input.browserCliExecutionBridgeSummary?.reason,
+        }),
+        "",
+        renderBrowserCliExecutionBridgeSummary(input.browserCliExecutionBridgeSummary),
+      ].join("\n"),
       evidence: [
         "browser-command-runner:status-preview-only",
+        ...(input.browserCliExecutionBridgeSummary?.evidence ?? []),
         "browser-command-runner:no-browser-execution",
         "browser-command-runner:no-provider-or-model-call",
         "browser-command-runner:no-persistence",
@@ -114,5 +130,6 @@ export async function runBrowserCommandAsync(input: {
   return runBrowserCommand({
     contract: input.contract,
     capability: input.capability,
+    browserCliExecutionBridgeSummary: input.browserCliExecutionBridgeSummary,
   });
 }

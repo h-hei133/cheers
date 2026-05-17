@@ -3,6 +3,7 @@ import {
   createBrowserExternalRunnerManifest,
   validateBrowserExternalRunnerManifest,
 } from "./browserExternalRunnerManifest.js";
+import { createBrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
 
 describe("browser external runner manifest", () => {
   it("validates safe test-local runner manifests", () => {
@@ -30,5 +31,27 @@ describe("browser external runner manifest", () => {
     const result = validateBrowserExternalRunnerManifest(manifest);
 
     expect(result.ok).toBe(false);
+  });
+
+  it("accepts explicit skill-managed metadata and rejects unsafe capability claims", () => {
+    const manifest = createBrowserExternalRunnerManifest({
+      source: "skill-managed",
+      runnerMode: "skill-managed",
+      runnerId: "skill:browser-runner",
+      runnerRef: "skill:browser-runner",
+      skillRunnerMetadata: createBrowserSkillRunnerMetadata(),
+    });
+    const unsafe = createBrowserExternalRunnerManifest({
+      source: "skill-managed",
+      runnerMode: "skill-managed",
+      runnerId: "skill:browser-runner",
+      runnerRef: "skill:browser-runner",
+      skillRunnerMetadata: createBrowserSkillRunnerMetadata({
+        actions: ["observe", "auth"],
+      }),
+    });
+
+    expect(validateBrowserExternalRunnerManifest(manifest).ok).toBe(true);
+    expect(validateBrowserExternalRunnerManifest(unsafe).ok).toBe(false);
   });
 });
