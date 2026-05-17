@@ -122,10 +122,11 @@ external-network replay, dynamic skill discovery or runner registry, MCP
 browser server launch, Playwright package dependency, and provider/model replay
 planning.
 
-## Route 108 Recommendation
+## Route 108 Persistent Cache Note
 
-Recommended Route 108: browser replay UX/report polish if replay output is too
-verbose. Alternative Route 108 options are browser action self-healing design,
-external-network browser execution after local replay remains stable, or a
-persistent action cache decision only if explicit in-memory cache is
-insufficient and safe.
+Route 108 adds an explicit sanitized persistent receipt/action cache for
+cross-process local/test replay. Persistence is still non-default and requires
+an explicit cache manifest or root. Persistent records do not bypass replay
+policy or runtime preflight, and raw evidence, secrets, external network,
+dynamic discovery, MCP launch, provider/model calls, and automatic replay
+remain blocked.

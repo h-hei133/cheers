@@ -524,3 +524,8 @@ startup/model injection: no automatic replay, persistent cache, external
 network, dynamic discovery, MCP launch, provider/model call, SessionManager
 schema change, automatic recovery, atomic rollback, or raw browser evidence is
 added.
+
+Route 108 adds explicit sanitized browser receipt cache persistence for
+cross-process local/test replay, but it remains outside context persistence and
+startup/model injection. Cache records are discardable replay artifacts, not
+SessionManager state or automatic context.

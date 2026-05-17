@@ -212,3 +212,11 @@ allowlist, confirmation, and binding revalidation. Replay-generated receipts
 link back to the source receipt/cache entry and use source `replay`; no
 automatic replay, persistent cache, external network, provider/model call, MCP
 launch, or raw evidence surface is added.
+
+## Route 108 Persistent Cache Note
+
+Route 108 persists only sanitized replay-ready receipt/cache-entry records when
+an explicit cache root or manifest is provided. Persisted receipts remain
+evidence, not authority: replay still revalidates current runner, sandbox,
+allowlist, confirmation, and runtime preflight. Invalidated/deleted records are
+not replayable.

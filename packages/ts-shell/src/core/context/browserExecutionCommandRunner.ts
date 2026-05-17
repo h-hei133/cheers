@@ -29,6 +29,7 @@ import {
   renderBrowserSkillExecutionSurface,
 } from "./browserSkillExecutionSurface.js";
 import type { BrowserActionCache } from "./browserActionCache.js";
+import type { BrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
 
 export interface BrowserExecutionCommandRunResult {
   readonly output: string;
@@ -43,6 +44,7 @@ export async function runBrowserExecutionCommand(input: {
   readonly confirmations?: readonly BrowserExecutionConfirmationRecord[];
   readonly cliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary;
   readonly actionCache?: BrowserActionCache;
+  readonly receiptCacheStore?: BrowserReceiptCacheStore;
   readonly now?: () => string;
 }): Promise<BrowserExecutionCommandRunResult> {
   const executor = input.executor ?? NOOP_BROWSER_EXECUTOR;
@@ -82,16 +84,28 @@ export async function runBrowserExecutionCommand(input: {
         code: preflight.preflightStatus === "pass" ? policy.status : `preflight-${preflight.preflightStatus}`,
         message: preflight.blockers[0] ?? policy.reason,
       });
+  const receiptExecutorResult = {
+    ...executorResult,
+    evidence: [
+      ...executorResult.evidence,
+      { label: "sandbox decision", value: `${preflight.sandboxDecision.authority.mode}:${preflight.sandboxDecision.status}` },
+      { label: "allowlist decision", value: `network:${preflight.networkDecision.status}` },
+      { label: "confirmation decision", value: `${preflight.confirmationDecision.kind}:${preflight.confirmationDecision.status}` },
+    ],
+  };
   const result = createBrowserExecutionResult({
     request,
     policy,
-    executorResult,
+    executorResult: receiptExecutorResult,
     skillRunnerMetadata: input.cliExecutionBridgeSummary?.skillRunnerMetadata,
     skillRunnerReadiness: input.cliExecutionBridgeSummary?.skillRunnerReadiness,
     now: input.now,
   });
   const cacheResult = result.receipt.replayReadiness.status === "replay-ready"
     ? input.actionCache?.addReceipt(result.receipt)
+    : undefined;
+  const persistentCacheResult = result.receipt.replayReadiness.status === "replay-ready"
+    ? input.receiptCacheStore?.writeReceipt(result.receipt)
     : undefined;
   return {
     output: [
@@ -133,12 +147,25 @@ export async function runBrowserExecutionCommand(input: {
             "- Automatic replay: no",
           ]
         : []),
+      ...(input.receiptCacheStore
+        ? [
+            "",
+            "Browser receipt cache",
+            `- Cache write: ${persistentCacheResult?.written ? "yes" : "no"}`,
+            `- Cache status: ${persistentCacheResult?.record?.status ?? result.receipt.replayReadiness.status}`,
+            `- Receipt id: ${persistentCacheResult?.record?.receiptId ?? result.receipt.receiptId}`,
+            "- Persistence: explicit only",
+            "- Raw evidence stored: no",
+            "- Automatic replay: no",
+          ]
+        : []),
     ].join("\n"),
     evidence: [
       ...result.evidence,
       ...preflight.evidence,
       ...(input.cliExecutionBridgeSummary?.evidence ?? []),
       ...(cacheResult?.ok ? cacheResult.evidence : []),
+      ...(persistentCacheResult?.evidence ?? []),
       "browser-execution-command-runner:non-default",
       "browser-execution-command-runner:no-mcp-launch",
       "browser-execution-command-runner:no-provider-or-model-call",

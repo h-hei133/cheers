@@ -1,6 +1,6 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 
-export type BrowserReplayCommandMode = "status" | "replay";
+export type BrowserReplayCommandMode = "status" | "replay" | "cache-status" | "cache-invalidate" | "cache-delete";
 
 export interface BrowserReplayCommandRequest {
   readonly mode: BrowserReplayCommandMode;
@@ -17,6 +17,26 @@ export function parseBrowserReplayCommandArgs(
 ): BrowserReplayCommandParseResult {
   if (args.length === 0 || args[0] === "status") {
     return { ok: true, request: { mode: "status", sourceCommand: "/browser replay" } };
+  }
+  if (args[0] === "cache") {
+    if (args.length === 1 || args[1] === "status") {
+      return { ok: true, request: { mode: "cache-status", sourceCommand: "/browser replay" } };
+    }
+    if (args[1] === "invalidate" || args[1] === "delete") {
+      const receiptId = sanitizeBrowserText(args.slice(2).join(" "), 180);
+      if (!receiptId) {
+        return invalid("Missing browser receipt id.");
+      }
+      return {
+        ok: true,
+        request: {
+          mode: args[1] === "invalidate" ? "cache-invalidate" : "cache-delete",
+          receiptId,
+          sourceCommand: "/browser replay",
+        },
+      };
+    }
+    return invalid("Unsupported browser replay cache command.");
   }
   const receiptId = sanitizeBrowserText(args.join(" "), 180);
   if (!receiptId) {

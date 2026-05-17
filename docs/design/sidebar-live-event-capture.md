@@ -284,3 +284,10 @@ blocked states summarize source receipt, cache entry, revalidation status, new
 receipt id, and executed yes/no. No sidebar persistence, raw evidence, dynamic
 discovery, MCP launch, provider/model call, automatic replay, or startup/model
 injection is added.
+
+## Route 108 Persistent Cache Note
+
+Route 108 surfaces persistent browser receipt cache status through existing
+sanitized command-result summaries. Browser execution/replay events may mention
+cache write/read status and receipt ids, but never raw cache records, raw
+runner output, raw page content, secrets, or cross-process sidebar state.

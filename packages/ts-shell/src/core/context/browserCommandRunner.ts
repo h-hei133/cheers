@@ -14,6 +14,7 @@ import {
   type BrowserExecutionCommandRunResult,
 } from "./browserExecutionCommandRunner.js";
 import type { BrowserActionCache } from "./browserActionCache.js";
+import type { BrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
 import type { BrowserExecutor } from "./browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
@@ -105,6 +106,7 @@ export async function runBrowserCommandAsync(input: {
   readonly browserExecutionConfirmations?: readonly BrowserExecutionConfirmationRecord[];
   readonly browserCliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary;
   readonly browserActionCache?: BrowserActionCache;
+  readonly browserReceiptCacheStore?: BrowserReceiptCacheStore;
   readonly now?: () => string;
 }): Promise<BrowserCommandRunResult | BrowserExecutionCommandRunResult> {
   if (input.contract.mode === "execute") {
@@ -128,6 +130,7 @@ export async function runBrowserCommandAsync(input: {
       confirmations: input.browserExecutionConfirmations,
       cliExecutionBridgeSummary: input.browserCliExecutionBridgeSummary,
       actionCache: input.browserActionCache,
+      receiptCacheStore: input.browserReceiptCacheStore,
       now: input.now,
     });
   }
@@ -148,6 +151,7 @@ export async function runBrowserCommandAsync(input: {
     return runBrowserReplayCommand({
       request: input.contract.replay,
       actionCache: input.browserActionCache,
+      receiptCacheStore: input.browserReceiptCacheStore,
       executor: input.browserExecutor,
       sandboxAuthority: input.browserSandboxAuthority,
       networkAllowlist: input.browserNetworkAllowlist,

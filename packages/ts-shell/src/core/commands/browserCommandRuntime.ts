@@ -17,6 +17,7 @@ export async function runBrowserLocalCommand(
         browserExecutionConfirmations: context.browserExecutionConfirmations,
         browserCliExecutionBridgeSummary: context.browserCliExecutionBridgeSummary,
         browserActionCache: context.browserActionCache,
+        browserReceiptCacheStore: context.browserReceiptCacheStore,
       })
     : undefined;
   const result: LocalCommandResult = parsed.ok && parsed.contract

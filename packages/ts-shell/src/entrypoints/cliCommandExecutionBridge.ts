@@ -1,6 +1,8 @@
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
 import { createBrowserCliExecutionBridge } from "../core/context/browserCliExecutionBridge.js";
 import { loadBrowserCliExecutorInjectionFromEnv } from "../core/context/browserCliExecutorInjection.js";
+import { loadBrowserReceiptCacheManifestFromEnv } from "../core/context/browserReceiptCacheManifest.js";
+import { createBrowserReceiptCacheStore } from "../core/context/browserReceiptCacheStore.js";
 import type { CompactInjectionStateStore } from "../core/context/compactInjectionState.js";
 import type { CompactLiveCheckpointStore } from "../core/context/compactLiveCheckpoint.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
@@ -56,11 +58,16 @@ export async function buildCliCommandExecution(
   const browserCliExecutionBridge = createBrowserCliExecutionBridge(
     loadBrowserCliExecutorInjectionFromEnv({ env: input.env }),
   );
+  const receiptCacheManifest = loadBrowserReceiptCacheManifestFromEnv({ env: input.env });
+  const browserReceiptCacheStore = receiptCacheManifest.ok
+    ? createBrowserReceiptCacheStore({ manifest: receiptCacheManifest.manifest })
+    : undefined;
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
     cwd: input.cwd,
     sessionId: input.sessionId,
     compactCheckpointStore: input.compactCheckpointStore,
     compactInjectionStateStore: input.compactInjectionStateStore,
+    browserReceiptCacheStore,
     ...browserCliExecutionBridge,
   });
   if (slashResult?.kind === "local") {

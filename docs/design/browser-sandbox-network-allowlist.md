@@ -273,3 +273,10 @@ authority. Replay remains limited to local-fixture observe/extract/local
 navigate, and external URLs, auth/payment/destructive actions, upload/download,
 screenshot/OCR, arbitrary JavaScript, MCP launch, provider/model calls, and raw
 runner/page output remain blocked.
+
+## Route 108 Persistent Cache Note
+
+Route 108 persistent cache records keep sandbox, allowlist, and confirmation
+snapshots as evidence only. Replay from cache still reruns current replay
+policy and runtime preflight before execution; invalidated/deleted cache
+records, external URLs, and unsafe browser actions remain blocked.

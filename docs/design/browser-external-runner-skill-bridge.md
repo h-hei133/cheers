@@ -221,3 +221,11 @@ external-runner and skill-managed local/test paths. Replay reuses the current
 explicit runner bridge only after current gates are revalidated; it does not
 persist cache entries, infer runner authority from old receipts, launch MCP,
 use external network, call providers/models, or expose raw runner output.
+
+## Route 108 Persistent Cache Note
+
+Route 108 adds explicit persistent receipt cache reads/writes around the
+external-runner and skill-managed replay paths. The cache stores sanitized
+receipt/cache-entry summaries only; it does not store raw runner stdout/stderr,
+does not infer runner authority, and does not replace current runner manifest
+validation.

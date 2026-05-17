@@ -1,5 +1,8 @@
 import type { BrowserActionCache } from "./browserActionCache.js";
 import type { BrowserExecutor } from "./browserExecutor.js";
+import { inspectBrowserReceiptCacheHealth } from "./browserReceiptCacheHealth.js";
+import type { BrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
+import { renderBrowserReceiptCacheSurface } from "./browserReceiptCacheSurface.js";
 import { executeBrowserReplay } from "./browserReplayExecutor.js";
 import { planBrowserReplay } from "./browserReplayPlanner.js";
 import type { BrowserReplayCommandRequest } from "./browserReplayCommandContract.js";
@@ -20,6 +23,7 @@ export interface BrowserReplayCommandRunResult {
 export async function runBrowserReplayCommand(input: {
   readonly request: BrowserReplayCommandRequest;
   readonly actionCache?: BrowserActionCache;
+  readonly receiptCacheStore?: BrowserReceiptCacheStore;
   readonly executor?: BrowserExecutor;
   readonly sandboxAuthority?: BrowserSandboxAuthority;
   readonly networkAllowlist?: BrowserNetworkAllowlist;
@@ -27,7 +31,7 @@ export async function runBrowserReplayCommand(input: {
   readonly cliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary;
   readonly now?: () => string;
 }): Promise<BrowserReplayCommandRunResult> {
-  if (input.request.mode === "status") {
+  if (input.request.mode === "status" || input.request.mode === "cache-status") {
     const summary = input.actionCache?.summary() ?? {
       entryCount: 0,
       visibleEntryCount: 0,
@@ -41,19 +45,56 @@ export async function runBrowserReplayCommand(input: {
       replayStatus: entry.replayReadinessSnapshot.status,
     })) ?? [];
     return {
-      output: renderBrowserReplayStatusSurface({
-        entryCount: summary.entryCount,
-        visibleEntryCount: summary.visibleEntryCount,
-        entries,
-      }),
+      output: [
+        renderBrowserReplayStatusSurface({
+          entryCount: summary.entryCount,
+          visibleEntryCount: summary.visibleEntryCount,
+          entries,
+        }),
+        "",
+        renderBrowserReceiptCacheSurface({
+          manifest: input.receiptCacheStore?.manifest,
+          health: inspectBrowserReceiptCacheHealth(input.receiptCacheStore),
+        }),
+      ].join("\n"),
       evidence: [
         ...summary.evidence,
+        ...inspectBrowserReceiptCacheHealth(input.receiptCacheStore).evidence,
         "browser-replay-command-runner:status",
         "browser-replay-command-runner:no-automatic-replay",
       ],
     };
   }
-  const entry = input.request.receiptId && input.actionCache?.get(input.request.receiptId);
+  if (input.request.mode === "cache-invalidate" || input.request.mode === "cache-delete") {
+    const mutation = input.request.mode === "cache-invalidate"
+      ? input.receiptCacheStore?.invalidate(input.request.receiptId ?? "", "explicit /browser replay cache invalidate")
+      : input.receiptCacheStore?.delete(input.request.receiptId ?? "", "explicit /browser replay cache delete");
+    return {
+      output: [
+        "Browser replay",
+        "Result",
+        `- Outcome: ${mutation?.changed ? input.request.mode.replace("cache-", "") : "blocked"}`,
+        `- Receipt id: ${input.request.receiptId ?? "none"}`,
+        `- Cache status: ${mutation?.record?.status ?? "missing"}`,
+        "- Persistence: explicit only",
+        "- Raw evidence stored: no",
+        "- Automatic replay: no",
+        `- Next action: ${mutation?.changed ? "Use /browser replay cache status to inspect cache health." : "Provide an explicit receipt cache with the requested operation allowed."}`,
+      ].join("\n"),
+      evidence: [
+        ...(mutation?.evidence ?? ["browser-replay-command-runner:persistent-cache-mutation-blocked"]),
+        "browser-replay-command-runner:explicit-cache-management",
+      ],
+    };
+  }
+  const memoryEntry = input.request.receiptId && input.actionCache?.get(input.request.receiptId);
+  const persistentRecord = !memoryEntry && input.request.receiptId
+    ? input.receiptCacheStore?.get(input.request.receiptId)
+    : undefined;
+  const entry = memoryEntry ?? persistentRecord?.cacheEntry;
+  const sourceReceipt = entry
+    ? input.actionCache?.getReceipt(entry.sourceReceiptId) ?? persistentRecord?.receipt
+    : undefined;
   const plan = planBrowserReplay({
     entry,
     sourceCommand: "/browser replay",
@@ -66,7 +107,7 @@ export async function runBrowserReplayCommand(input: {
   const execution = await executeBrowserReplay({
     plan,
     executor: input.executor,
-    sourceReceipt: entry ? input.actionCache?.getReceipt(entry.sourceReceiptId) : undefined,
+    sourceReceipt,
     sandboxAuthority: input.sandboxAuthority,
     networkAllowlist: input.networkAllowlist,
     confirmations: input.confirmations,
@@ -74,13 +115,31 @@ export async function runBrowserReplayCommand(input: {
     skillRunnerReadiness: input.cliExecutionBridgeSummary?.skillRunnerReadiness,
     now: input.now,
   });
+  const persistentReplayWrite = execution.receipt?.replayReadiness.status === "replay-ready"
+    ? input.receiptCacheStore?.writeReceipt(execution.receipt)
+    : undefined;
   return {
-    output: renderBrowserReplaySurface({ plan, execution }),
+    output: [
+      renderBrowserReplaySurface({ plan, execution }),
+      ...(input.receiptCacheStore
+        ? [
+            "",
+            "Browser receipt cache",
+            `- Cache source: ${persistentRecord ? "persistent" : "memory"}`,
+            `- Cache write: ${persistentReplayWrite?.written ? "yes" : "no"}`,
+            `- Cache status: ${persistentRecord?.status ?? "none"}`,
+            "- Persistence: explicit only",
+            "- Raw evidence stored: no",
+          ]
+        : []),
+    ].join("\n"),
     evidence: [
       ...plan.evidence,
       ...execution.evidence,
+      ...(persistentRecord ? ["browser-replay-command-runner:persistent-cache-read"] : []),
+      ...(persistentReplayWrite?.evidence ?? []),
       "browser-replay-command-runner:explicit-replay",
-      "browser-replay-command-runner:no-persistence",
+      "browser-replay-command-runner:no-default-persistence",
     ],
   };
 }

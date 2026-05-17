@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 import {
@@ -6,6 +9,7 @@ import {
   projectCliCommandExecution,
   type CliCommandExecutionBridge,
 } from "./cliCommandExecutionBridge.js";
+import { BROWSER_RECEIPT_CACHE_ROOT_ENV } from "../core/context/browserReceiptCacheManifest.js";
 
 function renderer(): Pick<StreamingRenderer, "renderLine"> & {
   readonly lines: string[];
@@ -96,6 +100,44 @@ describe("CLI command execution bridge", () => {
         compactInjectionStateStore: "injection-store",
       }),
     ]);
+  });
+
+  it("passes explicit browser receipt cache store from env to slash commands", async () => {
+    const output = renderer();
+    const cacheRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cli-browser-cache-"));
+    const contextSeen: unknown[] = [];
+    try {
+      const resolved = await buildCliCommandExecution(
+        {
+          prompt: "/browser replay status",
+          cwd: "/workspace",
+          renderer: output as StreamingRenderer,
+          printMode: false,
+          interactive: true,
+          env: {
+            [BROWSER_RECEIPT_CACHE_ROOT_ENV]: cacheRoot,
+          },
+        },
+        {
+          routeSlashCommand: async (_prompt, context) => {
+            contextSeen.push(context);
+            return { kind: "local", output: "browser output" };
+          },
+          resolveRepoAwarePromptResponse: () => null,
+        },
+      );
+
+      expect(resolved).toEqual({ kind: "handled" });
+      expect(contextSeen).toEqual([
+        expect.objectContaining({
+          browserReceiptCacheStore: expect.objectContaining({
+            manifest: expect.objectContaining({ cacheRoot }),
+          }),
+        }),
+      ]);
+    } finally {
+      fs.rmSync(cacheRoot, { recursive: true, force: true });
+    }
   });
 
   it("passes shell actions back to cli.tsx without executing them", async () => {

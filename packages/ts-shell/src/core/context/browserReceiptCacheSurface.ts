@@ -1,0 +1,42 @@
+import type { BrowserReceiptCacheHealth } from "./browserReceiptCacheHealth.js";
+import type { BrowserReceiptCacheManifest } from "./browserReceiptCacheManifest.js";
+
+export function renderBrowserReceiptCacheSurface(input: {
+  readonly manifest?: BrowserReceiptCacheManifest;
+  readonly health: BrowserReceiptCacheHealth;
+}): string {
+  return [
+    "Browser receipt cache",
+    "Status",
+    `- Cache configured: ${input.health.status === "missing" ? "no" : "yes"}`,
+    `- Cache status: ${input.health.status}`,
+    `- Scope: ${input.manifest?.scope ?? "none"}`,
+    `- Source: ${input.manifest?.source ?? "none"}`,
+    `- Records: ${input.health.recordCount}`,
+    `- Replayable records: ${input.health.replayableCount}`,
+    `- Invalidated/deleted records: ${input.health.invalidatedCount + input.health.deletedCount}`,
+    `- Corrupted/skipped records: ${input.health.corruptedCount}`,
+    `- Readable: ${input.health.readable ? "yes" : "no"}`,
+    `- Writable: ${input.health.writable ? "yes" : "no"}`,
+    `- Last update: ${input.health.lastUpdatedAt ?? "none"}`,
+    "- Persistence: explicit only",
+    "- Raw evidence stored: no",
+    "- Automatic replay: no",
+    "- Provider/model call: none",
+    `- Blockers/warnings: ${[...input.health.blockers, ...input.health.warnings].join("; ") || "none"}`,
+    `- Next action: ${nextAction(input.health)}`,
+  ].join("\n");
+}
+
+function nextAction(health: BrowserReceiptCacheHealth): string {
+  if (health.status === "missing") {
+    return "Provide an explicit browser receipt cache manifest or root to enable persistent replay.";
+  }
+  if (health.status === "invalid") {
+    return "Fix the explicit cache manifest/root before relying on persistent replay.";
+  }
+  if (health.replayableCount === 0) {
+    return "Run an explicit replay-ready local/test browser execution to write a cache record.";
+  }
+  return "Run /browser replay <receipt-id> explicitly with current runner gates.";
+}

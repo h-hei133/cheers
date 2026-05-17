@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseBrowserCommandArgs } from "./browserCommandContract.js";
 import { runBrowserCommandAsync } from "./browserCommandRunner.js";
@@ -8,6 +11,9 @@ import { createBrowserSandboxAuthority } from "./browserSandboxAuthority.js";
 import { BrowserPlaywrightCliLocalFixtureExecutor } from "./browserPlaywrightCliExecutor.js";
 import { createBrowserPlaywrightAvailability } from "./browserPlaywrightAvailability.js";
 import { BrowserPlaywrightLocalExecutor } from "./browserPlaywrightLocalExecutor.js";
+import { createBrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
+import { createBrowserReceiptCacheManifest } from "./browserReceiptCacheManifest.js";
+import { createBrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
 
 describe("browser execution command runner", () => {
   it("blocks /browser execute without an injected executor", async () => {
@@ -64,6 +70,34 @@ describe("browser execution command runner", () => {
     expect(result.output).toContain("- Raw content: excluded");
     expect(result.output).not.toContain("<html");
     expect(result.output).not.toContain("sk-");
+  });
+
+  it("writes replay-ready receipts only when an explicit persistent cache exists", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "browser-exec-cache-"));
+    try {
+      const parsed = parseBrowserCommandArgs(["execute", "observe", "local-fixture://route108-demo"]);
+      const store = createBrowserReceiptCacheStore({
+        manifest: createBrowserReceiptCacheManifest({
+          cacheRoot: root,
+          allowedOperations: ["read", "write"],
+        }),
+      });
+      const result = await runBrowserCommandAsync({
+        contract: parsed.contract!,
+        browserExecutor: new BrowserPlaywrightCliLocalFixtureExecutor(),
+        browserSandboxAuthority: createBrowserSandboxAuthority({ mode: "local-fixture" }),
+        browserNetworkAllowlist: createBrowserNetworkAllowlist(),
+        browserExecutionConfirmations: [{ kind: "sandbox", status: "confirmed" }],
+        browserReceiptCacheStore: store,
+      });
+
+      expect(result.output).toContain("Browser receipt cache");
+      expect(result.output).toContain("Cache write: yes");
+      expect(store.health().replayableCount).toBe(1);
+      expect(fs.readFileSync(path.join(root, "browser-receipt-cache.jsonl"), "utf8")).not.toContain("RAW_");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("runs local fixture extract without raw HTML or secrets", async () => {

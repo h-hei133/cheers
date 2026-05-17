@@ -219,3 +219,10 @@ cross-process replay continuity is deferred unless a future route explicitly
 adds safe persistence. Reports summarize replay source/new receipt state
 without raw runner stdout/stderr, raw manifest content, raw page content, or
 secrets.
+
+## Route 108 Persistent Cache Note
+
+Route 108 adds explicit CLI harness cache roots/manifests so one CLI command
+can write a sanitized replay-ready receipt and a later command can replay it
+with current runner gates. The cache remains local/test scoped, discardable,
+and disabled unless explicitly configured.

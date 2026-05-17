@@ -136,3 +136,10 @@ current explicit binding, current sandbox/allowlist/confirmation records, and a
 replay-ready source receipt. It adds no automatic replay, cache persistence,
 dynamic discovery, MCP launch, provider/model call, external network, package
 change, or raw skill/page output.
+
+## Route 108 Persistent Cache Note
+
+Route 108 allows skill-managed local/test replay-ready receipts to be written
+to an explicit sanitized persistent cache. A later replay still requires a
+current skill binding and current sandbox/allowlist/confirmation gates; cached
+skill metadata does not create dynamic discovery or replay authority.

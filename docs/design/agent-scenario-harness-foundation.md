@@ -241,3 +241,10 @@ can run execute-then-replay in process with an explicit in-memory cache and
 current runner context, and it can report replay status safely. It does not add
 browser runtime ownership, cross-process cache persistence, automatic replay,
 dynamic discovery, MCP launch, provider/model calls, or raw runner output.
+
+## Route 108 Persistent Cache Note
+
+Route 108 extends browser replay scenarios with explicit persistent cache
+fixtures. The scenarios prove execute-write, fresh-store replay, invalidated
+or deleted cache blocking, no-cache status behavior, and unsafe/corrupted
+record rejection without adding default persistence.
