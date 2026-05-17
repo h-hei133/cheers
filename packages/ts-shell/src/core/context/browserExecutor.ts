@@ -1,6 +1,10 @@
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
 
-export type BrowserExecutorKind = "noop" | "fake-test" | "explicit-local";
+export type BrowserExecutorKind =
+  | "noop"
+  | "fake-test"
+  | "local-fixture"
+  | "explicit-local";
 export type BrowserExecutorStatus = "executed" | "blocked" | "failed" | "skipped";
 
 export interface BrowserExecutorContext {

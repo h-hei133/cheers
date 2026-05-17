@@ -201,3 +201,11 @@ and blocked execute output through a child process while preserving the Route
 97 preflight boundary: no real browser launch, no network access, no
 Playwright/MCP launch, no provider/model call, and no raw browser content in
 reports.
+
+## Route 99 Local Fixture Execution Note
+
+Route 99 adds local-fixture sandbox authority and a non-default local fixture
+executor. Read-only observe/extract can execute only when the executor and
+local-fixture authority are injected. External navigation remains blocked by
+the allowlist/preflight path; no external network, MCP launch, persistent
+browser session, provider/model call, or raw browser content is added.

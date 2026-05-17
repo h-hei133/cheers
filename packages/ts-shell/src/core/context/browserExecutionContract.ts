@@ -8,6 +8,7 @@ import type { BrowserActionContract } from "./browserActionContract.js";
 export type BrowserExecutionMode =
   | "disabled"
   | "fake-test"
+  | "local-fixture"
   | "explicit-local"
   | "future-runtime";
 

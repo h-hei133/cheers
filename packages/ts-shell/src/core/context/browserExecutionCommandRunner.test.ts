@@ -5,6 +5,7 @@ import { createBrowserPlaywrightCliPlan } from "./browserPlaywrightCliAdapter.js
 import { FakeBrowserExecutor, NOOP_BROWSER_EXECUTOR } from "./browserExecutor.js";
 import { decideBrowserExecutionPolicy } from "./browserExecutionPolicy.js";
 import { createBrowserSandboxAuthority } from "./browserSandboxAuthority.js";
+import { BrowserPlaywrightCliLocalFixtureExecutor } from "./browserPlaywrightCliExecutor.js";
 
 describe("browser execution command runner", () => {
   it("blocks /browser execute without an injected executor", async () => {
@@ -37,6 +38,71 @@ describe("browser execution command runner", () => {
     expect(result.output).toContain("timestamp=2026-05-17T01:02:03.000Z");
     expect(result.output).toContain("- Raw content: excluded");
     expect(result.output).not.toContain("Browser process: launched");
+  });
+
+  it("runs read-only observe through the local fixture executor with sanitized evidence", async () => {
+    const parsed = parseBrowserCommandArgs(["execute", "observe"]);
+    const result = await runBrowserCommandAsync({
+      contract: parsed.contract!,
+      browserExecutor: new BrowserPlaywrightCliLocalFixtureExecutor(),
+      browserSandboxAuthority: createBrowserSandboxAuthority({ mode: "local-fixture" }),
+      now: () => "2026-05-17T04:05:06.000Z",
+    });
+
+    expect(result.output).toContain("- Outcome: executed");
+    expect(result.output).toContain("- Mode: local-fixture");
+    expect(result.output).toContain("- Runtime: playwright-cli local fixture executor");
+    expect(result.output).toContain("- Browser process: local fixture only");
+    expect(result.output).toContain("- Executed: yes");
+    expect(result.output).toContain("safe title=Local fixture page");
+    expect(result.output).toContain("Browser execution lifecycle");
+    expect(result.output).toContain("- Raw content: excluded");
+    expect(result.output).not.toContain("<html");
+    expect(result.output).not.toContain("sk-");
+  });
+
+  it("runs local fixture extract without raw HTML or secrets", async () => {
+    const parsed = parseBrowserCommandArgs(["execute", "extract", "headline"]);
+    const result = await runBrowserCommandAsync({
+      contract: parsed.contract!,
+      browserExecutor: new BrowserPlaywrightCliLocalFixtureExecutor(),
+      browserSandboxAuthority: createBrowserSandboxAuthority({ mode: "local-fixture" }),
+    });
+
+    expect(result.output).toContain("- Outcome: executed");
+    expect(result.output).toContain("Extraction summary:");
+    expect(result.output).toContain("- Executed: yes");
+    expect(result.output).not.toContain("<body");
+    expect(result.output).not.toContain("github_pat_");
+  });
+
+  it("runs local fixture navigation without external network", async () => {
+    const parsed = parseBrowserCommandArgs(["execute", "navigate", "local-fixture://route99"]);
+    const result = await runBrowserCommandAsync({
+      contract: parsed.contract!,
+      browserExecutor: new BrowserPlaywrightCliLocalFixtureExecutor(),
+      browserSandboxAuthority: createBrowserSandboxAuthority({ mode: "local-fixture" }),
+    });
+
+    expect(result.output).toContain("- Outcome: executed");
+    expect(result.output).toContain("- Action: navigate");
+    expect(result.output).toContain("- Network allowlist: allowed");
+    expect(result.output).toContain("- Confirmation status: not-required");
+    expect(result.output).toContain("- Executed: yes");
+    expect(result.evidence).toContain("browser-network-allowlist:decision:allowed");
+  });
+
+  it("blocks external navigation without external authority or allowlist", async () => {
+    const parsed = parseBrowserCommandArgs(["execute", "navigate", "https://example.com"]);
+    const result = await runBrowserCommandAsync({
+      contract: parsed.contract!,
+      browserExecutor: new BrowserPlaywrightCliLocalFixtureExecutor(),
+      browserSandboxAuthority: createBrowserSandboxAuthority({ mode: "local-fixture" }),
+    });
+
+    expect(result.output).toContain("- Outcome: blocked");
+    expect(result.output).toContain("- Network allowlist: blocked-no-allowlist");
+    expect(result.output).toContain("- Executed: no");
   });
 
   it("blocks sensitive and unsupported execution actions through policy", async () => {

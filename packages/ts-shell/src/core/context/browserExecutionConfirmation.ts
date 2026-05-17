@@ -67,6 +67,9 @@ export function decideBrowserExecutionConfirmation(input: {
 function confirmationKindForRequest(
   request: BrowserExecutionRequest,
 ): BrowserConfirmationKind | undefined {
+  if (request.mode === "local-fixture" && request.action.url?.startsWith("local-fixture://")) {
+    return undefined;
+  }
   if (request.actionKind === "navigate") {
     return "network";
   }

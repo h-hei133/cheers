@@ -141,3 +141,11 @@ trajectory reports, fixtures, or assertion reuse before browser execution.
 
 Choose browser sandbox lifecycle hardening if process evidence exposes cleanup,
 allowlist, confirmation, or status gaps.
+
+## Route 99 Local Fixture Note
+
+Route 99 keeps real CLI coverage to the default blocked `/browser execute
+observe` path. Local-fixture execution is covered in-process because injecting
+a non-default browser executor through the CLI requires a dedicated bridge and
+lifecycle policy. That bridge is the recommended Route 100 path if CLI-level
+local execution evidence becomes the next blocker.

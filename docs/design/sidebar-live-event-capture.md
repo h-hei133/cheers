@@ -219,3 +219,11 @@ preflight status, sandbox authority, network allowlist, confirmation status,
 evidence requirements, and blockers/warnings. Events remain session-scoped and
 in-memory, with no raw browser content, persistence, MCP launch, dynamic
 discovery, provider/model call, or startup/model auto-injection.
+
+## Route 99 Local Fixture Execution Note
+
+Route 99 keeps `/browser execute ...` on the same sidebar event path. Local
+fixture execution success is summarized as a `Browser execution` event with
+sanitized command output and lifecycle lines. The event store remains
+session-scoped and in-memory, with no raw browser payload, persistence, MCP
+launch, dynamic discovery, provider/model call, or startup/model injection.

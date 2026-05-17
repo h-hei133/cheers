@@ -8,6 +8,7 @@ import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import { createBrowserExecutionResult } from "./browserExecutionResult.js";
 import { renderBrowserExecutionSurface } from "./browserExecutionSurface.js";
+import { renderBrowserExecutionLifecycleSurface } from "./browserExecutionLifecycleSurface.js";
 import { decideBrowserExecutionPolicy } from "./browserExecutionPolicy.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
 import { runBrowserRuntimePreflight } from "./browserRuntimePreflight.js";
@@ -30,7 +31,14 @@ export async function runBrowserExecutionCommand(input: {
   const executor = input.executor ?? NOOP_BROWSER_EXECUTOR;
   const request = {
     ...input.request,
-    mode: executor.kind === "fake-test" ? "fake-test" : executor.kind === "explicit-local" ? "explicit-local" : input.request.mode,
+    mode:
+      executor.kind === "fake-test"
+        ? "fake-test"
+        : executor.kind === "local-fixture"
+          ? "local-fixture"
+          : executor.kind === "explicit-local"
+            ? "explicit-local"
+            : input.request.mode,
   } as BrowserExecutionRequest;
   const policy = decideBrowserExecutionPolicy({
     request,
@@ -61,6 +69,8 @@ export async function runBrowserExecutionCommand(input: {
       renderBrowserExecutionSurface(result),
       "",
       renderBrowserSandboxSurface(preflight, result.executed),
+      "",
+      renderBrowserExecutionLifecycleSurface({ result, preflight }),
     ].join("\n"),
     evidence: [
       ...result.evidence,

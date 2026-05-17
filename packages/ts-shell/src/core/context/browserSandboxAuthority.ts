@@ -5,6 +5,7 @@ export type BrowserSandboxAuthorityMode =
   | "disabled"
   | "dry-run-only"
   | "fake-test"
+  | "local-fixture"
   | "explicit-local"
   | "future-runtime";
 
@@ -58,8 +59,8 @@ export function createBrowserSandboxAuthority(
   return {
     mode,
     scope: input.scope ?? {
-      label: mode === "fake-test" ? "fake/test sandbox" : "none",
-      ephemeral: mode === "fake-test",
+      label: mode === "fake-test" ? "fake/test sandbox" : mode === "local-fixture" ? "local fixture sandbox" : "none",
+      ephemeral: mode === "fake-test" || mode === "local-fixture",
       allowNetwork: false,
       allowPersistence: false,
       rawContent: "excluded",
@@ -84,7 +85,7 @@ export function decideBrowserSandboxAuthority(input: {
   if (authority.mode === "disabled" || authority.mode === "dry-run-only") {
     return decision("blocked", authority, requiredCapability, {
       reason: "Browser sandbox authority is not enabled for execution.",
-      nextAction: "Provide fake-test authority for harness-only execution or plan a future explicit-local route.",
+      nextAction: "Provide fake-test or local-fixture authority for bounded execution or plan a future explicit-local route.",
     });
   }
   if (isAlwaysBlockedCapability(requiredCapability)) {
@@ -111,6 +112,12 @@ export function decideBrowserSandboxAuthority(input: {
       nextAction: "Keep execution blocked until a future route adds real runtime lifecycle gates.",
     });
   }
+  if (authority.mode === "local-fixture") {
+    return decision("allowed", authority, requiredCapability, {
+      reason: "Local fixture sandbox authority allows this bounded browser action.",
+      nextAction: "Continue only if fixture, network, and confirmation preflight also pass.",
+    });
+  }
   return decision("allowed", authority, requiredCapability, {
     reason: "Fake/test sandbox authority allows this harness-only browser action.",
     nextAction: "Continue only if network allowlist and confirmation preflight also pass.",
@@ -120,7 +127,7 @@ export function decideBrowserSandboxAuthority(input: {
 function capabilitiesForMode(
   mode: BrowserSandboxAuthorityMode,
 ): readonly BrowserSandboxCapability[] {
-  if (mode === "fake-test") {
+  if (mode === "fake-test" || mode === "local-fixture") {
     return ["navigation", "observe", "extract"];
   }
   if (mode === "explicit-local" || mode === "future-runtime") {

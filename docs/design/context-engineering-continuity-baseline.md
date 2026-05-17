@@ -406,6 +406,13 @@ warmup status surfaces. It still adds no provider/model call, real browser
 launch, network access, MCP launch/discovery, SessionManager schema change,
 startup/model auto-injection, memory persistence behavior change, CLI
 lifecycle rewrite, or raw content/secrets/hidden reasoning in reports.
+Route 99 adds a non-default local-fixture browser execution path for injected
+read-only observe/extract scenarios, plus local execution authority, fixture
+model, evidence redaction, lifecycle surface, and scenario coverage. It still
+adds no default browser execution, external-network browsing, MCP launch,
+provider/model call, persistent browser session, SessionManager schema change,
+startup/model auto-injection, memory persistence behavior change, CLI lifecycle
+rewrite, or raw content/secrets/hidden reasoning in evidence.
 
 ## Residual Risks
 
@@ -444,7 +451,8 @@ lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   rendering, Route 92 bounded watch frames, Route 93 preview-only browser
   boundary, Route 94 non-executing browser dry-run planning, and Route 95
   scenario harness foundation, Route 96 non-default browser execution seam,
-  Route 97 browser sandbox/allowlist preflight, and Route 98 real CLI scenario
-  process evidence are now machine-checkable enough to plan real browser opt-in,
-  sandbox lifecycle hardening,
+  Route 97 browser sandbox/allowlist preflight, Route 98 real CLI scenario
+  process evidence, and Route 99 local-fixture execution are now
+  machine-checkable enough to plan CLI executor injection, external browser
+  opt-in, sandbox lifecycle hardening,
   startup-read integration, or retrieval-quality work separately.

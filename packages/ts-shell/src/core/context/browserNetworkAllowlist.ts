@@ -129,6 +129,12 @@ export function decideBrowserNetworkAllowlist(input: {
     });
   }
   if (!target.scheme || !["https", "http"].includes(target.scheme)) {
+    if (input.request.mode === "local-fixture" && target.scheme === "local-fixture") {
+      return decision("allowed", target, allowlist, {
+        reason: "Local fixture navigation does not require external network access.",
+        nextAction: "Continue only if sandbox authority also permits local fixture execution.",
+      });
+    }
     return decision("blocked-scheme", target, allowlist, {
       reason: `URL scheme ${target.scheme ?? "(unknown)"} is not allowed.`,
       nextAction: "Use an explicitly allowlisted https origin.",

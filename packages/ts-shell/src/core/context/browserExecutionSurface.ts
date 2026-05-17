@@ -13,7 +13,7 @@ export function renderBrowserExecutionSurface(
     `- Policy decision: ${result.policy.status}`,
     `- Reason: ${sanitizeBrowserText(result.policy.reason)}`,
     `- Executed: ${result.executed ? "yes" : "no"}`,
-    `- Browser process: ${result.executorResult.executorKind === "fake-test" ? "fake/test only" : "not launched"}`,
+    `- Browser process: ${browserProcessLabel(result.executorResult.executorKind)}`,
     "- MCP discovery/launch: none",
     "- Provider/model call: none",
     "- Persistence: none",
@@ -25,10 +25,20 @@ export function renderBrowserExecutionSurface(
   return lines.join("\n");
 }
 
+function browserProcessLabel(kind: BrowserExecutionResult["executorResult"]["executorKind"]): string {
+  if (kind === "fake-test") {
+    return "fake/test only";
+  }
+  if (kind === "local-fixture") {
+    return "local fixture only";
+  }
+  return "not launched";
+}
+
 function renderEvidence(result: BrowserExecutionResult): string {
   const values = result.executorResult.evidence
     .map((item) => `${sanitizeBrowserText(item.label)}=${sanitizeBrowserText(item.value)}`)
-    .slice(0, 4);
+    .slice(0, 6);
   return values.length > 0 ? values.join("; ") : "none";
 }
 

@@ -44,7 +44,9 @@ export async function runAgentScenario(input: {
     blockers.push(...result.blockers);
     if (result.output) {
       const checks = runAgentScenarioSafetyChecks(result.output, {
-        expectBrowserExecution: input.scenario.metadata?.capability?.includes("browser-fake-execution") === true,
+        expectBrowserExecution:
+          input.scenario.metadata?.capability?.includes("browser-fake-execution") === true ||
+          input.scenario.metadata?.capability?.includes("browser-local-fixture-execution") === true,
       });
       safetyChecks.push(...checks);
       blockers.push(...checks.filter((check) => check.status !== "passed").map((check) => check.message));
@@ -84,6 +86,8 @@ export async function runAgentScenario(input: {
       "agent-scenario-runner:no-provider-call",
       input.scenario.metadata?.capability?.includes("browser-fake-execution") === true
         ? "agent-scenario-runner:fake-browser-execution-only"
+        : input.scenario.metadata?.capability?.includes("browser-local-fixture-execution") === true
+          ? "agent-scenario-runner:local-fixture-browser-execution-only"
         : "agent-scenario-runner:no-browser-execution",
     ],
   ]);

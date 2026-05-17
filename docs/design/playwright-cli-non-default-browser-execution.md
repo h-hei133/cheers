@@ -217,3 +217,11 @@ Route 98 adds process-level CLI evidence before any real Playwright execution.
 The new CLI scenarios assert that `/browser dry-run ...` remains non-executing
 and `/browser execute ...` remains blocked by the existing gates when reached
 through the actual CLI child process.
+
+## Route 99 Local Fixture Execution Note
+
+Route 99 adds a Playwright CLI executor seam with a local-fixture execution
+mode. The seam remains non-default and does not spawn Playwright or MCP by
+default. The local fixture executor can return sanitized `Executed: yes`
+evidence for injected read-only observe/extract scenarios while default CLI
+execution remains blocked.

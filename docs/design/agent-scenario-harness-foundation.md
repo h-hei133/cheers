@@ -169,3 +169,10 @@ real CLI evidence. It complements this in-process harness by asserting stdout,
 stderr, exit, timeout, report, and safety evidence from the actual CLI child
 process. The two harnesses remain separate so the CLI runner does not become a
 second runtime implementation.
+
+## Route 99 Local Fixture Execution Note
+
+Route 99 extends in-process scenarios to allow explicitly marked
+`browser-local-fixture-execution` evidence. This keeps local fixture execution
+separate from fake/test execution while preserving the default safety check
+that rejects unexpected `Executed: yes` browser claims.
