@@ -50,14 +50,6 @@ export function decideBrowserExecutionPolicy(input: {
       requirements: request.requirements,
     });
   }
-  if (request.actionKind === "navigate" && request.approval !== "network-runtime") {
-    return decision("blocked-confirmation-required", {
-      reason: "Navigation requires explicit network/runtime confirmation.",
-      nextAction: "Use a route-scoped executor with network-runtime approval after sandbox policy is reviewed.",
-      requirements: request.requirements,
-      warnings: ["network access remains non-default"],
-    });
-  }
   if (request.actionKind === "observe" || request.actionKind === "extract") {
     return decision("allowed", {
       reason: "Read-only browser execution is allowed with the explicitly injected executor.",
@@ -68,10 +60,10 @@ export function decideBrowserExecutionPolicy(input: {
   }
   if (request.actionKind === "navigate") {
     return decision("allowed", {
-      reason: "Navigation is allowed only for the explicitly injected executor and route-scoped approval.",
-      nextAction: "Capture sanitized navigation evidence and do not persist browser session state.",
+      reason: "Navigation may proceed only if sandbox, allowlist, and confirmation preflight pass.",
+      nextAction: "Run browser runtime preflight before invoking the injected executor.",
       requirements: request.requirements,
-      warnings: ["network access must be handled by the injected executor boundary"],
+      warnings: ["network access remains non-default and preflight-gated"],
     });
   }
   return decision("future-runtime-required", {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FakeBrowserExecutor } from "../context/browserExecutor.js";
+import { createBrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
 import { createAgentScenarioFixtureContext } from "./agentScenarioFixtures.js";
 import { runAgentScenario } from "./agentScenarioRunner.js";
 import type { AgentScenario } from "./agentScenarioModel.js";
@@ -42,6 +43,7 @@ describe("browser scenario examples", () => {
     const context = createAgentScenarioFixtureContext({
       scenarioId: "browser-execute-fake-success",
       browserExecutor: new FakeBrowserExecutor(),
+      browserSandboxAuthority: createBrowserSandboxAuthority({ mode: "fake-test" }),
     });
     const scenario: AgentScenario = {
       id: "browser-execute-fake-success",

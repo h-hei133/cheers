@@ -218,3 +218,10 @@ executor, execution is blocked with `Executed: no`. A fake/test executor can
 exercise read-only harness scenarios, while the Playwright CLI adapter remains
 plan-only and does not launch a browser, MCP server, provider, model, network,
 or persistent browser session.
+
+## Route 97 Sandbox Gate Note
+
+Route 97 keeps dry-run non-executing and adds explicit sandbox/allowlist/
+confirmation preflight to `/browser execute ...`. Dry-run can continue to show
+future sandbox requirements without needing an executor, browser launch, MCP
+launch, provider/model call, or network access.

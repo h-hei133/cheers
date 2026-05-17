@@ -10,6 +10,9 @@ import {
   type BrowserExecutionCommandRunResult,
 } from "./browserExecutionCommandRunner.js";
 import type { BrowserExecutor } from "./browserExecutor.js";
+import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
+import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
+import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
 
 export interface BrowserCommandRunResult {
   readonly output: string;
@@ -78,6 +81,9 @@ export async function runBrowserCommandAsync(input: {
   readonly contract: BrowserCommandContract;
   readonly capability?: BrowserCapabilityState;
   readonly browserExecutor?: BrowserExecutor;
+  readonly browserSandboxAuthority?: BrowserSandboxAuthority;
+  readonly browserNetworkAllowlist?: BrowserNetworkAllowlist;
+  readonly browserExecutionConfirmations?: readonly BrowserExecutionConfirmationRecord[];
   readonly now?: () => string;
 }): Promise<BrowserCommandRunResult | BrowserExecutionCommandRunResult> {
   if (input.contract.mode === "execute") {
@@ -96,6 +102,9 @@ export async function runBrowserCommandAsync(input: {
     return runBrowserExecutionCommand({
       request: input.contract.execution,
       executor: input.browserExecutor,
+      sandboxAuthority: input.browserSandboxAuthority,
+      networkAllowlist: input.browserNetworkAllowlist,
+      confirmations: input.browserExecutionConfirmations,
       now: input.now,
     });
   }

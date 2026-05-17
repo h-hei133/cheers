@@ -12,6 +12,9 @@ export async function runBrowserLocalCommand(
     ? await runBrowserCommandAsync({
         contract: parsed.contract,
         browserExecutor: context.browserExecutor,
+        browserSandboxAuthority: context.browserSandboxAuthority,
+        browserNetworkAllowlist: context.browserNetworkAllowlist,
+        browserExecutionConfirmations: context.browserExecutionConfirmations,
       })
     : undefined;
   const result: LocalCommandResult = parsed.ok && parsed.contract

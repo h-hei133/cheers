@@ -210,3 +210,10 @@ Route 96 adds `/browser execute navigate|observe|extract` as a non-default
 execution branch. The default command path still has no executor and therefore
 blocks execution. Preview and dry-run surfaces stay unchanged, and real
 Playwright/MCP/browser runtime work remains deferred to a later sandbox route.
+
+## Route 97 Sandbox Gate Note
+
+Route 97 adds the missing execution gates before any real browser runtime:
+sandbox authority, network allowlist, confirmation records, runtime preflight,
+and evidence policy. Browser status/preview remain non-executing, and execute
+still cannot launch a browser unless a future route adds a real runtime.

@@ -395,6 +395,11 @@ may inject a fake/test executor for sanitized read-only evidence. It still adds
 no real browser launch, MCP launch/discovery, provider/model call, persistent
 browser session, SessionManager schema change, startup/model auto-injection, or
 raw browser content rendering.
+Route 97 adds browser sandbox authority, network allowlist, confirmation
+records, runtime preflight, and evidence policy ahead of executor invocation.
+It still adds no real browser launch, network access, MCP launch/discovery,
+provider/model call, browser session persistence, SessionManager schema
+change, startup/model auto-injection, or raw browser content rendering.
 
 ## Residual Risks
 
@@ -433,6 +438,7 @@ lifecycle controls, Route 85 explicit memory injection, and Route 86 memory
   rendering, Route 92 bounded watch frames, Route 93 preview-only browser
   boundary, Route 94 non-executing browser dry-run planning, and Route 95
   scenario harness foundation, and Route 96 non-default browser execution seam
-  are now machine-checkable enough to plan real CLI scenario verification,
-  browser sandbox hardening, sandbox harness work,
+  and Route 97 browser sandbox/allowlist preflight are now machine-checkable
+  enough to plan real CLI scenario verification, real browser opt-in,
+  sandbox lifecycle hardening,
   startup-read integration, or retrieval-quality work separately.

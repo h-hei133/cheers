@@ -202,3 +202,11 @@ before browser runtime work.
 
 Choose Playwright CLI real execution opt-in only after sandbox, allowlist, and
 confirmation policy are explicit enough to prevent default browser execution.
+
+## Route 97 Sandbox Gate Note
+
+Route 97 adds sandbox authority, network allowlist, confirmation records,
+runtime preflight, and evidence policy in front of the Route 96 executor seam.
+Executor invocation is now gated by preflight. The fake/test executor can run
+only when fake-test authority, allowlist, and required confirmation pass; real
+Playwright/MCP/browser/network execution remains unavailable.

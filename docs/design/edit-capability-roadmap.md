@@ -1471,6 +1471,13 @@ Allowed after this document:
   execution, real Playwright launch, MCP launch/discovery, provider/model
   calls, browser session persistence, SessionManager schema change, automatic
   recovery, rollback, or default mutation readiness.
+- Route 97 browser/tooling work adds browser sandbox authority, network
+  allowlist, confirmation records, runtime preflight, evidence policy, sandbox
+  surface, and scenario harness coverage ahead of executor invocation. It
+  remains outside edit runtime, adds no real browser launch, network access,
+  MCP launch/discovery, provider/model calls, browser session persistence,
+  SessionManager schema change, automatic recovery, rollback, or default
+  mutation readiness.
 
 Forbidden after this document:
 
@@ -1488,10 +1495,10 @@ Forbidden after this document:
 - full ClaudeCode/opencode/gemini-cli parity
 - default real-provider mutation readiness
 
-Route 97 recommendation: choose browser sandbox hardening and network allowlist
-if real browser execution is next, real CLI scenario harness if process-spawn
-evidence is next, or Playwright CLI real execution opt-in only after sandbox
-and confirmation policy are explicit. Do not treat Route 82, Route 83, Route
-84, Route 85, Route 86, Route 87, Route 88, Route 89, Route 90, Route 91,
-Route 92, Route 93, Route 94, Route 95, or Route 96 as edit-capability
-expansions.
+Route 98 recommendation: choose Playwright CLI real execution opt-in only if
+the sandbox/allowlist/confirmation gates remain stable, real CLI scenario
+harness if process-spawn evidence should come first, or browser sandbox
+lifecycle hardening if cleanup/status surfaces need more work. Do not treat
+Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
+Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, or Route
+97 as edit-capability expansions.

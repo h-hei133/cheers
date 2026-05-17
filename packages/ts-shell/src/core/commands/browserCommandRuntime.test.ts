@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { runBrowserLocalCommand } from "./browserCommandRuntime.js";
 import { createSidebarLiveEventStore } from "../context/sidebarLiveEventStore.js";
 import { FakeBrowserExecutor } from "../context/browserExecutor.js";
+import { createBrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
 
 describe("browser local command runtime", () => {
   it("emits a sidebar event for blocked browser execution", async () => {
@@ -34,6 +35,7 @@ describe("browser local command runtime", () => {
       sessionId: "browser-runtime-test",
       sidebarLiveEventStore,
       browserExecutor: new FakeBrowserExecutor(),
+      browserSandboxAuthority: createBrowserSandboxAuthority({ mode: "fake-test" }),
     });
 
     expect(result.output).toContain("- Executed: yes");

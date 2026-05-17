@@ -4,6 +4,7 @@ import { runBrowserCommandAsync } from "./browserCommandRunner.js";
 import { createBrowserPlaywrightCliPlan } from "./browserPlaywrightCliAdapter.js";
 import { FakeBrowserExecutor, NOOP_BROWSER_EXECUTOR } from "./browserExecutor.js";
 import { decideBrowserExecutionPolicy } from "./browserExecutionPolicy.js";
+import { createBrowserSandboxAuthority } from "./browserSandboxAuthority.js";
 
 describe("browser execution command runner", () => {
   it("blocks /browser execute without an injected executor", async () => {
@@ -24,6 +25,7 @@ describe("browser execution command runner", () => {
     const result = await runBrowserCommandAsync({
       contract: parsed.contract!,
       browserExecutor: new FakeBrowserExecutor(),
+      browserSandboxAuthority: createBrowserSandboxAuthority({ mode: "fake-test" }),
       now: () => "2026-05-17T01:02:03.000Z",
     });
 
@@ -51,6 +53,7 @@ describe("browser execution command runner", () => {
       const result = await runBrowserCommandAsync({
         contract: parsed.contract!,
         browserExecutor: new FakeBrowserExecutor(),
+        browserSandboxAuthority: createBrowserSandboxAuthority({ mode: "fake-test" }),
       });
       expect(result.output).toContain("- Outcome: blocked");
       expect(result.output).toContain("- Policy decision: blocked-sensitive");
@@ -68,7 +71,7 @@ describe("browser execution command runner", () => {
         request: { ...request, mode: "fake-test" },
         executorAvailable: true,
       }).status,
-    ).toBe("blocked-confirmation-required");
+    ).toBe("allowed");
     expect(
       decideBrowserExecutionPolicy({
         request: { ...request, mode: "explicit-local", approval: "network-runtime" },

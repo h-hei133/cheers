@@ -211,3 +211,11 @@ event and fake/test execution success remains a sanitized command summary. The
 event path still uses the session-scoped in-memory live store and does not add
 persistence, dynamic discovery, raw browser payloads, provider/model calls, MCP
 launch, or startup/model auto-injection.
+
+## Route 97 Browser Sandbox Note
+
+Route 97 allows `/browser execute ...` sidebar summaries to include sanitized
+preflight status, sandbox authority, network allowlist, confirmation status,
+evidence requirements, and blockers/warnings. Events remain session-scoped and
+in-memory, with no raw browser content, persistence, MCP launch, dynamic
+discovery, provider/model call, or startup/model auto-injection.

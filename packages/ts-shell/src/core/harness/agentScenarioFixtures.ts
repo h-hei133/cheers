@@ -9,6 +9,9 @@ import { createProjectMemoryReviewStateStore } from "../context/projectMemoryRev
 import type { ProjectMemoryRecord } from "../context/projectMemoryStoreContract.js";
 import { createSidebarLiveEventStore } from "../context/sidebarLiveEventStore.js";
 import type { BrowserExecutor } from "../context/browserExecutor.js";
+import type { BrowserExecutionConfirmationRecord } from "../context/browserExecutionConfirmation.js";
+import type { BrowserNetworkAllowlist } from "../context/browserNetworkAllowlist.js";
+import type { BrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
 import { createStartupWarmContextCacheStore } from "../context/startupWarmContextHealth.js";
 import type { CommandContext } from "../commands/types.js";
 import {
@@ -28,6 +31,9 @@ export function createAgentScenarioFixtureContext(input: {
   readonly workspaceRoot?: string;
   readonly sessionId?: string;
   readonly browserExecutor?: BrowserExecutor;
+  readonly browserSandboxAuthority?: BrowserSandboxAuthority;
+  readonly browserNetworkAllowlist?: BrowserNetworkAllowlist;
+  readonly browserExecutionConfirmations?: readonly BrowserExecutionConfirmationRecord[];
 }): AgentScenarioFixtureContext {
   const workspaceRoot =
     input.workspaceRoot ??
@@ -79,6 +85,9 @@ export function createAgentScenarioFixtureContext(input: {
     projectMemoryStore,
     startupWarmContextCacheStore,
     browserExecutor: input.browserExecutor,
+    browserSandboxAuthority: input.browserSandboxAuthority,
+    browserNetworkAllowlist: input.browserNetworkAllowlist,
+    browserExecutionConfirmations: input.browserExecutionConfirmations,
     sidebarLiveEventStore,
   };
   return {

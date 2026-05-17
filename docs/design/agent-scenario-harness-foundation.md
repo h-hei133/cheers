@@ -154,3 +154,10 @@ asserts `/browser execute ...` is blocked without an executor. A separate
 fake/test scenario injects `FakeBrowserExecutor`, marks
 `browser-fake-execution` in metadata, and verifies sanitized `Executed: yes`
 evidence without launching Playwright, MCP, providers, models, or network.
+
+## Route 97 Browser Sandbox Note
+
+Route 97 adds sandbox-specific browser scenarios for missing authority,
+missing allowlist, fake/test preflight success, and dry-run sandbox
+requirements. Fake/test execution remains explicitly marked in metadata so the
+harness can reject accidental real browser execution claims.

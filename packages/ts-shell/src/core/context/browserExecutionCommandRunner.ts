@@ -5,9 +5,14 @@ import {
   type BrowserExecutor,
 } from "./browserExecutor.js";
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
+import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import { createBrowserExecutionResult } from "./browserExecutionResult.js";
 import { renderBrowserExecutionSurface } from "./browserExecutionSurface.js";
 import { decideBrowserExecutionPolicy } from "./browserExecutionPolicy.js";
+import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
+import { runBrowserRuntimePreflight } from "./browserRuntimePreflight.js";
+import { renderBrowserSandboxSurface } from "./browserSandboxSurface.js";
+import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
 
 export interface BrowserExecutionCommandRunResult {
   readonly output: string;
@@ -17,6 +22,9 @@ export interface BrowserExecutionCommandRunResult {
 export async function runBrowserExecutionCommand(input: {
   readonly request: BrowserExecutionRequest;
   readonly executor?: BrowserExecutor;
+  readonly sandboxAuthority?: BrowserSandboxAuthority;
+  readonly networkAllowlist?: BrowserNetworkAllowlist;
+  readonly confirmations?: readonly BrowserExecutionConfirmationRecord[];
   readonly now?: () => string;
 }): Promise<BrowserExecutionCommandRunResult> {
   const executor = input.executor ?? NOOP_BROWSER_EXECUTOR;
@@ -28,12 +36,20 @@ export async function runBrowserExecutionCommand(input: {
     request,
     executorAvailable: browserExecutorIsAvailable(executor),
   });
-  const executorResult = policy.allowed
+  const preflight = runBrowserRuntimePreflight({
+    request,
+    policy,
+    executorKind: executor.kind,
+    authority: input.sandboxAuthority,
+    allowlist: input.networkAllowlist,
+    confirmations: input.confirmations,
+  });
+  const executorResult = policy.allowed && ["pass", "warning"].includes(preflight.preflightStatus)
     ? await executor.execute(request, { now: input.now })
     : blockedBrowserExecutorResult({
         request,
-        code: policy.status,
-        message: policy.reason,
+        code: preflight.preflightStatus === "pass" ? policy.status : `preflight-${preflight.preflightStatus}`,
+        message: preflight.blockers[0] ?? policy.reason,
       });
   const result = createBrowserExecutionResult({
     request,
@@ -41,9 +57,14 @@ export async function runBrowserExecutionCommand(input: {
     executorResult,
   });
   return {
-    output: renderBrowserExecutionSurface(result),
+    output: [
+      renderBrowserExecutionSurface(result),
+      "",
+      renderBrowserSandboxSurface(preflight, result.executed),
+    ].join("\n"),
     evidence: [
       ...result.evidence,
+      ...preflight.evidence,
       "browser-execution-command-runner:non-default",
       "browser-execution-command-runner:no-mcp-launch",
       "browser-execution-command-runner:no-provider-or-model-call",
