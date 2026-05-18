@@ -1588,11 +1588,14 @@ failures; it adds no auto-repair, no auto-replay, and no external network.
 Route 112 adds proposal-only browser action self-healing metadata for blocked
 replay failures, including proposal kind, confidence, patch reference, report,
 sidebar, and scenario coverage. It adds no repair apply, no automatic replay,
-and no browser execution change. Recommended Route 113: explicit self-healing
-apply design only if it remains user-reviewed and metadata-safe, otherwise
-replay UX/report polish. Do not treat
+and no browser execution change. Route 113 adds explicit metadata-safe
+self-healing apply for sanitized cache repair and command-context confirmation,
+plus blocked-safe plans for manifest/runner/unsafe/external cases. It adds no
+automatic repair/replay and no browser execution changes. Recommended Route
+114: browser replay UX/report polish or self-healing apply CLI cross-process
+harness. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
 Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, Route 104,
-Route 105, Route 106, Route 107, Route 108, Route 109, Route 110, Route 111, or
-Route 112 as edit-capability expansions.
+Route 105, Route 106, Route 107, Route 108, Route 109, Route 110, Route 111,
+Route 112, or Route 113 as edit-capability expansions.

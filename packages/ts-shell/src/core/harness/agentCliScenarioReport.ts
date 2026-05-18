@@ -37,7 +37,7 @@ function summarizeBrowserExecutionEvidence(
 ): string {
   const outputs = result.steps
     .map((step) => step.process.output.combined)
-    .filter((output) => /Browser execution|Browser replay/i.test(output));
+    .filter((output) => /Browser execution|Browser replay|Browser self-healing apply/i.test(output));
   if (outputs.length === 0) {
     return "none";
   }
@@ -51,6 +51,7 @@ function summarizeBrowserExecutionEvidence(
   const missingManifest = outputs.some((output) => /Manifest status:\s*missing/i.test(output));
   const receipt = outputs.find((output) => /Browser execution receipt/i.test(output));
   const replay = outputs.find((output) => /Browser replay/i.test(output));
+  const apply = outputs.find((output) => /Browser self-healing apply/i.test(output));
   const cache = outputs.find((output) => /Browser receipt cache/i.test(output));
   const receiptStatus = receipt?.match(/^- Status:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
   const replayReadiness = receipt?.match(/^- Replay readiness:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
@@ -74,6 +75,7 @@ function summarizeBrowserExecutionEvidence(
     `replayCommand=${replay ? replay.match(/^- Replay status:\s*(.+)$/im)?.[1]?.trim() ?? "present" : "none"}`,
     `repair=${replay ? replay.match(/^- Repair readiness:\s*(.+)$/im)?.[1]?.trim() ?? replay.match(/^- Repair needed:\s*(.+)$/im)?.[1]?.trim() ?? "none" : "none"}`,
     `selfHealing=${replay ? summarizeSelfHealing(replay) : "none"}`,
+    `repairApply=${apply ? summarizeRepairApply(apply) : "none"}`,
     `receiptCache=${cache ? cache.match(/^- Cache status:\s*(.+)$/im)?.[1]?.trim() ?? "present" : "none"}`,
     `cacheIntegrity=${cache ? cache.match(/^- Integrity:\s*(.+)$/im)?.[1]?.trim() ?? "unknown" : "none"}`,
     `cacheCompaction=${cache ? cache.match(/^- Records before\/after:\s*(.+)$/im)?.[1]?.trim() ?? "none" : "none"}`,
@@ -81,6 +83,13 @@ function summarizeBrowserExecutionEvidence(
     `binding=${skillBinding}`,
     `dependency=${dependencyDecision}`,
   ].join("; ");
+}
+
+function summarizeRepairApply(output: string): string {
+  const outcome = output.match(/^- Outcome:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const target = output.match(/^- Target:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const changed = output.match(/^- Metadata\/cache changed:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  return `${outcome}/${target}/changed=${changed}`;
 }
 
 function summarizeSelfHealing(output: string): string {

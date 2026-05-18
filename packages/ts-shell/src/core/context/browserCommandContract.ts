@@ -7,14 +7,19 @@ import {
   parseBrowserReplayCommandArgs,
   type BrowserReplayCommandRequest,
 } from "./browserReplayCommandContract.js";
+import {
+  parseBrowserSelfHealingCommandArgs,
+  type BrowserSelfHealingCommandRequest,
+} from "./browserSelfHealingCommandContract.js";
 
-export type BrowserCommandMode = "status" | "preview" | "dry-run" | "execute" | "replay";
+export type BrowserCommandMode = "status" | "preview" | "dry-run" | "execute" | "replay" | "repair";
 
 export interface BrowserCommandContract {
   readonly mode: BrowserCommandMode;
   readonly action?: BrowserActionContract;
   readonly execution?: BrowserExecutionCommandParseResult["request"];
   readonly replay?: BrowserReplayCommandRequest;
+  readonly repair?: BrowserSelfHealingCommandRequest;
 }
 
 export interface BrowserCommandParseResult {
@@ -63,6 +68,22 @@ export function parseBrowserCommandArgs(args: readonly string[]): BrowserCommand
       },
     };
   }
+  if (args[0] === "repair") {
+    const parsed = parseBrowserSelfHealingCommandArgs(args.slice(1));
+    if (parsed.ok === false) {
+      return {
+        ok: false,
+        errorOutput: parsed.errorOutput,
+      };
+    }
+    return {
+      ok: true,
+      contract: {
+        mode: "repair",
+        repair: parsed.request,
+      },
+    };
+  }
   if (args[0] !== "preview" && args[0] !== "dry-run") {
     return invalidBrowserArgs(args.join(" "));
   }
@@ -90,7 +111,7 @@ function invalidBrowserArgs(value: string): BrowserCommandParseResult {
       "- Outcome: blocked",
       "- BlockerKind: invalid-browser-args",
       `- Reason: Unsupported /browser argument: ${value || "(empty)"}`,
-      "- DoNext: Use /browser, /browser status, /browser preview <action>, /browser dry-run <action>, /browser execute <action>, or /browser replay <receipt-id>.",
+      "- DoNext: Use /browser, /browser status, /browser preview <action>, /browser dry-run <action>, /browser execute <action>, /browser replay <receipt-id>, or /browser repair status.",
       "",
       "Supported /browser forms:",
       "- /browser",
@@ -108,6 +129,8 @@ function invalidBrowserArgs(value: string): BrowserCommandParseResult {
       "- /browser execute extract <goal>",
       "- /browser replay status",
       "- /browser replay <receipt-id>",
+      "- /browser repair status",
+      "- /browser repair apply <proposal-id> --confirm",
     ].join("\n"),
   };
 }

@@ -21,6 +21,7 @@ import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
 import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
 import { renderBrowserSkillRunnerSurface } from "./browserSkillRunnerSurface.js";
 import { runBrowserReplayCommand } from "./browserReplayCommandRunner.js";
+import { runBrowserSelfHealingCommand } from "./browserSelfHealingCommandRunner.js";
 
 export interface BrowserCommandRunResult {
   readonly output: string;
@@ -158,6 +159,30 @@ export async function runBrowserCommandAsync(input: {
       confirmations: input.browserExecutionConfirmations,
       cliExecutionBridgeSummary: input.browserCliExecutionBridgeSummary,
       now: input.now,
+    });
+  }
+  if (input.contract.mode === "repair") {
+    if (!input.contract.repair) {
+      return {
+        output: [
+          "Browser self-healing apply",
+          "Result",
+          "- Outcome: blocked",
+          "- BlockerKind: invalid-browser-repair",
+          "- Reason: Missing browser repair request.",
+          "- Browser executed: no",
+          "- Replay executed: no",
+          "- DoNext: Use /browser repair status or /browser repair apply <proposal-id> --confirm.",
+        ].join("\n"),
+        evidence: ["browser-command-runner:missing-repair-request"],
+      };
+    }
+    return runBrowserSelfHealingCommand({
+      request: input.contract.repair,
+      receiptCacheStore: input.browserReceiptCacheStore,
+      networkAllowlist: input.browserNetworkAllowlist,
+      confirmations: input.browserExecutionConfirmations,
+      cliExecutionBridgeSummary: input.browserCliExecutionBridgeSummary,
     });
   }
   return runBrowserCommand({

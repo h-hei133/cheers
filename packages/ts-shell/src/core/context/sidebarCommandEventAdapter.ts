@@ -167,6 +167,9 @@ function titleForCommand(
     if (subcommand === "replay") {
       return "Browser replay";
     }
+    if (subcommand === "repair") {
+      return "Browser repair";
+    }
     return "Browser status";
   }
   if (family === "sidebar") {
@@ -225,5 +228,5 @@ function summarizeCommandOutput(outcome: string, output: string): string {
 }
 
 function isSafeSummaryLine(line: string): boolean {
-  return /^- (Outcome|BlockerKind|Memory written|Auto-load|Auto-injected|Injected into model|Startup auto-load|Provider\/model call|Persistence|Recovery execution|Future-turn injection|Injection status|Checkpoint id|Result count|Cache status|Cache action|Records|Records before\/after|Records removed|Tombstones kept|Integrity|Lock|Staleness|Browser capability|Action|Requested action|Target|Risk|Readiness|Recommended future runtime|Sandbox decision|Blocked risks|Preflight status|Sandbox authority|Network allowlist|Confirmation status|Evidence requirements|Blockers\/warnings|Executed|Browser process|MCP discovery\/launch|Network access|Receipt|Receipt id|Status|Source|Mode|Runner|Skill runner|Skill id\/name|Metadata status|Skill binding mode|Binding mode|Supported actions|Blocked actions|Evidence contract|Sandbox contract|Replay contract|Execution|Execution status|Evidence summary|Receipt status|Replay readiness|Repair needed|Repair readiness|Repair applied|Automatic repair|Self-healing proposal|Self-healing confidence|Proposal id|Proposal|Proposal status|Confidence|Required gate|Required user action|Suggested action|Failure|Proposed patch|Patch status|Applied|Automatic replay|Redactions\/warnings|DoNext|Next action):/i.test(line);
+  return /^- (Outcome|BlockerKind|Memory written|Auto-load|Auto-injected|Injected into model|Startup auto-load|Provider\/model call|Persistence|Recovery execution|Future-turn injection|Injection status|Checkpoint id|Result count|Cache status|Cache action|Records|Records before\/after|Records removed|Tombstones kept|Integrity|Lock|Staleness|Browser capability|Action|Requested action|Target|Risk|Readiness|Recommended future runtime|Sandbox decision|Blocked risks|Preflight status|Sandbox authority|Network allowlist|Confirmation status|Evidence requirements|Blockers\/warnings|Executed|Browser process|MCP discovery\/launch|Network access|Receipt|Receipt id|Status|Source|Mode|Runner|Skill runner|Skill id\/name|Metadata status|Skill binding mode|Binding mode|Supported actions|Blocked actions|Evidence contract|Sandbox contract|Replay contract|Execution|Execution status|Evidence summary|Receipt status|Replay readiness|Repair needed|Repair readiness|Repair applied|Automatic repair|Self-healing proposal|Self-healing confidence|Proposal id|Proposal|Proposal kind|Proposal status|Confidence|Apply status|Apply availability|Supported apply target|Blocked targets|Required context|User confirmation required|Metadata\/cache changed|Change summary|Browser executed|Replay executed|Browser execution change|Required gate|Required user action|Suggested action|Failure|Proposed patch|Patch status|Applied|Automatic replay|Redactions\/warnings|DoNext|Next action):/i.test(line);
 }

@@ -134,6 +134,33 @@ describe("sidebar command event adapter", () => {
     expect(event.summary).not.toContain("sk-secret");
   });
 
+  it("summarizes browser repair apply without raw output", () => {
+    const event = adaptCommandResultToSidebarEvent({
+      command: "/browser",
+      args: ["repair"],
+      result: {
+        kind: "local",
+        output: [
+          "Browser self-healing apply",
+          "Result",
+          "- Outcome: applied",
+          "- Proposal kind: repair-cache",
+          "- Apply status: apply-allowed",
+          "- Metadata/cache changed: yes",
+          "- Browser executed: no",
+          "- Replay executed: no",
+          "RAW_APPLY_CONTENT sk-secret1234567890 hidden reasoning",
+        ].join("\n"),
+      },
+    });
+
+    expect(event.title).toBe("Browser repair");
+    expect(event.summary).toContain("Apply status: apply-allowed");
+    expect(event.summary).toContain("Metadata/cache changed: yes");
+    expect(event.summary).not.toContain("RAW_APPLY_CONTENT");
+    expect(event.summary).not.toContain("sk-secret");
+  });
+
   it("swallows non-safety sink failures", () => {
     expect(() =>
       emitSidebarCommandResult(
