@@ -62,6 +62,18 @@ describe("Route 129 browser transaction continuation", () => {
     expect(result.finalOutput).toContain("closed");
   });
 
+  it("continues from compact transaction trace evidence without page state", async () => {
+    const result = await runContinue([
+      "browser-agent-transaction-trace:browser-txn-trace-66666666:browser-txn-fff:success:ready:succeeded:closed:clean:Clicked Save draft from trace",
+    ]);
+
+    expect(result.status).toBe("completed");
+    expect(result.finalOutput).toContain("Browser evidence from prior session");
+    expect(result.finalOutput).toContain("browser-agent-transaction-trace");
+    expect(result.finalOutput).toContain("Clicked Save draft from trace");
+    expect(JSON.stringify(result)).not.toContain("<main");
+  });
+
   it("contains no raw DOM or secrets in continuation output", async () => {
     const result = await runContinue([
       "browser-agent-transaction:browser-txn-obs-55555555:browser-txn-eee:success:ready:not-needed:closed:[REDACTED_SECRET] visible summary",

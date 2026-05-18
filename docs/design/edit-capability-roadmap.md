@@ -1693,3 +1693,12 @@ agent-loop, and `/continue` tests cover same-page state, repair, timeout,
 unavailable runtime, redaction, and cleanup evidence. Recommended Route 130:
 add a trace/report closeout surface for deterministic transaction comparisons
 without public web, provider calls, MCP live backend, or broad browser autonomy.
+
+Route 130 adds the browser transaction closeout gate: compact transaction trace,
+terminal report surface, deterministic golden evals, planner/repair scoring,
+trace-backed `/continue`, and `verify:browser-txn-gate`. Real browser eval cases
+run only when the controlled local Playwright runtime is ready; pre-runtime,
+policy-blocked, and unavailable paths stay deterministic and provider-free.
+Recommended Route 131: operator-facing controlled browser transaction docs and
+manual diagnostics, or return to the highest-priority default CLI hardening
+blocker instead of expanding browser autonomy.

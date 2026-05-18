@@ -1,4 +1,6 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
+import { createBrowserTxnTrace, type BrowserTxnTrace } from "./browserTrace.js";
+import { renderBrowserTxnReport } from "./browserTxnReport.js";
 import type { BrowserTxnPlannerDecision } from "./browserPlan.js";
 
 export type BrowserTxnStatus = "success" | "stopped" | "failed";
@@ -17,6 +19,7 @@ export interface BrowserTxnResult {
   readonly transactionId: string;
   readonly controlledTarget: string;
   readonly planner: BrowserTxnPlannerDecision;
+  readonly plannedSteps: readonly string[];
   readonly stepSummaries: readonly BrowserTxnStepSummary[];
   readonly finalSummary: string;
   readonly reasonCode: string;
@@ -25,6 +28,7 @@ export interface BrowserTxnResult {
   readonly repairStatus: "not-needed" | "attempted" | "succeeded" | "failed";
   readonly durationMs: number;
   readonly evidenceId: string;
+  readonly trace: BrowserTxnTrace;
   readonly nextActions: readonly string[];
   readonly evidence: readonly string[];
 }
@@ -34,6 +38,7 @@ export function createBrowserTxnResult(input: {
   readonly transactionId: string;
   readonly controlledTarget: string;
   readonly planner: BrowserTxnPlannerDecision;
+  readonly plannedSteps?: readonly string[];
   readonly stepSummaries: readonly BrowserTxnStepSummary[];
   readonly finalSummary: string;
   readonly reasonCode: string;
@@ -51,11 +56,13 @@ export function createBrowserTxnResult(input: {
     input.cleanupStatus,
     finalSummary,
   ].join("|"));
-  return {
+  const result: Omit<BrowserTxnResult, "trace"> = {
     status: input.status,
     transactionId: input.transactionId,
     controlledTarget: sanitizeBrowserText(input.controlledTarget, 180),
     planner: input.planner,
+    plannedSteps: (input.plannedSteps ?? input.stepSummaries.map((step) => step.kind))
+      .map((step) => sanitizeBrowserText(step, 40)),
     stepSummaries: input.stepSummaries.map((step) => ({
       kind: sanitizeBrowserText(step.kind, 40),
       status: step.status,
@@ -88,27 +95,14 @@ export function createBrowserTxnResult(input: {
       "browser-transaction:no-mcp-live-backend",
     ]),
   };
+  return {
+    ...result,
+    trace: createBrowserTxnTrace(result),
+  };
 }
 
 export function formatBrowserTxnResult(result: BrowserTxnResult): string {
-  const title = result.status === "success"
-    ? "Browser task completed"
-    : "Browser task stopped";
-  return [
-    title,
-    `- Transaction: ${result.status}`,
-    `- TransactionId: ${result.transactionId}`,
-    `- Target: ${result.controlledTarget}`,
-    `- Plan: ${result.stepSummaries.map((step) => step.kind).join(" -> ") || "none"}`,
-    `- Summary: ${result.finalSummary}`,
-    `- ReasonCode: ${result.reasonCode}`,
-    `- Repair: ${result.repairStatus}`,
-    `- Cleanup: ${result.cleanupStatus}`,
-    `- Redaction: ${result.redactionStatus}`,
-    `- EvidenceId: ${result.evidenceId}`,
-    `- Next: ${result.nextActions.join("; ") || "none"}`,
-    "- Raw DOM: excluded",
-  ].join("\n");
+  return renderBrowserTxnReport(result);
 }
 
 export function browserTxnEvidenceLine(result: BrowserTxnResult): string {

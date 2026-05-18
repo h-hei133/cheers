@@ -176,7 +176,8 @@ function browserEvidenceFromContinuity(continuityState: unknown): readonly strin
     .filter((entry): entry is string => typeof entry === "string")
     .filter((entry) =>
       entry.startsWith("browser-agent-observation:") ||
-      entry.startsWith("browser-agent-transaction:")
+      entry.startsWith("browser-agent-transaction:") ||
+      entry.startsWith("browser-agent-transaction-trace:")
     )
     .slice(0, 6);
 }

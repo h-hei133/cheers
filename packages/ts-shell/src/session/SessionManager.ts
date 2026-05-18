@@ -2452,6 +2452,8 @@ export class SessionManager {
       "current-permission-request-project-root:",
       "current-permission-request-source:",
       "current-permission-request-lineage:",
+      "browser-agent-transaction-trace:",
+      "browser-agent-transaction:",
       "browser-agent-observation:",
       "browser-observation:",
       "browser-agent-result:",

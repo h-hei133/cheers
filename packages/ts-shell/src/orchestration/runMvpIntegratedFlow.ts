@@ -18,6 +18,7 @@ import {
   browserObservationFromMetadata,
 } from "../core/context/browserObs.js";
 import { executeBrowserTransaction } from "../core/context/browserTxn.js";
+import { browserTxnTraceEvidenceLine } from "../core/context/browserTrace.js";
 import {
   browserTxnEvidenceLine,
   formatBrowserTxnResult,
@@ -3783,6 +3784,7 @@ async function executeBrowserWorkflowTaskPlan(input: {
       runtimeStatus: input.browserRuntimeStatus,
     });
     evidence.push(browserTxnEvidenceLine(transaction));
+    evidence.push(browserTxnTraceEvidenceLine(transaction.trace));
     evidence.push([
       "browser-agent-observation",
       transaction.evidenceId,
