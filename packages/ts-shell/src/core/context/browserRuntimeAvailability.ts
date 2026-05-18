@@ -5,6 +5,7 @@ export type BrowserRuntimeAvailabilityStatus =
   | "available-simulated"
   | "available-external"
   | "available-skill-managed"
+  | "available-direct-playwright"
   | "unavailable"
   | "blocked-by-policy"
   | "dependency-missing";
@@ -80,6 +81,15 @@ export function decideBrowserRuntimeAvailability(input: {
       runtimeMode: manifest.runtimeMode,
       reason: "Explicit skill-managed controlled runtime is available.",
       nextAction: "Keep execution controlled and avoid dynamic discovery.",
+      warnings: load.warnings,
+      evidence: load.evidence,
+    });
+  }
+  if (manifest.runtimeMode === "direct-playwright-core") {
+    return availability("available-direct-playwright", load, {
+      runtimeMode: manifest.runtimeMode,
+      reason: "Explicit Direct Playwright controlled runtime is available.",
+      nextAction: "Keep execution opt-in and controlled local/test scoped.",
       warnings: load.warnings,
       evidence: load.evidence,
     });

@@ -6,6 +6,7 @@ export type BrowserRuntimeMode =
   | "simulated-browser-runtime"
   | "external-browser-runtime"
   | "skill-managed-browser-runtime"
+  | "direct-playwright-core"
   | "unavailable";
 export type BrowserRuntimeAllowedAction = "navigate" | "observe" | "extract" | "click" | "type";
 export type BrowserRuntimeSnapshotCapability = "dom" | "accessibility" | "text" | "links";

@@ -33,6 +33,10 @@ import { renderBrowserRuntimeSurface } from "./browserRuntimeSurface.js";
 import type { BrowserExternalRuntimeManifestLoadResult } from "./browserExternalRuntimeManifest.js";
 import { BrowserRuntimeAdapterExecutor } from "./browserRuntimeAdapterExecutor.js";
 import type { BrowserSkillRuntimeBinding } from "./browserSkillRuntimeBinding.js";
+import type { BrowserPlaywrightRuntimeAvailability } from "./browserPlaywrightRuntimeAvailability.js";
+import type { BrowserPlaywrightMcpBackendComparison } from "./browserPlaywrightMcpBackendComparison.js";
+import type { BrowserRuntimeDirectionDecision } from "./browserRuntimeDirectionDecision.js";
+import { renderBrowserPlaywrightAdapterSurface } from "./browserPlaywrightAdapterSurface.js";
 import type { BrowserExecutor } from "./browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
@@ -132,6 +136,9 @@ export async function runBrowserCommandAsync(input: {
   readonly browserRuntimeExecutor?: BrowserRuntimeExecutor;
   readonly browserExternalRuntimeManifest?: BrowserExternalRuntimeManifestLoadResult;
   readonly browserSkillRuntimeBinding?: BrowserSkillRuntimeBinding;
+  readonly browserPlaywrightAvailability?: BrowserPlaywrightRuntimeAvailability;
+  readonly browserPlaywrightMcpComparison?: BrowserPlaywrightMcpBackendComparison;
+  readonly browserRuntimeDirectionDecision?: BrowserRuntimeDirectionDecision;
   readonly browserActionCache?: BrowserActionCache;
   readonly browserReceiptCacheStore?: BrowserReceiptCacheStore;
   readonly now?: () => string;
@@ -148,11 +155,19 @@ export async function runBrowserCommandAsync(input: {
     return {
       output: [
         renderBrowserRuntimeStatusSurface(availability),
+        renderOptionalPlaywrightDirection({
+          availability: input.browserPlaywrightAvailability,
+          mcpComparison: input.browserPlaywrightMcpComparison,
+          decision: input.browserRuntimeDirectionDecision,
+        }),
         "",
         renderBrowserCliExecutionBridgeSummary(input.browserCliExecutionBridgeSummary),
-      ].join("\n"),
+      ].filter(Boolean).join("\n"),
       evidence: [
         ...availability.evidence,
+        ...(input.browserPlaywrightAvailability?.evidence ?? []),
+        ...(input.browserPlaywrightMcpComparison?.evidence ?? []),
+        ...(input.browserRuntimeDirectionDecision?.evidence ?? []),
         ...(input.browserCliExecutionBridgeSummary?.evidence ?? []),
         "browser-command-runner:runtime-status",
       ],
@@ -270,4 +285,23 @@ export async function runBrowserCommandAsync(input: {
     capability: input.capability,
     browserCliExecutionBridgeSummary: input.browserCliExecutionBridgeSummary,
   });
+}
+
+function renderOptionalPlaywrightDirection(input: {
+  readonly availability?: BrowserPlaywrightRuntimeAvailability;
+  readonly mcpComparison?: BrowserPlaywrightMcpBackendComparison;
+  readonly decision?: BrowserRuntimeDirectionDecision;
+}): string {
+  if (!input.availability || !input.mcpComparison || !input.decision) {
+    return "";
+  }
+  return [
+    "",
+    renderBrowserPlaywrightAdapterSurface({
+      availability: input.availability,
+      mcpComparison: input.mcpComparison,
+      decision: input.decision,
+      tested: ["runtime status integration"],
+    }),
+  ].join("\n");
 }

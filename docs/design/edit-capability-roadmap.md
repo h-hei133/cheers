@@ -110,6 +110,12 @@ repair apply, process-runner scenarios, and an expanded browser eval gauntlet.
 Public browser automation remains blocked. Recommended next route: decide a
 real Playwright/Stagehand adapter, controlled action planner, disabled-by-default
 session/auth design, or browser eval score gates.
+Route 125 evaluates Direct Playwright as the preferred opt-in core runtime and
+Playwright MCP as an optional backend, without package installs, dependency
+changes, MCP launch, provider/model calls, default runtime, or public browser
+automation. Recommended next route: Route 126 should make the explicit Direct
+Playwright dependency/runtime implementation decision before expanding browser
+capability.
 
 This document records the current edit / patch / mutation capability upper
 bound and the long-range route sequence needed before broader edit support can
