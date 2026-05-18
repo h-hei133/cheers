@@ -7,6 +7,10 @@ import {
   createBrowserExternalNetworkRunnerHarnessContext,
   loadBrowserExternalNetworkRunnerManifestFromEnv,
 } from "../core/context/browserExternalNetworkRunnerManifest.js";
+import {
+  createBrowserControlledNetworkHarnessContext,
+  loadBrowserControlledNetworkRunnerManifestFromEnv,
+} from "../core/context/browserControlledNetworkRunnerManifest.js";
 import type { CompactInjectionStateStore } from "../core/context/compactInjectionState.js";
 import type { CompactLiveCheckpointStore } from "../core/context/compactLiveCheckpoint.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
@@ -66,6 +70,10 @@ export async function buildCliCommandExecution(
   const browserExternalNetworkRunnerContext = createBrowserExternalNetworkRunnerHarnessContext(
     browserExternalNetworkRunnerManifest,
   );
+  const browserControlledNetworkRunnerManifest = loadBrowserControlledNetworkRunnerManifestFromEnv({ env: input.env });
+  const browserControlledNetworkRunnerContext = createBrowserControlledNetworkHarnessContext(
+    browserControlledNetworkRunnerManifest,
+  );
   const receiptCacheManifest = loadBrowserReceiptCacheManifestFromEnv({ env: input.env });
   const browserReceiptCacheStore = receiptCacheManifest.ok
     ? createBrowserReceiptCacheStore({ manifest: receiptCacheManifest.manifest })
@@ -78,7 +86,9 @@ export async function buildCliCommandExecution(
     browserReceiptCacheStore,
     ...browserCliExecutionBridge,
     ...browserExternalNetworkRunnerContext,
+    ...browserControlledNetworkRunnerContext,
     browserExternalNetworkRunnerManifest,
+    browserControlledNetworkRunnerManifest,
   });
   if (slashResult?.kind === "local") {
     input.renderer.renderLine(

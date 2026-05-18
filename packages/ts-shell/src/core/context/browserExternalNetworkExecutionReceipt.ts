@@ -13,8 +13,11 @@ export interface BrowserExternalNetworkExecutionReceipt {
   readonly preflightStatus: string;
   readonly externalRunnerStatus: BrowserExternalNetworkRunnerPolicyDecision["status"];
   readonly externalNetworkRunnerManifestStatus: "missing" | "valid" | "invalid";
+  readonly controlledNetworkRunnerManifestStatus: "missing" | "valid" | "invalid";
   readonly handoffStatus?: string;
   readonly handoffReceiptId?: string;
+  readonly controlledNetworkStatus?: string;
+  readonly controlledNetworkReceiptId?: string;
   readonly riskLevel: string;
   readonly blockedReasons: readonly string[];
   readonly readinessStatus: "blocked" | "ready-for-future-runner";
@@ -30,8 +33,11 @@ export function createBrowserExternalNetworkExecutionReceipt(input: {
   readonly preflight: BrowserRuntimePreflight;
   readonly runner: BrowserExternalNetworkRunnerPolicyDecision;
   readonly manifestStatus?: "missing" | "valid" | "invalid";
+  readonly controlledManifestStatus?: "missing" | "valid" | "invalid";
   readonly handoffStatus?: string;
   readonly handoffReceiptId?: string;
+  readonly controlledNetworkStatus?: string;
+  readonly controlledNetworkReceiptId?: string;
 }): BrowserExternalNetworkExecutionReceipt {
   const blockedReasons = unique([
     ...input.preflight.blockers,
@@ -50,8 +56,11 @@ export function createBrowserExternalNetworkExecutionReceipt(input: {
     preflightStatus: input.preflight.preflightStatus,
     externalRunnerStatus: input.runner.status,
     externalNetworkRunnerManifestStatus: input.manifestStatus ?? "missing",
+    controlledNetworkRunnerManifestStatus: input.controlledManifestStatus ?? "missing",
     handoffStatus: input.handoffStatus,
     handoffReceiptId: input.handoffReceiptId,
+    controlledNetworkStatus: input.controlledNetworkStatus,
+    controlledNetworkReceiptId: input.controlledNetworkReceiptId,
     riskLevel: input.intent.riskLevel,
     blockedReasons,
     readinessStatus,
@@ -63,6 +72,7 @@ export function createBrowserExternalNetworkExecutionReceipt(input: {
       ...input.preflight.evidence,
       ...input.runner.evidence,
       ...(input.handoffStatus ? [`browser-external-network-receipt:handoff:${input.handoffStatus}`] : []),
+      ...(input.controlledNetworkStatus ? [`browser-external-network-receipt:controlled-network:${input.controlledNetworkStatus}`] : []),
       "browser-external-network-receipt:no-browser-launch",
       "browser-external-network-receipt:no-network-call",
       "browser-external-network-receipt:raw-content-excluded",

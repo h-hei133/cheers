@@ -38,17 +38,32 @@ import {
   createBrowserExternalNetworkHandoffReceipt,
   type BrowserExternalNetworkHandoffReceipt,
 } from "./browserExternalNetworkHandoffReceipt.js";
+import type { BrowserControlledNetworkRunnerManifestLoadResult } from "./browserControlledNetworkRunnerManifest.js";
+import {
+  decideBrowserControlledNetworkPolicy,
+  type BrowserControlledNetworkPolicyDecision,
+} from "./browserControlledNetworkPolicy.js";
+import {
+  runBrowserControlledNetworkExecutor,
+} from "./browserControlledNetworkExecutor.js";
+import {
+  createBrowserControlledNetworkReceipt,
+  type BrowserControlledNetworkReceipt,
+} from "./browserControlledNetworkReceipt.js";
 
 export interface BrowserExternalNetworkExecutionBridgeResult {
   readonly mode: BrowserExternalNetworkExecutionMode;
-  readonly status: "blocked" | "ready-for-future-runner" | "simulated-handoff";
+  readonly status: "blocked" | "ready-for-future-runner" | "simulated-handoff" | "controlled-network-executed";
   readonly request: BrowserExecutionRequest;
   readonly intent: BrowserExternalNetworkIntent;
   readonly preflight: BrowserRuntimePreflight;
   readonly runner: BrowserExternalNetworkRunnerPolicyDecision;
   readonly handoffPolicy?: BrowserExternalNetworkHandoffPolicyDecision;
   readonly handoffReceipt?: BrowserExternalNetworkHandoffReceipt;
+  readonly controlledNetworkPolicy?: BrowserControlledNetworkPolicyDecision;
+  readonly controlledNetworkReceipt?: BrowserControlledNetworkReceipt;
   readonly runnerManifestStatus: "missing" | "valid" | "invalid";
+  readonly controlledRunnerManifestStatus: "missing" | "valid" | "invalid";
   readonly receipt: BrowserExternalNetworkExecutionReceipt;
   readonly executed: false;
   readonly evidence: readonly string[];
@@ -131,6 +146,7 @@ export function runBrowserExternalNetworkExecutionBridge(input: {
     handoffPolicy,
     handoffReceipt,
     runnerManifestStatus: input.runnerManifest?.status ?? "missing",
+    controlledRunnerManifestStatus: "missing",
     receipt,
     executed: false,
     evidence: [
@@ -140,8 +156,143 @@ export function runBrowserExternalNetworkExecutionBridge(input: {
       ...(input.runnerManifest?.evidence ?? []),
       `browser-external-network-bridge:mode:${mode}`,
       `browser-external-network-bridge:runner-manifest:${input.runnerManifest?.status ?? "missing"}`,
+      "browser-external-network-bridge:controlled-runner-manifest:missing",
       "browser-external-network-bridge:no-browser-launch",
       "browser-external-network-bridge:no-network-call",
+      "browser-external-network-bridge:no-mcp-launch",
+    ],
+  };
+}
+
+export async function runBrowserExternalNetworkExecutionBridgeWithControlledNetwork(input: {
+  readonly request: BrowserExecutionRequest;
+  readonly sandboxAuthority?: BrowserSandboxAuthority;
+  readonly networkAllowlist?: BrowserNetworkAllowlist;
+  readonly confirmations?: readonly BrowserExecutionConfirmationRecord[];
+  readonly runnerMode?: BrowserExternalNetworkRunnerMode;
+  readonly runnerManifest?: BrowserExternalNetworkRunnerManifestLoadResult;
+  readonly controlledRunnerManifest?: BrowserControlledNetworkRunnerManifestLoadResult;
+}): Promise<BrowserExternalNetworkExecutionBridgeResult> {
+  const intent = createBrowserExternalNetworkIntent(input.request);
+  const policy = decideBrowserExecutionPolicy({
+    request: { ...input.request, mode: "future-runtime" },
+    executorAvailable: true,
+  });
+  const preflight = runBrowserRuntimePreflight({
+    request: { ...input.request, mode: "future-runtime" },
+    policy,
+    executorKind: "noop",
+    authority: input.sandboxAuthority,
+    allowlist: input.networkAllowlist,
+    confirmations: input.confirmations,
+  });
+  const gatesReady = gatesAreRepresented(preflight);
+  const runner = decideBrowserExternalNetworkRunnerPolicy({
+    request: input.request,
+    runnerMode: input.runnerMode,
+    gatesReady,
+  });
+  const handoffPolicy = decideBrowserExternalNetworkHandoffPolicy({
+    request: input.request,
+    intent,
+    preflight,
+    manifest: input.runnerManifest?.status === "valid" ? input.runnerManifest.manifest : undefined,
+    manifestValid: input.runnerManifest?.status !== "invalid",
+  });
+  const handoffRequest = handoffPolicy.allowed && input.runnerManifest?.status === "valid"
+    ? createBrowserExternalNetworkHandoffRequest({
+        request: input.request,
+        targetOrigin: intent.normalizedOrigin,
+        safeUrlSummary: intent.rawTargetSummary,
+        allowlistStatus: preflight.networkDecision.status,
+        confirmationStatus: preflight.confirmationDecision.status,
+        sandboxStatus: preflight.sandboxDecision.status,
+        preflightStatus: gatesReady ? "pass" : preflight.preflightStatus,
+        runnerMode: input.runnerManifest.manifest.runnerMode,
+        outputBudgetBytes: input.runnerManifest.manifest.outputBudgetBytes,
+      })
+    : undefined;
+  const handoffExecutor = handoffRequest
+    ? runBrowserExternalNetworkHandoffExecutor({ request: handoffRequest })
+    : undefined;
+  const handoffReceipt = handoffExecutor
+    ? createBrowserExternalNetworkHandoffReceipt({
+        policy: handoffPolicy,
+        executor: handoffExecutor,
+      })
+    : undefined;
+  const controlledNetworkPolicy = decideBrowserControlledNetworkPolicy({
+    request: input.request,
+    intent,
+    preflight,
+    manifest: input.controlledRunnerManifest?.status === "valid"
+      ? input.controlledRunnerManifest.manifest
+      : undefined,
+    manifestStatus: input.controlledRunnerManifest?.status ?? "missing",
+  });
+  const controlledNetworkExecutor = controlledNetworkPolicy.allowed && input.controlledRunnerManifest?.status === "valid"
+    ? await runBrowserControlledNetworkExecutor({
+        request: input.request,
+        policy: controlledNetworkPolicy,
+        manifest: input.controlledRunnerManifest.manifest,
+      })
+    : undefined;
+  const controlledNetworkReceipt = controlledNetworkExecutor && input.controlledRunnerManifest?.status === "valid"
+    ? createBrowserControlledNetworkReceipt({
+        request: input.request,
+        manifest: input.controlledRunnerManifest.manifest,
+        policy: controlledNetworkPolicy,
+        executor: controlledNetworkExecutor,
+      })
+    : undefined;
+  const receipt = createBrowserExternalNetworkExecutionReceipt({
+    request: input.request,
+    intent,
+    preflight: gatesReady ? { ...preflight, blockers: [] } : preflight,
+    runner,
+    handoffStatus: handoffPolicy.status,
+    handoffReceiptId: handoffReceipt?.receiptId,
+    controlledNetworkStatus: controlledNetworkPolicy.status,
+    controlledNetworkReceiptId: controlledNetworkReceipt?.receiptId,
+    manifestStatus: input.runnerManifest?.status ?? "missing",
+    controlledManifestStatus: input.controlledRunnerManifest?.status ?? "missing",
+  });
+  const mode = modeFor({ preflight, runner });
+  const status = controlledNetworkReceipt?.executed
+    ? "controlled-network-executed"
+    : handoffReceipt
+      ? "simulated-handoff"
+    : receipt.readinessStatus;
+  return {
+    mode,
+    status,
+    request: input.request,
+    intent,
+    preflight,
+    runner,
+    handoffPolicy,
+    handoffReceipt,
+    controlledNetworkPolicy,
+    controlledNetworkReceipt,
+    runnerManifestStatus: input.runnerManifest?.status ?? "missing",
+    controlledRunnerManifestStatus: input.controlledRunnerManifest?.status ?? "missing",
+    receipt,
+    executed: false,
+    evidence: [
+      ...receipt.evidence,
+      ...handoffPolicy.evidence,
+      ...(handoffReceipt?.evidence ?? []),
+      ...controlledNetworkPolicy.evidence,
+      ...(controlledNetworkReceipt?.evidence ?? []),
+      ...(input.runnerManifest?.evidence ?? []),
+      ...(input.controlledRunnerManifest?.evidence ?? []),
+      `browser-external-network-bridge:mode:${mode}`,
+      `browser-external-network-bridge:runner-manifest:${input.runnerManifest?.status ?? "missing"}`,
+      `browser-external-network-bridge:controlled-runner-manifest:${input.controlledRunnerManifest?.status ?? "missing"}`,
+      "browser-external-network-bridge:no-browser-launch",
+      controlledNetworkReceipt?.executed
+        ? "browser-external-network-bridge:controlled-loopback-request"
+        : "browser-external-network-bridge:no-network-call",
       "browser-external-network-bridge:no-mcp-launch",
     ],
   };

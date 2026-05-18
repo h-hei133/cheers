@@ -198,6 +198,34 @@ describe("sidebar command event adapter", () => {
     expect(event.summary).not.toContain("sk-secret");
   });
 
+  it("summarizes controlled browser network execution without raw output", () => {
+    const event = adaptCommandResultToSidebarEvent({
+      command: "/browser",
+      args: ["execute"],
+      result: {
+        kind: "local",
+        output: [
+          "Controlled browser network execution",
+          "- Origin: http://127.0.0.1:43210",
+          "- Action: navigate",
+          "- Policy: controlled-network-allowed",
+          "- Public network: no",
+          "- Browser launched: no",
+          "- Executed: yes",
+          "- Evidence summary: controlled observe summary route118",
+          "RAW_CONTROLLED_CONTENT sk-secret1234567890 hidden reasoning",
+        ].join("\n"),
+      },
+    });
+
+    expect(event.title).toBe("Browser execution");
+    expect(event.summary).toContain("Policy: controlled-network-allowed");
+    expect(event.summary).toContain("Public network: no");
+    expect(event.summary).toContain("Executed: yes");
+    expect(event.summary).not.toContain("RAW_CONTROLLED_CONTENT");
+    expect(event.summary).not.toContain("sk-secret");
+  });
+
   it("swallows non-safety sink failures", () => {
     expect(() =>
       emitSidebarCommandResult(

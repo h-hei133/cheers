@@ -129,7 +129,7 @@ function hasNoProviderBrowserNetworkEvidence(value: string): boolean {
     if (/^Browser process:\s*(?!not launched\b)/i.test(normalized)) {
       return false;
     }
-    if (/^Network access:\s*(?!none\b)/i.test(normalized)) {
+    if (/^Network access:\s*(?!none\b|controlled-loopback\b)/i.test(normalized)) {
       return false;
     }
     if (/^MCP discovery\/launch:\s*(?!none\b)/i.test(normalized)) {
@@ -158,6 +158,12 @@ function hasNoProviderBrowserNetworkEvidence(value: string): boolean {
     /Browser process:\s*skill-managed local\/test runner only/i.test(value) &&
     /MCP discovery\/launch:\s*none/i.test(value) &&
     /Provider\/model call:\s*none/i.test(value);
+  const controlledNetworkExecution =
+    /Controlled browser network execution/i.test(value) &&
+    /Public network:\s*no/i.test(value) &&
+    /Browser launched:\s*no/i.test(value) &&
+    /MCP discovery\/launch:\s*none/i.test(value) &&
+    /Provider\/model call:\s*none/i.test(value);
   if (/browser process:\s*(launched|started)|real browser execution:\s*yes/i.test(value)) {
     return false;
   }
@@ -166,7 +172,8 @@ function hasNoProviderBrowserNetworkEvidence(value: string): boolean {
     !localFixtureExecution &&
     !playwrightLocalExecution &&
     !externalRunnerExecution &&
-    !skillRunnerExecution
+    !skillRunnerExecution &&
+    !controlledNetworkExecution
   ) {
     return false;
   }

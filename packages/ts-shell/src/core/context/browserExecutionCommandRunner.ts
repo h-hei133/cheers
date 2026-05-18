@@ -34,13 +34,14 @@ import {
   isExternalNetworkExecutionRequest,
 } from "./browserExternalNetworkExecutionMode.js";
 import {
-  runBrowserExternalNetworkExecutionBridge,
+  runBrowserExternalNetworkExecutionBridgeWithControlledNetwork,
 } from "./browserExternalNetworkExecutionBridge.js";
 import {
   renderBrowserExternalNetworkExecutionSurface,
 } from "./browserExternalNetworkExecutionSurface.js";
 import type { BrowserExternalNetworkRunnerMode } from "./browserExternalNetworkRunnerPolicy.js";
 import type { BrowserExternalNetworkRunnerManifestLoadResult } from "./browserExternalNetworkRunnerManifest.js";
+import type { BrowserControlledNetworkRunnerManifestLoadResult } from "./browserControlledNetworkRunnerManifest.js";
 
 export interface BrowserExecutionCommandRunResult {
   readonly output: string;
@@ -58,6 +59,7 @@ export async function runBrowserExecutionCommand(input: {
   readonly receiptCacheStore?: BrowserReceiptCacheStore;
   readonly externalNetworkRunnerMode?: BrowserExternalNetworkRunnerMode;
   readonly externalNetworkRunnerManifest?: BrowserExternalNetworkRunnerManifestLoadResult;
+  readonly controlledNetworkRunnerManifest?: BrowserControlledNetworkRunnerManifestLoadResult;
   readonly now?: () => string;
 }): Promise<BrowserExecutionCommandRunResult> {
   const executor = input.executor ?? NOOP_BROWSER_EXECUTOR;
@@ -83,13 +85,14 @@ export async function runBrowserExecutionCommand(input: {
     executorAvailable: browserExecutorIsAvailable(executor),
   });
   if (isExternalNetworkExecutionRequest(request) && executor.kind === "noop") {
-    const bridge = runBrowserExternalNetworkExecutionBridge({
+    const bridge = await runBrowserExternalNetworkExecutionBridgeWithControlledNetwork({
       request,
       sandboxAuthority: input.sandboxAuthority,
       networkAllowlist: input.networkAllowlist,
       confirmations: input.confirmations,
       runnerMode: input.externalNetworkRunnerMode,
       runnerManifest: input.externalNetworkRunnerManifest,
+      controlledRunnerManifest: input.controlledNetworkRunnerManifest,
     });
     return {
       output: [

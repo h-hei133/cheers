@@ -1602,11 +1602,13 @@ external-network execution opt-in bridge, disabled by default, with no external
 network execution, browser launch, MCP launch, or provider/model call.
 Route 117 adds an external-network runner handoff protocol and simulated
 execution harness only; real external network execution still does not happen.
-Recommended Route 118: real external-network runner design, still disabled by
-default, or external-network handoff report/UX polish. Do not treat
+Route 118 adds a controlled-network external runner harness for explicit
+loopback test servers only; public external network remains blocked.
+Recommended Route 119: public external-network execution design with a real
+runner still opt-in, or controlled-network evidence/report polish. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
 Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, Route 104,
 Route 105, Route 106, Route 107, Route 108, Route 109, Route 110, Route 111,
-Route 112, Route 113, Route 114, Route 115, or Route 116 as edit-capability
+Route 112, Route 113, Route 114, Route 115, Route 116, Route 117, or Route 118 as edit-capability
 expansions.

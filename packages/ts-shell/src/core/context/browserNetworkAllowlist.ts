@@ -158,6 +158,20 @@ export function decideBrowserNetworkAllowlist(input: {
       nextAction: "Use an explicitly allowlisted https origin.",
     });
   }
+  if (
+    target.scheme === "http" &&
+    target.hostname &&
+    isPrivateNetworkHost(target.hostname) &&
+    allowlist.allowPrivateNetworkInTest &&
+    allowlist.allowedOrigins.some(
+      (allowed) => normalizeBrowserAllowedOrigin(allowed.origin) === target.origin,
+    )
+  ) {
+    return decision("allowed", target, allowlist, {
+      reason: "HTTP loopback origin is explicitly allowlisted for controlled test mode.",
+      nextAction: "Continue only if confirmation and sandbox authority also pass.",
+    });
+  }
   if (target.scheme !== "https") {
     return decision("blocked-scheme", target, allowlist, {
       reason: "Only https origins are allowed by the initial browser network policy.",
