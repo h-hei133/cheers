@@ -6,6 +6,19 @@ import type { BrowserRuntimeManifest } from "./browserRuntimeManifest.js";
 
 export type PwEvidenceStatus = "ok" | "blocked" | "unavailable" | "timed-out" | "failed";
 export type PwCleanupStatus = "closed" | "close-failed" | "not-started";
+export type PwFailureCode =
+  | "runtime-package-missing"
+  | "runtime-binary-missing"
+  | "runtime-disabled"
+  | "navigation-timeout"
+  | "observe-failed"
+  | "extract-failed"
+  | "action-target-missing"
+  | "action-timeout"
+  | "policy-blocked"
+  | "cleanup-failed"
+  | "adapter-invalid-result"
+  | "unknown";
 
 export interface PwPageEvidence {
   readonly status: PwEvidenceStatus;
@@ -21,6 +34,7 @@ export interface PwPageEvidence {
   readonly cleanupStatus: PwCleanupStatus;
   readonly targetSummary?: string;
   readonly errorKind?: "timeout" | "runtime" | "policy" | "unavailable";
+  readonly failureCode?: PwFailureCode;
   readonly errorSummary?: string;
   readonly redactions?: readonly string[];
   readonly warnings?: readonly string[];
@@ -44,6 +58,7 @@ export function mapPwEvidence(input: {
   const hiddenRedactions = /type\s*=\s*["']hidden["']/i.test(input.evidence.rawHtml ?? "")
     ? ["hidden-input-redacted"]
     : [];
+  const failureCode = classifyPwFailure(input.request, input.evidence);
   const redactions = unique([
     ...textRedaction.redactions,
     ...rawRedaction.redactions,
@@ -82,6 +97,7 @@ export function mapPwEvidence(input: {
       ...textRedaction.warnings,
       ...rawRedaction.warnings,
       `pw-evidence:cleanup:${input.evidence.cleanupStatus}`,
+      `pw-evidence:reason:${failureCode}`,
       "pw-evidence:safe-summary-only",
     ]),
     redactions,
@@ -90,6 +106,7 @@ export function mapPwEvidence(input: {
       "pw-evidence:mapped",
       `pw-evidence:operation:${input.evidence.operation}`,
       `pw-evidence:status:${input.evidence.status}`,
+      `pw-evidence:failure:${failureCode}`,
       `pw-evidence:cleanup:${input.evidence.cleanupStatus}`,
       "pw-evidence:raw-dom-excluded",
       "pw-evidence:no-cookies-session-or-auth",
@@ -97,6 +114,40 @@ export function mapPwEvidence(input: {
     ],
     rawContent: "internal-only",
   };
+}
+
+export function classifyPwFailure(
+  request: BrowserExecutionRequest,
+  evidence: PwPageEvidence,
+): PwFailureCode {
+  if (evidence.cleanupStatus === "close-failed") {
+    return "cleanup-failed";
+  }
+  if (evidence.failureCode) {
+    return evidence.failureCode;
+  }
+  if (evidence.status === "ok") {
+    return "unknown";
+  }
+  if (evidence.status === "blocked") {
+    return "policy-blocked";
+  }
+  if (evidence.status === "unavailable") {
+    return "runtime-binary-missing";
+  }
+  if (evidence.errorKind === "timeout") {
+    return request.actionKind === "click" || request.actionKind === "type" ? "action-timeout" : "navigation-timeout";
+  }
+  if (/target.*not found|missing target|not found/i.test(evidence.errorSummary ?? "")) {
+    return "action-target-missing";
+  }
+  if (request.actionKind === "observe") {
+    return "observe-failed";
+  }
+  if (request.actionKind === "extract") {
+    return "extract-failed";
+  }
+  return "unknown";
 }
 
 function toRuntimeStatus(
@@ -170,6 +221,11 @@ function redactPwText(value: string): {
       redactions.add("secret-looking-field");
       const label = match.split(/[:=]/)[0] ?? "secret";
       return `${label}=[REDACTED_SECRET]`;
+    })
+    .replace(/\b(cookie|session(?:storage)?|localstorage|storage)\s*[:=]\s*[^\s<>"']+/gi, (match) => {
+      redactions.add("browser-storage-redacted");
+      const label = match.split(/[:=]/)[0] ?? "storage";
+      return `${label}=[REDACTED_BROWSER_STORAGE]`;
     })
     .replace(/\b(hidden reasoning|chain[- ]?of[- ]?thought)\b/gi, () => {
       redactions.add("hidden-reasoning-label");

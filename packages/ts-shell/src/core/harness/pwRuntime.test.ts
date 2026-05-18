@@ -27,6 +27,7 @@ describe("Route 126 Direct Playwright runtime", () => {
     });
 
     expect(status.status).toBe("package-missing");
+    expect(status.reasonCode).toBe("runtime-package-missing");
     expect(status.browserLaunched).toBe(false);
     expect(status.skipReason).toBe("playwright-package-missing");
     expect(status.evidence).toContain("pw-runtime:no-browser-launch-during-status");
@@ -40,7 +41,34 @@ describe("Route 126 Direct Playwright runtime", () => {
 
     expect(status.status).toBe("binary-missing");
     expect(status.dependency).toBe("playwright-core");
+    expect(status.reasonCode).toBe("runtime-binary-missing");
+    expect(status.executableSource).toBe("playwright-cache");
     expect(status.skipReason).toBe("playwright-browser-binary-missing");
+  });
+
+  it("honors PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH before package-managed paths", async () => {
+    const status = await getPwRuntimeStatus({
+      importer: async () => fakeRuntime("/tmp/missing-route127-cache-chromium"),
+      fsExists: (path) => path === "/tmp/route127-env-chromium",
+      env: { PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: "/tmp/route127-env-chromium" },
+    });
+
+    expect(status.status).toBe("ready");
+    expect(status.executablePath).toBe("/tmp/route127-env-chromium");
+    expect(status.executableSource).toBe("env");
+  });
+
+  it("can use a common local Chromium path when Playwright cache is absent", async () => {
+    const status = await getPwRuntimeStatus({
+      importer: async () => fakeRuntime("/tmp/missing-route127-cache-chromium"),
+      fsExists: (path) => path === "/usr/bin/chromium",
+      env: {},
+      platform: "linux",
+    });
+
+    expect(status.status).toBe("ready");
+    expect(status.executablePath).toBe("/usr/bin/chromium");
+    expect(status.executableSource).toBe("system-path");
   });
 
   it("integrates compact Direct Playwright status into /browser runtime status", async () => {
@@ -57,6 +85,8 @@ describe("Route 126 Direct Playwright runtime", () => {
     expect(result.output).toContain("Browser runtime status");
     expect(result.output).toContain("Direct Playwright");
     expect(result.output).toContain("- Status: binary-missing");
+    expect(result.output).toContain("- Reason code: runtime-binary-missing");
+    expect(result.output).toContain("- Executable source: playwright-cache");
     expect(result.output).toContain("- MCP backend: optional-not-default");
     expect(result.evidence).toContain("pw-runtime:status:binary-missing");
   });
@@ -102,6 +132,7 @@ describe("Route 126 Direct Playwright runtime", () => {
     expect(result.receipt.redactions).toEqual(expect.arrayContaining([
       "hidden-input-redacted",
       "hidden-reasoning-label",
+      "browser-storage-redacted",
       "secret-looking-field",
     ]));
     expect(serialized).not.toContain("<main>");
@@ -154,9 +185,11 @@ function createInjectedAdapter(): PwAdapter {
   return new PwAdapter({
     status: {
       status: "ready",
+      reasonCode: "ready",
       dependency: "playwright-core",
       packageName: "playwright-core",
       browserName: "chromium",
+      executableSource: "unknown",
       realBrowserValidationAvailable: true,
       passiveStatusCheck: true,
       browserLaunched: false,

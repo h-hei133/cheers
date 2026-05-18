@@ -66,7 +66,7 @@ export const pwFixtures = [
       "<main>",
       "<h1>Secret Fixture</h1>",
       "<input type=\"hidden\" name=\"token\" value=\"sk-route126SECRET\" />",
-      "<p>api_key=sk-route126SECRET hidden reasoning</p>",
+      "<p>api_key=sk-route126SECRET hidden reasoning cookie=session-cookie localStorage=stored-secret</p>",
       "<button id=\"save\">Save draft</button>",
       "</main>",
       "</body></html>",
@@ -76,10 +76,10 @@ export const pwFixtures = [
 
 export function createPwManifestLoad(): BrowserRuntimeManifestLoadResult {
   return validateBrowserRuntimeManifest(createBrowserRuntimeManifest({
-    manifestId: "browser-runtime:route126-direct-playwright",
+    manifestId: "browser-runtime:route127-direct-playwright",
     runtimeMode: "direct-playwright-core",
     allowedOrigins: pwFixtures.map((fixture) => fixture.marker),
-    warnings: ["route126:direct-playwright-runtime"],
+    warnings: ["route127:direct-playwright-runtime"],
   }));
 }
 

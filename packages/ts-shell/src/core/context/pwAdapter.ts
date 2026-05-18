@@ -5,7 +5,7 @@ import type {
   BrowserRuntimeExecutorResult,
 } from "./browserRuntimeExecutor.js";
 import type { BrowserRuntimeManifest } from "./browserRuntimeManifest.js";
-import { mapPwEvidence, type PwCleanupStatus, type PwPageEvidence } from "./pwEvidence.js";
+import { mapPwEvidence, type PwCleanupStatus, type PwFailureCode, type PwPageEvidence } from "./pwEvidence.js";
 import {
   importPwRuntime,
   type PwBrowser,
@@ -86,9 +86,17 @@ export class PwAdapter implements BrowserRuntimeExecutor {
     timeoutMs: number,
   ): Promise<PwPageEvidence> {
     if (this.input.status.status !== "ready") {
-      return this.errorEvidence(request, fixture, "unavailable", "unavailable", this.input.status.reason, false, "not-started", [
-        `pw-adapter:runtime:${this.input.status.status}`,
-      ]);
+      return this.errorEvidence(
+        request,
+        fixture,
+        "unavailable",
+        "unavailable",
+        this.input.status.reason,
+        false,
+        "not-started",
+        [`pw-adapter:runtime:${this.input.status.status}`],
+        this.input.status.reasonCode === "ready" ? "unknown" : this.input.status.reasonCode,
+      );
     }
 
     let browser: PwBrowser | undefined;
@@ -142,6 +150,9 @@ export class PwAdapter implements BrowserRuntimeExecutor {
         browserLaunched,
         "not-started",
         ["pw-adapter:real-error"],
+        /target.*not found|not found/i.test(error instanceof Error ? error.message : String(error))
+          ? "action-target-missing"
+          : undefined,
       );
     }
 
@@ -182,6 +193,7 @@ export class PwAdapter implements BrowserRuntimeExecutor {
     browserLaunched: boolean,
     cleanupStatus: PwCleanupStatus,
     warnings: readonly string[],
+    failureCode?: PwFailureCode,
   ): PwPageEvidence {
     return {
       status,
@@ -196,6 +208,7 @@ export class PwAdapter implements BrowserRuntimeExecutor {
       targetSummary: request.action.target,
       errorKind,
       errorSummary: error instanceof Error ? error.message : String(error),
+      failureCode,
       warnings,
       evidence: ["pw-adapter:error"],
     };

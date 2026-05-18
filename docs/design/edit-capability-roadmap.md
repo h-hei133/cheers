@@ -127,6 +127,18 @@ auth/cookie/session persistence, destructive/payment/upload/download flows,
 raw DOM/secrets in output, and default enablement remain blocked. Recommended
 Route 127: Direct Playwright browser eval/report closeout, or a Playwright MCP
 optional-backend prototype over the same contracts.
+Route 127 closes out the Direct Playwright browser runtime as a usable,
+testable, reportable controlled local/test capability. Runtime readiness now
+reports stable reason codes, executable source, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`
+support, Playwright cache probing, and common local Chrome/Chromium probing.
+The current machine remains `binary-missing` with stable
+`runtime-binary-missing` / `playwright-browser-binary-missing`; injected
+fallback evals pass and real-browser tests skip only for that binary gap.
+`pwEval`/`pwReport` add pass/fail/skip closeout reporting with cleanup,
+duration, redaction, and failure taxonomy, while `pwMcp` defines Playwright MCP
+as optional/not-default over the same report contract without launching MCP.
+Recommended Route 128: choose one of MCP backend prototype, Stagehand-style
+planner, or public-safe navigation gate.
 
 This document records the current edit / patch / mutation capability upper
 bound and the long-range route sequence needed before broader edit support can

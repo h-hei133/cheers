@@ -100,13 +100,51 @@ async function readyRuntime(): Promise<Extract<Awaited<ReturnType<typeof realRun
 
 function detectRealBrowserSkipReason(): "playwright-package-missing" | "playwright-browser-binary-missing" | undefined {
   const require = createRequire(import.meta.url);
+  const envPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  if (envPath) {
+    return existsSync(envPath) ? undefined : "playwright-browser-binary-missing";
+  }
   try {
     const runtime = require("playwright-core") as PwRuntimeModule;
     const executablePath = runtime.chromium?.executablePath();
-    return executablePath && existsSync(executablePath) ? undefined : "playwright-browser-binary-missing";
+    if (executablePath && existsSync(executablePath)) {
+      return undefined;
+    }
+    return commonChromiumCandidates().some((candidate) => existsSync(candidate))
+      ? undefined
+      : "playwright-browser-binary-missing";
   } catch {
     return "playwright-package-missing";
   }
+}
+
+function commonChromiumCandidates(): readonly string[] {
+  if (process.platform === "darwin") {
+    return [
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+      "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    ];
+  }
+  if (process.platform === "win32") {
+    return [
+      process.env.LOCALAPPDATA,
+      process.env.PROGRAMFILES,
+      process.env["PROGRAMFILES(X86)"],
+    ].filter((value): value is string => !!value).flatMap((root) => [
+      `${root}\\Google\\Chrome\\Application\\chrome.exe`,
+      `${root}\\Chromium\\Application\\chrome.exe`,
+      `${root}\\Microsoft\\Edge\\Application\\msedge.exe`,
+    ]);
+  }
+  return [
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/snap/bin/chromium",
+    "/opt/google/chrome/chrome",
+  ];
 }
 
 async function runReal(
