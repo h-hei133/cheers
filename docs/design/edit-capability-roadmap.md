@@ -116,6 +116,17 @@ changes, MCP launch, provider/model calls, default runtime, or public browser
 automation. Recommended next route: Route 126 should make the explicit Direct
 Playwright dependency/runtime implementation decision before expanding browser
 capability.
+Route 126 adds the first real Direct Playwright core runtime path behind
+explicit controlled local/test manifests, using the minimal `playwright-core`
+dependency. Runtime status now distinguishes ready, package-missing,
+binary-missing, disabled, and failed without launching a browser during status.
+The adapter covers local fixture observe/extract/click/type, timeout, cleanup,
+evidence mapping, redaction, `/browser runtime status`, and existing browser
+eval harness reuse. Public browser automation, provider/model calls,
+auth/cookie/session persistence, destructive/payment/upload/download flows,
+raw DOM/secrets in output, and default enablement remain blocked. Recommended
+Route 127: Direct Playwright browser eval/report closeout, or a Playwright MCP
+optional-backend prototype over the same contracts.
 
 This document records the current edit / patch / mutation capability upper
 bound and the long-range route sequence needed before broader edit support can

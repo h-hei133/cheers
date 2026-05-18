@@ -37,6 +37,8 @@ import type { BrowserPlaywrightRuntimeAvailability } from "./browserPlaywrightRu
 import type { BrowserPlaywrightMcpBackendComparison } from "./browserPlaywrightMcpBackendComparison.js";
 import type { BrowserRuntimeDirectionDecision } from "./browserRuntimeDirectionDecision.js";
 import { renderBrowserPlaywrightAdapterSurface } from "./browserPlaywrightAdapterSurface.js";
+import { renderPwRuntimeStatus } from "./pwStatus.js";
+import { getPwRuntimeStatus, type PwRuntimeStatus } from "./pwRuntime.js";
 import type { BrowserExecutor } from "./browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
@@ -137,6 +139,7 @@ export async function runBrowserCommandAsync(input: {
   readonly browserExternalRuntimeManifest?: BrowserExternalRuntimeManifestLoadResult;
   readonly browserSkillRuntimeBinding?: BrowserSkillRuntimeBinding;
   readonly browserPlaywrightAvailability?: BrowserPlaywrightRuntimeAvailability;
+  readonly browserPwStatus?: PwRuntimeStatus;
   readonly browserPlaywrightMcpComparison?: BrowserPlaywrightMcpBackendComparison;
   readonly browserRuntimeDirectionDecision?: BrowserRuntimeDirectionDecision;
   readonly browserActionCache?: BrowserActionCache;
@@ -152,9 +155,12 @@ export async function runBrowserCommandAsync(input: {
       manifestLoad,
       executorAvailable: !!input.browserRuntimeExecutor || input.browserExternalRuntimeManifest?.status === "valid",
     });
+    const pwStatus = input.browserPwStatus ?? await getPwRuntimeStatus();
     return {
       output: [
         renderBrowserRuntimeStatusSurface(availability),
+        "",
+        renderPwRuntimeStatus(pwStatus),
         renderOptionalPlaywrightDirection({
           availability: input.browserPlaywrightAvailability,
           mcpComparison: input.browserPlaywrightMcpComparison,
@@ -165,6 +171,7 @@ export async function runBrowserCommandAsync(input: {
       ].filter(Boolean).join("\n"),
       evidence: [
         ...availability.evidence,
+        ...pwStatus.evidence,
         ...(input.browserPlaywrightAvailability?.evidence ?? []),
         ...(input.browserPlaywrightMcpComparison?.evidence ?? []),
         ...(input.browserRuntimeDirectionDecision?.evidence ?? []),
