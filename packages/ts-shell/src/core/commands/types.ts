@@ -15,6 +15,8 @@ import type { BrowserPublicReadOnlyWebManifestLoadResult } from '../context/brow
 import type { BrowserPublicReadOnlyHttpClient } from '../context/browserPublicReadOnlyWebExecutor.js'
 import type { BrowserRuntimeManifestLoadResult } from '../context/browserRuntimeManifest.js'
 import type { BrowserRuntimeExecutor } from '../context/browserRuntimeExecutor.js'
+import type { BrowserExternalRuntimeManifestLoadResult } from '../context/browserExternalRuntimeManifest.js'
+import type { BrowserSkillRuntimeBinding } from '../context/browserSkillRuntimeBinding.js'
 import type { BrowserActionCache } from '../context/browserActionCache.js'
 import type { BrowserReceiptCacheStore } from '../context/browserReceiptCacheStore.js'
 import type { BrowserPublicReadOnlyWebSmokeConfig } from '../harness/browserPublicReadOnlyWebSmokeConfig.js'
@@ -44,6 +46,8 @@ export interface CommandContext {
   readonly browserPublicReadOnlyHttpClient?: BrowserPublicReadOnlyHttpClient
   readonly browserRuntimeManifest?: BrowserRuntimeManifestLoadResult
   readonly browserRuntimeExecutor?: BrowserRuntimeExecutor
+  readonly browserExternalRuntimeManifest?: BrowserExternalRuntimeManifestLoadResult
+  readonly browserSkillRuntimeBinding?: BrowserSkillRuntimeBinding
   readonly browserPublicReadOnlyWebSmokeConfig?: BrowserPublicReadOnlyWebSmokeConfig
   readonly browserActionCache?: BrowserActionCache
   readonly browserReceiptCacheStore?: BrowserReceiptCacheStore

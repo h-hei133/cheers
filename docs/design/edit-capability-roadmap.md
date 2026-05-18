@@ -104,6 +104,12 @@ runtime receipts/surfaces, and a deterministic browser eval foundation. Public
 browser automation, package dependencies, default runtime, provider/model/MCP
 calls, cookies/auth/session persistence, raw DOM/page content, and
 SessionManager schema changes remain blocked.
+Route 124 adds an opt-in browser runtime adapter boundary with external-process
+and skill-managed manifest paths, protocol validation, controlled selector
+repair apply, process-runner scenarios, and an expanded browser eval gauntlet.
+Public browser automation remains blocked. Recommended next route: decide a
+real Playwright/Stagehand adapter, controlled action planner, disabled-by-default
+session/auth design, or browser eval score gates.
 
 This document records the current edit / patch / mutation capability upper
 bound and the long-range route sequence needed before broader edit support can

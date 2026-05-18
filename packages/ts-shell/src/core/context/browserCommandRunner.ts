@@ -30,6 +30,9 @@ import {
   type BrowserRuntimeManifestLoadResult,
 } from "./browserRuntimeManifest.js";
 import { renderBrowserRuntimeSurface } from "./browserRuntimeSurface.js";
+import type { BrowserExternalRuntimeManifestLoadResult } from "./browserExternalRuntimeManifest.js";
+import { BrowserRuntimeAdapterExecutor } from "./browserRuntimeAdapterExecutor.js";
+import type { BrowserSkillRuntimeBinding } from "./browserSkillRuntimeBinding.js";
 import type { BrowserExecutor } from "./browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
@@ -127,15 +130,20 @@ export async function runBrowserCommandAsync(input: {
   readonly browserPublicReadOnlyHttpClient?: BrowserPublicReadOnlyHttpClient;
   readonly browserRuntimeManifest?: BrowserRuntimeManifestLoadResult;
   readonly browserRuntimeExecutor?: BrowserRuntimeExecutor;
+  readonly browserExternalRuntimeManifest?: BrowserExternalRuntimeManifestLoadResult;
+  readonly browserSkillRuntimeBinding?: BrowserSkillRuntimeBinding;
   readonly browserActionCache?: BrowserActionCache;
   readonly browserReceiptCacheStore?: BrowserReceiptCacheStore;
   readonly now?: () => string;
 }): Promise<BrowserCommandRunResult | BrowserExecutionCommandRunResult> {
   if (input.contract.mode === "runtime") {
-    const manifestLoad = input.browserRuntimeManifest ?? validateBrowserRuntimeManifest(undefined);
+    const manifestLoad = input.browserRuntimeManifest ??
+      (input.browserExternalRuntimeManifest?.status === "valid"
+        ? input.browserExternalRuntimeManifest.runtimeManifest
+        : validateBrowserRuntimeManifest(undefined));
     const availability = decideBrowserRuntimeAvailability({
       manifestLoad,
-      executorAvailable: !!input.browserRuntimeExecutor,
+      executorAvailable: !!input.browserRuntimeExecutor || input.browserExternalRuntimeManifest?.status === "valid",
     });
     return {
       output: [
@@ -163,11 +171,19 @@ export async function runBrowserCommandAsync(input: {
         evidence: ["browser-command-runner:missing-execution-request"],
       };
     }
-    if (input.browserRuntimeManifest || input.browserRuntimeExecutor) {
+    if (input.browserRuntimeManifest || input.browserRuntimeExecutor || input.browserExternalRuntimeManifest) {
+      const manifestLoad = input.browserRuntimeManifest ??
+        (input.browserExternalRuntimeManifest?.status === "valid"
+          ? input.browserExternalRuntimeManifest.runtimeManifest
+          : undefined);
+      const executor = input.browserRuntimeExecutor ??
+        (input.browserExternalRuntimeManifest
+          ? new BrowserRuntimeAdapterExecutor(input.browserExternalRuntimeManifest, input.browserSkillRuntimeBinding)
+          : undefined);
       const runtime = await runBrowserActionLoopExecutor({
         request: input.contract.execution,
-        manifestLoad: input.browserRuntimeManifest,
-        executor: input.browserRuntimeExecutor,
+        manifestLoad,
+        executor,
         now: input.now,
       });
       return {
