@@ -41,6 +41,7 @@ export class PwAdapter implements BrowserRuntimeExecutor {
       readonly injectedClient?: PwInjectedClient;
       readonly runtimeModule?: PwRuntimeModule;
       readonly timeoutMs?: number;
+      readonly launchTimeoutMs?: number;
       readonly outputBudgetChars?: number;
     },
   ) {}
@@ -112,7 +113,7 @@ export class PwAdapter implements BrowserRuntimeExecutor {
       browser = await runtime.chromium.launch({
         headless: true,
         executablePath: this.input.status.executablePath,
-        timeout: timeoutMs,
+        timeout: Math.max(timeoutMs, this.input.launchTimeoutMs ?? 5_000),
       });
       browserLaunched = true;
       context = await browser.newContext({
@@ -162,7 +163,7 @@ export class PwAdapter implements BrowserRuntimeExecutor {
       cleanupStatus,
       warnings: [
         ...(outcome.warnings ?? []),
-        cleanupStatus === "closed" ? "pw-adapter:cleanup-closed" : "pw-adapter:cleanup-failed",
+        cleanupWarning(cleanupStatus),
       ],
       evidence: [
         ...(outcome.evidence ?? []),
@@ -213,6 +214,16 @@ export class PwAdapter implements BrowserRuntimeExecutor {
       evidence: ["pw-adapter:error"],
     };
   }
+}
+
+function cleanupWarning(cleanupStatus: PwCleanupStatus): string {
+  if (cleanupStatus === "closed") {
+    return "pw-adapter:cleanup-closed";
+  }
+  if (cleanupStatus === "close-failed") {
+    return "pw-adapter:cleanup-failed";
+  }
+  return "pw-adapter:cleanup-not-started";
 }
 
 async function loadRuntimeModule(): Promise<PwRuntimeModule> {
