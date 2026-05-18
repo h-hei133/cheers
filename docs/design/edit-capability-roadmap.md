@@ -97,6 +97,14 @@ Recommended Route 86 focus: memory injection quality/merge hardening if
 explicit injection remains stable; otherwise harden memory store lifecycle.
 This is still not broad edit readiness.
 
+Route 123 adds an explicit controlled real-browser-runtime MVP surface with
+manifest/availability/session models, DOM and accessibility snapshots,
+controlled local/test click/type action-loop policy, selector repair preview,
+runtime receipts/surfaces, and a deterministic browser eval foundation. Public
+browser automation, package dependencies, default runtime, provider/model/MCP
+calls, cookies/auth/session persistence, raw DOM/page content, and
+SessionManager schema changes remain blocked.
+
 This document records the current edit / patch / mutation capability upper
 bound and the long-range route sequence needed before broader edit support can
 be claimed. It is based on current target code, current target docs, focused

@@ -12,7 +12,7 @@ import {
   type BrowserSelfHealingCommandRequest,
 } from "./browserSelfHealingCommandContract.js";
 
-export type BrowserCommandMode = "status" | "preview" | "dry-run" | "execute" | "replay" | "repair" | "smoke";
+export type BrowserCommandMode = "status" | "preview" | "dry-run" | "execute" | "replay" | "repair" | "runtime" | "smoke";
 
 export interface BrowserCommandContract {
   readonly mode: BrowserCommandMode;
@@ -57,6 +57,15 @@ export function parseBrowserCommandArgs(args: readonly string[]): BrowserCommand
       ok: true,
       contract: { mode: "smoke" },
     };
+  }
+  if (args[0] === "runtime") {
+    if (args.length === 1 || args[1] === "status") {
+      return {
+        ok: true,
+        contract: { mode: "runtime" },
+      };
+    }
+    return invalidBrowserArgs(args.join(" "));
   }
   if (args[0] === "replay") {
     const parsed = parseBrowserReplayCommandArgs(args.slice(1));
@@ -117,11 +126,12 @@ function invalidBrowserArgs(value: string): BrowserCommandParseResult {
       "- Outcome: blocked",
       "- BlockerKind: invalid-browser-args",
       `- Reason: Unsupported /browser argument: ${value || "(empty)"}`,
-      "- DoNext: Use /browser, /browser status, /browser preview <action>, /browser dry-run <action>, /browser execute <action>, /browser replay <receipt-id>, or /browser repair status.",
+      "- DoNext: Use /browser, /browser status, /browser runtime status, /browser preview <action>, /browser dry-run <action>, /browser execute <action>, /browser replay <receipt-id>, or /browser repair status.",
       "",
       "Supported /browser forms:",
       "- /browser",
       "- /browser status",
+      "- /browser runtime status",
       "- /browser preview navigate <url>",
       "- /browser preview extract <goal>",
       "- /browser preview click <target>",

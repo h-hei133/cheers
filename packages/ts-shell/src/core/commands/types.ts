@@ -13,6 +13,8 @@ import type { BrowserExternalNetworkRunnerManifestLoadResult } from '../context/
 import type { BrowserControlledNetworkRunnerManifestLoadResult } from '../context/browserControlledNetworkRunnerManifest.js'
 import type { BrowserPublicReadOnlyWebManifestLoadResult } from '../context/browserPublicReadOnlyWebManifest.js'
 import type { BrowserPublicReadOnlyHttpClient } from '../context/browserPublicReadOnlyWebExecutor.js'
+import type { BrowserRuntimeManifestLoadResult } from '../context/browserRuntimeManifest.js'
+import type { BrowserRuntimeExecutor } from '../context/browserRuntimeExecutor.js'
 import type { BrowserActionCache } from '../context/browserActionCache.js'
 import type { BrowserReceiptCacheStore } from '../context/browserReceiptCacheStore.js'
 import type { BrowserPublicReadOnlyWebSmokeConfig } from '../harness/browserPublicReadOnlyWebSmokeConfig.js'
@@ -40,6 +42,8 @@ export interface CommandContext {
   readonly browserControlledNetworkRunnerManifest?: BrowserControlledNetworkRunnerManifestLoadResult
   readonly browserPublicReadOnlyWebManifest?: BrowserPublicReadOnlyWebManifestLoadResult
   readonly browserPublicReadOnlyHttpClient?: BrowserPublicReadOnlyHttpClient
+  readonly browserRuntimeManifest?: BrowserRuntimeManifestLoadResult
+  readonly browserRuntimeExecutor?: BrowserRuntimeExecutor
   readonly browserPublicReadOnlyWebSmokeConfig?: BrowserPublicReadOnlyWebSmokeConfig
   readonly browserActionCache?: BrowserActionCache
   readonly browserReceiptCacheStore?: BrowserReceiptCacheStore

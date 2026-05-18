@@ -13,12 +13,23 @@ import {
   runBrowserExecutionCommand,
   type BrowserExecutionCommandRunResult,
 } from "./browserExecutionCommandRunner.js";
+import { runBrowserActionLoopExecutor } from "./browserActionLoopExecutor.js";
 import type { BrowserActionCache } from "./browserActionCache.js";
 import type { BrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
 import type { BrowserExternalNetworkRunnerManifestLoadResult } from "./browserExternalNetworkRunnerManifest.js";
 import type { BrowserControlledNetworkRunnerManifestLoadResult } from "./browserControlledNetworkRunnerManifest.js";
 import type { BrowserPublicReadOnlyWebManifestLoadResult } from "./browserPublicReadOnlyWebManifest.js";
 import type { BrowserPublicReadOnlyHttpClient } from "./browserPublicReadOnlyWebExecutor.js";
+import {
+  decideBrowserRuntimeAvailability,
+  renderBrowserRuntimeStatusSurface,
+} from "./browserRuntimeAvailability.js";
+import type { BrowserRuntimeExecutor } from "./browserRuntimeExecutor.js";
+import {
+  validateBrowserRuntimeManifest,
+  type BrowserRuntimeManifestLoadResult,
+} from "./browserRuntimeManifest.js";
+import { renderBrowserRuntimeSurface } from "./browserRuntimeSurface.js";
 import type { BrowserExecutor } from "./browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
@@ -114,10 +125,31 @@ export async function runBrowserCommandAsync(input: {
   readonly browserControlledNetworkRunnerManifest?: BrowserControlledNetworkRunnerManifestLoadResult;
   readonly browserPublicReadOnlyWebManifest?: BrowserPublicReadOnlyWebManifestLoadResult;
   readonly browserPublicReadOnlyHttpClient?: BrowserPublicReadOnlyHttpClient;
+  readonly browserRuntimeManifest?: BrowserRuntimeManifestLoadResult;
+  readonly browserRuntimeExecutor?: BrowserRuntimeExecutor;
   readonly browserActionCache?: BrowserActionCache;
   readonly browserReceiptCacheStore?: BrowserReceiptCacheStore;
   readonly now?: () => string;
 }): Promise<BrowserCommandRunResult | BrowserExecutionCommandRunResult> {
+  if (input.contract.mode === "runtime") {
+    const manifestLoad = input.browserRuntimeManifest ?? validateBrowserRuntimeManifest(undefined);
+    const availability = decideBrowserRuntimeAvailability({
+      manifestLoad,
+      executorAvailable: !!input.browserRuntimeExecutor,
+    });
+    return {
+      output: [
+        renderBrowserRuntimeStatusSurface(availability),
+        "",
+        renderBrowserCliExecutionBridgeSummary(input.browserCliExecutionBridgeSummary),
+      ].join("\n"),
+      evidence: [
+        ...availability.evidence,
+        ...(input.browserCliExecutionBridgeSummary?.evidence ?? []),
+        "browser-command-runner:runtime-status",
+      ],
+    };
+  }
   if (input.contract.mode === "execute") {
     if (!input.contract.execution) {
       return {
@@ -129,6 +161,26 @@ export async function runBrowserCommandAsync(input: {
           "- DoNext: Use /browser execute navigate <url>, observe, or extract <goal>.",
         ].join("\n"),
         evidence: ["browser-command-runner:missing-execution-request"],
+      };
+    }
+    if (input.browserRuntimeManifest || input.browserRuntimeExecutor) {
+      const runtime = await runBrowserActionLoopExecutor({
+        request: input.contract.execution,
+        manifestLoad: input.browserRuntimeManifest,
+        executor: input.browserRuntimeExecutor,
+        now: input.now,
+      });
+      return {
+        output: [
+          renderBrowserRuntimeSurface(runtime),
+          "",
+          renderBrowserCliExecutionBridgeSummary(input.browserCliExecutionBridgeSummary),
+        ].join("\n"),
+        evidence: [
+          ...runtime.evidence,
+          ...(input.browserCliExecutionBridgeSummary?.evidence ?? []),
+          "browser-command-runner:runtime-execute",
+        ],
       };
     }
     return runBrowserExecutionCommand({
