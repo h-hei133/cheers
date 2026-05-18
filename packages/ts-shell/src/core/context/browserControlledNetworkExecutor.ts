@@ -4,6 +4,14 @@ import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
 import type { BrowserControlledNetworkRunnerManifest } from "./browserControlledNetworkRunnerManifest.js";
 import type { BrowserControlledNetworkPolicyDecision } from "./browserControlledNetworkPolicy.js";
 import { browserControlledNetworkTargetUrl } from "./browserControlledNetworkOrigin.js";
+import {
+  decideBrowserNetworkEgress,
+} from "./browserNetworkEgressGuard.js";
+import { decideBrowserRedirectPolicy } from "./browserRedirectPolicy.js";
+import {
+  createBrowserNetworkAuditRecord,
+  type BrowserNetworkAuditRecord,
+} from "./browserNetworkAuditRecord.js";
 
 export type BrowserControlledNetworkRequestStatus =
   | "executed"
@@ -24,6 +32,7 @@ export interface BrowserControlledNetworkExecutorResult {
   readonly redactions: readonly string[];
   readonly warnings: readonly string[];
   readonly errorSummary?: string;
+  readonly auditRecord?: BrowserNetworkAuditRecord;
   readonly evidence: readonly string[];
 }
 
@@ -51,6 +60,29 @@ export async function runBrowserControlledNetworkExecutor(input: {
       evidence: ["browser-controlled-network-executor:target-outside-origin"],
     });
   }
+  const preflightEgress = decideBrowserNetworkEgress({
+    request: input.request,
+    requestedUrl: url.toString(),
+    allowedOrigins: [input.manifest.allowedLoopbackOrigin],
+    controlledOrigin: input.manifest.allowedLoopbackOrigin,
+    networkMode: "controlled-only",
+    outputBudgetBytes: input.manifest.outputBudgetBytes,
+  });
+  if (!preflightEgress.allowed) {
+    const auditRecord = createBrowserNetworkAuditRecord({
+      request: input.request,
+      egressDecision: preflightEgress,
+      outputBudgetBytes: input.manifest.outputBudgetBytes,
+    });
+    return result("blocked", {
+      executed: false,
+      errorSummary: preflightEgress.reason,
+      redactions: auditRecord.redactions,
+      warnings: auditRecord.warnings,
+      auditRecord,
+      evidence: auditRecord.evidence,
+    });
+  }
   try {
     const response = await (input.httpGet ?? controlledHttpGet)(
       url,
@@ -58,26 +90,60 @@ export async function runBrowserControlledNetworkExecutor(input: {
       input.manifest.outputBudgetBytes,
     );
     if (response.redirectLocation) {
-      const redirect = new URL(response.redirectLocation, url);
-      if (redirect.origin !== input.manifest.allowedLoopbackOrigin) {
+      const redirectPolicy = decideBrowserRedirectPolicy({
+        request: input.request,
+        requestedUrl: url.toString(),
+        redirectTarget: response.redirectLocation,
+        allowedOrigins: [input.manifest.allowedLoopbackOrigin],
+        controlledOrigin: input.manifest.allowedLoopbackOrigin,
+        outputBudgetBytes: input.manifest.outputBudgetBytes,
+      });
+      const auditRecord = createBrowserNetworkAuditRecord({
+        request: input.request,
+        egressDecision: preflightEgress,
+        redirectDecision: redirectPolicy,
+        statusCode: response.statusCode,
+        outputBytes: response.bodyBytes,
+        outputBudgetBytes: input.manifest.outputBudgetBytes,
+      });
+      if (!redirectPolicy.allowed) {
         return result("redirect-blocked", {
           executed: false,
           statusCode: response.statusCode,
           errorSummary: "Redirect target left the controlled loopback origin.",
-          redactions: response.redactions,
-          warnings: ["redirect-blocked"],
-          evidence: response.evidence,
+          redactions: [...response.redactions, ...auditRecord.redactions],
+          warnings: ["redirect-blocked", ...auditRecord.warnings],
+          auditRecord,
+          evidence: [...response.evidence, ...auditRecord.evidence],
         });
       }
     }
+    const auditRecord = createBrowserNetworkAuditRecord({
+      request: input.request,
+      egressDecision: response.truncated
+        ? decideBrowserNetworkEgress({
+            request: input.request,
+            requestedUrl: url.toString(),
+            allowedOrigins: [input.manifest.allowedLoopbackOrigin],
+            controlledOrigin: input.manifest.allowedLoopbackOrigin,
+            networkMode: "controlled-only",
+            outputBudgetBytes: input.manifest.outputBudgetBytes,
+            observedOutputBytes: response.bodyBytes,
+          })
+        : preflightEgress,
+      statusCode: response.statusCode,
+      outputBytes: response.bodyBytes,
+      outputBudgetBytes: input.manifest.outputBudgetBytes,
+    });
     if (response.truncated || hasForbiddenContent(response.body)) {
       return result("unsafe-output", {
         executed: false,
         statusCode: response.statusCode,
         errorSummary: "Controlled-network response was unsafe or over budget.",
-        redactions: [...response.redactions, "unsafe-output"],
-        warnings: ["unsafe-output"],
-        evidence: response.evidence,
+        redactions: [...response.redactions, "unsafe-output", ...auditRecord.redactions],
+        warnings: ["unsafe-output", ...auditRecord.warnings],
+        auditRecord,
+        evidence: [...response.evidence, ...auditRecord.evidence],
       });
     }
     return result("executed", {
@@ -86,7 +152,8 @@ export async function runBrowserControlledNetworkExecutor(input: {
       safeTitle: extractTitle(response.body),
       safeSummary: summarizeBody(input.request.actionKind, response.body, response.statusCode),
       redactions: response.redactions,
-      evidence: response.evidence,
+      auditRecord,
+      evidence: [...response.evidence, ...auditRecord.evidence],
     });
   } catch (error) {
     const code = error instanceof Error && error.message === "controlled-network-timeout"
@@ -104,6 +171,7 @@ export async function runBrowserControlledNetworkExecutor(input: {
 export interface ControlledHttpResponse {
   readonly statusCode: number;
   readonly body: string;
+  readonly bodyBytes: number;
   readonly redirectLocation?: string;
   readonly truncated: boolean;
   readonly redactions: readonly string[];
@@ -135,6 +203,7 @@ function controlledHttpGet(
         resolve({
           statusCode: response.statusCode ?? 0,
           body: sanitizeBrowserText(Buffer.concat(chunks).toString("utf8"), outputBudgetBytes),
+          bodyBytes: size,
           redirectLocation: response.headers.location,
           truncated,
           redactions: [],
@@ -170,6 +239,7 @@ function result(
     redactions: unique(input.redactions ?? []),
     warnings: unique(input.warnings ?? []),
     errorSummary: input.errorSummary,
+    auditRecord: input.auditRecord,
     evidence: [
       ...(input.evidence ?? []),
       `browser-controlled-network-executor:${status}`,

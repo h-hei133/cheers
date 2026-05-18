@@ -13,6 +13,7 @@ export function renderBrowserExternalNetworkHandoffSurface(
     `- Simulated handoff: ${safe(receipt.handoffStatus)}`,
     "- Real network execution: no",
     "- Browser launched: no",
+    "- Future public egress guard: required",
     `- Receipt: ${safe(receipt.receiptId, 180)}`,
     `- Evidence summary: ${safe(receipt.evidenceSummary, 240)}`,
     `- Redactions/warnings: ${[...receipt.redactions, ...receipt.warnings].length === 0 ? "none" : [...receipt.redactions, ...receipt.warnings].map((item) => safe(item)).join(", ")}`,

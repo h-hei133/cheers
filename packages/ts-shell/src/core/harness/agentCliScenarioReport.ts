@@ -122,7 +122,9 @@ function summarizeControlledNetwork(output: string): string {
   const executed = section.match(/^- Executed:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
   const status = section.match(/^- Status:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
   const policy = section.match(/^- Policy:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
-  return `${executed === "yes" ? "executed" : "blocked"}/${policy}/${status}`;
+  const egress = section.match(/^- Egress decision:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const audit = section.match(/^- Egress audit:\s*(.+)$/im)?.[1]?.trim() ?? "none";
+  return `${executed === "yes" ? "executed" : "blocked"}/${policy}/${status}/egress=${egress}/audit=${audit}`;
 }
 
 function summarizeRepairApply(output: string): string {

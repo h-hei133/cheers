@@ -1,5 +1,6 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import type { BrowserControlledNetworkReceipt } from "./browserControlledNetworkReceipt.js";
+import { renderBrowserNetworkEgressSurface } from "./browserNetworkEgressSurface.js";
 
 export function renderBrowserControlledNetworkSurface(
   receipt: BrowserControlledNetworkReceipt,
@@ -14,9 +15,12 @@ export function renderBrowserControlledNetworkSurface(
     `- Executed: ${receipt.executed ? "yes" : "no"}`,
     `- Evidence summary: ${safe(receipt.safeSummary, 240)}`,
     `- Receipt: ${safe(receipt.receiptId, 180)}`,
+    `- Egress decision: ${safe(receipt.egressDecision ?? "none")}`,
+    `- Egress audit: ${safe(receipt.egressAuditId ?? "none")}`,
     `- Status: ${safe(receipt.requestStatus)}; ${safe(receipt.statusCodeSummary)}`,
     `- Redactions/warnings: ${[...receipt.redactions, ...receipt.warnings].length === 0 ? "none" : [...receipt.redactions, ...receipt.warnings].map((item) => safe(item)).join(", ")}`,
     `- Next action: ${safe(receipt.nextAction, 240)}`,
+    ...(receipt.egressAudit ? ["", renderBrowserNetworkEgressSurface(receipt.egressAudit)] : []),
   ].join("\n");
 }
 

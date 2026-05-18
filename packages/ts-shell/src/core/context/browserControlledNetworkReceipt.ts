@@ -3,6 +3,7 @@ import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
 import type { BrowserControlledNetworkRunnerManifest } from "./browserControlledNetworkRunnerManifest.js";
 import type { BrowserControlledNetworkPolicyDecision } from "./browserControlledNetworkPolicy.js";
 import type { BrowserControlledNetworkExecutorResult } from "./browserControlledNetworkExecutor.js";
+import type { BrowserNetworkAuditRecord } from "./browserNetworkAuditRecord.js";
 
 export interface BrowserControlledNetworkReceipt {
   readonly receiptId: string;
@@ -21,6 +22,9 @@ export interface BrowserControlledNetworkReceipt {
   readonly warnings: readonly string[];
   readonly executed: boolean;
   readonly nextAction: string;
+  readonly egressAuditId?: string;
+  readonly egressDecision?: string;
+  readonly egressAudit?: BrowserNetworkAuditRecord;
   readonly evidence: readonly string[];
 }
 
@@ -49,6 +53,9 @@ export function createBrowserControlledNetworkReceipt(input: {
     nextAction: input.executor.executed
       ? "Use the controlled-network evidence only as test harness proof; public internet remains blocked."
       : input.policy.nextAction,
+    egressAuditId: input.executor.auditRecord?.auditId,
+    egressDecision: input.executor.auditRecord?.egressDecision,
+    egressAudit: input.executor.auditRecord,
     evidence: [
       ...input.policy.evidence,
       ...input.executor.evidence,
