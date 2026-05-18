@@ -1,13 +1,14 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import type { BrowserSelfHealingApplyResult } from "./browserSelfHealingApplyExecutor.js";
 import type { BrowserSelfHealingApplyPlan } from "./browserSelfHealingApplyPlan.js";
+import { renderBrowserSelfHealingManifestPatchSurface } from "./browserSelfHealingManifestPatchSurface.js";
 
 export function renderBrowserSelfHealingApplySurface(input: {
   readonly plan: BrowserSelfHealingApplyPlan;
   readonly result?: BrowserSelfHealingApplyResult;
 }): string {
   const result = input.result;
-  return [
+  const lines = [
     "Browser self-healing apply",
     "Result",
     `- Outcome: ${result ? (result.applied ? "applied" : "blocked") : "status"}`,
@@ -20,6 +21,7 @@ export function renderBrowserSelfHealingApplySurface(input: {
     `- Replay executed: ${result?.replayExecuted ? "yes" : "no"}`,
     `- Metadata/cache changed: ${result?.metadataCacheChanged ?? "no"}`,
     `- Change summary: ${safe(result?.changedSummary ?? "none", 220)}`,
+    `- Manifest patch: ${result?.manifestPatch ? result.manifestPatch.manifestPatchStatus : "none"}`,
     `- Required context: ${safe(input.plan.requiredExplicitContext)}`,
     `- User confirmation required: ${input.plan.requiredUserConfirmation ? "yes" : "no"}`,
     `- Warnings/blockers: ${summarize([...(result?.blockers ?? input.plan.blockers), ...(result?.warnings ?? input.plan.warnings)])}`,
@@ -27,7 +29,11 @@ export function renderBrowserSelfHealingApplySurface(input: {
     "- Automatic replay: no",
     "- Browser execution change: no",
     `- Next action: ${safe(result?.nextAction ?? input.plan.nextAction, 240)}`,
-  ].join("\n");
+  ];
+  if (result?.manifestPatch) {
+    lines.push("", renderBrowserSelfHealingManifestPatchSurface(result.manifestPatch));
+  }
+  return lines.join("\n");
 }
 
 export function renderBrowserSelfHealingStatusSurface(): string {

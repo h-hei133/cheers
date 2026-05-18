@@ -147,6 +147,7 @@ describe("sidebar command event adapter", () => {
           "- Proposal kind: repair-cache",
           "- Apply status: apply-allowed",
           "- Metadata/cache changed: yes",
+          "- Manifest patch: patch-allowed",
           "- Browser executed: no",
           "- Replay executed: no",
           "RAW_APPLY_CONTENT sk-secret1234567890 hidden reasoning",
@@ -157,6 +158,7 @@ describe("sidebar command event adapter", () => {
     expect(event.title).toBe("Browser repair");
     expect(event.summary).toContain("Apply status: apply-allowed");
     expect(event.summary).toContain("Metadata/cache changed: yes");
+    expect(event.summary).toContain("Manifest patch: patch-allowed");
     expect(event.summary).not.toContain("RAW_APPLY_CONTENT");
     expect(event.summary).not.toContain("sk-secret");
   });

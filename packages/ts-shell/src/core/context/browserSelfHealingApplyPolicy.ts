@@ -66,7 +66,7 @@ export function decideBrowserSelfHealingApplyPolicy(input: {
     if (!input.hasExplicitManifestContext) {
       return decision("apply-needs-explicit-context", false, "Runner, skill, fixture, and retry metadata apply require an explicit local/test manifest context.", "explicit local/test manifest", true, ["missing-explicit-manifest-context"], [], "Provide an explicit local/test manifest context.");
     }
-    return decision("apply-blocked-unsupported", false, "Safe manifest write support is not available in this route.", "manifest write helper", false, ["manifest-write-helper-missing"], ["apply-plan-created-without-manifest-mutation"], "Keep this as a plan, or add a dedicated manifest writer route.");
+    return confirmable(input.userConfirmed, "explicit local/test manifest", "Patch explicit local/test manifest metadata.");
   }
   return decision("apply-blocked-unsupported", false, "Unsupported self-healing proposal kind.", "supported proposal kind", false, ["unsupported-proposal-kind"], [], "Use a supported browser self-healing proposal.");
 }

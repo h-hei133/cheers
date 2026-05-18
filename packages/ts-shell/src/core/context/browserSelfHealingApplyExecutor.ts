@@ -1,5 +1,7 @@
 import type { BrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
 import type { BrowserSelfHealingApplyPlan } from "./browserSelfHealingApplyPlan.js";
+import { writeBrowserSelfHealingManifestPatch, type BrowserSelfHealingManifestPatchWriteResult } from "./browserSelfHealingManifestPatchWriter.js";
+import type { BrowserSelfHealingManifestPatchKind } from "./browserSelfHealingManifestPatch.js";
 
 export interface BrowserSelfHealingApplyResult {
   readonly proposalId: string;
@@ -11,6 +13,7 @@ export interface BrowserSelfHealingApplyResult {
   readonly replayExecuted: false;
   readonly metadataCacheChanged: "yes" | "no";
   readonly changedSummary: string;
+  readonly manifestPatch?: BrowserSelfHealingManifestPatchWriteResult;
   readonly blockers: readonly string[];
   readonly warnings: readonly string[];
   readonly nextAction: string;
@@ -20,6 +23,7 @@ export interface BrowserSelfHealingApplyResult {
 export function executeBrowserSelfHealingApply(input: {
   readonly plan: BrowserSelfHealingApplyPlan;
   readonly receiptCacheStore?: BrowserReceiptCacheStore;
+  readonly manifestPath?: string;
 }): BrowserSelfHealingApplyResult {
   const plan = input.plan;
   if (plan.applyStatus !== "apply-allowed") {
@@ -81,6 +85,25 @@ export function executeBrowserSelfHealingApply(input: {
       ],
     });
   }
+  const manifestPatchKind = manifestPatchKindForPlan(plan);
+  if (manifestPatchKind) {
+    const manifestPatch = writeBrowserSelfHealingManifestPatch({
+      proposalId: plan.proposalId,
+      patchKind: manifestPatchKind,
+      manifestPath: input.manifestPath,
+    });
+    return result({
+      plan,
+      applied: manifestPatch.applied,
+      metadataCacheChanged: manifestPatch.applied ? "yes" : "no",
+      changedSummary: manifestPatch.changedSummary,
+      manifestPatch,
+      blockers: manifestPatch.blockers,
+      warnings: manifestPatch.warnings,
+      nextAction: manifestPatch.nextAction,
+      evidence: manifestPatch.evidence,
+    });
+  }
   return result({
     plan,
     applied: false,
@@ -98,6 +121,7 @@ function result(input: {
   readonly applied: boolean;
   readonly metadataCacheChanged: "yes" | "no";
   readonly changedSummary: string;
+  readonly manifestPatch?: BrowserSelfHealingManifestPatchWriteResult;
   readonly blockers: readonly string[];
   readonly warnings: readonly string[];
   readonly nextAction: string;
@@ -113,6 +137,7 @@ function result(input: {
     replayExecuted: false,
     metadataCacheChanged: input.metadataCacheChanged,
     changedSummary: input.changedSummary,
+    manifestPatch: input.manifestPatch,
     blockers: input.blockers,
     warnings: input.warnings,
     nextAction: input.nextAction,
@@ -122,4 +147,22 @@ function result(input: {
       "browser-self-healing-apply-executor:metadata-cache-only",
     ],
   };
+}
+
+function manifestPatchKindForPlan(
+  plan: BrowserSelfHealingApplyPlan,
+): BrowserSelfHealingManifestPatchKind | undefined {
+  if (plan.proposalKind === "add-runner-binding" || plan.proposalKind === "retry-local-runner") {
+    return "add-runner-binding";
+  }
+  if (plan.proposalKind === "add-skill-metadata") {
+    return "add-skill-metadata";
+  }
+  if (plan.proposalKind === "update-allowlist") {
+    return "update-allowlist-local-fixture";
+  }
+  if (plan.proposalKind === "refresh-fixture") {
+    return "refresh-fixture-summary";
+  }
+  return undefined;
 }

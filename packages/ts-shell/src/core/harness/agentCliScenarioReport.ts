@@ -89,7 +89,8 @@ function summarizeRepairApply(output: string): string {
   const outcome = output.match(/^- Outcome:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
   const target = output.match(/^- Target:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
   const changed = output.match(/^- Metadata\/cache changed:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
-  return `${outcome}/${target}/changed=${changed}`;
+  const manifestPatch = output.match(/^- Manifest patch:\s*(.+)$/im)?.[1]?.trim() ?? "none";
+  return `${outcome}/${target}/changed=${changed}/manifestPatch=${manifestPatch}`;
 }
 
 function summarizeSelfHealing(output: string): string {

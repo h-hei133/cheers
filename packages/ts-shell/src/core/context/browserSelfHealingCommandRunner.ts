@@ -42,14 +42,15 @@ export function runBrowserSelfHealingCommand(input: {
     proposalId: input.request.proposalId ?? "none",
     proposalKind,
     hasExplicitCacheContext: Boolean(input.receiptCacheStore),
-    hasExplicitManifestContext: Boolean(input.cliExecutionBridgeSummary?.manifestStatus === "valid"),
+    hasExplicitManifestContext: Boolean(input.request.manifestPath || input.cliExecutionBridgeSummary?.manifestStatus === "valid"),
     hasExplicitConfirmationContext: Boolean(input.confirmations),
-    hasExplicitAllowlistContext: Boolean(input.networkAllowlist),
+    hasExplicitAllowlistContext: Boolean(input.request.manifestPath || input.networkAllowlist),
     userConfirmed: input.request.userConfirmed,
   });
   const result = executeBrowserSelfHealingApply({
     plan,
     receiptCacheStore: input.receiptCacheStore,
+    manifestPath: input.request.manifestPath,
   });
   return {
     output: renderBrowserSelfHealingApplySurface({ plan, result }),

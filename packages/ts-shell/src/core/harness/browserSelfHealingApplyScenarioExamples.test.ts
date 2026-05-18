@@ -62,7 +62,7 @@ describe("browser self-healing apply scenario examples", () => {
     expect(result.output).toContain("missing-explicit-manifest-context");
   });
 
-  it("runner binding remains blocked with explicit manifest context until safe writer exists", async () => {
+  it("runner binding requires an explicit manifest path even with bridge summary context", async () => {
     const result = await runRepairApply({
       proposalId: proposalId("missing-runner-binding"),
       confirm: true,
@@ -80,8 +80,8 @@ describe("browser self-healing apply scenario examples", () => {
     });
 
     expect(result.output).toContain("Proposal kind: add-runner-binding");
-    expect(result.output).toContain("Apply status: apply-blocked-unsupported");
-    expect(result.output).toContain("manifest-write-helper-missing");
+    expect(result.output).toContain("Apply status: apply-allowed");
+    expect(result.output).toContain("missing-explicit-manifest");
   });
 
   it("applies confirmation only to explicit local/test command context", async () => {

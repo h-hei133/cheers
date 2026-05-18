@@ -5,6 +5,7 @@ export type BrowserSelfHealingCommandMode = "status" | "apply";
 export interface BrowserSelfHealingCommandRequest {
   readonly mode: BrowserSelfHealingCommandMode;
   readonly proposalId?: string;
+  readonly manifestPath?: string;
   readonly userConfirmed: boolean;
   readonly sourceCommand: "/browser repair";
 }
@@ -23,7 +24,16 @@ export function parseBrowserSelfHealingCommandArgs(
     return invalid("Unsupported browser repair command.");
   }
   const userConfirmed = args.includes("--confirm");
-  const proposalId = sanitizeBrowserText(args.filter((arg) => arg !== "apply" && arg !== "--confirm").join(" "), 240);
+  const manifestIndex = args.indexOf("--manifest");
+  const manifestPath = manifestIndex >= 0
+    ? sanitizeBrowserText(args[manifestIndex + 1] ?? "", 240)
+    : undefined;
+  const proposalId = sanitizeBrowserText(args.filter((arg, index) =>
+    arg !== "apply" &&
+    arg !== "--confirm" &&
+    arg !== "--manifest" &&
+    index !== manifestIndex + 1
+  ).join(" "), 240);
   if (!proposalId) {
     return invalid("Missing self-healing proposal id.");
   }
@@ -32,6 +42,7 @@ export function parseBrowserSelfHealingCommandArgs(
     request: {
       mode: "apply",
       proposalId,
+      manifestPath,
       userConfirmed,
       sourceCommand: "/browser repair",
     },
