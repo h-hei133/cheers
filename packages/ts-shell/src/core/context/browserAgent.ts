@@ -1,4 +1,8 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
+import {
+  planBrowserTransaction,
+  type BrowserTxnPlan,
+} from "./browserPlan.js";
 import type { BrowserToolName } from "./browserToolPolicy.js";
 
 export interface BrowserAgentAction {
@@ -8,6 +12,7 @@ export interface BrowserAgentAction {
 
 export interface BrowserAgentPlan {
   readonly reason: string;
+  readonly transactionPlan?: BrowserTxnPlan;
   readonly actions: readonly BrowserAgentAction[];
   readonly continuationSummary?: string;
   readonly evidence: readonly string[];
@@ -33,6 +38,20 @@ export function detectBrowserAgentPlan(input: {
 
   if (!hasBrowserCue(normalized)) {
     return undefined;
+  }
+
+  const transactionPlan = planBrowserTransaction({ prompt: input.prompt });
+  if (transactionPlan) {
+    return {
+      reason: transactionPlan.planner.reason,
+      transactionPlan,
+      actions: [],
+      evidence: [
+        "browser-agent:transaction-selected",
+        `browser-agent:transaction-id:${transactionPlan.transactionId}`,
+        ...transactionPlan.planner.evidence,
+      ],
+    };
   }
 
   const page = selectFixture(normalized, input.prompt);
@@ -155,6 +174,9 @@ function browserEvidenceFromContinuity(continuityState: unknown): readonly strin
   }
   return evidence
     .filter((entry): entry is string => typeof entry === "string")
-    .filter((entry) => entry.startsWith("browser-agent-observation:"))
+    .filter((entry) =>
+      entry.startsWith("browser-agent-observation:") ||
+      entry.startsWith("browser-agent-transaction:")
+    )
     .slice(0, 6);
 }

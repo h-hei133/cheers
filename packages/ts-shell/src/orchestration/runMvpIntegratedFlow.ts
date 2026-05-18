@@ -17,6 +17,11 @@ import {
   browserObservationEvidenceLine,
   browserObservationFromMetadata,
 } from "../core/context/browserObs.js";
+import { executeBrowserTransaction } from "../core/context/browserTxn.js";
+import {
+  browserTxnEvidenceLine,
+  formatBrowserTxnResult,
+} from "../core/context/browserTxnEvidence.js";
 import { getPwRuntimeStatus, type PwRuntimeStatus } from "../core/context/pwRuntime.js";
 import {
   rebindPathLikeToWorkspace,
@@ -220,6 +225,7 @@ export async function runMvpIntegratedFlow(
     dispatcher,
     workflowContext,
     mcpSnapshot,
+    browserRuntimeStatus,
     options.providerMode ?? "synthetic",
     options.realProvider,
     options.agentMode ?? "build",
@@ -292,6 +298,7 @@ export async function* streamMvpIntegratedFlow(
     dispatcher,
     workflowContext,
     mcpSnapshot,
+    browserRuntimeStatus,
     options.providerMode ?? "synthetic",
     options.realProvider,
     options.agentMode ?? "build",
@@ -362,6 +369,7 @@ function createIntegratedRunner(
   dispatcher: ToolDispatcher,
   workflowContext: ReturnType<typeof getWorkflowGitContext>,
   mcpSnapshot: Awaited<ReturnType<CoreMcpGateway["snapshot"]>>,
+  browserRuntimeStatus: PwRuntimeStatus,
   providerMode: "synthetic" | "real",
   realProvider?: MvpIntegratedFlowOptions["realProvider"],
   agentMode: "plan" | "build" = "build",
@@ -479,6 +487,7 @@ function createIntegratedRunner(
         freshnessObservability,
         prompt: cleanPrompt,
         dispatcher,
+        browserRuntimeStatus,
         sessionId: sharedContext.sessionId,
         turn,
         workspaceRoot,
@@ -659,7 +668,7 @@ function buildWorkflowTaskPlan(
       browserPlan,
       inspectFirst: false,
       verifyAfterEdit: false,
-      usedRestoredState: browserPlan.actions.length === 0,
+      usedRestoredState: Boolean(browserPlan.continuationSummary),
     };
   }
   if (
@@ -3726,6 +3735,7 @@ async function executeBrowserWorkflowTaskPlan(input: {
   readonly plan: BrowserAgentPlan;
   readonly freshnessObservability: FreshnessObservability;
   readonly dispatcher: ToolDispatcher;
+  readonly browserRuntimeStatus: PwRuntimeStatus;
   readonly sessionId: string;
   readonly turn: number;
   readonly workspaceRoot: string;
@@ -3764,6 +3774,59 @@ async function executeBrowserWorkflowTaskPlan(input: {
       taskVerdict: "satisfied",
       taskReasons: [],
       userFacingOutput: output,
+    });
+    return { events, notes, ...projected };
+  }
+
+  if (input.plan.transactionPlan) {
+    const transaction = await executeBrowserTransaction(input.plan.transactionPlan, {
+      runtimeStatus: input.browserRuntimeStatus,
+    });
+    evidence.push(browserTxnEvidenceLine(transaction));
+    evidence.push([
+      "browser-agent-observation",
+      transaction.evidenceId,
+      "transaction",
+      transaction.status,
+      transaction.reasonCode,
+      transaction.cleanupStatus,
+      transaction.finalSummary,
+    ].join(":"));
+    evidence.push(...transaction.evidence);
+    notes.push(
+      `browser-transaction: ${transaction.status} ${transaction.reasonCode} repair=${transaction.repairStatus} cleanup=${transaction.cleanupStatus}`,
+    );
+    const failed = transaction.status !== "success";
+    const projected = projectRuntimeCodingOutcome({
+      taskKind: "browser",
+      changedFiles: [],
+      failedFiles: failed
+        ? [{ path: "(browser)", reason: transaction.finalSummary }]
+        : [],
+      patches: [],
+      verifiedFiles: [],
+      unverifiedFiles: [],
+      verification: failed
+        ? {
+            status: "blocked",
+            reason: transaction.finalSummary,
+            selectionScope: "focused",
+            selectionSource: "auto-from-changes",
+            blockerKind: "unknown",
+            nextAction: transaction.nextActions[0] ?? "Retry only within controlled local browser policy.",
+          }
+        : { status: "passed", selectionScope: "focused", selectionSource: "auto-from-changes" },
+      repairNotes: transaction.repairStatus === "not-needed"
+        ? ["browser transaction completed without repair"]
+        : [`browser transaction repair ${transaction.repairStatus}`],
+      evidence: [
+        ...evidence,
+        `browser-agent-result:${failed ? "stopped" : "success"}`,
+        `browser-agent-reason:${transaction.reasonCode}`,
+      ],
+      taskVerdict: failed ? "insufficient-evidence" : "satisfied",
+      taskReasons: failed ? [transaction.finalSummary] : [],
+      userFacingOutput: formatBrowserTxnResult(transaction),
     });
     return { events, notes, ...projected };
   }
@@ -3862,6 +3925,7 @@ async function executeWorkflowTaskPlan(input: {
   readonly freshnessObservability: FreshnessObservability;
   readonly prompt: string;
   readonly dispatcher: ToolDispatcher;
+  readonly browserRuntimeStatus: PwRuntimeStatus;
   readonly sessionId: string;
   readonly turn: number;
   readonly workspaceRoot: string;
@@ -3920,6 +3984,7 @@ async function executeWorkflowTaskPlan(input: {
       plan: input.plan.browserPlan,
       freshnessObservability: input.freshnessObservability,
       dispatcher: input.dispatcher,
+      browserRuntimeStatus: input.browserRuntimeStatus,
       sessionId: input.sessionId,
       turn: input.turn,
       workspaceRoot: input.workspaceRoot,

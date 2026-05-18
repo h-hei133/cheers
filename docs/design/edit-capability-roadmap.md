@@ -1680,3 +1680,16 @@ agent-loop validation for observe/click/type, timeout, target-missing,
 unavailable, and policy-blocked paths. Recommended Route 129: add a same-page
 controlled action sequence abstraction for observe -> click/type -> extract
 without broad browser autonomy or session persistence.
+
+Route 129 adds same-page controlled browser transactions on top of Route 128:
+`observe -> extract`, `observe -> click -> extract`,
+`observe -> type -> extract`, and optional one-step re-observe all run on one
+temporary Direct Playwright page with mandatory cleanup and no cross-session
+page persistence. The planner is deterministic and local-only; low-confidence
+plans stop before runtime. One-step repair is limited to a single safe
+role/name candidate from the prior observation, with repair success/failure
+summarized in transaction evidence. Focused real-browser transaction,
+agent-loop, and `/continue` tests cover same-page state, repair, timeout,
+unavailable runtime, redaction, and cleanup evidence. Recommended Route 130:
+add a trace/report closeout surface for deterministic transaction comparisons
+without public web, provider calls, MCP live backend, or broad browser autonomy.
