@@ -1595,10 +1595,12 @@ automatic repair/replay and no browser execution changes. Route 114 adds an
 explicit local/test manifest patch writer for metadata-safe self-healing
 repairs covering runner binding, skill metadata, local-fixture allowlist, and
 fixture summary refresh. It adds no automatic repair/replay and no browser
-execution changes. Recommended Route 115: self-healing apply cross-process CLI
-harness or browser replay UX/report polish. Do not treat
+execution changes. Route 115 adds real CLI cross-process harness evidence for
+explicit self-healing manifest repair while preserving no automatic
+repair/replay and no browser execution changes. Recommended Route 116: replay
+UX/report polish or a separate external-network execution design. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
 Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, Route 104,
 Route 105, Route 106, Route 107, Route 108, Route 109, Route 110, Route 111,
-Route 112, Route 113, or Route 114 as edit-capability expansions.
+Route 112, Route 113, Route 114, or Route 115 as edit-capability expansions.

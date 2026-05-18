@@ -1,4 +1,5 @@
 import type { AgentCliScenarioResult } from "./agentCliScenarioModel.js";
+import { summarizeBrowserSelfHealingApplyCliScenario } from "./browserSelfHealingApplyCliReport.js";
 
 export function renderAgentCliScenarioReport(
   result: AgentCliScenarioResult,
@@ -16,6 +17,7 @@ export function renderAgentCliScenarioReport(
     `- Assertions: ${passedAssertions} passed, ${failedAssertions} failed`,
     `- Safety checks: ${passedSafety} passed, ${failedSafety} failed`,
     `- Browser execution evidence: ${browserSummary}`,
+    `- Browser repair CLI evidence: ${summarizeBrowserRepairCliEvidence(result)}`,
     `- Blockers: ${result.blockers.length === 0 ? "none" : result.blockers.join("; ")}`,
     `- Next action: ${result.nextAction ?? "none"}`,
     `- Redactions: ${result.redactions.length === 0 ? "none" : result.redactions.join(", ")}`,
@@ -30,6 +32,21 @@ export function renderAgentCliScenarioReport(
       ].join("\n"),
     ),
   ].join("\n");
+}
+
+function summarizeBrowserRepairCliEvidence(
+  result: AgentCliScenarioResult,
+): string {
+  if (!result.steps.some((step) => /Browser self-healing apply/i.test(step.process.output.combined))) {
+    return "none";
+  }
+  return summarizeBrowserSelfHealingApplyCliScenario(result)
+    .split(/\r?\n/)
+    .filter((line) =>
+      /^- (Manifest patched|Browser executed|Replay executed automatically|Raw manifest exposed):/i.test(line),
+    )
+    .map((line) => line.replace(/^- /, ""))
+    .join("; ");
 }
 
 function summarizeBrowserExecutionEvidence(
