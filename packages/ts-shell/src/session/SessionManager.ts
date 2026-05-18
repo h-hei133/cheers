@@ -2452,6 +2452,10 @@ export class SessionManager {
       "current-permission-request-project-root:",
       "current-permission-request-source:",
       "current-permission-request-lineage:",
+      "browser-agent-observation:",
+      "browser-observation:",
+      "browser-agent-result:",
+      "browser-agent-reason:",
     ];
 
     for (const entry of evidence) {

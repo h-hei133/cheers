@@ -14,6 +14,8 @@ import {
   classifyUnknownMcpFailure,
   mcpFailureMetadata,
 } from '../mcp/errorTaxonomy.js'
+import { createBrowserToolDefinitions } from '../context/browserTool.js'
+import type { PwRuntimeStatus } from '../context/pwRuntime.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
@@ -106,6 +108,7 @@ function daemonUnavailableResult(
 export function createCoreToolRegistry(options?: {
   mcpTools?: readonly McpToolDescriptor[]
   mcpGateway?: CoreMcpGateway
+  browserRuntimeStatus?: PwRuntimeStatus
 }): ReadonlyMap<string, ToolDefinition> {
   const tools: ToolDefinition[] = [
     {
@@ -251,6 +254,10 @@ export function createCoreToolRegistry(options?: {
       },
     },
   ]
+
+  tools.push(...createBrowserToolDefinitions({
+    runtimeStatus: options?.browserRuntimeStatus,
+  }))
 
   for (const tool of options?.mcpTools ?? []) {
     tools.push({

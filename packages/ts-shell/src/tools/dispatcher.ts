@@ -1,5 +1,6 @@
 import type { SandboxEnforcer } from '../sandbox/sandboxEnforcer.js'
 import type { RuntimeConfig } from '../config/runtimeConfig.js'
+import type { PwRuntimeStatus } from '../core/context/pwRuntime.js'
 import type { CoreMcpGateway } from '../core/mcp/gateway.js'
 import type { McpToolDescriptor } from '../core/mcp/types.js'
 import { ToolRuntime } from '../core/tools/runtime.js'
@@ -14,6 +15,7 @@ export class ToolDispatcher {
       mcpTools?: readonly McpToolDescriptor[]
       mcpGateway?: CoreMcpGateway
       runtimeConfig?: RuntimeConfig
+      browserRuntimeStatus?: PwRuntimeStatus
     },
   ) {
     this.runtime = new ToolRuntime(enforcer, options)

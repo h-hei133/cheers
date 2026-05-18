@@ -43,6 +43,7 @@ export type CodingTaskKind =
   | 'write-file'
   | 'edit-file'
   | 'run-command'
+  | 'browser'
 
 export type CodingVerificationStatus = 'passed' | 'failed' | 'blocked' | 'skipped' | 'not-requested'
 export type CodingVerificationSelectionScope = 'explicit' | 'focused' | 'broader' | 'none'

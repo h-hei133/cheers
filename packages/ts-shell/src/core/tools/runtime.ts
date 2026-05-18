@@ -11,6 +11,7 @@ import { isMcpConfigLoadError } from '../mcp/config.js'
 import { classifyMcpFailure, mcpFailureMetadata } from '../mcp/errorTaxonomy.js'
 import type { CoreMcpGateway } from '../mcp/gateway.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
+import type { PwRuntimeStatus } from '../context/pwRuntime.js'
 import { ToolApprovalFlow } from './approvalFlow.js'
 import { filterVisibleToolNames } from './prefilter.js'
 import { createCoreToolRegistry } from './registry.js'
@@ -23,6 +24,7 @@ export class ToolRuntime {
   private readonly logger = createComponentLogger('tool-runtime')
   private readonly runtimeConfig?: RuntimeConfig
   private readonly mcpGateway?: CoreMcpGateway
+  private readonly browserRuntimeStatus?: PwRuntimeStatus
 
   constructor(
     enforcer: SandboxEnforcer,
@@ -30,12 +32,14 @@ export class ToolRuntime {
       mcpTools?: readonly McpToolDescriptor[]
       mcpGateway?: CoreMcpGateway
       runtimeConfig?: RuntimeConfig
+      browserRuntimeStatus?: PwRuntimeStatus
     },
   ) {
     this.approvalFlow = new ToolApprovalFlow(enforcer)
     this.registry = createCoreToolRegistry(options)
     this.runtimeConfig = options?.runtimeConfig
     this.mcpGateway = options?.mcpGateway
+    this.browserRuntimeStatus = options?.browserRuntimeStatus
   }
 
   listTools(): readonly string[] {
@@ -43,11 +47,9 @@ export class ToolRuntime {
   }
 
   listVisibleTools(): readonly string[] {
-    if (!this.runtimeConfig) {
-      return this.listTools()
-    }
-
-    let visible = filterVisibleToolNames(Array.from(this.registry.keys()), this.runtimeConfig)
+    let visible = this.runtimeConfig
+      ? filterVisibleToolNames(Array.from(this.registry.keys()), this.runtimeConfig)
+      : Array.from(this.registry.keys())
 
     if (this.mcpGateway) {
       try {
@@ -97,7 +99,15 @@ export class ToolRuntime {
       }
     }
 
+    if (!this.isBrowserRuntimeVisible()) {
+      visible = visible.filter(name => !name.startsWith('browser.'))
+    }
+
     return visible
+  }
+
+  private isBrowserRuntimeVisible(): boolean {
+    return this.browserRuntimeStatus?.status === 'ready'
   }
 
   async execute(

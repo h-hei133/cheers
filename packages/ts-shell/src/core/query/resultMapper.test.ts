@@ -880,6 +880,54 @@ describe("mapTerminalToOrchestrationResult", () => {
       "insufficient-evidence",
     );
   });
+
+  it("maps browser policy and runtime blockers to stopped terminal results", () => {
+    const fakeState = {
+      transcript: [
+        {
+          role: "assistant",
+          content: "Browser task stopped.",
+          codingResult: {
+            ...buildCodingResult({
+              changedFiles: [],
+              failedFiles: [
+                {
+                  path: "(browser)",
+                  reason: "policy-blocked: public web automation is blocked",
+                },
+              ],
+              verification: {
+                status: "blocked",
+                reason: "policy-blocked: public web automation is blocked",
+                blockerKind: "unknown",
+              },
+              verdict: "insufficient-evidence",
+              reasons: ["policy-blocked: public web automation is blocked"],
+              evidence: ["browser-agent-reason:policy-blocked"],
+            }),
+            taskKind: "browser",
+          },
+        },
+      ],
+      sharedContext: {
+        sessionId: "sess_browser_mapper",
+        initialPrompt: "prompt",
+        notes: [],
+        handoffs: [],
+      },
+      lastContinuationReason: undefined,
+    } as never;
+
+    const result = mapTerminalToOrchestrationResult(fakeState, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+      stopReason: undefined,
+    } as never);
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.stopReason).toContain("policy-blocked");
+  });
 });
 
 function buildCodingResult(input: {

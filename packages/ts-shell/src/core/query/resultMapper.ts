@@ -54,7 +54,12 @@ type ActionableBlockerKind =
   | "verification-failed"
   | "command-not-allowlisted"
   | "mcp-unavailable"
-  | "approval-denied";
+  | "approval-denied"
+  | "browser-policy-blocked"
+  | "browser-unavailable"
+  | "browser-timeout"
+  | "browser-target-missing"
+  | "browser-adapter-failure";
 
 function deriveTruthfulTerminal(input: {
   terminal: QueryTerminal;
@@ -350,7 +355,12 @@ function findActionableKindFromEvidence(
     actionableMarker === "verification-failed" ||
     actionableMarker === "command-not-allowlisted" ||
     actionableMarker === "mcp-unavailable" ||
-    actionableMarker === "approval-denied"
+    actionableMarker === "approval-denied" ||
+    actionableMarker === "browser-policy-blocked" ||
+    actionableMarker === "browser-unavailable" ||
+    actionableMarker === "browser-timeout" ||
+    actionableMarker === "browser-target-missing" ||
+    actionableMarker === "browser-adapter-failure"
   ) {
     return actionableMarker;
   }
@@ -371,6 +381,29 @@ function classifyActionableKind(
         normalized.includes("unavailable")))
   ) {
     return "mcp-unavailable";
+  }
+  if (
+    normalized.includes("policy-blocked") ||
+    normalized.includes("public web automation is blocked") ||
+    normalized.includes("outside the controlled local fixture")
+  ) {
+    return "browser-policy-blocked";
+  }
+  if (
+    normalized.includes("runtime-package-missing") ||
+    normalized.includes("runtime-binary-missing") ||
+    normalized.includes("direct playwright runtime") && normalized.includes("disabled")
+  ) {
+    return "browser-unavailable";
+  }
+  if (normalized.includes("action-target-missing") || normalized.includes("target was not found")) {
+    return "browser-target-missing";
+  }
+  if (normalized.includes("action-timeout") || normalized.includes("navigation-timeout") || normalized.includes("timed out")) {
+    return "browser-timeout";
+  }
+  if (normalized.includes("browser tool failed") || normalized.includes("playwright operation failed")) {
+    return "browser-adapter-failure";
   }
   if (verificationFailed || normalized.includes("verification failed")) {
     return "verification-failed";

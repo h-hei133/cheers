@@ -10,6 +10,15 @@ import type {
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
 import {
+  detectBrowserAgentPlan,
+  type BrowserAgentPlan,
+} from "../core/context/browserAgent.js";
+import {
+  browserObservationEvidenceLine,
+  browserObservationFromMetadata,
+} from "../core/context/browserObs.js";
+import { getPwRuntimeStatus, type PwRuntimeStatus } from "../core/context/pwRuntime.js";
+import {
   rebindPathLikeToWorkspace,
 } from "../core/paths/legacyRootRebase.js";
 import {
@@ -165,6 +174,7 @@ export interface MvpIntegratedFlowOptions {
   };
   readonly runtimeSeed?: QueryRuntimeStateSeed;
   readonly applyPatchRuntimeRoute?: ApplyPatchRuntimeRouteOptions;
+  readonly browserRuntimeStatus?: PwRuntimeStatus;
 }
 
 export async function runMvpIntegratedFlow(
@@ -179,6 +189,8 @@ export async function runMvpIntegratedFlow(
   const logger = createComponentLogger("orchestration");
   const workflowContext = getWorkflowGitContext(options.workspaceRoot);
   const runtimeConfig = getRuntimeConfig(options.workspaceRoot);
+  const browserRuntimeStatus =
+    options.browserRuntimeStatus ?? await getPwRuntimeStatus();
   const mcpGateway = new CoreMcpGateway(options.workspaceRoot);
   const mcpSnapshot = await mcpGateway.snapshot();
   const enforcer = new SandboxEnforcer({
@@ -201,6 +213,7 @@ export async function runMvpIntegratedFlow(
     mcpTools: mcpSnapshot.tools,
     mcpGateway,
     runtimeConfig,
+    browserRuntimeStatus,
   });
   const runner = createIntegratedRunner(
     options.workspaceRoot,
@@ -249,6 +262,8 @@ export async function* streamMvpIntegratedFlow(
 
   const workflowContext = getWorkflowGitContext(options.workspaceRoot);
   const runtimeConfig = getRuntimeConfig(options.workspaceRoot);
+  const browserRuntimeStatus =
+    options.browserRuntimeStatus ?? await getPwRuntimeStatus();
   const mcpGateway = new CoreMcpGateway(options.workspaceRoot);
   const mcpSnapshot = await mcpGateway.snapshot();
   const enforcer = new SandboxEnforcer({
@@ -270,6 +285,7 @@ export async function* streamMvpIntegratedFlow(
     mcpTools: mcpSnapshot.tools,
     mcpGateway,
     runtimeConfig,
+    browserRuntimeStatus,
   });
   const runner = createIntegratedRunner(
     options.workspaceRoot,
@@ -632,6 +648,20 @@ function buildWorkflowTaskPlan(
     unsupportedCommand,
   } = extractWorkflowTaskIntentSignals(prompt, continuity);
   const targetResolution = resolveTaskTargets(prompt, workspaceRoot);
+  const browserPlan = detectBrowserAgentPlan({
+    prompt,
+    continuityState: continuity,
+  });
+  if (browserPlan) {
+    return {
+      taskKind: "browser",
+      reason: browserPlan.reason,
+      browserPlan,
+      inspectFirst: false,
+      verifyAfterEdit: false,
+      usedRestoredState: browserPlan.actions.length === 0,
+    };
+  }
   if (
     targetResolution.blocker &&
     shouldBlockMutationForTargetResolution({
@@ -3692,6 +3722,141 @@ function appendSingleFileEditRepairObservability(
   }
 }
 
+async function executeBrowserWorkflowTaskPlan(input: {
+  readonly plan: BrowserAgentPlan;
+  readonly freshnessObservability: FreshnessObservability;
+  readonly dispatcher: ToolDispatcher;
+  readonly sessionId: string;
+  readonly turn: number;
+  readonly workspaceRoot: string;
+  readonly abortSignal?: AbortSignal;
+}): Promise<WorkflowExecutionResult> {
+  const events: QueryEvent[] = [];
+  const notes = [
+    ...input.freshnessObservability.notes,
+    "browser-agent: tool pipeline selected",
+  ];
+  const evidence = [
+    ...input.freshnessObservability.evidence,
+    ...input.plan.evidence,
+    "browser-agent-loop:entered-query-loop",
+    "browser-agent-loop:no-raw-dom",
+    "browser-agent-loop:no-public-web-default",
+  ];
+
+  if (input.plan.actions.length === 0 && input.plan.continuationSummary) {
+    evidence.push("browser-agent-loop:continued-from-prior-evidence");
+    const output = [
+      "Browser evidence from prior session",
+      `- Summary: ${input.plan.continuationSummary}`,
+      "- Raw DOM: excluded",
+    ].join("\n");
+    const projected = projectRuntimeCodingOutcome({
+      taskKind: "browser",
+      changedFiles: [],
+      failedFiles: [],
+      patches: [],
+      verifiedFiles: [],
+      unverifiedFiles: [],
+      verification: { status: "passed", selectionScope: "none", selectionSource: "not-requested" },
+      repairNotes: ["browser continuation evidence summarized"],
+      evidence,
+      taskVerdict: "satisfied",
+      taskReasons: [],
+      userFacingOutput: output,
+    });
+    return { events, notes, ...projected };
+  }
+
+  const observations = [];
+  let firstFailure: { reason: string; reasonCode: string } | undefined;
+  for (let index = 0; index < input.plan.actions.length; index += 1) {
+    const action = input.plan.actions[index]!;
+    const taskId = `browser_agent_${input.turn}_${index + 1}_${action.toolName.replace(/[^a-z0-9]+/gi, "_")}`;
+    const result = await dispatchToolWithLifecycle({
+      dispatcher: input.dispatcher,
+      events,
+      toolName: action.toolName,
+      taskId,
+      args: action.args,
+      workspaceRoot: input.workspaceRoot,
+      sessionId: input.sessionId,
+      abortSignal: input.abortSignal,
+      requireApprovalEvent: false,
+    });
+    const observation = browserObservationFromMetadata(result.metadata);
+    if (observation) {
+      observations.push(observation);
+      evidence.push(browserObservationEvidenceLine(observation));
+      evidence.push(...observation.evidence);
+      notes.push(
+        `browser-action: ${observation.operation} ${observation.status} ${observation.reasonCode} cleanup=${observation.cleanupStatus}`,
+      );
+    }
+    if (!result.success) {
+      firstFailure = {
+        reason: result.error ?? observation?.visibleTextSummary ?? "Browser tool failed",
+        reasonCode: observation?.reasonCode ?? "unknown",
+      };
+      break;
+    }
+  }
+
+  const finalObservation = observations[observations.length - 1];
+  const failed = Boolean(firstFailure);
+  const reasonCode = firstFailure?.reasonCode ?? finalObservation?.reasonCode ?? "ready";
+  const output = failed
+    ? [
+        "Browser task stopped",
+        `- ReasonCode: ${reasonCode}`,
+        `- Reason: ${firstFailure?.reason ?? "Browser tool failed"}`,
+        `- Cleanup: ${finalObservation?.cleanupStatus ?? "not-started"}`,
+        `- Next: ${finalObservation?.nextActions.join("; ") ?? "Retry only within controlled local browser policy."}`,
+        "- Raw DOM: excluded",
+      ].join("\n")
+    : [
+        "Browser task completed",
+        `- Operation: ${finalObservation?.operation ?? "none"}`,
+        `- Summary: ${finalObservation?.visibleTextSummary ?? "No browser observation returned."}`,
+        `- Cleanup: ${finalObservation?.cleanupStatus ?? "not-started"}`,
+        `- EvidenceId: ${finalObservation?.evidenceId ?? "none"}`,
+        "- Raw DOM: excluded",
+      ].join("\n");
+
+  const projected = projectRuntimeCodingOutcome({
+    taskKind: "browser",
+    changedFiles: [],
+    failedFiles: failed
+      ? [{ path: "(browser)", reason: firstFailure?.reason ?? "Browser tool failed" }]
+      : [],
+    patches: [],
+    verifiedFiles: [],
+    unverifiedFiles: [],
+    verification: failed
+      ? {
+          status: "blocked",
+          reason: firstFailure?.reason,
+          selectionScope: "focused",
+          selectionSource: "auto-from-changes",
+          blockerKind: "unknown",
+          nextAction: finalObservation?.nextActions[0] ?? "Retry only within controlled local browser policy.",
+        }
+      : { status: "passed", selectionScope: "focused", selectionSource: "auto-from-changes" },
+    repairNotes: failed
+      ? [`browser stopped: ${reasonCode}`]
+      : ["browser observation summarized without raw DOM"],
+    evidence: [
+      ...evidence,
+      `browser-agent-result:${failed ? "stopped" : "success"}`,
+      `browser-agent-reason:${reasonCode}`,
+    ],
+    taskVerdict: failed ? "insufficient-evidence" : "satisfied",
+    taskReasons: failed ? [firstFailure?.reason ?? "Browser tool failed"] : [],
+    userFacingOutput: output,
+  });
+  return { events, notes, ...projected };
+}
+
 async function executeWorkflowTaskPlan(input: {
   readonly plan: WorkflowTaskPlan;
   readonly freshnessObservability: FreshnessObservability;
@@ -3748,6 +3913,18 @@ async function executeWorkflowTaskPlan(input: {
         degradedReopenCandidatePruned: input.plan.degradedReopenCandidatePruned,
       }),
     };
+  }
+
+  if (input.plan.taskKind === "browser" && input.plan.browserPlan) {
+    return executeBrowserWorkflowTaskPlan({
+      plan: input.plan.browserPlan,
+      freshnessObservability: input.freshnessObservability,
+      dispatcher: input.dispatcher,
+      sessionId: input.sessionId,
+      turn: input.turn,
+      workspaceRoot: input.workspaceRoot,
+      abortSignal: input.abortSignal,
+    });
   }
 
   if (input.plan.degradedReopen) {

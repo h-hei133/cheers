@@ -1,4 +1,5 @@
 import type { CodingTaskKind } from "./types.js";
+import type { BrowserAgentPlan } from "../core/context/browserAgent.js";
 import type { GroundedDeliverableMode } from "./runtimeHandoffProjection.js";
 
 export type ReflectiveStateQueryKind =
@@ -113,6 +114,7 @@ export interface WorkflowTaskPlan {
   readonly verifyAfterEdit: boolean;
   readonly verifyCommand?: string;
   readonly directCommand?: string;
+  readonly browserPlan?: BrowserAgentPlan;
   readonly blockedReason?: string;
   readonly targetMissing?: boolean;
   readonly usedRestoredState?: boolean;

@@ -1669,3 +1669,14 @@ Route 105, Route 106, Route 107, Route 108, Route 109, Route 110, Route 111,
 Route 112, Route 113, Route 114, Route 115, Route 116, Route 117, Route 118,
 Route 119, Route 120, Route 121, or Route 122 as edit-capability
 expansions.
+
+Route 128 connects Direct Playwright to the existing agent loop as controlled
+`browser.observe`, `browser.extract`, `browser.click`, and `browser.type`
+tools. Availability is driven by runtime status; policy blocks happen before
+`PwAdapter`; observations enter `codingResult` and `/continue` as safe summaries
+without raw DOM, screenshots, cookies, auth/session state, or secrets.
+Controlled autonomous use is limited to local fixtures, with real browser
+agent-loop validation for observe/click/type, timeout, target-missing,
+unavailable, and policy-blocked paths. Recommended Route 129: add a same-page
+controlled action sequence abstraction for observe -> click/type -> extract
+without broad browser autonomy or session persistence.

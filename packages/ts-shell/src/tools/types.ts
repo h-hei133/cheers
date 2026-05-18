@@ -38,6 +38,10 @@ export type MvpToolName =
   | 'bash'
   | 'git-status'
   | 'git-diff'
+  | 'browser.observe'
+  | 'browser.extract'
+  | 'browser.click'
+  | 'browser.type'
 
 export const MVP_TOOL_ALLOWLIST: ReadonlySet<MvpToolName> = new Set([
   'read',
@@ -47,6 +51,10 @@ export const MVP_TOOL_ALLOWLIST: ReadonlySet<MvpToolName> = new Set([
   'bash',
   'git-status',
   'git-diff',
+  'browser.observe',
+  'browser.extract',
+  'browser.click',
+  'browser.type',
 ])
 
 export function isAllowlistedTool(toolName: string): toolName is MvpToolName {
