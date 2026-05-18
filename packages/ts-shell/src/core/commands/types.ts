@@ -15,6 +15,7 @@ import type { BrowserPublicReadOnlyWebManifestLoadResult } from '../context/brow
 import type { BrowserPublicReadOnlyHttpClient } from '../context/browserPublicReadOnlyWebExecutor.js'
 import type { BrowserActionCache } from '../context/browserActionCache.js'
 import type { BrowserReceiptCacheStore } from '../context/browserReceiptCacheStore.js'
+import type { BrowserPublicReadOnlyWebSmokeConfig } from '../harness/browserPublicReadOnlyWebSmokeConfig.js'
 import type { SidebarEventSink } from '../context/sidebarEventSink.js'
 import type { SidebarLiveEventStore } from '../context/sidebarLiveEventStore.js'
 
@@ -39,6 +40,7 @@ export interface CommandContext {
   readonly browserControlledNetworkRunnerManifest?: BrowserControlledNetworkRunnerManifestLoadResult
   readonly browserPublicReadOnlyWebManifest?: BrowserPublicReadOnlyWebManifestLoadResult
   readonly browserPublicReadOnlyHttpClient?: BrowserPublicReadOnlyHttpClient
+  readonly browserPublicReadOnlyWebSmokeConfig?: BrowserPublicReadOnlyWebSmokeConfig
   readonly browserActionCache?: BrowserActionCache
   readonly browserReceiptCacheStore?: BrowserReceiptCacheStore
   readonly sidebarEventSink?: SidebarEventSink

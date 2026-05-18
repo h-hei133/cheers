@@ -1610,12 +1610,14 @@ origin, private non-harness origin, sensitive action, and output budget blocks.
 Route 120 adds explicit public read-only web execution opt-in, limited to
 HTTPS `GET`/`HEAD` with manifest, allowlist, confirmation, egress guard, and
 safe evidence only; no browser, JavaScript, auth, cookies, or write actions.
-Recommended Route 121: public read-only UX/report polish or skipped opt-in
-real public smoke harness. Do not treat
+Route 121 adds an opt-in public read-only smoke harness and UX/report polish;
+default validation still does not access public internet. Recommended Route
+122: public read-only smoke operator docs/manual run recipe, or read-only
+extraction quality/ranking. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
 Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, Route 104,
 Route 105, Route 106, Route 107, Route 108, Route 109, Route 110, Route 111,
 Route 112, Route 113, Route 114, Route 115, Route 116, Route 117, Route 118,
-Route 119, or Route 120 as edit-capability
+Route 119, Route 120, or Route 121 as edit-capability
 expansions.

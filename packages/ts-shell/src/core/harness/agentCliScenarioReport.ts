@@ -54,7 +54,7 @@ function summarizeBrowserExecutionEvidence(
 ): string {
   const outputs = result.steps
     .map((step) => step.process.output.combined)
-    .filter((output) => /Browser execution|Controlled browser network execution|Public read-only web execution|Browser replay|Browser self-healing apply/i.test(output));
+    .filter((output) => /Browser execution|Controlled browser network execution|Public read-only web execution|Public read-only web smoke|Browser replay|Browser self-healing apply/i.test(output));
   if (outputs.length === 0) {
     return "none";
   }
@@ -72,6 +72,7 @@ function summarizeBrowserExecutionEvidence(
   const externalNetwork = outputs.find((output) => /External browser execution/i.test(output));
   const controlledNetwork = outputs.find((output) => /Controlled browser network execution/i.test(output));
   const publicReadOnly = outputs.find((output) => /Public read-only web execution/i.test(output));
+  const publicSmoke = outputs.find((output) => /Public read-only web smoke/i.test(output));
   const cache = outputs.find((output) => /Browser receipt cache/i.test(output));
   const receiptStatus = receipt?.match(/^- Status:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
   const replayReadiness = receipt?.match(/^- Replay readiness:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
@@ -99,6 +100,7 @@ function summarizeBrowserExecutionEvidence(
     `externalNetwork=${externalNetwork ? summarizeExternalNetwork(externalNetwork) : "none"}`,
     `controlledNetwork=${controlledNetwork ? summarizeControlledNetwork(controlledNetwork) : "none"}`,
     `publicReadOnly=${publicReadOnly ? summarizePublicReadOnly(publicReadOnly) : "none"}`,
+    `publicSmoke=${publicSmoke ? summarizePublicSmoke(publicSmoke) : "none"}`,
     `receiptCache=${cache ? cache.match(/^- Cache status:\s*(.+)$/im)?.[1]?.trim() ?? "present" : "none"}`,
     `cacheIntegrity=${cache ? cache.match(/^- Integrity:\s*(.+)$/im)?.[1]?.trim() ?? "unknown" : "none"}`,
     `cacheCompaction=${cache ? cache.match(/^- Records before\/after:\s*(.+)$/im)?.[1]?.trim() ?? "none" : "none"}`,
@@ -106,6 +108,13 @@ function summarizeBrowserExecutionEvidence(
     `binding=${skillBinding}`,
     `dependency=${dependencyDecision}`,
   ].join("; ");
+}
+
+function summarizePublicSmoke(output: string): string {
+  const status = output.match(/^- Status:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const enabled = output.match(/^- Smoke enabled:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const publicNetwork = output.match(/^- Public network used:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  return `${status}/enabled=${enabled}/publicNetwork=${publicNetwork}`;
 }
 
 function summarizePublicReadOnly(output: string): string {

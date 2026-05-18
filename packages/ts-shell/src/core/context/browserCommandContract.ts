@@ -12,7 +12,7 @@ import {
   type BrowserSelfHealingCommandRequest,
 } from "./browserSelfHealingCommandContract.js";
 
-export type BrowserCommandMode = "status" | "preview" | "dry-run" | "execute" | "replay" | "repair";
+export type BrowserCommandMode = "status" | "preview" | "dry-run" | "execute" | "replay" | "repair" | "smoke";
 
 export interface BrowserCommandContract {
   readonly mode: BrowserCommandMode;
@@ -50,6 +50,12 @@ export function parseBrowserCommandArgs(args: readonly string[]): BrowserCommand
         action: parsed.request.action,
         execution: parsed.request,
       },
+    };
+  }
+  if (args[0] === "smoke") {
+    return {
+      ok: true,
+      contract: { mode: "smoke" },
     };
   }
   if (args[0] === "replay") {
@@ -127,6 +133,7 @@ function invalidBrowserArgs(value: string): BrowserCommandParseResult {
       "- /browser execute navigate <url>",
       "- /browser execute observe",
       "- /browser execute extract <goal>",
+      "- /browser smoke",
       "- /browser replay status",
       "- /browser replay <receipt-id>",
       "- /browser repair status",

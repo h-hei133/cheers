@@ -1,5 +1,8 @@
 import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
 import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
+import { parseBrowserPublicReadOnlyWebSmokeConfig } from "../harness/browserPublicReadOnlyWebSmokeConfig.js";
+import { renderBrowserPublicReadOnlyWebSmokeReport } from "../harness/browserPublicReadOnlyWebSmokeReport.js";
+import { runBrowserPublicReadOnlyWebSmoke } from "../harness/browserPublicReadOnlyWebSmokeRunner.js";
 import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
@@ -8,6 +11,22 @@ export async function runBrowserLocalCommand(
   context: CommandContext,
 ): Promise<LocalCommandResult> {
   const parsed = parseBrowserCommandArgs(args);
+  if (parsed.ok && parsed.contract?.mode === "smoke") {
+    const smoke = await runBrowserPublicReadOnlyWebSmoke({
+      config: context.browserPublicReadOnlyWebSmokeConfig ?? parseBrowserPublicReadOnlyWebSmokeConfig({ env: {} }),
+      httpClient: context.browserPublicReadOnlyHttpClient,
+    });
+    const result: LocalCommandResult = {
+      kind: "local",
+      output: renderBrowserPublicReadOnlyWebSmokeReport(smoke),
+    };
+    emitCommandResultToSidebar(context, {
+      command: "/browser",
+      args,
+      result,
+    });
+    return result;
+  }
   const runResult = parsed.ok && parsed.contract
     ? await runBrowserCommandAsync({
         contract: parsed.contract,

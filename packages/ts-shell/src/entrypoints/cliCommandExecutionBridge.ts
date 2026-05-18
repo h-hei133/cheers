@@ -15,6 +15,7 @@ import {
   createBrowserPublicReadOnlyWebHarnessContext,
   loadBrowserPublicReadOnlyWebManifestFromEnv,
 } from "../core/context/browserPublicReadOnlyWebManifest.js";
+import { parseBrowserPublicReadOnlyWebSmokeConfig } from "../core/harness/browserPublicReadOnlyWebSmokeConfig.js";
 import type { CompactInjectionStateStore } from "../core/context/compactInjectionState.js";
 import type { CompactLiveCheckpointStore } from "../core/context/compactLiveCheckpoint.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
@@ -83,6 +84,7 @@ export async function buildCliCommandExecution(
     manifestLoad: browserPublicReadOnlyWebManifest,
     env: input.env,
   });
+  const browserPublicReadOnlyWebSmokeConfig = parseBrowserPublicReadOnlyWebSmokeConfig({ env: input.env });
   const receiptCacheManifest = loadBrowserReceiptCacheManifestFromEnv({ env: input.env });
   const browserReceiptCacheStore = receiptCacheManifest.ok
     ? createBrowserReceiptCacheStore({ manifest: receiptCacheManifest.manifest })
@@ -100,6 +102,7 @@ export async function buildCliCommandExecution(
     browserExternalNetworkRunnerManifest,
     browserControlledNetworkRunnerManifest,
     browserPublicReadOnlyWebManifest,
+    browserPublicReadOnlyWebSmokeConfig,
   });
   if (slashResult?.kind === "local") {
     input.renderer.renderLine(

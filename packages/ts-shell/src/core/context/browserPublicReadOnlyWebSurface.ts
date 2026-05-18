@@ -1,10 +1,15 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import { renderBrowserNetworkEgressSurface } from "./browserNetworkEgressSurface.js";
 import type { BrowserPublicReadOnlyWebReceipt } from "./browserPublicReadOnlyWebReceipt.js";
+import {
+  createBrowserPublicReadOnlyWebUxSummary,
+  renderBrowserPublicReadOnlyWebUxSummary,
+} from "./browserPublicReadOnlyWebUxSummary.js";
 
 export function renderBrowserPublicReadOnlyWebSurface(
   receipt: BrowserPublicReadOnlyWebReceipt,
 ): string {
+  const summary = createBrowserPublicReadOnlyWebUxSummary(receipt);
   return [
     "Public read-only web execution",
     `- Origin: ${safe(receipt.targetOrigin)}`,
@@ -24,6 +29,8 @@ export function renderBrowserPublicReadOnlyWebSurface(
     `- Status: ${safe(receipt.requestStatus)}; ${safe(receipt.statusCodeSummary)}`,
     `- Redactions/warnings: ${[...receipt.redactions, ...receipt.warnings].length === 0 ? "none" : [...receipt.redactions, ...receipt.warnings].map((item) => safe(item)).join(", ")}`,
     `- Next action: ${safe(receipt.nextAction, 240)}`,
+    "",
+    renderBrowserPublicReadOnlyWebUxSummary(summary),
     ...(receipt.egressAudit ? ["", renderBrowserNetworkEgressSurface(receipt.egressAudit)] : []),
   ].join("\n");
 }
