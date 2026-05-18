@@ -22,6 +22,7 @@ export function renderBrowserCapabilitySurface(
     "- MCP discovery/launch: none",
     "- Provider/model call: none",
     "- Persistence: none",
+    "- External-network bridge: disabled by default",
     `- Preview actions: ${state.supportedPreviewActions.join(", ")}`,
     `- Blocked actions: ${state.blockedActions.join(", ")}`,
     "",
@@ -51,7 +52,7 @@ export function browserCapabilitySidebarToolItem(
     status: state.status === "blocked" || state.status === "unavailable"
       ? "unavailable" as const
       : "deferred" as const,
-    summary: `${state.status}; ${browserRuntimeDependencySummary()}; preview-only; no browser/MCP launch or provider/model call.`,
+    summary: `${state.status}; ${browserRuntimeDependencySummary()}; external-network bridge disabled by default; no browser/MCP launch or provider/model call.`,
     evidence: [
       "browser-capability-surface:sidebar-placeholder",
       "browser-capability-surface:no-discovery",

@@ -27,6 +27,7 @@ export function renderBrowserDryRunSurface(plan: BrowserDryRunPlan): BrowserDryR
       "- Browser process: not launched",
       "- MCP discovery/launch: none",
       "- Network access: none",
+      "- External-network bridge: disabled by default",
       "- Provider/model call: none",
       "- Persistence: none",
       "- Raw content/secrets/hidden reasoning: excluded",

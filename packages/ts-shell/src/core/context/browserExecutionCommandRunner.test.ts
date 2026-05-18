@@ -20,15 +20,13 @@ describe("browser execution command runner", () => {
     const parsed = parseBrowserCommandArgs(["execute", "navigate", "https://example.com"]);
     const result = await runBrowserCommandAsync({ contract: parsed.contract! });
 
-    expect(result.output).toContain("Browser execution");
-    expect(result.output).toContain("- Policy decision: blocked-no-executor");
+    expect(result.output).toContain("External browser execution");
+    expect(result.output).toContain("- Runner status:");
     expect(result.output).toContain("- Executed: no");
     expect(result.output).toContain("- Browser process: not launched");
-    expect(result.output).toContain("- MCP discovery/launch: none");
+    expect(result.output).toContain("- Network access: none");
     expect(result.output).toContain("- Provider/model call: none");
-    expect(result.output).toContain("Browser runtime dependency");
-    expect(result.output).toContain("- Decision: external-runner-only");
-    expect(result.output).toContain("- Browser execution default: disabled");
+    expect(result.output).toContain("- MCP discovery/launch: none");
     expect(result.evidence).toContain("browser-execution-command-runner:no-mcp-launch");
   });
 

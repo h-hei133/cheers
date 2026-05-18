@@ -109,7 +109,7 @@ describe("Agent CLI scenario harness", () => {
             {
               id: "browser-execution-output",
               kind: "stdout-contains",
-              text: "Browser execution",
+              text: "External browser execution",
             },
             { id: "blocked", kind: "browser-execution-blocked" },
             { id: "executed-no", kind: "executed-no" },
@@ -124,7 +124,7 @@ describe("Agent CLI scenario harness", () => {
       expectedOutcome: { status: "passed" },
     });
 
-    expect(result.nextAction).toContain("Inject a non-default");
+    expect(result.nextAction).toContain("allowlist");
   });
 
   it("runs sidebar panel through the real CLI child process", async () => {

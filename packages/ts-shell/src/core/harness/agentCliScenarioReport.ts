@@ -69,6 +69,7 @@ function summarizeBrowserExecutionEvidence(
   const receipt = outputs.find((output) => /Browser execution receipt/i.test(output));
   const replay = outputs.find((output) => /Browser replay/i.test(output));
   const apply = outputs.find((output) => /Browser self-healing apply/i.test(output));
+  const externalNetwork = outputs.find((output) => /External browser execution/i.test(output));
   const cache = outputs.find((output) => /Browser receipt cache/i.test(output));
   const receiptStatus = receipt?.match(/^- Status:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
   const replayReadiness = receipt?.match(/^- Replay readiness:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
@@ -93,6 +94,7 @@ function summarizeBrowserExecutionEvidence(
     `repair=${replay ? replay.match(/^- Repair readiness:\s*(.+)$/im)?.[1]?.trim() ?? replay.match(/^- Repair needed:\s*(.+)$/im)?.[1]?.trim() ?? "none" : "none"}`,
     `selfHealing=${replay ? summarizeSelfHealing(replay) : "none"}`,
     `repairApply=${apply ? summarizeRepairApply(apply) : "none"}`,
+    `externalNetwork=${externalNetwork ? summarizeExternalNetwork(externalNetwork) : "none"}`,
     `receiptCache=${cache ? cache.match(/^- Cache status:\s*(.+)$/im)?.[1]?.trim() ?? "present" : "none"}`,
     `cacheIntegrity=${cache ? cache.match(/^- Integrity:\s*(.+)$/im)?.[1]?.trim() ?? "unknown" : "none"}`,
     `cacheCompaction=${cache ? cache.match(/^- Records before\/after:\s*(.+)$/im)?.[1]?.trim() ?? "none" : "none"}`,
@@ -100,6 +102,13 @@ function summarizeBrowserExecutionEvidence(
     `binding=${skillBinding}`,
     `dependency=${dependencyDecision}`,
   ].join("; ");
+}
+
+function summarizeExternalNetwork(output: string): string {
+  const outcome = output.match(/^- Outcome:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const runner = output.match(/^- Runner status:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const executed = output.match(/^- Executed:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  return `${outcome}/${runner}/executed=${executed}`;
 }
 
 function summarizeRepairApply(output: string): string {

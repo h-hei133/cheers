@@ -163,6 +163,36 @@ describe("sidebar command event adapter", () => {
     expect(event.summary).not.toContain("sk-secret");
   });
 
+  it("summarizes external browser execution bridge without raw output", () => {
+    const event = adaptCommandResultToSidebarEvent({
+      command: "/browser",
+      args: ["execute"],
+      result: {
+        kind: "local",
+        output: [
+          "External browser execution",
+          "Result",
+          "- Outcome: blocked",
+          "- Origin: credential-url-redacted",
+          "- Gate status: sandbox=future-runtime-required; allowlist=blocked-credential-url; confirmation=confirmed; preflight=blocked",
+          "- Runner status: blocked-runner-disabled",
+          "- Risk receipt: browser-external-network-receipt:route116",
+          "- Executed: no",
+          "- Network access: none",
+          "https://user:pass@example.com RAW_BROWSER_EVIDENCE sk-secret1234567890 hidden reasoning",
+        ].join("\n"),
+      },
+    });
+
+    expect(event.title).toBe("Browser execution");
+    expect(event.summary).toContain("Origin: credential-url-redacted");
+    expect(event.summary).toContain("Runner status: blocked-runner-disabled");
+    expect(event.summary).toContain("Executed: no");
+    expect(event.summary).not.toContain("user:pass");
+    expect(event.summary).not.toContain("RAW_BROWSER_EVIDENCE");
+    expect(event.summary).not.toContain("sk-secret");
+  });
+
   it("swallows non-safety sink failures", () => {
     expect(() =>
       emitSidebarCommandResult(

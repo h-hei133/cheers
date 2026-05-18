@@ -30,6 +30,16 @@ import {
 } from "./browserSkillExecutionSurface.js";
 import type { BrowserActionCache } from "./browserActionCache.js";
 import type { BrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
+import {
+  isExternalNetworkExecutionRequest,
+} from "./browserExternalNetworkExecutionMode.js";
+import {
+  runBrowserExternalNetworkExecutionBridge,
+} from "./browserExternalNetworkExecutionBridge.js";
+import {
+  renderBrowserExternalNetworkExecutionSurface,
+} from "./browserExternalNetworkExecutionSurface.js";
+import type { BrowserExternalNetworkRunnerMode } from "./browserExternalNetworkRunnerPolicy.js";
 
 export interface BrowserExecutionCommandRunResult {
   readonly output: string;
@@ -45,6 +55,7 @@ export async function runBrowserExecutionCommand(input: {
   readonly cliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary;
   readonly actionCache?: BrowserActionCache;
   readonly receiptCacheStore?: BrowserReceiptCacheStore;
+  readonly externalNetworkRunnerMode?: BrowserExternalNetworkRunnerMode;
   readonly now?: () => string;
 }): Promise<BrowserExecutionCommandRunResult> {
   const executor = input.executor ?? NOOP_BROWSER_EXECUTOR;
@@ -69,6 +80,31 @@ export async function runBrowserExecutionCommand(input: {
     request,
     executorAvailable: browserExecutorIsAvailable(executor),
   });
+  if (isExternalNetworkExecutionRequest(request) && executor.kind === "noop") {
+    const bridge = runBrowserExternalNetworkExecutionBridge({
+      request,
+      sandboxAuthority: input.sandboxAuthority,
+      networkAllowlist: input.networkAllowlist,
+      confirmations: input.confirmations,
+      runnerMode: input.externalNetworkRunnerMode,
+    });
+    return {
+      output: [
+        renderBrowserExternalNetworkExecutionSurface(bridge),
+        "",
+        renderBrowserCliExecutionBridgeSummary(input.cliExecutionBridgeSummary),
+      ].join("\n"),
+      evidence: [
+        ...bridge.evidence,
+        ...(input.cliExecutionBridgeSummary?.evidence ?? []),
+        "browser-execution-command-runner:external-network-bridge",
+        "browser-execution-command-runner:no-browser-launch",
+        "browser-execution-command-runner:no-network-call",
+        "browser-execution-command-runner:no-mcp-launch",
+        "browser-execution-command-runner:no-provider-or-model-call",
+      ],
+    };
+  }
   const preflight = runBrowserRuntimePreflight({
     request,
     policy,
