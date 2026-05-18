@@ -16,6 +16,14 @@ Read-only reference repositories:
 /home/wang/projects/source-claudecode
 /home/wang/projects/opencode
 /home/wang/projects/gemini-cli
+/home/wang/projects/OpenHands
+/home/wang/projects/stagehand
+/home/wang/projects/playwright-mcp
+/home/wang/projects/mempalace
+/home/wang/projects/mem0
+/home/wang/projects/graphiti
+/home/wang/projects/inspect_ai
+/home/wang/projects/mini-swe-agent
 ```
 
 Only the target repository may be modified. The reference repositories are used only to recover load-bearing runtime semantics, responsibility boundaries, permission behavior, tool execution boundaries, and user-visible result semantics.
@@ -25,6 +33,14 @@ Reference repository roles:
 - Claude Code: behavior, UX, tool-result surface, compact/resume, and permission-surface comparison.
 - opencode: open-source agent architecture, permission/tool execution, apply_patch, session processor, and provider-abstraction comparison.
 - Gemini CLI: CLI/core layering, ReAct loop, built-in tools, MCP, checkpoint/headless, and sandbox comparison.
+- OpenHands: browser/runtime events, action/observation surface, sandbox/tool execution, and recovery/reporting comparison.
+- Stagehand: browser observe/act/extract, action target metadata, selector repair, action cache, and web interaction comparison.
+- Playwright MCP: browser tool schema, browser context/session lifecycle, snapshots, accessibility tree, and MCP browser-runtime comparison.
+- MemPalace: layered memory, local-first recall/wake-up, evidence-first memory structure, and backend-boundary comparison.
+- mem0: long-term memory extraction, memory lifecycle, retrieval, user/project memory behavior, and memory API comparison.
+- graphiti: temporal/entity graph memory, relationship extraction, invalidation, and graph-backed recall comparison.
+- Inspect AI: eval harness, task/scorer separation, sandbox/tool execution, transcript, and report/score comparison.
+- mini-swe-agent: lightweight agent loop, CLI trajectory, subprocess/tool evidence, benchmark scenarios, and failure-report comparison.
 
 Do not copy implementation code mechanically from the reference repositories. Use them to align architectural responsibility and runtime behavior.
 
