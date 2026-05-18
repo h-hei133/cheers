@@ -23,14 +23,32 @@ import {
   createBrowserExternalNetworkExecutionReceipt,
   type BrowserExternalNetworkExecutionReceipt,
 } from "./browserExternalNetworkExecutionReceipt.js";
+import type { BrowserExternalNetworkRunnerManifestLoadResult } from "./browserExternalNetworkRunnerManifest.js";
+import {
+  createBrowserExternalNetworkHandoffRequest,
+} from "./browserExternalNetworkHandoffProtocol.js";
+import {
+  decideBrowserExternalNetworkHandoffPolicy,
+  type BrowserExternalNetworkHandoffPolicyDecision,
+} from "./browserExternalNetworkHandoffPolicy.js";
+import {
+  runBrowserExternalNetworkHandoffExecutor,
+} from "./browserExternalNetworkHandoffExecutor.js";
+import {
+  createBrowserExternalNetworkHandoffReceipt,
+  type BrowserExternalNetworkHandoffReceipt,
+} from "./browserExternalNetworkHandoffReceipt.js";
 
 export interface BrowserExternalNetworkExecutionBridgeResult {
   readonly mode: BrowserExternalNetworkExecutionMode;
-  readonly status: "blocked" | "ready-for-future-runner";
+  readonly status: "blocked" | "ready-for-future-runner" | "simulated-handoff";
   readonly request: BrowserExecutionRequest;
   readonly intent: BrowserExternalNetworkIntent;
   readonly preflight: BrowserRuntimePreflight;
   readonly runner: BrowserExternalNetworkRunnerPolicyDecision;
+  readonly handoffPolicy?: BrowserExternalNetworkHandoffPolicyDecision;
+  readonly handoffReceipt?: BrowserExternalNetworkHandoffReceipt;
+  readonly runnerManifestStatus: "missing" | "valid" | "invalid";
   readonly receipt: BrowserExternalNetworkExecutionReceipt;
   readonly executed: false;
   readonly evidence: readonly string[];
@@ -42,6 +60,7 @@ export function runBrowserExternalNetworkExecutionBridge(input: {
   readonly networkAllowlist?: BrowserNetworkAllowlist;
   readonly confirmations?: readonly BrowserExecutionConfirmationRecord[];
   readonly runnerMode?: BrowserExternalNetworkRunnerMode;
+  readonly runnerManifest?: BrowserExternalNetworkRunnerManifestLoadResult;
 }): BrowserExternalNetworkExecutionBridgeResult {
   const intent = createBrowserExternalNetworkIntent(input.request);
   const policy = decideBrowserExecutionPolicy({
@@ -62,25 +81,65 @@ export function runBrowserExternalNetworkExecutionBridge(input: {
     runnerMode: input.runnerMode,
     gatesReady,
   });
+  const handoffPolicy = decideBrowserExternalNetworkHandoffPolicy({
+    request: input.request,
+    intent,
+    preflight,
+    manifest: input.runnerManifest?.status === "valid" ? input.runnerManifest.manifest : undefined,
+    manifestValid: input.runnerManifest?.status !== "invalid",
+  });
+  const handoffRequest = handoffPolicy.allowed && input.runnerManifest?.status === "valid"
+    ? createBrowserExternalNetworkHandoffRequest({
+        request: input.request,
+        targetOrigin: intent.normalizedOrigin,
+        safeUrlSummary: intent.rawTargetSummary,
+        allowlistStatus: preflight.networkDecision.status,
+        confirmationStatus: preflight.confirmationDecision.status,
+        sandboxStatus: preflight.sandboxDecision.status,
+        preflightStatus: gatesReady ? "pass" : preflight.preflightStatus,
+        runnerMode: input.runnerManifest.manifest.runnerMode,
+        outputBudgetBytes: input.runnerManifest.manifest.outputBudgetBytes,
+      })
+    : undefined;
+  const handoffExecutor = handoffRequest
+    ? runBrowserExternalNetworkHandoffExecutor({ request: handoffRequest })
+    : undefined;
+  const handoffReceipt = handoffExecutor
+    ? createBrowserExternalNetworkHandoffReceipt({
+        policy: handoffPolicy,
+        executor: handoffExecutor,
+      })
+    : undefined;
   const receipt = createBrowserExternalNetworkExecutionReceipt({
     request: input.request,
     intent,
     preflight: gatesReady ? { ...preflight, blockers: [] } : preflight,
     runner,
+    handoffStatus: handoffPolicy.status,
+    handoffReceiptId: handoffReceipt?.receiptId,
+    manifestStatus: input.runnerManifest?.status ?? "missing",
   });
   const mode = modeFor({ preflight, runner });
+  const status = handoffReceipt ? "simulated-handoff" : receipt.readinessStatus;
   return {
     mode,
-    status: receipt.readinessStatus,
+    status,
     request: input.request,
     intent,
     preflight,
     runner,
+    handoffPolicy,
+    handoffReceipt,
+    runnerManifestStatus: input.runnerManifest?.status ?? "missing",
     receipt,
     executed: false,
     evidence: [
       ...receipt.evidence,
+      ...handoffPolicy.evidence,
+      ...(handoffReceipt?.evidence ?? []),
+      ...(input.runnerManifest?.evidence ?? []),
       `browser-external-network-bridge:mode:${mode}`,
+      `browser-external-network-bridge:runner-manifest:${input.runnerManifest?.status ?? "missing"}`,
       "browser-external-network-bridge:no-browser-launch",
       "browser-external-network-bridge:no-network-call",
       "browser-external-network-bridge:no-mcp-launch",

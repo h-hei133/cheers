@@ -28,16 +28,23 @@ export interface BrowserExternalNetworkIntent {
 export function isExternalNetworkExecutionRequest(
   request: BrowserExecutionRequest,
 ): boolean {
-  if (request.actionKind !== "navigate") {
+  if (!["navigate", "observe", "extract"].includes(request.actionKind)) {
     return false;
   }
-  return !request.action.url?.startsWith("local-fixture://");
+  const target = externalNetworkTarget(request);
+  if (!target) {
+    return false;
+  }
+  if (request.actionKind === "navigate") {
+    return !target.startsWith("local-fixture://");
+  }
+  return target.startsWith("http://") || target.startsWith("https://");
 }
 
 export function createBrowserExternalNetworkIntent(
   request: BrowserExecutionRequest,
 ): BrowserExternalNetworkIntent {
-  const target = parseBrowserNetworkTarget(request.action.url ?? request.action.target);
+  const target = parseBrowserNetworkTarget(externalNetworkTarget(request));
   const redacted = target.hasCredentials;
   const normalizedOrigin = redacted
     ? "credential-url-redacted"
@@ -64,6 +71,10 @@ export function createBrowserExternalNetworkIntent(
       `browser-external-network-intent:risk:${riskLevel}`,
     ],
   };
+}
+
+function externalNetworkTarget(request: BrowserExecutionRequest): string | undefined {
+  return request.action.url ?? request.action.target ?? request.action.extractionGoal;
 }
 
 function riskLevelForRequest(

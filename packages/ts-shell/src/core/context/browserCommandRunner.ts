@@ -15,6 +15,7 @@ import {
 } from "./browserExecutionCommandRunner.js";
 import type { BrowserActionCache } from "./browserActionCache.js";
 import type { BrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
+import type { BrowserExternalNetworkRunnerManifestLoadResult } from "./browserExternalNetworkRunnerManifest.js";
 import type { BrowserExecutor } from "./browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
@@ -106,6 +107,7 @@ export async function runBrowserCommandAsync(input: {
   readonly browserNetworkAllowlist?: BrowserNetworkAllowlist;
   readonly browserExecutionConfirmations?: readonly BrowserExecutionConfirmationRecord[];
   readonly browserCliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary;
+  readonly browserExternalNetworkRunnerManifest?: BrowserExternalNetworkRunnerManifestLoadResult;
   readonly browserActionCache?: BrowserActionCache;
   readonly browserReceiptCacheStore?: BrowserReceiptCacheStore;
   readonly now?: () => string;
@@ -130,6 +132,7 @@ export async function runBrowserCommandAsync(input: {
       networkAllowlist: input.browserNetworkAllowlist,
       confirmations: input.browserExecutionConfirmations,
       cliExecutionBridgeSummary: input.browserCliExecutionBridgeSummary,
+      externalNetworkRunnerManifest: input.browserExternalNetworkRunnerManifest,
       actionCache: input.browserActionCache,
       receiptCacheStore: input.browserReceiptCacheStore,
       now: input.now,

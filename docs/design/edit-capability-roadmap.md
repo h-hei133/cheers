@@ -1600,8 +1600,10 @@ explicit self-healing manifest repair while preserving no automatic
 repair/replay and no browser execution changes. Route 116 adds an
 external-network execution opt-in bridge, disabled by default, with no external
 network execution, browser launch, MCP launch, or provider/model call.
-Recommended Route 117: external-network runner design still disabled by default,
-external-network CLI harness polish, or replay/report UX polish. Do not treat
+Route 117 adds an external-network runner handoff protocol and simulated
+execution harness only; real external network execution still does not happen.
+Recommended Route 118: real external-network runner design, still disabled by
+default, or external-network handoff report/UX polish. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
 Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, Route 104,

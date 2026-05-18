@@ -24,7 +24,9 @@ describe("browser local command runtime", () => {
       sidebarLiveEventStore,
     });
 
-    expect(result.output).toContain("- Policy decision: blocked-no-executor");
+    expect(result.output).toContain("External browser execution");
+    expect(result.output).toContain("- Executed: no");
+    expect(result.output).toContain("- Runner manifest: missing");
     const events = sidebarLiveEventStore.listRecent({
       sessionScopeId: "session:browser-runtime-test",
       includeDeveloperOnly: true,

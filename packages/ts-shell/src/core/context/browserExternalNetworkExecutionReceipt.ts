@@ -12,6 +12,9 @@ export interface BrowserExternalNetworkExecutionReceipt {
   readonly sandboxStatus: string;
   readonly preflightStatus: string;
   readonly externalRunnerStatus: BrowserExternalNetworkRunnerPolicyDecision["status"];
+  readonly externalNetworkRunnerManifestStatus: "missing" | "valid" | "invalid";
+  readonly handoffStatus?: string;
+  readonly handoffReceiptId?: string;
   readonly riskLevel: string;
   readonly blockedReasons: readonly string[];
   readonly readinessStatus: "blocked" | "ready-for-future-runner";
@@ -26,6 +29,9 @@ export function createBrowserExternalNetworkExecutionReceipt(input: {
   readonly intent: BrowserExternalNetworkIntent;
   readonly preflight: BrowserRuntimePreflight;
   readonly runner: BrowserExternalNetworkRunnerPolicyDecision;
+  readonly manifestStatus?: "missing" | "valid" | "invalid";
+  readonly handoffStatus?: string;
+  readonly handoffReceiptId?: string;
 }): BrowserExternalNetworkExecutionReceipt {
   const blockedReasons = unique([
     ...input.preflight.blockers,
@@ -43,6 +49,9 @@ export function createBrowserExternalNetworkExecutionReceipt(input: {
     sandboxStatus: input.preflight.sandboxDecision.status,
     preflightStatus: input.preflight.preflightStatus,
     externalRunnerStatus: input.runner.status,
+    externalNetworkRunnerManifestStatus: input.manifestStatus ?? "missing",
+    handoffStatus: input.handoffStatus,
+    handoffReceiptId: input.handoffReceiptId,
     riskLevel: input.intent.riskLevel,
     blockedReasons,
     readinessStatus,
@@ -53,6 +62,7 @@ export function createBrowserExternalNetworkExecutionReceipt(input: {
       ...input.intent.evidence,
       ...input.preflight.evidence,
       ...input.runner.evidence,
+      ...(input.handoffStatus ? [`browser-external-network-receipt:handoff:${input.handoffStatus}`] : []),
       "browser-external-network-receipt:no-browser-launch",
       "browser-external-network-receipt:no-network-call",
       "browser-external-network-receipt:raw-content-excluded",

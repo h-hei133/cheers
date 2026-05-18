@@ -176,6 +176,9 @@ describe("sidebar command event adapter", () => {
           "- Origin: credential-url-redacted",
           "- Gate status: sandbox=future-runtime-required; allowlist=blocked-credential-url; confirmation=confirmed; preflight=blocked",
           "- Runner status: blocked-runner-disabled",
+          "- Runner manifest: valid",
+          "- Handoff status: blocked-unsafe-url",
+          "- Real network execution: no",
           "- Risk receipt: browser-external-network-receipt:route116",
           "- Executed: no",
           "- Network access: none",
@@ -187,6 +190,8 @@ describe("sidebar command event adapter", () => {
     expect(event.title).toBe("Browser execution");
     expect(event.summary).toContain("Origin: credential-url-redacted");
     expect(event.summary).toContain("Runner status: blocked-runner-disabled");
+    expect(event.summary).toContain("Handoff status: blocked-unsafe-url");
+    expect(event.summary).toContain("Real network execution: no");
     expect(event.summary).toContain("Executed: no");
     expect(event.summary).not.toContain("user:pass");
     expect(event.summary).not.toContain("RAW_BROWSER_EVIDENCE");

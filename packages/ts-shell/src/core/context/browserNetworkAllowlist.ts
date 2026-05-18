@@ -70,6 +70,10 @@ export function browserNetworkTargetFromRequest(
   request: BrowserExecutionRequest,
 ): BrowserNetworkTarget {
   if (request.actionKind !== "navigate") {
+    const target = request.action.url ?? request.action.target ?? request.action.extractionGoal;
+    if (target?.startsWith("http://") || target?.startsWith("https://")) {
+      return parseBrowserNetworkTarget(target);
+    }
     return {
       rawUrl: request.action.url,
       hasCredentials: false,
@@ -110,7 +114,13 @@ export function decideBrowserNetworkAllowlist(input: {
 }): BrowserNetworkDecision {
   const allowlist = input.allowlist ?? createBrowserNetworkAllowlist();
   const target = browserNetworkTargetFromRequest(input.request);
-  if (input.request.actionKind !== "navigate") {
+  if (
+    input.request.actionKind !== "navigate" &&
+    !(
+      target.rawUrl?.startsWith("http://") ||
+      target.rawUrl?.startsWith("https://")
+    )
+  ) {
     return decision("allowed", target, allowlist, {
       reason: "No new network navigation target is required for this read-only action.",
       nextAction: "Continue with sandbox and evidence preflight.",

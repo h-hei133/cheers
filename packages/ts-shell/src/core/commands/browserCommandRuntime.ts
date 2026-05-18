@@ -16,6 +16,7 @@ export async function runBrowserLocalCommand(
         browserNetworkAllowlist: context.browserNetworkAllowlist,
         browserExecutionConfirmations: context.browserExecutionConfirmations,
         browserCliExecutionBridgeSummary: context.browserCliExecutionBridgeSummary,
+        browserExternalNetworkRunnerManifest: context.browserExternalNetworkRunnerManifest,
         browserActionCache: context.browserActionCache,
         browserReceiptCacheStore: context.browserReceiptCacheStore,
       })

@@ -107,7 +107,11 @@ function summarizeBrowserExecutionEvidence(
 function summarizeExternalNetwork(output: string): string {
   const outcome = output.match(/^- Outcome:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
   const runner = output.match(/^- Runner status:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const handoff = output.match(/^- Handoff status:\s*(.+)$/im)?.[1]?.trim() ?? "none";
   const executed = output.match(/^- Executed:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  if (handoff !== "none") {
+    return `${outcome}/${runner}/handoff=${handoff}/executed=${executed}`;
+  }
   return `${outcome}/${runner}/executed=${executed}`;
 }
 

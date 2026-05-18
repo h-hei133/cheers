@@ -9,6 +9,7 @@ import type { BrowserExecutionConfirmationRecord } from '../context/browserExecu
 import type { BrowserNetworkAllowlist } from '../context/browserNetworkAllowlist.js'
 import type { BrowserSandboxAuthority } from '../context/browserSandboxAuthority.js'
 import type { BrowserCliExecutionBridgeSummary } from '../context/browserCliExecutionBridge.js'
+import type { BrowserExternalNetworkRunnerManifestLoadResult } from '../context/browserExternalNetworkRunnerManifest.js'
 import type { BrowserActionCache } from '../context/browserActionCache.js'
 import type { BrowserReceiptCacheStore } from '../context/browserReceiptCacheStore.js'
 import type { SidebarEventSink } from '../context/sidebarEventSink.js'
@@ -31,6 +32,7 @@ export interface CommandContext {
   readonly browserNetworkAllowlist?: BrowserNetworkAllowlist
   readonly browserExecutionConfirmations?: readonly BrowserExecutionConfirmationRecord[]
   readonly browserCliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary
+  readonly browserExternalNetworkRunnerManifest?: BrowserExternalNetworkRunnerManifestLoadResult
   readonly browserActionCache?: BrowserActionCache
   readonly browserReceiptCacheStore?: BrowserReceiptCacheStore
   readonly sidebarEventSink?: SidebarEventSink

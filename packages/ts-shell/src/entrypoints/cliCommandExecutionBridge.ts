@@ -3,6 +3,10 @@ import { createBrowserCliExecutionBridge } from "../core/context/browserCliExecu
 import { loadBrowserCliExecutorInjectionFromEnv } from "../core/context/browserCliExecutorInjection.js";
 import { loadBrowserReceiptCacheManifestFromEnv } from "../core/context/browserReceiptCacheManifest.js";
 import { createBrowserReceiptCacheStore } from "../core/context/browserReceiptCacheStore.js";
+import {
+  createBrowserExternalNetworkRunnerHarnessContext,
+  loadBrowserExternalNetworkRunnerManifestFromEnv,
+} from "../core/context/browserExternalNetworkRunnerManifest.js";
 import type { CompactInjectionStateStore } from "../core/context/compactInjectionState.js";
 import type { CompactLiveCheckpointStore } from "../core/context/compactLiveCheckpoint.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
@@ -58,6 +62,10 @@ export async function buildCliCommandExecution(
   const browserCliExecutionBridge = createBrowserCliExecutionBridge(
     loadBrowserCliExecutorInjectionFromEnv({ env: input.env }),
   );
+  const browserExternalNetworkRunnerManifest = loadBrowserExternalNetworkRunnerManifestFromEnv({ env: input.env });
+  const browserExternalNetworkRunnerContext = createBrowserExternalNetworkRunnerHarnessContext(
+    browserExternalNetworkRunnerManifest,
+  );
   const receiptCacheManifest = loadBrowserReceiptCacheManifestFromEnv({ env: input.env });
   const browserReceiptCacheStore = receiptCacheManifest.ok
     ? createBrowserReceiptCacheStore({ manifest: receiptCacheManifest.manifest })
@@ -69,6 +77,8 @@ export async function buildCliCommandExecution(
     compactInjectionStateStore: input.compactInjectionStateStore,
     browserReceiptCacheStore,
     ...browserCliExecutionBridge,
+    ...browserExternalNetworkRunnerContext,
+    browserExternalNetworkRunnerManifest,
   });
   if (slashResult?.kind === "local") {
     input.renderer.renderLine(

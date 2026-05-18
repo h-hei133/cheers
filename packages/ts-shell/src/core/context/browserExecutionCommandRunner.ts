@@ -40,6 +40,7 @@ import {
   renderBrowserExternalNetworkExecutionSurface,
 } from "./browserExternalNetworkExecutionSurface.js";
 import type { BrowserExternalNetworkRunnerMode } from "./browserExternalNetworkRunnerPolicy.js";
+import type { BrowserExternalNetworkRunnerManifestLoadResult } from "./browserExternalNetworkRunnerManifest.js";
 
 export interface BrowserExecutionCommandRunResult {
   readonly output: string;
@@ -56,6 +57,7 @@ export async function runBrowserExecutionCommand(input: {
   readonly actionCache?: BrowserActionCache;
   readonly receiptCacheStore?: BrowserReceiptCacheStore;
   readonly externalNetworkRunnerMode?: BrowserExternalNetworkRunnerMode;
+  readonly externalNetworkRunnerManifest?: BrowserExternalNetworkRunnerManifestLoadResult;
   readonly now?: () => string;
 }): Promise<BrowserExecutionCommandRunResult> {
   const executor = input.executor ?? NOOP_BROWSER_EXECUTOR;
@@ -87,6 +89,7 @@ export async function runBrowserExecutionCommand(input: {
       networkAllowlist: input.networkAllowlist,
       confirmations: input.confirmations,
       runnerMode: input.externalNetworkRunnerMode,
+      runnerManifest: input.externalNetworkRunnerManifest,
     });
     return {
       output: [

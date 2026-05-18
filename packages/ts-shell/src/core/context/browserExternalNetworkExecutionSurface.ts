@@ -1,5 +1,6 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import type { BrowserExternalNetworkExecutionBridgeResult } from "./browserExternalNetworkExecutionBridge.js";
+import { renderBrowserExternalNetworkHandoffSurface } from "./browserExternalNetworkHandoffSurface.js";
 
 export function renderBrowserExternalNetworkExecutionSurface(
   result: BrowserExternalNetworkExecutionBridgeResult,
@@ -11,6 +12,8 @@ export function renderBrowserExternalNetworkExecutionSurface(
     `- Action: ${safe(result.receipt.actionKind)}`,
     `- Gate status: sandbox=${result.receipt.sandboxStatus}; allowlist=${result.receipt.allowlistStatus}; confirmation=${result.receipt.confirmationStatus}; preflight=${result.receipt.preflightStatus}`,
     `- Runner status: ${result.receipt.externalRunnerStatus}`,
+    `- Runner manifest: ${result.receipt.externalNetworkRunnerManifestStatus}`,
+    `- Handoff status: ${result.receipt.handoffStatus ?? "none"}`,
     `- Risk receipt: ${safe(result.receipt.receiptId, 180)}`,
     `- Risk level: ${result.receipt.riskLevel}`,
     `- Executed: ${result.receipt.executed ? "yes" : "no"}`,
@@ -22,6 +25,12 @@ export function renderBrowserExternalNetworkExecutionSurface(
     `- Blockers: ${result.receipt.blockedReasons.length === 0 ? "none" : result.receipt.blockedReasons.map((item) => safe(item)).join("; ")}`,
     `- Redactions: ${result.receipt.redactions.length === 0 ? "none" : result.receipt.redactions.join(", ")}`,
     `- Next action: ${safe(result.receipt.nextAction, 240)}`,
+    ...(result.handoffReceipt
+      ? [
+          "",
+          renderBrowserExternalNetworkHandoffSurface(result.handoffReceipt),
+        ]
+      : []),
   ].join("\n");
 }
 
