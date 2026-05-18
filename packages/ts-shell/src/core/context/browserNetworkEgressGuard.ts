@@ -2,9 +2,10 @@ import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
 import { parseBrowserNetworkTarget } from "./browserNetworkAllowlist.js";
 
-export type BrowserNetworkMode = "controlled-only" | "future-public" | "disabled";
+export type BrowserNetworkMode = "controlled-only" | "public-readonly" | "future-public" | "disabled";
 export type BrowserNetworkEgressDecisionStatus =
   | "allowed-controlled-origin"
+  | "allowed-public-readonly-origin"
   | "blocked-no-allowlist"
   | "blocked-origin-mismatch"
   | "blocked-public-origin"
@@ -21,7 +22,7 @@ export interface BrowserNetworkEgressDecision {
   readonly requestedOrigin: string;
   readonly effectiveOrigin: string;
   readonly allowedOrigin?: string;
-  readonly publicNetwork: false;
+  readonly publicNetwork: boolean;
   readonly controlledNetwork: boolean;
   readonly privateNetworkBlocked: boolean;
   readonly credentialsRedacted: boolean;
@@ -59,9 +60,33 @@ export function decideBrowserNetworkEgress(input: {
     return decision("blocked-output-budget", requestedOrigin, effectiveOrigin, input, "Network output exceeded the route budget.", ["output-budget-exceeded"], "Keep output bounded and summarized.");
   }
   if (input.redirectTarget && effectiveOrigin !== requestedOrigin) {
-    if (effectiveOrigin !== input.controlledOrigin) {
+    if (
+      input.networkMode === "controlled-only" &&
+      effectiveOrigin !== input.controlledOrigin
+    ) {
       return decision("blocked-redirect-escape", requestedOrigin, effectiveOrigin, input, "Redirect target escaped the controlled origin.", ["redirect-escape"], "Block the redirect and keep public internet disabled.");
     }
+    if (
+      input.networkMode === "public-readonly" &&
+      !input.allowedOrigins.includes(effectiveOrigin)
+    ) {
+      return decision("blocked-redirect-escape", requestedOrigin, effectiveOrigin, input, "Redirect target escaped the explicit public read-only allowlist.", ["redirect-escape"], "Block the redirect and keep the explicit origin allowlist unchanged.");
+    }
+  }
+  if (input.networkMode === "public-readonly") {
+    if (!input.allowedOrigins.length) {
+      return decision("blocked-no-allowlist", requestedOrigin, effectiveOrigin, input, "Public read-only execution requires an explicit allowlist.", ["missing-public-allowlist"], "Provide an exact https origin in the manifest.");
+    }
+    if (target.scheme !== "https") {
+      return decision("blocked-unsupported-scheme", requestedOrigin, effectiveOrigin, input, "Public read-only execution requires https.", ["unsupported-scheme"], "Use an explicitly allowlisted https origin.");
+    }
+    if (isPrivateOrigin(effectiveOrigin)) {
+      return decision("blocked-private-network", requestedOrigin, effectiveOrigin, input, "Private/local origins are blocked for public read-only execution.", ["private-origin"], "Use public https origins only.");
+    }
+    if (!input.allowedOrigins.includes(effectiveOrigin)) {
+      return decision("blocked-origin-mismatch", requestedOrigin, effectiveOrigin, input, "Effective origin does not match the explicit public read-only allowlist.", ["origin-mismatch"], "Add the exact public origin to the manifest.");
+    }
+    return decision("allowed-public-readonly-origin", requestedOrigin, effectiveOrigin, input, "Public read-only origin is explicitly allowlisted.", [], "Proceed with read-only GET/HEAD request.", []);
   }
   if (input.networkMode !== "controlled-only" || !input.controlledOrigin) {
     return decision("blocked-public-origin", requestedOrigin, effectiveOrigin, input, "Only controlled-network mode is enforceable in this route.", ["public-network-disabled"], "Use controlled loopback only.");
@@ -102,11 +127,11 @@ function decision(
 ): BrowserNetworkEgressDecision {
   return {
     status,
-    allowed: status === "allowed-controlled-origin",
+    allowed: status === "allowed-controlled-origin" || status === "allowed-public-readonly-origin",
     requestedOrigin: sanitizeBrowserText(requestedOrigin, 160),
     effectiveOrigin: sanitizeBrowserText(effectiveOrigin, 160),
-    allowedOrigin: input.controlledOrigin,
-    publicNetwork: false,
+    allowedOrigin: status === "allowed-public-readonly-origin" ? effectiveOrigin : input.controlledOrigin,
+    publicNetwork: status === "allowed-public-readonly-origin",
     controlledNetwork: status === "allowed-controlled-origin",
     privateNetworkBlocked: status === "blocked-private-network",
     credentialsRedacted: redactions.includes("url-credentials"),

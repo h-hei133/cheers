@@ -42,6 +42,8 @@ import {
 import type { BrowserExternalNetworkRunnerMode } from "./browserExternalNetworkRunnerPolicy.js";
 import type { BrowserExternalNetworkRunnerManifestLoadResult } from "./browserExternalNetworkRunnerManifest.js";
 import type { BrowserControlledNetworkRunnerManifestLoadResult } from "./browserControlledNetworkRunnerManifest.js";
+import type { BrowserPublicReadOnlyWebManifestLoadResult } from "./browserPublicReadOnlyWebManifest.js";
+import type { BrowserPublicReadOnlyHttpClient } from "./browserPublicReadOnlyWebExecutor.js";
 
 export interface BrowserExecutionCommandRunResult {
   readonly output: string;
@@ -60,6 +62,8 @@ export async function runBrowserExecutionCommand(input: {
   readonly externalNetworkRunnerMode?: BrowserExternalNetworkRunnerMode;
   readonly externalNetworkRunnerManifest?: BrowserExternalNetworkRunnerManifestLoadResult;
   readonly controlledNetworkRunnerManifest?: BrowserControlledNetworkRunnerManifestLoadResult;
+  readonly publicReadOnlyWebManifest?: BrowserPublicReadOnlyWebManifestLoadResult;
+  readonly publicReadOnlyHttpClient?: BrowserPublicReadOnlyHttpClient;
   readonly now?: () => string;
 }): Promise<BrowserExecutionCommandRunResult> {
   const executor = input.executor ?? NOOP_BROWSER_EXECUTOR;
@@ -93,6 +97,8 @@ export async function runBrowserExecutionCommand(input: {
       runnerMode: input.externalNetworkRunnerMode,
       runnerManifest: input.externalNetworkRunnerManifest,
       controlledRunnerManifest: input.controlledNetworkRunnerManifest,
+      publicReadOnlyWebManifest: input.publicReadOnlyWebManifest,
+      publicReadOnlyHttpClient: input.publicReadOnlyHttpClient,
     });
     return {
       output: [
@@ -104,8 +110,13 @@ export async function runBrowserExecutionCommand(input: {
         ...bridge.evidence,
         ...(input.cliExecutionBridgeSummary?.evidence ?? []),
         "browser-execution-command-runner:external-network-bridge",
+        ...(bridge.publicReadOnlyReceipt?.executed
+          ? ["browser-execution-command-runner:public-readonly-web-executed"]
+          : []),
         "browser-execution-command-runner:no-browser-launch",
-        "browser-execution-command-runner:no-network-call",
+        bridge.publicReadOnlyReceipt?.executed
+          ? "browser-execution-command-runner:public-network-explicit"
+          : "browser-execution-command-runner:no-network-call",
         "browser-execution-command-runner:no-mcp-launch",
         "browser-execution-command-runner:no-provider-or-model-call",
       ],

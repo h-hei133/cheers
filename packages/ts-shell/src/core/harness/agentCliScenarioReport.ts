@@ -54,7 +54,7 @@ function summarizeBrowserExecutionEvidence(
 ): string {
   const outputs = result.steps
     .map((step) => step.process.output.combined)
-    .filter((output) => /Browser execution|Controlled browser network execution|Browser replay|Browser self-healing apply/i.test(output));
+    .filter((output) => /Browser execution|Controlled browser network execution|Public read-only web execution|Browser replay|Browser self-healing apply/i.test(output));
   if (outputs.length === 0) {
     return "none";
   }
@@ -71,6 +71,7 @@ function summarizeBrowserExecutionEvidence(
   const apply = outputs.find((output) => /Browser self-healing apply/i.test(output));
   const externalNetwork = outputs.find((output) => /External browser execution/i.test(output));
   const controlledNetwork = outputs.find((output) => /Controlled browser network execution/i.test(output));
+  const publicReadOnly = outputs.find((output) => /Public read-only web execution/i.test(output));
   const cache = outputs.find((output) => /Browser receipt cache/i.test(output));
   const receiptStatus = receipt?.match(/^- Status:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
   const replayReadiness = receipt?.match(/^- Replay readiness:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
@@ -97,6 +98,7 @@ function summarizeBrowserExecutionEvidence(
     `repairApply=${apply ? summarizeRepairApply(apply) : "none"}`,
     `externalNetwork=${externalNetwork ? summarizeExternalNetwork(externalNetwork) : "none"}`,
     `controlledNetwork=${controlledNetwork ? summarizeControlledNetwork(controlledNetwork) : "none"}`,
+    `publicReadOnly=${publicReadOnly ? summarizePublicReadOnly(publicReadOnly) : "none"}`,
     `receiptCache=${cache ? cache.match(/^- Cache status:\s*(.+)$/im)?.[1]?.trim() ?? "present" : "none"}`,
     `cacheIntegrity=${cache ? cache.match(/^- Integrity:\s*(.+)$/im)?.[1]?.trim() ?? "unknown" : "none"}`,
     `cacheCompaction=${cache ? cache.match(/^- Records before\/after:\s*(.+)$/im)?.[1]?.trim() ?? "none" : "none"}`,
@@ -104,6 +106,16 @@ function summarizeBrowserExecutionEvidence(
     `binding=${skillBinding}`,
     `dependency=${dependencyDecision}`,
   ].join("; ");
+}
+
+function summarizePublicReadOnly(output: string): string {
+  const section = output.split(/Public read-only web execution/i).at(1) ?? output;
+  const executed = section.match(/^- Executed:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const status = section.match(/^- Status:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const policy = section.match(/^- Policy:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const egress = section.match(/^- Egress decision:\s*(.+)$/im)?.[1]?.trim() ?? "unknown";
+  const audit = section.match(/^- Egress audit:\s*(.+)$/im)?.[1]?.trim() ?? "none";
+  return `${executed === "yes" ? "executed" : "blocked"}/${policy}/${status}/egress=${egress}/audit=${audit}`;
 }
 
 function summarizeExternalNetwork(output: string): string {

@@ -50,10 +50,24 @@ import {
   createBrowserControlledNetworkReceipt,
   type BrowserControlledNetworkReceipt,
 } from "./browserControlledNetworkReceipt.js";
+import type { BrowserPublicReadOnlyWebManifestLoadResult } from "./browserPublicReadOnlyWebManifest.js";
+import {
+  decideBrowserPublicReadOnlyWebPolicy,
+  type BrowserPublicReadOnlyWebPolicyDecision,
+} from "./browserPublicReadOnlyWebPolicy.js";
+import {
+  runBrowserPublicReadOnlyWebExecutor,
+  type BrowserPublicReadOnlyHttpClient,
+  type BrowserPublicReadOnlyWebExecutorResult,
+} from "./browserPublicReadOnlyWebExecutor.js";
+import {
+  createBrowserPublicReadOnlyWebReceipt,
+  type BrowserPublicReadOnlyWebReceipt,
+} from "./browserPublicReadOnlyWebReceipt.js";
 
 export interface BrowserExternalNetworkExecutionBridgeResult {
   readonly mode: BrowserExternalNetworkExecutionMode;
-  readonly status: "blocked" | "ready-for-future-runner" | "simulated-handoff" | "controlled-network-executed";
+  readonly status: "blocked" | "ready-for-future-runner" | "simulated-handoff" | "controlled-network-executed" | "public-readonly-executed";
   readonly request: BrowserExecutionRequest;
   readonly intent: BrowserExternalNetworkIntent;
   readonly preflight: BrowserRuntimePreflight;
@@ -62,10 +76,13 @@ export interface BrowserExternalNetworkExecutionBridgeResult {
   readonly handoffReceipt?: BrowserExternalNetworkHandoffReceipt;
   readonly controlledNetworkPolicy?: BrowserControlledNetworkPolicyDecision;
   readonly controlledNetworkReceipt?: BrowserControlledNetworkReceipt;
+  readonly publicReadOnlyPolicy?: BrowserPublicReadOnlyWebPolicyDecision;
+  readonly publicReadOnlyExecutor?: BrowserPublicReadOnlyWebExecutorResult;
+  readonly publicReadOnlyReceipt?: BrowserPublicReadOnlyWebReceipt;
   readonly runnerManifestStatus: "missing" | "valid" | "invalid";
   readonly controlledRunnerManifestStatus: "missing" | "valid" | "invalid";
   readonly receipt: BrowserExternalNetworkExecutionReceipt;
-  readonly executed: false;
+  readonly executed: boolean;
   readonly evidence: readonly string[];
 }
 
@@ -172,6 +189,8 @@ export async function runBrowserExternalNetworkExecutionBridgeWithControlledNetw
   readonly runnerMode?: BrowserExternalNetworkRunnerMode;
   readonly runnerManifest?: BrowserExternalNetworkRunnerManifestLoadResult;
   readonly controlledRunnerManifest?: BrowserControlledNetworkRunnerManifestLoadResult;
+  readonly publicReadOnlyWebManifest?: BrowserPublicReadOnlyWebManifestLoadResult;
+  readonly publicReadOnlyHttpClient?: BrowserPublicReadOnlyHttpClient;
 }): Promise<BrowserExternalNetworkExecutionBridgeResult> {
   const intent = createBrowserExternalNetworkIntent(input.request);
   const policy = decideBrowserExecutionPolicy({
@@ -245,6 +264,37 @@ export async function runBrowserExternalNetworkExecutionBridgeWithControlledNetw
         executor: controlledNetworkExecutor,
       })
     : undefined;
+  const publicReadOnlyPolicy = shouldTryPublicReadOnly(input.request, controlledNetworkReceipt)
+    ? decideBrowserPublicReadOnlyWebPolicy({
+        request: input.request,
+        manifestLoad: input.publicReadOnlyWebManifest,
+        confirmations: input.confirmations,
+        clientAvailable: true,
+      })
+    : undefined;
+  const publicReadOnlyExecutor = publicReadOnlyPolicy?.allowed && input.publicReadOnlyWebManifest?.status === "valid"
+    ? await runBrowserPublicReadOnlyWebExecutor({
+        request: input.request,
+        policy: publicReadOnlyPolicy,
+        manifest: input.publicReadOnlyWebManifest.manifest,
+        httpClient: input.publicReadOnlyHttpClient,
+      })
+    : publicReadOnlyPolicy && input.publicReadOnlyWebManifest?.status === "valid"
+      ? await runBrowserPublicReadOnlyWebExecutor({
+          request: input.request,
+          policy: publicReadOnlyPolicy,
+          manifest: input.publicReadOnlyWebManifest.manifest,
+          httpClient: input.publicReadOnlyHttpClient,
+        })
+      : undefined;
+  const publicReadOnlyReceipt = publicReadOnlyPolicy && publicReadOnlyExecutor && input.publicReadOnlyWebManifest?.status === "valid"
+    ? createBrowserPublicReadOnlyWebReceipt({
+        request: input.request,
+        manifest: input.publicReadOnlyWebManifest.manifest,
+        policy: publicReadOnlyPolicy,
+        executor: publicReadOnlyExecutor,
+      })
+    : undefined;
   const receipt = createBrowserExternalNetworkExecutionReceipt({
     request: input.request,
     intent,
@@ -260,6 +310,8 @@ export async function runBrowserExternalNetworkExecutionBridgeWithControlledNetw
   const mode = modeFor({ preflight, runner });
   const status = controlledNetworkReceipt?.executed
     ? "controlled-network-executed"
+    : publicReadOnlyReceipt?.executed
+      ? "public-readonly-executed"
     : handoffReceipt
       ? "simulated-handoff"
     : receipt.readinessStatus;
@@ -274,24 +326,32 @@ export async function runBrowserExternalNetworkExecutionBridgeWithControlledNetw
     handoffReceipt,
     controlledNetworkPolicy,
     controlledNetworkReceipt,
+    publicReadOnlyPolicy,
+    publicReadOnlyExecutor,
+    publicReadOnlyReceipt,
     runnerManifestStatus: input.runnerManifest?.status ?? "missing",
     controlledRunnerManifestStatus: input.controlledRunnerManifest?.status ?? "missing",
     receipt,
-    executed: false,
+    executed: publicReadOnlyReceipt?.executed ?? false,
     evidence: [
       ...receipt.evidence,
       ...handoffPolicy.evidence,
       ...(handoffReceipt?.evidence ?? []),
       ...controlledNetworkPolicy.evidence,
       ...(controlledNetworkReceipt?.evidence ?? []),
+      ...(publicReadOnlyPolicy?.evidence ?? []),
+      ...(publicReadOnlyReceipt?.evidence ?? []),
       ...(input.runnerManifest?.evidence ?? []),
       ...(input.controlledRunnerManifest?.evidence ?? []),
+      ...(input.publicReadOnlyWebManifest?.evidence ?? []),
       `browser-external-network-bridge:mode:${mode}`,
       `browser-external-network-bridge:runner-manifest:${input.runnerManifest?.status ?? "missing"}`,
       `browser-external-network-bridge:controlled-runner-manifest:${input.controlledRunnerManifest?.status ?? "missing"}`,
       "browser-external-network-bridge:no-browser-launch",
       controlledNetworkReceipt?.executed
         ? "browser-external-network-bridge:controlled-loopback-request"
+        : publicReadOnlyReceipt?.executed
+          ? "browser-external-network-bridge:public-readonly-request"
         : "browser-external-network-bridge:no-network-call",
       "browser-external-network-bridge:no-mcp-launch",
     ],
@@ -323,4 +383,15 @@ function modeFor(input: {
     return "blocked-by-policy";
   }
   return "disabled";
+}
+
+function shouldTryPublicReadOnly(
+  request: BrowserExecutionRequest,
+  controlledNetworkReceipt: BrowserControlledNetworkReceipt | undefined,
+): boolean {
+  if (controlledNetworkReceipt?.executed) {
+    return false;
+  }
+  const target = request.action.url ?? request.action.target ?? request.action.extractionGoal;
+  return !!target && target.startsWith("https://");
 }

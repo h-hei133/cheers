@@ -7,7 +7,7 @@ export function renderBrowserNetworkEgressSurface(record: BrowserNetworkAuditRec
     `- Requested origin: ${safe(record.requestedOrigin)}`,
     `- Decision: ${safe(record.egressDecision)}`,
     `- Redirect decision: ${safe(record.redirectDecision ?? "none")}`,
-    "- Public network: no",
+    `- Public network: ${record.publicNetwork ? "yes" : "no"}`,
     `- Controlled network: ${record.controlledNetwork ? "yes" : "no"}`,
     `- Audit id: ${safe(record.auditId)}`,
     `- Warnings/redactions: ${[...record.warnings, ...record.redactions].length === 0 ? "none" : [...record.warnings, ...record.redactions].map((item) => safe(item)).join(", ")}`,

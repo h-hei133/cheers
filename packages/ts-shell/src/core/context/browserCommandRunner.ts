@@ -17,6 +17,8 @@ import type { BrowserActionCache } from "./browserActionCache.js";
 import type { BrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
 import type { BrowserExternalNetworkRunnerManifestLoadResult } from "./browserExternalNetworkRunnerManifest.js";
 import type { BrowserControlledNetworkRunnerManifestLoadResult } from "./browserControlledNetworkRunnerManifest.js";
+import type { BrowserPublicReadOnlyWebManifestLoadResult } from "./browserPublicReadOnlyWebManifest.js";
+import type { BrowserPublicReadOnlyHttpClient } from "./browserPublicReadOnlyWebExecutor.js";
 import type { BrowserExecutor } from "./browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
@@ -110,6 +112,8 @@ export async function runBrowserCommandAsync(input: {
   readonly browserCliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary;
   readonly browserExternalNetworkRunnerManifest?: BrowserExternalNetworkRunnerManifestLoadResult;
   readonly browserControlledNetworkRunnerManifest?: BrowserControlledNetworkRunnerManifestLoadResult;
+  readonly browserPublicReadOnlyWebManifest?: BrowserPublicReadOnlyWebManifestLoadResult;
+  readonly browserPublicReadOnlyHttpClient?: BrowserPublicReadOnlyHttpClient;
   readonly browserActionCache?: BrowserActionCache;
   readonly browserReceiptCacheStore?: BrowserReceiptCacheStore;
   readonly now?: () => string;
@@ -136,6 +140,8 @@ export async function runBrowserCommandAsync(input: {
       cliExecutionBridgeSummary: input.browserCliExecutionBridgeSummary,
       externalNetworkRunnerManifest: input.browserExternalNetworkRunnerManifest,
       controlledNetworkRunnerManifest: input.browserControlledNetworkRunnerManifest,
+      publicReadOnlyWebManifest: input.browserPublicReadOnlyWebManifest,
+      publicReadOnlyHttpClient: input.browserPublicReadOnlyHttpClient,
       actionCache: input.browserActionCache,
       receiptCacheStore: input.browserReceiptCacheStore,
       now: input.now,

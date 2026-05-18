@@ -11,6 +11,8 @@ import type { BrowserSandboxAuthority } from '../context/browserSandboxAuthority
 import type { BrowserCliExecutionBridgeSummary } from '../context/browserCliExecutionBridge.js'
 import type { BrowserExternalNetworkRunnerManifestLoadResult } from '../context/browserExternalNetworkRunnerManifest.js'
 import type { BrowserControlledNetworkRunnerManifestLoadResult } from '../context/browserControlledNetworkRunnerManifest.js'
+import type { BrowserPublicReadOnlyWebManifestLoadResult } from '../context/browserPublicReadOnlyWebManifest.js'
+import type { BrowserPublicReadOnlyHttpClient } from '../context/browserPublicReadOnlyWebExecutor.js'
 import type { BrowserActionCache } from '../context/browserActionCache.js'
 import type { BrowserReceiptCacheStore } from '../context/browserReceiptCacheStore.js'
 import type { SidebarEventSink } from '../context/sidebarEventSink.js'
@@ -35,6 +37,8 @@ export interface CommandContext {
   readonly browserCliExecutionBridgeSummary?: BrowserCliExecutionBridgeSummary
   readonly browserExternalNetworkRunnerManifest?: BrowserExternalNetworkRunnerManifestLoadResult
   readonly browserControlledNetworkRunnerManifest?: BrowserControlledNetworkRunnerManifestLoadResult
+  readonly browserPublicReadOnlyWebManifest?: BrowserPublicReadOnlyWebManifestLoadResult
+  readonly browserPublicReadOnlyHttpClient?: BrowserPublicReadOnlyHttpClient
   readonly browserActionCache?: BrowserActionCache
   readonly browserReceiptCacheStore?: BrowserReceiptCacheStore
   readonly sidebarEventSink?: SidebarEventSink

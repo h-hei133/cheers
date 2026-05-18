@@ -1607,13 +1607,15 @@ loopback test servers only; public external network remains blocked.
 Route 119 adds a browser network egress guard and report-safe audit layer for
 controlled-network execution, including redirect escape, credential URL, public
 origin, private non-harness origin, sensitive action, and output budget blocks.
-Public internet remains blocked. Recommended Route 120: public external-network
-execution design with this guard as a mandatory opt-in boundary, or controlled-network
-report/UX polish if public runner policy is not ready. Do not treat
+Route 120 adds explicit public read-only web execution opt-in, limited to
+HTTPS `GET`/`HEAD` with manifest, allowlist, confirmation, egress guard, and
+safe evidence only; no browser, JavaScript, auth, cookies, or write actions.
+Recommended Route 121: public read-only UX/report polish or skipped opt-in
+real public smoke harness. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
 Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, Route 104,
 Route 105, Route 106, Route 107, Route 108, Route 109, Route 110, Route 111,
 Route 112, Route 113, Route 114, Route 115, Route 116, Route 117, Route 118,
-or Route 119 as edit-capability
+Route 119, or Route 120 as edit-capability
 expansions.

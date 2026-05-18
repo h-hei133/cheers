@@ -12,7 +12,7 @@ export interface BrowserNetworkAuditRecord {
   readonly allowedOrigin?: string;
   readonly egressDecision: string;
   readonly redirectDecision?: string;
-  readonly publicNetwork: false;
+  readonly publicNetwork: boolean;
   readonly controlledNetwork: boolean;
   readonly privateNetworkBlocked: boolean;
   readonly credentialsRedacted: boolean;
@@ -43,7 +43,7 @@ export function createBrowserNetworkAuditRecord(input: {
     allowedOrigin: input.egressDecision.allowedOrigin,
     egressDecision: effective.status,
     redirectDecision: input.redirectDecision?.status,
-    publicNetwork: false,
+    publicNetwork: effective.publicNetwork,
     controlledNetwork: effective.controlledNetwork,
     privateNetworkBlocked: effective.privateNetworkBlocked,
     credentialsRedacted: input.egressDecision.credentialsRedacted || effective.credentialsRedacted,
@@ -56,7 +56,9 @@ export function createBrowserNetworkAuditRecord(input: {
       ...input.egressDecision.evidence,
       ...(input.redirectDecision?.evidence ?? []),
       "browser-network-audit-record:created",
-      "browser-network-audit-record:public-network-no",
+      effective.publicNetwork
+        ? "browser-network-audit-record:public-network-yes"
+        : "browser-network-audit-record:public-network-no",
       "browser-network-audit-record:raw-content-excluded",
     ],
   };

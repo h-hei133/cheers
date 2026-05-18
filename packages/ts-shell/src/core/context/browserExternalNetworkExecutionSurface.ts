@@ -2,6 +2,7 @@ import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import type { BrowserExternalNetworkExecutionBridgeResult } from "./browserExternalNetworkExecutionBridge.js";
 import { renderBrowserExternalNetworkHandoffSurface } from "./browserExternalNetworkHandoffSurface.js";
 import { renderBrowserControlledNetworkSurface } from "./browserControlledNetworkSurface.js";
+import { renderBrowserPublicReadOnlyWebSurface } from "./browserPublicReadOnlyWebSurface.js";
 
 export function renderBrowserExternalNetworkExecutionSurface(
   result: BrowserExternalNetworkExecutionBridgeResult,
@@ -17,11 +18,12 @@ export function renderBrowserExternalNetworkExecutionSurface(
     `- Handoff status: ${result.receipt.handoffStatus ?? "none"}`,
     `- Controlled-network manifest: ${result.receipt.controlledNetworkRunnerManifestStatus}`,
     `- Controlled-network status: ${result.receipt.controlledNetworkStatus ?? "none"}`,
+    `- Public read-only status: ${result.publicReadOnlyReceipt?.requestStatus ?? result.publicReadOnlyPolicy?.status ?? "none"}`,
     `- Risk receipt: ${safe(result.receipt.receiptId, 180)}`,
     `- Risk level: ${result.receipt.riskLevel}`,
-    `- Executed: ${result.receipt.executed ? "yes" : "no"}`,
+    `- Executed: ${result.executed || result.receipt.executed ? "yes" : "no"}`,
     "- Browser process: not launched",
-    `- Network access: ${result.controlledNetworkReceipt?.executed ? "controlled-loopback" : "none"}`,
+    `- Network access: ${result.publicReadOnlyReceipt?.executed ? "public-readonly" : result.controlledNetworkReceipt?.executed ? "controlled-loopback" : "none"}`,
     "- MCP discovery/launch: none",
     "- Provider/model call: none",
     "- Raw content: excluded",
@@ -38,6 +40,12 @@ export function renderBrowserExternalNetworkExecutionSurface(
       ? [
           "",
           renderBrowserControlledNetworkSurface(result.controlledNetworkReceipt),
+        ]
+      : []),
+    ...(result.publicReadOnlyReceipt
+      ? [
+          "",
+          renderBrowserPublicReadOnlyWebSurface(result.publicReadOnlyReceipt),
         ]
       : []),
   ].join("\n");
