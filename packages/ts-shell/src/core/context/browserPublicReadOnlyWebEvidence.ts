@@ -2,6 +2,16 @@ import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
 import type { BrowserNetworkAuditRecord } from "./browserNetworkAuditRecord.js";
 import type { BrowserPublicReadOnlyWebMethod } from "./browserPublicReadOnlyWebManifest.js";
+import { rankBrowserReadOnlyEvidence, type BrowserReadOnlyRankedEvidence } from "./browserReadOnlyEvidenceRanking.js";
+import { scoreBrowserReadOnlyExtractionQuality, type BrowserReadOnlyExtractionQuality } from "./browserReadOnlyExtractionQuality.js";
+import {
+  createBrowserReadOnlyExtraction,
+  type BrowserReadOnlyExtraction,
+} from "./browserReadOnlyExtractionModel.js";
+import {
+  createBrowserReadOnlyExtractionSurface,
+  type BrowserReadOnlyExtractionSurface,
+} from "./browserReadOnlyExtractionSurface.js";
 
 export interface BrowserPublicReadOnlyWebEvidence {
   readonly actionKind: BrowserExecutionRequest["actionKind"];
@@ -12,6 +22,10 @@ export interface BrowserPublicReadOnlyWebEvidence {
   readonly contentLengthSummary: string;
   readonly safeTitle?: string;
   readonly safeTextSummary: string;
+  readonly extraction?: BrowserReadOnlyExtraction;
+  readonly extractionQuality?: BrowserReadOnlyExtractionQuality;
+  readonly rankedEvidence: readonly BrowserReadOnlyRankedEvidence[];
+  readonly extractionSurface?: BrowserReadOnlyExtractionSurface;
   readonly redirectSummary: string;
   readonly egressAuditId?: string;
   readonly redactions: readonly string[];
@@ -28,16 +42,44 @@ export function createBrowserPublicReadOnlyWebEvidence(input: {
   readonly body?: string;
   readonly bodyBytes: number;
   readonly responseByteBudget: number;
+  readonly contentTypeAllowlist?: readonly string[];
   readonly redirectOrigins?: readonly string[];
   readonly auditRecord?: BrowserNetworkAuditRecord;
   readonly redactions?: readonly string[];
   readonly warnings?: readonly string[];
 }): BrowserPublicReadOnlyWebEvidence {
-  const body = input.method === "HEAD" ? "" : sanitizeBrowserText(input.body ?? "", input.responseByteBudget);
-  const safeTitle = input.method === "HEAD" ? undefined : extractTitle(body);
+  const body = input.method === "HEAD" ? "" : input.body ?? "";
+  const extraction = createBrowserReadOnlyExtraction({
+    method: input.method,
+    finalOrigin: input.finalOrigin,
+    contentType: input.contentType,
+    contentTypeAllowlist: input.contentTypeAllowlist,
+    body,
+    bodyBytes: input.bodyBytes,
+    responseByteBudget: input.responseByteBudget,
+    redirectOrigins: input.redirectOrigins,
+    warnings: input.warnings,
+    redactions: input.redactions,
+  });
+  const extractionQuality = scoreBrowserReadOnlyExtractionQuality({
+    extraction,
+    finalOrigin: input.finalOrigin,
+    redirectOrigins: input.redirectOrigins,
+  });
+  const rankedEvidence = rankBrowserReadOnlyEvidence({
+    extraction,
+    quality: extractionQuality,
+  });
+  const extractionSurface = createBrowserReadOnlyExtractionSurface({
+    extraction,
+    quality: extractionQuality,
+    rankedEvidence,
+    origin: input.finalOrigin,
+  });
+  const safeTitle = input.method === "HEAD" ? undefined : extraction.title;
   const safeText = input.method === "HEAD"
     ? "HEAD response body excluded."
-    : summarizeBody(input.request.actionKind, body, input.statusCode);
+    : summarizeBody(input.request.actionKind, extractionSurface.summary, input.statusCode);
   return {
     actionKind: input.request.actionKind,
     method: input.method,
@@ -47,6 +89,10 @@ export function createBrowserPublicReadOnlyWebEvidence(input: {
     contentLengthSummary: `${input.bodyBytes}/${input.responseByteBudget} bytes`,
     safeTitle,
     safeTextSummary: safe(safeText, 260),
+    extraction,
+    extractionQuality,
+    rankedEvidence,
+    extractionSurface,
     redirectSummary: input.redirectOrigins?.length
       ? input.redirectOrigins.map((origin) => safe(origin)).join(" -> ")
       : "none",
@@ -55,6 +101,10 @@ export function createBrowserPublicReadOnlyWebEvidence(input: {
     warnings: unique([...(input.warnings ?? []), ...(input.auditRecord?.warnings ?? [])]),
     evidence: [
       ...(input.auditRecord?.evidence ?? []),
+      ...extraction.evidence,
+      ...extractionQuality.evidence,
+      ...rankedEvidence.flatMap((item) => item.evidence),
+      ...extractionSurface.evidence,
       "browser-public-readonly-web-evidence:created",
       "browser-public-readonly-web-evidence:safe-summary-only",
       "browser-public-readonly-web-evidence:raw-body-excluded",
@@ -72,7 +122,7 @@ export function contentTypeAllowed(
 }
 
 export function publicReadOnlyBodyLooksUnsafe(value: string): boolean {
-  return /(sk-[a-z0-9]|api[_-]?key|token|secret|password|hidden reasoning|set-cookie:|authorization:|<script|data:image|ocr payload)/i.test(value);
+  return /(data:image|ocr payload)/i.test(value);
 }
 
 function summarizeBody(
@@ -87,11 +137,6 @@ function summarizeBody(
     .replace(/\s+/g, " ")
     .trim();
   return `${actionKind} status=${statusCode ?? 0}; ${text || "empty public read-only response"}`;
-}
-
-function extractTitle(body: string): string | undefined {
-  const match = body.match(/<title>([^<]+)<\/title>/i);
-  return match ? safe(match[1] ?? "", 120) : undefined;
 }
 
 function statusCodeClass(statusCode: number | undefined): string {

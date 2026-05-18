@@ -17,6 +17,7 @@ export function renderBrowserPublicReadOnlyWebSmokeReport(
     "- Browser launched: no",
     "- JavaScript executed: no",
     `- Evidence summary: ${safe(result.receipt?.evidenceSummary ?? result.reason, 260)}`,
+    `- Extraction quality: ${safe(result.receipt?.extractionQualitySummary ?? "none", 120)}`,
     `- Redactions/warnings: ${[...result.redactions, ...result.warnings].length === 0 ? "none" : [...result.redactions, ...result.warnings].map((item) => safe(item)).join(", ")}`,
     `- Next action: ${safe(result.nextAction, 240)}`,
     ...(result.uxSummary ? ["", renderBrowserPublicReadOnlyWebUxSummary(result.uxSummary)] : []),

@@ -1613,11 +1613,16 @@ safe evidence only; no browser, JavaScript, auth, cookies, or write actions.
 Route 121 adds an opt-in public read-only smoke harness and UX/report polish;
 default validation still does not access public internet. Recommended Route
 122: public read-only smoke operator docs/manual run recipe, or read-only
-extraction quality/ranking. Do not treat
+extraction quality/ranking.
+Route 122 adds content-type aware public read-only extraction quality, ranking,
+and report/sidebar summaries as post-processing only; it adds no crawling,
+browser launch, JavaScript, auth/cookies, provider/model calls, or write
+authority. Recommended Route 123: source citation and quote budget discipline,
+or extraction CLI UX polish. Do not treat
 Route 82, Route 83, Route 84, Route 85, Route 86, Route 87, Route 88, Route 89,
 Route 90, Route 91, Route 92, Route 93, Route 94, Route 95, Route 96, Route 97,
 Route 98, Route 99, Route 100, Route 101, Route 102, Route 103, Route 104,
 Route 105, Route 106, Route 107, Route 108, Route 109, Route 110, Route 111,
 Route 112, Route 113, Route 114, Route 115, Route 116, Route 117, Route 118,
-Route 119, Route 120, or Route 121 as edit-capability
+Route 119, Route 120, Route 121, or Route 122 as edit-capability
 expansions.

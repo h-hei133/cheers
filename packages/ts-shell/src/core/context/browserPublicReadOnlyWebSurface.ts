@@ -5,6 +5,7 @@ import {
   createBrowserPublicReadOnlyWebUxSummary,
   renderBrowserPublicReadOnlyWebUxSummary,
 } from "./browserPublicReadOnlyWebUxSummary.js";
+import { renderBrowserReadOnlyExtractionSurface } from "./browserReadOnlyExtractionSurface.js";
 
 export function renderBrowserPublicReadOnlyWebSurface(
   receipt: BrowserPublicReadOnlyWebReceipt,
@@ -22,6 +23,8 @@ export function renderBrowserPublicReadOnlyWebSurface(
     `- Executed: ${receipt.executed ? "yes" : "no"}`,
     `- Evidence summary: ${safe(receipt.evidenceSummary, 260)}`,
     `- Title: ${safe(receipt.safeTitle ?? "none")}`,
+    `- Extraction quality: ${safe(receipt.extractionQualitySummary)}`,
+    `- Ranked evidence: ${receipt.rankedEvidenceSummary.length ? receipt.rankedEvidenceSummary.map((item) => safe(item, 180)).join(" | ") : "none"}`,
     `- Receipt: ${safe(receipt.receiptId, 180)}`,
     `- Egress decision: ${safe(receipt.egressDecision ?? "none")}`,
     `- Egress audit: ${safe(receipt.egressAuditId ?? "none")}`,
@@ -31,6 +34,7 @@ export function renderBrowserPublicReadOnlyWebSurface(
     `- Next action: ${safe(receipt.nextAction, 240)}`,
     "",
     renderBrowserPublicReadOnlyWebUxSummary(summary),
+    ...(receipt.extractionSurface ? ["", renderBrowserReadOnlyExtractionSurface(receipt.extractionSurface)] : []),
     ...(receipt.egressAudit ? ["", renderBrowserNetworkEgressSurface(receipt.egressAudit)] : []),
   ].join("\n");
 }

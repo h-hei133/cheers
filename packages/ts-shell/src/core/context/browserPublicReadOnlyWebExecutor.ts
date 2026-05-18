@@ -178,6 +178,7 @@ export async function runBrowserPublicReadOnlyWebExecutor(input: {
         finalOrigin: currentUrl.origin.toLowerCase(),
         statusCode: response.statusCode,
         contentType,
+        contentTypeAllowlist: input.manifest.contentTypeAllowlist,
         body: response.body,
         bodyBytes,
         responseByteBudget: input.manifest.responseByteBudget,

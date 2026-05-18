@@ -22,6 +22,7 @@ export function createBrowserPublicReadOnlyWebUxSummary(
       receipt.executed
         ? `Fetched ${safe(receipt.statusCodeSummary)} with sanitized evidence only.`
         : `Reason: ${safe(receipt.evidenceSummary, 220)}`,
+      `Extraction quality: ${safe(receipt.extractionQualitySummary, 120)}`,
       `Evidence: ${safe(receipt.evidenceSummary, 220)}`,
       "Not done: browser launch, JavaScript, auth/cookies, write action, raw content persistence.",
       `Next: ${safe(receipt.nextAction, 220)}`,

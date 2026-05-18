@@ -1,6 +1,7 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
 import type { BrowserNetworkAuditRecord } from "./browserNetworkAuditRecord.js";
+import type { BrowserReadOnlyExtractionSurface } from "./browserReadOnlyExtractionSurface.js";
 import type { BrowserPublicReadOnlyWebExecutorResult } from "./browserPublicReadOnlyWebExecutor.js";
 import type { BrowserPublicReadOnlyWebManifest } from "./browserPublicReadOnlyWebManifest.js";
 import type { BrowserPublicReadOnlyWebPolicyDecision } from "./browserPublicReadOnlyWebPolicy.js";
@@ -23,6 +24,9 @@ export interface BrowserPublicReadOnlyWebReceipt {
   readonly statusCodeSummary: string;
   readonly evidenceSummary: string;
   readonly safeTitle?: string;
+  readonly extractionSurface?: BrowserReadOnlyExtractionSurface;
+  readonly extractionQualitySummary: string;
+  readonly rankedEvidenceSummary: readonly string[];
   readonly redactions: readonly string[];
   readonly warnings: readonly string[];
   readonly nextAction: string;
@@ -55,6 +59,11 @@ export function createBrowserPublicReadOnlyWebReceipt(input: {
     statusCodeSummary: input.executor.statusCode ? `http ${input.executor.statusCode}` : "none",
     evidenceSummary: sanitizeBrowserText(evidence?.safeTextSummary ?? input.executor.errorSummary ?? input.policy.reason, 260),
     safeTitle: evidence?.safeTitle,
+    extractionSurface: evidence?.extractionSurface,
+    extractionQualitySummary: evidence?.extractionQuality
+      ? `${evidence.extractionQuality.status} (${evidence.extractionQuality.score}/100)`
+      : "none",
+    rankedEvidenceSummary: evidence?.rankedEvidence.map((item) => sanitizeBrowserText(`${item.kind}: ${item.text}`, 220)).slice(0, 6) ?? [],
     redactions: unique([...input.policy.redactions, ...input.executor.redactions]),
     warnings: unique([...input.manifest.warnings, ...input.policy.warnings, ...input.executor.warnings]),
     nextAction: input.executor.executed
