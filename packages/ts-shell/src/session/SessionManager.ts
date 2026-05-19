@@ -50,6 +50,27 @@ import {
 import { projectDurableStatus } from "./durableStatusProjection.js";
 import { buildMutationContinuityState } from "./mutationContinuityState.js";
 import {
+  projectCompactRetentionPlanInput,
+} from "./sessionCompactProjection.js";
+import {
+  hasContinuationEvidence as snapshotHasContinuationEvidence,
+  hasDeterministicTerminalEvidence as snapshotHasDeterministicTerminalEvidence,
+  selectContinuationEvidenceForSnapshot,
+} from "./sessionContinuationProjection.js";
+import {
+  createLifecycleTranscriptEvent,
+  createMessageTranscriptEvent,
+  createQueryTranscriptEvent,
+  decodeTranscriptLine,
+  encodeTranscriptEvent,
+  transcriptEventToSessionMessage,
+  type TranscriptEvent,
+} from "./sessionEventCodec.js";
+import {
+  projectCurrentSessionMetadata,
+  projectSessionMetadata,
+} from "./sessionMetadataProjection.js";
+import {
   buildResumeReplayInput,
   buildSessionReplayPlan,
   normalizeReplayTranscriptEvents,
@@ -63,6 +84,11 @@ import {
   buildSessionResumeSnapshot,
   buildSuccessHandoffDiagnostic,
 } from "./sessionResumeContextBuilder.js";
+import {
+  projectRecoveryTrustBoundaryBlock,
+  projectSessionReentrySummary,
+  scoreSessionReentrySummary,
+} from "./sessionSummaryProjection.js";
 import type {
   ApprovalAuditMemoryState,
   PermissionRequestMemoryState,
@@ -98,6 +124,7 @@ export type {
   ApprovalAuditMemoryState,
   SessionContinuitySnapshot,
 } from "./sessionContinuityTypes.js";
+export type { TranscriptEvent } from "./sessionEventCodec.js";
 
 export interface SessionMessage {
   role: "user" | "assistant";
@@ -195,26 +222,6 @@ interface TranscriptRepairContext {
   readonly pendingPrompt?: string;
   readonly updatedAt: string;
 }
-
-export type TranscriptEvent =
-  | {
-      type: "message";
-      role: SessionMessage["role"];
-      content: string;
-      timestamp: string;
-    }
-  | {
-      type: "lifecycle";
-      event:
-        | "run-started"
-        | "run-interrupted"
-        | "run-completed"
-        | "run-error"
-        | "run-terminated";
-      timestamp: string;
-      detail?: string;
-    }
-  | { type: "query-event"; event: QueryEvent; timestamp: string };
 
 export interface RecoverySnapshot {
   readonly pendingPrompt?: string;
@@ -421,10 +428,10 @@ export class SessionManager {
       schemaVersion: 1,
       byProjectRoot: {
         ...current.byProjectRoot,
-        [normalizedProjectRoot]: {
+        [normalizedProjectRoot]: projectCurrentSessionMetadata({
           sessionId: normalizedSessionId,
           updatedAt: new Date().toISOString(),
-        },
+        }),
       },
     };
     this.writeCurrentSessionStore(next);
@@ -564,15 +571,16 @@ export class SessionManager {
   addTurn(sessionId: string, message: SessionMessage): void {
     const session = this.load(sessionId);
     const timestamp = new Date().toISOString();
-    const nextMessage: SessionMessage = { ...message, timestamp };
+    const nextMessage: SessionMessage & { timestamp: string } = {
+      ...message,
+      timestamp,
+    };
     session.turns.push(nextMessage);
     session.updatedAt = timestamp;
-    this.appendTranscriptEvent(sessionId, {
-      type: "message",
-      role: nextMessage.role,
-      content: nextMessage.content,
-      timestamp,
-    });
+    this.appendTranscriptEvent(
+      sessionId,
+      createMessageTranscriptEvent(nextMessage),
+    );
     this.writeSessionMetadata(session);
     this.writeSessionState(session);
   }
@@ -661,12 +669,14 @@ export class SessionManager {
     delete session.lastError;
     session.pendingPrompt = prompt;
     session.updatedAt = new Date().toISOString();
-    this.appendTranscriptEvent(sessionId, {
-      type: "lifecycle",
-      event: "run-started",
-      timestamp: session.updatedAt,
-      detail: prompt,
-    });
+    this.appendTranscriptEvent(
+      sessionId,
+      createLifecycleTranscriptEvent({
+        event: "run-started",
+        timestamp: session.updatedAt,
+        detail: prompt,
+      }),
+    );
     this.writeSessionMetadata(session);
     this.writeSessionState(session, {
       terminalReason: undefined,
@@ -679,7 +689,7 @@ export class SessionManager {
   persistUserPromptBarrier(sessionId: string, prompt: string): void {
     const session = this.load(sessionId);
     const timestamp = new Date().toISOString();
-    const nextMessage: SessionMessage = {
+    const nextMessage: SessionMessage & { timestamp: string } = {
       role: "user",
       content: prompt,
       timestamp,
@@ -691,18 +701,18 @@ export class SessionManager {
     session.updatedAt = timestamp;
     session.turns.push(nextMessage);
 
-    this.appendTranscriptEvent(sessionId, {
-      type: "lifecycle",
-      event: "run-started",
-      timestamp,
-      detail: prompt,
-    });
-    this.appendTranscriptEvent(sessionId, {
-      type: "message",
-      role: "user",
-      content: prompt,
-      timestamp,
-    });
+    this.appendTranscriptEvent(
+      sessionId,
+      createLifecycleTranscriptEvent({
+        event: "run-started",
+        timestamp,
+        detail: prompt,
+      }),
+    );
+    this.appendTranscriptEvent(
+      sessionId,
+      createMessageTranscriptEvent(nextMessage),
+    );
 
     this.writeSessionMetadata(session);
     this.writeSessionState(session, {
@@ -757,12 +767,14 @@ export class SessionManager {
     session.status = "interrupted";
     delete session.lastError;
     session.updatedAt = new Date().toISOString();
-    this.appendTranscriptEvent(sessionId, {
-      type: "lifecycle",
-      event: "run-interrupted",
-      timestamp: session.updatedAt,
-      detail: session.pendingPrompt,
-    });
+    this.appendTranscriptEvent(
+      sessionId,
+      createLifecycleTranscriptEvent({
+        event: "run-interrupted",
+        timestamp: session.updatedAt,
+        detail: session.pendingPrompt,
+      }),
+    );
     this.writeSessionMetadata(session);
     this.writeSessionState(session, {
       interruptedKind,
@@ -778,11 +790,13 @@ export class SessionManager {
     delete session.lastError;
     delete session.pendingPrompt;
     session.updatedAt = new Date().toISOString();
-    this.appendTranscriptEvent(sessionId, {
-      type: "lifecycle",
-      event: "run-completed",
-      timestamp: session.updatedAt,
-    });
+    this.appendTranscriptEvent(
+      sessionId,
+      createLifecycleTranscriptEvent({
+        event: "run-completed",
+        timestamp: session.updatedAt,
+      }),
+    );
     this.writeSessionMetadata(session);
     this.writeSessionState(session, {
       runPhase: "idle",
@@ -826,12 +840,14 @@ export class SessionManager {
       session.lastError = error;
     }
     session.updatedAt = new Date().toISOString();
-    this.appendTranscriptEvent(sessionId, {
-      type: "lifecycle",
-      event: "run-error",
-      timestamp: session.updatedAt,
-      detail: error,
-    });
+    this.appendTranscriptEvent(
+      sessionId,
+      createLifecycleTranscriptEvent({
+        event: "run-error",
+        timestamp: session.updatedAt,
+        detail: error,
+      }),
+    );
     this.writeSessionMetadata(session);
     this.writeSessionState(session, {
       runPhase: "idle",
@@ -849,11 +865,13 @@ export class SessionManager {
     delete session.lastError;
     delete session.pendingPrompt;
     session.updatedAt = new Date().toISOString();
-    this.appendTranscriptEvent(sessionId, {
-      type: "lifecycle",
-      event: "run-terminated",
-      timestamp: session.updatedAt,
-    });
+    this.appendTranscriptEvent(
+      sessionId,
+      createLifecycleTranscriptEvent({
+        event: "run-terminated",
+        timestamp: session.updatedAt,
+      }),
+    );
     this.writeSessionMetadata(session);
     this.writeSessionState(session, {
       runPhase: "idle",
@@ -923,11 +941,13 @@ export class SessionManager {
       return;
     }
 
-    this.appendTranscriptEvent(sessionId, {
-      type: "query-event",
-      event,
-      timestamp: new Date().toISOString(),
-    });
+    this.appendTranscriptEvent(
+      sessionId,
+      createQueryTranscriptEvent({
+        event,
+        timestamp: new Date().toISOString(),
+      }),
+    );
     this.applyQueryEventToState(sessionId, event);
   }
 
@@ -958,7 +978,7 @@ export class SessionManager {
       .readFileSync(transcriptPath, "utf8")
       .split("\n")
       .filter(Boolean)
-      .map((line) => JSON.parse(line) as TranscriptEvent);
+      .map(decodeTranscriptLine);
   }
 
   getRecoverySnapshot(sessionId: string): RecoverySnapshot {
@@ -1159,7 +1179,7 @@ export class SessionManager {
 
     const scored = summaries.map((summary) => ({
       summary,
-      score: this.scoreSessionReentrySummary(summary, preferredProjectRoot),
+      score: scoreSessionReentrySummary({ summary, preferredProjectRoot }),
     }));
     scored.sort((left, right) => right.score - left.score);
     const sorted = scored.map((item) => item.summary);
@@ -1364,43 +1384,12 @@ export class SessionManager {
     const recoverySnapshot = this.getRecoverySnapshot(sessionId);
     const continuitySnapshot = this.buildContinuitySnapshot(sessionId);
 
-    return {
-      id: session.id,
-      title: session.title,
-      status: session.status,
-      projectRoot: session.projectRoot,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
-      pendingPrompt: recoverySnapshot.pendingPrompt,
-      runPhase: recoverySnapshot.runPhase,
-      lastError: session.lastError,
-      durableStatus: recoverySnapshot.durableStatus,
-      terminalReason: recoverySnapshot.terminalReason,
-      terminalClassification: recoverySnapshot.terminalClassification,
-      lastUserMessage: recoverySnapshot.lastUserMessage?.content,
-      lastAssistantMessage: recoverySnapshot.lastAssistantMessage?.content,
-      recoverable: trustBoundary.recoverable,
-      resumeDisposition: trustBoundary.disposition,
-      autoResumeReady: trustBoundary.autoResumeReady,
-      resumeDetail: trustBoundary.detail,
-      ...(continuitySnapshot.lastStagedRepairStepCount !== undefined
-        ? { stagedRepairStepCount: continuitySnapshot.lastStagedRepairStepCount }
-        : {}),
-      ...(continuitySnapshot.lastStagedRepairCompletedStep !== undefined
-        ? {
-            stagedRepairCompletedStep:
-              continuitySnapshot.lastStagedRepairCompletedStep,
-          }
-        : {}),
-      ...(continuitySnapshot.lastStagedRepairBlockedStep !== undefined
-        ? { stagedRepairBlockedStep: continuitySnapshot.lastStagedRepairBlockedStep }
-        : {}),
-      ...(continuitySnapshot.lastStagedRepairNextStep !== undefined
-        ? { stagedRepairNextStep: continuitySnapshot.lastStagedRepairNextStep }
-        : {}),
-      blockedReason: trustBoundary.block?.reason,
-      blockedDetail: trustBoundary.block?.detail,
-    };
+    return projectSessionReentrySummary({
+      session,
+      trustBoundary,
+      recoverySnapshot,
+      continuitySnapshot,
+    });
   }
 
   getSessionResumeEligibility(sessionId: string): SessionResumeEligibility {
@@ -1782,7 +1771,7 @@ export class SessionManager {
       lastRepairStatus: lastCodingResult?.repair.status,
       lastRepairNotes: (lastCodingResult?.repair.notes ?? []).slice(0, 6),
       lastContinuationStatus: lastCodingResult?.continuation.status,
-      lastContinuationEvidence: this.selectContinuationEvidenceForSnapshot(
+      lastContinuationEvidence: selectContinuationEvidenceForSnapshot(
         lastCodingResult?.continuation.evidence ?? [],
       ),
       lastTaskSatisfactionVerdict: lastCodingResult?.taskSatisfaction.verdict,
@@ -2168,41 +2157,6 @@ export class SessionManager {
     return first;
   }
 
-  private scoreSessionReentrySummary(
-    summary: SessionReentrySummary,
-    preferredProjectRoot?: string,
-  ): number {
-    let score = 0;
-
-    if (summary.resumeDisposition === "fully-resumable") {
-      score += 200;
-    } else if (summary.resumeDisposition === "partially-resumable") {
-      score += 120;
-    }
-
-    if (
-      preferredProjectRoot &&
-      preferredProjectRoot === summary.projectRoot.trim()
-    ) {
-      score += 90;
-    }
-
-    if (summary.pendingPrompt?.trim()) {
-      score += 30;
-    }
-
-    if (summary.terminalClassification === "success") {
-      score -= 10;
-    }
-
-    const updatedAt = new Date(summary.updatedAt).getTime();
-    if (Number.isFinite(updatedAt)) {
-      score += Math.floor(updatedAt / 1000);
-    }
-
-    return score;
-  }
-
   private findLastQueryCompletionEvent(
     transcriptEvents: readonly TranscriptEvent[],
   ):
@@ -2391,70 +2345,6 @@ export class SessionManager {
     );
   }
 
-  private selectContinuationEvidenceForSnapshot(
-    evidence: readonly string[],
-  ): string[] {
-    if (evidence.length <= 8) {
-      return [...evidence];
-    }
-
-    const keep = evidence.slice(0, 8);
-    const criticalPrefixes = [
-      "repair-remaining-files:",
-      "repair-failed-files:",
-      "repair-processed-files:",
-      "repair-skipped-files:",
-      "repair-outcome:",
-      "transform:",
-      "replan-transform:",
-      "rebind-transform:",
-      "rebind-blocker:",
-      "verify-command-hint:",
-      "verify-target-hint:",
-      "verify-cwd-hint:",
-      "verify-resume-eligible:",
-      "verify-blocker-kind:",
-      "verify-next-action:",
-      "reopen-candidates:",
-      "why-not-auto-select:",
-      "blocked-disambiguation",
-      "reopen-target:",
-      "reopen-reason:",
-      "current-request-scope-cache-key:",
-      "current-request-scope-label:",
-      "current-request-scope-project-root:",
-      "current-request-scope-source:",
-      "current-permission-request-tool:",
-      "current-permission-request-operation:",
-      "current-permission-request-target:",
-      "current-permission-request-process:",
-      "current-permission-request-scope-key:",
-      "current-permission-request-scope-label:",
-      "current-permission-request-cache-key:",
-      "current-permission-request-project-root:",
-      "current-permission-request-source:",
-      "current-permission-request-lineage:",
-      "browser-agent-transaction-trace:",
-      "browser-agent-transaction:",
-      "browser-agent-observation:",
-      "browser-observation:",
-      "browser-agent-result:",
-      "browser-agent-reason:",
-    ];
-
-    for (const entry of evidence) {
-      const lowered = entry.toLowerCase();
-      if (
-        criticalPrefixes.some((prefix) => lowered.startsWith(prefix)) &&
-        !keep.includes(entry)
-      ) {
-        keep.push(entry);
-      }
-    }
-
-    return keep.slice(0, 16);
-  }
-
   private evaluateRecoveryTrustBoundary(
     session: Session,
   ): SessionResumeEligibility {
@@ -2489,7 +2379,7 @@ export class SessionManager {
       };
     }
 
-    const hasContinuationEvidence = this.hasContinuationEvidence(snapshot);
+    const hasContinuationEvidence = snapshotHasContinuationEvidence(snapshot);
     const hasResumeContextEvidence = this.hasResumeContextEvidence(snapshot);
     const hasInterruptedLifecycleEvidence =
       snapshot.lastLifecycleEvent?.event === "run-interrupted";
@@ -2555,7 +2445,7 @@ export class SessionManager {
       };
     }
 
-    if (!this.hasDeterministicTerminalEvidence(snapshot)) {
+    if (!snapshotHasDeterministicTerminalEvidence(snapshot)) {
       return {
         recoverable: false,
         disposition: "not-resumable",
@@ -2592,20 +2482,6 @@ export class SessionManager {
     };
   }
 
-  private hasContinuationEvidence(snapshot: RecoverySnapshot): boolean {
-    const hasPendingPrompt =
-      typeof snapshot.pendingPrompt === "string" &&
-      snapshot.pendingPrompt.trim().length > 0;
-    const hasActiveRunPhase =
-      snapshot.runPhase === "prompt-persisted" ||
-      snapshot.runPhase === "turn-active";
-    const hasPendingLifecycle =
-      Object.keys(snapshot.pendingLifecycle.pendingApprovals).length > 0 ||
-      Object.keys(snapshot.pendingLifecycle.pendingTools).length > 0;
-
-    return hasPendingPrompt || hasActiveRunPhase || hasPendingLifecycle;
-  }
-
   private hasResumeContextEvidence(snapshot: RecoverySnapshot): boolean {
     const hasLastMessages =
       Boolean(snapshot.lastUserMessage?.content?.trim()) ||
@@ -2622,35 +2498,17 @@ export class SessionManager {
     return hasLastMessages || hasCompletedTurn || hasRepairEvidence;
   }
 
-  private hasDeterministicTerminalEvidence(
-    snapshot: RecoverySnapshot,
-  ): boolean {
-    if (snapshot.durableStatus) {
-      return true;
-    }
-
-    if (snapshot.terminalClassification || snapshot.terminalReason) {
-      return true;
-    }
-
-    return (
-      snapshot.lastLifecycleEvent?.event === "run-completed" ||
-      snapshot.lastLifecycleEvent?.event === "run-error" ||
-      snapshot.lastLifecycleEvent?.event === "run-terminated"
-    );
-  }
-
   private createRecoveryTrustBoundaryBlock(
     session: Session,
     reason: RecoveryTrustBoundaryBlock["reason"],
     detail: string,
   ): RecoveryTrustBoundaryBlock {
-    return {
+    return projectRecoveryTrustBoundaryBlock({
       sessionId: session.id,
+      sessionDir: this.getSessionDir(session.id),
       reason,
       detail,
-      recoveryHint: `Session ${session.id} is not recoverable. Start a fresh session or manually repair ${this.getSessionDir(session.id)}.`,
-    };
+    });
   }
 
   private writeSession(session: Session): void {
@@ -2668,17 +2526,7 @@ export class SessionManager {
   }
 
   private writeSessionMetadata(session: Session): void {
-    const metadata: SessionMetadata = {
-      id: session.id,
-      projectRoot: session.projectRoot,
-      rootMode: session.rootMode,
-      requestedWorkspaceRoot: session.requestedWorkspaceRoot,
-      targetPathBase: session.targetPathBase,
-      gitRoot: session.gitRoot,
-      title: session.title,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
-    };
+    const metadata: SessionMetadata = projectSessionMetadata(session);
     fs.writeFileSync(
       this.getMetadataPath(session.id),
       JSON.stringify(metadata, null, 2),
@@ -2714,7 +2562,7 @@ export class SessionManager {
   ): void {
     fs.appendFileSync(
       this.getTranscriptPath(sessionId),
-      `${JSON.stringify(event)}\n`,
+      `${encodeTranscriptEvent(event)}\n`,
       "utf8",
     );
   }
@@ -2805,27 +2653,29 @@ export class SessionManager {
     const successHandoffDiagnostic = buildSuccessHandoffDiagnostic(
       queryCompleted?.result.codingResult,
     );
-    return applyCompactRetentionPlan({
-      workingMemory,
-      event,
-      turnThreshold: SessionManager.AUTO_COMPACT_TURN_THRESHOLD,
-      now,
-      ...(approvalAudit ? { approvalAudit } : {}),
-      approvalAuditHistory,
-      ...(actionHandoffSummary ? { actionHandoffSummary } : {}),
-      ...(stoppedSessionContinuity?.writeContinuity
-        ? { writeContinuity: stoppedSessionContinuity.writeContinuity }
-        : {}),
-      ...(seedInfluence ? { seedInfluence } : {}),
-      ...(seedInfluenceHandoffSummary ? { seedInfluenceHandoffSummary } : {}),
-      ...(stoppedSessionContinuity?.failureHandoffDiagnostic
-        ? {
-            failureHandoffDiagnostic:
-              stoppedSessionContinuity.failureHandoffDiagnostic,
-          }
-        : {}),
-      ...(successHandoffDiagnostic ? { successHandoffDiagnostic } : {}),
-    });
+    return applyCompactRetentionPlan(
+      projectCompactRetentionPlanInput({
+        workingMemory,
+        event,
+        turnThreshold: SessionManager.AUTO_COMPACT_TURN_THRESHOLD,
+        now,
+        ...(approvalAudit ? { approvalAudit } : {}),
+        approvalAuditHistory,
+        ...(actionHandoffSummary ? { actionHandoffSummary } : {}),
+        ...(stoppedSessionContinuity?.writeContinuity
+          ? { writeContinuity: stoppedSessionContinuity.writeContinuity }
+          : {}),
+        ...(seedInfluence ? { seedInfluence } : {}),
+        ...(seedInfluenceHandoffSummary ? { seedInfluenceHandoffSummary } : {}),
+        ...(stoppedSessionContinuity?.failureHandoffDiagnostic
+          ? {
+              failureHandoffDiagnostic:
+                stoppedSessionContinuity.failureHandoffDiagnostic,
+            }
+          : {}),
+        ...(successHandoffDiagnostic ? { successHandoffDiagnostic } : {}),
+      }),
+    );
   }
 
   private extractSeedInfluenceFromQueryResult(
@@ -3136,19 +2986,9 @@ export class SessionManager {
         .readFileSync(transcriptPath, "utf8")
         .split("\n")
         .filter(Boolean);
-      const parsedEvents = transcriptLines.map((line) => {
-        const event = JSON.parse(line) as TranscriptEvent;
-        if (event.type === "message") {
-          const message: SessionMessage = {
-            role: event.role,
-            content: event.content,
-            timestamp: event.timestamp,
-          };
-          return message;
-        }
-
-        return null;
-      });
+      const parsedEvents = transcriptLines.map((line) =>
+        transcriptEventToSessionMessage(decodeTranscriptLine(line)) ?? null,
+      );
       const turns: SessionMessage[] = parsedEvents.filter(
         (event): event is SessionMessage => event !== null,
       );

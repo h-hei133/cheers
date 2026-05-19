@@ -250,24 +250,50 @@ rewrite, and focused validation tied to touched files.
   command allowlist, permission semantics, session schema, CLI/dependencies, and
   broad runMvp structure.
 
-### Route 145: No Red-Baseline Follow-Up
+### Route 145: Session Substrate Seam Extraction
 
-- Modules: Harness Engineering, Product Triage.
-- Goal: select the next route from product value, not from remaining package
-  reds. Route 144 left no package-level failures.
-- Best candidates should come from current product blockers, with a fresh route
-  doc before implementation.
-- Stop conditions: using this placeholder to reopen provider live calls,
-  browser expansion, edit expansion, schema changes, or broad refactors.
+- Modules: Session / Continue Engineering, Result Surface Engineering,
+  Capability Contract Architecture.
+- Status: closed by `docs/architecture/session-substrate-seams.md`.
+- Result:
+  - extracted transcript event codec helpers into `sessionEventCodec.ts`
+  - extracted reentry summary/scoring and recovery block projection into
+    `sessionSummaryProjection.ts`
+  - extracted replay-safe continuation evidence selection and recovery
+    predicates into `sessionContinuationProjection.ts`
+  - extracted compact retention input projection into
+    `sessionCompactProjection.ts`
+  - extracted session/current-session metadata projection into
+    `sessionMetadataProjection.ts`
+  - added `sessionProjection.test.ts` as focused helper characterization
+- Preserved: session file schemas, transcript JSONL shape/order, compact
+  retention behavior, current-session selection behavior, CLI UX,
+  provider/browser/edit boundaries, dependencies, and broad SessionManager or
+  runMvp rewrites.
+- Validation:
+  - focused helper/session-adjacent tests pass
+  - full `runMvpIntegratedFlow.test.ts` passes
+  - full `packages/ts-shell` package sweep passes
+  - `verify:edit-capability-closeout`, `verify:result-contract`, build, and
+    `git diff --check` pass
 
-### Route 146: Git-Aware Change Attribution
+### Route 146: Tool / Policy / Result Contract Unification
 
-- Modules: Workspace / File Context Engineering, Result Surface Engineering.
-- Goal: isolate git-aware changed/pre-existing/attempted file attribution from
-  the broad runMvp suite.
-- Validation: focused git attribution tests plus result-contract/build.
-- Stop conditions: broad git workflow, commit/push behavior, or filesystem
-  discovery expansion.
+- Modules: Tool Engineering, Permission / Policy Engineering, Result Surface
+  Engineering, Capability Contract Architecture.
+- Goal: normalize existing policy/result receipt vocabulary across approval,
+  command, MCP, browser, and workspace surfaces without changing decisions,
+  provider behavior, browser behavior, or edit behavior.
+- Best first candidates:
+  - policy reason projection table for existing approval/command/MCP/browser
+    blocks
+  - shared tool/runtime receipt vocabulary consumed by result/session surfaces
+  - result-contract characterization before any user-visible wording change
+- Validation: focused helper tests, `verify:result-contract`, touched
+  capability gates, and build.
+- Stop conditions: provider live calls, browser/edit expansion, workspace
+  write-policy changes, terminal truthfulness changes without result-contract
+  evidence, broad CLI/runMvp rewrites, or dependency changes.
 
 ### Route 147: Future Edit Expansion Contract Map
 
@@ -359,8 +385,8 @@ Recommended order:
 6. Route 142: Continuation / Rebase / Lineage Cleanup.
 7. Route 143: Write / Edit Expectation Cleanup.
 8. Route 144: Approval / Transcript / Resume Harness Cleanup.
-9. Route 145: No Red-Baseline Follow-Up.
-10. Route 146: Git-Aware Change Attribution.
+9. Route 145: Session Substrate Seam Extraction.
+10. Route 146: Tool / Policy / Result Contract Unification.
 11. Route 147: Future Edit Expansion Contract Map.
 12. Route 148: Capability Lifecycle Adoption Across Edit / Browser / Shell.
 13. Route 149: Runtime Receipt Contract.
