@@ -4,6 +4,14 @@ import {
   type FutureEditContractInput,
   type FutureEditPrecondition,
 } from "./futureEditContract.js";
+import {
+  buildEditPatchMutationManifest,
+  type EditPatchMutationManifest,
+} from "./editPatchManifest.js";
+import {
+  evaluateEditPatchPreconditions,
+  type EditPatchPreconditionProjection,
+} from "./editPatchPreconditions.js";
 
 export interface FutureEditPlan {
   readonly mode: FutureEditContract["mode"];
@@ -18,6 +26,8 @@ export interface FutureEditPlan {
   readonly verificationRequirement: "required-before-future-execution" | "current-route";
   readonly rollbackRequirement: "required-before-future-execution" | "not-required";
   readonly mutationAllowedNow: boolean;
+  readonly moduleManifest: EditPatchMutationManifest;
+  readonly modulePreconditions: EditPatchPreconditionProjection;
   readonly stoppedActionableProjection: FutureEditContract["stoppedResult"];
   readonly contract: FutureEditContract;
 }
@@ -26,6 +36,13 @@ export function planFutureEditExpansion(
   input: FutureEditContractInput,
 ): FutureEditPlan {
   const contract = classifyFutureEditContract(input);
+  const moduleManifest = buildEditPatchMutationManifest({
+    contract,
+    request: input,
+  });
+  const modulePreconditions = evaluateEditPatchPreconditions({
+    manifest: moduleManifest,
+  });
   const targetHints = normalizeTargetHints(input);
   const requestedScope = inferRequestedScope(input, targetHints, contract);
   const missingInformation = contract.mutationAllowedNow
@@ -48,6 +65,8 @@ export function planFutureEditExpansion(
       ? "required-before-future-execution"
       : "not-required",
     mutationAllowedNow: contract.mutationAllowedNow,
+    moduleManifest,
+    modulePreconditions,
     stoppedActionableProjection: contract.stoppedResult,
     contract,
   };

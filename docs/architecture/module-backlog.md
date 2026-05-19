@@ -332,38 +332,36 @@ rewrite, and focused validation tied to touched files.
   closeout/result-contract/build/diff/status validation are the Route 147 final
   gates.
 
-### Route 148: Capability Lifecycle Adoption Across Edit / Browser / Shell
+### Route 148: Edit / Patch Module Development
 
-- Modules: Capability Contract Architecture, Browser Engineering, Edit / Patch
-  Engineering, Runtime Engineering, Harness / Eval Engineering.
-- Goal: apply `docs/architecture/capability-contract.md` to mature
-  capabilities through projection/report alignment only.
-- Best first candidates:
-  - browser transaction result projection alignment
-  - bounded edit/patch result projection alignment
-  - shell/tool runtime receipt vocabulary
-  - gate/report marker taxonomy for deterministic verifiers
-- Validation:
-  - `rtk npm run verify:browser-txn-gate` if browser report/result surfaces are
-    touched
-  - `rtk npm run verify:edit-capability-closeout` if edit/patch surfaces are
-    touched
-  - `rtk npm run verify:result-contract`
-  - focused helper tests
-  - `rtk npm run build -w packages/ts-shell`
-- Stop conditions: public browser expansion, edit engine expansion,
-  rollback/snapshot implementation, schema changes, or default release gate
-  changes.
+- Modules: Edit / Patch Engineering, Capability Contract Architecture, Result
+  Surface Engineering.
+- Status: closed by `docs/architecture/edit-patch-module.md`.
+- Result:
+  - added an Edit / Patch module facade over existing current edit expectation
+    and future edit expansion helpers
+  - added module-owned mutation manifest, preview/evidence substrate,
+    precondition projection, and result projection helpers
+  - represented broad refactor, multi-file discovery edit, fenced replacement,
+    and rollback/snapshot as preview/precondition states, not executable broad
+    writes
+  - kept current bounded write/edit behavior delegated to existing routes and
+    preserved workspace authority, stale-read, approval, provider, browser,
+    schema, CLI, dependency, and broad runMvp boundaries
+- Validation: focused edit module/future edit/edit expectation tests, runMvp,
+  package sweep, closeout/result-contract/build/diff/status validation are the
+  Route 148 final gates.
 
 ## Medium-Priority Follow-Up Routes
 
-### Route 149: Runtime Receipt Contract
+### Route 149: Edit / Patch Thin Integration or Runtime Receipt Contract
 
-- Modules: Runtime Engineering, Tool Engineering.
-- Goal: define a shared receipt vocabulary for local shell, daemon, browser,
-  timeout/cancel, cleanup, and redaction without moving control-plane semantics
-  into Rust.
-- Validation: docs/diff/status first; focused runtime tests if code changes.
+- Modules: Edit / Patch Engineering, Runtime Engineering, Tool Engineering.
+- Goal: either adopt the Edit / Patch module facade in one thin
+  runMvp/result-projection point, or define the shared runtime receipt
+  vocabulary for local shell, daemon, timeout/cancel, cleanup, and redaction.
+- Validation: focused helper/runtime tests first; broaden only if runMvp or
+  result/session surfaces are touched.
 
 ### Route 150: Harness and Gate Taxonomy
 
