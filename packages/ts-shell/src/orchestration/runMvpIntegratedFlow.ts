@@ -141,6 +141,10 @@ import {
   selectRepoExplainEvidenceTarget,
 } from "./repoExplainEvidence.js";
 import {
+  classifyEditExpectationContract,
+  isWriteExpectationPrompt,
+} from "./editExpectationContract.js";
+import {
   buildActionResultSeedDecisionTrace,
   buildPostEditVerifyContinuationLineage,
   continuityStateAsObject,
@@ -1050,8 +1054,11 @@ function buildWorkflowTaskPlan(
       normalizePathLike(explicitPrimaryTarget.cleaned),
     ),
   );
+  const hasWriteExpectationIntent =
+    !hasCreateIntent && isWriteExpectationPrompt(prompt);
+  const hasWriteTaskIntent = hasCreateIntent || hasWriteExpectationIntent;
   const mutationIntentTarget =
-    hasCreateIntent || hasEditIntent
+    hasWriteTaskIntent || hasEditIntent
       ? selectMutationTargetFromPrompt(prompt, targetResolution.targets)
       : undefined;
   const primaryTarget =
@@ -1067,6 +1074,19 @@ function buildWorkflowTaskPlan(
           inWorkspace: true,
         }
       : null);
+  const editExpectationContract = classifyEditExpectationContract({
+    prompt,
+    targetPath: primaryTarget?.cleaned,
+    targetCount: targetResolution.targets.length,
+    hasConcreteContent: Boolean(
+      extractFencedContent(prompt) ?? extractInlineWriteContent(prompt),
+    ),
+    hasReplaceDirective: Boolean(effectiveReplaceDirectiveFromPrompt),
+    hasFencedContent: Boolean(extractFencedContent(prompt)),
+    hasCreateIntent: hasWriteTaskIntent,
+    hasEditIntent,
+    hasReadInspectIntent: hasGroundedReadLikeIntent,
+  });
   const readContinuationLineage = [
     ...(ignoredExplicitTargetLineageOrUndefined ?? []),
     ...(readContinuityRecovery.relocationNote
@@ -2206,6 +2226,18 @@ function buildWorkflowTaskPlan(
     };
   }
 
+  if (editExpectationContract.reasonCode === "unsupported-discovery-edit") {
+    return {
+      taskKind: "edit-file",
+      reason: "discovery edit is outside current write/edit contract",
+      inspectFirst: true,
+      verifyAfterEdit: false,
+      blockedReason: `Discovery edit is unsupported in the current bounded edit contract. ${editExpectationContract.doNext}`,
+      targetMissing: true,
+      usedRestoredState,
+    };
+  }
+
   if (hasExecutionIntent && unsupportedCommand) {
     return {
       taskKind: "run-command",
@@ -2233,18 +2265,18 @@ function buildWorkflowTaskPlan(
     };
   }
 
-  if (hasCreateIntent || hasEditIntent) {
+  if (hasWriteTaskIntent || hasEditIntent) {
     if (!primaryTarget) {
       return {
-        taskKind: hasCreateIntent ? "write-file" : "edit-file",
+        taskKind: hasWriteTaskIntent ? "write-file" : "edit-file",
         reason: "write/edit intent without resolvable target",
-        inspectFirst: !hasCreateIntent,
+        inspectFirst: !hasWriteTaskIntent,
         verifyAfterEdit: hasVerifyIntent,
         ...(effectiveVerifyCommand
           ? { verifyCommand: effectiveVerifyCommand }
           : {}),
-        blockedReason: hasCreateIntent
-          ? "Target file is required for write task. Provide an explicit file path."
+        blockedReason: hasWriteTaskIntent
+          ? `Target file is required for write task. ${editExpectationContract.doNext}`
           : formatEditExecutionFailure({
               failureReason: "edit-target-missing",
               explanation:
@@ -2265,9 +2297,9 @@ function buildWorkflowTaskPlan(
 
     if (!primaryTarget.inWorkspace) {
       return {
-        taskKind: hasCreateIntent ? "write-file" : "edit-file",
+        taskKind: hasWriteTaskIntent ? "write-file" : "edit-file",
         reason: "target resolved outside workspace",
-        inspectFirst: !hasCreateIntent,
+        inspectFirst: !hasWriteTaskIntent,
         verifyAfterEdit: hasVerifyIntent,
         ...(effectiveVerifyCommand
           ? { verifyCommand: effectiveVerifyCommand }
@@ -2280,12 +2312,12 @@ function buildWorkflowTaskPlan(
     }
 
     return {
-      taskKind: hasCreateIntent ? "write-file" : "edit-file",
-      reason: hasCreateIntent
+      taskKind: hasWriteTaskIntent ? "write-file" : "edit-file",
+      reason: hasWriteTaskIntent
         ? "write intent with explicit target"
         : "edit intent with explicit target",
       targetPath: primaryTarget.cleaned,
-      inspectFirst: !hasCreateIntent,
+      inspectFirst: !hasWriteTaskIntent,
       verifyAfterEdit: hasVerifyIntent,
       ...(effectiveVerifyCommand
         ? { verifyCommand: effectiveVerifyCommand }
@@ -9179,7 +9211,7 @@ function findPromptSegmentStart(
 
 function extractInlineWriteContent(prompt: string): string | undefined {
   const zhMatch = prompt.match(
-    /(?:\u5199\u5165(?:\u4ee5\u4e0b)?\u5185\u5bb9|\u5185\u5bb9[:\uFF1A])\s*[:\uFF1A]?\s*(.+)$/u,
+    /(?:\u5199\u5165(?:\u4ee5\u4e0b)?\u5185\u5bb9|\u5185\u5bb9(?:\u662f|[:\uFF1A]))\s*[:\uFF1A]?\s*(.+)$/u,
   );
   if (zhMatch?.[1]) {
     return trimTrailingVerifyInstruction(zhMatch[1]).trim();

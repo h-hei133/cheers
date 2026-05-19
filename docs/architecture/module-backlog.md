@@ -204,25 +204,94 @@ rewrite, and focused validation tied to touched files.
 
 - Modules: Agent Loop Engineering, Edit / Patch Engineering, Result Surface
   Engineering.
-- Goal: separate stale write/edit expectations from current bounded edit
-  behavior, then repair only high-confidence product drift without expanding
-  edit capability.
-- Best first candidates:
-  - old write-file completion expectations that now require concrete content
-  - fenced/single-file repair stale terminal assertions under skipped
-    verification
-  - partial batch/discovery terminal rebaseline
-  - batch/refactor tests that should remain deferred if they require broad edit
-    expansion
+- Status: closed by `docs/architecture/edit-expectation-contract.md`.
+- Result:
+  - added `editExpectationContract.ts` as the current write/edit expectation
+    helper
+  - documented explicit target and concrete-content requirements
+  - fixed `Write <path>` routing from chat success to actionable write stopped
+  - fixed Chinese `内容是 ...` inline content parsing
+  - stopped discovery edit before command fallback
+  - rebaselined fenced/repair mutation paths under skipped verification
+  - moved broad refactor, batch edit, and discovery edit success expectations to
+    future capability routes
+- Baseline result:
+  - focused edit/write route passes with `18 passed / 140 skipped`
+  - full `runMvpIntegratedFlow.test.ts` moved from `127 passed / 24 failed`
+    to `144 passed / 7 failed`
 - Validation:
-  - focused write/edit runMvp tests
+  - focused edit expectation and write/edit runMvp tests
   - `rtk npm run verify:edit-capability-closeout`
   - `rtk npm run verify:result-contract`
   - `rtk npm run build -w packages/ts-shell`
 - Stop conditions: edit engine expansion, multi-file/add/delete/move support,
   rollback/snapshot implementation, schema changes, or CLI/dependency changes.
 
-### Route 144: Capability Lifecycle Adoption Across Edit / Browser / Shell
+### Route 144: Approval / Transcript / Resume Harness Cleanup
+
+- Modules: Session / Continue Engineering, Agent Loop Engineering, Result
+  Surface Engineering.
+- Goal: rebaseline or repair the remaining approval callback, transcript role,
+  and legacy resume harness expectations without schema changes or CLI redesign.
+- Best first candidates:
+  - explicit escalation callback prompt expectation
+  - default transcript role expectation under current planner/coder contract
+  - legacy resume role normalization stopped-cycle expectation
+- Validation:
+  - focused approval/transcript/resume runMvp tests
+  - Route 142 continuation tests
+  - Route 143 edit expectation tests
+  - `rtk npm run verify:result-contract`
+  - `rtk npm run build -w packages/ts-shell`
+- Stop conditions: SessionManager schema migration, CLI redesign, provider live
+  calls, or changing approval permission semantics.
+
+### Route 145: Provider Mock Harness Cleanup
+
+- Modules: Provider / Model Engineering, Harness Engineering, Result Surface
+  Engineering.
+- Goal: rebaseline deterministic provider mock transcript expectations without
+  provider live calls or provider/auth changes.
+- Best first candidates:
+  - planner/coder/reviewer expected-role mismatch in deterministic real-mode
+    mocks
+  - openai-compatible deterministic mock retry transcript count
+- Validation:
+  - focused provider mock runMvp tests
+  - provider readiness classification self-tests if touched
+  - `rtk npm run verify:result-contract`
+  - `rtk npm run build -w packages/ts-shell`
+- Stop conditions: real provider execution, provider config reads, auth changes,
+  or model/provider default changes.
+
+### Route 146: Git-Aware Change Attribution
+
+- Modules: Workspace / File Context Engineering, Result Surface Engineering.
+- Goal: isolate git-aware changed/pre-existing/attempted file attribution from
+  the broad runMvp suite.
+- Validation: focused git attribution tests plus result-contract/build.
+- Stop conditions: broad git workflow, commit/push behavior, or filesystem
+  discovery expansion.
+
+### Route 147: Future Edit Expansion Contract Map
+
+- Modules: Edit / Patch Engineering, Capability Contract Architecture, Harness
+  Engineering.
+- Goal: define, but not implement by default, explicit contracts for broad
+  refactor planning, multi-file discovery edit, and broader fenced replacement
+  support.
+- Best first candidates:
+  - broad refactor planning route with explicit target/constraint manifest
+  - multi-file discovery edit route with user-confirmed target selection
+  - fenced replacement support route that distinguishes bounded single-file
+    replacement from broad patch candidates
+- Validation: contract/helper tests first; runtime implementation only in a
+  separate route with focused write-boundary tests.
+- Stop conditions: implementing broad edit behavior in a planning-only route,
+  weakening workspace boundaries, skipping stale-read checks, or inferring write
+  authorization from prompt text.
+
+### Route 148: Capability Lifecycle Adoption Across Edit / Browser / Shell
 
 - Modules: Capability Contract Architecture, Browser Engineering, Edit / Patch
   Engineering, Runtime Engineering, Harness / Eval Engineering.
@@ -247,7 +316,7 @@ rewrite, and focused validation tied to touched files.
 
 ## Medium-Priority Follow-Up Routes
 
-### Route 145: Runtime Receipt Contract
+### Route 149: Runtime Receipt Contract
 
 - Modules: Runtime Engineering, Tool Engineering.
 - Goal: define a shared receipt vocabulary for local shell, daemon, browser,
@@ -255,7 +324,7 @@ rewrite, and focused validation tied to touched files.
   into Rust.
 - Validation: docs/diff/status first; focused runtime tests if code changes.
 
-### Route 146: Harness and Gate Taxonomy
+### Route 150: Harness and Gate Taxonomy
 
 - Modules: Harness Engineering, Eval / Benchmark Engineering.
 - Goal: categorize verifier scripts as product path, deterministic gate,
@@ -263,7 +332,7 @@ rewrite, and focused validation tied to touched files.
   report markers where safe.
 - Validation: `rtk git diff --check`; touched verifier self-tests only.
 
-### Route 147: Workspace / File Context Contract
+### Route 151: Workspace / File Context Contract
 
 - Modules: Workspace / File Context Engineering, Edit / Patch Engineering.
 - Goal: consolidate workspace root, target resolution, file constraints,
@@ -271,7 +340,7 @@ rewrite, and focused validation tied to touched files.
 - Validation: workspace/patch focused tests if code changes; docs/diff/status
   otherwise.
 
-### Route 148: Provider Readiness Parity Map
+### Route 152: Provider Readiness Parity Map
 
 - Modules: Provider / Model Engineering, Harness Engineering.
 - Goal: map provider readiness runtime classification to readiness scripts and
@@ -293,11 +362,15 @@ Recommended order:
 5. Route 141: Verification Planner Cleanup.
 6. Route 142: Continuation / Rebase / Lineage Cleanup.
 7. Route 143: Write / Edit Expectation Cleanup.
-8. Route 144: Capability Lifecycle Adoption Across Edit / Browser / Shell.
-9. Route 145: Runtime Receipt Contract.
-10. Route 146: Harness and Gate Taxonomy.
-11. Route 147: Workspace / File Context Contract.
-12. Route 148: Provider Readiness Parity Map.
+8. Route 144: Approval / Transcript / Resume Harness Cleanup.
+9. Route 145: Provider Mock Harness Cleanup.
+10. Route 146: Git-Aware Change Attribution.
+11. Route 147: Future Edit Expansion Contract Map.
+12. Route 148: Capability Lifecycle Adoption Across Edit / Browser / Shell.
+13. Route 149: Runtime Receipt Contract.
+14. Route 150: Harness and Gate Taxonomy.
+15. Route 151: Workspace / File Context Contract.
+16. Route 152: Provider Readiness Parity Map.
 
 Do not use this backlog to justify broad source refactors. A route is valid
 only when it reduces a user-facing runtime blocker or a named cross-layer

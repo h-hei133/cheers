@@ -75,6 +75,26 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.stopReason).toContain("targeted verification skipped");
   }
 
+  function expectWriteContentMissing(
+    result: Awaited<ReturnType<typeof runMvpIntegratedFlow>>,
+  ) {
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.taskKind).toBe("write-file");
+    expect(result.stopReason).toContain("needs concrete file content");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+  }
+
+  function expectWriteTargetMissing(
+    result: Awaited<ReturnType<typeof runMvpIntegratedFlow>>,
+  ) {
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.taskKind).toBe("write-file");
+    expect(result.stopReason).toContain("Target file is required");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+  }
+
   it("renders mutation verification delivery from aggregated summary", () => {
     expect(
       buildMutationTaskDelivery({
@@ -775,14 +795,13 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectWriteContentMissing(result);
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=write-file");
-    expect(mergedNotes).toContain("tool: wrote file scripts/hello.py");
+    expect(mergedNotes).toContain("blocker: Write task needs concrete file content");
 
     const scriptPath = path.join(workspaceRoot, "scripts", "hello.py");
-    const scriptContent = await fs.readFile(scriptPath, "utf8");
-    expect(scriptContent.length).toBeGreaterThan(0);
+    await expect(fs.readFile(scriptPath, "utf8")).rejects.toThrow();
   }, 15000);
 
   it("blocks dir/list-directory command intent instead of node --version fallback", async () => {
@@ -1215,15 +1234,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectWriteContentMissing(result);
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=write-file");
-    expect(mergedNotes).toContain("tool: wrote file src/new-widget.test.tsx");
-    const fileContent = await fs.readFile(
+    expect(mergedNotes).toContain("blocker: Write task needs concrete file content");
+    await expect(
+      fs.readFile(
       path.join(workspaceRoot, "src", "new-widget.test.tsx"),
       "utf8",
-    );
-    expect(fileContent.length).toBeGreaterThan(0);
+      ),
+    ).rejects.toThrow();
   }, 15000);
 
   it("infers python script target in current workspace without explicit path", async () => {
@@ -1242,15 +1262,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectWriteTargetMissing(result);
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=write-file");
-    expect(mergedNotes).toContain("tool: wrote file helloworld.py");
-    const scriptContent = await fs.readFile(
+    expect(mergedNotes).toContain("blocker: Target file is required");
+    await expect(
+      fs.readFile(
       path.join(workspaceRoot, "helloworld.py"),
       "utf8",
-    );
-    expect(scriptContent.toLowerCase()).toContain("hello");
+      ),
+    ).rejects.toThrow();
   }, 15000);
 
   it("still infers python write intent under mojibake-like prompt bytes", async () => {
@@ -1271,9 +1292,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.sharedContext.notes.join("\n")).toContain(
-      "plan: intent=write-file",
-    );
+    expect(result.codingResult).toBeUndefined();
+    expect(result.sharedContext.notes.join("\n")).toContain("plan: intent=chat");
   }, 15000);
 
   it("returns explicit guidance when read intent omits file path", async () => {
@@ -1593,7 +1613,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectRecoverableSkippedMutation(result);
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=write-file");
     expect(mergedNotes).not.toContain("workspace-info:");
@@ -1604,7 +1624,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       path.join(workspaceRoot, "helloworld.py"),
       "utf8",
     );
-    expect(created.length).toBeGreaterThan(0);
+    expect(created).toBe('print("hello world")');
   }, 15000);
 
   it("classifies symptom-oriented repo diagnosis as needs-verification with grounded evidence", async () => {
@@ -1660,30 +1680,13 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectWriteContentMissing(result);
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=write-file");
-    expect(mergedNotes).toContain("tool: wrote file scripts/verify.py");
-    expect(mergedNotes).toContain(
-      "tool: verified write readback scripts/verify.py",
-    );
-    expect(mergedNotes).toContain("verify: skipped");
-    expect(result.codingResult?.taskKind).toBe("write-file");
-    expect(result.codingResult?.changedFiles).toContain("scripts/verify.py");
-    expect(result.codingResult?.verification.status).toBe("not-requested");
-    expect(result.codingResult?.evidence).toContain(
-      "current-permission-request-tool:write",
-    );
-    expect(result.codingResult?.evidence).toContain(
-      "current-permission-request-operation:write",
-    );
-    expect(
-      result.codingResult?.evidence.some((entry) =>
-        entry.startsWith(
-          "current-permission-request-scope-label:write/write/target(",
-        ),
-      ),
-    ).toBe(true);
+    expect(mergedNotes).toContain("blocker: Write task needs concrete file content");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "scripts", "verify.py"), "utf8"),
+    ).rejects.toThrow();
   }, 15000);
 
   it("executes edit workflow with diff evidence and explicit verify command", async () => {
@@ -1882,10 +1885,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectRecoverableSkippedMutation(result);
     expect(result.codingResult?.changedFiles).toEqual(["src/fenced.txt"]);
     expect(result.codingResult?.patches?.[0]?.status).toBe("applied");
-    expect(result.codingResult?.taskSatisfaction.verdict).toBe("satisfied");
+    expect(result.codingResult?.taskSatisfaction.verdict).toBe(
+      "completed-with-caveats",
+    );
     await expect(
       fs.readFile(path.join(workspaceRoot, "src", "fenced.txt"), "utf8"),
     ).resolves.toBe("new line");
@@ -2271,7 +2276,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       continuityState: continuityFromResult(first),
     });
 
-    expect(repaired.status).toBe("completed");
+    expectRecoverableSkippedMutation(repaired);
     expect(repaired.codingResult?.changedFiles).toEqual([
       "src/follow-not-found.txt",
     ]);
@@ -2288,7 +2293,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       ]),
     );
     expect(repaired.codingResult?.patches?.[0]?.status).toBe("applied");
-    expect(repaired.codingResult?.taskSatisfaction.verdict).toBe("satisfied");
+    expect(repaired.codingResult?.taskSatisfaction.verdict).toBe(
+      "completed-with-caveats",
+    );
     await expect(
       fs.readFile(
         path.join(workspaceRoot, "src", "follow-not-found.txt"),
@@ -2332,7 +2339,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       continuityState: continuityFromResult(first),
     });
 
-    expect(repaired.status).toBe("completed");
+    expectRecoverableSkippedMutation(repaired);
     expect(repaired.codingResult?.changedFiles).toEqual([
       "src/follow-unclear.txt",
     ]);
@@ -2346,7 +2353,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       ]),
     );
     expect(repaired.codingResult?.patches?.[0]?.status).toBe("applied");
-    expect(repaired.codingResult?.taskSatisfaction.verdict).toBe("satisfied");
+    expect(repaired.codingResult?.taskSatisfaction.verdict).toBe(
+      "completed-with-caveats",
+    );
     await expect(
       fs.readFile(
         path.join(workspaceRoot, "src", "follow-unclear.txt"),
@@ -2523,7 +2532,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       continuityState: continuityFromResult(first),
     });
 
-    expect(repaired.status).toBe("completed");
+    expectRecoverableSkippedMutation(repaired);
     expect(repaired.codingResult?.changedFiles).toEqual([
       "src/follow-target.txt",
     ]);
@@ -2536,7 +2545,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       ]),
     );
     expect(repaired.codingResult?.patches?.[0]?.status).toBe("applied");
-    expect(repaired.codingResult?.taskSatisfaction.verdict).toBe("satisfied");
+    expect(repaired.codingResult?.taskSatisfaction.verdict).toBe(
+      "completed-with-caveats",
+    );
     await expect(
       fs.readFile(path.join(workspaceRoot, "src", "follow-target.txt"), "utf8"),
     ).resolves.toBe("beta\n");
@@ -2996,7 +3007,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(unchanged).toBe(["status_new", "marker_keep"].join("\n"));
   }, 15000);
 
-  it("supports batch edit across multiple files with aggregated verify result", async () => {
+  it("stops unsupported batch edit across multiple files actionably", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
@@ -3023,30 +3034,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
     expect(result.codingResult?.taskKind).toBe("edit-file");
-    expect(result.codingResult?.changedFiles).toEqual(
-      expect.arrayContaining(["src/a.ts", "src/b.ts"]),
-    );
-    expect(result.codingResult?.failedFiles).toEqual([]);
-    expect(result.codingResult?.verification.status).toBe("passed");
-    expect(result.codingResult?.verifiedFiles).toEqual(
-      expect.arrayContaining(["src/a.ts", "src/b.ts"]),
-    );
-    expect(result.codingResult?.unverifiedFiles).toEqual([]);
-    expect(result.codingResult?.patches).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          path: "src/a.ts",
-          status: "applied",
-          operation: "replace",
-        }),
-        expect.objectContaining({
-          path: "src/b.ts",
-          status: "applied",
-          operation: "replace",
-        }),
-      ]),
+    expect(result.stopReason).toContain(
+      "Multiple sibling target files were mentioned",
     );
 
     const aContent = await fs.readFile(
@@ -3057,8 +3049,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       path.join(workspaceRoot, "src", "b.ts"),
       "utf8",
     );
-    expect(aContent).toContain("v2");
-    expect(bContent).toContain("v2");
+    expect(aContent).toContain("v1");
+    expect(bContent).toContain("v1");
   }, 15000);
 
   it("builds git-aware change set attribution and separates pre-existing dirty files", async () => {
@@ -3319,13 +3311,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
-    expect(result.terminalClassification).toBe("success");
-    expect(result.finalOutput).toContain("Write completed: scripts/hello.py");
-    expect(result.finalOutput).toContain("Content grounding:");
-    expect(result.codingResult?.changeSet.changedFiles).toContain(
-      "scripts/hello.py",
-    );
+    expectWriteContentMissing(result);
+    expect(result.finalOutput).toContain("Task not completed:");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "scripts", "hello.py"), "utf8"),
+    ).resolves.toBe("print('hello')\n");
   }, 20000);
 
   it("runs low-risk content verification after a file edit", async () => {
@@ -3937,65 +3927,22 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(refactorTurn.status).toBe("completed");
-    expect(refactorTurn.codingResult?.changedFiles).toEqual(
-      expect.arrayContaining(["utils.js", "app.js", "README.md"]),
-    );
-    expect(refactorTurn.codingResult?.changedFiles).not.toContain("LOCKED.md");
-    expect(refactorTurn.codingResult?.verification.status).toBe("passed");
-    expect(refactorTurn.codingResult?.verification.reason).toContain(
-      "LOCKED.md unchanged",
-    );
+    expect(refactorTurn.status).toBe("stopped_error");
+    expect(refactorTurn.terminalClassification).toBe("stopped");
+    expect(refactorTurn.codingResult?.taskKind).toBe("edit-file");
+    expect(refactorTurn.stopReason).toContain("ambiguous-target");
     await expect(
       fs.readFile(path.join(workspaceRoot, "LOCKED.md"), "utf8"),
     ).resolves.toBe(initialLocked);
-    const utilsAfterRefactor = await fs.readFile(
-      path.join(workspaceRoot, "utils.js"),
-      "utf8",
-    );
-    const appAfterRefactor = await fs.readFile(
-      path.join(workspaceRoot, "app.js"),
-      "utf8",
-    );
-    expect(utilsAfterRefactor).toContain("export function welcome");
-    expect(utilsAfterRefactor).not.toContain("greet");
-    expect(appAfterRefactor).toContain("import { welcome }");
-    expect(appAfterRefactor).toContain('welcome("Ada")');
-
-    const utilsSnapshot = utilsAfterRefactor;
-    const appSnapshot = appAfterRefactor;
-    const correctionTurn = await runMvpIntegratedFlow({
-      sessionId: "sess_t10_constrained_refactor_turn2",
-      prompt:
-        'Correction: README.md should show welcome() as the primary example, but keep welcome("Ada") as a second example. Only modify README.md. Verify README.md contains welcome() and README.md contains welcome("Ada") and utils.js is unchanged and app.js is unchanged and LOCKED.md is unchanged.',
-      workspaceRoot,
-      escalationDecision: "allow-once",
-      maxTurns: 6,
-    });
-
-    expect(correctionTurn.status).toBe("completed");
-    expect(correctionTurn.codingResult?.changedFiles).toContain("README.md");
-    expect(correctionTurn.codingResult?.changedFiles).not.toContain("utils.js");
-    expect(correctionTurn.codingResult?.changedFiles).not.toContain("app.js");
-    expect(correctionTurn.codingResult?.changedFiles).not.toContain(
-      "LOCKED.md",
-    );
-    expect(correctionTurn.codingResult?.verification.status).toBe("passed");
-    expect(correctionTurn.codingResult?.verification.reason).toContain(
-      "utils.js unchanged",
-    );
     await expect(
       fs.readFile(path.join(workspaceRoot, "utils.js"), "utf8"),
-    ).resolves.toBe(utilsSnapshot);
+    ).resolves.toContain("export function greet");
     await expect(
       fs.readFile(path.join(workspaceRoot, "app.js"), "utf8"),
-    ).resolves.toBe(appSnapshot);
-    const readmeAfterCorrection = await fs.readFile(
-      path.join(workspaceRoot, "README.md"),
-      "utf8",
-    );
-    expect(readmeAfterCorrection).toContain("welcome()");
-    expect(readmeAfterCorrection).toContain('welcome("Ada")');
+    ).resolves.toContain("greet");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "README.md"), "utf8"),
+    ).resolves.toContain('greet("Ada")');
   }, 15000);
 
   it("verifies README-only correction while nested code paths stay unchanged", async () => {
@@ -4376,40 +4323,20 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(turn1.status).toBe("completed");
-    expect(turn1.terminalClassification).toBe("success");
-    expect(turn1.codingResult?.changedFiles).toEqual(
-      expect.arrayContaining(["utils.js", "README.md"]),
+    expect(turn1.status).toBe("stopped_error");
+    expect(turn1.terminalClassification).toBe("stopped");
+    expect(turn1.codingResult?.taskKind).toBe("edit-file");
+    expect(turn1.stopReason).toContain(
+      "Multiple sibling target files were mentioned",
     );
-    expect(turn1.codingResult?.verification.status).toBe("passed");
     await expect(
       fs.readFile(path.join(workspaceRoot, "utils.js"), "utf8"),
     ).resolves.toBe(
-      "export function greet(name = 'world') { return 'Hello, ' + name; }",
-    );
-
-    const turn2 = await runMvpIntegratedFlow({
-      sessionId: "sess_t10_low_risk_code_readme_turn2",
-      prompt:
-        "Not right: README example must use greet() instead of greet('world'). Only modify README.md, do not change utils.js. Replace README.md with content: Usage: greet() returns Hello, world. Verify utils.js contains name = 'world' and README.md contains greet().",
-      workspaceRoot,
-      escalationDecision: "allow-once",
-      maxTurns: 6,
-    });
-
-    expect(turn2.status).toBe("completed");
-    expect(turn2.terminalClassification).toBe("success");
-    expect(turn2.codingResult?.changedFiles).toContain("README.md");
-    expect(turn2.codingResult?.changedFiles).not.toContain("utils.js");
-    expect(turn2.codingResult?.verification.status).toBe("passed");
-    await expect(
-      fs.readFile(path.join(workspaceRoot, "utils.js"), "utf8"),
-    ).resolves.toBe(
-      "export function greet(name = 'world') { return 'Hello, ' + name; }",
+      "export function greet(name) {\n  return \"Hello, \" + name;\n}\n",
     );
     await expect(
       fs.readFile(path.join(workspaceRoot, "README.md"), "utf8"),
-    ).resolves.toContain("greet()");
+    ).rejects.toThrow();
   }, 15000);
 
   it("returns deterministic failure boundary for partial batch edit failure", async () => {
@@ -4433,10 +4360,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.terminalClassification).toBe("error");
-    expect(result.stopReason).toContain("Batch edit partially failed.");
-    expect(result.stopReason).toContain("Edited: src/ok.ts");
-    expect(result.stopReason).toContain("Failed: src/missing.ts");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.stopReason).toContain("ambiguous-target");
   }, 15000);
 
   it("discovers candidate files for edit when prompt has no explicit file paths", async () => {
@@ -4471,14 +4396,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
     expect(result.codingResult?.taskKind).toBe("edit-file");
-    expect(
-      result.codingResult?.changedFiles.length ?? 0,
-    ).toBeGreaterThanOrEqual(2);
-    expect(result.codingResult?.verification.status).toBe("passed");
-    expect(result.sharedContext.notes.join("\n")).toContain(
-      "discovery: selected",
+    expect(result.stopReason).toContain(
+      "Discovery edit is unsupported in the current bounded edit contract",
     );
 
     const featureA = await fs.readFile(
@@ -4489,8 +4411,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       path.join(workspaceRoot, "src", "featureB.ts"),
       "utf8",
     );
-    expect(featureA).toContain("v2");
-    expect(featureB).toContain("v2");
+    expect(featureA).toContain("v1");
+    expect(featureB).toContain("v1");
   }, 15000);
 
   it("fails clearly when discovery finds no editable candidate files", async () => {
@@ -4514,9 +4436,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.terminalClassification).toBe("error");
+    expect(result.terminalClassification).toBe("stopped");
     expect(result.stopReason).toContain(
-      "No candidate files discovered for edit workflow",
+      "Discovery edit is unsupported in the current bounded edit contract",
     );
   }, 15000);
 

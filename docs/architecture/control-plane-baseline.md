@@ -302,3 +302,43 @@ Current remaining deferred owner counts:
 | provider mock harness | 3 | rebaseline deterministic provider harness without live calls |
 | approval/transcript/resume harness | 3 | rebaseline role, approval prompt, and legacy resume expectations |
 | git/change-set attribution | 1 | isolate git-aware attribution from runMvp broad suite |
+
+## Route 143 Addendum
+
+Closeout doc: `docs/architecture/edit-expectation-contract.md`.
+
+Route 143 repaired and rebaselined the write/edit expectation cluster:
+
+- full `runMvpIntegratedFlow.test.ts` moved from `127 passed / 24 failed` to
+  `144 passed / 7 failed`
+- focused edit expectation helper tests passed with `7 passed`
+- focused edit/write runMvp route passed with `18 passed / 140 skipped`
+- `editExpectationContract.ts` defines concrete write, missing content,
+  missing target, bounded edit, unsupported refactor, unsupported batch edit,
+  unsupported discovery edit, no-write inspect, and ambiguous mutation states
+- `Write <path>` now routes to write-file stopped/actionable instead of chat
+  success when content is missing
+- Chinese inline content `内容是 ...` is recognized as concrete content
+- discovery edit is stopped before command fallback
+- broad refactor, batch edit, discovery edit, and generated script content
+  remain future routes rather than current capability expansion
+
+Removed from the deferred red baseline by Route 143:
+
+| Test family | Route 143 outcome |
+|---|---|
+| vague write/create script without content | rebaselined to concrete-content stopped |
+| explicit write path without content | fixed routing and rebaselined to concrete-content stopped |
+| inferred Python/current-directory target | rebaselined to target-required stopped |
+| explicit Chinese content write | fixed content parsing; skipped verification remains recoverable stopped |
+| fenced single-file replacement and repair follow-ups | mutation applies; skipped verification remains recoverable stopped |
+| batch/refactor/discovery edit expectations | moved to backlog/explicit stopped assertions |
+| partial batch/discovery terminal classification | rebaselined to actionable stopped |
+
+Current remaining deferred owner counts:
+
+| Owner | Count | Best next action |
+|---|---:|---|
+| approval/transcript/resume harness | 3 | rebaseline role, approval prompt, and legacy resume expectations |
+| provider mock harness | 3 | rebaseline deterministic provider harness without live calls |
+| git/change-set attribution | 1 | isolate git-aware attribution from runMvp broad suite |
