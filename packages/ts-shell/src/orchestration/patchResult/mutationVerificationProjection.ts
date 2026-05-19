@@ -226,6 +226,8 @@ function taskVerdictFor(
   if (
     input.verification.status === "failed" ||
     input.verification.status === "blocked" ||
+    (input.changedFiles.length > 0 &&
+      input.verification.status === "skipped") ||
     kind === "verification-failed" ||
     kind === "verification-blocked" ||
     kind === "protected-file-changed"
@@ -253,11 +255,20 @@ function taskReasonsFor(
     return ["Workflow stopped on blocker/failure."];
   }
   if (input.verification.status === "failed") {
-    return ["Edit applied but verify failed; repair required."];
+    return [
+      input.verification.reason ??
+        "Edit applied but verify failed; repair required.",
+    ];
   }
   if (input.verification.status === "blocked") {
     return [
       `Edit applied but verify was blocked (${input.verification.blockerKind ?? "unknown"}); follow next action before continuing.`,
+    ];
+  }
+  if (input.verification.status === "skipped") {
+    return [
+      input.verification.reason ??
+        "Edit applied but selected verification was skipped.",
     ];
   }
   return ["Workflow completed under inspect/edit/verify contract."];

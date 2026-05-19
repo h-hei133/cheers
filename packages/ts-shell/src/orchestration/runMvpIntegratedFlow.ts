@@ -117,6 +117,16 @@ import {
   classifyReadInspectIntent,
   isPathOnlyReadIntentPrompt,
 } from "./readInspectIntent.js";
+import {
+  planVerification,
+  planVerificationRetry,
+  stripVerificationTailForMutationTarget,
+} from "./verificationPlanner.js";
+import {
+  projectCommandVerificationResult,
+  projectNotRequestedVerification,
+  projectSkippedVerification,
+} from "./verificationResultProjection.js";
 import { resolveReadContinuationTargetRecovery } from "./readContinuationTarget.js";
 import {
   inferDiagnosisEvidenceRole,
@@ -660,7 +670,19 @@ function buildWorkflowTaskPlan(
     hasExecutionIntent,
     unsupportedCommand,
   } = extractWorkflowTaskIntentSignals(prompt, continuity);
-  const targetResolution = resolveTaskTargets(prompt, workspaceRoot);
+  let targetResolution = resolveTaskTargets(prompt, workspaceRoot);
+  if (targetResolution.blocker && hasVerifyIntent) {
+    const mutationTargetPrompt = stripVerificationTailForMutationTarget(prompt);
+    if (mutationTargetPrompt && mutationTargetPrompt !== prompt.trim()) {
+      const mutationTargetResolution = resolveTaskTargets(
+        mutationTargetPrompt,
+        workspaceRoot,
+      );
+      if (!mutationTargetResolution.blocker && mutationTargetResolution.primaryTarget) {
+        targetResolution = mutationTargetResolution;
+      }
+    }
+  }
   const browserPlan = detectBrowserAgentPlan({
     prompt,
     continuityState: continuity,
@@ -4035,7 +4057,7 @@ async function executeWorkflowTaskPlan(input: {
   if (
     input.plan.taskKind === "edit-file" &&
     input.plan.verifyCommand &&
-    !input.plan.verifyAfterEdit
+    input.plan.verifyAfterEdit
   ) {
     evidence.push(`verify-command-hint:${input.plan.verifyCommand}`);
     if (input.plan.targetPath) {
@@ -5424,9 +5446,17 @@ async function executeWorkflowTaskPlan(input: {
     }
   }
 
-  if (input.plan.verifyAfterEdit && changedFiles.length > 0) {
-    const verifyCommand = input.plan.verifyCommand;
-    if (!verifyCommand) {
+  const verificationPlan = planVerification({
+    taskKind: input.plan.taskKind,
+    prompt: input.prompt,
+    changedFiles,
+    explicitVerifyRequested: input.plan.verifyAfterEdit,
+    explicitVerifyCommand: input.plan.verifyAfterEdit
+      ? input.plan.verifyCommand
+      : undefined,
+  });
+
+  if (verificationPlan.mode === "low-risk") {
       const lowRiskVerificationPlan = planLowRiskVerification({
         prompt: input.prompt,
         changedFiles,
@@ -5812,21 +5842,27 @@ async function executeWorkflowTaskPlan(input: {
           notes.push("verify blocked: no verify strategy");
         }
       }
-    } else {
-      const currentVerifyScope = deriveCurrentPermissionRequestFromToolInput({
-        toolName: "bash",
-        operation: "spawn",
-        target: verifyCommand,
-        workspaceRoot: input.workspaceRoot,
-        source: "verification-command",
-        lineageHint: "verify-after-edit",
-      });
-      appendCurrentRequestScopeEvidence(evidence, currentVerifyScope);
+  } else if (verificationPlan.mode === "command" && verificationPlan.command) {
+    const verifyCommand = verificationPlan.command;
+    const currentVerifyScope = deriveCurrentPermissionRequestFromToolInput({
+      toolName: "bash",
+      operation: "spawn",
+      target: verifyCommand,
+      workspaceRoot: input.workspaceRoot,
+      source: "verification-command",
+      lineageHint: "verify-after-edit",
+    });
+    appendCurrentRequestScopeEvidence(evidence, currentVerifyScope);
+
+    for (let attempt = 1; attempt <= verificationPlan.maxAttempts; attempt += 1) {
       const verifyResult = await dispatchToolWithLifecycle({
         dispatcher: input.dispatcher,
         events,
         toolName: "bash",
-        taskId: `task_${input.sessionId}_${input.turn}_verify`,
+        taskId:
+          attempt === 1
+            ? `task_${input.sessionId}_${input.turn}_verify`
+            : `task_${input.sessionId}_${input.turn}_verify_retry_${attempt}`,
         args: { command: verifyCommand },
         workspaceRoot: input.workspaceRoot,
         sessionId: input.sessionId,
@@ -5834,27 +5870,42 @@ async function executeWorkflowTaskPlan(input: {
         requireApprovalEvent: true,
         provenanceCollector,
       });
+      const failure = verifyResult.success
+        ? undefined
+        : classifyVerificationFailure(verifyResult);
+      const retry = planVerificationRetry({
+        plan: verificationPlan,
+        attempt,
+        outcome: verifyResult.success
+          ? "passed"
+          : failure?.status === "blocked"
+            ? "blocked"
+            : "failed",
+      });
+      const projected = projectCommandVerificationResult({
+        plan: verificationPlan,
+        result: verifyResult,
+        attempt,
+        retry,
+        targetPath: input.plan.targetPath,
+        workspaceRoot: input.workspaceRoot,
+        verifyLikeCommand: isVerifyLikeCommand(verifyCommand),
+      });
+      verification = projected.verification;
+
+      if (retry.status === "retry-planned") {
+        notes.push(
+          `verify retry planned: ${verifyCommand} (${attempt}/${verificationPlan.maxAttempts})`,
+        );
+        evidence.push(`verify-retry:${retry.status}:${retry.reasonCode}`);
+        continue;
+      }
+
+      notes.push(projected.note);
+      evidence.push(...projected.evidence);
       if (verifyResult.success) {
-        verification = {
-          status: "passed",
-          command: verifyCommand,
-          reason: "verify completed",
-          selectionScope: "focused",
-          selectionSource: "explicit-user",
-        };
         verifiedFiles.push(...changedFiles);
-        notes.push(`verify passed: ${verifyCommand}`);
       } else {
-        const verifyFailure = classifyVerificationFailure(verifyResult);
-        verification = {
-          status: verifyFailure.status,
-          command: verifyCommand,
-          reason: verifyFailure.reason,
-          selectionScope: "focused",
-          selectionSource: "explicit-user",
-          blockerKind: verifyFailure.blockerKind,
-          nextAction: verifyFailure.nextAction,
-        };
         for (const path of changedFiles) {
           unverifiedFiles.push({
             path,
@@ -5864,17 +5915,25 @@ async function executeWorkflowTaskPlan(input: {
           });
         }
         repairNotes.push(
-          verifyFailure.status === "blocked"
-            ? `verify blocked after edit; ${verifyFailure.nextAction}`
+          verification.status === "blocked"
+            ? `verify blocked after edit; ${verification.nextAction}`
             : "verify failed after edit; inspect failing command output before continuing edits",
         );
-        notes.push(
-          verifyFailure.status === "blocked"
-            ? `verify blocked: ${verifyCommand}`
-            : `verify failed: ${verifyCommand}`,
-        );
       }
+      break;
     }
+  } else if (
+    verificationPlan.mode === "skipped" ||
+    verificationPlan.mode === "unavailable"
+  ) {
+    verification = projectSkippedVerification(verificationPlan);
+    for (const path of changedFiles) {
+      unverifiedFiles.push({
+        path,
+        reason: verification.reason ?? "verification skipped",
+      });
+    }
+    notes.push(`verify skipped: ${verification.reason ?? "not available"}`);
   } else if (changedFiles.length > 0) {
     for (const path of changedFiles) {
       unverifiedFiles.push({
@@ -5882,12 +5941,7 @@ async function executeWorkflowTaskPlan(input: {
         reason: "verify step was not requested in prompt",
       });
     }
-    verification = {
-      status: "not-requested",
-      reason: "mutation completed without explicit verify intent",
-      selectionScope: "none",
-      selectionSource: "not-requested",
-    };
+    verification = projectNotRequestedVerification(verificationPlan);
   }
 
   if (failedFiles.length > 0 && repairNotes.length === 0) {
@@ -9783,6 +9837,10 @@ function normalizePathLike(value: string): string {
 function stripPathTokensForIntent(prompt: string): string {
   return prompt
     .replace(/["'`](?:\.{1,2}[\\/]|[A-Za-z]:[\\/]|\/)[^"'`]+["'`]/g, " ")
+    .replace(
+      /\b(?:[\w.-]+[\\/])+[\w.-]+\.(?:d\.ts|test\.(?:ts|tsx|jsx|js)|spec\.(?:ts|tsx|jsx|js)|[A-Za-z0-9]{1,8})\b/g,
+      " ",
+    )
     .replace(/(?:\.{1,2}[\\/]|[A-Za-z]:[\\/]|\/)[^\s\u3002\uFF0C,;:!?]+/g, " ")
     .replace(/\b[\w.-]+\.[A-Za-z0-9]{1,8}\b/g, " ")
     .replace(/\s+/g, " ")

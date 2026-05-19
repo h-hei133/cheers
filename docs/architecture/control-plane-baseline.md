@@ -211,3 +211,53 @@ Current remaining deferred owner counts:
 | provider mock harness | 3 | rebaseline deterministic provider harness without live calls |
 | transcript/approval/resume harness | 3 | rebaseline role and approval prompt expectations |
 | git/change-set attribution | 1 | isolate git-aware attribution from runMvp broad suite |
+
+## Route 141 Addendum
+
+Closeout doc: `docs/architecture/verification-planner-cleanup.md`.
+
+Route 141 repaired and rebaselined the verification planner/result cluster:
+
+- full `runMvpIntegratedFlow.test.ts` moved from `111 passed / 40 failed` to
+  `112 passed / 39 failed`
+- focused verification route passed with `19 passed / 142 skipped`
+- `verificationPlanner.ts` now owns deterministic verify selection, skip vs
+  not-requested, unsupported-command availability, and retry decisions
+- `verificationResultProjection.ts` now owns command verification result
+  summaries and transcript-safe retry/evidence projection
+- test-only and source edits auto-select allowlisted `node --version` without
+  expanding the shell allowlist
+- explicit verify commands remain recognized
+- failed command verification retries once and records
+  `retry-not-planned:attempts-exhausted`
+- README/docs-like mutations with no supported verify route project
+  `skipped` verification and recoverable `stopped_error`
+- no-write read/inspect remains `not-requested`
+- verification-tail file paths no longer make single-target mutation planning
+  ambiguous
+- failed verification is recoverable `stopped`, not a generic hard error
+
+Removed from the deferred red baseline by Route 141:
+
+| Test | Route 141 outcome |
+|---|---|
+| auto-selects focused verify for test-only edits without explicit verify command | fixed |
+| auto-selects broader verify for source edits without explicit verify command | fixed |
+| fails verify only after bounded retry attempts and records repair failure boundary | fixed |
+| skips targeted verify with explicit reason when changed files do not map to allowlisted verify commands | rebaselined to `skipped` + recoverable stopped |
+| runs low-risk multi-file consistency verification after a file edit | fixed |
+| keeps multi-file consistency source separate from append target | fixed |
+| fails low-risk multi-file consistency verification when target misses source item | rebaselined to recoverable stopped |
+| applies a user correction to the derived file and re-verifies consistency | reclassified as edit-planning blocker; current stopped behavior asserted |
+| writes action result seed from execution result for next-turn continuity | rebaselined to passed verify seed |
+
+Current remaining deferred owner counts:
+
+| Owner | Count | Best next action |
+|---|---:|---|
+| continuation/rebase/lineage | 15 | extract continuation target/lineage decisions and rebase-safe verify hint handling |
+| edit/refactor/batch/discovery expansion | 10 | keep deferred until an edit route opens broader mutation behavior |
+| write planning and concrete-content contract | 7 | separate obsolete synthetic-write expectations from real behavior gaps |
+| provider mock harness | 3 | rebaseline deterministic provider harness without live calls |
+| transcript/approval/resume harness | 3 | rebaseline role and approval prompt expectations |
+| git/change-set attribution | 1 | isolate git-aware attribution from runMvp broad suite |

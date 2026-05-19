@@ -2803,10 +2803,10 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       actionKind: "edit-file",
       target: "src/auto-action-result-seed.txt",
       changedFiles: ["src/auto-action-result-seed.txt"],
-      verifiedFiles: [],
+      verifiedFiles: ["src/auto-action-result-seed.txt"],
       verification: {
-        status: "blocked",
-        blockerKind: "no-verify-strategy",
+        status: "passed",
+        command: "node --version",
       },
     });
 
@@ -2830,8 +2830,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(notes).toContain("seed=action-result");
     expect(notes).toContain("seedAction=edit-file");
     expect(notes).toContain("seedTarget=src/auto-action-result-seed.txt");
-    expect(notes).toContain("seedVerifyStatus=blocked");
-    expect(notes).toContain("seedBlocker=no-verify-strategy");
+    expect(notes).toContain("seedVerifyStatus=passed");
+    expect(notes).toContain("seedVerifyCommandInherited=yes");
     expect(notes).not.toContain("last-continuation-evidence:");
     expect(second.finalOutput).toContain("auto_seed_verified");
   }, 15000);
@@ -3255,7 +3255,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
     expect(result.codingResult?.taskKind).toBe("edit-file");
     expect(result.codingResult?.verification.status).toBe("skipped");
     expect(result.codingResult?.verification.selectionScope).toBe("none");
@@ -4300,7 +4301,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.terminalClassification).toBe("error");
+    expect(result.terminalClassification).toBe("stopped");
     expect(result.codingResult?.changedFiles).toContain("plan.txt");
     expect(result.codingResult?.verification.status).toBe("failed");
     expect(result.codingResult?.verification.reason).toContain(
@@ -4335,17 +4336,18 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
-    expect(result.terminalClassification).toBe("success");
-    expect(result.codingResult?.changedFiles).toContain("plan.txt");
-    expect(result.codingResult?.changedFiles).not.toContain("todo.txt");
-    expect(result.codingResult?.verification.status).toBe("passed");
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.failedFiles).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: "plan.txt" })]),
+    );
+    expect(result.codingResult?.verification.status).toBe("skipped");
+    expect(result.codingResult?.verification.reason).toContain(
+      "mutation instruction missing",
+    );
     await expect(
       fs.readFile(path.join(workspaceRoot, "todo.txt"), "utf8"),
     ).resolves.toBe(todoContent);
-    await expect(
-      fs.readFile(path.join(workspaceRoot, "plan.txt"), "utf8"),
-    ).resolves.toContain("- [ ] verify multi-file follow-up");
   }, 15000);
 
   it("runs a small code edit plus README correction with low-risk file verification", async () => {

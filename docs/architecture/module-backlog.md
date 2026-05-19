@@ -155,43 +155,46 @@ rewrite, and focused validation tied to touched files.
 
 - Modules: Agent Loop Engineering, Result Surface Engineering, Tool
   Engineering.
-- Goal: normalize verify command selection, skipped/not-requested semantics,
-  retry boundaries, and stopped result mapping for the largest remaining
-  user-facing failure cluster.
+- Status: closed by `docs/architecture/verification-planner-cleanup.md`.
+- Result:
+  - `verificationPlanner.ts` owns verify selection, skipped/not-requested,
+    unsupported-command availability, and retry decisions
+  - `verificationResultProjection.ts` owns command verification summaries and
+    transcript-safe retry/evidence projection
+  - auto verification selects existing allowlisted `node --version` for
+    test-only/source edits without broadening the allowlist
+  - failed command verification retries once and records attempts-exhausted
+  - skipped verification is recoverable stopped, not false completed success
+- Baseline result:
+  - focused verification route passes with `19 passed / 142 skipped`
+  - full `runMvpIntegratedFlow.test.ts` moved from `111 passed / 40 failed` to
+    `112 passed / 39 failed`
+- Preserved: provider, browser, edit expansion, shell allowlist expansion, CLI,
+  dependencies, session schema, and broad runMvp rewrite.
+
+### Route 142: Continuation / Rebase / Lineage Cleanup
+
+- Modules: Session / Continue Engineering, Agent Loop Engineering, Result
+  Surface Engineering.
+- Goal: extract and normalize continuation target, rebase, weak/no-cue lineage,
+  temporal successor, and verify-hint continuation behavior for the largest
+  remaining runMvp cluster.
 - Best first candidates:
-  - auto-select focused verify for test-only edits
-  - auto-select broader verify for source edits when safe
-  - distinguish skipped verification from not-requested verification
-  - keep failed/blocked verification result classification truthful
-  - preserve command allowlist and no provider calls
+  - weak/no-cue same-file slot activation vs clarify
+  - cross-file reopen candidate uniqueness vs ambiguity
+  - temporal successor cues (`next`, `what next`) over bounded evidence
+  - migration-like root rebasing for blocker->fix continuation
+  - verify command hint persistence after blocker repair
 - Validation:
-  - focused verification planner/result tests
-  - targeted runMvp verification cluster
-  - result mapper tests if terminal classification changes
+  - focused continuation/rebase/lineage runMvp tests
+  - continuation planning/handoff projection tests
+  - Route 140 read/inspect preservation tests
+  - Route 141 verification planner preservation tests
   - `rtk npm run verify:result-contract`
   - `rtk npm run build -w packages/ts-shell`
-- Stop conditions: shell allowlist expansion, edit engine expansion, provider
-  behavior changes, CLI UX redesign, or session schema changes.
-
-### Route 142: CLI/Core Split Preparation
-
-- Modules: CLI / UX Engineering, Session / Continue Engineering.
-- Goal: move display-only and routing-only helpers out of `cli.tsx` while
-  preserving every CLI behavior and compatibility branch.
-- Best first candidates:
-  - permissions list/explain renderer
-  - session switch diagnostics helper
-  - replay prompt script runner
-  - workspace-info prompt detector
-  - approval mode materialization projector
-- Validation:
-  - focused CLI helper tests
-  - CLI argument/mode tests when command routing is touched
-  - `rtk npm run test:gate:golden-main-path`
-  - `rtk npm run build -w packages/ts-shell`
-- Stop conditions: CLI UX redesign, slash command behavior changes,
-  provider credential changes, approval semantic changes, or session schema
-  changes.
+- Stop conditions: provider/model calls, browser/edit capability expansion,
+  session schema changes, CLI redesign, broad runMvp rewrite, or adding a new
+  persistence layer.
 
 ### Route 143: Capability Lifecycle Adoption Across Edit / Browser / Shell
 
