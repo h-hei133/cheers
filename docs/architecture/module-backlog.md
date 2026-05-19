@@ -37,8 +37,12 @@ This backlog proposes future module routes. It is not a commitment to implement 
 
 - Module: Harness Engineering
 - Goal: Behavior-preserving decomposition of `scripts/verify-real-user-capabilities.mjs` into focused support modules.
-- Expected files: `scripts/verify-real-user-capabilities.mjs`, `scripts/real-user-capabilities/*`.
+- Expected files: `scripts/verify-real-user-capabilities.mjs`, `scripts/verify/*`, existing `scripts/real-user-capabilities/*` helpers.
 - Must preserve: flags, output markers, report fields, exit codes, redaction, dirty repo guard, dry-run, real-provider opt-in boundaries.
+- Route 135 closeout note: verifier responsibilities are split behind the
+  compatibility entrypoint into `scripts/verify/{cases,env,run,result,report,residue,orchestration,index}.mjs`;
+  behavior preservation is validated by focused verifier commands and existing
+  closeout/result/build checks. Next recommended route remains Route 132.
 - Validation:
   - `rtk npm run verify:real-user-capabilities -- --suite=candidate-mutation`
   - `rtk npm run verify:real-user-capabilities -- --candidate-mutation-failure-taxonomy-self-test`

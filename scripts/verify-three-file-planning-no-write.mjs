@@ -28,7 +28,7 @@ const scenarios = [
     patch: updatePatch(['a', 'b']),
     files: { 'src/a.ts': 'a = 1\n', 'src/b.ts': 'b = 1\n' },
     expectedOutcome: 'blocked',
-    expectedClass: 'two-file-planning-no-write',
+    expectedClass: 'bounded-update-planning-no-write',
     expectedPlanned: ['src/a.ts', 'src/b.ts'],
   },
   {
@@ -43,7 +43,7 @@ const scenarios = [
     },
     expectedOutcome: 'blocked',
     expectedClass: 'unsupported',
-    expectedPlanned: [],
+    expectedPlanned: ['src/a.ts', 'src/b.ts', 'src/c.ts', 'src/d.ts'],
   },
   {
     id: 'delete-move-remain-unsupported',
@@ -187,6 +187,8 @@ function runDryRun(projectDir, patchText) {
     const blockedReason = dryRun.unsupportedCapability?.blockedReason;
     const classification = blockedReason === 'three-file-update-planning-no-write'
       ? 'three-file-planning-no-write'
+      : blockedReason === 'bounded-update-planning-no-write'
+        ? 'bounded-update-planning-no-write'
       : blockedReason === 'multi-file-update-write-not-enabled'
         ? 'two-file-planning-no-write'
         : dryRun.resultSurface?.failureCategory === 'unsupported-patch-shape'
