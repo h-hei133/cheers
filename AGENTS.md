@@ -355,6 +355,47 @@ Use these trigger rules:
 
 Do not default every round to full-repository validation. Broaden validation only when touched files cross core boundaries or focused tests cannot cover the risk.
 
+## Test Contract and Baseline Discipline
+
+Capability contracts are the source of truth for expected behavior. Tests are evidence for those contracts, not automatically the source of truth. When a test disagrees with the current capability contract, classify the mismatch before changing implementation or tests.
+
+When broad, integration, contract, or route-gate tests fail, classify each relevant failure before repair, rebaseline, skip, or deletion:
+
+- `product behavior drift`: the implementation no longer satisfies the current contract. Fix product code and add or keep focused regression coverage.
+- `stale expectation`: the test asserts an older contract. Rebaseline it to the current contract with precise assertions.
+- `harness/setup drift`: the test harness no longer matches the runtime path. Fix the harness instead of changing product behavior to satisfy the harness.
+- `obsolete scenario`: the scenario no longer represents a supported or meaningful contract. Replace it with current-contract coverage or move it to a backlog/pending note.
+- `future capability expectation`: the test describes a desired future capability, not current supported behavior. Do not keep it as a required current green gate; convert it to backlog/pending documentation, an explicit unsupported-behavior test, or an actionable stopped-result assertion.
+- `environment/flaky issue`: the failure depends on environment, network, provider, timing, or external configuration. Record the attribution and do not claim a product failure without evidence.
+
+Do not make tests pass by weakening assertions, broad skipping, deleting scenarios without replacement, or mass-rebaselining terminal text and snapshots. Rebaselined tests should become more precise under the current contract, not looser.
+
+Before changing tests:
+
+1. Identify whether the mismatch is product drift, stale expectation, harness drift, obsolete scenario, future expectation, or environment/flaky.
+2. State why the old expectation is no longer the current contract when rebaselining.
+3. Preserve or improve coverage for externally visible behavior: result status, terminal classification, reason codes, evidence markers, transcript/continue summaries, cleanup, and redaction where applicable.
+
+Before changing product code to satisfy a failing test:
+
+1. Confirm the failure is product behavior drift under the current contract.
+2. Add or preserve focused coverage for the intended contract.
+3. Run adjacent lifecycle gates for the affected capability.
+
+When extracting modules or performing behavior-preserving cleanup, add characterization coverage for externally visible shapes before relying on the extraction as safe. Pure projection, codec, planner, classifier, and result-surface extractions should preserve result status, reason codes, evidence markers, transcript/continue summaries, terminal classification, cleanup, and redaction semantics unless the route explicitly owns a contract change.
+
+Discovered baseline drift must not remain an unclassified "pre-existing failure." It must be fixed, rebaselined, moved to backlog/pending documentation, or recorded in a relevant baseline/architecture note or final report with an owner, classification, and next action.
+
+If a route touches broad integration behavior, result mapping, session/continue semantics, tool dispatch, permission/policy, or capability contracts, the final report should include baseline impact:
+
+- focused gates run
+- broad gates run or intentionally not run
+- red tests discovered
+- classification of relevant failures
+- repaired, rebaselined, deferred, or newly introduced failures
+
+Run the narrowest meaningful focused gates first. Run broad gates only when the route touches their contract area, when focused gates cannot cover the risk, or when the route is explicitly classifying baseline health.
+
 ## Validation Rules
 
 Validation should distinguish:
