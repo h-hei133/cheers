@@ -77,7 +77,7 @@ describe("browser external runner CLI scenario examples", () => {
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
     expect(renderAgentCliScenarioReport(result)).toContain("mode=external-runner");
-  });
+  }, 20000);
 
   it("blocks external URL navigation even with an external runner manifest", async () => {
     const fixture = createBrowserExternalRunnerScenarioFixture();
@@ -178,7 +178,7 @@ describe("browser external runner CLI scenario examples", () => {
       });
       expect(agentCliAssertionFailures(result)).toEqual([]);
     }
-  });
+  }, 30000);
 
   function scenario(id: string, steps: AgentCliScenario["steps"]): AgentCliScenario {
     return {

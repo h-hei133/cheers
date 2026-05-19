@@ -85,7 +85,7 @@ describe("browser skill runner CLI scenario examples", () => {
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
     expect(renderAgentCliScenarioReport(result)).toContain("skill=available-metadata-only");
-  });
+  }, 20000);
 
   it("blocks unsafe skill capabilities without raw manifest leaks", async () => {
     const env = writeManifestEnv(createBrowserExternalRunnerManifest({

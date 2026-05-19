@@ -111,6 +111,51 @@ describe('shell runtime context', () => {
     })
   })
 
+  it('falls back to project root when legacy runtime context lacks target path base', () => {
+    const context = createShellRuntimeContext({
+      cwd: 'D:/repo',
+      originalCwd: 'D:/repo',
+      projectRoot: 'D:/repo',
+      rootMode: 'git-root',
+      targetPathBase: 'D:/repo',
+      gitRoot: 'D:/repo',
+      runtimeConfig: {
+        provider: 'openai',
+        daemonEnabled: true,
+        maxTurns: 6,
+        disabledTools: [],
+        hiddenToolPrefixes: [],
+        enableMcpTools: true,
+        configSources: [],
+      },
+      gitContext: {
+        insideGit: true,
+        branch: 'main',
+        isClean: true,
+        root: 'D:/repo',
+      },
+      session: {
+        id: 'sess_old',
+        createdAt: 'now',
+        updatedAt: 'now',
+        status: 'active',
+        turns: [],
+      },
+    })
+    delete (context as { targetPathBase?: string }).targetPathBase
+
+    applyShellSubstrateTransition(context, {
+      projectRoot: 'D:/repo',
+    })
+
+    expect(context.targetPathBase).toBe('D:/repo')
+    expect(
+      context.rootBindingDiagnostics.some(
+        (diagnostic) => diagnostic.code === 'root-binding-target-base-mismatch',
+      ),
+    ).toBe(false)
+  })
+
   it('reports root binding diagnostics without warning on normal bindings', () => {
     const gitRootDiagnostics = resolveRootBindingDiagnostics({
       projectRoot: 'D:/repo',

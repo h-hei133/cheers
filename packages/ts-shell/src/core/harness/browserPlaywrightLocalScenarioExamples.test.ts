@@ -202,8 +202,8 @@ describe("browser Playwright local real CLI scenario examples", () => {
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
-    expect(renderAgentCliScenarioReport(result)).toContain(
-      "Browser execution evidence: present; executed=no; mode=playwright-local; manifest=valid; dependency=external-runner-only",
-    );
+    const report = renderAgentCliScenarioReport(result);
+    expect(report).toContain("Browser execution evidence: present; executed=no; mode=playwright-local; manifest=valid");
+    expect(report).toContain("dependency=external-runner-only");
   });
 });

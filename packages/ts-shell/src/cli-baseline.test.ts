@@ -4657,17 +4657,19 @@ describe("CLI streaming baseline (T3)", () => {
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     expect(output).toContain("Execution summary");
     expect(output).toContain("Result");
-    expect(output).toContain("- Outcome: success");
+    expect(output).toContain("- Outcome: stopped");
+    expect(output).not.toContain("- Outcome: success");
+    expect(output).toContain(
+      "targeted verification skipped: changed files do not map to a supported allowlisted verification command",
+    );
     expect(output).toContain("Action result");
     expect(output).toContain("- Task: write-file");
     expect(output).toContain("- Changed: 1 file(s)");
     expect(output).toContain("- Changed files: note.txt");
     expect(output).toContain("- Verification:");
+    expect(output).toContain("- Verification: skipped");
     expect(output).toContain(
-      "- Verification detail: No verification was requested; changed files were not checked.",
-    );
-    expect(output).toContain(
-      "- Next action: Ask for an explicit low-risk verification if you want the changed files checked.",
+      "- Note: targeted verification skipped: changed files do not map to a supported allowlisted verification command",
     );
     expect(fs.readFileSync(path.join(projectRoot, "note.txt"), "utf8")).toContain(
       "hello execution surface",

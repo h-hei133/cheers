@@ -145,7 +145,14 @@ describe('shell recovery read-model priority', () => {
         renderer: { renderLine() {} } as never,
       })
 
-      expect(result).toEqual({ resumed: true })
+      expect(result).toMatchObject({ resumed: true })
+      if (!result.resumed || !result.autoResume) {
+        throw new Error('Expected auto-resume payload')
+      }
+      await runtime.executePrompt(session.id, result.autoResume.prompt, {
+        runtimeSeed: result.autoResume.runtimeSeed,
+        continuityState: result.autoResume.continuityState,
+      })
       expect(capturedRuntimeSeed?.recoveryBoundary).toBe('fresh-entry')
       expect(capturedRuntimeSeed?.truthBoundary.continuationSafety).toBe('fresh-only')
       expect(capturedRuntimeSeed?.truthBoundary.policyEvidence.has('repair-drift')).toBe(true)

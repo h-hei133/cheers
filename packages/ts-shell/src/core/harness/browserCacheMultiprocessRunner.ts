@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { createBrowserReceiptCacheManifest } from "../context/browserReceiptCacheManifest.js";
 import { createBrowserReceiptCacheStore } from "../context/browserReceiptCacheStore.js";
 import { scanBrowserReceiptCacheIntegrity } from "../context/browserReceiptCacheIntegrity.js";
@@ -146,15 +147,39 @@ async function runGroup(
     return Promise.all(group.map((step) => runStep(step)));
   }
   const lockHolderRuns = lockHolders.map((step) => runStep(step));
-  await delay(250);
-  const otherRuns = group
-    .filter((step) => step.role !== "lock-holder")
-    .map((step) => runStep(step));
-  return Promise.all([...lockHolderRuns, ...otherRuns]);
+  await waitForReadyFiles(lockHolders.map((step) => step.readyFilePath));
+  const otherSteps = group.filter((step) => step.role !== "lock-holder");
+  const otherResults = await Promise.all(otherSteps.map((step) => runStep(step)));
+  releaseLockHolders(lockHolders);
+  const lockHolderResults = await Promise.all(lockHolderRuns);
+  return [...lockHolderResults, ...otherResults];
 }
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForReadyFiles(paths: readonly (string | undefined)[]): Promise<void> {
+  const readyPaths = paths.filter((path): path is string => Boolean(path));
+  if (readyPaths.length === 0) {
+    await delay(250);
+    return;
+  }
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (readyPaths.every((path) => fs.existsSync(path))) {
+      return;
+    }
+    await delay(20);
+  }
+}
+
+function releaseLockHolders(steps: readonly BrowserCacheProcessStep[]): void {
+  for (const step of steps) {
+    if (!step.releaseFilePath) {
+      continue;
+    }
+    fs.writeFileSync(step.releaseFilePath, "release\n", "utf8");
+  }
 }
 
 function groupSteps(

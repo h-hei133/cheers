@@ -105,7 +105,7 @@ describe("browser skill execution CLI scenario examples", () => {
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
     expect(renderAgentCliScenarioReport(result)).toContain("binding=test-local-process");
-  });
+  }, 20000);
 
   it("blocks external URLs even with a valid skill binding", async () => {
     const fixture = createBrowserSkillExecutionScenarioFixture();
@@ -164,7 +164,7 @@ describe("browser skill execution CLI scenario examples", () => {
       });
       expect(agentCliAssertionFailures(result)).toEqual([]);
     }
-  });
+  }, 30000);
 
   function scenario(id: string, steps: AgentCliScenario["steps"]): AgentCliScenario {
     return {

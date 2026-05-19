@@ -125,7 +125,8 @@ export function applyShellSubstrateTransition(
   const nextRootMode = transition.rootMode ?? context.rootMode
   const nextRequestedWorkspaceRoot =
     transition.requestedWorkspaceRoot ?? context.requestedWorkspaceRoot
-  const nextTargetPathBase = transition.targetPathBase ?? context.targetPathBase
+  const nextTargetPathBase =
+    transition.targetPathBase ?? context.targetPathBase ?? nextProjectRoot
   const nextGitRoot =
     Object.prototype.hasOwnProperty.call(transition, "gitRoot")
       ? (transition.gitRoot ?? null)

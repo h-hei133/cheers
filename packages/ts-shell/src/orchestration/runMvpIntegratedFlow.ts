@@ -59,6 +59,10 @@ import {
   type ToolLifecycleResult,
 } from "./flowDispatch.js";
 import {
+  attributeGitChangeSet,
+  snapshotGitChangeSet,
+} from "./gitChangeSetAttribution.js";
+import {
   projectBrowserContinuationResult,
   projectBrowserObservationResult,
   projectBrowserTransactionResult,
@@ -1322,16 +1326,18 @@ function buildWorkflowTaskPlan(
           interruptedGoalRepairDirective,
       })
     : undefined;
+  const hasVerifyContinuationStateSignal =
+    hasDiagnosticVerifyHandoffCue ||
+    lastTaskHadVerifySignal ||
+    hasVerifyLineageHint ||
+    Boolean(rawContinuityTargetPath);
   const hasVerifyObjectCue =
     (hasVerifyContinuationCue ||
       hasDiagnosticVerifyHandoffCue ||
       (reflectiveStateQueryKind === "next-step" &&
         hasReflectiveActionCue &&
         (hasVerifyIntent || hasBlockedVerifyResumeContext))) &&
-    (hasContinuationCue ||
-      hasExecutionCorrectionCue ||
-      lastTaskHadVerifySignal ||
-      hasVerifyLineageHint);
+    (hasExecutionCorrectionCue || hasVerifyContinuationStateSignal);
   const verifyContinuationTargetPath = primaryTarget?.inWorkspace
     ? primaryTarget.cleaned
     : hasVerifyObjectCue
@@ -4093,6 +4099,7 @@ async function executeWorkflowTaskPlan(input: {
   const repairNotes: string[] = [];
   const evidence: string[] = [];
   const provenanceCollector = createCodingResultProvenanceCollector();
+  const preRunGitChangeSet = snapshotGitChangeSet(input.workspaceRoot);
   const appliedContentByPath = new Map<string, string>();
   const mutationResults: FileMutationExecutionResult[] = [];
   notes.push(...input.freshnessObservability.notes);
@@ -6108,10 +6115,22 @@ async function executeWorkflowTaskPlan(input: {
           provenance: summarizeCodingResultProvenance(provenanceCollector),
         });
 
+  const codingResult =
+    input.plan.taskKind === "run-command"
+      ? resultContract.codingResult
+      : {
+          ...resultContract.codingResult,
+          changeSet: attributeGitChangeSet({
+            workspaceRoot: input.workspaceRoot,
+            preRun: preRunGitChangeSet,
+            changeSet: resultContract.codingResult.changeSet,
+          }),
+        };
+
   return {
     events,
     notes,
-    codingResult: resultContract.codingResult,
+    codingResult,
     userFacingOutput: resultContract.userFacingOutput,
   };
 }

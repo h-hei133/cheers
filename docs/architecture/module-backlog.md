@@ -227,42 +227,38 @@ rewrite, and focused validation tied to touched files.
 - Stop conditions: edit engine expansion, multi-file/add/delete/move support,
   rollback/snapshot implementation, schema changes, or CLI/dependency changes.
 
-### Route 144: Approval / Transcript / Resume Harness Cleanup
+### Route 144: runMvp Final Closeout and Package Sweep
 
 - Modules: Session / Continue Engineering, Agent Loop Engineering, Result
-  Surface Engineering.
-- Goal: rebaseline or repair the remaining approval callback, transcript role,
-  and legacy resume harness expectations without schema changes or CLI redesign.
-- Best first candidates:
-  - explicit escalation callback prompt expectation
-  - default transcript role expectation under current planner/coder contract
-  - legacy resume role normalization stopped-cycle expectation
-- Validation:
-  - focused approval/transcript/resume runMvp tests
-  - Route 142 continuation tests
-  - Route 143 edit expectation tests
-  - `rtk npm run verify:result-contract`
-  - `rtk npm run build -w packages/ts-shell`
-- Stop conditions: SessionManager schema migration, CLI redesign, provider live
-  calls, or changing approval permission semantics.
+  Surface Engineering, Harness Engineering.
+- Status: closed by `docs/architecture/runmvp-package-closeout.md`.
+- Result:
+  - full `runMvpIntegratedFlow.test.ts` moved from `144 passed / 7 failed` to
+    `151 passed`
+  - package sweep moved from `2017 passed / 30 failed / 1 skipped` to
+    `2051 passed / 1 skipped`
+  - repaired explicit approval callback routing when generic `continue` wording
+    appeared without verify lineage
+  - added git-aware mutation change-set attribution
+  - repaired sandbox bare-command escalation for process spawn checks
+  - repaired legacy recovery `targetPathBase` fallback
+  - rebaselined stale transcript, resume, provider-mock, slash, CLI, trace, and
+    browser harness expectations to current contracts
+  - stabilized browser cache busy-lock and sandbox audit harness assertions under
+    package-level parallel load
+- Preserved: provider live-call boundary, browser/edit capability boundaries,
+  command allowlist, permission semantics, session schema, CLI/dependencies, and
+  broad runMvp structure.
 
-### Route 145: Provider Mock Harness Cleanup
+### Route 145: No Red-Baseline Follow-Up
 
-- Modules: Provider / Model Engineering, Harness Engineering, Result Surface
-  Engineering.
-- Goal: rebaseline deterministic provider mock transcript expectations without
-  provider live calls or provider/auth changes.
-- Best first candidates:
-  - planner/coder/reviewer expected-role mismatch in deterministic real-mode
-    mocks
-  - openai-compatible deterministic mock retry transcript count
-- Validation:
-  - focused provider mock runMvp tests
-  - provider readiness classification self-tests if touched
-  - `rtk npm run verify:result-contract`
-  - `rtk npm run build -w packages/ts-shell`
-- Stop conditions: real provider execution, provider config reads, auth changes,
-  or model/provider default changes.
+- Modules: Harness Engineering, Product Triage.
+- Goal: select the next route from product value, not from remaining package
+  reds. Route 144 left no package-level failures.
+- Best candidates should come from current product blockers, with a fresh route
+  doc before implementation.
+- Stop conditions: using this placeholder to reopen provider live calls,
+  browser expansion, edit expansion, schema changes, or broad refactors.
 
 ### Route 146: Git-Aware Change Attribution
 
@@ -363,7 +359,7 @@ Recommended order:
 6. Route 142: Continuation / Rebase / Lineage Cleanup.
 7. Route 143: Write / Edit Expectation Cleanup.
 8. Route 144: Approval / Transcript / Resume Harness Cleanup.
-9. Route 145: Provider Mock Harness Cleanup.
+9. Route 145: No Red-Baseline Follow-Up.
 10. Route 146: Git-Aware Change Attribution.
 11. Route 147: Future Edit Expansion Contract Map.
 12. Route 148: Capability Lifecycle Adoption Across Edit / Browser / Shell.

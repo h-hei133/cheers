@@ -480,8 +480,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(prompts.length).toBeGreaterThan(0);
     expect(result.status).toBe("stopped_error");
-    expect(result.terminalClassification).toBe("error");
-    expect(result.stopReason).toContain("Approval denied by user for bash");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.stopReason).toContain("Re-run and approve escalation");
+    expect(result.codingResult?.verification.blockerKind).toBe("approval-denied");
   }, 15000);
 
   it("keeps synthetic escalation fallback injection-only: default path denies, explicit injection allows", async () => {
@@ -692,7 +693,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     }
   }, 15000);
 
-  it("uses default single-assistant task contract without visible role labels", async () => {
+  it("keeps default task transcript internal while hiding role labels from output", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
@@ -708,13 +709,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.transcript.map((turn) => turn.role)).toEqual(["coder"]);
+    expect(result.transcript.map((turn) => turn.role)).toEqual([
+      "planner",
+      "coder",
+    ]);
     expect(result.finalOutput).not.toContain("PLANNER:");
     expect(result.finalOutput).not.toContain("CODER:");
     expect(result.finalOutput).not.toContain("REVIEWER:");
   }, 15000);
 
-  it("normalizes legacy resume runtime roles into single-assistant continuation contract", async () => {
+  it("stops legacy resume runtime role cycles instead of normalizing them to success", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
@@ -774,9 +778,20 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       runtimeSeed: legacyRuntimeSeed,
     });
 
-    expect(result.status).toBe("completed");
-    expect(result.transcript.every((turn) => turn.role === "coder")).toBe(true);
-    expect(result.sharedContext.handoffs.length).toBe(0);
+    expect(result.status).toBe("stopped_cycle");
+    expect(result.stopReason).toContain("Cycle detected at planner->coder");
+    expect(result.transcript.map((turn) => turn.role)).toEqual([
+      "planner",
+      "planner",
+    ]);
+    expect(result.sharedContext.handoffs).toEqual([
+      {
+        from: "planner",
+        to: "coder",
+        reason: "legacy handoff",
+        turn: 1,
+      },
+    ]);
   }, 15000);
 
   it("writes a python file when prompt includes explicit create/write intent and path", async () => {
@@ -4561,7 +4576,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     }
   }, 15000);
 
-  it("keeps planner/coder/reviewer provider semantics aligned in real mode", async () => {
+  it("keeps no-write inspect flow provider-free in real mode", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
@@ -4622,19 +4637,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       expect(result.transcript.map((turn) => turn.role)).toEqual([
         "planner",
         "coder",
-        "reviewer",
       ]);
-      expect(result.transcript[0]?.content).toContain("REAL_PROVIDER_CALL_1");
-      expect(result.transcript[1]?.content).toContain("REAL_PROVIDER_CALL_2");
-      expect(result.transcript[2]?.content).toContain("REAL_PROVIDER_CALL_3");
-      expect(result.finalOutput).toContain("REAL_PROVIDER_CALL_3");
+      expect(result.codingResult?.taskKind).toBe("inspect-files");
+      expect(result.finalOutput).toContain("Repository inspection result");
 
-      expect(callIndex).toBe(3);
-      expect(authHeaders).toEqual([
-        "Bearer test-real-provider-key",
-        "Bearer test-real-provider-key",
-        "Bearer test-real-provider-key",
-      ]);
+      expect(callIndex).toBe(0);
+      expect(authHeaders).toEqual([]);
     } finally {
       globalThis.fetch = originalFetch;
       if (previousKey === undefined) {
@@ -4645,7 +4653,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     }
   }, 15000);
 
-  it("uses custom base URL and model for openai-compatible real providers", async () => {
+  it("does not consume custom provider config on no-write inspect flow", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
@@ -4720,17 +4728,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       expect(result.transcript.map((turn) => turn.role)).toEqual([
         "planner",
         "coder",
-        "reviewer",
       ]);
-      expect(result.finalOutput).toContain("COMPATIBLE_CALL_3");
-      expect(
-        requestUrls.every(
-          (url) => url === "https://api.siliconflow.cn/v1/chat/completions",
-        ),
-      ).toBe(true);
-      expect(
-        requestBodies.every((body) => body.model === "deepseek-ai/DeepSeek-V3"),
-      ).toBe(true);
+      expect(result.codingResult?.taskKind).toBe("inspect-files");
+      expect(result.finalOutput).toContain("Repository inspection result");
+      expect(callIndex).toBe(0);
+      expect(requestUrls).toEqual([]);
+      expect(requestBodies).toEqual([]);
     } finally {
       globalThis.fetch = originalFetch;
       if (previousKey === undefined) {
@@ -4741,7 +4744,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     }
   }, 15000);
 
-  it("retries a transient openai-compatible draft-stream network failure before terminalizing the run", async () => {
+  it("does not enter provider retry path for no-write inspect flow", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
@@ -4825,21 +4828,13 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       expect(result.transcript.map((turn) => turn.role)).toEqual([
         "planner",
         "coder",
-        "reviewer",
       ]);
-      expect(result.finalOutput).toContain("COMPATIBLE_CALL_4");
+      expect(result.codingResult?.taskKind).toBe("inspect-files");
+      expect(result.finalOutput).toContain("Repository inspection result");
       expect(modelsCallCount).toBe(0);
-      expect(chatCallCount).toBe(4);
-      expect(
-        requestUrls.every(
-          (url) =>
-            url === "https://api.siliconflow.cn/v1/chat/completions" ||
-            url === "https://api.siliconflow.cn/v1/models",
-        ),
-      ).toBe(true);
-      expect(
-        requestBodies.every((body) => body.model === "deepseek-ai/DeepSeek-V3"),
-      ).toBe(true);
+      expect(chatCallCount).toBe(0);
+      expect(requestUrls).toEqual([]);
+      expect(requestBodies).toEqual([]);
     } finally {
       globalThis.fetch = originalFetch;
       if (previousKey === undefined) {

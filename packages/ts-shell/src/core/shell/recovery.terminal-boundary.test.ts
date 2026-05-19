@@ -157,7 +157,14 @@ describe('shell recovery terminal boundary', () => {
           sessionRuntime: firstRuntime,
           renderer: { renderLine() {} } as never,
         })
-        expect(firstResult).toEqual({ resumed: true })
+        expect(firstResult).toMatchObject({ resumed: true })
+        if (!firstResult.resumed || !firstResult.autoResume) {
+          throw new Error('Expected first auto-resume payload')
+        }
+        await firstRuntime.executePrompt(session.id, firstResult.autoResume.prompt, {
+          runtimeSeed: firstResult.autoResume.runtimeSeed,
+          continuityState: firstResult.autoResume.continuityState,
+        })
 
         let capturedRuntimeSeed: Awaited<ReturnType<SessionManager['buildRuntimeStateSeed']>> | undefined
         const runtime = new ShellSessionRuntime({
@@ -207,7 +214,14 @@ describe('shell recovery terminal boundary', () => {
           renderer: { renderLine() {} } as never,
         })
 
-        expect(secondResult).toEqual({ resumed: true })
+        expect(secondResult).toMatchObject({ resumed: true })
+        if (!secondResult.resumed || !secondResult.autoResume) {
+          throw new Error('Expected second auto-resume payload')
+        }
+        await runtime.executePrompt(session.id, secondResult.autoResume.prompt, {
+          runtimeSeed: secondResult.autoResume.runtimeSeed,
+          continuityState: secondResult.autoResume.continuityState,
+        })
         expect(capturedRuntimeSeed?.recoveryBoundary).toBe('mid-turn-reentry')
         expect(capturedRuntimeSeed?.currentRole).toBe('coder')
         expect(capturedRuntimeSeed?.turn).toBe(4)

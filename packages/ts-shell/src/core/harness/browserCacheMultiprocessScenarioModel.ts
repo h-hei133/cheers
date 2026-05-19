@@ -18,6 +18,8 @@ export interface BrowserCacheProcessStep {
   readonly groupId?: string;
   readonly expectedBlocked?: boolean;
   readonly allowTimeout?: boolean;
+  readonly readyFilePath?: string;
+  readonly releaseFilePath?: string;
 }
 
 export interface BrowserCacheMultiprocessScenario {

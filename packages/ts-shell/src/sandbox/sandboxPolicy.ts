@@ -105,6 +105,15 @@ export class SandboxPolicy {
   ): PolicyDecision {
     // Default deny process spawning
     // Only allow if command is within workspace or on explicit allowlist
+    if (this.isBareCommand(command)) {
+      return {
+        allowed: false,
+        reason: `Process spawn outside workspace: ${command}`,
+        requiresEscalation: true,
+        policyRule: 'default-deny-process-spawn',
+      };
+    }
+
     const commandPath = this.normalizePath(command);
     
     if (!this.isWithinWorkspace(commandPath)) {
@@ -170,6 +179,17 @@ export class SandboxPolicy {
       return resolved.toLowerCase();
     }
     return resolved;
+  }
+
+  private isBareCommand(command: string): boolean {
+    const trimmed = command.trim();
+    return (
+      trimmed.length > 0 &&
+      !path.isAbsolute(trimmed) &&
+      !trimmed.includes('/') &&
+      !trimmed.includes('\\') &&
+      !/^[A-Za-z]:/.test(trimmed)
+    );
   }
 
   /**

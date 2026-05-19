@@ -342,3 +342,36 @@ Current remaining deferred owner counts:
 | approval/transcript/resume harness | 3 | rebaseline role, approval prompt, and legacy resume expectations |
 | provider mock harness | 3 | rebaseline deterministic provider harness without live calls |
 | git/change-set attribution | 1 | isolate git-aware attribution from runMvp broad suite |
+
+## Route 144 Addendum
+
+Closeout doc: `docs/architecture/runmvp-package-closeout.md`.
+
+Route 144 closed the remaining broad runMvp failures and package-level drift:
+
+- full `runMvpIntegratedFlow.test.ts` moved from `144 passed / 7 failed` to
+  `151 passed`
+- package sweep moved from `2017 passed / 30 failed / 1 skipped` to
+  `2051 passed / 1 skipped`
+- approval callback routing now avoids treating generic `continue` wording as a
+  verify-continuation request without lineage
+- default transcript, legacy resume, and provider mock expectations were
+  rebaselined to current contracts without provider live calls
+- git-aware change set attribution now records pre-existing and post-run dirty
+  files for attempted mutation results
+- recovery runtime contexts tolerate missing legacy `targetPathBase` by falling
+  back to `projectRoot`
+- sandbox process policy treats bare executable names as command names requiring
+  escalation instead of resolving them as workspace-local paths
+- slash, CLI, trace, and browser harness expectations were rebaselined to
+  current no-provider/no-browser-expansion surfaces
+- browser CLI scenario timeouts were raised only for long-running child-process
+  harness cases; assertions remain active
+- browser cache multiprocess lock and sandbox audit assertions were stabilized
+  against package-level parallel timing without weakening the underlying checks
+
+Current remaining deferred owner counts:
+
+| Owner | Count | Best next action |
+|---|---:|---|
+| package red baseline | 0 | no failure-driven route required |

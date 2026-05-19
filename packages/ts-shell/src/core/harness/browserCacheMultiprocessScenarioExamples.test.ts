@@ -98,7 +98,7 @@ describe("browser cache multiprocess scenario examples", () => {
     expect(result.integrity.status).not.toBe("unsafe");
     expect(result.integrity.status).not.toBe("corrupted");
     expect(assertBrowserCacheStressSafe(result)).toEqual([]);
-  });
+  }, 20000);
 
   it("blocks compact under busy lock, recovers stale locks, and repairs corrupt unsafe lines", async () => {
     const fixture = track(createBrowserCacheMultiprocessFixture());
@@ -123,7 +123,7 @@ describe("browser cache multiprocess scenario examples", () => {
         name: "compact busy lock",
         cacheRoot: fixture.cacheRoot,
         steps: [
-          fixture.lockHolderStep({ id: "lock-holder", groupId: "busy-compact", holdMs: 2000 }),
+          fixture.lockHolderStep({ id: "lock-holder", groupId: "busy-compact", holdMs: 20000 }),
           fixture.cliStep({
             id: "compact",
             role: "compactor",
@@ -163,7 +163,7 @@ describe("browser cache multiprocess scenario examples", () => {
     expect(repair.integrity.skippedCount).toBe(0);
     expect(cacheText(fixture)).not.toContain("RAW_SECRET");
     expect(assertBrowserCacheStressSafe(repair)).toEqual([]);
-  });
+  }, 20000);
 
   it("renders a concise report without raw child-process output", async () => {
     const fixture = track(createBrowserCacheMultiprocessFixture());

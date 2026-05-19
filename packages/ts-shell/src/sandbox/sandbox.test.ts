@@ -9,11 +9,13 @@ import { SandboxPolicy } from './sandboxPolicy.js'
 const workspaceRoot = path.join(os.tmpdir(), 'private-agents-workspace')
 const auditLogPath = path.join(os.tmpdir(), 'private-agents-audit.jsonl')
 
-async function waitForFile(filePath: string): Promise<void> {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    if (fs.existsSync(filePath)) return
-    await new Promise(resolve => setTimeout(resolve, 5))
+async function waitForFileContent(filePath: string, expected: readonly string[]): Promise<string> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const content = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : ''
+    if (expected.every(value => content.includes(value))) return content
+    await new Promise(resolve => setTimeout(resolve, 20))
   }
+  return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : ''
 }
 
 describe('sandbox policy and escalation workflow', () => {
@@ -78,6 +80,30 @@ describe('sandbox policy and escalation workflow', () => {
     })
   })
 
+  it('treats bare process commands as command names, not workspace-local paths', () => {
+    const policy = new SandboxPolicy(workspaceRoot)
+
+    expect(policy.checkProcessPermission('node', [])).toMatchObject({
+      allowed: false,
+      requiresEscalation: true,
+      policyRule: 'default-deny-process-spawn',
+    })
+    expect(policy.checkProcessPermission('node.exe', [])).toMatchObject({
+      allowed: false,
+      requiresEscalation: true,
+      policyRule: 'default-deny-process-spawn',
+    })
+    expect(policy.checkProcessPermission(path.join(workspaceRoot, 'tools', 'agent-runner'), [])).toMatchObject({
+      allowed: true,
+      requiresEscalation: false,
+    })
+    expect(policy.checkProcessPermission(path.join(os.tmpdir(), 'outside-agent-runner'), [])).toMatchObject({
+      allowed: false,
+      requiresEscalation: true,
+      policyRule: 'default-deny-process-spawn',
+    })
+  })
+
   it('requires explicit denial/approval and logs audit entries', async () => {
     const enforcer = new SandboxEnforcer({
       workspaceRoot,
@@ -106,8 +132,11 @@ describe('sandbox policy and escalation workflow', () => {
 
     enforcer.close()
 
-    await waitForFile(auditLogPath)
-    const auditContent = fs.readFileSync(auditLogPath, 'utf8')
+    const auditContent = await waitForFileContent(auditLogPath, [
+      'permission_check',
+      'escalation_request',
+      'escalation_decision',
+    ])
     expect(auditContent).toContain('permission_check')
     expect(auditContent).toContain('escalation_request')
     expect(auditContent).toContain('escalation_decision')

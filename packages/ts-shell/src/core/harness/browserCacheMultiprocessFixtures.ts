@@ -106,15 +106,21 @@ export function createBrowserCacheMultiprocessFixture(input: {
     },
     lockHolderStep(step) {
       const scriptPath = path.join(root, `${step.id}.lock-holder.cjs`);
+      const readyFilePath = path.join(root, `${step.id}.lock-ready`);
+      const releaseFilePath = path.join(root, `${step.id}.lock-release`);
       fs.writeFileSync(scriptPath, lockHolderScript({
         cacheRoot,
         operation: step.operation ?? "write",
         holdMs: step.holdMs ?? 500,
+        readyFilePath,
+        releaseFilePath,
       }), "utf8");
       return {
         id: step.id,
         role: "lock-holder",
         groupId: step.groupId,
+        readyFilePath,
+        releaseFilePath,
         spec: {
           command: process.execPath,
           args: [scriptPath],
@@ -175,6 +181,8 @@ function lockHolderScript(input: {
   readonly cacheRoot: string;
   readonly operation: BrowserReceiptCacheLockOperation;
   readonly holdMs: number;
+  readonly readyFilePath: string;
+  readonly releaseFilePath: string;
 }): string {
   return [
     "const fs = require('node:fs');",
@@ -188,6 +196,15 @@ function lockHolderScript(input: {
     "  createdAt: new Date(Date.now() + 60000).toISOString(),",
     "  expiresAt: new Date(Date.now() + 120000).toISOString(),",
     "}) + '\\n', 'utf8');",
-    `setTimeout(() => { fs.rmSync(path.join(cacheRoot, 'browser-receipt-cache.lock.json'), { force: true }); }, ${input.holdMs});`,
+    `fs.writeFileSync(${JSON.stringify(input.readyFilePath)}, 'ready\\n', 'utf8');`,
+    `const releasePath = ${JSON.stringify(input.releaseFilePath)};`,
+    "const lockPath = path.join(cacheRoot, 'browser-receipt-cache.lock.json');",
+    "const startedAt = Date.now();",
+    "const interval = setInterval(() => {",
+    `  if (fs.existsSync(releasePath) || Date.now() - startedAt >= ${input.holdMs}) {`,
+    "    fs.rmSync(lockPath, { force: true });",
+    "    clearInterval(interval);",
+    "  }",
+    "}, 25);",
   ].join("\n");
 }

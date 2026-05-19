@@ -15,13 +15,13 @@ describe("browser scenario examples", () => {
       name: "browser execute blocked by default",
       metadata: { route: "route96", capability: ["browser-execution"] },
       steps: [
-        { id: "execute", kind: "command", input: "/browser execute navigate https://example.com" },
+          { id: "execute", kind: "command", input: "/browser execute navigate https://example.com" },
         { id: "sidebar", kind: "command", input: "/sidebar" },
       ],
       expectedOutcome: {
         status: "passed",
         assertions: [
-          { id: "blocked", kind: "output-contains", stepId: "execute", text: "blocked-no-executor" },
+          { id: "blocked", kind: "output-contains", stepId: "execute", text: "blocked-no-runner" },
           { id: "executed-no", kind: "output-contains", stepId: "execute", text: "- Executed: no" },
           { id: "browser-event", kind: "sidebar-event-emitted", eventTitle: "Browser execution" },
           { id: "no-secret", kind: "output-not-contains", stepId: "execute", text: "sk-" },

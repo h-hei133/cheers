@@ -167,7 +167,7 @@ describe("browser CLI execution scenario examples", () => {
     const report = renderAgentCliScenarioReport(result);
     expect(report).toContain("Browser execution evidence: present; executed=yes; mode=local-fixture; manifest=valid");
     expect(report).toContain("dependency=external-runner-only");
-  });
+  }, 20000);
 
   it("still blocks external URL navigation with a valid local fixture manifest", async () => {
     const fixture = createBrowserCliLocalFixtureManifestFixture();

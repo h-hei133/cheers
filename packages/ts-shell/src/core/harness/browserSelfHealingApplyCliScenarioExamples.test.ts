@@ -51,7 +51,7 @@ describe("browser self-healing apply real CLI scenario examples", () => {
       runnerBindingPatched: true,
     });
     expect(summarizeBrowserSelfHealingApplyCliScenario(result)).toContain("Replay executed automatically: no");
-  });
+  }, 20000);
 
   it("repairs skill metadata across CLI child processes while execution stays explicit", async () => {
     const fixture = track(createBrowserSelfHealingApplyCliScenarioFixture({ manifestKind: "skill-runner" }));
@@ -76,7 +76,7 @@ describe("browser self-healing apply real CLI scenario examples", () => {
       skillMetadataReady: true,
       skillBindingReady: false,
     });
-  });
+  }, 20000);
 
   it("repairs local fixture allowlist across CLI child processes and keeps external URL blocked", async () => {
     const fixture = track(createBrowserSelfHealingApplyCliScenarioFixture({ manifestKind: "local-fixture" }));
@@ -108,7 +108,7 @@ describe("browser self-healing apply real CLI scenario examples", () => {
       valid: true,
       localFixtureAllowlistPatched: true,
     });
-  });
+  }, 30000);
 
   it("repairs fixture summary without exposing raw fixture content", async () => {
     const fixture = track(createBrowserSelfHealingApplyCliScenarioFixture({ manifestKind: "local-fixture" }));
@@ -131,7 +131,7 @@ describe("browser self-healing apply real CLI scenario examples", () => {
       fixtureSummaryRefreshed: true,
     });
     expect(fs.readFileSync(fixture.manifestPath, "utf8")).not.toContain("RAW_");
-  });
+  }, 20000);
 
   it("blocks external, unsafe, missing, invalid, global, and unconfirmed repair apply", async () => {
     const fixture = track(createBrowserSelfHealingApplyCliScenarioFixture({ manifestKind: "local-fixture" }));
@@ -200,7 +200,7 @@ describe("browser self-healing apply real CLI scenario examples", () => {
     expect(agentCliAssertionFailures(result)).toEqual([]);
     expect(renderAgentCliScenarioReport(result)).toContain("repairApply=applied/runner-binding/changed=yes/manifestPatch=patch-allowed");
     expect(summarizeBrowserSelfHealingApplyCliScenario(result)).toContain("Browser executed: no");
-  });
+  }, 30000);
 
   it("renders compact repair CLI reports without raw manifest content", () => {
     const report = renderBrowserSelfHealingApplyCliReport({

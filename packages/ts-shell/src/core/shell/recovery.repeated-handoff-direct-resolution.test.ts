@@ -166,7 +166,14 @@ describe('shell recovery repeated handoff direct resolution', () => {
         renderer: { renderLine() {} } as never,
       })
 
-      expect(firstResult).toEqual({ resumed: true })
+      expect(firstResult).toMatchObject({ resumed: true })
+      if (!firstResult.resumed || !firstResult.autoResume) {
+        throw new Error('Expected first auto-resume payload')
+      }
+      await firstRuntime.executePrompt(session.id, firstResult.autoResume.prompt, {
+        runtimeSeed: firstResult.autoResume.runtimeSeed,
+        continuityState: firstResult.autoResume.continuityState,
+      })
       expect(firstSeed?.recoveryBoundary).toBe('mid-turn-reentry')
       expect(firstSeed?.currentRole).toBe('reviewer')
       expect(firstSeed?.turn).toBe(3)
@@ -260,7 +267,14 @@ describe('shell recovery repeated handoff direct resolution', () => {
         renderer: { renderLine() {} } as never,
       })
 
-      expect(secondResult).toEqual({ resumed: true })
+      expect(secondResult).toMatchObject({ resumed: true })
+      if (!secondResult.resumed || !secondResult.autoResume) {
+        throw new Error('Expected second auto-resume payload')
+      }
+      await secondRuntime.executePrompt(session.id, secondResult.autoResume.prompt, {
+        runtimeSeed: secondResult.autoResume.runtimeSeed,
+        continuityState: secondResult.autoResume.continuityState,
+      })
       expect(secondSeed?.recoveryBoundary).toBe('mid-turn-reentry')
       expect(secondSeed?.currentRole).toBe('coder')
       expect(secondSeed?.turn).toBe(4)

@@ -968,13 +968,14 @@ describe("slash router (W4)", () => {
       expect(dryRun.output).toContain("- Browser process: not launched");
       expect(dryRun.output).toContain("- Provider/model call: none");
     }
-    expect(sidebar?.kind).toBe("local");
-    if (sidebar?.kind === "local") {
-      expect(sidebar.output).toContain("Browser capability");
-      expect(sidebar.output).toContain("preview-only; no browser/MCP launch");
-      expect(sidebar.output).toContain("Browser preview");
-      expect(sidebar.output).toContain("Browser dry-run");
-      expect(sidebar.output).not.toContain("Unknown slash command");
+      expect(sidebar?.kind).toBe("local");
+      if (sidebar?.kind === "local") {
+        expect(sidebar.output).toContain("Browser capability");
+      expect(sidebar.output).toContain("preview-only");
+      expect(sidebar.output).toContain("no browser/MCP launch");
+        expect(sidebar.output).toContain("Browser preview");
+        expect(sidebar.output).toContain("Browser dry-run");
+        expect(sidebar.output).not.toContain("Unknown slash command");
     }
   });
 
