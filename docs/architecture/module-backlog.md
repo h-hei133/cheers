@@ -306,19 +306,31 @@ rewrite, and focused validation tied to touched files.
 
 - Modules: Edit / Patch Engineering, Capability Contract Architecture, Harness
   Engineering.
-- Goal: define, but not implement by default, explicit contracts for broad
-  refactor planning, multi-file discovery edit, and broader fenced replacement
-  support.
-- Best first candidates:
-  - broad refactor planning route with explicit target/constraint manifest
-  - multi-file discovery edit route with user-confirmed target selection
-  - fenced replacement support route that distinguishes bounded single-file
-    replacement from broad patch candidates
-- Validation: contract/helper tests first; runtime implementation only in a
-  separate route with focused write-boundary tests.
-- Stop conditions: implementing broad edit behavior in a planning-only route,
-  weakening workspace boundaries, skipping stale-read checks, or inferring write
-  authorization from prompt text.
+- Status: closed by `docs/architecture/future-edit-expansion-contract.md`.
+- Result:
+  - added `futureEditContract.ts` as a pure future-edit classifier and Route
+    146 stopped-result projector
+  - added `futureEditPlanner.ts` as a no-op planning projector for mode, scope,
+    target hints, missing preconditions, confirmation, verification, and
+    rollback requirements
+  - separated broad refactor planning, multi-file discovery edit, and broader
+    fenced replacement into distinct future-only modes
+  - preserved current bounded write/edit support and kept broad mutation,
+    discovery, fuzzy replacement, vague generated content, workspace authority,
+    stale-read, provider, browser, CLI, schema, dependency, and broad runMvp
+    behavior unchanged
+- Follow-up routes:
+  - Route 148A: fenced replacement bounded implementation with explicit target
+    and exact old/new or fenced block mapping only
+  - Route 148B: multi-file discovery edit candidate selection with
+    user-confirmed target set and max-file guard
+  - Route 148C: broad refactor planning with target/constraint manifest and no
+    mutation until user confirmation
+  - Route 148D: snapshot/rollback precondition route before any broad edit
+    execution
+- Validation: focused future-edit/edit tests, runMvp, package sweep,
+  closeout/result-contract/build/diff/status validation are the Route 147 final
+  gates.
 
 ### Route 148: Capability Lifecycle Adoption Across Edit / Browser / Shell
 
