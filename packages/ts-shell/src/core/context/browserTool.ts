@@ -22,6 +22,10 @@ import {
   decideBrowserToolPolicy,
   type BrowserToolName,
 } from "./browserToolPolicy.js";
+import {
+  buildPolicyBlockedResult,
+  buildUnavailableResult,
+} from "../tools/toolPolicyResult.js";
 
 export const BROWSER_TOOL_NAMES = [
   "browser.observe",
@@ -185,19 +189,35 @@ function blockedResult(input: {
   readonly operation: string;
   readonly controlledTarget?: string;
 }): ToolExecutionResult {
+  const contract = isBrowserUnavailableReason(input.reasonCode)
+    ? buildUnavailableResult({
+        capability: "browser",
+        availability: browserAvailabilityForReason(input.reasonCode),
+        reasonCode: input.reasonCode,
+        reason: input.reason,
+        doNext: input.nextAction,
+        evidence: input.evidence,
+      })
+    : buildPolicyBlockedResult({
+        capability: "browser",
+        reasonCode: input.reasonCode,
+        reason: input.reason,
+        doNext: input.nextAction,
+        evidence: input.evidence,
+      });
   const observation: BrowserObservation = {
     status: "stopped",
     operation: input.operation,
     controlledTarget: input.controlledTarget ?? "controlled-target-unresolved",
-    visibleTextSummary: input.reason,
+    visibleTextSummary: contract.reason,
     actionResultSummary: "Browser tool stopped before Direct Playwright runtime call.",
-    reasonCode: input.reasonCode,
+    reasonCode: contract.reasonCode,
     cleanupStatus: "not-started",
     redactionStatus: "clean",
-    evidenceId: `browser-obs-blocked-${input.reasonCode}`,
-    nextActions: [input.nextAction],
+    evidenceId: `browser-obs-blocked-${contract.reasonCode}`,
+    nextActions: [contract.doNext],
     evidence: [
-      ...input.evidence,
+      ...contract.evidence,
       "browser-observation:stopped-before-runtime",
       "browser-observation:raw-dom-excluded",
     ],
@@ -205,14 +225,37 @@ function blockedResult(input: {
   return {
     success: false,
     output: formatBrowserObservation(observation),
-    error: input.reason,
+    error: contract.reason,
     metadata: browserToolMetadata({
       observation,
       runtimeStatus: undefined,
       manifest: undefined,
-      evidence: input.evidence,
+      evidence: contract.evidence,
     }),
   };
+}
+
+function isBrowserUnavailableReason(reasonCode: string): boolean {
+  return (
+    reasonCode === "runtime-disabled" ||
+    reasonCode === "runtime-package-missing" ||
+    reasonCode === "runtime-binary-missing"
+  );
+}
+
+function browserAvailabilityForReason(
+  reasonCode: string,
+): "disabled" | "not-installed" | "not-ready" {
+  if (reasonCode === "runtime-disabled") {
+    return "disabled";
+  }
+  if (
+    reasonCode === "runtime-package-missing" ||
+    reasonCode === "runtime-binary-missing"
+  ) {
+    return "not-installed";
+  }
+  return "not-ready";
 }
 
 function browserToolMetadata(input: {

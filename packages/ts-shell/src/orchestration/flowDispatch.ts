@@ -1,6 +1,8 @@
 import type { QueryEvent } from "../core/query/events.js";
+import { buildCompletedToolResult } from "../core/tools/toolPolicyResult.js";
 import { projectToolLifecycle } from "../core/tools/toolLifecycleProjection.js";
 import type { ToolLifecycleProjection } from "../core/tools/toolLifecycleProjection.js";
+import { sanitizeToolResultText } from "../core/tools/toolResultProjection.js";
 import type { ToolExecutionResult } from "../tools/types.js";
 import {
   createCodingResultProvenanceCollector,
@@ -143,7 +145,13 @@ export function projectRunCommandDispatchOutcome(input: {
     });
   }
 
-  const reason = `Command executed successfully: ${input.command}`;
+  const receipt = buildCompletedToolResult({
+    capability: "command",
+    reasonCode: "tool-succeeded",
+    reason: `Command executed successfully: ${input.command}`,
+    doNext: "Continue with the command result.",
+    evidence: input.evidence,
+  });
 
   return projectRuntimeCodingOutcome({
     taskKind: "run-command",
@@ -156,7 +164,7 @@ export function projectRunCommandDispatchOutcome(input: {
     repairNotes: input.repairNotes,
     evidence: input.evidence,
     taskVerdict: "satisfied",
-    taskReasons: [reason],
+    taskReasons: [receipt.reason],
     userFacingOutput: `Command completed: ${input.command}`,
   });
 }
@@ -247,11 +255,5 @@ export function projectDispatchReentrySummary(input: {
 }
 
 function safeText(value: string): string {
-  return value
-    .replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]")
-    .replace(
-      /\b(api[_-]?key|token|secret|cookie|authorization)\b\s*[:=]\s*\S+/gi,
-      "$1=[redacted]",
-    )
-    .slice(0, 240);
+  return sanitizeToolResultText(value, 240);
 }

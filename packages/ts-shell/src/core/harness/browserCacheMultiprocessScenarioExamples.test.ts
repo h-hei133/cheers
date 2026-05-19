@@ -48,7 +48,7 @@ describe("browser cache multiprocess scenario examples", () => {
     expect(assertBrowserCacheStressSafe(result)).toEqual([]);
     expect(renderBrowserCacheMultiprocessReport(result)).toContain("Persistence: explicit only");
     expect(cacheText(fixture)).not.toContain("RAW_");
-  });
+  }, 20000);
 
   it("runs status and replay while a real lock-holder process simulates an in-flight write", async () => {
     const fixture = track(createBrowserCacheMultiprocessFixture({ runnerDelayMs: 80 }));

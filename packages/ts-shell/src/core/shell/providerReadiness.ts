@@ -5,6 +5,7 @@ import type {
 } from "../../config/runtimeConfig.js";
 import { createProviderFetchFromEnv } from "../../model-adapters/providerFetch.js";
 import type { QueryEvent } from "../query/events.js";
+import { buildUnavailableResult } from "../tools/toolPolicyResult.js";
 import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
 import { getProviderApiKeyEnvVarName } from "./providerCredentials.js";
 
@@ -45,10 +46,11 @@ export async function checkRealProviderReadiness(
   if (!isRealProviderSupported(provider)) {
     return {
       ok: false,
-      failure: {
-        kind: "unsupported-provider",
-        stopReason: `Provider readiness failed (provider-readiness:unsupported-provider): Provider ${provider} is configured but not yet supported by this build's real provider adapter. Switch provider to openai and retry.`,
-      },
+      failure: providerUnavailableFailure(
+        "unsupported-provider",
+        `Provider readiness failed (provider-readiness:unsupported-provider): Provider ${provider} is configured but not yet supported by this build's real provider adapter. Switch provider to openai and retry.`,
+        "unavailable",
+      ),
     };
   }
 
@@ -58,10 +60,11 @@ export async function checkRealProviderReadiness(
   if (!apiKey && !accountAccess) {
     return {
       ok: false,
-      failure: {
-        kind: "missing-key",
-        stopReason: `Provider readiness failed (provider-readiness:missing-key): ${envVarName} is not set for real provider mode. Set ${envVarName}, configure /connect set ${provider} <api-key>${isOpenAICompatibleStyleProvider(provider) ? " <base-url> <model>" : ""}, or create an account-auth connection via /connect login openai --account.`,
-      },
+      failure: providerUnavailableFailure(
+        "missing-key",
+        `Provider readiness failed (provider-readiness:missing-key): ${envVarName} is not set for real provider mode. Set ${envVarName}, configure /connect set ${provider} <api-key>${isOpenAICompatibleStyleProvider(provider) ? " <base-url> <model>" : ""}, or create an account-auth connection via /connect login openai --account.`,
+        "not-configured",
+      ),
     };
   }
 
@@ -108,22 +111,22 @@ export async function checkRealProviderReadiness(
     if (!options.baseUrl?.trim()) {
       return {
         ok: false,
-        failure: {
-          kind: "missing-config",
-          stopReason:
-            `Provider readiness failed (provider-readiness:missing-config): ${provider} requires a configured base URL. Set it via /connect set ${provider} <api-key> <base-url> <model>, then retry.`,
-        },
+        failure: providerUnavailableFailure(
+          "missing-config",
+          `Provider readiness failed (provider-readiness:missing-config): ${provider} requires a configured base URL. Set it via /connect set ${provider} <api-key> <base-url> <model>, then retry.`,
+          "not-configured",
+        ),
       };
     }
 
     if (!model) {
       return {
         ok: false,
-        failure: {
-          kind: "missing-config",
-          stopReason:
-            `Provider readiness failed (provider-readiness:missing-config): ${provider} requires a configured model. Set it via /connect set ${provider} <api-key> <base-url> <model>, then retry.`,
-        },
+        failure: providerUnavailableFailure(
+          "missing-config",
+          `Provider readiness failed (provider-readiness:missing-config): ${provider} requires a configured model. Set it via /connect set ${provider} <api-key> <base-url> <model>, then retry.`,
+          "not-configured",
+        ),
       };
     }
   }
@@ -226,6 +229,28 @@ function getProviderLabel(provider: RuntimeProvider): string {
     default:
       return "OpenAI";
   }
+}
+
+function providerUnavailableFailure(
+  kind: Extract<
+    ProviderReadinessFailureKind,
+    "missing-key" | "missing-config" | "unsupported-provider"
+  >,
+  stopReason: string,
+  availability: "not-configured" | "unavailable",
+): ProviderReadinessFailure {
+  const receipt = buildUnavailableResult({
+    capability: "provider",
+    availability,
+    reasonCode: `provider-readiness:${kind}`,
+    reason: stopReason,
+    doNext: stopReason,
+    evidence: [`provider-readiness:${kind}`],
+  });
+  return {
+    kind,
+    stopReason: receipt.reason,
+  };
 }
 
 function normalizeBaseUrl(baseUrl: string): string {

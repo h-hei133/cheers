@@ -15,6 +15,10 @@ import type { PwRuntimeStatus } from '../context/pwRuntime.js'
 import { ToolApprovalFlow } from './approvalFlow.js'
 import { filterVisibleToolNames } from './prefilter.js'
 import { createCoreToolRegistry } from './registry.js'
+import {
+  buildPolicyBlockedResult,
+  buildUnavailableResult,
+} from './toolPolicyResult.js'
 import { deniedResult, runtimeErrorResult } from './toolResultLifecycle.js'
 
 export class ToolRuntime {
@@ -119,7 +123,15 @@ export class ToolRuntime {
     if (!isMcpTool && !isAllowlistedTool(toolName)) {
       this.logger.warn('Tool blocked by allowlist', { toolName })
       recordCount('tools.denied', 1, { toolName, reason: 'allowlist' })
-      return deniedResult(`Tool '${toolName}' is not in the MVP allowlist`)
+      const receipt = buildPolicyBlockedResult({
+        capability: 'command',
+        label: toolName,
+        reasonCode: 'command-not-allowlisted',
+        reason: `Tool '${toolName}' is not in the MVP allowlist`,
+        doNext: 'Retry with one of the visible MVP tools.',
+        evidence: ['tool-runtime:allowlist-blocked'],
+      })
+      return deniedResult(receipt.reason)
     }
 
     const tool = this.registry.get(toolName)
@@ -130,17 +142,32 @@ export class ToolRuntime {
           failureClass: 'tool-unavailable',
           detail: `MCP tool '${toolName}' is not registered`,
         })
-        return deniedResult(`MCP tool '${toolName}' is not registered`, {
+        const receipt = buildUnavailableResult({
+          capability: 'mcp',
+          availability: 'not-configured',
+          reasonCode: 'mcp-unavailable',
+          reason: `MCP tool '${toolName}' is not registered`,
+          doNext: 'Run /mcp status and /mcp refresh to list available MCP tools, then retry with a visible tool name.',
+          evidence: ['tool-runtime:mcp-tool-unavailable'],
+        })
+        return deniedResult(receipt.reason, {
           executionPath: 'mcp-stdio',
           serverName,
           blockerKind: 'unknown',
-          reason: `MCP tool '${toolName}' is not registered`,
+          reason: receipt.reason,
           ...mcpFailureMetadata(taxonomy),
-          doNext: 'Run /mcp status and /mcp refresh to list available MCP tools, then retry with a visible tool name.',
+          doNext: receipt.doNext,
         })
       }
 
-      return deniedResult(`Tool '${toolName}' is not registered`)
+      const receipt = buildUnavailableResult({
+        capability: 'tool',
+        label: toolName,
+        reason: `Tool '${toolName}' is not registered`,
+        doNext: 'Retry with a visible MVP tool.',
+        evidence: ['tool-runtime:tool-unavailable'],
+      })
+      return deniedResult(receipt.reason)
     }
 
     const approvalFailure = await this.approvalFlow.authorize(

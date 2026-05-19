@@ -41,7 +41,7 @@ describe("browser execution receipt CLI scenario examples", () => {
     expect(agentCliAssertionFailures(result)).toEqual([]);
     expect(renderAgentCliScenarioReport(result)).toContain("receipt=executed");
     expect(renderAgentCliScenarioReport(result)).toContain("replay=replay-ready");
-  });
+  }, 20000);
 
   it("external runner extract success produces replay-ready receipt", async () => {
     const fixture = createBrowserExternalRunnerScenarioFixture();

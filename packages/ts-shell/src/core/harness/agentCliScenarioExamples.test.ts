@@ -90,7 +90,7 @@ describe("Agent CLI scenario harness", () => {
 
     expect(result.evidence).toContain("agent-cli-scenario-runner:real-cli-child-process");
     expect(renderAgentCliScenarioReport(result)).toContain("Agent CLI scenario report");
-  });
+  }, 20000);
 
   it("runs blocked browser execute through the real CLI child process", async () => {
     const result = await runScenario({

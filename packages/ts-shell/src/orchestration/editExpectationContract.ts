@@ -1,3 +1,5 @@
+import { buildPolicyBlockedResult } from "../core/tools/toolPolicyResult.js";
+
 export type EditExpectationCapabilityKind =
   | "write-file"
   | "edit-file"
@@ -205,5 +207,20 @@ function isDiscoveryEditPrompt(prompt: string): boolean {
 }
 
 function contract(input: EditExpectationContract): EditExpectationContract {
-  return input;
+  if (input.contractStatus !== "stopped") {
+    return input;
+  }
+  const receipt = buildPolicyBlockedResult({
+    capability: "edit",
+    label: input.capabilityKind,
+    reasonCode: input.reasonCode,
+    reason: input.reasonCode,
+    doNext: input.doNext,
+    evidence: [`edit-expectation:${input.reasonCode}`],
+  });
+  return {
+    ...input,
+    reasonCode: receipt.reasonCode as EditExpectationReasonCode,
+    doNext: receipt.doNext,
+  };
 }

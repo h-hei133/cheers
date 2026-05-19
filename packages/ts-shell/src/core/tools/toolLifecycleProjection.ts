@@ -1,5 +1,12 @@
 import type { ToolExecutionResult } from "../../tools/types.js";
 import {
+  buildApprovalDeniedResult,
+  buildCompletedToolResult,
+  buildExecutionFailedResult,
+  buildPolicyBlockedResult,
+  buildUnavailableResult,
+} from "./toolPolicyResult.js";
+import {
   deriveToolExecutionProvenance,
   type ToolExecutionProvenance,
 } from "./toolExecutionProvenance.js";
@@ -66,41 +73,66 @@ export function projectToolLifecycle(
   };
 
   if (provenance.kind === "executed-succeeded") {
+    const receipt = buildCompletedToolResult({
+      capability: isMcpExecutionPath(executionPath) ? "mcp" : "tool",
+      label: projectedToolName,
+      reasonCode: "tool-succeeded",
+      reason: "Tool execution completed.",
+    });
     return {
       kind: "success",
       legacySuccess: true,
       ...(executionPath ? { executionPath } : {}),
       ...(serverName ? { serverName } : {}),
-      ...(projectedToolName ? { toolName: projectedToolName } : {}),
+      toolName: receipt.label,
     };
   }
 
   if (provenance.kind === "approval-denied") {
+    const receipt = buildApprovalDeniedResult({
+      capability: input.toolName === "bash" ? "command" : "tool",
+      label: projectedToolName,
+      reason,
+      doNext: "Re-run and approve escalation for verify command execution.",
+    });
     return {
       kind: "approval-denied",
       ...base,
       failureBoundary: "approval-denied",
       verificationBlockerKind: "approval-denied",
-      nextAction: "Re-run and approve escalation for verify command execution.",
+      nextAction: receipt.doNext,
     };
   }
 
   if (provenance.kind === "sandbox-preflight-blocked") {
+    const receipt = buildPolicyBlockedResult({
+      capability: "command",
+      label: projectedToolName,
+      reasonCode: "sandbox-preflight-blocked",
+      reason,
+      doNext:
+        "Resolve environment/network readiness (dependencies, connectivity, shell), then rerun verify.",
+    });
     return {
       kind: "environment-blocked",
       ...base,
       failureBoundary: "sandbox-preflight-blocked",
       verificationBlockerKind: "environment-not-ready",
-      nextAction:
-        "Resolve environment/network readiness (dependencies, connectivity, shell), then rerun verify.",
+      nextAction: receipt.doNext,
     };
   }
 
   if (provenance.kind === "permission-blocked") {
+    const receipt = buildPolicyBlockedResult({
+      capability: "tool",
+      label: projectedToolName,
+      reasonCode: "permission-blocked",
+      reason,
+    });
     return {
       kind: "permission-blocked",
       ...base,
-      failureBoundary: "permission-blocked",
+      failureBoundary: receipt.reasonCode,
     };
   }
 
@@ -108,6 +140,18 @@ export function projectToolLifecycle(
     const kind = isMcpExecutionPath(executionPath)
       ? "mcp-unavailable"
       : "tool-unavailable";
+    const receipt = buildUnavailableResult({
+      capability: isMcpExecutionPath(executionPath) ? "mcp" : "tool",
+      label: projectedToolName,
+      availability: isMcpExecutionPath(executionPath)
+        ? "not-configured"
+        : "unavailable",
+      reasonCode: kind,
+      reason,
+      doNext: isMcpExecutionPath(executionPath)
+        ? "Run /mcp status and /mcp refresh for the affected server, then retry with a visible executable MCP tool."
+        : undefined,
+    });
     return {
       kind,
       ...base,
@@ -115,48 +159,77 @@ export function projectToolLifecycle(
       verificationBlockerKind: isMcpExecutionPath(executionPath)
         ? "environment-not-ready"
         : undefined,
-      nextAction: isMcpExecutionPath(executionPath)
-        ? "Run /mcp status and /mcp refresh for the affected server, then retry with a visible executable MCP tool."
-        : undefined,
+      nextAction: isMcpExecutionPath(executionPath) ? receipt.doNext : undefined,
     };
   }
 
   if (isMcpExecutionPath(executionPath)) {
     if (mcpFailureClass === "tool-is-error") {
+      const receipt = buildExecutionFailedResult({
+        capability: "mcp",
+        label: projectedToolName,
+        reasonCode: "mcp-tool-is-error",
+        reason,
+      });
       return {
         kind: "mcp-tool-is-error",
         ...base,
-        failureBoundary: "mcp-tool-is-error",
+        failureBoundary: receipt.reasonCode,
       };
     }
     if (mcpFailureClass === "protocol" || mcpFailureClass === "malformed-result") {
+      const receipt = buildExecutionFailedResult({
+        capability: "mcp",
+        label: projectedToolName,
+        reasonCode: "mcp-protocol-failed",
+        reason,
+        execution: "invalid-result",
+      });
       return {
         kind: "mcp-protocol-failed",
         ...base,
-        failureBoundary: "mcp-protocol-failed",
+        failureBoundary: receipt.reasonCode,
       };
     }
     if (
       mcpFailureClass === "stdio-process" ||
       mcpFailureClass === "server-unavailable"
     ) {
+      const receipt = buildExecutionFailedResult({
+        capability: "mcp",
+        label: projectedToolName,
+        reasonCode: "mcp-process-failed",
+        reason,
+      });
       return {
         kind: "mcp-process-failed",
         ...base,
-        failureBoundary: "mcp-process-failed",
+        failureBoundary: receipt.reasonCode,
       };
     }
+    const receipt = buildExecutionFailedResult({
+      capability: "mcp",
+      label: projectedToolName,
+      reasonCode: "mcp-execution-failed",
+      reason,
+    });
     return {
       kind: "mcp-execution-failed",
       ...base,
-      failureBoundary: "mcp-execution-failed",
+      failureBoundary: receipt.reasonCode,
     };
   }
 
+  const receipt = buildExecutionFailedResult({
+    capability: input.toolName === "bash" ? "command" : "tool",
+    label: projectedToolName,
+    reason,
+    reasonCode: "tool-execution-failed",
+  });
   return {
     kind: "tool-execution-failed",
     ...base,
-    failureBoundary: normalizeFailureBoundary(provenance),
+    failureBoundary: normalizeFailureBoundary(provenance) ?? receipt.reasonCode,
   };
 }
 

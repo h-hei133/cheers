@@ -281,19 +281,26 @@ rewrite, and focused validation tied to touched files.
 
 - Modules: Tool Engineering, Permission / Policy Engineering, Result Surface
   Engineering, Capability Contract Architecture.
-- Goal: normalize existing policy/result receipt vocabulary across approval,
-  command, MCP, browser, and workspace surfaces without changing decisions,
-  provider behavior, browser behavior, or edit behavior.
-- Best first candidates:
-  - policy reason projection table for existing approval/command/MCP/browser
-    blocks
-  - shared tool/runtime receipt vocabulary consumed by result/session surfaces
-  - result-contract characterization before any user-visible wording change
-- Validation: focused helper tests, `verify:result-contract`, touched
-  capability gates, and build.
-- Stop conditions: provider live calls, browser/edit expansion, workspace
-  write-policy changes, terminal truthfulness changes without result-contract
-  evidence, broad CLI/runMvp rewrites, or dependency changes.
+- Status: closed by `docs/architecture/tool-policy-result-contract.md`.
+- Result:
+  - added `toolPolicyResult.ts` as the shared lifecycle receipt vocabulary
+    for availability, policy, execution, result, reason code, do-next, and
+    safe capability labels
+  - added `toolResultProjection.ts` as the transcript-safe tool summary and
+    redaction projector
+  - integrated the seam into command allowlist/unavailable results, approval
+    denial, MCP unavailable/protocol/tool-error results, browser
+    blocked/unavailable results, edit expectation stopped contracts, provider
+    readiness not-configured failures, tool lifecycle projection, and
+    successful run-command dispatch projection
+  - preserved terminal truthfulness, command allowlist, MCP taxonomy,
+    browser/edit/provider boundaries, session schemas, CLI/dependencies, and
+    broad runMvp/tool-registry structure
+- Validation:
+  - focused tool policy/result, lifecycle, dispatch, dispatcher, result mapper,
+    edit expectation, MCP, and browser-adjacent tests pass
+  - full runMvp, package sweep, closeout/result-contract/build/diff/status
+    validation are the Route 146 final gates
 
 ### Route 147: Future Edit Expansion Contract Map
 

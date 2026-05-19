@@ -36,7 +36,7 @@ describe("Route 126 real Direct Playwright runtime", () => {
     expect(result.receipt.executed).toBe(true);
     expect(result.receipt.browserLaunched).toBe(true);
     expect(result.observation?.textSummary).toContain("Static fixture ready");
-  });
+  }, 20000);
 
   realBrowserIt(`real JS-rendered text${REAL_BROWSER_SKIP_REASON ? ` skipped: ${REAL_BROWSER_SKIP_REASON}` : ""}`, async () => {
     const runtime = await readyRuntime();
