@@ -162,3 +162,52 @@ route is **Command intent and read/inspect capability cleanup**:
 
 The second-best route is verification planner cleanup, but it should wait until
 read/inspect command intent is no longer masking prompt classification.
+
+## Route 140 Addendum
+
+Closeout doc: `docs/architecture/read-inspect-intent-cleanup.md`.
+
+Route 140 repaired the read/list/inspect/repo-explain cluster and rebaselined
+stale no-write stopped semantics:
+
+- full `runMvpIntegratedFlow.test.ts` moved from `101 passed / 50 failed` to
+  `111 passed / 40 failed`
+- focused read/inspect route passed with `14 passed / 141 skipped`
+- list-files intent now routes to no-write `inspect-files` / `glob(.ts)`
+  instead of chat or unrelated bash fallback
+- pathless targeted read now stops actionably with explicit in-workspace path
+  guidance
+- pathless read continuation can consume restored read target state
+- migrated read continuation target recovery relocates only when a single
+  high-confidence basename candidate exists
+- ambiguous or missing read relocation is `stopped_error`, not completed
+- path-only file prompts with optional line count default to grounded read
+- repo-explain collects `glob(.ts)` / read evidence and projects
+  `grounded-explanation` or `needs-verification`
+
+Removed from the deferred red baseline by Route 140:
+
+| Test | Route 140 outcome |
+|---|---|
+| derives file-oriented intent from prompt and uses glob without default bash demo path | fixed |
+| returns explicit guidance when read intent omits file path | rebaselined to actionable stopped |
+| inherits continuation target for pathless read follow-up from continuity context | fixed |
+| relocates inherited continuation target after migration when moved file has a single high-confidence candidate | fixed |
+| truthfully blocks continuation relocation when multiple candidates are ambiguous | rebaselined to actionable stopped |
+| truthfully blocks continuation relocation when no recovery path exists | rebaselined to actionable stopped |
+| defaults to grounded read when prompt provides a file path but lacks explicit read verb | fixed |
+| collects repo evidence before answering repo-specific coding questions | fixed |
+| routes runtime why/how questions to repo diagnosis instead of generic chat | fixed |
+| classifies symptom-oriented repo diagnosis as needs-verification with grounded evidence | diagnosis fixed; status rebaselined to caveated stopped |
+
+Current remaining deferred owner counts:
+
+| Owner | Count | Best next action |
+|---|---:|---|
+| write planning and concrete-content contract | 7 | separate obsolete synthetic-write expectations from real behavior gaps |
+| verification planner/result mapping | 10 | normalize verify command selection, retry, skipped, and stopped semantics |
+| continuation/rebase/lineage/action seed | 10 | extract and test continuation target and lineage decisions |
+| edit/refactor/batch/discovery expansion | 7 | keep deferred until an edit route opens those semantics |
+| provider mock harness | 3 | rebaseline deterministic provider harness without live calls |
+| transcript/approval/resume harness | 3 | rebaseline role and approval prompt expectations |
+| git/change-set attribution | 1 | isolate git-aware attribution from runMvp broad suite |

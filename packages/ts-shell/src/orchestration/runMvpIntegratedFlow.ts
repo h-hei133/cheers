@@ -114,6 +114,17 @@ import {
   projectRuntimeMutationOutcome,
 } from "./runtimeOutcomeProjection.js";
 import {
+  classifyReadInspectIntent,
+  isPathOnlyReadIntentPrompt,
+} from "./readInspectIntent.js";
+import { resolveReadContinuationTargetRecovery } from "./readContinuationTarget.js";
+import {
+  inferDiagnosisEvidenceRole,
+  inferRepoDiagnosisDisposition,
+  parseGlobFileList,
+  selectRepoExplainEvidenceTarget,
+} from "./repoExplainEvidence.js";
+import {
   buildActionResultSeedDecisionTrace,
   buildPostEditVerifyContinuationLineage,
   continuityStateAsObject,
@@ -545,6 +556,8 @@ interface WorkflowTaskIntentSignals {
   readonly hasContextSeedPrefix: boolean;
   readonly hasExplicitBoundaryResetPrompt: boolean;
   readonly hasFileReadIntent: boolean;
+  readonly hasTargetedFileReadIntent: boolean;
+  readonly hasRepositoryInspectIntent: boolean;
   readonly hasSummarizeIntent: boolean;
   readonly hasExplainIntent: boolean;
   readonly hasReflectiveExplainStateQuestion: boolean;
@@ -612,6 +625,8 @@ function buildWorkflowTaskPlan(
     hasContextSeedPrefix,
     hasExplicitBoundaryResetPrompt,
     hasFileReadIntent,
+    hasTargetedFileReadIntent,
+    hasRepositoryInspectIntent,
     hasSummarizeIntent,
     hasExplainIntent,
     hasReflectiveExplainStateQuestion,
@@ -693,6 +708,12 @@ function buildWorkflowTaskPlan(
     Boolean(promptPathTarget || explicitPrimaryTarget) ||
     targetResolution.targets.length > 0 ||
     hasPathLikeReference(prompt);
+  const hasImplicitPathOnlyReadIntent =
+    !hasFileReadIntent &&
+    !hasSummarizeIntent &&
+    !hasExplainIntent &&
+    hasExplicitPathReference &&
+    isPathOnlyReadIntentPrompt(prompt);
   const seedActionKind = continuity.lastActionResultSeed?.actionKind;
   const hasActionResultSeed = Boolean(continuity.lastActionResultSeed);
   const seedIgnoredExplicitTargetLineage =
@@ -947,9 +968,25 @@ function buildWorkflowTaskPlan(
     (continuationReopenDecision.enabled &&
       (Boolean(continuationReopenDecision.selectedTarget) ||
         continuationReopenDecision.candidates.length > 0));
+  const readContinuityRecovery = resolveReadContinuationTargetRecovery({
+    candidatePath: rawContinuityTargetPath,
+    continuity,
+    workspaceRoot,
+  });
+  const continuityCandidateForIntent =
+    hasGroundedReadLikeIntent || hasImplicitPathOnlyReadIntent
+      ? readContinuityRecovery.targetPath
+      : rawContinuityTargetPath;
+  const hasPathlessReadTargetCarryoverCue =
+    hasFileReadIntent &&
+    !hasExplicitPathReference &&
+    !hasEditIntent &&
+    !hasCreateIntent &&
+    !hasExecutionIntent &&
+    !hasVerifyIntent;
   const shouldUseContinuationTarget = Boolean(
     !explicitPrimaryTarget &&
-    rawContinuityTargetPath &&
+    continuityCandidateForIntent &&
     (hasContinuationCue ||
       hasCorrectionCue ||
       hasExecutionCorrectionCue ||
@@ -962,6 +999,7 @@ function buildWorkflowTaskPlan(
       hasSeedReadOnlyCheckCue ||
       hasWeakDiagnosticHandoffCue ||
       hasDiagnosticVerifyHandoffCue ||
+      hasPathlessReadTargetCarryoverCue ||
       (hasGroundedReadLikeIntent && lastTaskWasReadLike) ||
       hasEditIntent ||
       hasCreateIntent ||
@@ -972,7 +1010,7 @@ function buildWorkflowTaskPlan(
   );
   const continuityTargetPath =
     continuationReopenDecision.selectedTarget ??
-    (shouldUseContinuationTarget ? rawContinuityTargetPath : undefined);
+    (shouldUseContinuationTarget ? continuityCandidateForIntent : undefined);
   const explicitHasExtension = Boolean(
     explicitPrimaryTarget?.cleaned &&
     /\/[^/]+\.[A-Za-z0-9._-]+$/.test(
@@ -996,6 +1034,14 @@ function buildWorkflowTaskPlan(
           inWorkspace: true,
         }
       : null);
+  const readContinuationLineage = [
+    ...(ignoredExplicitTargetLineageOrUndefined ?? []),
+    ...(readContinuityRecovery.relocationNote
+      ? [readContinuityRecovery.relocationNote]
+      : []),
+  ];
+  const readContinuationLineageOrUndefined =
+    readContinuationLineage.length > 0 ? readContinuationLineage : undefined;
   const usedRestoredState =
     !explicitPrimaryTarget &&
     (Boolean(continuityTargetPath) ||
@@ -1617,7 +1663,25 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
-      continuationLineage: ignoredExplicitTargetLineageOrUndefined,
+      continuationLineage: readContinuationLineageOrUndefined,
+    };
+  }
+
+  if (
+    hasFileReadIntent &&
+    !hasExplicitPathReference &&
+    !primaryTarget &&
+    readContinuityRecovery.blockedReason
+  ) {
+    return {
+      taskKind: "read-file",
+      reason: "pathless read follow-up could not recover continuation target",
+      inspectFirst: true,
+      verifyAfterEdit: false,
+      blockedReason: readContinuityRecovery.blockedReason,
+      targetMissing: true,
+      usedRestoredState: Boolean(rawContinuityTargetPath),
+      continuationLineage: readContinuationLineageOrUndefined,
     };
   }
 
@@ -1684,7 +1748,7 @@ function buildWorkflowTaskPlan(
       verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
-      continuationLineage: ignoredExplicitTargetLineageOrUndefined,
+      continuationLineage: readContinuationLineageOrUndefined,
     };
   }
 
@@ -1766,6 +1830,29 @@ function buildWorkflowTaskPlan(
       blockedReason:
         "Grounded read/summarize/explain target is outside current workspace. Attach/switch project or provide an in-workspace path.",
       targetMissing: true,
+      usedRestoredState,
+    };
+  }
+
+  if (
+    hasDiagnosisIntent &&
+    !hasExecutionIntent &&
+    !hasEditIntent &&
+    !hasCreateIntent &&
+    (hasExplainIntent ||
+      /\b(?:repository|repo|runtime|session|implementation|implemented)\b/i.test(
+        groundedIntentPrompt,
+      ) ||
+      /\b(?:fail|fails|failing|error|errors|exception|boom|intermittently)\b/i.test(
+        groundedIntentPrompt,
+      ))
+  ) {
+    return {
+      taskKind: "repo-explain",
+      reason: "repo diagnosis intent",
+      targetPath: primaryTarget?.inWorkspace ? primaryTarget.cleaned : undefined,
+      inspectFirst: true,
+      verifyAfterEdit: false,
       usedRestoredState,
     };
   }
@@ -2122,6 +2209,25 @@ function buildWorkflowTaskPlan(
     };
   }
 
+  if (
+    hasImplicitPathOnlyReadIntent &&
+    primaryTarget?.inWorkspace &&
+    !hasEditIntent &&
+    !hasCreateIntent &&
+    !hasExecutionIntent
+  ) {
+    return {
+      taskKind: "read-file",
+      reason: "path-only prompt resolved as grounded read",
+      targetPath: primaryTarget.cleaned,
+      groundedDeliverableMode: "read",
+      ...(readLineCount !== undefined ? { readLineCount } : {}),
+      inspectFirst: true,
+      verifyAfterEdit: false,
+      usedRestoredState,
+    };
+  }
+
   if ((hasSummarizeIntent || hasExplainIntent) && primaryTarget?.inWorkspace) {
     const effectiveRepairInstruction = hasLocalExplainCue
       ? { ...normalizedRepairInstruction, targetMode: "explain" as const }
@@ -2166,6 +2272,18 @@ function buildWorkflowTaskPlan(
   }
 
   if (hasFileReadIntent) {
+    if (hasTargetedFileReadIntent && !hasRepositoryInspectIntent) {
+      return {
+        taskKind: "read-file",
+        reason: "targeted read intent requires explicit readable target",
+        inspectFirst: true,
+        verifyAfterEdit: false,
+        blockedReason:
+          "I can read the file, but I still need an explicit in-workspace file path.",
+        targetMissing: true,
+        usedRestoredState,
+      };
+    }
     return {
       taskKind: "inspect-files",
       reason: "read/inspect intent without explicit in-workspace target",
@@ -2209,10 +2327,12 @@ function extractWorkflowTaskIntentSignals(
     /\b(?:do\s+not|don't|not)\s+continue\s+(?:the\s+)?old\s+edit\b/i.test(
       prompt,
     ) || /\bboundary\s+reset\b/i.test(prompt);
-  const hasFileReadIntent =
-    /(?:read|inspect|open|show|print|\u67e5\u770b|\u8bfb\u53d6|\u770b\u770b|\u5206\u6790|\u524d\s*\d+\s*\u884c)/i.test(
-      groundedIntentPrompt,
-    );
+  const readInspectIntent = classifyReadInspectIntent(groundedIntentPrompt);
+  const hasFileReadIntent = readInspectIntent.hasFileReadIntent;
+  const hasTargetedFileReadIntent =
+    readInspectIntent.hasTargetedFileReadIntent;
+  const hasRepositoryInspectIntent =
+    readInspectIntent.hasRepositoryInspectIntent;
   const hasSummarizeIntent =
     /(?:summari[sz]e|summary|\u603b\u7ed3|\u6458\u8981|\u6982\u8ff0)/i.test(
       groundedIntentPrompt,
@@ -2298,6 +2418,8 @@ function extractWorkflowTaskIntentSignals(
     hasContextSeedPrefix,
     hasExplicitBoundaryResetPrompt,
     hasFileReadIntent,
+    hasTargetedFileReadIntent,
+    hasRepositoryInspectIntent,
     hasSummarizeIntent,
     hasExplainIntent,
     hasReflectiveExplainStateQuestion,
@@ -4185,7 +4307,66 @@ async function executeWorkflowTaskPlan(input: {
   }
 
   if (input.plan.taskKind === "repo-explain") {
-    if (!input.plan.targetPath) {
+    const globStep = await dispatchToolWithLifecycle({
+      dispatcher: input.dispatcher,
+      events,
+      toolName: "glob",
+      taskId: `task_${input.sessionId}_${input.turn}_repo_explain_glob`,
+      args: { pattern: ".ts" },
+      workspaceRoot: input.workspaceRoot,
+      sessionId: input.sessionId,
+      abortSignal: input.abortSignal,
+      requireApprovalEvent: false,
+    });
+    const candidateFiles = globStep.success
+      ? parseGlobFileList(globStep.output ?? "")
+      : [];
+    if (globStep.success) {
+      notes.push("tool: approved glob(.ts) for repo diagnosis");
+      evidence.push("repo-explain: glob(.ts) executed");
+    } else {
+      notes.push(
+        `repo-explain glob failed: ${globStep.error ?? "glob failed"}`,
+      );
+    }
+
+    let targetPath = input.plan.targetPath;
+    let targetContent: string | undefined;
+
+    if (!targetPath && candidateFiles.length > 0) {
+      const inspectedCandidates: Array<{ path: string; content: string }> = [];
+      for (const candidatePath of candidateFiles.slice(0, 20)) {
+        const readCandidate = await dispatchToolWithLifecycle({
+          dispatcher: input.dispatcher,
+          events,
+          toolName: "read",
+          taskId: `task_${input.sessionId}_${input.turn}_repo_explain_candidate_${hashStableId(candidatePath)}`,
+          args: { path: candidatePath },
+          workspaceRoot: input.workspaceRoot,
+          sessionId: input.sessionId,
+          abortSignal: input.abortSignal,
+          requireApprovalEvent: false,
+        });
+        if (readCandidate.success) {
+          inspectedCandidates.push({
+            path: candidatePath,
+            content: readCandidate.output ?? "",
+          });
+        }
+      }
+      const selected = selectRepoExplainEvidenceTarget({
+        prompt: input.prompt,
+        candidates: inspectedCandidates,
+      });
+      targetPath = selected?.path;
+      targetContent = selected?.content;
+    }
+
+    if (!targetPath) {
+      const reason =
+        candidateFiles.length > 1
+          ? "Repo explain needs one high-confidence evidence target, but multiple candidates matched. Provide an explicit in-workspace file path."
+          : "Repo explain requires an explicit in-workspace file target for truthful delivery.";
       return {
         events,
         notes: [...notes, "repo-explain missing explicit target"],
@@ -4195,8 +4376,7 @@ async function executeWorkflowTaskPlan(input: {
           failedFiles: [
             {
               path: "(missing-target)",
-              reason:
-                "Repo explain requires an explicit in-workspace file target for truthful delivery.",
+              reason,
             },
           ],
           patches,
@@ -4213,75 +4393,108 @@ async function executeWorkflowTaskPlan(input: {
           taskVerdict: "insufficient-evidence",
           taskReasons: ["Explanation target was not resolved."],
           userFacingOutput:
-            "Task not completed: missing target file. Provide an explicit in-workspace file path to explain.",
+            `Task not completed: ${reason}`,
         }),
       };
     }
-    const readStep = await dispatchToolWithLifecycle({
-      dispatcher: input.dispatcher,
-      events,
-      toolName: "read",
-      taskId: `task_${input.sessionId}_${input.turn}_repo_explain_read`,
-      args: { path: input.plan.targetPath },
-      workspaceRoot: input.workspaceRoot,
-      sessionId: input.sessionId,
-      abortSignal: input.abortSignal,
-      requireApprovalEvent: false,
-    });
-    if (!readStep.success) {
-      const reason = readStep.error ?? "read failed";
-      return {
+
+    if (targetContent === undefined) {
+      const readStep = await dispatchToolWithLifecycle({
+        dispatcher: input.dispatcher,
         events,
-        notes: [...notes, `repo-explain read failed: ${reason}`],
-        ...projectRuntimeCodingOutcome({
-          taskKind: "repo-explain",
-          changedFiles,
-          failedFiles: [{ path: input.plan.targetPath, reason }],
-          patches,
-          verifiedFiles,
-          unverifiedFiles,
-          verification: {
-            status: "skipped",
-            reason: "repo-explain read failed",
-            selectionScope: "none",
-            selectionSource: "not-requested",
-          },
-          repairNotes: ["Could not read target file for explanation."],
-          evidence: [`repo-explain read failed: ${reason}`],
-          taskVerdict: "insufficient-evidence",
-          taskReasons: ["Target file could not be read for explanation."],
-          userFacingOutput: `Task not completed: failed to read ${input.plan.targetPath}. Reason: ${reason}`,
-        }),
-      };
+        toolName: "read",
+        taskId: `task_${input.sessionId}_${input.turn}_repo_explain_read`,
+        args: { path: targetPath },
+        workspaceRoot: input.workspaceRoot,
+        sessionId: input.sessionId,
+        abortSignal: input.abortSignal,
+        requireApprovalEvent: false,
+      });
+      if (!readStep.success) {
+        const reason = readStep.error ?? "read failed";
+        return {
+          events,
+          notes: [...notes, `repo-explain read failed: ${reason}`],
+          ...projectRuntimeCodingOutcome({
+            taskKind: "repo-explain",
+            changedFiles,
+            failedFiles: [{ path: targetPath, reason }],
+            patches,
+            verifiedFiles,
+            unverifiedFiles,
+            verification: {
+              status: "skipped",
+              reason: "repo-explain read failed",
+              selectionScope: "none",
+              selectionSource: "not-requested",
+            },
+            repairNotes: ["Could not read target file for explanation."],
+            evidence: [`repo-explain read failed: ${reason}`],
+            taskVerdict: "insufficient-evidence",
+            taskReasons: ["Target file could not be read for explanation."],
+            userFacingOutput: `Task not completed: failed to read ${targetPath}. Reason: ${reason}`,
+          }),
+        };
+      }
+      targetContent = readStep.output ?? "";
     }
-    const explainOutput = buildExplainTaskDelivery(
-      input.plan.targetPath,
-      readStep.output ?? "",
-    );
+
+    notes.push("tool: read diagnosis evidence");
+    evidence.push(`repo-explain: read ${targetPath}`);
+    const explainOutput = buildExplainTaskDelivery(targetPath, targetContent);
+    const disposition = inferRepoDiagnosisDisposition(input.prompt);
+    const outcome = projectRuntimeCodingOutcome({
+      taskKind: "repo-explain",
+      changedFiles,
+      failedFiles,
+      patches,
+      verifiedFiles,
+      unverifiedFiles,
+      verification: {
+        status: "not-requested",
+        reason: "repo-explain read-only task",
+        selectionScope: "none",
+        selectionSource: "not-requested",
+      },
+      repairNotes,
+      evidence,
+      taskVerdict:
+        disposition === "needs-verification"
+          ? "completed-with-caveats"
+          : "satisfied",
+      taskReasons: [
+        disposition === "needs-verification"
+          ? "Repo diagnosis is grounded in inspected files but still needs verification."
+          : "Repo explanation delivered from inspected file content.",
+      ],
+      userFacingOutput: explainOutput,
+    });
+    outcome.codingResult.diagnosis = {
+      disposition,
+      reason:
+        disposition === "needs-verification"
+          ? "Symptom-oriented diagnosis requires verification after evidence collection."
+          : "Explanation is grounded in inspected repository evidence.",
+      searchPattern: ".ts",
+      candidateFiles,
+      evidenceFiles: [targetPath],
+      evidenceNodes: [
+        {
+          path: targetPath,
+          role: inferDiagnosisEvidenceRole(targetPath),
+          score: 1,
+        },
+      ],
+      evidenceLinks: [],
+    };
     return {
       events,
-      notes: [...notes, `repo-explain delivered: ${input.plan.targetPath}`],
-      ...projectRuntimeCodingOutcome({
-        taskKind: "repo-explain",
-        changedFiles,
-        failedFiles,
-        patches,
-        verifiedFiles,
-        unverifiedFiles,
-        verification: {
-          status: "not-requested",
-          reason: "repo-explain read-only task",
-          selectionScope: "none",
-          selectionSource: "not-requested",
-        },
-        repairNotes,
-        evidence: [...evidence, `repo-explain: read ${input.plan.targetPath}`],
-        taskVerdict: "satisfied",
-        taskReasons: [
-          "Repo explanation delivered from inspected file content.",
-        ],
-        userFacingOutput: explainOutput,
-      }),
+      notes: [
+        ...notes,
+        `repo-explain delivered: ${targetPath}`,
+        `diagnosis: disposition=${disposition}`,
+      ],
+      ...outcome,
     };
   }
 

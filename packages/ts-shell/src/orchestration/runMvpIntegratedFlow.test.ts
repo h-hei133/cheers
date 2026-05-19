@@ -1283,12 +1283,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expect(result.status).toBe("stopped_error");
     expect(result.finalOutput).toContain(
-      "I can read the file, but I still need an explicit file path.",
+      "I can read the file, but I still need an explicit in-workspace file path.",
     );
     expect(result.sharedContext.notes.join("\n")).toContain(
-      "plan: intent=read-file-missing-path",
+      "plan: intent=read-file",
     );
   }, 15000);
 
@@ -1417,7 +1417,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expect(result.status).toBe("stopped_error");
     expect(result.finalOutput).toContain("Task not completed");
     expect(result.finalOutput).toContain("relocation is ambiguous");
   }, 15000);
@@ -1455,7 +1455,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expect(result.status).toBe("stopped_error");
     expect(result.finalOutput).toContain("Task not completed");
     expect(result.finalOutput).toContain(
       "no high-confidence relocation candidate was found",
@@ -1623,7 +1623,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expect(result.status).toBe("stopped_error");
     expect(result.codingResult?.taskKind).toBe("repo-explain");
     expect(result.codingResult?.diagnosis?.disposition).toBe(
       "needs-verification",
