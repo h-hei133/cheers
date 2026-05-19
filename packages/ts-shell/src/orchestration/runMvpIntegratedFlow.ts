@@ -8169,6 +8169,12 @@ function countDeliverableModeCues(prompt: string): number {
 }
 
 function detectVerifyCommand(normalizedPrompt: string): string | undefined {
+  if (
+    normalizedPrompt.includes("node --version") ||
+    normalizedPrompt.includes("node version")
+  ) {
+    return "node --version";
+  }
   if (/(test|\u6d4b\u8bd5)/i.test(normalizedPrompt)) {
     return "npm test -- --help";
   }
@@ -8298,16 +8304,27 @@ function extractReplaceDirective(
     /replac(?:e|ing)(?:\s+it)?\s+["'`]?(.+?)["'`]?\s+with\s+["'`]?(.+?)["'`]?(?:[.\u3002!\uFF01?\uFF1F]|$)/i,
   );
   if (enMatch?.[1] && enMatch?.[2]) {
-    return { from: enMatch[1], to: enMatch[2] };
+    return { from: enMatch[1], to: sanitizeReplaceTarget(enMatch[2]) };
   }
 
   const enChangeMatch = prompt.match(
     /(?:change|update|fix|modify|swap)\s+["'`]?(.+?)["'`]?\s+(?:to|into|with)\s+["'`]?(.+?)["'`]?(?=\s+in\s+(?:that|this)\s+(?:part|section|file)|[.\u3002!\uFF01?\uFF1F]|$)(?:\s+in\s+(?:that|this)\s+(?:part|section|file))?(?:[.\u3002!\uFF01?\uFF1F]|$)/i,
   );
   if (enChangeMatch?.[1] && enChangeMatch?.[2]) {
-    return { from: enChangeMatch[1], to: enChangeMatch[2] };
+    return {
+      from: enChangeMatch[1],
+      to: sanitizeReplaceTarget(enChangeMatch[2]),
+    };
   }
   return undefined;
+}
+
+function sanitizeReplaceTarget(value: string): string {
+  return value
+    .replace(/\s*,\s*then\s+run\b[\s\S]*$/i, "")
+    .replace(/\s+then\s+run\b[\s\S]*$/i, "")
+    .replace(/\s+and\s+run\b[\s\S]*$/i, "")
+    .trim();
 }
 
 function isVerifyLikeCommand(command: string): boolean {

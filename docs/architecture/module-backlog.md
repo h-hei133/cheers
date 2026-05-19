@@ -87,30 +87,56 @@ rewrite, and focused validation tied to touched files.
   - provider diagnostic handoff planner, projection-only
   - SessionManager recovery/reentry projector or codec
 
-### Route 139: Tool / Policy / Result Contract Unification
+### Route 139: Control-Plane Baseline Sweep and Policy-Result Repair
 
-- Modules: Tool Engineering, Permission / Policy Engineering, Result Surface
-  Engineering.
-- Goal: define and adopt a shared projection vocabulary for tool, MCP,
-  approval, command allowlist, workspace, browser-policy, and provider opt-in
-  outcomes without changing decisions.
+- Modules: Agent Loop Engineering, Tool Engineering, Permission / Policy
+  Engineering, Result Surface Engineering.
+- Result: swept focused and broad control-plane baselines before more
+  extraction, repaired high-confidence command/verify behavior drift, and
+  documented the remaining full `runMvpIntegratedFlow.test.ts` reds.
+- Closeout doc:
+  `docs/architecture/control-plane-baseline.md`.
+- Repairs:
+  - `dir` / `ls` command intent is blocked with actionable
+    `command-not-allowlisted` instead of silently executing `node --version`.
+  - explicit `node --version` verify command is selected without expanding the
+    command allowlist.
+  - English replacement parsing trims trailing `then run ...` command clauses.
+- Baseline result:
+  - focused command/policy/result/projection/dispatch tests pass
+  - focused browser policy/runtime preservation tests pass
+  - focused Route 139 runMvp gate passes
+  - full `runMvpIntegratedFlow.test.ts` remains red with `101 passed / 50
+    failed`, each listed in the closeout doc with owner, classification, and
+    next action
+- Preserved: provider live calls, browser/edit expansion, broad shell/allowlist
+  expansion, CLI UX, dependency set, `SessionManager` schema, and broad
+  runMvp rewrite.
+- Route 140 should start with command intent and read/inspect capability
+  cleanup, not generic extraction, because unsupported command/read/list
+  classification is still masking several broad runMvp baselines.
+
+### Route 140: Command Intent and Read / Inspect Capability Cleanup
+
+- Modules: Agent Loop Engineering, Tool Engineering, Permission / Policy
+  Engineering, Result Surface Engineering.
+- Goal: define the current command/read/list/inspect contract before further
+  extraction or broad runMvp rebaseline.
 - Best first candidates:
-  - policy reason normalizer
-  - tool lifecycle to capability lifecycle projector
-  - MCP safe detail projector
-  - capability-result-to-coding-summary projector
+  - supported read/list/inspect prompt families and their owner capability
+  - blocked unsupported command-like prompts with actionable stopped results
+  - removal of silent fallback execution for unsupported shell-like requests
+  - focused read/inspect intent tests split out of broad runMvp
 - Validation:
-  - focused policy/tool/result tests
-  - `rtk npm run verify:mcp:error-taxonomy` if MCP surface changes
+  - focused command intent and allowlist tests
+  - focused read/inspect/repo-explain runMvp tests
+  - Route 139 focused runMvp gate
   - `rtk npm run verify:result-contract`
-  - `rtk npm run verify:edit-capability-closeout` if patch/write result
-    semantics are touched
   - `rtk npm run build -w packages/ts-shell`
-- Stop conditions: changing approval decisions, workspace authority,
-  provider opt-in, browser policy, MCP readiness claims, or terminal
-  classification rules without a dedicated route.
+- Stop conditions: broad shell allowlist expansion, new edit/browser/provider
+  behavior, CLI UX redesign, or session schema changes.
 
-### Route 140: CLI/Core Split Preparation
+### Route 141: CLI/Core Split Preparation
 
 - Modules: CLI / UX Engineering, Session / Continue Engineering.
 - Goal: move display-only and routing-only helpers out of `cli.tsx` while
@@ -130,7 +156,7 @@ rewrite, and focused validation tied to touched files.
   provider credential changes, approval semantic changes, or session schema
   changes.
 
-### Route 141: Capability Lifecycle Adoption Across Edit / Browser / Shell
+### Route 142: Capability Lifecycle Adoption Across Edit / Browser / Shell
 
 - Modules: Capability Contract Architecture, Browser Engineering, Edit / Patch
   Engineering, Runtime Engineering, Harness / Eval Engineering.
@@ -155,7 +181,7 @@ rewrite, and focused validation tied to touched files.
 
 ## Medium-Priority Follow-Up Routes
 
-### Route 142: Runtime Receipt Contract
+### Route 143: Runtime Receipt Contract
 
 - Modules: Runtime Engineering, Tool Engineering.
 - Goal: define a shared receipt vocabulary for local shell, daemon, browser,
@@ -163,7 +189,7 @@ rewrite, and focused validation tied to touched files.
   into Rust.
 - Validation: docs/diff/status first; focused runtime tests if code changes.
 
-### Route 143: Harness and Gate Taxonomy
+### Route 144: Harness and Gate Taxonomy
 
 - Modules: Harness Engineering, Eval / Benchmark Engineering.
 - Goal: categorize verifier scripts as product path, deterministic gate,
@@ -171,7 +197,15 @@ rewrite, and focused validation tied to touched files.
   report markers where safe.
 - Validation: `rtk git diff --check`; touched verifier self-tests only.
 
-### Route 144: Provider Readiness Parity Map
+### Route 145: Workspace / File Context Contract
+
+- Modules: Workspace / File Context Engineering, Edit / Patch Engineering.
+- Goal: consolidate workspace root, target resolution, file constraints,
+  read/write authority, stale-read, and post-write verification vocabulary.
+- Validation: workspace/patch focused tests if code changes; docs/diff/status
+  otherwise.
+
+### Route 146: Provider Readiness Parity Map
 
 - Modules: Provider / Model Engineering, Harness Engineering.
 - Goal: map provider readiness runtime classification to readiness scripts and
@@ -182,27 +216,20 @@ rewrite, and focused validation tied to touched files.
 - Stop conditions: manually reading provider config, printing secrets, or
   changing default provider gates.
 
-### Route 145: Workspace / File Context Contract
-
-- Modules: Workspace / File Context Engineering, Edit / Patch Engineering.
-- Goal: consolidate workspace root, target resolution, file constraints,
-  read/write authority, stale-read, and post-write verification vocabulary.
-- Validation: workspace/patch focused tests if code changes; docs/diff/status
-  otherwise.
-
 ## Backlog Ordering
 
 Recommended order:
 
 1. Route 137: Agent Loop Projection Extraction.
 2. Route 138: Session Codec / Continue Seam or Agent Dispatch Seam Extraction.
-3. Route 139: Tool / Policy / Result Contract Unification.
-4. Route 140: CLI/Core Split Preparation.
-5. Route 141: Capability Lifecycle Adoption Across Edit / Browser / Shell.
-6. Route 142: Runtime Receipt Contract.
-7. Route 143: Harness and Gate Taxonomy.
-8. Route 145: Workspace / File Context Contract.
-9. Route 144: Provider Readiness Parity Map.
+3. Route 139: Control-Plane Baseline Sweep and Policy-Result Repair.
+4. Route 140: Command Intent and Read / Inspect Capability Cleanup.
+5. Route 141: CLI/Core Split Preparation.
+6. Route 142: Capability Lifecycle Adoption Across Edit / Browser / Shell.
+7. Route 143: Runtime Receipt Contract.
+8. Route 144: Harness and Gate Taxonomy.
+9. Route 145: Workspace / File Context Contract.
+10. Route 146: Provider Readiness Parity Map.
 
 Do not use this backlog to justify broad source refactors. A route is valid
 only when it reduces a user-facing runtime blocker or a named cross-layer

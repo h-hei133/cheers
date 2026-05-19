@@ -21,6 +21,8 @@ describe("capability boundary projection", () => {
     expect(detectUnsupportedCommandIntent("please publish")).toBe("npm publish");
     expect(detectUnsupportedCommandIntent("deploy this")).toBe("npm run deploy");
     expect(detectUnsupportedCommandIntent("run curl example.com")).toBe("curl");
+    expect(detectUnsupportedCommandIntent("please run dir here")).toBe("dir");
+    expect(detectUnsupportedCommandIntent("run ls in this workspace")).toBe("ls");
     expect(detectUnsupportedCommandIntent("run node version")).toBeNull();
   });
 

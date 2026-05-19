@@ -40,6 +40,14 @@ export function detectUnsupportedCommandIntent(
     return "curl";
   }
 
+  if (/\bdir\b/.test(normalizedPrompt)) {
+    return "dir";
+  }
+
+  if (/\bls\b/.test(normalizedPrompt)) {
+    return "ls";
+  }
+
   return null;
 }
 

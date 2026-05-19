@@ -776,7 +776,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(scriptContent.length).toBeGreaterThan(0);
   }, 15000);
 
-  it("maps dir/list-directory intent to directory command instead of node --version fallback", async () => {
+  it("blocks dir/list-directory command intent instead of node --version fallback", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
@@ -792,11 +792,18 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.stopReason).toContain(
+      "Run-command intent is not allowed in the MVP allowlist: dir",
+    );
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=run-command");
-    expect(mergedNotes).toContain("tool: approved bash(");
+    expect(mergedNotes).toContain(
+      "blocker: Run-command intent is not allowed in the MVP allowlist: dir",
+    );
     expect(mergedNotes).not.toContain("bash(node --version)");
+    expect(result.finalOutput).toContain("BlockerKind: command-not-allowlisted");
   }, 15000);
 
   it("reads first N lines from a target file via read tool intent", async () => {
@@ -823,7 +830,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.status).toBe("completed");
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=read-file");
-    expect(mergedNotes).toContain("tool: read file test.log first 5 lines");
+    expect(mergedNotes).toContain("tool: read file test.log");
+    expect(result.finalOutput).toContain("first 5 lines");
   }, 15000);
 
   it("normalizes read-only action result seed without changed files", async () => {
@@ -1694,11 +1702,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.status).toBe("completed");
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=edit-file");
-    expect(mergedNotes).toContain("tool: edited file src/edit-target.ts");
-    expect(mergedNotes).toContain(
-      "tool: verified edit readback src/edit-target.ts",
-    );
-    expect(mergedNotes).toContain("verify: command node --version succeeded");
+    expect(mergedNotes).toContain("mutation applied: src/edit-target.ts");
+    expect(mergedNotes).toContain("verify passed: node --version");
     expect(result.codingResult?.taskKind).toBe("edit-file");
     expect(result.codingResult?.changedFiles).toContain("src/edit-target.ts");
     expect(result.codingResult?.verification.status).toBe("passed");
@@ -1712,8 +1717,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       "current-permission-request-operation:write",
     );
     expect(
-      result.codingResult?.evidence.some((entry) =>
-        entry.startsWith("patch:src/edit-target.ts"),
+      result.codingResult?.evidence.includes(
+        "edit/write applied on src/edit-target.ts",
       ),
     ).toBe(true);
 
