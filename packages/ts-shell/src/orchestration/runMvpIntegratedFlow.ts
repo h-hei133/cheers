@@ -13,16 +13,8 @@ import {
   detectBrowserAgentPlan,
   type BrowserAgentPlan,
 } from "../core/context/browserAgent.js";
-import {
-  browserObservationEvidenceLine,
-  browserObservationFromMetadata,
-} from "../core/context/browserObs.js";
+import { browserObservationFromMetadata } from "../core/context/browserObs.js";
 import { executeBrowserTransaction } from "../core/context/browserTxn.js";
-import { browserTxnTraceEvidenceLine } from "../core/context/browserTrace.js";
-import {
-  browserTxnEvidenceLine,
-  formatBrowserTxnResult,
-} from "../core/context/browserTxnEvidence.js";
 import { getPwRuntimeStatus, type PwRuntimeStatus } from "../core/context/pwRuntime.js";
 import {
   rebindPathLikeToWorkspace,
@@ -60,6 +52,19 @@ import {
   extractLowRiskUnchangedVerifications,
   type FileConstraintAssertions,
 } from "./fileConstraintAssertions.js";
+import {
+  buildBrowserAgentBaseEvidence,
+  projectBrowserContinuationEvidence,
+  projectBrowserObservationEvidence,
+  projectBrowserTransactionEvidence,
+  projectVerificationEvidence,
+} from "./flowEvidenceProjection.js";
+import {
+  projectBrowserContinuationResult,
+  projectBrowserObservationResult,
+  projectBrowserTransactionResult,
+  type BrowserToolFailureProjection,
+} from "./flowResultProjection.js";
 import {
   buildReflectiveStateQueryResponse,
   buildRepairContinuationObject,
@@ -3747,34 +3752,15 @@ async function executeBrowserWorkflowTaskPlan(input: {
     ...input.freshnessObservability.notes,
     "browser-agent: tool pipeline selected",
   ];
-  const evidence = [
-    ...input.freshnessObservability.evidence,
-    ...input.plan.evidence,
-    "browser-agent-loop:entered-query-loop",
-    "browser-agent-loop:no-raw-dom",
-    "browser-agent-loop:no-public-web-default",
-  ];
+  const evidence = buildBrowserAgentBaseEvidence({
+    freshnessEvidence: input.freshnessObservability.evidence,
+    planEvidence: input.plan.evidence,
+  });
 
   if (input.plan.actions.length === 0 && input.plan.continuationSummary) {
-    evidence.push("browser-agent-loop:continued-from-prior-evidence");
-    const output = [
-      "Browser evidence from prior session",
-      `- Summary: ${input.plan.continuationSummary}`,
-      "- Raw DOM: excluded",
-    ].join("\n");
-    const projected = projectRuntimeCodingOutcome({
-      taskKind: "browser",
-      changedFiles: [],
-      failedFiles: [],
-      patches: [],
-      verifiedFiles: [],
-      unverifiedFiles: [],
-      verification: { status: "passed", selectionScope: "none", selectionSource: "not-requested" },
-      repairNotes: ["browser continuation evidence summarized"],
-      evidence,
-      taskVerdict: "satisfied",
-      taskReasons: [],
-      userFacingOutput: output,
+    const projected = projectBrowserContinuationResult({
+      evidence: projectBrowserContinuationEvidence(evidence),
+      continuationSummary: input.plan.continuationSummary,
     });
     return { events, notes, ...projected };
   }
@@ -3783,58 +3769,22 @@ async function executeBrowserWorkflowTaskPlan(input: {
     const transaction = await executeBrowserTransaction(input.plan.transactionPlan, {
       runtimeStatus: input.browserRuntimeStatus,
     });
-    evidence.push(browserTxnEvidenceLine(transaction));
-    evidence.push(browserTxnTraceEvidenceLine(transaction.trace));
-    evidence.push([
-      "browser-agent-observation",
-      transaction.evidenceId,
-      "transaction",
-      transaction.status,
-      transaction.reasonCode,
-      transaction.cleanupStatus,
-      transaction.finalSummary,
-    ].join(":"));
-    evidence.push(...transaction.evidence);
+    const transactionEvidence = projectBrowserTransactionEvidence({
+      evidence,
+      transaction,
+    });
     notes.push(
       `browser-transaction: ${transaction.status} ${transaction.reasonCode} repair=${transaction.repairStatus} cleanup=${transaction.cleanupStatus}`,
     );
-    const failed = transaction.status !== "success";
-    const projected = projectRuntimeCodingOutcome({
-      taskKind: "browser",
-      changedFiles: [],
-      failedFiles: failed
-        ? [{ path: "(browser)", reason: transaction.finalSummary }]
-        : [],
-      patches: [],
-      verifiedFiles: [],
-      unverifiedFiles: [],
-      verification: failed
-        ? {
-            status: "blocked",
-            reason: transaction.finalSummary,
-            selectionScope: "focused",
-            selectionSource: "auto-from-changes",
-            blockerKind: "unknown",
-            nextAction: transaction.nextActions[0] ?? "Retry only within controlled local browser policy.",
-          }
-        : { status: "passed", selectionScope: "focused", selectionSource: "auto-from-changes" },
-      repairNotes: transaction.repairStatus === "not-needed"
-        ? ["browser transaction completed without repair"]
-        : [`browser transaction repair ${transaction.repairStatus}`],
-      evidence: [
-        ...evidence,
-        `browser-agent-result:${failed ? "stopped" : "success"}`,
-        `browser-agent-reason:${transaction.reasonCode}`,
-      ],
-      taskVerdict: failed ? "insufficient-evidence" : "satisfied",
-      taskReasons: failed ? [transaction.finalSummary] : [],
-      userFacingOutput: formatBrowserTxnResult(transaction),
+    const projected = projectBrowserTransactionResult({
+      evidence: transactionEvidence,
+      transaction,
     });
     return { events, notes, ...projected };
   }
 
   const observations = [];
-  let firstFailure: { reason: string; reasonCode: string } | undefined;
+  let firstFailure: BrowserToolFailureProjection | undefined;
   for (let index = 0; index < input.plan.actions.length; index += 1) {
     const action = input.plan.actions[index]!;
     const taskId = `browser_agent_${input.turn}_${index + 1}_${action.toolName.replace(/[^a-z0-9]+/gi, "_")}`;
@@ -3852,8 +3802,7 @@ async function executeBrowserWorkflowTaskPlan(input: {
     const observation = browserObservationFromMetadata(result.metadata);
     if (observation) {
       observations.push(observation);
-      evidence.push(browserObservationEvidenceLine(observation));
-      evidence.push(...observation.evidence);
+      evidence.push(...projectBrowserObservationEvidence(observation));
       notes.push(
         `browser-action: ${observation.operation} ${observation.status} ${observation.reasonCode} cleanup=${observation.cleanupStatus}`,
       );
@@ -3868,56 +3817,10 @@ async function executeBrowserWorkflowTaskPlan(input: {
   }
 
   const finalObservation = observations[observations.length - 1];
-  const failed = Boolean(firstFailure);
-  const reasonCode = firstFailure?.reasonCode ?? finalObservation?.reasonCode ?? "ready";
-  const output = failed
-    ? [
-        "Browser task stopped",
-        `- ReasonCode: ${reasonCode}`,
-        `- Reason: ${firstFailure?.reason ?? "Browser tool failed"}`,
-        `- Cleanup: ${finalObservation?.cleanupStatus ?? "not-started"}`,
-        `- Next: ${finalObservation?.nextActions.join("; ") ?? "Retry only within controlled local browser policy."}`,
-        "- Raw DOM: excluded",
-      ].join("\n")
-    : [
-        "Browser task completed",
-        `- Operation: ${finalObservation?.operation ?? "none"}`,
-        `- Summary: ${finalObservation?.visibleTextSummary ?? "No browser observation returned."}`,
-        `- Cleanup: ${finalObservation?.cleanupStatus ?? "not-started"}`,
-        `- EvidenceId: ${finalObservation?.evidenceId ?? "none"}`,
-        "- Raw DOM: excluded",
-      ].join("\n");
-
-  const projected = projectRuntimeCodingOutcome({
-    taskKind: "browser",
-    changedFiles: [],
-    failedFiles: failed
-      ? [{ path: "(browser)", reason: firstFailure?.reason ?? "Browser tool failed" }]
-      : [],
-    patches: [],
-    verifiedFiles: [],
-    unverifiedFiles: [],
-    verification: failed
-      ? {
-          status: "blocked",
-          reason: firstFailure?.reason,
-          selectionScope: "focused",
-          selectionSource: "auto-from-changes",
-          blockerKind: "unknown",
-          nextAction: finalObservation?.nextActions[0] ?? "Retry only within controlled local browser policy.",
-        }
-      : { status: "passed", selectionScope: "focused", selectionSource: "auto-from-changes" },
-    repairNotes: failed
-      ? [`browser stopped: ${reasonCode}`]
-      : ["browser observation summarized without raw DOM"],
-    evidence: [
-      ...evidence,
-      `browser-agent-result:${failed ? "stopped" : "success"}`,
-      `browser-agent-reason:${reasonCode}`,
-    ],
-    taskVerdict: failed ? "insufficient-evidence" : "satisfied",
-    taskReasons: failed ? [firstFailure?.reason ?? "Browser tool failed"] : [],
-    userFacingOutput: output,
+  const projected = projectBrowserObservationResult({
+    evidence,
+    firstFailure,
+    finalObservation,
   });
   return { events, notes, ...projected };
 }
@@ -5299,32 +5202,16 @@ async function executeWorkflowTaskPlan(input: {
           ? { nextAction: commandFailure.nextAction }
           : {}),
       };
-      if (verification.command && isVerifyLikeCommand(verification.command)) {
-        evidence.push(`verify-command-hint:${verification.command}`);
-        evidence.push(`verify-cwd-hint:${input.workspaceRoot}`);
-      }
-      if (input.plan.targetPath) {
-        evidence.push(`verify-target-hint:${input.plan.targetPath}`);
-      }
-      if (verification.blockerKind) {
-        evidence.push(`verify-blocker-kind:${verification.blockerKind}`);
-      }
-      if (verification.nextAction) {
-        evidence.push(
-          `verify-next-action:${truncate(
-            verification.nextAction.replace(/\s+/g, " "),
-            200,
-          )}`,
-        );
-      }
-      if (verification.status === "blocked") {
-        const resumeEligible =
-          verification.blockerKind === "approval-denied" &&
-          Boolean(verification.command?.trim());
-        evidence.push(
-          `verify-resume-eligible:${resumeEligible ? "true" : "false"}`,
-        );
-      }
+      evidence.push(
+        ...projectVerificationEvidence({
+          verification,
+          targetPath: input.plan.targetPath,
+          workspaceRoot: input.workspaceRoot,
+          verifyLikeCommand: Boolean(
+            verification.command && isVerifyLikeCommand(verification.command),
+          ),
+        }),
+      );
       if (!commandResult.success) {
         failedFiles.push({
           path: "(command)",

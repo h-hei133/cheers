@@ -41,39 +41,51 @@ rewrite, and focused validation tied to touched files.
 ### Route 137: Agent Loop Projection Extraction
 
 - Modules: Agent Loop Engineering, Result Surface Engineering.
-- Goal: reduce `runMvpIntegratedFlow.ts` concentration by extracting one
-  projection family with direct tests.
-- Best first candidates:
-  - intent signal projector
+- Result: extracted browser result/transcript projection and flow evidence
+  projection helpers from `runMvpIntegratedFlow.ts`.
+- Closeout doc:
+  `docs/architecture/agent-loop-projection-extraction.md`.
+- New owners:
+  - `packages/ts-shell/src/orchestration/flowResultProjection.ts`
+  - `packages/ts-shell/src/orchestration/flowEvidenceProjection.ts`
+- Preserved: browser/edit/provider/permission behavior, CLI UX,
+  `SessionManager` schema, dependency set, and runMvp control flow.
+- Validation:
+  - `rtk npm run test -w packages/ts-shell -- src/orchestration/flowProjection.test.ts src/core/harness/browserAgentLoop.test.ts`
+  - baseline note: `runMvpIntegratedFlow.test.ts -t "covers prompt -> handoff -> tool approval -> streamed result"` is pre-existing red with Route 137 changes stashed
+  - `rtk npm run verify:result-contract`
+  - `rtk npm run verify:edit-capability-closeout`
+  - `rtk npm run build -w packages/ts-shell`
+- Remaining candidates move to Route 138/139:
   - provider diagnostic handoff planner
   - mutation target selection projector
   - read-window continuation projector
-  - capability result summary projector
-- Validation:
-  - focused tests for the extracted projector
-  - existing runtime route tests covering the touched path
-  - `rtk npm run verify:result-contract`
-  - `rtk npm run build -w packages/ts-shell`
-- Stop conditions: provider auth movement, browser/edit expansion, workspace
-  write authority movement, terminal behavior drift, schema changes.
+  - generic capability result summary projector
 
-### Route 138: Session Codec and Continuation Seam Extraction
+### Route 138: Session Codec / Continue Seam or Agent Dispatch Seam Extraction
 
-- Modules: Session / Continue Engineering, Result Surface Engineering.
-- Goal: continue extracting pure codecs/projections from `SessionManager.ts`
-  while keeping filesystem state transitions in the class.
+- Modules: Session / Continue Engineering, Agent Loop Engineering, Result
+  Surface Engineering.
+- Goal: pick one implementation seam that materially reduces runtime coupling:
+  either a pure SessionManager recovery/reentry projector or a small agent-loop
+  dispatch seam now that Route 137 moved browser projection out.
 - Best first candidates:
   - recovery snapshot terminal summary projector
   - session reentry summary projector/scorer
   - transcript event codec helpers
   - approval/request memory summary projector consolidation
+  - browser dispatch route wrapper that preserves existing transaction/tool
+    execution calls
+  - provider diagnostic handoff planner, projection-only
 - Validation:
   - focused session helper tests
+  - focused agent-loop tests if dispatch is touched
   - relevant `SessionManager.test.ts` slices
   - `rtk npm run verify:result-contract`
   - `rtk npm run build -w packages/ts-shell`
 - Stop conditions: `metadata.json`, `state.json`, `transcript.jsonl`, compact,
-  replay, or `/continue` semantic changes.
+  replay, `/continue`, provider auth, browser/edit behavior, or CLI semantic
+  changes.
 
 ### Route 139: Tool / Policy / Result Contract Unification
 
@@ -183,7 +195,7 @@ rewrite, and focused validation tied to touched files.
 Recommended order:
 
 1. Route 137: Agent Loop Projection Extraction.
-2. Route 138: Session Codec and Continuation Seam Extraction.
+2. Route 138: Session Codec / Continue Seam or Agent Dispatch Seam Extraction.
 3. Route 139: Tool / Policy / Result Contract Unification.
 4. Route 140: CLI/Core Split Preparation.
 5. Route 141: Capability Lifecycle Adoption Across Edit / Browser / Shell.
