@@ -387,8 +387,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.terminalClassification).toBe("error");
-    expect(result.stopReason).toContain("Approval denied by user for bash");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.stopReason).toContain("Re-run and approve escalation");
+    expect(result.codingResult?.verification.reason).toContain(
+      "Escalation denied by user",
+    );
     expect(result.codingResult?.provenance?.approvalDecisions).toEqual([
       expect.objectContaining({
         kind: "escalation-denied",
@@ -404,12 +407,15 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       }),
     ]);
 
-    expect(result.transcript.map((turn) => turn.role)).toEqual(["planner"]);
+    expect(result.transcript.map((turn) => turn.role)).toEqual([
+      "planner",
+      "coder",
+    ]);
 
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("workflow: branch=");
     expect(mergedNotes).toContain("mcp: clients=");
-    expect(result.finalOutput).toContain("PLANNER:");
+    expect(result.finalOutput).toContain("Task not completed");
   }, 15000);
 
   it("uses explicit escalation callback instead of prompt-derived synthetic decisions", async () => {
@@ -467,12 +473,16 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(defaultPathResult.status).toBe("stopped_error");
-    expect(defaultPathResult.terminalClassification).toBe("error");
+    expect(defaultPathResult.terminalClassification).toBe("stopped");
     expect(defaultPathResult.stopReason).toContain(
-      "Approval denied by user for bash",
+      "Re-run and approve escalation",
+    );
+    expect(defaultPathResult.codingResult?.verification.reason).toContain(
+      "Escalation denied by user",
     );
     expect(defaultPathResult.transcript.map((turn) => turn.role)).toEqual([
       "planner",
+      "coder",
     ]);
 
     const injectedPathResult = await runMvpIntegratedFlow({
@@ -488,7 +498,6 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(injectedPathResult.transcript.map((turn) => turn.role)).toEqual([
       "planner",
       "coder",
-      "reviewer",
     ]);
 
     const mergedNotes = injectedPathResult.sharedContext.notes.join("\n");
@@ -526,7 +535,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         event.type === "query.completed",
     );
     expect(defaultCompleted?.result.status).toBe("stopped_error");
-    expect(defaultCompleted?.result.terminalClassification).toBe("error");
+    expect(defaultCompleted?.result.terminalClassification).toBe("stopped");
     expect(defaultCompleted?.result.status).not.toBe("completed");
 
     const injectedPathEvents: QueryEvent[] = [];

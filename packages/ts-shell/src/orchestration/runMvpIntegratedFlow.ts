@@ -19,10 +19,6 @@ import { getPwRuntimeStatus, type PwRuntimeStatus } from "../core/context/pwRunt
 import {
   rebindPathLikeToWorkspace,
 } from "../core/paths/legacyRootRebase.js";
-import {
-  projectToolLifecycle,
-  type ToolLifecycleProjection,
-} from "../core/tools/toolLifecycleProjection.js";
 import type { QueryEvent } from "../core/query/events.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { OpenAIModelAdapter } from "../model-adapters/providers/openai/OpenAIModelAdapter.js";
@@ -37,9 +33,7 @@ import { ToolDispatcher } from "../tools/dispatcher.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import {
   createCodingResultProvenanceCollector,
-  recordToolLifecycleProvenance,
   summarizeCodingResultProvenance,
-  type CodingResultProvenanceCollector,
 } from "./codingResultProvenance.js";
 import {
   blockedCommandReason,
@@ -59,6 +53,11 @@ import {
   projectBrowserTransactionEvidence,
   projectVerificationEvidence,
 } from "./flowEvidenceProjection.js";
+import {
+  dispatchToolWithLifecycle,
+  projectRunCommandDispatchOutcome,
+  type ToolLifecycleResult,
+} from "./flowDispatch.js";
 import {
   projectBrowserContinuationResult,
   projectBrowserObservationResult,
@@ -131,12 +130,6 @@ import type {
 import { classifyVerificationFailure } from "./toolExecutionOutcomeProjection.js";
 import type { SingleFileReplacePatchResult } from "./patchMutationLane.js";
 import {
-  appendApprovalRequestedEvent,
-  appendApprovalResolvedEvent,
-  appendToolResultEvent,
-  appendToolStartedEvent,
-} from "./toolLifecycleEvents.js";
-import {
   buildWorkflowDecisionTrace,
   type ContinuationTransform,
   type GroundedDeliverableConstraints,
@@ -152,7 +145,6 @@ import type {
   AgentExecutionInput,
   AgentExecutionOutput,
   CodingPatchRecord,
-  CodingResultProvenanceSummary,
   CodingResultSummary,
   CodingTaskKind,
   CodingVerificationSummary,
@@ -597,15 +589,6 @@ interface WorkflowExecutionResult {
   readonly notes: string[];
   readonly codingResult: CodingResultSummary;
   readonly userFacingOutput: string;
-}
-
-interface ToolLifecycleResult {
-  readonly success: boolean;
-  readonly output?: string;
-  readonly error?: string;
-  readonly metadata?: Record<string, unknown>;
-  readonly projection: ToolLifecycleProjection;
-  readonly provenance?: CodingResultProvenanceSummary;
 }
 
 type ReadWindowMode = "reset" | "continue" | "absolute";
@@ -3863,6 +3846,7 @@ async function executeWorkflowTaskPlan(input: {
   let verification: CodingVerificationSummary = {
     status: "not-requested",
   };
+  let dispatchedRunCommand: string | undefined;
 
   if (input.plan.blockedReason) {
     notes.push(`blocker: ${input.plan.blockedReason}`);
@@ -5148,6 +5132,7 @@ async function executeWorkflowTaskPlan(input: {
 
   if (input.plan.taskKind === "run-command") {
     const command = input.plan.directCommand ?? "node --version";
+    dispatchedRunCommand = command;
     const currentRequestScope = deriveCurrentPermissionRequestFromToolInput({
       toolName: "bash",
       operation: "spawn",
@@ -5182,6 +5167,11 @@ async function executeWorkflowTaskPlan(input: {
       const commandFailure = commandResult.success
         ? undefined
         : classifyVerificationFailure(commandResult);
+      notes.push(
+        commandResult.success
+          ? `tool: approved bash(${command})`
+          : `tool: blocked bash(${command})`,
+      );
       verification = {
         status: commandResult.success
           ? "passed"
@@ -5693,23 +5683,37 @@ async function executeWorkflowTaskPlan(input: {
     );
   }
 
-  const resultContract = projectRuntimeMutationOutcome({
-    taskKind: input.plan.taskKind,
-    changedFiles,
-    failedFiles,
-    patches,
-    verifiedFiles,
-    unverifiedFiles,
-    verification,
-    repairNotes,
-    evidence,
-    crossFileDegradationReason,
-    degradedCrossFileTargets,
-    crossFileRemainingTargets,
-    crossFileFailedByReason,
-    crossFileSkippedFiles,
-    provenance: summarizeCodingResultProvenance(provenanceCollector),
-  });
+  const resultContract =
+    input.plan.taskKind === "run-command"
+      ? projectRunCommandDispatchOutcome({
+          command: dispatchedRunCommand ?? verification.command ?? "command",
+          changedFiles,
+          failedFiles,
+          patches,
+          verifiedFiles,
+          unverifiedFiles,
+          verification,
+          repairNotes,
+          evidence,
+          provenance: summarizeCodingResultProvenance(provenanceCollector),
+        })
+      : projectRuntimeMutationOutcome({
+          taskKind: input.plan.taskKind,
+          changedFiles,
+          failedFiles,
+          patches,
+          verifiedFiles,
+          unverifiedFiles,
+          verification,
+          repairNotes,
+          evidence,
+          crossFileDegradationReason,
+          degradedCrossFileTargets,
+          crossFileRemainingTargets,
+          crossFileFailedByReason,
+          crossFileSkippedFiles,
+          provenance: summarizeCodingResultProvenance(provenanceCollector),
+        });
 
   return {
     events,
@@ -8265,64 +8269,6 @@ function uniqueStable(values: readonly string[]): string[] {
 
 function hashStableId(value: string): string {
   return computeFragmentFingerprint(value).slice(0, 12);
-}
-
-async function dispatchToolWithLifecycle(input: {
-  readonly dispatcher: ToolDispatcher;
-  readonly events: QueryEvent[];
-  readonly toolName: string;
-  readonly taskId: string;
-  readonly args: Record<string, unknown>;
-  readonly workspaceRoot: string;
-  readonly sessionId: string;
-  readonly abortSignal?: AbortSignal;
-  readonly requireApprovalEvent: boolean;
-  readonly provenanceCollector?: CodingResultProvenanceCollector;
-}): Promise<ToolLifecycleResult> {
-  const identity = {
-    toolName: input.toolName,
-    taskId: input.taskId,
-  };
-  if (input.requireApprovalEvent) {
-    appendApprovalRequestedEvent(input.events, identity);
-  }
-  appendToolStartedEvent(input.events, identity);
-  const result = await input.dispatcher.dispatch(input.toolName, input.args, {
-    taskId: input.taskId,
-    workspaceRoot: input.workspaceRoot,
-    sessionId: input.sessionId,
-    abortSignal: input.abortSignal,
-  });
-  if (input.requireApprovalEvent) {
-    appendApprovalResolvedEvent(input.events, identity, result);
-  }
-  appendToolResultEvent(input.events, identity, result);
-  if (input.provenanceCollector) {
-    recordToolLifecycleProvenance(input.provenanceCollector, {
-      ...identity,
-      result,
-      requireApprovalEvent: input.requireApprovalEvent,
-    });
-  }
-  const provenance = input.provenanceCollector
-    ? summarizeCodingResultProvenance(input.provenanceCollector)
-    : undefined;
-  const projection = projectToolLifecycle({
-    toolName: input.toolName,
-    success: result.success,
-    output: result.output,
-    error: result.error,
-    metadata: result.metadata,
-    requireApprovalEvent: input.requireApprovalEvent,
-  });
-  return {
-    success: result.success,
-    output: result.output,
-    error: result.error,
-    metadata: result.metadata,
-    projection,
-    ...(provenance ? { provenance } : {}),
-  };
 }
 
 function extractFencedContent(prompt: string): string | undefined {

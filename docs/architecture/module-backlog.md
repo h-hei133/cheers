@@ -62,30 +62,30 @@ rewrite, and focused validation tied to touched files.
   - read-window continuation projector
   - generic capability result summary projector
 
-### Route 138: Session Codec / Continue Seam or Agent Dispatch Seam Extraction
+### Route 138: Agent Loop Baseline Repair and Dispatch Seam
 
-- Modules: Session / Continue Engineering, Agent Loop Engineering, Result
-  Surface Engineering.
-- Goal: pick one implementation seam that materially reduces runtime coupling:
-  either a pure SessionManager recovery/reentry projector or a small agent-loop
-  dispatch seam now that Route 137 moved browser projection out.
-- Best first candidates:
-  - recovery snapshot terminal summary projector
-  - session reentry summary projector/scorer
-  - transcript event codec helpers
-  - approval/request memory summary projector consolidation
-  - browser dispatch route wrapper that preserves existing transaction/tool
-    execution calls
-  - provider diagnostic handoff planner, projection-only
+- Modules: Agent Loop Engineering, Tool Engineering, Result Surface
+  Engineering.
+- Result: repaired the pre-existing streamed-result handoff/tool-approval
+  baseline and extracted a dispatch/reentry seam from `runMvpIntegratedFlow.ts`.
+- Closeout doc:
+  `docs/architecture/agent-loop-baseline-dispatch.md`.
+- New owner:
+  - `packages/ts-shell/src/orchestration/flowDispatch.ts`
+- Classification: product behavior drift in command-result projection; a
+  successful `run-command` was incorrectly routed through mutation-only result
+  satisfaction and downgraded to `No file mutation was applied.`
+- Preserved: provider/model behavior, browser behavior, edit/write behavior,
+  permission decisions, CLI UX, `SessionManager` schema, dependency set, and
+  runMvp execution order.
 - Validation:
-  - focused session helper tests
-  - focused agent-loop tests if dispatch is touched
-  - relevant `SessionManager.test.ts` slices
-  - `rtk npm run verify:result-contract`
-  - `rtk npm run build -w packages/ts-shell`
-- Stop conditions: `metadata.json`, `state.json`, `transcript.jsonl`, compact,
-  replay, `/continue`, provider auth, browser/edit behavior, or CLI semantic
-  changes.
+  - `rtk npm run test -w packages/ts-shell -- src/orchestration/flowDispatch.test.ts`
+  - `rtk npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "covers prompt -> handoff -> tool approval -> streamed result|carries verify-only action result seed target and command across weak follow-up target carryover|denies escalation and terminates with explicit stopped_error terminal|keeps synthetic escalation fallback injection-only|keeps stream fallback injection-only"`
+- Remaining candidates move to Route 139:
+  - policy reason normalizer
+  - tool lifecycle to shared capability-result summary projector
+  - provider diagnostic handoff planner, projection-only
+  - SessionManager recovery/reentry projector or codec
 
 ### Route 139: Tool / Policy / Result Contract Unification
 
