@@ -258,6 +258,47 @@ Current remaining deferred owner counts:
 | continuation/rebase/lineage | 15 | extract continuation target/lineage decisions and rebase-safe verify hint handling |
 | edit/refactor/batch/discovery expansion | 10 | keep deferred until an edit route opens broader mutation behavior |
 | write planning and concrete-content contract | 7 | separate obsolete synthetic-write expectations from real behavior gaps |
+
+## Route 142 Addendum
+
+Closeout doc: `docs/architecture/continuation-lineage-cleanup.md`.
+
+Route 142 repaired and rebaselined the continuation / rebase / lineage cluster:
+
+- full `runMvpIntegratedFlow.test.ts` moved from `112 passed / 39 failed` to
+  `127 passed / 24 failed`
+- focused continuation runMvp route passed with `18 passed / 133 skipped`
+- `continuationIntent.ts` classifies explicit `/continue`, weak follow-up,
+  temporal successor, reopen/rebase, retry-after-failure, and unrelated tasks
+- `continuationLineage.ts` projects replay-safe lineage facts and activation /
+  disambiguation decisions without raw DOM, raw file dumps, or secrets
+- `continuationRebase.ts` owns deterministic rebase resolution
+- `continuationProjection.ts` owns transcript-safe continuation summaries and
+  activation evidence
+- weak same-file and cross-file follow-ups now emit lineage activation or
+  actionable disambiguation markers
+- migration-like legacy absolute paths are rebased before repair execution
+- verify command hints carry across same-lineage blocker repair continuation
+- skipped mutation verification remains recoverable `stopped_error`
+
+Removed from the deferred red baseline by Route 142:
+
+| Test family | Route 142 outcome |
+|---|---|
+| weak-evidence corrective continuation | rebaselined to recoverable stopped after skipped verification |
+| same-file slot activation / clarify | fixed activation and ambiguity evidence |
+| cross-file reopen uniqueness / ambiguity | fixed activation and actionable target disambiguation |
+| temporal successor auto-continue and multi-hop rollover | fixed/rebaselined under skipped-verification contract |
+| migration-like blocker->fix rebase | fixed legacy path transform parsing and rebase |
+| verify command hint after blocker repair | fixed same-lineage verify hint carryover |
+| stale continuation status expectation | rebaselined to current truthful continuation status |
+
+Current remaining deferred owner counts:
+
+| Owner | Count | Best next action |
+|---|---:|---|
+| edit/refactor/batch/discovery expansion | 10 | separate stale terminal expectations from bounded edit capability gaps |
+| write planning and concrete-content contract | 7 | define supported write content inference before rebaselining old synthetic-write tests |
 | provider mock harness | 3 | rebaseline deterministic provider harness without live calls |
-| transcript/approval/resume harness | 3 | rebaseline role and approval prompt expectations |
+| approval/transcript/resume harness | 3 | rebaseline role, approval prompt, and legacy resume expectations |
 | git/change-set attribution | 1 | isolate git-aware attribution from runMvp broad suite |

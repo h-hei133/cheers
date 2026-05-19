@@ -76,6 +76,12 @@ import {
   type RepairContinuationObject,
   type VerifyContinuationObject,
 } from "./continuationPlanning.js";
+import { classifyContinuationIntent } from "./continuationIntent.js";
+import {
+  buildReplaySafeContinuationLineage,
+  decideLineageActivation,
+} from "./continuationLineage.js";
+import { projectLineageActivation } from "./continuationProjection.js";
 import {
   buildAmbiguousEditInstructionReason,
   formatEditExecutionFailure,
@@ -628,6 +634,11 @@ function buildWorkflowTaskPlan(
   continuityState?: unknown,
 ): WorkflowTaskPlan {
   const continuity = continuityStateAsObject(continuityState);
+  const continuationIntent = classifyContinuationIntent({
+    prompt,
+    continuity,
+  });
+  const replaySafeLineage = buildReplaySafeContinuationLineage({ continuity });
   const {
     normalized,
     intentPrompt,
@@ -1214,6 +1225,19 @@ function buildWorkflowTaskPlan(
     hasSingleRecoverableCrossFileReopenTarget &&
     hasExecutableCrossFileTransformEvidence,
   );
+  const lineageActivation = decideLineageActivation({
+    continuity,
+    weakOrTemporalCue: hasUltraWeakContinuationEquivalentCue,
+    selectedReopenTarget: continuationReopenDecision.selectedTarget,
+    reopenCandidates: continuationReopenDecision.candidates,
+    crossFileSignal: hasCrossFileEvidenceSignal,
+  });
+  const lineageActivationProjection =
+    projectLineageActivation(lineageActivation);
+  const lineageActivationEvidence =
+    lineageActivationProjection.evidence.length > 0
+      ? lineageActivationProjection.evidence
+      : undefined;
   const shouldUsePostExhaustionUnifiedBlocker =
     hasStaleTransformExhaustionHistory &&
     hasUltraWeakContinuationEquivalentCue &&
@@ -1264,7 +1288,10 @@ function buildWorkflowTaskPlan(
         continuity,
         targetPath:
           primaryTarget?.inWorkspace
-            ? primaryTarget.cleaned
+            ? (rebindContinuationTargetToWorkspace(
+                primaryTarget.cleaned,
+                workspaceRoot,
+              ) ?? primaryTarget.cleaned)
             : hasInterruptedGoalRepairCue
               ? rawContinuityTargetPath
               : undefined,
@@ -1380,7 +1407,55 @@ function buildWorkflowTaskPlan(
           }
         : {}),
       ...(failedTransforms.length > 0 ? { failedTransforms } : {}),
+      continuationLineage: [
+        `continuation-intent:${continuationIntent.kind}`,
+        ...lineageActivationProjection.evidence,
+        ...(repairObject.verifyCommand
+          ? [
+              `verify-command-hint:${repairObject.verifyCommand}`,
+              ...(repairObject.targetPath
+                ? [`verify-target-hint:${repairObject.targetPath}`]
+                : []),
+            ]
+          : []),
+        ...(repairObject.sourceLineage.length > 0
+          ? repairObject.sourceLineage
+          : replaySafeLineage.evidenceIds),
+      ],
       usedRestoredState: hasInterruptedGoalRepairCue ? true : usedRestoredState,
+    };
+  }
+
+  if (lineageActivation.status === "blocked") {
+    return {
+      taskKind: "edit-file",
+      reason: "continuation lineage requires explicit disambiguation",
+      inspectFirst: true,
+      verifyAfterEdit: false,
+      blockedReason:
+        lineageActivation.reason ??
+        "Continuation follow-up is ambiguous; provide explicit target/action.",
+      targetMissing: true,
+      usedRestoredState,
+      continuationLineage: [
+        `continuation-intent:${continuationIntent.kind}`,
+        ...lineageActivationProjection.evidence,
+      ],
+      previousRemainingTargets,
+      previousFailedEntries,
+      ...(continuationReopenDecision.enabled
+        ? {
+            degradedReopen: true,
+            degradedReopenReason:
+              continuationReopenDecision.reason ??
+              lineageActivation.reason,
+            degradedReopenCandidates: continuationReopenDecision.candidates,
+            degradedReopenCandidateSource:
+              continuationReopenDecision.candidateSourceSummary,
+            degradedReopenCandidatePruned:
+              continuationReopenDecision.prunedCandidateSummary,
+          }
+        : {}),
     };
   }
 
@@ -1487,6 +1562,10 @@ function buildWorkflowTaskPlan(
         continuationReopenDecision.candidateSourceSummary,
       degradedReopenCandidatePruned:
         continuationReopenDecision.prunedCandidateSummary,
+      continuationLineage: [
+        `continuation-intent:${continuationIntent.kind}`,
+        ...(lineageActivationEvidence ?? []),
+      ],
     };
   }
 
@@ -2055,6 +2134,15 @@ function buildWorkflowTaskPlan(
             replaceTo: effectiveReplaceDirective.to,
           }
         : {}),
+      continuationLineage: [
+        `continuation-intent:${continuationIntent.kind}`,
+        ...(lineageActivationEvidence ?? []),
+        ...(replaySafeLineage.verificationHint?.command &&
+        hasVerifyLineageHint &&
+        continuityTargetPath === primaryTarget.cleaned
+          ? [`verify-command-hint:${replaySafeLineage.verificationHint.command}`]
+          : []),
+      ],
       ...(hasEditFailureRepairPayload &&
       editFailureRepairContext &&
       editFailureRepairPayloadKind
@@ -3977,6 +4065,9 @@ async function executeWorkflowTaskPlan(input: {
   const mutationResults: FileMutationExecutionResult[] = [];
   notes.push(...input.freshnessObservability.notes);
   evidence.push(...input.freshnessObservability.evidence);
+  if ((input.plan.continuationLineage?.length ?? 0) > 0) {
+    evidence.push(...input.plan.continuationLineage!);
+  }
   appendSingleFileEditRepairObservability(evidence, input.plan);
   let crossFileRemainingTargets: string[] = [];
   let crossFileFailedByReason: Array<{
@@ -4001,7 +4092,10 @@ async function executeWorkflowTaskPlan(input: {
         taskKind: input.plan.taskKind,
         blockedReason: input.plan.blockedReason,
         targetPath: input.plan.targetPath,
-        freshnessEvidence: input.freshnessObservability.evidence,
+        freshnessEvidence: [
+          ...input.freshnessObservability.evidence,
+          ...(input.plan.continuationLineage ?? []),
+        ],
         previousRemainingTargets: input.plan.previousRemainingTargets,
         previousFailedEntries: input.plan.previousFailedEntries,
         degradedReopenReason: input.plan.degradedReopenReason,
@@ -8632,7 +8726,7 @@ function inferReplaceDirectiveFromContinuity(input: {
 function parseTransformEvidence(
   evidence: string,
 ): { path: string; from: string; to: string } | undefined {
-  const directMatch = evidence.match(/transform:([^:]+):(.+)=>(.+)$/i);
+  const directMatch = evidence.match(/^transform:(.+):(.+)=>(.+)$/i);
   if (directMatch?.[1] && directMatch?.[2] && directMatch?.[3]) {
     return {
       path: directMatch[1].trim(),
@@ -8640,7 +8734,7 @@ function parseTransformEvidence(
       to: directMatch[3].trim(),
     };
   }
-  const replanMatch = evidence.match(/replan-transform:([^:]+):(.+)=>(.+)$/i);
+  const replanMatch = evidence.match(/^replan-transform:(.+):(.+)=>(.+)$/i);
   if (replanMatch?.[1] && replanMatch?.[2] && replanMatch?.[3]) {
     return {
       path: replanMatch[1].trim(),
@@ -8649,7 +8743,7 @@ function parseTransformEvidence(
     };
   }
   const rebindMatch = evidence.match(
-    /rebind-transform:([^:]+):.+=>.+->(.+)=>(.+)$/i,
+    /^rebind-transform:(.+):.+=>.+->(.+)=>(.+)$/i,
   );
   if (rebindMatch?.[1] && rebindMatch?.[2] && rebindMatch?.[3]) {
     return {

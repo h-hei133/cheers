@@ -176,15 +176,19 @@ rewrite, and focused validation tied to touched files.
 
 - Modules: Session / Continue Engineering, Agent Loop Engineering, Result
   Surface Engineering.
-- Goal: extract and normalize continuation target, rebase, weak/no-cue lineage,
-  temporal successor, and verify-hint continuation behavior for the largest
-  remaining runMvp cluster.
-- Best first candidates:
-  - weak/no-cue same-file slot activation vs clarify
-  - cross-file reopen candidate uniqueness vs ambiguity
-  - temporal successor cues (`next`, `what next`) over bounded evidence
-  - migration-like root rebasing for blocker->fix continuation
-  - verify command hint persistence after blocker repair
+- Status: closed by `docs/architecture/continuation-lineage-cleanup.md`.
+- Result:
+  - extracted continuation intent, lineage, rebase, and projection helpers
+  - fixed weak/no-cue same-file slot activation vs clarify
+  - fixed cross-file reopen candidate uniqueness vs ambiguity
+  - repaired temporal successor cues (`next`, `what next`) over bounded
+    evidence
+  - repaired migration-like root rebasing for blocker->fix continuation
+  - preserved verify command hint persistence after blocker repair
+- Baseline result:
+  - focused continuation route passes with `18 passed / 133 skipped`
+  - full `runMvpIntegratedFlow.test.ts` moved from `112 passed / 39 failed`
+    to `127 passed / 24 failed`
 - Validation:
   - focused continuation/rebase/lineage runMvp tests
   - continuation planning/handoff projection tests
@@ -196,7 +200,29 @@ rewrite, and focused validation tied to touched files.
   session schema changes, CLI redesign, broad runMvp rewrite, or adding a new
   persistence layer.
 
-### Route 143: Capability Lifecycle Adoption Across Edit / Browser / Shell
+### Route 143: Write / Edit Expectation Cleanup
+
+- Modules: Agent Loop Engineering, Edit / Patch Engineering, Result Surface
+  Engineering.
+- Goal: separate stale write/edit expectations from current bounded edit
+  behavior, then repair only high-confidence product drift without expanding
+  edit capability.
+- Best first candidates:
+  - old write-file completion expectations that now require concrete content
+  - fenced/single-file repair stale terminal assertions under skipped
+    verification
+  - partial batch/discovery terminal rebaseline
+  - batch/refactor tests that should remain deferred if they require broad edit
+    expansion
+- Validation:
+  - focused write/edit runMvp tests
+  - `rtk npm run verify:edit-capability-closeout`
+  - `rtk npm run verify:result-contract`
+  - `rtk npm run build -w packages/ts-shell`
+- Stop conditions: edit engine expansion, multi-file/add/delete/move support,
+  rollback/snapshot implementation, schema changes, or CLI/dependency changes.
+
+### Route 144: Capability Lifecycle Adoption Across Edit / Browser / Shell
 
 - Modules: Capability Contract Architecture, Browser Engineering, Edit / Patch
   Engineering, Runtime Engineering, Harness / Eval Engineering.
@@ -221,7 +247,7 @@ rewrite, and focused validation tied to touched files.
 
 ## Medium-Priority Follow-Up Routes
 
-### Route 144: Runtime Receipt Contract
+### Route 145: Runtime Receipt Contract
 
 - Modules: Runtime Engineering, Tool Engineering.
 - Goal: define a shared receipt vocabulary for local shell, daemon, browser,
@@ -229,7 +255,7 @@ rewrite, and focused validation tied to touched files.
   into Rust.
 - Validation: docs/diff/status first; focused runtime tests if code changes.
 
-### Route 145: Harness and Gate Taxonomy
+### Route 146: Harness and Gate Taxonomy
 
 - Modules: Harness Engineering, Eval / Benchmark Engineering.
 - Goal: categorize verifier scripts as product path, deterministic gate,
@@ -237,7 +263,7 @@ rewrite, and focused validation tied to touched files.
   report markers where safe.
 - Validation: `rtk git diff --check`; touched verifier self-tests only.
 
-### Route 146: Workspace / File Context Contract
+### Route 147: Workspace / File Context Contract
 
 - Modules: Workspace / File Context Engineering, Edit / Patch Engineering.
 - Goal: consolidate workspace root, target resolution, file constraints,
@@ -245,7 +271,7 @@ rewrite, and focused validation tied to touched files.
 - Validation: workspace/patch focused tests if code changes; docs/diff/status
   otherwise.
 
-### Route 147: Provider Readiness Parity Map
+### Route 148: Provider Readiness Parity Map
 
 - Modules: Provider / Model Engineering, Harness Engineering.
 - Goal: map provider readiness runtime classification to readiness scripts and
@@ -265,12 +291,13 @@ Recommended order:
 3. Route 139: Control-Plane Baseline Sweep and Policy-Result Repair.
 4. Route 140: Command Intent and Read / Inspect Capability Cleanup.
 5. Route 141: Verification Planner Cleanup.
-6. Route 142: CLI/Core Split Preparation.
-7. Route 143: Capability Lifecycle Adoption Across Edit / Browser / Shell.
-8. Route 144: Runtime Receipt Contract.
-9. Route 145: Harness and Gate Taxonomy.
-10. Route 146: Workspace / File Context Contract.
-11. Route 147: Provider Readiness Parity Map.
+6. Route 142: Continuation / Rebase / Lineage Cleanup.
+7. Route 143: Write / Edit Expectation Cleanup.
+8. Route 144: Capability Lifecycle Adoption Across Edit / Browser / Shell.
+9. Route 145: Runtime Receipt Contract.
+10. Route 146: Harness and Gate Taxonomy.
+11. Route 147: Workspace / File Context Contract.
+12. Route 148: Provider Readiness Parity Map.
 
 Do not use this backlog to justify broad source refactors. A route is valid
 only when it reduces a user-facing runtime blocker or a named cross-layer

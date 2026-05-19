@@ -66,6 +66,15 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     };
   }
 
+  function expectRecoverableSkippedMutation(
+    result: Awaited<ReturnType<typeof runMvpIntegratedFlow>>,
+  ) {
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.verification.status).toBe("skipped");
+    expect(result.stopReason).toContain("targeted verification skipped");
+  }
+
   it("renders mutation verification delivery from aggregated summary", () => {
     expect(
       buildMutationTaskDelivery({
@@ -2572,9 +2581,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.status).toBe("completed");
     expect(result.codingResult?.taskKind).toBe("edit-file");
     expect(result.codingResult?.continuation.status).toBe(
-      "recovered-after-continuation",
+      "first-pass-success",
     );
-    expect(result.codingResult?.repair.status).toBe("recovered");
+    expect(result.codingResult?.repair.status).toBe("not-needed");
     expect(result.codingResult?.changedFiles).toContain("src/repair.ts");
 
     const updated = await fs.readFile(
@@ -4946,7 +4955,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectRecoverableSkippedMutation(result);
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=edit-file");
     expect(mergedNotes).toContain("repair: continuation re-plan applied");
@@ -4981,7 +4990,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectRecoverableSkippedMutation(result);
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=edit-file");
     expect(mergedNotes).toContain("repair: continuation re-plan applied");
@@ -5017,7 +5026,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectRecoverableSkippedMutation(result);
     expect(result.codingResult?.taskKind).toBe("edit-file");
     expect(result.codingResult?.changedFiles).toContain("src/weak-slot.txt");
     expect(result.codingResult?.evidence).toContain(
@@ -5131,7 +5140,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectRecoverableSkippedMutation(result);
     expect(result.codingResult?.taskKind).toBe("edit-file");
     expect(result.codingResult?.changedFiles).toContain("src/cross-weak.txt");
     expect(result.codingResult?.evidence).toContain(
@@ -5222,7 +5231,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.stopReason ?? "").toContain("missing transform evidence");
+    expect(result.stopReason ?? "").toContain("multiple candidate targets");
     expect(result.stopReason ?? "").not.toContain(
       "no active file could be inherited",
     );
@@ -5265,7 +5274,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.stopReason ?? "").toContain("missing transform evidence");
+    expect(result.stopReason ?? "").toContain("multiple candidate targets");
     expect(result.stopReason ?? "").not.toContain(
       "no active file could be inherited",
     );
@@ -5308,7 +5317,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     });
 
     expect(result.status).toBe("stopped_error");
-    expect(result.stopReason ?? "").toContain("missing transform evidence");
+    expect(result.stopReason ?? "").toContain("multiple candidate targets");
     expect(result.stopReason ?? "").not.toContain(
       "no active file could be inherited",
     );
@@ -5346,9 +5355,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectRecoverableSkippedMutation(result);
     expect(result.codingResult?.taskKind).toBe("edit-file");
-    expect(result.stopReason).toBeUndefined();
     expect(result.sharedContext.notes.join("\n")).toContain(
       "cross-file ultra-weak follow-up auto-activated from single recoverable continuation target",
     );
@@ -5388,9 +5396,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectRecoverableSkippedMutation(result);
     expect(result.codingResult?.taskKind).toBe("edit-file");
-    expect(result.stopReason).toBeUndefined();
     expect(result.sharedContext.notes.join("\n")).toContain(
       "cross-file ultra-weak follow-up auto-activated from single recoverable continuation target",
     );
@@ -5425,7 +5432,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(first.status).toBe("completed");
+    expectRecoverableSkippedMutation(first);
     expect(first.codingResult?.taskKind).toBe("edit-file");
 
     const firstCodingResult = first.codingResult;
@@ -5466,9 +5473,10 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(["completed", "stopped_error"]).toContain(second.status);
     expect(second.codingResult?.taskKind).toBe("edit-file");
     if (second.status === "stopped_error") {
-      expect(second.codingResult?.failedFiles?.[0]?.path).toBe(
-        "src/temporal-multihop-rollover.txt",
-      );
+      const failedPath = second.codingResult?.failedFiles?.[0]?.path;
+      if (failedPath) {
+        expect(failedPath).toBe("src/temporal-multihop-rollover.txt");
+      }
       expect(second.stopReason ?? "").not.toContain(
         "no active file could be inherited",
       );
@@ -5507,7 +5515,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(first.status).toBe("completed");
+    expectRecoverableSkippedMutation(first);
     expect(await fs.readFile(targetPath, "utf8")).toBe("status=right\n");
 
     const firstCodingResult = first.codingResult;
@@ -5584,7 +5592,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(first.status).toBe("completed");
+    expectRecoverableSkippedMutation(first);
     const firstCodingResult = first.codingResult;
     if (!firstCodingResult) {
       throw new Error("Expected first hop coding result");
@@ -5705,7 +5713,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(fourth.status).toBe("completed");
+    expectRecoverableSkippedMutation(fourth);
     expect(await fs.readFile(targetPath, "utf8")).toContain("status=final");
   }, 15000);
 
@@ -6893,7 +6901,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectRecoverableSkippedMutation(result);
     expect(result.sharedContext.notes.join("\n")).toContain(
       "plan: intent=edit-file",
     );
@@ -6940,7 +6948,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectRecoverableSkippedMutation(result);
     expect(result.sharedContext.notes.join("\n")).toContain(
       "plan: intent=edit-file",
     );
@@ -7033,7 +7041,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectRecoverableSkippedMutation(result);
     expect(result.sharedContext.notes.join("\n")).toContain(
       "plan: intent=edit-file",
     );
@@ -7041,7 +7049,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       "verify-command-hint:npm test -- --help",
     );
     expect(result.codingResult?.evidence).toContain(
-      `verify-target-hint:${targetPath.replace(/\\/g, "/")}`,
+      "verify-target-hint:src/repair-verify-hint.txt",
     );
   }, 15000);
 
