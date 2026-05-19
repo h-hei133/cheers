@@ -47,6 +47,7 @@ import {
   type CurrentSessionSelectionResolution,
   type CurrentSessionSelectionStore,
 } from "./currentSessionSelection.js";
+import { projectDurableStatus } from "./durableStatusProjection.js";
 import { buildMutationContinuityState } from "./mutationContinuityState.js";
 import {
   buildResumeReplayInput,
@@ -235,25 +236,6 @@ interface TerminalPersistence {
   readonly terminalReason?: TerminalReason;
   readonly terminalClassification?: TerminalClassification;
   readonly lastContinuationReason?: ContinuationReason;
-}
-
-function toDurableStatus(
-  terminalClassification: TerminalClassification | undefined,
-  status: Session["status"],
-): "success" | "stopped" | "error" | undefined {
-  if (terminalClassification === "success" || status === "completed") {
-    return "success";
-  }
-
-  if (terminalClassification === "stopped") {
-    return "stopped";
-  }
-
-  if (terminalClassification === "error" || status === "error") {
-    return "error";
-  }
-
-  return undefined;
 }
 
 export interface ReplayPlan {
@@ -3309,7 +3291,7 @@ export class SessionManager {
         )
           ? overrides.terminalClassification
           : current?.terminalClassification,
-      durableStatus: toDurableStatus(
+      durableStatus: projectDurableStatus(
         overrides &&
           Object.prototype.hasOwnProperty.call(
             overrides,
