@@ -7,6 +7,10 @@ import type {
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionContinuitySnapshot } from "../../session/SessionManager.js";
 import type { QueryEvent } from "../query/events.js";
+import {
+  deriveActionableBlockerContract,
+  projectActionableBlockerTerminalDetail,
+} from "../query/actionableBlockerModule.js";
 import type { RuntimeEventDigest } from "./sessionEventSurface.js";
 import { renderExecutionSummaryBlock } from "./sessionEventSurface.js";
 import { formatExplicitRestoreSummaryLines } from "./restoreSurfaceSummary.js";
@@ -217,7 +221,7 @@ function renderTerminalResultBlock(
       input.status === "completed"
         ? "completed"
         : (input.terminalStopReason ?? input.status);
-    const actionableBlocker = deriveActionableBlockerContract({
+    const actionableBlocker = deriveSessionTerminalBlockerDetail({
       stopReason: input.terminalStopReason,
       codingResult: input.codingResult,
     });
@@ -232,7 +236,7 @@ function renderTerminalResultBlock(
     renderer.renderLine("");
     return;
   }
-  const actionableBlocker = deriveActionableBlockerContract({
+  const actionableBlocker = deriveSessionTerminalBlockerDetail({
     stopReason: input.terminalStopReason,
     codingResult: input.codingResult,
   });
@@ -252,187 +256,14 @@ function renderTerminalResultBlock(
   renderer.renderLine("");
 }
 
-type ActionableBlockerKind =
-  | "ambiguous-target"
-  | "patch-from-not-found"
-  | "patch-target-missing"
-  | "patch-generation-failed"
-  | "stale-read"
-  | "partial-mutation-failed"
-  | "verification-failed"
-  | "command-not-allowlisted"
-  | "mcp-unavailable"
-  | "approval-denied";
-
-function deriveActionableBlockerContract(input: {
+function deriveSessionTerminalBlockerDetail(input: {
   stopReason?: string;
   codingResult?: CodingResultSummary;
-}):
-  | { kind: ActionableBlockerKind; reason: string; doNext: string }
-  | undefined {
-  const evidenceKind = findActionableBlockerKindInEvidence(
-    input.codingResult?.evidence,
-  );
-  const reason =
-    input.stopReason?.trim() ||
-    input.codingResult?.verification.reason?.trim() ||
-    input.codingResult?.failedFiles.find(
-      (entry) => entry.reason.trim().length > 0,
-    )?.reason ||
-    input.codingResult?.taskSatisfaction.reasons.find(
-      (entry) => entry.trim().length > 0,
-    );
-
-  if (!reason) {
-    return undefined;
-  }
-
-  const kind =
-    evidenceKind ??
-    classifyActionableBlockerKind(
-      reason,
-      input.codingResult?.verification.status === "failed",
-    );
-  if (!kind) {
-    return undefined;
-  }
-
-  return {
-    kind,
-    reason,
-    doNext: actionableBlockerNextAction(kind),
-  };
-}
-
-function findActionableBlockerKindInEvidence(
-  evidence: readonly string[] | undefined,
-): ActionableBlockerKind | undefined {
-  if (!evidence) {
-    return undefined;
-  }
-  const marker = evidence
-    .find((entry) => entry.startsWith("actionable-blocker-kind:"))
-    ?.slice("actionable-blocker-kind:".length)
-    .trim();
-  const mutationSummaryMarker = evidence
-    .find((entry) => entry.startsWith("mutation-summary-blocker:"))
-    ?.slice("mutation-summary-blocker:".length)
-    .trim();
-  const verifyBlockerMarker = evidence
-    .find((entry) => entry.startsWith("verify-blocker-kind:"))
-    ?.slice("verify-blocker-kind:".length)
-    .trim();
-  const actionableMarker = marker ?? mutationSummaryMarker ?? verifyBlockerMarker;
-  if (
-    actionableMarker === "ambiguous-target" ||
-    actionableMarker === "patch-from-not-found" ||
-    actionableMarker === "patch-target-missing" ||
-    actionableMarker === "patch-generation-failed" ||
-    actionableMarker === "stale-read" ||
-    actionableMarker === "partial-mutation-failed" ||
-    actionableMarker === "verification-failed" ||
-    actionableMarker === "command-not-allowlisted" ||
-    actionableMarker === "mcp-unavailable" ||
-    actionableMarker === "approval-denied"
-  ) {
-    return actionableMarker;
-  }
-  return undefined;
-}
-
-function classifyActionableBlockerKind(
-  reason: string,
-  verificationFailed: boolean,
-): ActionableBlockerKind | undefined {
-  const normalizedReason = reason.toLowerCase();
-  if (
-    normalizedReason.includes("mcp config is invalid") ||
-    normalizedReason.includes("mcp server ") ||
-    normalizedReason.includes("unknown mcp server") ||
-    (normalizedReason.includes("mcp tool ") &&
-      (normalizedReason.includes("not registered") ||
-        normalizedReason.includes("unavailable")))
-  ) {
-    return "mcp-unavailable";
-  }
-  if (verificationFailed || normalizedReason.includes("verification failed")) {
-    return "verification-failed";
-  }
-  if (normalizedReason.includes("not allowed in the mvp allowlist")) {
-    return "command-not-allowlisted";
-  }
-  if (
-    normalizedReason.includes("patch-target-missing") ||
-    normalizedReason.includes("edit-target-missing")
-  ) {
-    return "patch-target-missing";
-  }
-  if (
-    normalizedReason.includes("patch-generation-failed") ||
-    normalizedReason.includes("unified diff") ||
-    normalizedReason.includes("apply_patch")
-  ) {
-    return "patch-generation-failed";
-  }
-  if (
-    normalizedReason.includes("stale-read") ||
-    normalizedReason.includes("stale read") ||
-    normalizedReason.includes("changed since it was read") ||
-    normalizedReason.includes("read it again before")
-  ) {
-    return "stale-read";
-  }
-  if (
-    normalizedReason.includes("partial-mutation-failed") ||
-    normalizedReason.includes("mutation-summary-blocker") ||
-    normalizedReason.includes("one or more file mutations failed")
-  ) {
-    return "partial-mutation-failed";
-  }
-  if (
-    normalizedReason.includes("patch-from-not-found") ||
-    normalizedReason.includes("replace source text not found")
-  ) {
-    return "patch-from-not-found";
-  }
-  if (
-    normalizedReason.includes("patch-ambiguous") ||
-    normalizedReason.includes("target-not-unique") ||
-    normalizedReason.includes("relocation is ambiguous") ||
-    normalizedReason.includes("follow-up is ambiguous") ||
-    (normalizedReason.includes("ambiguous") &&
-      !normalizedReason.includes("allowlist"))
-  ) {
-    return "ambiguous-target";
-  }
-  return undefined;
-}
-
-function actionableBlockerNextAction(kind: ActionableBlockerKind): string {
-  switch (kind) {
-    case "command-not-allowlisted":
-      return "Rephrase the request with an allowlisted command: node --version, npm test -- --help, or npm run build -- --help.";
-    case "mcp-unavailable":
-      return "Run /mcp status and /mcp refresh for the affected server, then retry with a visible executable MCP tool.";
-    case "approval-denied":
-      return "Re-run and approve escalation for verify command execution.";
-    case "patch-from-not-found":
-      return "Provide the exact current source text from the target file, then rerun the patch.";
-    case "patch-target-missing":
-      return "Create or confirm the target file path first, then rerun the patch.";
-    case "patch-generation-failed":
-      return "Rerun with one explicit target file plus exact replace-from and replace-to text; do not pass unified diff or apply_patch syntax.";
-    case "stale-read":
-      return "Re-read the latest target file content, then rerun the edit against that current content.";
-    case "partial-mutation-failed":
-      return "Review the failed files, re-read current content, inspect any writer-started target before retrying, and retry only the unresolved mutation.";
-    case "ambiguous-target":
-      return "Specify one exact target file/path (and exact from/to text if editing), then rerun.";
-    case "verification-failed":
-      return "Fix the verification failure, then rerun the verification step.";
-    default:
-      return "Clarify the blocking condition and rerun.";
-  }
+}) {
+  const contract = deriveActionableBlockerContract(input);
+  return contract
+    ? projectActionableBlockerTerminalDetail(contract)
+    : undefined;
 }
 
 function renderCodingResultContract(

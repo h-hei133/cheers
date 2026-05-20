@@ -70,12 +70,14 @@
         "session schema changes"
       ],
       "contradictionChecks": [
-        "session terminal detail classifier should understand Result Surface blocker markers or consume the shared projection"
+        "session terminal detail rendering consumes Result Surface blocker classification instead of a narrower local vocabulary"
       ],
       "validationEvidence": [
-        "manual audit: sessionTerminalState.ts has a narrower duplicate marker set than actionableBlockerModule.ts"
+        "packages/ts-shell/src/core/shell/sessionRuntimeBoundary.test.ts",
+        "packages/ts-shell/src/core/query/resultMapperBoundary.test.ts",
+        "packages/ts-shell/src/core/query/crossCapabilityResultFlow.test.ts"
       ],
-      "status": "contradiction",
+      "status": "consistent",
       "ownerModuleForFollowUp": "Result Surface / Session / Continue"
     },
     {

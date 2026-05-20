@@ -521,11 +521,10 @@ Unsafe area:
 
 Route 163 adds `docs/foundation/` as the current foundation consistency audit
 surface. The audit confirms the extraction/result-flow foundation is mostly
-consistent, but records a high-risk Result Surface / Session terminal surface
-contradiction: `resultMapper` recognizes the newer provider/browser/edit
-actionable markers while `sessionTerminalState` still renders blocker details
-from an older marker subset. Fix it only in a focused route because it changes
-session/CLI output text.
+consistent. Route 164 resolves its high-risk Result Surface / Session terminal
+surface contradiction by making `sessionTerminalState` consume the shared
+Result Surface blocker classification for provider/browser/edit actionable
+markers instead of keeping a narrower local marker subset.
 
 ## Extraction Decision
 

@@ -10,19 +10,25 @@ have focused evidence.
 
 ## High
 
+None open after Route 164.
+
+## Resolved
+
 ### Session terminal blocker detail marker parity
 
 - Affected modules: Result Surface, Session / Continue, CLI / UX.
-- Why it is a contradiction: `resultMapper` and `actionableBlockerModule`
-  recognize Route 162 provider/browser/edit markers, but
-  `sessionTerminalState` keeps a narrower duplicate classifier for terminal
+- Why it was a contradiction: `resultMapper` and `actionableBlockerModule`
+  recognized Route 162 provider/browser/edit markers, while
+  `sessionTerminalState` kept a narrower duplicate classifier for terminal
   blocker detail rendering.
+- Resolution: Route 164 made `sessionTerminalState` consume the shared Result
+  Surface blocker classification and Result Surface-owned do-next projection.
 - Evidence: `actionableBlockerModule.ts`, `sessionTerminalState.ts`,
-  `crossCapabilityResultFlow.test.ts`.
-- Recommended next action: add a focused Result Surface / Session terminal
-  surface route that shares or aligns blocker detail projection without
-  changing terminal truthfulness or session schema.
-- Should become a route: yes.
+  `sessionRuntimeBoundary.test.ts`, `crossCapabilityResultFlow.test.ts`,
+  `resultMapperBoundary.test.ts`.
+- Recommended next action: none for this risk; preserve the shared Result
+  Surface vocabulary in future terminal output work.
+- Should become a route: no, resolved by Route 164.
 
 ## Medium
 
@@ -46,8 +52,8 @@ have focused evidence.
   marker as an actionable stopped terminal result.
 - Evidence: `browserTxn.ts`, `browserTxn.test.ts`,
   `crossCapabilityResultFlow.test.ts`.
-- Recommended next action: keep the distinction documented; add terminal
-  surface marker parity before changing browser behavior.
+- Recommended next action: keep the distinction documented; terminal surface
+  marker parity is now covered by Route 164.
 - Should become a route: no, unless terminal output parity is routed.
 
 ### Provider readiness diagnostic failure classification is intentionally mixed

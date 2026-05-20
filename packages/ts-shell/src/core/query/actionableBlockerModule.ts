@@ -28,6 +28,10 @@ export type ActionableBlockerContract = {
   reason: string;
 };
 
+export type ActionableBlockerTerminalDetail = ActionableBlockerContract & {
+  doNext: string;
+};
+
 export function deriveActionableBlockerContract(input: {
   stopReason?: string;
   codingResult?: CodingResultSummary;
@@ -61,6 +65,15 @@ export function deriveActionableBlockerContract(input: {
   return {
     kind,
     reason: kind === "approval-denied" && nextAction ? nextAction : reason,
+  };
+}
+
+export function projectActionableBlockerTerminalDetail(
+  contract: ActionableBlockerContract,
+): ActionableBlockerTerminalDetail {
+  return {
+    ...contract,
+    doNext: actionableBlockerNextAction(contract.kind),
   };
 }
 
@@ -278,4 +291,51 @@ export function classifyActionableKind(
 
 function firstTruthy(values: readonly string[]): string | undefined {
   return values.find((value) => value.trim().length > 0);
+}
+
+function actionableBlockerNextAction(kind: ActionableBlockerKind): string {
+  switch (kind) {
+    case "command-not-allowlisted":
+      return "Rephrase the request with an allowlisted command: node --version, npm test -- --help, or npm run build -- --help.";
+    case "mcp-unavailable":
+      return "Run /mcp status and /mcp refresh for the affected server, then retry with a visible executable MCP tool.";
+    case "approval-denied":
+      return "Re-run and approve escalation for verify command execution.";
+    case "browser-policy-blocked":
+      return "Use a controlled local fixture or an explicitly approved browser route before retrying.";
+    case "browser-unavailable":
+      return "Check the browser runtime status and install or enable the required local runtime before retrying.";
+    case "browser-timeout":
+      return "Retry against a controlled local fixture with a narrower target or longer dedicated browser timeout.";
+    case "browser-target-missing":
+      return "Re-observe the controlled page, confirm one exact target, then retry the browser action.";
+    case "browser-adapter-failure":
+      return "Inspect the browser adapter failure and rerun only after the adapter returns a valid result.";
+    case "browser-cleanup-failed":
+      return "Resolve the browser cleanup failure before retrying so no stale runtime state is reused.";
+    case "provider-not-configured":
+      return "Configure the provider through the approved readiness path or retry with a synthetic/non-provider route.";
+    case "provider-opt-in-required":
+      return "Use the explicit real-provider opt-in gate if this route intentionally needs real provider credentials.";
+    case "provider-unsupported":
+      return "Choose a supported provider/model mode or update the provider readiness contract in a dedicated route.";
+    case "patch-from-not-found":
+      return "Provide the exact current source text from the target file, then rerun the patch.";
+    case "patch-target-missing":
+      return "Create or confirm the target file path first, then rerun the patch.";
+    case "patch-content-missing":
+      return "Provide concrete content, an exact replacement mapping, or a supported patch shape before retrying.";
+    case "unsupported-future-edit":
+      return "Keep this as a preview/planning result until a dedicated edit capability route enables execution.";
+    case "patch-generation-failed":
+      return "Rerun with one explicit target file plus exact replace-from and replace-to text; do not pass unified diff or apply_patch syntax.";
+    case "stale-read":
+      return "Re-read the latest target file content, then rerun the edit against that current content.";
+    case "partial-mutation-failed":
+      return "Review the failed files, re-read current content, inspect any writer-started target before retrying, and retry only the unresolved mutation.";
+    case "ambiguous-target":
+      return "Specify one exact target file/path (and exact from/to text if editing), then rerun.";
+    case "verification-failed":
+      return "Fix the verification failure, then rerun the verification step.";
+  }
 }

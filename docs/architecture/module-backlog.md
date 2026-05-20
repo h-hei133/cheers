@@ -150,6 +150,22 @@ as an import-policing rule.
   parity route; `Harness / gate taxonomy` remains the best release/report
   confidence route.
 
+### Route 164: Session Terminal Blocker Detail Parity
+
+- Route 164 resolves the Route 163 high-risk foundation drift by making
+  `sessionTerminalState.ts` consume the shared Result Surface blocker
+  classification from `actionableBlockerModule.ts` for terminal blocker-detail
+  rendering.
+- Provider not-configured / opt-in / unsupported markers, browser policy /
+  unavailable / timeout / cleanup markers, and edit missing-content /
+  unsupported-future-edit / stale-read style markers now share the Result
+  Surface blocker vocabulary used by `resultMapper`.
+- The route preserves result truthfulness, completed/stopped/error semantics,
+  provider/browser/edit capability scope, workspace/stale-read behavior,
+  session schema, dependencies, package scripts, and default gates.
+- `docs/foundation/` was updated to mark the blocker-detail parity risk as
+  resolved.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -230,7 +246,8 @@ If these answers are weak, pick a contract route instead of a feature route.
 
 The central-file extraction pass is complete for the current atlas set, and
 Route 163 records the current foundation consistency state in
-`docs/foundation/`. Routes 154-160 classify `runMvpIntegratedFlow.ts`,
+`docs/foundation/`, and Route 164 resolves its high-risk session terminal
+blocker-detail parity drift. Routes 154-160 classify `runMvpIntegratedFlow.ts`,
 `sessionRuntime.ts`, `SessionManager.ts`, `cli.tsx`,
 `scripts/verify/index.mjs`, and `resultMapper.ts` as acceptable
 composition/substrate/readiness/truthfulness roots under owner-module
@@ -239,11 +256,9 @@ boundaries.
 Choose the next route by module lifecycle gap and product risk rather than by
 central-file size. After Route 162, the best default next route is `Tool /
 Runtime success/failure result-flow calibration` if result/session consistency
-is the priority. If foundation consistency is the immediate priority, first
-close the Route 163 Result Surface / Session terminal blocker-detail parity
-risk. Choose `Harness / gate taxonomy` if release/report confidence is the
-blocker. Consider shared handoff extraction only after more capability-specific
-flows prove repeated stable fields.
+is the priority. Choose `Harness / gate taxonomy` if release/report confidence
+is the blocker. Consider shared handoff extraction only after more
+capability-specific flows prove repeated stable fields.
 
 ## Persistent Boundaries
 
