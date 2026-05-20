@@ -1,5 +1,7 @@
 import type { SandboxEnforcer } from '../../sandbox/sandboxEnforcer.js'
 import type { PermissionCheck } from '../../sandbox/index.js'
+import { createSandboxPolicyRuntimeReceipt } from '../runtime/runtimeReceipt.js'
+import { projectRuntimeReceipt } from '../runtime/runtimeReceiptProjection.js'
 import { buildApprovalDeniedResult } from './toolPolicyResult.js'
 import { deniedResult } from './toolResultLifecycle.js'
 
@@ -14,6 +16,15 @@ export class ToolApprovalFlow {
     for (const check of checks) {
       const policyResult = await this.enforcer.checkAndEnforce(toolName, check)
       if (!policyResult.allowed) {
+        const runtimeReceipt = createSandboxPolicyRuntimeReceipt({
+          toolName,
+          operation: check.operation,
+          target: check.target,
+          allowed: policyResult.allowed,
+          reason: policyResult.reason,
+          requiresEscalation: policyResult.wasEscalated,
+          wasEscalated: policyResult.wasEscalated,
+        })
         const receipt = buildApprovalDeniedResult({
           capability: toolName === 'bash' ? 'command' : 'tool',
           label: toolName,
@@ -22,6 +33,7 @@ export class ToolApprovalFlow {
         })
         return deniedResult(receipt.reason, {
           wasEscalated: policyResult.wasEscalated,
+          runtimeReceipt: projectRuntimeReceipt(runtimeReceipt),
         })
       }
     }

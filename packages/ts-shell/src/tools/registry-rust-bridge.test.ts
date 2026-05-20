@@ -105,6 +105,10 @@ describe('tool registry rust bridge', () => {
     expect(result.success).toBe(true)
     expect(result.output?.toLowerCase()).toContain('ts-local')
     expect(result.metadata).toMatchObject({ executionPath: 'ts-local' })
+    expect(result.metadata?.runtimeReceipt).toMatchObject({
+      resultSummary: expect.stringContaining('local-command:completed:command-succeeded'),
+      cleanupSummary: 'cleanup:not-needed',
+    })
   }, 15000)
 
   it('fails closed when rust daemon execution is unavailable', async () => {
@@ -140,6 +144,10 @@ describe('tool registry rust bridge', () => {
       status: 'failed',
       exitCode: null,
       failureKind: 'execution_failure',
+    })
+    expect(result.metadata?.runtimeReceipt).toMatchObject({
+      resultSummary: expect.stringContaining('daemon:failed:command-failed'),
+      cleanupSummary: 'cleanup:not-needed',
     })
     expect(result.metadata).toHaveProperty('recoveryReason')
   }, 15000)

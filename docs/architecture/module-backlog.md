@@ -84,6 +84,19 @@ conditions before implementation.
 - It adds `docs/architecture/module-roadmap-reset.md` as the module status and
   phase-ordering source for the next planning cycle.
 
+### Route 150: Runtime Receipt Contract
+
+- Route 150 adds `core/runtime/runtimeReceipt.ts` and
+  `core/runtime/runtimeReceiptProjection.ts` as the Runtime-owned receipt seam
+  over Route 146 Tool / Policy / Result vocabulary.
+- Existing command, sandbox escalation/denial, browser runtime status/cleanup,
+  and MCP process/protocol failure paths attach projected receipt metadata
+  without changing execution behavior, CLI output, schema, browser/edit/provider
+  capability, Rust protocol, or dependencies.
+- `docs/architecture/runtime-receipt-contract.md` records the field contract,
+  lifecycle mapping, redaction rules, integrated call sites, and validation
+  gate.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -111,7 +124,7 @@ capability scope.
 | Candidate | Primary module | Goal | Validation shape |
 |---|---|---|---|
 | Agent Loop dispatch extraction v2 | Agent Loop | Move one more pure dispatch/projection decision out of `runMvpIntegratedFlow.ts` without changing behavior. | focused dispatch/runMvp tests; build if source changes |
-| Runtime receipt contract | Runtime, Tool, Result Surface | Define shared shell/local/daemon/browser runtime receipt vocabulary consumed by result/session surfaces. | focused helper tests if source changes; result-contract when projections change |
+| Agent Loop receipt-consumer thin wiring | Agent Loop, Runtime, Result Surface | Adopt Runtime Receipt projection at one existing result/session handoff without changing truthfulness or schema. | focused receipt/runMvp/result-contract tests |
 | Workspace / File Context contract | Workspace / File Context, Edit / Patch | Consolidate root, target, read/write authority, stale-read, and post-write verification vocabulary. | docs-only diff/status or focused workspace/patch tests if source changes |
 | CLI / core split preparation | CLI / UX, Session / Continue | Move display/session-switch preparation behind a CLI-owned boundary without changing UX. | focused CLI tests; no schema/provider changes |
 
@@ -154,12 +167,15 @@ If these answers are weak, pick a contract route instead of a feature route.
 
 ## Current Default Recommendation
 
-The best default next route is `Runtime Receipt Contract` in Phase A.
+The best default next route is `Agent Loop receipt-consumer thin wiring` in
+Phase A if runtime receipt adoption should continue.
 
-Rationale: Route 146 already gives Tool / Policy / Result a common lifecycle
-vocabulary, but runtime execution receipts remain capability-specific. A
-runtime receipt contract can reduce Agent Loop and Result Surface coupling
-without enabling provider, browser, or edit execution.
+Rationale: Route 150 now provides a Runtime-owned receipt/projection seam and
+safe metadata at high-value command, sandbox, browser, and MCP paths. The next
+value is a single consumer handoff that proves the seam reduces Result Surface
+or Agent Loop coupling without changing `resultMapper.ts` truthfulness,
+session schemas, CLI UX, provider behavior, browser scope, edit execution, Rust
+protocol, or dependencies.
 
 If the user explicitly chooses mutation work next, select `Edit / Patch thin
 integration` and keep it to one module-owned handoff with no new broad write

@@ -17,6 +17,11 @@ import {
 import { createBrowserToolDefinitions } from '../context/browserTool.js'
 import type { PwRuntimeStatus } from '../context/pwRuntime.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
+import {
+  createCommandRuntimeReceipt,
+  createMcpRuntimeFailureReceipt,
+} from '../runtime/runtimeReceipt.js'
+import { projectRuntimeReceipt } from '../runtime/runtimeReceiptProjection.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
 import { buildExecutionFailedResult } from './toolPolicyResult.js'
@@ -71,6 +76,15 @@ async function runLocalCommand(
     cwd: context.workspaceRoot,
     timeoutMs: 30_000,
   })
+  const receipt = createCommandRuntimeReceipt({
+    command,
+    status: result.status,
+    executionPath: 'ts-local',
+    exitCode: result.exitCode,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    timeoutMs: 30_000,
+  })
 
   return {
     success: result.status === 'completed',
@@ -81,6 +95,7 @@ async function runLocalCommand(
       status: result.status,
       exitCode: result.exitCode,
       failureKind: inferFailureKind(result),
+      runtimeReceipt: projectRuntimeReceipt(receipt),
     },
   }
 }
@@ -90,6 +105,15 @@ function daemonUnavailableResult(
   context: ToolExecutionContext,
   reason: string,
 ) {
+  const receipt = createCommandRuntimeReceipt({
+    runtimeKind: 'daemon',
+    command,
+    status: 'failed',
+    executionPath: 'rust-daemon',
+    exitCode: null,
+    reason,
+    evidence: ['runtime-receipt:daemon-unavailable'],
+  })
   return {
     success: false,
     output: '',
@@ -102,6 +126,7 @@ function daemonUnavailableResult(
       recoveryReason: reason,
       blockedCommand: command,
       workspaceRoot: context.workspaceRoot,
+      runtimeReceipt: projectRuntimeReceipt(receipt),
     },
   }
 }
@@ -195,6 +220,16 @@ export function createCoreToolRegistry(options?: {
                 timeoutMs: 30_000,
                 abortSignal: context.abortSignal,
               })
+              const receipt = createCommandRuntimeReceipt({
+                runtimeKind: 'daemon',
+                command,
+                status: daemonResult.status,
+                executionPath: 'rust-daemon',
+                exitCode: daemonResult.exitCode,
+                stdout: daemonResult.stdout,
+                stderr: daemonResult.stderr,
+                timeoutMs: 30_000,
+              })
               return {
                 success: daemonResult.status === 'completed',
                 output: daemonResult.stdout,
@@ -208,6 +243,7 @@ export function createCoreToolRegistry(options?: {
                   daemonPid: daemonResult.daemonPid,
                   daemonRequestSeq: daemonResult.daemonRequestSeq,
                   daemonExecutionId: daemonResult.daemonExecutionId,
+                  runtimeReceipt: projectRuntimeReceipt(receipt),
                 },
               }
             } catch (error) {
@@ -299,6 +335,14 @@ export function createCoreToolRegistry(options?: {
               reason: receipt.reason,
               ...mcpFailureMetadata(taxonomy),
               doNext: receipt.doNext,
+              runtimeReceipt: projectRuntimeReceipt(createMcpRuntimeFailureReceipt({
+                serverName: tool.serverName,
+                toolName: tool.toolName,
+                failureClass: taxonomy.failureClass,
+                failurePlane: taxonomy.failurePlane,
+                safeDetail: taxonomy.safeDetail,
+                doNext: receipt.doNext,
+              })),
             })
           }
           return approvedResult(result.content, {
@@ -320,6 +364,15 @@ export function createCoreToolRegistry(options?: {
                 safeDetail: error.mcpSafeDetail,
               }),
               doNext: error.doNext,
+              runtimeReceipt: projectRuntimeReceipt(createMcpRuntimeFailureReceipt({
+                serverName: tool.serverName,
+                toolName: tool.toolName,
+                failureClass: error.mcpFailureClass,
+                failurePlane: error.mcpFailurePlane,
+                safeDetail: error.mcpSafeDetail,
+                doNext: error.doNext,
+                protocolFailure: error.mcpFailureClass === 'protocol' || error.mcpFailureClass === 'malformed-result',
+              })),
             })
           }
           const taxonomy = classifyUnknownMcpFailure(error)
@@ -352,6 +405,15 @@ export function createCoreToolRegistry(options?: {
                 : taxonomy,
             ),
             doNext: receipt.doNext,
+            runtimeReceipt: projectRuntimeReceipt(createMcpRuntimeFailureReceipt({
+              serverName: tool.serverName,
+              toolName: tool.toolName,
+              failureClass: taxonomy.failureClass,
+              failurePlane: taxonomy.failurePlane,
+              safeDetail: taxonomy.safeDetail,
+              doNext: receipt.doNext,
+              protocolFailure: taxonomy.failureClass === 'protocol' || taxonomy.failureClass === 'malformed-result',
+            })),
           })
         }
       },

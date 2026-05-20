@@ -19,6 +19,11 @@ import {
   buildPolicyBlockedResult,
   buildUnavailableResult,
 } from './toolPolicyResult.js'
+import {
+  createMcpRuntimeFailureReceipt,
+  createRuntimeReceipt,
+} from '../runtime/runtimeReceipt.js'
+import { projectRuntimeReceipt } from '../runtime/runtimeReceiptProjection.js'
 import { deniedResult, runtimeErrorResult } from './toolResultLifecycle.js'
 
 export class ToolRuntime {
@@ -131,7 +136,22 @@ export class ToolRuntime {
         doNext: 'Retry with one of the visible MVP tools.',
         evidence: ['tool-runtime:allowlist-blocked'],
       })
-      return deniedResult(receipt.reason)
+      return deniedResult(receipt.reason, {
+        runtimeReceipt: projectRuntimeReceipt(createRuntimeReceipt({
+          runtimeKind: 'sandbox',
+          availability: receipt.availability,
+          policy: receipt.policy,
+          execution: receipt.execution,
+          result: receipt.result,
+          reasonCode: receipt.reasonCode,
+          reason: receipt.reason,
+          doNext: receipt.doNext,
+          targetSummary: toolName,
+          cleanup: 'not-started',
+          redaction: receipt.redaction,
+          evidence: receipt.evidence,
+        })),
+      })
     }
 
     const tool = this.registry.get(toolName)
@@ -157,6 +177,13 @@ export class ToolRuntime {
           reason: receipt.reason,
           ...mcpFailureMetadata(taxonomy),
           doNext: receipt.doNext,
+          runtimeReceipt: projectRuntimeReceipt(createMcpRuntimeFailureReceipt({
+            serverName,
+            failureClass: taxonomy.failureClass,
+            failurePlane: taxonomy.failurePlane,
+            safeDetail: taxonomy.safeDetail,
+            doNext: receipt.doNext,
+          })),
         })
       }
 

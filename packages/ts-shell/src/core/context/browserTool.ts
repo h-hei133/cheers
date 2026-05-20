@@ -26,6 +26,11 @@ import {
   buildPolicyBlockedResult,
   buildUnavailableResult,
 } from "../tools/toolPolicyResult.js";
+import {
+  createBrowserRuntimeStatusReceipt,
+  type RuntimeCleanupState,
+} from "../runtime/runtimeReceipt.js";
+import { projectRuntimeReceipt } from "../runtime/runtimeReceiptProjection.js";
 
 export const BROWSER_TOOL_NAMES = [
   "browser.observe",
@@ -264,6 +269,16 @@ function browserToolMetadata(input: {
   readonly manifest: BrowserRuntimeManifest | undefined;
   readonly evidence: readonly string[];
 }): Record<string, unknown> {
+  const runtimeReceipt = createBrowserRuntimeStatusReceipt({
+    status: input.runtimeStatus?.status ?? "not-ready",
+    reasonCode: input.observation.reasonCode,
+    reason: input.observation.visibleTextSummary,
+    nextAction: input.observation.nextActions[0] ?? "Review sanitized browser runtime evidence.",
+    cleanup: browserCleanupState(input.observation.cleanupStatus),
+    evidence: input.evidence,
+    warnings: input.runtimeStatus?.warnings,
+    targetSummary: input.observation.controlledTarget,
+  });
   return {
     executionPath: "browser-tool",
     browserRuntimeStatus: input.runtimeStatus?.status ?? "not-ready",
@@ -273,6 +288,7 @@ function browserToolMetadata(input: {
     manifestId: input.manifest?.manifestId,
     publicAutomation: false,
     rawContent: "excluded",
+    runtimeReceipt: projectRuntimeReceipt(runtimeReceipt),
     evidence: [
       ...input.evidence,
       ...input.observation.evidence,
@@ -288,6 +304,19 @@ function browserToolMetadata(input: {
 function browserToolDescription(toolName: BrowserToolName): string {
   const action = browserActionKindForTool(toolName);
   return `Controlled local browser ${action}; Direct Playwright only, no public web, auth, cookies, screenshots, uploads/downloads, or raw DOM.`;
+}
+
+function browserCleanupState(value: string): RuntimeCleanupState {
+  if (
+    value === "not-started" ||
+    value === "not-needed" ||
+    value === "succeeded" ||
+    value === "failed" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+  return "unknown";
 }
 
 function browserToolArgsSchema(toolName: BrowserToolName): Record<string, unknown> {

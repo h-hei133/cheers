@@ -41,6 +41,10 @@ describe('core tool runtime (W2)', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toContain('not in the MVP allowlist')
+    expect(result.metadata?.runtimeReceipt).toMatchObject({
+      resultSummary: expect.stringContaining('sandbox:stopped:command-not-allowlisted'),
+      cleanupSummary: 'cleanup:not-started',
+    })
   })
 
   it('does not execute stale visible MCP tools after reconnect changes capability state', async () => {
@@ -111,6 +115,10 @@ describe('core tool runtime (W2)', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('MCP server localSdk requires authentication')
+    expect(result.metadata?.runtimeReceipt).toMatchObject({
+      resultSummary: expect.stringContaining('mcp-process:failed:mcp-execution-failed'),
+      cleanupSummary: 'cleanup:unknown',
+    })
   })
 
   it('surfaces real rust-daemon sandbox denial as a failed tool result after TS escalation approval', async () => {
