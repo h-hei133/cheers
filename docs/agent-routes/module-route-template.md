@@ -52,12 +52,27 @@ This route is not successful if:
 
 ## References
 
+### Selective Document Loading
+
+Start by reading:
+
+- `docs/ACTIVE_CONTEXT.md`
+- this route plan
+
+Then list only route-relevant docs below. For each selected doc, state why it is
+needed. Do not default to reading historical extraction docs, old route
+closeouts, or broad design directories. Prefer `docs/implementation-context/`
+and `docs/foundation/` over old route closeouts when they cover the current
+module or risk. If this route creates a new long-lived doc, update
+`docs/DOC_STATUS.md` before closeout.
+
 Target project evidence:
 
-- `docs/implementation-context/README.md`
-- `docs/implementation-context/capability-flow-manifest.json`
-- `docs/implementation-context/capability-flow-graph.md`
-- `docs/implementation-context/capability-recipes.md`
+- `docs/DOC_STATUS.md`: why needed:
+- `docs/implementation-context/README.md`: why needed:
+- `docs/implementation-context/capability-flow-manifest.json`: why needed:
+- `docs/implementation-context/capability-flow-graph.md`: why needed:
+- `docs/implementation-context/capability-recipes.md`: why needed:
 - 
 
 Reference projects to inspect:

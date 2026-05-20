@@ -5,14 +5,14 @@ Route: `docs/agent-routes/route149-module-roadmap-reset.md`
 This backlog is now module-first. It records completed consolidation work and
 candidate route families; it is not a fixed feature queue.
 
-Use these documents before starting a route:
+Use the active context policy before starting a route:
 
-- `docs/architecture/module-roadmap-reset.md`
-- `docs/architecture/control-plane-atlas.md`
-- `docs/architecture/capability-contract.md`
-- `docs/implementation-context/README.md`
-- `docs/implementation-context/capability-flow-manifest.json`
-- `docs/agent-routes/module-route-template.md`
+- Read `docs/ACTIVE_CONTEXT.md` first.
+- Use `docs/DOC_STATUS.md` to choose only route-relevant docs.
+- Read `docs/agent-routes/module-route-template.md` when drafting or executing
+  a module route.
+- Read implementation-context, foundation, module-reference, or historical docs
+  only when the active route needs that context.
 
 Every future route must name its owner module, lifecycle stage, cross-module
 inputs and outputs, product behavior boundary, validation gate, and stop
@@ -182,6 +182,20 @@ as an import-policing rule.
 - `docs/architecture/tool-runtime-execution-flow.md` records the calibrated
   flow and validation surface.
 
+### Route 166: Docs Active Context Map
+
+- Route 166 adds `docs/ACTIVE_CONTEXT.md`, `docs/DOC_STATUS.md`, and
+  `docs/archive/README.md` so future routes start from a concise documentation
+  entrypoint and status map instead of loading all route history.
+- Documentation is classified as active, implementation-context,
+  foundation-evidence, module-reference, historical, superseded, or archived.
+- Future route prompts should use the active context policy, explain why each
+  selected doc is needed, and avoid default reading of old extraction docs,
+  route closeouts, or broad design directories.
+- This route is documentation-only and does not change product code, package
+  scripts, dependencies, behavior, provider gates, browser scope, edit scope,
+  runtime behavior, or validation scripts.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -271,9 +285,11 @@ composition/substrate/readiness/truthfulness roots under owner-module
 boundaries.
 
 Choose the next route by module lifecycle gap and product risk rather than by
-central-file size. After Route 165, choose `Harness / gate taxonomy` if
-release/report confidence is the blocker. Consider shared handoff extraction
-only after more
+central-file size. After Route 166, return to code or validation work rather
+than more doc pruning. Choose `Harness / gate taxonomy` if release/report
+confidence is the blocker. Consider bounded product capability only after the
+active context policy identifies the relevant module docs and validation
+surface. Consider shared handoff extraction only after more
 capability-specific flows prove repeated stable fields.
 
 ## Persistent Boundaries
