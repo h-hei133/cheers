@@ -129,7 +129,7 @@ capability scope.
 | Agent Loop receipt-consumer thin wiring | Agent Loop, Runtime, Result Surface | Adopt Runtime Receipt projection at one existing result/session handoff without changing truthfulness or schema. | focused receipt/runMvp/result-contract tests |
 | Workspace / File Context contract | Workspace / File Context, Edit / Patch | Route 151 added `workspaceFileContract` and `workspaceTargetProjection` as shared vocabulary for root, target, read/write authority, stale-read, verification preconditions, continuation, and future discovery summaries without changing authority or execution. | closed by Route 151; focused workspace/adjacent tests, runMvp, edit closeout, result-contract, build |
 | CLI / core split preparation | CLI / UX, Session / Continue | Route 153 added startup, session, provider, and display projection helpers while preserving CLI flags, slash semantics, session/schema behavior, provider gates, runtime invocation, and result surfaces. | closed by Route 153; focused CLI/slash/baseline tests and build |
-| CLI / core split implementation phase 2 | CLI / UX, Session / Continue | Extract one narrow slash-command action boundary, likely session or workspace execution, behind a tested CLI-owned helper. | focused CLI/session tests; no schema/provider/result changes |
+| CLI module facade extraction | CLI / UX, Session / Continue, Permission / Policy, Provider / Model, Workspace / File Context, Agent Loop | Route 158 added `cliApprovalModule`, `cliRuntimeModule`, `cliSessionModule`, `cliWorkspaceModule`, and `cliPermissionModule` so `cli.tsx` remains the process entrypoint while module-owned facades own approval, runtime turn handoff, session, workspace, and permission surfaces. | closed by Route 158; focused CLI facade/adjacent tests, CLI baseline, runMvp, build |
 | Session runtime module facade extraction | Session / Continue, Result Surface, Agent Loop | Route 156 added `sessionEventSurface`, `sessionTerminalState`, `sessionPersistenceProjection`, and `sessionFutureTurnProjection` so `sessionRuntime.ts` keeps event order and coordination while module-owned facades own rendering, terminal accumulation, persistence payload projection, and future-turn projection. | closed by Route 156; focused sessionRuntime boundary/runtime tests, runMvp, result-contract, build |
 | SessionManager module facade extraction | Session / Continue, Permission / Policy, CLI / UX | Route 157 added `sessionStore`, `sessionRegistry`, `sessionApprovalMemoryModule`, `sessionCompactModule`, and `sessionContinuityModule` so `SessionManager.ts` remains the stateful substrate while module-owned facades own layout, current-session registry, approval-memory, compact-retention, and continuity evidence details. | closed by Route 157; focused session boundary/adjacent tests, sessionRuntime tests, runMvp, build |
 
@@ -172,18 +172,19 @@ If these answers are weak, pick a contract route instead of a feature route.
 
 ## Current Default Recommendation
 
-The best default next route is a narrow `cli.tsx` action-boundary extraction in
-Phase A.
+The best default next route is a Harness / Eval owned decomposition of
+`scripts/verify-real-user-capabilities.mjs` in Phase C.
 
-Rationale: Route 153 reduced `cli.tsx` pressure, Routes 154-155 classified
-`runMvpIntegratedFlow.ts` as an acceptable Agent Loop composition root, Route
-156 classified `sessionRuntime.ts` as an acceptable shell/runtime composition
-root, and Route 157 classified `SessionManager.ts` as an acceptable stateful
-Session / Continue substrate. The next highest-value central file is now
-`cli.tsx`, where argument mode dispatch, slash command action wiring, session
-command surfaces, provider snapshot display, approval bridge wiring, and runtime
-invocation still converge. Keep the next route to one CLI-owned action boundary
-with no schema/provider/result changes.
+Rationale: Routes 154-155 classified `runMvpIntegratedFlow.ts` as an acceptable
+Agent Loop composition root, Route 156 classified `sessionRuntime.ts` as an
+acceptable shell/runtime composition root, Route 157 classified
+`SessionManager.ts` as an acceptable stateful Session / Continue substrate, and
+Route 158 classified `cli.tsx` as an acceptable CLI entrypoint composition
+root. The next highest-value central file is now
+`scripts/verify-real-user-capabilities.mjs`, where readiness scenarios,
+redaction/report projection, markers, exit codes, and opt-in real-provider
+boundaries converge. Keep the next route behavior-preserving with no provider
+live/config reads outside explicit gates and no package/dependency changes.
 
 If the user explicitly chooses mutation work next, select `Edit / Patch thin
 integration` and keep it to one module-owned handoff with no new broad write

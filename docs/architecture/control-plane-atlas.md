@@ -306,6 +306,11 @@ Unsafe areas:
 Current owners:
 
 - `packages/ts-shell/src/entrypoints/cli.tsx`
+- `packages/ts-shell/src/entrypoints/cliApprovalModule.ts`
+- `packages/ts-shell/src/entrypoints/cliRuntimeModule.ts`
+- `packages/ts-shell/src/entrypoints/cliSessionModule.ts`
+- `packages/ts-shell/src/entrypoints/cliWorkspaceModule.ts`
+- `packages/ts-shell/src/entrypoints/cliPermissionModule.ts`
 - `packages/ts-shell/src/entrypoints/cliArgs.ts`
 - `packages/ts-shell/src/entrypoints/cliModeDispatch.ts`
 - `packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts`
@@ -316,28 +321,31 @@ Current owners:
 
 Mixed responsibilities:
 
-- `cli.tsx` remains a large composition root for startup, session commands,
-  approval, workspace binding, provider snapshot, prompt execution, and display
-  helpers
-- many mode helpers exist, but session switch and permissions display remain in
-  the entrypoint
+- `cli.tsx` remains the process entrypoint and top-level interactive
+  composition root for bootstrap ordering, mode selection, readline lifecycle,
+  MCP gateway lifetime, and compatibility glue
+- module facades now own approval prompt internals, non-interactive runtime
+  turn handoff, session command surfaces, workspace attach/status surfaces, and
+  permissions display/mutation surfaces
 
 Lifecycle coverage:
 
 - CLI selects session/project context, routes print/stdin/replay/interactive
   modes, and bridges slash commands
 - non-interactive approval behavior is explicit
+- facade boundary tests characterize approval-mode projection,
+  root-binding/session switch diagnostics, and workspace-info classification
 
 Missing boundary:
 
-- a CLI core facade that wires runtime dependencies while keeping display
-  helpers outside the entrypoint
+- MCP control command execution still lives in the entrypoint because gateway
+  lifetime is tied to current runtime cwd
 
 Safe extraction candidates:
 
-- permissions list/explain renderer
-- session switch diagnostics helper
-- workspace-info prompt detector
+- MCP control command facade once gateway lifecycle is characterized
+- provider/workspace startup display facade if startup output needs another
+  behavior-preserving reduction
 
 Unsafe areas:
 
@@ -463,8 +471,9 @@ Unsafe area:
 2. `SessionManager.ts`: acceptable stateful Session / Continue substrate after
    Route 157; avoid regrowing store/layout, registry, compact, approval-memory,
    or pure continuity evidence internals there.
-3. `cli.tsx`: entrypoint plus command/display/session/provider/approval
-   wiring.
+3. `cli.tsx`: acceptable CLI entrypoint composition root after Route 158;
+   avoid regrowing approval prompt internals, runtime turn execution internals,
+   session/workspace command internals, or permission surface details there.
 4. `sessionRuntime.ts`: acceptable shell/runtime composition root after Route
    156; avoid regrowing rendering, terminal projection, persistence payload, or
    future-turn internals there.
@@ -692,6 +701,62 @@ classifications. `cli.tsx` is now the highest-value central file because
 argument mode dispatch, slash command action wiring, session command surfaces,
 provider snapshot display, approval bridge wiring, and runtime invocation still
 converge there.
+
+## Post-Route-158 CLI Module Facade Pass
+
+Route 158 ran the owner-module extraction pass for
+`packages/ts-shell/src/entrypoints/cli.tsx`.
+
+New module facades:
+
+- `packages/ts-shell/src/entrypoints/cliApprovalModule.ts`
+  - owner: Permission / Policy Engineering and CLI / UX Engineering
+  - owns approval-mode cue projection, conflict analysis, approval prompt
+    handler creation, non-interactive approval resolution, audit-surface
+    emission, and apply-patch approval decision projection
+- `packages/ts-shell/src/entrypoints/cliRuntimeModule.ts`
+  - owner: Agent Loop Engineering and CLI / UX Engineering
+  - owns non-interactive prompt/replay/stdin handoff, runtime invocation event
+    streaming, and prompt turn execution payload construction
+- `packages/ts-shell/src/entrypoints/cliSessionModule.ts`
+  - owner: Session / Continue Engineering and CLI / UX Engineering
+  - owns session command surfaces, switch reference resolution, root-binding
+    diagnostics, and runtime-context session rebinding projection
+- `packages/ts-shell/src/entrypoints/cliWorkspaceModule.ts`
+  - owner: Workspace / File Context Engineering and CLI / UX Engineering
+  - owns workspace-info prompt classification, workspace attach/status/recent
+    command surfaces, root-mode resolution, and project-root projection
+- `packages/ts-shell/src/entrypoints/cliPermissionModule.ts`
+  - owner: Permission / Policy Engineering and CLI / UX Engineering
+  - owns `/permissions` list/explain/revoke/reset display and trust-grant
+    mutation surface
+
+`cli.tsx` is now acceptable as a CLI entrypoint composition root. It keeps
+process startup, argv parse and early exits, bootstrap ordering, top-level mode
+selection, readline lifecycle, signal hooks, prompt chrome, cancellation
+handling, MCP gateway lifetime, and high-level interactive slash dispatch. It
+should not regain direct approval prompt internals, non-interactive runtime turn
+execution internals, session switch/root-binding helpers, workspace attach/path
+helpers, or permission-list/explain surface details.
+
+Remaining CLI-adjacent responsibilities to avoid growing:
+
+- MCP control command execution is still inline because gateway lifetime is tied
+  to the current runtime cwd and needs separate characterization before moving
+- provider credential snapshot resolution and startup display wiring remain in
+  the entrypoint, while redacted provider projection stays in existing helpers
+- compatibility process exits for version, doctor, and invalid project path
+  remain in `cli.tsx`
+
+Next central file recommendation:
+`scripts/verify-real-user-capabilities.mjs`.
+
+Reason: after Routes 154-158, `runMvpIntegratedFlow.ts`, `sessionRuntime.ts`,
+`SessionManager.ts`, and `cli.tsx` all have acceptable
+composition/substrate/entrypoint classifications. The verifier script remains a
+large readiness/reporting control surface and should be decomposed only through
+Harness / Eval owned facades that preserve flags, markers, report fields,
+redaction, exit codes, and opt-in behavior.
 
 ## Post-Route-149 Roadmap Reset
 
