@@ -85,7 +85,9 @@
       "sourceOfTruthModule": "Runtime",
       "sourceFilesOrFacades": [
         "packages/ts-shell/src/core/runtime/runtimeReceipt.ts",
-        "packages/ts-shell/src/core/runtime/runtimeReceiptProjection.ts"
+        "packages/ts-shell/src/core/runtime/runtimeReceiptProjection.ts",
+        "packages/ts-shell/src/orchestration/flowDispatch.ts",
+        "packages/ts-shell/src/orchestration/verificationResultProjection.ts"
       ],
       "consumers": [
         "Tool",
@@ -99,17 +101,21 @@
         "result",
         "reasonCode",
         "timeoutMs",
-        "durationMs"
+        "durationMs",
+        "runtime receipt evidence marker"
       ],
       "forbiddenFields": [
         "completed terminal claim from timeout",
         "unbudgeted stdout/stderr"
       ],
       "contradictionChecks": [
-        "timeout summary is explicit and bounded"
+        "timeout summary is explicit and bounded",
+        "runtime receipt evidence marker does not decide terminal truthfulness"
       ],
       "validationEvidence": [
-        "packages/ts-shell/src/core/runtime/runtimeReceiptProjection.test.ts"
+        "packages/ts-shell/src/core/runtime/runtimeReceiptProjection.test.ts",
+        "packages/ts-shell/src/orchestration/flowDispatch.test.ts",
+        "packages/ts-shell/src/orchestration/verificationPlanner.test.ts"
       ],
       "status": "consistent",
       "ownerModuleForFollowUp": "Runtime"
@@ -120,7 +126,10 @@
       "sourceFilesOrFacades": [
         "packages/ts-shell/src/core/runtime/runtimeReceipt.ts",
         "packages/ts-shell/src/core/tools/toolLifecycleProjection.ts",
-        "packages/ts-shell/src/core/query/capabilityResultClassification.ts"
+        "packages/ts-shell/src/core/query/capabilityResultClassification.ts",
+        "packages/ts-shell/src/orchestration/flowDispatch.ts",
+        "packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+        "packages/ts-shell/src/orchestration/verificationResultProjection.ts"
       ],
       "consumers": [
         "Result Surface",
@@ -133,18 +142,22 @@
         "execution=failed",
         "result=failed",
         "exitCode or failure reason",
-        "safe stdout/stderr summary"
+        "safe stdout/stderr summary",
+        "runtime receipt result/transcript/stdout/stderr evidence markers"
       ],
       "forbiddenFields": [
         "completed terminal claim for approved hard failure",
         "unbudgeted output dump"
       ],
       "contradictionChecks": [
-        "approved command hard failures do not become completed"
+        "approved command hard failures do not become completed",
+        "runtime receipt evidence is budgeted and transcript-safe before gate evidence consumption"
       ],
       "validationEvidence": [
         "packages/ts-shell/src/core/query/resultMapperBoundary.test.ts",
-        "packages/ts-shell/src/core/runtime/runtimeReceipt.test.ts"
+        "packages/ts-shell/src/core/runtime/runtimeReceipt.test.ts",
+        "packages/ts-shell/src/orchestration/flowDispatch.test.ts",
+        "packages/ts-shell/src/orchestration/verificationPlanner.test.ts"
       ],
       "status": "consistent",
       "ownerModuleForFollowUp": "Runtime"

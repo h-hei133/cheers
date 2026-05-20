@@ -445,6 +445,7 @@
         "tool lifecycle result",
         "provenance summary",
         "runtime receipt metadata",
+        "runtime receipt evidence markers",
         "transcript-safe summaries"
       ],
       "downstreamConsumers": [
@@ -453,11 +454,12 @@
         "sessionEventSurface",
         "verifiers"
       ],
-      "resultSurfaceHandoff": "success/failure/blocked/MCP unavailable facts become coding result fields or actionable blockers before terminal mapping.",
-      "transcriptContinuationHandoff": "tool/runtime output is budgeted and redacted before transcript or replay use.",
+      "resultSurfaceHandoff": "success/failure/blocked/MCP unavailable facts become coding result fields or actionable blockers before terminal mapping; runtime receipt markers remain evidence only.",
+      "transcriptContinuationHandoff": "tool/runtime output is budgeted and redacted before transcript or replay use; run-command and verify paths carry projected runtime receipt markers.",
       "validationGates": [
         "tool runtime facade tests",
         "flowDispatch tests",
+        "verificationPlanner tests when verify receipt evidence changes",
         "MCP focused tests when touched",
         "verify:result-contract",
         "runMvp if dispatch order changes"

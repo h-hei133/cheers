@@ -7,6 +7,7 @@ import {
 } from "./codingResultProvenance.js";
 import {
   dispatchToolWithLifecycle,
+  projectRuntimeReceiptEvidence,
   type ToolLifecycleResult,
 } from "./flowDispatch.js";
 import type { CodingResultProvenanceSummary } from "./types.js";
@@ -16,6 +17,8 @@ export type {
   CodingResultProvenanceSummary,
   ToolLifecycleResult,
 };
+
+export { projectRuntimeReceiptEvidence };
 
 export function createToolRuntimeProvenanceCollector(): CodingResultProvenanceCollector {
   return createCodingResultProvenanceCollector();

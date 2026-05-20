@@ -323,6 +323,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.codingResult?.taskKind).toBe("run-command");
     expect(result.codingResult?.verification.command).toBe("node --version");
     expect(result.codingResult?.verification.status).toBe("passed");
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^runtime-receipt-result:/),
+        expect.stringMatching(/^runtime-receipt-transcript:/),
+      ]),
+    );
     expect(
       result.transcript[1]?.events?.some(
         (event) => event.type === "approval.requested",
@@ -420,6 +426,13 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.stopReason).toContain("Re-run and approve escalation");
     expect(result.codingResult?.verification.reason).toContain(
       "Escalation denied by user",
+    );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^runtime-receipt-result:/),
+        expect.stringMatching(/^runtime-receipt-transcript:/),
+        "runtime-receipt-cleanup:cleanup:not-started",
+      ]),
     );
     expect(result.codingResult?.provenance?.approvalDecisions).toEqual([
       expect.objectContaining({

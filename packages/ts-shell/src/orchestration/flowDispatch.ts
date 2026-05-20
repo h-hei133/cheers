@@ -112,6 +112,42 @@ export function createDispatchProvenanceCollector(): CodingResultProvenanceColle
   return createCodingResultProvenanceCollector();
 }
 
+export function projectRuntimeReceiptEvidence(
+  result: Pick<ToolLifecycleResult, "metadata">,
+): readonly string[] {
+  const receipt = readRuntimeReceiptProjection(result.metadata?.runtimeReceipt);
+  if (!receipt) {
+    return [];
+  }
+
+  return [
+    receipt.resultSummary
+      ? `runtime-receipt-result:${safeText(receipt.resultSummary)}`
+      : undefined,
+    receipt.transcriptSummary
+      ? `runtime-receipt-transcript:${safeText(receipt.transcriptSummary)}`
+      : undefined,
+    receipt.cleanupSummary
+      ? `runtime-receipt-cleanup:${safeText(receipt.cleanupSummary)}`
+      : undefined,
+    receipt.timeoutSummary
+      ? `runtime-receipt-timeout:${safeText(receipt.timeoutSummary)}`
+      : undefined,
+    receipt.stdoutSummary
+      ? `runtime-receipt-stdout:${safeText(receipt.stdoutSummary)}`
+      : undefined,
+    receipt.stderrSummary
+      ? `runtime-receipt-stderr:${safeText(receipt.stderrSummary)}`
+      : undefined,
+    receipt.redactionStatus
+      ? `runtime-receipt-redaction:${safeText(receipt.redactionStatus)}`
+      : undefined,
+    ...receipt.evidenceSummary.map(
+      (entry) => `runtime-receipt-evidence:${safeText(entry)}`,
+    ),
+  ].filter((entry): entry is string => Boolean(entry?.trim()));
+}
+
 export function projectRunCommandDispatchOutcome(input: {
   readonly command: string;
   readonly changedFiles: string[];
@@ -256,4 +292,40 @@ export function projectDispatchReentrySummary(input: {
 
 function safeText(value: string): string {
   return sanitizeToolResultText(value, 240);
+}
+
+function readRuntimeReceiptProjection(value: unknown): {
+  readonly resultSummary?: string;
+  readonly evidenceSummary: readonly string[];
+  readonly transcriptSummary?: string;
+  readonly cleanupSummary?: string;
+  readonly timeoutSummary?: string;
+  readonly stdoutSummary?: string;
+  readonly stderrSummary?: string;
+  readonly redactionStatus?: string;
+} | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    resultSummary: readString(record.resultSummary),
+    evidenceSummary: Array.isArray(record.evidenceSummary)
+      ? record.evidenceSummary.filter(
+          (entry): entry is string => typeof entry === "string",
+        )
+      : [],
+    transcriptSummary: readString(record.transcriptSummary),
+    cleanupSummary: readString(record.cleanupSummary),
+    timeoutSummary: readString(record.timeoutSummary),
+    stdoutSummary: readString(record.stdoutSummary),
+    stderrSummary: readString(record.stderrSummary),
+    redactionStatus: readString(record.redactionStatus),
+  };
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0
+    ? value
+    : undefined;
 }

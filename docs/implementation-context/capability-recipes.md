@@ -79,6 +79,22 @@ not import restrictions.
 - Validate: `node --check` for touched scripts, verifier self-test/focused
   suite, `verify:result-contract` when result claims are asserted.
 
+## Calibrate A Tool / Runtime Command Outcome
+
+- Start in: Tool and Runtime.
+- Use facades/contracts: `toolRuntimeModule.ts`, `flowDispatch.ts`,
+  `toolLifecycleProjection.ts`, `toolExecutionOutcomeProjection.ts`,
+  `runtimeReceipt.ts`, and `runtimeReceiptProjection.ts`.
+- Consume: existing tool result metadata, projected runtime receipt, approval
+  decision, command allowlist result, and current verification summary.
+- Emit: tool lifecycle projection, provenance summary, budgeted
+  `runtime-receipt-*` evidence markers, and Result Surface inputs that preserve
+  current truthfulness.
+- Do not bypass: command allowlist, sandbox/approval policy, runtime receipt
+  redaction, `resultMapper.ts` truthfulness, or session schema boundaries.
+- Validate: focused tool/runtime/verification/result/session tests,
+  `verify:result-contract`, and build when TypeScript source changes.
+
 ## Add A Result Stopped Path
 
 - Start in: Result Surface.

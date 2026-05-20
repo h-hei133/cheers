@@ -94,13 +94,16 @@ CLI / UX
 - Inputs: tool request, command allowlist, approval decision, sandbox/runtime
   facts, MCP availability and error taxonomy.
 - Outputs: tool lifecycle result, provenance summary, runtime receipt metadata,
-  transcript-safe tool/runtime summaries.
+  runtime receipt evidence markers, transcript-safe tool/runtime summaries.
 - Downstream consumers: Agent Loop, Result Surface, Session / Continue,
   Harness / Eval.
 - Result handoff: command success/failure/blocked/MCP unavailable facts become
-  coding result fields or actionable blockers before `resultMapper.ts`.
+  coding result fields or actionable blockers before `resultMapper.ts`; runtime
+  receipt markers remain evidence-only inputs.
 - Transcript/continuation handoff: tool/runtime summaries are budgeted and
-  redacted before transcript or replay use.
+  redacted before transcript or replay use. Run-command and verification paths
+  carry projected `runtime-receipt-*` markers from the existing receipt
+  projection.
 - Validation gates: tool runtime facade tests, flowDispatch tests, MCP focused
   tests when touched, result-contract, runMvp if dispatch order changes.
 - Forbidden shortcuts: do not bypass approval, command allowlist, MCP safe

@@ -166,6 +166,22 @@ as an import-policing rule.
 - `docs/foundation/` was updated to mark the blocker-detail parity risk as
   resolved.
 
+### Route 165: Tool / Runtime Execution Flow Calibration
+
+- Route 165 aligns the existing command execution path by projecting the
+  already budgeted `metadata.runtimeReceipt` into stable
+  `runtime-receipt-*` evidence markers for run-command and verification
+  results.
+- Command success, nonzero failure, timeout/cancel receipt projection,
+  allowlist blocked, approval-denied, unavailable, and stdout/stderr budgeting
+  remain covered by focused Tool, Runtime, Result Surface, and Session tests.
+- The route preserves command allowlists, sandbox/approval decisions, runtime
+  execution semantics, Result Surface truthfulness, session schema, CLI
+  behavior, provider/browser/edit scope, dependencies, package scripts, and
+  default gates.
+- `docs/architecture/tool-runtime-execution-flow.md` records the calibrated
+  flow and validation surface.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -246,18 +262,18 @@ If these answers are weak, pick a contract route instead of a feature route.
 
 The central-file extraction pass is complete for the current atlas set, and
 Route 163 records the current foundation consistency state in
-`docs/foundation/`, and Route 164 resolves its high-risk session terminal
-blocker-detail parity drift. Routes 154-160 classify `runMvpIntegratedFlow.ts`,
-`sessionRuntime.ts`, `SessionManager.ts`, `cli.tsx`,
+`docs/foundation/`, Route 164 resolves its high-risk session terminal
+blocker-detail parity drift, and Route 165 calibrates the existing Tool /
+Runtime command receipt evidence path. Routes 154-160 classify
+`runMvpIntegratedFlow.ts`, `sessionRuntime.ts`, `SessionManager.ts`, `cli.tsx`,
 `scripts/verify/index.mjs`, and `resultMapper.ts` as acceptable
 composition/substrate/readiness/truthfulness roots under owner-module
 boundaries.
 
 Choose the next route by module lifecycle gap and product risk rather than by
-central-file size. After Route 162, the best default next route is `Tool /
-Runtime success/failure result-flow calibration` if result/session consistency
-is the priority. Choose `Harness / gate taxonomy` if release/report confidence
-is the blocker. Consider shared handoff extraction only after more
+central-file size. After Route 165, choose `Harness / gate taxonomy` if
+release/report confidence is the blocker. Consider shared handoff extraction
+only after more
 capability-specific flows prove repeated stable fields.
 
 ## Persistent Boundaries

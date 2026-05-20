@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { QueryEvent } from "../core/query/events.js";
+import { createCommandRuntimeReceipt } from "../core/runtime/runtimeReceipt.js";
+import { projectRuntimeReceipt } from "../core/runtime/runtimeReceiptProjection.js";
 import {
   createDispatchProvenanceCollector,
   dispatchToolWithLifecycle,
   projectDispatchReentrySummary,
+  projectRuntimeReceiptEvidence,
   projectRunCommandDispatchOutcome,
   type ToolDispatchRuntime,
 } from "./flowDispatch.js";
@@ -136,6 +139,36 @@ describe("agent-loop flow dispatch", () => {
       resumeEligible: true,
     });
     expect(summary.safeSummary).not.toMatch(/Bearer abc123|<html>|raw page/i);
+  });
+
+  it("projects runtime receipt evidence with budgeted stdout and stderr", () => {
+    const receipt = projectRuntimeReceipt(
+      createCommandRuntimeReceipt({
+        command: "npm test -- --help",
+        status: "failed",
+        executionPath: "ts-local",
+        exitCode: 2,
+        stdout: "api_key=secret123 " + "x".repeat(400),
+        stderr:
+          "Bearer abcdefghijklmnop /home/wang/.private-agents-real/provider.env",
+      }),
+    );
+
+    const evidence = projectRuntimeReceiptEvidence({
+      metadata: { runtimeReceipt: receipt },
+    }).join("\n");
+
+    expect(evidence).toContain("runtime-receipt-result:");
+    expect(evidence).toContain("runtime-receipt-transcript:");
+    expect(evidence).toContain("runtime-receipt-stdout:");
+    expect(evidence).toContain("runtime-receipt-stderr:");
+    expect(evidence).toContain("runtime-receipt-redaction:redacted");
+    expect(evidence).not.toContain("secret123");
+    expect(evidence).not.toContain("abcdef");
+    expect(evidence).not.toContain("/home/wang/.private-agents-real");
+    for (const line of evidence.split("\n")) {
+      expect(line.length).toBeLessThanOrEqual(280);
+    }
   });
 
   it("keeps successful run-command dispatch complete without file mutation", () => {

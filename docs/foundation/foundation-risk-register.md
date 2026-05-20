@@ -10,9 +10,28 @@ have focused evidence.
 
 ## High
 
-None open after Route 164.
+None open after Route 165.
 
 ## Resolved
+
+### Tool / Runtime command receipt evidence bridge
+
+- Affected modules: Tool, Runtime, Result Surface, Session / Continue,
+  Harness / Eval.
+- Why it was a calibration gap: command execution already produced
+  budgeted/sanitized `metadata.runtimeReceipt`, but run-command and verify
+  evidence did not carry stable receipt markers for gate and transcript-safe
+  inspection.
+- Resolution: Route 165 added a narrow evidence bridge over the existing
+  projected runtime receipt and wired it into run-command and verification
+  evidence.
+- Evidence: `flowDispatch.ts`, `runMvpIntegratedFlow.ts`,
+  `verificationResultProjection.ts`, `flowDispatch.test.ts`,
+  `verificationPlanner.test.ts`, `runtimeReceiptProjection.test.ts`,
+  `resultMapperBoundary.test.ts`, `sessionRuntimeBoundary.test.ts`.
+- Recommended next action: none for this gap; keep receipt markers evidence-only
+  and leave terminal truthfulness in `resultMapper.ts`.
+- Should become a route: no, resolved by Route 165.
 
 ### Session terminal blocker detail marker parity
 

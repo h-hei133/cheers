@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { createCommandRuntimeReceipt } from "../core/runtime/runtimeReceipt.js";
+import { projectRuntimeReceipt } from "../core/runtime/runtimeReceiptProjection.js";
 import type { ToolLifecycleResult } from "./flowDispatch.js";
 import {
   planVerification,
@@ -202,6 +204,52 @@ describe("verification planner", () => {
     expect(projected.evidence.join("\n")).not.toContain("x".repeat(300));
   });
 
+  it("includes budgeted runtime receipt evidence for verify command results", () => {
+    const plan = planVerification({
+      taskKind: "edit-file",
+      prompt: "Edit src/app.ts and verify",
+      changedFiles: ["src/app.ts"],
+      explicitVerifyRequested: false,
+    });
+    const retry = planVerificationRetry({
+      plan,
+      attempt: 1,
+      outcome: "failed",
+    });
+    const runtimeReceipt = projectRuntimeReceipt(
+      createCommandRuntimeReceipt({
+        command: "node --version",
+        status: "failed",
+        executionPath: "ts-local",
+        exitCode: 1,
+        stdout: "token=secret123 " + "x".repeat(400),
+        stderr: "command failed",
+      }),
+    );
+    const projected = projectCommandVerificationResult({
+      plan,
+      result: toolResult({
+        success: false,
+        error: "command failed",
+        projectionKind: "tool-execution-failed",
+        metadata: { runtimeReceipt },
+      }),
+      attempt: 1,
+      retry,
+      targetPath: "src/app.ts",
+      workspaceRoot: "/tmp/work",
+      verifyLikeCommand: true,
+    });
+    const evidence = projected.evidence.join("\n");
+
+    expect(evidence).toContain("runtime-receipt-result:");
+    expect(evidence).toContain("runtime-receipt-transcript:");
+    expect(evidence).toContain("runtime-receipt-stdout:");
+    expect(evidence).toContain("runtime-receipt-stderr:");
+    expect(evidence).not.toContain("secret123");
+    expect(projected.evidence.every((entry) => entry.length <= 280)).toBe(true);
+  });
+
   it("strips verification tails before mutation target disambiguation", () => {
     expect(
       stripVerificationTailForMutationTarget(
@@ -214,11 +262,13 @@ describe("verification planner", () => {
 function toolResult(input: {
   readonly success: boolean;
   readonly error?: string;
+  readonly metadata?: Record<string, unknown>;
   readonly projectionKind?: ToolLifecycleResult["projection"]["kind"];
 }): ToolLifecycleResult {
   return {
     success: input.success,
     error: input.error,
+    metadata: input.metadata,
     projection: {
       kind: input.projectionKind ?? (input.success ? "success" : "tool-execution-failed"),
       legacySuccess: input.success,

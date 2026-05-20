@@ -135,6 +135,7 @@ import { resolveTaskTargets } from "./targetResolution.js";
 import {
   createToolRuntimeProvenanceCollector,
   dispatchRuntimeTool,
+  projectRuntimeReceiptEvidence,
   summarizeToolRuntimeProvenance,
   type ToolLifecycleResult,
 } from "./toolRuntimeModule.js";
@@ -5489,6 +5490,7 @@ async function executeWorkflowTaskPlan(input: {
             verification.command && isVerifyLikeCommand(verification.command),
           ),
         }),
+        ...projectRuntimeReceiptEvidence(commandResult),
       );
       if (!commandResult.success) {
         failedFiles.push({

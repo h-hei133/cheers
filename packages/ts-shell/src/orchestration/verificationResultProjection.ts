@@ -1,4 +1,7 @@
-import type { ToolLifecycleResult } from "./flowDispatch.js";
+import {
+  projectRuntimeReceiptEvidence,
+  type ToolLifecycleResult,
+} from "./flowDispatch.js";
 import { projectVerificationEvidence } from "./flowEvidenceProjection.js";
 import { classifyVerificationFailure } from "./toolExecutionOutcomeProjection.js";
 import type { VerificationPlan, VerificationRetryDecision } from "./verificationPlanner.js";
@@ -39,6 +42,7 @@ export function projectCommandVerificationResult(input: {
           workspaceRoot: input.workspaceRoot,
           verifyLikeCommand: input.verifyLikeCommand,
         }),
+        ...projectRuntimeReceiptEvidence(input.result),
         "verify-retry:retry-not-planned:passed",
       ],
       retry: input.retry,
@@ -81,6 +85,7 @@ export function projectCommandVerificationResult(input: {
         workspaceRoot: input.workspaceRoot,
         verifyLikeCommand: input.verifyLikeCommand,
       }),
+      ...projectRuntimeReceiptEvidence(input.result),
       `verify-retry:${input.retry.status}:${input.retry.reasonCode}`,
     ],
     retry: input.retry,

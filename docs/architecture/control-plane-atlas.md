@@ -900,10 +900,40 @@ Calibrated capability facts:
 classification inputs only; they do not authorize provider calls, browser
 actions, edit writes, session schema changes, or CLI behavior changes.
 
-Next recommendation: continue vertical calibration for the Tool / Runtime
-success/failure flow if result/session consistency is the priority. Consider a
-shared handoff extraction only after several more capability-specific flows
-stabilize around repeated fields.
+Route 165 followed this recommendation for the Tool / Runtime success/failure
+flow. Keep considering shared handoff extraction only after several more
+capability-specific flows stabilize around repeated fields.
+
+## Post-Route-165 Tool / Runtime Execution Flow Calibration
+
+Route 165 calibrated the existing command execution path across Tool, Runtime,
+Result Surface, Session / Continue, and Harness / Eval. The runtime already
+attached budgeted `metadata.runtimeReceipt` projections to command, sandbox,
+daemon, MCP, and browser-adjacent paths; Route 165 adds a narrow
+`flowDispatch.ts` evidence bridge so run-command and verification results carry
+stable `runtime-receipt-*` markers without changing command execution or
+terminal truthfulness.
+
+Calibrated command facts:
+
+- command success remains completed when verification/task evidence is
+  satisfied
+- approved nonzero command failure remains a hard command error, not a
+  completed result
+- timeout/cancel/unavailable receipt facts remain non-completed local runtime
+  evidence where current fixtures support them
+- allowlist blocked and approval-denied command paths remain actionable stopped
+  paths
+- stdout/stderr summaries are budgeted and redacted before entering evidence
+
+`resultMapper.ts` remains the terminal truthfulness root, and
+`sessionTerminalState.ts` remains a consumer of mapped terminal facts. Runtime
+receipt markers are evidence-only; they do not authorize commands, bypass
+approval, broaden allowlists, change session schema, or alter CLI behavior.
+
+Next recommendation: choose `Harness / gate taxonomy` if release/report
+confidence is now the blocker. Do not extract a broader shared handoff until
+more capability-specific flows prove repeated stable fields.
 
 ## Post-Route-149 Roadmap Reset
 
