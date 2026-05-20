@@ -9,6 +9,19 @@ import { createCommandRunner } from './run.mjs'
 import { runVerifierEntrypoint } from './orchestration.mjs'
 import { createReportWriter } from './report.mjs'
 import {
+  candidateMutationSuiteId,
+  parseVerifierOptions,
+  verifierSuiteValues,
+  verifierTierValues,
+} from './verifierCliModule.mjs'
+import {
+  buildTierPlanReport,
+  createVerifierCasePlan,
+  printCasePlan,
+} from './verifierCaseModule.mjs'
+import { validateVerifierSelectionSafety, projectDryRunSafetyFacts } from './verifierSafetyModule.mjs'
+import { createVerifierReportModule } from './verifierReportModule.mjs'
+import {
   cleanupIsolatedAuditLogPath,
   createIsolatedAuditLogPath,
   inspectAuditIsolation,
@@ -106,54 +119,55 @@ const {
 })
 const run = createCommandRunner({ defaultCwd: repoRoot })
 
-const tierValues = ['mvp', 'candidate', 'release', 'backlog', 'all']
-const suiteValues = ['candidate-mutation']
-const candidateMutationSuiteId = 'candidate-mutation'
+const tierValues = verifierTierValues
+const suiteValues = verifierSuiteValues
 const defaultProviderEnvPath = '/home/wang/.private-agents-real/provider.env'
 const applyPatchProviderResultMarker = '__APPLY_PATCH_DRY_RUN_PROVIDER_RESULT__'
 const applyPatchProviderDiagnosticsMarker = '__APPLY_PATCH_DRY_RUN_PROVIDER_DIAGNOSTICS__'
 const realSingleFileUpdateCaseId = 'real-selected-workspace-single-file-update'
 const realSingleFileCreateCaseId = 'real-selected-workspace-single-file-create'
 const realTwoFileUpdateCaseId = 'real-selected-workspace-two-file-update'
-const selectedTier = parseTierArg(process.argv)
-const selectedCaseId = parseCaseArg(process.argv)
-const selectedSuiteId = parseSuiteArg(process.argv)
-const includeCandidates = process.argv.includes('--include-candidates')
-const includeRealProviderSuiteCases = process.argv.includes('--include-real')
-const includeContinueSmoke = process.argv.includes('--include-continue-smoke')
-const listCases = process.argv.includes('--list')
-const dryRun = process.argv.includes('--dry-run')
-const showHelp = process.argv.includes('--help') || process.argv.includes('-h')
-const turnBoundaryDryRun = process.argv.includes('--turn-boundary-dry-run')
-const terminalResultSurfaceDryRun = process.argv.includes('--terminal-result-surface-dry-run')
-const toolExecutionPlanningDryRun = process.argv.includes('--tool-execution-planning-dry-run')
-const failureFollowupContextDryRun = process.argv.includes('--failure-followup-context-dry-run')
-const realReadonlyCodingDryRun = process.argv.includes('--real-readonly-coding-dry-run')
-const realReadonlyCodingPreflight = process.argv.includes('--real-readonly-coding-preflight')
-const realReadonlyCodingPreflightSelfTest = process.argv.includes('--real-readonly-coding-preflight-self-test')
-const realReadonlyCodingFailureAttributionSelfTest = process.argv.includes('--real-readonly-coding-failure-attribution-self-test')
-const realReadonlyCodingSmoke = process.argv.includes('--real-readonly-coding-smoke')
-const realCodingFlowDryRun = process.argv.includes('--real-coding-flow-dry-run')
-const realCodingFlowSmoke = process.argv.includes('--real-coding-flow-smoke')
-const realCodingFlowFailureAttributionSelfTest = process.argv.includes('--real-coding-flow-failure-attribution-self-test')
-const realCodingFlowFollowupContextSelfTest = process.argv.includes('--real-coding-flow-followup-context-self-test')
-const realCodingFlowFollowupSmokeDryRun = process.argv.includes('--real-coding-flow-followup-smoke-dry-run')
-const realCodingFlowFollowupSmoke = process.argv.includes('--real-coding-flow-followup-smoke')
-const realCodingFlowDiagnosticsSelfTest = process.argv.includes('--real-coding-flow-diagnostics-self-test')
-const realCodingFlowAuditIsolationSelfTest = process.argv.includes('--real-coding-flow-audit-isolation-self-test')
-const realApplyPatchDryRunSmokeDryRun = process.argv.includes('--real-apply-patch-dry-run-smoke-dry-run')
-const realApplyPatchDryRunSmoke = process.argv.includes('--real-apply-patch-dry-run-smoke')
-const realApplyPatchPermissionUxSmoke = process.argv.includes('--real-apply-patch-permission-ux-smoke')
-const realApplyPatchWriteFixtureSmoke = process.argv.includes('--real-apply-patch-write-fixture-smoke')
-const realApplyPatchRuntimeNoWriteSmoke = process.argv.includes('--real-apply-patch-runtime-no-write-smoke')
-const realApplyPatchGuardedWriteSmoke = process.argv.includes('--real-apply-patch-guarded-write-smoke')
-const realApplyPatchGuardedRouteSmoke = process.argv.includes('--real-apply-patch-guarded-route-smoke')
-const realApplyPatchWorkspaceWriteSmoke = process.argv.includes('--real-apply-patch-workspace-write-smoke')
+const verifierOptions = parseVerifierOptions(process.argv)
+const {
+  selectedTier,
+  selectedCaseId,
+  selectedSuiteId,
+  includeCandidates,
+  includeRealProviderSuiteCases,
+  includeContinueSmoke,
+  listCases,
+  dryRun,
+  showHelp,
+  turnBoundaryDryRun,
+  terminalResultSurfaceDryRun,
+  toolExecutionPlanningDryRun,
+  failureFollowupContextDryRun,
+  realReadonlyCodingDryRun,
+  realReadonlyCodingPreflight,
+  realReadonlyCodingPreflightSelfTest,
+  realReadonlyCodingFailureAttributionSelfTest,
+  realReadonlyCodingSmoke,
+  realCodingFlowDryRun,
+  realCodingFlowSmoke,
+  realCodingFlowFailureAttributionSelfTest,
+  realCodingFlowFollowupContextSelfTest,
+  realCodingFlowFollowupSmokeDryRun,
+  realCodingFlowFollowupSmoke,
+  realCodingFlowDiagnosticsSelfTest,
+  realCodingFlowAuditIsolationSelfTest,
+  realApplyPatchDryRunSmokeDryRun,
+  realApplyPatchDryRunSmoke,
+  realApplyPatchPermissionUxSmoke,
+  realApplyPatchWriteFixtureSmoke,
+  realApplyPatchRuntimeNoWriteSmoke,
+  realApplyPatchGuardedWriteSmoke,
+  realApplyPatchGuardedRouteSmoke,
+  realApplyPatchWorkspaceWriteSmoke,
+  candidateMutationFailureTaxonomySelfTest,
+  route03TwoFileCliPathEvidence,
+  route08UnsupportedPatchE2e,
+} = verifierOptions
 const realMutationEnvContract = prepareRealMutationEnvContract()
-const candidateMutationFailureTaxonomySelfTest = process.argv.includes('--candidate-mutation-failure-taxonomy-self-test')
-const route03TwoFileCliPathEvidence = process.argv.includes('--route03-two-file-cli-path-evidence') ||
-  process.argv.includes('--two-file-cli-path-evidence')
-const route08UnsupportedPatchE2e = process.argv.includes('--route08-unsupported-patch-e2e')
 let lastApplyPatchProviderDiagnostics = undefined
 const syntheticHome = getSyntheticHome()
 const realHome = realMutationEnvContract.realHome ?? getRealProviderHome({ allowDefault: true })
@@ -182,48 +196,6 @@ const posixPrivateAgentsConfigPattern =
   /\/[^\s"'`<>]+\/\.private-agents\/config\.json/gi
 const posixPrivateAgentsRealHomePattern =
   /\/[^\s"'`<>]*\.private-agents-real(?:\/[^\s"'`<>]*)?/gi
-
-function parseTierArg(argv) {
-  const explicitEquals = argv.find((arg) => arg.startsWith('--tier='))
-  const raw = explicitEquals
-    ? explicitEquals.slice('--tier='.length)
-    : argv.includes('--tier')
-      ? argv[argv.indexOf('--tier') + 1]
-      : undefined
-  const normalized = raw?.trim().toLowerCase() || 'mvp'
-  if (!tierValues.includes(normalized)) {
-    console.error(`Invalid --tier value: ${raw}. Use ${tierValues.join('|')}.`)
-    process.exit(3)
-  }
-  return normalized
-}
-
-function parseCaseArg(argv) {
-  const explicitEquals = argv.find((arg) => arg.startsWith('--case='))
-  const raw = explicitEquals
-    ? explicitEquals.slice('--case='.length)
-    : argv.includes('--case')
-      ? argv[argv.indexOf('--case') + 1]
-      : undefined
-  const normalized = raw?.trim()
-  return normalized || undefined
-}
-
-function parseSuiteArg(argv) {
-  const explicitEquals = argv.find((arg) => arg.startsWith('--suite='))
-  const raw = explicitEquals
-    ? explicitEquals.slice('--suite='.length)
-    : argv.includes('--suite')
-      ? argv[argv.indexOf('--suite') + 1]
-      : undefined
-  const normalized = raw?.trim().toLowerCase()
-  if (!normalized) return undefined
-  if (!suiteValues.includes(normalized)) {
-    console.error(`Invalid --suite value: ${raw}. Use ${suiteValues.join('|')}.`)
-    process.exit(3)
-  }
-  return normalized
-}
 
 function prepareRealMutationEnvContract() {
   if (!shouldPrepareRealMutationEnv()) {
@@ -938,6 +910,18 @@ const caseRegistry = createCaseRegistry({
     process.exit(3)
   },
 })
+const verifierReport = createVerifierReportModule({
+  reportPath,
+  writeReport,
+  failureCategories,
+  futureGateCandidates,
+  candidateMutationSuiteRealCaseIds,
+  buildCandidateMetadata,
+  summarizeFailureStatus: summarizeResultFailureStatus,
+  classifyProviderReadinessFailure,
+  categorizeFailure,
+  redactProviderOutput,
+})
 
 function allCapabilityCases() {
   return caseRegistry.allCapabilityCases()
@@ -981,51 +965,6 @@ function selectedCasesForTier(tier) {
 
 function selectedExecutableScenariosForTier(tier) {
   return caseRegistry.selectedExecutableScenariosForTier(tier)
-}
-
-function printCasePlan(tier, selected, skipped, options = {}) {
-  if (options.suite) {
-    console.log(`suite=${options.suite}`)
-    console.log(`suiteIncludeReal=${options.includeReal ? 'true' : 'false'}`)
-  }
-  console.log(`tier=${tier}`)
-  console.log(`mode=${options.dryRun ? 'dry-run' : options.list ? 'list' : 'execute'}`)
-  console.log(`selectedCases=${selected.length}`)
-  for (const capabilityCase of selected) {
-    const metadata = caseMetadata(capabilityCase)
-    const label = metadata.executable
-      ? 'RUN'
-      : options.suite === candidateMutationSuiteId &&
-          options.includeReal &&
-          candidateMutationSuiteRealCaseIds.includes(metadata.id)
-        ? 'RUN-REAL'
-        : 'META'
-    console.log(
-      `[${label}] ${metadata.id} tier=${metadata.tier} provider=${metadata.provider} expectedToPassCurrentMvp=${metadata.expectedToPassCurrentMvp} realProvider=${metadata.requiresRealProvider}`,
-    )
-    console.log(`      expectedCapability=${metadata.expectedCapability}`)
-    console.log(`      currentSupportedCapability=${metadata.currentSupportedCapability}`)
-    if (metadata.manualFlag) {
-      console.log(`      manualFlag=${metadata.manualFlag}`)
-    }
-  }
-  for (const skippedCase of skipped) {
-    console.log(`[SKIP] ${skippedCase.id} reason=${skippedCase.skipReason}`)
-  }
-}
-
-function buildTierPlanReport(tier, selected, skipped, options = {}) {
-  return {
-    tier,
-    ...(options.suite ? {
-      suite: options.suite,
-      suiteIncludeReal: Boolean(options.includeReal),
-    } : {}),
-    mode: options.dryRun ? 'dry-run' : options.list ? 'list' : 'execute',
-    selectedCases: selected.map(caseMetadata),
-    skippedCases: skipped,
-    allCases: allCapabilityCases().map(caseMetadata),
-  }
 }
 
 async function runProviderReadinessPreflight() {
@@ -11653,41 +11592,31 @@ async function main() {
     return
   }
 
-  if (selectedCaseId && selectedSuiteId) {
-    console.error('Invalid selection: use either --case=<id> or --suite=<name>, not both.')
-    process.exit(3)
-  }
-  if (includeRealProviderSuiteCases && selectedSuiteId !== candidateMutationSuiteId) {
-    console.error('Invalid selection: --include-real is only supported with --suite=candidate-mutation.')
-    process.exit(3)
-  }
+  validateVerifierSelectionSafety({
+    selectedCaseId,
+    selectedSuiteId,
+    includeRealProviderSuiteCases,
+    candidateMutationSuiteId,
+  })
 
-  const selectedCase = selectedCaseId ? findCapabilityCaseById(selectedCaseId) : undefined
-  const executionTier = selectedCase
-    ? selectedCase.tier
-    : selectedSuiteId
-      ? 'candidate'
-      : includeCandidates
-        ? 'candidate'
-        : includeContinueSmoke
-          ? 'candidate'
-          : selectedTier
-  const selectedPlanCases = selectedSuiteId
-    ? selectedCasesForSuite(selectedSuiteId, { includeReal: includeRealProviderSuiteCases })
-    : selectedCasesForTier(executionTier)
-  const selectedScenarios = selectedSuiteId
-    ? selectedPlanCases.filter((scenario) => scenario.executable !== false)
-    : selectedExecutableScenariosForTier(executionTier)
-  const skippedCases = selectedSuiteId
-    ? skippedCasesForSuite(selectedSuiteId, { includeReal: includeRealProviderSuiteCases })
-    : skippedCasesForTier(executionTier)
-  const selectedMetadata = selectedPlanCases.map(caseMetadata)
-  const selectedRequiresRealProvider = selectedScenarios.some((scenario) => scenario.requiresRealProvider)
-  const selectedSuiteRealCases = selectedSuiteId && includeRealProviderSuiteCases
-    ? candidateMutationSuiteRealCaseIds.filter((caseId) =>
-        selectedPlanCases.some((capabilityCase) => capabilityCase.id === caseId),
-      )
-    : []
+  const {
+    executionTier,
+    selectedPlanCases,
+    selectedScenarios,
+    skippedCases,
+    selectedMetadata,
+    selectedRequiresRealProvider,
+    selectedSuiteRealCases,
+  } = createVerifierCasePlan({
+    caseRegistry,
+    selectedTier,
+    selectedCaseId,
+    selectedSuiteId,
+    includeCandidates,
+    includeContinueSmoke,
+    includeRealProviderSuiteCases,
+    candidateMutationSuiteRealCaseIds,
+  })
 
   console.log('gate name=real-user-capabilities')
   if (selectedSuiteId) {
@@ -11714,14 +11643,22 @@ async function main() {
     list: listCases,
     suite: selectedSuiteId,
     includeReal: includeRealProviderSuiteCases,
+    caseMetadata,
+    candidateMutationSuiteId,
+    candidateMutationSuiteRealCaseIds,
   })
 
   if (listCases || dryRun) {
+    const dryRunSafety = projectDryRunSafetyFacts({
+      selectedSuiteId,
+      includeRealProviderSuiteCases,
+      candidateMutationSuiteRealCaseIds,
+    })
     console.log('real-provider execution skipped')
-    console.log(`realProviderTouched=false`)
+    console.log(`realProviderTouched=${dryRunSafety.realProviderTouched ? 'true' : 'false'}`)
     if (selectedSuiteId) {
-      console.log(`suiteExecutedCases=0`)
-      console.log(`suiteSkippedRealProviderCases=${includeRealProviderSuiteCases ? 0 : candidateMutationSuiteRealCaseIds.length}`)
+      console.log(`suiteExecutedCases=${dryRunSafety.suiteExecutedCases}`)
+      console.log(`suiteSkippedRealProviderCases=${dryRunSafety.suiteSkippedRealProviderCases}`)
     }
     console.log('reportWritten=false')
     const plan = buildTierPlanReport(executionTier, selectedPlanCases, skippedCases, {
@@ -11729,6 +11666,8 @@ async function main() {
       list: listCases,
       suite: selectedSuiteId,
       includeReal: includeRealProviderSuiteCases,
+      caseMetadata,
+      allCapabilityCases,
     })
     console.log(`planCases=${plan.allCases.length}`)
     return
@@ -11779,22 +11718,12 @@ async function main() {
       ensureHome(realHome, 'real')
     }
   } catch (error) {
-    const report = {
-      generatedAt: new Date().toISOString(),
-      status: 'CONFIG',
-      statusDetail: 'config-failure',
-      tier: executionTier,
-      reportPath,
-      failureCategory: 'provider-readiness',
+    verifierReport.writeConfigFailureReport({
+      executionTier,
       failureReason: error.message,
-      failureCategories,
-      futureGateCandidates,
-      selectedCases: selectedMetadata,
+      selectedMetadata,
       skippedCases,
-      candidates: [],
-      capabilities: [],
-    }
-    writeReport(report)
+    })
     console.log(`[CONFIG] ${error.message}`)
     console.log(`report=${reportPath}`)
     cleanupRealMutationEnvContract()
@@ -11806,28 +11735,12 @@ async function main() {
     providerPreflight = await runProviderReadinessPreflight()
     if (!providerPreflight.ok) {
       const isConfig = providerPreflight.status === 'config-failure'
-      const report = {
-        generatedAt: new Date().toISOString(),
-        status: 'FAIL',
-        statusDetail: providerPreflight.status,
-        tier: executionTier,
-        reportPath,
-        failureCategory: 'provider-readiness',
-        failureReason:
-          providerPreflight.status === 'provider-network-inconclusive'
-            ? 'provider-network-inconclusive: provider endpoint remained unreachable after readiness retry'
-            : providerPreflight.status,
-        providerReadiness: providerPreflight,
-        capabilitySkipped: true,
-        codingCapabilityNotEvaluated: true,
-        failureCategories,
-        futureGateCandidates,
-        selectedCases: selectedMetadata,
+      const report = verifierReport.writeProviderPreflightFailureReport({
+        executionTier,
+        providerPreflight,
+        selectedMetadata,
         skippedCases,
-        capabilities: [],
-        candidates: [],
-      }
-      writeReport(report)
+      })
       const label =
         providerPreflight.status === 'provider-network-inconclusive'
           ? 'PROVIDER_NETWORK'
@@ -11875,36 +11788,17 @@ async function main() {
   }
 
   const ok = results.every((capability) => capability.status === 'PASS')
-  const summarizedFailure = summarizeResultFailureStatus(results, {
-    classifyProviderReadinessFailure,
-  })
-  const capabilities = results.filter((result) => result.tier === 'mvp')
-  const candidates = results.filter((result) => result.tier === 'candidate')
-  const report = {
-    generatedAt: new Date().toISOString(),
-    status: ok ? 'PASS' : 'FAIL',
-    statusDetail: summarizedFailure.statusDetail,
-    tier: executionTier,
-    ...(selectedSuiteId ? {
-      suite: selectedSuiteId,
-      suiteIncludeReal: includeRealProviderSuiteCases,
-      suiteSkippedRealProviderCases: includeRealProviderSuiteCases ? [] : candidateMutationSuiteRealCaseIds,
-      realProviderTouched: results.some((result) => result.realProviderExecution),
-      defaultMvpAffected: false,
-    } : {}),
-    reportPath,
-    providerReadiness: providerPreflight ?? { status: 'skipped', reason: 'selected tier has no real-provider cases' },
-    capabilitySkipped: selectedScenarios.length === 0,
-    codingCapabilityNotEvaluated: selectedScenarios.length === 0,
-    failureCategories,
-    futureGateCandidates: buildCandidateMetadata(candidates),
-    selectedCases: selectedMetadata,
+  const { summarizedFailure } = verifierReport.writeFinalReport({
+    ok,
+    executionTier,
+    selectedSuiteId,
+    includeRealProviderSuiteCases,
+    providerPreflight,
+    selectedScenarios,
+    selectedMetadata,
     skippedCases,
-    capabilities,
-    candidates,
     results,
-  }
-  writeReport(report)
+  })
   console.log(`report=${reportPath}`)
   cleanupRealMutationEnvContract()
   process.exit(summarizedFailure.exitCode)
@@ -11913,21 +11807,8 @@ async function main() {
 runVerifierEntrypoint({
   main,
   onError: (error) => {
-  const rawFailure = error instanceof Error ? error.stack ?? error.message : String(error)
-  const redactedFailure = redactProviderOutput(rawFailure)
-  const report = {
-    generatedAt: new Date().toISOString(),
-    status: 'FAIL',
-    reportPath,
-    failureCategory: categorizeFailure(redactedFailure),
-    failureReason: redactedFailure,
-    failureCategories,
-    futureGateCandidates,
-    candidates: [],
-    capabilities: [],
-  }
-  writeReport(report)
-  console.error(redactedFailure)
-  process.exit(1)
+    const { redactedFailure } = verifierReport.writeUnhandledFailureReport(error)
+    console.error(redactedFailure)
+    process.exit(1)
   },
 })

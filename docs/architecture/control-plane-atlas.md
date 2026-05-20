@@ -439,6 +439,10 @@ Unsafe area:
 Current owners:
 
 - `scripts/verify/*`
+- `scripts/verify/verifierCliModule.mjs`
+- `scripts/verify/verifierCaseModule.mjs`
+- `scripts/verify/verifierSafetyModule.mjs`
+- `scripts/verify/verifierReportModule.mjs`
 - `scripts/verify-real-user-capabilities.mjs`
 - `scripts/verify-result-contract.mjs`
 - `scripts/verify-edit-capability-closeout.mjs`
@@ -448,6 +452,9 @@ Lifecycle coverage:
 
 - Route 135 split the real-user verifier behind a compatibility entrypoint
 - deterministic gates assert output markers and opt-in boundaries
+- Route 159 keeps the public verifier entrypoint as a thin shim and moves
+  CLI/options, suite/case planning, selection safety, and report construction
+  behind Harness-owned facades
 
 Gap:
 
@@ -477,7 +484,10 @@ Unsafe area:
 4. `sessionRuntime.ts`: acceptable shell/runtime composition root after Route
    156; avoid regrowing rendering, terminal projection, persistence payload, or
    future-turn internals there.
-5. `resultMapper.ts`: correct truthfulness owner, but now the place every
+5. `scripts/verify/index.mjs`: acceptable Harness / Eval readiness composition
+   root after Route 159; avoid regrowing CLI parsing, suite/case planning,
+   selection safety, or top-level report object construction there.
+6. `resultMapper.ts`: correct truthfulness owner, but now the place every
    capability must satisfy before claiming success.
 
 ## Capability Lifecycle Gaps
@@ -490,7 +500,7 @@ Unsafe area:
 | Provider | opt-in, readiness classification, diagnostic handoff | provider outcome projection still touches planning flow |
 | Session / Continue | transcript, compact, replay, approval/mutation continuity, stateful substrate | CLI-facing action wiring still concentrated in entrypoint |
 | CLI | args/mode helpers, startup surface, slash registry | entrypoint still owns display helpers and switch details |
-| Harness / Eval | deterministic gates and Route 135 verifier modules | common gate/report taxonomy still pending |
+| Harness / Eval | deterministic gates, verifier CLI/case/safety/report facades | common gate/report taxonomy still pending |
 
 ## Extraction Decision
 
@@ -757,6 +767,55 @@ composition/substrate/entrypoint classifications. The verifier script remains a
 large readiness/reporting control surface and should be decomposed only through
 Harness / Eval owned facades that preserve flags, markers, report fields,
 redaction, exit codes, and opt-in behavior.
+
+## Post-Route-159 Verifier Module Facade Pass
+
+Route 159 ran the owner-module extraction pass for the real-user capability
+verifier surface.
+
+Entrypoint classification:
+
+- `scripts/verify-real-user-capabilities.mjs` is acceptable as a thin
+  compatibility entrypoint. It only imports `scripts/verify/index.mjs` and
+  should not gain verifier logic.
+- `scripts/verify/index.mjs` remains the Harness / Eval readiness composition
+  root for ordering early self-tests, path/runner setup, provider env contract
+  lifecycle, provider preflight, scenario execution, marker emission, report
+  writing, and exit decisions.
+
+New module facades:
+
+- `scripts/verify/verifierCliModule.mjs`
+  - owner: Harness / Eval Engineering
+  - owns verifier option parsing, tier/suite values, flag aliases, and invalid
+    option exit-code behavior
+- `scripts/verify/verifierCaseModule.mjs`
+  - owner: Harness / Eval Engineering
+  - owns tier/suite/case planning, skipped-case projection, selected-case
+    metadata, and dry-run/list plan report inputs
+- `scripts/verify/verifierSafetyModule.mjs`
+  - owner: Harness / Eval Engineering and Provider / Model Engineering
+  - owns selection safety checks and include-real opt-in constraints without
+    touching real-provider config
+- `scripts/verify/verifierReportModule.mjs`
+  - owner: Harness / Eval Engineering
+  - owns config/preflight/final/unhandled failure report object construction
+    while preserving report fields and exit-code inputs
+
+`scripts/verify/index.mjs` is acceptable as a Harness / Eval readiness
+composition root for this route. It should not regain direct CLI parsing,
+suite/case planning, selection safety checks, or top-level report object
+construction. Larger real-provider smoke bodies and provider env contract
+loading remain in `index.mjs` intentionally because moving them would need
+separate redaction/config characterization.
+
+Next central file recommendation: `resultMapper.ts`.
+
+Reason: after Routes 154-159, the main control-plane composition roots,
+session substrate, CLI entrypoint, and verifier readiness surface all have
+acceptable owner-module classifications. `resultMapper.ts` remains the shared
+truthfulness boundary every capability must satisfy before a terminal success,
+stopped, or error claim.
 
 ## Post-Route-149 Roadmap Reset
 
