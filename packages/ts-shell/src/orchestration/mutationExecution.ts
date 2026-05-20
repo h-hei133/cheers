@@ -2,6 +2,7 @@ import type {
   CodingPatchOperation,
   CodingPatchRecord,
 } from "./types.js";
+import { projectStaleReadBlockedSummary } from "./workspaceTargetProjection.js";
 
 export interface FileMutationDispatchResult {
   readonly success: boolean;
@@ -76,9 +77,13 @@ export async function executeFileMutationBranch(input: {
   ) {
     const current = await input.readContentBeforeWrite();
     if (!current.success) {
-      const reason =
-        current.error ??
-        "stale-read: Could not verify the current file content before writing.";
+      const staleRead = projectStaleReadBlockedSummary({
+        targetPath: input.path,
+        reason:
+          current.error ??
+          "stale-read: Could not verify the current file content before writing.",
+      });
+      const reason = staleRead.reason;
       return {
         failedFile: { path: input.path, reason },
         patch: {
@@ -92,8 +97,13 @@ export async function executeFileMutationBranch(input: {
       };
     }
     if (current.content !== input.expectedContentBeforeWrite) {
-      const reason =
-        "stale-read: Target file changed since it was read for this edit. Re-read the latest file content and rerun the mutation.";
+      const staleRead = projectStaleReadBlockedSummary({
+        targetPath: input.path,
+        reason:
+          "stale-read: Target file changed since it was read for this edit. Re-read the latest file content and rerun the mutation.",
+        doNext: "Re-read the latest file content and rerun the mutation.",
+      });
+      const reason = staleRead.reason;
       return {
         failedFile: { path: input.path, reason },
         patch: {

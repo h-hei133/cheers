@@ -36,6 +36,10 @@ describe("futureEditPlanner", () => {
       requestedScope: "workspace",
       confirmationRequirement: "required-before-target-selection",
       mutationAllowedNow: false,
+      fileContextSummary: {
+        mutationAuthority: "not-granted",
+        confirmationRequired: true,
+      },
     });
     expect(plan.missingInformation).toEqual(
       expect.arrayContaining(["candidate-file-list"]),
@@ -57,6 +61,10 @@ describe("futureEditPlanner", () => {
       requestedScope: "single-file",
       targetHints: ["src/app.ts"],
       mutationAllowedNow: false,
+      fileContextSummary: {
+        candidateLabels: ["src/app.ts"],
+        mutationAuthority: "not-granted",
+      },
     });
     expect(plan.missingInformation).toEqual(
       expect.arrayContaining(["exact-old-new-mapping", "final-stale-read"]),

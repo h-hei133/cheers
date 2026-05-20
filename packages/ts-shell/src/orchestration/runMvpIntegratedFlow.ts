@@ -158,6 +158,11 @@ import {
   type GroundedDeliverableMode,
 } from "./runtimeHandoffProjection.js";
 import { resolveTaskTargets } from "./targetResolution.js";
+import {
+  projectAmbiguousTargetStoppedSummary,
+  projectMissingTargetStoppedSummary,
+  projectOutOfWorkspaceTargetStoppedSummary,
+} from "./workspaceTargetProjection.js";
 import type {
   ResolvedTarget,
   TargetResolutionBlocker,
@@ -1929,14 +1934,18 @@ function buildWorkflowTaskPlan(
   }
 
   if (hasGroundedReadLikeIntent && hasExplicitPathReference && !primaryTarget) {
+    const targetStop = projectMissingTargetStoppedSummary({
+      reason:
+        "Grounded read/summarize/explain request included a path reference, but no resolvable target was found. Provide a valid in-workspace file path.",
+      doNext: "Provide a valid in-workspace file path.",
+    });
     return {
       taskKind: "read-file",
       reason:
         "grounded read/summarize/explain requires a resolvable target path",
       inspectFirst: true,
       verifyAfterEdit: false,
-      blockedReason:
-        "Grounded read/summarize/explain request included a path reference, but no resolvable target was found. Provide a valid in-workspace file path.",
+      blockedReason: targetStop.reason,
       targetMissing: true,
       usedRestoredState,
     };
@@ -1947,6 +1956,12 @@ function buildWorkflowTaskPlan(
     primaryTarget &&
     !primaryTarget.inWorkspace
   ) {
+    const targetStop = projectOutOfWorkspaceTargetStoppedSummary({
+      targetPath: primaryTarget.cleaned,
+      reason:
+        "Grounded read/summarize/explain target is outside current workspace. Attach/switch project or provide an in-workspace path.",
+      doNext: "Attach/switch project or provide an in-workspace path.",
+    });
     return {
       taskKind: "read-file",
       reason:
@@ -1954,8 +1969,7 @@ function buildWorkflowTaskPlan(
       targetPath: primaryTarget.cleaned,
       inspectFirst: true,
       verifyAfterEdit: false,
-      blockedReason:
-        "Grounded read/summarize/explain target is outside current workspace. Attach/switch project or provide an in-workspace path.",
+      blockedReason: targetStop.reason,
       targetMissing: true,
       usedRestoredState,
     };
@@ -2421,13 +2435,17 @@ function buildWorkflowTaskPlan(
 
   if (hasFileReadIntent) {
     if (hasTargetedFileReadIntent && !hasRepositoryInspectIntent) {
+      const targetStop = projectMissingTargetStoppedSummary({
+        reason:
+          "I can read the file, but I still need an explicit in-workspace file path.",
+        doNext: "Provide an explicit in-workspace file path.",
+      });
       return {
         taskKind: "read-file",
         reason: "targeted read intent requires explicit readable target",
         inspectFirst: true,
         verifyAfterEdit: false,
-        blockedReason:
-          "I can read the file, but I still need an explicit in-workspace file path.",
+        blockedReason: targetStop.reason,
         targetMissing: true,
         usedRestoredState,
       };
@@ -4518,10 +4536,20 @@ async function executeWorkflowTaskPlan(input: {
     }
 
     if (!targetPath) {
-      const reason =
+      const targetStop =
         candidateFiles.length > 1
-          ? "Repo explain needs one high-confidence evidence target, but multiple candidates matched. Provide an explicit in-workspace file path."
-          : "Repo explain requires an explicit in-workspace file target for truthful delivery.";
+          ? projectAmbiguousTargetStoppedSummary({
+              candidates: candidateFiles,
+              reason:
+                "Repo explain needs one high-confidence evidence target, but multiple candidates matched. Provide an explicit in-workspace file path.",
+              doNext: "Provide an explicit in-workspace file path.",
+            })
+          : projectMissingTargetStoppedSummary({
+              reason:
+                "Repo explain requires an explicit in-workspace file target for truthful delivery.",
+              doNext: "Provide an explicit in-workspace file path.",
+            });
+      const reason = targetStop.reason;
       return {
         events,
         notes: [...notes, "repo-explain missing explicit target"],

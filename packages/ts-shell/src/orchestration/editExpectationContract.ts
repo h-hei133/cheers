@@ -1,4 +1,9 @@
 import { buildPolicyBlockedResult } from "../core/tools/toolPolicyResult.js";
+import {
+  projectMissingTargetStoppedSummary,
+  projectReadOnlyTargetSummary,
+  type WorkspaceTargetSafeSummary,
+} from "./workspaceTargetProjection.js";
 
 export type EditExpectationCapabilityKind =
   | "write-file"
@@ -30,6 +35,7 @@ export interface EditExpectationContract {
   readonly doNext: string;
   readonly mutationMayProceed: boolean;
   readonly verificationMayBeConsidered: boolean;
+  readonly workspaceTargetSummary?: WorkspaceTargetSafeSummary;
 }
 
 export function classifyEditExpectationContract(input: {
@@ -50,6 +56,10 @@ export function classifyEditExpectationContract(input: {
   const editLike = isEditExpectationPrompt(prompt) || input.hasEditIntent;
 
   if (input.hasReadInspectIntent && !writeLike && !editLike) {
+    const readOnly = projectReadOnlyTargetSummary({
+      targetPath: input.targetPath,
+      reasonCode: "no-write-inspect",
+    });
     return contract({
       capabilityKind: "no-write",
       contractStatus: "ready",
@@ -57,6 +67,7 @@ export function classifyEditExpectationContract(input: {
       doNext: "Use read/inspect evidence without mutating the workspace.",
       mutationMayProceed: false,
       verificationMayBeConsidered: false,
+      workspaceTargetSummary: readOnly,
     });
   }
 
@@ -85,12 +96,15 @@ export function classifyEditExpectationContract(input: {
   }
 
   if (isDiscoveryEditPrompt(prompt) && !hasTarget) {
+    const targetStop = projectMissingTargetStoppedSummary({
+      doNext:
+        "Provide exactly one explicit in-workspace target file before requesting an edit.",
+    });
     return contract({
       capabilityKind: "edit-file",
       contractStatus: "stopped",
       reasonCode: "unsupported-discovery-edit",
-      doNext:
-        "Provide exactly one explicit in-workspace target file before requesting an edit.",
+      doNext: targetStop.doNext,
       mutationMayProceed: false,
       verificationMayBeConsidered: false,
     });
@@ -98,12 +112,15 @@ export function classifyEditExpectationContract(input: {
 
   if (writeLike) {
     if (!hasTarget) {
+      const targetStop = projectMissingTargetStoppedSummary({
+        doNext:
+          "Provide an explicit in-workspace target file path and concrete content.",
+      });
       return contract({
         capabilityKind: "write-file",
         contractStatus: "stopped",
         reasonCode: "write-target-missing",
-        doNext:
-          "Provide an explicit in-workspace target file path and concrete content.",
+        doNext: targetStop.doNext,
         mutationMayProceed: false,
         verificationMayBeConsidered: false,
       });
@@ -131,12 +148,15 @@ export function classifyEditExpectationContract(input: {
 
   if (editLike) {
     if (!hasTarget) {
+      const targetStop = projectMissingTargetStoppedSummary({
+        doNext:
+          "Provide exactly one explicit in-workspace target file before requesting an edit.",
+      });
       return contract({
         capabilityKind: "edit-file",
         contractStatus: "stopped",
         reasonCode: "write-target-missing",
-        doNext:
-          "Provide exactly one explicit in-workspace target file before requesting an edit.",
+        doNext: targetStop.doNext,
         mutationMayProceed: false,
         verificationMayBeConsidered: false,
       });

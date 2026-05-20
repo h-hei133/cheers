@@ -67,6 +67,13 @@ describe("editExpectationContract", () => {
       contractStatus: "ready",
       reasonCode: "no-write-inspect",
       mutationMayProceed: false,
+      workspaceTargetSummary: {
+        targetLabel: "src/panel.test.tsx",
+        authority: {
+          mode: "read",
+          decision: "available",
+        },
+      },
     });
   });
 

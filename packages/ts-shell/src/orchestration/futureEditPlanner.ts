@@ -12,6 +12,10 @@ import {
   evaluateEditPatchPreconditions,
   type EditPatchPreconditionProjection,
 } from "./editPatchPreconditions.js";
+import {
+  projectFutureDiscoveryCandidateSummary,
+  type FutureDiscoveryCandidateSummary,
+} from "./workspaceTargetProjection.js";
 
 export interface FutureEditPlan {
   readonly mode: FutureEditContract["mode"];
@@ -29,6 +33,7 @@ export interface FutureEditPlan {
   readonly moduleManifest: EditPatchMutationManifest;
   readonly modulePreconditions: EditPatchPreconditionProjection;
   readonly stoppedActionableProjection: FutureEditContract["stoppedResult"];
+  readonly fileContextSummary: FutureDiscoveryCandidateSummary;
   readonly contract: FutureEditContract;
 }
 
@@ -48,6 +53,10 @@ export function planFutureEditExpansion(
   const missingInformation = contract.mutationAllowedNow
     ? []
     : contract.requiredPreconditions;
+  const fileContextSummary = projectFutureDiscoveryCandidateSummary({
+    candidates: targetHints,
+    confirmationRequired: contract.userConfirmationRequired,
+  });
 
   return {
     mode: contract.mode,
@@ -68,6 +77,7 @@ export function planFutureEditExpansion(
     moduleManifest,
     modulePreconditions,
     stoppedActionableProjection: contract.stoppedResult,
+    fileContextSummary,
     contract,
   };
 }

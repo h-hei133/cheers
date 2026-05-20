@@ -2,11 +2,16 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { ContinuityStateLike } from "./runtimeHandoffProjection.js";
+import {
+  projectContinuationSafeTargetSummary,
+  type ContinuationSafeTargetSummary,
+} from "./workspaceTargetProjection.js";
 
 export interface ReadContinuationTargetRecovery {
   readonly targetPath?: string;
   readonly relocationNote?: string;
   readonly blockedReason?: string;
+  readonly targetSummary?: ContinuationSafeTargetSummary;
 }
 
 export function resolveReadContinuationTargetRecovery(input: {
@@ -26,7 +31,13 @@ export function resolveReadContinuationTargetRecovery(input: {
     input.workspaceRoot,
   );
   if (existingTarget) {
-    return { targetPath: existingTarget };
+    return {
+      targetPath: existingTarget,
+      targetSummary: projectContinuationSafeTargetSummary({
+        status: "available",
+        targetPath: existingTarget,
+      }),
+    };
   }
 
   const candidates = findWorkspaceFilesByBasename({
@@ -37,16 +48,31 @@ export function resolveReadContinuationTargetRecovery(input: {
     return {
       targetPath: candidates[0],
       relocationNote: `continuation target relocated: ${sourceTarget} -> ${candidates[0]}`,
+      targetSummary: projectContinuationSafeTargetSummary({
+        status: "relocated",
+        targetPath: candidates[0],
+        relocatedFrom: sourceTarget,
+        candidates,
+      }),
     };
   }
   if (candidates.length > 1) {
     return {
       blockedReason: `Continuation target relocation is ambiguous for ${sourceTarget}; candidates: ${candidates.join(", ")}. Provide the explicit file path to continue reading.`,
+      targetSummary: projectContinuationSafeTargetSummary({
+        status: "ambiguous",
+        relocatedFrom: sourceTarget,
+        candidates,
+      }),
     };
   }
 
   return {
     blockedReason: `Continuation target ${sourceTarget} no longer exists and no high-confidence relocation candidate was found. Provide the explicit file path to continue reading.`,
+    targetSummary: projectContinuationSafeTargetSummary({
+      status: "missing",
+      relocatedFrom: sourceTarget,
+    }),
   };
 }
 

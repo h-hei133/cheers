@@ -1,4 +1,8 @@
 import { rebindPathLikeToWorkspace } from "../core/paths/legacyRootRebase.js";
+import {
+  projectContinuationSafeTargetSummary,
+  type ContinuationSafeTargetSummary,
+} from "./workspaceTargetProjection.js";
 
 export type ContinuationRebaseStatus =
   | "rebased"
@@ -11,6 +15,7 @@ export interface ContinuationRebaseResolution {
   readonly targetPath?: string;
   readonly reason: string;
   readonly candidates: readonly string[];
+  readonly targetSummary: ContinuationSafeTargetSummary;
 }
 
 export function resolveContinuationRebase(input: {
@@ -24,6 +29,9 @@ export function resolveContinuationRebase(input: {
       status: "missing",
       reason: "no prior target path was available",
       candidates: [],
+      targetSummary: projectContinuationSafeTargetSummary({
+        status: "missing",
+      }),
     };
   }
 
@@ -37,6 +45,11 @@ export function resolveContinuationRebase(input: {
           ? "prior target is already in the current workspace"
           : "prior target was rebased to current workspace path",
       candidates: [rebound],
+      targetSummary: projectContinuationSafeTargetSummary({
+        status: rebound === priorPath ? "available" : "relocated",
+        targetPath: rebound,
+        relocatedFrom: rebound === priorPath ? undefined : priorPath,
+      }),
     };
   }
 
@@ -47,6 +60,12 @@ export function resolveContinuationRebase(input: {
       targetPath: candidates[0],
       reason: "single deterministic candidate selected",
       candidates,
+      targetSummary: projectContinuationSafeTargetSummary({
+        status: "relocated",
+        targetPath: candidates[0],
+        relocatedFrom: priorPath,
+        candidates,
+      }),
     };
   }
   if (candidates.length > 1) {
@@ -54,12 +73,21 @@ export function resolveContinuationRebase(input: {
       status: "ambiguous",
       reason: "multiple deterministic candidates require explicit selection",
       candidates,
+      targetSummary: projectContinuationSafeTargetSummary({
+        status: "ambiguous",
+        relocatedFrom: priorPath,
+        candidates,
+      }),
     };
   }
   return {
     status: "missing",
     reason: "prior target is missing and no deterministic candidate was found",
     candidates: [],
+    targetSummary: projectContinuationSafeTargetSummary({
+      status: "missing",
+      relocatedFrom: priorPath,
+    }),
   };
 }
 

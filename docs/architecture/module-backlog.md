@@ -125,7 +125,7 @@ capability scope.
 |---|---|---|---|
 | Agent Loop dispatch extraction v2 | Agent Loop | Move one more pure dispatch/projection decision out of `runMvpIntegratedFlow.ts` without changing behavior. | focused dispatch/runMvp tests; build if source changes |
 | Agent Loop receipt-consumer thin wiring | Agent Loop, Runtime, Result Surface | Adopt Runtime Receipt projection at one existing result/session handoff without changing truthfulness or schema. | focused receipt/runMvp/result-contract tests |
-| Workspace / File Context contract | Workspace / File Context, Edit / Patch | Consolidate root, target, read/write authority, stale-read, and post-write verification vocabulary. | docs-only diff/status or focused workspace/patch tests if source changes |
+| Workspace / File Context contract | Workspace / File Context, Edit / Patch | Route 151 added `workspaceFileContract` and `workspaceTargetProjection` as shared vocabulary for root, target, read/write authority, stale-read, verification preconditions, continuation, and future discovery summaries without changing authority or execution. | closed by Route 151; focused workspace/adjacent tests, runMvp, edit closeout, result-contract, build |
 | CLI / core split preparation | CLI / UX, Session / Continue | Move display/session-switch preparation behind a CLI-owned boundary without changing UX. | focused CLI tests; no schema/provider changes |
 
 ### Phase B: Capability Module Expansion
