@@ -162,3 +162,14 @@ Best next candidates:
 Stop conditions for Route 146: provider live calls, browser/edit expansion,
 workspace write-policy changes, result truthfulness changes without
 `verify:result-contract`, or broad runMvp/CLI rewrites.
+
+## Post-Route-149 Forward Pointer
+
+Route 149 keeps Session / Continue work module-first and schema-neutral. Future
+session routes should preserve `metadata.json`, `state.json`, and
+`transcript.jsonl` behavior, and should expose transcript, reentry, compact,
+and continuation changes through Session-owned codecs or projections before any
+Agent Loop or CLI wiring.
+
+Session evidence remains a consumer of module-owned receipts; it should not be
+used to smuggle new edit, browser, provider, or runtime behavior into replay.

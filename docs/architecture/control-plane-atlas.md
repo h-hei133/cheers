@@ -493,3 +493,16 @@ Deferred:
   coupling and should be Route 137 work
 - CLI display helper extraction is safe-looking, but it is lower leverage than
   session/result projection and should wait for the CLI/core preparation route
+
+## Post-Route-149 Roadmap Reset
+
+Route 144 established the green runMvp/package baseline, and Routes 145-148
+turned the next work into module-owned contracts rather than feature-first
+cleanup. After Route 149, module-first development is the default: new
+capability work must enter through the owning module contract before it reaches
+the Agent Loop.
+
+Agent Loop should compose module receipts and projections; it should not absorb
+new edit, browser, provider, workspace, or CLI policy logic. The next
+control-plane candidates are Agent Loop dispatch extraction v2, Runtime receipt
+contract, Workspace / File Context contract, and CLI / core split preparation.

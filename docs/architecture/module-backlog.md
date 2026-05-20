@@ -1,416 +1,177 @@
 # Module Backlog
 
-Route: `docs/agent-routes/route131-module-atlas.md`
+Route: `docs/agent-routes/route149-module-roadmap-reset.md`
 
-Route 136 replaced the earlier conservative ledger queue with fewer,
-implementation-ready control-plane routes. Use
-`docs/architecture/control-plane-atlas.md` as the current atlas and
-`docs/agent-routes/module-route-template.md` before starting any route.
+This backlog is now module-first. It records completed consolidation work and
+candidate route families; it is not a fixed feature queue.
 
-This backlog is not a commitment to implement all routes immediately. Each
-route must preserve AGENTS.md boundaries: no provider/auth expansion, no
-browser/edit broadening, no schema changes, no broad entrypoint or main-loop
-rewrite, and focused validation tied to touched files.
+Use these documents before starting a route:
+
+- `docs/architecture/module-roadmap-reset.md`
+- `docs/architecture/control-plane-atlas.md`
+- `docs/architecture/capability-contract.md`
+- `docs/agent-routes/module-route-template.md`
+
+Every future route must name its owner module, lifecycle stage, cross-module
+inputs and outputs, product behavior boundary, validation gate, and stop
+conditions before implementation.
 
 ## Completed Consolidation Routes
 
-### Route 135: Real-User Capability Verifier Decomposition
+### Routes 135-136: Verifier Decomposition And Atlas
 
-- Module: Harness Engineering
-- Result: `scripts/verify-real-user-capabilities.mjs` is now a compatibility
-  entrypoint delegating to focused modules under `scripts/verify/`.
-- Closeout doc: `docs/design/verifier-decomposition.md`.
-- Boundary preserved: flags, markers, report fields, exit codes, redaction,
-  dry-run, dirty repo guard, and real-provider opt-in behavior.
+- Route 135 decomposed the real-user capability verifier behind a compatibility
+  entrypoint while preserving flags, markers, report fields, exit codes,
+  redaction, dry-run, dirty-repo guard, and real-provider opt-in behavior.
+- Route 136 consolidated the control-plane atlas and module ledgers, naming
+  Agent Loop, CLI / UX, Session / Continue, Permission / Policy, Result
+  Surface, Provider / Model, Tool, Runtime, and Harness / Eval ownership.
 
-### Route 136: Control-Plane Module Atlas
+### Routes 137-139: Agent Loop Baseline And Dispatch
 
-- Modules: Agent Loop, CLI / UX, Session / Continue, Permission / Policy,
-  Result Surface, Provider / Model, Tool, Runtime, Harness / Eval.
-- Result docs:
-  - `docs/architecture/control-plane-atlas.md`
-  - `docs/architecture/run-mvp-ledger.md`
-  - `docs/architecture/session-manager-boundary.md`
-  - `docs/architecture/cli-boundary.md`
-  - `docs/architecture/policy-result-boundary.md`
-- Source result: one no-behavior-change session projection extraction,
-  `packages/ts-shell/src/session/durableStatusProjection.ts`.
+- Route 137 extracted flow result/evidence projection helpers from
+  `runMvpIntegratedFlow.ts`.
+- Route 138 repaired the streamed-result handoff/tool-approval baseline and
+  extracted `flowDispatch.ts`.
+- Route 139 swept focused and broad control-plane baselines, repaired command
+  intent drift, and classified remaining broad runMvp failures before further
+  extraction.
 
-## High-Priority Implementation Routes
+### Routes 140-142: Read, Verification, And Continuation Contracts
 
-### Route 137: Agent Loop Projection Extraction
+- Route 140 defined read/list/inspect/repo-explain no-write contracts and
+  added focused owners for read intent, continuation target, and repo-explain
+  evidence.
+- Route 141 moved verification selection, retry, skipped/not-requested, and
+  command verification projection into named helpers.
+- Route 142 extracted continuation, lineage, rebase, and projection helpers
+  while preserving session schema and provider/browser/edit boundaries.
 
-- Modules: Agent Loop Engineering, Result Surface Engineering.
-- Result: extracted browser result/transcript projection and flow evidence
-  projection helpers from `runMvpIntegratedFlow.ts`.
-- Closeout doc:
-  `docs/architecture/agent-loop-projection-extraction.md`.
-- New owners:
-  - `packages/ts-shell/src/orchestration/flowResultProjection.ts`
-  - `packages/ts-shell/src/orchestration/flowEvidenceProjection.ts`
-- Preserved: browser/edit/provider/permission behavior, CLI UX,
-  `SessionManager` schema, dependency set, and runMvp control flow.
-- Validation:
-  - `rtk npm run test -w packages/ts-shell -- src/orchestration/flowProjection.test.ts src/core/harness/browserAgentLoop.test.ts`
-  - baseline note: `runMvpIntegratedFlow.test.ts -t "covers prompt -> handoff -> tool approval -> streamed result"` is pre-existing red with Route 137 changes stashed
-  - `rtk npm run verify:result-contract`
-  - `rtk npm run verify:edit-capability-closeout`
-  - `rtk npm run build -w packages/ts-shell`
-- Remaining candidates move to Route 138/139:
-  - provider diagnostic handoff planner
-  - mutation target selection projector
-  - read-window continuation projector
-  - generic capability result summary projector
+### Routes 143-144: Edit Expectation And Green Baseline
 
-### Route 138: Agent Loop Baseline Repair and Dispatch Seam
+- Route 143 defined current bounded write/edit expectations and moved broad
+  refactor, batch edit, discovery edit, and vague generated-content success
+  expectations into future capability routes.
+- Route 144 closed the remaining full `runMvpIntegratedFlow.test.ts` failures
+  and swept the `packages/ts-shell` package baseline green.
 
-- Modules: Agent Loop Engineering, Tool Engineering, Result Surface
-  Engineering.
-- Result: repaired the pre-existing streamed-result handoff/tool-approval
-  baseline and extracted a dispatch/reentry seam from `runMvpIntegratedFlow.ts`.
-- Closeout doc:
-  `docs/architecture/agent-loop-baseline-dispatch.md`.
-- New owner:
-  - `packages/ts-shell/src/orchestration/flowDispatch.ts`
-- Classification: product behavior drift in command-result projection; a
-  successful `run-command` was incorrectly routed through mutation-only result
-  satisfaction and downgraded to `No file mutation was applied.`
-- Preserved: provider/model behavior, browser behavior, edit/write behavior,
-  permission decisions, CLI UX, `SessionManager` schema, dependency set, and
-  runMvp execution order.
-- Validation:
-  - `rtk npm run test -w packages/ts-shell -- src/orchestration/flowDispatch.test.ts`
-  - `rtk npm run test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts -t "covers prompt -> handoff -> tool approval -> streamed result|carries verify-only action result seed target and command across weak follow-up target carryover|denies escalation and terminates with explicit stopped_error terminal|keeps synthetic escalation fallback injection-only|keeps stream fallback injection-only"`
-- Remaining candidates move to Route 139:
-  - policy reason normalizer
-  - tool lifecycle to shared capability-result summary projector
-  - provider diagnostic handoff planner, projection-only
-  - SessionManager recovery/reentry projector or codec
+### Routes 145-147: Substrate And Contract Unification
 
-### Route 139: Control-Plane Baseline Sweep and Policy-Result Repair
+- Route 145 extracted Session / Continue substrate seams without schema,
+  transcript, compact, CLI, provider, browser, edit, dependency, or broad
+  runMvp changes.
+- Route 146 introduced the Tool / Policy / Result receipt vocabulary and
+  transcript-safe projection helpers.
+- Route 147 defined future edit expansion contracts for broad refactor,
+  multi-file discovery edit, and broader fenced replacement without enabling
+  broad edit execution.
 
-- Modules: Agent Loop Engineering, Tool Engineering, Permission / Policy
-  Engineering, Result Surface Engineering.
-- Result: swept focused and broad control-plane baselines before more
-  extraction, repaired high-confidence command/verify behavior drift, and
-  documented the remaining full `runMvpIntegratedFlow.test.ts` reds.
-- Closeout doc:
-  `docs/architecture/control-plane-baseline.md`.
-- Repairs:
-  - `dir` / `ls` command intent is blocked with actionable
-    `command-not-allowlisted` instead of silently executing `node --version`.
-  - explicit `node --version` verify command is selected without expanding the
-    command allowlist.
-  - English replacement parsing trims trailing `then run ...` command clauses.
-- Baseline result:
-  - focused command/policy/result/projection/dispatch tests pass
-  - focused browser policy/runtime preservation tests pass
-  - focused Route 139 runMvp gate passes
-  - full `runMvpIntegratedFlow.test.ts` remains red with `101 passed / 50
-    failed`, each listed in the closeout doc with owner, classification, and
-    next action
-- Preserved: provider live calls, browser/edit expansion, broad shell/allowlist
-  expansion, CLI UX, dependency set, `SessionManager` schema, and broad
-  runMvp rewrite.
-- Route 140 should start with command intent and read/inspect capability
-  cleanup, not generic extraction, because unsupported command/read/list
-  classification is still masking several broad runMvp baselines.
+### Route 148: Edit / Patch Module Boundary
 
-### Route 140: Command Intent and Read / Inspect Capability Cleanup
+- Route 148 added an Edit / Patch module facade over current and future edit
+  helpers, plus module-owned manifest, preview/evidence, precondition, and
+  result projection helpers.
+- Current bounded write/edit execution remains delegated to existing routes.
+- Broad refactor, multi-file discovery edit, broader fenced replacement, and
+  rollback/snapshot remain preview/precondition states, not executable paths.
 
-- Modules: Agent Loop Engineering, Tool Engineering, Permission / Policy
-  Engineering, Result Surface Engineering.
-- Result: defined and implemented the current read/list/inspect/repo-explain
-  no-write contract before further extraction or broad runMvp rebaseline.
-- Closeout doc:
-  `docs/architecture/read-inspect-intent-cleanup.md`.
-- New owners:
-  - `packages/ts-shell/src/orchestration/readInspectIntent.ts`
-  - `packages/ts-shell/src/orchestration/readContinuationTarget.ts`
-  - `packages/ts-shell/src/orchestration/repoExplainEvidence.ts`
-- Repairs and rebaseline:
-  - list-files prompts route to `inspect-files` / `glob(.ts)`, not chat or
-    unrelated bash fallback
-  - pathless targeted read stops actionably with explicit in-workspace path
-    guidance
-  - read continuation consumes restored targets and relocates only a unique
-    high-confidence moved target
-  - ambiguous/missing read relocation is actionable `stopped_error`
-  - path-only file prompts default to grounded read
-  - repo-explain collects no-write `glob` / read evidence and projects
-    `grounded-explanation` or `needs-verification`
-- Baseline result:
-  - focused read/inspect route passes with `14 passed / 141 skipped`
-  - full `runMvpIntegratedFlow.test.ts` moved from `101 passed / 50 failed` to
-    `111 passed / 40 failed`
-- Validation:
-  - focused read/inspect intent and runMvp tests pass
-  - full runMvp remains red with the documented remaining 40 failures
-  - closeout/result-contract/build validation should remain focused on the
-    touched no-write route
-- Preserved: broad shell allowlist expansion, edit/browser/provider behavior,
-  CLI UX, dependencies, session schema, and broad runMvp rewrite.
+### Route 149: Module Roadmap Reset
 
-### Route 141: Verification Planner Cleanup
+- Route 149 resets the next-roadmap decision around module ownership, lifecycle
+  stage, risk, and product value.
+- It removes the stale implication that Edit / Patch must continue next merely
+  because Routes 147-148 discussed edit contracts.
+- It adds `docs/architecture/module-roadmap-reset.md` as the module status and
+  phase-ordering source for the next planning cycle.
 
-- Modules: Agent Loop Engineering, Result Surface Engineering, Tool
-  Engineering.
-- Status: closed by `docs/architecture/verification-planner-cleanup.md`.
-- Result:
-  - `verificationPlanner.ts` owns verify selection, skipped/not-requested,
-    unsupported-command availability, and retry decisions
-  - `verificationResultProjection.ts` owns command verification summaries and
-    transcript-safe retry/evidence projection
-  - auto verification selects existing allowlisted `node --version` for
-    test-only/source edits without broadening the allowlist
-  - failed command verification retries once and records attempts-exhausted
-  - skipped verification is recoverable stopped, not false completed success
-- Baseline result:
-  - focused verification route passes with `19 passed / 142 skipped`
-  - full `runMvpIntegratedFlow.test.ts` moved from `111 passed / 40 failed` to
-    `112 passed / 39 failed`
-- Preserved: provider, browser, edit expansion, shell allowlist expansion, CLI,
-  dependencies, session schema, and broad runMvp rewrite.
+## Module-First Route Rule
 
-### Route 142: Continuation / Rebase / Lineage Cleanup
+Future routes must state:
 
-- Modules: Session / Continue Engineering, Agent Loop Engineering, Result
-  Surface Engineering.
-- Status: closed by `docs/architecture/continuation-lineage-cleanup.md`.
-- Result:
-  - extracted continuation intent, lineage, rebase, and projection helpers
-  - fixed weak/no-cue same-file slot activation vs clarify
-  - fixed cross-file reopen candidate uniqueness vs ambiguity
-  - repaired temporal successor cues (`next`, `what next`) over bounded
-    evidence
-  - repaired migration-like root rebasing for blocker->fix continuation
-  - preserved verify command hint persistence after blocker repair
-- Baseline result:
-  - focused continuation route passes with `18 passed / 133 skipped`
-  - full `runMvpIntegratedFlow.test.ts` moved from `112 passed / 39 failed`
-    to `127 passed / 24 failed`
-- Validation:
-  - focused continuation/rebase/lineage runMvp tests
-  - continuation planning/handoff projection tests
-  - Route 140 read/inspect preservation tests
-  - Route 141 verification planner preservation tests
-  - `rtk npm run verify:result-contract`
-  - `rtk npm run build -w packages/ts-shell`
-- Stop conditions: provider/model calls, browser/edit capability expansion,
-  session schema changes, CLI redesign, broad runMvp rewrite, or adding a new
-  persistence layer.
+- owning module
+- lifecycle stage touched
+- cross-module inputs
+- cross-module outputs
+- product behavior boundary
+- validation gate
+- stop conditions
 
-### Route 143: Write / Edit Expectation Cleanup
+Feature work is allowed only when it enters through a module-owned contract.
+Edit expansion enters through Edit / Patch; browser planner work enters through
+Browser; provider readiness enters through Provider / Model; CLI work enters
+through CLI / UX.
 
-- Modules: Agent Loop Engineering, Edit / Patch Engineering, Result Surface
-  Engineering.
-- Status: closed by `docs/architecture/edit-expectation-contract.md`.
-- Result:
-  - added `editExpectationContract.ts` as the current write/edit expectation
-    helper
-  - documented explicit target and concrete-content requirements
-  - fixed `Write <path>` routing from chat success to actionable write stopped
-  - fixed Chinese `内容是 ...` inline content parsing
-  - stopped discovery edit before command fallback
-  - rebaselined fenced/repair mutation paths under skipped verification
-  - moved broad refactor, batch edit, and discovery edit success expectations to
-    future capability routes
-- Baseline result:
-  - focused edit/write route passes with `18 passed / 140 skipped`
-  - full `runMvpIntegratedFlow.test.ts` moved from `127 passed / 24 failed`
-    to `144 passed / 7 failed`
-- Validation:
-  - focused edit expectation and write/edit runMvp tests
-  - `rtk npm run verify:edit-capability-closeout`
-  - `rtk npm run verify:result-contract`
-  - `rtk npm run build -w packages/ts-shell`
-- Stop conditions: edit engine expansion, multi-file/add/delete/move support,
-  rollback/snapshot implementation, schema changes, or CLI/dependency changes.
+## Candidate Route Families
 
-### Route 144: runMvp Final Closeout and Package Sweep
+### Phase A: Control-Plane Kernel Hardening
 
-- Modules: Session / Continue Engineering, Agent Loop Engineering, Result
-  Surface Engineering, Harness Engineering.
-- Status: closed by `docs/architecture/runmvp-package-closeout.md`.
-- Result:
-  - full `runMvpIntegratedFlow.test.ts` moved from `144 passed / 7 failed` to
-    `151 passed`
-  - package sweep moved from `2017 passed / 30 failed / 1 skipped` to
-    `2051 passed / 1 skipped`
-  - repaired explicit approval callback routing when generic `continue` wording
-    appeared without verify lineage
-  - added git-aware mutation change-set attribution
-  - repaired sandbox bare-command escalation for process spawn checks
-  - repaired legacy recovery `targetPathBase` fallback
-  - rebaselined stale transcript, resume, provider-mock, slash, CLI, trace, and
-    browser harness expectations to current contracts
-  - stabilized browser cache busy-lock and sandbox audit harness assertions under
-    package-level parallel load
-- Preserved: provider live-call boundary, browser/edit capability boundaries,
-  command allowlist, permission semantics, session schema, CLI/dependencies, and
-  broad runMvp structure.
+Recommended when reducing cross-module coupling is more valuable than adding
+capability scope.
 
-### Route 145: Session Substrate Seam Extraction
+| Candidate | Primary module | Goal | Validation shape |
+|---|---|---|---|
+| Agent Loop dispatch extraction v2 | Agent Loop | Move one more pure dispatch/projection decision out of `runMvpIntegratedFlow.ts` without changing behavior. | focused dispatch/runMvp tests; build if source changes |
+| Runtime receipt contract | Runtime, Tool, Result Surface | Define shared shell/local/daemon/browser runtime receipt vocabulary consumed by result/session surfaces. | focused helper tests if source changes; result-contract when projections change |
+| Workspace / File Context contract | Workspace / File Context, Edit / Patch | Consolidate root, target, read/write authority, stale-read, and post-write verification vocabulary. | docs-only diff/status or focused workspace/patch tests if source changes |
+| CLI / core split preparation | CLI / UX, Session / Continue | Move display/session-switch preparation behind a CLI-owned boundary without changing UX. | focused CLI tests; no schema/provider changes |
 
-- Modules: Session / Continue Engineering, Result Surface Engineering,
-  Capability Contract Architecture.
-- Status: closed by `docs/architecture/session-substrate-seams.md`.
-- Result:
-  - extracted transcript event codec helpers into `sessionEventCodec.ts`
-  - extracted reentry summary/scoring and recovery block projection into
-    `sessionSummaryProjection.ts`
-  - extracted replay-safe continuation evidence selection and recovery
-    predicates into `sessionContinuationProjection.ts`
-  - extracted compact retention input projection into
-    `sessionCompactProjection.ts`
-  - extracted session/current-session metadata projection into
-    `sessionMetadataProjection.ts`
-  - added `sessionProjection.test.ts` as focused helper characterization
-- Preserved: session file schemas, transcript JSONL shape/order, compact
-  retention behavior, current-session selection behavior, CLI UX,
-  provider/browser/edit boundaries, dependencies, and broad SessionManager or
-  runMvp rewrites.
-- Validation:
-  - focused helper/session-adjacent tests pass
-  - full `runMvpIntegratedFlow.test.ts` passes
-  - full `packages/ts-shell` package sweep passes
-  - `verify:edit-capability-closeout`, `verify:result-contract`, build, and
-    `git diff --check` pass
+### Phase B: Capability Module Expansion
 
-### Route 146: Tool / Policy / Result Contract Unification
+Recommended only when the owning module already defines inputs, outputs,
+preconditions, result projection, and validation.
 
-- Modules: Tool Engineering, Permission / Policy Engineering, Result Surface
-  Engineering, Capability Contract Architecture.
-- Status: closed by `docs/architecture/tool-policy-result-contract.md`.
-- Result:
-  - added `toolPolicyResult.ts` as the shared lifecycle receipt vocabulary
-    for availability, policy, execution, result, reason code, do-next, and
-    safe capability labels
-  - added `toolResultProjection.ts` as the transcript-safe tool summary and
-    redaction projector
-  - integrated the seam into command allowlist/unavailable results, approval
-    denial, MCP unavailable/protocol/tool-error results, browser
-    blocked/unavailable results, edit expectation stopped contracts, provider
-    readiness not-configured failures, tool lifecycle projection, and
-    successful run-command dispatch projection
-  - preserved terminal truthfulness, command allowlist, MCP taxonomy,
-    browser/edit/provider boundaries, session schemas, CLI/dependencies, and
-    broad runMvp/tool-registry structure
-- Validation:
-  - focused tool policy/result, lifecycle, dispatch, dispatcher, result mapper,
-    edit expectation, MCP, and browser-adjacent tests pass
-  - full runMvp, package sweep, closeout/result-contract/build/diff/status
-    validation are the Route 146 final gates
+| Candidate | Primary module | Goal | Stop condition |
+|---|---|---|---|
+| Edit / Patch thin integration | Edit / Patch, Result Surface | Adopt the module facade at one thin classification/projection handoff. | no new write execution |
+| Edit snapshot / rollback substrate | Edit / Patch, Runtime | Define snapshot/rollback preconditions and receipts before broad edit execution. | no rollback execution unless explicitly routed |
+| Multi-file discovery candidate selection | Edit / Patch, Workspace / File Context | Produce bounded candidate sets and confirmation requirements. | no mutation by discovery |
+| Browser controlled planner v2 | Browser, Agent Loop | Improve controlled planner contracts only if browser becomes product priority. | no public web or default browser action expansion |
 
-### Route 147: Future Edit Expansion Contract Map
+### Phase C: Gate And Release Architecture
 
-- Modules: Edit / Patch Engineering, Capability Contract Architecture, Harness
-  Engineering.
-- Status: closed by `docs/architecture/future-edit-expansion-contract.md`.
-- Result:
-  - added `futureEditContract.ts` as a pure future-edit classifier and Route
-    146 stopped-result projector
-  - added `futureEditPlanner.ts` as a no-op planning projector for mode, scope,
-    target hints, missing preconditions, confirmation, verification, and
-    rollback requirements
-  - separated broad refactor planning, multi-file discovery edit, and broader
-    fenced replacement into distinct future-only modes
-  - preserved current bounded write/edit support and kept broad mutation,
-    discovery, fuzzy replacement, vague generated content, workspace authority,
-    stale-read, provider, browser, CLI, schema, dependency, and broad runMvp
-    behavior unchanged
-- Follow-up routes:
-  - Route 148A: fenced replacement bounded implementation with explicit target
-    and exact old/new or fenced block mapping only
-  - Route 148B: multi-file discovery edit candidate selection with
-    user-confirmed target set and max-file guard
-  - Route 148C: broad refactor planning with target/constraint manifest and no
-    mutation until user confirmation
-  - Route 148D: snapshot/rollback precondition route before any broad edit
-    execution
-- Validation: focused future-edit/edit tests, runMvp, package sweep,
-  closeout/result-contract/build/diff/status validation are the Route 147 final
-  gates.
+Recommended when confidence, reporting, or release-readiness truthfulness is the
+blocker.
 
-### Route 148: Edit / Patch Module Development
+| Candidate | Primary module | Goal | Validation shape |
+|---|---|---|---|
+| Harness / gate taxonomy | Harness / Eval | Classify gates as product path, deterministic, opt-in real, dry-run, self-test, docs-only, or report-only. | diff/status plus touched verifier self-tests |
+| Eval report schema | Harness / Eval, Result Surface | Normalize report fields and markers without changing product routes. | report self-tests and result-contract where relevant |
+| Provider readiness parity | Provider / Model, Harness | Align runtime provider classification with readiness scripts and default-skip behavior. | classification self-test; real-provider live gate only by explicit opt-in |
+| Capability lifecycle adoption report | Capability Contract Architecture | Audit which modules implement lifecycle stages and where gaps remain. | docs-only diff/status |
 
-- Modules: Edit / Patch Engineering, Capability Contract Architecture, Result
-  Surface Engineering.
-- Status: closed by `docs/architecture/edit-patch-module.md`.
-- Result:
-  - added an Edit / Patch module facade over existing current edit expectation
-    and future edit expansion helpers
-  - added module-owned mutation manifest, preview/evidence substrate,
-    precondition projection, and result projection helpers
-  - represented broad refactor, multi-file discovery edit, fenced replacement,
-    and rollback/snapshot as preview/precondition states, not executable broad
-    writes
-  - kept current bounded write/edit behavior delegated to existing routes and
-    preserved workspace authority, stale-read, approval, provider, browser,
-    schema, CLI, dependency, and broad runMvp boundaries
-- Validation: focused edit module/future edit/edit expectation tests, runMvp,
-  package sweep, closeout/result-contract/build/diff/status validation are the
-  Route 148 final gates.
+## Decision Criteria
 
-## Medium-Priority Follow-Up Routes
+Choose the next route by evidence, not route number:
 
-### Route 149: Edit / Patch Thin Integration or Runtime Receipt Contract
+- Which module owns the highest current coupling or user-facing risk?
+- Which lifecycle stage is missing, duplicated, or too close to a large file?
+- Which runtime path, result surface, or gate improves?
+- Which focused validation already exists or can be added narrowly?
+- Which stop condition prevents provider/browser/edit/schema/CLI/dependency
+  expansion?
 
-- Modules: Edit / Patch Engineering, Runtime Engineering, Tool Engineering.
-- Goal: either adopt the Edit / Patch module facade in one thin
-  runMvp/result-projection point, or define the shared runtime receipt
-  vocabulary for local shell, daemon, timeout/cancel, cleanup, and redaction.
-- Validation: focused helper/runtime tests first; broaden only if runMvp or
-  result/session surfaces are touched.
+If these answers are weak, pick a contract route instead of a feature route.
 
-### Route 150: Harness and Gate Taxonomy
+## Current Default Recommendation
 
-- Modules: Harness Engineering, Eval / Benchmark Engineering.
-- Goal: categorize verifier scripts as product path, deterministic gate,
-  opt-in real, dry-run, self-test, docs-only, or report-only, then normalize
-  report markers where safe.
-- Validation: `rtk git diff --check`; touched verifier self-tests only.
+The best default next route is `Runtime Receipt Contract` in Phase A.
 
-### Route 151: Workspace / File Context Contract
+Rationale: Route 146 already gives Tool / Policy / Result a common lifecycle
+vocabulary, but runtime execution receipts remain capability-specific. A
+runtime receipt contract can reduce Agent Loop and Result Surface coupling
+without enabling provider, browser, or edit execution.
 
-- Modules: Workspace / File Context Engineering, Edit / Patch Engineering.
-- Goal: consolidate workspace root, target resolution, file constraints,
-  read/write authority, stale-read, and post-write verification vocabulary.
-- Validation: workspace/patch focused tests if code changes; docs/diff/status
-  otherwise.
+If the user explicitly chooses mutation work next, select `Edit / Patch thin
+integration` and keep it to one module-owned handoff with no new broad write
+behavior.
 
-### Route 152: Provider Readiness Parity Map
-
-- Modules: Provider / Model Engineering, Harness Engineering.
-- Goal: map provider readiness runtime classification to readiness scripts and
-  real-provider default-skip behavior.
-- Validation:
-  - `rtk npm run verify:provider-readiness:real -- --classification-self-test`
-  - real-provider live gate only when an explicit task opens that boundary.
-- Stop conditions: manually reading provider config, printing secrets, or
-  changing default provider gates.
-
-## Backlog Ordering
-
-Recommended order:
-
-1. Route 137: Agent Loop Projection Extraction.
-2. Route 138: Session Codec / Continue Seam or Agent Dispatch Seam Extraction.
-3. Route 139: Control-Plane Baseline Sweep and Policy-Result Repair.
-4. Route 140: Command Intent and Read / Inspect Capability Cleanup.
-5. Route 141: Verification Planner Cleanup.
-6. Route 142: Continuation / Rebase / Lineage Cleanup.
-7. Route 143: Write / Edit Expectation Cleanup.
-8. Route 144: Approval / Transcript / Resume Harness Cleanup.
-9. Route 145: Session Substrate Seam Extraction.
-10. Route 146: Tool / Policy / Result Contract Unification.
-11. Route 147: Future Edit Expansion Contract Map.
-12. Route 148: Capability Lifecycle Adoption Across Edit / Browser / Shell.
-13. Route 149: Runtime Receipt Contract.
-14. Route 150: Harness and Gate Taxonomy.
-15. Route 151: Workspace / File Context Contract.
-16. Route 152: Provider Readiness Parity Map.
+## Persistent Boundaries
 
 Do not use this backlog to justify broad source refactors. A route is valid
 only when it reduces a user-facing runtime blocker or a named cross-layer
 concentration point with focused evidence.
+
+Unless a route explicitly opens the boundary, do not add provider behavior,
+read or print real-provider config, expand browser execution, broaden edit
+execution, change schemas, change CLI behavior, change dependencies, or change
+default gates.

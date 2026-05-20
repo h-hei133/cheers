@@ -11,6 +11,10 @@ Use this template for future module-focused routes. It exists to prevent vague f
 - Primary module:
 - Secondary modules:
 - Capability:
+- Cross-module inputs:
+- Cross-module outputs:
+- Product behavior boundary:
+- Stop conditions:
 - Capability lifecycle stage(s):
   - availability:
   - policy:
@@ -35,12 +39,16 @@ This route is successful when:
 - [ ] 
 - [ ] 
 - [ ] 
+- [ ] the owning module, lifecycle stage, cross-module inputs/outputs,
+      behavior boundary, validation gate, and stop conditions are explicit
 
 This route is not successful if:
 
 - [ ] it only adds tests/docs without reducing the stated blocker
 - [ ] it changes a default gate or capability claim without explicit approval
 - [ ] it broadens source behavior outside the bounded surface
+- [ ] feature work bypasses the owning module contract and lands directly in a
+      central loop, entrypoint, or session substrate
 
 ## References
 

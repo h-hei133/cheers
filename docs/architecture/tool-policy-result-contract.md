@@ -179,3 +179,14 @@ Proceed with Future Edit Expansion Contract Map only as a contract/planning
 route. The best next implementation value is to define explicit contracts for
 broad refactor planning, multi-file discovery edit, and broader fenced
 replacement support without enabling new write behavior.
+
+## Post-Route-149 Forward Pointer
+
+Route 149 makes this contract a shared input for future module routes. New
+runtime, workspace, edit, browser, provider, and CLI work should reuse the
+availability/policy/execution/result vocabulary instead of inventing
+capability-local success or stopped states.
+
+The contract remains a projection surface. It does not authorize writes,
+provider calls, browser execution, schema changes, CLI behavior changes, or
+default gate changes.

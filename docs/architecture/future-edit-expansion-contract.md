@@ -149,3 +149,13 @@ Route 147 did not enable provider calls, browser work, broad edit/refactor,
 batch/discovery execution, broad/fuzzy fenced replacement, vague generated
 content, workspace authority weakening, stale-read bypass, rollback execution,
 schema changes, CLI redesign, dependency changes, or broad runMvp rewrites.
+
+## Post-Route-149 Forward Pointer
+
+Route 147 defined future edit contracts only. Route 148 gave those contracts an
+Edit / Patch module facade, and Route 149 reset the roadmap so Edit / Patch is
+not automatically the next route.
+
+Future edit work must enter through the Edit / Patch module, satisfy explicit
+manifest/precondition/result boundaries, and remain no-write until a dedicated
+execution route opens a narrow supported lane.
