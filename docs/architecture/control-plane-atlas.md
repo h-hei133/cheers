@@ -545,6 +545,51 @@ route should extract one rendering or terminal-status projection boundary
 without changing schema, result truthfulness, CLI behavior, provider behavior,
 or session persistence semantics.
 
+## Post-Route-155 Execution / Result Facade Pass
+
+Route 155 continued the `runMvpIntegratedFlow.ts` owner-module extraction pass
+into heavier execution/result handoffs.
+
+New or consolidated module facades:
+
+- `packages/ts-shell/src/orchestration/browserModule.ts`
+  - owner: Browser Engineering
+  - owns browser plan detection and browser continuation / transaction /
+    observation execution-result handoff
+- `packages/ts-shell/src/orchestration/toolRuntimeModule.ts`
+  - owner: Tool Engineering / Runtime Engineering
+  - owns tool lifecycle dispatch entrypoint and coding-result provenance
+    collector/summary handoff
+- `packages/ts-shell/src/orchestration/resultSurfaceModule.ts`
+  - owner: Result Surface Engineering
+  - owns runtime coding outcome, blocked outcome, and turn result handoff access
+- `packages/ts-shell/src/orchestration/providerModule.ts`
+  - owner: Provider / Model Engineering
+  - owns provider diagnostic continuity projection with no live/config reads
+
+`runMvpIntegratedFlow.ts` is now acceptable as an Agent Loop composition root:
+it still owns turn ordering, capability branch selection, and module facade
+composition, but it should not regain direct imports of browser result/evidence,
+tool dispatch/provenance, provider diagnostic projection, or runtime/turn
+result handoff helpers.
+
+Remaining non-Agent-Loop responsibilities to avoid growing:
+
+- edit execution and mutation-result reconciliation remain inline and should be
+  a future Edit / Patch route if touched
+- runtime receipt consumer adoption remains partial
+- large intent-planning order remains in the Agent Loop file and should only
+  move with characterization coverage
+- capability-specific fallback strings remain in some branches and should move
+  only under Result Surface coverage
+
+Next central file recommendation: `sessionRuntime.ts`.
+
+Reason: after Routes 154-155, `runMvpIntegratedFlow.ts` is a large but
+acceptable composition root. `sessionRuntime.ts` is now the next better target
+because it still joins query event rendering, terminal status accumulation,
+future-turn injection, result handoff, and session persistence calls.
+
 ## Post-Route-149 Roadmap Reset
 
 Route 144 established the green runMvp/package baseline, and Routes 145-148

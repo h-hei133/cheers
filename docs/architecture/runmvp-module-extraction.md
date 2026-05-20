@@ -81,3 +81,66 @@ are provided through a Session / Continue facade.
 
 These are deferred because they would touch execution semantics, result
 truthfulness, provider/browser/edit boundaries, or order-sensitive planning.
+
+## Route 155 Execution / Result Facade Plan
+
+Route 154 completed the first owner-module pass:
+
+- Workspace / File Context facade: `readInspectModule.ts`
+- Result Surface / Verification facade: `verificationModule.ts`
+- Session / Continue facade: `continuationModule.ts`
+
+Route 155 continues with heavier execution/result handoffs while keeping
+`runMvpIntegratedFlow.ts` as Agent Loop composition root. This section records
+the target clusters before code movement.
+
+| Heavy responsibility cluster | Current direct owner in `runMvpIntegratedFlow.ts` | True owner module | Target facade | Route 155 decision | Why this owner | Validation required | Stop condition |
+|---|---|---|---|---|---|---|---|
+| Browser plan, transaction, observation, result, and evidence handoff | direct imports from `core/context/browser*`, `flowResultProjection.ts`, and `flowEvidenceProjection.ts` | Browser Engineering | `browserModule.ts` | extract now | Browser policy/result/evidence redaction is capability-owned; Agent Loop should consume browser handoff facts. | browser facade test, browser adjacent tests where focused, full runMvp, result-contract | stop if extraction changes browser availability, public-web behavior, action policy, or transaction execution |
+| Tool dispatch lifecycle and provenance handoff | direct imports of `dispatchToolWithLifecycle`, `ToolLifecycleResult`, and coding provenance summary | Tool Engineering / Runtime Engineering | `toolRuntimeModule.ts` | extract now | Tool execution lifecycle, approval events, and provenance summaries are Tool/Runtime-owned surfaces consumed by Agent Loop. | tool runtime facade test, `flowDispatch.test.ts`, full runMvp, result-contract | stop if command allowlist, approval, permission, sandbox, or dispatch order changes |
+| Generic runtime/result surface construction | direct imports of `projectRuntimeCodingOutcome`, `projectBlockedRuntimeOutcome`, and `projectTurnResultHandoff` | Result Surface Engineering | `resultSurfaceModule.ts` | extract now | Runtime coding outcomes and turn result handoff are result-surface compatibility objects, not Agent Loop internals. | result facade test, runtime outcome / turn kernel tests, full runMvp, result-contract | stop if terminal classification, result truthfulness, schema, or transcript fields change |
+| Provider diagnostic handoff projection | direct import of `projectProviderOutcome` in planning | Provider / Model Engineering | `providerModule.ts` | extract now | Provider diagnostic continuity is provider-owned data projection; Agent Loop should not depend on provider helper fragments. | provider facade test, provider outcome projection test, full runMvp | stop if provider live/config reads, auth behavior, model selection, or opt-in gates change |
+| Edit execution/result handoff | direct mutation execution and reconciliation calls | Edit / Patch Engineering | future `editExecutionModule.ts` or `editPatchModule.ts` consolidation | defer | This touches stale-read/write-authority and writer result semantics; Route 155 can validate adjacent edit gates without changing writer behavior. | edit closeout if later touched | stop for any writer behavior, workspace authority, stale-read, or mutation-order change |
+| Runtime receipt consumer adoption | direct runtime outcome consumption | Runtime Engineering / Result Surface Engineering | future runtime receipt consumer facade | defer | Route 150 receipt adoption should be a separate focused result/session route. | runtime receipt tests + result-contract | stop for protocol/schema/runtime execution change |
+
+Route 155 classifies `runMvpIntegratedFlow.ts` as still acceptable only if,
+after extraction, it retains Agent Loop composition duties and no longer owns
+the selected heavy result/evidence details directly.
+
+## Route 155 Extraction Result
+
+Extracted heavy clusters:
+
+- Browser Engineering: `browserModule.ts`
+  - moved browser plan detection and the browser execution/result handoff
+    behind a browser-owned facade
+  - `runMvpIntegratedFlow.ts` no longer constructs browser continuation,
+    transaction, observation, result, or evidence details directly
+- Tool / Runtime Engineering: `toolRuntimeModule.ts`
+  - moved tool lifecycle dispatch and coding-result provenance creation /
+    summary behind a Tool / Runtime facade
+  - `runMvpIntegratedFlow.ts` still decides when tools are called, but does not
+    import dispatch/provenance helper fragments directly
+- Result Surface Engineering: `resultSurfaceModule.ts`
+  - moved runtime coding outcome, blocked runtime outcome, and turn result
+    handoff access behind a Result Surface facade
+  - result truthfulness and schema remain unchanged
+- Provider / Model Engineering: `providerModule.ts`
+  - moved provider diagnostic handoff projection behind a provider-owned facade
+  - no provider live/config reads or auth behavior changes
+
+Deferred after Route 155:
+
+- edit execution facade adoption
+- runtime receipt consumer adoption beyond the current result-surface handoff
+- broad intent-planner movement
+- deeper generic result fallback extraction inside individual capability
+  branches
+
+Route 155 classification:
+
+`runMvpIntegratedFlow.ts` is acceptable as the Agent Loop composition root for
+now. It still contains large branch bodies, but the selected heavy
+browser/tool/provider/result details are now module-owned facades. Further work
+should target one explicit remaining branch family at a time, not a broad
+rewrite.

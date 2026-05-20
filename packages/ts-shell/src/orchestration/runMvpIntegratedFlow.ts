@@ -9,12 +9,6 @@ import type {
 } from "../config/runtimeConfig.js";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
-import {
-  detectBrowserAgentPlan,
-  type BrowserAgentPlan,
-} from "../core/context/browserAgent.js";
-import { browserObservationFromMetadata } from "../core/context/browserObs.js";
-import { executeBrowserTransaction } from "../core/context/browserTxn.js";
 import { getPwRuntimeStatus, type PwRuntimeStatus } from "../core/context/pwRuntime.js";
 import {
   rebindPathLikeToWorkspace,
@@ -32,9 +26,10 @@ import {
 import { ToolDispatcher } from "../tools/dispatcher.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import {
-  createCodingResultProvenanceCollector,
-  summarizeCodingResultProvenance,
-} from "./codingResultProvenance.js";
+  detectWorkflowBrowserPlan,
+  executeBrowserModulePlan,
+  type BrowserAgentPlan,
+} from "./browserModule.js";
 import {
   blockedCommandReason,
   detectCommand,
@@ -47,25 +42,9 @@ import {
   type FileConstraintAssertions,
 } from "./fileConstraintAssertions.js";
 import {
-  buildBrowserAgentBaseEvidence,
-  projectBrowserContinuationEvidence,
-  projectBrowserObservationEvidence,
-  projectBrowserTransactionEvidence,
-} from "./flowEvidenceProjection.js";
-import {
-  dispatchToolWithLifecycle,
-  type ToolLifecycleResult,
-} from "./flowDispatch.js";
-import {
   attributeGitChangeSet,
   snapshotGitChangeSet,
 } from "./gitChangeSetAttribution.js";
-import {
-  projectBrowserContinuationResult,
-  projectBrowserObservationResult,
-  projectBrowserTransactionResult,
-  type BrowserToolFailureProjection,
-} from "./flowResultProjection.js";
 import {
   buildWorkflowContinuationLineage,
   buildWorkflowRepairContinuation,
@@ -106,7 +85,7 @@ import {
   appendCurrentRequestScopeEvidence,
   deriveCurrentPermissionRequestFromToolInput,
 } from "./approvalAuthorityProjection.js";
-import { projectProviderOutcome } from "./providerOutcomeProjection.js";
+import { projectProviderDiagnosticHandoff } from "./providerModule.js";
 import { reconcileFileMutationSummary } from "./mutationResultAggregation.js";
 import {
   applySingleFileReplacePatch,
@@ -114,9 +93,10 @@ import {
 } from "./patchMutationLane.js";
 import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
 import {
-  projectBlockedRuntimeOutcome,
-  projectRuntimeCodingOutcome,
-} from "./runtimeOutcomeProjection.js";
+  projectWorkflowBlockedOutcome,
+  projectWorkflowRuntimeOutcome,
+  projectWorkflowTurnHandoff,
+} from "./resultSurfaceModule.js";
 import {
   classifyReadInspectRequest,
   inferRepoDiagnosis,
@@ -152,7 +132,12 @@ import {
   type GroundedDeliverableMode,
 } from "./runtimeHandoffProjection.js";
 import { resolveTaskTargets } from "./targetResolution.js";
-import { projectTurnResultHandoff } from "./turnKernel.js";
+import {
+  createToolRuntimeProvenanceCollector,
+  dispatchRuntimeTool,
+  summarizeToolRuntimeProvenance,
+  type ToolLifecycleResult,
+} from "./toolRuntimeModule.js";
 import type {
   ResolvedTarget,
   TargetResolutionBlocker,
@@ -697,7 +682,7 @@ function buildWorkflowTaskPlan(
       }
     }
   }
-  const browserPlan = detectBrowserAgentPlan({
+  const browserPlan = detectWorkflowBrowserPlan({
     prompt,
     continuityState: continuity,
   });
@@ -756,7 +741,7 @@ function buildWorkflowTaskPlan(
     hasActionResultSeed && hasExplicitPathReference
       ? ["seedInfluence=ignored-explicit-target"]
       : undefined;
-  const diagnosticHandoffProjection = projectProviderOutcome(continuity);
+  const diagnosticHandoffProjection = projectProviderDiagnosticHandoff(continuity);
   const diagnosticHandoffEvidence =
     diagnosticHandoffProjection.diagnosticHandoff;
   const hasDiagnosticVerifyHandoffCue =
@@ -4003,94 +3988,6 @@ function appendSingleFileEditRepairObservability(
   }
 }
 
-async function executeBrowserWorkflowTaskPlan(input: {
-  readonly plan: BrowserAgentPlan;
-  readonly freshnessObservability: FreshnessObservability;
-  readonly dispatcher: ToolDispatcher;
-  readonly browserRuntimeStatus: PwRuntimeStatus;
-  readonly sessionId: string;
-  readonly turn: number;
-  readonly workspaceRoot: string;
-  readonly abortSignal?: AbortSignal;
-}): Promise<WorkflowExecutionResult> {
-  const events: QueryEvent[] = [];
-  const notes = [
-    ...input.freshnessObservability.notes,
-    "browser-agent: tool pipeline selected",
-  ];
-  const evidence = buildBrowserAgentBaseEvidence({
-    freshnessEvidence: input.freshnessObservability.evidence,
-    planEvidence: input.plan.evidence,
-  });
-
-  if (input.plan.actions.length === 0 && input.plan.continuationSummary) {
-    const projected = projectBrowserContinuationResult({
-      evidence: projectBrowserContinuationEvidence(evidence),
-      continuationSummary: input.plan.continuationSummary,
-    });
-    return { events, notes, ...projected };
-  }
-
-  if (input.plan.transactionPlan) {
-    const transaction = await executeBrowserTransaction(input.plan.transactionPlan, {
-      runtimeStatus: input.browserRuntimeStatus,
-    });
-    const transactionEvidence = projectBrowserTransactionEvidence({
-      evidence,
-      transaction,
-    });
-    notes.push(
-      `browser-transaction: ${transaction.status} ${transaction.reasonCode} repair=${transaction.repairStatus} cleanup=${transaction.cleanupStatus}`,
-    );
-    const projected = projectBrowserTransactionResult({
-      evidence: transactionEvidence,
-      transaction,
-    });
-    return { events, notes, ...projected };
-  }
-
-  const observations = [];
-  let firstFailure: BrowserToolFailureProjection | undefined;
-  for (let index = 0; index < input.plan.actions.length; index += 1) {
-    const action = input.plan.actions[index]!;
-    const taskId = `browser_agent_${input.turn}_${index + 1}_${action.toolName.replace(/[^a-z0-9]+/gi, "_")}`;
-    const result = await dispatchToolWithLifecycle({
-      dispatcher: input.dispatcher,
-      events,
-      toolName: action.toolName,
-      taskId,
-      args: action.args,
-      workspaceRoot: input.workspaceRoot,
-      sessionId: input.sessionId,
-      abortSignal: input.abortSignal,
-      requireApprovalEvent: false,
-    });
-    const observation = browserObservationFromMetadata(result.metadata);
-    if (observation) {
-      observations.push(observation);
-      evidence.push(...projectBrowserObservationEvidence(observation));
-      notes.push(
-        `browser-action: ${observation.operation} ${observation.status} ${observation.reasonCode} cleanup=${observation.cleanupStatus}`,
-      );
-    }
-    if (!result.success) {
-      firstFailure = {
-        reason: result.error ?? observation?.visibleTextSummary ?? "Browser tool failed",
-        reasonCode: observation?.reasonCode ?? "unknown",
-      };
-      break;
-    }
-  }
-
-  const finalObservation = observations[observations.length - 1];
-  const projected = projectBrowserObservationResult({
-    evidence,
-    firstFailure,
-    finalObservation,
-  });
-  return { events, notes, ...projected };
-}
-
 async function executeWorkflowTaskPlan(input: {
   readonly plan: WorkflowTaskPlan;
   readonly freshnessObservability: FreshnessObservability;
@@ -4111,7 +4008,7 @@ async function executeWorkflowTaskPlan(input: {
   const unverifiedFiles: Array<{ path: string; reason: string }> = [];
   const repairNotes: string[] = [];
   const evidence: string[] = [];
-  const provenanceCollector = createCodingResultProvenanceCollector();
+  const provenanceCollector = createToolRuntimeProvenanceCollector();
   const preRunGitChangeSet = snapshotGitChangeSet(input.workspaceRoot);
   const appliedContentByPath = new Map<string, string>();
   const mutationResults: FileMutationExecutionResult[] = [];
@@ -4140,7 +4037,7 @@ async function executeWorkflowTaskPlan(input: {
     return {
       events,
       notes,
-      ...projectBlockedRuntimeOutcome({
+      ...projectWorkflowBlockedOutcome({
         taskKind: input.plan.taskKind,
         blockedReason: input.plan.blockedReason,
         targetPath: input.plan.targetPath,
@@ -4159,7 +4056,7 @@ async function executeWorkflowTaskPlan(input: {
   }
 
   if (input.plan.taskKind === "browser" && input.plan.browserPlan) {
-    return executeBrowserWorkflowTaskPlan({
+    return executeBrowserModulePlan({
       plan: input.plan.browserPlan,
       freshnessObservability: input.freshnessObservability,
       dispatcher: input.dispatcher,
@@ -4230,7 +4127,7 @@ async function executeWorkflowTaskPlan(input: {
     input.plan.targetPath &&
     (input.plan.taskKind === "edit-file" || input.plan.taskKind === "read-file")
   ) {
-    const readStep = await dispatchToolWithLifecycle({
+    const readStep = await dispatchRuntimeTool({
       dispatcher: input.dispatcher,
       events,
       toolName: "read",
@@ -4279,7 +4176,7 @@ async function executeWorkflowTaskPlan(input: {
       return {
         events,
         notes,
-        ...projectRuntimeCodingOutcome({
+        ...projectWorkflowRuntimeOutcome({
           taskKind: input.plan.taskKind,
           changedFiles,
           failedFiles,
@@ -4305,7 +4202,7 @@ async function executeWorkflowTaskPlan(input: {
     evidence.push(`inspect: read ${input.plan.targetPath}`);
     if (input.plan.taskKind === "edit-file" && unchangedAssertions.length > 0) {
       for (const assertion of unchangedAssertions) {
-        const readProtected = await dispatchToolWithLifecycle({
+        const readProtected = await dispatchRuntimeTool({
           dispatcher: input.dispatcher,
           events,
           toolName: "read",
@@ -4346,7 +4243,7 @@ async function executeWorkflowTaskPlan(input: {
       return {
         events,
         notes,
-        ...projectRuntimeCodingOutcome({
+        ...projectWorkflowRuntimeOutcome({
           taskKind: "read-file",
           changedFiles,
           failedFiles,
@@ -4378,7 +4275,7 @@ async function executeWorkflowTaskPlan(input: {
   }
   if (input.plan.taskKind === "write-file" && unchangedAssertions.length > 0) {
     for (const assertion of unchangedAssertions) {
-      const readProtected = await dispatchToolWithLifecycle({
+      const readProtected = await dispatchRuntimeTool({
         dispatcher: input.dispatcher,
         events,
         toolName: "read",
@@ -4402,7 +4299,7 @@ async function executeWorkflowTaskPlan(input: {
   }
 
   if (input.plan.taskKind === "inspect-files") {
-    const globStep = await dispatchToolWithLifecycle({
+    const globStep = await dispatchRuntimeTool({
       dispatcher: input.dispatcher,
       events,
       toolName: "glob",
@@ -4421,7 +4318,7 @@ async function executeWorkflowTaskPlan(input: {
       return {
         events,
         notes,
-        ...projectRuntimeCodingOutcome({
+        ...projectWorkflowRuntimeOutcome({
           taskKind: "inspect-files",
           changedFiles,
           failedFiles,
@@ -4452,7 +4349,7 @@ async function executeWorkflowTaskPlan(input: {
     return {
       events,
       notes,
-      ...projectRuntimeCodingOutcome({
+      ...projectWorkflowRuntimeOutcome({
         taskKind: "inspect-files",
         changedFiles,
         failedFiles,
@@ -4475,7 +4372,7 @@ async function executeWorkflowTaskPlan(input: {
   }
 
   if (input.plan.taskKind === "repo-explain") {
-    const globStep = await dispatchToolWithLifecycle({
+    const globStep = await dispatchRuntimeTool({
       dispatcher: input.dispatcher,
       events,
       toolName: "glob",
@@ -4504,7 +4401,7 @@ async function executeWorkflowTaskPlan(input: {
     if (!targetPath && candidateFiles.length > 0) {
       const inspectedCandidates: Array<{ path: string; content: string }> = [];
       for (const candidatePath of candidateFiles.slice(0, 20)) {
-        const readCandidate = await dispatchToolWithLifecycle({
+        const readCandidate = await dispatchRuntimeTool({
           dispatcher: input.dispatcher,
           events,
           toolName: "read",
@@ -4548,7 +4445,7 @@ async function executeWorkflowTaskPlan(input: {
       return {
         events,
         notes: [...notes, "repo-explain missing explicit target"],
-        ...projectRuntimeCodingOutcome({
+        ...projectWorkflowRuntimeOutcome({
           taskKind: "repo-explain",
           changedFiles,
           failedFiles: [
@@ -4577,7 +4474,7 @@ async function executeWorkflowTaskPlan(input: {
     }
 
     if (targetContent === undefined) {
-      const readStep = await dispatchToolWithLifecycle({
+      const readStep = await dispatchRuntimeTool({
         dispatcher: input.dispatcher,
         events,
         toolName: "read",
@@ -4593,7 +4490,7 @@ async function executeWorkflowTaskPlan(input: {
         return {
           events,
           notes: [...notes, `repo-explain read failed: ${reason}`],
-          ...projectRuntimeCodingOutcome({
+          ...projectWorkflowRuntimeOutcome({
             taskKind: "repo-explain",
             changedFiles,
             failedFiles: [{ path: targetPath, reason }],
@@ -4621,7 +4518,7 @@ async function executeWorkflowTaskPlan(input: {
     evidence.push(`repo-explain: read ${targetPath}`);
     const explainOutput = buildExplainTaskDelivery(targetPath, targetContent);
     const disposition = inferRepoDiagnosis({ prompt: input.prompt });
-    const outcome = projectRuntimeCodingOutcome({
+    const outcome = projectWorkflowRuntimeOutcome({
       taskKind: "repo-explain",
       changedFiles,
       failedFiles,
@@ -4696,7 +4593,7 @@ async function executeWorkflowTaskPlan(input: {
       return {
         events,
         notes,
-        ...projectRuntimeCodingOutcome({
+        ...projectWorkflowRuntimeOutcome({
           taskKind: input.plan.taskKind,
           changedFiles,
           failedFiles,
@@ -4829,7 +4726,7 @@ async function executeWorkflowTaskPlan(input: {
         return {
           events,
           notes: [...notes, `blocker: ${reason}`],
-          ...projectRuntimeCodingOutcome({
+          ...projectWorkflowRuntimeOutcome({
             taskKind: input.plan.taskKind,
             changedFiles,
             failedFiles,
@@ -4881,7 +4778,7 @@ async function executeWorkflowTaskPlan(input: {
         return {
           events,
           notes: [...notes, `blocker: ${reason}`],
-          ...projectRuntimeCodingOutcome({
+          ...projectWorkflowRuntimeOutcome({
             taskKind: input.plan.taskKind,
             changedFiles,
             failedFiles,
@@ -4956,7 +4853,7 @@ async function executeWorkflowTaskPlan(input: {
         return {
           events,
           notes: [...notes, `blocker: ${mutationInstruction.reason}`],
-          ...projectRuntimeCodingOutcome({
+          ...projectWorkflowRuntimeOutcome({
             taskKind: input.plan.taskKind,
             changedFiles,
             failedFiles,
@@ -5050,7 +4947,7 @@ async function executeWorkflowTaskPlan(input: {
               }
             : undefined,
         dispatch: () =>
-          dispatchToolWithLifecycle({
+          dispatchRuntimeTool({
             dispatcher: input.dispatcher,
             events,
             toolName: primaryMutationToolName,
@@ -5095,7 +4992,7 @@ async function executeWorkflowTaskPlan(input: {
             continue;
           }
           processedRenamePaths.add(normalizePathLike(renamePath));
-          const renameRead = await dispatchToolWithLifecycle({
+          const renameRead = await dispatchRuntimeTool({
             dispatcher: input.dispatcher,
             events,
             toolName: "read",
@@ -5141,7 +5038,7 @@ async function executeWorkflowTaskPlan(input: {
             appliedNote: `low-risk rename applied: ${renamePath}`,
             appliedEvidence: `rename-refactor:${renamePath}:${lowRiskRenameRefactor.from}->${lowRiskRenameRefactor.to}`,
             dispatch: () =>
-              dispatchToolWithLifecycle({
+              dispatchRuntimeTool({
                 dispatcher: input.dispatcher,
                 events,
                 toolName: "edit",
@@ -5195,7 +5092,7 @@ async function executeWorkflowTaskPlan(input: {
           appliedNote: `secondary write applied: ${secondary.path}`,
           appliedEvidence: `secondary write applied on ${secondary.path}`,
           dispatch: () =>
-            dispatchToolWithLifecycle({
+            dispatchRuntimeTool({
               dispatcher: input.dispatcher,
               events,
               toolName: "write",
@@ -5253,7 +5150,7 @@ async function executeWorkflowTaskPlan(input: {
       }> = [];
       const skippedEntries: Array<{ path: string; reason: string }> = [];
       for (const linkedPath of coordinatedTargets) {
-        const linkedRead = await dispatchToolWithLifecycle({
+        const linkedRead = await dispatchRuntimeTool({
           dispatcher: input.dispatcher,
           events,
           toolName: "read",
@@ -5382,7 +5279,7 @@ async function executeWorkflowTaskPlan(input: {
           appliedEvidence: `repair-cross-file applied on ${linkedPath}`,
           recordAppliedContent: false,
           dispatch: () =>
-            dispatchToolWithLifecycle({
+            dispatchRuntimeTool({
               dispatcher: input.dispatcher,
               events,
               toolName: "edit",
@@ -5543,7 +5440,7 @@ async function executeWorkflowTaskPlan(input: {
         selectionSource: "not-requested",
       };
     } else {
-      const commandResult = await dispatchToolWithLifecycle({
+      const commandResult = await dispatchRuntimeTool({
         dispatcher: input.dispatcher,
         events,
         toolName: "bash",
@@ -5631,7 +5528,7 @@ async function executeWorkflowTaskPlan(input: {
       if (consistencyAssertion) {
         const verifyReadResults = await Promise.all(
           consistencyAssertion.paths.map(async (targetPath) => {
-            const readResult = await dispatchToolWithLifecycle({
+            const readResult = await dispatchRuntimeTool({
               dispatcher: input.dispatcher,
               events,
               toolName: "read",
@@ -5742,7 +5639,7 @@ async function executeWorkflowTaskPlan(input: {
                   result: { success: true, output: entry.output, error: undefined },
                 };
               }
-              const readResult = await dispatchToolWithLifecycle({
+              const readResult = await dispatchRuntimeTool({
                 dispatcher: input.dispatcher,
                 events,
                 toolName: "read",
@@ -5904,7 +5801,7 @@ async function executeWorkflowTaskPlan(input: {
         } else if (contentAssertion) {
           const verifyReadResults = await Promise.all(
             changedFiles.map(async (changedPath) => {
-              const readResult = await dispatchToolWithLifecycle({
+              const readResult = await dispatchRuntimeTool({
                 dispatcher: input.dispatcher,
                 events,
                 toolName: "read",
@@ -6011,7 +5908,7 @@ async function executeWorkflowTaskPlan(input: {
     appendCurrentRequestScopeEvidence(evidence, currentVerifyScope);
 
     for (let attempt = 1; attempt <= verificationPlan.maxAttempts; attempt += 1) {
-      const verifyResult = await dispatchToolWithLifecycle({
+      const verifyResult = await dispatchRuntimeTool({
         dispatcher: input.dispatcher,
         events,
         toolName: "bash",
@@ -6108,7 +6005,7 @@ async function executeWorkflowTaskPlan(input: {
 
   const resultContract =
     input.plan.taskKind === "run-command"
-      ? projectTurnResultHandoff({
+      ? projectWorkflowTurnHandoff({
           capabilityPlan: {
             taskKind: input.plan.taskKind,
             targetPath: input.plan.targetPath,
@@ -6133,10 +6030,10 @@ async function executeWorkflowTaskPlan(input: {
             verification,
             repairNotes,
             evidence,
-            provenance: summarizeCodingResultProvenance(provenanceCollector),
+            provenance: summarizeToolRuntimeProvenance(provenanceCollector),
           },
         })
-      : projectTurnResultHandoff({
+      : projectWorkflowTurnHandoff({
           capabilityPlan: {
             taskKind: input.plan.taskKind,
             targetPath: input.plan.targetPath,
@@ -6167,7 +6064,7 @@ async function executeWorkflowTaskPlan(input: {
             crossFileRemainingTargets,
             crossFileFailedByReason,
             crossFileSkippedFiles,
-            provenance: summarizeCodingResultProvenance(provenanceCollector),
+            provenance: summarizeToolRuntimeProvenance(provenanceCollector),
           },
         });
 
