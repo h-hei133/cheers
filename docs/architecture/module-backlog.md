@@ -133,6 +133,23 @@ as an import-policing rule.
   flow summary, touched facades, result states preserved, and validation
   surface.
 
+### Route 163: Foundation Consistency Audit
+
+- Route 163 adds `docs/foundation/` with a concise audit, machine-readable
+  consistency matrix, and risk register over result truthfulness, runtime
+  receipts, workspace/edit preconditions, browser cleanup, provider readiness,
+  session/continue, CLI surfaces, and verifier reports.
+- The audit finds no blocking foundation contradiction and makes no source,
+  package, provider, browser, edit, runtime, CLI, session-schema, dependency,
+  package-script, or global handoff changes.
+- The main high-risk contradiction is marker parity between Result Surface
+  truthfulness and Session terminal blocker detail rendering: new Route 162
+  markers are terminal-truthful in `resultMapper`, but the session terminal
+  blocker detail classifier still recognizes only the older subset.
+- The best follow-up is a focused Result Surface / Session terminal surface
+  parity route; `Harness / gate taxonomy` remains the best release/report
+  confidence route.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -211,18 +228,22 @@ If these answers are weak, pick a contract route instead of a feature route.
 
 ## Current Default Recommendation
 
-The central-file extraction pass is complete for the current atlas set. Routes
-154-160 classify `runMvpIntegratedFlow.ts`, `sessionRuntime.ts`,
-`SessionManager.ts`, `cli.tsx`, `scripts/verify/index.mjs`, and
-`resultMapper.ts` as acceptable composition/substrate/readiness/truthfulness
-roots under owner-module boundaries.
+The central-file extraction pass is complete for the current atlas set, and
+Route 163 records the current foundation consistency state in
+`docs/foundation/`. Routes 154-160 classify `runMvpIntegratedFlow.ts`,
+`sessionRuntime.ts`, `SessionManager.ts`, `cli.tsx`,
+`scripts/verify/index.mjs`, and `resultMapper.ts` as acceptable
+composition/substrate/readiness/truthfulness roots under owner-module
+boundaries.
 
 Choose the next route by module lifecycle gap and product risk rather than by
 central-file size. After Route 162, the best default next route is `Tool /
 Runtime success/failure result-flow calibration` if result/session consistency
-is the priority, or `Harness / gate taxonomy` if release/report confidence is
-the blocker. Consider shared handoff extraction only after more
-capability-specific flows prove repeated stable fields.
+is the priority. If foundation consistency is the immediate priority, first
+close the Route 163 Result Surface / Session terminal blocker-detail parity
+risk. Choose `Harness / gate taxonomy` if release/report confidence is the
+blocker. Consider shared handoff extraction only after more capability-specific
+flows prove repeated stable fields.
 
 ## Persistent Boundaries
 

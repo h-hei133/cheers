@@ -1,0 +1,824 @@
+{
+  "schemaVersion": 1,
+  "route": "docs/agent-routes/route163-foundation-consistency-audit.md",
+  "scope": {
+    "kind": "foundation-consistency-audit",
+    "behaviorChangesAllowed": false,
+    "globalHandoffAbstraction": false,
+    "providerLiveCalls": false,
+    "externalMcpExecution": false,
+    "packageSweepRequired": false
+  },
+  "facts": [
+    {
+      "id": "result.actionableMarkers",
+      "sourceOfTruthModule": "Result Surface",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/query/actionableBlockerModule.ts",
+        "packages/ts-shell/src/core/query/resultMapper.ts"
+      ],
+      "consumers": [
+        "Session / Continue",
+        "CLI / UX",
+        "Harness / Eval"
+      ],
+      "expectedResultState": "stopped_error when actionable evidence blocks a completed-looking result",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "terminalReason",
+        "terminalClassification",
+        "stopReason",
+        "safe evidence marker"
+      ],
+      "forbiddenFields": [
+        "raw DOM",
+        "provider config path",
+        "secrets"
+      ],
+      "contradictionChecks": [
+        "new Route 162 actionable markers are recognized by Result Surface",
+        "unknown hard failures remain error"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/query/crossCapabilityResultFlow.test.ts",
+        "packages/ts-shell/src/core/query/resultMapperBoundary.test.ts",
+        "rtk npm run verify:result-contract"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Result Surface"
+    },
+    {
+      "id": "result.sessionTerminalBlockerParity",
+      "sourceOfTruthModule": "Result Surface",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/query/actionableBlockerModule.ts",
+        "packages/ts-shell/src/core/shell/sessionTerminalState.ts"
+      ],
+      "consumers": [
+        "Session / Continue",
+        "CLI / UX"
+      ],
+      "expectedResultState": "stopped_error",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "blocker kind",
+        "blocker reason",
+        "blocker do next"
+      ],
+      "forbiddenFields": [
+        "terminal success for actionable blockers",
+        "session schema changes"
+      ],
+      "contradictionChecks": [
+        "session terminal detail classifier should understand Result Surface blocker markers or consume the shared projection"
+      ],
+      "validationEvidence": [
+        "manual audit: sessionTerminalState.ts has a narrower duplicate marker set than actionableBlockerModule.ts"
+      ],
+      "status": "contradiction",
+      "ownerModuleForFollowUp": "Result Surface / Session / Continue"
+    },
+    {
+      "id": "runtime.commandTimeout",
+      "sourceOfTruthModule": "Runtime",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/runtime/runtimeReceipt.ts",
+        "packages/ts-shell/src/core/runtime/runtimeReceiptProjection.ts"
+      ],
+      "consumers": [
+        "Tool",
+        "Result Surface",
+        "Session / Continue"
+      ],
+      "expectedResultState": "failed receipt; terminal mapping remains Result Surface owned",
+      "expectedTerminalClassification": "error unless an actionable blocker exists",
+      "requiredFields": [
+        "execution",
+        "result",
+        "reasonCode",
+        "timeoutMs",
+        "durationMs"
+      ],
+      "forbiddenFields": [
+        "completed terminal claim from timeout",
+        "unbudgeted stdout/stderr"
+      ],
+      "contradictionChecks": [
+        "timeout summary is explicit and bounded"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/runtime/runtimeReceiptProjection.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Runtime"
+    },
+    {
+      "id": "runtime.commandFailed",
+      "sourceOfTruthModule": "Runtime and Tool",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/runtime/runtimeReceipt.ts",
+        "packages/ts-shell/src/core/tools/toolLifecycleProjection.ts",
+        "packages/ts-shell/src/core/query/capabilityResultClassification.ts"
+      ],
+      "consumers": [
+        "Result Surface",
+        "Session / Continue",
+        "Harness / Eval"
+      ],
+      "expectedResultState": "failed receipt; hard terminal error when approved execution failed",
+      "expectedTerminalClassification": "error",
+      "requiredFields": [
+        "execution=failed",
+        "result=failed",
+        "exitCode or failure reason",
+        "safe stdout/stderr summary"
+      ],
+      "forbiddenFields": [
+        "completed terminal claim for approved hard failure",
+        "unbudgeted output dump"
+      ],
+      "contradictionChecks": [
+        "approved command hard failures do not become completed"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/query/resultMapperBoundary.test.ts",
+        "packages/ts-shell/src/core/runtime/runtimeReceipt.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Runtime"
+    },
+    {
+      "id": "runtime.unavailable",
+      "sourceOfTruthModule": "Runtime",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/runtime/runtimeReceipt.ts",
+        "packages/ts-shell/src/core/tools/runtime.ts",
+        "packages/ts-shell/src/core/context/browserTool.ts"
+      ],
+      "consumers": [
+        "Tool",
+        "Browser",
+        "Result Surface"
+      ],
+      "expectedResultState": "stopped receipt or stopped_error terminal when actionable",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "availability",
+        "execution=not-run",
+        "reasonCode",
+        "doNext"
+      ],
+      "forbiddenFields": [
+        "runtime execution after unavailable precondition",
+        "success claim"
+      ],
+      "contradictionChecks": [
+        "runtime unavailable facts stop before execution"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/context/browserTool.test.ts",
+        "packages/ts-shell/src/core/runtime/runtimeReceipt.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Runtime"
+    },
+    {
+      "id": "runtime.cleanupFacts",
+      "sourceOfTruthModule": "Runtime",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/runtime/runtimeReceipt.ts",
+        "packages/ts-shell/src/core/runtime/runtimeReceiptProjection.ts"
+      ],
+      "consumers": [
+        "Browser",
+        "Result Surface",
+        "Session / Continue"
+      ],
+      "expectedResultState": "receipt-local status only",
+      "expectedTerminalClassification": "not decided by runtime receipt",
+      "requiredFields": [
+        "cleanup",
+        "cleanupSummary",
+        "redactionStatus"
+      ],
+      "forbiddenFields": [
+        "raw browser content",
+        "cookies",
+        "authorization headers",
+        "provider config paths"
+      ],
+      "contradictionChecks": [
+        "cleanup is projected distinctly from timeout",
+        "raw content is sanitized"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/runtime/runtimeReceiptProjection.test.ts",
+        "packages/ts-shell/src/core/context/browserTool.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Runtime"
+    },
+    {
+      "id": "edit.missingTarget",
+      "sourceOfTruthModule": "Edit / Patch",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/orchestration/editPatchModule.ts",
+        "packages/ts-shell/src/orchestration/editPatchResult.ts",
+        "packages/ts-shell/src/orchestration/workspaceTargetProjection.ts"
+      ],
+      "consumers": [
+        "Agent Loop",
+        "Result Surface",
+        "Session / Continue"
+      ],
+      "expectedResultState": "stopped_error",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "patch-target-missing marker",
+        "writerInvoked=false",
+        "changedFiles=[]"
+      ],
+      "forbiddenFields": [
+        "write authorization",
+        "writer invocation"
+      ],
+      "contradictionChecks": [
+        "missing target does not execute mutation"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/query/crossCapabilityResultFlow.test.ts",
+        "packages/ts-shell/src/orchestration/editPatchModule.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Edit / Patch"
+    },
+    {
+      "id": "workspace.ambiguousTarget",
+      "sourceOfTruthModule": "Workspace / File Context",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/orchestration/workspaceTargetProjection.ts",
+        "packages/ts-shell/src/orchestration/readInspectModule.ts",
+        "packages/ts-shell/src/core/query/actionableBlockerModule.ts"
+      ],
+      "consumers": [
+        "Agent Loop",
+        "Edit / Patch",
+        "Session / Continue",
+        "Result Surface"
+      ],
+      "expectedResultState": "stopped_error",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "ambiguous-target marker or reason",
+        "candidate-safe labels",
+        "do-next asking for one exact target"
+      ],
+      "forbiddenFields": [
+        "write authority from ambiguous target",
+        "raw file dump"
+      ],
+      "contradictionChecks": [
+        "ambiguous target stops for explicit selection"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/query/resultMapperBoundary.test.ts",
+        "docs/architecture/workspace-file-context-contract.md"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Workspace / File Context"
+    },
+    {
+      "id": "edit.missingContent",
+      "sourceOfTruthModule": "Edit / Patch",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/orchestration/editPatchResult.ts"
+      ],
+      "consumers": [
+        "Result Surface",
+        "Session / Continue"
+      ],
+      "expectedResultState": "stopped_error",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "patch-content-missing marker",
+        "no-write evidence"
+      ],
+      "forbiddenFields": [
+        "synthetic success",
+        "changed files"
+      ],
+      "contradictionChecks": [
+        "missing content maps to actionable stopped and changed files stay empty"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/query/crossCapabilityResultFlow.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Edit / Patch"
+    },
+    {
+      "id": "edit.staleRead",
+      "sourceOfTruthModule": "Workspace / File Context and Edit / Patch",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/orchestration/patchResult/workspaceWriteRoute.ts",
+        "packages/ts-shell/src/orchestration/patchResult/workspaceWriteResult.ts",
+        "packages/ts-shell/src/orchestration/editPatchResult.ts"
+      ],
+      "consumers": [
+        "Result Surface",
+        "Session / Continue",
+        "Harness / Eval"
+      ],
+      "expectedResultState": "stopped_error or no-write route failure before writer",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "stale-read marker",
+        "final stale-read evidence",
+        "writer unreachable on stale read"
+      ],
+      "forbiddenFields": [
+        "writer invocation after stale-read",
+        "success-like terminal state"
+      ],
+      "contradictionChecks": [
+        "stale-read never executes mutation"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/orchestration/patchResult/workspaceWriteResult.test.ts",
+        "packages/ts-shell/src/orchestration/patchResult/workspaceWriteRoute.test.ts",
+        "rtk npm run verify:edit-capability-closeout"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Workspace / File Context"
+    },
+    {
+      "id": "edit.unsupportedFutureEdit",
+      "sourceOfTruthModule": "Edit / Patch",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/orchestration/editPatchResult.ts",
+        "packages/ts-shell/src/orchestration/futureEditContract.ts"
+      ],
+      "consumers": [
+        "Agent Loop",
+        "Result Surface",
+        "Session / Continue"
+      ],
+      "expectedResultState": "stopped_error",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "unsupported-future-edit marker",
+        "preview-only state"
+      ],
+      "forbiddenFields": [
+        "execution claim",
+        "write authorization"
+      ],
+      "contradictionChecks": [
+        "future-only edit stays no-write"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/query/crossCapabilityResultFlow.test.ts",
+        "packages/ts-shell/src/orchestration/editPatchModule.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Edit / Patch"
+    },
+    {
+      "id": "browser.cleanupFailed",
+      "sourceOfTruthModule": "Browser",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/context/browserTxn.ts",
+        "packages/ts-shell/src/core/runtime/runtimeReceiptProjection.ts"
+      ],
+      "consumers": [
+        "Result Surface",
+        "Session / Continue",
+        "Browser harness"
+      ],
+      "expectedResultState": "browser-local failed; terminal actionable stopped when marker reaches Result Surface",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "cleanup status",
+        "browser-cleanup-failed marker",
+        "redaction status"
+      ],
+      "forbiddenFields": [
+        "raw DOM",
+        "cookies",
+        "session storage",
+        "screenshots/OCR-like raw content"
+      ],
+      "contradictionChecks": [
+        "cleanup failure is distinct from adapter failure",
+        "raw content stays excluded"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/harness/browserTxn.test.ts",
+        "packages/ts-shell/src/core/query/crossCapabilityResultFlow.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Browser"
+    },
+    {
+      "id": "browser.unavailable",
+      "sourceOfTruthModule": "Browser and Runtime",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/context/browserTxn.ts",
+        "packages/ts-shell/src/core/context/browserTool.ts",
+        "packages/ts-shell/src/core/runtime/runtimeReceipt.ts"
+      ],
+      "consumers": [
+        "Result Surface",
+        "Session / Continue",
+        "Browser harness"
+      ],
+      "expectedResultState": "stopped_error when surfaced to terminal",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "browser-unavailable marker",
+        "runtime reason code",
+        "cleanup=not-started"
+      ],
+      "forbiddenFields": [
+        "browser launch",
+        "public web action",
+        "raw browser content"
+      ],
+      "contradictionChecks": [
+        "browser unavailable stops before runtime execution"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/context/browserTool.test.ts",
+        "packages/ts-shell/src/core/harness/browserTxn.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Browser"
+    },
+    {
+      "id": "browser.policyBlocked",
+      "sourceOfTruthModule": "Browser",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/context/browserToolPolicy.ts",
+        "packages/ts-shell/src/core/context/browserPublicReadOnlyWebPolicy.ts",
+        "packages/ts-shell/src/core/query/actionableBlockerModule.ts"
+      ],
+      "consumers": [
+        "Result Surface",
+        "Session / Continue",
+        "Browser harness"
+      ],
+      "expectedResultState": "stopped_error",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "browser-policy-blocked marker or reason",
+        "safe do-next"
+      ],
+      "forbiddenFields": [
+        "public web/default browser action expansion",
+        "auth/session persistence"
+      ],
+      "contradictionChecks": [
+        "policy blocked browser action remains stopped and non-executing"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/query/resultMapperBoundary.test.ts",
+        "packages/ts-shell/src/core/context/browserTool.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Browser"
+    },
+    {
+      "id": "browser.timeout",
+      "sourceOfTruthModule": "Browser and Runtime",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/context/browserTxn.ts",
+        "packages/ts-shell/src/core/runtime/runtimeReceiptProjection.ts"
+      ],
+      "consumers": [
+        "Result Surface",
+        "Session / Continue",
+        "Browser harness"
+      ],
+      "expectedResultState": "stopped_error when actionable timeout evidence blocks success",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "browser-timeout marker",
+        "timeout summary",
+        "cleanup evidence"
+      ],
+      "forbiddenFields": [
+        "completed terminal claim from timeout"
+      ],
+      "contradictionChecks": [
+        "timeout never maps to completed when blocker evidence exists"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/query/resultMapperBoundary.test.ts",
+        "packages/ts-shell/src/core/query/crossCapabilityResultFlow.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Browser"
+    },
+    {
+      "id": "provider.notConfigured",
+      "sourceOfTruthModule": "Provider / Model",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/shell/providerReadiness.ts",
+        "packages/ts-shell/src/core/query/actionableBlockerModule.ts"
+      ],
+      "consumers": [
+        "CLI / UX",
+        "Result Surface",
+        "Harness / Eval"
+      ],
+      "expectedResultState": "stopped_error",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "provider-readiness:missing-key or missing-config marker",
+        "redacted reason",
+        "do-next guidance"
+      ],
+      "forbiddenFields": [
+        "real provider config path",
+        "API key",
+        "token",
+        "headers"
+      ],
+      "contradictionChecks": [
+        "missing provider config is actionable stopped and redacted"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/query/crossCapabilityResultFlow.test.ts",
+        "packages/ts-shell/src/core/shell/providerReadiness.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Provider / Model"
+    },
+    {
+      "id": "provider.optInRequired",
+      "sourceOfTruthModule": "Provider / Model",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/query/actionableBlockerModule.ts",
+        "scripts/verify/verifierSafetyModule.mjs"
+      ],
+      "consumers": [
+        "CLI / UX",
+        "Harness / Eval",
+        "Result Surface"
+      ],
+      "expectedResultState": "stopped_error or dry-run skip depending on surface",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "explicit opt-in fact",
+        "realProviderTouched=false for dry-run skip"
+      ],
+      "forbiddenFields": [
+        "default real-provider execution",
+        "manual config reads"
+      ],
+      "contradictionChecks": [
+        "include-real dry-run does not touch real provider"
+      ],
+      "validationEvidence": [
+        "scripts/verify/verifierModuleBoundary.test.mjs",
+        "packages/ts-shell/src/core/query/crossCapabilityResultFlow.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Provider / Model"
+    },
+    {
+      "id": "provider.unsupportedMode",
+      "sourceOfTruthModule": "Provider / Model",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/core/shell/providerReadiness.ts",
+        "packages/ts-shell/src/core/query/actionableBlockerModule.ts"
+      ],
+      "consumers": [
+        "CLI / UX",
+        "Result Surface",
+        "Harness / Eval"
+      ],
+      "expectedResultState": "stopped_error",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "provider-readiness:unsupported-provider marker",
+        "provider-unsupported blocker kind",
+        "redacted do-next"
+      ],
+      "forbiddenFields": [
+        "provider live call",
+        "provider config path",
+        "secrets"
+      ],
+      "contradictionChecks": [
+        "unsupported provider readiness maps to actionable stopped without config reads"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/query/resultMapperBoundary.test.ts",
+        "packages/ts-shell/src/core/shell/providerReadiness.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Provider / Model"
+    },
+    {
+      "id": "provider.diagnosticFailure",
+      "sourceOfTruthModule": "Provider / Model",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/entrypoints/providerReadinessCliSurface.ts"
+      ],
+      "consumers": [
+        "CLI / UX",
+        "Session / Continue",
+        "Result Surface"
+      ],
+      "expectedResultState": "stopped_error",
+      "expectedTerminalClassification": "error for auth/unknown diagnostic failures",
+      "requiredFields": [
+        "redacted stop reason",
+        "provider-readiness diagnostic marker"
+      ],
+      "forbiddenFields": [
+        "secret",
+        "unredacted provider config path"
+      ],
+      "contradictionChecks": [
+        "diagnostic failures are not rewritten into unsupported success claims"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/entrypoints/providerReadinessCliSurface.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Provider / Model"
+    },
+    {
+      "id": "session.stoppedContinuation",
+      "sourceOfTruthModule": "Session / Continue",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/session/sessionResumeContextBuilder.ts",
+        "packages/ts-shell/src/session/SessionManager.ts",
+        "packages/ts-shell/src/session/durableStatusProjection.ts"
+      ],
+      "consumers": [
+        "Agent Loop",
+        "CLI / UX",
+        "Result Surface"
+      ],
+      "expectedResultState": "prior stopped remains stopped in future-turn context",
+      "expectedTerminalClassification": "stopped",
+      "requiredFields": [
+        "last-terminal",
+        "terminalClassification",
+        "terminalReason",
+        "safe failed/changed file summaries"
+      ],
+      "forbiddenFields": [
+        "success carryover for stopped result",
+        "raw file dumps",
+        "raw DOM",
+        "secrets"
+      ],
+      "contradictionChecks": [
+        "stopped results do not become success continuation seeds"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/session/sessionResumeContextBuilder.test.ts",
+        "packages/ts-shell/src/session/mutationCompactContinuity.test.ts",
+        "packages/ts-shell/src/session/SessionManager.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Session / Continue"
+    },
+    {
+      "id": "cli.providerReadinessDisplay",
+      "sourceOfTruthModule": "CLI / UX and Provider / Model",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/entrypoints/providerReadinessCliSurface.ts",
+        "packages/ts-shell/src/entrypoints/cliProviderProjection.ts"
+      ],
+      "consumers": [
+        "CLI / UX",
+        "Session / Continue"
+      ],
+      "expectedResultState": "stopped_error for pre-query provider gate",
+      "expectedTerminalClassification": "error or stopped depending on diagnostic kind",
+      "requiredFields": [
+        "stopReason",
+        "redacted diagnostics",
+        "empty transcript for pre-query block"
+      ],
+      "forbiddenFields": [
+        "provider secrets",
+        "real provider path"
+      ],
+      "contradictionChecks": [
+        "readiness display preserves redacted provider diagnostics"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/entrypoints/providerReadinessCliSurface.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "CLI / UX"
+    },
+    {
+      "id": "cli.sessionStatusDisplay",
+      "sourceOfTruthModule": "CLI / UX and Session / Continue",
+      "sourceFilesOrFacades": [
+        "packages/ts-shell/src/entrypoints/cliSessionModule.ts",
+        "packages/ts-shell/src/core/shell/sessionStateSurface.ts",
+        "packages/ts-shell/src/session/sessionSummaryProjection.ts"
+      ],
+      "consumers": [
+        "CLI / UX",
+        "Session / Continue"
+      ],
+      "expectedResultState": "display-only session status projection",
+      "expectedTerminalClassification": "preserves persisted terminalClassification when shown",
+      "requiredFields": [
+        "session id",
+        "session status",
+        "terminalClassification when available"
+      ],
+      "forbiddenFields": [
+        "session schema change",
+        "terminal truthfulness override"
+      ],
+      "contradictionChecks": [
+        "CLI session surfaces display session facts without redefining terminal truthfulness"
+      ],
+      "validationEvidence": [
+        "packages/ts-shell/src/core/shell/sessionStateSurface.test.ts",
+        "packages/ts-shell/src/entrypoints/cliModuleBoundary.test.ts"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "CLI / UX"
+    },
+    {
+      "id": "verifier.includeRealDryRun",
+      "sourceOfTruthModule": "Harness / Eval",
+      "sourceFilesOrFacades": [
+        "scripts/verify/verifierCliModule.mjs",
+        "scripts/verify/verifierCaseModule.mjs",
+        "scripts/verify/verifierSafetyModule.mjs",
+        "scripts/verify/verifierReportModule.mjs"
+      ],
+      "consumers": [
+        "Route closeout",
+        "Release gates",
+        "Provider / Model"
+      ],
+      "expectedResultState": "dry-run report with realProviderTouched=false",
+      "expectedTerminalClassification": "not applicable",
+      "requiredFields": [
+        "suiteSkippedRealProviderCases",
+        "realProviderExecutionSkipped",
+        "realProviderTouched",
+        "exitCode"
+      ],
+      "forbiddenFields": [
+        "hidden skip",
+        "real-provider execution during dry-run",
+        "unredacted failure"
+      ],
+      "contradictionChecks": [
+        "include-real dry-run reports skipped real cases and does not touch real provider"
+      ],
+      "validationEvidence": [
+        "scripts/verify/verifierModuleBoundary.test.mjs"
+      ],
+      "status": "consistent",
+      "ownerModuleForFollowUp": "Harness / Eval"
+    },
+    {
+      "id": "verifier.gateTaxonomy",
+      "sourceOfTruthModule": "Harness / Eval",
+      "sourceFilesOrFacades": [
+        "scripts/verify/*",
+        "docs/architecture/module-backlog.md"
+      ],
+      "consumers": [
+        "Route closeout",
+        "Release reports"
+      ],
+      "expectedResultState": "gate/report evidence classified by gate family",
+      "expectedTerminalClassification": "not applicable",
+      "requiredFields": [
+        "marker",
+        "report field",
+        "exit code semantics",
+        "skip classification"
+      ],
+      "forbiddenFields": [
+        "hidden skip",
+        "report success without executed or explicitly skipped case evidence"
+      ],
+      "contradictionChecks": [
+        "gate taxonomy is named before release/report expansion"
+      ],
+      "validationEvidence": [
+        "manual audit: module backlog already lists Harness / gate taxonomy as pending"
+      ],
+      "status": "suspect",
+      "ownerModuleForFollowUp": "Harness / Eval"
+    }
+  ]
+}
