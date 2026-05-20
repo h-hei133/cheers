@@ -113,6 +113,14 @@ import {
   normalizePromptForExecution,
 } from "./cliCommandExecutionBridge.js";
 import {
+  formatAgentModeStatusLines,
+  formatAgentModeUpdatedLines,
+  formatViewModeStatusLines,
+  formatViewModeUpdatedLine,
+  formatWorkspaceInfoLines,
+  projectPermissionListDisplay,
+} from "./cliDisplayProjection.js";
+import {
   buildPersistentShellPrompt,
   formatCliContextTag,
 } from "./cliInteractiveLoopState.js";
@@ -127,6 +135,15 @@ import {
   renderRecentProjectContexts,
   renderWorkspaceSummary,
 } from "./cliWorkspaceSurface.js";
+import {
+  formatSessionPanelSwitchSuccessLines,
+  formatSessionSwitchAmbiguousLine,
+  formatSessionSwitchFailureLine,
+  formatSessionSwitchNotFoundLine,
+  formatSessionSwitchSuccessLines,
+  formatSessionSwitchUsage,
+} from "./cliSessionProjection.js";
+import { projectCliStartupPlan } from "./cliStartupPlan.js";
 import {
   renderMcpBlockedContract,
   renderMcpDoctorControlPlane,
@@ -297,6 +314,20 @@ async function main(): Promise<void> {
     stdinTransportMode,
     nonInteractivePromptCount: nonInteractivePrompts.length,
   });
+  const startupPlan = projectCliStartupPlan({
+    options,
+    cliModePlan,
+    stdinTransportMode,
+    nonInteractivePromptCount: nonInteractivePrompts.length,
+    launchCwd,
+    runtimeBaseDir,
+    workspaceRoot,
+    projectRoot: runtimeContext.projectRoot,
+    rootMode: runtimeContext.rootMode,
+    providerCredentialResolution: resolvedCredential,
+    providerModeEnv: process.env.PRIVATE_AGENTS_PROVIDER_MODE,
+    maxTurns: runtimeContext.runtimeConfig.maxTurns,
+  });
   const showStartupSurface =
     !options.printMode &&
     !options.replayFile &&
@@ -311,11 +342,11 @@ async function main(): Promise<void> {
       recoveryCandidate,
       recoveryCandidateSummary: recoveryCandidateSummary ?? undefined,
       recoveryBlockedNotice: recoveryBlockedNotice ?? undefined,
-      provider: resolvedCredential.provider,
-      model: resolvedCredential.model,
-      maxTurns: runtimeContext.runtimeConfig.maxTurns,
+      provider: startupPlan.provider.provider,
+      model: startupPlan.provider.model,
+      maxTurns: startupPlan.maxTurns,
       executionPath: isRustDaemonEnabled() ? "rust-daemon" : "ts-local",
-      stdinTransportMode,
+      stdinTransportMode: startupPlan.stdinTransportMode,
     });
   }
   logger.info("CLI session initialized", {
@@ -543,13 +574,13 @@ async function main(): Promise<void> {
 
     try {
       if (isWorkspaceInfoPromptStrict(trimmed)) {
-        renderer.renderLine("");
-        renderer.renderLine(`Current working directory: ${runtimeContext.cwd}`);
-        renderer.renderLine(`Project root: ${runtimeContext.projectRoot}`);
-        renderer.renderLine(
-          "Use /cd <path> (or /workspace attach <path>) to switch target project.",
+        renderProjectedLines(
+          renderer,
+          formatWorkspaceInfoLines({
+            cwd: runtimeContext.cwd,
+            projectRoot: runtimeContext.projectRoot,
+          }),
         );
-        renderer.renderLine("");
         rl.prompt();
         return;
       }
@@ -644,9 +675,7 @@ async function main(): Promise<void> {
         if (sessionAction === "switch") {
           const targetSessionReference = slashResult.sessionId?.trim();
           if (!targetSessionReference) {
-            renderer.renderLine(
-              "\nUsage: /sessions switch <id|prefix|title|last>\n",
-            );
+            renderer.renderLine(formatSessionSwitchUsage({ printMode: false }));
             rl.prompt();
             return;
           }
@@ -681,11 +710,14 @@ async function main(): Promise<void> {
             const previousSessionId = runtimeContext.session.id;
             switchRuntimeSessionProjectContext(runtimeContext, resumed);
             mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
-            renderer.renderLine(
-              `\nSwitched session: ${previousSessionId} -> ${resumed.id}\n`,
-            );
-            renderer.renderLine(
-              `Project context: ${runtimeContext.projectRoot}`,
+            renderProjectedLines(
+              renderer,
+              formatSessionSwitchSuccessLines({
+                previousSessionId,
+                nextSessionId: resumed.id,
+                projectRoot: runtimeContext.projectRoot,
+                printMode: false,
+              }),
             );
             renderSwitchedSessionSurface(renderer, {
               sessionManager,
@@ -696,7 +728,10 @@ async function main(): Promise<void> {
             refreshInteractivePromptChrome();
           } catch (error) {
             renderer.renderLine(
-              `\nFailed to switch session: ${error instanceof Error ? error.message : String(error)}\n`,
+              formatSessionSwitchFailureLine({
+                message: error instanceof Error ? error.message : String(error),
+                printMode: false,
+              }),
             );
           }
           rl.prompt();
@@ -742,11 +777,12 @@ async function main(): Promise<void> {
             );
             switchRuntimeSessionProjectContext(runtimeContext, resumed);
             mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
-            renderer.renderLine(
-              `\nSwitched to session ${panelResult.switchedSessionId}.\n`,
-            );
-            renderer.renderLine(
-              `Project context: ${runtimeContext.projectRoot}`,
+            renderProjectedLines(
+              renderer,
+              formatSessionPanelSwitchSuccessLines({
+                nextSessionId: panelResult.switchedSessionId,
+                projectRoot: runtimeContext.projectRoot,
+              }),
             );
             renderSwitchedSessionSurface(renderer, {
               sessionManager,
@@ -952,13 +988,9 @@ async function main(): Promise<void> {
       }
 
       if (isShellAction(slashResult, "show-view")) {
-        const activeMode =
-          sessionRuntime.getViewMode() === "compact" ? "user" : "developer";
-        renderer.renderLine(
-          `\nCurrent view mode: ${activeMode} (${sessionRuntime.getViewMode()})`,
-        );
-        renderer.renderLine(
-          "Use /view user for product-style output, or /view developer for runtime-level diagnostics.\n",
+        renderProjectedLines(
+          renderer,
+          formatViewModeStatusLines({ viewMode: sessionRuntime.getViewMode() }),
         );
         rl.prompt();
         return;
@@ -967,19 +999,17 @@ async function main(): Promise<void> {
       if (isShellAction(slashResult, "set-view")) {
         const nextMode = slashResult.viewMode ?? "compact";
         sessionRuntime.setViewMode(nextMode);
-        const activeMode = nextMode === "compact" ? "user" : "developer";
-        renderer.renderLine(
-          `\nView mode updated to ${activeMode} (${nextMode}). Use /view status to inspect current mode.\n`,
-        );
+        renderer.renderLine(formatViewModeUpdatedLine({ viewMode: nextMode }));
         rl.prompt();
         return;
       }
 
       if (isShellAction(slashResult, "show-agent-mode")) {
-        const activeMode = sessionRuntime.getAgentMode();
-        renderer.renderLine(`\nCurrent agent mode: ${activeMode}`);
-        renderer.renderLine(
-          "Use /plan for planning-oriented reasoning, or /build for coding/build execution (default).\n",
+        renderProjectedLines(
+          renderer,
+          formatAgentModeStatusLines({
+            agentMode: sessionRuntime.getAgentMode(),
+          }),
         );
         rl.prompt();
         return;
@@ -989,13 +1019,10 @@ async function main(): Promise<void> {
         const nextMode = slashResult.agentMode ?? "build";
         sessionRuntime.setAgentMode(nextMode);
         refreshInteractivePromptChrome();
-        renderer.renderLine(`\nAgent mode updated to ${nextMode}.`);
-        renderer.renderLine(
-          nextMode === "plan"
-            ? "Plan mode prioritizes planning and diagnosis over direct edits/tool execution."
-            : "Build mode prioritizes direct coding workflow (read/search/edit/verify).",
+        renderProjectedLines(
+          renderer,
+          formatAgentModeUpdatedLines({ agentMode: nextMode }),
         );
-        renderer.renderLine("");
         rl.prompt();
         return;
       }
@@ -2038,7 +2065,7 @@ async function runNonInteractivePrompt(options: {
         const targetSessionReference = resolved.slashResult.sessionId?.trim();
         if (!targetSessionReference) {
           options.renderer.renderLine(
-            "Usage: /sessions switch <id|prefix|title|last>",
+            formatSessionSwitchUsage({ printMode: true }),
           );
           return;
         }
@@ -2069,11 +2096,14 @@ async function runNonInteractivePrompt(options: {
           const resumed = options.sessionManager.resume(resolvedSessionId);
           const previousSessionId = options.runtimeContext.session.id;
           switchRuntimeSessionProjectContext(options.runtimeContext, resumed);
-          options.renderer.renderLine(
-            `Switched session: ${previousSessionId} -> ${resumed.id}`,
-          );
-          options.renderer.renderLine(
-            `Project context: ${options.runtimeContext.projectRoot}`,
+          renderProjectedLines(
+            options.renderer,
+            formatSessionSwitchSuccessLines({
+              previousSessionId,
+              nextSessionId: resumed.id,
+              projectRoot: options.runtimeContext.projectRoot,
+              printMode: true,
+            }),
           );
           renderSwitchedSessionSurface(options.renderer, {
             sessionManager: options.sessionManager,
@@ -2083,7 +2113,10 @@ async function runNonInteractivePrompt(options: {
           return;
         } catch (error) {
           options.renderer.renderLine(
-            `Failed to switch session: ${error instanceof Error ? error.message : String(error)}`,
+            formatSessionSwitchFailureLine({
+              message: error instanceof Error ? error.message : String(error),
+              printMode: true,
+            }),
           );
           return;
         }
@@ -2550,6 +2583,15 @@ function renderSessionSurfaceOverview(
   renderSessionCommandMap(renderer);
 }
 
+function renderProjectedLines(
+  renderer: { renderLine(line: string): void },
+  lines: readonly string[],
+): void {
+  for (const line of lines) {
+    renderer.renderLine(line);
+  }
+}
+
 function switchRuntimeSessionProjectContext(
   runtimeContext: ShellRuntimeContext,
   resumedSession: Session,
@@ -2638,26 +2680,21 @@ function resolveSwitchSessionReference(input: {
   }
 
   if (resolved.reason === "ambiguous") {
-    const lines: string[] = [
-      `Switch target '${input.reference}' is ambiguous.`,
-    ];
-    for (const candidate of (resolved.candidates ?? []).slice(0, 3)) {
-      const title = candidate.title?.trim() || "(untitled)";
-      lines.push(`- ${candidate.id} [${candidate.status}] ${title}`);
-    }
-    lines.push(
-      "Hint: use a longer session id prefix or exact session id from /sessions list.",
-    );
     input.renderer.renderLine(
-      input.printMode ? lines.join("\n") : `\n${lines.join("\n")}\n`,
+      formatSessionSwitchAmbiguousLine({
+        reference: input.reference,
+        candidates: resolved.candidates ?? [],
+        printMode: input.printMode,
+      }),
     );
     return null;
   }
 
   input.renderer.renderLine(
-    input.printMode
-      ? `Switch target '${input.reference}' was not found.\nHint: run /sessions list, then /sessions switch <id|prefix|title|last>.`
-      : `\nSwitch target '${input.reference}' was not found.\nHint: run /sessions list, then /sessions switch <id|prefix|title|last>.\n`,
+    formatSessionSwitchNotFoundLine({
+      reference: input.reference,
+      printMode: input.printMode,
+    }),
   );
   return null;
 }
@@ -2668,14 +2705,14 @@ function renderPermissionsList(
   projectRoot: string,
 ): void {
   const grants = trustPolicy.listGrants(projectRoot);
-  const projectLabel = path.basename(projectRoot) || projectRoot;
+  const projection = projectPermissionListDisplay({
+    projectRoot,
+    grantCount: grants.length,
+  });
+  const projectLabel = projection.projectLabel;
   renderer.renderLine(`\nTrust policy grants @ ${projectLabel}`);
   if (grants.length === 0) {
-    renderer.renderLine("- No persisted allow-always grants for this project.");
-    renderer.renderLine(
-      "- Use /permissions reset all to clear global grants if needed.",
-    );
-    renderer.renderLine("");
+    renderProjectedLines(renderer, projection.emptyLines ?? []);
     return;
   }
 
