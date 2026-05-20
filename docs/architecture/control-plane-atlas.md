@@ -460,8 +460,9 @@ Unsafe area:
    read/inspect/workspace, verification, and continuation by adding
    module-owned facades, but the file remains the highest concentration point
    because execution branches and result assembly still live there.
-2. `SessionManager.ts`: persistence substrate plus projection/codecs/reentry
-   summaries.
+2. `SessionManager.ts`: acceptable stateful Session / Continue substrate after
+   Route 157; avoid regrowing store/layout, registry, compact, approval-memory,
+   or pure continuity evidence internals there.
 3. `cli.tsx`: entrypoint plus command/display/session/provider/approval
    wiring.
 4. `sessionRuntime.ts`: acceptable shell/runtime composition root after Route
@@ -478,7 +479,7 @@ Unsafe area:
 | Browser | availability, policy, planning, execution, evidence, eval, report, cleanup, redaction | generic result/session projection still incomplete |
 | Shell / Tool | execution/provenance, approval, MCP failure classes | shared runtime receipt and transcript vocabulary |
 | Provider | opt-in, readiness classification, diagnostic handoff | provider outcome projection still touches planning flow |
-| Session / Continue | transcript, compact, replay, approval/mutation continuity | schema-neutral projector extraction not finished |
+| Session / Continue | transcript, compact, replay, approval/mutation continuity, stateful substrate | CLI-facing action wiring still concentrated in entrypoint |
 | CLI | args/mode helpers, startup surface, slash registry | entrypoint still owns display helpers and switch details |
 | Harness / Eval | deterministic gates and Route 135 verifier modules | common gate/report taxonomy still pending |
 
@@ -639,6 +640,58 @@ their current scopes. `SessionManager.ts` is now the highest-value central file
 because persistence substrate, schema-neutral projection/codecs, compact/replay,
 approval/mutation continuity, and CLI-facing reentry summaries still converge
 there.
+
+## Post-Route-157 SessionManager Facade Pass
+
+Route 157 ran the owner-module extraction pass for
+`packages/ts-shell/src/session/SessionManager.ts`.
+
+New module facades:
+
+- `packages/ts-shell/src/session/sessionStore.ts`
+  - owner: Session / Continue Engineering
+  - owns session root/layout facts, current-session store path, per-session file
+    layout, session id generation, and id validation
+- `packages/ts-shell/src/session/sessionRegistry.ts`
+  - owner: Session / Continue Engineering
+  - owns current-session registry read/write/remove projection and delegates
+    selection semantics to `currentSessionSelection.ts`
+- `packages/ts-shell/src/session/sessionApprovalMemoryModule.ts`
+  - owner: Session / Continue Engineering and Permission / Policy Engineering
+  - owns approval audit working-memory payload projection and history trimming
+- `packages/ts-shell/src/session/sessionCompactModule.ts`
+  - owner: Session / Continue Engineering
+  - owns compact retention projection inputs and continuity handoff payloads
+- `packages/ts-shell/src/session/sessionContinuityModule.ts`
+  - owner: Session / Continue Engineering
+  - owns pure continuity evidence extraction, transcript event discovery, seed
+    influence parsing, and replay-safe summary normalization helpers
+
+`SessionManager.ts` is now acceptable as a stateful Session / Continue
+substrate. It keeps public API methods, metadata/state/transcript schema
+ownership, filesystem state-transition ordering, transcript append order, state
+locks, atomic writes, and unreadable-session warning state. It should not regain
+store/path layout helpers, current-session registry persistence, approval
+memory payload construction, compact retention projection, or pure continuity
+evidence extraction.
+
+Remaining non-substrate responsibilities to avoid growing:
+
+- CLI session commands and display/action wiring still live in `cli.tsx`
+- recovery trust-boundary decisions remain inside SessionManager because they
+  depend on live snapshots and should move only with dedicated recovery
+  characterization coverage
+- session listing warning state remains in SessionManager to avoid CLI output
+  drift
+
+Next central file recommendation: `cli.tsx`.
+
+Reason: after Routes 154-157, `runMvpIntegratedFlow.ts`, `sessionRuntime.ts`,
+and `SessionManager.ts` all have acceptable composition/substrate
+classifications. `cli.tsx` is now the highest-value central file because
+argument mode dispatch, slash command action wiring, session command surfaces,
+provider snapshot display, approval bridge wiring, and runtime invocation still
+converge there.
 
 ## Post-Route-149 Roadmap Reset
 

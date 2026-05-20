@@ -7,9 +7,7 @@
  * - state.json      -> mutable runtime state snapshot
  */
 
-import * as crypto from "node:crypto";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import type { QueryEvent } from "../core/query/events.js";
 import type {
@@ -32,26 +30,21 @@ import type {
 import { deriveActionableFailureContinuity } from "./actionableFailureContinuity.js";
 import {
   projectApprovalAudit,
-  projectApprovalAuditContinuity,
-  projectApprovalSummaryFallback,
 } from "./approvalAuditProjection.js";
 import {
   decodeApprovalMemory,
   decodeApprovalMemoryHistory,
 } from "./approvalMemoryCodec.js";
-import { applyCompactRetentionPlan } from "./compactRetentionPlanner.js";
-import {
-  createEmptyCurrentSessionSelectionStore,
-  parseCurrentSessionSelectionStore,
-  selectCurrentSession,
-  type CurrentSessionSelectionResolution,
-  type CurrentSessionSelectionStore,
+import type {
+  CurrentSessionSelectionResolution,
+  CurrentSessionSelectionStore,
 } from "./currentSessionSelection.js";
 import { projectDurableStatus } from "./durableStatusProjection.js";
 import { buildMutationContinuityState } from "./mutationContinuityState.js";
 import {
-  projectCompactRetentionPlanInput,
-} from "./sessionCompactProjection.js";
+  projectApprovalMemoryPersistence,
+} from "./sessionApprovalMemoryModule.js";
+import { applySessionCompactRetention } from "./sessionCompactModule.js";
 import {
   hasContinuationEvidence as snapshotHasContinuationEvidence,
   hasDeterministicTerminalEvidence as snapshotHasDeterministicTerminalEvidence,
@@ -67,9 +60,36 @@ import {
   type TranscriptEvent,
 } from "./sessionEventCodec.js";
 import {
-  projectCurrentSessionMetadata,
+  collectRecentCodingResults,
+  compactContinuityText,
+  extractGroundedDeliverableMode,
+  extractLastAnswerDefect,
+  extractLastReadDeliveredLines,
+  extractLastReadFragment,
+  extractLastReadWindow,
+  extractSeedInfluenceFromStrings,
+  extractStagedRepairProgress,
+  extractSummaryBoolean,
+  extractSummaryString,
+  findLastCodingCompletionEvent,
+  findLastLifecycleEvent,
+  findLastQueryCompletionEvent,
+  findLastTurnContent,
+  normalizeOptionalBoolean,
+  normalizeOptionalString,
+  normalizeWriteEffect,
+  parseSeedInfluence,
+} from "./sessionContinuityModule.js";
+import {
   projectSessionMetadata,
 } from "./sessionMetadataProjection.js";
+import {
+  projectCurrentSessionRegistryResolution,
+  projectCurrentSessionSelectionStore,
+  readSessionRegistryStore,
+  removeCurrentSessionSelectionFromStore,
+  writeSessionRegistryStore,
+} from "./sessionRegistry.js";
 import {
   buildResumeReplayInput,
   buildSessionReplayPlan,
@@ -84,6 +104,14 @@ import {
   buildSessionResumeSnapshot,
   buildSuccessHandoffDiagnostic,
 } from "./sessionResumeContextBuilder.js";
+import {
+  createSessionId,
+  createSessionStoreLayout,
+  ensureSessionStoreLayout,
+  projectSessionFileLayout,
+  validateSessionId,
+  type SessionStoreLayout,
+} from "./sessionStore.js";
 import {
   projectRecoveryTrustBoundaryBlock,
   projectSessionReentrySummary,
@@ -289,6 +317,7 @@ export class SessionManager {
   private static readonly STATE_LOCK_RETRY_DELAY_MS = 20;
   private static readonly AUTO_COMPACT_TURN_THRESHOLD = 12;
   private static readonly APPROVAL_AUDIT_HISTORY_LIMIT = 16;
+  private readonly storeLayout: SessionStoreLayout;
   private sessionsDir: string;
   private readonly currentSessionStorePath: string;
   private lastCurrentSessionStoreReadError: string | null = null;
@@ -296,44 +325,53 @@ export class SessionManager {
   private didWarnListSessionsFailure = false;
 
   constructor() {
-    const homeDir = process.env.USERPROFILE || process.env.HOME || os.homedir();
-    this.sessionsDir = path.join(homeDir, ".private-agents", "sessions");
-    this.currentSessionStorePath = path.join(
-      homeDir,
-      ".private-agents",
-      "current-session.json",
-    );
+    this.storeLayout = createSessionStoreLayout();
+    this.sessionsDir = this.storeLayout.sessionsDir;
+    this.currentSessionStorePath = this.storeLayout.currentSessionStorePath;
     this.ensureSessionsDir();
   }
 
   private ensureSessionsDir(): void {
-    if (!fs.existsSync(this.sessionsDir)) {
-      fs.mkdirSync(this.sessionsDir, { recursive: true });
-    }
+    ensureSessionStoreLayout(this.storeLayout);
   }
 
   private generateSessionId(): string {
-    return `sess_${crypto.randomBytes(8).toString("hex")}_${Date.now()}`;
+    return createSessionId();
   }
 
   private getSessionDir(sessionId: string): string {
-    return path.join(this.sessionsDir, sessionId);
+    return projectSessionFileLayout({
+      sessionsDir: this.sessionsDir,
+      sessionId,
+    }).sessionDir;
   }
 
   private getMetadataPath(sessionId: string): string {
-    return path.join(this.getSessionDir(sessionId), "metadata.json");
+    return projectSessionFileLayout({
+      sessionsDir: this.sessionsDir,
+      sessionId,
+    }).metadataPath;
   }
 
   private getTranscriptPath(sessionId: string): string {
-    return path.join(this.getSessionDir(sessionId), "transcript.jsonl");
+    return projectSessionFileLayout({
+      sessionsDir: this.sessionsDir,
+      sessionId,
+    }).transcriptPath;
   }
 
   private getStatePath(sessionId: string): string {
-    return path.join(this.getSessionDir(sessionId), "state.json");
+    return projectSessionFileLayout({
+      sessionsDir: this.sessionsDir,
+      sessionId,
+    }).statePath;
   }
 
   private getStateLockPath(sessionId: string): string {
-    return path.join(this.getSessionDir(sessionId), "state.lock");
+    return projectSessionFileLayout({
+      sessionsDir: this.sessionsDir,
+      sessionId,
+    }).stateLockPath;
   }
 
   getSessionFilePath(sessionId: string): string {
@@ -364,7 +402,7 @@ export class SessionManager {
     const storeReadError = this.lastCurrentSessionStoreReadError;
     const selection = store.byProjectRoot[normalizedProjectRoot];
     if (!selection?.sessionId?.trim()) {
-      const unselectedProjection = selectCurrentSession({
+      const unselectedProjection = projectCurrentSessionRegistryResolution({
         projectRoot,
         normalizedProjectRoot,
         storeReadError,
@@ -373,7 +411,7 @@ export class SessionManager {
       return unselectedProjection.resolution;
     }
     if (!this.sessionExists(selection.sessionId)) {
-      const missingProjection = selectCurrentSession({
+      const missingProjection = projectCurrentSessionRegistryResolution({
         projectRoot,
         normalizedProjectRoot,
         storeReadError,
@@ -387,7 +425,7 @@ export class SessionManager {
     try {
       const session = this.load(selection.sessionId);
       const sessionProjectRoot = session.projectRoot || normalizedProjectRoot;
-      const selectedProjection = selectCurrentSession({
+      const selectedProjection = projectCurrentSessionRegistryResolution({
         projectRoot,
         normalizedProjectRoot,
         storeReadError,
@@ -403,7 +441,7 @@ export class SessionManager {
       }
       return selectedProjection.resolution;
     } catch (error) {
-      const failedProjection = selectCurrentSession({
+      const failedProjection = projectCurrentSessionRegistryResolution({
         projectRoot,
         normalizedProjectRoot,
         storeReadError,
@@ -424,16 +462,12 @@ export class SessionManager {
     }
 
     const current = this.readCurrentSessionStore();
-    const next: CurrentSessionSelectionStore = {
-      schemaVersion: 1,
-      byProjectRoot: {
-        ...current.byProjectRoot,
-        [normalizedProjectRoot]: projectCurrentSessionMetadata({
-          sessionId: normalizedSessionId,
-          updatedAt: new Date().toISOString(),
-        }),
-      },
-    };
+    const next = projectCurrentSessionSelectionStore({
+      current,
+      normalizedProjectRoot,
+      sessionId: normalizedSessionId,
+      updatedAt: new Date().toISOString(),
+    });
     this.writeCurrentSessionStore(next);
   }
 
@@ -455,15 +489,7 @@ export class SessionManager {
       readonly gitRoot?: string | null;
     },
   ): Session {
-    const normalizedId = sessionId.trim();
-    if (!normalizedId) {
-      throw new Error("Session id is required");
-    }
-    if (!/^[A-Za-z0-9_.-]+$/.test(normalizedId)) {
-      throw new Error(
-        `Invalid session id "${sessionId}". Allowed characters: letters, numbers, dot, underscore, dash.`,
-      );
-    }
+    const normalizedId = validateSessionId(sessionId);
     if (this.sessionExists(normalizedId)) {
       throw new Error(`Session ${normalizedId} already exists`);
     }
@@ -593,72 +619,20 @@ export class SessionManager {
   ): void {
     const session = this.load(sessionId);
     const recordedAt = decision.recordedAt ?? new Date().toISOString();
-    const normalizedProjectRoot = path.resolve(
-      decision.projectRoot?.trim() || session.projectRoot,
-    );
     this.withSessionStateLock(session.id, () => {
       const statePath = this.getStatePath(session.id);
       const current = this.readStateSnapshotSafely(statePath);
-      const currentWorkingMemory =
-        current?.workingMemory &&
-        typeof current.workingMemory === "object" &&
-        !Array.isArray(current.workingMemory)
-          ? { ...(current.workingMemory as Record<string, unknown>) }
-          : {};
-      const nextApprovalAudit: ApprovalAuditMemoryState = {
-        decision: decision.decision,
-        decisionSource: decision.decisionSource,
-        persistent: decision.persistent,
-        cacheEffect: decision.cacheEffect,
-        projectRoot: normalizedProjectRoot,
-        cacheKey: decision.cacheKey,
-        scopeLabel: decision.scopeLabel,
-        ...(decision.lineage ? { lineage: decision.lineage } : {}),
-        ...(decision.stopReason ? { stopReason: decision.stopReason } : {}),
-        ...(decision.channel ? { channel: decision.channel } : {}),
-        ...(decision.inputKey ? { inputKey: decision.inputKey } : {}),
+      const approvalMemory = projectApprovalMemoryPersistence({
+        currentWorkingMemory: current?.workingMemory,
+        sessionProjectRoot: session.projectRoot,
+        decision,
         recordedAt,
-      };
-      const approvalAuditHistory = decodeApprovalMemoryHistory(
-        currentWorkingMemory,
-        { historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT },
-      );
-      const nextApprovalAuditHistory = [
-        ...approvalAuditHistory,
-        nextApprovalAudit,
-      ].slice(-SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT);
-      const currentContinuity =
-        currentWorkingMemory.continuity &&
-        typeof currentWorkingMemory.continuity === "object" &&
-        !Array.isArray(currentWorkingMemory.continuity)
-          ? { ...(currentWorkingMemory.continuity as Record<string, unknown>) }
-          : {};
-      const nextContinuity: Record<string, unknown> = {
-        ...currentContinuity,
-        ...projectApprovalAuditContinuity({
-          approvalAudit: nextApprovalAudit,
-          approvalAuditHistory: nextApprovalAuditHistory,
-        }),
-      };
-      const currentSummaryEntries = Array.isArray(currentWorkingMemory.summary)
-        ? currentWorkingMemory.summary.filter(
-            (entry): entry is string => typeof entry === "string",
-          )
-        : [];
-      const nextSummary = projectApprovalSummaryFallback({
-        currentSummaryEntries,
-        approvalAudit: nextApprovalAudit,
+        historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
       });
       const snapshot = this.buildSessionStateSnapshot(session, current);
       this.writeJsonFileAtomic(statePath, {
         ...snapshot,
-        workingMemory: {
-          ...currentWorkingMemory,
-          approvalAudit: nextApprovalAudit,
-          approvalAuditHistory: nextApprovalAuditHistory,
-          continuity: nextContinuity,
-          summary: nextSummary,
-        },
+        workingMemory: approvalMemory.workingMemory,
       } satisfies SessionStateSnapshot);
     });
   }
@@ -1298,38 +1272,16 @@ export class SessionManager {
   }
 
   private readCurrentSessionStore(): CurrentSessionSelectionStore {
-    if (!fs.existsSync(this.currentSessionStorePath)) {
-      this.lastCurrentSessionStoreReadError = null;
-      return createEmptyCurrentSessionSelectionStore();
-    }
-
-    try {
-      const parsed = JSON.parse(
-        fs.readFileSync(this.currentSessionStorePath, "utf8"),
-      ) as Partial<CurrentSessionSelectionStore>;
-      const result = parseCurrentSessionSelectionStore(
-        parsed,
-        this.currentSessionStorePath,
-      );
-      this.lastCurrentSessionStoreReadError = result.readError;
-      return result.store;
-    } catch (error) {
-      this.lastCurrentSessionStoreReadError =
-        error instanceof Error ? error.message : String(error);
-      return createEmptyCurrentSessionSelectionStore();
-    }
+    const result = readSessionRegistryStore(this.currentSessionStorePath);
+    this.lastCurrentSessionStoreReadError = result.readError;
+    return result.store;
   }
 
   private writeCurrentSessionStore(store: CurrentSessionSelectionStore): void {
-    const storeDir = path.dirname(this.currentSessionStorePath);
-    if (!fs.existsSync(storeDir)) {
-      fs.mkdirSync(storeDir, { recursive: true });
-    }
-    fs.writeFileSync(
-      this.currentSessionStorePath,
-      JSON.stringify(store, null, 2),
-      "utf8",
-    );
+    writeSessionRegistryStore({
+      storePath: this.currentSessionStorePath,
+      store,
+    });
   }
 
   private removeCurrentSessionSelection(normalizedProjectRoot: string): void {
@@ -1338,12 +1290,13 @@ export class SessionManager {
       return;
     }
 
-    const nextByProjectRoot = { ...current.byProjectRoot };
-    delete nextByProjectRoot[normalizedProjectRoot];
-    this.writeCurrentSessionStore({
-      schemaVersion: 1,
-      byProjectRoot: nextByProjectRoot,
+    const next = removeCurrentSessionSelectionFromStore({
+      current,
+      normalizedProjectRoot,
     });
+    if (next) {
+      this.writeCurrentSessionStore(next);
+    }
   }
 
   getRecoveryTrustBoundaryBlock(input?: {
@@ -1405,30 +1358,30 @@ export class SessionManager {
     );
     const recoverySnapshot = this.getRecoverySnapshot(sessionId);
     const transcriptEvents = this.getTranscriptEvents(sessionId);
-    const lastRunErrorEvent = this.findLastLifecycleEvent(
+    const lastRunErrorEvent = findLastLifecycleEvent(
       transcriptEvents,
       "run-error",
     );
-    const lastQueryCompletion = this.findLastQueryCompletionEvent(transcriptEvents);
+    const lastQueryCompletion = findLastQueryCompletionEvent(transcriptEvents);
     const lastCodingCompletion =
-      this.findLastCodingCompletionEvent(transcriptEvents);
+      findLastCodingCompletionEvent(transcriptEvents);
     const lastCodingResult = lastCodingCompletion?.event.result.codingResult;
-    const recentCodingResults = this.collectRecentCodingResults(
+    const recentCodingResults = collectRecentCodingResults(
       transcriptEvents,
       4,
     );
     const lastGroundedDeliverableMode =
-      this.extractGroundedDeliverableMode(lastCodingResult?.continuation.evidence);
-    const lastReadDeliveredLines = this.extractLastReadDeliveredLines(
+      extractGroundedDeliverableMode(lastCodingResult?.continuation.evidence);
+    const lastReadDeliveredLines = extractLastReadDeliveredLines(
       lastCodingResult?.continuation.evidence,
     );
-    const lastReadWindow = this.extractLastReadWindow(
+    const lastReadWindow = extractLastReadWindow(
       lastCodingResult?.continuation.evidence,
     );
-    const lastReadFragment = this.extractLastReadFragment(
+    const lastReadFragment = extractLastReadFragment(
       lastCodingResult?.continuation.evidence,
     );
-    const stagedRepairProgress = this.extractStagedRepairProgress(
+    const stagedRepairProgress = extractStagedRepairProgress(
       lastCodingResult?.continuation.evidence,
     );
     const lastRequestScope = extractLastRequestScopeFromEvidence(
@@ -1468,7 +1421,7 @@ export class SessionManager {
     const lastToolExecutionProvenance =
       toolExecutionProvenanceItems[toolExecutionProvenanceItems.length - 1];
     const lastAnswerDefect =
-      this.extractLastAnswerDefect(lastCodingResult) ?? undefined;
+      extractLastAnswerDefect(lastCodingResult) ?? undefined;
     const lastStoppedSessionContinuity =
       deriveStoppedSessionContinuitySurface(lastCodingResult);
     const lastWriteContinuity =
@@ -1509,7 +1462,7 @@ export class SessionManager {
         : lastQueryCompletion;
     const lastUserIntent =
       recoverySnapshot.lastUserMessage?.content ??
-      this.findLastTurnContent(session.turns, "user");
+      findLastTurnContent(session.turns, "user");
     const mutationContinuity = buildMutationContinuityState({
       lastCodingResult,
       recentCodingResults,
@@ -1533,12 +1486,12 @@ export class SessionManager {
       );
       if (continuityTerminalSource.event.result.stopReason?.trim()) {
         unresolvedItems.push(
-          `stop-reason:${this.compactText(continuityTerminalSource.event.result.stopReason, 180)}`,
+          `stop-reason:${compactContinuityText(continuityTerminalSource.event.result.stopReason, 180)}`,
         );
       }
     } else if (lastRunErrorEvent?.detail?.trim()) {
       unresolvedItems.push(
-        `previous-run-error:${this.compactText(lastRunErrorEvent.detail, 180)}`,
+        `previous-run-error:${compactContinuityText(lastRunErrorEvent.detail, 180)}`,
       );
     }
     if ((lastCodingResult?.failedFiles.length ?? 0) > 0) {
@@ -1588,7 +1541,7 @@ export class SessionManager {
       lastUserIntent,
       lastAssistantOutput:
         recoverySnapshot.lastAssistantMessage?.content ??
-        this.findLastTurnContent(session.turns, "assistant"),
+        findLastTurnContent(session.turns, "assistant"),
       lastTerminalClassification:
         continuityTerminalSource?.event.result.terminalClassification ??
         recoverySnapshot.terminalClassification,
@@ -1849,483 +1802,34 @@ export class SessionManager {
     return buildSessionResumeSnapshot({ currentPrompt, snapshot });
   }
 
-  private extractGroundedDeliverableMode(
-    evidence: readonly string[] | undefined,
-  ): "read" | "summary" | "explain" | undefined {
-    if (!evidence?.length) {
-      return undefined;
-    }
-    for (let index = evidence.length - 1; index >= 0; index -= 1) {
-      const item = evidence[index]?.trim().toLowerCase();
-      if (!item) {
-        continue;
-      }
-      const match = item.match(/^deliverable-mode:(read|summary|explain)$/);
-      if (match?.[1]) {
-        return match[1] as "read" | "summary" | "explain";
-      }
-    }
-    return undefined;
-  }
-
-  private extractLastReadDeliveredLines(
-    evidence: readonly string[] | undefined,
-  ): number | undefined {
-    if (!evidence?.length) {
-      return undefined;
-    }
-    for (let index = evidence.length - 1; index >= 0; index -= 1) {
-      const item = evidence[index]?.trim().toLowerCase();
-      if (!item) {
-        continue;
-      }
-      const match = item.match(/^read-delivered-lines:(\d+)$/);
-      if (!match?.[1]) {
-        continue;
-      }
-      const parsed = Number.parseInt(match[1], 10);
-      if (Number.isFinite(parsed) && parsed >= 0) {
-        return parsed;
-      }
-    }
-    return undefined;
-  }
-
-  private extractLastReadWindow(
-    evidence: readonly string[] | undefined,
-  ): { start?: number; end?: number; size?: number } {
-    if (!evidence?.length) {
-      return {};
-    }
-    let start: number | undefined;
-    let end: number | undefined;
-    let size: number | undefined;
-    for (let index = evidence.length - 1; index >= 0; index -= 1) {
-      const item = evidence[index]?.trim().toLowerCase();
-      if (!item) {
-        continue;
-      }
-      if (start === undefined) {
-        const match = item.match(/^read-window-start:(\d+)$/);
-        if (match?.[1]) {
-          const parsed = Number.parseInt(match[1], 10);
-          if (Number.isFinite(parsed) && parsed >= 0) {
-            start = parsed;
-          }
-        }
-      }
-      if (end === undefined) {
-        const match = item.match(/^read-window-end:(\d+)$/);
-        if (match?.[1]) {
-          const parsed = Number.parseInt(match[1], 10);
-          if (Number.isFinite(parsed) && parsed >= 0) {
-            end = parsed;
-          }
-        }
-      }
-      if (size === undefined) {
-        const match = item.match(/^read-window-size:(\d+)$/);
-        if (match?.[1]) {
-          const parsed = Number.parseInt(match[1], 10);
-          if (Number.isFinite(parsed) && parsed > 0) {
-            size = parsed;
-          }
-        }
-      }
-      if (start !== undefined && end !== undefined && size !== undefined) {
-        break;
-      }
-    }
-    return { start, end, size };
-  }
-
-  private extractLastReadFragment(
-    evidence: readonly string[] | undefined,
-  ): {
-    start?: number;
-    end?: number;
-    lineIndexes?: number[];
-    ranges?: string[];
-    sourceWindowStart?: number;
-    sourceWindowEnd?: number;
-    fingerprint?: string;
-    filter?: "none" | "function-definitions";
-  } {
-    if (!evidence?.length) {
-      return {};
-    }
-    let start: number | undefined;
-    let end: number | undefined;
-    let lineIndexes: number[] | undefined;
-    let ranges: string[] | undefined;
-    let sourceWindowStart: number | undefined;
-    let sourceWindowEnd: number | undefined;
-    let fingerprint: string | undefined;
-    let filter: "none" | "function-definitions" | undefined;
-    for (let index = evidence.length - 1; index >= 0; index -= 1) {
-      const item = evidence[index]?.trim().toLowerCase();
-      if (!item) {
-        continue;
-      }
-      if (start === undefined) {
-        const match = item.match(/^read-fragment-start:(\d+)$/);
-        if (match?.[1]) {
-          const parsed = Number.parseInt(match[1], 10);
-          if (Number.isFinite(parsed) && parsed >= 0) {
-            start = parsed;
-          }
-        }
-      }
-      if (end === undefined) {
-        const match = item.match(/^read-fragment-end:(\d+)$/);
-        if (match?.[1]) {
-          const parsed = Number.parseInt(match[1], 10);
-          if (Number.isFinite(parsed) && parsed >= 0) {
-            end = parsed;
-          }
-        }
-      }
-      if (lineIndexes === undefined) {
-        const match = item.match(/^read-fragment-line-indexes:([0-9,\s]+)$/);
-        if (match?.[1]) {
-          const parsed = match[1]
-            .split(",")
-            .map((value) => Number.parseInt(value.trim(), 10))
-            .filter((value) => Number.isFinite(value) && value >= 0)
-            .map((value) => Math.floor(value));
-          if (parsed.length > 0) {
-            lineIndexes = Array.from(new Set(parsed)).sort((a, b) => a - b);
-          }
-        }
-      }
-      if (ranges === undefined) {
-        const match = item.match(/^read-fragment-ranges:([0-9;,\s-]+)$/);
-        if (match?.[1]) {
-          const parsed = match[1]
-            .split(";")
-            .map((value) => value.trim())
-            .filter((value) => value.length > 0);
-          if (parsed.length > 0) {
-            ranges = parsed;
-          }
-        }
-      }
-      if (sourceWindowStart === undefined) {
-        const match = item.match(/^read-fragment-source-window-start:(\d+)$/);
-        if (match?.[1]) {
-          const parsed = Number.parseInt(match[1], 10);
-          if (Number.isFinite(parsed) && parsed >= 0) {
-            sourceWindowStart = parsed;
-          }
-        }
-      }
-      if (sourceWindowEnd === undefined) {
-        const match = item.match(/^read-fragment-source-window-end:(\d+)$/);
-        if (match?.[1]) {
-          const parsed = Number.parseInt(match[1], 10);
-          if (Number.isFinite(parsed) && parsed >= 0) {
-            sourceWindowEnd = parsed;
-          }
-        }
-      }
-      if (filter === undefined) {
-        const match = item.match(/^repair-read-filter:(none|function-definitions)$/);
-        if (match?.[1] === "none" || match?.[1] === "function-definitions") {
-          filter = match[1];
-        }
-      }
-      if (fingerprint === undefined) {
-        const match = item.match(/^read-fragment-fingerprint:([0-9a-f]{64})$/);
-        if (match?.[1]) {
-          fingerprint = match[1];
-        }
-      }
-      if (
-        start !== undefined &&
-        end !== undefined &&
-        lineIndexes !== undefined &&
-        filter !== undefined
-      ) {
-        break;
-      }
-    }
-    return {
-      ...(start !== undefined ? { start } : {}),
-      ...(end !== undefined ? { end } : {}),
-      ...(lineIndexes?.length ? { lineIndexes } : {}),
-      ...(ranges?.length ? { ranges } : {}),
-      ...(sourceWindowStart !== undefined ? { sourceWindowStart } : {}),
-      ...(sourceWindowEnd !== undefined ? { sourceWindowEnd } : {}),
-      ...(fingerprint ? { fingerprint } : {}),
-      ...(filter ? { filter } : {}),
-    };
-  }
-
-  private extractStagedRepairProgress(
-    evidence: readonly string[] | undefined,
-  ): {
-    stepCount?: number;
-    completedStep?: number;
-    blockedStep?: number;
-    nextStep?: number;
-  } {
-    if (!evidence?.length) {
-      return {};
-    }
-    let stepCount: number | undefined;
-    let completedStep: number | undefined;
-    let blockedStep: number | undefined;
-    let nextStep: number | undefined;
-
-    for (let index = evidence.length - 1; index >= 0; index -= 1) {
-      const item = evidence[index]?.trim().toLowerCase();
-      if (!item) {
-        continue;
-      }
-      if (stepCount === undefined) {
-        const match = item.match(/^staged-repair-(?:step-total|steps):(\d+)$/);
-        if (match?.[1]) {
-          const parsed = Number.parseInt(match[1], 10);
-          if (Number.isFinite(parsed) && parsed > 0) {
-            stepCount = parsed;
-          }
-        }
-      }
-      if (completedStep === undefined) {
-        const match = item.match(
-          /^staged-repair-(?:completed-step|step-cursor):(\d+)$/,
-        );
-        if (match?.[1]) {
-          const parsed = Number.parseInt(match[1], 10);
-          if (Number.isFinite(parsed) && parsed >= 0) {
-            completedStep = parsed;
-          }
-        }
-      }
-      if (blockedStep === undefined) {
-        const match = item.match(/^staged-repair-blocked-step:(\d+)$/);
-        if (match?.[1]) {
-          const parsed = Number.parseInt(match[1], 10);
-          if (Number.isFinite(parsed) && parsed > 0) {
-            blockedStep = parsed;
-          }
-        }
-      }
-      if (nextStep === undefined) {
-        const match = item.match(/^staged-repair-next-step:(\d+)$/);
-        if (match?.[1]) {
-          const parsed = Number.parseInt(match[1], 10);
-          if (Number.isFinite(parsed) && parsed > 0) {
-            nextStep = parsed;
-          }
-        }
-      }
-      if (
-        stepCount !== undefined &&
-        completedStep !== undefined &&
-        blockedStep !== undefined &&
-        nextStep !== undefined
-      ) {
-        break;
-      }
-    }
-
-    return { stepCount, completedStep, blockedStep, nextStep };
-  }
-
-  private extractLastAnswerDefect(
-    codingResult:
-      | {
-          readonly taskSatisfaction?: {
-            readonly verdict?: string;
-            readonly reasons?: readonly string[];
-          };
-        }
-      | undefined,
+  private extractActionHandoffSummaryFromMemory(
+    workingMemory: unknown,
   ): string | undefined {
-    const reasons = codingResult?.taskSatisfaction?.reasons ?? [];
-    if (reasons.length === 0) {
+    if (!workingMemory || typeof workingMemory !== "object") {
       return undefined;
     }
-    const first = reasons[0]?.trim();
-    if (!first) {
-      return undefined;
-    }
-    if (codingResult?.taskSatisfaction?.verdict === "satisfied") {
-      return undefined;
-    }
-    return first;
-  }
-
-  private findLastQueryCompletionEvent(
-    transcriptEvents: readonly TranscriptEvent[],
-  ):
-    | Extract<TranscriptEvent, { type: "query-event" }> & {
-        event: Extract<QueryEvent, { type: "query.completed" }>;
-      }
-    | undefined {
-    for (let index = transcriptEvents.length - 1; index >= 0; index -= 1) {
-      const event = transcriptEvents[index];
-      if (event?.type !== "query-event") {
-        continue;
-      }
-      if (event.event.type === "query.completed") {
-        return event as Extract<TranscriptEvent, { type: "query-event" }> & {
-          event: Extract<QueryEvent, { type: "query.completed" }>;
-        };
-      }
-    }
-    return undefined;
-  }
-
-  private findLastLifecycleEvent(
-    transcriptEvents: readonly TranscriptEvent[],
-    lifecycleEvent: Extract<TranscriptEvent, { type: "lifecycle" }>["event"],
-  ): Extract<TranscriptEvent, { type: "lifecycle" }> | undefined {
-    for (let index = transcriptEvents.length - 1; index >= 0; index -= 1) {
-      const event = transcriptEvents[index];
-      if (event?.type !== "lifecycle") {
-        continue;
-      }
-      if (event.event === lifecycleEvent) {
-        return event;
-      }
-    }
-    return undefined;
-  }
-
-  private findLastCodingCompletionEvent(
-    transcriptEvents: readonly TranscriptEvent[],
-  ):
-    | (Extract<TranscriptEvent, { type: "query-event" }> & {
-        event: Extract<QueryEvent, { type: "query.completed" }>;
-      })
-    | undefined {
-    let fallback:
-      | (Extract<TranscriptEvent, { type: "query-event" }> & {
-          event: Extract<QueryEvent, { type: "query.completed" }>;
-        })
-      | undefined;
-    for (let index = transcriptEvents.length - 1; index >= 0; index -= 1) {
-      const event = transcriptEvents[index];
-      if (event?.type !== "query-event") {
-        continue;
-      }
-      if (event.event.type !== "query.completed") {
-        continue;
-      }
-      if (event.event.result.codingResult) {
-        const typedEvent = event as Extract<TranscriptEvent, { type: "query-event" }> & {
-          event: Extract<QueryEvent, { type: "query.completed" }>;
-        };
-        if (typedEvent.event.result.codingResult.taskKind !== "chat") {
-          return typedEvent;
-        }
-        if (!fallback) {
-          fallback = typedEvent;
-        }
-      }
-    }
-    return fallback;
-  }
-
-  private collectRecentCodingResults(
-    transcriptEvents: readonly TranscriptEvent[],
-    limit: number,
-  ): Array<
-    NonNullable<Extract<QueryEvent, { type: "query.completed" }>["result"]["codingResult"]>
-  > {
-    const collected: Array<
-      NonNullable<Extract<QueryEvent, { type: "query.completed" }>["result"]["codingResult"]>
-    > = [];
-    for (let index = transcriptEvents.length - 1; index >= 0; index -= 1) {
-      if (collected.length >= limit) {
-        break;
-      }
-      const event = transcriptEvents[index];
-      if (event?.type !== "query-event" || event.event.type !== "query.completed") {
-        continue;
-      }
-      const codingResult = event.event.result.codingResult;
-      if (!codingResult || codingResult.taskKind === "chat") {
-        continue;
-      }
-      collected.push(codingResult);
-    }
-    return collected;
-  }
-
-  private findLastTurnContent(
-    turns: readonly SessionMessage[],
-    role: SessionMessage["role"],
-  ): string | undefined {
-    for (let index = turns.length - 1; index >= 0; index -= 1) {
-      const turn = turns[index];
-      if (turn.role === role && turn.content.trim().length > 0) {
-        return turn.content;
-      }
-    }
-    return undefined;
-  }
-
-  private compactText(input: string, max: number = 220): string {
-    const normalized = input.replace(/\s+/g, " ").trim();
-    if (normalized.length <= max) {
-      return normalized;
-    }
-    return `${normalized.slice(0, max)}...`;
-  }
-
-  private normalizeOptionalString(value: unknown): string | undefined {
-    if (typeof value !== "string") {
-      return undefined;
-    }
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : undefined;
-  }
-
-  private normalizeOptionalBoolean(value: unknown): boolean | undefined {
-    if (typeof value === "boolean") {
-      return value;
-    }
-    if (typeof value !== "string") {
-      return undefined;
-    }
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "yes" || normalized === "true") {
-      return true;
-    }
-    if (normalized === "no" || normalized === "false") {
-      return false;
-    }
-    return undefined;
-  }
-
-  private normalizeWriteEffect(value: unknown): CodingWriteEffect | undefined {
-    if (typeof value !== "string") {
-      return undefined;
-    }
-    const normalized = value.trim().toLowerCase();
+    const root = workingMemory as Record<string, unknown>;
     if (
-      normalized === "none" ||
-      normalized === "unknown" ||
-      normalized === "unverified" ||
-      normalized === "verified"
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
     ) {
-      return normalized;
+      const continuity = root.continuity as Record<string, unknown>;
+      const candidate = normalizeOptionalString(
+        continuity.lastActionHandoffSummary,
+      );
+      if (candidate) {
+        return candidate;
+      }
     }
-    return undefined;
-  }
-
-  private extractSummaryString(
-    summaryEntries: readonly string[],
-    key: string,
-  ): string | undefined {
-    const prefix = `${key.toLowerCase()}:`;
+    const summaryEntries = Array.isArray(root.summary)
+      ? root.summary.filter((entry): entry is string => typeof entry === "string")
+      : [];
     for (const entry of summaryEntries) {
       const normalized = entry.trim().startsWith("- ")
         ? entry.trim().slice(2).trim()
         : entry.trim();
+      const prefix = "last-action-handoff-summary:";
       if (normalized.toLowerCase().startsWith(prefix)) {
         const value = normalized.slice(prefix.length).trim();
         if (value) {
@@ -2336,13 +1840,178 @@ export class SessionManager {
     return undefined;
   }
 
-  private extractSummaryBoolean(
-    summaryEntries: readonly string[],
-    key: string,
-  ): boolean | undefined {
-    return this.normalizeOptionalBoolean(
-      this.extractSummaryString(summaryEntries, key),
+  private extractWriteContinuityFromMemory(
+    workingMemory: unknown,
+  ):
+    | {
+        readonly writerStarted?: boolean;
+        readonly writeEffect?: CodingWriteEffect;
+        readonly requiresUserInspection?: boolean;
+        readonly target?: string;
+      }
+    | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    const continuity =
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+        ? (root.continuity as Record<string, unknown>)
+        : undefined;
+    const summaryEntries = Array.isArray(root.summary)
+      ? root.summary.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    const writerStarted =
+      normalizeOptionalBoolean(continuity?.lastWriterStarted) ??
+      extractSummaryBoolean(summaryEntries, "last-writer-started");
+    const requiresUserInspection =
+      normalizeOptionalBoolean(
+        continuity?.lastWriteRequiresUserInspection,
+      ) ??
+      extractSummaryBoolean(
+        summaryEntries,
+        "last-write-requires-user-inspection",
+      );
+    const writeEffect = normalizeWriteEffect(
+      continuity?.lastWriteEffect,
+    ) ?? normalizeWriteEffect(
+      extractSummaryString(summaryEntries, "last-write-effect"),
     );
+    const target =
+      normalizeOptionalString(continuity?.lastWriteEffectTarget) ??
+      extractSummaryString(summaryEntries, "last-write-effect-target");
+    if (
+      writerStarted === undefined &&
+      requiresUserInspection === undefined &&
+      writeEffect === undefined &&
+      !target
+    ) {
+      return undefined;
+    }
+    return {
+      ...(writerStarted !== undefined ? { writerStarted } : {}),
+      ...(requiresUserInspection !== undefined
+        ? { requiresUserInspection }
+        : {}),
+      ...(writeEffect ? { writeEffect } : {}),
+      ...(target ? { target } : {}),
+    };
+  }
+
+  private extractSeedInfluenceHandoffSummaryFromMemory(
+    workingMemory: unknown,
+  ): string | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    if (
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+    ) {
+      const continuity = root.continuity as Record<string, unknown>;
+      const candidate = normalizeOptionalString(
+        continuity.lastSeedInfluenceHandoffSummary,
+      );
+      if (candidate) {
+        return candidate;
+      }
+    }
+    const summaryEntries = Array.isArray(root.summary)
+      ? root.summary.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    for (const entry of summaryEntries) {
+      const normalized = entry.trim().startsWith("- ")
+        ? entry.trim().slice(2).trim()
+        : entry.trim();
+      const prefix = "last-seed-influence-handoff-summary:";
+      if (normalized.toLowerCase().startsWith(prefix)) {
+        const value = normalized.slice(prefix.length).trim();
+        if (value) {
+          return value;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private extractFailureHandoffDiagnosticFromMemory(
+    workingMemory: unknown,
+  ): string | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    if (
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+    ) {
+      const continuity = root.continuity as Record<string, unknown>;
+      const candidate = normalizeOptionalString(
+        continuity.lastFailureHandoffDiagnostic,
+      );
+      if (candidate) {
+        return candidate;
+      }
+    }
+    const summaryEntries = Array.isArray(root.summary)
+      ? root.summary.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    for (const entry of summaryEntries) {
+      const normalized = entry.trim().startsWith("- ")
+        ? entry.trim().slice(2).trim()
+        : entry.trim();
+      const prefix = "last-failure-handoff-diagnostic:";
+      if (normalized.toLowerCase().startsWith(prefix)) {
+        const value = normalized.slice(prefix.length).trim();
+        if (value) {
+          return value;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private extractSuccessHandoffDiagnosticFromMemory(
+    workingMemory: unknown,
+  ): string | undefined {
+    if (!workingMemory || typeof workingMemory !== "object") {
+      return undefined;
+    }
+    const root = workingMemory as Record<string, unknown>;
+    if (
+      root.continuity &&
+      typeof root.continuity === "object" &&
+      !Array.isArray(root.continuity)
+    ) {
+      const continuity = root.continuity as Record<string, unknown>;
+      const candidate = normalizeOptionalString(
+        continuity.lastSuccessHandoffDiagnostic,
+      );
+      if (candidate) {
+        return candidate;
+      }
+    }
+    const summaryEntries = Array.isArray(root.summary)
+      ? root.summary.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    for (const entry of summaryEntries) {
+      const normalized = entry.trim().startsWith("- ")
+        ? entry.trim().slice(2).trim()
+        : entry.trim();
+      const prefix = "last-success-handoff-diagnostic:";
+      if (normalized.toLowerCase().startsWith(prefix)) {
+        const value = normalized.slice(prefix.length).trim();
+        if (value) {
+          return value;
+        }
+      }
+    }
+    return undefined;
   }
 
   private evaluateRecoveryTrustBoundary(
@@ -2487,7 +2156,7 @@ export class SessionManager {
       Boolean(snapshot.lastUserMessage?.content?.trim()) ||
       Boolean(snapshot.lastAssistantMessage?.content?.trim());
     const hasCompletedTurn =
-      this.findLastQueryCompletionEvent(snapshot.transcriptEvents) !== undefined;
+      findLastQueryCompletionEvent(snapshot.transcriptEvents) !== undefined;
     const hasRepairEvidence =
       snapshot.repairSummary.insertedPromptMessage ||
       snapshot.repairSummary.insertedQueryStarted ||
@@ -2630,52 +2299,16 @@ export class SessionManager {
     workingMemory: unknown,
     event: QueryEvent,
   ): unknown {
-    const now = new Date().toISOString();
-    const queryCompleted =
-      event.type === "query.completed" ? event : undefined;
-    const approvalAudit = decodeApprovalMemory(workingMemory);
-    const approvalAuditHistory = decodeApprovalMemoryHistory(workingMemory, {
+    return applySessionCompactRetention({
+      workingMemory,
+      event,
+      turnThreshold: SessionManager.AUTO_COMPACT_TURN_THRESHOLD,
       historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
+      now: new Date().toISOString(),
+      seedInfluence: this.extractSeedInfluenceFromQueryResult(
+        event.type === "query.completed" ? event.result : undefined,
+      ),
     });
-    const actionHandoffSummary = buildActionHandoffSummary(
-      queryCompleted?.result.codingResult?.lastActionResultSeed,
-    );
-    const stoppedSessionContinuity = deriveStoppedSessionContinuitySurface(
-      queryCompleted?.result.codingResult,
-    );
-    const seedInfluence = this.extractSeedInfluenceFromQueryResult(
-      queryCompleted?.result,
-    );
-    const seedInfluenceHandoffSummary = buildSeedInfluenceHandoffSummary(
-      queryCompleted?.result.codingResult?.lastActionResultSeed,
-      seedInfluence,
-    );
-    const successHandoffDiagnostic = buildSuccessHandoffDiagnostic(
-      queryCompleted?.result.codingResult,
-    );
-    return applyCompactRetentionPlan(
-      projectCompactRetentionPlanInput({
-        workingMemory,
-        event,
-        turnThreshold: SessionManager.AUTO_COMPACT_TURN_THRESHOLD,
-        now,
-        ...(approvalAudit ? { approvalAudit } : {}),
-        approvalAuditHistory,
-        ...(actionHandoffSummary ? { actionHandoffSummary } : {}),
-        ...(stoppedSessionContinuity?.writeContinuity
-          ? { writeContinuity: stoppedSessionContinuity.writeContinuity }
-          : {}),
-        ...(seedInfluence ? { seedInfluence } : {}),
-        ...(seedInfluenceHandoffSummary ? { seedInfluenceHandoffSummary } : {}),
-        ...(stoppedSessionContinuity?.failureHandoffDiagnostic
-          ? {
-              failureHandoffDiagnostic:
-                stoppedSessionContinuity.failureHandoffDiagnostic,
-            }
-          : {}),
-        ...(successHandoffDiagnostic ? { successHandoffDiagnostic } : {}),
-      }),
-    );
   }
 
   private extractSeedInfluenceFromQueryResult(
@@ -2684,7 +2317,7 @@ export class SessionManager {
     if (!result) {
       return undefined;
     }
-    return this.extractSeedInfluenceFromStrings([
+    return extractSeedInfluenceFromStrings([
       ...(result.sharedContext.notes ?? []),
       ...(result.codingResult?.evidence ?? []),
       ...(result.codingResult?.continuation.evidence ?? []),
@@ -2705,8 +2338,8 @@ export class SessionManager {
       !Array.isArray(root.continuity)
     ) {
       const continuity = root.continuity as Record<string, unknown>;
-      const fromContinuity = this.parseSeedInfluence(
-        this.normalizeOptionalString(continuity.lastSeedInfluence),
+      const fromContinuity = parseSeedInfluence(
+        normalizeOptionalString(continuity.lastSeedInfluence),
       );
       if (fromContinuity) {
         return fromContinuity;
@@ -2715,251 +2348,7 @@ export class SessionManager {
     const summaryEntries = Array.isArray(root.summary)
       ? root.summary.filter((entry): entry is string => typeof entry === "string")
       : [];
-    return this.extractSeedInfluenceFromStrings(summaryEntries);
-  }
-
-  private extractSeedInfluenceFromStrings(
-    entries: readonly string[],
-  ): SeedInfluenceDiagnostic | undefined {
-    for (const entry of entries) {
-      const influence = this.parseSeedInfluence(entry);
-      if (influence) {
-        return influence;
-      }
-    }
-    return undefined;
-  }
-
-  private parseSeedInfluence(
-    raw: string | undefined,
-  ): SeedInfluenceDiagnostic | undefined {
-    if (!raw) {
-      return undefined;
-    }
-    const direct = raw.trim().toLowerCase();
-    if (
-      direct === "target-carryover" ||
-      direct === "verify-signal" ||
-      direct === "ignored-explicit-target"
-    ) {
-      return direct;
-    }
-    const match = direct.match(
-      /\bseedInfluence=(target-carryover|verify-signal|ignored-explicit-target)\b/i,
-    );
-    return match?.[1] as SeedInfluenceDiagnostic | undefined;
-  }
-
-  private extractActionHandoffSummaryFromMemory(
-    workingMemory: unknown,
-  ): string | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    if (
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-    ) {
-      const continuity = root.continuity as Record<string, unknown>;
-      const candidate = this.normalizeOptionalString(
-        continuity.lastActionHandoffSummary,
-      );
-      if (candidate) {
-        return candidate;
-      }
-    }
-    const summaryEntries = Array.isArray(root.summary)
-      ? root.summary.filter((entry): entry is string => typeof entry === "string")
-      : [];
-    for (const entry of summaryEntries) {
-      const normalized = entry.trim().startsWith("- ")
-        ? entry.trim().slice(2).trim()
-        : entry.trim();
-      const prefix = "last-action-handoff-summary:";
-      if (normalized.toLowerCase().startsWith(prefix)) {
-        const value = normalized.slice(prefix.length).trim();
-        if (value) {
-          return value;
-        }
-      }
-    }
-    return undefined;
-  }
-
-  private extractWriteContinuityFromMemory(
-    workingMemory: unknown,
-  ):
-    | {
-        readonly writerStarted?: boolean;
-        readonly writeEffect?: CodingWriteEffect;
-        readonly requiresUserInspection?: boolean;
-        readonly target?: string;
-      }
-    | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    const continuity =
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-        ? (root.continuity as Record<string, unknown>)
-        : undefined;
-    const summaryEntries = Array.isArray(root.summary)
-      ? root.summary.filter((entry): entry is string => typeof entry === "string")
-      : [];
-    const writerStarted =
-      this.normalizeOptionalBoolean(continuity?.lastWriterStarted) ??
-      this.extractSummaryBoolean(summaryEntries, "last-writer-started");
-    const requiresUserInspection =
-      this.normalizeOptionalBoolean(
-        continuity?.lastWriteRequiresUserInspection,
-      ) ??
-      this.extractSummaryBoolean(
-        summaryEntries,
-        "last-write-requires-user-inspection",
-      );
-    const writeEffect = this.normalizeWriteEffect(
-      continuity?.lastWriteEffect,
-    ) ?? this.normalizeWriteEffect(
-      this.extractSummaryString(summaryEntries, "last-write-effect"),
-    );
-    const target =
-      this.normalizeOptionalString(continuity?.lastWriteEffectTarget) ??
-      this.extractSummaryString(summaryEntries, "last-write-effect-target");
-    if (
-      writerStarted === undefined &&
-      requiresUserInspection === undefined &&
-      writeEffect === undefined &&
-      !target
-    ) {
-      return undefined;
-    }
-    return {
-      ...(writerStarted !== undefined ? { writerStarted } : {}),
-      ...(requiresUserInspection !== undefined
-        ? { requiresUserInspection }
-        : {}),
-      ...(writeEffect ? { writeEffect } : {}),
-      ...(target ? { target } : {}),
-    };
-  }
-
-  private extractSeedInfluenceHandoffSummaryFromMemory(
-    workingMemory: unknown,
-  ): string | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    if (
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-    ) {
-      const continuity = root.continuity as Record<string, unknown>;
-      const candidate = this.normalizeOptionalString(
-        continuity.lastSeedInfluenceHandoffSummary,
-      );
-      if (candidate) {
-        return candidate;
-      }
-    }
-    const summaryEntries = Array.isArray(root.summary)
-      ? root.summary.filter((entry): entry is string => typeof entry === "string")
-      : [];
-    for (const entry of summaryEntries) {
-      const normalized = entry.trim().startsWith("- ")
-        ? entry.trim().slice(2).trim()
-        : entry.trim();
-      const prefix = "last-seed-influence-handoff-summary:";
-      if (normalized.toLowerCase().startsWith(prefix)) {
-        const value = normalized.slice(prefix.length).trim();
-        if (value) {
-          return value;
-        }
-      }
-    }
-    return undefined;
-  }
-
-  private extractFailureHandoffDiagnosticFromMemory(
-    workingMemory: unknown,
-  ): string | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    if (
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-    ) {
-      const continuity = root.continuity as Record<string, unknown>;
-      const candidate = this.normalizeOptionalString(
-        continuity.lastFailureHandoffDiagnostic,
-      );
-      if (candidate) {
-        return candidate;
-      }
-    }
-    const summaryEntries = Array.isArray(root.summary)
-      ? root.summary.filter((entry): entry is string => typeof entry === "string")
-      : [];
-    for (const entry of summaryEntries) {
-      const normalized = entry.trim().startsWith("- ")
-        ? entry.trim().slice(2).trim()
-        : entry.trim();
-      const prefix = "last-failure-handoff-diagnostic:";
-      if (normalized.toLowerCase().startsWith(prefix)) {
-        const value = normalized.slice(prefix.length).trim();
-        if (value) {
-          return value;
-        }
-      }
-    }
-    return undefined;
-  }
-
-  private extractSuccessHandoffDiagnosticFromMemory(
-    workingMemory: unknown,
-  ): string | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    if (
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-    ) {
-      const continuity = root.continuity as Record<string, unknown>;
-      const candidate = this.normalizeOptionalString(
-        continuity.lastSuccessHandoffDiagnostic,
-      );
-      if (candidate) {
-        return candidate;
-      }
-    }
-    const summaryEntries = Array.isArray(root.summary)
-      ? root.summary.filter((entry): entry is string => typeof entry === "string")
-      : [];
-    for (const entry of summaryEntries) {
-      const normalized = entry.trim().startsWith("- ")
-        ? entry.trim().slice(2).trim()
-        : entry.trim();
-      const prefix = "last-success-handoff-diagnostic:";
-      if (normalized.toLowerCase().startsWith(prefix)) {
-        const value = normalized.slice(prefix.length).trim();
-        if (value) {
-          return value;
-        }
-      }
-    }
-    return undefined;
+    return extractSeedInfluenceFromStrings(summaryEntries);
   }
 
   private load(sessionId: string): Session {
