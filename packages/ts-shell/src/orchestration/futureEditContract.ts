@@ -12,6 +12,7 @@ import {
 export type FutureEditMode =
   | "current-bounded-write"
   | "current-bounded-edit"
+  | "current-fenced-replacement"
   | "future-broad-refactor-planning"
   | "future-multi-file-discovery-edit"
   | "future-fenced-replacement"
@@ -29,6 +30,7 @@ export type FutureEditSupportStatus =
 export type FutureEditReasonCode =
   | "current-bounded-write"
   | "current-bounded-edit"
+  | "current-fenced-replacement"
   | "future-broad-refactor-planning"
   | "future-multi-file-discovery-edit"
   | "future-fenced-replacement"
@@ -65,6 +67,7 @@ export interface FutureEditContractInput {
   readonly hasReplaceDirective?: boolean;
   readonly hasFencedContent?: boolean;
   readonly hasExactOldNewMapping?: boolean;
+  readonly hasExactFencedReplacementMapping?: boolean;
   readonly hasCreateIntent?: boolean;
   readonly hasEditIntent?: boolean;
   readonly hasReadInspectIntent?: boolean;
@@ -102,6 +105,25 @@ export function classifyFutureEditContract(
       requiredPreconditions: [
         "explicit-target",
         "concrete-content",
+        "workspace-authority-check",
+        "final-stale-read",
+        "post-write-verification-plan",
+      ],
+    });
+  }
+
+  if (
+    input.hasExactFencedReplacementMapping &&
+    input.targetPath &&
+    input.hasFencedContent
+  ) {
+    return supportedContract({
+      mode: "current-fenced-replacement",
+      reasonCode: "current-fenced-replacement",
+      doNext: "Proceed through the exact fenced replacement route.",
+      requiredPreconditions: [
+        "explicit-target",
+        "exact-old-new-mapping",
         "workspace-authority-check",
         "final-stale-read",
         "post-write-verification-plan",
@@ -227,11 +249,15 @@ export function classifyFutureEditContract(
 function supportedContract(input: {
   readonly mode: Extract<
     FutureEditMode,
-    "current-bounded-write" | "current-bounded-edit"
+    | "current-bounded-write"
+    | "current-bounded-edit"
+    | "current-fenced-replacement"
   >;
   readonly reasonCode: Extract<
     FutureEditReasonCode,
-    "current-bounded-write" | "current-bounded-edit"
+    | "current-bounded-write"
+    | "current-bounded-edit"
+    | "current-fenced-replacement"
   >;
   readonly doNext: string;
   readonly requiredPreconditions: readonly FutureEditPrecondition[];

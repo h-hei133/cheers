@@ -24,6 +24,10 @@ Current supported write/edit behavior remains:
 - write requires one explicit in-workspace target and concrete content
 - edit requires one explicit in-workspace target plus concrete replacement,
   patch, or fenced target content under the current bounded route
+- exact fenced replacement now has a current-supported narrow lane when the
+  route has one explicit target, an exact old/new fenced mapping, exactly one
+  matching region, workspace authority, final stale-read, and post-write
+  verification
 - ambiguous sibling targets stop before mutation
 - vague generated-content prompts stop actionably
 - no-write read/inspect requests stay separate from mutation
@@ -35,7 +39,8 @@ Still unsupported in the current route:
 - broad refactor execution
 - batch or broad multi-file edit execution
 - discovery edit execution
-- broad/fuzzy fenced replacement execution
+- broad/fuzzy fenced replacement execution; only exact old/new fenced mapping
+  is supported
 - generated file content from vague prompts
 - rollback or snapshot execution
 
@@ -61,7 +66,7 @@ The reference scan was shape-only; no implementation code was copied.
 |---|---|---|
 | broad refactor planning | future-only | target/constraint manifest, user-confirmed target selection, workspace authority, final stale-read, verification plan, snapshot/rollback story |
 | multi-file discovery edit | future-only | discovery phase, candidate file list, user-confirmed target set, per-file plan, bounded max-file guard, workspace authority, final stale-read, verification plan |
-| fenced replacement | future-only beyond current bounded replacement | explicit target file, exact old/new or fenced block mapping, ambiguity handling, workspace authority, final stale-read, verification plan |
+| fenced replacement | current-supported only for exact old/new fenced mapping; broad/fuzzy remains future-only | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, verification plan |
 
 These modes are intentionally separate. A broad refactor request is not a
 discovery edit. A discovery edit is not permission to mutate every candidate.
@@ -134,7 +139,8 @@ classification only; execution remains owned by the existing bounded routes.
 
 Future implementation routes should add gates in this order:
 
-1. fenced replacement bounded implementation with exact mapping only
+1. fenced replacement bounded implementation with exact mapping only: closed
+   for exact old/new fenced mapping by Route 167; broad/fuzzy remains future-only
 2. discovery edit candidate selection with user-confirmed target set
 3. broad refactor manifest planning with no mutation
 4. snapshot/rollback precondition route before any broad execution

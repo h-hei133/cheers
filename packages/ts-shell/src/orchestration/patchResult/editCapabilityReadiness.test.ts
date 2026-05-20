@@ -15,6 +15,7 @@ describe("edit capability readiness model", () => {
       "bounded-marker-apply-patch-candidates",
       "bounded-broad-patch-safe-subset",
       "fenced-bounded-broad-patch-safe-subset",
+      "exact-fenced-replacement",
       "rename-with-content-decomposition",
       "unsupported-broad-shape-taxonomy",
     ] as const) {
@@ -78,6 +79,6 @@ describe("edit capability readiness model", () => {
     const ids = rows.map((row) => row.id);
 
     expect(new Set(ids).size).toBe(ids.length);
-    expect(rows).toHaveLength(22);
+    expect(rows).toHaveLength(23);
   });
 });

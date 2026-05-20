@@ -24,6 +24,19 @@ import {
   projectEditPatchResult,
   type EditPatchResultProjection,
 } from "./editPatchResult.js";
+export {
+  parseExactFencedReplacementMapping,
+  planExactFencedReplacement,
+  type ExactFencedReplacementPlan,
+  type FencedEditMapping,
+  type FencedEditMappingResult,
+} from "./fencedEditPlanner.js";
+export {
+  runFencedEditReplacementRoute,
+  type FencedEditReplacementRoute,
+  type FencedEditReplacementRouteOptions,
+} from "./fencedEditRoute.js";
+export { buildFencedEditReplacementRouteResult } from "./fencedEditResult.js";
 
 export interface EditPatchModuleState {
   readonly editExpectation: EditExpectationContract;

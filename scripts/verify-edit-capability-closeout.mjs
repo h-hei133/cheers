@@ -16,6 +16,8 @@ const testTargets = [
   'src/orchestration/patchResult/editCompatibilityGauntlet.test.ts',
   'src/orchestration/patchResult/editCapabilityReadiness.test.ts',
   'src/orchestration/patchResult/editCapabilityCloseoutManifest.test.ts',
+  'src/orchestration/fencedEditPlanner.test.ts',
+  'src/orchestration/fencedEditRoute.test.ts',
   'src/orchestration/patchRecovery/restoreCommandContract.test.ts',
   'src/orchestration/patchRecovery/restoreCommandRunner.test.ts',
   'src/orchestration/patchRecovery/restoreExecutionBridge.test.ts',

@@ -63,6 +63,9 @@
       "publicFacades": [
         "packages/ts-shell/src/orchestration/editPatchModule.ts",
         "packages/ts-shell/src/orchestration/editExpectationContract.ts",
+        "packages/ts-shell/src/orchestration/fencedEditPlanner.ts",
+        "packages/ts-shell/src/orchestration/fencedEditRoute.ts",
+        "packages/ts-shell/src/orchestration/fencedEditResult.ts",
         "packages/ts-shell/src/orchestration/futureEditContract.ts",
         "packages/ts-shell/src/orchestration/futureEditPlanner.ts",
         "packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.ts",
@@ -71,6 +74,7 @@
       ],
       "owns": [
         "current bounded edit/write expectations",
+        "exact fenced replacement planning and route projection",
         "future-only edit planning contracts",
         "workspace write authority facts",
         "stale-read and mutation result projections"
@@ -359,6 +363,9 @@
       "publicFacades": [
         "editPatchModule.ts",
         "editExpectationContract.ts",
+        "fencedEditPlanner.ts",
+        "fencedEditRoute.ts",
+        "fencedEditResult.ts",
         "futureEditContract.ts",
         "futureEditPlanner.ts",
         "workspaceAuthority.ts",
@@ -368,6 +375,7 @@
       "keyInputs": [
         "explicit target",
         "concrete content or exact mapping",
+        "exact fenced old/new mapping",
         "workspace authority fact",
         "final stale-read fact",
         "verification plan"
@@ -375,6 +383,7 @@
       "keyOutputs": [
         "edit expectation",
         "patch/write result projection",
+        "fenced replacement result projection",
         "changed/failed file summaries",
         "verification summary",
         "actionable blocker evidence"
@@ -903,12 +912,16 @@
       "startModule": "editPatch",
       "requiredFacades": [
         "editPatchModule.ts",
+        "fencedEditPlanner.ts",
+        "fencedEditRoute.ts",
+        "fencedEditResult.ts",
         "workspaceAuthority.ts",
         "workspaceWriteResult.ts",
         "mutationVerificationProjection.ts"
       ],
       "emit": [
         "patch/write result",
+        "fenced replacement result",
         "verification summary",
         "actionable blocker evidence for missing target, missing content, stale-read, and unsupported future edit",
         "continuation-safe mutation evidence"

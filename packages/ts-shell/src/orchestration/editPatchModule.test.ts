@@ -153,6 +153,44 @@ describe("editPatchModule", () => {
     expect(state.result.receipt.result).toBe("stopped");
   });
 
+  it("recognizes exact fenced replacement mapping as current-supported owner lane", () => {
+    const state = buildEditPatchModuleState({
+      request: {
+        prompt: [
+          "Replace the exact fenced block in src/app.ts",
+          "```",
+          "status: draft",
+          "```",
+          "with",
+          "```",
+          "status: ready",
+          "```",
+        ].join("\n"),
+        targetPath: "src/app.ts",
+        hasEditIntent: true,
+        hasFencedContent: true,
+        hasExactFencedReplacementMapping: true,
+      },
+    });
+
+    expect(state.futureContract).toMatchObject({
+      mode: "current-fenced-replacement",
+      supportStatus: "current-supported",
+      mutationAllowedNow: true,
+    });
+    expect(state.manifest).toMatchObject({
+      contentSummary: "exact-mapping",
+      workspaceAuthorityRequirement: "delegated-to-current-route",
+      staleReadRequirement: "delegated-to-current-route",
+      verificationRequirement: "delegated-to-current-route",
+    });
+    expect(state.manifest.operations[0]).toMatchObject({
+      targetPath: "src/app.ts",
+      operationKind: "replace",
+      writeIntent: "current-route-only",
+    });
+  });
+
   it("keeps manifest separate from write authorization", () => {
     const contract = classifyEditRequest({
       prompt: "Create file notes.txt with content: hello",

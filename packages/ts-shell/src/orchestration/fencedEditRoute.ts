@@ -1,0 +1,177 @@
+import path from "node:path";
+import {
+  planExactFencedReplacement,
+  type ExactFencedReplacementPlan,
+  type FencedEditMapping,
+} from "./fencedEditPlanner.js";
+import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
+import type {
+  WorkspaceWriteTargetAuthority,
+} from "./patchResult/workspaceAuthority.js";
+import {
+  runWorkspaceWriteRoute,
+  type WorkspaceWriteRoute,
+} from "./patchResult/workspaceWriteRoute.js";
+import type { RecoveryAuthorityStoreConfig } from "./patchRecovery/recoveryAuthorityStore.js";
+
+export type FencedEditReplacementRoute =
+  | {
+      readonly source: "fenced-edit-replacement-route";
+      readonly status: "written";
+      readonly targetPath: string;
+      readonly plan: Extract<ExactFencedReplacementPlan, { ok: true }>;
+      readonly workspaceRoute: Extract<WorkspaceWriteRoute, { status: "written" }>;
+      readonly changedFiles: readonly [string];
+      readonly postWriteVerification: "passed";
+      readonly terminalClassification: "success";
+      readonly evidence: readonly string[];
+    }
+  | {
+      readonly source: "fenced-edit-replacement-route";
+      readonly status: "blocked";
+      readonly targetPath?: string;
+      readonly blocker: string;
+      readonly plan: ExactFencedReplacementPlan;
+      readonly workspaceRoute?: Extract<WorkspaceWriteRoute, { status: "blocked" }>;
+      readonly changedFiles: readonly [];
+      readonly postWriteVerification: "not-run" | "blocked" | "failed";
+      readonly terminalClassification: "stopped";
+      readonly nextAction: string;
+      readonly evidence: readonly string[];
+    };
+
+export interface FencedEditReplacementRouteOptions {
+  readonly workspaceRoot: string;
+  readonly targetPath?: string;
+  readonly mapping?: FencedEditMapping;
+  readonly explicitRuntimeOptIn: boolean;
+  readonly explicitWorkspaceWriteOptIn: boolean;
+  readonly requestedUserDecision?: SingleFileApplyPatchRequestedUserDecision;
+  readonly defaultProductionRejectionUnchanged: true;
+  readonly readFile: (absolutePath: string) => string | undefined;
+  readonly readVerifiedFile: (relativePath: string) => string | undefined;
+  readonly validateWriteTarget: (
+    relativePath: string,
+  ) => WorkspaceWriteTargetAuthority;
+  readonly writeFile: (relativePath: string, content: string) => void | Promise<void>;
+  readonly recoveryAuthority?: RecoveryAuthorityStoreConfig;
+  readonly abortSignal?: AbortSignal;
+}
+
+export async function runFencedEditReplacementRoute(
+  options: FencedEditReplacementRouteOptions,
+): Promise<FencedEditReplacementRoute> {
+  if (options.targetPath) {
+    const targetAuthority = options.validateWriteTarget(options.targetPath);
+    if (targetAuthority.ok === false) {
+      const plan = planExactFencedReplacement({
+        targetPath: options.targetPath,
+        originalContent: undefined,
+        mapping: options.mapping,
+      });
+      return {
+        source: "fenced-edit-replacement-route",
+        status: "blocked",
+        targetPath: options.targetPath,
+        blocker: `workspace-${targetAuthority.reason}`,
+        plan,
+        changedFiles: [],
+        postWriteVerification: "not-run",
+        terminalClassification: "stopped",
+        nextAction: targetAuthority.message,
+        evidence: [
+          "fenced-edit-route:workspace-authority-blocked",
+          ...targetAuthority.evidence,
+          ...plan.evidence,
+          "fenced-edit-route:no-writer-invoked",
+        ],
+      };
+    }
+  }
+
+  const originalContent = options.targetPath
+    ? options.readFile(path.resolve(options.workspaceRoot, options.targetPath))
+    : undefined;
+  const plan = planExactFencedReplacement({
+    targetPath: options.targetPath,
+    originalContent,
+    mapping: options.mapping,
+  });
+
+  if (plan.ok === false) {
+    return {
+      source: "fenced-edit-replacement-route",
+      status: "blocked",
+      ...(plan.targetPath ? { targetPath: plan.targetPath } : {}),
+      blocker: plan.blocker,
+      plan,
+      changedFiles: [],
+      postWriteVerification: "not-run",
+      terminalClassification: "stopped",
+      nextAction: plan.nextAction,
+      evidence: [
+        "fenced-edit-route:planning-blocked",
+        ...plan.evidence,
+        "fenced-edit-route:no-writer-invoked",
+      ],
+    };
+  }
+
+  const workspaceRoute = await runWorkspaceWriteRoute({
+    workspaceRoot: options.workspaceRoot,
+    rawPatchText: plan.rawPatchText,
+    explicitRuntimeOptIn: options.explicitRuntimeOptIn,
+    explicitWorkspaceWriteOptIn: options.explicitWorkspaceWriteOptIn,
+    ...(options.requestedUserDecision
+      ? { requestedUserDecision: options.requestedUserDecision }
+      : {}),
+    defaultProductionRejectionUnchanged:
+      options.defaultProductionRejectionUnchanged,
+    readFile: options.readFile,
+    readVerifiedFile: options.readVerifiedFile,
+    validateWriteTarget: options.validateWriteTarget,
+    writeFile: options.writeFile,
+    ...(options.recoveryAuthority
+      ? { recoveryAuthority: options.recoveryAuthority }
+      : {}),
+    ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
+  });
+
+  if (workspaceRoute.status === "blocked") {
+    return {
+      source: "fenced-edit-replacement-route",
+      status: "blocked",
+      targetPath: plan.targetPath,
+      blocker: `workspace-${workspaceRoute.blocker}`,
+      plan,
+      workspaceRoute,
+      changedFiles: [],
+      postWriteVerification: workspaceRoute.postWriteVerification,
+      terminalClassification: "stopped",
+      nextAction: workspaceRoute.nextAction,
+      evidence: [
+        "fenced-edit-route:workspace-route-blocked",
+        ...plan.evidence,
+        ...workspaceRoute.evidence,
+        "fenced-edit-route:no-success-claim",
+      ],
+    };
+  }
+
+  return {
+    source: "fenced-edit-replacement-route",
+    status: "written",
+    targetPath: plan.targetPath,
+    plan,
+    workspaceRoute,
+    changedFiles: workspaceRoute.changedFiles,
+    postWriteVerification: workspaceRoute.postWriteVerification,
+    terminalClassification: "success",
+    evidence: [
+      "fenced-edit-route:exact-replacement-written",
+      ...plan.evidence,
+      ...workspaceRoute.evidence,
+      "fenced-edit-route:continuation-safe-evidence",
+    ],
+  };
+}

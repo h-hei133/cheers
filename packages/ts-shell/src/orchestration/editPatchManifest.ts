@@ -126,6 +126,7 @@ function operationKindFor(mode: FutureEditMode): EditPatchOperationKind {
     case "current-bounded-write":
       return "write";
     case "current-bounded-edit":
+    case "current-fenced-replacement":
     case "future-fenced-replacement":
       return "replace";
     case "future-broad-refactor-planning":
@@ -166,7 +167,11 @@ function contentSummaryFor(
   if (contract.mode === "future-broad-refactor-planning") {
     return "future-transform";
   }
-  if (request?.hasExactOldNewMapping || request?.hasReplaceDirective) {
+  if (
+    request?.hasExactOldNewMapping ||
+    request?.hasExactFencedReplacementMapping ||
+    request?.hasReplaceDirective
+  ) {
     return "exact-mapping";
   }
   if (request?.hasConcreteContent) {

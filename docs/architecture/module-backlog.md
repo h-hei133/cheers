@@ -196,6 +196,20 @@ as an import-policing rule.
   scripts, dependencies, behavior, provider gates, browser scope, edit scope,
   runtime behavior, or validation scripts.
 
+### Route 167: Bounded Fenced Replacement
+
+- Route 167 adds an Edit / Patch-owned exact fenced replacement lane for one
+  explicit in-workspace target and one exact old/new fenced mapping.
+- The lane plans an apply_patch update only after one exact match, then delegates
+  execution to the existing workspace write route for workspace authority, final
+  stale-read, writer invocation, and post-write verification.
+- Result projection records fenced replacement as success or stopped without raw
+  file content, and continuation evidence carries only target, operation,
+  changed/stopped state, blocker, verification, and safe markers.
+- Broad/fuzzy replacement, discovery edit, generated-content edit, multi-file
+  edit, rollback/snapshot execution, provider/browser calls, schema changes,
+  CLI redesign, dependencies, and broad runMvp refactor remain closed.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -285,11 +299,10 @@ composition/substrate/readiness/truthfulness roots under owner-module
 boundaries.
 
 Choose the next route by module lifecycle gap and product risk rather than by
-central-file size. After Route 166, return to code or validation work rather
-than more doc pruning. Choose `Harness / gate taxonomy` if release/report
-confidence is the blocker. Consider bounded product capability only after the
-active context policy identifies the relevant module docs and validation
-surface. Consider shared handoff extraction only after more
+central-file size. After Route 167, choose `Harness / gate taxonomy` if
+release/report confidence is the blocker. Consider the next bounded product
+capability only after the active context policy identifies the relevant module
+docs and validation surface. Consider shared handoff extraction only after more
 capability-specific flows prove repeated stable fields.
 
 ## Persistent Boundaries

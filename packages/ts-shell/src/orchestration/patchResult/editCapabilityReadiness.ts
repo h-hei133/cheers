@@ -14,6 +14,7 @@ export type EditCapabilityId =
   | "bounded-marker-apply-patch-candidates"
   | "bounded-broad-patch-safe-subset"
   | "fenced-bounded-broad-patch-safe-subset"
+  | "exact-fenced-replacement"
   | "rename-with-content-decomposition"
   | "unsupported-broad-shape-taxonomy"
   | "recovery-authority-capture"
@@ -72,6 +73,11 @@ const READINESS: readonly EditCapabilityReadiness[] = [
     "fenced patch extractor tests",
     "fenced broad diff candidate tests",
     "Route 72 compatibility gauntlet fenced fixtures",
+  ]),
+  defaultReady("exact-fenced-replacement", [
+    "fenced edit planner tests",
+    "fenced edit route tests",
+    "workspace write route stale-read and post-write verification tests",
   ]),
   defaultReady("rename-with-content-decomposition", [
     "bounded broad patch normalizer tests",
