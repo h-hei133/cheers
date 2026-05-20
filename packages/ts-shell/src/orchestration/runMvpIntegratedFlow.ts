@@ -55,7 +55,6 @@ import {
 } from "./flowEvidenceProjection.js";
 import {
   dispatchToolWithLifecycle,
-  projectRunCommandDispatchOutcome,
   type ToolLifecycleResult,
 } from "./flowDispatch.js";
 import {
@@ -121,7 +120,6 @@ import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.
 import {
   projectBlockedRuntimeOutcome,
   projectRuntimeCodingOutcome,
-  projectRuntimeMutationOutcome,
 } from "./runtimeOutcomeProjection.js";
 import {
   classifyReadInspectIntent,
@@ -158,6 +156,7 @@ import {
   type GroundedDeliverableMode,
 } from "./runtimeHandoffProjection.js";
 import { resolveTaskTargets } from "./targetResolution.js";
+import { projectTurnResultHandoff } from "./turnKernel.js";
 import {
   projectAmbiguousTargetStoppedSummary,
   projectMissingTargetStoppedSummary,
@@ -6113,34 +6112,67 @@ async function executeWorkflowTaskPlan(input: {
 
   const resultContract =
     input.plan.taskKind === "run-command"
-      ? projectRunCommandDispatchOutcome({
-          command: dispatchedRunCommand ?? verification.command ?? "command",
-          changedFiles,
-          failedFiles,
-          patches,
-          verifiedFiles,
-          unverifiedFiles,
-          verification,
-          repairNotes,
-          evidence,
-          provenance: summarizeCodingResultProvenance(provenanceCollector),
+      ? projectTurnResultHandoff({
+          capabilityPlan: {
+            taskKind: input.plan.taskKind,
+            targetPath: input.plan.targetPath,
+            directCommand: dispatchedRunCommand ?? verification.command,
+            verification,
+            verifyAfterEdit: input.plan.verifyAfterEdit,
+            inspectFirst: input.plan.inspectFirst,
+            continuationLineage: input.plan.continuationLineage,
+          },
+          receipts: {
+            evidence,
+            continuationEvidence: input.plan.continuationLineage,
+            verification,
+          },
+          command: {
+            command: dispatchedRunCommand ?? verification.command ?? "command",
+            changedFiles,
+            failedFiles,
+            patches,
+            verifiedFiles,
+            unverifiedFiles,
+            verification,
+            repairNotes,
+            evidence,
+            provenance: summarizeCodingResultProvenance(provenanceCollector),
+          },
         })
-      : projectRuntimeMutationOutcome({
-          taskKind: input.plan.taskKind,
-          changedFiles,
-          failedFiles,
-          patches,
-          verifiedFiles,
-          unverifiedFiles,
-          verification,
-          repairNotes,
-          evidence,
-          crossFileDegradationReason,
-          degradedCrossFileTargets,
-          crossFileRemainingTargets,
-          crossFileFailedByReason,
-          crossFileSkippedFiles,
-          provenance: summarizeCodingResultProvenance(provenanceCollector),
+      : projectTurnResultHandoff({
+          capabilityPlan: {
+            taskKind: input.plan.taskKind,
+            targetPath: input.plan.targetPath,
+            blockedReason: input.plan.blockedReason,
+            directCommand: input.plan.directCommand,
+            verification,
+            verifyAfterEdit: input.plan.verifyAfterEdit,
+            inspectFirst: input.plan.inspectFirst,
+            continuationLineage: input.plan.continuationLineage,
+          },
+          receipts: {
+            evidence,
+            continuationEvidence: input.plan.continuationLineage,
+            verification,
+          },
+          mutation: {
+            taskKind: input.plan.taskKind,
+            changedFiles,
+            failedFiles,
+            patches,
+            verifiedFiles,
+            unverifiedFiles,
+            verification,
+            repairNotes,
+            evidence,
+            crossFileDegradationReason,
+            degradedCrossFileTargets,
+            crossFileRemainingTargets,
+            crossFileFailedByReason,
+            crossFileSkippedFiles,
+            provenance: summarizeCodingResultProvenance(provenanceCollector),
+          },
         });
 
   const codingResult =
