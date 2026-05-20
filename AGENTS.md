@@ -203,22 +203,7 @@ Integration tests may use scenario names, but should still be short and responsi
 
 Prefer adding focused modules over growing central files. If a file name exceeds 45 characters or has more than four semantic segments, consider whether the directory should carry more context or whether the file should be split.
 
-Avoid route-title names such as:
-
-```text
-singleFileApplyPatchRealProviderPermissionUxGate.ts
-singleFileApplyPatchProductionOptInNoWriteRuntimeRouteContract.ts
-singleFileApplyPatchGuardedProductionRouteRuntimeProjection.ts
-```
-
-Prefer shorter responsibility names such as:
-
-```text
-permissionUxGate.ts
-noWriteRuntimeRoute.ts
-realProviderWriteSmoke.ts
-productionRouteProjection.ts
-```
+Avoid route-title names and names with more than four semantic segments. Prefer short, responsibility-based names such as `permissionUxGate.ts`, `noWriteRuntimeRoute.ts`, `realProviderWriteSmoke.ts`, or `productionRouteProjection.ts`.
 
 Use this placement guidance for common areas:
 
@@ -251,8 +236,9 @@ Use this placement guidance for common areas:
   - If a validation script grows too large, prefer extracting scenario-specific smoke modules under a focused subdirectory such as `scripts/real-provider-smokes/`.
 
 - `PLANS.*` and `PROJECT_STATE.md`
-  - route plans, state summaries, and stage records.
-  - These files may use longer descriptive names because they are human-facing records, not runtime modules.
+  - project-state aids and human-facing planning records.
+  - Use them to understand durable decisions and material blockers, not as the primary place for route logs, completed milestones, branch state, or future roadmap queues.
+  - These files may use descriptive names, but AGENTS.md and runtime modules should stay stable and responsibility-based.
 
 Do not launch large rename-only cleanups by default. Prefer this migration strategy:
 
@@ -465,9 +451,9 @@ Do not present intention, design, or a skipped validation as completed implement
 
 ## Project State Files
 
-`PROJECT_STATE.md` and `PLANS.*.md` are project-state aids, not automatic truth.
+`PROJECT_STATE.md` and `PLANS.*.md` are project-state aids, not automatic truth or route logs.
 
-Use them to understand recent decisions, blockers, and planned boundaries, but prefer evidence in this order:
+Use them to understand durable decisions, material blockers, and planned boundaries, but prefer evidence in this order:
 
 1. current user instruction
 2. current code
@@ -477,11 +463,11 @@ Use them to understand recent decisions, blockers, and planned boundaries, but p
 6. project state documents
 7. targeted reference-repository comparison
 
-Update project state files only when:
+Update project state files sparingly, only when:
 
-- a blocker materially changes
+- a durable blocker materially changes
 - a real runtime fact is established
-- the recommended next action materially changes
+- a long-lived boundary or contract materially changes
 - the document is clearly behind code reality
 
-Do not use `AGENTS.md` to record current project status, completed milestones, branch state, or future roadmap.
+Do not use `PROJECT_STATE.md`, `PLANS.*.md`, or `AGENTS.md` to record route logs, completed milestones, branch state, transient baseline counts, or future roadmap queues.
