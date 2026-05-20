@@ -455,7 +455,10 @@ Unsafe area:
 ## Cross-Layer Concentration Points
 
 1. `runMvpIntegratedFlow.ts`: capability planning plus execution plus result
-   assembly.
+   assembly. Route 154 reduced direct helper-fragment imports for
+   read/inspect/workspace, verification, and continuation by adding
+   module-owned facades, but the file remains the highest concentration point
+   because execution branches and result assembly still live there.
 2. `SessionManager.ts`: persistence substrate plus projection/codecs/reentry
    summaries.
 3. `cli.tsx`: entrypoint plus command/display/session/provider/approval
@@ -493,6 +496,54 @@ Deferred:
   coupling and should be Route 137 work
 - CLI display helper extraction is safe-looking, but it is lower leverage than
   session/result projection and should wait for the CLI/core preparation route
+
+## Post-Route-154 Agent Loop Facade Pass
+
+Route 154 starts the owner-module extraction pass for
+`runMvpIntegratedFlow.ts`.
+
+New module facades:
+
+- `packages/ts-shell/src/orchestration/readInspectModule.ts`
+  - owner: Workspace / File Context Engineering
+  - exposes read/inspect intent, read continuation target recovery,
+    repo-explain evidence selection, diagnosis metadata, and workspace target
+    stopped surfaces
+- `packages/ts-shell/src/orchestration/verificationModule.ts`
+  - owner: Result Surface / Verification Engineering
+  - exposes verification planning, retry, skipped/not-requested/command
+    projection, and verification evidence
+- `packages/ts-shell/src/orchestration/continuationModule.ts`
+  - owner: Session / Continue Engineering
+  - exposes continuation intent, replay-safe lineage, target derivation,
+    lineage activation projection, repair/verify continuation objects, and
+    verify-resume facts
+
+`runMvpIntegratedFlow.ts` remains the Agent Loop composition root. It should
+keep turn ordering, capability selection composition, facade invocation,
+receipt aggregation, and final handoff. It should not regain direct imports of
+read/inspect, verification, or continuation helper fragments unless a route
+explicitly reopens that ownership.
+
+Deferred from Route 154:
+
+- edit execution facade adoption
+- browser module facade
+- provider diagnostic/execution facade
+- runtime receipt consumer adoption
+- generic result surface handoff
+- broad intent-planner movement
+
+Next central file recommendation: `sessionRuntime.ts`.
+
+Reason: Route 153 reduced `cli.tsx` pressure, and Route 154 starts reducing
+`runMvpIntegratedFlow.ts` by facade ownership. The next highest-value central
+file is `sessionRuntime.ts`, where query event rendering, terminal
+accumulation, future-turn injection, and persistence calls still converge
+between Agent Loop output and Session / Result Surface ownership. A narrow
+route should extract one rendering or terminal-status projection boundary
+without changing schema, result truthfulness, CLI behavior, provider behavior,
+or session persistence semantics.
 
 ## Post-Route-149 Roadmap Reset
 

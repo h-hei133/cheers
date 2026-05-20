@@ -51,7 +51,6 @@ import {
   projectBrowserContinuationEvidence,
   projectBrowserObservationEvidence,
   projectBrowserTransactionEvidence,
-  projectVerificationEvidence,
 } from "./flowEvidenceProjection.js";
 import {
   dispatchToolWithLifecycle,
@@ -68,23 +67,20 @@ import {
   type BrowserToolFailureProjection,
 } from "./flowResultProjection.js";
 import {
-  buildReflectiveStateQueryResponse,
-  buildRepairContinuationObject,
-  buildVerifyContinuationObject,
-  deriveContinuationTargetPath,
-  hasLocalExplainEvidenceInContinuity,
-  hasReadFragmentEvidenceInContinuity,
-  inferVerifyCommandFromContinuity,
-  isVerifyResumeEligibleFromContinuity,
+  buildWorkflowContinuationLineage,
+  buildWorkflowRepairContinuation,
+  buildWorkflowVerifyContinuation,
+  classifyWorkflowContinuationIntent,
+  deriveWorkflowContinuationTarget,
+  hasWorkflowLocalExplainEvidence,
+  hasWorkflowReadFragmentEvidence,
+  inferWorkflowVerifyCommand,
+  isWorkflowVerifyResumeEligible,
+  projectWorkflowLineageActivation,
   type RepairContinuationObject,
   type VerifyContinuationObject,
-} from "./continuationPlanning.js";
-import { classifyContinuationIntent } from "./continuationIntent.js";
-import {
-  buildReplaySafeContinuationLineage,
-  decideLineageActivation,
-} from "./continuationLineage.js";
-import { projectLineageActivation } from "./continuationProjection.js";
+} from "./continuationModule.js";
+import { buildReflectiveStateQueryResponse } from "./continuationPlanning.js";
 import {
   buildAmbiguousEditInstructionReason,
   formatEditExecutionFailure,
@@ -122,26 +118,26 @@ import {
   projectRuntimeCodingOutcome,
 } from "./runtimeOutcomeProjection.js";
 import {
-  classifyReadInspectIntent,
-  isPathOnlyReadIntentPrompt,
-} from "./readInspectIntent.js";
+  classifyReadInspectRequest,
+  inferRepoDiagnosis,
+  inferRepoEvidenceRole,
+  isPathOnlyReadRequest,
+  parseRepoCandidateFiles,
+  projectReadAmbiguousTargetStop,
+  projectReadMissingTargetStop,
+  projectReadOutOfWorkspaceTargetStop,
+  recoverReadContinuationTarget,
+  selectRepoExplainTarget,
+} from "./readInspectModule.js";
 import {
-  planVerification,
-  planVerificationRetry,
-  stripVerificationTailForMutationTarget,
-} from "./verificationPlanner.js";
-import {
-  projectCommandVerificationResult,
-  projectNotRequestedVerification,
-  projectSkippedVerification,
-} from "./verificationResultProjection.js";
-import { resolveReadContinuationTargetRecovery } from "./readContinuationTarget.js";
-import {
-  inferDiagnosisEvidenceRole,
-  inferRepoDiagnosisDisposition,
-  parseGlobFileList,
-  selectRepoExplainEvidenceTarget,
-} from "./repoExplainEvidence.js";
+  planWorkflowVerification,
+  planWorkflowVerificationRetry,
+  projectNotRequestedWorkflowVerification,
+  projectSkippedWorkflowVerification,
+  projectWorkflowCommandVerification,
+  projectWorkflowVerificationEvidence,
+  stripVerificationTailForTarget,
+} from "./verificationModule.js";
 import {
   classifyEditExpectationContract,
   isWriteExpectationPrompt,
@@ -157,11 +153,6 @@ import {
 } from "./runtimeHandoffProjection.js";
 import { resolveTaskTargets } from "./targetResolution.js";
 import { projectTurnResultHandoff } from "./turnKernel.js";
-import {
-  projectAmbiguousTargetStoppedSummary,
-  projectMissingTargetStoppedSummary,
-  projectOutOfWorkspaceTargetStoppedSummary,
-} from "./workspaceTargetProjection.js";
 import type {
   ResolvedTarget,
   TargetResolutionBlocker,
@@ -646,11 +637,11 @@ function buildWorkflowTaskPlan(
   continuityState?: unknown,
 ): WorkflowTaskPlan {
   const continuity = continuityStateAsObject(continuityState);
-  const continuationIntent = classifyContinuationIntent({
+  const continuationIntent = classifyWorkflowContinuationIntent({
     prompt,
     continuity,
   });
-  const replaySafeLineage = buildReplaySafeContinuationLineage({ continuity });
+  const replaySafeLineage = buildWorkflowContinuationLineage({ continuity });
   const {
     normalized,
     intentPrompt,
@@ -695,7 +686,7 @@ function buildWorkflowTaskPlan(
   } = extractWorkflowTaskIntentSignals(prompt, continuity);
   let targetResolution = resolveTaskTargets(prompt, workspaceRoot);
   if (targetResolution.blocker && hasVerifyIntent) {
-    const mutationTargetPrompt = stripVerificationTailForMutationTarget(prompt);
+    const mutationTargetPrompt = stripVerificationTailForTarget(prompt);
     if (mutationTargetPrompt && mutationTargetPrompt !== prompt.trim()) {
       const mutationTargetResolution = resolveTaskTargets(
         mutationTargetPrompt,
@@ -743,10 +734,10 @@ function buildWorkflowTaskPlan(
       targetMissing: true,
     };
   }
-  const rawContinuityTargetPath = deriveContinuationTargetPath(
+  const rawContinuityTargetPath = deriveWorkflowContinuationTarget({
     continuity,
     workspaceRoot,
-  );
+  });
   const promptPathTarget = derivePromptPathTarget(prompt, workspaceRoot);
   const explicitPrimaryTarget = targetResolution.primaryTarget;
   const hasExplicitPathReference =
@@ -758,7 +749,7 @@ function buildWorkflowTaskPlan(
     !hasSummarizeIntent &&
     !hasExplainIntent &&
     hasExplicitPathReference &&
-    isPathOnlyReadIntentPrompt(prompt);
+    isPathOnlyReadRequest(prompt);
   const seedActionKind = continuity.lastActionResultSeed?.actionKind;
   const hasActionResultSeed = Boolean(continuity.lastActionResultSeed);
   const seedIgnoredExplicitTargetLineage =
@@ -1013,7 +1004,7 @@ function buildWorkflowTaskPlan(
     (continuationReopenDecision.enabled &&
       (Boolean(continuationReopenDecision.selectedTarget) ||
         continuationReopenDecision.candidates.length > 0));
-  const readContinuityRecovery = resolveReadContinuationTargetRecovery({
+  const readContinuityRecovery = recoverReadContinuationTarget({
     candidatePath: rawContinuityTargetPath,
     continuity,
     workspaceRoot,
@@ -1253,15 +1244,15 @@ function buildWorkflowTaskPlan(
     hasSingleRecoverableCrossFileReopenTarget &&
     hasExecutableCrossFileTransformEvidence,
   );
-  const lineageActivation = decideLineageActivation({
+  const lineageActivationResult = projectWorkflowLineageActivation({
     continuity,
     weakOrTemporalCue: hasUltraWeakContinuationEquivalentCue,
     selectedReopenTarget: continuationReopenDecision.selectedTarget,
     reopenCandidates: continuationReopenDecision.candidates,
     crossFileSignal: hasCrossFileEvidenceSignal,
   });
-  const lineageActivationProjection =
-    projectLineageActivation(lineageActivation);
+  const lineageActivation = lineageActivationResult.decision;
+  const lineageActivationProjection = lineageActivationResult.projection;
   const lineageActivationEvidence =
     lineageActivationProjection.evidence.length > 0
       ? lineageActivationProjection.evidence
@@ -1274,12 +1265,12 @@ function buildWorkflowTaskPlan(
       hasCrossFileContinuationContext ||
       continuationReopenDecision.enabled);
   const hasVerifyLineageHint = Boolean(
-    inferVerifyCommandFromContinuity(continuity),
+    inferWorkflowVerifyCommand(continuity),
   );
   const hasBlockedVerifyResumeContext =
     continuity.lastVerificationStatus === "blocked" &&
-    Boolean(inferVerifyCommandFromContinuity(continuity)) &&
-    isVerifyResumeEligibleFromContinuity(continuity);
+    Boolean(inferWorkflowVerifyCommand(continuity)) &&
+    isWorkflowVerifyResumeEligible(continuity);
   const inferredTransformDirective =
     failedTransforms.length > 0
       ? {
@@ -1312,7 +1303,7 @@ function buildWorkflowTaskPlan(
         prompt,
       ));
   const repairObject = hasRepairContinuationCue
-    ? buildRepairContinuationObject({
+    ? buildWorkflowRepairContinuation({
         continuity,
         targetPath:
           primaryTarget?.inWorkspace
@@ -1348,7 +1339,7 @@ function buildWorkflowTaskPlan(
       ? rawContinuityTargetPath
       : undefined;
   const verifyObject = hasVerifyObjectCue
-    ? buildVerifyContinuationObject({
+    ? buildWorkflowVerifyContinuation({
         continuity,
         targetPath: verifyContinuationTargetPath,
         command: effectiveVerifyCommand,
@@ -1426,7 +1417,7 @@ function buildWorkflowTaskPlan(
             verifyCommand:
               repairObject.verifyCommand ??
               effectiveVerifyCommand ??
-              inferVerifyCommandFromContinuity(continuity) ??
+              inferWorkflowVerifyCommand(continuity) ??
               continuity.lastVerificationCommand,
           }
         : {}),
@@ -1933,7 +1924,7 @@ function buildWorkflowTaskPlan(
   }
 
   if (hasGroundedReadLikeIntent && hasExplicitPathReference && !primaryTarget) {
-    const targetStop = projectMissingTargetStoppedSummary({
+    const targetStop = projectReadMissingTargetStop({
       reason:
         "Grounded read/summarize/explain request included a path reference, but no resolvable target was found. Provide a valid in-workspace file path.",
       doNext: "Provide a valid in-workspace file path.",
@@ -1955,7 +1946,7 @@ function buildWorkflowTaskPlan(
     primaryTarget &&
     !primaryTarget.inWorkspace
   ) {
-    const targetStop = projectOutOfWorkspaceTargetStoppedSummary({
+    const targetStop = projectReadOutOfWorkspaceTargetStop({
       targetPath: primaryTarget.cleaned,
       reason:
         "Grounded read/summarize/explain target is outside current workspace. Attach/switch project or provide an in-workspace path.",
@@ -2434,7 +2425,7 @@ function buildWorkflowTaskPlan(
 
   if (hasFileReadIntent) {
     if (hasTargetedFileReadIntent && !hasRepositoryInspectIntent) {
-      const targetStop = projectMissingTargetStoppedSummary({
+      const targetStop = projectReadMissingTargetStop({
         reason:
           "I can read the file, but I still need an explicit in-workspace file path.",
         doNext: "Provide an explicit in-workspace file path.",
@@ -2492,7 +2483,7 @@ function extractWorkflowTaskIntentSignals(
     /\b(?:do\s+not|don't|not)\s+continue\s+(?:the\s+)?old\s+edit\b/i.test(
       prompt,
     ) || /\bboundary\s+reset\b/i.test(prompt);
-  const readInspectIntent = classifyReadInspectIntent(groundedIntentPrompt);
+  const readInspectIntent = classifyReadInspectRequest(groundedIntentPrompt);
   const hasFileReadIntent = readInspectIntent.hasFileReadIntent;
   const hasTargetedFileReadIntent =
     readInspectIntent.hasTargetedFileReadIntent;
@@ -2523,9 +2514,9 @@ function extractWorkflowTaskIntentSignals(
   const hasReflectiveActionCue =
     workflowIntentProjection.hasReflectiveActionCue;
   const hasPriorLocalExplainEvidence =
-    hasLocalExplainEvidenceInContinuity(continuity);
+    hasWorkflowLocalExplainEvidence(continuity);
   const hasRecoverableReadFragmentEvidence =
-    hasReadFragmentEvidenceInContinuity(continuity);
+    hasWorkflowReadFragmentEvidence(continuity);
   const hasLocalExplainCue =
     hasExplainIntent &&
     (hasLocalSliceExplainCue(groundedIntentPrompt) ||
@@ -3276,7 +3267,12 @@ function resolveSingleFileEditFailureRepairContext(
     }
   };
 
-  addCandidate(deriveContinuationTargetPath(continuity, workspaceRoot));
+  addCandidate(
+    deriveWorkflowContinuationTarget({
+      continuity,
+      workspaceRoot,
+    }),
+  );
   for (const entry of continuity.recentFailedFiles ?? []) {
     addCandidate(entry.path);
   }
@@ -4491,7 +4487,7 @@ async function executeWorkflowTaskPlan(input: {
       requireApprovalEvent: false,
     });
     const candidateFiles = globStep.success
-      ? parseGlobFileList(globStep.output ?? "")
+      ? parseRepoCandidateFiles(globStep.output ?? "")
       : [];
     if (globStep.success) {
       notes.push("tool: approved glob(.ts) for repo diagnosis");
@@ -4526,7 +4522,7 @@ async function executeWorkflowTaskPlan(input: {
           });
         }
       }
-      const selected = selectRepoExplainEvidenceTarget({
+      const selected = selectRepoExplainTarget({
         prompt: input.prompt,
         candidates: inspectedCandidates,
       });
@@ -4537,13 +4533,13 @@ async function executeWorkflowTaskPlan(input: {
     if (!targetPath) {
       const targetStop =
         candidateFiles.length > 1
-          ? projectAmbiguousTargetStoppedSummary({
+          ? projectReadAmbiguousTargetStop({
               candidates: candidateFiles,
               reason:
                 "Repo explain needs one high-confidence evidence target, but multiple candidates matched. Provide an explicit in-workspace file path.",
               doNext: "Provide an explicit in-workspace file path.",
             })
-          : projectMissingTargetStoppedSummary({
+          : projectReadMissingTargetStop({
               reason:
                 "Repo explain requires an explicit in-workspace file target for truthful delivery.",
               doNext: "Provide an explicit in-workspace file path.",
@@ -4624,7 +4620,7 @@ async function executeWorkflowTaskPlan(input: {
     notes.push("tool: read diagnosis evidence");
     evidence.push(`repo-explain: read ${targetPath}`);
     const explainOutput = buildExplainTaskDelivery(targetPath, targetContent);
-    const disposition = inferRepoDiagnosisDisposition(input.prompt);
+    const disposition = inferRepoDiagnosis({ prompt: input.prompt });
     const outcome = projectRuntimeCodingOutcome({
       taskKind: "repo-explain",
       changedFiles,
@@ -4663,7 +4659,7 @@ async function executeWorkflowTaskPlan(input: {
       evidenceNodes: [
         {
           path: targetPath,
-          role: inferDiagnosisEvidenceRole(targetPath),
+          role: inferRepoEvidenceRole({ targetPath }),
           score: 1,
         },
       ],
@@ -5588,7 +5584,7 @@ async function executeWorkflowTaskPlan(input: {
           : {}),
       };
       evidence.push(
-        ...projectVerificationEvidence({
+        ...projectWorkflowVerificationEvidence({
           verification,
           targetPath: input.plan.targetPath,
           workspaceRoot: input.workspaceRoot,
@@ -5606,7 +5602,7 @@ async function executeWorkflowTaskPlan(input: {
     }
   }
 
-  const verificationPlan = planVerification({
+  const verificationPlan = planWorkflowVerification({
     taskKind: input.plan.taskKind,
     prompt: input.prompt,
     changedFiles,
@@ -6033,7 +6029,7 @@ async function executeWorkflowTaskPlan(input: {
       const failure = verifyResult.success
         ? undefined
         : classifyVerificationFailure(verifyResult);
-      const retry = planVerificationRetry({
+      const retry = planWorkflowVerificationRetry({
         plan: verificationPlan,
         attempt,
         outcome: verifyResult.success
@@ -6042,7 +6038,7 @@ async function executeWorkflowTaskPlan(input: {
             ? "blocked"
             : "failed",
       });
-      const projected = projectCommandVerificationResult({
+      const projected = projectWorkflowCommandVerification({
         plan: verificationPlan,
         result: verifyResult,
         attempt,
@@ -6086,7 +6082,7 @@ async function executeWorkflowTaskPlan(input: {
     verificationPlan.mode === "skipped" ||
     verificationPlan.mode === "unavailable"
   ) {
-    verification = projectSkippedVerification(verificationPlan);
+    verification = projectSkippedWorkflowVerification(verificationPlan);
     for (const path of changedFiles) {
       unverifiedFiles.push({
         path,
@@ -6101,7 +6097,7 @@ async function executeWorkflowTaskPlan(input: {
         reason: "verify step was not requested in prompt",
       });
     }
-    verification = projectNotRequestedVerification(verificationPlan);
+    verification = projectNotRequestedWorkflowVerification(verificationPlan);
   }
 
   if (failedFiles.length > 0 && repairNotes.length === 0) {

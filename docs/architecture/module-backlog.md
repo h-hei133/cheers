@@ -124,10 +124,12 @@ capability scope.
 | Candidate | Primary module | Goal | Validation shape |
 |---|---|---|---|
 | Agent Loop dispatch extraction v2 | Agent Loop | Route 152 added `turnCapabilityPlan`, `turnReceiptAggregation`, and `turnKernel` to centralize turn summary, receipt aggregation, and final result handoff while preserving behavior. | closed by Route 152; focused turn/adjacent tests, runMvp, edit closeout, result-contract, build |
+| Agent Loop module facade extraction | Agent Loop, Workspace / File Context, Session / Continue, Result Surface / Verification | Route 154 added `readInspectModule`, `verificationModule`, and `continuationModule` facades so `runMvpIntegratedFlow.ts` consumes stable module entrypoints for those clusters while preserving behavior. | closed by Route 154; facade/adjacent tests, runMvp, edit closeout/result-contract because result/evidence and workspace/edit-adjacent surfaces were touched, build |
 | Agent Loop receipt-consumer thin wiring | Agent Loop, Runtime, Result Surface | Adopt Runtime Receipt projection at one existing result/session handoff without changing truthfulness or schema. | focused receipt/runMvp/result-contract tests |
 | Workspace / File Context contract | Workspace / File Context, Edit / Patch | Route 151 added `workspaceFileContract` and `workspaceTargetProjection` as shared vocabulary for root, target, read/write authority, stale-read, verification preconditions, continuation, and future discovery summaries without changing authority or execution. | closed by Route 151; focused workspace/adjacent tests, runMvp, edit closeout, result-contract, build |
 | CLI / core split preparation | CLI / UX, Session / Continue | Route 153 added startup, session, provider, and display projection helpers while preserving CLI flags, slash semantics, session/schema behavior, provider gates, runtime invocation, and result surfaces. | closed by Route 153; focused CLI/slash/baseline tests and build |
 | CLI / core split implementation phase 2 | CLI / UX, Session / Continue | Extract one narrow slash-command action boundary, likely session or workspace execution, behind a tested CLI-owned helper. | focused CLI/session tests; no schema/provider/result changes |
+| Route 155: sessionRuntime projection boundary | Session / Continue, Result Surface, Agent Loop | Follow the atlas recommendation by extracting one narrow `sessionRuntime.ts` rendering or terminal-status projection boundary behind a module-owned facade, preserving event order, session persistence calls, schema, CLI behavior, and result truthfulness. | focused sessionRuntime/result surface tests, result-contract if terminal/result classification is touched, build |
 
 ### Phase B: Capability Module Expansion
 
@@ -168,15 +170,17 @@ If these answers are weak, pick a contract route instead of a feature route.
 
 ## Current Default Recommendation
 
-The best default next route is `CLI / core split implementation phase 2` in
-Phase A if CLI coupling reduction should continue.
+The best default next route is `Route 155: sessionRuntime projection boundary`
+in Phase A.
 
-Rationale: Route 153 proved that CLI startup/session/provider/display facts can
-move behind CLI-owned projections without changing UX or runtime behavior. The
-next value is one narrow command-action extraction that reduces `cli.tsx`
-control-flow density while preserving `SessionManager`, runtime-context,
-approval, provider, result, transcript, browser, edit, Rust protocol, and
-dependency boundaries.
+Rationale: Route 153 reduced `cli.tsx` pressure, and Route 154 started reducing
+`runMvpIntegratedFlow.ts` by moving read/inspect/workspace, verification, and
+continuation helper clusters behind module-owned facades. The atlas now ranks
+`sessionRuntime.ts` as the next central file because it still joins query event
+rendering, terminal accumulation, future-turn injection, and session
+persistence calls. Keep Route 155 to one rendering or terminal-status
+projection boundary; do not change schema, result truthfulness, CLI behavior,
+provider behavior, browser/edit behavior, or persistence semantics.
 
 If the user explicitly chooses mutation work next, select `Edit / Patch thin
 integration` and keep it to one module-owned handoff with no new broad write
