@@ -97,6 +97,19 @@ conditions before implementation.
   lifecycle mapping, redaction rules, integrated call sites, and validation
   gate.
 
+### Route 160: ResultMapper Result Surface Facades
+
+- Route 160 adds `core/query/actionableBlockerModule.ts`,
+  `core/query/terminalClassificationProjection.ts`, and
+  `core/query/capabilityResultClassification.ts` as Result Surface-owned
+  facades for actionable blockers, terminal fallback labels, and capability
+  hard-failure/caveat classification.
+- `resultMapper.ts` remains the final truthfulness composition root for the
+  top-level `OrchestrationResult` shape and completed/stopped/error decision
+  order.
+- `docs/architecture/resultmapper-module-extraction.md` records the
+  responsibility migration table and final ownership classification.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -131,6 +144,7 @@ capability scope.
 | CLI / core split preparation | CLI / UX, Session / Continue | Route 153 added startup, session, provider, and display projection helpers while preserving CLI flags, slash semantics, session/schema behavior, provider gates, runtime invocation, and result surfaces. | closed by Route 153; focused CLI/slash/baseline tests and build |
 | CLI module facade extraction | CLI / UX, Session / Continue, Permission / Policy, Provider / Model, Workspace / File Context, Agent Loop | Route 158 added `cliApprovalModule`, `cliRuntimeModule`, `cliSessionModule`, `cliWorkspaceModule`, and `cliPermissionModule` so `cli.tsx` remains the process entrypoint while module-owned facades own approval, runtime turn handoff, session, workspace, and permission surfaces. | closed by Route 158; focused CLI facade/adjacent tests, CLI baseline, runMvp, build |
 | Real-user verifier module facade extraction | Harness / Eval, Provider / Model, Result Surface | Route 159 kept `scripts/verify-real-user-capabilities.mjs` as a thin compatibility entrypoint and added `verifierCliModule`, `verifierCaseModule`, `verifierSafetyModule`, and `verifierReportModule` so `scripts/verify/index.mjs` remains the Harness readiness composition root while module-owned facades own options, case planning, opt-in safety, and report construction. | closed by Route 159; node checks, verifier boundary self-test, real-user verifier tier/suite/dry-run/include-real dry-run gates, edit closeout, result-contract |
+| ResultMapper Result Surface facade extraction | Result Surface, Tool, Runtime, Edit / Patch, Browser, Provider / Model, Session / Continue | Route 160 added actionable blocker, terminal classification, and capability result classification facades so `resultMapper.ts` remains the final truthfulness composition root while Result Surface-owned modules own blocker marker parsing, fallback labels, and hard-failure/caveat classification. | closed by Route 160; resultMapper boundary tests, existing resultMapper tests, result-contract, build |
 | Session runtime module facade extraction | Session / Continue, Result Surface, Agent Loop | Route 156 added `sessionEventSurface`, `sessionTerminalState`, `sessionPersistenceProjection`, and `sessionFutureTurnProjection` so `sessionRuntime.ts` keeps event order and coordination while module-owned facades own rendering, terminal accumulation, persistence payload projection, and future-turn projection. | closed by Route 156; focused sessionRuntime boundary/runtime tests, runMvp, result-contract, build |
 | SessionManager module facade extraction | Session / Continue, Permission / Policy, CLI / UX | Route 157 added `sessionStore`, `sessionRegistry`, `sessionApprovalMemoryModule`, `sessionCompactModule`, and `sessionContinuityModule` so `SessionManager.ts` remains the stateful substrate while module-owned facades own layout, current-session registry, approval-memory, compact-retention, and continuity evidence details. | closed by Route 157; focused session boundary/adjacent tests, sessionRuntime tests, runMvp, build |
 
@@ -173,22 +187,17 @@ If these answers are weak, pick a contract route instead of a feature route.
 
 ## Current Default Recommendation
 
-The best default next route is a Result Surface owned extraction around
-`packages/ts-shell/src/core/query/resultMapper.ts`.
+The central-file extraction pass is complete for the current atlas set. Routes
+154-160 classify `runMvpIntegratedFlow.ts`, `sessionRuntime.ts`,
+`SessionManager.ts`, `cli.tsx`, `scripts/verify/index.mjs`, and
+`resultMapper.ts` as acceptable composition/substrate/readiness/truthfulness
+roots under owner-module boundaries.
 
-Rationale: Routes 154-155 classified `runMvpIntegratedFlow.ts` as an acceptable
-Agent Loop composition root, Route 156 classified `sessionRuntime.ts` as an
-acceptable shell/runtime composition root, Route 157 classified
-`SessionManager.ts` as an acceptable stateful Session / Continue substrate,
-Route 158 classified `cli.tsx` as an acceptable CLI entrypoint composition
-root, and Route 159 classified the real-user verifier as an acceptable Harness
-/ Eval readiness composition root. The next highest-value central file is now
-`resultMapper.ts`, because terminal truthfulness and stopped/error/success
-projection remain the common boundary every capability must satisfy.
-
-If the user explicitly chooses mutation work next, select `Edit / Patch thin
-integration` and keep it to one module-owned handoff with no new broad write
-behavior.
+Choose the next route by module lifecycle gap and product risk rather than by
+central-file size. The best default next route is now `Harness / gate taxonomy`
+if release/report confidence is the blocker, or `Edit / Patch thin integration`
+if mutation capability is explicitly prioritized. The edit route must remain a
+single module-owned handoff with no new broad write behavior.
 
 ## Persistent Boundaries
 

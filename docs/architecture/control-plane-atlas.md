@@ -230,6 +230,9 @@ Unsafe areas:
 Current owners:
 
 - `packages/ts-shell/src/core/query/resultMapper.ts`
+- `packages/ts-shell/src/core/query/actionableBlockerModule.ts`
+- `packages/ts-shell/src/core/query/capabilityResultClassification.ts`
+- `packages/ts-shell/src/core/query/terminalClassificationProjection.ts`
 - `packages/ts-shell/src/core/shell/sessionRuntime.ts`
 - `packages/ts-shell/src/core/shell/sessionStateSurface.ts`
 - `packages/ts-shell/src/core/shell/turnBoundarySurface.ts`
@@ -237,8 +240,11 @@ Current owners:
 
 Mixed responsibilities:
 
-- `resultMapper.ts` owns core truthfulness, while `sessionRuntime.ts` still
-  accumulates terminal status and renders query events
+- `resultMapper.ts` remains the final truthfulness composition root, while
+  Result Surface facades now own actionable blocker classification, terminal
+  label fallback, and capability hard-failure/caveat classification
+- `sessionRuntime.ts` still accumulates terminal status and renders query
+  events
 - capability branches still create user-facing output close to execution
 
 Lifecycle coverage:
@@ -246,6 +252,8 @@ Lifecycle coverage:
 - success/stopped/error are explicitly classified
 - actionable blockers prevent false success for approval, MCP, browser, command,
   verification, and patch failures
+- terminal classification fallback and retryable continuation classification
+  are facade-owned without changing explicit terminal precedence
 
 Missing boundary:
 
@@ -254,8 +262,10 @@ Missing boundary:
 
 Safe extraction candidates:
 
-- durable terminal-status projection
-- coding summary/result surface projector
+- coding summary/result surface projector where capability branches still build
+  user-facing result text close to execution
+- shared report/result schema projector if Harness / Eval report vocabulary
+  becomes the blocker
 
 Unsafe areas:
 
@@ -487,8 +497,9 @@ Unsafe area:
 5. `scripts/verify/index.mjs`: acceptable Harness / Eval readiness composition
    root after Route 159; avoid regrowing CLI parsing, suite/case planning,
    selection safety, or top-level report object construction there.
-6. `resultMapper.ts`: correct truthfulness owner, but now the place every
-   capability must satisfy before claiming success.
+6. `resultMapper.ts`: acceptable Result Surface truthfulness root after Route
+   160; avoid regrowing blocker marker parsing, terminal fallback projection,
+   or capability hard-failure/caveat classification there.
 
 ## Capability Lifecycle Gaps
 
@@ -816,6 +827,43 @@ session substrate, CLI entrypoint, and verifier readiness surface all have
 acceptable owner-module classifications. `resultMapper.ts` remains the shared
 truthfulness boundary every capability must satisfy before a terminal success,
 stopped, or error claim.
+
+## Post-Route-160 ResultMapper Module Facade Pass
+
+Route 160 ran the owner-module extraction pass for
+`packages/ts-shell/src/core/query/resultMapper.ts`.
+
+New module facades:
+
+- `packages/ts-shell/src/core/query/actionableBlockerModule.ts`
+  - owner: Result Surface Engineering
+  - owns actionable blocker kinds, evidence marker parsing, reason selection,
+    approval-denied next-action projection, and command/MCP/browser/edit policy
+    blocker classification from safe result facts
+- `packages/ts-shell/src/core/query/terminalClassificationProjection.ts`
+  - owner: Result Surface Engineering
+  - owns pure `TerminalReason` plus continuation fallback classification while
+    preserving explicit terminalClassification precedence in `resultMapper.ts`
+- `packages/ts-shell/src/core/query/capabilityResultClassification.ts`
+  - owner: Result Surface Engineering
+  - owns successful mutation with verification caveat classification, hard
+    failure detection, and approved bash execution failure provenance
+
+`resultMapper.ts` is acceptable as the Result Surface truthfulness composition
+root. It keeps latest coding-result selection, top-level
+`OrchestrationResult` construction, explicit terminal fact precedence, final
+completed/stopped/error ordering, and fallback stop-reason selection. It should
+not regain direct actionable blocker marker parsing, terminal classification
+fallback logic, or capability hard-failure/caveat classification.
+
+Central-file pass classification: complete for the current atlas set. Routes
+154-160 now classify the main control-plane composition roots, session
+substrate, CLI entrypoint, verifier readiness surface, and Result Surface
+truthfulness root as acceptable under owner-module boundaries.
+
+Next central file recommendation: none. Choose the next route by product risk
+and module lifecycle gap instead of continuing central-file extraction by
+default.
 
 ## Post-Route-149 Roadmap Reset
 
