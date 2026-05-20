@@ -130,7 +130,7 @@ capability scope.
 | Workspace / File Context contract | Workspace / File Context, Edit / Patch | Route 151 added `workspaceFileContract` and `workspaceTargetProjection` as shared vocabulary for root, target, read/write authority, stale-read, verification preconditions, continuation, and future discovery summaries without changing authority or execution. | closed by Route 151; focused workspace/adjacent tests, runMvp, edit closeout, result-contract, build |
 | CLI / core split preparation | CLI / UX, Session / Continue | Route 153 added startup, session, provider, and display projection helpers while preserving CLI flags, slash semantics, session/schema behavior, provider gates, runtime invocation, and result surfaces. | closed by Route 153; focused CLI/slash/baseline tests and build |
 | CLI / core split implementation phase 2 | CLI / UX, Session / Continue | Extract one narrow slash-command action boundary, likely session or workspace execution, behind a tested CLI-owned helper. | focused CLI/session tests; no schema/provider/result changes |
-| Route 155: sessionRuntime projection boundary | Session / Continue, Result Surface, Agent Loop | Follow the atlas recommendation by extracting one narrow `sessionRuntime.ts` rendering or terminal-status projection boundary behind a module-owned facade, preserving event order, session persistence calls, schema, CLI behavior, and result truthfulness. | focused sessionRuntime/result surface tests, result-contract if terminal/result classification is touched, build |
+| Session runtime module facade extraction | Session / Continue, Result Surface, Agent Loop | Route 156 added `sessionEventSurface`, `sessionTerminalState`, `sessionPersistenceProjection`, and `sessionFutureTurnProjection` so `sessionRuntime.ts` keeps event order and coordination while module-owned facades own rendering, terminal accumulation, persistence payload projection, and future-turn projection. | closed by Route 156; focused sessionRuntime boundary/runtime tests, runMvp, result-contract, build |
 
 ### Phase B: Capability Module Expansion
 
@@ -171,18 +171,18 @@ If these answers are weak, pick a contract route instead of a feature route.
 
 ## Current Default Recommendation
 
-The best default next route is `Route 156: sessionRuntime projection boundary`
-in Phase A.
+The best default next route is a `SessionManager.ts` schema-neutral projection
+boundary in Phase A.
 
-Rationale: Route 153 reduced `cli.tsx` pressure, and Route 154 started reducing
-`runMvpIntegratedFlow.ts` by moving read/inspect/workspace, verification, and
-continuation helper clusters behind module-owned facades. Route 155 continued
-that work for browser, tool/runtime, provider diagnostic, and result-surface
-handoffs. The atlas now classifies `runMvpIntegratedFlow.ts` as acceptable as
-an Agent Loop composition root, so the next central file is `sessionRuntime.ts`.
-Keep Route 156 to one rendering or terminal-status projection boundary; do not
-change schema, result truthfulness, CLI behavior, provider behavior,
-browser/edit behavior, or persistence semantics.
+Rationale: Route 153 reduced `cli.tsx` pressure, Routes 154-155 classified
+`runMvpIntegratedFlow.ts` as an acceptable Agent Loop composition root, and
+Route 156 classified `sessionRuntime.ts` as an acceptable shell/runtime
+composition root after extracting rendering, terminal, persistence payload, and
+future-turn facades. The next highest-value central file is `SessionManager.ts`,
+where persistence substrate, codec/projection/reentry summaries, compact/replay,
+approval/mutation continuity, and CLI-facing session state still converge. Keep
+the next route schema-neutral unless a separate plan explicitly opens
+persistence format changes.
 
 If the user explicitly chooses mutation work next, select `Edit / Patch thin
 integration` and keep it to one module-owned handoff with no new broad write

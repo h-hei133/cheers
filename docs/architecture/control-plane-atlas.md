@@ -55,8 +55,9 @@ too many cross-layer decisions:
 - `packages/ts-shell/src/entrypoints/cli.tsx`: argument/mode dispatch,
   approval bridge, session commands, workspace binding, provider snapshot, and
   runtime invocation.
-- `packages/ts-shell/src/core/shell/sessionRuntime.ts`: query event rendering,
-  terminal accumulation, future-turn injection, and session persistence calls.
+- `packages/ts-shell/src/core/shell/sessionRuntime.ts`: shell/runtime event
+  ordering, facade invocation, state-machine coordination, and SessionManager
+  write-call ordering.
 - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`: prompt
   classification, capability planning, browser/edit/tool/provider dispatch,
   policy handoff, result construction, and evidence notes.
@@ -463,8 +464,9 @@ Unsafe area:
    summaries.
 3. `cli.tsx`: entrypoint plus command/display/session/provider/approval
    wiring.
-4. `sessionRuntime.ts`: query event rendering plus terminal accumulation plus
-   persistence calls.
+4. `sessionRuntime.ts`: acceptable shell/runtime composition root after Route
+   156; avoid regrowing rendering, terminal projection, persistence payload, or
+   future-turn internals there.
 5. `resultMapper.ts`: correct truthfulness owner, but now the place every
    capability must satisfy before claiming success.
 
@@ -589,6 +591,54 @@ Reason: after Routes 154-155, `runMvpIntegratedFlow.ts` is a large but
 acceptable composition root. `sessionRuntime.ts` is now the next better target
 because it still joins query event rendering, terminal status accumulation,
 future-turn injection, result handoff, and session persistence calls.
+
+## Post-Route-156 Session Runtime Facade Pass
+
+Route 156 ran the owner-module extraction pass for
+`packages/ts-shell/src/core/shell/sessionRuntime.ts`.
+
+New module facades:
+
+- `packages/ts-shell/src/core/shell/sessionEventSurface.ts`
+  - owner: Result Surface Engineering
+  - owns QueryEvent display facts, compact retry notice rendering, runtime
+    event digest accumulation, and execution summary rendering
+- `packages/ts-shell/src/core/shell/sessionTerminalState.ts`
+  - owner: Result Surface Engineering
+  - owns terminal state accumulation plus terminal/coding/continuation result
+    surface rendering, while preserving `resultMapper` as the truthfulness owner
+- `packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts`
+  - owner: Session / Continue Engineering
+  - owns assistant-turn and terminal save payload projection for existing
+    SessionManager calls
+- `packages/ts-shell/src/core/shell/sessionFutureTurnProjection.ts`
+  - owner: Session / Continue Engineering
+  - owns compact and project-memory future-turn prompt projection
+
+`sessionRuntime.ts` is now acceptable as a shell/runtime composition root: it
+keeps event consumption order, `ShellStateMachine` coordination, `runPrompt`
+invocation, continuity snapshot selection, and SessionManager write-call order.
+It should not regain direct QueryEvent rendering helpers, terminal result
+projection helpers, persistence payload construction, or future-turn injection
+internals.
+
+Remaining non-runtime responsibilities to avoid growing:
+
+- continuity snapshot selection still uses optional SessionManager methods and
+  should move only with schema-neutral Session / Continue coverage
+- SessionManager still concentrates persistence substrate, state/schema update
+  coordination, codecs, compact/replay, and reentry summaries
+- CLI/session command wiring remains in `cli.tsx` and should only move through
+  CLI-owned action boundaries
+
+Next central file recommendation: `SessionManager.ts`.
+
+Reason: after Routes 153-156, `cli.tsx`, `runMvpIntegratedFlow.ts`, and
+`sessionRuntime.ts` all have acceptable composition-root classifications for
+their current scopes. `SessionManager.ts` is now the highest-value central file
+because persistence substrate, schema-neutral projection/codecs, compact/replay,
+approval/mutation continuity, and CLI-facing reentry summaries still converge
+there.
 
 ## Post-Route-149 Roadmap Reset
 
