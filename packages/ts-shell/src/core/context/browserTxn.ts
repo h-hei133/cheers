@@ -245,7 +245,10 @@ export async function executeBrowserTransaction(
       ...(reasonCode === "action-timeout" || reasonCode === "navigation-timeout"
         ? ["actionable-blocker-kind:browser-timeout"]
         : []),
-      ...(reasonCode === "cleanup-failed" || reasonCode === "adapter-invalid-result"
+      ...(reasonCode === "cleanup-failed"
+        ? ["actionable-blocker-kind:browser-cleanup-failed"]
+        : []),
+      ...(reasonCode === "adapter-invalid-result"
         ? ["actionable-blocker-kind:browser-adapter-failure"]
         : []),
     ],

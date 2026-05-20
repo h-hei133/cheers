@@ -95,8 +95,29 @@ function evidence(input: {
     input.preview.evidenceId,
     `edit-patch-mode:${input.manifest.requestedMode}`,
     `edit-patch-preconditions:${input.preconditions.overall}`,
+    ...actionableBlockerEvidence(input),
     "mutation:not-run-in-module",
     `authorization:${input.manifest.authorization}`,
     input.manifest.redaction,
   ];
+}
+
+function actionableBlockerEvidence(input: {
+  readonly manifest: EditPatchMutationManifest;
+  readonly preconditions: EditPatchPreconditionProjection;
+}): readonly string[] {
+  const markers = new Set<string>();
+  if (input.preconditions.missing.includes("explicit-target")) {
+    markers.add("actionable-blocker-kind:patch-target-missing");
+  }
+  if (input.preconditions.missing.includes("content-or-transform")) {
+    markers.add("actionable-blocker-kind:patch-content-missing");
+  }
+  if (input.preconditions.missing.includes("stale-read")) {
+    markers.add("actionable-blocker-kind:stale-read");
+  }
+  if (input.manifest.supportStatus === "future-only") {
+    markers.add("actionable-blocker-kind:unsupported-future-edit");
+  }
+  return [...markers];
 }

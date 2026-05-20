@@ -385,7 +385,7 @@
         "sessionContinuityModule",
         "edit closeout verifier"
       ],
-      "resultSurfaceHandoff": "coding result fields and actionable evidence feed resultMapper without changing write behavior.",
+      "resultSurfaceHandoff": "coding result fields and actionable evidence feed resultMapper without changing write behavior; editPatchResult emits no-write markers for missing target, missing content, stale-read, and unsupported future edit stopped states.",
       "transcriptContinuationHandoff": "mutation results and stale-read evidence feed replay-safe continuation summaries.",
       "validationGates": [
         "workspace write route tests",
@@ -529,7 +529,7 @@
         "sessionContinuityModule",
         "browser harness gates"
       ],
-      "resultSurfaceHandoff": "browser unavailable, policy, timeout, and adapter facts feed actionable stopped paths.",
+      "resultSurfaceHandoff": "browser unavailable, policy, timeout, cleanup, and adapter facts feed actionable stopped paths.",
       "transcriptContinuationHandoff": "safe summaries and trace-backed continuation facts exclude raw DOM/page content by default.",
       "validationGates": [
         "browser transaction gate",
@@ -596,7 +596,7 @@
         "resultMapper",
         "real-provider verifiers"
       ],
-      "resultSurfaceHandoff": "provider unavailable, not-configured, or diagnostic facts become stopped/error facts through Result Surface.",
+      "resultSurfaceHandoff": "provider not-configured, opt-in-required, unsupported, unavailable, or diagnostic facts become stopped/error facts through Result Surface.",
       "transcriptContinuationHandoff": "provider diagnostic continuity is redacted; credentials and config paths are not persisted.",
       "validationGates": [
         "provider readiness/facade tests",
@@ -908,7 +908,7 @@
       "emit": [
         "patch/write result",
         "verification summary",
-        "actionable blocker evidence",
+        "actionable blocker evidence for missing target, missing content, stale-read, and unsupported future edit",
         "continuation-safe mutation evidence"
       ],
       "focusedValidation": [
@@ -928,7 +928,7 @@
         "safe observation summary",
         "transaction report",
         "cleanup status",
-        "browser actionable blockers"
+        "browser actionable blockers including cleanup failure"
       ],
       "focusedValidation": [
         "browser transaction gate",
@@ -946,6 +946,7 @@
       "emit": [
         "redacted diagnostic handoff",
         "readiness classification",
+        "provider-specific not-configured/opt-in/unsupported markers",
         "safe do-next text"
       ],
       "focusedValidation": [
@@ -1059,4 +1060,3 @@
     ]
   }
 }
-

@@ -117,6 +117,22 @@ as an import-policing rule.
 - `docs/architecture/resultmapper-module-extraction.md` records the
   responsibility migration table and final ownership classification.
 
+### Route 162: Cross-Capability Result Flow Calibration
+
+- Route 162 starts vertical stopped/result calibration after the central-file
+  pass and implementation-context pack.
+- Provider not-configured/opt-in/unsupported readiness facts, browser
+  unavailable/policy/timeout/cleanup facts, and edit missing-target,
+  missing-content, stale-read, and unsupported-future-edit facts now have
+  capability-specific Result Surface markers where the current code already
+  supplies safe facts.
+- The route preserves capability-specific flows and does not add a global
+  handoff abstraction, provider calls, browser actions, edit writes, session
+  schema changes, CLI behavior, dependencies, or default gate changes.
+- `docs/architecture/cross-capability-result-flow.md` records the before/after
+  flow summary, touched facades, result states preserved, and validation
+  surface.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -152,6 +168,7 @@ capability scope.
 | CLI module facade extraction | CLI / UX, Session / Continue, Permission / Policy, Provider / Model, Workspace / File Context, Agent Loop | Route 158 added `cliApprovalModule`, `cliRuntimeModule`, `cliSessionModule`, `cliWorkspaceModule`, and `cliPermissionModule` so `cli.tsx` remains the process entrypoint while module-owned facades own approval, runtime turn handoff, session, workspace, and permission surfaces. | closed by Route 158; focused CLI facade/adjacent tests, CLI baseline, runMvp, build |
 | Real-user verifier module facade extraction | Harness / Eval, Provider / Model, Result Surface | Route 159 kept `scripts/verify-real-user-capabilities.mjs` as a thin compatibility entrypoint and added `verifierCliModule`, `verifierCaseModule`, `verifierSafetyModule`, and `verifierReportModule` so `scripts/verify/index.mjs` remains the Harness readiness composition root while module-owned facades own options, case planning, opt-in safety, and report construction. | closed by Route 159; node checks, verifier boundary self-test, real-user verifier tier/suite/dry-run/include-real dry-run gates, edit closeout, result-contract |
 | ResultMapper Result Surface facade extraction | Result Surface, Tool, Runtime, Edit / Patch, Browser, Provider / Model, Session / Continue | Route 160 added actionable blocker, terminal classification, and capability result classification facades so `resultMapper.ts` remains the final truthfulness composition root while Result Surface-owned modules own blocker marker parsing, fallback labels, and hard-failure/caveat classification. | closed by Route 160; resultMapper boundary tests, existing resultMapper tests, result-contract, build |
+| Cross-capability result-flow calibration | Result Surface, Provider / Model, Browser, Edit / Patch, Runtime, Harness / Eval | Route 162 calibrated three low-risk stopped/result flows through capability-specific markers and focused tests without adding a global handoff abstraction or execution capability. | closed by Route 162; cross-capability result-flow test, provider/browser/edit/result focused tests, result-contract, edit closeout, build |
 | Session runtime module facade extraction | Session / Continue, Result Surface, Agent Loop | Route 156 added `sessionEventSurface`, `sessionTerminalState`, `sessionPersistenceProjection`, and `sessionFutureTurnProjection` so `sessionRuntime.ts` keeps event order and coordination while module-owned facades own rendering, terminal accumulation, persistence payload projection, and future-turn projection. | closed by Route 156; focused sessionRuntime boundary/runtime tests, runMvp, result-contract, build |
 | SessionManager module facade extraction | Session / Continue, Permission / Policy, CLI / UX | Route 157 added `sessionStore`, `sessionRegistry`, `sessionApprovalMemoryModule`, `sessionCompactModule`, and `sessionContinuityModule` so `SessionManager.ts` remains the stateful substrate while module-owned facades own layout, current-session registry, approval-memory, compact-retention, and continuity evidence details. | closed by Route 157; focused session boundary/adjacent tests, sessionRuntime tests, runMvp, build |
 
@@ -201,10 +218,11 @@ The central-file extraction pass is complete for the current atlas set. Routes
 roots under owner-module boundaries.
 
 Choose the next route by module lifecycle gap and product risk rather than by
-central-file size. The best default next route is now `Harness / gate taxonomy`
-if release/report confidence is the blocker, or `Edit / Patch thin integration`
-if mutation capability is explicitly prioritized. The edit route must remain a
-single module-owned handoff with no new broad write behavior.
+central-file size. After Route 162, the best default next route is `Tool /
+Runtime success/failure result-flow calibration` if result/session consistency
+is the priority, or `Harness / gate taxonomy` if release/report confidence is
+the blocker. Consider shared handoff extraction only after more
+capability-specific flows prove repeated stable fields.
 
 ## Persistent Boundaries
 

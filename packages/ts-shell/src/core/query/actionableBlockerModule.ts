@@ -15,7 +15,13 @@ export type ActionableBlockerKind =
   | "browser-unavailable"
   | "browser-timeout"
   | "browser-target-missing"
-  | "browser-adapter-failure";
+  | "browser-adapter-failure"
+  | "browser-cleanup-failed"
+  | "patch-content-missing"
+  | "unsupported-future-edit"
+  | "provider-not-configured"
+  | "provider-opt-in-required"
+  | "provider-unsupported";
 
 export type ActionableBlockerContract = {
   kind: ActionableBlockerKind;
@@ -72,7 +78,11 @@ export function findActionableKindFromEvidence(
     .find((entry) => entry.startsWith("mutation-summary-blocker:"))
     ?.slice("mutation-summary-blocker:".length)
     .trim();
-  const actionableMarker = marker ?? mutationSummaryMarker;
+  const providerReadinessMarker = evidence
+    .find((entry) => entry.startsWith("provider-readiness:"))
+    ?.trim();
+  const actionableMarker =
+    marker ?? mutationSummaryMarker ?? providerReadinessMarker;
   if (
     actionableMarker === "ambiguous-target" ||
     actionableMarker === "patch-from-not-found" ||
@@ -88,9 +98,24 @@ export function findActionableKindFromEvidence(
     actionableMarker === "browser-unavailable" ||
     actionableMarker === "browser-timeout" ||
     actionableMarker === "browser-target-missing" ||
-    actionableMarker === "browser-adapter-failure"
+    actionableMarker === "browser-adapter-failure" ||
+    actionableMarker === "browser-cleanup-failed" ||
+    actionableMarker === "patch-content-missing" ||
+    actionableMarker === "unsupported-future-edit" ||
+    actionableMarker === "provider-not-configured" ||
+    actionableMarker === "provider-opt-in-required" ||
+    actionableMarker === "provider-unsupported"
   ) {
     return actionableMarker;
+  }
+  if (
+    actionableMarker === "provider-readiness:missing-key" ||
+    actionableMarker === "provider-readiness:missing-config"
+  ) {
+    return "provider-not-configured";
+  }
+  if (actionableMarker === "provider-readiness:unsupported-provider") {
+    return "provider-unsupported";
   }
   return undefined;
 }
@@ -144,6 +169,35 @@ export function classifyActionableKind(
   ) {
     return "browser-adapter-failure";
   }
+  if (
+    normalized.includes("cleanup-failed") ||
+    normalized.includes("cleanup failed")
+  ) {
+    return "browser-cleanup-failed";
+  }
+  if (
+    normalized.includes("provider-readiness:missing-key") ||
+    normalized.includes("provider-readiness:missing-config") ||
+    normalized.includes("provider not configured") ||
+    normalized.includes("missing provider key") ||
+    normalized.includes("requires a configured base url") ||
+    normalized.includes("requires a configured model")
+  ) {
+    return "provider-not-configured";
+  }
+  if (
+    normalized.includes("provider-opt-in-required") ||
+    normalized.includes("real provider path requires explicit opt-in") ||
+    normalized.includes("real-provider opt-in required")
+  ) {
+    return "provider-opt-in-required";
+  }
+  if (
+    normalized.includes("provider-readiness:unsupported-provider") ||
+    normalized.includes("unsupported provider")
+  ) {
+    return "provider-unsupported";
+  }
   if (verificationFailed || normalized.includes("verification failed")) {
     return "verification-failed";
   }
@@ -160,9 +214,27 @@ export function classifyActionableKind(
   }
   if (
     normalized.includes("patch-target-missing") ||
-    normalized.includes("edit-target-missing")
+    normalized.includes("edit-target-missing") ||
+    normalized.includes("explicit target is required")
   ) {
     return "patch-target-missing";
+  }
+  if (
+    normalized.includes("patch-content-missing") ||
+    normalized.includes("edit-patch-content-or-transform-missing") ||
+    normalized.includes("concrete content") ||
+    normalized.includes("exact mapping") ||
+    normalized.includes("transform manifest is missing")
+  ) {
+    return "patch-content-missing";
+  }
+  if (
+    normalized.includes("unsupported-future-edit") ||
+    normalized.includes("preview-only future edit") ||
+    normalized.includes("execution is not enabled") ||
+    normalized.includes("future-only")
+  ) {
+    return "unsupported-future-edit";
   }
   if (
     normalized.includes("patch-generation-failed") ||
@@ -207,4 +279,3 @@ export function classifyActionableKind(
 function firstTruthy(values: readonly string[]): string | undefined {
   return values.find((value) => value.trim().length > 0);
 }
-

@@ -12,7 +12,8 @@ not import restrictions.
 - Consume: explicit in-workspace target, concrete content or exact mapping,
   workspace authority fact, final stale-read fact, verification plan.
 - Emit: patch/write result projection, changed/failed file summaries,
-  actionable blocker markers, verification summary, continuation-safe mutation
+  actionable blocker markers for missing target, missing content, stale-read,
+  and unsupported future edit, verification summary, continuation-safe mutation
   evidence.
 - Do not bypass: workspace authority, final stale-read, permission decisions,
   post-write verification projection, Result Surface truthfulness.
@@ -28,7 +29,7 @@ not import restrictions.
 - Consume: browser plan, runtime availability, network/local-fixture policy,
   action target metadata, explicit confirmation facts for risky apply paths.
 - Emit: safe observation summary, transaction trace/report, cleanup status,
-  actionable unavailable/policy/timeout/adapter blocker facts.
+  actionable unavailable/policy/timeout/cleanup/adapter blocker facts.
 - Do not bypass: public-web opt-in boundary, raw DOM/page-content exclusion,
   auth/session persistence boundary, selector-repair confirmation boundary.
 - Validate: browser transaction gate or focused browser adjacent tests,
@@ -41,8 +42,8 @@ not import restrictions.
   `providerReadiness.ts`, `providerReadinessCliSurface.ts`.
 - Consume: redacted readiness or adapter diagnostic facts; explicit
   real-provider opt-in only when the route opens it.
-- Emit: provider diagnostic handoff, readiness classification, redacted reason
-  and do-next text.
+- Emit: provider diagnostic handoff, readiness classification, provider-specific
+  not-configured/opt-in/unsupported markers, redacted reason and do-next text.
 - Do not bypass: real-provider home boundary, readiness redaction,
   non-default opt-in gates, isolated test roots for real-provider gates.
 - Validate: provider readiness/facade tests, `verify:result-contract` if
@@ -106,4 +107,3 @@ not import restrictions.
   exclusion, SessionManager write-call ordering.
 - Validate: continuation/sessionRuntime tests, SessionManager/session boundary
   tests, runMvp/result-contract when Agent Loop handoff changes.
-

@@ -871,6 +871,33 @@ Next central file recommendation: none. Choose the next route by product risk
 and module lifecycle gap instead of continuing central-file extraction by
 default.
 
+## Post-Route-162 Vertical Result-Flow Calibration
+
+Route 162 started vertical stopped/result calibration across Provider / Model,
+Browser, Edit / Patch, Runtime, Result Surface, and Harness / Eval without
+introducing a global handoff abstraction.
+
+Calibrated capability facts:
+
+- provider not-configured, opt-in-required, and unsupported-provider markers
+  now reach Result Surface as provider-specific stopped facts when the current
+  code already supplies safe provider readiness evidence
+- browser cleanup failure is distinct from adapter failure while unavailable,
+  policy, timeout, target-missing, and redaction-safe runtime receipt summaries
+  remain capability-owned
+- Edit / Patch module stopped projections now emit no-write actionable markers
+  for missing target, missing content, stale-read, and unsupported future edit
+  preconditions
+
+`resultMapper.ts` remains the terminal truthfulness root. These markers are
+classification inputs only; they do not authorize provider calls, browser
+actions, edit writes, session schema changes, or CLI behavior changes.
+
+Next recommendation: continue vertical calibration for the Tool / Runtime
+success/failure flow if result/session consistency is the priority. Consider a
+shared handoff extraction only after several more capability-specific flows
+stabilize around repeated fields.
+
 ## Post-Route-149 Roadmap Reset
 
 Route 144 established the green runMvp/package baseline, and Routes 145-148

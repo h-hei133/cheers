@@ -72,7 +72,9 @@ CLI / UX
 - Downstream consumers: Agent Loop, Result Surface, Session / Continue,
   Harness / Eval.
 - Result handoff: edit result summaries and blockers feed `resultMapper.ts`
-  through coding result fields and actionable evidence.
+  through coding result fields and actionable evidence. The Edit / Patch
+  module emits no-write markers for missing target, missing content, stale-read,
+  and unsupported future-edit stopped states.
 - Transcript/continuation handoff: mutation results and stale-read evidence
   feed continuation/recovery summaries without raw file dumps.
 - Validation gates: edit closeout, workspace write route tests, mutation-lane
@@ -119,7 +121,7 @@ CLI / UX
   cleanup status, browser actionable blockers.
 - Downstream consumers: Agent Loop, Result Surface, Session / Continue,
   Browser harness gates.
-- Result handoff: browser unavailable/policy/timeout/adapter facts feed
+- Result handoff: browser unavailable/policy/timeout/cleanup/adapter facts feed
   actionable stopped paths; raw observations do not define terminal success.
 - Transcript/continuation handoff: safe observation summaries and trace-backed
   continuation facts exclude raw DOM/page content by default.
@@ -142,8 +144,9 @@ CLI / UX
 - Outputs: provider diagnostic handoff, readiness classification, redacted
   startup/readiness surfaces.
 - Downstream consumers: CLI / UX, Agent Loop, Result Surface, Harness / Eval.
-- Result handoff: provider unavailable/not-configured/diagnostic facts become
-  stopped/error facts through Result Surface; provider config is never exposed.
+- Result handoff: provider not-configured, opt-in-required, unsupported, and
+  diagnostic facts become stopped/error facts through Result Surface; provider
+  config is never exposed.
 - Transcript/continuation handoff: provider diagnostic continuity is safe and
   redacted; credentials and config paths are not persisted.
 - Validation gates: provider facade/readiness tests, result-contract if
@@ -200,4 +203,3 @@ CLI / UX
 - Forbidden shortcuts: do not hide skips, change exit codes/markers/report
   fields, launch external MCP or real-provider paths without explicit opt-in,
   or read real-provider config manually.
-

@@ -61,12 +61,24 @@ describe("resultMapper Result Surface facades", () => {
     expect(classifyActionableKind("action-timeout while clicking", false)).toBe(
       "browser-timeout",
     );
+    expect(classifyActionableKind("cleanup-failed after close", false)).toBe(
+      "browser-cleanup-failed",
+    );
     expect(
       findActionableKindFromEvidence(["mutation-summary-blocker:stale-read"]),
     ).toBe("stale-read");
     expect(
       classifyActionableKind("patch-target-missing: missing file", false),
     ).toBe("patch-target-missing");
+    expect(
+      classifyActionableKind(
+        "edit-patch-content-or-transform-missing: exact mapping is missing",
+        false,
+      ),
+    ).toBe("patch-content-missing");
+    expect(
+      findActionableKindFromEvidence(["provider-readiness:missing-key"]),
+    ).toBe("provider-not-configured");
   });
 
   it("classifies command hard failures and successful mutation caveats", () => {
