@@ -54,6 +54,10 @@ This route is not successful if:
 
 Target project evidence:
 
+- `docs/implementation-context/README.md`
+- `docs/implementation-context/capability-flow-manifest.json`
+- `docs/implementation-context/capability-flow-graph.md`
+- `docs/implementation-context/capability-recipes.md`
 - 
 
 Reference projects to inspect:

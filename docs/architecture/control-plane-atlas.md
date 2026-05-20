@@ -37,6 +37,12 @@ reference implementation code is copied.
 
 ## Control-Plane Flow
 
+Implementation routes that wire or extend capability paths should first consult
+`docs/implementation-context/`. That directory contains the AI-oriented
+capability flow graph, machine-readable manifest, and route recipes derived
+from this atlas and the Route 154-160 facade passes. It is implementation
+context, not import policing.
+
 ```text
 CLI / UX
   -> session bootstrap and active-session selection

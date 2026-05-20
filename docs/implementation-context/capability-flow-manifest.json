@@ -1,0 +1,1062 @@
+{
+  "schemaVersion": 1,
+  "route": "docs/agent-routes/route161-capability-flow-context.md",
+  "purpose": "AI-usable implementation wiring context for capability routes.",
+  "scope": {
+    "kind": "implementation-context",
+    "notImportPolice": true,
+    "behaviorChangesAllowed": false,
+    "defaultPackageSweep": false
+  },
+  "modules": {
+    "cliUx": {
+      "name": "CLI / UX",
+      "publicFacades": [
+        "packages/ts-shell/src/entrypoints/cliApprovalModule.ts",
+        "packages/ts-shell/src/entrypoints/cliRuntimeModule.ts",
+        "packages/ts-shell/src/entrypoints/cliSessionModule.ts",
+        "packages/ts-shell/src/entrypoints/cliWorkspaceModule.ts",
+        "packages/ts-shell/src/entrypoints/cliPermissionModule.ts"
+      ],
+      "owns": [
+        "process entrypoint wiring",
+        "mode selection",
+        "slash command surfaces",
+        "display-oriented CLI projections"
+      ]
+    },
+    "agentLoop": {
+      "name": "Agent Loop",
+      "publicFacades": [
+        "packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+        "packages/ts-shell/src/orchestration/readInspectModule.ts",
+        "packages/ts-shell/src/orchestration/verificationModule.ts",
+        "packages/ts-shell/src/orchestration/continuationModule.ts",
+        "packages/ts-shell/src/orchestration/browserModule.ts",
+        "packages/ts-shell/src/orchestration/toolRuntimeModule.ts",
+        "packages/ts-shell/src/orchestration/providerModule.ts",
+        "packages/ts-shell/src/orchestration/resultSurfaceModule.ts"
+      ],
+      "owns": [
+        "turn ordering",
+        "capability branch selection",
+        "module facade composition",
+        "receipt and result handoff aggregation"
+      ]
+    },
+    "workspaceFileContext": {
+      "name": "Workspace / File Context",
+      "publicFacades": [
+        "packages/ts-shell/src/orchestration/readInspectModule.ts",
+        "packages/ts-shell/src/orchestration/workspaceFileContract.ts",
+        "packages/ts-shell/src/orchestration/workspaceTargetProjection.ts"
+      ],
+      "owns": [
+        "read and inspect target facts",
+        "workspace target summaries",
+        "continuation-safe target facts",
+        "future discovery candidate summaries without mutation authority"
+      ]
+    },
+    "editPatch": {
+      "name": "Edit / Patch",
+      "publicFacades": [
+        "packages/ts-shell/src/orchestration/editPatchModule.ts",
+        "packages/ts-shell/src/orchestration/editExpectationContract.ts",
+        "packages/ts-shell/src/orchestration/futureEditContract.ts",
+        "packages/ts-shell/src/orchestration/futureEditPlanner.ts",
+        "packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.ts",
+        "packages/ts-shell/src/orchestration/patchResult/workspaceWriteResult.ts",
+        "packages/ts-shell/src/orchestration/patchResult/mutationVerificationProjection.ts"
+      ],
+      "owns": [
+        "current bounded edit/write expectations",
+        "future-only edit planning contracts",
+        "workspace write authority facts",
+        "stale-read and mutation result projections"
+      ]
+    },
+    "tool": {
+      "name": "Tool",
+      "publicFacades": [
+        "packages/ts-shell/src/orchestration/toolRuntimeModule.ts",
+        "packages/ts-shell/src/core/tools/toolPolicyResult.ts",
+        "packages/ts-shell/src/core/tools/toolResultProjection.ts",
+        "packages/ts-shell/src/core/tools/toolLifecycleProjection.ts"
+      ],
+      "owns": [
+        "tool dispatch lifecycle",
+        "approval and unavailable tool facts",
+        "MCP failure classes",
+        "transcript-safe tool summaries"
+      ]
+    },
+    "runtime": {
+      "name": "Runtime",
+      "publicFacades": [
+        "packages/ts-shell/src/core/runtime/runtimeReceipt.ts",
+        "packages/ts-shell/src/core/runtime/runtimeReceiptProjection.ts"
+      ],
+      "owns": [
+        "runtime receipt vocabulary",
+        "command, sandbox, daemon, browser, and MCP runtime facts",
+        "cleanup, timeout, and redacted observation summaries"
+      ]
+    },
+    "browser": {
+      "name": "Browser",
+      "publicFacades": [
+        "packages/ts-shell/src/orchestration/browserModule.ts",
+        "packages/ts-shell/src/core/context/browserCapabilitySurface.ts",
+        "packages/ts-shell/src/core/context/browserRuntimeAvailabilitySurface.ts",
+        "packages/ts-shell/src/core/context/browserRuntimeSurface.ts",
+        "packages/ts-shell/src/core/context/browserExecutionReceiptSurface.ts",
+        "packages/ts-shell/src/core/context/browserToolPolicy.ts",
+        "packages/ts-shell/src/core/context/browserPublicReadOnlyWebPolicy.ts"
+      ],
+      "owns": [
+        "browser planning and runtime availability facts",
+        "browser policy boundaries",
+        "transaction trace/report facts",
+        "safe observation and cleanup summaries"
+      ]
+    },
+    "providerModel": {
+      "name": "Provider / Model",
+      "publicFacades": [
+        "packages/ts-shell/src/orchestration/providerModule.ts",
+        "packages/ts-shell/src/orchestration/providerOutcomeProjection.ts",
+        "packages/ts-shell/src/core/shell/providerReadiness.ts",
+        "packages/ts-shell/src/entrypoints/providerReadinessCliSurface.ts",
+        "packages/ts-shell/src/core/auth/providerAuthContract.ts"
+      ],
+      "owns": [
+        "provider readiness classification",
+        "redacted provider diagnostic handoff",
+        "model adapter boundary",
+        "real-provider opt-in constraints"
+      ]
+    },
+    "resultSurface": {
+      "name": "Result Surface",
+      "publicFacades": [
+        "packages/ts-shell/src/core/query/resultMapper.ts",
+        "packages/ts-shell/src/core/query/actionableBlockerModule.ts",
+        "packages/ts-shell/src/core/query/terminalClassificationProjection.ts",
+        "packages/ts-shell/src/core/query/capabilityResultClassification.ts",
+        "packages/ts-shell/src/orchestration/resultSurfaceModule.ts",
+        "packages/ts-shell/src/core/shell/sessionEventSurface.ts",
+        "packages/ts-shell/src/core/shell/sessionTerminalState.ts"
+      ],
+      "owns": [
+        "final terminal truthfulness",
+        "actionable blocker classification",
+        "terminal classification fallback",
+        "user-visible result and event surfaces"
+      ]
+    },
+    "sessionContinue": {
+      "name": "Session / Continue",
+      "publicFacades": [
+        "packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts",
+        "packages/ts-shell/src/core/shell/sessionFutureTurnProjection.ts",
+        "packages/ts-shell/src/session/sessionStore.ts",
+        "packages/ts-shell/src/session/sessionRegistry.ts",
+        "packages/ts-shell/src/session/sessionCompactModule.ts",
+        "packages/ts-shell/src/session/sessionContinuityModule.ts",
+        "packages/ts-shell/src/session/sessionApprovalMemoryModule.ts"
+      ],
+      "owns": [
+        "session store and registry facts",
+        "transcript and terminal persistence payloads",
+        "compact and future-turn projection",
+        "continuation evidence and replay-safe summaries"
+      ]
+    },
+    "permissionPolicy": {
+      "name": "Permission / Policy",
+      "publicFacades": [
+        "packages/ts-shell/src/entrypoints/cliApprovalModule.ts",
+        "packages/ts-shell/src/entrypoints/cliPermissionModule.ts",
+        "packages/ts-shell/src/core/tools/approvalFlow.ts",
+        "packages/ts-shell/src/orchestration/approvalAuthorityProjection.ts",
+        "packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.ts"
+      ],
+      "owns": [
+        "approval ask, denial, and audit facts",
+        "workspace authority inputs",
+        "policy display and mutation surfaces"
+      ]
+    },
+    "harnessEval": {
+      "name": "Harness / Eval",
+      "publicFacades": [
+        "scripts/verify-real-user-capabilities.mjs",
+        "scripts/verify/index.mjs",
+        "scripts/verify/verifierCliModule.mjs",
+        "scripts/verify/verifierCaseModule.mjs",
+        "scripts/verify/verifierSafetyModule.mjs",
+        "scripts/verify/verifierReportModule.mjs"
+      ],
+      "owns": [
+        "verifier option and case planning",
+        "selection safety and dry-run facts",
+        "report object construction",
+        "marker and exit-code compatibility"
+      ]
+    }
+  },
+  "flows": {
+    "cliTurn": {
+      "entryPoint": "packages/ts-shell/src/entrypoints/cli.tsx",
+      "ownerModule": "cliUx",
+      "secondaryModules": [
+        "agentLoop",
+        "sessionContinue",
+        "permissionPolicy",
+        "providerModel",
+        "workspaceFileContext",
+        "resultSurface"
+      ],
+      "lifecycleStages": [
+        "availability",
+        "policy",
+        "planning",
+        "execution",
+        "evidence",
+        "result mapping",
+        "transcript",
+        "continue / replay",
+        "redaction"
+      ],
+      "publicFacades": [
+        "cliApprovalModule.ts",
+        "cliRuntimeModule.ts",
+        "cliSessionModule.ts",
+        "cliWorkspaceModule.ts",
+        "cliPermissionModule.ts"
+      ],
+      "keyInputs": [
+        "argv",
+        "prompt/stdin/replay mode",
+        "current session",
+        "workspace root",
+        "provider readiness snapshot",
+        "approval mode"
+      ],
+      "keyOutputs": [
+        "runtime turn payload",
+        "approval handler",
+        "session/project context",
+        "workspace root projection"
+      ],
+      "downstreamConsumers": [
+        "ShellSessionRuntime",
+        "SessionManager",
+        "runMvpIntegratedFlow"
+      ],
+      "resultSurfaceHandoff": "runtime query events and final orchestration result reach resultMapper through ShellSessionRuntime.",
+      "transcriptContinuationHandoff": "Session runtime appends query events and persists terminal state through SessionManager.",
+      "validationGates": [
+        "focused CLI facade tests",
+        "slash/CLI adjacent tests",
+        "build if TS source changes"
+      ],
+      "forbiddenShortcuts": [
+        "put approval decisions directly in cli.tsx",
+        "change session schema from a CLI command",
+        "read provider credentials in display helpers",
+        "decide terminal truthfulness in CLI"
+      ],
+      "forbiddenFields": [
+        "provider credentials",
+        "raw provider config paths",
+        "authorization headers"
+      ]
+    },
+    "readInspect": {
+      "entryPoint": "Agent Loop read/inspect planning",
+      "ownerModule": "workspaceFileContext",
+      "secondaryModules": [
+        "agentLoop",
+        "resultSurface",
+        "sessionContinue"
+      ],
+      "lifecycleStages": [
+        "planning",
+        "observation",
+        "evidence",
+        "result mapping",
+        "transcript",
+        "continue / replay",
+        "redaction"
+      ],
+      "publicFacades": [
+        "readInspectModule.ts",
+        "workspaceFileContract.ts",
+        "workspaceTargetProjection.ts"
+      ],
+      "keyInputs": [
+        "prompt",
+        "workspace root",
+        "path hints",
+        "continuation target evidence",
+        "repo-explain candidates"
+      ],
+      "keyOutputs": [
+        "read/inspect classification",
+        "target recovery",
+        "missing/ambiguous/out-of-workspace stopped surface",
+        "repo-explain evidence role"
+      ],
+      "downstreamConsumers": [
+        "runMvpIntegratedFlow",
+        "resultMapper",
+        "sessionContinuityModule"
+      ],
+      "resultSurfaceHandoff": "stopped target surfaces feed coding result fields; successful read remains no-write evidence.",
+      "transcriptContinuationHandoff": "read windows and target summaries can become replay-safe continuation evidence.",
+      "validationGates": [
+        "read/inspect adjacent tests",
+        "workspace target tests",
+        "runMvp when routing changes",
+        "verify:result-contract for stopped surfaces"
+      ],
+      "forbiddenShortcuts": [
+        "grant write authority from read target facts",
+        "mutate from future discovery candidates",
+        "skip workspace target projection for ambiguous paths"
+      ],
+      "forbiddenFields": [
+        "raw file dumps in continuation summaries",
+        "secrets",
+        "provider config paths"
+      ]
+    },
+    "editPatch": {
+      "entryPoint": "Agent Loop edit planning and bounded mutation route",
+      "ownerModule": "editPatch",
+      "secondaryModules": [
+        "workspaceFileContext",
+        "permissionPolicy",
+        "resultSurface",
+        "sessionContinue",
+        "harnessEval"
+      ],
+      "lifecycleStages": [
+        "availability",
+        "policy",
+        "planning",
+        "execution",
+        "evidence",
+        "result mapping",
+        "transcript",
+        "continue / replay",
+        "eval",
+        "cleanup",
+        "redaction"
+      ],
+      "publicFacades": [
+        "editPatchModule.ts",
+        "editExpectationContract.ts",
+        "futureEditContract.ts",
+        "futureEditPlanner.ts",
+        "workspaceAuthority.ts",
+        "workspaceWriteResult.ts",
+        "mutationVerificationProjection.ts"
+      ],
+      "keyInputs": [
+        "explicit target",
+        "concrete content or exact mapping",
+        "workspace authority fact",
+        "final stale-read fact",
+        "verification plan"
+      ],
+      "keyOutputs": [
+        "edit expectation",
+        "patch/write result projection",
+        "changed/failed file summaries",
+        "verification summary",
+        "actionable blocker evidence"
+      ],
+      "downstreamConsumers": [
+        "runMvpIntegratedFlow",
+        "resultMapper",
+        "sessionContinuityModule",
+        "edit closeout verifier"
+      ],
+      "resultSurfaceHandoff": "coding result fields and actionable evidence feed resultMapper without changing write behavior.",
+      "transcriptContinuationHandoff": "mutation results and stale-read evidence feed replay-safe continuation summaries.",
+      "validationGates": [
+        "workspace write route tests",
+        "mutation-lane rejection regression",
+        "verify:edit-capability-closeout",
+        "verify:result-contract",
+        "runMvp if routing changes"
+      ],
+      "forbiddenShortcuts": [
+        "infer write authorization from prompt text",
+        "skip workspace authority",
+        "skip final stale-read",
+        "treat dry-run or preview as write success",
+        "broaden multi-file/add/delete/move/rollback without a dedicated route"
+      ],
+      "forbiddenFields": [
+        "raw file dumps",
+        "unredacted secrets",
+        "private provider paths"
+      ]
+    },
+    "toolRuntime": {
+      "entryPoint": "Agent Loop tool dispatch",
+      "ownerModule": "tool",
+      "secondaryModules": [
+        "runtime",
+        "permissionPolicy",
+        "resultSurface",
+        "sessionContinue"
+      ],
+      "lifecycleStages": [
+        "availability",
+        "policy",
+        "execution",
+        "observation",
+        "evidence",
+        "result mapping",
+        "transcript",
+        "redaction"
+      ],
+      "publicFacades": [
+        "toolRuntimeModule.ts",
+        "toolPolicyResult.ts",
+        "toolResultProjection.ts",
+        "toolLifecycleProjection.ts",
+        "runtimeReceipt.ts",
+        "runtimeReceiptProjection.ts"
+      ],
+      "keyInputs": [
+        "tool request",
+        "command allowlist",
+        "approval decision",
+        "sandbox/runtime facts",
+        "MCP availability and failure taxonomy"
+      ],
+      "keyOutputs": [
+        "tool lifecycle result",
+        "provenance summary",
+        "runtime receipt metadata",
+        "transcript-safe summaries"
+      ],
+      "downstreamConsumers": [
+        "runMvpIntegratedFlow",
+        "resultMapper",
+        "sessionEventSurface",
+        "verifiers"
+      ],
+      "resultSurfaceHandoff": "success/failure/blocked/MCP unavailable facts become coding result fields or actionable blockers before terminal mapping.",
+      "transcriptContinuationHandoff": "tool/runtime output is budgeted and redacted before transcript or replay use.",
+      "validationGates": [
+        "tool runtime facade tests",
+        "flowDispatch tests",
+        "MCP focused tests when touched",
+        "verify:result-contract",
+        "runMvp if dispatch order changes"
+      ],
+      "forbiddenShortcuts": [
+        "bypass approval",
+        "bypass command allowlist",
+        "emit raw MCP process/env dumps",
+        "decide terminal success from receipt alone"
+      ],
+      "forbiddenFields": [
+        "raw stdout/stderr dumps beyond budget",
+        "environment secrets",
+        "authorization headers",
+        "private provider paths"
+      ]
+    },
+    "browserTransaction": {
+      "entryPoint": "Agent Loop browser plan detection",
+      "ownerModule": "browser",
+      "secondaryModules": [
+        "agentLoop",
+        "runtime",
+        "resultSurface",
+        "sessionContinue",
+        "harnessEval"
+      ],
+      "lifecycleStages": [
+        "availability",
+        "policy",
+        "planning",
+        "execution",
+        "observation",
+        "evidence",
+        "result mapping",
+        "transcript",
+        "continue / replay",
+        "eval",
+        "report",
+        "cleanup",
+        "redaction"
+      ],
+      "publicFacades": [
+        "browserModule.ts",
+        "browserCapabilitySurface.ts",
+        "browserRuntimeAvailabilitySurface.ts",
+        "browserRuntimeSurface.ts",
+        "browserExecutionReceiptSurface.ts",
+        "browserToolPolicy.ts",
+        "browserPublicReadOnlyWebPolicy.ts"
+      ],
+      "keyInputs": [
+        "browser plan",
+        "runtime availability",
+        "local fixture or public web policy",
+        "action target metadata",
+        "transaction trace facts"
+      ],
+      "keyOutputs": [
+        "browser execution result",
+        "safe observation summary",
+        "transaction report",
+        "cleanup status",
+        "browser actionable blockers"
+      ],
+      "downstreamConsumers": [
+        "runMvpIntegratedFlow",
+        "resultMapper",
+        "sessionContinuityModule",
+        "browser harness gates"
+      ],
+      "resultSurfaceHandoff": "browser unavailable, policy, timeout, and adapter facts feed actionable stopped paths.",
+      "transcriptContinuationHandoff": "safe summaries and trace-backed continuation facts exclude raw DOM/page content by default.",
+      "validationGates": [
+        "browser transaction gate",
+        "browser facade/adjacent tests",
+        "verify:result-contract when result mapping changes"
+      ],
+      "forbiddenShortcuts": [
+        "enable public web or default browser action expansion",
+        "persist auth/session state",
+        "expose raw DOM or screenshots",
+        "apply selector repair without explicit confirmation"
+      ],
+      "forbiddenFields": [
+        "raw DOM",
+        "raw HTML",
+        "screenshots/OCR-like content",
+        "cookies",
+        "localStorage",
+        "sessionStorage",
+        "auth headers"
+      ]
+    },
+    "providerDiagnostic": {
+      "entryPoint": "CLI provider snapshot and Agent Loop provider handoff",
+      "ownerModule": "providerModel",
+      "secondaryModules": [
+        "cliUx",
+        "agentLoop",
+        "resultSurface",
+        "harnessEval"
+      ],
+      "lifecycleStages": [
+        "availability",
+        "policy",
+        "execution",
+        "evidence",
+        "result mapping",
+        "transcript",
+        "eval",
+        "report",
+        "redaction"
+      ],
+      "publicFacades": [
+        "providerModule.ts",
+        "providerOutcomeProjection.ts",
+        "providerReadiness.ts",
+        "providerReadinessCliSurface.ts",
+        "providerAuthContract.ts"
+      ],
+      "keyInputs": [
+        "redacted readiness facts",
+        "model adapter result",
+        "diagnostic continuity facts",
+        "explicit real-provider opt-in when allowed"
+      ],
+      "keyOutputs": [
+        "provider diagnostic handoff",
+        "readiness classification",
+        "redacted startup/readiness surface"
+      ],
+      "downstreamConsumers": [
+        "cli.tsx",
+        "runMvpIntegratedFlow",
+        "resultMapper",
+        "real-provider verifiers"
+      ],
+      "resultSurfaceHandoff": "provider unavailable, not-configured, or diagnostic facts become stopped/error facts through Result Surface.",
+      "transcriptContinuationHandoff": "provider diagnostic continuity is redacted; credentials and config paths are not persisted.",
+      "validationGates": [
+        "provider readiness/facade tests",
+        "verify:result-contract if terminal mapping changes",
+        "isolated real-provider gate only when explicitly opened"
+      ],
+      "forbiddenShortcuts": [
+        "read or print /home/wang/.private-agents-real manually",
+        "make real-provider behavior default",
+        "copy provider config into reports",
+        "hide provider-network/config attribution"
+      ],
+      "forbiddenFields": [
+        "API keys",
+        "tokens",
+        "headers",
+        "provider config paths",
+        "/home/wang/.private-agents-real"
+      ]
+    },
+    "sessionContinue": {
+      "entryPoint": "ShellSessionRuntime and SessionManager",
+      "ownerModule": "sessionContinue",
+      "secondaryModules": [
+        "resultSurface",
+        "agentLoop",
+        "cliUx",
+        "permissionPolicy"
+      ],
+      "lifecycleStages": [
+        "transcript",
+        "continue / replay",
+        "evidence",
+        "result mapping",
+        "cleanup",
+        "redaction"
+      ],
+      "publicFacades": [
+        "sessionEventSurface.ts",
+        "sessionTerminalState.ts",
+        "sessionPersistenceProjection.ts",
+        "sessionFutureTurnProjection.ts",
+        "sessionStore.ts",
+        "sessionRegistry.ts",
+        "sessionCompactModule.ts",
+        "sessionContinuityModule.ts",
+        "sessionApprovalMemoryModule.ts"
+      ],
+      "keyInputs": [
+        "query events",
+        "terminal result",
+        "coding result",
+        "continuation seeds",
+        "compact/project-memory future-turn facts",
+        "approval audit facts"
+      ],
+      "keyOutputs": [
+        "transcript event lines",
+        "terminal state",
+        "assistant turn payload",
+        "future-turn prompt context",
+        "continuation summaries"
+      ],
+      "downstreamConsumers": [
+        "cli session surfaces",
+        "runMvpIntegratedFlow future turns",
+        "replay/continue commands",
+        "result-contract verifier"
+      ],
+      "resultSurfaceHandoff": "session runtime consumes resultMapper output and does not decide terminal truthfulness.",
+      "transcriptContinuationHandoff": "SessionManager preserves existing metadata/state/transcript schemas while projections filter unsafe evidence.",
+      "validationGates": [
+        "sessionRuntime boundary/runtime tests",
+        "SessionManager boundary/session tests",
+        "runMvp when Agent Loop handoff changes",
+        "verify:result-contract when terminal/session result changes"
+      ],
+      "forbiddenShortcuts": [
+        "change metadata/state/transcript schemas without a dedicated route",
+        "reorder transcript events",
+        "change compact retention semantics",
+        "persist unsafe continuation evidence"
+      ],
+      "forbiddenFields": [
+        "raw DOM",
+        "raw file dumps",
+        "secrets",
+        "cookies",
+        "authorization headers",
+        "private keys"
+      ]
+    },
+    "verifierHarness": {
+      "entryPoint": "scripts/verify-real-user-capabilities.mjs and scripts/verify/index.mjs",
+      "ownerModule": "harnessEval",
+      "secondaryModules": [
+        "providerModel",
+        "resultSurface"
+      ],
+      "lifecycleStages": [
+        "availability",
+        "policy",
+        "execution",
+        "evidence",
+        "eval",
+        "report",
+        "cleanup",
+        "redaction"
+      ],
+      "publicFacades": [
+        "verifierCliModule.mjs",
+        "verifierCaseModule.mjs",
+        "verifierSafetyModule.mjs",
+        "verifierReportModule.mjs"
+      ],
+      "keyInputs": [
+        "verifier argv",
+        "tier/suite/case selection",
+        "isolated test root",
+        "dry-run and include-real flags",
+        "scenario definitions",
+        "provider preflight facts"
+      ],
+      "keyOutputs": [
+        "selected/skipped case plan",
+        "selection safety facts",
+        "marker output",
+        "JSON report",
+        "exit-code classification"
+      ],
+      "downstreamConsumers": [
+        "route closeout reports",
+        "release gates",
+        "real-provider opt-in gates"
+      ],
+      "resultSurfaceHandoff": "verifier reports assert product result semantics but do not define product behavior.",
+      "transcriptContinuationHandoff": "no session schema handoff; reports are redacted and isolated.",
+      "validationGates": [
+        "verifier boundary self-test",
+        "selected verifier tier/suite commands",
+        "verify:result-contract when result claims are touched"
+      ],
+      "forbiddenShortcuts": [
+        "hide skips",
+        "change exit codes, markers, or report fields casually",
+        "launch external MCP without explicit opt-in",
+        "read real-provider config manually"
+      ],
+      "forbiddenFields": [
+        "provider credentials",
+        "provider config paths",
+        "auth JSON",
+        "tokens",
+        "headers"
+      ]
+    }
+  },
+  "contracts": {
+    "CapabilityPlan": {
+      "ownerModule": "agentLoop",
+      "requiredFacts": [
+        "intent classification",
+        "owner capability",
+        "policy and availability facts when known"
+      ],
+      "doNotEmit": [
+        "write authorization by prompt implication",
+        "provider credentials"
+      ]
+    },
+    "PolicyDecision": {
+      "ownerModule": "permissionPolicy",
+      "requiredFacts": [
+        "decision kind",
+        "reason",
+        "scope",
+        "do-next when blocked"
+      ],
+      "doNotEmit": [
+        "approval as write success",
+        "hidden permission grants"
+      ]
+    },
+    "WorkspaceTarget": {
+      "ownerModule": "workspaceFileContext",
+      "requiredFacts": [
+        "workspace root",
+        "target path or candidate set",
+        "read/write authority distinction",
+        "stale-read evidence when mutating"
+      ],
+      "doNotEmit": [
+        "raw file content",
+        "mutation authority from discovery candidates"
+      ]
+    },
+    "RuntimeReceipt": {
+      "ownerModule": "runtime",
+      "requiredFacts": [
+        "runtime kind",
+        "availability",
+        "policy",
+        "execution",
+        "result",
+        "redaction status"
+      ],
+      "doNotEmit": [
+        "raw DOM",
+        "unbudgeted stdout/stderr",
+        "secrets"
+      ]
+    },
+    "CapabilityEvidence": {
+      "ownerModule": "resultSurface",
+      "requiredFacts": [
+        "safe reason",
+        "evidence markers",
+        "do-next text when actionable",
+        "redaction status when relevant"
+      ],
+      "doNotEmit": [
+        "raw browser/page content",
+        "raw file dumps",
+        "provider config",
+        "auth material"
+      ]
+    },
+    "ResultHandoff": {
+      "ownerModule": "resultSurface",
+      "requiredFacts": [
+        "terminal reason",
+        "terminal classification",
+        "stop reason when stopped/error",
+        "coding result summary when present"
+      ],
+      "doNotEmit": [
+        "false completed status",
+        "vague stopped reason when actionable blocker exists"
+      ]
+    },
+    "TerminalSummary": {
+      "ownerModule": "resultSurface",
+      "requiredFacts": [
+        "completed/stopped/error truthfulness",
+        "actionable blocker kind when known",
+        "safe final output"
+      ],
+      "doNotEmit": [
+        "raw DOM",
+        "raw command dumps",
+        "credentials"
+      ]
+    },
+    "TranscriptEvent": {
+      "ownerModule": "sessionContinue",
+      "requiredFacts": [
+        "event type",
+        "safe payload",
+        "stream order",
+        "session id"
+      ],
+      "doNotEmit": [
+        "schema drift",
+        "unsafe replay evidence"
+      ]
+    },
+    "ContinuationSeed": {
+      "ownerModule": "sessionContinue",
+      "requiredFacts": [
+        "safe evidence",
+        "target summary",
+        "last terminal/coding result",
+        "do-next when stopped"
+      ],
+      "doNotEmit": [
+        "raw file dumps",
+        "raw DOM",
+        "secrets",
+        "cookies",
+        "auth headers"
+      ]
+    },
+    "VerifierReport": {
+      "ownerModule": "harnessEval",
+      "requiredFacts": [
+        "run id",
+        "selected/skipped cases",
+        "status",
+        "exit code",
+        "redaction checks",
+        "residue classification"
+      ],
+      "doNotEmit": [
+        "provider credentials",
+        "provider config paths",
+        "hidden skips"
+      ]
+    }
+  },
+  "recipes": {
+    "addBoundedEditCapability": {
+      "startModule": "editPatch",
+      "requiredFacades": [
+        "editPatchModule.ts",
+        "workspaceAuthority.ts",
+        "workspaceWriteResult.ts",
+        "mutationVerificationProjection.ts"
+      ],
+      "emit": [
+        "patch/write result",
+        "verification summary",
+        "actionable blocker evidence",
+        "continuation-safe mutation evidence"
+      ],
+      "focusedValidation": [
+        "workspace write route tests",
+        "mutation-lane rejection regression",
+        "verify:edit-capability-closeout",
+        "verify:result-contract"
+      ]
+    },
+    "addBrowserAction": {
+      "startModule": "browser",
+      "requiredFacades": [
+        "browserModule.ts",
+        "browser runtime/policy/receipt surfaces"
+      ],
+      "emit": [
+        "safe observation summary",
+        "transaction report",
+        "cleanup status",
+        "browser actionable blockers"
+      ],
+      "focusedValidation": [
+        "browser transaction gate",
+        "focused browser adjacent tests",
+        "verify:result-contract if result mapping changes"
+      ]
+    },
+    "addProviderDiagnosticMarker": {
+      "startModule": "providerModel",
+      "requiredFacades": [
+        "providerModule.ts",
+        "providerOutcomeProjection.ts",
+        "providerReadiness.ts"
+      ],
+      "emit": [
+        "redacted diagnostic handoff",
+        "readiness classification",
+        "safe do-next text"
+      ],
+      "focusedValidation": [
+        "provider readiness/facade tests",
+        "verify:result-contract if terminal classification changes"
+      ]
+    },
+    "addCliCommand": {
+      "startModule": "cliUx",
+      "requiredFacades": [
+        "cliSessionModule.ts",
+        "cliWorkspaceModule.ts",
+        "cliPermissionModule.ts",
+        "cliApprovalModule.ts"
+      ],
+      "emit": [
+        "display surface lines",
+        "command result object",
+        "runtime handoff payload when prompt execution is needed"
+      ],
+      "focusedValidation": [
+        "focused CLI facade tests",
+        "slash router tests",
+        "CLI baseline when command behavior changes"
+      ]
+    },
+    "addVerifierGate": {
+      "startModule": "harnessEval",
+      "requiredFacades": [
+        "verifierCliModule.mjs",
+        "verifierCaseModule.mjs",
+        "verifierSafetyModule.mjs",
+        "verifierReportModule.mjs"
+      ],
+      "emit": [
+        "stable markers",
+        "JSON report fields",
+        "exit-code classification",
+        "residue classification"
+      ],
+      "focusedValidation": [
+        "node --check for touched scripts",
+        "verifier self-test/focused suite",
+        "verify:result-contract when result claims are asserted"
+      ]
+    },
+    "addResultStoppedPath": {
+      "startModule": "resultSurface",
+      "requiredFacades": [
+        "actionableBlockerModule.ts",
+        "terminalClassificationProjection.ts",
+        "capabilityResultClassification.ts",
+        "resultMapper.ts"
+      ],
+      "emit": [
+        "stopped_error",
+        "terminalClassification stopped when actionable",
+        "safe stop reason",
+        "do-next text"
+      ],
+      "focusedValidation": [
+        "resultMapper boundary tests",
+        "existing resultMapper tests",
+        "verify:result-contract"
+      ]
+    },
+    "addContinuationSupport": {
+      "startModule": "sessionContinue",
+      "requiredFacades": [
+        "continuationModule.ts",
+        "sessionContinuityModule.ts",
+        "sessionFutureTurnProjection.ts",
+        "sessionPersistenceProjection.ts"
+      ],
+      "emit": [
+        "continuation seed",
+        "future-turn prompt context",
+        "replay-safe summary",
+        "recovery guidance"
+      ],
+      "focusedValidation": [
+        "continuation/sessionRuntime tests",
+        "SessionManager/session boundary tests",
+        "runMvp and result-contract when Agent Loop handoff changes"
+      ]
+    }
+  },
+  "validation": {
+    "routeTiers": {
+      "tier1DocsManifest": [
+        "JSON parse check for capability-flow-manifest.json",
+        "rtk git diff --check",
+        "rtk git status --short --branch",
+        "package file diff guard"
+      ],
+      "tier2SourceTouched": [
+        "focused tests for touched module",
+        "build when TypeScript source changes"
+      ],
+      "tier3TruthfulnessOrRuntimeTouched": [
+        "result-contract",
+        "runMvp/sessionRuntime/SessionManager gates when relevant",
+        "package sweep only when escalation conditions are hit"
+      ]
+    },
+    "defaultForThisPack": "tier1DocsManifest",
+    "packageGuard": [
+      "package.json",
+      "package-lock.json",
+      "packages/ts-shell/package.json"
+    ]
+  }
+}
+

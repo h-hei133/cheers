@@ -10,11 +10,18 @@ Use these documents before starting a route:
 - `docs/architecture/module-roadmap-reset.md`
 - `docs/architecture/control-plane-atlas.md`
 - `docs/architecture/capability-contract.md`
+- `docs/implementation-context/README.md`
+- `docs/implementation-context/capability-flow-manifest.json`
 - `docs/agent-routes/module-route-template.md`
 
 Every future route must name its owner module, lifecycle stage, cross-module
 inputs and outputs, product behavior boundary, validation gate, and stop
 conditions before implementation.
+
+When a route wires a capability path, consult `docs/implementation-context/`
+for the current owner module, public facade, handoff, forbidden shortcut, and
+focused validation context. Treat it as route-start implementation context, not
+as an import-policing rule.
 
 ## Completed Consolidation Routes
 
