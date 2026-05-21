@@ -223,12 +223,15 @@ not import restrictions.
 
 - Start in: Session / Continue, with the capability owner providing safe facts.
 - Use facades/contracts: `continuationModule.ts`, `sessionContinuityModule.ts`,
-  `sessionFutureTurnProjection.ts`, `sessionPersistenceProjection.ts`.
+  `sessionFutureTurnProjection.ts`, `sessionPersistenceProjection.ts`,
+  `sessionResultParity.ts`, `continuationEvidenceParity.ts`.
 - Consume: safe evidence markers, target summaries, last terminal/coding
   result, replay-safe continuation seed.
 - Emit: continuation seed, future-turn prompt context, replay-safe summary,
-  recovery guidance if stopped.
+  recovery guidance if stopped, safe reason/do-next parity, and capability
+  evidence summaries without raw content.
 - Do not bypass: transcript schema, replay safety filters, raw DOM/file/secret
   exclusion, SessionManager write-call ordering.
 - Validate: continuation/sessionRuntime tests, SessionManager/session boundary
-  tests, runMvp/result-contract when Agent Loop handoff changes.
+  tests, parity projection tests, runMvp/result-contract when Agent Loop
+  handoff changes.

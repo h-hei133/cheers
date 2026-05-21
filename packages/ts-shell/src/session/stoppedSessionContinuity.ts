@@ -6,6 +6,7 @@ import {
   deriveActionableFailureContinuity,
   type ActionableFailureContinuity,
 } from "./actionableFailureContinuity.js";
+import { formatContinuationEvidenceParityDetails } from "./continuationEvidenceParity.js";
 
 export type StoppedSessionContinuityKind =
   | "writer-started-unknown"
@@ -166,19 +167,6 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
       ? "resolve the blocker and rerun the intended verification"
       : "inspect the failure and rerun verification");
   const parts = [`Failure handoff: status=${status ?? "failed"}`];
-  const discoverySummary = extractDiscoveryEditContinuationSummary(codingResult);
-  const generatedSummary = extractGeneratedEditContinuationSummary(codingResult);
-  const providerEditSummary = extractProviderEditContinuationSummary(codingResult);
-  const editRepairContextSummary = extractEditRepairContextContinuationSummary(codingResult);
-  const editRepairProposalSummary = extractEditRepairProposalContinuationSummary(codingResult);
-  const contextPacketSummary = extractContextPacketContinuationSummary(codingResult);
-  const contextPlanSummary = extractContextPlanContinuationSummary(codingResult);
-  const agentPlanSummary = extractAgentPlanContinuationSummary(codingResult);
-  const proposalReviewSummary = extractEditProposalReviewContinuationSummary(codingResult);
-  const proposalApplySummary = extractEditProposalApplyContinuationSummary(codingResult);
-  const proposalHunkSetSummary = extractProposalHunkSetContinuationSummary(codingResult);
-  const targetSetSummary = extractTargetSetEditContinuationSummary(codingResult);
-  const editRecoverySummary = extractEditRecoveryApplyContinuationSummary(codingResult);
   if (target) {
     parts.push(`target=${target}`);
   }
@@ -208,45 +196,7 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   if (codingResult.recoverySurface) {
     parts.push("automatic-rollback=no");
   }
-  if (discoverySummary) {
-    parts.push(discoverySummary);
-  }
-  if (generatedSummary) {
-    parts.push(generatedSummary);
-  }
-  if (providerEditSummary) {
-    parts.push(providerEditSummary);
-  }
-  if (editRepairContextSummary) {
-    parts.push(editRepairContextSummary);
-  }
-  if (editRepairProposalSummary) {
-    parts.push(editRepairProposalSummary);
-  }
-  if (contextPacketSummary) {
-    parts.push(contextPacketSummary);
-  }
-  if (contextPlanSummary) {
-    parts.push(contextPlanSummary);
-  }
-  if (agentPlanSummary) {
-    parts.push(agentPlanSummary);
-  }
-  if (proposalReviewSummary) {
-    parts.push(proposalReviewSummary);
-  }
-  if (proposalApplySummary) {
-    parts.push(proposalApplySummary);
-  }
-  if (proposalHunkSetSummary) {
-    parts.push(proposalHunkSetSummary);
-  }
-  if (targetSetSummary) {
-    parts.push(targetSetSummary);
-  }
-  if (editRecoverySummary) {
-    parts.push(editRecoverySummary);
-  }
+  parts.push(...formatContinuationEvidenceParityDetails(codingResult));
   parts.push(`next=${compactText(nextFocus, 140).replace(/[.]+$/, "")}`);
   return `${parts.join("; ")}.`;
 }
@@ -316,172 +266,6 @@ function extractWriteEffectFromEvidence(
     }
   }
   return undefined;
-}
-
-function extractDiscoveryEditContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("discovery-edit manifest="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `discovery=${compactText(summary, 300)}`;
-}
-
-function extractGeneratedEditContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("generated-edit proposal="),
-  ) ?? codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("generated-edit handoff="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `generated=${compactText(summary, 300)}`;
-}
-
-function extractProviderEditContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("provider-edit proposal="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `provider-edit=${compactText(summary, 300)}`;
-}
-
-function extractEditRepairContextContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("edit-repair-context id="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `edit-repair-context=${compactText(summary, 300)}`;
-}
-
-function extractEditRepairProposalContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("edit-repair-proposal id="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `edit-repair-proposal=${compactText(summary, 300)}`;
-}
-
-function extractContextPacketContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("context-packet "),
-  ) ?? codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("context-packet:id:"),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `context-packet=${compactText(summary, 300)}`;
-}
-
-function extractContextPlanContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("context-plan "),
-  ) ?? codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("context-plan:readiness:"),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `context-plan=${compactText(summary, 300)}`;
-}
-
-function extractAgentPlanContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("agent-plan "),
-  ) ?? codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("agent-plan:readiness:"),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `agent-plan=${compactText(summary, 300)}`;
-}
-
-function extractEditProposalReviewContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("edit-proposal-review proposal="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `proposal-review=${compactText(summary, 300)}`;
-}
-
-function extractEditProposalApplyContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("edit-proposal-apply proposal="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `proposal-apply=${compactText(summary, 300)}`;
-}
-
-function extractProposalHunkSetContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("proposal-hunk-set-apply proposal="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `proposal-hunk-set=${compactText(summary, 300)}`;
-}
-
-function extractTargetSetEditContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("target-set-edit transaction="),
-  ) ?? codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("target-set-edit manifest="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `target-set=${compactText(summary, 300)}`;
-}
-
-function extractEditRecoveryApplyContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("edit-recovery-apply plan="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `edit-recovery=${compactText(summary, 300)}`;
 }
 
 function compactText(input: string, max: number = 220): string {

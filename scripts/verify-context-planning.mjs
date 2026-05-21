@@ -14,8 +14,12 @@ const focusedTests = [
   'src/orchestration/agentPlanResult.test.ts',
   'src/orchestration/readInspectIntent.test.ts',
   'src/orchestration/targetResolution.test.ts',
+  'src/session/continuationEvidenceParity.test.ts',
+  'src/session/sessionResultParity.test.ts',
+  'src/session/sessionCompactModule.test.ts',
   'src/session/stoppedSessionContinuity.test.ts',
   'src/session/sessionResumeContextBuilder.test.ts',
+  'src/core/shell/sessionRuntimeBoundary.test.ts',
   'src/core/query/resultMapperBoundary.test.ts',
 ]
 
@@ -27,6 +31,9 @@ console.log('marker continuation-safe-summary')
 console.log('marker context-packet-feeds-agent-plan')
 console.log('marker broad-edit-needs-more-context')
 console.log('marker agent-plan-result-surface')
+console.log('marker session-result-parity')
+console.log('marker approval-denied-compact-reason')
+console.log('marker continuation-evidence-parity')
 
 const result = spawnSync(
   'npm',

@@ -4,6 +4,7 @@ import type {
   CodingResultSummary,
 } from "../orchestration/types.js";
 import { formatPromptContinuityContext } from "./continuityFormatter.js";
+import { formatContinuationEvidenceParityDetails } from "./continuationEvidenceParity.js";
 import type {
   SeedInfluenceDiagnostic,
   SessionContinuitySnapshot,
@@ -393,42 +394,7 @@ export function buildSuccessHandoffDiagnostic(
   if (codingResult.recoverySurface) {
     parts.push("automatic-rollback=no");
   }
-  const discoverySummary = extractDiscoveryEditContinuationSummary(codingResult);
-  if (discoverySummary) {
-    parts.push(discoverySummary);
-  }
-  const generatedSummary = extractGeneratedEditContinuationSummary(codingResult);
-  if (generatedSummary) {
-    parts.push(generatedSummary);
-  }
-  const providerEditSummary = extractProviderEditContinuationSummary(codingResult);
-  if (providerEditSummary) {
-    parts.push(providerEditSummary);
-  }
-  const contextPacketSummary = extractContextPacketContinuationSummary(codingResult);
-  if (contextPacketSummary) {
-    parts.push(contextPacketSummary);
-  }
-  const contextPlanSummary = extractContextPlanContinuationSummary(codingResult);
-  if (contextPlanSummary) {
-    parts.push(contextPlanSummary);
-  }
-  const agentPlanSummary = extractAgentPlanContinuationSummary(codingResult);
-  if (agentPlanSummary) {
-    parts.push(agentPlanSummary);
-  }
-  const proposalReviewSummary = extractEditProposalReviewContinuationSummary(codingResult);
-  if (proposalReviewSummary) {
-    parts.push(proposalReviewSummary);
-  }
-  const proposalApplySummary = extractEditProposalApplyContinuationSummary(codingResult);
-  if (proposalApplySummary) {
-    parts.push(proposalApplySummary);
-  }
-  const proposalHunkSetSummary = extractProposalHunkSetContinuationSummary(codingResult);
-  if (proposalHunkSetSummary) {
-    parts.push(proposalHunkSetSummary);
-  }
+  parts.push(...formatContinuationEvidenceParityDetails(codingResult));
   parts.push(`next=${nextFocus}`);
   return `${parts.join("; ")}.`;
 }
@@ -633,120 +599,4 @@ function compactText(input: string, max: number = 220): string {
     return normalized;
   }
   return `${normalized.slice(0, max)}...`;
-}
-
-function extractDiscoveryEditContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("discovery-edit manifest="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `discovery=${compactText(summary, 300)}`;
-}
-
-function extractGeneratedEditContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("generated-edit proposal="),
-  ) ?? codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("generated-edit handoff="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `generated=${compactText(summary, 300)}`;
-}
-
-function extractProviderEditContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("provider-edit proposal="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `provider-edit=${compactText(summary, 300)}`;
-}
-
-function extractContextPacketContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("context-packet "),
-  ) ?? codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("context-packet:id:"),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `context-packet=${compactText(summary, 300)}`;
-}
-
-function extractContextPlanContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("context-plan "),
-  ) ?? codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("context-plan:readiness:"),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `context-plan=${compactText(summary, 300)}`;
-}
-
-function extractAgentPlanContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("agent-plan "),
-  ) ?? codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("agent-plan:readiness:"),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `agent-plan=${compactText(summary, 300)}`;
-}
-
-function extractEditProposalReviewContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("edit-proposal-review proposal="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `proposal-review=${compactText(summary, 300)}`;
-}
-
-function extractEditProposalApplyContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("edit-proposal-apply proposal="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `proposal-apply=${compactText(summary, 300)}`;
-}
-
-function extractProposalHunkSetContinuationSummary(
-  codingResult: CodingResultSummary,
-): string | undefined {
-  const summary = codingResult.continuation.evidence.find((entry) =>
-    entry.startsWith("proposal-hunk-set-apply proposal="),
-  );
-  if (!summary) {
-    return undefined;
-  }
-  return `proposal-hunk-set=${compactText(summary, 300)}`;
 }

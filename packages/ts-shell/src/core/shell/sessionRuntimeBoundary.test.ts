@@ -307,6 +307,51 @@ describe("session runtime boundary facades", () => {
     expect(completed.some((line) => line.includes("BlockerKind"))).toBe(false);
   });
 
+  it("renders approval-denied compact reason and do-next without collapsing them", () => {
+    const rendered = renderTerminalFor({
+      stopReason: "Re-run and approve escalation for verify command execution.",
+      terminalClassification: "stopped",
+      codingResult: buildBoundaryCodingResult({
+        reason: "Approval denied by user for bash",
+        verificationStatus: "blocked",
+        evidence: ["actionable-blocker-kind:approval-denied"],
+        nextAction: "Re-run and approve escalation for verify command execution.",
+      }),
+    });
+
+    expect(rendered).toContain("- BlockerKind: approval-denied");
+    expect(rendered).toContain("- Reason: Approval denied by user for bash");
+    expect(rendered).toContain(
+      "- DoNext: Re-run and approve escalation for verify command execution.",
+    );
+  });
+
+  it("renders context and agent-plan parity details from safe result evidence", () => {
+    const rendered = renderTerminalFor({
+      stopReason: "Read the suggested candidates before planning mutation.",
+      terminalClassification: "stopped",
+      codingResult: buildBoundaryCodingResult({
+        reason: "Context packet needs more related reads before planning.",
+        verificationStatus: "blocked",
+        evidence: [
+          "context-packet ctx_abc; target=src/target.ts; included=2; omitted=1; mutationAuthority=not-granted; raw-full-content-excluded",
+          "agent-plan plan_abc; readiness=needs-more-context; confidence=medium; missingFacts=1; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
+          "actionable-blocker-kind:unsupported-future-edit",
+        ],
+        nextAction: "Read the suggested candidates before planning mutation.",
+      }),
+    }).join("\n");
+
+    expect(rendered).toContain("- Outcome: stopped");
+    expect(rendered).toContain(
+      "- Reason: Context packet needs more related reads before planning.",
+    );
+    expect(rendered).toContain(
+      "- DoNext: Read the suggested candidates before planning mutation.",
+    );
+    expect(rendered).not.toContain("RAW_SECRET_FILE_CONTENT");
+  });
+
   it("projects SessionManager persistence payloads without changing shape", () => {
     const completed = createSessionTerminalState();
     completed.finalOutput = "done";
@@ -474,6 +519,7 @@ function buildBoundaryCodingResult(input: {
   readonly reason: string;
   readonly verificationStatus: "passed" | "failed" | "blocked";
   readonly evidence: readonly string[];
+  readonly nextAction?: string;
 }) {
   return {
     taskKind: "edit-file",
@@ -517,6 +563,7 @@ function buildBoundaryCodingResult(input: {
     verification: {
       status: input.verificationStatus,
       reason: input.reason,
+      ...(input.nextAction ? { nextAction: input.nextAction } : {}),
     },
     evidence: input.evidence,
   } as const;

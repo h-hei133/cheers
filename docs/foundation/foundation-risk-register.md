@@ -14,6 +14,27 @@ None open after Route 165.
 
 ## Resolved
 
+### Session result parity after context and planning
+
+- Affected modules: Result Surface, Session / Continue, Workspace / File
+  Context, Agent Loop, Edit / Patch, Harness / Eval.
+- Why it was a parity risk: context packets, Agent Plan summaries, and recent
+  edit proposal/repair/hunk-set stopped states added safe terminal facts that
+  could drift between terminal rendering, compact summaries, and `/continue`.
+- Resolution: Route 183 adds session result parity and continuation evidence
+  parity helpers so terminal compact output keeps approval-denied Reason and
+  do-next distinct, and stopped/success handoff diagnostics reuse one
+  replay-safe evidence extractor for context packets, agent plans, proposals,
+  repairs, hunk-sets, target-set partial failures, and explicit recovery.
+- Evidence: session result parity tests, continuation evidence parity tests,
+  session runtime boundary tests, stopped-session continuity tests, session
+  resume context tests, context/agent-plan regressions, focused parity verifier,
+  result-contract, and build.
+- Recommended next action: keep session schema, edit execution expansion,
+  provider/browser calls, approval policy, CLI behavior, and raw compact/continue
+  retention closed until separate routes define them.
+- Should become a route: no, resolved by Route 183 for parity projection only.
+
 ### Targeted context planning substrate
 
 - Affected modules: Workspace / File Context, Agent Loop, Result Surface,

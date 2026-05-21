@@ -422,6 +422,21 @@ as an import-policing rule.
   index, schema/CLI/dependency change, authority bypass, or broad
   `runMvpIntegratedFlow.ts` refactor is added.
 
+### Route 183: Session Result Parity
+
+- Route 183 adds `sessionResultParity.ts` and
+  `continuationEvidenceParity.ts` so Session / Continue consumes
+  Result Surface-owned blocker vocabulary while preserving safe reason,
+  do-next, context packet, agent plan, edit proposal, repair, hunk-set,
+  target-set, and recovery summaries across terminal, compact, and continue
+  surfaces.
+- Approval-denied compact output keeps the denial reason separate from the
+  retry/approval do-next guidance, and context/agent-plan/edit stopped evidence
+  remains replay-safe without raw file/provider/browser content.
+- No product capability, edit execution, provider/model call, browser work,
+  approval policy change, session schema change, CLI/dependency change, or
+  broad `runMvpIntegratedFlow.ts` refactor is added.
+
 ## Module-First Route Rule
 
 Future routes must state:

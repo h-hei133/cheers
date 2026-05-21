@@ -214,7 +214,9 @@
         "packages/ts-shell/src/session/sessionRegistry.ts",
         "packages/ts-shell/src/session/sessionCompactModule.ts",
         "packages/ts-shell/src/session/sessionContinuityModule.ts",
-        "packages/ts-shell/src/session/sessionApprovalMemoryModule.ts"
+        "packages/ts-shell/src/session/sessionApprovalMemoryModule.ts",
+        "packages/ts-shell/src/session/sessionResultParity.ts",
+        "packages/ts-shell/src/session/continuationEvidenceParity.ts"
       ],
       "owns": [
         "session store and registry facts",
@@ -788,7 +790,9 @@
         "sessionRegistry.ts",
         "sessionCompactModule.ts",
         "sessionContinuityModule.ts",
-        "sessionApprovalMemoryModule.ts"
+        "sessionApprovalMemoryModule.ts",
+        "sessionResultParity.ts",
+        "continuationEvidenceParity.ts"
       ],
       "keyInputs": [
         "query events",
@@ -811,8 +815,8 @@
         "replay/continue commands",
         "result-contract verifier"
       ],
-      "resultSurfaceHandoff": "session runtime consumes resultMapper output and does not decide terminal truthfulness.",
-      "transcriptContinuationHandoff": "SessionManager preserves existing metadata/state/transcript schemas while projections filter unsafe evidence.",
+      "resultSurfaceHandoff": "session runtime consumes resultMapper output and Result Surface-owned blocker vocabulary; sessionResultParity normalizes safe reason and do-next details for terminal/session consumers without deciding terminal truthfulness.",
+      "transcriptContinuationHandoff": "SessionManager preserves existing metadata/state/transcript schemas while projections filter unsafe evidence; continuationEvidenceParity keeps context packet, agent plan, proposal, repair, hunk-set, target-set, and recovery summaries replay-safe.",
       "validationGates": [
         "sessionRuntime boundary/runtime tests",
         "SessionManager boundary/session tests",

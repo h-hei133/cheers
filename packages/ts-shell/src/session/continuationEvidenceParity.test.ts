@@ -1,0 +1,74 @@
+import { describe, expect, it } from "vitest";
+import type { CodingResultSummary } from "../orchestration/types.js";
+import { formatContinuationEvidenceParityDetails } from "./continuationEvidenceParity.js";
+
+describe("continuation evidence parity", () => {
+  it("normalizes context agent-plan and edit stopped evidence without raw content", () => {
+    const details = formatContinuationEvidenceParityDetails(
+      makeCodingResult([
+        "context-packet ctx_abc; target=src/a.ts; included=2; omitted=1; mutationAuthority=not-granted; raw-full-content-excluded",
+        "context-plan ctx_abc; readiness=needs-more-context; suggestedReads=1; tests=0; mutationAuthority=not-granted",
+        "agent-plan plan_abc; owner=workspace-file-context; readiness=needs-more-context; confidence=medium; missingFacts=1; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
+        "generated-edit proposal=generated-edit-abc; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
+        "edit-repair-proposal id=edit-repair-proposal-def; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
+        "proposal-hunk-set proposal=provider-edit-abc; hunkSet=proposal-hunk-set-def; source=provider; targets=src/a.ts; mutationAuthority:not-granted; raw-content-excluded",
+      ]),
+    );
+
+    expect(details).toContain(
+      "context-packet=context-packet ctx_abc; target=src/a.ts; included=2; omitted=1; mutationAuthority=not-granted; raw-full-content-excluded",
+    );
+    expect(details).toContain(
+      "agent-plan=agent-plan plan_abc; owner=workspace-file-context; readiness=needs-more-context; confidence=medium; missingFacts=1; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
+    );
+    expect(details).toContain(
+      "proposal-hunk-set=proposal-hunk-set proposal=provider-edit-abc; hunkSet=proposal-hunk-set-def; source=provider; targets=src/a.ts; mutationAuthority:not-granted; raw-content-excluded",
+    );
+    expect(JSON.stringify(details)).not.toContain("RAW_SECRET");
+  });
+});
+
+function makeCodingResult(
+  continuationEvidence: readonly string[],
+): CodingResultSummary {
+  return {
+    taskKind: "edit-file",
+    changedFiles: [],
+    failedFiles: [],
+    patches: [],
+    repair: {
+      status: "failed",
+      attempts: 0,
+      recoveredItems: [],
+      failedItems: [],
+      notes: [],
+    },
+    continuation: {
+      status: "failed-after-bounded-continuation",
+      attempts: 1,
+      evidence: [...continuationEvidence],
+    },
+    changeSet: {
+      gitAware: false,
+      preExistingDirtyFiles: [],
+      postRunDirtyFiles: [],
+      attemptedFiles: [],
+      changedFiles: [],
+      unchangedAttemptedFiles: [],
+    },
+    taskSatisfaction: {
+      verdict: "insufficient-evidence",
+      reasons: [],
+      requiredEvidence: [],
+      observedEvidence: [],
+    },
+    verifiedFiles: [],
+    unverifiedFiles: [],
+    verification: {
+      status: "blocked",
+      reason: "review required",
+      blockerKind: "unknown",
+    },
+    evidence: [],
+  };
+}

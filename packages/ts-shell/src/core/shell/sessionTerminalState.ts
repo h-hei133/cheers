@@ -6,11 +6,8 @@ import type {
 } from "../../orchestration/types.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionContinuitySnapshot } from "../../session/SessionManager.js";
+import { projectSessionResultParity } from "../../session/sessionResultParity.js";
 import type { QueryEvent } from "../query/events.js";
-import {
-  deriveActionableBlockerContract,
-  projectActionableBlockerTerminalDetail,
-} from "../query/actionableBlockerModule.js";
 import type { RuntimeEventDigest } from "./sessionEventSurface.js";
 import { renderExecutionSummaryBlock } from "./sessionEventSurface.js";
 import { formatExplicitRestoreSummaryLines } from "./restoreSurfaceSummary.js";
@@ -224,6 +221,7 @@ function renderTerminalResultBlock(
     const actionableBlocker = deriveSessionTerminalBlockerDetail({
       stopReason: input.terminalStopReason,
       codingResult: input.codingResult,
+      terminalClassification: input.terminalClassification,
     });
     renderer.renderLine("Result");
     renderer.renderLine(`- Outcome: ${statusLabel}`);
@@ -239,6 +237,7 @@ function renderTerminalResultBlock(
   const actionableBlocker = deriveSessionTerminalBlockerDetail({
     stopReason: input.terminalStopReason,
     codingResult: input.codingResult,
+    terminalClassification: input.terminalClassification,
   });
   renderer.renderLine("Final result");
   renderer.renderLine(`- Classification: ${statusLabel}`);
@@ -259,11 +258,21 @@ function renderTerminalResultBlock(
 function deriveSessionTerminalBlockerDetail(input: {
   stopReason?: string;
   codingResult?: CodingResultSummary;
+  terminalClassification: "success" | "stopped" | "error";
 }) {
-  const contract = deriveActionableBlockerContract(input);
-  return contract
-    ? projectActionableBlockerTerminalDetail(contract)
-    : undefined;
+  const projection = projectSessionResultParity({
+    terminalClassification: input.terminalClassification,
+    stopReason: input.stopReason,
+    codingResult: input.codingResult,
+  });
+  if (!projection.blockerKind || !projection.reason || !projection.doNext) {
+    return undefined;
+  }
+  return {
+    kind: projection.blockerKind,
+    reason: projection.reason,
+    doNext: projection.doNext,
+  };
 }
 
 function renderCodingResultContract(
