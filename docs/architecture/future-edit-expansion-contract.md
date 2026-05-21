@@ -31,7 +31,11 @@ Current supported write/edit behavior remains:
   runtime selection while still delegating execution to Edit / Patch; Route 169
   closes out the activated lane with stable success/stopped/failed outcome
   markers, Result Surface classification, continuation-safe evidence, and
-  verifier coverage without adding edit power
+  verifier coverage without adding edit power; Route 170 adds a single-file
+  pre-write snapshot/recovery substrate for the activated lane; Route 171 adds
+  a no-write discovery candidate manifest and explicit confirmation model, with
+  handoff only when exactly one confirmed candidate reduces to this existing
+  exact fenced replacement lane
 - ambiguous sibling targets stop before mutation
 - vague generated-content prompts stop actionably
 - no-write read/inspect requests stay separate from mutation
@@ -42,7 +46,9 @@ Still unsupported in the current route:
 
 - broad refactor execution
 - batch or broad multi-file edit execution
-- discovery edit execution
+- discovery edit execution, except Route 171's no-write candidate manifest and
+  confirmed single-target handoff into the existing exact fenced replacement
+  lane
 - broad/fuzzy fenced replacement execution; only exact old/new fenced mapping
   is supported
 - generated file content from vague prompts
@@ -69,7 +75,8 @@ The reference scan was shape-only; no implementation code was copied.
 | Mode | Status now | Required before execution |
 |---|---|---|
 | broad refactor planning | future-only | target/constraint manifest, user-confirmed target selection, workspace authority, final stale-read, verification plan, snapshot/rollback story |
-| multi-file discovery edit | future-only | discovery phase, candidate file list, user-confirmed target set, per-file plan, bounded max-file guard, workspace authority, final stale-read, verification plan |
+| multi-file discovery edit | no-write manifest supported; multi-file mutation remains future-only | discovery phase, bounded candidate file list, explicit confirmation requirement, per-candidate exact fenced replacement plan projection, bounded max-file guard; mutation still requires a later route for target-set execution |
+| confirmed single-target discovery edit | current-supported only when it reduces to exact fenced replacement | one confirmed candidate from the manifest, exact old/new fenced mapping, workspace authority through existing write route, final stale-read, pre-write snapshot receipt, post-write verification |
 | fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy/discovery/generated/multi-file/rollback remains stopped and no-write | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, pre-write snapshot receipt, verification plan, stable outcome taxonomy, rollback readiness projection |
 
 These modes are intentionally separate. A broad refactor request is not a
@@ -99,6 +106,13 @@ Future execution routes must create a manifest before mutation:
 The manifest is not write authorization. It becomes actionable only after the
 user confirms the target set and the execution route re-checks authority and
 stale-read state.
+
+Route 171 discovery manifests are explicitly no-write. They carry
+`mutationAuthority: not-granted`, bounded candidate path labels, match evidence
+summaries, confidence, required confirmation, planned operation kind,
+snapshot/verification requirements, and raw-content-excluded redaction status.
+Only `confirmed-single-target` may hand off, and only to the existing exact
+fenced replacement route. Multi-target confirmation remains no-write.
 
 ## User Confirmation Model
 

@@ -166,6 +166,7 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
       ? "resolve the blocker and rerun the intended verification"
       : "inspect the failure and rerun verification");
   const parts = [`Failure handoff: status=${status ?? "failed"}`];
+  const discoverySummary = extractDiscoveryEditContinuationSummary(codingResult);
   if (target) {
     parts.push(`target=${target}`);
   }
@@ -194,6 +195,9 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   }
   if (codingResult.recoverySurface) {
     parts.push("automatic-rollback=no");
+  }
+  if (discoverySummary) {
+    parts.push(discoverySummary);
   }
   parts.push(`next=${compactText(nextFocus, 140).replace(/[.]+$/, "")}`);
   return `${parts.join("; ")}.`;
@@ -264,6 +268,18 @@ function extractWriteEffectFromEvidence(
     }
   }
   return undefined;
+}
+
+function extractDiscoveryEditContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("discovery-edit manifest="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `discovery=${compactText(summary, 300)}`;
 }
 
 function compactText(input: string, max: number = 220): string {

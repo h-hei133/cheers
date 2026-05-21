@@ -123,10 +123,13 @@ import {
   isWriteExpectationPrompt,
 } from "./editExpectationContract.js";
 import {
+  buildDiscoveryEditPlanResult,
   buildFencedEditReplacementRouteResult,
+  planDiscoveryEdit,
   runFencedEditReplacementRoute,
   selectFencedEditReplacementActivation,
 } from "./editPatchModule.js";
+import { buildDiscoveryEditRuntimeRequest } from "./discoveryEditRuntime.js";
 import {
   buildActionResultSeedDecisionTrace,
   buildPostEditVerifyContinuationLineage,
@@ -4029,6 +4032,84 @@ async function executeWorkflowTaskPlan(input: {
     evidence.push(...input.plan.continuationLineage!);
   }
   appendSingleFileEditRepairObservability(evidence, input.plan);
+  const discoveryEditRequest = buildDiscoveryEditRuntimeRequest({
+    prompt: input.prompt,
+    workspaceRoot: input.workspaceRoot,
+    targetPath: input.plan.targetPath,
+  });
+  if (discoveryEditRequest) {
+    const discoveryPlan = planDiscoveryEdit(discoveryEditRequest);
+    if (discoveryPlan.status !== "ready-for-handoff") {
+      const result = buildDiscoveryEditPlanResult({
+        sessionId: input.sessionId,
+        prompt: input.prompt,
+        plan: discoveryPlan,
+      });
+      return {
+        events,
+        notes: [
+          ...notes,
+          "discovery-edit: manifest produced without mutation",
+          discoveryPlan.manifest.transcriptSummary,
+          ...discoveryPlan.evidence,
+        ],
+        codingResult: result.codingResult!,
+        userFacingOutput: result.finalOutput,
+      };
+    }
+
+    const workspaceAuthority = createWorkspaceWriteAuthority(input.workspaceRoot);
+    const absoluteTarget = path.isAbsolute(discoveryPlan.confirmation.targetPath)
+      ? discoveryPlan.confirmation.targetPath
+      : path.join(input.workspaceRoot, discoveryPlan.confirmation.targetPath);
+    const approval = await input.enforcer.checkAndEnforce("edit", {
+      scope: "filesystem",
+      operation: "write",
+      target: absoluteTarget,
+      workspaceRoot: input.workspaceRoot,
+    });
+    const route = await runFencedEditReplacementRoute({
+      workspaceRoot: input.workspaceRoot,
+      targetPath: discoveryPlan.confirmation.targetPath,
+      mapping: discoveryPlan.mapping,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: approval.allowed ? "approved" : "denied",
+      defaultProductionRejectionUnchanged: true,
+      readFile: workspaceAuthority.readFile,
+      readVerifiedFile: workspaceAuthority.readVerifiedFile,
+      validateWriteTarget: workspaceAuthority.validateWriteTarget,
+      writeFile: workspaceAuthority.writeFile,
+      ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+    });
+    const activatedRoute = {
+      ...route,
+      evidence: [
+        discoveryPlan.manifest.transcriptSummary,
+        ...discoveryPlan.evidence,
+        "discovery-edit-handoff:existing-fenced-route",
+        ...route.evidence,
+      ],
+    };
+    const result = buildFencedEditReplacementRouteResult({
+      sessionId: input.sessionId,
+      prompt: input.prompt,
+      route: activatedRoute,
+    });
+    return {
+      events,
+      notes: [
+        ...notes,
+        `discovery-edit: confirmed target=${discoveryPlan.confirmation.targetPath}`,
+        `discovery-edit: permission=${approval.allowed ? "approved" : "denied"}`,
+        discoveryPlan.manifest.transcriptSummary,
+        ...discoveryPlan.evidence,
+        ...activatedRoute.evidence,
+      ],
+      codingResult: result.codingResult!,
+      userFacingOutput: result.finalOutput,
+    };
+  }
   const fencedActivation = selectFencedEditReplacementActivation({
     prompt: input.prompt,
     ...(input.plan.targetPath ? { targetPath: input.plan.targetPath } : {}),

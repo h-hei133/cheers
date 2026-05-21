@@ -99,6 +99,7 @@ function buildCodingResult(route: FencedEditReplacementRoute): CodingResultSumma
         ...fencedEditOutcomeEvidence(outcome),
         ...(editRecovery ? editRecovery.evidence : []),
         ...(editRecovery ? [editRecovery.continuationSummary] : []),
+        ...route.evidence.filter((entry) => entry.startsWith("discovery-edit")),
         "fenced-edit-result:continuation-safe",
         `fenced-edit-result:operation:fenced-replacement`,
         `fenced-edit-result:state:${

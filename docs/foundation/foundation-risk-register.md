@@ -14,6 +14,27 @@ None open after Route 165.
 
 ## Resolved
 
+### Discovery edit manifest without mutation authority
+
+- Affected modules: Edit / Patch, Workspace / File Context, Result Surface,
+  Session / Continue, Harness / Eval.
+- Why it was a calibration gap: discovery-style edit prompts previously stopped
+  as unsupported future edits, so there was no bounded candidate manifest,
+  explicit confirmation state, or safe single-target handoff story.
+- Resolution: Route 171 adds `discoveryEditManifest.ts`,
+  `discoveryEditPlanner.ts`, `discoveryEditConfirmation.ts`, and
+  `discoveryEditResult.ts`; manifests are no-write with
+  `mutationAuthority: not-granted`, unconfirmed/ambiguous/broad/fuzzy/generated
+  paths stop before mutation, and only one confirmed candidate can hand off to
+  the existing exact fenced replacement lane.
+- Evidence: discovery manifest/planner/confirmation/result tests, fenced edit
+  runtime activation tests, session continuity tests, and edit closeout verifier
+  markers.
+- Recommended next action: do not expand to multi-file target-set mutation until
+  an atomicity/recovery route exists.
+- Should become a route: no, resolved by Route 171 for no-write manifests and
+  confirmed single-target handoff.
+
 ### Activated fenced replacement snapshot recovery substrate
 
 - Affected modules: Edit / Patch, Workspace / File Context, Result Surface,

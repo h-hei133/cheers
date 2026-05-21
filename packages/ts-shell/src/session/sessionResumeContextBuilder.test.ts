@@ -165,6 +165,25 @@ describe("session resume context builder", () => {
     expect(diagnostic).toContain("automatic-rollback=no");
   });
 
+  it("includes confirmed discovery handoff facts in success diagnostics", () => {
+    const diagnostic = buildSuccessHandoffDiagnostic({
+      ...makeCodingResult(),
+      continuation: {
+        status: "first-pass-success",
+        attempts: 0,
+        evidence: [
+          "discovery-edit manifest=discovery-edit-def456; candidates=src/a.ts; ambiguity=single-candidate; confirmation=confirmed-single-target; mutation:not-run; mutationAuthority:not-granted; raw-content-excluded",
+        ],
+      },
+    });
+
+    expect(diagnostic).toContain(
+      "discovery=discovery-edit manifest=discovery-edit-def456",
+    );
+    expect(diagnostic).toContain("confirmation=confirmed-single-target");
+    expect(diagnostic).toContain("raw-content-excluded");
+  });
+
   it("extracts path-like targets for prompt routing", () => {
     expect(extractPathLikeTargets("continue in src/a.ts and ./b.test.ts")).toEqual([
       "./b.test.ts",

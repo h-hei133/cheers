@@ -393,6 +393,10 @@ export function buildSuccessHandoffDiagnostic(
   if (codingResult.recoverySurface) {
     parts.push("automatic-rollback=no");
   }
+  const discoverySummary = extractDiscoveryEditContinuationSummary(codingResult);
+  if (discoverySummary) {
+    parts.push(discoverySummary);
+  }
   parts.push(`next=${nextFocus}`);
   return `${parts.join("; ")}.`;
 }
@@ -597,4 +601,16 @@ function compactText(input: string, max: number = 220): string {
     return normalized;
   }
   return `${normalized.slice(0, max)}...`;
+}
+
+function extractDiscoveryEditContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("discovery-edit manifest="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `discovery=${compactText(summary, 300)}`;
 }

@@ -95,7 +95,7 @@ describe("fenced edit runtime activation", () => {
     for (const entry of [
       {
         prompt: [
-          "Replace the exact fenced block in src/app.ts after you discover the right file",
+          "Find the closest file and fuzzy replace the exact fenced block",
           "```",
           "status: draft",
           "```",
@@ -104,7 +104,7 @@ describe("fenced edit runtime activation", () => {
           "status: ready",
           "```",
         ].join("\n"),
-        marker: "fenced-edit-outcome:fenced-edit-unsupported-discovery",
+        marker: "discovery-edit-planner:unsupported-fuzzy",
       },
       {
         prompt: [
@@ -138,13 +138,21 @@ describe("fenced edit runtime activation", () => {
       });
       expect(result.status, entry.marker).toBe("stopped_error");
       expect(result.codingResult?.changedFiles).toEqual([]);
+      const expectedNoWriteMarkers = entry.marker.startsWith("discovery-edit")
+        ? [
+            entry.marker,
+            "discovery-edit-result:mutation:not-run",
+            "discovery-edit-result:raw-content-excluded",
+            "actionable-blocker-kind:unsupported-future-edit",
+          ]
+        : [
+            entry.marker,
+            "fenced-edit-mutation:not-run",
+            "edit-snapshot-status:snapshot-not-needed-no-write",
+            "actionable-blocker-kind:unsupported-future-edit",
+          ];
       expect(result.codingResult?.evidence).toEqual(
-        expect.arrayContaining([
-          entry.marker,
-          "fenced-edit-mutation:not-run",
-          "edit-snapshot-status:snapshot-not-needed-no-write",
-          "actionable-blocker-kind:unsupported-future-edit",
-        ]),
+        expect.arrayContaining(expectedNoWriteMarkers),
       );
       await expect(
         fs.readFile(path.join(workspaceRoot, "src", "app.ts"), "utf8"),
@@ -175,6 +183,86 @@ describe("fenced edit runtime activation", () => {
     expect(multiple.codingResult?.evidence).toContain(
       "fenced-edit-outcome:fenced-edit-multiple-matches",
     );
+  });
+
+  it("produces discovery manifests and only hands off after one confirmed target", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "app.ts"),
+      "title\nstatus: draft\nfooter\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "other.ts"),
+      "status: draft\n",
+      "utf8",
+    );
+
+    const unconfirmed = await runMvpIntegratedFlow({
+      sessionId: "sess_discovery_manifest_unconfirmed",
+      prompt: [
+        "Find the file that contains this exact block and replace it",
+        "```",
+        "status: draft",
+        "```",
+        "with",
+        "```",
+        "status: ready",
+        "```",
+      ].join("\n"),
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(unconfirmed.status).toBe("stopped_error");
+    expect(unconfirmed.codingResult?.changedFiles).toEqual([]);
+    expect(unconfirmed.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "discovery-edit-manifest:mutation-authority:not-granted",
+        "discovery-edit-confirmation:target-selection-required",
+        "discovery-edit-result:mutation:not-run",
+        "discovery-edit-result:raw-content-excluded",
+      ]),
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "app.ts"), "utf8"),
+    ).resolves.toBe("title\nstatus: draft\nfooter\n");
+
+    const confirmed = await runMvpIntegratedFlow({
+      sessionId: "sess_discovery_manifest_confirmed",
+      prompt: [
+        "Find the file that contains this exact block and replace it; confirm target src/app.ts",
+        "```",
+        "status: draft",
+        "```",
+        "with",
+        "```",
+        "status: ready",
+        "```",
+      ].join("\n"),
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(confirmed.status).toBe("completed");
+    expect(confirmed.codingResult?.changedFiles).toEqual(["src/app.ts"]);
+    expect(confirmed.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "discovery-edit-confirmation:confirmed-single-target",
+        "discovery-edit-handoff:existing-fenced-route",
+        "fenced-edit-route:exact-replacement-written",
+        "apply-patch-workspace-write-route:final-stale-read-immediately-before-writer",
+        "edit-snapshot-status:snapshot-created",
+      ]),
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "app.ts"), "utf8"),
+    ).resolves.toBe("title\nstatus: ready\nfooter\n");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "other.ts"), "utf8"),
+    ).resolves.toBe("status: draft\n");
   });
 
   it("stops missing target and missing mapping through the activated runtime path", async () => {

@@ -18,12 +18,18 @@ const testTargets = [
   'src/orchestration/patchResult/editCapabilityCloseoutManifest.test.ts',
   'src/orchestration/fencedEditPlanner.test.ts',
   'src/orchestration/fencedEditOutcome.test.ts',
+  'src/orchestration/discoveryEditManifest.test.ts',
+  'src/orchestration/discoveryEditConfirmation.test.ts',
+  'src/orchestration/discoveryEditPlanner.test.ts',
+  'src/orchestration/discoveryEditResult.test.ts',
   'src/orchestration/editSnapshot.test.ts',
   'src/orchestration/editRecoveryResult.test.ts',
   'src/orchestration/editRollback.test.ts',
   'src/orchestration/fencedEditActivation.test.ts',
   'src/orchestration/fencedEditRoute.test.ts',
   'src/orchestration/fencedEditRuntimeActivation.test.ts',
+  'src/session/stoppedSessionContinuity.test.ts',
+  'src/session/sessionResumeContextBuilder.test.ts',
   'src/entrypoints/cliRuntimeInvocation.test.ts',
   'src/orchestration/patchRecovery/restoreCommandContract.test.ts',
   'src/orchestration/patchRecovery/restoreCommandRunner.test.ts',
@@ -41,6 +47,9 @@ console.log('report field raw_content_excluded=covered')
 console.log('report field edit_snapshot_receipt=covered')
 console.log('report field rollback_readiness=covered')
 console.log('report field explicit_single_file_rollback=covered')
+console.log('report field discovery_edit_manifest=covered')
+console.log('report field discovery_edit_confirmation=covered')
+console.log('report field discovery_edit_single_target_handoff=covered')
 console.log('report field result_contract_compatible=covered')
 console.log(`repo=${repoRoot}`)
 
@@ -72,6 +81,16 @@ console.log('marker snapshot-failure-stops-before-mutation')
 console.log('marker rollback-readiness-reported-for-write-failures')
 console.log('marker rollback-plan-dry-run-supported-for-known-single-file-snapshot')
 console.log('marker explicit-single-file-rollback-seam-covered')
+console.log('marker discovery-manifest-mutation-authority-not-granted')
+console.log('marker discovery-no-candidates-stopped')
+console.log('marker discovery-multiple-candidates-confirmation-required')
+console.log('marker discovery-too-many-candidates-stopped')
+console.log('marker discovery-missing-mapping-stopped')
+console.log('marker discovery-unsupported-fuzzy-stopped')
+console.log('marker discovery-generated-edit-stopped')
+console.log('marker discovery-confirmed-single-target-handoff')
+console.log('marker discovery-multi-target-confirmation-no-write')
+console.log('marker discovery-candidate-summary-raw-content-excluded')
 console.log('marker result-contract-compatible')
 console.log('[pass] edit-capability-closeout')
 process.exit(0)

@@ -243,6 +243,30 @@ as an import-policing rule.
   stopped paths, continuation safety, raw-content exclusion, and
   result-contract compatibility.
 
+### Route 170: Fenced Replacement Snapshot Recovery
+
+- Route 170 adds the activated exact fenced replacement lane's single-file
+  pre-write snapshot receipt, recovery result projection, and explicit rollback
+  readiness/apply seam.
+- Snapshot capture happens through the existing workspace write route after
+  authority/final stale-read and before writer mutation.
+- No automatic rollback, broad rollback, fuzzy/discovery/generated/multi-file
+  execution, provider/browser calls, schema changes, or CLI redesign is added.
+
+### Route 171: Discovery Edit Manifest
+
+- Route 171 adds a bounded no-write discovery edit manifest with
+  `mutationAuthority: not-granted`, candidate path labels, match evidence
+  summaries, confidence, confirmation requirement, planned exact fenced
+  operation kind, snapshot/verification requirements, and raw-content exclusion.
+- Confirmation is explicit and scoped. Unconfirmed, ambiguous, missing-mapping,
+  no-candidate, too-many-candidate, fuzzy, generated, broad, and multi-target
+  confirmation paths remain stopped/no-write.
+- Only `confirmed-single-target` may hand off, and only to the existing exact
+  fenced replacement lane, which still performs workspace authority, final
+  stale-read, pre-write snapshot capture, writer invocation, post-write
+  verification, Result Surface, and Session / Continue projection.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -291,7 +315,7 @@ preconditions, result projection, and validation.
 |---|---|---|---|
 | Edit / Patch thin integration | Edit / Patch, Result Surface | Adopt the module facade at one thin classification/projection handoff. | no new write execution |
 | Edit snapshot / rollback substrate | Edit / Patch, Runtime | Route 170 substrate now exists for activated exact fenced replacement: pre-write snapshot receipt, rollback readiness, dry-run rollback plan, and explicit single-file apply seam. | no automatic rollback; no broad/fuzzy/discovery/generated/multi-file execution |
-| Multi-file discovery candidate selection | Edit / Patch, Workspace / File Context | Produce bounded candidate sets and confirmation requirements. | no mutation by discovery |
+| Discovery target-set mutation route | Edit / Patch, Workspace / File Context | Decide whether any future target-set execution can be supported beyond Route 171's no-write manifest and confirmed single-target handoff. | no multi-file mutation without a dedicated atomicity/recovery route |
 | Browser controlled planner v2 | Browser, Agent Loop | Improve controlled planner contracts only if browser becomes product priority. | no public web or default browser action expansion |
 
 ### Phase C: Gate And Release Architecture

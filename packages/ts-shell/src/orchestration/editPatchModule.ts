@@ -56,6 +56,26 @@ export {
   selectFencedEditReplacementActivation,
   type FencedEditActivation,
 } from "./fencedEditActivation.js";
+export {
+  buildDiscoveryEditManifest,
+  type DiscoveryEditCandidate,
+  type DiscoveryEditManifest,
+} from "./discoveryEditManifest.js";
+export {
+  decideDiscoveryEditConfirmation,
+  type DiscoveryEditConfirmationDecision,
+  type DiscoveryEditConfirmationState,
+} from "./discoveryEditConfirmation.js";
+export {
+  planDiscoveryEdit,
+  type DiscoveryEditCandidateInput,
+  type DiscoveryEditPlan,
+} from "./discoveryEditPlanner.js";
+export {
+  buildDiscoveryEditRuntimeRequest,
+  type DiscoveryEditRuntimeRequest,
+} from "./discoveryEditRuntime.js";
+export { buildDiscoveryEditPlanResult } from "./discoveryEditResult.js";
 
 export interface EditPatchModuleState {
   readonly editExpectation: EditExpectationContract;

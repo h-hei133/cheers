@@ -196,6 +196,53 @@ describe("stopped session continuity", () => {
     expect(JSON.stringify(result)).not.toContain("status: draft");
   });
 
+  it("preserves discovery edit manifest facts for continue without raw content", () => {
+    const nextAction = "Confirm exactly one candidate path before any mutation can be considered.";
+    const result = makeCodingResult({
+      failedFiles: [
+        {
+          path: "src/app.ts, src/other.ts",
+          reason: "Discovery edit found candidates but no exact target was confirmed.",
+        },
+      ],
+      verification: {
+        status: "blocked",
+        reason: "Discovery edit found candidates but no exact target was confirmed.",
+        blockerKind: "unknown",
+        nextAction,
+      },
+      evidence: [
+        "discovery-edit-result:manifest-produced",
+        "discovery-edit-result:mutation-authority:not-granted",
+        "discovery-edit-result:raw-content-excluded",
+        "actionable-blocker-kind:unsupported-future-edit",
+      ],
+      continuation: {
+        status: "failed-after-bounded-continuation",
+        attempts: 1,
+        evidence: [
+          "discovery-edit manifest=discovery-edit-abc123; candidates=src/app.ts, src/other.ts; ambiguity=multiple-candidates; confirmation=required-target-selection; mutation:not-run; mutationAuthority:not-granted; raw-content-excluded",
+          "discovery-edit-result:raw-content-excluded",
+        ],
+      },
+    });
+
+    const surface = deriveStoppedSessionContinuitySurface(result);
+
+    expect(surface?.kind).toBe("unsupported-future-edit");
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "discovery=discovery-edit manifest=discovery-edit-abc123",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "confirmation=required-target-selection",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "mutationAuthority:not-granted",
+    );
+    expect(JSON.stringify(result)).not.toContain("status: ready");
+    expect(JSON.stringify(result)).not.toContain("status: draft");
+  });
+
   it("keeps MCP unavailable as an MCP blocker without file mutations", () => {
     const reason = "MCP tool mcp__localSdk__search is unavailable.";
     const result = makeCodingResult({
