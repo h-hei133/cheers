@@ -59,6 +59,10 @@ describe("cliProposalReviewSurface", () => {
         source: "provider",
         route: {
           source: "proposal-hunk-set-route",
+          hunkCount: 3,
+          fileResults: [{ status: "written", hunkCount: 2 }],
+          failedFiles: [{ hunkIds: ["h3"] }],
+          unattemptedFiles: [],
         } as never,
         changedFiles: ["src/a.ts", "src/b.ts"],
         evidence: ["proposal-hunk-set-route:raw-content-excluded"],
@@ -70,6 +74,7 @@ describe("cliProposalReviewSurface", () => {
 
     expect(output).toContain("Proposal apply");
     expect(output).toContain("Status: hunk-set-applied");
+    expect(output).toContain("Hunks: 3 total; 2 changed; 1 failed; 0 unattempted");
     expect(output).toContain("Route: proposal hunk-set");
     expect(output).toContain("Raw content: excluded");
     expect(output).not.toContain("status: ready");

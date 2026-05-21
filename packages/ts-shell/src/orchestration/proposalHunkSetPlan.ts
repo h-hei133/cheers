@@ -10,6 +10,13 @@ import type {
   ProposalHunkSetHunk,
   ProposalHunkSetManifest,
 } from "./proposalHunkSet.js";
+import {
+  buildExactHunkSetModel,
+  locateExactHunkRange,
+  type ExactHunkSetModel,
+  type ExactHunkRange,
+} from "./exactHunkSet.js";
+import { detectExactHunkConflicts } from "./exactHunkConflict.js";
 
 export type ProposalHunkSetPlanBlocker =
   | "selection-not-confirmed"
@@ -39,6 +46,7 @@ export type ProposalHunkSetPlan =
       readonly maxHunks: number;
       readonly maxHunksPerFile: number;
       readonly targets: readonly ProposalHunkSetPlanTarget[];
+      readonly exactHunkSet: ExactHunkSetModel;
       readonly evidence: readonly string[];
       readonly nextAction: string;
     }
@@ -61,9 +69,23 @@ export type ProposalHunkSetPlan =
 
 export interface ProposalHunkSetPlanTarget {
   readonly hunkId: string;
+  readonly hunkIds: readonly string[];
+  readonly targetPath: string;
+  readonly mapping: FencedEditMapping;
+  readonly hunkMappings: readonly ProposalHunkSetPlanHunk[];
+  readonly fencedPlan: Extract<ExactFencedReplacementPlan, { ok: true }>;
+  readonly hunkCount: number;
+  readonly evidence: readonly string[];
+}
+
+export interface ProposalHunkSetPlanHunk {
+  readonly hunkId: string;
   readonly targetPath: string;
   readonly mapping: FencedEditMapping;
   readonly fencedPlan: Extract<ExactFencedReplacementPlan, { ok: true }>;
+  readonly matchCount: 1;
+  readonly range: ExactHunkRange;
+  readonly orderKey: string;
   readonly evidence: readonly string[];
 }
 
@@ -81,8 +103,8 @@ export function buildProposalHunkSetPlan(input: {
   ) => WorkspaceWriteTargetAuthority;
 }): ProposalHunkSetPlan {
   const maxFiles = input.maxFiles ?? 3;
-  const maxHunks = input.maxHunks ?? 5;
-  const maxHunksPerFile = input.maxHunksPerFile ?? 1;
+  const maxHunks = input.maxHunks ?? 6;
+  const maxHunksPerFile = input.maxHunksPerFile ?? 3;
   const base = {
     hunkSetId: input.manifest.hunkSetId,
     sourceProposalId: input.manifest.sourceProposalId,
@@ -149,22 +171,17 @@ export function buildProposalHunkSetPlan(input: {
   if (overPerFile) {
     return blocked({
       ...base,
-      blocker:
-        maxHunksPerFile === 1
-          ? "conflicting-target-hunks"
-          : "over-max-hunks-per-file",
+      blocker: "over-max-hunks-per-file",
       targetPath: overPerFile[0],
       reason:
-        maxHunksPerFile === 1
-          ? "Route 178 supports one exact proposal hunk per file."
-          : `Selected target has ${overPerFile[1].length} hunks; max is ${maxHunksPerFile}.`,
-      nextAction:
-        "Apply one hunk per file in this route, or use a later route for bounded multi-hunk-per-file support.",
-      evidence: ["proposal-hunk-set-plan:blocker:conflicting-target-hunks"],
+        `Selected target has ${overPerFile[1].length} hunks; max is ${maxHunksPerFile}.`,
+      nextAction: `Select at most ${maxHunksPerFile} exact hunks per file.`,
+      evidence: ["proposal-hunk-set-plan:blocker:over-max-hunks-per-file"],
     });
   }
 
-  const targets: ProposalHunkSetPlanTarget[] = [];
+  const hunkPlans: ProposalHunkSetPlanHunk[] = [];
+  const originalContentByTarget = new Map<string, string>();
   for (const hunk of input.manifest.selectedHunks) {
     if (hunk.exactMappingStatus === "non-exact") {
       return blocked({
@@ -204,9 +221,13 @@ export function buildProposalHunkSetPlan(input: {
         ],
       });
     }
+    const originalContent = input.readFile(path.resolve(input.workspaceRoot, hunk.targetPath));
+    if (typeof originalContent === "string") {
+      originalContentByTarget.set(hunk.targetPath, originalContent);
+    }
     const fencedPlan = planExactFencedReplacement({
       targetPath: hunk.targetPath,
-      originalContent: input.readFile(path.resolve(input.workspaceRoot, hunk.targetPath)),
+      originalContent,
       mapping,
     });
     if (fencedPlan.ok === false) {
@@ -223,15 +244,74 @@ export function buildProposalHunkSetPlan(input: {
         ],
       });
     }
-    targets.push({
+    const located = locateExactHunkRange({
+      content: originalContent ?? "",
+      oldText: mapping.oldText,
+    });
+    hunkPlans.push({
       hunkId: hunk.hunkId,
       targetPath: hunk.targetPath,
       mapping,
       fencedPlan,
+      matchCount: 1,
+      range: located.range ?? { startLine: -1, endLine: -1 },
+      orderKey: `${hunk.targetPath}:${String(located.range?.startLine ?? -1).padStart(8, "0")}:${hunk.hunkId}`,
       evidence: [
         `proposal-hunk-set-plan:target:${hunk.targetPath}:ready`,
         `proposal-hunk-set-plan:hunk:${hunk.hunkId}:ready`,
+        `proposal-hunk-set-plan:hunk:${hunk.hunkId}:match-count:1`,
         ...fencedPlan.evidence,
+      ],
+    });
+  }
+
+  const exactHunkSet = buildExactHunkSetModel({
+    proposalId: input.manifest.sourceProposalId,
+    hunkSetId: input.manifest.hunkSetId,
+    hunks: hunkPlans,
+  });
+  const targets: ProposalHunkSetPlanTarget[] = [];
+  for (const [targetPath, groupedHunks] of groupPlanHunksByTarget(hunkPlans)) {
+    const conflicts = detectExactHunkConflicts({
+      targetPath,
+      originalContent: originalContentByTarget.get(targetPath),
+      hunks: groupedHunks,
+    });
+    if (conflicts.ok === false) {
+      return blocked({
+        ...base,
+        blocker:
+          conflicts.kind === "duplicate-hunk"
+            ? "duplicate-hunk"
+            : "conflicting-target-hunks",
+        targetPath: conflicts.targetPath,
+        hunkId: conflicts.hunkId,
+        reason: conflicts.reason,
+        nextAction: conflicts.nextAction,
+        evidence: conflicts.evidence,
+      });
+    }
+    const ordered = conflicts.orderedHunks.map((orderedHunk) => {
+      const planHunk = groupedHunks.find((hunk) => hunk.hunkId === orderedHunk.hunkId);
+      if (!planHunk) {
+        throw new Error(`Missing exact hunk plan for ${orderedHunk.hunkId}`);
+      }
+      return planHunk;
+    });
+    const first = ordered[0]!;
+    targets.push({
+      hunkId: first.hunkId,
+      hunkIds: ordered.map((hunk) => hunk.hunkId),
+      targetPath,
+      mapping: first.mapping,
+      hunkMappings: ordered,
+      fencedPlan: first.fencedPlan,
+      hunkCount: ordered.length,
+      evidence: [
+        `proposal-hunk-set-plan:target:${targetPath}:hunk-count:${ordered.length}`,
+        "proposal-hunk-set-plan:target:deterministic-order:descending-original-range",
+        ...conflicts.evidence,
+        ...ordered.flatMap((hunk) => hunk.evidence),
       ],
     });
   }
@@ -240,12 +320,15 @@ export function buildProposalHunkSetPlan(input: {
     ...base,
     status: "ready",
     targets,
-    nextAction: "Apply every preflighted exact proposal hunk through the existing fenced route.",
+    exactHunkSet,
+    nextAction: "Apply every preflighted exact proposal hunk through the exact hunk-set route.",
     evidence: [
       ...input.manifest.evidence,
+      ...exactHunkSet.evidence,
       "proposal-hunk-set-plan:created",
       "proposal-hunk-set-plan:all-hunks-preflighted-before-mutation",
-      "proposal-hunk-set-plan:one-hunk-per-file-policy",
+      "proposal-hunk-set-plan:multi-hunk-per-file-exact-policy",
+      "proposal-hunk-set-plan:max-hunks-per-file:3",
       "proposal-hunk-set-plan:ready",
       "proposal-hunk-set-plan:raw-content-excluded",
       ...targets.flatMap((target) => target.evidence),
@@ -284,6 +367,16 @@ function groupHunksByTarget(
   hunks: readonly ProposalHunkSetHunk[],
 ): Map<string, ProposalHunkSetHunk[]> {
   const grouped = new Map<string, ProposalHunkSetHunk[]>();
+  for (const hunk of hunks) {
+    grouped.set(hunk.targetPath, [...(grouped.get(hunk.targetPath) ?? []), hunk]);
+  }
+  return grouped;
+}
+
+function groupPlanHunksByTarget(
+  hunks: readonly ProposalHunkSetPlanHunk[],
+): Map<string, ProposalHunkSetPlanHunk[]> {
+  const grouped = new Map<string, ProposalHunkSetPlanHunk[]>();
   for (const hunk of hunks) {
     grouped.set(hunk.targetPath, [...(grouped.get(hunk.targetPath) ?? []), hunk]);
   }

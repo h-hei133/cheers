@@ -196,6 +196,28 @@ export {
   type ProposalHunkSetPlanTarget,
 } from "./proposalHunkSetPlan.js";
 export {
+  buildExactHunkSetModel,
+  locateExactHunkRange,
+  sortHunksForApply,
+  type ExactHunkSetEntry,
+  type ExactHunkSetFile,
+  type ExactHunkSetModel,
+  type ExactHunkRange,
+} from "./exactHunkSet.js";
+export {
+  detectExactHunkConflicts,
+  type ExactHunkConflictResult,
+} from "./exactHunkConflict.js";
+export {
+  buildMultiHunkApplyPatch,
+  runExactHunkApplyRoute,
+  type ExactHunkApplyRoute,
+} from "./exactHunkApply.js";
+export {
+  projectExactHunkResultSummary,
+  type ExactHunkResultSummary,
+} from "./exactHunkResult.js";
+export {
   runProposalHunkSetRoute,
   type ProposalHunkSetRoute,
   type ProposalHunkSetRouteOptions,

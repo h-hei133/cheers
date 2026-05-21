@@ -21,12 +21,31 @@ export function formatCliProposalApplyOutput(input: {
     "Proposal apply",
     `Proposal: ${"proposalId" in result ? result.proposalId ?? "(none)" : "(none)"}`,
     `Status: ${result.status}`,
+    `Hunks: ${hunkSummary(result)}`,
     `Changed: ${result.changedFiles.join(", ") || "none"}`,
     `Mutation: ${result.changedFiles.length > 0 ? "applied" : "not run"}`,
     `Route: ${routeLabel(result)}`,
     "Raw content: excluded",
   ].join("\n");
   return input.printMode ? output : `\n${output}\n`;
+}
+
+function hunkSummary(result: EditProposalApplyResult): string {
+  if ("route" in result && result.route.source === "proposal-hunk-set-route") {
+    const changed = result.route.fileResults
+      .filter((file) => file.status === "written")
+      .reduce((count, file) => count + file.hunkCount, 0);
+    const failed = result.route.failedFiles.reduce(
+      (count, file) => count + (file.hunkIds?.length ?? 1),
+      0,
+    );
+    const unattempted = result.route.unattemptedFiles.reduce(
+      (count, file) => count + (file.hunkIds?.length ?? 1),
+      0,
+    );
+    return `${result.route.hunkCount} total; ${changed} changed; ${failed} failed; ${unattempted} unattempted`;
+  }
+  return "not available";
 }
 
 function routeLabel(result: EditProposalApplyResult): string {

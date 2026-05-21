@@ -46,7 +46,11 @@ Current supported write/edit behavior remains:
   verification, and replay-safe result/session evidence; Route 174 adds a
   transaction id, safe execution journal, explicit preflight atomicity policy,
   verification aggregation, partial-failure separation, and recovery workflow
-  handoff for confirmed target sets without claiming true atomic rollback
+  handoff for confirmed target sets without claiming true atomic rollback;
+  Route 179 extends confirmed proposal hunk-sets to bounded exact
+  multi-hunk-per-file apply with max 3 files, max 6 hunks, max 3 hunks per
+  file, all-hunk preflight before mutation, overlap/conflict detection,
+  deterministic replacement order, and one snapshot/write per target file
 - generated edit proposals are current-supported only as no-write proposal
   manifests and review/confirmation projections; provider-backed proposal
   generation may participate only through an explicit opt-in provider boundary
@@ -102,7 +106,7 @@ The reference scan was shape-only; no implementation code was copied.
 |---|---|---|
 | broad refactor planning | future-only | target/constraint manifest, user-confirmed target selection, workspace authority, final stale-read, verification plan, snapshot/rollback story |
 | multi-file discovery edit | current-supported only for confirmed target sets that reduce to exact fenced replacement, max 3 files | discovery phase, bounded candidate file list, explicit target-set confirmation, exact old/new fenced mapping for every target, preflight-all-before-mutation, transaction id, safe journal, per-file workspace authority, final stale-read, snapshot receipt, post-write verification aggregation, partial-failure changed/failed/unattempted separation, recovery workflow handoff, rollback readiness, and explicit snapshot-backed subset recovery apply; no fuzzy/generated/broad execution, no automatic rollback, no atomic rollback claim |
-| generated edit proposal | current-supported only as no-write proposal, explicit review/selection/confirmation lifecycle, exact apply bridge, and proposal hunk-set apply for per-target distinct exact mappings | proposal manifest with `mutationAuthority: not-granted`, safe summary, raw-content-excluded evidence, explicit hunk/target selection, explicit old/new mapping, explicit confirmation, then apply through existing fenced or target-set transaction lanes; per-target distinct exact mappings use a proposal hunk-set manifest, all-hunk preflight before mutation, the existing fenced lane per target, and target-set transaction/journal/recovery evidence; provider-backed proposal generation is allowed only behind explicit provider availability with redacted/budgeted context and fake-provider deterministic tests; no default real-provider calls, no autonomous generation apply loop, no mutation from proposal alone |
+| generated edit proposal | current-supported only as no-write proposal, explicit review/selection/confirmation lifecycle, exact apply bridge, and proposal hunk-set apply for per-target distinct exact mappings plus bounded exact multi-hunk-per-file apply | proposal manifest with `mutationAuthority: not-granted`, safe summary, raw-content-excluded evidence, explicit hunk/target selection, explicit old/new mapping, explicit confirmation, then apply through existing fenced or target-set transaction lanes; per-target distinct exact mappings use a proposal hunk-set manifest, all-hunk preflight before mutation, exact hunk conflict checks, one snapshot/write per file for multi-hunk targets, and target-set transaction/journal/recovery evidence; provider-backed proposal generation is allowed only behind explicit provider availability with redacted/budgeted context and fake-provider deterministic tests; no default real-provider calls, no autonomous generation apply loop, no mutation from proposal alone |
 | confirmed single-target discovery edit | current-supported only when it reduces to exact fenced replacement | one confirmed candidate from the manifest, exact old/new fenced mapping, workspace authority through existing write route, final stale-read, pre-write snapshot receipt, post-write verification |
 | fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy/discovery/generated/multi-file rollback remains stopped and no-write, while explicit snapshot-backed single-file rollback apply is current-supported | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, pre-write snapshot receipt, verification plan, stable outcome taxonomy, rollback readiness projection, explicit snapshot id and target for rollback apply |
 
@@ -183,18 +187,21 @@ rejection, stopped apply, successful apply, and partial failure states through
 Result Surface and Session / Continue. Non-exact, fuzzy, broad, unconfirmed, or
 non-uniform target-set selections stay no-write.
 
-Route 178 keeps the same authority boundary while closing the non-uniform exact
-target-set gap. `proposalHunkSet.ts` records a redacted hunk-set manifest,
-`proposalHunkSetPlan.ts` requires explicit confirmation, max 3 files, max 5
-hunks, one hunk per file, per-target exact mapping payloads, workspace
-authority, and exact match-count preflight for every selected hunk before the
-first mutation. `proposalHunkSetRoute.ts` then coordinates existing fenced
-replacement routes per target and projects target-set transaction, safe
-journal, verification, partial-failure, and recovery workflow evidence.
-`proposalHunkSetResult.ts` keeps Result Surface and Session / Continue
-summaries raw-content-excluded. Non-exact, fuzzy, broad, generated-only,
-unconfirmed, duplicate/conflicting, over-max, and multi-hunk-per-file proposal
-hunks remain no-write.
+Routes 178-179 keep the same authority boundary while closing exact proposal
+hunk-set gaps. `proposalHunkSet.ts` records a redacted hunk-set manifest.
+`exactHunkSet.ts`, `exactHunkConflict.ts`, and `proposalHunkSetPlan.ts`
+require explicit confirmation, max 3 files, max 6 hunks, max 3 hunks per file,
+per-hunk exact mapping payloads, workspace authority, exact match-count
+preflight, and overlap/conflict checks for every selected hunk before the first
+mutation. `proposalHunkSetRoute.ts` coordinates existing fenced replacement
+routes for one-hunk files and `exactHunkApply.ts` for bounded multi-hunk files,
+preserving final stale-read, one pre-write snapshot, one write per file,
+post-write verification, target-set transaction, safe journal, partial-failure
+separation, and recovery workflow evidence. `proposalHunkSetResult.ts` and
+`exactHunkResult.ts` keep Result Surface and Session / Continue summaries
+raw-content-excluded. Non-exact, fuzzy, broad, generated-only, unconfirmed,
+duplicate/conflicting, over-max, ambiguous, or overlapping proposal hunks remain
+no-write.
 
 ## User Confirmation Model
 

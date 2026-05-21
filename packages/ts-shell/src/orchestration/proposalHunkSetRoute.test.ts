@@ -78,6 +78,48 @@ describe("proposalHunkSetRoute", () => {
     expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("status: draft\n");
   });
 
+  it("applies multiple confirmed exact hunks in one file with one write", async () => {
+    const fixture = createFixture({
+      "src/a.ts": "alpha\nmiddle\nomega\n",
+    });
+    let writeCount = 0;
+    const route = await runProposalHunkSetRoute({
+      ...fixture.options,
+      manifest: {
+        ...manifest(["src/a.ts", "src/a.ts"]),
+        selectedTargetPaths: ["src/a.ts"],
+      },
+      mappingByHunkId: new Map([
+        ["h1", mapping("alpha", "ALPHA")],
+        ["h2", mapping("omega", "OMEGA")],
+      ]),
+      confirmed: true,
+      writeFile: (relativePath, content) => {
+        writeCount += 1;
+        return fixture.options.writeFile(relativePath, content);
+      },
+    });
+
+    expect(route.status).toBe("written");
+    expect(route.changedFiles).toEqual(["src/a.ts"]);
+    expect(route.fileResults[0]?.hunkCount).toBe(2);
+    expect(writeCount).toBe(1);
+    expect(route.evidence).toEqual(
+      expect.arrayContaining([
+        "proposal-hunk-set-route:multi-hunk-exact-apply",
+        "exact-hunk-apply:single-file-one-write",
+        "exact-hunk-apply:one-pre-write-snapshot",
+        "proposal-hunk-set-journal:hunk:h1:write-succeeded",
+        "proposal-hunk-set-journal:hunk:h2:recovery-readiness-projected",
+        "proposal-hunk-set-route:hunk:h1:written",
+        "proposal-hunk-set-route:hunk:h2:written",
+      ]),
+    );
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe(
+      "ALPHA\nmiddle\nOMEGA\n",
+    );
+  });
+
   it("separates changed, failed, and unattempted files with recovery evidence", async () => {
     const fixture = createFixture({
       "src/a.ts": "status: draft\n",

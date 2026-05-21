@@ -34,12 +34,13 @@ describe("proposalHunkSetPlan", () => {
     expect(plan.evidence).toEqual(
       expect.arrayContaining([
         "proposal-hunk-set-plan:all-hunks-preflighted-before-mutation",
-        "proposal-hunk-set-plan:one-hunk-per-file-policy",
+        "proposal-hunk-set-plan:multi-hunk-per-file-exact-policy",
+        "proposal-hunk-set-plan:max-hunks-per-file:3",
       ]),
     );
   });
 
-  it("stops duplicate or same-file hunk selections before mutation", () => {
+  it("stops duplicate or overlapping same-file hunk selections before mutation", () => {
     const fixture = createFixture({ "src/a.ts": "status: draft\n" });
     const plan = buildProposalHunkSetPlan({
       manifest: {
@@ -59,6 +60,34 @@ describe("proposalHunkSetPlan", () => {
       "proposal-hunk-set-plan:blocker:conflicting-target-hunks",
     );
     expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("status: draft\n");
+  });
+
+  it("preflights bounded non-overlapping multi-hunk selections in one file", () => {
+    const fixture = createFixture({
+      "src/a.ts": "alpha\nmiddle\nomega\n",
+    });
+    const plan = buildProposalHunkSetPlan({
+      manifest: {
+        ...manifest(["src/a.ts", "src/a.ts"]),
+        selectedTargetPaths: ["src/a.ts"],
+      },
+      mappingByHunkId: new Map([
+        ["h1", mapping("alpha", "ALPHA")],
+        ["h2", mapping("omega", "OMEGA")],
+      ]),
+      confirmed: true,
+      ...fixture.options,
+    });
+
+    expect(plan.status).toBe("ready");
+    expect(plan.status === "ready" && plan.targets).toHaveLength(1);
+    expect(plan.status === "ready" && plan.targets[0]?.hunkIds).toEqual(["h2", "h1"]);
+    expect(plan.status === "ready" && plan.evidence).toEqual(
+      expect.arrayContaining([
+        "proposal-hunk-set-plan:multi-hunk-per-file-exact-policy",
+        "exact-hunk-conflict:order:descending-original-range",
+      ]),
+    );
   });
 
   it("keeps unconfirmed, non-exact, and over-max hunk sets no-write", () => {

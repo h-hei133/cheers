@@ -111,13 +111,15 @@ export async function applyEditProposalSelection(input: {
     });
   }
   const mapping = mappings[0]!;
-  if (
+  const usesHunkSetRoute =
+    input.selection.selectedHunks.length !==
+      new Set(input.selection.selectedTargetLabels).size ||
     mappings.some(
       (candidate) =>
         candidate!.oldText !== mapping.oldText ||
         candidate!.newText !== mapping.newText,
-    )
-  ) {
+    );
+  if (usesHunkSetRoute) {
     const manifest = buildProposalHunkSetManifest({
       selection: input.selection,
       mappingByHunkId: input.mappingByHunkId,

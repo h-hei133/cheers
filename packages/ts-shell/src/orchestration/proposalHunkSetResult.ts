@@ -7,6 +7,7 @@ import type {
   OrchestrationResult,
 } from "./types.js";
 import type { ProposalHunkSetRoute } from "./proposalHunkSetRoute.js";
+import { projectExactHunkResultSummary } from "./exactHunkResult.js";
 
 export function buildProposalHunkSetRouteResult(input: {
   readonly sessionId: string;
@@ -23,6 +24,7 @@ export function buildProposalHunkSetRouteResult(input: {
 function buildCodingResult(route: ProposalHunkSetRoute): CodingResultSummary {
   const success = route.status === "written";
   const partial = route.status === "partial-failure";
+  const hunkSummary = projectExactHunkResultSummary(route);
   const failedFiles = route.failedFiles.map((file) => ({
     path: file.path,
     reason: file.reason,
@@ -36,6 +38,11 @@ function buildCodingResult(route: ProposalHunkSetRoute): CodingResultSummary {
     route.transcriptSummary,
     `proposal-hunk-set-result:state:${route.status}`,
     `proposal-hunk-set-result:transaction:${route.transactionId}`,
+    ...hunkSummary.evidence,
+    `proposal-hunk-set-result:hunk-count:${hunkSummary.hunkCount}`,
+    `proposal-hunk-set-result:changed-hunk-count:${hunkSummary.changedHunkCount}`,
+    `proposal-hunk-set-result:failed-hunk-count:${hunkSummary.failedHunkCount}`,
+    `proposal-hunk-set-result:unattempted-hunk-count:${hunkSummary.unattemptedHunkCount}`,
     `proposal-hunk-set-result:verification:${route.verificationAggregate.overallStatus}`,
     `proposal-hunk-set-result:recovery:${route.recoveryWorkflow.status}`,
     success
@@ -108,6 +115,8 @@ function buildCodingResult(route: ProposalHunkSetRoute): CodingResultSummary {
         "explicit proposal hunk-set confirmation",
         "all-hunk preflight before mutation",
         "per-target exact mapping",
+        "deterministic hunk order",
+        "one snapshot/write per file for multi-hunk targets",
         "workspace authority",
         "final stale-read",
         "snapshot/recovery",
@@ -224,6 +233,7 @@ function buildOutput(route: ProposalHunkSetRoute): string {
     `Proposal: ${route.proposalId}`,
     `Hunk set: ${route.hunkSetId}`,
     `Status: ${route.status}`,
+    `Hunks: ${route.hunkCount}`,
     `Changed: ${route.changedFiles.join(", ") || "none"}`,
     `Failed: ${route.failedFiles.map((file) => file.path).join(", ") || "none"}`,
     `Unattempted: ${route.unattemptedFiles.map((file) => file.path).join(", ") || "none"}`,

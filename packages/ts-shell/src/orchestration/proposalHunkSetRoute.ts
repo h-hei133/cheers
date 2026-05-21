@@ -6,6 +6,10 @@ import {
   runFencedEditReplacementRoute,
   type FencedEditReplacementRoute,
 } from "./fencedEditRoute.js";
+import {
+  runExactHunkApplyRoute,
+  type ExactHunkApplyRoute,
+} from "./exactHunkApply.js";
 import type { FencedEditMapping } from "./fencedEditPlanner.js";
 import {
   buildProposalHunkSetPlan,
@@ -41,8 +45,11 @@ export type ProposalHunkSetRouteStatus =
 export interface ProposalHunkSetFileResult {
   readonly targetPath: string;
   readonly hunkId: string;
+  readonly hunkIds: readonly string[];
+  readonly hunkCount: number;
   readonly status: "written" | "stopped" | "failed" | "not-run";
   readonly route?: FencedEditReplacementRoute;
+  readonly exactRoute?: ExactHunkApplyRoute;
   readonly changedFiles: readonly string[];
   readonly recoveryReadiness: "rollback-ready" | "rollback-not-run";
   readonly reason?: string;
@@ -60,8 +67,8 @@ export interface ProposalHunkSetRoute {
   readonly targetCount: number;
   readonly hunkCount: number;
   readonly changedFiles: readonly string[];
-  readonly failedFiles: readonly { path: string; hunkId: string; reason: string }[];
-  readonly unattemptedFiles: readonly { path: string; hunkId: string; reason: string }[];
+  readonly failedFiles: readonly { path: string; hunkId: string; hunkIds?: readonly string[]; reason: string }[];
+  readonly unattemptedFiles: readonly { path: string; hunkId: string; hunkIds?: readonly string[]; reason: string }[];
   readonly fileResults: readonly ProposalHunkSetFileResult[];
   readonly journal: readonly TargetSetEditJournalEntry[];
   readonly transaction: TargetSetEditTransaction;
@@ -184,8 +191,8 @@ export async function runProposalHunkSetRoute(
 
   const fileResults: ProposalHunkSetFileResult[] = [];
   const changedFiles: string[] = [];
-  const failedFiles: Array<{ path: string; hunkId: string; reason: string }> = [];
-  const unattemptedFiles: Array<{ path: string; hunkId: string; reason: string }> = [];
+  const failedFiles: Array<{ path: string; hunkId: string; hunkIds?: readonly string[]; reason: string }> = [];
+  const unattemptedFiles: Array<{ path: string; hunkId: string; hunkIds?: readonly string[]; reason: string }> = [];
   const journal: TargetSetEditJournalEntry[] = [...preflightJournal];
 
   for (const target of plan.targets) {
@@ -195,41 +202,67 @@ export async function runProposalHunkSetRoute(
         targetPath: target.targetPath,
         step: "stale-read-checked",
         status: "projected",
+        evidence: target.hunkIds.map((hunkId) => `proposal-hunk-set-journal:hunk:${hunkId}:stale-read-checked`),
       }),
       buildTargetSetEditExecutionJournalEntry({
         transactionId,
         targetPath: target.targetPath,
         step: "snapshot-captured",
         status: "projected",
+        evidence: target.hunkIds.map((hunkId) => `proposal-hunk-set-journal:hunk:${hunkId}:snapshot-captured`),
       }),
       buildTargetSetEditExecutionJournalEntry({
         transactionId,
         targetPath: target.targetPath,
         step: "write-attempted",
         status: "projected",
+        evidence: target.hunkIds.map((hunkId) => `proposal-hunk-set-journal:hunk:${hunkId}:write-attempted`),
       }),
     );
-    const route = await runFencedEditReplacementRoute({
-      workspaceRoot: options.workspaceRoot,
-      targetPath: target.targetPath,
-      mapping: target.mapping,
-      explicitRuntimeOptIn: options.explicitRuntimeOptIn,
-      explicitWorkspaceWriteOptIn: options.explicitWorkspaceWriteOptIn,
-      ...(options.requestedUserDecision
-        ? { requestedUserDecision: options.requestedUserDecision }
-        : {}),
-      defaultProductionRejectionUnchanged:
-        options.defaultProductionRejectionUnchanged,
-      readFile: options.readFile,
-      readVerifiedFile: options.readVerifiedFile,
-      validateWriteTarget: options.validateWriteTarget,
-      writeFile: options.writeFile,
-      ...(options.recoveryAuthority
-        ? { recoveryAuthority: options.recoveryAuthority }
-        : {}),
-      ...(options.snapshotStorage ? { snapshotStorage: options.snapshotStorage } : {}),
-      ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
-    });
+    const route =
+      target.hunkMappings.length === 1
+        ? await runFencedEditReplacementRoute({
+            workspaceRoot: options.workspaceRoot,
+            targetPath: target.targetPath,
+            mapping: target.mapping,
+            explicitRuntimeOptIn: options.explicitRuntimeOptIn,
+            explicitWorkspaceWriteOptIn: options.explicitWorkspaceWriteOptIn,
+            ...(options.requestedUserDecision
+              ? { requestedUserDecision: options.requestedUserDecision }
+              : {}),
+            defaultProductionRejectionUnchanged:
+              options.defaultProductionRejectionUnchanged,
+            readFile: options.readFile,
+            readVerifiedFile: options.readVerifiedFile,
+            validateWriteTarget: options.validateWriteTarget,
+            writeFile: options.writeFile,
+            ...(options.recoveryAuthority
+              ? { recoveryAuthority: options.recoveryAuthority }
+              : {}),
+            ...(options.snapshotStorage ? { snapshotStorage: options.snapshotStorage } : {}),
+            ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
+          })
+        : await runExactHunkApplyRoute({
+            workspaceRoot: options.workspaceRoot,
+            targetPath: target.targetPath,
+            hunks: target.hunkMappings,
+            explicitRuntimeOptIn: options.explicitRuntimeOptIn,
+            explicitWorkspaceWriteOptIn: options.explicitWorkspaceWriteOptIn,
+            ...(options.requestedUserDecision
+              ? { requestedUserDecision: options.requestedUserDecision }
+              : {}),
+            defaultProductionRejectionUnchanged:
+              options.defaultProductionRejectionUnchanged,
+            readFile: options.readFile,
+            readVerifiedFile: options.readVerifiedFile,
+            validateWriteTarget: options.validateWriteTarget,
+            writeFile: options.writeFile,
+            ...(options.recoveryAuthority
+              ? { recoveryAuthority: options.recoveryAuthority }
+              : {}),
+            ...(options.snapshotStorage ? { snapshotStorage: options.snapshotStorage } : {}),
+            ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
+          });
 
     if (route.status === "written") {
       changedFiles.push(...route.changedFiles);
@@ -239,30 +272,38 @@ export async function runProposalHunkSetRoute(
           targetPath: target.targetPath,
           step: "write-succeeded",
           status: "passed",
+          evidence: target.hunkIds.map((hunkId) => `proposal-hunk-set-journal:hunk:${hunkId}:write-succeeded`),
         }),
         buildTargetSetEditExecutionJournalEntry({
           transactionId,
           targetPath: target.targetPath,
           step: "verification-projected",
           status: "passed",
+          evidence: target.hunkIds.map((hunkId) => `proposal-hunk-set-journal:hunk:${hunkId}:verification-projected`),
         }),
         buildTargetSetEditExecutionJournalEntry({
           transactionId,
           targetPath: target.targetPath,
           step: "recovery-readiness-projected",
           status: "passed",
+          evidence: target.hunkIds.map((hunkId) => `proposal-hunk-set-journal:hunk:${hunkId}:recovery-readiness-projected`),
         }),
       );
       fileResults.push({
         targetPath: target.targetPath,
         hunkId: target.hunkId,
+        hunkIds: target.hunkIds,
+        hunkCount: target.hunkCount,
         status: "written",
-        route,
+        ...(target.hunkMappings.length === 1
+          ? { route: route as FencedEditReplacementRoute }
+          : { exactRoute: route as ExactHunkApplyRoute }),
         changedFiles: route.changedFiles,
         recoveryReadiness: "rollback-ready",
         evidence: [
           `proposal-hunk-set-route:file:${target.targetPath}:written`,
-          `proposal-hunk-set-route:hunk:${target.hunkId}:written`,
+          `proposal-hunk-set-route:file:${target.targetPath}:hunk-count:${target.hunkCount}`,
+          ...target.hunkIds.map((hunkId) => `proposal-hunk-set-route:hunk:${hunkId}:written`),
           "proposal-hunk-set-route:rollback-ready",
           ...route.evidence,
         ],
@@ -270,8 +311,11 @@ export async function runProposalHunkSetRoute(
       continue;
     }
 
-    const status = route.terminalClassification === "error" ? "failed" : "stopped";
-    const reason = route.nextAction;
+    const status =
+      "terminalClassification" in route && route.terminalClassification === "error"
+        ? "failed"
+        : "stopped";
+    const reason = "nextAction" in route ? route.nextAction : route.reason;
     journal.push(
       buildTargetSetEditExecutionJournalEntry({
         transactionId,
@@ -279,6 +323,7 @@ export async function runProposalHunkSetRoute(
         step: "write-failed",
         status: "failed",
         reason,
+        evidence: target.hunkIds.map((hunkId) => `proposal-hunk-set-journal:hunk:${hunkId}:write-failed`),
       }),
       buildTargetSetEditExecutionJournalEntry({
         transactionId,
@@ -286,6 +331,7 @@ export async function runProposalHunkSetRoute(
         step: "verification-projected",
         status: "failed",
         reason,
+        evidence: target.hunkIds.map((hunkId) => `proposal-hunk-set-journal:hunk:${hunkId}:verification-projected`),
       }),
       buildTargetSetEditExecutionJournalEntry({
         transactionId,
@@ -296,14 +342,19 @@ export async function runProposalHunkSetRoute(
             ? "passed"
             : "not-run",
         reason,
+        evidence: target.hunkIds.map((hunkId) => `proposal-hunk-set-journal:hunk:${hunkId}:recovery-readiness-projected`),
       }),
     );
-    failedFiles.push({ path: target.targetPath, hunkId: target.hunkId, reason });
+    failedFiles.push({ path: target.targetPath, hunkId: target.hunkId, hunkIds: target.hunkIds, reason });
     fileResults.push({
       targetPath: target.targetPath,
       hunkId: target.hunkId,
+      hunkIds: target.hunkIds,
+      hunkCount: target.hunkCount,
       status,
-      route,
+      ...(target.hunkMappings.length === 1
+        ? { route: route as FencedEditReplacementRoute }
+        : { exactRoute: route as ExactHunkApplyRoute }),
       changedFiles: [],
       recoveryReadiness:
         route.snapshotReceipt?.status === "snapshot-created"
@@ -312,7 +363,8 @@ export async function runProposalHunkSetRoute(
       reason,
       evidence: [
         `proposal-hunk-set-route:file:${target.targetPath}:${status}`,
-        `proposal-hunk-set-route:hunk:${target.hunkId}:${status}`,
+        `proposal-hunk-set-route:file:${target.targetPath}:hunk-count:${target.hunkCount}`,
+        ...target.hunkIds.map((hunkId) => `proposal-hunk-set-route:hunk:${hunkId}:${status}`),
         route.snapshotReceipt?.status === "snapshot-created"
           ? "proposal-hunk-set-route:rollback-ready"
           : "proposal-hunk-set-route:rollback-not-run",
@@ -324,17 +376,20 @@ export async function runProposalHunkSetRoute(
 
   for (const target of plan.targets.slice(fileResults.length)) {
     const reason = "Not run after earlier proposal hunk-set failure.";
-    unattemptedFiles.push({ path: target.targetPath, hunkId: target.hunkId, reason });
+    unattemptedFiles.push({ path: target.targetPath, hunkId: target.hunkId, hunkIds: target.hunkIds, reason });
     fileResults.push({
       targetPath: target.targetPath,
       hunkId: target.hunkId,
+      hunkIds: target.hunkIds,
+      hunkCount: target.hunkCount,
       status: "not-run",
       changedFiles: [],
       recoveryReadiness: "rollback-not-run",
       reason,
       evidence: [
         `proposal-hunk-set-route:file:${target.targetPath}:not-run`,
-        `proposal-hunk-set-route:hunk:${target.hunkId}:not-run`,
+        `proposal-hunk-set-route:file:${target.targetPath}:hunk-count:${target.hunkCount}`,
+        ...target.hunkIds.map((hunkId) => `proposal-hunk-set-route:hunk:${hunkId}:not-run`),
         "proposal-hunk-set-route:rollback-not-run",
       ],
     });
@@ -388,7 +443,7 @@ export async function runProposalHunkSetRoute(
           : "failed",
     nextAction:
       status === "written"
-        ? "Proposal hunk-set exact replacements completed through existing fenced lanes."
+        ? "Proposal hunk-set exact replacements completed through exact hunk-set apply."
         : recoveryWorkflow.doNext,
     evidence: [
       ...options.manifest.evidence,
@@ -401,6 +456,7 @@ export async function runProposalHunkSetRoute(
       ...fileResults.flatMap((result) => result.evidence),
       `proposal-hunk-set-route:status:${status}`,
       "proposal-hunk-set-route:reuse-existing-fenced-lane",
+      "proposal-hunk-set-route:multi-hunk-exact-apply",
       "proposal-hunk-set-route:transaction-route",
       "proposal-hunk-set-route:no-new-writer",
       "proposal-hunk-set-route:no-provider-call",
@@ -451,6 +507,8 @@ function buildProposalHunkSetPreflightJournal(input: {
         evidence: [
           `proposal-hunk-set-journal:authority-checked:${target.targetPath}`,
           `target-set-edit-journal:authority-checked:${target.targetPath}`,
+          `proposal-hunk-set-journal:hunk-count:${target.hunkCount}`,
+          ...target.hunkIds.map((hunkId) => `proposal-hunk-set-journal:hunk:${hunkId}:authority-checked`),
         ],
       },
       {
@@ -461,6 +519,7 @@ function buildProposalHunkSetPreflightJournal(input: {
         evidence: [
           `proposal-hunk-set-journal:match-count-checked:${target.targetPath}`,
           `target-set-edit-journal:match-count-checked:${target.targetPath}`,
+          ...target.hunkIds.map((hunkId) => `proposal-hunk-set-journal:hunk:${hunkId}:match-count-checked`),
         ],
       },
     );
@@ -489,7 +548,7 @@ function buildProposalHunkSetPreflightPolicy(
     "target-set-edit-policy:no-write-atomicity-claim",
     "target-set-edit-policy:no-automatic-rollback",
     "proposal-hunk-set-policy:exact-per-target-mapping-only",
-    "proposal-hunk-set-policy:one-hunk-per-file",
+    "proposal-hunk-set-policy:multi-hunk-per-file-exact",
     "proposal-hunk-set-policy:raw-content-excluded",
   ];
   if (plan.status === "blocked") {
@@ -519,6 +578,7 @@ function buildProposalHunkSetPreflightPolicy(
       ...baseEvidence,
       `proposal-hunk-set-policy:target-count:${plan.targetCount}`,
       `proposal-hunk-set-policy:hunk-count:${plan.hunkCount}`,
+      `proposal-hunk-set-policy:max-hunks-per-file:${plan.maxHunksPerFile}`,
       "target-set-edit-policy:preflight-passed",
       "proposal-hunk-set-policy:preflight-passed",
     ],
@@ -545,6 +605,7 @@ function buildRoute(input: Omit<ProposalHunkSetRoute, "source" | "transcriptSumm
       `status=${input.status}`,
       `targets=${input.manifest.selectedTargetPaths.join(", ") || "(none)"}`,
       `hunks=${input.manifest.selectedHunks.map((hunk) => hunk.hunkId).join(", ") || "(none)"}`,
+      `hunkCount=${input.hunkCount}`,
       `changed=${input.changedFiles.join(", ") || "none"}`,
       `failed=${input.failedFiles.map((file) => file.path).join(", ") || "none"}`,
       `unattempted=${input.unattemptedFiles.map((file) => file.path).join(", ") || "none"}`,

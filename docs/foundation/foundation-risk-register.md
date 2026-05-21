@@ -33,17 +33,22 @@ None open after Route 165.
 - Evidence: proposal review/selection/apply/result tests, generated/provider
   regression tests, fenced/target-set route regressions, session continuity
   regressions, CLI print helper coverage, and edit closeout verifier markers.
-- Route 178 update: per-target distinct exact mappings are now covered by
-  `proposalHunkSet.ts`, `proposalHunkSetPlan.ts`,
-  `proposalHunkSetRoute.ts`, and `proposalHunkSetResult.ts`. The hunk-set
-  route requires explicit confirmation, all-hunk preflight, max guards, one
-  hunk per file, per-target exact mapping payloads, and existing fenced-lane
-  execution with target-set transaction/journal/recovery evidence.
+- Routes 178-179 update: per-target distinct exact mappings and bounded
+  same-file exact multi-hunk apply are now covered by `proposalHunkSet.ts`,
+  `proposalHunkSetPlan.ts`, `proposalHunkSetRoute.ts`,
+  `proposalHunkSetResult.ts`, `exactHunkSet.ts`, `exactHunkConflict.ts`,
+  `exactHunkApply.ts`, and `exactHunkResult.ts`. The hunk-set route requires
+  explicit confirmation, all-hunk preflight, max guards, per-hunk exact mapping
+  payloads, conflict/overlap checks, one snapshot/write per multi-hunk file,
+  and target-set transaction/journal/recovery evidence.
 - Recommended next action: keep fuzzy/broad/generated direct mutation,
-  multi-hunk-per-file apply, provider calls during apply, and new writer
-  behavior closed until a separate route defines them.
-- Should become a route: no, resolved by Routes 177-178 for exact proposal
-  review/selection/apply and per-target distinct hunk-set bridging.
+  provider calls during apply, and new writer behavior closed until a separate
+  route defines them. Bounded exact multi-hunk-per-file proposal apply is Route
+  179-only and remains no-write for non-exact, ambiguous, overlapping, or
+  unconfirmed hunks.
+- Should become a route: no, resolved by Routes 177-179 for exact proposal
+  review/selection/apply, per-target distinct hunk-set bridging, and bounded
+  same-file exact multi-hunk apply.
 
 ### Provider-backed edit proposal lifecycle
 

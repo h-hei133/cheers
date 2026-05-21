@@ -175,6 +175,41 @@ describe("editProposalApply", () => {
     );
   });
 
+  it("applies confirmed same-file multi-hunk proposals through hunk-set route", async () => {
+    const fixture = createFixture({
+      "src/a.ts": "alpha\nmiddle\nomega\n",
+    });
+    const selection = selectEditProposalHunks({
+      review: exactReview(["src/a.ts", "src/a.ts"]),
+      action: "select-all-exact",
+      explicitConfirmation: true,
+    });
+    const result = await applyEditProposalSelection({
+      selection,
+      mappingByHunkId: new Map([
+        [selection.selectedHunks[0]!.hunkId, mapping("alpha", "ALPHA")],
+        [selection.selectedHunks[1]!.hunkId, mapping("omega", "OMEGA")],
+      ]),
+      targetPathByLabel: new Map([["src/a.ts", "src/a.ts"]]),
+      fencedOptions: fixture.options,
+      targetSetOptions: fixture.options,
+    });
+
+    expect(selection.state).toBe("confirmed-exact-target-set");
+    expect(result.status).toBe("hunk-set-applied");
+    expect(result.changedFiles).toEqual(["src/a.ts"]);
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe(
+      "ALPHA\nmiddle\nOMEGA\n",
+    );
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "edit-proposal-selection:confirmed-exact-multi-hunk-target",
+        "proposal-hunk-set-route:multi-hunk-exact-apply",
+        "exact-hunk-apply:single-file-one-write",
+      ]),
+    );
+  });
+
   it("applies generated proposal target sets with per-target distinct exact mappings", async () => {
     const fixture = createFixture({
       "src/a.ts": "status: draft\n",

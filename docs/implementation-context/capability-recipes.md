@@ -21,7 +21,9 @@ not import restrictions.
   `providerEditProposal.ts`, `providerEditPlanner.ts`,
   `providerEditConfirmation.ts`, `providerEditResult.ts`,
   `editProposalReview.ts`, `editProposalSelection.ts`,
-  `editProposalApply.ts`, `editProposalReviewResult.ts`, `editSnapshot.ts`,
+  `editProposalApply.ts`, `editProposalReviewResult.ts`, `exactHunkSet.ts`,
+  `exactHunkConflict.ts`, `exactHunkApply.ts`, `exactHunkResult.ts`,
+  `editSnapshot.ts`,
   `editRecoveryPlan.ts`, `editRecoveryApply.ts`, `editRecoveryOutcome.ts`,
   `editRecoveryResult.ts`, `editRollback.ts`, `workspaceFileContract.ts`,
   `workspaceTargetProjection.ts`,
@@ -35,7 +37,8 @@ not import restrictions.
   confirmation facts, provider edit safe context packet and explicit provider
   availability facts when provider-backed proposal generation is opened,
   proposal review/selection facts and explicit apply confirmation,
-  proposal hunk-set manifest facts for per-target distinct exact mappings,
+  proposal hunk-set manifest facts for per-target distinct exact mappings and
+  bounded exact multi-hunk-per-file selections,
   workspace authority fact, final stale-read fact, pre-write snapshot receipt
   facts for activated exact fenced replacement, explicit snapshot ids and
   target paths for recovery apply, verification plan.
@@ -50,6 +53,8 @@ not import restrictions.
   evidence, provider proposal no-write/review/handoff-ready evidence,
   proposal review/reject/selection/apply bridge evidence,
   proposal hunk-set apply evidence for distinct per-target exact mappings,
+  exact hunk-set conflict/preflight evidence, one snapshot/write per file for
+  bounded multi-hunk targets, hunk-level changed/failed/unattempted counts,
   continuation-safe mutation evidence, safe snapshot receipt status,
   rollback readiness, explicit recovery plan/apply evidence for
   single-file and bounded target-set subset rollback when directly invoked.
@@ -67,8 +72,9 @@ not import restrictions.
   generated mutation. Proposal review and selection are not write authority;
   apply must reuse the existing fenced or target-set transaction routes and
   must not call providers. Per-target distinct proposal mappings must use a
-  hunk-set manifest, all-hunk preflight before mutation, and the existing
-  fenced route per target; one hunk per file is the current supported policy.
+  hunk-set manifest, all-hunk preflight before mutation, exact conflict checks,
+  existing fenced route execution for one-hunk files, and bounded exact
+  multi-hunk apply with one snapshot/write per file for multi-hunk targets.
   Do not run automatic rollback.
 - Validate: focused edit/write route tests, stale-read/authority regression,
   fenced edit activation/runtime tests, discovery edit
@@ -76,7 +82,8 @@ not import restrictions.
   proposal/planner/confirmation/result tests, provider edit
   context/proposal/planner/confirmation/result tests, proposal review/
   selection/apply/result tests, proposal hunk-set
-  manifest/plan/route/result tests, target-set edit
+  manifest/plan/route/result tests, exact hunk set/conflict/apply/result
+  tests, target-set edit
   plan/route/result/transaction/journal/policy/verification tests, target-set
   recovery workflow/recovery tests,
   snapshot/recovery/rollback tests, CLI runtime invocation tests,
