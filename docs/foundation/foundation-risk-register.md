@@ -14,6 +14,30 @@ None open after Route 165.
 
 ## Resolved
 
+### Provider-backed edit proposal lifecycle
+
+- Affected modules: Edit / Patch, Provider / Model, Workspace / File Context,
+  Result Surface, Session / Continue, Harness / Eval.
+- Why it was a calibration gap: Route 175 established generated edit proposals
+  without provider calls, leaving no safe context packet, provider proposal
+  planner, or provider-specific review/confirmation/result coverage for
+  model-assisted edit planning.
+- Resolution: Route 176 adds `providerEditContext.ts`,
+  `providerEditProposal.ts`, `providerEditPlanner.ts`,
+  `providerEditConfirmation.ts`, and `providerEditResult.ts` so explicit
+  provider-backed proposal generation consumes only redacted/budgeted context,
+  normalizes provider output into no-write proposal manifests, and projects
+  review or exact handoff-ready states through Result Surface and
+  Session / Continue without granting mutation authority.
+- Evidence: provider edit context/proposal/planner/confirmation/result tests,
+  provider proposal session continuity regressions, and edit closeout verifier
+  markers.
+- Recommended next action: keep real-provider live calls opt-in and isolated;
+  do not open provider-generated mutation, broad/fuzzy apply loops, or
+  autonomous generation apply behavior without a separate route.
+- Should become a route: no, resolved by Route 176 for provider-backed
+  proposal generation and no-write handoff readiness.
+
 ### Generated edit proposal lifecycle
 
 - Affected modules: Edit / Patch, Workspace / File Context, Result Surface,

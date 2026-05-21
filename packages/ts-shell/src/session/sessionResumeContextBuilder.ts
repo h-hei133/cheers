@@ -401,6 +401,10 @@ export function buildSuccessHandoffDiagnostic(
   if (generatedSummary) {
     parts.push(generatedSummary);
   }
+  const providerEditSummary = extractProviderEditContinuationSummary(codingResult);
+  if (providerEditSummary) {
+    parts.push(providerEditSummary);
+  }
   parts.push(`next=${nextFocus}`);
   return `${parts.join("; ")}.`;
 }
@@ -631,4 +635,16 @@ function extractGeneratedEditContinuationSummary(
     return undefined;
   }
   return `generated=${compactText(summary, 300)}`;
+}
+
+function extractProviderEditContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("provider-edit proposal="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `provider-edit=${compactText(summary, 300)}`;
 }

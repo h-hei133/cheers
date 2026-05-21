@@ -26,6 +26,11 @@ const testTargets = [
   'src/orchestration/generatedEditPlanner.test.ts',
   'src/orchestration/generatedEditConfirmation.test.ts',
   'src/orchestration/generatedEditResult.test.ts',
+  'src/orchestration/providerEditContext.test.ts',
+  'src/orchestration/providerEditProposal.test.ts',
+  'src/orchestration/providerEditPlanner.test.ts',
+  'src/orchestration/providerEditConfirmation.test.ts',
+  'src/orchestration/providerEditResult.test.ts',
   'src/orchestration/targetSetEditPlan.test.ts',
   'src/orchestration/targetSetEditPolicy.test.ts',
   'src/orchestration/targetSetEditJournal.test.ts',
@@ -69,6 +74,11 @@ console.log('report field generated_edit_proposal=covered')
 console.log('report field generated_edit_confirmation=covered')
 console.log('report field generated_edit_exact_handoff=covered')
 console.log('report field generated_edit_no_raw_content=covered')
+console.log('report field provider_edit_context_packet=covered')
+console.log('report field provider_edit_fake_proposal=covered')
+console.log('report field provider_edit_confirmation=covered')
+console.log('report field provider_edit_exact_handoff_ready=covered')
+console.log('report field provider_edit_no_raw_content=covered')
 console.log('report field target_set_transaction=covered')
 console.log('report field target_set_execution_journal=covered')
 console.log('report field target_set_preflight_atomicity=covered')
@@ -126,6 +136,16 @@ console.log('marker generated-unconfirmed-proposal-no-mutation')
 console.log('marker generated-confirmed-single-target-handoff-existing-fenced-lane')
 console.log('marker generated-confirmed-target-set-handoff-existing-target-set-lane')
 console.log('marker generated-proposal-session-raw-content-excluded')
+console.log('marker provider-edit-context-redacted-budgeted')
+console.log('marker provider-edit-fake-provider-proposal-created-no-write')
+console.log('marker provider-edit-not-configured-stopped')
+console.log('marker provider-edit-opt-in-required-stopped')
+console.log('marker provider-edit-context-over-budget-stopped')
+console.log('marker provider-edit-invalid-proposal-stopped')
+console.log('marker provider-edit-exact-single-target-handoff-ready')
+console.log('marker provider-edit-exact-target-set-handoff-ready')
+console.log('marker provider-edit-proposal-no-mutation-without-execution-path')
+console.log('marker provider-edit-session-report-raw-content-and-secrets-excluded')
 console.log('marker target-set-max-file-guard-stopped-no-write')
 console.log('marker target-set-preflight-all-files-before-mutation')
 console.log('marker target-set-transaction-id-emitted')

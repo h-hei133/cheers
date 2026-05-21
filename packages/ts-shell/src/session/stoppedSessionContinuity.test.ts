@@ -545,6 +545,41 @@ describe("stopped session continuity", () => {
     expect(surface?.failureHandoffDiagnostic).not.toContain("status: draft");
     expect(surface?.failureHandoffDiagnostic).not.toContain("raw content");
   });
+
+  it("includes provider edit proposal facts in stopped diagnostics", () => {
+    const result = makeCodingResult({
+      failedFiles: [
+        {
+          path: "src/app.ts",
+          reason: "Provider proposal requires review.",
+        },
+      ],
+      continuation: {
+        status: "failed-after-bounded-continuation",
+        attempts: 1,
+        evidence: [
+          "provider-edit proposal=provider-edit-abc123; provider=fake-provider; targets=src/app.ts; readiness=review-only; confirmation=review-required; mutation:not-run; mutationAuthority:not-granted; raw-content-excluded",
+        ],
+      },
+      verification: {
+        status: "blocked",
+        reason: "Provider proposal requires review.",
+        blockerKind: "unknown",
+        nextAction: "Review and confirm exact mapping before handoff.",
+      },
+      evidence: ["provider-edit-result:raw-content-excluded"],
+    });
+
+    const surface = deriveStoppedSessionContinuitySurface(result);
+
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "provider-edit=provider-edit proposal=provider-edit-abc123",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "mutationAuthority:not-granted",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain("raw-content-excluded");
+  });
 });
 
 function makeCodingResult(

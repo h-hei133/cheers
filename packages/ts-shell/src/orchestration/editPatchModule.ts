@@ -145,6 +145,30 @@ export {
   type GeneratedEditHandoffResult,
 } from "./generatedEditConfirmation.js";
 export { buildGeneratedEditProposalResult } from "./generatedEditResult.js";
+export {
+  buildProviderEditContextPacket,
+  redactProviderEditText,
+  type ProviderEditContextPacket,
+  type ProviderEditTargetContext,
+} from "./providerEditContext.js";
+export {
+  buildProviderEditProposalManifest,
+  normalizeProviderEditProposal,
+  type ProviderEditProposalManifest,
+  type ProviderEditRawProposal,
+} from "./providerEditProposal.js";
+export {
+  planProviderEditProposal,
+  providerReadinessFailureToEditAvailability,
+  type ProviderEditAvailability,
+  type ProviderEditFakeProvider,
+  type ProviderEditPlan,
+} from "./providerEditPlanner.js";
+export {
+  decideProviderEditConfirmation,
+  type ProviderEditConfirmationDecision,
+} from "./providerEditConfirmation.js";
+export { buildProviderEditProposalResult } from "./providerEditResult.js";
 
 export interface EditPatchModuleState {
   readonly editExpectation: EditExpectationContract;

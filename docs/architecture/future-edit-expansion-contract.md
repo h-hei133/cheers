@@ -48,10 +48,13 @@ Current supported write/edit behavior remains:
   verification aggregation, partial-failure separation, and recovery workflow
   handoff for confirmed target sets without claiming true atomic rollback
 - generated edit proposals are current-supported only as no-write proposal
-  manifests and review/confirmation projections; they can hand off only after
-  they reduce to explicit old/new mapping plus explicit single-target or
-  bounded target-set confirmation, and that handoff reuses the existing exact
-  fenced replacement or target-set exact fenced lanes
+  manifests and review/confirmation projections; provider-backed proposal
+  generation may participate only through an explicit opt-in provider boundary
+  that consumes redacted, budgeted file context, and provider output remains a
+  proposal manifest with `mutationAuthority: not-granted`; proposals can hand
+  off only after they reduce to explicit old/new mapping plus explicit
+  single-target or bounded target-set confirmation, and that handoff reuses the
+  existing exact fenced replacement or target-set exact fenced lanes
 - ambiguous sibling targets stop before mutation
 - vague generated-content prompts produce a reviewable no-write generated
   proposal when safe, or stop actionably when content, target, mapping, or
@@ -95,7 +98,7 @@ The reference scan was shape-only; no implementation code was copied.
 |---|---|---|
 | broad refactor planning | future-only | target/constraint manifest, user-confirmed target selection, workspace authority, final stale-read, verification plan, snapshot/rollback story |
 | multi-file discovery edit | current-supported only for confirmed target sets that reduce to exact fenced replacement, max 3 files | discovery phase, bounded candidate file list, explicit target-set confirmation, exact old/new fenced mapping for every target, preflight-all-before-mutation, transaction id, safe journal, per-file workspace authority, final stale-read, snapshot receipt, post-write verification aggregation, partial-failure changed/failed/unattempted separation, recovery workflow handoff, rollback readiness, and explicit snapshot-backed subset recovery apply; no fuzzy/generated/broad execution, no automatic rollback, no atomic rollback claim |
-| generated edit proposal | current-supported only as no-write proposal and explicit review/confirmation lifecycle | proposal manifest with `mutationAuthority: not-granted`, safe summary, raw-content-excluded evidence, explicit old/new mapping, explicit confirmation, then handoff through existing fenced or target-set exact lanes; no provider/model calls, no autonomous generation, no mutation from proposal alone |
+| generated edit proposal | current-supported only as no-write proposal and explicit review/confirmation lifecycle | proposal manifest with `mutationAuthority: not-granted`, safe summary, raw-content-excluded evidence, explicit old/new mapping, explicit confirmation, then handoff through existing fenced or target-set exact lanes; provider-backed proposal generation is allowed only behind explicit provider availability with redacted/budgeted context and fake-provider deterministic tests; no default real-provider calls, no autonomous generation apply loop, no mutation from proposal alone |
 | confirmed single-target discovery edit | current-supported only when it reduces to exact fenced replacement | one confirmed candidate from the manifest, exact old/new fenced mapping, workspace authority through existing write route, final stale-read, pre-write snapshot receipt, post-write verification |
 | fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy/discovery/generated/multi-file rollback remains stopped and no-write, while explicit snapshot-backed single-file rollback apply is current-supported | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, pre-write snapshot receipt, verification plan, stable outcome taxonomy, rollback readiness projection, explicit snapshot id and target for rollback apply |
 
@@ -155,6 +158,16 @@ verification/snapshot requirements, and `raw-content-excluded` evidence. A
 reviewed proposal can execute only after it becomes an explicit old/new mapping
 with explicit target confirmation, and execution remains owned by the existing
 exact fenced replacement or bounded target-set route.
+
+Route 176 provider-backed edit proposal manifests preserve the same boundary.
+`providerEditContext.ts` builds a redacted, budgeted safe edit context packet;
+`providerEditPlanner.ts` calls only an explicitly available provider boundary
+or deterministic fake provider; `providerEditProposal.ts` normalizes output
+into review-only, exact single-target, exact target-set, or unsupported states;
+and `providerEditConfirmation.ts` / `providerEditResult.ts` keep review,
+confirmation, Result Surface, Session / Continue, and verifier evidence
+no-write until an existing exact lane performs its own authority, stale-read,
+snapshot/recovery, and verification checks.
 
 ## User Confirmation Model
 

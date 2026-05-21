@@ -322,6 +322,21 @@ as an import-policing rule.
 - Provider/model calls, autonomous generation, broad/fuzzy execution,
   unconfirmed mutation, and mutation from proposal alone remain closed.
 
+### Route 176: Provider Edit Proposal
+
+- Route 176 adds provider-backed edit proposal generation behind explicit
+  provider availability and deterministic fake-provider tests.
+- Provider planning consumes a redacted, budgeted safe edit context packet and
+  normalizes output into review-only, exact single-target, exact target-set, or
+  unsupported proposal manifests.
+- Provider proposals remain no-write with `mutationAuthority: not-granted`;
+  exact confirmation only marks handoff readiness for the existing fenced or
+  target-set exact lanes, which still own workspace authority, stale-read,
+  snapshot/recovery, and verification.
+- Default real-provider calls, manual private config reads, provider-generated
+  mutation, broad/fuzzy apply loops, CLI/schema/dependency changes, and Result
+  Surface bypass remain closed.
+
 ## Module-First Route Rule
 
 Future routes must state:
