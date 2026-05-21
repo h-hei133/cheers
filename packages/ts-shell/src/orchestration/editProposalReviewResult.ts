@@ -11,6 +11,7 @@ import type { EditProposalApplyResult } from "./editProposalApply.js";
 import type { EditProposalReview } from "./editProposalReview.js";
 import type { EditProposalSelection } from "./editProposalSelection.js";
 import type { FencedEditReplacementRoute } from "./fencedEditRoute.js";
+import type { ProposalHunkSetRoute } from "./proposalHunkSetRoute.js";
 import type { TargetSetEditRoute } from "./targetSetEditRoute.js";
 
 export function buildEditProposalReviewResult(input: {
@@ -35,9 +36,12 @@ function buildCodingResult(input: {
   const state = input.applyResult?.status ?? input.selection?.state ?? input.review.reviewStatus;
   const success = input.applyResult
     ? input.applyResult.status === "single-target-applied" ||
-      input.applyResult.status === "target-set-applied"
+      input.applyResult.status === "target-set-applied" ||
+      input.applyResult.status === "hunk-set-applied"
     : false;
-  const partial = input.applyResult?.status === "target-set-partial-failure";
+  const partial =
+    input.applyResult?.status === "target-set-partial-failure" ||
+    input.applyResult?.status === "hunk-set-partial-failure";
   const changedFiles = [...(input.applyResult?.changedFiles ?? [])];
   const failedFiles = failedFilesFor(input);
   const reason = reasonFor(input);
@@ -108,6 +112,7 @@ function buildCodingResult(input: {
         "explicit selection",
         "explicit confirmation",
         "existing fenced or target-set route",
+        "proposal hunk-set route when per-target mappings differ",
         "workspace authority",
         "final stale-read",
         "snapshot/recovery",
@@ -194,7 +199,8 @@ function buildTerminalInput(
 ): QueryTerminal {
   if (
     applyResult?.status === "single-target-applied" ||
-    applyResult?.status === "target-set-applied"
+    applyResult?.status === "target-set-applied" ||
+    applyResult?.status === "hunk-set-applied"
   ) {
     return {
       action: "terminal",
@@ -240,6 +246,12 @@ function failedFilesFor(input: {
   if (route.source === "target-set-edit-route") {
     return route.failedFiles.map((failure) => ({ ...failure }));
   }
+  if (route.source === "proposal-hunk-set-route") {
+    return route.failedFiles.map((failure) => ({
+      path: failure.path,
+      reason: failure.reason,
+    }));
+  }
   return route.status === "blocked"
     ? [{ path: route.targetPath ?? "(edit proposal)", reason: route.nextAction }]
     : [];
@@ -255,7 +267,8 @@ function reasonFor(input: {
       return input.applyResult.reason;
     }
     return input.applyResult.status === "single-target-applied" ||
-      input.applyResult.status === "target-set-applied"
+      input.applyResult.status === "target-set-applied" ||
+      input.applyResult.status === "hunk-set-applied"
       ? "Confirmed proposal applied through an existing exact edit lane."
       : routeNextAction(input.applyResult.route);
   }
@@ -276,9 +289,12 @@ function nextActionFor(input: {
 }
 
 function routeNextAction(
-  route: FencedEditReplacementRoute | TargetSetEditRoute,
+  route: FencedEditReplacementRoute | TargetSetEditRoute | ProposalHunkSetRoute,
 ): string {
-  if (route.source === "target-set-edit-route") {
+  if (
+    route.source === "target-set-edit-route" ||
+    route.source === "proposal-hunk-set-route"
+  ) {
     return route.nextAction;
   }
   return route.status === "blocked"

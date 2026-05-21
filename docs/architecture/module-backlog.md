@@ -351,6 +351,21 @@ as an import-policing rule.
   mutation, authority/stale-read/snapshot bypass, CLI/schema/dependency
   changes, or broad `runMvpIntegratedFlow.ts` refactor is added.
 
+### Route 178: Proposal Hunk-Set Apply
+
+- Route 178 adds a proposal hunk-set manifest, plan, route, and Result Surface
+  projection for confirmed generated/provider proposals whose selected targets
+  need distinct exact old/new mappings.
+- The hunk-set route requires explicit confirmation, max 3 files, max 5 hunks,
+  one hunk per file, per-target exact mapping payloads, workspace authority,
+  and match-count preflight for every hunk before any mutation.
+- Execution reuses the existing fenced replacement lane per target and projects
+  target-set transaction id, safe journal, verification aggregation,
+  partial-failure changed/failed/unattempted separation, and recovery workflow
+  handoff.
+- Unconfirmed, non-exact, fuzzy, broad, generated-only, duplicate/conflicting,
+  over-max, and multi-hunk-per-file proposal hunks remain stopped/no-write.
+
 ## Module-First Route Rule
 
 Future routes must state:

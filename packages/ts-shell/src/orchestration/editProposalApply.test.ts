@@ -2,8 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { buildGeneratedEditProposalManifest } from "./generatedEditProposal.js";
 import { buildProviderEditProposalManifest } from "./providerEditProposal.js";
-import { buildProviderEditProposalReview } from "./editProposalReview.js";
+import {
+  buildGeneratedEditProposalReview,
+  buildProviderEditProposalReview,
+} from "./editProposalReview.js";
 import { selectEditProposalHunks } from "./editProposalSelection.js";
 import { applyEditProposalSelection } from "./editProposalApply.js";
 import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
@@ -132,7 +136,7 @@ describe("editProposalApply", () => {
     );
   });
 
-  it("stops non-uniform target-set mappings instead of creating a new writer", async () => {
+  it("applies confirmed target-set proposals with per-target distinct exact mappings through hunk-set route", async () => {
     const fixture = createFixture({
       "src/a.ts": "status: draft\n",
       "src/b.ts": "state: draft\n",
@@ -156,9 +160,57 @@ describe("editProposalApply", () => {
       targetSetOptions: fixture.options,
     });
 
-    expect(result.status).toBe("unsupported-for-apply");
-    expect(result.changedFiles).toEqual([]);
-    expect(result.evidence).toContain("edit-proposal-apply:mutation:not-run");
+    expect(result.status).toBe("hunk-set-applied");
+    expect(result.changedFiles).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(readFile(fixture.workspaceRoot, "src/a.ts")).toBe("status: ready\n");
+    expect(readFile(fixture.workspaceRoot, "src/b.ts")).toBe("state: ready\n");
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "edit-proposal-apply:hunk-set-route",
+        "edit-proposal-apply:per-target-distinct-mapping",
+        "proposal-hunk-set-route:reuse-existing-fenced-lane",
+        "proposal-hunk-set-route:no-new-writer",
+        "proposal-hunk-set-route:no-provider-call",
+      ]),
+    );
+  });
+
+  it("applies generated proposal target sets with per-target distinct exact mappings", async () => {
+    const fixture = createFixture({
+      "src/a.ts": "status: draft\n",
+      "src/b.ts": "state: draft\n",
+    });
+    const review = buildGeneratedEditProposalReview(
+      buildGeneratedEditProposalManifest({
+        targets: ["src/a.ts", "src/b.ts"],
+        requestedOperationKind: "exact-fenced-replacement",
+        proposedContentStatus: "explicit-new-content",
+        exactMappingStatus: "exact-target-set",
+      }),
+    );
+    const selection = selectEditProposalHunks({
+      review,
+      action: "select-all-exact",
+      explicitConfirmation: true,
+    });
+    const result = await applyEditProposalSelection({
+      selection,
+      mappingByHunkId: new Map([
+        [selection.selectedHunks[0]!.hunkId, mapping("status: draft", "status: ready")],
+        [selection.selectedHunks[1]!.hunkId, mapping("state: draft", "state: ready")],
+      ]),
+      targetPathByLabel: new Map([
+        ["src/a.ts", "src/a.ts"],
+        ["src/b.ts", "src/b.ts"],
+      ]),
+      fencedOptions: fixture.options,
+      targetSetOptions: fixture.options,
+    });
+
+    expect(result.status).toBe("hunk-set-applied");
+    expect(result.source).toBe("generated");
+    expect(result.changedFiles).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(result.evidence).toContain("edit-proposal-apply:no-provider-call");
   });
 });
 

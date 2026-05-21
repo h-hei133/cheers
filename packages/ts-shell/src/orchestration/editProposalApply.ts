@@ -13,6 +13,11 @@ import {
   type TargetSetEditRoute,
   type TargetSetEditRouteOptions,
 } from "./targetSetEditRoute.js";
+import { buildProposalHunkSetManifest } from "./proposalHunkSet.js";
+import {
+  runProposalHunkSetRoute,
+  type ProposalHunkSetRoute,
+} from "./proposalHunkSetRoute.js";
 
 export type EditProposalApplyResult =
   | {
@@ -32,6 +37,19 @@ export type EditProposalApplyResult =
       readonly proposalId: string;
       readonly source: EditProposalSelection["source"];
       readonly route: TargetSetEditRoute;
+      readonly changedFiles: readonly string[];
+      readonly evidence: readonly string[];
+      readonly transcriptSummary: string;
+    }
+  | {
+      readonly status:
+        | "hunk-set-applied"
+        | "hunk-set-partial-failure"
+        | "hunk-set-preflight-stopped"
+        | "hunk-set-failed";
+      readonly proposalId: string;
+      readonly source: EditProposalSelection["source"];
+      readonly route: ProposalHunkSetRoute;
       readonly changedFiles: readonly string[];
       readonly evidence: readonly string[];
       readonly transcriptSummary: string;
@@ -100,16 +118,36 @@ export async function applyEditProposalSelection(input: {
         candidate!.newText !== mapping.newText,
     )
   ) {
-    return stoppedApply({
-      status: "unsupported-for-apply",
+    const manifest = buildProposalHunkSetManifest({
+      selection: input.selection,
+      mappingByHunkId: input.mappingByHunkId,
+      targetPathByLabel: input.targetPathByLabel,
+    });
+    const route = await runProposalHunkSetRoute({
+      ...input.fencedOptions,
+      manifest,
+      mappingByHunkId: input.mappingByHunkId ?? new Map(),
+      confirmed: input.selection.state === "confirmed-exact-target-set",
+    });
+    const status = hunkSetApplyStatus(route.status);
+    return {
+      status,
       proposalId: input.selection.proposalId,
       source: input.selection.source,
-      reason:
-        "Selected target-set hunks do not share one exact mapping supported by the existing target-set route.",
-      nextAction:
-        "Apply one target at a time or use a later route that supports per-target mappings.",
-      evidence: input.selection.evidence,
-    });
+      route,
+      changedFiles: route.changedFiles,
+      evidence: [
+        ...input.selection.evidence,
+        ...route.evidence,
+        `edit-proposal-apply:status:${status}`,
+        "edit-proposal-apply:hunk-set-route",
+        "edit-proposal-apply:per-target-distinct-mapping",
+        "edit-proposal-apply:transaction-route",
+        "edit-proposal-apply:no-provider-call",
+        "edit-proposal-apply:raw-content-excluded",
+      ],
+      transcriptSummary: buildHunkSetApplySummary(route),
+    };
   }
 
   const targetPaths = input.selection.selectedTargetLabels.map(
@@ -206,6 +244,41 @@ export async function applyEditProposalSelection(input: {
       changedFiles: route.changedFiles,
     }),
   };
+}
+
+function hunkSetApplyStatus(
+  status: ProposalHunkSetRoute["status"],
+): Extract<
+  EditProposalApplyResult["status"],
+  | "hunk-set-applied"
+  | "hunk-set-partial-failure"
+  | "hunk-set-preflight-stopped"
+  | "hunk-set-failed"
+> {
+  switch (status) {
+    case "written":
+      return "hunk-set-applied";
+    case "partial-failure":
+      return "hunk-set-partial-failure";
+    case "preflight-stopped":
+      return "hunk-set-preflight-stopped";
+    case "failed":
+      return "hunk-set-failed";
+  }
+}
+
+function buildHunkSetApplySummary(route: ProposalHunkSetRoute): string {
+  return [
+    `edit-proposal-apply proposal=${route.proposalId}`,
+    `hunkSet=${route.hunkSetId}`,
+    `status=${hunkSetApplyStatus(route.status)}`,
+    `targets=${route.manifest.selectedTargetPaths.join(", ") || "(none)"}`,
+    `hunks=${route.manifest.selectedHunks.map((hunk) => hunk.hunkId).join(", ") || "(none)"}`,
+    `changed=${route.changedFiles.join(", ") || "none"}`,
+    `failed=${route.failedFiles.map((file) => file.path).join(", ") || "none"}`,
+    `unattempted=${route.unattemptedFiles.map((file) => file.path).join(", ") || "none"}`,
+    "raw-content-excluded",
+  ].join("; ");
 }
 
 function stoppedApply(input: {

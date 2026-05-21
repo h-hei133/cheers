@@ -33,11 +33,17 @@ None open after Route 165.
 - Evidence: proposal review/selection/apply/result tests, generated/provider
   regression tests, fenced/target-set route regressions, session continuity
   regressions, CLI print helper coverage, and edit closeout verifier markers.
-- Recommended next action: keep per-target distinct target-set mappings,
-  fuzzy/broad/generated direct mutation, provider calls during apply, and new
-  writer behavior closed until a separate route defines them.
-- Should become a route: no, resolved by Route 177 for exact proposal
-  review/selection/apply bridging.
+- Route 178 update: per-target distinct exact mappings are now covered by
+  `proposalHunkSet.ts`, `proposalHunkSetPlan.ts`,
+  `proposalHunkSetRoute.ts`, and `proposalHunkSetResult.ts`. The hunk-set
+  route requires explicit confirmation, all-hunk preflight, max guards, one
+  hunk per file, per-target exact mapping payloads, and existing fenced-lane
+  execution with target-set transaction/journal/recovery evidence.
+- Recommended next action: keep fuzzy/broad/generated direct mutation,
+  multi-hunk-per-file apply, provider calls during apply, and new writer
+  behavior closed until a separate route defines them.
+- Should become a route: no, resolved by Routes 177-178 for exact proposal
+  review/selection/apply and per-target distinct hunk-set bridging.
 
 ### Provider-backed edit proposal lifecycle
 

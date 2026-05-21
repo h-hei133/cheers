@@ -35,6 +35,10 @@ const testTargets = [
   'src/orchestration/editProposalSelection.test.ts',
   'src/orchestration/editProposalApply.test.ts',
   'src/orchestration/editProposalReviewResult.test.ts',
+  'src/orchestration/proposalHunkSet.test.ts',
+  'src/orchestration/proposalHunkSetPlan.test.ts',
+  'src/orchestration/proposalHunkSetRoute.test.ts',
+  'src/orchestration/proposalHunkSetResult.test.ts',
   'src/orchestration/targetSetEditPlan.test.ts',
   'src/orchestration/targetSetEditPolicy.test.ts',
   'src/orchestration/targetSetEditJournal.test.ts',
@@ -88,6 +92,11 @@ console.log('report field proposal_review_surface=covered')
 console.log('report field proposal_selection_confirmation=covered')
 console.log('report field proposal_apply_bridge=covered')
 console.log('report field proposal_apply_no_raw_content=covered')
+console.log('report field proposal_hunk_set_manifest=covered')
+console.log('report field proposal_hunk_set_preflight=covered')
+console.log('report field proposal_hunk_set_per_target_mapping=covered')
+console.log('report field proposal_hunk_set_transaction_recovery=covered')
+console.log('report field proposal_hunk_set_result_surface=covered')
 console.log('report field target_set_transaction=covered')
 console.log('report field target_set_execution_journal=covered')
 console.log('report field target_set_preflight_atomicity=covered')
@@ -162,6 +171,15 @@ console.log('marker proposal-invalid-selection-no-write')
 console.log('marker proposal-non-exact-hunk-no-write')
 console.log('marker proposal-confirmed-single-target-apply-existing-fenced-route')
 console.log('marker proposal-confirmed-target-set-apply-existing-transaction-route')
+console.log('marker proposal-hunk-set-distinct-per-target-exact-mapping-applies')
+console.log('marker proposal-hunk-set-all-hunks-preflight-before-mutation')
+console.log('marker proposal-hunk-set-unconfirmed-no-write')
+console.log('marker proposal-hunk-set-non-exact-no-write')
+console.log('marker proposal-hunk-set-conflicting-hunks-no-write')
+console.log('marker proposal-hunk-set-one-hunk-per-file-policy')
+console.log('marker proposal-hunk-set-partial-failure-recovery-ready')
+console.log('marker proposal-hunk-set-no-provider-call-during-apply')
+console.log('marker proposal-hunk-set-result-session-raw-content-excluded')
 console.log('marker proposal-apply-stopped-preserves-proposal-evidence')
 console.log('marker proposal-partial-failure-preserves-transaction-evidence')
 console.log('marker proposal-review-apply-raw-content-excluded')

@@ -140,6 +140,17 @@ export function selectEditProposalHunks(input: {
       evidence: ["edit-proposal-selection:over-max-files"],
     });
   }
+  if (selectedTargetLabels.length === 1 && selectedHunks.length > 1) {
+    return stoppedSelection({
+      review: input.review,
+      state: "unsupported-for-apply",
+      selectedHunks,
+      reason: "Route 178 supports one exact proposal hunk per file.",
+      nextAction:
+        "Apply one hunk for this file, or use a later route for bounded multi-hunk-per-file support.",
+      evidence: ["edit-proposal-selection:multiple-hunks-per-file"],
+    });
+  }
   if (selectedTargetLabels.length === 1) {
     return {
       ...baseSelection({

@@ -595,6 +595,7 @@ describe("stopped session continuity", () => {
         evidence: [
           "edit-proposal-review proposal=provider-edit-abc123; source=provider; status=ready-for-selection; targets=src/app.ts; readiness=single-target-ready; mutation:not-run; raw-content-excluded",
           "edit-proposal-apply proposal=provider-edit-abc123; status=unconfirmed-no-write; targets=(none); changed=none; raw-content-excluded",
+          "proposal-hunk-set-apply proposal=provider-edit-abc123; hunkSet=proposal-hunk-set-def; status=preflight-stopped; targets=src/app.ts; hunks=h1; changed=none; failed=src/app.ts; unattempted=none; verification=not-run; recovery=unavailable; raw-content-excluded",
         ],
       },
       verification: {
@@ -613,6 +614,9 @@ describe("stopped session continuity", () => {
     );
     expect(surface?.failureHandoffDiagnostic).toContain(
       "proposal-apply=edit-proposal-apply proposal=provider-edit-abc123",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "proposal-hunk-set=proposal-hunk-set-apply proposal=provider-edit-abc123",
     );
     expect(surface?.failureHandoffDiagnostic).toContain("raw-content-excluded");
   });

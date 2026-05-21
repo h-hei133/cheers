@@ -171,6 +171,7 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   const providerEditSummary = extractProviderEditContinuationSummary(codingResult);
   const proposalReviewSummary = extractEditProposalReviewContinuationSummary(codingResult);
   const proposalApplySummary = extractEditProposalApplyContinuationSummary(codingResult);
+  const proposalHunkSetSummary = extractProposalHunkSetContinuationSummary(codingResult);
   const targetSetSummary = extractTargetSetEditContinuationSummary(codingResult);
   const editRecoverySummary = extractEditRecoveryApplyContinuationSummary(codingResult);
   if (target) {
@@ -216,6 +217,9 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   }
   if (proposalApplySummary) {
     parts.push(proposalApplySummary);
+  }
+  if (proposalHunkSetSummary) {
+    parts.push(proposalHunkSetSummary);
   }
   if (targetSetSummary) {
     parts.push(targetSetSummary);
@@ -354,6 +358,18 @@ function extractEditProposalApplyContinuationSummary(
     return undefined;
   }
   return `proposal-apply=${compactText(summary, 300)}`;
+}
+
+function extractProposalHunkSetContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("proposal-hunk-set-apply proposal="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `proposal-hunk-set=${compactText(summary, 300)}`;
 }
 
 function extractTargetSetEditContinuationSummary(

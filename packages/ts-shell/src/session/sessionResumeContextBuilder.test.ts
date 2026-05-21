@@ -232,6 +232,7 @@ describe("session resume context builder", () => {
         evidence: [
           "edit-proposal-review proposal=provider-edit-def456; source=provider; status=ready-for-selection; targets=src/a.ts; readiness=single-target-ready; mutation:not-run; raw-content-excluded",
           "edit-proposal-apply proposal=provider-edit-def456; status=single-target-applied; targets=src/a.ts; changed=src/a.ts; raw-content-excluded",
+          "proposal-hunk-set-apply proposal=provider-edit-def456; hunkSet=proposal-hunk-set-abc; status=written; targets=src/a.ts, src/b.ts; hunks=h1, h2; changed=src/a.ts, src/b.ts; failed=none; unattempted=none; verification=passed; recovery=not-needed; raw-content-excluded",
         ],
       },
     });
@@ -241,6 +242,9 @@ describe("session resume context builder", () => {
     );
     expect(diagnostic).toContain(
       "proposal-apply=edit-proposal-apply proposal=provider-edit-def456",
+    );
+    expect(diagnostic).toContain(
+      "proposal-hunk-set=proposal-hunk-set-apply proposal=provider-edit-def456",
     );
     expect(diagnostic).toContain("single-target-applied");
     expect(diagnostic).toContain("raw-content-excluded");

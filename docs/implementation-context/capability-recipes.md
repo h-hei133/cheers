@@ -35,6 +35,7 @@ not import restrictions.
   confirmation facts, provider edit safe context packet and explicit provider
   availability facts when provider-backed proposal generation is opened,
   proposal review/selection facts and explicit apply confirmation,
+  proposal hunk-set manifest facts for per-target distinct exact mappings,
   workspace authority fact, final stale-read fact, pre-write snapshot receipt
   facts for activated exact fenced replacement, explicit snapshot ids and
   target paths for recovery apply, verification plan.
@@ -48,6 +49,7 @@ not import restrictions.
   recovery workflow handoff, generated proposal no-write/review/handoff
   evidence, provider proposal no-write/review/handoff-ready evidence,
   proposal review/reject/selection/apply bridge evidence,
+  proposal hunk-set apply evidence for distinct per-target exact mappings,
   continuation-safe mutation evidence, safe snapshot receipt status,
   rollback readiness, explicit recovery plan/apply evidence for
   single-file and bounded target-set subset rollback when directly invoked.
@@ -64,13 +66,17 @@ not import restrictions.
   explicit provider availability, redacted/budgeted context, and no provider
   generated mutation. Proposal review and selection are not write authority;
   apply must reuse the existing fenced or target-set transaction routes and
-  must not call providers. Do not run automatic rollback.
+  must not call providers. Per-target distinct proposal mappings must use a
+  hunk-set manifest, all-hunk preflight before mutation, and the existing
+  fenced route per target; one hunk per file is the current supported policy.
+  Do not run automatic rollback.
 - Validate: focused edit/write route tests, stale-read/authority regression,
   fenced edit activation/runtime tests, discovery edit
   manifest/planner/confirmation/result tests, generated edit
   proposal/planner/confirmation/result tests, provider edit
   context/proposal/planner/confirmation/result tests, proposal review/
-  selection/apply/result tests, target-set edit
+  selection/apply/result tests, proposal hunk-set
+  manifest/plan/route/result tests, target-set edit
   plan/route/result/transaction/journal/policy/verification tests, target-set
   recovery workflow/recovery tests,
   snapshot/recovery/rollback tests, CLI runtime invocation tests,

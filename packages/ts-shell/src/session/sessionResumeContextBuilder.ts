@@ -413,6 +413,10 @@ export function buildSuccessHandoffDiagnostic(
   if (proposalApplySummary) {
     parts.push(proposalApplySummary);
   }
+  const proposalHunkSetSummary = extractProposalHunkSetContinuationSummary(codingResult);
+  if (proposalHunkSetSummary) {
+    parts.push(proposalHunkSetSummary);
+  }
   parts.push(`next=${nextFocus}`);
   return `${parts.join("; ")}.`;
 }
@@ -679,4 +683,16 @@ function extractEditProposalApplyContinuationSummary(
     return undefined;
   }
   return `proposal-apply=${compactText(summary, 300)}`;
+}
+
+function extractProposalHunkSetContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("proposal-hunk-set-apply proposal="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `proposal-hunk-set=${compactText(summary, 300)}`;
 }

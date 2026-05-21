@@ -185,6 +185,22 @@ export {
   type EditProposalApplyResult,
 } from "./editProposalApply.js";
 export { buildEditProposalReviewResult } from "./editProposalReviewResult.js";
+export {
+  buildProposalHunkSetManifest,
+  type ProposalHunkSetManifest,
+  type ProposalHunkSetHunk,
+} from "./proposalHunkSet.js";
+export {
+  buildProposalHunkSetPlan,
+  type ProposalHunkSetPlan,
+  type ProposalHunkSetPlanTarget,
+} from "./proposalHunkSetPlan.js";
+export {
+  runProposalHunkSetRoute,
+  type ProposalHunkSetRoute,
+  type ProposalHunkSetRouteOptions,
+} from "./proposalHunkSetRoute.js";
+export { buildProposalHunkSetRouteResult } from "./proposalHunkSetResult.js";
 
 export interface EditPatchModuleState {
   readonly editExpectation: EditExpectationContract;
