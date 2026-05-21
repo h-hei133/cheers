@@ -14,6 +14,28 @@ None open after Route 165.
 
 ## Resolved
 
+### Verification repair proposal loop
+
+- Affected modules: Edit / Patch, Provider / Model, Result Surface,
+  Session / Continue, Harness / Eval.
+- Why it was a calibration gap: verification failures could explain the
+  failure and recovery guidance, but there was no review-gated repair proposal
+  manifest that preserved safe failure context and handed off only to existing
+  exact hunk-set apply.
+- Resolution: Route 180 adds `editRepairContext.ts`,
+  `editRepairProposal.ts`, `editRepairPlanner.ts`, and `editRepairResult.ts`
+  so failed apply/verification facts can produce redacted repair context,
+  deterministic fake-provider repair proposals, review-required no-write
+  states, explicit exact hunk-set handoff, and Result Surface / Session
+  evidence without automatic mutation.
+- Evidence: edit repair context/proposal/planner/result tests, proposal
+  review/selection/apply and hunk-set regressions, stopped-session continuity
+  coverage, and edit closeout verifier markers.
+- Recommended next action: keep automatic repair, provider calls during apply,
+  fuzzy/broad repair, new writer behavior, and default real-provider repair
+  calls closed until a separate route defines them.
+- Should become a route: no, resolved by Route 180 for repair proposals only.
+
 ### Proposal review and apply bridge
 
 - Affected modules: Edit / Patch, CLI / UX, Result Surface,

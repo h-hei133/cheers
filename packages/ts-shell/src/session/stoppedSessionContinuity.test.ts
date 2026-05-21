@@ -620,6 +620,45 @@ describe("stopped session continuity", () => {
     );
     expect(surface?.failureHandoffDiagnostic).toContain("raw-content-excluded");
   });
+
+  it("includes edit repair context and proposal facts in stopped diagnostics", () => {
+    const result = makeCodingResult({
+      failedFiles: [
+        {
+          path: "src/app.ts",
+          reason: "Verification failed; repair proposal requires review.",
+        },
+      ],
+      continuation: {
+        status: "failed-after-bounded-continuation",
+        attempts: 0,
+        evidence: [
+          "edit-repair-context id=edit-repair-context-abc; status=repair-context-created; sourceTransaction=txn-1; verification=failed; failed=src/app.ts; changed=src/app.ts; mutation:not-run; raw-content-excluded",
+          "edit-repair-proposal id=edit-repair-proposal-def; context=edit-repair-context-abc; targets=src/app.ts; hunks=h1; readiness=exact-single-target; confirmation=review-required; mutation:not-run; mutationAuthority:not-granted; raw-content-excluded",
+        ],
+      },
+      verification: {
+        status: "failed",
+        reason: "Verification failed; repair proposal requires review.",
+        blockerKind: "unknown",
+        nextAction: "Review and confirm exact repair hunks before apply.",
+      },
+      evidence: ["edit-repair-result:raw-content-excluded"],
+    });
+
+    const surface = deriveStoppedSessionContinuitySurface(result);
+
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "edit-repair-context=edit-repair-context id=edit-repair-context-abc",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "edit-repair-proposal=edit-repair-proposal id=edit-repair-proposal-def",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "mutationAuthority:not-granted",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain("raw-content-excluded");
+  });
 });
 
 function makeCodingResult(

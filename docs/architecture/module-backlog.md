@@ -370,6 +370,25 @@ as an import-policing rule.
 - Unconfirmed, non-exact, fuzzy, broad, generated-only, duplicate/conflicting,
   overlapping, ambiguous, and over-max proposal hunks remain stopped/no-write.
 
+### Route 180: Verification Repair Proposal
+
+- Route 180 adds repair proposal generation after failed apply or verification,
+  without automatic repair mutation.
+- Repair context is redacted and budgeted: failed verification summary,
+  failed/changed file labels, failed hunk summaries, runtime receipt markers,
+  snapshot/recovery availability, and omitted-content reasons are preserved
+  without raw full files, unbudgeted output, provider config, or credentials.
+- Repair proposals are review-required and no-write by default. Deterministic
+  fake-provider tests cover proposal creation, provider-not-configured,
+  opt-in-required, invalid proposal, review-required, and explicit exact
+  hunk-set handoff states.
+- Confirmed exact repair hunks reuse the existing proposal hunk-set apply route;
+  authority, final stale-read, snapshot/recovery, transaction evidence, and
+  verification remain owned by that route.
+- No provider call during apply, default real-provider call, new writer,
+  fuzzy/broad/generated direct mutation, schema/CLI/dependency change, or broad
+  `runMvpIntegratedFlow.ts` refactor is added.
+
 ## Module-First Route Rule
 
 Future routes must state:

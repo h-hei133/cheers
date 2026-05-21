@@ -169,6 +169,8 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   const discoverySummary = extractDiscoveryEditContinuationSummary(codingResult);
   const generatedSummary = extractGeneratedEditContinuationSummary(codingResult);
   const providerEditSummary = extractProviderEditContinuationSummary(codingResult);
+  const editRepairContextSummary = extractEditRepairContextContinuationSummary(codingResult);
+  const editRepairProposalSummary = extractEditRepairProposalContinuationSummary(codingResult);
   const proposalReviewSummary = extractEditProposalReviewContinuationSummary(codingResult);
   const proposalApplySummary = extractEditProposalApplyContinuationSummary(codingResult);
   const proposalHunkSetSummary = extractProposalHunkSetContinuationSummary(codingResult);
@@ -211,6 +213,12 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   }
   if (providerEditSummary) {
     parts.push(providerEditSummary);
+  }
+  if (editRepairContextSummary) {
+    parts.push(editRepairContextSummary);
+  }
+  if (editRepairProposalSummary) {
+    parts.push(editRepairProposalSummary);
   }
   if (proposalReviewSummary) {
     parts.push(proposalReviewSummary);
@@ -334,6 +342,30 @@ function extractProviderEditContinuationSummary(
     return undefined;
   }
   return `provider-edit=${compactText(summary, 300)}`;
+}
+
+function extractEditRepairContextContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("edit-repair-context id="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `edit-repair-context=${compactText(summary, 300)}`;
+}
+
+function extractEditRepairProposalContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("edit-repair-proposal id="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `edit-repair-proposal=${compactText(summary, 300)}`;
 }
 
 function extractEditProposalReviewContinuationSummary(

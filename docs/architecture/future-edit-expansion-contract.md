@@ -50,7 +50,12 @@ Current supported write/edit behavior remains:
   Route 179 extends confirmed proposal hunk-sets to bounded exact
   multi-hunk-per-file apply with max 3 files, max 6 hunks, max 3 hunks per
   file, all-hunk preflight before mutation, overlap/conflict detection,
-  deterministic replacement order, and one snapshot/write per target file
+  deterministic replacement order, and one snapshot/write per target file;
+  Route 180 adds verification-driven repair proposal generation from redacted
+  failed apply/verification context, review-required repair manifests,
+  deterministic fake-provider repair planning, Result Surface and
+  Session / Continue evidence, and explicit exact hunk-set handoff only after
+  confirmation, without automatic repair mutation
 - generated edit proposals are current-supported only as no-write proposal
   manifests and review/confirmation projections; provider-backed proposal
   generation may participate only through an explicit opt-in provider boundary
@@ -107,6 +112,7 @@ The reference scan was shape-only; no implementation code was copied.
 | broad refactor planning | future-only | target/constraint manifest, user-confirmed target selection, workspace authority, final stale-read, verification plan, snapshot/rollback story |
 | multi-file discovery edit | current-supported only for confirmed target sets that reduce to exact fenced replacement, max 3 files | discovery phase, bounded candidate file list, explicit target-set confirmation, exact old/new fenced mapping for every target, preflight-all-before-mutation, transaction id, safe journal, per-file workspace authority, final stale-read, snapshot receipt, post-write verification aggregation, partial-failure changed/failed/unattempted separation, recovery workflow handoff, rollback readiness, and explicit snapshot-backed subset recovery apply; no fuzzy/generated/broad execution, no automatic rollback, no atomic rollback claim |
 | generated edit proposal | current-supported only as no-write proposal, explicit review/selection/confirmation lifecycle, exact apply bridge, and proposal hunk-set apply for per-target distinct exact mappings plus bounded exact multi-hunk-per-file apply | proposal manifest with `mutationAuthority: not-granted`, safe summary, raw-content-excluded evidence, explicit hunk/target selection, explicit old/new mapping, explicit confirmation, then apply through existing fenced or target-set transaction lanes; per-target distinct exact mappings use a proposal hunk-set manifest, all-hunk preflight before mutation, exact hunk conflict checks, one snapshot/write per file for multi-hunk targets, and target-set transaction/journal/recovery evidence; provider-backed proposal generation is allowed only behind explicit provider availability with redacted/budgeted context and fake-provider deterministic tests; no default real-provider calls, no autonomous generation apply loop, no mutation from proposal alone |
+| verification repair proposal | current-supported only as no-write repair context/proposal/review plus explicit exact hunk-set handoff | failed apply or verification summary, redacted/budgeted failure excerpt, failed/changed file labels, failed hunk summaries, repair proposal manifest with `mutationAuthority: not-granted`, fake-provider deterministic proposal path, review and explicit hunk confirmation, then existing proposal hunk-set apply route owns authority, stale-read, snapshot/recovery, and verification; no automatic repair, no provider call during apply, no fuzzy/broad/generated direct mutation |
 | confirmed single-target discovery edit | current-supported only when it reduces to exact fenced replacement | one confirmed candidate from the manifest, exact old/new fenced mapping, workspace authority through existing write route, final stale-read, pre-write snapshot receipt, post-write verification |
 | fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy/discovery/generated/multi-file rollback remains stopped and no-write, while explicit snapshot-backed single-file rollback apply is current-supported | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, pre-write snapshot receipt, verification plan, stable outcome taxonomy, rollback readiness projection, explicit snapshot id and target for rollback apply |
 
@@ -202,6 +208,16 @@ separation, and recovery workflow evidence. `proposalHunkSetResult.ts` and
 raw-content-excluded. Non-exact, fuzzy, broad, generated-only, unconfirmed,
 duplicate/conflicting, over-max, ambiguous, or overlapping proposal hunks remain
 no-write.
+
+Route 180 adds a verification repair proposal loop without adding write power.
+`editRepairContext.ts` builds redacted, budgeted context from failed apply or
+verification facts; `editRepairProposal.ts` and `editRepairPlanner.ts` create
+review-required repair manifests through deterministic fake-provider or
+explicit provider availability; `editRepairResult.ts` projects context,
+proposal, review, handoff, stopped, partial, and applied states into Result
+Surface / Session evidence. Confirmed exact repair hunks use the existing
+proposal hunk-set apply route; repair context, proposal, review, and selection
+alone never mutate.
 
 ## User Confirmation Model
 

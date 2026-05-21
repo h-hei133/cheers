@@ -171,6 +171,7 @@ export {
 export { buildProviderEditProposalResult } from "./providerEditResult.js";
 export {
   buildGeneratedEditProposalReview,
+  buildEditRepairProposalReview,
   buildProviderEditProposalReview,
   formatEditProposalReviewForPrint,
   type EditProposalReview,
@@ -223,6 +224,30 @@ export {
   type ProposalHunkSetRouteOptions,
 } from "./proposalHunkSetRoute.js";
 export { buildProposalHunkSetRouteResult } from "./proposalHunkSetResult.js";
+export {
+  buildEditRepairContext,
+  buildEditRepairContextFromCodingResult,
+  type EditRepairContext,
+  type EditRepairContextStatus,
+  type EditRepairHunkSummary,
+} from "./editRepairContext.js";
+export {
+  buildEditRepairProposalManifest,
+  normalizeEditRepairProposal,
+  type EditRepairProposalManifest,
+  type EditRepairRawProposal,
+} from "./editRepairProposal.js";
+export {
+  planEditRepairHunkSetHandoff,
+  planEditRepairProposal,
+  type EditRepairFakeProvider,
+  type EditRepairPlan,
+  type EditRepairPlannerStatus,
+} from "./editRepairPlanner.js";
+export {
+  buildEditRepairResult,
+  type EditRepairResultState,
+} from "./editRepairResult.js";
 
 export interface EditPatchModuleState {
   readonly editExpectation: EditExpectationContract;

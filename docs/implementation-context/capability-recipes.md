@@ -20,6 +20,8 @@ not import restrictions.
   `generatedEditResult.ts`, `providerEditContext.ts`,
   `providerEditProposal.ts`, `providerEditPlanner.ts`,
   `providerEditConfirmation.ts`, `providerEditResult.ts`,
+  `editRepairContext.ts`, `editRepairProposal.ts`,
+  `editRepairPlanner.ts`, `editRepairResult.ts`,
   `editProposalReview.ts`, `editProposalSelection.ts`,
   `editProposalApply.ts`, `editProposalReviewResult.ts`, `exactHunkSet.ts`,
   `exactHunkConflict.ts`, `exactHunkApply.ts`, `exactHunkResult.ts`,
@@ -36,6 +38,8 @@ not import restrictions.
   generated edit no-write proposal manifest and explicit exact mapping
   confirmation facts, provider edit safe context packet and explicit provider
   availability facts when provider-backed proposal generation is opened,
+  verification repair safe context and repair proposal facts when failed apply
+  or verification opens review-gated repair planning,
   proposal review/selection facts and explicit apply confirmation,
   proposal hunk-set manifest facts for per-target distinct exact mappings and
   bounded exact multi-hunk-per-file selections,
@@ -51,6 +55,8 @@ not import restrictions.
   facts, target-set transaction id, safe journal, verification aggregate,
   recovery workflow handoff, generated proposal no-write/review/handoff
   evidence, provider proposal no-write/review/handoff-ready evidence,
+  verification repair context/proposal/review states with no automatic repair
+  mutation,
   proposal review/reject/selection/apply bridge evidence,
   proposal hunk-set apply evidence for distinct per-target exact mappings,
   exact hunk-set conflict/preflight evidence, one snapshot/write per file for
@@ -75,13 +81,18 @@ not import restrictions.
   hunk-set manifest, all-hunk preflight before mutation, exact conflict checks,
   existing fenced route execution for one-hunk files, and bounded exact
   multi-hunk apply with one snapshot/write per file for multi-hunk targets.
+  Repair proposals must be generated only from redacted failed verification/apply
+  context, stay review-required and no-write by default, and hand off only after
+  explicit exact hunk confirmation to the existing hunk-set apply route. Repair
+  planning must not call providers during apply or run automatic repair.
   Do not run automatic rollback.
 - Validate: focused edit/write route tests, stale-read/authority regression,
   fenced edit activation/runtime tests, discovery edit
   manifest/planner/confirmation/result tests, generated edit
   proposal/planner/confirmation/result tests, provider edit
-  context/proposal/planner/confirmation/result tests, proposal review/
-  selection/apply/result tests, proposal hunk-set
+  context/proposal/planner/confirmation/result tests, edit repair
+  context/proposal/planner/result tests, proposal review/selection/apply/result
+  tests, proposal hunk-set
   manifest/plan/route/result tests, exact hunk set/conflict/apply/result
   tests, target-set edit
   plan/route/result/transaction/journal/policy/verification tests, target-set

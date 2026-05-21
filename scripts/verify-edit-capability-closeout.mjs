@@ -31,6 +31,10 @@ const testTargets = [
   'src/orchestration/providerEditPlanner.test.ts',
   'src/orchestration/providerEditConfirmation.test.ts',
   'src/orchestration/providerEditResult.test.ts',
+  'src/orchestration/editRepairContext.test.ts',
+  'src/orchestration/editRepairProposal.test.ts',
+  'src/orchestration/editRepairPlanner.test.ts',
+  'src/orchestration/editRepairResult.test.ts',
   'src/orchestration/editProposalReview.test.ts',
   'src/orchestration/editProposalSelection.test.ts',
   'src/orchestration/editProposalApply.test.ts',
@@ -92,6 +96,11 @@ console.log('report field provider_edit_fake_proposal=covered')
 console.log('report field provider_edit_confirmation=covered')
 console.log('report field provider_edit_exact_handoff_ready=covered')
 console.log('report field provider_edit_no_raw_content=covered')
+console.log('report field edit_repair_context=covered')
+console.log('report field edit_repair_fake_provider_proposal=covered')
+console.log('report field edit_repair_review_required=covered')
+console.log('report field edit_repair_hunk_set_handoff=covered')
+console.log('report field edit_repair_no_raw_content=covered')
 console.log('report field proposal_review_surface=covered')
 console.log('report field proposal_selection_confirmation=covered')
 console.log('report field proposal_apply_bridge=covered')
@@ -172,6 +181,17 @@ console.log('marker provider-edit-exact-single-target-handoff-ready')
 console.log('marker provider-edit-exact-target-set-handoff-ready')
 console.log('marker provider-edit-proposal-no-mutation-without-execution-path')
 console.log('marker provider-edit-session-report-raw-content-and-secrets-excluded')
+console.log('marker edit-repair-context-created-from-verification-failure')
+console.log('marker edit-repair-context-redacted-budgeted')
+console.log('marker edit-repair-fake-provider-proposal-created-no-write')
+console.log('marker edit-repair-provider-not-configured-stopped')
+console.log('marker edit-repair-provider-opt-in-required-stopped')
+console.log('marker edit-repair-invalid-proposal-stopped-no-write')
+console.log('marker edit-repair-review-required-no-write')
+console.log('marker edit-repair-confirmed-hunk-set-handoff-existing-route')
+console.log('marker edit-repair-no-automatic-mutation-after-verification-failure')
+console.log('marker edit-repair-transaction-recovery-evidence-preserved')
+console.log('marker edit-repair-result-session-raw-content-excluded')
 console.log('marker proposal-review-created-no-write')
 console.log('marker proposal-reject-no-write')
 console.log('marker proposal-selection-required-no-write')

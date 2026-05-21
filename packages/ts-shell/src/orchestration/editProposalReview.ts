@@ -1,7 +1,8 @@
 import type { GeneratedEditProposalManifest } from "./generatedEditProposal.js";
 import type { ProviderEditProposalManifest } from "./providerEditProposal.js";
+import type { EditRepairProposalManifest } from "./editRepairProposal.js";
 
-export type EditProposalSource = "generated" | "provider";
+export type EditProposalSource = "generated" | "provider" | "repair";
 export type EditProposalReviewStatus =
   | "review-required"
   | "ready-for-selection"
@@ -121,6 +122,53 @@ export function buildProviderEditProposalReview(
       ...(target.exactOldNewReady
         ? {}
         : { unsupportedReason: "provider hunk is not exact old/new mapping" }),
+      redactionStatus: "raw-content-excluded",
+    })),
+    evidence: manifest.evidence,
+  });
+}
+
+export function buildEditRepairProposalReview(
+  manifest: EditRepairProposalManifest,
+): EditProposalReview {
+  const targetLabels = Array.from(
+    new Set(manifest.proposedHunks.map((hunk) => hunk.targetLabel)),
+  );
+  const exactMappingReadiness =
+    manifest.handoffReadiness === "exact-single-target"
+      ? "single-target-ready"
+      : manifest.handoffReadiness === "exact-hunk-set"
+        ? "target-set-ready"
+        : manifest.handoffReadiness === "unsupported"
+          ? "unsupported"
+          : "missing";
+  const reviewStatus =
+    exactMappingReadiness === "unsupported"
+      ? "unsupported-for-apply"
+      : exactMappingReadiness === "missing"
+        ? "review-required"
+        : "ready-for-selection";
+  return buildReview({
+    proposalId: manifest.repairProposalId,
+    source: "repair",
+    targetLabels,
+    operationSummary: manifest.safeSummary,
+    exactMappingReadiness,
+    reviewStatus,
+    riskNotes: [
+      manifest.riskSummary,
+      "repair proposal review is not write authorization",
+      "repair apply must reuse the existing exact hunk-set route",
+      "no provider call is made during repair apply",
+    ],
+    hunkSummaries: manifest.proposedHunks.map((hunk) => ({
+      hunkId: hunk.hunkId,
+      targetLabel: hunk.targetLabel,
+      operationSummary: hunk.operationSummary,
+      exactMappingReady: hunk.exactMappingReady,
+      ...(hunk.exactMappingReady
+        ? {}
+        : { unsupportedReason: hunk.unsupportedReason ?? "repair hunk is not exact old/new mapping" }),
       redactionStatus: "raw-content-excluded",
     })),
     evidence: manifest.evidence,

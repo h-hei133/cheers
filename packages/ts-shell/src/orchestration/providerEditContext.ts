@@ -134,7 +134,7 @@ export function buildProviderEditContextPacket(input: {
 export function redactProviderEditText(value: string): string {
   return value
     .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-provider-home]")
-    .replace(/\b(?:api[_-]?key|token|authorization|password|secret)\s*[:=]\s*[^\s"'`]+/gi, "$1=[redacted]")
+    .replace(/\b(api[_-]?key|token|authorization|password|secret)\s*[:=]\s*[^\s"'`]+/gi, "$1=[redacted]")
     .replace(/sk-[A-Za-z0-9_-]{12,}/g, "sk-[redacted]")
     .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]");
 }
