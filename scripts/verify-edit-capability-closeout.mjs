@@ -31,6 +31,10 @@ const testTargets = [
   'src/orchestration/providerEditPlanner.test.ts',
   'src/orchestration/providerEditConfirmation.test.ts',
   'src/orchestration/providerEditResult.test.ts',
+  'src/orchestration/editProposalReview.test.ts',
+  'src/orchestration/editProposalSelection.test.ts',
+  'src/orchestration/editProposalApply.test.ts',
+  'src/orchestration/editProposalReviewResult.test.ts',
   'src/orchestration/targetSetEditPlan.test.ts',
   'src/orchestration/targetSetEditPolicy.test.ts',
   'src/orchestration/targetSetEditJournal.test.ts',
@@ -49,6 +53,7 @@ const testTargets = [
   'src/orchestration/fencedEditRuntimeActivation.test.ts',
   'src/session/stoppedSessionContinuity.test.ts',
   'src/session/sessionResumeContextBuilder.test.ts',
+  'src/entrypoints/cliProposalReviewSurface.test.ts',
   'src/entrypoints/cliRuntimeInvocation.test.ts',
   'src/orchestration/patchRecovery/restoreCommandContract.test.ts',
   'src/orchestration/patchRecovery/restoreCommandRunner.test.ts',
@@ -79,6 +84,10 @@ console.log('report field provider_edit_fake_proposal=covered')
 console.log('report field provider_edit_confirmation=covered')
 console.log('report field provider_edit_exact_handoff_ready=covered')
 console.log('report field provider_edit_no_raw_content=covered')
+console.log('report field proposal_review_surface=covered')
+console.log('report field proposal_selection_confirmation=covered')
+console.log('report field proposal_apply_bridge=covered')
+console.log('report field proposal_apply_no_raw_content=covered')
 console.log('report field target_set_transaction=covered')
 console.log('report field target_set_execution_journal=covered')
 console.log('report field target_set_preflight_atomicity=covered')
@@ -146,6 +155,16 @@ console.log('marker provider-edit-exact-single-target-handoff-ready')
 console.log('marker provider-edit-exact-target-set-handoff-ready')
 console.log('marker provider-edit-proposal-no-mutation-without-execution-path')
 console.log('marker provider-edit-session-report-raw-content-and-secrets-excluded')
+console.log('marker proposal-review-created-no-write')
+console.log('marker proposal-reject-no-write')
+console.log('marker proposal-selection-required-no-write')
+console.log('marker proposal-invalid-selection-no-write')
+console.log('marker proposal-non-exact-hunk-no-write')
+console.log('marker proposal-confirmed-single-target-apply-existing-fenced-route')
+console.log('marker proposal-confirmed-target-set-apply-existing-transaction-route')
+console.log('marker proposal-apply-stopped-preserves-proposal-evidence')
+console.log('marker proposal-partial-failure-preserves-transaction-evidence')
+console.log('marker proposal-review-apply-raw-content-excluded')
 console.log('marker target-set-max-file-guard-stopped-no-write')
 console.log('marker target-set-preflight-all-files-before-mutation')
 console.log('marker target-set-transaction-id-emitted')

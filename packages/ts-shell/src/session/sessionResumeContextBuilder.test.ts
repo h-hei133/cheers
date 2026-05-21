@@ -223,6 +223,29 @@ describe("session resume context builder", () => {
     expect(diagnostic).toContain("raw-content-excluded");
   });
 
+  it("includes proposal review/apply facts in success diagnostics", () => {
+    const diagnostic = buildSuccessHandoffDiagnostic({
+      ...makeCodingResult(),
+      continuation: {
+        status: "first-pass-success",
+        attempts: 0,
+        evidence: [
+          "edit-proposal-review proposal=provider-edit-def456; source=provider; status=ready-for-selection; targets=src/a.ts; readiness=single-target-ready; mutation:not-run; raw-content-excluded",
+          "edit-proposal-apply proposal=provider-edit-def456; status=single-target-applied; targets=src/a.ts; changed=src/a.ts; raw-content-excluded",
+        ],
+      },
+    });
+
+    expect(diagnostic).toContain(
+      "proposal-review=edit-proposal-review proposal=provider-edit-def456",
+    );
+    expect(diagnostic).toContain(
+      "proposal-apply=edit-proposal-apply proposal=provider-edit-def456",
+    );
+    expect(diagnostic).toContain("single-target-applied");
+    expect(diagnostic).toContain("raw-content-excluded");
+  });
+
   it("extracts path-like targets for prompt routing", () => {
     expect(extractPathLikeTargets("continue in src/a.ts and ./b.test.ts")).toEqual([
       "./b.test.ts",

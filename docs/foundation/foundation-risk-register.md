@@ -14,6 +14,31 @@ None open after Route 165.
 
 ## Resolved
 
+### Proposal review and apply bridge
+
+- Affected modules: Edit / Patch, CLI / UX, Result Surface,
+  Session / Continue, Harness / Eval.
+- Why it was a calibration gap: generated/provider proposals could be created
+  and marked handoff-ready, but there was no shared review surface, hunk/target
+  selection model, explicit confirmation state machine, or apply bridge that
+  reused the existing exact write lanes.
+- Resolution: Route 177 adds `editProposalReview.ts`,
+  `editProposalSelection.ts`, `editProposalApply.ts`, and
+  `editProposalReviewResult.ts` to render compact no-write reviews, record
+  reject/review-only/selection/confirmation states, apply confirmed exact
+  single-target selections through the fenced route, apply confirmed exact
+  target-set selections through the target-set transaction route, and project
+  review/apply/partial-failure evidence through Result Surface and
+  Session / Continue.
+- Evidence: proposal review/selection/apply/result tests, generated/provider
+  regression tests, fenced/target-set route regressions, session continuity
+  regressions, CLI print helper coverage, and edit closeout verifier markers.
+- Recommended next action: keep per-target distinct target-set mappings,
+  fuzzy/broad/generated direct mutation, provider calls during apply, and new
+  writer behavior closed until a separate route defines them.
+- Should become a route: no, resolved by Route 177 for exact proposal
+  review/selection/apply bridging.
+
 ### Provider-backed edit proposal lifecycle
 
 - Affected modules: Edit / Patch, Provider / Model, Workspace / File Context,

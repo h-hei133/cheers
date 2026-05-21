@@ -19,7 +19,9 @@ not import restrictions.
   `generatedEditPlanner.ts`, `generatedEditConfirmation.ts`,
   `generatedEditResult.ts`, `providerEditContext.ts`,
   `providerEditProposal.ts`, `providerEditPlanner.ts`,
-  `providerEditConfirmation.ts`, `providerEditResult.ts`, `editSnapshot.ts`,
+  `providerEditConfirmation.ts`, `providerEditResult.ts`,
+  `editProposalReview.ts`, `editProposalSelection.ts`,
+  `editProposalApply.ts`, `editProposalReviewResult.ts`, `editSnapshot.ts`,
   `editRecoveryPlan.ts`, `editRecoveryApply.ts`, `editRecoveryOutcome.ts`,
   `editRecoveryResult.ts`, `editRollback.ts`, `workspaceFileContract.ts`,
   `workspaceTargetProjection.ts`,
@@ -32,6 +34,7 @@ not import restrictions.
   generated edit no-write proposal manifest and explicit exact mapping
   confirmation facts, provider edit safe context packet and explicit provider
   availability facts when provider-backed proposal generation is opened,
+  proposal review/selection facts and explicit apply confirmation,
   workspace authority fact, final stale-read fact, pre-write snapshot receipt
   facts for activated exact fenced replacement, explicit snapshot ids and
   target paths for recovery apply, verification plan.
@@ -44,6 +47,7 @@ not import restrictions.
   facts, target-set transaction id, safe journal, verification aggregate,
   recovery workflow handoff, generated proposal no-write/review/handoff
   evidence, provider proposal no-write/review/handoff-ready evidence,
+  proposal review/reject/selection/apply bridge evidence,
   continuation-safe mutation evidence, safe snapshot receipt status,
   rollback readiness, explicit recovery plan/apply evidence for
   single-file and bounded target-set subset rollback when directly invoked.
@@ -58,12 +62,15 @@ not import restrictions.
   providers by default, or become authority until reduced to explicit old/new
   mapping and confirmed target(s). Provider-backed proposal generation must use
   explicit provider availability, redacted/budgeted context, and no provider
-  generated mutation. Do not run automatic rollback.
+  generated mutation. Proposal review and selection are not write authority;
+  apply must reuse the existing fenced or target-set transaction routes and
+  must not call providers. Do not run automatic rollback.
 - Validate: focused edit/write route tests, stale-read/authority regression,
   fenced edit activation/runtime tests, discovery edit
   manifest/planner/confirmation/result tests, generated edit
   proposal/planner/confirmation/result tests, provider edit
-  context/proposal/planner/confirmation/result tests, target-set edit
+  context/proposal/planner/confirmation/result tests, proposal review/
+  selection/apply/result tests, target-set edit
   plan/route/result/transaction/journal/policy/verification tests, target-set
   recovery workflow/recovery tests,
   snapshot/recovery/rollback tests, CLI runtime invocation tests,

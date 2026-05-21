@@ -54,7 +54,9 @@ Current supported write/edit behavior remains:
   proposal manifest with `mutationAuthority: not-granted`; proposals can hand
   off only after they reduce to explicit old/new mapping plus explicit
   single-target or bounded target-set confirmation, and that handoff reuses the
-  existing exact fenced replacement or target-set exact fenced lanes
+  existing exact fenced replacement or target-set exact fenced lanes; Route 177
+  adds a proposal review/selection/confirmation/apply bridge so confirmed exact
+  selections can invoke those existing lanes without creating a proposal writer
 - ambiguous sibling targets stop before mutation
 - vague generated-content prompts produce a reviewable no-write generated
   proposal when safe, or stop actionably when content, target, mapping, or
@@ -98,7 +100,7 @@ The reference scan was shape-only; no implementation code was copied.
 |---|---|---|
 | broad refactor planning | future-only | target/constraint manifest, user-confirmed target selection, workspace authority, final stale-read, verification plan, snapshot/rollback story |
 | multi-file discovery edit | current-supported only for confirmed target sets that reduce to exact fenced replacement, max 3 files | discovery phase, bounded candidate file list, explicit target-set confirmation, exact old/new fenced mapping for every target, preflight-all-before-mutation, transaction id, safe journal, per-file workspace authority, final stale-read, snapshot receipt, post-write verification aggregation, partial-failure changed/failed/unattempted separation, recovery workflow handoff, rollback readiness, and explicit snapshot-backed subset recovery apply; no fuzzy/generated/broad execution, no automatic rollback, no atomic rollback claim |
-| generated edit proposal | current-supported only as no-write proposal and explicit review/confirmation lifecycle | proposal manifest with `mutationAuthority: not-granted`, safe summary, raw-content-excluded evidence, explicit old/new mapping, explicit confirmation, then handoff through existing fenced or target-set exact lanes; provider-backed proposal generation is allowed only behind explicit provider availability with redacted/budgeted context and fake-provider deterministic tests; no default real-provider calls, no autonomous generation apply loop, no mutation from proposal alone |
+| generated edit proposal | current-supported only as no-write proposal, explicit review/selection/confirmation lifecycle, and exact apply bridge | proposal manifest with `mutationAuthority: not-granted`, safe summary, raw-content-excluded evidence, explicit hunk/target selection, explicit old/new mapping, explicit confirmation, then apply through existing fenced or target-set transaction lanes; provider-backed proposal generation is allowed only behind explicit provider availability with redacted/budgeted context and fake-provider deterministic tests; no default real-provider calls, no autonomous generation apply loop, no mutation from proposal alone |
 | confirmed single-target discovery edit | current-supported only when it reduces to exact fenced replacement | one confirmed candidate from the manifest, exact old/new fenced mapping, workspace authority through existing write route, final stale-read, pre-write snapshot receipt, post-write verification |
 | fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy/discovery/generated/multi-file rollback remains stopped and no-write, while explicit snapshot-backed single-file rollback apply is current-supported | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, pre-write snapshot receipt, verification plan, stable outcome taxonomy, rollback readiness projection, explicit snapshot id and target for rollback apply |
 
@@ -168,6 +170,16 @@ and `providerEditConfirmation.ts` / `providerEditResult.ts` keep review,
 confirmation, Result Surface, Session / Continue, and verifier evidence
 no-write until an existing exact lane performs its own authority, stale-read,
 snapshot/recovery, and verification checks.
+
+Route 177 closes the review/apply workflow without adding edit power.
+`editProposalReview.ts` renders generated/provider proposal manifests as
+compact review surfaces, `editProposalSelection.ts` records explicit target or
+hunk selection without granting authority, `editProposalApply.ts` bridges only
+confirmed exact selections into `runFencedEditReplacementRoute` or
+`runTargetSetEditRoute`, and `editProposalReviewResult.ts` projects review,
+rejection, stopped apply, successful apply, and partial failure states through
+Result Surface and Session / Continue. Non-exact, fuzzy, broad, unconfirmed, or
+non-uniform target-set selections stay no-write.
 
 ## User Confirmation Model
 

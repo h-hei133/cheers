@@ -169,6 +169,22 @@ export {
   type ProviderEditConfirmationDecision,
 } from "./providerEditConfirmation.js";
 export { buildProviderEditProposalResult } from "./providerEditResult.js";
+export {
+  buildGeneratedEditProposalReview,
+  buildProviderEditProposalReview,
+  formatEditProposalReviewForPrint,
+  type EditProposalReview,
+  type EditProposalReviewHunk,
+} from "./editProposalReview.js";
+export {
+  selectEditProposalHunks,
+  type EditProposalSelection,
+} from "./editProposalSelection.js";
+export {
+  applyEditProposalSelection,
+  type EditProposalApplyResult,
+} from "./editProposalApply.js";
+export { buildEditProposalReviewResult } from "./editProposalReviewResult.js";
 
 export interface EditPatchModuleState {
   readonly editExpectation: EditExpectationContract;

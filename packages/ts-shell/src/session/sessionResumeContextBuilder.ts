@@ -405,6 +405,14 @@ export function buildSuccessHandoffDiagnostic(
   if (providerEditSummary) {
     parts.push(providerEditSummary);
   }
+  const proposalReviewSummary = extractEditProposalReviewContinuationSummary(codingResult);
+  if (proposalReviewSummary) {
+    parts.push(proposalReviewSummary);
+  }
+  const proposalApplySummary = extractEditProposalApplyContinuationSummary(codingResult);
+  if (proposalApplySummary) {
+    parts.push(proposalApplySummary);
+  }
   parts.push(`next=${nextFocus}`);
   return `${parts.join("; ")}.`;
 }
@@ -647,4 +655,28 @@ function extractProviderEditContinuationSummary(
     return undefined;
   }
   return `provider-edit=${compactText(summary, 300)}`;
+}
+
+function extractEditProposalReviewContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("edit-proposal-review proposal="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `proposal-review=${compactText(summary, 300)}`;
+}
+
+function extractEditProposalApplyContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("edit-proposal-apply proposal="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `proposal-apply=${compactText(summary, 300)}`;
 }

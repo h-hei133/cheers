@@ -169,6 +169,8 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   const discoverySummary = extractDiscoveryEditContinuationSummary(codingResult);
   const generatedSummary = extractGeneratedEditContinuationSummary(codingResult);
   const providerEditSummary = extractProviderEditContinuationSummary(codingResult);
+  const proposalReviewSummary = extractEditProposalReviewContinuationSummary(codingResult);
+  const proposalApplySummary = extractEditProposalApplyContinuationSummary(codingResult);
   const targetSetSummary = extractTargetSetEditContinuationSummary(codingResult);
   const editRecoverySummary = extractEditRecoveryApplyContinuationSummary(codingResult);
   if (target) {
@@ -208,6 +210,12 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   }
   if (providerEditSummary) {
     parts.push(providerEditSummary);
+  }
+  if (proposalReviewSummary) {
+    parts.push(proposalReviewSummary);
+  }
+  if (proposalApplySummary) {
+    parts.push(proposalApplySummary);
   }
   if (targetSetSummary) {
     parts.push(targetSetSummary);
@@ -322,6 +330,30 @@ function extractProviderEditContinuationSummary(
     return undefined;
   }
   return `provider-edit=${compactText(summary, 300)}`;
+}
+
+function extractEditProposalReviewContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("edit-proposal-review proposal="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `proposal-review=${compactText(summary, 300)}`;
+}
+
+function extractEditProposalApplyContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("edit-proposal-apply proposal="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `proposal-apply=${compactText(summary, 300)}`;
 }
 
 function extractTargetSetEditContinuationSummary(

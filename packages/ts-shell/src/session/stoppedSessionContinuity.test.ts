@@ -580,6 +580,42 @@ describe("stopped session continuity", () => {
     );
     expect(surface?.failureHandoffDiagnostic).toContain("raw-content-excluded");
   });
+
+  it("includes proposal review/apply facts in stopped diagnostics", () => {
+    const result = makeCodingResult({
+      failedFiles: [
+        {
+          path: "src/app.ts",
+          reason: "Proposal selection requires confirmation.",
+        },
+      ],
+      continuation: {
+        status: "failed-after-bounded-continuation",
+        attempts: 1,
+        evidence: [
+          "edit-proposal-review proposal=provider-edit-abc123; source=provider; status=ready-for-selection; targets=src/app.ts; readiness=single-target-ready; mutation:not-run; raw-content-excluded",
+          "edit-proposal-apply proposal=provider-edit-abc123; status=unconfirmed-no-write; targets=(none); changed=none; raw-content-excluded",
+        ],
+      },
+      verification: {
+        status: "blocked",
+        reason: "Proposal selection requires confirmation.",
+        blockerKind: "unknown",
+        nextAction: "Confirm selected exact hunks before apply.",
+      },
+      evidence: ["edit-proposal-result:raw-content-excluded"],
+    });
+
+    const surface = deriveStoppedSessionContinuitySurface(result);
+
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "proposal-review=edit-proposal-review proposal=provider-edit-abc123",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "proposal-apply=edit-proposal-apply proposal=provider-edit-abc123",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain("raw-content-excluded");
+  });
 });
 
 function makeCodingResult(

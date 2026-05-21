@@ -337,6 +337,20 @@ as an import-policing rule.
   mutation, broad/fuzzy apply loops, CLI/schema/dependency changes, and Result
   Surface bypass remain closed.
 
+### Route 177: Proposal Review And Apply
+
+- Route 177 adds a shared generated/provider proposal review, selection,
+  explicit confirmation, and apply bridge.
+- Review and selection surfaces are no-write and redacted; reject,
+  review-only, invalid selection, non-exact hunks, and unconfirmed selections
+  stop before mutation.
+- Confirmed exact single-target selections apply only through the existing
+  fenced replacement route; confirmed exact target-set selections apply only
+  through the existing target-set transaction route.
+- No new writer, provider call during apply, fuzzy/broad/generated direct
+  mutation, authority/stale-read/snapshot bypass, CLI/schema/dependency
+  changes, or broad `runMvpIntegratedFlow.ts` refactor is added.
+
 ## Module-First Route Rule
 
 Future routes must state:
