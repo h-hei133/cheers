@@ -250,6 +250,29 @@ describe("session resume context builder", () => {
     expect(diagnostic).toContain("raw-content-excluded");
   });
 
+  it("includes targeted context packet and plan facts in success diagnostics", () => {
+    const diagnostic = buildSuccessHandoffDiagnostic({
+      ...makeCodingResult(),
+      taskKind: "read-file",
+      changedFiles: [],
+      verifiedFiles: [],
+      continuation: {
+        status: "first-pass-success",
+        attempts: 0,
+        evidence: [
+          "context-packet ctx_def456; target=src/target.ts; included=4; omitted=0; confidence=high; mutationAuthority=not-granted",
+          "context-plan ctx_def456; readiness=ready; suggestedReads=0; tests=1; mutationAuthority=not-granted",
+        ],
+      },
+    });
+
+    expect(diagnostic).toContain(
+      "context-packet=context-packet ctx_def456",
+    );
+    expect(diagnostic).toContain("context-plan=context-plan ctx_def456");
+    expect(diagnostic).toContain("mutationAuthority=not-granted");
+  });
+
   it("extracts path-like targets for prompt routing", () => {
     expect(extractPathLikeTargets("continue in src/a.ts and ./b.test.ts")).toEqual([
       "./b.test.ts",

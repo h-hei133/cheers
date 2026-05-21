@@ -101,6 +101,32 @@ not import restrictions.
   mutation-lane rejection, `verify:edit-capability-closeout`,
   `verify:result-contract`, build if TS source changes.
 
+## Add A Targeted Context Planning Surface
+
+- Start in: Workspace / File Context, then hand off safe facts to Agent Loop,
+  Result Surface, Session / Continue, and Harness / Eval.
+- Use facades/contracts: `readInspectModule.ts`, `contextPacket.ts`,
+  `contextDiscovery.ts`, `contextBudget.ts`, `contextPlan.ts`,
+  `contextPacketResult.ts`, `workspaceFileContract.ts`,
+  `workspaceTargetProjection.ts`, `continuationModule.ts`,
+  `resultSurfaceModule.ts`, and Session / Continue continuity helpers.
+- Consume: one explicit in-workspace code target, current read-only file facts,
+  bounded local filesystem discovery candidates, and optional prompt intent for
+  context packet / planning context.
+- Emit: deterministic packet id, target safe label, included and omitted source
+  summaries, budget and redaction status, replay-safe summary, suggested next
+  reads, likely tests, verification candidates, and
+  `mutationAuthority:not-granted`.
+- Do not bypass: workspace boundaries, raw full-content exclusion, provider
+  config and credential redaction, Result Surface truthfulness, transcript
+  replay safety, write authority, final stale-read, or edit confirmation. Do
+  not add LSP, embeddings, full-repo semantic index, browser work, provider
+  calls, schema/CLI/dependency changes, or mutation reachability.
+- Validate: context packet/discovery/budget/plan/result tests,
+  read/inspect and target-resolution regressions, Session / Continue
+  regressions, focused runMvp context planning tests, focused verifier gate,
+  `verify:result-contract`, and build if TypeScript source changes.
+
 ## Add A Browser Action
 
 - Start in: Browser.

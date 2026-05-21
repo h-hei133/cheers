@@ -171,6 +171,8 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   const providerEditSummary = extractProviderEditContinuationSummary(codingResult);
   const editRepairContextSummary = extractEditRepairContextContinuationSummary(codingResult);
   const editRepairProposalSummary = extractEditRepairProposalContinuationSummary(codingResult);
+  const contextPacketSummary = extractContextPacketContinuationSummary(codingResult);
+  const contextPlanSummary = extractContextPlanContinuationSummary(codingResult);
   const proposalReviewSummary = extractEditProposalReviewContinuationSummary(codingResult);
   const proposalApplySummary = extractEditProposalApplyContinuationSummary(codingResult);
   const proposalHunkSetSummary = extractProposalHunkSetContinuationSummary(codingResult);
@@ -219,6 +221,12 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   }
   if (editRepairProposalSummary) {
     parts.push(editRepairProposalSummary);
+  }
+  if (contextPacketSummary) {
+    parts.push(contextPacketSummary);
+  }
+  if (contextPlanSummary) {
+    parts.push(contextPlanSummary);
   }
   if (proposalReviewSummary) {
     parts.push(proposalReviewSummary);
@@ -366,6 +374,34 @@ function extractEditRepairProposalContinuationSummary(
     return undefined;
   }
   return `edit-repair-proposal=${compactText(summary, 300)}`;
+}
+
+function extractContextPacketContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("context-packet "),
+  ) ?? codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("context-packet:id:"),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `context-packet=${compactText(summary, 300)}`;
+}
+
+function extractContextPlanContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("context-plan "),
+  ) ?? codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("context-plan:readiness:"),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `context-plan=${compactText(summary, 300)}`;
 }
 
 function extractEditProposalReviewContinuationSummary(

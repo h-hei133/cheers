@@ -7438,4 +7438,51 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(roles[0]).toBe("planner");
     expect(roles.includes("reviewer")).toBe(false);
   }, 15000);
+
+  it("builds a targeted context packet for explicit read planning prompts", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(path.join(workspaceRoot, "src", "dep.ts"), "export const dep = 1;\n");
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "target.ts"),
+      "import { dep } from './dep.js';\nexport const target = dep;\n",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_context_packet_read",
+      prompt: "Read src/target.ts and build a context packet with related files",
+      workspaceRoot,
+      maxTurns: 4,
+    });
+
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.finalOutput).toContain("Context packet:");
+    expect(result.finalOutput).toContain("Mutation authority: not-granted");
+    expect(result.codingResult?.continuation.evidence).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^context-packet ctx_/),
+        "context-packet:mutation-authority:not-granted",
+      ]),
+    );
+  }, 15000);
+
+  it("stops broad edit prompts on targeted context planning without mutation authority", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(path.join(workspaceRoot, "src", "target.ts"), "export const target = 1;\n");
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_context_packet_edit_stop",
+      prompt: "Edit src/target.ts to improve the implementation",
+      workspaceRoot,
+      maxTurns: 4,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.finalOutput).toContain("Context packet:");
+    expect(result.finalOutput).toContain("Mutation authority: not-granted");
+    expect(result.codingResult?.continuation.evidence).toContain(
+      "context-packet:mutation-authority:not-granted",
+    );
+  }, 15000);
 });

@@ -86,6 +86,8 @@ export interface WorkflowTaskPlan {
   readonly repairContextAbandonedReason?: "multiple-failed-targets";
   readonly repairContextAbandonedFailureReason?: SingleFileEditFailureReason;
   readonly repairContextAbandonedTargetCount?: number;
+  readonly contextPlanningRequested?: boolean;
+  readonly contextPlanningReason?: "explicit-context-packet" | "missing-edit-context";
   readonly mutationScopeLineIndexes?: readonly number[];
   readonly mutationScopeRanges?: readonly string[];
   readonly mutationScopeSourceWindowStart?: number;

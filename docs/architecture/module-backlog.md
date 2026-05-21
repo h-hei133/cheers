@@ -389,6 +389,23 @@ as an import-policing rule.
   fuzzy/broad/generated direct mutation, schema/CLI/dependency change, or broad
   `runMvpIntegratedFlow.ts` refactor is added.
 
+### Route 181: Targeted Context Planning
+
+- Route 181 adds deterministic targeted context packets for explicit code
+  targets, covering direct imports, sibling files, nearby tests, docs/readme
+  references, and bounded textual call-site candidates.
+- Context packets are read-only, redacted, budgeted, replay-safe, and
+  continuation-safe. They carry selected and omitted candidate summaries,
+  missing-context suggested reads, likely test and verification candidates, and
+  `mutationAuthority:not-granted`.
+- Result Surface and Session / Continue can preserve context packet and plan
+  summaries without raw file dumps. Broad edit requests that lack a concrete
+  transform can stop with context planning evidence instead of implying write
+  readiness.
+- No edit expansion, provider/model call, browser work, LSP, embeddings,
+  full-repo semantic index, schema/CLI/dependency change, authority bypass, or
+  broad `runMvpIntegratedFlow.ts` refactor is added.
+
 ## Module-First Route Rule
 
 Future routes must state:

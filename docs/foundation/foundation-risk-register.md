@@ -14,6 +14,28 @@ None open after Route 165.
 
 ## Resolved
 
+### Targeted context planning substrate
+
+- Affected modules: Workspace / File Context, Agent Loop, Result Surface,
+  Session / Continue, Harness / Eval.
+- Why it was a calibration gap: explicit target reads could inspect one file,
+  while planning and complex edit stops had weak independent evidence about
+  imports, tests, docs/readme references, call-site candidates, budget, and
+  remaining missing context.
+- Resolution: Route 181 adds deterministic read-only context packet,
+  discovery, budget/redaction, planning, and result projection modules for
+  explicit code targets. Packets summarize target/import/sibling/test/docs/
+  call-site candidates, omit over-budget or unsafe sources with reasons, carry
+  replay-safe summaries, and keep `mutationAuthority:not-granted`.
+- Evidence: context budget/discovery/packet/plan/result tests, read/target
+  regressions, runMvp context planning tests, Session / Continue continuity
+  coverage, and the focused context-planning verifier.
+- Recommended next action: keep provider planning, LSP/embedding/index
+  discovery, browser context, schema/CLI changes, and edit execution expansion
+  closed until separate routes define them.
+- Should become a route: no, resolved by Route 181 for read/plan substrate
+  only.
+
 ### Verification repair proposal loop
 
 - Affected modules: Edit / Patch, Provider / Model, Result Surface,

@@ -24,6 +24,20 @@ import {
   projectOutOfWorkspaceTargetStoppedSummary,
   type WorkspaceTargetStoppedSummary,
 } from "./workspaceTargetProjection.js";
+export {
+  buildTargetedContextPacket,
+  type TargetedContextPacket,
+  type ContextPacketSourceSummary,
+} from "./contextPacket.js";
+export {
+  buildContextPlanningSummary,
+  type ContextPlanningSummary,
+} from "./contextPlan.js";
+export {
+  buildContextPacketResult,
+  projectContextPacketRuntimeOutcome,
+  type ContextPacketResultProjection,
+} from "./contextPacketResult.js";
 
 export type {
   ReadContinuationTargetRecovery,

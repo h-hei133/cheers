@@ -48,11 +48,19 @@
       "name": "Workspace / File Context",
       "publicFacades": [
         "packages/ts-shell/src/orchestration/readInspectModule.ts",
+        "packages/ts-shell/src/orchestration/contextPacket.ts",
+        "packages/ts-shell/src/orchestration/contextDiscovery.ts",
+        "packages/ts-shell/src/orchestration/contextBudget.ts",
+        "packages/ts-shell/src/orchestration/contextPlan.ts",
+        "packages/ts-shell/src/orchestration/contextPacketResult.ts",
         "packages/ts-shell/src/orchestration/workspaceFileContract.ts",
         "packages/ts-shell/src/orchestration/workspaceTargetProjection.ts"
       ],
       "owns": [
         "read and inspect target facts",
+        "deterministic targeted context packets for explicit code targets",
+        "bounded import, sibling test, docs/readme, and call-site candidate discovery",
+        "read-only planning summaries with missing-context suggested reads",
         "workspace target summaries",
         "continuation-safe target facts",
         "future discovery candidate summaries without mutation authority"

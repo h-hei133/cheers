@@ -103,6 +103,8 @@ import {
   inferRepoEvidenceRole,
   isPathOnlyReadRequest,
   parseRepoCandidateFiles,
+  buildTargetedContextPacket,
+  projectContextPacketRuntimeOutcome,
   projectReadAmbiguousTargetStop,
   projectReadMissingTargetStop,
   projectReadOutOfWorkspaceTargetStop,
@@ -2016,6 +2018,12 @@ function buildWorkflowTaskPlan(
       groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
       ...(readLineCount !== undefined ? { readLineCount } : {}),
       ...(readLineOffset !== undefined ? { readLineOffset } : {}),
+      ...(shouldBuildContextPlanningSurface(prompt)
+        ? {
+            contextPlanningRequested: true,
+            contextPlanningReason: "explicit-context-packet" as const,
+          }
+        : {}),
       inspectFirst: true,
       verifyAfterEdit: false,
       usedRestoredState,
@@ -2321,6 +2329,27 @@ function buildWorkflowTaskPlan(
       };
     }
 
+    if (
+      hasEditIntent &&
+      !effectiveReplaceDirective &&
+      !extractFencedContent(prompt) &&
+      !extractLowRiskRenameRefactor(prompt)
+    ) {
+      return {
+        taskKind: "edit-file",
+        reason: "edit intent needs targeted context planning before mutation",
+        targetPath: primaryTarget.cleaned,
+        inspectFirst: false,
+        verifyAfterEdit: false,
+        blockedReason:
+          "Missing concrete edit transform. A targeted context packet is required before planning this edit; inspect suggested reads and rerun with an exact replacement or confirmed proposal.",
+        targetMissing: false,
+        contextPlanningRequested: true,
+        contextPlanningReason: "missing-edit-context",
+        usedRestoredState,
+      };
+    }
+
     return {
       taskKind: hasWriteTaskIntent ? "write-file" : "edit-file",
       reason: hasWriteTaskIntent
@@ -2353,6 +2382,12 @@ function buildWorkflowTaskPlan(
       groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
       ...(readLineCount !== undefined ? { readLineCount } : {}),
       ...(readLineOffset !== undefined ? { readLineOffset } : {}),
+      ...(shouldBuildContextPlanningSurface(prompt)
+        ? {
+            contextPlanningRequested: true,
+            contextPlanningReason: "explicit-context-packet" as const,
+          }
+        : {}),
       inspectFirst: true,
       verifyAfterEdit: false,
       usedRestoredState,
@@ -2393,6 +2428,12 @@ function buildWorkflowTaskPlan(
         (hasExplainIntent ? "explain" : "summary"),
       ...(readLineCount !== undefined ? { readLineCount } : {}),
       ...(readLineOffset !== undefined ? { readLineOffset } : {}),
+      ...(shouldBuildContextPlanningSurface(prompt)
+        ? {
+            contextPlanningRequested: true,
+            contextPlanningReason: "explicit-context-packet" as const,
+          }
+        : {}),
       ...(hasLocalExplainCue && readFragmentDirective.lineIndexes?.length
         ? { readFragmentLineIndexes: readFragmentDirective.lineIndexes }
         : {}),
@@ -2456,6 +2497,12 @@ function buildWorkflowTaskPlan(
     verifyAfterEdit: false,
     usedRestoredState,
   };
+}
+
+function shouldBuildContextPlanningSurface(prompt: string): boolean {
+  return /\b(?:context packet|targeted context|planning context|related files|related tests|suggested reads|missing context|plan(?:ning)? surface)\b/i.test(
+    prompt,
+  );
 }
 
 function removeNegatedMutationInstructions(prompt: string): string {
@@ -4273,6 +4320,25 @@ async function executeWorkflowTaskPlan(input: {
 
   if (input.plan.blockedReason) {
     notes.push(`blocker: ${input.plan.blockedReason}`);
+    if (input.plan.contextPlanningRequested && input.plan.targetPath) {
+      const packet = await buildTargetedContextPacket({
+        workspaceRoot: input.workspaceRoot,
+        targetPath: input.plan.targetPath,
+      });
+      const projected = projectContextPacketRuntimeOutcome({
+        packet,
+        reason: input.plan.blockedReason,
+      });
+      return {
+        events,
+        notes: [
+          ...notes,
+          `context-packet: ${packet.packetId}`,
+          packet.replaySafeSummary,
+        ],
+        ...projected,
+      };
+    }
     return {
       events,
       notes,
@@ -4479,6 +4545,57 @@ async function executeWorkflowTaskPlan(input: {
         readFilter: input.plan.readFilter,
         repairInstruction: input.plan.repairInstruction,
       });
+      if (input.plan.contextPlanningRequested) {
+        const packet = await buildTargetedContextPacket({
+          workspaceRoot: input.workspaceRoot,
+          targetPath: input.plan.targetPath,
+        });
+        const contextProjection = projectContextPacketRuntimeOutcome({ packet });
+        return {
+          events,
+          notes: [
+            ...notes,
+            `context-packet: ${packet.packetId}`,
+            packet.replaySafeSummary,
+          ],
+          ...projectWorkflowRuntimeOutcome({
+            taskKind: "read-file",
+            changedFiles,
+            failedFiles: contextProjection.codingResult.failedFiles,
+            patches,
+            verifiedFiles,
+            unverifiedFiles,
+            verification: {
+              status: "not-requested",
+              reason: "read-only context packet",
+              selectionScope: "none",
+              selectionSource: "not-requested",
+            },
+            repairNotes,
+            evidence: [
+              ...evidence,
+              ...readDelivery.evidenceMarkers,
+              ...contextProjection.codingResult.evidence,
+            ],
+            taskVerdict:
+              readDelivery.completed &&
+              contextProjection.codingResult.taskSatisfaction.verdict === "satisfied"
+                ? "satisfied"
+                : "insufficient-evidence",
+            taskReasons: [
+              readDelivery.completed
+                ? "Read/summarize task delivered requested content."
+                : "Read step succeeded but no user-facing delivery could be produced.",
+              ...contextProjection.codingResult.taskSatisfaction.reasons,
+            ],
+            userFacingOutput: [
+              readDelivery.output,
+              "",
+              contextProjection.userFacingOutput,
+            ].join("\n"),
+          }),
+        };
+      }
       return {
         events,
         notes,
@@ -5089,6 +5206,54 @@ async function executeWorkflowTaskPlan(input: {
           reason: mutationInstruction.reason,
         });
         repairNotes.push(mutationInstruction.reason);
+        if (mutationInstruction.reason.includes("edit-transform-unclear")) {
+          const packet = await buildTargetedContextPacket({
+            workspaceRoot: input.workspaceRoot,
+            targetPath,
+          });
+          const contextProjection = projectContextPacketRuntimeOutcome({
+            packet,
+            reason: mutationInstruction.reason,
+          });
+          return {
+            events,
+            notes: [
+              ...notes,
+              `blocker: ${mutationInstruction.reason}`,
+              `context-packet: ${packet.packetId}`,
+              packet.replaySafeSummary,
+            ],
+            ...projectWorkflowRuntimeOutcome({
+              taskKind: input.plan.taskKind,
+              changedFiles,
+              failedFiles,
+              patches,
+              verifiedFiles,
+              unverifiedFiles,
+              verification: {
+                status: "skipped",
+                reason: "mutation instruction missing",
+                selectionScope: "none",
+                selectionSource: "not-requested",
+              },
+              repairNotes,
+              evidence: [
+                ...evidence,
+                ...contextProjection.codingResult.evidence,
+              ],
+              taskVerdict: "insufficient-evidence",
+              taskReasons: [
+                mutationInstruction.reason,
+                ...contextProjection.codingResult.taskSatisfaction.reasons,
+              ],
+              userFacingOutput: [
+                `Task not completed: ${mutationInstruction.reason}`,
+                "",
+                contextProjection.userFacingOutput,
+              ].join("\n"),
+            }),
+          };
+        }
         return {
           events,
           notes: [...notes, `blocker: ${mutationInstruction.reason}`],

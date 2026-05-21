@@ -659,6 +659,48 @@ describe("stopped session continuity", () => {
     );
     expect(surface?.failureHandoffDiagnostic).toContain("raw-content-excluded");
   });
+
+  it("includes targeted context packet and plan facts in stopped diagnostics", () => {
+    const result = makeCodingResult({
+      taskKind: "read-file",
+      failedFiles: [
+        {
+          path: "src/target.ts",
+          reason: "Context packet needs more related reads before planning.",
+        },
+      ],
+      continuation: {
+        status: "failed-after-bounded-continuation",
+        attempts: 1,
+        evidence: [
+          "context-packet ctx_abc123; target=src/target.ts; included=2; omitted=1; confidence=medium; mutationAuthority=not-granted; raw-full-content-excluded",
+          "context-plan ctx_abc123; readiness=needs-more-context; suggestedReads=1; tests=0; mutationAuthority=not-granted",
+          "context-packet:raw-full-content-excluded",
+        ],
+      },
+      verification: {
+        status: "blocked",
+        reason: "Context packet needs more related reads before planning.",
+        blockerKind: "unknown",
+        nextAction: "Read the suggested candidates before planning mutation.",
+      },
+    });
+
+    const surface = deriveStoppedSessionContinuitySurface(result);
+
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "context-packet=context-packet ctx_abc123",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "context-plan=context-plan ctx_abc123",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "mutationAuthority=not-granted",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "raw-full-content-excluded",
+    );
+  });
 });
 
 function makeCodingResult(

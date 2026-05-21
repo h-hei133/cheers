@@ -405,6 +405,14 @@ export function buildSuccessHandoffDiagnostic(
   if (providerEditSummary) {
     parts.push(providerEditSummary);
   }
+  const contextPacketSummary = extractContextPacketContinuationSummary(codingResult);
+  if (contextPacketSummary) {
+    parts.push(contextPacketSummary);
+  }
+  const contextPlanSummary = extractContextPlanContinuationSummary(codingResult);
+  if (contextPlanSummary) {
+    parts.push(contextPlanSummary);
+  }
   const proposalReviewSummary = extractEditProposalReviewContinuationSummary(codingResult);
   if (proposalReviewSummary) {
     parts.push(proposalReviewSummary);
@@ -659,6 +667,34 @@ function extractProviderEditContinuationSummary(
     return undefined;
   }
   return `provider-edit=${compactText(summary, 300)}`;
+}
+
+function extractContextPacketContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("context-packet "),
+  ) ?? codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("context-packet:id:"),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `context-packet=${compactText(summary, 300)}`;
+}
+
+function extractContextPlanContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("context-plan "),
+  ) ?? codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("context-plan:readiness:"),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `context-plan=${compactText(summary, 300)}`;
 }
 
 function extractEditProposalReviewContinuationSummary(
