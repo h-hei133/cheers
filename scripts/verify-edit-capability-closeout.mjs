@@ -22,6 +22,10 @@ const testTargets = [
   'src/orchestration/discoveryEditConfirmation.test.ts',
   'src/orchestration/discoveryEditPlanner.test.ts',
   'src/orchestration/discoveryEditResult.test.ts',
+  'src/orchestration/generatedEditProposal.test.ts',
+  'src/orchestration/generatedEditPlanner.test.ts',
+  'src/orchestration/generatedEditConfirmation.test.ts',
+  'src/orchestration/generatedEditResult.test.ts',
   'src/orchestration/targetSetEditPlan.test.ts',
   'src/orchestration/targetSetEditPolicy.test.ts',
   'src/orchestration/targetSetEditJournal.test.ts',
@@ -61,6 +65,10 @@ console.log('report field discovery_edit_manifest=covered')
 console.log('report field discovery_edit_confirmation=covered')
 console.log('report field discovery_edit_single_target_handoff=covered')
 console.log('report field discovery_edit_confirmed_target_set_execution=covered')
+console.log('report field generated_edit_proposal=covered')
+console.log('report field generated_edit_confirmation=covered')
+console.log('report field generated_edit_exact_handoff=covered')
+console.log('report field generated_edit_no_raw_content=covered')
 console.log('report field target_set_transaction=covered')
 console.log('report field target_set_execution_journal=covered')
 console.log('report field target_set_preflight_atomicity=covered')
@@ -108,6 +116,16 @@ console.log('marker discovery-unsupported-fuzzy-stopped')
 console.log('marker discovery-generated-edit-stopped')
 console.log('marker discovery-confirmed-single-target-handoff')
 console.log('marker discovery-confirmed-target-set-execution')
+console.log('marker generated-proposal-created-no-write')
+console.log('marker generated-missing-content-stopped-no-write')
+console.log('marker generated-broad-request-stopped-no-write')
+console.log('marker generated-fuzzy-request-stopped-no-write')
+console.log('marker generated-discovery-request-stopped-no-write')
+console.log('marker generated-provider-content-unsupported-no-write')
+console.log('marker generated-unconfirmed-proposal-no-mutation')
+console.log('marker generated-confirmed-single-target-handoff-existing-fenced-lane')
+console.log('marker generated-confirmed-target-set-handoff-existing-target-set-lane')
+console.log('marker generated-proposal-session-raw-content-excluded')
 console.log('marker target-set-max-file-guard-stopped-no-write')
 console.log('marker target-set-preflight-all-files-before-mutation')
 console.log('marker target-set-transaction-id-emitted')

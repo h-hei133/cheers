@@ -14,6 +14,29 @@ None open after Route 165.
 
 ## Resolved
 
+### Generated edit proposal lifecycle
+
+- Affected modules: Edit / Patch, Workspace / File Context, Result Surface,
+  Session / Continue, Harness / Eval.
+- Why it was a calibration gap: generated edit prompts previously collapsed
+  into unsupported generated-content stops, while the edit stack had no
+  reviewable no-write proposal surface or explicit conversion point into the
+  exact lanes opened by Routes 167-174.
+- Resolution: Route 175 adds `generatedEditProposal.ts`,
+  `generatedEditPlanner.ts`, `generatedEditConfirmation.ts`, and
+  `generatedEditResult.ts` to project generated edit proposal ids, safe target
+  summaries, proposed content status, exact mapping readiness, confirmation
+  state, no-write result/session evidence, and exact-lane handoff only through
+  the existing fenced or target-set edit routes.
+- Evidence: generated proposal/planner/confirmation/result tests, generated
+  session continuity regression, fenced/target-set handoff regressions, and
+  edit closeout verifier markers.
+- Recommended next action: keep autonomous generation, provider-generated
+  mutation, broad/fuzzy execution, and unconfirmed proposal mutation closed
+  until a separate route defines them.
+- Should become a route: no, resolved by Route 175 for the no-write proposal
+  lifecycle and exact-lane handoff boundary.
+
 ### Target-set edit transaction evidence
 
 - Affected modules: Edit / Patch, Workspace / File Context, Result Surface,

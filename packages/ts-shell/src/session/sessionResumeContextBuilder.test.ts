@@ -184,6 +184,25 @@ describe("session resume context builder", () => {
     expect(diagnostic).toContain("raw-content-excluded");
   });
 
+  it("includes generated edit handoff facts in success diagnostics", () => {
+    const diagnostic = buildSuccessHandoffDiagnostic({
+      ...makeCodingResult(),
+      continuation: {
+        status: "first-pass-success",
+        attempts: 0,
+        evidence: [
+          "generated-edit handoff=single-target-handoff; proposal=generated-edit-abc123; changed=src/a.ts; raw-content-excluded",
+        ],
+      },
+    });
+
+    expect(diagnostic).toContain(
+      "generated=generated-edit handoff=single-target-handoff",
+    );
+    expect(diagnostic).toContain("proposal=generated-edit-abc123");
+    expect(diagnostic).toContain("raw-content-excluded");
+  });
+
   it("extracts path-like targets for prompt routing", () => {
     expect(extractPathLikeTargets("continue in src/a.ts and ./b.test.ts")).toEqual([
       "./b.test.ts",

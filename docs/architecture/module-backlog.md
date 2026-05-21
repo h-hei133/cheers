@@ -308,6 +308,20 @@ as an import-policing rule.
 - Session / Continue and Result Surface summaries preserve transaction,
   verification, and recovery recommendation facts without raw file content.
 
+### Route 175: Generated Edit Proposal
+
+- Route 175 adds a generated edit proposal lifecycle without direct generated
+  mutation.
+- Generated prompts can produce a no-write proposal manifest with proposal id,
+  target summary, proposed content status, exact mapping readiness,
+  confirmation status, verification/snapshot requirements, and
+  raw-content-excluded evidence.
+- Handoff is allowed only after explicit old/new mapping and exact target
+  confirmation, and it reuses the existing fenced or target-set exact lanes for
+  workspace authority, stale-read, snapshot/recovery, and verification.
+- Provider/model calls, autonomous generation, broad/fuzzy execution,
+  unconfirmed mutation, and mutation from proposal alone remain closed.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -357,6 +371,7 @@ preconditions, result projection, and validation.
 | Edit / Patch thin integration | Edit / Patch, Result Surface | Adopt the module facade at one thin classification/projection handoff. | no new write execution |
 | Edit snapshot / rollback substrate | Edit / Patch, Runtime | Route 173 closes explicit snapshot-backed single-file rollback apply and bounded target-set subset recovery apply through recovery plans, guarded restore, verification, Result Surface, Session / Continue, and verifier coverage. | no automatic rollback; no broad/fuzzy/discovery/generated execution; no atomic rollback claim |
 | Discovery target-set mutation route | Edit / Patch, Workspace / File Context | Route 174 keeps confirmed target sets limited to exact fenced replacement, max 3 files, and adds transaction id, safe journal, preflight policy, verification aggregation, partial-failure separation, and recovery workflow handoff. | no fuzzy/generated/broad execution; no automatic rollback; no true atomic rollback claim |
+| Generated edit proposal lifecycle | Edit / Patch, Result Surface | Route 175 closes no-write generated proposal manifests, review/confirmation projection, exact handoff through existing lanes, continuation evidence, and verifier markers. | no provider/model calls; no autonomous generation; no mutation from proposal alone |
 | Browser controlled planner v2 | Browser, Agent Loop | Improve controlled planner contracts only if browser becomes product priority. | no public web or default browser action expansion |
 
 ### Phase C: Gate And Release Architecture

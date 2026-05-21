@@ -47,8 +47,15 @@ Current supported write/edit behavior remains:
   transaction id, safe execution journal, explicit preflight atomicity policy,
   verification aggregation, partial-failure separation, and recovery workflow
   handoff for confirmed target sets without claiming true atomic rollback
+- generated edit proposals are current-supported only as no-write proposal
+  manifests and review/confirmation projections; they can hand off only after
+  they reduce to explicit old/new mapping plus explicit single-target or
+  bounded target-set confirmation, and that handoff reuses the existing exact
+  fenced replacement or target-set exact fenced lanes
 - ambiguous sibling targets stop before mutation
-- vague generated-content prompts stop actionably
+- vague generated-content prompts produce a reviewable no-write generated
+  proposal when safe, or stop actionably when content, target, mapping, or
+  confirmation is missing
 - no-write read/inspect requests stay separate from mutation
 - workspace authority, final stale-read, and post-write verification remain
   execution-route preconditions owned by the bounded write/edit routes
@@ -62,7 +69,7 @@ Still unsupported in the current route:
   lane, and Route 172's confirmed target-set exact fenced replacement lane
 - broad/fuzzy fenced replacement execution; only exact old/new fenced mapping
   is supported
-- generated file content from vague prompts
+- direct generated file content mutation from vague prompts
 - rollback or snapshot execution except explicit snapshot-backed recovery apply
   from Route 173
 
@@ -88,6 +95,7 @@ The reference scan was shape-only; no implementation code was copied.
 |---|---|---|
 | broad refactor planning | future-only | target/constraint manifest, user-confirmed target selection, workspace authority, final stale-read, verification plan, snapshot/rollback story |
 | multi-file discovery edit | current-supported only for confirmed target sets that reduce to exact fenced replacement, max 3 files | discovery phase, bounded candidate file list, explicit target-set confirmation, exact old/new fenced mapping for every target, preflight-all-before-mutation, transaction id, safe journal, per-file workspace authority, final stale-read, snapshot receipt, post-write verification aggregation, partial-failure changed/failed/unattempted separation, recovery workflow handoff, rollback readiness, and explicit snapshot-backed subset recovery apply; no fuzzy/generated/broad execution, no automatic rollback, no atomic rollback claim |
+| generated edit proposal | current-supported only as no-write proposal and explicit review/confirmation lifecycle | proposal manifest with `mutationAuthority: not-granted`, safe summary, raw-content-excluded evidence, explicit old/new mapping, explicit confirmation, then handoff through existing fenced or target-set exact lanes; no provider/model calls, no autonomous generation, no mutation from proposal alone |
 | confirmed single-target discovery edit | current-supported only when it reduces to exact fenced replacement | one confirmed candidate from the manifest, exact old/new fenced mapping, workspace authority through existing write route, final stale-read, pre-write snapshot receipt, post-write verification |
 | fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy/discovery/generated/multi-file rollback remains stopped and no-write, while explicit snapshot-backed single-file rollback apply is current-supported | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, pre-write snapshot receipt, verification plan, stable outcome taxonomy, rollback readiness projection, explicit snapshot id and target for rollback apply |
 
@@ -140,6 +148,14 @@ excludes raw old/new blocks or file content. Preflight atomicity means every
 target is checked before the first mutation; it is not a claim that later writes
 are atomically rolled back.
 
+Route 175 generated edit proposal manifests are also not mutation authority.
+They record proposal id, requested mode, target scope, target labels, proposed
+content status, exact mapping status, confirmation status, mutation readiness,
+verification/snapshot requirements, and `raw-content-excluded` evidence. A
+reviewed proposal can execute only after it becomes an explicit old/new mapping
+with explicit target confirmation, and execution remains owned by the existing
+exact fenced replacement or bounded target-set route.
+
 ## User Confirmation Model
 
 User confirmation must be explicit and scoped:
@@ -151,6 +167,8 @@ User confirmation must be explicit and scoped:
   exact fenced replacement targets
 - fenced replacement requires confirmation of the exact target and mapping
   when the mapping is not already a current bounded edit input
+- generated edit proposal review is not write authorization; confirmation must
+  name exact target(s) and exact mapping before handoff
 
 Prompt wording alone must not imply write authorization.
 
@@ -163,6 +181,7 @@ not in the planning helper:
 - final stale-read check immediately before writer invocation
 - no symlink or realpath boundary weakening
 - concrete content or exact old/new mapping
+- generated proposal reduced to explicit old/new mapping before handoff
 - bounded candidate set and max-file guard for multi-file modes
 - preflight every target before the first mutation in confirmed target-set mode
 - post-write verification plan and result projection

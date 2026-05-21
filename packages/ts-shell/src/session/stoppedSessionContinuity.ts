@@ -167,6 +167,7 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
       : "inspect the failure and rerun verification");
   const parts = [`Failure handoff: status=${status ?? "failed"}`];
   const discoverySummary = extractDiscoveryEditContinuationSummary(codingResult);
+  const generatedSummary = extractGeneratedEditContinuationSummary(codingResult);
   const targetSetSummary = extractTargetSetEditContinuationSummary(codingResult);
   const editRecoverySummary = extractEditRecoveryApplyContinuationSummary(codingResult);
   if (target) {
@@ -200,6 +201,9 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   }
   if (discoverySummary) {
     parts.push(discoverySummary);
+  }
+  if (generatedSummary) {
+    parts.push(generatedSummary);
   }
   if (targetSetSummary) {
     parts.push(targetSetSummary);
@@ -288,6 +292,20 @@ function extractDiscoveryEditContinuationSummary(
     return undefined;
   }
   return `discovery=${compactText(summary, 300)}`;
+}
+
+function extractGeneratedEditContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("generated-edit proposal="),
+  ) ?? codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("generated-edit handoff="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `generated=${compactText(summary, 300)}`;
 }
 
 function extractTargetSetEditContinuationSummary(

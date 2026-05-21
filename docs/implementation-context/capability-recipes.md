@@ -15,7 +15,9 @@ not import restrictions.
   `targetSetEditResult.ts`, `targetSetEditTransaction.ts`,
   `targetSetEditJournal.ts`, `targetSetEditPolicy.ts`,
   `targetSetEditVerification.ts`, `targetSetEditRecoveryWorkflow.ts`,
-  `targetSetEditRecovery.ts`, `editSnapshot.ts`,
+  `targetSetEditRecovery.ts`, `generatedEditProposal.ts`,
+  `generatedEditPlanner.ts`, `generatedEditConfirmation.ts`,
+  `generatedEditResult.ts`, `editSnapshot.ts`,
   `editRecoveryPlan.ts`, `editRecoveryApply.ts`, `editRecoveryOutcome.ts`,
   `editRecoveryResult.ts`, `editRollback.ts`, `workspaceFileContract.ts`,
   `workspaceTargetProjection.ts`,
@@ -25,6 +27,8 @@ not import restrictions.
   runtime activation facts when the lane is reached from prompt/CLI selection,
   bounded discovery candidate manifest and explicit single-target confirmation,
   explicit confirmed target set for exact fenced replacement only,
+  generated edit no-write proposal manifest and explicit exact mapping
+  confirmation facts,
   workspace authority fact, final stale-read fact, pre-write snapshot receipt
   facts for activated exact fenced replacement, explicit snapshot ids and
   target paths for recovery apply, verification plan.
@@ -35,8 +39,9 @@ not import restrictions.
   required/invalid/no-candidate states, writer failure, and verification
   failure, confirmed target-set success/preflight-stopped/partial-failure
   facts, target-set transaction id, safe journal, verification aggregate,
-  recovery workflow handoff, continuation-safe mutation evidence, safe snapshot
-  receipt status, rollback readiness, explicit recovery plan/apply evidence for
+  recovery workflow handoff, generated proposal no-write/review/handoff
+  evidence, continuation-safe mutation evidence, safe snapshot receipt status,
+  rollback readiness, explicit recovery plan/apply evidence for
   single-file and bounded target-set subset rollback when directly invoked.
 - Do not bypass: workspace authority, final stale-read, permission decisions,
   pre-write snapshot failure stops, post-write verification projection, Result
@@ -45,10 +50,13 @@ not import restrictions.
   preflight all files before the first mutation and reuse the existing
   single-file fenced lane per target. Recovery apply must require explicit
   snapshot ids, target paths, current-content guards, workspace authority, and
-  direct rollback confirmation. Do not run automatic rollback.
+  direct rollback confirmation. Generated edit proposals must not mutate, call
+  providers, or become authority until reduced to explicit old/new mapping and
+  confirmed target(s). Do not run automatic rollback.
 - Validate: focused edit/write route tests, stale-read/authority regression,
   fenced edit activation/runtime tests, discovery edit
-  manifest/planner/confirmation/result tests, target-set edit
+  manifest/planner/confirmation/result tests, generated edit
+  proposal/planner/confirmation/result tests, target-set edit
   plan/route/result/transaction/journal/policy/verification tests, target-set
   recovery workflow/recovery tests,
   snapshot/recovery/rollback tests, CLI runtime invocation tests,

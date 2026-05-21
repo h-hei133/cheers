@@ -397,6 +397,10 @@ export function buildSuccessHandoffDiagnostic(
   if (discoverySummary) {
     parts.push(discoverySummary);
   }
+  const generatedSummary = extractGeneratedEditContinuationSummary(codingResult);
+  if (generatedSummary) {
+    parts.push(generatedSummary);
+  }
   parts.push(`next=${nextFocus}`);
   return `${parts.join("; ")}.`;
 }
@@ -613,4 +617,18 @@ function extractDiscoveryEditContinuationSummary(
     return undefined;
   }
   return `discovery=${compactText(summary, 300)}`;
+}
+
+function extractGeneratedEditContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("generated-edit proposal="),
+  ) ?? codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("generated-edit handoff="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `generated=${compactText(summary, 300)}`;
 }

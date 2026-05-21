@@ -130,6 +130,21 @@ export {
   buildTargetSetEditRecoveryWorkflow,
   type TargetSetEditRecoveryWorkflow,
 } from "./targetSetEditRecoveryWorkflow.js";
+export {
+  buildGeneratedEditProposalManifest,
+  type GeneratedEditProposalManifest,
+} from "./generatedEditProposal.js";
+export {
+  planGeneratedEdit,
+  type GeneratedEditPlan,
+} from "./generatedEditPlanner.js";
+export {
+  decideGeneratedEditConfirmation,
+  runGeneratedEditHandoff,
+  type GeneratedEditConfirmationDecision,
+  type GeneratedEditHandoffResult,
+} from "./generatedEditConfirmation.js";
+export { buildGeneratedEditProposalResult } from "./generatedEditResult.js";
 
 export interface EditPatchModuleState {
   readonly editExpectation: EditExpectationContract;
