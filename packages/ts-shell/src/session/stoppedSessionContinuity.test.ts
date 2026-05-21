@@ -675,6 +675,7 @@ describe("stopped session continuity", () => {
         evidence: [
           "context-packet ctx_abc123; target=src/target.ts; included=2; omitted=1; confidence=medium; mutationAuthority=not-granted; raw-full-content-excluded",
           "context-plan ctx_abc123; readiness=needs-more-context; suggestedReads=1; tests=0; mutationAuthority=not-granted",
+          "agent-plan plan_abc123; owner=workspace-file-context; action=context-planning; readiness=needs-more-context; confidence=medium; contextPackets=1; missingFacts=1; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
           "context-packet:raw-full-content-excluded",
         ],
       },
@@ -693,6 +694,9 @@ describe("stopped session continuity", () => {
     );
     expect(surface?.failureHandoffDiagnostic).toContain(
       "context-plan=context-plan ctx_abc123",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "agent-plan=agent-plan plan_abc123",
     );
     expect(surface?.failureHandoffDiagnostic).toContain(
       "mutationAuthority=not-granted",

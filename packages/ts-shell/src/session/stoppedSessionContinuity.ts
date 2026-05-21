@@ -173,6 +173,7 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   const editRepairProposalSummary = extractEditRepairProposalContinuationSummary(codingResult);
   const contextPacketSummary = extractContextPacketContinuationSummary(codingResult);
   const contextPlanSummary = extractContextPlanContinuationSummary(codingResult);
+  const agentPlanSummary = extractAgentPlanContinuationSummary(codingResult);
   const proposalReviewSummary = extractEditProposalReviewContinuationSummary(codingResult);
   const proposalApplySummary = extractEditProposalApplyContinuationSummary(codingResult);
   const proposalHunkSetSummary = extractProposalHunkSetContinuationSummary(codingResult);
@@ -227,6 +228,9 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   }
   if (contextPlanSummary) {
     parts.push(contextPlanSummary);
+  }
+  if (agentPlanSummary) {
+    parts.push(agentPlanSummary);
   }
   if (proposalReviewSummary) {
     parts.push(proposalReviewSummary);
@@ -402,6 +406,20 @@ function extractContextPlanContinuationSummary(
     return undefined;
   }
   return `context-plan=${compactText(summary, 300)}`;
+}
+
+function extractAgentPlanContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("agent-plan "),
+  ) ?? codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("agent-plan:readiness:"),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `agent-plan=${compactText(summary, 300)}`;
 }
 
 function extractEditProposalReviewContinuationSummary(

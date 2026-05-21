@@ -38,6 +38,23 @@ export {
   projectContextPacketRuntimeOutcome,
   type ContextPacketResultProjection,
 } from "./contextPacketResult.js";
+export {
+  buildAgentPlan,
+  type AgentPlan,
+} from "./agentPlan.js";
+export {
+  projectContextPacketToAgentPlanContext,
+  type AgentPlanContextProjection,
+} from "./agentPlanContext.js";
+export {
+  projectWorkflowTaskPlanToAgentPlan,
+  type AgentPlanProjectionInput,
+} from "./agentPlanProjection.js";
+export {
+  buildAgentPlanResult,
+  projectAgentPlanRuntimeOutcome,
+  type AgentPlanResultProjection,
+} from "./agentPlanResult.js";
 
 export type {
   ReadContinuationTargetRecovery,

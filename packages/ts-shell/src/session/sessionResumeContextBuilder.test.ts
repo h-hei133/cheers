@@ -262,6 +262,7 @@ describe("session resume context builder", () => {
         evidence: [
           "context-packet ctx_def456; target=src/target.ts; included=4; omitted=0; confidence=high; mutationAuthority=not-granted",
           "context-plan ctx_def456; readiness=ready; suggestedReads=0; tests=1; mutationAuthority=not-granted",
+          "agent-plan plan_def456; owner=workspace-file-context; action=context-planning; readiness=ready; confidence=high; contextPackets=1; missingFacts=0; suggestedReads=0; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
         ],
       },
     });
@@ -270,6 +271,7 @@ describe("session resume context builder", () => {
       "context-packet=context-packet ctx_def456",
     );
     expect(diagnostic).toContain("context-plan=context-plan ctx_def456");
+    expect(diagnostic).toContain("agent-plan=agent-plan plan_def456");
     expect(diagnostic).toContain("mutationAuthority=not-granted");
   });
 

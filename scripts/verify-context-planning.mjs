@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 
 const focusedTests = [
   'src/orchestration/contextBudget.test.ts',
@@ -7,6 +8,10 @@ const focusedTests = [
   'src/orchestration/contextPacket.test.ts',
   'src/orchestration/contextPlan.test.ts',
   'src/orchestration/contextPacketResult.test.ts',
+  'src/orchestration/agentPlan.test.ts',
+  'src/orchestration/agentPlanContext.test.ts',
+  'src/orchestration/agentPlanProjection.test.ts',
+  'src/orchestration/agentPlanResult.test.ts',
   'src/orchestration/readInspectIntent.test.ts',
   'src/orchestration/targetResolution.test.ts',
   'src/session/stoppedSessionContinuity.test.ts',
@@ -19,6 +24,9 @@ console.log('marker explicit-target-context-packet')
 console.log('marker deterministic-import-sibling-test-docs-callsite')
 console.log('marker budget-redaction-no-write')
 console.log('marker continuation-safe-summary')
+console.log('marker context-packet-feeds-agent-plan')
+console.log('marker broad-edit-needs-more-context')
+console.log('marker agent-plan-result-surface')
 
 const result = spawnSync(
   'npm',
@@ -67,6 +75,25 @@ if (runMvpResult.status !== 0) {
   process.exit(runMvpResult.status ?? 1)
 }
 
+const runMvpSource = readFileSync(
+  'packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts',
+  'utf8',
+)
+
+if (!runMvpSource.includes('projectWorkflowTaskPlanToAgentPlan')) {
+  console.log('[product-regression] context-planning - runMvp does not call agent plan facade')
+  process.exit(1)
+}
+
+if (
+  runMvpSource.includes('function buildAgentPlan') ||
+  runMvpSource.includes('projectContextPacketRuntimeOutcome')
+) {
+  console.log('[product-regression] context-planning - planning helpers are implemented inline or bypass facade')
+  process.exit(1)
+}
+
 console.log('marker no-provider-call')
 console.log('marker no-mutation-authority')
+console.log('marker runmvp-planning-facade-coupling-guard')
 console.log('[pass] context-planning')

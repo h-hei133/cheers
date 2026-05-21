@@ -36,6 +36,27 @@ None open after Route 165.
 - Should become a route: no, resolved by Route 181 for read/plan substrate
   only.
 
+### Agent Loop planning facade
+
+- Affected modules: Agent Loop, Workspace / File Context, Result Surface,
+  Session / Continue, Harness / Eval.
+- Why it was a coupling risk: Route 181 proved targeted context packets, but
+  leaving context-aware readiness, confidence, missing facts, and suggested
+  reads in `runMvpIntegratedFlow.ts` would keep expanding the central loop.
+- Resolution: Route 182 adds deterministic Agent Plan facade modules over
+  plan objects, context-packet-to-plan projection, workflow-plan readiness
+  classification, and planning result projection. `runMvpIntegratedFlow.ts`
+  remains the composition caller for context packet generation and plan result
+  handoff.
+- Evidence: agent plan/context/projection/result tests, context packet
+  regressions, runMvp context-planning output markers, Session / Continue
+  continuation evidence coverage, and the focused context-planning verifier.
+- Recommended next action: keep autonomous planners, provider-generated plans,
+  LSP/embedding/index discovery, edit execution expansion, schema/CLI changes,
+  and mutation authority grants closed until separate routes define them.
+- Should become a route: no, resolved by Route 182 for the planning facade
+  boundary only.
+
 ### Verification repair proposal loop
 
 - Affected modules: Edit / Patch, Provider / Model, Result Surface,

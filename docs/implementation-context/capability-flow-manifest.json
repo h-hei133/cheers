@@ -35,12 +35,17 @@
         "packages/ts-shell/src/orchestration/browserModule.ts",
         "packages/ts-shell/src/orchestration/toolRuntimeModule.ts",
         "packages/ts-shell/src/orchestration/providerModule.ts",
-        "packages/ts-shell/src/orchestration/resultSurfaceModule.ts"
+        "packages/ts-shell/src/orchestration/resultSurfaceModule.ts",
+        "packages/ts-shell/src/orchestration/agentPlan.ts",
+        "packages/ts-shell/src/orchestration/agentPlanContext.ts",
+        "packages/ts-shell/src/orchestration/agentPlanProjection.ts",
+        "packages/ts-shell/src/orchestration/agentPlanResult.ts"
       ],
       "owns": [
         "turn ordering",
         "capability branch selection",
         "module facade composition",
+        "deterministic context-aware planning facade projection",
         "receipt and result handoff aggregation"
       ]
     },
@@ -53,6 +58,7 @@
         "packages/ts-shell/src/orchestration/contextBudget.ts",
         "packages/ts-shell/src/orchestration/contextPlan.ts",
         "packages/ts-shell/src/orchestration/contextPacketResult.ts",
+        "packages/ts-shell/src/orchestration/agentPlanContext.ts",
         "packages/ts-shell/src/orchestration/workspaceFileContract.ts",
         "packages/ts-shell/src/orchestration/workspaceTargetProjection.ts"
       ],
@@ -337,6 +343,10 @@
       ],
       "publicFacades": [
         "readInspectModule.ts",
+        "agentPlan.ts",
+        "agentPlanContext.ts",
+        "agentPlanProjection.ts",
+        "agentPlanResult.ts",
         "workspaceFileContract.ts",
         "workspaceTargetProjection.ts"
       ],
@@ -351,7 +361,8 @@
         "read/inspect classification",
         "target recovery",
         "missing/ambiguous/out-of-workspace stopped surface",
-        "repo-explain evidence role"
+        "repo-explain evidence role",
+        "agent plan readiness, confidence, missing facts, suggested reads, and verification candidates"
       ],
       "downstreamConsumers": [
         "runMvpIntegratedFlow",

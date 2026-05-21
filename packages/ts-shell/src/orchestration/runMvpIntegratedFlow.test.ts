@@ -7456,11 +7456,14 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.codingResult?.changedFiles).toEqual([]);
     expect(result.finalOutput).toContain("Context packet:");
+    expect(result.finalOutput).toContain("Agent plan:");
     expect(result.finalOutput).toContain("Mutation authority: not-granted");
     expect(result.codingResult?.continuation.evidence).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/^context-packet ctx_/),
+        expect.stringMatching(/^agent-plan plan_/),
         "context-packet:mutation-authority:not-granted",
+        "agent-plan:mutation-authority:not-granted",
       ]),
     );
   }, 15000);
@@ -7480,9 +7483,14 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.terminalClassification).toBe("stopped");
     expect(result.codingResult?.changedFiles).toEqual([]);
     expect(result.finalOutput).toContain("Context packet:");
+    expect(result.finalOutput).toContain("Agent plan:");
+    expect(result.finalOutput).toContain("Readiness: needs-more-context");
     expect(result.finalOutput).toContain("Mutation authority: not-granted");
     expect(result.codingResult?.continuation.evidence).toContain(
       "context-packet:mutation-authority:not-granted",
+    );
+    expect(result.codingResult?.continuation.evidence).toContain(
+      "agent-plan:mutation-authority:not-granted",
     );
   }, 15000);
 });

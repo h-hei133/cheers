@@ -406,6 +406,22 @@ as an import-policing rule.
   full-repo semantic index, schema/CLI/dependency change, authority bypass, or
   broad `runMvpIntegratedFlow.ts` refactor is added.
 
+### Route 182: Agent Loop Planning Facade
+
+- Route 182 extracts Agent Plan facade modules so context-aware readiness,
+  confidence, missing facts, suggested reads, verification candidates, and
+  no-write evidence are owned outside `runMvpIntegratedFlow.ts`.
+- Route 181 context packets now feed Agent Plan projection for explicit
+  read/context prompts and broad edit stops that lack a concrete transform.
+  Planning remains deterministic and read-only with
+  `mutationAuthority:not-granted`.
+- Result Surface and Session / Continue can preserve agent plan summaries
+  alongside context packet/plan summaries without raw file content.
+- No edit expansion, provider/model call, browser work, autonomous planner,
+  hidden chain-of-thought persistence, LSP, embeddings, full-repo semantic
+  index, schema/CLI/dependency change, authority bypass, or broad
+  `runMvpIntegratedFlow.ts` refactor is added.
+
 ## Module-First Route Rule
 
 Future routes must state:

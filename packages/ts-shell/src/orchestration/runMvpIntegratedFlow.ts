@@ -103,14 +103,20 @@ import {
   inferRepoEvidenceRole,
   isPathOnlyReadRequest,
   parseRepoCandidateFiles,
+  buildContextPacketResult,
   buildTargetedContextPacket,
-  projectContextPacketRuntimeOutcome,
   projectReadAmbiguousTargetStop,
   projectReadMissingTargetStop,
   projectReadOutOfWorkspaceTargetStop,
   recoverReadContinuationTarget,
   selectRepoExplainTarget,
 } from "./readInspectModule.js";
+import { projectContextPacketToAgentPlanContext } from "./agentPlanContext.js";
+import { projectWorkflowTaskPlanToAgentPlan } from "./agentPlanProjection.js";
+import {
+  buildAgentPlanResult,
+  projectAgentPlanRuntimeOutcome,
+} from "./agentPlanResult.js";
 import {
   planWorkflowVerification,
   planWorkflowVerificationRetry,
@@ -2341,8 +2347,13 @@ function buildWorkflowTaskPlan(
         targetPath: primaryTarget.cleaned,
         inspectFirst: false,
         verifyAfterEdit: false,
-        blockedReason:
-          "Missing concrete edit transform. A targeted context packet is required before planning this edit; inspect suggested reads and rerun with an exact replacement or confirmed proposal.",
+        blockedReason: formatEditExecutionFailure({
+          failureReason: "edit-transform-unclear",
+          explanation:
+            "Missing concrete edit transform. A targeted context packet is required before planning this edit.",
+          nextAction:
+            "Inspect suggested reads and rerun with an exact replacement or confirmed proposal.",
+        }),
         targetMissing: false,
         contextPlanningRequested: true,
         contextPlanningReason: "missing-edit-context",
@@ -4325,9 +4336,15 @@ async function executeWorkflowTaskPlan(input: {
         workspaceRoot: input.workspaceRoot,
         targetPath: input.plan.targetPath,
       });
-      const projected = projectContextPacketRuntimeOutcome({
-        packet,
+      const contextResult = buildContextPacketResult(packet);
+      const agentPlan = projectWorkflowTaskPlanToAgentPlan({
+        workflowPlan: input.plan,
+        context: projectContextPacketToAgentPlanContext(packet),
+      });
+      const projected = projectAgentPlanRuntimeOutcome({
+        plan: agentPlan,
         reason: input.plan.blockedReason,
+        baseOutput: contextResult.output,
       });
       return {
         events,
@@ -4335,6 +4352,7 @@ async function executeWorkflowTaskPlan(input: {
           ...notes,
           `context-packet: ${packet.packetId}`,
           packet.replaySafeSummary,
+          agentPlan.replaySafeSummary,
         ],
         ...projected,
       };
@@ -4550,18 +4568,30 @@ async function executeWorkflowTaskPlan(input: {
           workspaceRoot: input.workspaceRoot,
           targetPath: input.plan.targetPath,
         });
-        const contextProjection = projectContextPacketRuntimeOutcome({ packet });
+        const contextResult = buildContextPacketResult(packet);
+        const agentPlan = projectWorkflowTaskPlanToAgentPlan({
+          workflowPlan: input.plan,
+          context: projectContextPacketToAgentPlanContext(packet),
+        });
+        const agentPlanResult = buildAgentPlanResult(agentPlan);
+        const planningReady = agentPlan.executionReadiness === "ready";
+        const planningReason = planningReady
+          ? "Agent plan is ready for the existing read/context route."
+          : agentPlan.doNext;
         return {
           events,
           notes: [
             ...notes,
             `context-packet: ${packet.packetId}`,
             packet.replaySafeSummary,
+            agentPlan.replaySafeSummary,
           ],
           ...projectWorkflowRuntimeOutcome({
             taskKind: "read-file",
             changedFiles,
-            failedFiles: contextProjection.codingResult.failedFiles,
+            failedFiles: planningReady
+              ? []
+              : [{ path: input.plan.targetPath, reason: planningReason }],
             patches,
             verifiedFiles,
             unverifiedFiles,
@@ -4575,23 +4605,25 @@ async function executeWorkflowTaskPlan(input: {
             evidence: [
               ...evidence,
               ...readDelivery.evidenceMarkers,
-              ...contextProjection.codingResult.evidence,
+              ...contextResult.evidence,
+              ...agentPlanResult.evidence,
             ],
             taskVerdict:
-              readDelivery.completed &&
-              contextProjection.codingResult.taskSatisfaction.verdict === "satisfied"
+              readDelivery.completed && planningReady
                 ? "satisfied"
                 : "insufficient-evidence",
             taskReasons: [
               readDelivery.completed
                 ? "Read/summarize task delivered requested content."
                 : "Read step succeeded but no user-facing delivery could be produced.",
-              ...contextProjection.codingResult.taskSatisfaction.reasons,
+              planningReason,
             ],
             userFacingOutput: [
               readDelivery.output,
               "",
-              contextProjection.userFacingOutput,
+              contextResult.output,
+              "",
+              agentPlanResult.output,
             ].join("\n"),
           }),
         };
@@ -5211,10 +5243,17 @@ async function executeWorkflowTaskPlan(input: {
             workspaceRoot: input.workspaceRoot,
             targetPath,
           });
-          const contextProjection = projectContextPacketRuntimeOutcome({
-            packet,
-            reason: mutationInstruction.reason,
+          const contextResult = buildContextPacketResult(packet);
+          const agentPlan = projectWorkflowTaskPlanToAgentPlan({
+            workflowPlan: {
+              ...input.plan,
+              blockedReason: mutationInstruction.reason,
+              contextPlanningRequested: true,
+              contextPlanningReason: "missing-edit-context",
+            },
+            context: projectContextPacketToAgentPlanContext(packet),
           });
+          const agentPlanResult = buildAgentPlanResult(agentPlan);
           return {
             events,
             notes: [
@@ -5222,6 +5261,7 @@ async function executeWorkflowTaskPlan(input: {
               `blocker: ${mutationInstruction.reason}`,
               `context-packet: ${packet.packetId}`,
               packet.replaySafeSummary,
+              agentPlan.replaySafeSummary,
             ],
             ...projectWorkflowRuntimeOutcome({
               taskKind: input.plan.taskKind,
@@ -5239,17 +5279,20 @@ async function executeWorkflowTaskPlan(input: {
               repairNotes,
               evidence: [
                 ...evidence,
-                ...contextProjection.codingResult.evidence,
+                ...contextResult.evidence,
+                ...agentPlanResult.evidence,
               ],
               taskVerdict: "insufficient-evidence",
               taskReasons: [
                 mutationInstruction.reason,
-                ...contextProjection.codingResult.taskSatisfaction.reasons,
+                agentPlan.doNext,
               ],
               userFacingOutput: [
                 `Task not completed: ${mutationInstruction.reason}`,
                 "",
-                contextProjection.userFacingOutput,
+                contextResult.output,
+                "",
+                agentPlanResult.output,
               ].join("\n"),
             }),
           };

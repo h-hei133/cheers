@@ -413,6 +413,10 @@ export function buildSuccessHandoffDiagnostic(
   if (contextPlanSummary) {
     parts.push(contextPlanSummary);
   }
+  const agentPlanSummary = extractAgentPlanContinuationSummary(codingResult);
+  if (agentPlanSummary) {
+    parts.push(agentPlanSummary);
+  }
   const proposalReviewSummary = extractEditProposalReviewContinuationSummary(codingResult);
   if (proposalReviewSummary) {
     parts.push(proposalReviewSummary);
@@ -695,6 +699,20 @@ function extractContextPlanContinuationSummary(
     return undefined;
   }
   return `context-plan=${compactText(summary, 300)}`;
+}
+
+function extractAgentPlanContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("agent-plan "),
+  ) ?? codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("agent-plan:readiness:"),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `agent-plan=${compactText(summary, 300)}`;
 }
 
 function extractEditProposalReviewContinuationSummary(

@@ -107,7 +107,8 @@ not import restrictions.
   Result Surface, Session / Continue, and Harness / Eval.
 - Use facades/contracts: `readInspectModule.ts`, `contextPacket.ts`,
   `contextDiscovery.ts`, `contextBudget.ts`, `contextPlan.ts`,
-  `contextPacketResult.ts`, `workspaceFileContract.ts`,
+  `contextPacketResult.ts`, `agentPlan.ts`, `agentPlanContext.ts`,
+  `agentPlanProjection.ts`, `agentPlanResult.ts`, `workspaceFileContract.ts`,
   `workspaceTargetProjection.ts`, `continuationModule.ts`,
   `resultSurfaceModule.ts`, and Session / Continue continuity helpers.
 - Consume: one explicit in-workspace code target, current read-only file facts,
@@ -115,7 +116,8 @@ not import restrictions.
   context packet / planning context.
 - Emit: deterministic packet id, target safe label, included and omitted source
   summaries, budget and redaction status, replay-safe summary, suggested next
-  reads, likely tests, verification candidates, and
+  reads, likely tests, verification candidates, agent plan readiness,
+  confidence, missing facts, suggested reads, do-next text, and
   `mutationAuthority:not-granted`.
 - Do not bypass: workspace boundaries, raw full-content exclusion, provider
   config and credential redaction, Result Surface truthfulness, transcript
@@ -123,6 +125,7 @@ not import restrictions.
   not add LSP, embeddings, full-repo semantic index, browser work, provider
   calls, schema/CLI/dependency changes, or mutation reachability.
 - Validate: context packet/discovery/budget/plan/result tests,
+  agent plan/context/projection/result tests,
   read/inspect and target-resolution regressions, Session / Continue
   regressions, focused runMvp context planning tests, focused verifier gate,
   `verify:result-contract`, and build if TypeScript source changes.
