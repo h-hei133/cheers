@@ -20,7 +20,10 @@ describe("discoveryEditResult", () => {
         { path: "src/other.ts", content: "status: draft\n" },
       ],
     });
-    if (plan.status === "ready-for-handoff") {
+    if (
+      plan.status === "ready-for-handoff" ||
+      plan.status === "ready-for-target-set"
+    ) {
       throw new Error("expected no-write plan");
     }
 

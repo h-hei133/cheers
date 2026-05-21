@@ -167,6 +167,7 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
       : "inspect the failure and rerun verification");
   const parts = [`Failure handoff: status=${status ?? "failed"}`];
   const discoverySummary = extractDiscoveryEditContinuationSummary(codingResult);
+  const targetSetSummary = extractTargetSetEditContinuationSummary(codingResult);
   if (target) {
     parts.push(`target=${target}`);
   }
@@ -198,6 +199,9 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   }
   if (discoverySummary) {
     parts.push(discoverySummary);
+  }
+  if (targetSetSummary) {
+    parts.push(targetSetSummary);
   }
   parts.push(`next=${compactText(nextFocus, 140).replace(/[.]+$/, "")}`);
   return `${parts.join("; ")}.`;
@@ -280,6 +284,18 @@ function extractDiscoveryEditContinuationSummary(
     return undefined;
   }
   return `discovery=${compactText(summary, 300)}`;
+}
+
+function extractTargetSetEditContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("target-set-edit manifest="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `target-set=${compactText(summary, 300)}`;
 }
 
 function compactText(input: string, max: number = 220): string {

@@ -22,6 +22,8 @@ const testTargets = [
   'src/orchestration/discoveryEditConfirmation.test.ts',
   'src/orchestration/discoveryEditPlanner.test.ts',
   'src/orchestration/discoveryEditResult.test.ts',
+  'src/orchestration/targetSetEditPlan.test.ts',
+  'src/orchestration/targetSetEditRoute.test.ts',
   'src/orchestration/editSnapshot.test.ts',
   'src/orchestration/editRecoveryResult.test.ts',
   'src/orchestration/editRollback.test.ts',
@@ -50,6 +52,8 @@ console.log('report field explicit_single_file_rollback=covered')
 console.log('report field discovery_edit_manifest=covered')
 console.log('report field discovery_edit_confirmation=covered')
 console.log('report field discovery_edit_single_target_handoff=covered')
+console.log('report field discovery_edit_confirmed_target_set_execution=covered')
+console.log('report field target_set_partial_failure=covered')
 console.log('report field result_contract_compatible=covered')
 console.log(`repo=${repoRoot}`)
 
@@ -89,7 +93,10 @@ console.log('marker discovery-missing-mapping-stopped')
 console.log('marker discovery-unsupported-fuzzy-stopped')
 console.log('marker discovery-generated-edit-stopped')
 console.log('marker discovery-confirmed-single-target-handoff')
-console.log('marker discovery-multi-target-confirmation-no-write')
+console.log('marker discovery-confirmed-target-set-execution')
+console.log('marker target-set-max-file-guard-stopped-no-write')
+console.log('marker target-set-preflight-all-files-before-mutation')
+console.log('marker target-set-partial-failure-rollback-readiness')
 console.log('marker discovery-candidate-summary-raw-content-excluded')
 console.log('marker result-contract-compatible')
 console.log('[pass] edit-capability-closeout')

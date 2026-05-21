@@ -14,6 +14,7 @@ export type DiscoveryEditConfirmationRequirement =
   | "not-required-explicit-target"
   | "required-target-selection"
   | "confirmed-single-target"
+  | "confirmed-target-set"
   | "confirmed-target-set-no-mutation"
   | "ambiguous-confirmation"
   | "invalid-confirmation";

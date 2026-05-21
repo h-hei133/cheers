@@ -51,18 +51,19 @@ describe("discoveryEditConfirmation", () => {
     );
   });
 
-  it("keeps multi-target confirmation no-write", () => {
+  it("allows multi-target confirmation to hand off to the bounded target-set route", () => {
     const decision = decideDiscoveryEditConfirmation({
       manifest,
       confirmedTargetSet: ["src/app.ts", "src/other.ts"],
     });
 
     expect(decision).toMatchObject({
-      state: "confirmed-target-set-no-mutation",
+      state: "confirmed-target-set",
       canHandoffToExactFencedReplacement: false,
+      canHandoffToTargetSetEdit: true,
     });
     expect(decision.evidence).toContain(
-      "discovery-edit-confirmation:multi-target-no-mutation",
+      "discovery-edit-confirmation:handoff-ready:target-set-edit",
     );
   });
 });

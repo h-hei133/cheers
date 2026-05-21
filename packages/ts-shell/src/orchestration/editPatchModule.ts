@@ -76,6 +76,18 @@ export {
   type DiscoveryEditRuntimeRequest,
 } from "./discoveryEditRuntime.js";
 export { buildDiscoveryEditPlanResult } from "./discoveryEditResult.js";
+export {
+  buildTargetSetEditPlan,
+  type TargetSetEditPlan,
+  type TargetSetEditPlanTarget,
+} from "./targetSetEditPlan.js";
+export {
+  runTargetSetEditRoute,
+  type TargetSetEditFileResult,
+  type TargetSetEditRoute,
+  type TargetSetEditRouteOptions,
+} from "./targetSetEditRoute.js";
+export { buildTargetSetEditRouteResult } from "./targetSetEditResult.js";
 
 export interface EditPatchModuleState {
   readonly editExpectation: EditExpectationContract;

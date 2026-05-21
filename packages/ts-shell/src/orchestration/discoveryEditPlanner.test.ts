@@ -78,7 +78,7 @@ describe("discoveryEditPlanner", () => {
     });
   });
 
-  it("stops unsupported fuzzy, generated, broad, and multi-target confirmation requests", () => {
+  it("stops unsupported fuzzy, generated, and broad requests", () => {
     const fuzzy = planDiscoveryEdit({
       prompt: "Find the closest file and do a fuzzy replacement.",
       candidates: [{ path: "src/app.ts", content: "status: draft\n" }],
@@ -99,19 +99,6 @@ describe("discoveryEditPlanner", () => {
     });
     expect(broad).toMatchObject({ blocker: "unsupported-broad-refactor" });
 
-    const targetSet = planDiscoveryEdit({
-      prompt,
-      candidates: [
-        { path: "src/app.ts", content: "status: draft\n" },
-        { path: "src/other.ts", content: "status: draft\n" },
-      ],
-      confirmedTargetSet: ["src/app.ts", "src/other.ts"],
-    });
-    expect(targetSet).toMatchObject({
-      status: "confirmation-required",
-      blocker: "multi-target-mutation-unsupported",
-      mutation: "not-run",
-    });
   });
 
   it("prepares handoff only for exactly one confirmed target", () => {
@@ -133,5 +120,26 @@ describe("discoveryEditPlanner", () => {
       state: "confirmed-single-target",
       targetPath: "src/app.ts",
     });
+  });
+
+  it("prepares target-set handoff for an explicitly confirmed target set", () => {
+    const plan = planDiscoveryEdit({
+      prompt,
+      candidates: [
+        { path: "src/app.ts", content: "title\nstatus: draft\n" },
+        { path: "src/other.ts", content: "status: draft\n" },
+      ],
+      confirmedTargetSet: ["src/app.ts", "src/other.ts"],
+    });
+
+    expect(plan).toMatchObject({
+      status: "ready-for-target-set",
+      mutationAuthority: "not-granted",
+      mutation: "not-run",
+      confirmedTargetSet: ["src/app.ts", "src/other.ts"],
+    });
+    expect(plan.evidence).toContain(
+      "discovery-edit-planner:ready-for-target-set-edit-route",
+    );
   });
 });

@@ -9,6 +9,7 @@ export type DiscoveryEditConfirmationState =
   | "not-required-explicit-target"
   | "required-target-selection"
   | "confirmed-single-target"
+  | "confirmed-target-set"
   | "confirmed-target-set-no-mutation"
   | "ambiguous-confirmation"
   | "invalid-confirmation";
@@ -17,10 +18,21 @@ export type DiscoveryEditConfirmationDecision =
   | {
       readonly state: Exclude<
         DiscoveryEditConfirmationState,
-        "confirmed-single-target"
+        "confirmed-single-target" | "confirmed-target-set"
       >;
       readonly selectedCandidate?: DiscoveryEditCandidate;
       readonly canHandoffToExactFencedReplacement: false;
+      readonly canHandoffToTargetSetEdit?: false;
+      readonly reason: string;
+      readonly nextAction: string;
+      readonly evidence: readonly string[];
+    }
+  | {
+      readonly state: "confirmed-target-set";
+      readonly selectedCandidate?: never;
+      readonly canHandoffToExactFencedReplacement: false;
+      readonly canHandoffToTargetSetEdit: true;
+      readonly confirmedTargetSet: readonly string[];
       readonly reason: string;
       readonly nextAction: string;
       readonly evidence: readonly string[];
@@ -29,6 +41,7 @@ export type DiscoveryEditConfirmationDecision =
       readonly state: "confirmed-single-target";
       readonly selectedCandidate: DiscoveryEditCandidate;
       readonly canHandoffToExactFencedReplacement: true;
+      readonly canHandoffToTargetSetEdit?: false;
       readonly targetPath: string;
       readonly mapping: FencedEditMapping;
       readonly reason: string;
@@ -47,16 +60,23 @@ export function decideDiscoveryEditConfirmation(input: {
   ];
 
   if (input.confirmedTargetSet && input.confirmedTargetSet.length > 1) {
-    return stopped({
-      state: "confirmed-target-set-no-mutation",
-      reason: "Discovery edit target-set confirmation is no-write in this route.",
+    return {
+      state: "confirmed-target-set",
+      canHandoffToExactFencedReplacement: false,
+      canHandoffToTargetSetEdit: true,
+      confirmedTargetSet: input.confirmedTargetSet.map(normalize),
+      reason:
+        "Discovery edit target set was explicitly confirmed for bounded exact fenced replacement.",
       nextAction:
-        "Choose exactly one candidate target for the exact fenced replacement lane.",
+        "Hand off to the bounded target-set edit route for preflight and per-file execution.",
       evidence: [
         ...evidence,
-        "discovery-edit-confirmation:multi-target-no-mutation",
+        "discovery-edit-confirmation:confirmed-target-set",
+        "discovery-edit-confirmation:handoff-ready:target-set-edit",
+        "discovery-edit-confirmation:mutation-authority:execution-route-only",
+        "discovery-edit-confirmation:raw-content-excluded",
       ],
-    });
+    };
   }
 
   if (!input.confirmationTargetPath) {
@@ -143,7 +163,7 @@ export function confirmationStatusFromDecision(
 function stopped(input: {
   readonly state: Exclude<
     DiscoveryEditConfirmationState,
-    "confirmed-single-target"
+    "confirmed-single-target" | "confirmed-target-set"
   >;
   readonly selectedCandidate?: DiscoveryEditCandidate;
   readonly reason: string;
@@ -156,6 +176,7 @@ function stopped(input: {
       ? { selectedCandidate: input.selectedCandidate }
       : {}),
     canHandoffToExactFencedReplacement: false,
+    canHandoffToTargetSetEdit: false,
     reason: input.reason,
     nextAction: input.nextAction,
     evidence: [

@@ -125,8 +125,10 @@ import {
 import {
   buildDiscoveryEditPlanResult,
   buildFencedEditReplacementRouteResult,
+  buildTargetSetEditRouteResult,
   planDiscoveryEdit,
   runFencedEditReplacementRoute,
+  runTargetSetEditRoute,
   selectFencedEditReplacementActivation,
 } from "./editPatchModule.js";
 import { buildDiscoveryEditRuntimeRequest } from "./discoveryEditRuntime.js";
@@ -4039,7 +4041,10 @@ async function executeWorkflowTaskPlan(input: {
   });
   if (discoveryEditRequest) {
     const discoveryPlan = planDiscoveryEdit(discoveryEditRequest);
-    if (discoveryPlan.status !== "ready-for-handoff") {
+    if (
+      discoveryPlan.status !== "ready-for-handoff" &&
+      discoveryPlan.status !== "ready-for-target-set"
+    ) {
       const result = buildDiscoveryEditPlanResult({
         sessionId: input.sessionId,
         prompt: input.prompt,
@@ -4052,6 +4057,67 @@ async function executeWorkflowTaskPlan(input: {
           "discovery-edit: manifest produced without mutation",
           discoveryPlan.manifest.transcriptSummary,
           ...discoveryPlan.evidence,
+        ],
+        codingResult: result.codingResult!,
+        userFacingOutput: result.finalOutput,
+      };
+    }
+
+    if (discoveryPlan.status === "ready-for-target-set") {
+      const workspaceAuthority = createWorkspaceWriteAuthority(input.workspaceRoot);
+      const approvalResults = [];
+      for (const targetPath of discoveryPlan.confirmedTargetSet) {
+        const absoluteTarget = path.isAbsolute(targetPath)
+          ? targetPath
+          : path.join(input.workspaceRoot, targetPath);
+        approvalResults.push(
+          await input.enforcer.checkAndEnforce("edit", {
+            scope: "filesystem",
+            operation: "write",
+            target: absoluteTarget,
+            workspaceRoot: input.workspaceRoot,
+          }),
+        );
+      }
+      const allApproved = approvalResults.every((approval) => approval.allowed);
+      const route = await runTargetSetEditRoute({
+        workspaceRoot: input.workspaceRoot,
+        manifest: discoveryPlan.manifest,
+        confirmedTargetSet: discoveryPlan.confirmedTargetSet,
+        mapping: discoveryPlan.mapping,
+        maxFiles: 3,
+        explicitRuntimeOptIn: true,
+        explicitWorkspaceWriteOptIn: true,
+        requestedUserDecision: allApproved ? "approved" : "denied",
+        defaultProductionRejectionUnchanged: true,
+        readFile: workspaceAuthority.readFile,
+        readVerifiedFile: workspaceAuthority.readVerifiedFile,
+        validateWriteTarget: workspaceAuthority.validateWriteTarget,
+        writeFile: workspaceAuthority.writeFile,
+        ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+      });
+      const result = buildTargetSetEditRouteResult({
+        sessionId: input.sessionId,
+        prompt: input.prompt,
+        route: {
+          ...route,
+          evidence: [
+            discoveryPlan.manifest.transcriptSummary,
+            ...discoveryPlan.evidence,
+            "discovery-edit-handoff:target-set-edit-route",
+            ...route.evidence,
+          ],
+        },
+      });
+      return {
+        events,
+        notes: [
+          ...notes,
+          `discovery-edit: confirmed target-set=${discoveryPlan.confirmedTargetSet.join(",")}`,
+          `discovery-edit: permission=${allApproved ? "approved" : "denied"}`,
+          discoveryPlan.manifest.transcriptSummary,
+          ...discoveryPlan.evidence,
+          ...route.evidence,
         ],
         codingResult: result.codingResult!,
         userFacingOutput: result.finalOutput,

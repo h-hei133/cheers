@@ -429,6 +429,69 @@ describe("stopped session continuity", () => {
     expect(result.changedFiles).toEqual([]);
     expect(result.failedFiles).toEqual([]);
   });
+
+  it("summarizes target-set partial failure without raw content or rollback success claims", () => {
+    const result = makeCodingResult({
+      changedFiles: ["src/a.ts"],
+      failedFiles: [
+        {
+          path: "src/b.ts",
+          reason: "fixture second write failed",
+        },
+      ],
+      continuation: {
+        status: "first-pass-success",
+        attempts: 0,
+        evidence: [
+          "target-set-edit manifest=discovery-edit-abc123",
+          "target-set-edit status=partial-failure",
+          "target-set-edit changed=src/a.ts",
+          "target-set-edit failed=src/b.ts",
+          "target-set-edit file=src/a.ts; state=written; rollback=rollback-ready",
+          "target-set-edit file=src/b.ts; state=failed; rollback=rollback-ready",
+          "target-set-edit-result:raw-content-excluded",
+          "actionable-blocker-kind:partial-mutation-failed",
+        ],
+      },
+      verification: {
+        status: "failed",
+        reason:
+          "Inspect changed and failed files before retrying; rollback is explicit-only.",
+        blockerKind: "unknown",
+        nextAction:
+          "Inspect changed and failed files before retrying; rollback is explicit-only.",
+      },
+      evidence: ["actionable-blocker-kind:partial-mutation-failed"],
+      lastActionResultSeed: {
+        actionKind: "edit-file",
+        changedFiles: ["src/a.ts"],
+        verifiedFiles: [],
+        writerStarted: true,
+        writeEffect: "unverified",
+        requiresUserInspection: true,
+        verification: {
+          status: "failed",
+          reason:
+            "Inspect changed and failed files before retrying; rollback is explicit-only.",
+          blockerKind: "unknown",
+        },
+      },
+    });
+
+    const surface = deriveStoppedSessionContinuitySurface(result);
+
+    expect(surface?.kind).toBe("writer-started-unverified");
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "target-set=target-set-edit manifest=discovery-edit-abc123",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain("writer-started=yes");
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "requires-user-inspection=yes",
+    );
+    expect(surface?.failureHandoffDiagnostic).not.toContain("status: ready");
+    expect(surface?.failureHandoffDiagnostic).not.toContain("rollback succeeded");
+    expect(surface?.failureHandoffDiagnostic).not.toContain("atomic rollback");
+  });
 });
 
 function makeCodingResult(

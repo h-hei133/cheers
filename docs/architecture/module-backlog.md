@@ -267,6 +267,20 @@ as an import-policing rule.
   stale-read, pre-write snapshot capture, writer invocation, post-write
   verification, Result Surface, and Session / Continue projection.
 
+### Route 172: Confirmed Target-Set Edit
+
+- Route 172 adds a bounded confirmed target-set execution lane for discovery
+  edits that reduce to exact fenced replacement only.
+- The lane uses a strict max 3 file guard, preflights every confirmed target
+  before the first mutation, then reuses the existing single-file fenced route
+  for per-file workspace authority, final stale-read, snapshot capture, write,
+  verification, Result Surface, and continuation-safe evidence.
+- Preflight failures remain stopped/no-write. Mid-execution failure reports
+  partial-failure facts, changed/failed files, rollback readiness for changed
+  files, and no automatic or atomic rollback claim.
+- Unconfirmed, over-max, fuzzy, generated, broad, and unsupported target-set
+  edits remain stopped/no-write.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -315,7 +329,7 @@ preconditions, result projection, and validation.
 |---|---|---|---|
 | Edit / Patch thin integration | Edit / Patch, Result Surface | Adopt the module facade at one thin classification/projection handoff. | no new write execution |
 | Edit snapshot / rollback substrate | Edit / Patch, Runtime | Route 170 substrate now exists for activated exact fenced replacement: pre-write snapshot receipt, rollback readiness, dry-run rollback plan, and explicit single-file apply seam. | no automatic rollback; no broad/fuzzy/discovery/generated/multi-file execution |
-| Discovery target-set mutation route | Edit / Patch, Workspace / File Context | Decide whether any future target-set execution can be supported beyond Route 171's no-write manifest and confirmed single-target handoff. | no multi-file mutation without a dedicated atomicity/recovery route |
+| Discovery target-set mutation route | Edit / Patch, Workspace / File Context | Route 172 supports only confirmed target sets that reduce to exact fenced replacement, max 3 files, with preflight-all-before-mutation and per-file recovery evidence. | no fuzzy/generated/broad execution; no automatic or atomic rollback claim |
 | Browser controlled planner v2 | Browser, Agent Loop | Improve controlled planner contracts only if browser becomes product priority. | no public web or default browser action expansion |
 
 ### Phase C: Gate And Release Architecture

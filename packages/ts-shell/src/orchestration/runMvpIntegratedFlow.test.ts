@@ -1825,6 +1825,66 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     ).resolves.toBe("title\nstatus: ready\nfooter\n");
   }, 15000);
 
+  it("executes confirmed discovery target-set exact fenced replacement through the integrated path", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "target-a.ts"),
+      "title\nstatus: draft\nfooter\n",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "target-b.ts"),
+      "title\nstatus: draft\nfooter\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_discovery_target_set_fenced",
+      prompt: [
+        "Find the target file locations and replace the exact fenced block.",
+        "confirmed targets: src/target-a.ts, src/target-b.ts",
+        "```",
+        "status: draft",
+        "```",
+        "with",
+        "```",
+        "status: ready",
+        "```",
+      ].join("\n"),
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.terminalClassification).toBe("success");
+    expect(result.codingResult?.changedFiles).toEqual([
+      "src/target-a.ts",
+      "src/target-b.ts",
+    ]);
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "discovery-edit-handoff:target-set-edit-route",
+        "target-set-edit-route:reuse-existing-fenced-lane",
+        "target-set-edit-route:no-automatic-rollback",
+        "target-set-edit-result:operation:exact-fenced-replacement",
+      ]),
+    );
+    expect(result.codingResult?.continuation.evidence).toEqual(
+      expect.arrayContaining([
+        "target-set-edit-result:continuation-safe",
+        "target-set-edit-result:raw-content-excluded",
+      ]),
+    );
+    expect(result.codingResult?.evidence.join("\n")).not.toContain("status: ready");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "target-a.ts"), "utf8"),
+    ).resolves.toBe("title\nstatus: ready\nfooter\n");
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "target-b.ts"), "utf8"),
+    ).resolves.toBe("title\nstatus: ready\nfooter\n");
+  }, 15000);
+
   it("keeps unsupported fenced activation prompts stopped through the integrated path", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(

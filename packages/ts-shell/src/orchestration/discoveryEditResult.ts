@@ -12,7 +12,10 @@ import type { DiscoveryEditPlan } from "./discoveryEditPlanner.js";
 export function buildDiscoveryEditPlanResult(input: {
   readonly sessionId: string;
   readonly prompt: string;
-  readonly plan: Exclude<DiscoveryEditPlan, { status: "ready-for-handoff" }>;
+  readonly plan: Exclude<
+    DiscoveryEditPlan,
+    { status: "ready-for-handoff" } | { status: "ready-for-target-set" }
+  >;
 }): OrchestrationResult {
   const codingResult = buildCodingResult(input.plan);
   return mapTerminalToOrchestrationResult(
@@ -27,7 +30,10 @@ export function buildDiscoveryEditPlanResult(input: {
 }
 
 function buildCodingResult(
-  plan: Exclude<DiscoveryEditPlan, { status: "ready-for-handoff" }>,
+  plan: Exclude<
+    DiscoveryEditPlan,
+    { status: "ready-for-handoff" } | { status: "ready-for-target-set" }
+  >,
 ): CodingResultSummary {
   const target = plan.manifest.candidates
     .map((candidate) => candidate.pathLabel)
@@ -127,7 +133,10 @@ function buildCodingResult(
 function buildRuntimeState(input: {
   readonly sessionId: string;
   readonly prompt: string;
-  readonly plan: Exclude<DiscoveryEditPlan, { status: "ready-for-handoff" }>;
+  readonly plan: Exclude<
+    DiscoveryEditPlan,
+    { status: "ready-for-handoff" } | { status: "ready-for-target-set" }
+  >;
   readonly codingResult: CodingResultSummary;
 }): QueryRuntimeState {
   return {
@@ -162,7 +171,10 @@ function buildRuntimeState(input: {
 }
 
 function buildTerminalInput(
-  plan: Exclude<DiscoveryEditPlan, { status: "ready-for-handoff" }>,
+  plan: Exclude<
+    DiscoveryEditPlan,
+    { status: "ready-for-handoff" } | { status: "ready-for-target-set" }
+  >,
 ): QueryTerminal {
   return {
     action: "terminal",
@@ -173,7 +185,10 @@ function buildTerminalInput(
 }
 
 function buildOutput(
-  plan: Exclude<DiscoveryEditPlan, { status: "ready-for-handoff" }>,
+  plan: Exclude<
+    DiscoveryEditPlan,
+    { status: "ready-for-handoff" } | { status: "ready-for-target-set" }
+  >,
 ): string {
   const candidateLines = plan.manifest.candidates.length
     ? plan.manifest.candidates.map(

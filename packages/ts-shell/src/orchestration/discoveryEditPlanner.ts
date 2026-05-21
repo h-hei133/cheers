@@ -15,6 +15,7 @@ export type DiscoveryEditPlanStatus =
   | "manifest-produced"
   | "confirmation-required"
   | "ready-for-handoff"
+  | "ready-for-target-set"
   | "stopped";
 
 export type DiscoveryEditPlanBlocker =
@@ -52,7 +53,27 @@ export type DiscoveryEditPlan =
       readonly evidence: readonly string[];
     }
   | {
-      readonly status: Exclude<DiscoveryEditPlanStatus, "ready-for-handoff">;
+      readonly status: "ready-for-target-set";
+      readonly manifest: DiscoveryEditManifest;
+      readonly mapping: FencedEditMapping;
+      readonly confirmation: Extract<
+        DiscoveryEditConfirmationDecision,
+        { state: "confirmed-target-set" }
+      >;
+      readonly confirmedTargetSet: readonly string[];
+      readonly changedFiles: readonly [];
+      readonly mutationAuthority: "not-granted";
+      readonly mutation: "not-run";
+      readonly blocker?: never;
+      readonly reason: string;
+      readonly nextAction: string;
+      readonly evidence: readonly string[];
+    }
+  | {
+      readonly status: Exclude<
+        DiscoveryEditPlanStatus,
+        "ready-for-handoff" | "ready-for-target-set"
+      >;
       readonly manifest: DiscoveryEditManifest;
       readonly confirmation: DiscoveryEditConfirmationDecision;
       readonly changedFiles: readonly [];
@@ -88,7 +109,7 @@ export function planDiscoveryEdit(input: {
           .filter((candidate) => candidate.matchCount > 0)
       : [];
   const initialConfirmationStatus = input.confirmedTargetSet
-    ? "confirmed-target-set-no-mutation"
+    ? "confirmed-target-set"
     : input.confirmationTargetPath
       ? "confirmed-single-target"
       : "required-target-selection";
@@ -184,6 +205,26 @@ export function planDiscoveryEdit(input: {
     };
   }
 
+  if (confirmation.state === "confirmed-target-set") {
+    return {
+      status: "ready-for-target-set",
+      manifest,
+      mapping: mappingResult.mapping,
+      confirmation,
+      confirmedTargetSet: confirmation.confirmedTargetSet,
+      changedFiles: [],
+      mutationAuthority: "not-granted",
+      mutation: "not-run",
+      reason: confirmation.reason,
+      nextAction: confirmation.nextAction,
+      evidence: [
+        ...manifest.evidence,
+        ...confirmation.evidence,
+        "discovery-edit-planner:ready-for-target-set-edit-route",
+      ],
+    };
+  }
+
   const blocker =
     confirmation.state === "confirmed-target-set-no-mutation"
       ? "multi-target-mutation-unsupported"
@@ -256,7 +297,10 @@ function classifyUnsupportedDiscoveryPrompt(prompt: string):
 }
 
 function stoppedPlan(input: {
-  readonly status: Exclude<DiscoveryEditPlanStatus, "ready-for-handoff">;
+  readonly status: Exclude<
+    DiscoveryEditPlanStatus,
+    "ready-for-handoff" | "ready-for-target-set"
+  >;
   readonly manifest: DiscoveryEditManifest;
   readonly blocker: DiscoveryEditPlanBlocker;
   readonly reason: string;
@@ -297,9 +341,11 @@ function stoppedConfirmationState(
   state: DiscoveryEditManifest["requiredConfirmationStatus"],
 ): Exclude<
   DiscoveryEditManifest["requiredConfirmationStatus"],
-  "confirmed-single-target"
+  "confirmed-single-target" | "confirmed-target-set"
 > {
-  return state === "confirmed-single-target" ? "invalid-confirmation" : state;
+  return state === "confirmed-single-target" || state === "confirmed-target-set"
+    ? "invalid-confirmation"
+    : state;
 }
 
 function countExactBlockMatches(content: string, block: string): number {

@@ -386,6 +386,9 @@
         "discoveryEditConfirmation.ts",
         "discoveryEditRuntime.ts",
         "discoveryEditResult.ts",
+        "targetSetEditPlan.ts",
+        "targetSetEditRoute.ts",
+        "targetSetEditResult.ts",
         "futureEditContract.ts",
         "futureEditPlanner.ts",
         "workspaceAuthority.ts",
@@ -398,6 +401,7 @@
         "exact fenced old/new mapping",
         "bounded discovery candidate manifest",
         "explicit single-target confirmation facts",
+        "explicit confirmed target set for exact fenced replacement only",
         "runtime fenced replacement activation facts",
         "workspace authority fact",
         "final stale-read fact",
@@ -411,6 +415,7 @@
         "fenced replacement result projection",
         "discovery manifest and confirmation stopped projections",
         "confirmed single-target discovery handoff evidence",
+        "confirmed target-set exact fenced replacement execution evidence",
         "changed/failed file summaries",
         "verification summary",
         "actionable blocker evidence"
@@ -426,6 +431,7 @@
       "validationGates": [
         "workspace write route tests",
         "discovery edit manifest/planner/confirmation/result tests",
+        "target-set edit plan/route/result tests",
         "fenced edit runtime activation tests",
         "CLI runtime invocation tests",
         "mutation-lane rejection regression",
@@ -952,6 +958,9 @@
         "discoveryEditConfirmation.ts",
         "discoveryEditRuntime.ts",
         "discoveryEditResult.ts",
+        "targetSetEditPlan.ts",
+        "targetSetEditRoute.ts",
+        "targetSetEditResult.ts",
         "workspaceAuthority.ts",
         "workspaceWriteResult.ts",
         "mutationVerificationProjection.ts"
@@ -963,6 +972,7 @@
         "fenced replacement result",
         "discovery edit no-write manifest and confirmation result",
         "confirmed discovery single-target handoff evidence",
+        "confirmed target-set execution evidence for exact fenced replacement only",
         "verification summary",
         "actionable blocker evidence for missing target, missing content, no-match, multiple matches, stale-read, unsupported future edit, writer failure, and verification failure",
         "continuation-safe mutation evidence"
@@ -970,6 +980,7 @@
       "focusedValidation": [
         "workspace write route tests",
         "discovery edit manifest/planner/confirmation/result tests",
+        "target-set edit plan/route/result tests",
         "fenced edit runtime activation tests",
         "CLI runtime invocation tests",
         "mutation-lane rejection regression",

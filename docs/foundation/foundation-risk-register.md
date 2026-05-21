@@ -14,7 +14,7 @@ None open after Route 165.
 
 ## Resolved
 
-### Discovery edit manifest without mutation authority
+### Discovery edit manifest and confirmed target-set execution
 
 - Affected modules: Edit / Patch, Workspace / File Context, Result Surface,
   Session / Continue, Harness / Eval.
@@ -26,12 +26,19 @@ None open after Route 165.
   `discoveryEditResult.ts`; manifests are no-write with
   `mutationAuthority: not-granted`, unconfirmed/ambiguous/broad/fuzzy/generated
   paths stop before mutation, and only one confirmed candidate can hand off to
-  the existing exact fenced replacement lane.
-- Evidence: discovery manifest/planner/confirmation/result tests, fenced edit
-  runtime activation tests, session continuity tests, and edit closeout verifier
+  the existing exact fenced replacement lane. Route 172 adds
+  `targetSetEditPlan.ts`, `targetSetEditRoute.ts`, and
+  `targetSetEditResult.ts` for explicitly confirmed target sets that reduce to
+  exact fenced replacement only, with max-file guard, preflight-all-before-
+  mutation, per-file authority/stale-read/snapshot/verification, partial-
+  failure evidence, rollback readiness, and no automatic or atomic rollback
+  claim.
+- Evidence: discovery manifest/planner/confirmation/result tests, target-set
+  plan/route tests, fenced edit runtime activation tests, session continuity
+  tests, runMvp focused target-set integration test, and edit closeout verifier
   markers.
-- Recommended next action: do not expand to multi-file target-set mutation until
-  an atomicity/recovery route exists.
+- Recommended next action: do not expand beyond exact fenced replacement target
+  sets until a separate route defines broader atomicity/recovery policy.
 - Should become a route: no, resolved by Route 171 for no-write manifests and
   confirmed single-target handoff.
 
