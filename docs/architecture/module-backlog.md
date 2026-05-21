@@ -472,6 +472,23 @@ as an import-policing rule.
   fuzzy/broad/generated direct mutation, new writers, schema/CLI/dependency
   changes, and broad `runMvpIntegratedFlow.ts` refactors remain closed.
 
+### Route 186: Command Verification Repair
+
+- Route 186 adds verification command plan, runner, result, failure
+  classifier, and repair bridge facades that select allowlisted command
+  candidates from Agent Plan / proposal / edit-result facts and execute them
+  only through the existing runtime dispatcher.
+- Runtime receipt markers, stdout/stderr budget/redaction status, timeout /
+  blocked / skipped / failed classification, and command safe labels feed
+  Result Surface and Session / Continue evidence.
+- Failed command verification can create Route 185 repair-loop context and
+  deterministic fake-provider review-required proposals, but command execution
+  never calls providers and repair proposals never apply automatically.
+- Arbitrary shell, broad allowlist expansion, default real-provider calls,
+  provider calls during command execution, automatic repair apply, new writers,
+  schema/CLI/dependency changes, and broad `runMvpIntegratedFlow.ts` refactors
+  remain closed.
+
 ## Module-First Route Rule
 
 Future routes must state:

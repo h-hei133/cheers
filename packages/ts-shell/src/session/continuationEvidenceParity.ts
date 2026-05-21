@@ -21,6 +21,7 @@ const CONTINUATION_EVIDENCE_PREFIXES: ReadonlyArray<{
   },
   { label: "edit-repair-context", prefixes: ["edit-repair-context id="] },
   { label: "edit-repair-proposal", prefixes: ["edit-repair-proposal id="] },
+  { label: "verification-command", prefixes: ["verification-command id="] },
   { label: "verification-repair-loop", prefixes: ["verification-repair-loop id="] },
   { label: "verification-repair-prompt", prefixes: ["verification-repair-prompt loop="] },
   { label: "context-packet", prefixes: ["context-packet ", "context-packet:id:"] },

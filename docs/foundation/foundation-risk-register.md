@@ -14,6 +14,31 @@ None open after Route 165.
 
 ## Resolved
 
+### Command-driven verification repair bridge
+
+- Affected modules: Tool / Runtime, Edit / Patch, Provider / Model, Result
+  Surface, Session / Continue, Harness / Eval.
+- Why it was a calibration gap: Route 185 accepted failed verification facts,
+  but the command path that creates those facts was not packaged as an
+  allowlisted, permission-preserving runtime bridge with receipt evidence and a
+  review-gated repair handoff.
+- Resolution: Route 186 adds `verificationCommandPlan.ts`,
+  `verificationCommandRunner.ts`, `verificationCommandResult.ts`,
+  `verificationFailureClassifier.ts`, and `verificationRepairBridge.ts`.
+  Command candidates remain explicit and allowlisted, execution goes through
+  the existing runtime dispatcher, stdout/stderr evidence is budgeted and
+  redacted, failed command results can create Route 185 repair-loop context,
+  and fake-provider repair proposals remain review-required and no-write.
+- Evidence: verification command plan/runner/result/classifier/bridge tests,
+  verification repair regressions, Session / Continue parity tests, focused
+  context-planning and edit closeout verifiers, result-contract, and build.
+- Recommended next action: keep arbitrary shell, broad allowlist expansion,
+  provider calls during command execution, automatic repair apply, new writers,
+  CLI/schema/dependency changes, and broad `runMvpIntegratedFlow.ts` rewrites
+  closed until separate routes define them.
+- Should become a route: no, resolved by Route 186 for command-driven
+  verification repair-loop facades only.
+
 ### Verification-driven repair loop
 
 - Affected modules: Edit / Patch, Provider / Model, Runtime, Workspace / File

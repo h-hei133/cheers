@@ -101,7 +101,7 @@ function projectCapabilityArea(evidence: readonly string[]): string | undefined 
   }
   if (
     evidence.some((entry) =>
-      /edit|proposal|hunk-set|target-set|rollback|recovery/.test(entry),
+      /edit|proposal|hunk-set|target-set|rollback|recovery|verification-command/.test(entry),
     )
   ) {
     return "edit-patch";
@@ -141,7 +141,7 @@ function extractSuggestedReads(evidence: readonly string[]): string | undefined 
 }
 
 function isParityEvidenceMarker(entry: string): boolean {
-  return /^(?:actionable-blocker-kind|verify-blocker-kind|context-packet|context-plan|agent-plan|generated-edit|provider-edit|context-aware-provider|edit-proposal|proposal-hunk-set|edit-repair|verification-repair|target-set-edit|edit-recovery)/.test(
+  return /^(?:actionable-blocker-kind|verify-blocker-kind|context-packet|context-plan|agent-plan|generated-edit|provider-edit|context-aware-provider|edit-proposal|proposal-hunk-set|edit-repair|verification-command|verification-repair|target-set-edit|edit-recovery)/.test(
     entry,
   );
 }

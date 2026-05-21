@@ -285,6 +285,33 @@ export {
   runVerificationRepairLoop,
   type VerificationRepairLoopRun,
 } from "./verificationRepairLoop.js";
+export {
+  buildVerificationCommandPlan,
+  type VerificationCommandKind,
+  type VerificationCommandPlan,
+  type VerificationCommandPlanState,
+  type VerificationCommandSource,
+} from "./verificationCommandPlan.js";
+export {
+  classifyVerificationCommandFailure,
+  type VerificationFailureClass,
+  type VerificationFailureClassification,
+} from "./verificationFailureClassifier.js";
+export {
+  buildVerificationCommandResult,
+  buildVerificationCommandSurfaceResult,
+  type VerificationCommandOutcome,
+  type VerificationCommandResult,
+} from "./verificationCommandResult.js";
+export {
+  runVerificationCommand,
+  type VerificationCommandRun,
+} from "./verificationCommandRunner.js";
+export {
+  bridgeVerificationCommandToRepairLoop,
+  type VerificationRepairBridgeResult,
+  type VerificationRepairBridgeStatus,
+} from "./verificationRepairBridge.js";
 
 export interface EditPatchModuleState {
   readonly editExpectation: EditExpectationContract;

@@ -12,6 +12,7 @@ describe("continuation evidence parity", () => {
         "generated-edit proposal=generated-edit-abc; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
         "context-aware-provider proposal=provider-edit-abc; status=review-required-proposal; contextPacket=ctx_abc; agentPlan=plan_abc; mutationAuthority=not-granted; raw-content-excluded",
         "edit-repair-proposal id=edit-repair-proposal-def; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
+        "verification-command id=verification-command-plan-abc:result:failed; plan=verification-command-plan-abc; command=npm test -- --help; outcome=failed; failureClass=test-failed; runtimeReceipts=1; repairEligible=yes; mutation:not-run; raw-content-excluded",
         "verification-repair-loop id=verification-repair-loop-abc; state=repair-review-required; repairContext=edit-repair-context-def; repairProposal=edit-repair-proposal-def; contextPacket=ctx_abc; agentPlan=plan_abc; verification=failed; runtimeReceipts=1; provider=proposal-only; next=review; raw-content-excluded",
         "verification-repair-prompt loop=verification-repair-loop-abc; context=edit-repair-context-def; contextPacket=ctx_abc; agentPlan=plan_abc; runtimeReceipts=1; mutationAuthority:not-granted; raw-content-excluded",
         "proposal-hunk-set proposal=provider-edit-abc; hunkSet=proposal-hunk-set-def; source=provider; targets=src/a.ts; mutationAuthority:not-granted; raw-content-excluded",
@@ -34,6 +35,11 @@ describe("continuation evidence parity", () => {
       detail.startsWith(
         "verification-repair-loop=verification-repair-loop id=verification-repair-loop-abc;",
       ) && detail.includes("contextPacket=ctx_abc"),
+    )).toBe(true);
+    expect(details.some((detail) =>
+      detail.startsWith(
+        "verification-command=verification-command id=verification-command-plan-abc:result:failed;",
+      ) && detail.includes("failureClass=test-failed"),
     )).toBe(true);
     expect(JSON.stringify(details)).not.toContain("RAW_SECRET");
   });

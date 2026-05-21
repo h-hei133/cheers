@@ -16,6 +16,11 @@ const focusedTests = [
   'src/orchestration/contextAwareProviderPrompt.test.ts',
   'src/orchestration/contextAwareProviderProposal.test.ts',
   'src/orchestration/contextAwareProviderResult.test.ts',
+  'src/orchestration/verificationCommandPlan.test.ts',
+  'src/orchestration/verificationCommandRunner.test.ts',
+  'src/orchestration/verificationCommandResult.test.ts',
+  'src/orchestration/verificationFailureClassifier.test.ts',
+  'src/orchestration/verificationRepairBridge.test.ts',
   'src/orchestration/verificationRepairContext.test.ts',
   'src/orchestration/verificationRepairPlanner.test.ts',
   'src/orchestration/verificationRepairResult.test.ts',
@@ -43,6 +48,9 @@ console.log('marker context-aware-provider-missing-context-stops-before-call')
 console.log('marker context-aware-provider-prompt-redacted-budgeted')
 console.log('marker context-aware-provider-session-continue-evidence')
 console.log('marker verification-repair-context-packet-agent-plan-ids')
+console.log('marker verification-command-plan-agent-plan-candidate')
+console.log('marker verification-command-runtime-receipt-captured')
+console.log('marker verification-command-failure-bridges-to-repair-loop')
 console.log('marker verification-repair-context-aware-fake-provider-no-write')
 console.log('marker verification-repair-session-continue-evidence')
 console.log('marker broad-edit-needs-more-context')

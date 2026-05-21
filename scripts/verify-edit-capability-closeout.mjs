@@ -39,6 +39,11 @@ const testTargets = [
   'src/orchestration/editRepairProposal.test.ts',
   'src/orchestration/editRepairPlanner.test.ts',
   'src/orchestration/editRepairResult.test.ts',
+  'src/orchestration/verificationCommandPlan.test.ts',
+  'src/orchestration/verificationCommandRunner.test.ts',
+  'src/orchestration/verificationCommandResult.test.ts',
+  'src/orchestration/verificationFailureClassifier.test.ts',
+  'src/orchestration/verificationRepairBridge.test.ts',
   'src/orchestration/verificationRepairContext.test.ts',
   'src/orchestration/verificationRepairPlanner.test.ts',
   'src/orchestration/verificationRepairResult.test.ts',
@@ -115,6 +120,10 @@ console.log('report field verification_repair_fake_provider_proposal=covered')
 console.log('report field verification_repair_review_required=covered')
 console.log('report field verification_repair_hunk_set_handoff=covered')
 console.log('report field verification_repair_no_automatic_mutation=covered')
+console.log('report field verification_command_plan=covered')
+console.log('report field verification_command_runtime_receipt=covered')
+console.log('report field verification_command_failure_classifier=covered')
+console.log('report field verification_command_repair_bridge=covered')
 console.log('report field proposal_review_surface=covered')
 console.log('report field proposal_selection_confirmation=covered')
 console.log('report field proposal_apply_bridge=covered')
@@ -223,6 +232,13 @@ console.log('marker verification-repair-review-required-no-write')
 console.log('marker verification-repair-confirmed-hunk-set-handoff-existing-route')
 console.log('marker verification-repair-no-automatic-mutation-after-verification-failure')
 console.log('marker verification-repair-result-session-raw-content-excluded')
+console.log('marker verification-command-allowlisted-success-runtime-receipt')
+console.log('marker verification-command-allowlisted-failure-repair-eligible')
+console.log('marker verification-command-not-allowlisted-no-runtime-dispatch')
+console.log('marker verification-command-timeout-classified-no-repair')
+console.log('marker verification-command-stdout-stderr-budget-redaction')
+console.log('marker verification-command-session-continue-evidence')
+console.log('marker verification-command-repair-bridge-fake-provider-no-write')
 console.log('marker proposal-review-created-no-write')
 console.log('marker proposal-reject-no-write')
 console.log('marker proposal-selection-required-no-write')

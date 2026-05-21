@@ -86,6 +86,28 @@ describe("session result parity", () => {
       "verification-repair-result:mutation-authority:not-granted-until-existing-route",
     );
   });
+
+  it("projects verification command markers for session consumers", () => {
+    const projection = projectSessionResultParity({
+      terminalClassification: "stopped",
+      stopReason: "Create a review-gated repair context from the failed test command.",
+      codingResult: makeCodingResult({
+        reason: "Verification command failed.",
+        nextAction: "Create a review-gated repair context from the failed test command.",
+        evidence: [
+          "verification-command id=verification-command-plan-abc:result:failed; plan=verification-command-plan-abc; command=npm test -- --help; outcome=failed; failureClass=test-failed; runtimeReceipts=1; repairEligible=yes; mutationAuthority:not-granted; mutation:not-run; raw-content-excluded",
+          "verification-command-result:mutation:not-run",
+        ],
+      }),
+    });
+
+    expect(projection.capabilityArea).toBe("edit-patch");
+    expect(projection.mutationAuthority).toBe("not-granted");
+    expect(projection.redactionStatus).toBe("raw-content-excluded");
+    expect(projection.evidenceMarkers).toContain(
+      "verification-command-result:mutation:not-run",
+    );
+  });
 });
 
 function makeCodingResult(input: {

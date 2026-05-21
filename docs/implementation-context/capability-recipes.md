@@ -22,6 +22,9 @@ not import restrictions.
   `providerEditConfirmation.ts`, `providerEditResult.ts`,
   `contextAwareProviderEdit.ts`, `contextAwareProviderPrompt.ts`,
   `contextAwareProviderProposal.ts`, `contextAwareProviderResult.ts`,
+  `verificationCommandPlan.ts`, `verificationCommandRunner.ts`,
+  `verificationCommandResult.ts`, `verificationFailureClassifier.ts`,
+  `verificationRepairBridge.ts`,
   `editRepairContext.ts`, `editRepairProposal.ts`,
   `editRepairPlanner.ts`, `editRepairResult.ts`,
   `verificationRepairContext.ts`, `verificationRepairPlanner.ts`,
@@ -45,6 +48,9 @@ not import restrictions.
   targeted context packet ids plus Agent Plan readiness, confidence, missing
   facts, suggested reads, and verification candidates when context-aware
   provider proposal generation is opened,
+  allowlisted verification command candidates from Agent Plan / proposal /
+  edit result facts, existing runtime receipt markers, and command failure
+  classifications when command-driven verification opens repair planning,
   verification repair safe context and repair proposal facts when failed apply
   or verification opens review-gated repair planning,
   verification repair loop facts that bind failed verification evidence,
@@ -68,6 +74,11 @@ not import restrictions.
   context-aware provider proposal no-write evidence with context packet and
   Agent Plan ids, missing-context stopped evidence, provider invalid-output
   stopped evidence, and review/handoff readiness,
+  verification command plan/runner/result evidence for allowlisted success,
+  failed, blocked, skipped, timeout, budget/redaction, and no-dispatch
+  not-allowlisted states,
+  verification command repair bridge evidence that creates Route 185 context
+  and fake-provider review-required proposals without mutation,
   verification repair context/proposal/review states with no automatic repair
   mutation,
   verification repair loop context/proposal/result states with provider
@@ -102,6 +113,9 @@ not import restrictions.
   context, stay review-required and no-write by default, and hand off only after
   explicit exact hunk confirmation to the existing hunk-set apply route. Repair
   planning must not call providers during apply or run automatic repair.
+  Verification command execution must use the existing runtime dispatcher,
+  keep command candidates allowlisted, preserve permission decisions, and never
+  call providers or apply repair during command execution.
   Verification repair loops must stop before provider invocation when failed
   verification evidence, context packet id, Agent Plan id, provider readiness,
   or bounded safe context is missing; they must not mutate from repair proposal
@@ -118,7 +132,8 @@ not import restrictions.
   proposal/planner/confirmation/result tests, provider edit
   context/proposal/planner/confirmation/result tests, context-aware provider
   edit/prompt/proposal/result tests, edit repair
-  context/proposal/planner/result tests, verification repair
+  context/proposal/planner/result tests, verification command
+  plan/runner/result/classifier/bridge tests, verification repair
   context/planner/result/loop tests, proposal review/selection/apply/result
   tests, proposal hunk-set
   manifest/plan/route/result tests, exact hunk set/conflict/apply/result
