@@ -14,6 +14,29 @@ None open after Route 165.
 
 ## Resolved
 
+### Explicit edit recovery apply
+
+- Affected modules: Edit / Patch, Workspace / File Context, Result Surface,
+  Session / Continue, Harness / Eval.
+- Why it was a calibration gap: Route 170 captured snapshot-backed rollback
+  readiness but left recovery apply as a low-level seam, while Route 172 target
+  set partial failures needed a bounded way to recover changed
+  snapshot-backed files without implying automatic or atomic rollback.
+- Resolution: Route 173 adds `editRecoveryPlan.ts`,
+  `editRecoveryApply.ts`, `editRecoveryOutcome.ts`, and
+  `targetSetEditRecovery.ts` to plan from explicit snapshot ids and target
+  paths, apply single-file or bounded target-set subset rollback only after
+  explicit confirmation, run current-content guards and post-rollback
+  verification, and project safe Result Surface / Session evidence.
+- Evidence: recovery plan/apply tests, target-set recovery tests,
+  snapshot/rollback regression tests, session continuity tests, and edit
+  closeout verifier markers.
+- Recommended next action: keep broad undo, fuzzy/generated rollback, automatic
+  rollback, and atomic rollback claims closed until a separate route defines
+  them.
+- Should become a route: no, resolved by Route 173 for explicit
+  snapshot-backed rollback apply.
+
 ### Discovery edit manifest and confirmed target-set execution
 
 - Affected modules: Edit / Patch, Workspace / File Context, Result Surface,

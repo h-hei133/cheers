@@ -12,8 +12,9 @@ not import restrictions.
   `discoveryEditPlanner.ts`, `discoveryEditConfirmation.ts`,
   `discoveryEditRuntime.ts`, `discoveryEditResult.ts`,
   `targetSetEditPlan.ts`, `targetSetEditRoute.ts`,
-  `targetSetEditResult.ts`, `editSnapshot.ts`, `editRecoveryResult.ts`,
-  `editRollback.ts`, `workspaceFileContract.ts`,
+  `targetSetEditResult.ts`, `targetSetEditRecovery.ts`, `editSnapshot.ts`,
+  `editRecoveryPlan.ts`, `editRecoveryApply.ts`, `editRecoveryOutcome.ts`,
+  `editRecoveryResult.ts`, `editRollback.ts`, `workspaceFileContract.ts`,
   `workspaceTargetProjection.ts`,
   `patchResult/workspaceAuthority.ts`, `mutationVerificationProjection.ts`.
 - Consume: explicit in-workspace target, concrete content or exact mapping,
@@ -22,25 +23,31 @@ not import restrictions.
   bounded discovery candidate manifest and explicit single-target confirmation,
   explicit confirmed target set for exact fenced replacement only,
   workspace authority fact, final stale-read fact, pre-write snapshot receipt
-  facts for activated exact fenced replacement, verification plan.
+  facts for activated exact fenced replacement, explicit snapshot ids and
+  target paths for recovery apply, verification plan.
 - Emit: patch/write result projection, changed/failed file summaries,
   fenced replacement activation, outcome taxonomy, and result projection,
   actionable blocker markers for missing target, missing content, no-match,
   multiple matches, stale-read, unsupported future edit, discovery confirmation
   required/invalid/no-candidate states, writer failure, and verification
   failure, confirmed target-set success/preflight-stopped/partial-failure
-  facts, verification summary, continuation-safe mutation evidence, safe snapshot receipt status, rollback readiness, explicit
-  single-file rollback plan/apply evidence when directly invoked.
+  facts, verification summary, continuation-safe mutation evidence, safe
+  snapshot receipt status, rollback readiness, explicit recovery plan/apply
+  evidence for single-file and bounded target-set subset rollback when directly
+  invoked.
 - Do not bypass: workspace authority, final stale-read, permission decisions,
   pre-write snapshot failure stops, post-write verification projection, Result
   Surface truthfulness. Do not mutate from discovery candidate manifests alone
   or infer target confirmation from vague wording. Target-set execution must
   preflight all files before the first mutation and reuse the existing
-  single-file fenced lane per target. Do not run automatic rollback.
+  single-file fenced lane per target. Recovery apply must require explicit
+  snapshot ids, target paths, current-content guards, workspace authority, and
+  direct rollback confirmation. Do not run automatic rollback.
 - Validate: focused edit/write route tests, stale-read/authority regression,
   fenced edit activation/runtime tests, discovery edit
   manifest/planner/confirmation/result tests, target-set edit
-  plan/route/result tests, snapshot/recovery/rollback tests, CLI runtime invocation tests,
+  plan/route/result tests, target-set recovery tests,
+  snapshot/recovery/rollback tests, CLI runtime invocation tests,
   mutation-lane rejection, `verify:edit-capability-closeout`,
   `verify:result-contract`, build if TS source changes.
 

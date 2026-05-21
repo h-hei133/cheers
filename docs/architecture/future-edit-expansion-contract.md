@@ -39,7 +39,11 @@ Current supported write/edit behavior remains:
   target-set execution lane for exact fenced replacement only, with max 3
   files, preflight-all-before-mutation, per-file workspace authority,
   final stale-read, pre-write snapshot, post-write verification, partial
-  failure evidence, and rollback readiness without automatic rollback
+  failure evidence, and rollback readiness without automatic rollback; Route
+  173 makes snapshot-backed recovery operational only through explicit
+  rollback apply, with recovery plans from known snapshot ids, single-file and
+  bounded target-set subset restore, current-content guards, post-rollback
+  verification, and replay-safe result/session evidence
 - ambiguous sibling targets stop before mutation
 - vague generated-content prompts stop actionably
 - no-write read/inspect requests stay separate from mutation
@@ -56,7 +60,8 @@ Still unsupported in the current route:
 - broad/fuzzy fenced replacement execution; only exact old/new fenced mapping
   is supported
 - generated file content from vague prompts
-- rollback or snapshot execution
+- rollback or snapshot execution except explicit snapshot-backed recovery apply
+  from Route 173
 
 ## Reference Scan
 
@@ -79,9 +84,9 @@ The reference scan was shape-only; no implementation code was copied.
 | Mode | Status now | Required before execution |
 |---|---|---|
 | broad refactor planning | future-only | target/constraint manifest, user-confirmed target selection, workspace authority, final stale-read, verification plan, snapshot/rollback story |
-| multi-file discovery edit | current-supported only for confirmed target sets that reduce to exact fenced replacement, max 3 files | discovery phase, bounded candidate file list, explicit target-set confirmation, exact old/new fenced mapping for every target, preflight-all-before-mutation, per-file workspace authority, final stale-read, snapshot receipt, post-write verification, partial-failure evidence, rollback readiness; no fuzzy/generated/broad execution, no automatic rollback, no atomic rollback claim |
+| multi-file discovery edit | current-supported only for confirmed target sets that reduce to exact fenced replacement, max 3 files | discovery phase, bounded candidate file list, explicit target-set confirmation, exact old/new fenced mapping for every target, preflight-all-before-mutation, per-file workspace authority, final stale-read, snapshot receipt, post-write verification, partial-failure evidence, rollback readiness, and explicit snapshot-backed subset recovery apply; no fuzzy/generated/broad execution, no automatic rollback, no atomic rollback claim |
 | confirmed single-target discovery edit | current-supported only when it reduces to exact fenced replacement | one confirmed candidate from the manifest, exact old/new fenced mapping, workspace authority through existing write route, final stale-read, pre-write snapshot receipt, post-write verification |
-| fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy/discovery/generated/multi-file/rollback remains stopped and no-write | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, pre-write snapshot receipt, verification plan, stable outcome taxonomy, rollback readiness projection |
+| fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy/discovery/generated/multi-file rollback remains stopped and no-write, while explicit snapshot-backed single-file rollback apply is current-supported | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, pre-write snapshot receipt, verification plan, stable outcome taxonomy, rollback readiness projection, explicit snapshot id and target for rollback apply |
 
 These modes are intentionally separate. A broad refactor request is not a
 discovery edit. A discovery edit is not permission to mutate every candidate.
@@ -120,6 +125,11 @@ fenced replacement route. Route 172 additionally allows
 `confirmed-target-set` handoff only to the bounded target-set exact fenced
 replacement route. The manifest still does not grant mutation authority; the
 execution route must re-check every target before any mutation.
+
+Route 173 recovery plans are also not mutation authority. They require explicit
+snapshot id and target facts, workspace authority, current-content guard
+preflight, direct rollback confirmation, and post-rollback verification before
+reporting restored files.
 
 ## User Confirmation Model
 
@@ -179,7 +189,9 @@ Future implementation routes should add gates in this order:
    - Route 172 opens bounded confirmed target-set exact fenced replacement
      execution only.
 3. broad refactor manifest planning with no mutation
-4. snapshot/rollback precondition route before any broad execution
+4. snapshot/rollback precondition route before any broad execution: Route 173
+   closes explicit single-file and bounded target-set subset rollback apply for
+   snapshot-backed edits only.
 
 Each route must include focused helper tests, write-boundary tests,
 stale-read/authority regressions, result-contract projection tests, and

@@ -168,6 +168,7 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   const parts = [`Failure handoff: status=${status ?? "failed"}`];
   const discoverySummary = extractDiscoveryEditContinuationSummary(codingResult);
   const targetSetSummary = extractTargetSetEditContinuationSummary(codingResult);
+  const editRecoverySummary = extractEditRecoveryApplyContinuationSummary(codingResult);
   if (target) {
     parts.push(`target=${target}`);
   }
@@ -202,6 +203,9 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   }
   if (targetSetSummary) {
     parts.push(targetSetSummary);
+  }
+  if (editRecoverySummary) {
+    parts.push(editRecoverySummary);
   }
   parts.push(`next=${compactText(nextFocus, 140).replace(/[.]+$/, "")}`);
   return `${parts.join("; ")}.`;
@@ -296,6 +300,18 @@ function extractTargetSetEditContinuationSummary(
     return undefined;
   }
   return `target-set=${compactText(summary, 300)}`;
+}
+
+function extractEditRecoveryApplyContinuationSummary(
+  codingResult: CodingResultSummary,
+): string | undefined {
+  const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("edit-recovery-apply plan="),
+  );
+  if (!summary) {
+    return undefined;
+  }
+  return `edit-recovery=${compactText(summary, 300)}`;
 }
 
 function compactText(input: string, max: number = 220): string {

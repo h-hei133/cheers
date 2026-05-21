@@ -45,6 +45,7 @@ export {
 } from "./editSnapshot.js";
 export {
   projectEditRecoveryResult,
+  buildEditRecoveryApplyRouteResult,
   type EditRecoveryResult,
 } from "./editRecoveryResult.js";
 export {
@@ -52,6 +53,23 @@ export {
   projectSingleFileRollbackPlan,
   type EditRollbackPlan,
 } from "./editRollback.js";
+export {
+  buildEditRecoveryPlan,
+  type EditRecoveryPlan,
+  type EditRecoveryPlanTarget,
+} from "./editRecoveryPlan.js";
+export {
+  runEditRecoveryApplyRoute,
+  type EditRecoveryApplyRoute,
+  type EditRecoveryApplyFileResult,
+} from "./editRecoveryApply.js";
+export {
+  buildEditRecoveryOutcome,
+  type EditRecoveryOutcome,
+} from "./editRecoveryOutcome.js";
+export {
+  buildTargetSetPartialRecoveryPlan,
+} from "./targetSetEditRecovery.js";
 export {
   selectFencedEditReplacementActivation,
   type FencedEditActivation,

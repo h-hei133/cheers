@@ -492,6 +492,55 @@ describe("stopped session continuity", () => {
     expect(surface?.failureHandoffDiagnostic).not.toContain("rollback succeeded");
     expect(surface?.failureHandoffDiagnostic).not.toContain("atomic rollback");
   });
+
+  it("summarizes explicit edit recovery apply without raw content", () => {
+    const result = makeCodingResult({
+      failedFiles: [
+        {
+          path: "src/a.ts",
+          reason: "Explicit rollback apply requires direct rollback confirmation.",
+        },
+      ],
+      continuation: {
+        status: "failed-after-bounded-continuation",
+        attempts: 0,
+        evidence: [
+          "edit-recovery-apply plan=edit-recovery-abc123",
+          "edit-recovery-apply status=rollback-stopped",
+          "edit-recovery-apply restored=none",
+          "edit-recovery-apply failed=src/a.ts",
+          "edit-recovery-result:raw-content-excluded",
+        ],
+      },
+      verification: {
+        status: "blocked",
+        reason: "Explicit rollback apply requires direct rollback confirmation.",
+        blockerKind: "unknown",
+        nextAction: "Confirm the snapshot rollback before retrying.",
+      },
+      evidence: ["edit-recovery-result:raw-content-excluded"],
+      lastActionResultSeed: {
+        actionKind: "edit-file",
+        changedFiles: [],
+        verifiedFiles: [],
+        reason: "Explicit rollback apply requires direct rollback confirmation.",
+        blockerKind: "unknown",
+        verification: {
+          status: "blocked",
+          reason: "Explicit rollback apply requires direct rollback confirmation.",
+          blockerKind: "unknown",
+        },
+      },
+    });
+
+    const surface = deriveStoppedSessionContinuitySurface(result);
+
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "edit-recovery=edit-recovery-apply plan=edit-recovery-abc123",
+    );
+    expect(surface?.failureHandoffDiagnostic).not.toContain("status: draft");
+    expect(surface?.failureHandoffDiagnostic).not.toContain("raw content");
+  });
 });
 
 function makeCodingResult(

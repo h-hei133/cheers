@@ -24,7 +24,10 @@ const testTargets = [
   'src/orchestration/discoveryEditResult.test.ts',
   'src/orchestration/targetSetEditPlan.test.ts',
   'src/orchestration/targetSetEditRoute.test.ts',
+  'src/orchestration/targetSetEditRecovery.test.ts',
   'src/orchestration/editSnapshot.test.ts',
+  'src/orchestration/editRecoveryPlan.test.ts',
+  'src/orchestration/editRecoveryApply.test.ts',
   'src/orchestration/editRecoveryResult.test.ts',
   'src/orchestration/editRollback.test.ts',
   'src/orchestration/fencedEditActivation.test.ts',
@@ -54,6 +57,7 @@ console.log('report field discovery_edit_confirmation=covered')
 console.log('report field discovery_edit_single_target_handoff=covered')
 console.log('report field discovery_edit_confirmed_target_set_execution=covered')
 console.log('report field target_set_partial_failure=covered')
+console.log('report field explicit_edit_recovery_apply=covered')
 console.log('report field result_contract_compatible=covered')
 console.log(`repo=${repoRoot}`)
 
@@ -97,6 +101,12 @@ console.log('marker discovery-confirmed-target-set-execution')
 console.log('marker target-set-max-file-guard-stopped-no-write')
 console.log('marker target-set-preflight-all-files-before-mutation')
 console.log('marker target-set-partial-failure-rollback-readiness')
+console.log('marker edit-recovery-plan-from-snapshot-id')
+console.log('marker edit-recovery-single-file-rollback-apply')
+console.log('marker edit-recovery-target-set-subset-rollback-apply')
+console.log('marker edit-recovery-missing-target-stopped-no-write')
+console.log('marker edit-recovery-stale-target-stopped-no-write')
+console.log('marker edit-recovery-no-automatic-rollback')
 console.log('marker discovery-candidate-summary-raw-content-excluded')
 console.log('marker result-contract-compatible')
 console.log('[pass] edit-capability-closeout')

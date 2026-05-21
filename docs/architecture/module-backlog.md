@@ -281,6 +281,21 @@ as an import-policing rule.
 - Unconfirmed, over-max, fuzzy, generated, broad, and unsupported target-set
   edits remain stopped/no-write.
 
+### Route 173: Edit Recovery Apply
+
+- Route 173 makes snapshot-backed edit recovery operational through explicit
+  rollback apply only.
+- Recovery planning consumes known snapshot ids and target paths, checks
+  workspace authority and current-content freshness, and keeps plans as
+  mutation-authority-not-granted until direct rollback confirmation.
+- Single-file rollback apply and bounded target-set subset rollback apply
+  restore only snapshot-backed files, run post-rollback verification, report
+  success/stopped/failed/partial-failure outcomes, and emit Session /
+  Continue-safe evidence without raw content.
+- Missing snapshot, missing target, ambiguous target, out-of-workspace target,
+  stale target, missing confirmation, unsupported rollback, and no automatic or
+  atomic rollback claims remain stopped/no-write.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -328,7 +343,7 @@ preconditions, result projection, and validation.
 | Candidate | Primary module | Goal | Stop condition |
 |---|---|---|---|
 | Edit / Patch thin integration | Edit / Patch, Result Surface | Adopt the module facade at one thin classification/projection handoff. | no new write execution |
-| Edit snapshot / rollback substrate | Edit / Patch, Runtime | Route 170 substrate now exists for activated exact fenced replacement: pre-write snapshot receipt, rollback readiness, dry-run rollback plan, and explicit single-file apply seam. | no automatic rollback; no broad/fuzzy/discovery/generated/multi-file execution |
+| Edit snapshot / rollback substrate | Edit / Patch, Runtime | Route 173 closes explicit snapshot-backed single-file rollback apply and bounded target-set subset recovery apply through recovery plans, guarded restore, verification, Result Surface, Session / Continue, and verifier coverage. | no automatic rollback; no broad/fuzzy/discovery/generated execution; no atomic rollback claim |
 | Discovery target-set mutation route | Edit / Patch, Workspace / File Context | Route 172 supports only confirmed target sets that reduce to exact fenced replacement, max 3 files, with preflight-all-before-mutation and per-file recovery evidence. | no fuzzy/generated/broad execution; no automatic or atomic rollback claim |
 | Browser controlled planner v2 | Browser, Agent Loop | Improve controlled planner contracts only if browser becomes product priority. | no public web or default browser action expansion |
 
