@@ -16,6 +16,10 @@ const focusedTests = [
   'src/orchestration/contextAwareProviderPrompt.test.ts',
   'src/orchestration/contextAwareProviderProposal.test.ts',
   'src/orchestration/contextAwareProviderResult.test.ts',
+  'src/orchestration/verificationRepairContext.test.ts',
+  'src/orchestration/verificationRepairPlanner.test.ts',
+  'src/orchestration/verificationRepairResult.test.ts',
+  'src/orchestration/verificationRepairLoop.test.ts',
   'src/orchestration/readInspectIntent.test.ts',
   'src/orchestration/targetResolution.test.ts',
   'src/session/continuationEvidenceParity.test.ts',
@@ -38,6 +42,9 @@ console.log('marker agent-plan-feeds-provider-proposal')
 console.log('marker context-aware-provider-missing-context-stops-before-call')
 console.log('marker context-aware-provider-prompt-redacted-budgeted')
 console.log('marker context-aware-provider-session-continue-evidence')
+console.log('marker verification-repair-context-packet-agent-plan-ids')
+console.log('marker verification-repair-context-aware-fake-provider-no-write')
+console.log('marker verification-repair-session-continue-evidence')
 console.log('marker broad-edit-needs-more-context')
 console.log('marker agent-plan-result-surface')
 console.log('marker session-result-parity')

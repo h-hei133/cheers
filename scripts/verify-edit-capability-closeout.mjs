@@ -39,6 +39,10 @@ const testTargets = [
   'src/orchestration/editRepairProposal.test.ts',
   'src/orchestration/editRepairPlanner.test.ts',
   'src/orchestration/editRepairResult.test.ts',
+  'src/orchestration/verificationRepairContext.test.ts',
+  'src/orchestration/verificationRepairPlanner.test.ts',
+  'src/orchestration/verificationRepairResult.test.ts',
+  'src/orchestration/verificationRepairLoop.test.ts',
   'src/orchestration/editProposalReview.test.ts',
   'src/orchestration/editProposalSelection.test.ts',
   'src/orchestration/editProposalApply.test.ts',
@@ -106,6 +110,11 @@ console.log('report field edit_repair_fake_provider_proposal=covered')
 console.log('report field edit_repair_review_required=covered')
 console.log('report field edit_repair_hunk_set_handoff=covered')
 console.log('report field edit_repair_no_raw_content=covered')
+console.log('report field verification_repair_loop_context=covered')
+console.log('report field verification_repair_fake_provider_proposal=covered')
+console.log('report field verification_repair_review_required=covered')
+console.log('report field verification_repair_hunk_set_handoff=covered')
+console.log('report field verification_repair_no_automatic_mutation=covered')
 console.log('report field proposal_review_surface=covered')
 console.log('report field proposal_selection_confirmation=covered')
 console.log('report field proposal_apply_bridge=covered')
@@ -202,6 +211,18 @@ console.log('marker edit-repair-confirmed-hunk-set-handoff-existing-route')
 console.log('marker edit-repair-no-automatic-mutation-after-verification-failure')
 console.log('marker edit-repair-transaction-recovery-evidence-preserved')
 console.log('marker edit-repair-result-session-raw-content-excluded')
+console.log('marker verification-repair-context-created-from-verification-failure')
+console.log('marker verification-repair-runtime-receipt-markers-preserved')
+console.log('marker verification-repair-context-packet-agent-plan-ids-preserved')
+console.log('marker verification-repair-missing-verification-stops-before-call')
+console.log('marker verification-repair-missing-context-stops-before-call')
+console.log('marker verification-repair-fake-provider-proposal-created-no-write')
+console.log('marker verification-repair-provider-unavailable-stopped')
+console.log('marker verification-repair-invalid-proposal-stopped-no-write')
+console.log('marker verification-repair-review-required-no-write')
+console.log('marker verification-repair-confirmed-hunk-set-handoff-existing-route')
+console.log('marker verification-repair-no-automatic-mutation-after-verification-failure')
+console.log('marker verification-repair-result-session-raw-content-excluded')
 console.log('marker proposal-review-created-no-write')
 console.log('marker proposal-reject-no-write')
 console.log('marker proposal-selection-required-no-write')

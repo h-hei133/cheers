@@ -14,6 +14,33 @@ None open after Route 165.
 
 ## Resolved
 
+### Verification-driven repair loop
+
+- Affected modules: Edit / Patch, Provider / Model, Runtime, Workspace / File
+  Context, Agent Loop, Result Surface, Session / Continue, Harness / Eval.
+- Why it was a calibration gap: repair proposals and context-aware provider
+  proposals existed separately, but failed verification/runtime receipt facts
+  did not yet flow through one review-gated repair loop that bound context
+  packet ids, Agent Plan ids, provider proposal evidence, Result Surface, and
+  `/continue` summaries without granting mutation authority.
+- Resolution: Route 185 adds `verificationRepairContext.ts`,
+  `verificationRepairPlanner.ts`, `verificationRepairResult.ts`, and
+  `verificationRepairLoop.ts`. Missing verification, missing context,
+  over-budget context, provider unavailable/opt-in, and invalid repair output
+  stop before mutation; deterministic fake-provider repair proposals are
+  review-required and no-write; confirmed exact repair hunks hand off only to
+  the existing hunk-set apply route.
+- Evidence: verification repair context/planner/result/loop tests, edit repair
+  and context-aware provider regressions, Session / Continue parity tests,
+  focused edit closeout and context-planning verifiers, result-contract, and
+  build.
+- Recommended next action: keep automatic repair, provider calls during apply,
+  default real-provider calls, fuzzy/broad/generated direct repair mutation,
+  new writers, CLI/schema/dependency changes, and broad
+  `runMvpIntegratedFlow.ts` rewrites closed until separate routes define them.
+- Should become a route: no, resolved by Route 185 for review-gated
+  verification repair loops only.
+
 ### Context-aware provider proposal evidence
 
 - Affected modules: Edit / Patch, Provider / Model, Workspace / File Context,

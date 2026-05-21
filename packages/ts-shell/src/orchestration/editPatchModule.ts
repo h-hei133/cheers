@@ -262,6 +262,29 @@ export {
   buildEditRepairResult,
   type EditRepairResultState,
 } from "./editRepairResult.js";
+export {
+  buildVerificationRepairContext,
+  buildVerificationRepairContextFromCodingResult,
+  buildVerificationRepairContextFromEditContext,
+  type VerificationRepairContext,
+  type VerificationRepairContextStatus,
+} from "./verificationRepairContext.js";
+export {
+  planVerificationRepairHunkSetHandoff,
+  planVerificationRepairLoop,
+  type VerificationRepairFakeProvider,
+  type VerificationRepairPlan,
+  type VerificationRepairPlannerStatus,
+  type VerificationRepairPromptContext,
+} from "./verificationRepairPlanner.js";
+export {
+  buildVerificationRepairResult,
+  type VerificationRepairResultState,
+} from "./verificationRepairResult.js";
+export {
+  runVerificationRepairLoop,
+  type VerificationRepairLoopRun,
+} from "./verificationRepairLoop.js";
 
 export interface EditPatchModuleState {
   readonly editExpectation: EditExpectationContract;

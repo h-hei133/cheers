@@ -64,6 +64,28 @@ describe("session result parity", () => {
       "context-aware-provider-result:mutation:not-run",
     );
   });
+
+  it("projects verification repair loop markers for session consumers", () => {
+    const projection = projectSessionResultParity({
+      terminalClassification: "stopped",
+      stopReason: "Review repair proposal and explicitly confirm exact hunks.",
+      codingResult: makeCodingResult({
+        reason: "Verification failed; repair proposal requires review.",
+        nextAction: "Review repair proposal and explicitly confirm exact hunks.",
+        evidence: [
+          "verification-repair-loop id=verification-repair-loop-abc; state=repair-review-required; repairContext=edit-repair-context-def; repairProposal=edit-repair-proposal-def; contextPacket=ctx_abc; agentPlan=plan_abc; verification=failed; runtimeReceipts=1; provider=proposal-only; next=review; raw-content-excluded",
+          "verification-repair-result:mutation-authority:not-granted-until-existing-route",
+        ],
+      }),
+    });
+
+    expect(projection.capabilityArea).toBe("edit-patch");
+    expect(projection.mutationAuthority).toBe("not-granted");
+    expect(projection.redactionStatus).toBe("raw-content-excluded");
+    expect(projection.evidenceMarkers).toContain(
+      "verification-repair-result:mutation-authority:not-granted-until-existing-route",
+    );
+  });
 });
 
 function makeCodingResult(input: {

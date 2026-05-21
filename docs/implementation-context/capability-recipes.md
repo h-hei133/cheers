@@ -24,6 +24,8 @@ not import restrictions.
   `contextAwareProviderProposal.ts`, `contextAwareProviderResult.ts`,
   `editRepairContext.ts`, `editRepairProposal.ts`,
   `editRepairPlanner.ts`, `editRepairResult.ts`,
+  `verificationRepairContext.ts`, `verificationRepairPlanner.ts`,
+  `verificationRepairResult.ts`, `verificationRepairLoop.ts`,
   `editProposalReview.ts`, `editProposalSelection.ts`,
   `editProposalApply.ts`, `editProposalReviewResult.ts`, `exactHunkSet.ts`,
   `exactHunkConflict.ts`, `exactHunkApply.ts`, `exactHunkResult.ts`,
@@ -45,6 +47,9 @@ not import restrictions.
   provider proposal generation is opened,
   verification repair safe context and repair proposal facts when failed apply
   or verification opens review-gated repair planning,
+  verification repair loop facts that bind failed verification evidence,
+  runtime receipt markers, source edit transaction/proposal ids, context packet
+  ids, and Agent Plan ids before a context-aware repair proposal is opened,
   proposal review/selection facts and explicit apply confirmation,
   proposal hunk-set manifest facts for per-target distinct exact mappings and
   bounded exact multi-hunk-per-file selections,
@@ -65,6 +70,10 @@ not import restrictions.
   stopped evidence, and review/handoff readiness,
   verification repair context/proposal/review states with no automatic repair
   mutation,
+  verification repair loop context/proposal/result states with provider
+  preflight stops, fake-provider no-write proposal evidence, runtime receipt
+  markers, context packet / Agent Plan ids, review-required no-write evidence,
+  and confirmed exact hunk-set handoff evidence,
   proposal review/reject/selection/apply bridge evidence,
   proposal hunk-set apply evidence for distinct per-target exact mappings,
   exact hunk-set conflict/preflight evidence, one snapshot/write per file for
@@ -93,6 +102,11 @@ not import restrictions.
   context, stay review-required and no-write by default, and hand off only after
   explicit exact hunk confirmation to the existing hunk-set apply route. Repair
   planning must not call providers during apply or run automatic repair.
+  Verification repair loops must stop before provider invocation when failed
+  verification evidence, context packet id, Agent Plan id, provider readiness,
+  or bounded safe context is missing; they must not mutate from repair proposal
+  alone and must hand off only confirmed exact hunks to the existing hunk-set
+  route.
   Context-aware provider proposals must stop before provider invocation when
   targeted context or Agent Plan readiness is missing, must use only redacted
   budgeted prompt context, and must record context packet / Agent Plan ids
@@ -104,7 +118,8 @@ not import restrictions.
   proposal/planner/confirmation/result tests, provider edit
   context/proposal/planner/confirmation/result tests, context-aware provider
   edit/prompt/proposal/result tests, edit repair
-  context/proposal/planner/result tests, proposal review/selection/apply/result
+  context/proposal/planner/result tests, verification repair
+  context/planner/result/loop tests, proposal review/selection/apply/result
   tests, proposal hunk-set
   manifest/plan/route/result tests, exact hunk set/conflict/apply/result
   tests, target-set edit

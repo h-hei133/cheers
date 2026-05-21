@@ -455,6 +455,23 @@ as an import-policing rule.
   LSP/embedding/full-repo indexing, schema/CLI/dependency changes, and broad
   `runMvpIntegratedFlow.ts` refactors remain closed.
 
+### Route 185: Verification-Driven Repair Loop
+
+- Route 185 adds verification repair context, planner, result, and loop
+  facades that connect failed verification/apply facts, runtime receipt
+  markers, context packet ids, Agent Plan ids, and context-aware fake-provider
+  repair proposals.
+- Missing verification evidence, missing context/plan ids, over-budget repair
+  context, provider unavailable/opt-in states, and invalid repair output stop
+  before provider invocation or mutation. Repair proposals remain
+  review-required and `mutationAuthority:not-granted`.
+- Confirmed exact repair hunks can hand off only to the existing proposal
+  hunk-set apply route, so workspace authority, stale-read, snapshot/recovery,
+  and post-write verification remain owned by existing write routes.
+- Automatic repair, provider calls during apply, default real-provider calls,
+  fuzzy/broad/generated direct mutation, new writers, schema/CLI/dependency
+  changes, and broad `runMvpIntegratedFlow.ts` refactors remain closed.
+
 ## Module-First Route Rule
 
 Future routes must state:
