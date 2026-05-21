@@ -180,6 +180,7 @@ function classifyUnsupportedActivation(prompt: string):
         | "unsupported-discovery"
         | "unsupported-fuzzy"
         | "unsupported-broad"
+        | "unsupported-multi-file"
         | "unsupported-generated"
         | "unsupported-rollback";
       readonly reason: string;
@@ -204,7 +205,7 @@ function classifyUnsupportedActivation(prompt: string):
   }
   if (/\b(?:all|every|each|matching|matches|broad|refactor)\b[\s\S]{0,80}\b(?:fenced|block|blocks|region|regions|match|matches)\b/i.test(prompt)) {
     return {
-      blocker: "unsupported-broad",
+      blocker: "unsupported-multi-file",
       reason: "Broad or multi-region fenced replacement is outside the exact replacement lane.",
       nextAction:
         "Retry with one exact old fenced block that matches exactly one region.",

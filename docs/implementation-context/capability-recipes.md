@@ -8,7 +8,7 @@ not import restrictions.
 - Start in: Edit / Patch.
 - Use facades/contracts: `editPatchModule.ts`, `editExpectationContract.ts`,
   `fencedEditActivation.ts`, `fencedEditPlanner.ts`, `fencedEditRoute.ts`,
-  `fencedEditResult.ts`, `workspaceFileContract.ts`,
+  `fencedEditOutcome.ts`, `fencedEditResult.ts`, `workspaceFileContract.ts`,
   `workspaceTargetProjection.ts`,
   `patchResult/workspaceAuthority.ts`, `mutationVerificationProjection.ts`.
 - Consume: explicit in-workspace target, concrete content or exact mapping,
@@ -16,9 +16,11 @@ not import restrictions.
   runtime activation facts when the lane is reached from prompt/CLI selection,
   workspace authority fact, final stale-read fact, verification plan.
 - Emit: patch/write result projection, changed/failed file summaries,
-  fenced replacement activation and result projection, actionable blocker
-  markers for missing target, missing content, stale-read, and unsupported
-  future edit, verification summary, continuation-safe mutation evidence.
+  fenced replacement activation, outcome taxonomy, and result projection,
+  actionable blocker markers for missing target, missing content, no-match,
+  multiple matches, stale-read, unsupported future edit, writer failure, and
+  verification failure, verification summary, continuation-safe mutation
+  evidence.
 - Do not bypass: workspace authority, final stale-read, permission decisions,
   post-write verification projection, Result Surface truthfulness.
 - Validate: focused edit/write route tests, stale-read/authority regression,

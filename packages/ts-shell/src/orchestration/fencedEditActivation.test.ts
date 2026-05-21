@@ -46,7 +46,7 @@ describe("fencedEditActivation", () => {
       },
       {
         prompt: "Update all fenced blocks in src/app.ts.",
-        blocker: "unsupported-broad",
+        blocker: "unsupported-multi-file",
       },
       {
         prompt: "Generate a new implementation for the fenced block in src/app.ts.",

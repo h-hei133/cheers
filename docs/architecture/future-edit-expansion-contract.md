@@ -28,7 +28,10 @@ Current supported write/edit behavior remains:
   route has one explicit target, an exact old/new fenced mapping, exactly one
   matching region, workspace authority, final stale-read, and post-write
   verification; Route 168 makes this lane reachable through prompt/CLI
-  runtime selection while still delegating execution to Edit / Patch
+  runtime selection while still delegating execution to Edit / Patch; Route 169
+  closes out the activated lane with stable success/stopped/failed outcome
+  markers, Result Surface classification, continuation-safe evidence, and
+  verifier coverage without adding edit power
 - ambiguous sibling targets stop before mutation
 - vague generated-content prompts stop actionably
 - no-write read/inspect requests stay separate from mutation
@@ -67,7 +70,7 @@ The reference scan was shape-only; no implementation code was copied.
 |---|---|---|
 | broad refactor planning | future-only | target/constraint manifest, user-confirmed target selection, workspace authority, final stale-read, verification plan, snapshot/rollback story |
 | multi-file discovery edit | future-only | discovery phase, candidate file list, user-confirmed target set, per-file plan, bounded max-file guard, workspace authority, final stale-read, verification plan |
-| fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy remains future-only | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, verification plan |
+| fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy/discovery/generated/multi-file/rollback remains stopped and no-write | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, verification plan, stable outcome taxonomy |
 
 These modes are intentionally separate. A broad refactor request is not a
 discovery edit. A discovery edit is not permission to mutate every candidate.
@@ -142,7 +145,8 @@ Future implementation routes should add gates in this order:
 
 1. fenced replacement bounded implementation with exact mapping only: closed
    for exact old/new fenced mapping by Route 167 and activated through runtime
-   selection by Route 168; broad/fuzzy remains future-only
+   selection by Route 168; Route 169 adds closeout taxonomy/verifier coverage;
+   broad/fuzzy/discovery/generated/multi-file/rollback remains future-only
 2. discovery edit candidate selection with user-confirmed target set
 3. broad refactor manifest planning with no mutation
 4. snapshot/rollback precondition route before any broad execution

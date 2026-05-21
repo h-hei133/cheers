@@ -146,6 +146,56 @@ describe("stopped session continuity", () => {
     );
   });
 
+  it("summarizes unsupported fenced replacement without raw block content", () => {
+    const nextAction =
+      "Provide exact old and new fenced blocks for one explicit target file.";
+    const result = makeCodingResult({
+      failedFiles: [
+        {
+          path: "src/app.ts",
+          reason:
+            "Fuzzy fenced replacement is outside the exact replacement lane.",
+        },
+      ],
+      verification: {
+        status: "blocked",
+        reason:
+          "Fuzzy fenced replacement is outside the exact replacement lane.",
+        blockerKind: "unknown",
+        nextAction,
+      },
+      evidence: [
+        "fenced-edit-outcome:fenced-edit-unsupported-fuzzy",
+        "fenced-edit-mutation:not-run",
+        "fenced-edit-result:raw-content-excluded",
+        "actionable-blocker-kind:unsupported-future-edit",
+      ],
+      continuation: {
+        status: "failed-after-bounded-continuation",
+        attempts: 1,
+        evidence: [
+          "fenced-edit-result:operation:fenced-replacement",
+          "fenced-edit-result:state:stopped",
+          "fenced-edit-outcome:fenced-edit-unsupported-fuzzy",
+          "fenced-edit-result:raw-content-excluded",
+        ],
+      },
+    });
+
+    const surface = deriveStoppedSessionContinuitySurface(result);
+
+    expect(surface?.kind).toBe("unsupported-future-edit");
+    expect(surface?.actionableFailure).toEqual({
+      blockerKind: "unsupported-future-edit",
+      nextAction,
+    });
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "blocker=unsupported-future-edit",
+    );
+    expect(JSON.stringify(result)).not.toContain("status: ready");
+    expect(JSON.stringify(result)).not.toContain("status: draft");
+  });
+
   it("keeps MCP unavailable as an MCP blocker without file mutations", () => {
     const reason = "MCP tool mcp__localSdk__search is unavailable.";
     const result = makeCodingResult({

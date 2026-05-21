@@ -225,6 +225,9 @@ function extractIntentSignals(prompt: string): IntentSignals {
       ])) ||
     (hasPathReference &&
       hasAny(text, [/\b(?:replace|update|change)\b/i])) ||
+    (hasPathReference &&
+      hasCodeFence &&
+      hasAny(text, [/\b(?:generate|generated|rewrite)\b/i])) ||
     asksForExplicitCommand ||
     (asksForImplementation && hasPathReference);
 

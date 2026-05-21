@@ -8,6 +8,10 @@ import type {
   OrchestrationResult,
 } from "./types.js";
 import type { FencedEditReplacementRoute } from "./fencedEditRoute.js";
+import {
+  classifyFencedEditOutcome,
+  fencedEditOutcomeEvidence,
+} from "./fencedEditOutcome.js";
 
 export function buildFencedEditReplacementRouteResult(input: {
   readonly sessionId: string;
@@ -29,6 +33,13 @@ export function buildFencedEditReplacementRouteResult(input: {
 function buildCodingResult(route: FencedEditReplacementRoute): CodingResultSummary {
   const target = route.targetPath ?? "(fenced replacement)";
   const success = route.status === "written";
+  const outcome = classifyFencedEditOutcome({
+    status: route.status === "written" ? "written" : "blocked",
+    blocker: route.status === "blocked" ? route.blocker : undefined,
+    writerStarted:
+      route.status === "blocked" ? route.workspaceRoute?.writerStarted : undefined,
+    postWriteVerification: route.postWriteVerification,
+  });
   const reason = success
     ? "Exact fenced replacement completed after workspace authority, final stale-read, and post-write verification."
     : route.nextAction;
@@ -66,9 +77,12 @@ function buildCodingResult(route: FencedEditReplacementRoute): CodingResultSumma
       status: "first-pass-success",
       attempts: 0,
       evidence: [
+        ...fencedEditOutcomeEvidence(outcome),
         "fenced-edit-result:continuation-safe",
         `fenced-edit-result:operation:fenced-replacement`,
-        `fenced-edit-result:state:${success ? "changed" : "stopped"}`,
+        `fenced-edit-result:state:${
+          success ? "changed" : outcome.state === "failed" ? "failed" : "stopped"
+        }`,
         ...(blocker ? [`fenced-edit-result:blocker:${blocker}`] : []),
         "fenced-edit-result:raw-content-excluded",
       ],
@@ -104,13 +118,14 @@ function buildCodingResult(route: FencedEditReplacementRoute): CodingResultSumma
           selectionSource: "auto-from-changes",
         }
       : {
-          status: "blocked",
+          status: outcome.state === "failed" ? "failed" : "blocked",
           reason,
           blockerKind: "unknown",
           nextAction: reason,
         },
     evidence: [
       ...route.evidence,
+      ...fencedEditOutcomeEvidence(outcome),
       "fenced-edit-result:operation:fenced-replacement",
       success
         ? "fenced-edit-result:coding-result-success"
@@ -131,9 +146,25 @@ function buildCodingResult(route: FencedEditReplacementRoute): CodingResultSumma
         : {
             status: "blocked",
             reason,
-            ...(blocker ? { blockerKind: "unknown" as const } : {}),
+            ...(blocker
+              ? {
+                  blockerKind: "unknown" as const,
+                }
+              : {}),
           },
-      ...(blocker ? { reason, blockerKind: "unknown" as const } : {}),
+      ...(blocker
+        ? {
+            reason,
+            blockerKind: "unknown" as const,
+            ...(outcome.state === "failed"
+              ? {
+                  writerStarted: true,
+                  writeEffect: "unknown" as const,
+                  requiresUserInspection: true,
+                }
+              : {}),
+          }
+        : {}),
     },
     ...(success
       ? {
@@ -235,7 +266,7 @@ function buildTerminalInput(route: FencedEditReplacementRoute): QueryTerminal {
   return {
     action: "terminal",
     terminalReason: "stopped_error",
-    terminalClassification: "stopped",
+    terminalClassification: route.terminalClassification,
     stopReason: route.nextAction,
   };
 }
@@ -249,8 +280,11 @@ function buildOutput(route: FencedEditReplacementRoute): string {
     ].join("\n");
   }
   return [
-    "fenced replacement stopped before success.",
-    "Changed: none",
+    route.terminalClassification === "error"
+      ? "fenced replacement failed during execution."
+      : "fenced replacement stopped before writing.",
+    route.terminalClassification === "error" ? "Changed: unverified" : "Changed: none",
     `Reason: ${route.nextAction}`,
+    `Next: ${route.nextAction}`,
   ].join("\n");
 }

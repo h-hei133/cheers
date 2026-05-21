@@ -17,6 +17,7 @@ export type StoppedSessionContinuityKind =
   | "tool-execution-failed"
   | "verification-failed"
   | "partial-mutation-failed"
+  | "unsupported-future-edit"
   | "generic-stopped"
   | "generic-error";
 
@@ -215,6 +216,7 @@ function classifyStoppedSessionContinuityKind(
     case "mcp-unavailable":
     case "verification-failed":
     case "partial-mutation-failed":
+    case "unsupported-future-edit":
       return input.actionableFailure.blockerKind;
     default:
       break;

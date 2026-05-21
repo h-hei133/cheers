@@ -8,6 +8,7 @@ export type ActionableFailureBlockerKind =
   | "stale-read"
   | "partial-mutation-failed"
   | "verification-failed"
+  | "unsupported-future-edit"
   | "command-not-allowlisted"
   | "mcp-unavailable"
   | "approval-denied";
@@ -154,6 +155,14 @@ function classifyBlockerFromReason(
     return "patch-generation-failed";
   }
   if (
+    normalized.includes("unsupported-future-edit") ||
+    normalized.includes("outside the exact replacement lane") ||
+    normalized.includes("outside the activated lane") ||
+    normalized.includes("outside the exact mapping lane")
+  ) {
+    return "unsupported-future-edit";
+  }
+  if (
     normalized.includes("stale-read") ||
     normalized.includes("stale read") ||
     normalized.includes("changed since it was read")
@@ -193,6 +202,7 @@ function normalizeActionableBlocker(
     case "stale-read":
     case "partial-mutation-failed":
     case "verification-failed":
+    case "unsupported-future-edit":
     case "command-not-allowlisted":
     case "mcp-unavailable":
     case "approval-denied":
@@ -220,6 +230,8 @@ function defaultNextAction(blockerKind: string): string | undefined {
       return "Specify one exact target file/path and exact from/to text if editing, then rerun.";
     case "verification-failed":
       return "Fix the verification failure, then rerun the verification step.";
+    case "unsupported-future-edit":
+      return "Retry with one explicit target file and exact old/new fenced blocks, or leave broader edit behavior for a dedicated route.";
     case "command-not-allowlisted":
       return "Rephrase the request with an allowlisted command.";
     case "mcp-unavailable":

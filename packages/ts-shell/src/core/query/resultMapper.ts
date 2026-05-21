@@ -79,7 +79,9 @@ function deriveTruthfulTerminal(input: {
   if (
     input.terminal.terminalReason !== "completed" &&
     baseActionableBlocker &&
-    baseClassification === "error"
+    baseClassification === "error" &&
+    baseActionableBlocker.kind !== "partial-mutation-failed" &&
+    baseActionableBlocker.kind !== "verification-failed"
   ) {
     return {
       terminalReason: input.terminal.terminalReason,

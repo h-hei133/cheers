@@ -225,6 +225,24 @@ as an import-policing rule.
 - Unsupported fuzzy, discovery, broad/multi-region, generated-content, and
   rollback/snapshot fenced requests remain stopped before mutation.
 
+### Route 169: Edit Activation Closeout Gate
+
+- Route 169 hardens the activated exact fenced replacement lane without adding
+  edit power.
+- `fencedEditOutcome.ts` owns the stable success/stopped/failed taxonomy and
+  emits markers for success, missing target, missing mapping, no match,
+  multiple matches, stale-read, unsupported fuzzy/discovery/generated/multi-file
+  requests, writer failure, and verification failure.
+- Result Surface remains the terminal truthfulness root: supported success is
+  completed/success, pre-mutation blockers are stopped/no-write, and
+  writer-started or post-write verification failures remain error-classified.
+- Session / Continue consumes replay-safe evidence only; raw old/new fenced
+  content, full file content, provider paths, and secrets remain excluded.
+- The focused edit closeout gate now includes the fenced outcome tests and
+  emits explicit activated-lane report markers for reachability, no-write
+  stopped paths, continuation safety, raw-content exclusion, and
+  result-contract compatibility.
+
 ## Module-First Route Rule
 
 Future routes must state:

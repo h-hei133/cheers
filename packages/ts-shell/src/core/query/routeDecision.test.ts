@@ -86,6 +86,7 @@ describe("query route decision", () => {
       "修改 src/app.ts",
       "把 README 里的错误说明改一下",
       "Replace the exact fenced block in src/app.ts with this mapping.",
+      ["Generate new content for the fenced block in src/app.ts", "```", "old", "```"].join("\n"),
       "apply_patch 更新文件",
       "运行命令并修复",
       "commit 并 push",

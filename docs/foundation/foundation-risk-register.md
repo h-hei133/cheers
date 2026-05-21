@@ -14,6 +14,24 @@ None open after Route 165.
 
 ## Resolved
 
+### Activated fenced replacement closeout taxonomy
+
+- Affected modules: Edit / Patch, Result Surface, Session / Continue,
+  Workspace / File Context, Permission / Policy, Harness / Eval.
+- Why it was a calibration gap: Route 168 made exact fenced replacement
+  reachable, but the activated lane still needed one stable success/stopped/
+  failed taxonomy across terminal output, result mapping, continuation
+  evidence, verifier markers, and no-write unsupported paths.
+- Resolution: Route 169 adds `fencedEditOutcome.ts`, routes the markers through
+  fenced edit route/result projection, keeps hard writer/verification failures
+  as failed/error outcomes, and extends the edit closeout verifier coverage.
+- Evidence: `fencedEditOutcome.ts`, `fencedEditRoute.ts`,
+  `fencedEditResult.ts`, `resultMapper.ts`, `stoppedSessionContinuity.ts`,
+  `verify-edit-capability-closeout.mjs`, fenced edit focused tests.
+- Recommended next action: no broader edit expansion; keep fuzzy/discovery/
+  generated/multi-file/rollback edits stopped until a dedicated route opens one.
+- Should become a route: no, resolved by Route 169.
+
 ### Tool / Runtime command receipt evidence bridge
 
 - Affected modules: Tool, Runtime, Result Surface, Session / Continue,

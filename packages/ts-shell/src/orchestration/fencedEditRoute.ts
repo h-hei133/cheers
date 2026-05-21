@@ -14,6 +14,10 @@ import {
   runWorkspaceWriteRoute,
   type WorkspaceWriteRoute,
 } from "./patchResult/workspaceWriteRoute.js";
+import {
+  classifyFencedEditOutcome,
+  fencedEditOutcomeEvidence,
+} from "./fencedEditOutcome.js";
 import type { RecoveryAuthorityStoreConfig } from "./patchRecovery/recoveryAuthorityStore.js";
 
 export type FencedEditReplacementRoute =
@@ -37,7 +41,7 @@ export type FencedEditReplacementRoute =
       readonly workspaceRoute?: Extract<WorkspaceWriteRoute, { status: "blocked" }>;
       readonly changedFiles: readonly [];
       readonly postWriteVerification: "not-run" | "blocked" | "failed";
-      readonly terminalClassification: "stopped";
+      readonly terminalClassification: "stopped" | "error";
       readonly nextAction: string;
       readonly evidence: readonly string[];
     };
@@ -71,6 +75,11 @@ export async function runFencedEditReplacementRoute(
         originalContent: undefined,
         mapping: options.mapping,
       });
+      const outcome = classifyFencedEditOutcome({
+        status: "blocked",
+        blocker: `workspace-${targetAuthority.reason}`,
+        postWriteVerification: "not-run",
+      });
       return {
         source: "fenced-edit-replacement-route",
         status: "blocked",
@@ -79,9 +88,10 @@ export async function runFencedEditReplacementRoute(
         plan,
         changedFiles: [],
         postWriteVerification: "not-run",
-        terminalClassification: "stopped",
+        terminalClassification: blockedTerminalClassification(outcome),
         nextAction: targetAuthority.message,
         evidence: [
+          ...fencedEditOutcomeEvidence(outcome),
           "fenced-edit-route:workspace-authority-blocked",
           ...targetAuthority.evidence,
           ...plan.evidence,
@@ -101,6 +111,11 @@ export async function runFencedEditReplacementRoute(
   });
 
   if (plan.ok === false) {
+    const outcome = classifyFencedEditOutcome({
+      status: "blocked",
+      blocker: plan.blocker,
+      postWriteVerification: "not-run",
+    });
     return {
       source: "fenced-edit-replacement-route",
       status: "blocked",
@@ -109,9 +124,10 @@ export async function runFencedEditReplacementRoute(
       plan,
       changedFiles: [],
       postWriteVerification: "not-run",
-      terminalClassification: "stopped",
+      terminalClassification: blockedTerminalClassification(outcome),
       nextAction: plan.nextAction,
       evidence: [
+        ...fencedEditOutcomeEvidence(outcome),
         "fenced-edit-route:planning-blocked",
         ...plan.evidence,
         "fenced-edit-route:no-writer-invoked",
@@ -140,6 +156,12 @@ export async function runFencedEditReplacementRoute(
   });
 
   if (workspaceRoute.status === "blocked") {
+    const outcome = classifyFencedEditOutcome({
+      status: "blocked",
+      blocker: `workspace-${workspaceRoute.blocker}`,
+      writerStarted: workspaceRoute.writerStarted,
+      postWriteVerification: workspaceRoute.postWriteVerification,
+    });
     return {
       source: "fenced-edit-replacement-route",
       status: "blocked",
@@ -149,9 +171,10 @@ export async function runFencedEditReplacementRoute(
       workspaceRoute,
       changedFiles: [],
       postWriteVerification: workspaceRoute.postWriteVerification,
-      terminalClassification: "stopped",
+      terminalClassification: blockedTerminalClassification(outcome),
       nextAction: workspaceRoute.nextAction,
       evidence: [
+        ...fencedEditOutcomeEvidence(outcome),
         "fenced-edit-route:workspace-route-blocked",
         ...plan.evidence,
         ...workspaceRoute.evidence,
@@ -160,6 +183,10 @@ export async function runFencedEditReplacementRoute(
     };
   }
 
+  const outcome = classifyFencedEditOutcome({
+    status: "written",
+    postWriteVerification: workspaceRoute.postWriteVerification,
+  });
   return {
     source: "fenced-edit-replacement-route",
     status: "written",
@@ -170,6 +197,7 @@ export async function runFencedEditReplacementRoute(
     postWriteVerification: workspaceRoute.postWriteVerification,
     terminalClassification: "success",
     evidence: [
+      ...fencedEditOutcomeEvidence(outcome),
       "fenced-edit-route:exact-replacement-written",
       ...plan.evidence,
       ...workspaceRoute.evidence,
@@ -192,6 +220,11 @@ export function buildStoppedFencedEditReplacementRoute(input: {
     nextAction: input.nextAction,
     evidence: input.evidence,
   });
+  const outcome = classifyFencedEditOutcome({
+    status: "blocked",
+    blocker: input.blocker,
+    postWriteVerification: "not-run",
+  });
   return {
     source: "fenced-edit-replacement-route",
     status: "blocked",
@@ -200,9 +233,10 @@ export function buildStoppedFencedEditReplacementRoute(input: {
     plan,
     changedFiles: [],
     postWriteVerification: "not-run",
-    terminalClassification: "stopped",
+    terminalClassification: blockedTerminalClassification(outcome),
     nextAction: input.nextAction,
     evidence: [
+      ...fencedEditOutcomeEvidence(outcome),
       "fenced-edit-route:activation-blocked",
       ...input.evidence,
       ...plan.evidence,
@@ -219,6 +253,7 @@ function fencedPlanBlocker(blocker: string): FencedEditPlanBlocker {
     case "unsupported-fuzzy":
     case "unsupported-discovery":
     case "unsupported-broad":
+    case "unsupported-multi-file":
     case "unsupported-generated":
     case "unsupported-rollback":
     case "target-missing":
@@ -230,4 +265,10 @@ function fencedPlanBlocker(blocker: string): FencedEditPlanBlocker {
     default:
       return "missing-mapping";
   }
+}
+
+function blockedTerminalClassification(input: {
+  readonly terminalClassification: "success" | "stopped" | "error";
+}): "stopped" | "error" {
+  return input.terminalClassification === "error" ? "error" : "stopped";
 }

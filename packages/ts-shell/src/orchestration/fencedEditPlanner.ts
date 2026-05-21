@@ -9,6 +9,7 @@ export type FencedEditPlanBlocker =
   | "unsupported-fuzzy"
   | "unsupported-discovery"
   | "unsupported-broad"
+  | "unsupported-multi-file"
   | "unsupported-generated"
   | "unsupported-rollback"
   | "target-missing"

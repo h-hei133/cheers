@@ -66,6 +66,7 @@
         "packages/ts-shell/src/orchestration/fencedEditActivation.ts",
         "packages/ts-shell/src/orchestration/fencedEditPlanner.ts",
         "packages/ts-shell/src/orchestration/fencedEditRoute.ts",
+        "packages/ts-shell/src/orchestration/fencedEditOutcome.ts",
         "packages/ts-shell/src/orchestration/fencedEditResult.ts",
         "packages/ts-shell/src/orchestration/futureEditContract.ts",
         "packages/ts-shell/src/orchestration/futureEditPlanner.ts",
@@ -76,7 +77,7 @@
       "owns": [
         "current bounded edit/write expectations",
         "runtime activation selection for exact fenced replacement",
-        "exact fenced replacement planning and route projection",
+        "exact fenced replacement planning, outcome taxonomy, and route projection",
         "future-only edit planning contracts",
         "workspace write authority facts",
         "stale-read and mutation result projections"
@@ -368,6 +369,7 @@
         "fencedEditActivation.ts",
         "fencedEditPlanner.ts",
         "fencedEditRoute.ts",
+        "fencedEditOutcome.ts",
         "fencedEditResult.ts",
         "futureEditContract.ts",
         "futureEditPlanner.ts",
@@ -387,6 +389,7 @@
       "keyOutputs": [
         "edit expectation",
         "fenced replacement activation selection",
+        "fenced replacement outcome taxonomy",
         "patch/write result projection",
         "fenced replacement result projection",
         "changed/failed file summaries",
@@ -922,6 +925,7 @@
         "fencedEditActivation.ts",
         "fencedEditPlanner.ts",
         "fencedEditRoute.ts",
+        "fencedEditOutcome.ts",
         "fencedEditResult.ts",
         "workspaceAuthority.ts",
         "workspaceWriteResult.ts",
@@ -930,9 +934,10 @@
       "emit": [
         "patch/write result",
         "fenced replacement activation selection",
+        "fenced replacement outcome taxonomy",
         "fenced replacement result",
         "verification summary",
-        "actionable blocker evidence for missing target, missing content, stale-read, and unsupported future edit",
+        "actionable blocker evidence for missing target, missing content, no-match, multiple matches, stale-read, unsupported future edit, writer failure, and verification failure",
         "continuation-safe mutation evidence"
       ],
       "focusedValidation": [

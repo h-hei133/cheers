@@ -82,6 +82,71 @@ describe("fenced edit runtime activation", () => {
     expect(fuzzy.codingResult?.evidence).toContain(
       "fenced-edit-activation:blocker:unsupported-fuzzy",
     );
+    expect(fuzzy.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "fenced-edit-outcome:fenced-edit-unsupported-fuzzy",
+        "fenced-edit-mutation:not-run",
+        "actionable-blocker-kind:unsupported-future-edit",
+      ]),
+    );
+
+    for (const entry of [
+      {
+        prompt: [
+          "Replace the exact fenced block in src/app.ts after you discover the right file",
+          "```",
+          "status: draft",
+          "```",
+          "with",
+          "```",
+          "status: ready",
+          "```",
+        ].join("\n"),
+        marker: "fenced-edit-outcome:fenced-edit-unsupported-discovery",
+      },
+      {
+        prompt: [
+          "Replace the exact fenced block in src/app.ts and generate new content for that fenced block",
+          "```",
+          "status: draft",
+          "```",
+        ].join("\n"),
+        marker: "fenced-edit-outcome:fenced-edit-unsupported-generated",
+      },
+      {
+        prompt: [
+          "Update all fenced blocks in src/app.ts",
+          "```",
+          "status: draft",
+          "```",
+          "with",
+          "```",
+          "status: ready",
+          "```",
+        ].join("\n"),
+        marker: "fenced-edit-outcome:fenced-edit-unsupported-multi-file",
+      },
+    ]) {
+      const result = await runMvpIntegratedFlow({
+        sessionId: `sess_fenced_runtime_${entry.marker.replaceAll(/[^a-z0-9]/gi, "_")}`,
+        prompt: entry.prompt,
+        workspaceRoot,
+        escalationDecision: "allow-once",
+        maxTurns: 6,
+      });
+      expect(result.status, entry.marker).toBe("stopped_error");
+      expect(result.codingResult?.changedFiles).toEqual([]);
+      expect(result.codingResult?.evidence).toEqual(
+        expect.arrayContaining([
+          entry.marker,
+          "fenced-edit-mutation:not-run",
+          "actionable-blocker-kind:unsupported-future-edit",
+        ]),
+      );
+      await expect(
+        fs.readFile(path.join(workspaceRoot, "src", "app.ts"), "utf8"),
+      ).resolves.toBe("status: draft\nstatus: draft\n");
+    }
 
     const multiple = await runMvpIntegratedFlow({
       sessionId: "sess_fenced_runtime_multiple",
@@ -103,6 +168,9 @@ describe("fenced edit runtime activation", () => {
     expect(multiple.codingResult?.changedFiles).toEqual([]);
     expect(multiple.codingResult?.evidence).toContain(
       "fenced-edit-plan:blocker:multiple-matches",
+    );
+    expect(multiple.codingResult?.evidence).toContain(
+      "fenced-edit-outcome:fenced-edit-multiple-matches",
     );
   });
 
