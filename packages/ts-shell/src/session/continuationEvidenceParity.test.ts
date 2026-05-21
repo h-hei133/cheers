@@ -10,6 +10,7 @@ describe("continuation evidence parity", () => {
         "context-plan ctx_abc; readiness=needs-more-context; suggestedReads=1; tests=0; mutationAuthority=not-granted",
         "agent-plan plan_abc; owner=workspace-file-context; readiness=needs-more-context; confidence=medium; missingFacts=1; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
         "generated-edit proposal=generated-edit-abc; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
+        "context-aware-provider proposal=provider-edit-abc; status=review-required-proposal; contextPacket=ctx_abc; agentPlan=plan_abc; mutationAuthority=not-granted; raw-content-excluded",
         "edit-repair-proposal id=edit-repair-proposal-def; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
         "proposal-hunk-set proposal=provider-edit-abc; hunkSet=proposal-hunk-set-def; source=provider; targets=src/a.ts; mutationAuthority:not-granted; raw-content-excluded",
       ]),
@@ -23,6 +24,9 @@ describe("continuation evidence parity", () => {
     );
     expect(details).toContain(
       "proposal-hunk-set=proposal-hunk-set proposal=provider-edit-abc; hunkSet=proposal-hunk-set-def; source=provider; targets=src/a.ts; mutationAuthority:not-granted; raw-content-excluded",
+    );
+    expect(details).toContain(
+      "context-aware-provider=context-aware-provider proposal=provider-edit-abc; status=review-required-proposal; contextPacket=ctx_abc; agentPlan=plan_abc; mutationAuthority=not-granted; raw-content-excluded",
     );
     expect(JSON.stringify(details)).not.toContain("RAW_SECRET");
   });

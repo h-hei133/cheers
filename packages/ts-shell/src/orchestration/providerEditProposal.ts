@@ -35,11 +35,15 @@ export interface ProviderEditProposalTarget {
 export interface ProviderEditProposalManifest {
   readonly proposalId: string;
   readonly providerKindLabel: string;
+  readonly contextPacketId?: string;
+  readonly agentPlanId?: string;
   readonly targetScope: "explicit-target" | "confirmed-target-set" | "unknown";
   readonly proposedOperationKind: ProviderEditOperationKind;
   readonly targets: readonly ProviderEditProposalTarget[];
   readonly exactReadiness: ProviderEditHandoffReadiness;
   readonly confidence: "low" | "medium" | "high";
+  readonly contextConfidence?: "low" | "medium" | "high";
+  readonly contextReadiness?: "ready" | "needs-more-context";
   readonly riskSummary: string;
   readonly verificationPlan: readonly string[];
   readonly reviewRequired: boolean;
@@ -81,6 +85,10 @@ export function normalizeProviderEditProposal(input: {
   readonly providerKindLabel: string;
   readonly rawProposal: ProviderEditRawProposal;
   readonly explicitTargetLabels: readonly string[];
+  readonly contextPacketId?: string;
+  readonly agentPlanId?: string;
+  readonly contextConfidence?: "low" | "medium" | "high";
+  readonly contextReadiness?: "ready" | "needs-more-context";
 }): ProviderEditProposalNormalization {
   const operationKind = input.rawProposal.operationKind;
   if (operationKind === "broad-refactor" || operationKind === "fuzzy-replacement") {
@@ -135,11 +143,15 @@ export function normalizeProviderEditProposal(input: {
     : "review-only";
   const manifest = buildProviderEditProposalManifest({
     providerKindLabel: input.providerKindLabel,
+    contextPacketId: input.contextPacketId,
+    agentPlanId: input.agentPlanId,
     targetLabels: targets.map((target) => target.pathLabel),
     proposedOperationKind: operationKind,
     targetSummaries: targets.map((target) => target.proposedSummary),
     exactReadiness,
     confidence: input.rawProposal.confidence ?? "medium",
+    contextConfidence: input.contextConfidence,
+    contextReadiness: input.contextReadiness,
     riskSummary: input.rawProposal.riskSummary ?? "provider proposal requires review",
     verificationPlan: input.rawProposal.verificationPlan ?? [
       "review provider proposal",
@@ -152,11 +164,15 @@ export function normalizeProviderEditProposal(input: {
 
 export function buildProviderEditProposalManifest(input: {
   readonly providerKindLabel: string;
+  readonly contextPacketId?: string;
+  readonly agentPlanId?: string;
   readonly targetLabels: readonly string[];
   readonly proposedOperationKind: ProviderEditOperationKind;
   readonly targetSummaries: readonly string[];
   readonly exactReadiness: ProviderEditHandoffReadiness;
   readonly confidence?: "low" | "medium" | "high";
+  readonly contextConfidence?: "low" | "medium" | "high";
+  readonly contextReadiness?: "ready" | "needs-more-context";
   readonly riskSummary?: string;
   readonly verificationPlan?: readonly string[];
   readonly confirmationStatus?: ProviderEditConfirmationStatus;
@@ -197,6 +213,8 @@ export function buildProviderEditProposalManifest(input: {
   const safeSummary = [
     `provider edit proposal for ${input.targetLabels.join(", ") || "(no target)"}`,
     `provider=${input.providerKindLabel}`,
+    ...(input.contextPacketId ? [`contextPacket=${input.contextPacketId}`] : []),
+    ...(input.agentPlanId ? [`agentPlan=${input.agentPlanId}`] : []),
     `operation=${input.proposedOperationKind}`,
     `readiness=${handoffReadiness}`,
     `confirmation=${confirmationStatus}`,
@@ -206,6 +224,8 @@ export function buildProviderEditProposalManifest(input: {
   const transcriptSummary = [
     `provider-edit proposal=${proposalId}`,
     `provider=${input.providerKindLabel}`,
+    ...(input.contextPacketId ? [`contextPacket=${input.contextPacketId}`] : []),
+    ...(input.agentPlanId ? [`agentPlan=${input.agentPlanId}`] : []),
     `targets=${input.targetLabels.join(", ") || "(none)"}`,
     `readiness=${handoffReadiness}`,
     `confirmation=${confirmationStatus}`,
@@ -216,11 +236,17 @@ export function buildProviderEditProposalManifest(input: {
   return {
     proposalId,
     providerKindLabel: input.providerKindLabel,
+    ...(input.contextPacketId ? { contextPacketId: input.contextPacketId } : {}),
+    ...(input.agentPlanId ? { agentPlanId: input.agentPlanId } : {}),
     targetScope,
     proposedOperationKind: input.proposedOperationKind,
     targets,
     exactReadiness: input.exactReadiness,
     confidence: input.confidence ?? "medium",
+    ...(input.contextConfidence
+      ? { contextConfidence: input.contextConfidence }
+      : {}),
+    ...(input.contextReadiness ? { contextReadiness: input.contextReadiness } : {}),
     riskSummary: redactProviderEditText(input.riskSummary ?? "review required"),
     verificationPlan: (input.verificationPlan ?? []).map(redactProviderEditText),
     reviewRequired: confirmationStatus === "review-required",
@@ -233,6 +259,12 @@ export function buildProviderEditProposalManifest(input: {
     evidence: [
       "provider-edit-proposal:manifest-created",
       `provider-edit-proposal:provider:${input.providerKindLabel}`,
+      ...(input.contextPacketId
+        ? [`provider-edit-proposal:context-packet:${input.contextPacketId}`]
+        : []),
+      ...(input.agentPlanId
+        ? [`provider-edit-proposal:agent-plan:${input.agentPlanId}`]
+        : []),
       `provider-edit-proposal:operation:${input.proposedOperationKind}`,
       `provider-edit-proposal:readiness:${handoffReadiness}`,
       `provider-edit-proposal:confirmation:${confirmationStatus}`,

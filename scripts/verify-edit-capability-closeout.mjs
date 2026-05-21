@@ -31,6 +31,10 @@ const testTargets = [
   'src/orchestration/providerEditPlanner.test.ts',
   'src/orchestration/providerEditConfirmation.test.ts',
   'src/orchestration/providerEditResult.test.ts',
+  'src/orchestration/contextAwareProviderEdit.test.ts',
+  'src/orchestration/contextAwareProviderPrompt.test.ts',
+  'src/orchestration/contextAwareProviderProposal.test.ts',
+  'src/orchestration/contextAwareProviderResult.test.ts',
   'src/orchestration/editRepairContext.test.ts',
   'src/orchestration/editRepairProposal.test.ts',
   'src/orchestration/editRepairPlanner.test.ts',
@@ -93,6 +97,7 @@ console.log('report field generated_edit_exact_handoff=covered')
 console.log('report field generated_edit_no_raw_content=covered')
 console.log('report field provider_edit_context_packet=covered')
 console.log('report field provider_edit_fake_proposal=covered')
+console.log('report field context_aware_provider_proposal=covered')
 console.log('report field provider_edit_confirmation=covered')
 console.log('report field provider_edit_exact_handoff_ready=covered')
 console.log('report field provider_edit_no_raw_content=covered')
@@ -181,6 +186,11 @@ console.log('marker provider-edit-exact-single-target-handoff-ready')
 console.log('marker provider-edit-exact-target-set-handoff-ready')
 console.log('marker provider-edit-proposal-no-mutation-without-execution-path')
 console.log('marker provider-edit-session-report-raw-content-and-secrets-excluded')
+console.log('marker context-aware-provider-context-packet-feeds-proposal')
+console.log('marker context-aware-provider-agent-plan-feeds-proposal')
+console.log('marker context-aware-provider-missing-context-stops-before-call')
+console.log('marker context-aware-provider-fake-proposal-created-no-write')
+console.log('marker context-aware-provider-result-session-evidence-preserved')
 console.log('marker edit-repair-context-created-from-verification-failure')
 console.log('marker edit-repair-context-redacted-budgeted')
 console.log('marker edit-repair-fake-provider-proposal-created-no-write')

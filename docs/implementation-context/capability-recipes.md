@@ -20,6 +20,8 @@ not import restrictions.
   `generatedEditResult.ts`, `providerEditContext.ts`,
   `providerEditProposal.ts`, `providerEditPlanner.ts`,
   `providerEditConfirmation.ts`, `providerEditResult.ts`,
+  `contextAwareProviderEdit.ts`, `contextAwareProviderPrompt.ts`,
+  `contextAwareProviderProposal.ts`, `contextAwareProviderResult.ts`,
   `editRepairContext.ts`, `editRepairProposal.ts`,
   `editRepairPlanner.ts`, `editRepairResult.ts`,
   `editProposalReview.ts`, `editProposalSelection.ts`,
@@ -38,6 +40,9 @@ not import restrictions.
   generated edit no-write proposal manifest and explicit exact mapping
   confirmation facts, provider edit safe context packet and explicit provider
   availability facts when provider-backed proposal generation is opened,
+  targeted context packet ids plus Agent Plan readiness, confidence, missing
+  facts, suggested reads, and verification candidates when context-aware
+  provider proposal generation is opened,
   verification repair safe context and repair proposal facts when failed apply
   or verification opens review-gated repair planning,
   proposal review/selection facts and explicit apply confirmation,
@@ -55,6 +60,9 @@ not import restrictions.
   facts, target-set transaction id, safe journal, verification aggregate,
   recovery workflow handoff, generated proposal no-write/review/handoff
   evidence, provider proposal no-write/review/handoff-ready evidence,
+  context-aware provider proposal no-write evidence with context packet and
+  Agent Plan ids, missing-context stopped evidence, provider invalid-output
+  stopped evidence, and review/handoff readiness,
   verification repair context/proposal/review states with no automatic repair
   mutation,
   proposal review/reject/selection/apply bridge evidence,
@@ -85,12 +93,17 @@ not import restrictions.
   context, stay review-required and no-write by default, and hand off only after
   explicit exact hunk confirmation to the existing hunk-set apply route. Repair
   planning must not call providers during apply or run automatic repair.
+  Context-aware provider proposals must stop before provider invocation when
+  targeted context or Agent Plan readiness is missing, must use only redacted
+  budgeted prompt context, and must record context packet / Agent Plan ids
+  without granting mutation authority.
   Do not run automatic rollback.
 - Validate: focused edit/write route tests, stale-read/authority regression,
   fenced edit activation/runtime tests, discovery edit
   manifest/planner/confirmation/result tests, generated edit
   proposal/planner/confirmation/result tests, provider edit
-  context/proposal/planner/confirmation/result tests, edit repair
+  context/proposal/planner/confirmation/result tests, context-aware provider
+  edit/prompt/proposal/result tests, edit repair
   context/proposal/planner/result tests, proposal review/selection/apply/result
   tests, proposal hunk-set
   manifest/plan/route/result tests, exact hunk set/conflict/apply/result

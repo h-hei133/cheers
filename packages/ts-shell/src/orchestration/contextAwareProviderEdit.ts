@@ -1,0 +1,145 @@
+import type { AgentPlan } from "./agentPlan.js";
+import type { TargetedContextPacket } from "./contextPacket.js";
+import { redactProviderEditText } from "./providerEditContext.js";
+
+export type ContextAwareProviderProposalMode = "provider-edit-proposal";
+export type ContextAwareProviderInputStatus =
+  | "ready"
+  | "missing-context"
+  | "context-over-budget"
+  | "plan-needs-more-context";
+
+export interface ContextAwareProviderEditInput {
+  readonly requestId: string;
+  readonly proposalMode: ContextAwareProviderProposalMode;
+  readonly status: ContextAwareProviderInputStatus;
+  readonly targetSummary: string;
+  readonly targetLabels: readonly string[];
+  readonly contextPacketId?: string;
+  readonly agentPlanId?: string;
+  readonly contextCompleteness: AgentPlan["contextCompleteness"];
+  readonly planConfidence: AgentPlan["confidence"];
+  readonly missingFacts: readonly string[];
+  readonly suggestedReads: readonly string[];
+  readonly suggestedVerification: readonly string[];
+  readonly targetLabelsFromPlan: readonly string[];
+  readonly providerReadinessState: string;
+  readonly redactionStatus: "redacted-and-budgeted";
+  readonly omittedContentReasons: readonly string[];
+  readonly mutationAuthority: "not-granted";
+  readonly reason?: string;
+  readonly nextAction?: string;
+  readonly evidence: readonly string[];
+}
+
+export function buildContextAwareProviderEditInput(input: {
+  readonly requestId: string;
+  readonly targetSummary: string;
+  readonly contextPacket?: TargetedContextPacket;
+  readonly agentPlan?: AgentPlan;
+  readonly providerReadinessState: string;
+  readonly proposalMode?: ContextAwareProviderProposalMode;
+  readonly allowReviewOnlyWithMissingContext?: boolean;
+}): ContextAwareProviderEditInput {
+  const packet = input.contextPacket;
+  const plan = input.agentPlan;
+  const targetLabels = packet ? [packet.targetSafeLabel] : [];
+  const omittedContentReasons = packet
+    ? Array.from(
+        new Set(
+          packet.omittedCandidateSummaries.map(
+            (source) => source.reason ?? source.kind,
+          ),
+        ),
+      )
+    : ["missing-context-packet"];
+  const overBudget = packet?.omittedCandidateSummaries.some(
+    (source) => source.kind === "omitted-over-budget-candidate",
+  ) ?? false;
+  const planNeedsMoreContext =
+    plan?.executionReadiness === "needs-more-context" &&
+    input.allowReviewOnlyWithMissingContext !== true;
+
+  const status: ContextAwareProviderInputStatus =
+    !packet || !plan || packet.completenessStatus === "missing-context"
+      ? "missing-context"
+      : overBudget
+        ? "context-over-budget"
+        : planNeedsMoreContext
+          ? "plan-needs-more-context"
+          : "ready";
+  const reason = buildStoppedReason(status, omittedContentReasons, plan);
+  const nextAction = buildNextAction(status, plan);
+
+  return {
+    requestId: redactProviderEditText(input.requestId),
+    proposalMode: input.proposalMode ?? "provider-edit-proposal",
+    status,
+    targetSummary: redactProviderEditText(input.targetSummary),
+    targetLabels,
+    ...(packet ? { contextPacketId: packet.packetId } : {}),
+    ...(plan ? { agentPlanId: plan.planId } : {}),
+    contextCompleteness: plan?.contextCompleteness ?? "missing-context",
+    planConfidence: plan?.confidence ?? "low",
+    missingFacts: (plan?.missingFacts ?? ["context packet and Agent Plan are required"]).map(
+      redactProviderEditText,
+    ),
+    suggestedReads: (plan?.suggestedReads ?? []).map(redactProviderEditText),
+    suggestedVerification: (plan?.suggestedVerification ?? []).map(
+      redactProviderEditText,
+    ),
+    targetLabelsFromPlan: plan?.targetSummary ? [redactProviderEditText(plan.targetSummary)] : [],
+    providerReadinessState: redactProviderEditText(input.providerReadinessState),
+    redactionStatus: "redacted-and-budgeted",
+    omittedContentReasons,
+    mutationAuthority: "not-granted",
+    ...(reason ? { reason } : {}),
+    ...(nextAction ? { nextAction } : {}),
+    evidence: [
+      `context-aware-provider-edit:status:${status}`,
+      ...(packet ? [`context-aware-provider-edit:context-packet:${packet.packetId}`] : []),
+      ...(plan ? [`context-aware-provider-edit:agent-plan:${plan.planId}`] : []),
+      `context-aware-provider-edit:context-completeness:${plan?.contextCompleteness ?? "missing-context"}`,
+      `context-aware-provider-edit:plan-confidence:${plan?.confidence ?? "low"}`,
+      "context-aware-provider-edit:redacted-and-budgeted",
+      "context-aware-provider-edit:mutation-authority:not-granted",
+    ],
+  };
+}
+
+function buildStoppedReason(
+  status: ContextAwareProviderInputStatus,
+  omittedContentReasons: readonly string[],
+  plan: AgentPlan | undefined,
+): string | undefined {
+  switch (status) {
+    case "ready":
+      return undefined;
+    case "missing-context":
+      return "Provider proposal requires a complete targeted context packet and Agent Plan before provider invocation.";
+    case "context-over-budget":
+      return `Provider proposal context exceeded budget: ${omittedContentReasons.join(", ") || "over budget"}.`;
+    case "plan-needs-more-context":
+      return plan?.missingFacts.length
+        ? `Agent Plan needs more context: ${plan.missingFacts.join("; ")}.`
+        : "Agent Plan needs more context before provider invocation.";
+  }
+}
+
+function buildNextAction(
+  status: ContextAwareProviderInputStatus,
+  plan: AgentPlan | undefined,
+): string | undefined {
+  switch (status) {
+    case "ready":
+      return undefined;
+    case "missing-context":
+      return "Build a targeted context packet and Agent Plan for the explicit target first.";
+    case "context-over-budget":
+      return "Reduce or summarize context sources before requesting a provider proposal.";
+    case "plan-needs-more-context":
+      return plan?.suggestedReads.length
+        ? `Read suggested context before provider proposal: ${plan.suggestedReads.join(", ")}.`
+        : "Read the Agent Plan suggested context before provider proposal.";
+  }
+}

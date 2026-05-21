@@ -12,6 +12,10 @@ const focusedTests = [
   'src/orchestration/agentPlanContext.test.ts',
   'src/orchestration/agentPlanProjection.test.ts',
   'src/orchestration/agentPlanResult.test.ts',
+  'src/orchestration/contextAwareProviderEdit.test.ts',
+  'src/orchestration/contextAwareProviderPrompt.test.ts',
+  'src/orchestration/contextAwareProviderProposal.test.ts',
+  'src/orchestration/contextAwareProviderResult.test.ts',
   'src/orchestration/readInspectIntent.test.ts',
   'src/orchestration/targetResolution.test.ts',
   'src/session/continuationEvidenceParity.test.ts',
@@ -29,6 +33,11 @@ console.log('marker deterministic-import-sibling-test-docs-callsite')
 console.log('marker budget-redaction-no-write')
 console.log('marker continuation-safe-summary')
 console.log('marker context-packet-feeds-agent-plan')
+console.log('marker context-packet-feeds-provider-proposal')
+console.log('marker agent-plan-feeds-provider-proposal')
+console.log('marker context-aware-provider-missing-context-stops-before-call')
+console.log('marker context-aware-provider-prompt-redacted-budgeted')
+console.log('marker context-aware-provider-session-continue-evidence')
 console.log('marker broad-edit-needs-more-context')
 console.log('marker agent-plan-result-surface')
 console.log('marker session-result-parity')

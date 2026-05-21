@@ -15,6 +15,10 @@ const CONTINUATION_EVIDENCE_PREFIXES: ReadonlyArray<{
     prefixes: ["generated-edit proposal=", "generated-edit handoff="],
   },
   { label: "provider-edit", prefixes: ["provider-edit proposal="] },
+  {
+    label: "context-aware-provider",
+    prefixes: ["context-aware-provider proposal="],
+  },
   { label: "edit-repair-context", prefixes: ["edit-repair-context id="] },
   { label: "edit-repair-proposal", prefixes: ["edit-repair-proposal id="] },
   { label: "context-packet", prefixes: ["context-packet ", "context-packet:id:"] },

@@ -42,6 +42,28 @@ describe("session result parity", () => {
     expect(projection.suggestedReads).toBe("1");
     expect(projection.reason).toContain("Context packet needs more related reads");
   });
+
+  it("projects context-aware provider proposal markers for session consumers", () => {
+    const projection = projectSessionResultParity({
+      terminalClassification: "stopped",
+      stopReason: "Review the context-aware provider proposal before handoff.",
+      codingResult: makeCodingResult({
+        reason: "Context-aware provider proposal was created for review.",
+        nextAction: "Review the context-aware provider proposal before handoff.",
+        evidence: [
+          "context-aware-provider proposal=provider-edit-abc; status=review-required-proposal; contextPacket=ctx_abc; agentPlan=plan_abc; mutationAuthority=not-granted; raw-content-excluded",
+          "context-aware-provider-result:mutation:not-run",
+        ],
+      }),
+    });
+
+    expect(projection.capabilityArea).toBe("edit-patch");
+    expect(projection.mutationAuthority).toBe("not-granted");
+    expect(projection.redactionStatus).toBe("raw-content-excluded");
+    expect(projection.evidenceMarkers).toContain(
+      "context-aware-provider-result:mutation:not-run",
+    );
+  });
 });
 
 function makeCodingResult(input: {

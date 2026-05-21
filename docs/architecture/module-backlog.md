@@ -437,6 +437,24 @@ as an import-policing rule.
   approval policy change, session schema change, CLI/dependency change, or
   broad `runMvpIntegratedFlow.ts` refactor is added.
 
+### Route 184: Context-Aware Provider Proposal
+
+- Route 184 adds context-aware provider edit input, prompt, proposal, and
+  result facades so targeted context packet ids and Agent Plan readiness,
+  confidence, missing facts, suggested reads, and verification candidates can
+  feed provider-backed edit proposals.
+- Missing context, over-budget context, and needs-more-context Agent Plans stop
+  before provider invocation. Provider-facing prompt context remains redacted,
+  budgeted, explicit, and no-write.
+- Normalized provider proposal manifests can record context packet and Agent
+  Plan ids, context confidence/readiness, review requirement, handoff
+  readiness, and `mutationAuthority:not-granted`; Session / Continue preserves
+  replay-safe proposal/context/plan evidence.
+- Default real-provider calls, manual private config reads, mutation from
+  proposal, provider calls during apply, fuzzy/broad/generated direct mutation,
+  LSP/embedding/full-repo indexing, schema/CLI/dependency changes, and broad
+  `runMvpIntegratedFlow.ts` refactors remain closed.
+
 ## Module-First Route Rule
 
 Future routes must state:

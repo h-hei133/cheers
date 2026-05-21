@@ -14,6 +14,31 @@ None open after Route 165.
 
 ## Resolved
 
+### Context-aware provider proposal evidence
+
+- Affected modules: Edit / Patch, Provider / Model, Workspace / File Context,
+  Agent Loop, Result Surface, Session / Continue, Harness / Eval.
+- Why it was a calibration gap: provider-backed edit proposals consumed a
+  redacted provider context packet, but did not yet bind Route 181 targeted
+  context packet ids and Route 182 Agent Plan readiness, confidence, missing
+  facts, suggested reads, or verification candidates into the provider-facing
+  proposal input and replay-safe evidence.
+- Resolution: Route 184 adds context-aware provider edit input, prompt,
+  proposal, and result facades. Missing context, over-budget context, and
+  needs-more-context Agent Plans stop before provider invocation; fake-provider
+  proposals record context packet and Agent Plan ids in no-write manifests and
+  continuation evidence.
+- Evidence: context-aware provider edit/prompt/proposal/result tests, provider
+  proposal regressions, session result parity and continuation evidence parity
+  tests, focused context-planning verifier, edit closeout verifier,
+  result-contract, and build.
+- Recommended next action: keep default real-provider calls, provider calls
+  during apply, mutation from provider proposals, fuzzy/broad direct mutation,
+  LSP/embedding/full-repo indexing, CLI/schema/dependency changes, and broad
+  `runMvpIntegratedFlow.ts` rewrites closed until separate routes define them.
+- Should become a route: no, resolved by Route 184 for proposal context
+  evidence only.
+
 ### Session result parity after context and planning
 
 - Affected modules: Result Surface, Session / Continue, Workspace / File

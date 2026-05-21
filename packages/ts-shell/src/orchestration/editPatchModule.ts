@@ -165,6 +165,20 @@ export {
   type ProviderEditPlan,
 } from "./providerEditPlanner.js";
 export {
+  buildContextAwareProviderEditInput,
+  type ContextAwareProviderEditInput,
+} from "./contextAwareProviderEdit.js";
+export {
+  buildContextAwareProviderPrompt,
+  type ContextAwareProviderPromptContext,
+} from "./contextAwareProviderPrompt.js";
+export {
+  planContextAwareProviderProposal,
+  type ContextAwareProviderFakeProvider,
+  type ContextAwareProviderProposalPlan,
+} from "./contextAwareProviderProposal.js";
+export { buildContextAwareProviderProposalResult } from "./contextAwareProviderResult.js";
+export {
   decideProviderEditConfirmation,
   type ProviderEditConfirmationDecision,
 } from "./providerEditConfirmation.js";
