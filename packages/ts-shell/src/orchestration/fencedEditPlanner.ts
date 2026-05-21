@@ -7,6 +7,10 @@ export type FencedEditPlanBlocker =
   | "ambiguous-target"
   | "missing-mapping"
   | "unsupported-fuzzy"
+  | "unsupported-discovery"
+  | "unsupported-broad"
+  | "unsupported-generated"
+  | "unsupported-rollback"
   | "target-missing"
   | "mapping-not-found"
   | "multiple-matches"
@@ -233,6 +237,24 @@ export function planExactFencedReplacement(input: {
   };
 }
 
+export function buildStoppedFencedReplacementPlan(input: {
+  readonly targetPath?: string;
+  readonly blocker: FencedEditPlanBlocker;
+  readonly matchCount?: number;
+  readonly reason: string;
+  readonly nextAction: string;
+  readonly evidence: readonly string[];
+}): Extract<ExactFencedReplacementPlan, { ok: false }> {
+  return stoppedPlan({
+    ...(input.targetPath ? { targetPath: input.targetPath } : {}),
+    blocker: input.blocker,
+    matchCount: input.matchCount ?? 0,
+    reason: input.reason,
+    nextAction: input.nextAction,
+    evidence: input.evidence,
+  });
+}
+
 function extractFencedBlocks(prompt: string): readonly string[] {
   const blocks: string[] = [];
   const matcher = /```(?:[\w.+-]+)?\n?([\s\S]*?)```/g;
@@ -324,7 +346,7 @@ function stoppedPlan(input: {
   readonly reason: string;
   readonly nextAction: string;
   readonly evidence: readonly string[];
-}): ExactFencedReplacementPlan {
+}): Extract<ExactFencedReplacementPlan, { ok: false }> {
   return {
     ok: false,
     ...(input.targetPath ? { targetPath: input.targetPath } : {}),

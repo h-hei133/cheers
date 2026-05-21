@@ -85,6 +85,7 @@ describe("query route decision", () => {
     for (const prompt of [
       "修改 src/app.ts",
       "把 README 里的错误说明改一下",
+      "Replace the exact fenced block in src/app.ts with this mapping.",
       "apply_patch 更新文件",
       "运行命令并修复",
       "commit 并 push",

@@ -1770,6 +1770,128 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(edited).not.toContain("v1");
   }, 15000);
 
+  it("activates exact fenced replacement through the integrated prompt path", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "fenced-target.ts"),
+      "title\nstatus: draft\nfooter\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_fenced_replacement_activation",
+      prompt: [
+        "Replace the exact fenced block in src/fenced-target.ts",
+        "```",
+        "status: draft",
+        "```",
+        "with",
+        "```",
+        "status: ready",
+        "```",
+      ].join("\n"),
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.terminalClassification).toBe("success");
+    expect(result.codingResult?.changedFiles).toEqual(["src/fenced-target.ts"]);
+    expect(result.codingResult?.verifiedFiles).toEqual(["src/fenced-target.ts"]);
+    expect(result.codingResult?.continuation.evidence).toEqual(
+      expect.arrayContaining([
+        "fenced-edit-result:operation:fenced-replacement",
+        "fenced-edit-result:state:changed",
+        "fenced-edit-result:raw-content-excluded",
+      ]),
+    );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "fenced-edit-route:exact-replacement-written",
+        "apply-patch-workspace-write-route:final-stale-read-immediately-before-writer",
+        "apply-patch-workspace-write-route:post-write-verification-passed",
+      ]),
+    );
+    expect(result.codingResult?.evidence.join("\n")).not.toContain(
+      "status: ready",
+    );
+    expect(result.codingResult?.continuation.evidence.join("\n")).not.toContain(
+      "status: ready",
+    );
+
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "fenced-target.ts"), "utf8"),
+    ).resolves.toBe("title\nstatus: ready\nfooter\n");
+  }, 15000);
+
+  it("keeps unsupported fenced activation prompts stopped through the integrated path", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "fuzzy-fenced.ts"),
+      "title\nstatus: draft\nfooter\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_fenced_replacement_fuzzy_stopped",
+      prompt:
+        "Replace the similar fenced block in src/fuzzy-fenced.ts with the closest new version.",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.continuation.evidence).toContain(
+      "fenced-edit-result:state:stopped",
+    );
+    expect(result.codingResult?.evidence).toContain(
+      "fenced-edit-activation:blocker:unsupported-fuzzy",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "fuzzy-fenced.ts"), "utf8"),
+    ).resolves.toBe("title\nstatus: draft\nfooter\n");
+  }, 15000);
+
+  it("stops activated fenced replacement when the exact block has multiple matches", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "multi-fenced.ts"),
+      "status: draft\nstatus: draft\n",
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_t10_fenced_replacement_multiple_stopped",
+      prompt: [
+        "Replace the exact fenced block in src/multi-fenced.ts",
+        "```",
+        "status: draft",
+        "```",
+        "with",
+        "```",
+        "status: ready",
+        "```",
+      ].join("\n"),
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.evidence).toContain(
+      "fenced-edit-plan:blocker:multiple-matches",
+    );
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "multi-fenced.ts"), "utf8"),
+    ).resolves.toBe("status: draft\nstatus: draft\n");
+  }, 15000);
+
   it("stale-read blocks single-file edit before writing stale planned content", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     const targetPath = path.join(workspaceRoot, "src", "stale-read.txt");

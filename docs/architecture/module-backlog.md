@@ -210,6 +210,21 @@ as an import-policing rule.
   edit, rollback/snapshot execution, provider/browser calls, schema changes,
   CLI redesign, dependencies, and broad runMvp refactor remain closed.
 
+### Route 168: Fenced Replacement Activation
+
+- Route 168 makes the Route 167 lane reachable from normal prompt / CLI /
+  Agent Loop selection for one explicit target and one exact old/new fenced
+  mapping.
+- Agent Loop only selects and delegates; exact mapping, workspace authority,
+  final stale-read, writer invocation, post-write verification, result
+  projection, and continuation-safe evidence remain owned by Edit / Patch and
+  existing write/result surfaces.
+- CLI routing keeps explicit replacement prompts on the orchestrated path so
+  success and stopped outcomes are visible through the normal user-facing
+  stream.
+- Unsupported fuzzy, discovery, broad/multi-region, generated-content, and
+  rollback/snapshot fenced requests remain stopped before mutation.
+
 ## Module-First Route Rule
 
 Future routes must state:

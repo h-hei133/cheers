@@ -123,6 +123,11 @@ import {
   isWriteExpectationPrompt,
 } from "./editExpectationContract.js";
 import {
+  buildFencedEditReplacementRouteResult,
+  runFencedEditReplacementRoute,
+  selectFencedEditReplacementActivation,
+} from "./editPatchModule.js";
+import {
   buildActionResultSeedDecisionTrace,
   buildPostEditVerifyContinuationLineage,
   continuityStateAsObject,
@@ -237,6 +242,7 @@ export async function runMvpIntegratedFlow(
   const runner = createIntegratedRunner(
     options.workspaceRoot,
     dispatcher,
+    enforcer,
     workflowContext,
     mcpSnapshot,
     browserRuntimeStatus,
@@ -310,6 +316,7 @@ export async function* streamMvpIntegratedFlow(
   const runner = createIntegratedRunner(
     options.workspaceRoot,
     dispatcher,
+    enforcer,
     workflowContext,
     mcpSnapshot,
     browserRuntimeStatus,
@@ -381,6 +388,7 @@ function pathStaysInsideWorkspace(
 function createIntegratedRunner(
   workspaceRoot: string,
   dispatcher: ToolDispatcher,
+  enforcer: SandboxEnforcer,
   workflowContext: ReturnType<typeof getWorkflowGitContext>,
   mcpSnapshot: Awaited<ReturnType<CoreMcpGateway["snapshot"]>>,
   browserRuntimeStatus: PwRuntimeStatus,
@@ -505,6 +513,7 @@ function createIntegratedRunner(
         sessionId: sharedContext.sessionId,
         turn,
         workspaceRoot,
+        enforcer,
         abortSignal,
       });
       const notes = [
@@ -3998,6 +4007,7 @@ async function executeWorkflowTaskPlan(input: {
   readonly sessionId: string;
   readonly turn: number;
   readonly workspaceRoot: string;
+  readonly enforcer: SandboxEnforcer;
   readonly abortSignal?: AbortSignal;
 }): Promise<WorkflowExecutionResult> {
   const notes: string[] = [];
@@ -4019,6 +4029,87 @@ async function executeWorkflowTaskPlan(input: {
     evidence.push(...input.plan.continuationLineage!);
   }
   appendSingleFileEditRepairObservability(evidence, input.plan);
+  const fencedActivation = selectFencedEditReplacementActivation({
+    prompt: input.prompt,
+    ...(input.plan.targetPath ? { targetPath: input.plan.targetPath } : {}),
+    ...(input.plan.replaceFrom && input.plan.replaceTo
+      ? {
+          replaceDirective: {
+            from: input.plan.replaceFrom,
+            to: input.plan.replaceTo,
+          },
+        }
+      : {}),
+    hasMultipleTargets:
+      (input.plan.additionalTargetPaths?.length ?? 0) > 0 ||
+      /(?:\s|^)(?:and|,)\s+[\w./\\-]+\.(?:ts|tsx|js|jsx|py|go|rs|md|txt|json|yaml|yml)\b/i.test(
+        input.prompt,
+      ),
+  });
+  if (fencedActivation.status === "stopped") {
+    const result = buildFencedEditReplacementRouteResult({
+      sessionId: input.sessionId,
+      prompt: input.prompt,
+      route: fencedActivation.route,
+    });
+    return {
+      events,
+      notes: [
+        ...notes,
+        "fenced-edit-activation: stopped before mutation",
+        ...fencedActivation.evidence,
+      ],
+      codingResult: result.codingResult!,
+      userFacingOutput: result.finalOutput,
+    };
+  }
+  if (fencedActivation.status === "selected") {
+    const workspaceAuthority = createWorkspaceWriteAuthority(input.workspaceRoot);
+    const absoluteTarget = path.isAbsolute(fencedActivation.targetPath)
+      ? fencedActivation.targetPath
+      : path.join(input.workspaceRoot, fencedActivation.targetPath);
+    const approval = await input.enforcer.checkAndEnforce("edit", {
+      scope: "filesystem",
+      operation: "write",
+      target: absoluteTarget,
+      workspaceRoot: input.workspaceRoot,
+    });
+    const route = await runFencedEditReplacementRoute({
+      workspaceRoot: input.workspaceRoot,
+      targetPath: fencedActivation.targetPath,
+      mapping: fencedActivation.mapping,
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: approval.allowed ? "approved" : "denied",
+      defaultProductionRejectionUnchanged: true,
+      readFile: workspaceAuthority.readFile,
+      readVerifiedFile: workspaceAuthority.readVerifiedFile,
+      validateWriteTarget: workspaceAuthority.validateWriteTarget,
+      writeFile: workspaceAuthority.writeFile,
+      ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+    });
+    const activatedRoute = {
+      ...route,
+      evidence: [...fencedActivation.evidence, ...route.evidence],
+    };
+    const result = buildFencedEditReplacementRouteResult({
+      sessionId: input.sessionId,
+      prompt: input.prompt,
+      route: activatedRoute,
+    });
+    return {
+      events,
+      notes: [
+        ...notes,
+        `fenced-edit-activation: selected target=${fencedActivation.targetPath}`,
+        `fenced-edit-activation: permission=${approval.allowed ? "approved" : "denied"}`,
+        ...fencedActivation.evidence,
+        ...activatedRoute.evidence,
+      ],
+      codingResult: result.codingResult!,
+      userFacingOutput: result.finalOutput,
+    };
+  }
   let crossFileRemainingTargets: string[] = [];
   let crossFileFailedByReason: Array<{
     path: string;

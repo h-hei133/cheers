@@ -1,8 +1,10 @@
 import path from "node:path";
 import {
+  buildStoppedFencedReplacementPlan,
   planExactFencedReplacement,
   type ExactFencedReplacementPlan,
   type FencedEditMapping,
+  type FencedEditPlanBlocker,
 } from "./fencedEditPlanner.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
 import type {
@@ -174,4 +176,58 @@ export async function runFencedEditReplacementRoute(
       "fenced-edit-route:continuation-safe-evidence",
     ],
   };
+}
+
+export function buildStoppedFencedEditReplacementRoute(input: {
+  readonly targetPath?: string;
+  readonly blocker: FencedEditPlanBlocker | string;
+  readonly reason: string;
+  readonly nextAction: string;
+  readonly evidence: readonly string[];
+}): Extract<FencedEditReplacementRoute, { status: "blocked" }> {
+  const plan = buildStoppedFencedReplacementPlan({
+    ...(input.targetPath ? { targetPath: input.targetPath } : {}),
+    blocker: fencedPlanBlocker(input.blocker),
+    reason: input.reason,
+    nextAction: input.nextAction,
+    evidence: input.evidence,
+  });
+  return {
+    source: "fenced-edit-replacement-route",
+    status: "blocked",
+    ...(input.targetPath ? { targetPath: input.targetPath } : {}),
+    blocker: input.blocker,
+    plan,
+    changedFiles: [],
+    postWriteVerification: "not-run",
+    terminalClassification: "stopped",
+    nextAction: input.nextAction,
+    evidence: [
+      "fenced-edit-route:activation-blocked",
+      ...input.evidence,
+      ...plan.evidence,
+      "fenced-edit-route:no-writer-invoked",
+    ],
+  };
+}
+
+function fencedPlanBlocker(blocker: string): FencedEditPlanBlocker {
+  switch (blocker) {
+    case "missing-target":
+    case "ambiguous-target":
+    case "missing-mapping":
+    case "unsupported-fuzzy":
+    case "unsupported-discovery":
+    case "unsupported-broad":
+    case "unsupported-generated":
+    case "unsupported-rollback":
+    case "target-missing":
+    case "mapping-not-found":
+    case "multiple-matches":
+    case "no-op":
+    case "unsafe-patch-control-line":
+      return blocker;
+    default:
+      return "missing-mapping";
+  }
 }

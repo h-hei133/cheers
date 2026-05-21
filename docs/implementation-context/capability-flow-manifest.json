@@ -63,6 +63,7 @@
       "publicFacades": [
         "packages/ts-shell/src/orchestration/editPatchModule.ts",
         "packages/ts-shell/src/orchestration/editExpectationContract.ts",
+        "packages/ts-shell/src/orchestration/fencedEditActivation.ts",
         "packages/ts-shell/src/orchestration/fencedEditPlanner.ts",
         "packages/ts-shell/src/orchestration/fencedEditRoute.ts",
         "packages/ts-shell/src/orchestration/fencedEditResult.ts",
@@ -74,6 +75,7 @@
       ],
       "owns": [
         "current bounded edit/write expectations",
+        "runtime activation selection for exact fenced replacement",
         "exact fenced replacement planning and route projection",
         "future-only edit planning contracts",
         "workspace write authority facts",
@@ -363,6 +365,7 @@
       "publicFacades": [
         "editPatchModule.ts",
         "editExpectationContract.ts",
+        "fencedEditActivation.ts",
         "fencedEditPlanner.ts",
         "fencedEditRoute.ts",
         "fencedEditResult.ts",
@@ -376,12 +379,14 @@
         "explicit target",
         "concrete content or exact mapping",
         "exact fenced old/new mapping",
+        "runtime fenced replacement activation facts",
         "workspace authority fact",
         "final stale-read fact",
         "verification plan"
       ],
       "keyOutputs": [
         "edit expectation",
+        "fenced replacement activation selection",
         "patch/write result projection",
         "fenced replacement result projection",
         "changed/failed file summaries",
@@ -398,6 +403,8 @@
       "transcriptContinuationHandoff": "mutation results and stale-read evidence feed replay-safe continuation summaries.",
       "validationGates": [
         "workspace write route tests",
+        "fenced edit runtime activation tests",
+        "CLI runtime invocation tests",
         "mutation-lane rejection regression",
         "verify:edit-capability-closeout",
         "verify:result-contract",
@@ -912,6 +919,7 @@
       "startModule": "editPatch",
       "requiredFacades": [
         "editPatchModule.ts",
+        "fencedEditActivation.ts",
         "fencedEditPlanner.ts",
         "fencedEditRoute.ts",
         "fencedEditResult.ts",
@@ -921,6 +929,7 @@
       ],
       "emit": [
         "patch/write result",
+        "fenced replacement activation selection",
         "fenced replacement result",
         "verification summary",
         "actionable blocker evidence for missing target, missing content, stale-read, and unsupported future edit",
@@ -928,6 +937,8 @@
       ],
       "focusedValidation": [
         "workspace write route tests",
+        "fenced edit runtime activation tests",
+        "CLI runtime invocation tests",
         "mutation-lane rejection regression",
         "verify:edit-capability-closeout",
         "verify:result-contract"

@@ -33,10 +33,15 @@ export {
 } from "./fencedEditPlanner.js";
 export {
   runFencedEditReplacementRoute,
+  buildStoppedFencedEditReplacementRoute,
   type FencedEditReplacementRoute,
   type FencedEditReplacementRouteOptions,
 } from "./fencedEditRoute.js";
 export { buildFencedEditReplacementRouteResult } from "./fencedEditResult.js";
+export {
+  selectFencedEditReplacementActivation,
+  type FencedEditActivation,
+} from "./fencedEditActivation.js";
 
 export interface EditPatchModuleState {
   readonly editExpectation: EditExpectationContract;

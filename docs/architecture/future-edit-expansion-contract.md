@@ -27,7 +27,8 @@ Current supported write/edit behavior remains:
 - exact fenced replacement now has a current-supported narrow lane when the
   route has one explicit target, an exact old/new fenced mapping, exactly one
   matching region, workspace authority, final stale-read, and post-write
-  verification
+  verification; Route 168 makes this lane reachable through prompt/CLI
+  runtime selection while still delegating execution to Edit / Patch
 - ambiguous sibling targets stop before mutation
 - vague generated-content prompts stop actionably
 - no-write read/inspect requests stay separate from mutation
@@ -66,7 +67,7 @@ The reference scan was shape-only; no implementation code was copied.
 |---|---|---|
 | broad refactor planning | future-only | target/constraint manifest, user-confirmed target selection, workspace authority, final stale-read, verification plan, snapshot/rollback story |
 | multi-file discovery edit | future-only | discovery phase, candidate file list, user-confirmed target set, per-file plan, bounded max-file guard, workspace authority, final stale-read, verification plan |
-| fenced replacement | current-supported only for exact old/new fenced mapping; broad/fuzzy remains future-only | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, verification plan |
+| fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy remains future-only | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, verification plan |
 
 These modes are intentionally separate. A broad refactor request is not a
 discovery edit. A discovery edit is not permission to mutate every candidate.
@@ -140,7 +141,8 @@ classification only; execution remains owned by the existing bounded routes.
 Future implementation routes should add gates in this order:
 
 1. fenced replacement bounded implementation with exact mapping only: closed
-   for exact old/new fenced mapping by Route 167; broad/fuzzy remains future-only
+   for exact old/new fenced mapping by Route 167 and activated through runtime
+   selection by Route 168; broad/fuzzy remains future-only
 2. discovery edit candidate selection with user-confirmed target set
 3. broad refactor manifest planning with no mutation
 4. snapshot/rollback precondition route before any broad execution

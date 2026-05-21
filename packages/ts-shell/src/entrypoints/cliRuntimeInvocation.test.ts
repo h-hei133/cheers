@@ -124,6 +124,32 @@ describe("CLI runtime invocation", () => {
     expect(calls).toEqual(["integrated:synthetic:patch"]);
   });
 
+  it("routes exact fenced replacement prompts through the integrated CLI path", async () => {
+    const { deps, calls } = dependencies();
+    const events = await collect(
+      runCliRuntimeInvocation(
+        baseInput({
+          providerModeEnv: "synthetic",
+          prompt: [
+            "Replace the exact fenced block in src/app.ts",
+            "```",
+            "status: draft",
+            "```",
+            "with",
+            "```",
+            "status: ready",
+            "```",
+          ].join("\n"),
+          agentMode: "build",
+        }),
+        deps,
+      ).events,
+    );
+
+    expect(events).toEqual([event("integrated")]);
+    expect(calls).toEqual(["integrated:synthetic:default"]);
+  });
+
   it("routes lightweight prompts through the existing lightweight provider path", async () => {
     const { deps, calls } = dependencies();
     const events = await collect(

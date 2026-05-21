@@ -223,6 +223,8 @@ function extractIntentSignals(prompt: string): IntentSignals {
         /\b(apply_patch|write|edit|delete|remove|rename|move|save|commit|push)\b/i,
         /(?:写入|编辑|删除|移除|重命名|移动|保存|提交|推送|改文件|修改文件)/u,
       ])) ||
+    (hasPathReference &&
+      hasAny(text, [/\b(?:replace|update|change)\b/i])) ||
     asksForExplicitCommand ||
     (asksForImplementation && hasPathReference);
 
