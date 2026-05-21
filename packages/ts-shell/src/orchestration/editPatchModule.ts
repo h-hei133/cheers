@@ -106,6 +106,30 @@ export {
   type TargetSetEditRouteOptions,
 } from "./targetSetEditRoute.js";
 export { buildTargetSetEditRouteResult } from "./targetSetEditResult.js";
+export {
+  buildTargetSetEditTransaction,
+  buildTargetSetEditTransactionId,
+  type TargetSetEditTransaction,
+} from "./targetSetEditTransaction.js";
+export {
+  buildTargetSetEditPreflightJournal,
+  buildTargetSetEditExecutionJournalEntry,
+  projectTargetSetEditJournalEvidence,
+  type TargetSetEditJournalEntry,
+} from "./targetSetEditJournal.js";
+export {
+  evaluateTargetSetEditPreflightPolicy,
+  classifyTargetSetExecutionFailure,
+  type TargetSetEditPreflightPolicy,
+} from "./targetSetEditPolicy.js";
+export {
+  aggregateTargetSetEditVerification,
+  type TargetSetEditVerificationAggregate,
+} from "./targetSetEditVerification.js";
+export {
+  buildTargetSetEditRecoveryWorkflow,
+  type TargetSetEditRecoveryWorkflow,
+} from "./targetSetEditRecoveryWorkflow.js";
 
 export interface EditPatchModuleState {
   readonly editExpectation: EditExpectationContract;

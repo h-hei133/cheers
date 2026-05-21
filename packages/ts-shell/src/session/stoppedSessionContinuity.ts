@@ -294,6 +294,8 @@ function extractTargetSetEditContinuationSummary(
   codingResult: CodingResultSummary,
 ): string | undefined {
   const summary = codingResult.continuation.evidence.find((entry) =>
+    entry.startsWith("target-set-edit transaction="),
+  ) ?? codingResult.continuation.evidence.find((entry) =>
     entry.startsWith("target-set-edit manifest="),
   );
   if (!summary) {

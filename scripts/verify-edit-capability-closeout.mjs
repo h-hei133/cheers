@@ -23,7 +23,12 @@ const testTargets = [
   'src/orchestration/discoveryEditPlanner.test.ts',
   'src/orchestration/discoveryEditResult.test.ts',
   'src/orchestration/targetSetEditPlan.test.ts',
+  'src/orchestration/targetSetEditPolicy.test.ts',
+  'src/orchestration/targetSetEditJournal.test.ts',
+  'src/orchestration/targetSetEditTransaction.test.ts',
+  'src/orchestration/targetSetEditVerification.test.ts',
   'src/orchestration/targetSetEditRoute.test.ts',
+  'src/orchestration/targetSetEditRecoveryWorkflow.test.ts',
   'src/orchestration/targetSetEditRecovery.test.ts',
   'src/orchestration/editSnapshot.test.ts',
   'src/orchestration/editRecoveryPlan.test.ts',
@@ -56,7 +61,12 @@ console.log('report field discovery_edit_manifest=covered')
 console.log('report field discovery_edit_confirmation=covered')
 console.log('report field discovery_edit_single_target_handoff=covered')
 console.log('report field discovery_edit_confirmed_target_set_execution=covered')
+console.log('report field target_set_transaction=covered')
+console.log('report field target_set_execution_journal=covered')
+console.log('report field target_set_preflight_atomicity=covered')
+console.log('report field target_set_verification_aggregation=covered')
 console.log('report field target_set_partial_failure=covered')
+console.log('report field target_set_recovery_workflow_handoff=covered')
 console.log('report field explicit_edit_recovery_apply=covered')
 console.log('report field result_contract_compatible=covered')
 console.log(`repo=${repoRoot}`)
@@ -100,6 +110,13 @@ console.log('marker discovery-confirmed-single-target-handoff')
 console.log('marker discovery-confirmed-target-set-execution')
 console.log('marker target-set-max-file-guard-stopped-no-write')
 console.log('marker target-set-preflight-all-files-before-mutation')
+console.log('marker target-set-transaction-id-emitted')
+console.log('marker target-set-safe-execution-journal')
+console.log('marker target-set-one-preflight-failure-stops-before-all-writes')
+console.log('marker target-set-partial-failure-separates-changed-failed-unattempted')
+console.log('marker target-set-verification-aggregation-visible')
+console.log('marker target-set-recovery-recommendation-visible')
+console.log('marker target-set-explicit-recovery-workflow-evidence')
 console.log('marker target-set-partial-failure-rollback-readiness')
 console.log('marker edit-recovery-plan-from-snapshot-id')
 console.log('marker edit-recovery-single-file-rollback-apply')

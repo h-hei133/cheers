@@ -443,10 +443,14 @@ describe("stopped session continuity", () => {
         status: "first-pass-success",
         attempts: 0,
         evidence: [
+          "target-set-edit transaction=target-set-txn-abc123",
           "target-set-edit manifest=discovery-edit-abc123",
           "target-set-edit status=partial-failure",
           "target-set-edit changed=src/a.ts",
           "target-set-edit failed=src/b.ts",
+          "target-set-edit unattempted=src/c.ts",
+          "target-set-edit verification=failed",
+          "target-set-edit recovery=available",
           "target-set-edit file=src/a.ts; state=written; rollback=rollback-ready",
           "target-set-edit file=src/b.ts; state=failed; rollback=rollback-ready",
           "target-set-edit-result:raw-content-excluded",
@@ -482,7 +486,7 @@ describe("stopped session continuity", () => {
 
     expect(surface?.kind).toBe("writer-started-unverified");
     expect(surface?.failureHandoffDiagnostic).toContain(
-      "target-set=target-set-edit manifest=discovery-edit-abc123",
+      "target-set=target-set-edit transaction=target-set-txn-abc123",
     );
     expect(surface?.failureHandoffDiagnostic).toContain("writer-started=yes");
     expect(surface?.failureHandoffDiagnostic).toContain(

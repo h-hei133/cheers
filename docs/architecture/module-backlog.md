@@ -296,6 +296,18 @@ as an import-policing rule.
   stale target, missing confirmation, unsupported rollback, and no automatic or
   atomic rollback claims remain stopped/no-write.
 
+### Route 174: Target-Set Edit Transaction
+
+- Route 174 hardens confirmed target-set exact fenced replacement with a
+  transaction id, safe execution journal, all-target preflight policy,
+  verification aggregation, partial-failure changed/failed/unattempted
+  separation, and recovery workflow handoff.
+- The transaction surface is audit evidence only. It does not add fuzzy,
+  generated, broad, or new edit types, and it does not claim true atomic
+  multi-file rollback.
+- Session / Continue and Result Surface summaries preserve transaction,
+  verification, and recovery recommendation facts without raw file content.
+
 ## Module-First Route Rule
 
 Future routes must state:
@@ -344,7 +356,7 @@ preconditions, result projection, and validation.
 |---|---|---|---|
 | Edit / Patch thin integration | Edit / Patch, Result Surface | Adopt the module facade at one thin classification/projection handoff. | no new write execution |
 | Edit snapshot / rollback substrate | Edit / Patch, Runtime | Route 173 closes explicit snapshot-backed single-file rollback apply and bounded target-set subset recovery apply through recovery plans, guarded restore, verification, Result Surface, Session / Continue, and verifier coverage. | no automatic rollback; no broad/fuzzy/discovery/generated execution; no atomic rollback claim |
-| Discovery target-set mutation route | Edit / Patch, Workspace / File Context | Route 172 supports only confirmed target sets that reduce to exact fenced replacement, max 3 files, with preflight-all-before-mutation and per-file recovery evidence. | no fuzzy/generated/broad execution; no automatic or atomic rollback claim |
+| Discovery target-set mutation route | Edit / Patch, Workspace / File Context | Route 174 keeps confirmed target sets limited to exact fenced replacement, max 3 files, and adds transaction id, safe journal, preflight policy, verification aggregation, partial-failure separation, and recovery workflow handoff. | no fuzzy/generated/broad execution; no automatic rollback; no true atomic rollback claim |
 | Browser controlled planner v2 | Browser, Agent Loop | Improve controlled planner contracts only if browser becomes product priority. | no public web or default browser action expansion |
 
 ### Phase C: Gate And Release Architecture

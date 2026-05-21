@@ -30,6 +30,9 @@ function buildCodingResult(route: TargetSetEditRoute): CodingResultSummary {
   const success = route.status === "written";
   const attemptedFiles = route.fileResults.map((result) => result.targetPath);
   const failedFiles = route.failedFiles.map((failure) => ({ ...failure }));
+  const unattemptedFiles = route.unattemptedFiles.map((failure) => ({
+    ...failure,
+  }));
   return {
     taskKind: "edit-file",
     changedFiles: [...route.changedFiles],
@@ -52,20 +55,29 @@ function buildCodingResult(route: TargetSetEditRoute): CodingResultSummary {
     repair: {
       status: "not-needed",
       attempts: 0,
-      recoveredItems: [],
-      failedItems: [],
+      recoveredItems: route.recoveryWorkflow.eligibleRollbackTargets.map(
+        (target) => target.targetPath,
+      ),
+      failedItems: route.recoveryWorkflow.ineligibleRollbackTargets.map(
+        (target) => target.targetPath,
+      ),
       notes: [
         "target-set exact fenced replacement route only; no automatic rollback was attempted.",
+        route.recoveryWorkflow.recommendation,
       ],
     },
     continuation: {
       status: "first-pass-success",
       attempts: 0,
       evidence: [
+        `target-set-edit transaction=${route.transactionId}`,
         `target-set-edit manifest=${route.manifestId}`,
         `target-set-edit status=${route.status}`,
         `target-set-edit changed=${route.changedFiles.join(", ") || "none"}`,
         `target-set-edit failed=${failedFiles.map((file) => file.path).join(", ") || "none"}`,
+        `target-set-edit unattempted=${unattemptedFiles.map((file) => file.path).join(", ") || "none"}`,
+        `target-set-edit verification=${route.verificationAggregate.overallStatus}`,
+        `target-set-edit recovery=${route.recoveryWorkflow.status}`,
         ...route.fileResults.map(
           (result) =>
             `target-set-edit file=${result.targetPath}; state=${result.status}; rollback=${result.recoveryReadiness}`,
@@ -94,9 +106,13 @@ function buildCodingResult(route: TargetSetEditRoute): CodingResultSummary {
         "preflight all targets before mutation",
         "per-file workspace authority",
         "per-file final stale-read",
-        "per-file pre-write snapshot",
-        "per-file post-write verification",
-        "partial-failure and rollback-readiness evidence",
+      "per-file pre-write snapshot",
+      "per-file post-write verification",
+      "transaction id",
+      "safe execution journal",
+      "verification aggregation",
+      "explicit recovery workflow handoff",
+      "partial-failure and rollback-readiness evidence",
       ],
       observedEvidence: [...route.evidence],
     },
@@ -105,13 +121,16 @@ function buildCodingResult(route: TargetSetEditRoute): CodingResultSummary {
     verification: success
       ? {
           status: "passed",
-          reason:
+      reason:
             "Every target-set exact fenced replacement passed post-write verification.",
           selectionScope: "focused",
           selectionSource: "auto-from-changes",
         }
       : {
-          status: "failed",
+          status:
+            route.verificationAggregate.overallStatus === "blocked"
+              ? "blocked"
+              : "failed",
           reason: route.nextAction,
           blockerKind: "unknown",
           nextAction: route.nextAction,
@@ -120,6 +139,9 @@ function buildCodingResult(route: TargetSetEditRoute): CodingResultSummary {
       ...route.evidence,
       "target-set-edit-result:operation:exact-fenced-replacement",
       `target-set-edit-result:state:${success ? "changed" : route.status}`,
+      `target-set-edit-result:transaction:${route.transactionId}`,
+      `target-set-edit-result:verification:${route.verificationAggregate.overallStatus}`,
+      `target-set-edit-result:recovery:${route.recoveryWorkflow.status}`,
       route.status === "preflight-stopped"
         ? "target-set-edit-result:coding-result-blocked"
         : route.status === "written"
@@ -138,7 +160,10 @@ function buildCodingResult(route: TargetSetEditRoute): CodingResultSummary {
               "Every target-set exact fenced replacement passed post-write verification.",
           }
         : {
-            status: "failed",
+            status:
+              route.verificationAggregate.overallStatus === "blocked"
+                ? "blocked"
+                : "failed",
             reason: route.nextAction,
             blockerKind: "unknown",
           },
@@ -180,6 +205,7 @@ function buildRuntimeState(input: {
       notes: [
         "target-set edit result consumed Edit/Patch owned route output.",
         `target-set edit status=${input.route.status}`,
+        `target-set edit transaction=${input.route.transactionId}`,
       ],
       handoffs: [],
     },
@@ -224,12 +250,15 @@ function buildOutput(route: TargetSetEditRoute): string {
         ? "target-set exact fenced replacement stopped before mutation."
         : "target-set exact fenced replacement partially failed.",
     `Manifest: ${route.manifestId}`,
+    `Transaction: ${route.transactionId}`,
     `Changed: ${route.changedFiles.join(", ") || "none"}`,
     `Failed: ${route.failedFiles.map((file) => file.path).join(", ") || "none"}`,
+    `Unattempted: ${route.unattemptedFiles.map((file) => file.path).join(", ") || "none"}`,
     "Files:",
     ...fileLines,
     "Rollback: explicit-only; automatic rollback=no; atomic rollback=no",
-    `Verification: ${route.postWriteVerification}`,
+    `Verification: ${route.verificationAggregate.overallStatus}`,
+    `Recovery: ${route.recoveryWorkflow.status}; ${route.recoveryWorkflow.recommendation}`,
     `Next: ${route.nextAction}`,
   ].join("\n");
 }

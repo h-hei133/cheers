@@ -14,6 +14,28 @@ None open after Route 165.
 
 ## Resolved
 
+### Target-set edit transaction evidence
+
+- Affected modules: Edit / Patch, Workspace / File Context, Result Surface,
+  Session / Continue, Harness / Eval.
+- Why it was a calibration gap: Route 172 separated preflight and per-file
+  execution, and Route 173 added explicit recovery apply, but target-set edits
+  still lacked one transaction-level audit surface for journaled steps,
+  verification aggregation, partial-failure separation, and recovery handoff.
+- Resolution: Route 174 adds `targetSetEditTransaction.ts`,
+  `targetSetEditJournal.ts`, `targetSetEditPolicy.ts`,
+  `targetSetEditVerification.ts`, and `targetSetEditRecoveryWorkflow.ts` to
+  project transaction ids, safe journals, preflight atomicity, verification
+  aggregates, changed/failed/unattempted separation, and explicit recovery
+  workflow guidance without changing the exact fenced replacement lane.
+- Evidence: target-set transaction/journal/policy/verification/recovery
+  workflow tests, target-set route/result/session regressions, and edit
+  closeout verifier markers.
+- Recommended next action: keep broader edit types, automatic rollback, and
+  true atomic multi-file rollback closed until a dedicated route defines them.
+- Should become a route: no, resolved by Route 174 for the current bounded
+  target-set lane.
+
 ### Explicit edit recovery apply
 
 - Affected modules: Edit / Patch, Workspace / File Context, Result Surface,

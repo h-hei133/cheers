@@ -43,7 +43,10 @@ Current supported write/edit behavior remains:
   173 makes snapshot-backed recovery operational only through explicit
   rollback apply, with recovery plans from known snapshot ids, single-file and
   bounded target-set subset restore, current-content guards, post-rollback
-  verification, and replay-safe result/session evidence
+  verification, and replay-safe result/session evidence; Route 174 adds a
+  transaction id, safe execution journal, explicit preflight atomicity policy,
+  verification aggregation, partial-failure separation, and recovery workflow
+  handoff for confirmed target sets without claiming true atomic rollback
 - ambiguous sibling targets stop before mutation
 - vague generated-content prompts stop actionably
 - no-write read/inspect requests stay separate from mutation
@@ -84,7 +87,7 @@ The reference scan was shape-only; no implementation code was copied.
 | Mode | Status now | Required before execution |
 |---|---|---|
 | broad refactor planning | future-only | target/constraint manifest, user-confirmed target selection, workspace authority, final stale-read, verification plan, snapshot/rollback story |
-| multi-file discovery edit | current-supported only for confirmed target sets that reduce to exact fenced replacement, max 3 files | discovery phase, bounded candidate file list, explicit target-set confirmation, exact old/new fenced mapping for every target, preflight-all-before-mutation, per-file workspace authority, final stale-read, snapshot receipt, post-write verification, partial-failure evidence, rollback readiness, and explicit snapshot-backed subset recovery apply; no fuzzy/generated/broad execution, no automatic rollback, no atomic rollback claim |
+| multi-file discovery edit | current-supported only for confirmed target sets that reduce to exact fenced replacement, max 3 files | discovery phase, bounded candidate file list, explicit target-set confirmation, exact old/new fenced mapping for every target, preflight-all-before-mutation, transaction id, safe journal, per-file workspace authority, final stale-read, snapshot receipt, post-write verification aggregation, partial-failure changed/failed/unattempted separation, recovery workflow handoff, rollback readiness, and explicit snapshot-backed subset recovery apply; no fuzzy/generated/broad execution, no automatic rollback, no atomic rollback claim |
 | confirmed single-target discovery edit | current-supported only when it reduces to exact fenced replacement | one confirmed candidate from the manifest, exact old/new fenced mapping, workspace authority through existing write route, final stale-read, pre-write snapshot receipt, post-write verification |
 | fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy/discovery/generated/multi-file rollback remains stopped and no-write, while explicit snapshot-backed single-file rollback apply is current-supported | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, pre-write snapshot receipt, verification plan, stable outcome taxonomy, rollback readiness projection, explicit snapshot id and target for rollback apply |
 
@@ -130,6 +133,12 @@ Route 173 recovery plans are also not mutation authority. They require explicit
 snapshot id and target facts, workspace authority, current-content guard
 preflight, direct rollback confirmation, and post-rollback verification before
 reporting restored files.
+
+Route 174 target-set transactions are audit evidence, not write authority.
+The transaction journal records only safe step/status/reason/evidence facts and
+excludes raw old/new blocks or file content. Preflight atomicity means every
+target is checked before the first mutation; it is not a claim that later writes
+are atomically rolled back.
 
 ## User Confirmation Model
 

@@ -35,9 +35,16 @@ describe("targetSetEditRoute", () => {
     });
 
     expect(route.status).toBe("written");
+    expect(route.transactionId).toMatch(/^target-set-txn-/);
+    expect(route.transaction.outcome).toBe("succeeded");
+    expect(route.verificationAggregate.overallStatus).toBe("passed");
+    expect(route.recoveryWorkflow.status).toBe("not-needed");
     expect(route.changedFiles).toEqual(["src/a.ts", "src/b.ts"]);
     expect(route.evidence).toEqual(
       expect.arrayContaining([
+        `target-set-edit-transaction:id:${route.transactionId}`,
+        "target-set-edit-journal:preflight-passed",
+        "target-set-edit-verification:overall:passed",
         "target-set-edit-route:reuse-existing-fenced-lane",
         "target-set-edit-route:no-automatic-rollback",
         "target-set-edit-rollback-ready",
@@ -63,6 +70,9 @@ describe("targetSetEditRoute", () => {
     expect(result.codingResult?.changedFiles).toEqual(["src/a.ts", "src/b.ts"]);
     expect(result.codingResult?.continuation.evidence).toEqual(
       expect.arrayContaining([
+        `target-set-edit transaction=${route.transactionId}`,
+        "target-set-edit verification=passed",
+        "target-set-edit recovery=not-needed",
         "target-set-edit-result:continuation-safe",
         "target-set-edit-result:raw-content-excluded",
       ]),
@@ -95,9 +105,12 @@ describe("targetSetEditRoute", () => {
     });
 
     expect(route.status).toBe("preflight-stopped");
+    expect(route.transaction.outcome).toBe("preflight-stopped");
     expect(route.changedFiles).toEqual([]);
     expect(route.evidence).toEqual(
       expect.arrayContaining([
+        "target-set-edit-policy:mutation:not-run",
+        "target-set-edit-journal:preflight-failed:multiple-matches",
         "target-set-edit-preflight-stopped",
         "target-set-edit-route:no-writer-invoked",
         "target-set-edit-mutation:not-run",
@@ -155,12 +168,16 @@ describe("targetSetEditRoute", () => {
   });
 
   it("reports partial failure with rollback readiness for already changed files", async () => {
-    const fixture = createFixture();
+    const fixture = createFixture({
+      "src/a.ts": "title\nstatus: draft\nfooter\n",
+      "src/b.ts": "title\nstatus: draft\nfooter\n",
+      "src/c.ts": "title\nstatus: draft\nfooter\n",
+    });
     const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
     const route = await runTargetSetEditRoute({
       workspaceRoot: fixture.workspaceRoot,
-      manifest: buildManifest(fixture.workspaceRoot, ["src/a.ts", "src/b.ts"]),
-      confirmedTargetSet: ["src/a.ts", "src/b.ts"],
+      manifest: buildManifest(fixture.workspaceRoot, ["src/a.ts", "src/b.ts", "src/c.ts"]),
+      confirmedTargetSet: ["src/a.ts", "src/b.ts", "src/c.ts"],
       mapping: mapping(),
       explicitRuntimeOptIn: true,
       explicitWorkspaceWriteOptIn: true,
@@ -178,10 +195,18 @@ describe("targetSetEditRoute", () => {
     });
 
     expect(route.status).toBe("partial-failure");
+    expect(route.transaction.outcome).toBe("recovery-available");
+    expect(route.verificationAggregate.overallStatus).toBe("failed");
+    expect(route.recoveryWorkflow.status).toBe("available");
     expect(route.changedFiles).toEqual(["src/a.ts"]);
     expect(route.failedFiles.map((file) => file.path)).toEqual(["src/b.ts"]);
+    expect(route.unattemptedFiles.map((file) => file.path)).toEqual(["src/c.ts"]);
+    expect(route.recoveryWorkflow.eligibleRollbackTargets.map((file) => file.targetPath)).toEqual(["src/a.ts"]);
     expect(route.evidence).toEqual(
       expect.arrayContaining([
+        "target-set-edit-route:unattempted-count:1",
+        "target-set-edit-verification:recovery-recommended",
+        "target-set-edit-recovery-workflow:status:available",
         "target-set-edit-outcome:target-set-edit-partial-failure",
         "target-set-edit-rollback-ready",
         "fenced-edit-outcome:fenced-edit-writer-failed",
@@ -192,6 +217,9 @@ describe("targetSetEditRoute", () => {
       "title\nstatus: ready\nfooter\n",
     );
     expect(readFile(fixture.workspaceRoot, "src/b.ts")).toBe(
+      "title\nstatus: draft\nfooter\n",
+    );
+    expect(readFile(fixture.workspaceRoot, "src/c.ts")).toBe(
       "title\nstatus: draft\nfooter\n",
     );
 
@@ -205,6 +233,8 @@ describe("targetSetEditRoute", () => {
     expect(result.codingResult?.failedFiles.map((file) => file.path)).toEqual([
       "src/b.ts",
     ]);
+    expect(result.finalOutput).toContain("Unattempted: src/c.ts");
+    expect(result.finalOutput).toContain("Recovery: available");
     expect(result.finalOutput).toContain("automatic rollback=no");
     expect(result.finalOutput).not.toContain("rollback succeeded");
   });

@@ -12,7 +12,10 @@ not import restrictions.
   `discoveryEditPlanner.ts`, `discoveryEditConfirmation.ts`,
   `discoveryEditRuntime.ts`, `discoveryEditResult.ts`,
   `targetSetEditPlan.ts`, `targetSetEditRoute.ts`,
-  `targetSetEditResult.ts`, `targetSetEditRecovery.ts`, `editSnapshot.ts`,
+  `targetSetEditResult.ts`, `targetSetEditTransaction.ts`,
+  `targetSetEditJournal.ts`, `targetSetEditPolicy.ts`,
+  `targetSetEditVerification.ts`, `targetSetEditRecoveryWorkflow.ts`,
+  `targetSetEditRecovery.ts`, `editSnapshot.ts`,
   `editRecoveryPlan.ts`, `editRecoveryApply.ts`, `editRecoveryOutcome.ts`,
   `editRecoveryResult.ts`, `editRollback.ts`, `workspaceFileContract.ts`,
   `workspaceTargetProjection.ts`,
@@ -31,10 +34,10 @@ not import restrictions.
   multiple matches, stale-read, unsupported future edit, discovery confirmation
   required/invalid/no-candidate states, writer failure, and verification
   failure, confirmed target-set success/preflight-stopped/partial-failure
-  facts, verification summary, continuation-safe mutation evidence, safe
-  snapshot receipt status, rollback readiness, explicit recovery plan/apply
-  evidence for single-file and bounded target-set subset rollback when directly
-  invoked.
+  facts, target-set transaction id, safe journal, verification aggregate,
+  recovery workflow handoff, continuation-safe mutation evidence, safe snapshot
+  receipt status, rollback readiness, explicit recovery plan/apply evidence for
+  single-file and bounded target-set subset rollback when directly invoked.
 - Do not bypass: workspace authority, final stale-read, permission decisions,
   pre-write snapshot failure stops, post-write verification projection, Result
   Surface truthfulness. Do not mutate from discovery candidate manifests alone
@@ -46,7 +49,8 @@ not import restrictions.
 - Validate: focused edit/write route tests, stale-read/authority regression,
   fenced edit activation/runtime tests, discovery edit
   manifest/planner/confirmation/result tests, target-set edit
-  plan/route/result tests, target-set recovery tests,
+  plan/route/result/transaction/journal/policy/verification tests, target-set
+  recovery workflow/recovery tests,
   snapshot/recovery/rollback tests, CLI runtime invocation tests,
   mutation-lane rejection, `verify:edit-capability-closeout`,
   `verify:result-contract`, build if TS source changes.
