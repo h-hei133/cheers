@@ -18,6 +18,9 @@ const testTargets = [
   'src/orchestration/patchResult/editCapabilityCloseoutManifest.test.ts',
   'src/orchestration/fencedEditPlanner.test.ts',
   'src/orchestration/fencedEditOutcome.test.ts',
+  'src/orchestration/editSnapshot.test.ts',
+  'src/orchestration/editRecoveryResult.test.ts',
+  'src/orchestration/editRollback.test.ts',
   'src/orchestration/fencedEditActivation.test.ts',
   'src/orchestration/fencedEditRoute.test.ts',
   'src/orchestration/fencedEditRuntimeActivation.test.ts',
@@ -35,6 +38,9 @@ console.log('report field activated_fenced_replacement=covered')
 console.log('report field stopped_no_write_unsupported=covered')
 console.log('report field continuation_safe_evidence=covered')
 console.log('report field raw_content_excluded=covered')
+console.log('report field edit_snapshot_receipt=covered')
+console.log('report field rollback_readiness=covered')
+console.log('report field explicit_single_file_rollback=covered')
 console.log('report field result_contract_compatible=covered')
 console.log(`repo=${repoRoot}`)
 
@@ -60,6 +66,12 @@ console.log('marker multiple-matches-stopped')
 console.log('marker stale-read-stopped')
 console.log('marker continuation-safe-evidence-present')
 console.log('marker raw-content-excluded')
+console.log('marker snapshot-receipt-created-before-fenced-edit-write')
+console.log('marker snapshot-not-created-for-stopped-no-write')
+console.log('marker snapshot-failure-stops-before-mutation')
+console.log('marker rollback-readiness-reported-for-write-failures')
+console.log('marker rollback-plan-dry-run-supported-for-known-single-file-snapshot')
+console.log('marker explicit-single-file-rollback-seam-covered')
 console.log('marker result-contract-compatible')
 console.log('[pass] edit-capability-closeout')
 process.exit(0)

@@ -39,6 +39,20 @@ export {
 } from "./fencedEditRoute.js";
 export { buildFencedEditReplacementRouteResult } from "./fencedEditResult.js";
 export {
+  buildEditSnapshotStoreConfig,
+  projectEditSnapshotReceipt,
+  type EditSnapshotReceipt,
+} from "./editSnapshot.js";
+export {
+  projectEditRecoveryResult,
+  type EditRecoveryResult,
+} from "./editRecoveryResult.js";
+export {
+  applyExplicitSingleFileRollback,
+  projectSingleFileRollbackPlan,
+  type EditRollbackPlan,
+} from "./editRollback.js";
+export {
   selectFencedEditReplacementActivation,
   type FencedEditActivation,
 } from "./fencedEditActivation.js";

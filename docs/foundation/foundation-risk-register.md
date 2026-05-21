@@ -14,6 +14,24 @@ None open after Route 165.
 
 ## Resolved
 
+### Activated fenced replacement snapshot recovery substrate
+
+- Affected modules: Edit / Patch, Workspace / File Context, Result Surface,
+  Session / Continue, Harness / Eval.
+- Why it was a calibration gap: exact fenced replacement could mutate one file,
+  but broader edit expansion still needed a pre-write recovery authority story
+  that did not leak raw content or imply automatic rollback.
+- Resolution: Route 170 adds `editSnapshot.ts`, `editRecoveryResult.ts`, and
+  `editRollback.ts`, wires pre-write snapshot capture into the activated exact
+  fenced replacement lane, projects rollback readiness through result/session
+  summaries, and keeps rollback explicit-only.
+- Evidence: fenced edit route/result tests, snapshot/recovery/rollback tests,
+  session continuity tests, and `verify-edit-capability-closeout.mjs` markers.
+- Recommended next action: keep fuzzy/discovery/generated/multi-file edit
+  stopped until target-set confirmation and atomicity routes exist.
+- Should become a route: no, resolved by Route 170 for the single-file exact
+  fenced replacement lane.
+
 ### Activated fenced replacement closeout taxonomy
 
 - Affected modules: Edit / Patch, Result Surface, Session / Continue,

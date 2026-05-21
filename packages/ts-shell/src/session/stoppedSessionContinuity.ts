@@ -189,6 +189,12 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   if (writeContinuity?.requiresUserInspection) {
     parts.push("requires-user-inspection=yes");
   }
+  if (codingResult.recoverySurface?.explicitRestoreAvailable) {
+    parts.push("restore-preview=available");
+  }
+  if (codingResult.recoverySurface) {
+    parts.push("automatic-rollback=no");
+  }
   parts.push(`next=${compactText(nextFocus, 140).replace(/[.]+$/, "")}`);
   return `${parts.join("; ")}.`;
 }

@@ -70,7 +70,7 @@ The reference scan was shape-only; no implementation code was copied.
 |---|---|---|
 | broad refactor planning | future-only | target/constraint manifest, user-confirmed target selection, workspace authority, final stale-read, verification plan, snapshot/rollback story |
 | multi-file discovery edit | future-only | discovery phase, candidate file list, user-confirmed target set, per-file plan, bounded max-file guard, workspace authority, final stale-read, verification plan |
-| fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy/discovery/generated/multi-file/rollback remains stopped and no-write | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, verification plan, stable outcome taxonomy |
+| fenced replacement | current-supported and runtime-reachable only for exact old/new fenced mapping; broad/fuzzy/discovery/generated/multi-file/rollback remains stopped and no-write | explicit target file, exact old/new fenced block mapping, exactly one match, ambiguity handling, workspace authority, final stale-read, pre-write snapshot receipt, verification plan, stable outcome taxonomy, rollback readiness projection |
 
 These modes are intentionally separate. A broad refactor request is not a
 discovery edit. A discovery edit is not permission to mutate every candidate.
@@ -91,6 +91,10 @@ Future execution routes must create a manifest before mutation:
 - verification command or evidence requirement
 - cleanup/redaction requirement
 - rollback or snapshot requirement when broad scope is involved
+- for the activated exact fenced replacement lane, the current substrate is a
+  single-file pre-write snapshot receipt plus explicit-only rollback plan/apply
+  seam; it does not grant broad, fuzzy, discovery, generated, multi-file, or
+  automatic rollback behavior
 
 The manifest is not write authorization. It becomes actionable only after the
 user confirms the target set and the execution route re-checks authority and

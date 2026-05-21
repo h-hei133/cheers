@@ -38,6 +38,12 @@ describe("fencedEditRoute", () => {
     });
 
     expect(route.status).toBe("written");
+    expect(route.snapshotReceipt.status).toBe("snapshot-created");
+    expect(route.snapshotReceipt.targetPath).toBe("src/app.ts");
+    expect(route.snapshotReceipt.preWriteContentHash).toBeDefined();
+    expect(route.snapshotReceipt.preWriteSizeBytes).toBe(
+      Buffer.byteLength("title\nstatus: draft\nfooter\n", "utf8"),
+    );
     expect(readFile(fixture.workspaceRoot, "src/app.ts")).toBe(
       "title\nstatus: ready\nfooter\n",
     );
@@ -50,6 +56,9 @@ describe("fencedEditRoute", () => {
         "fenced-edit-route:continuation-safe-evidence",
         "fenced-edit-outcome:fenced-edit-success",
         "fenced-edit-mutation:ran",
+        "edit-snapshot-status:snapshot-created",
+        "edit-snapshot-receipt:present",
+        "edit-snapshot:no-raw-content",
       ]),
     );
 
@@ -67,9 +76,12 @@ describe("fencedEditRoute", () => {
         "fenced-edit-result:state:changed",
         "fenced-edit-outcome:fenced-edit-success",
         "fenced-edit-result:raw-content-excluded",
+        "edit-recovery-rollback:rollback-not-needed-success",
       ]),
     );
     expect(JSON.stringify(result)).not.toContain("status: ready");
+    expect(JSON.stringify(result)).not.toContain("status: draft");
+    expect(result.finalOutput).toContain("Snapshot: pre-write receipt captured");
   });
 
   it("stops before writer for missing target, missing mapping, and multiple matches", async () => {
@@ -95,10 +107,12 @@ describe("fencedEditRoute", () => {
     expect(missingTarget.status).toBe("blocked");
     expect(missingTarget.blocker).toBe("missing-target");
     expect(missingTarget.evidence).toContain("fenced-edit-route:no-writer-invoked");
+    expect(missingTarget.snapshotReceipt?.status).toBe("snapshot-not-needed-no-write");
     expect(missingTarget.evidence).toEqual(
       expect.arrayContaining([
         "fenced-edit-outcome:fenced-edit-missing-target",
         "fenced-edit-mutation:not-run",
+        "edit-snapshot-status:snapshot-not-needed-no-write",
         "actionable-blocker-kind:patch-target-missing",
       ]),
     );
@@ -117,6 +131,9 @@ describe("fencedEditRoute", () => {
     });
     expect(missingMapping.status).toBe("blocked");
     expect(missingMapping.blocker).toBe("missing-mapping");
+    expect(missingMapping.snapshotReceipt?.status).toBe(
+      "snapshot-not-needed-no-write",
+    );
     expect(missingMapping.evidence).toEqual(
       expect.arrayContaining([
         "fenced-edit-outcome:fenced-edit-missing-mapping",
@@ -143,6 +160,7 @@ describe("fencedEditRoute", () => {
     });
     expect(multiple.status).toBe("blocked");
     expect(multiple.blocker).toBe("multiple-matches");
+    expect(multiple.snapshotReceipt?.status).toBe("snapshot-not-needed-no-write");
     expect(multiple.evidence).toEqual(
       expect.arrayContaining([
         "fenced-edit-outcome:fenced-edit-multiple-matches",
@@ -203,6 +221,9 @@ describe("fencedEditRoute", () => {
       writeFile: authority.writeFile,
     });
     expect(dryRunBlocked.status).toBe("blocked");
+    expect(dryRunBlocked.snapshotReceipt?.status).toBe(
+      "snapshot-not-needed-no-write",
+    );
     expect(dryRunBlocked.evidence).toContain("fenced-edit-mutation:not-run");
     expect(dryRunBlocked.evidence).toContain(
       "apply-patch-workspace-write-route:no-writer-invoked",
@@ -234,6 +255,7 @@ describe("fencedEditRoute", () => {
 
     expect(route.status).toBe("blocked");
     expect(route.blocker).toBe("workspace-path-outside-workspace");
+    expect(route.snapshotReceipt?.status).toBe("snapshot-not-needed-no-write");
     expect(route.evidence).toEqual(
       expect.arrayContaining([
         "fenced-edit-route:workspace-authority-blocked",
@@ -273,6 +295,7 @@ describe("fencedEditRoute", () => {
 
     expect(route.status).toBe("blocked");
     expect(route.blocker).toBe("workspace-final-stale-read");
+    expect(route.snapshotReceipt?.status).toBe("snapshot-not-needed-no-write");
     expect(route.postWriteVerification).toBe("not-run");
     expect(route.evidence).toEqual(
       expect.arrayContaining([
@@ -334,10 +357,12 @@ describe("fencedEditRoute", () => {
     });
     expect(writerFailed.status).toBe("blocked");
     expect(writerFailed.terminalClassification).toBe("error");
+    expect(writerFailed.snapshotReceipt?.status).toBe("snapshot-created");
     expect(writerFailed.evidence).toEqual(
       expect.arrayContaining([
         "fenced-edit-outcome:fenced-edit-writer-failed",
         "fenced-edit-mutation:ran",
+        "edit-recovery-rollback:rollback-available",
         "actionable-blocker-kind:partial-mutation-failed",
       ]),
     );
@@ -348,6 +373,10 @@ describe("fencedEditRoute", () => {
     });
     expect(writerResult.terminalClassification).toBe("error");
     expect(writerResult.codingResult?.verification.status).toBe("failed");
+    expect(writerResult.codingResult?.recoverySurface?.explicitRestoreAvailable).toBe(
+      true,
+    );
+    expect(writerResult.finalOutput).toContain("rollback readiness=rollback-available");
 
     const verificationFixture = createFixture();
     const verificationAuthority = createWorkspaceWriteAuthority(
@@ -381,12 +410,59 @@ describe("fencedEditRoute", () => {
     });
     expect(verificationFailed.status).toBe("blocked");
     expect(verificationFailed.terminalClassification).toBe("error");
+    expect(verificationFailed.snapshotReceipt?.status).toBe("snapshot-created");
     expect(verificationFailed.evidence).toEqual(
       expect.arrayContaining([
         "fenced-edit-outcome:fenced-edit-verification-failed",
         "fenced-edit-mutation:ran",
+        "edit-recovery-rollback:rollback-available",
         "actionable-blocker-kind:verification-failed",
       ]),
+    );
+  });
+
+  it("stops before mutation when snapshot capture fails", async () => {
+    const fixture = createFixture();
+    const authority = createWorkspaceWriteAuthority(fixture.workspaceRoot);
+    const ledgerRootFile = path.join(fixture.workspaceRoot, "snapshot-ledger-file");
+    fs.writeFileSync(ledgerRootFile, "not a directory", "utf8");
+
+    const route = await runFencedEditReplacementRoute({
+      workspaceRoot: fixture.workspaceRoot,
+      targetPath: "src/app.ts",
+      mapping: {
+        oldText: "status: draft",
+        newText: "status: ready",
+        source: "old-new-fenced-blocks",
+      },
+      explicitRuntimeOptIn: true,
+      explicitWorkspaceWriteOptIn: true,
+      requestedUserDecision: "approved",
+      defaultProductionRejectionUnchanged: true,
+      readFile: authority.readFile,
+      readVerifiedFile: authority.readVerifiedFile,
+      validateWriteTarget: authority.validateWriteTarget,
+      writeFile: () => {
+        throw new Error("writer must stay unreachable after snapshot failure");
+      },
+      snapshotStorage: {
+        ledgerRoot: ledgerRootFile,
+        authorityId: "snapshot-failure",
+      },
+    });
+
+    expect(route.status).toBe("blocked");
+    expect(route.blocker).toBe("workspace-recovery-authority-capture");
+    expect(route.snapshotReceipt?.status).toBe("snapshot-failed-no-mutation");
+    expect(route.evidence).toEqual(
+      expect.arrayContaining([
+        "edit-snapshot-status:snapshot-failed-no-mutation",
+        "edit-snapshot:failed-no-mutation",
+        "fenced-edit-route:no-success-claim",
+      ]),
+    );
+    expect(readFile(fixture.workspaceRoot, "src/app.ts")).toBe(
+      "title\nstatus: draft\nfooter\n",
     );
   });
 });

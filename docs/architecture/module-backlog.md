@@ -290,7 +290,7 @@ preconditions, result projection, and validation.
 | Candidate | Primary module | Goal | Stop condition |
 |---|---|---|---|
 | Edit / Patch thin integration | Edit / Patch, Result Surface | Adopt the module facade at one thin classification/projection handoff. | no new write execution |
-| Edit snapshot / rollback substrate | Edit / Patch, Runtime | Define snapshot/rollback preconditions and receipts before broad edit execution. | no rollback execution unless explicitly routed |
+| Edit snapshot / rollback substrate | Edit / Patch, Runtime | Route 170 substrate now exists for activated exact fenced replacement: pre-write snapshot receipt, rollback readiness, dry-run rollback plan, and explicit single-file apply seam. | no automatic rollback; no broad/fuzzy/discovery/generated/multi-file execution |
 | Multi-file discovery candidate selection | Edit / Patch, Workspace / File Context | Produce bounded candidate sets and confirmation requirements. | no mutation by discovery |
 | Browser controlled planner v2 | Browser, Agent Loop | Improve controlled planner contracts only if browser becomes product priority. | no public web or default browser action expansion |
 

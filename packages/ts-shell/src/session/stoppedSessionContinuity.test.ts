@@ -277,6 +277,65 @@ describe("stopped session continuity", () => {
     expect(result.changedFiles).toEqual([]);
   });
 
+  it("summarizes explicit restore availability for failed fenced edits", () => {
+    const result = makeCodingResult({
+      failedFiles: [
+        {
+          path: "src/app.ts",
+          reason: "workspace writer failed after snapshot capture",
+        },
+      ],
+      verification: {
+        status: "failed",
+        reason: "workspace writer failed after snapshot capture",
+        blockerKind: "unknown",
+      },
+      recoverySurface: {
+        recoveryAvailable: true,
+        explicitRestoreAvailable: true,
+        automaticRecoveryAvailable: false,
+        atomicRollbackAvailable: false,
+        recoveryExecuted: false,
+        restorableFiles: ["src/app.ts"],
+        blockedFiles: [],
+        recoveryAuthorityId: "authority-fenced",
+        routeId: "fenced-edit-replacement",
+        recoveryAction: "preview-restore",
+        userFacingMessage:
+          "Explicit guarded restore may be available. No automatic recovery ran.",
+        evidence: ["recovery-surface:explicit-restore-only"],
+      },
+      evidence: [
+        "edit-snapshot-status:snapshot-created",
+        "edit-recovery-rollback:rollback-available",
+        "actionable-blocker-kind:partial-mutation-failed",
+      ],
+      lastActionResultSeed: {
+        actionKind: "edit-file",
+        target: "src/app.ts",
+        writerStarted: true,
+        writeEffect: "unknown",
+        requiresUserInspection: true,
+        verification: {
+          status: "failed",
+          reason: "workspace writer failed after snapshot capture",
+          blockerKind: "unknown",
+        },
+      },
+    });
+
+    const surface = deriveStoppedSessionContinuitySurface(result);
+
+    expect(surface?.kind).toBe("writer-started-unknown");
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "restore-preview=available",
+    );
+    expect(surface?.failureHandoffDiagnostic).toContain(
+      "automatic-rollback=no",
+    );
+    expect(JSON.stringify(surface)).not.toContain("status: draft");
+  });
+
   it("falls back for generic stopped and error results", () => {
     const stopped = deriveStoppedSessionContinuitySurface(
       makeCodingResult({

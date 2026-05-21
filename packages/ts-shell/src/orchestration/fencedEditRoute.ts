@@ -19,6 +19,15 @@ import {
   fencedEditOutcomeEvidence,
 } from "./fencedEditOutcome.js";
 import type { RecoveryAuthorityStoreConfig } from "./patchRecovery/recoveryAuthorityStore.js";
+import {
+  buildEditSnapshotStoreConfig,
+  editSnapshotEvidence,
+  projectEditSnapshotReceiptForWorkspaceRoute,
+  type EditSnapshotReceipt,
+  type EditSnapshotStorageOptions,
+} from "./editSnapshot.js";
+import { projectEditRecoveryResult } from "./editRecoveryResult.js";
+import { projectRecoverySurfaceSummary } from "./patchRecovery/recoverySurfaceProjection.js";
 
 export type FencedEditReplacementRoute =
   | {
@@ -27,6 +36,7 @@ export type FencedEditReplacementRoute =
       readonly targetPath: string;
       readonly plan: Extract<ExactFencedReplacementPlan, { ok: true }>;
       readonly workspaceRoute: Extract<WorkspaceWriteRoute, { status: "written" }>;
+      readonly snapshotReceipt: EditSnapshotReceipt;
       readonly changedFiles: readonly [string];
       readonly postWriteVerification: "passed";
       readonly terminalClassification: "success";
@@ -39,6 +49,7 @@ export type FencedEditReplacementRoute =
       readonly blocker: string;
       readonly plan: ExactFencedReplacementPlan;
       readonly workspaceRoute?: Extract<WorkspaceWriteRoute, { status: "blocked" }>;
+      readonly snapshotReceipt?: EditSnapshotReceipt;
       readonly changedFiles: readonly [];
       readonly postWriteVerification: "not-run" | "blocked" | "failed";
       readonly terminalClassification: "stopped" | "error";
@@ -61,6 +72,7 @@ export interface FencedEditReplacementRouteOptions {
   ) => WorkspaceWriteTargetAuthority;
   readonly writeFile: (relativePath: string, content: string) => void | Promise<void>;
   readonly recoveryAuthority?: RecoveryAuthorityStoreConfig;
+  readonly snapshotStorage?: EditSnapshotStorageOptions;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -80,12 +92,17 @@ export async function runFencedEditReplacementRoute(
         blocker: `workspace-${targetAuthority.reason}`,
         postWriteVerification: "not-run",
       });
+      const snapshotReceipt = projectEditSnapshotReceiptForWorkspaceRoute({
+        workspaceRoot: options.workspaceRoot,
+        targetPath: options.targetPath,
+      });
       return {
         source: "fenced-edit-replacement-route",
         status: "blocked",
         targetPath: options.targetPath,
         blocker: `workspace-${targetAuthority.reason}`,
         plan,
+        snapshotReceipt,
         changedFiles: [],
         postWriteVerification: "not-run",
         terminalClassification: blockedTerminalClassification(outcome),
@@ -93,6 +110,7 @@ export async function runFencedEditReplacementRoute(
         evidence: [
           ...fencedEditOutcomeEvidence(outcome),
           "fenced-edit-route:workspace-authority-blocked",
+          ...editSnapshotEvidence(snapshotReceipt),
           ...targetAuthority.evidence,
           ...plan.evidence,
           "fenced-edit-route:no-writer-invoked",
@@ -116,12 +134,17 @@ export async function runFencedEditReplacementRoute(
       blocker: plan.blocker,
       postWriteVerification: "not-run",
     });
+    const snapshotReceipt = projectEditSnapshotReceiptForWorkspaceRoute({
+      workspaceRoot: options.workspaceRoot,
+      targetPath: plan.targetPath,
+    });
     return {
       source: "fenced-edit-replacement-route",
       status: "blocked",
       ...(plan.targetPath ? { targetPath: plan.targetPath } : {}),
       blocker: plan.blocker,
       plan,
+      snapshotReceipt,
       changedFiles: [],
       postWriteVerification: "not-run",
       terminalClassification: blockedTerminalClassification(outcome),
@@ -129,6 +152,7 @@ export async function runFencedEditReplacementRoute(
       evidence: [
         ...fencedEditOutcomeEvidence(outcome),
         "fenced-edit-route:planning-blocked",
+        ...editSnapshotEvidence(snapshotReceipt),
         ...plan.evidence,
         "fenced-edit-route:no-writer-invoked",
       ],
@@ -149,10 +173,19 @@ export async function runFencedEditReplacementRoute(
     readVerifiedFile: options.readVerifiedFile,
     validateWriteTarget: options.validateWriteTarget,
     writeFile: options.writeFile,
-    ...(options.recoveryAuthority
-      ? { recoveryAuthority: options.recoveryAuthority }
-      : {}),
+    recoveryAuthority:
+      options.recoveryAuthority ??
+      buildEditSnapshotStoreConfig({
+        workspaceRoot: options.workspaceRoot,
+        targetPath: plan.targetPath,
+        storage: options.snapshotStorage,
+      }),
     ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
+  });
+  const snapshotReceipt = projectEditSnapshotReceiptForWorkspaceRoute({
+    workspaceRoot: options.workspaceRoot,
+    targetPath: plan.targetPath,
+    workspaceRoute,
   });
 
   if (workspaceRoute.status === "blocked") {
@@ -162,6 +195,15 @@ export async function runFencedEditReplacementRoute(
       writerStarted: workspaceRoute.writerStarted,
       postWriteVerification: workspaceRoute.postWriteVerification,
     });
+    const editRecovery = projectEditRecoveryResult({
+      routeStatus: "blocked",
+      terminalClassification: blockedTerminalClassification(outcome),
+      snapshotReceipt,
+      recoverySurface: projectRecoverySurfaceSummary({
+        routeId: "fenced-edit-replacement",
+        recoveryAuthorityCapture: workspaceRoute.recoveryAuthorityCapture,
+      }),
+    });
     return {
       source: "fenced-edit-replacement-route",
       status: "blocked",
@@ -169,6 +211,7 @@ export async function runFencedEditReplacementRoute(
       blocker: `workspace-${workspaceRoute.blocker}`,
       plan,
       workspaceRoute,
+      snapshotReceipt,
       changedFiles: [],
       postWriteVerification: workspaceRoute.postWriteVerification,
       terminalClassification: blockedTerminalClassification(outcome),
@@ -176,6 +219,8 @@ export async function runFencedEditReplacementRoute(
       evidence: [
         ...fencedEditOutcomeEvidence(outcome),
         "fenced-edit-route:workspace-route-blocked",
+        ...editSnapshotEvidence(snapshotReceipt),
+        ...editRecovery.evidence,
         ...plan.evidence,
         ...workspaceRoute.evidence,
         "fenced-edit-route:no-success-claim",
@@ -187,18 +232,30 @@ export async function runFencedEditReplacementRoute(
     status: "written",
     postWriteVerification: workspaceRoute.postWriteVerification,
   });
+  const editRecovery = projectEditRecoveryResult({
+    routeStatus: "written",
+    terminalClassification: "success",
+    snapshotReceipt,
+    recoverySurface: projectRecoverySurfaceSummary({
+      routeId: "fenced-edit-replacement",
+      recoveryAuthorityCapture: workspaceRoute.recoveryAuthorityCapture,
+    }),
+  });
   return {
     source: "fenced-edit-replacement-route",
     status: "written",
     targetPath: plan.targetPath,
     plan,
     workspaceRoute,
+    snapshotReceipt,
     changedFiles: workspaceRoute.changedFiles,
     postWriteVerification: workspaceRoute.postWriteVerification,
     terminalClassification: "success",
     evidence: [
       ...fencedEditOutcomeEvidence(outcome),
       "fenced-edit-route:exact-replacement-written",
+      ...editSnapshotEvidence(snapshotReceipt),
+      ...editRecovery.evidence,
       ...plan.evidence,
       ...workspaceRoute.evidence,
       "fenced-edit-route:continuation-safe-evidence",
@@ -225,12 +282,16 @@ export function buildStoppedFencedEditReplacementRoute(input: {
     blocker: input.blocker,
     postWriteVerification: "not-run",
   });
+  const snapshotReceipt = projectEditSnapshotReceiptForWorkspaceRoute({
+    targetPath: input.targetPath,
+  });
   return {
     source: "fenced-edit-replacement-route",
     status: "blocked",
     ...(input.targetPath ? { targetPath: input.targetPath } : {}),
     blocker: input.blocker,
     plan,
+    snapshotReceipt,
     changedFiles: [],
     postWriteVerification: "not-run",
     terminalClassification: blockedTerminalClassification(outcome),
@@ -238,6 +299,7 @@ export function buildStoppedFencedEditReplacementRoute(input: {
     evidence: [
       ...fencedEditOutcomeEvidence(outcome),
       "fenced-edit-route:activation-blocked",
+      ...editSnapshotEvidence(snapshotReceipt),
       ...input.evidence,
       ...plan.evidence,
       "fenced-edit-route:no-writer-invoked",

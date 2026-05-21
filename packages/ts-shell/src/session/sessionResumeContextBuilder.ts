@@ -386,6 +386,13 @@ export function buildSuccessHandoffDiagnostic(
   if (reason) {
     parts.push(`reason=${compactText(reason, 140)}`);
   }
+  if (codingResult.recoverySurface?.explicitRestoreAvailable) {
+    parts.push("snapshot=created");
+    parts.push("restore-preview=available");
+  }
+  if (codingResult.recoverySurface) {
+    parts.push("automatic-rollback=no");
+  }
   parts.push(`next=${nextFocus}`);
   return `${parts.join("; ")}.`;
 }

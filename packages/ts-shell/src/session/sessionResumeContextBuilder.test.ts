@@ -140,6 +140,31 @@ describe("session resume context builder", () => {
     expect(diagnostic).toContain("next=keep the next turn focused");
   });
 
+  it("includes snapshot and explicit restore facts in success handoff diagnostics", () => {
+    const diagnostic = buildSuccessHandoffDiagnostic({
+      ...makeCodingResult(),
+      recoverySurface: {
+        recoveryAvailable: true,
+        explicitRestoreAvailable: true,
+        automaticRecoveryAvailable: false,
+        atomicRollbackAvailable: false,
+        recoveryExecuted: false,
+        restorableFiles: ["src/a.ts"],
+        blockedFiles: [],
+        recoveryAuthorityId: "authority-success",
+        routeId: "fenced-edit-replacement",
+        recoveryAction: "preview-restore",
+        userFacingMessage:
+          "Explicit guarded restore may be available. No automatic recovery ran.",
+        evidence: ["recovery-surface:explicit-restore-only"],
+      },
+    });
+
+    expect(diagnostic).toContain("snapshot=created");
+    expect(diagnostic).toContain("restore-preview=available");
+    expect(diagnostic).toContain("automatic-rollback=no");
+  });
+
   it("extracts path-like targets for prompt routing", () => {
     expect(extractPathLikeTargets("continue in src/a.ts and ./b.test.ts")).toEqual([
       "./b.test.ts",

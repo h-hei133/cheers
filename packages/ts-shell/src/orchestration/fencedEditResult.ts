@@ -12,6 +12,10 @@ import {
   classifyFencedEditOutcome,
   fencedEditOutcomeEvidence,
 } from "./fencedEditOutcome.js";
+import { projectRecoverySurfaceSummary } from "./patchRecovery/recoverySurfaceProjection.js";
+import {
+  projectEditRecoveryResult,
+} from "./editRecoveryResult.js";
 
 export function buildFencedEditReplacementRouteResult(input: {
   readonly sessionId: string;
@@ -44,8 +48,23 @@ function buildCodingResult(route: FencedEditReplacementRoute): CodingResultSumma
     ? "Exact fenced replacement completed after workspace authority, final stale-read, and post-write verification."
     : route.nextAction;
   const blocker = success ? undefined : route.blocker;
+  const recoverySurface = route.snapshotReceipt
+    ? projectRecoverySurfaceSummary({
+        routeId: "fenced-edit-replacement",
+        recoveryAuthorityCapture: route.workspaceRoute?.recoveryAuthorityCapture,
+      })
+    : undefined;
+  const editRecovery = route.snapshotReceipt
+    ? projectEditRecoveryResult({
+        routeStatus: route.status,
+        terminalClassification: route.terminalClassification,
+        snapshotReceipt: route.snapshotReceipt,
+        recoverySurface,
+      })
+    : undefined;
   return {
     taskKind: "edit-file",
+    ...(recoverySurface ? { recoverySurface } : {}),
     changedFiles: success ? [...route.changedFiles] : [],
     failedFiles: success ? [] : [{ path: target, reason }],
     patches: [
@@ -78,6 +97,8 @@ function buildCodingResult(route: FencedEditReplacementRoute): CodingResultSumma
       attempts: 0,
       evidence: [
         ...fencedEditOutcomeEvidence(outcome),
+        ...(editRecovery ? editRecovery.evidence : []),
+        ...(editRecovery ? [editRecovery.continuationSummary] : []),
         "fenced-edit-result:continuation-safe",
         `fenced-edit-result:operation:fenced-replacement`,
         `fenced-edit-result:state:${
@@ -104,6 +125,7 @@ function buildCodingResult(route: FencedEditReplacementRoute): CodingResultSumma
         "workspace authority",
         "final stale-read",
         "post-write verification",
+        "pre-write snapshot receipt",
       ],
       observedEvidence: [...route.evidence],
     },
@@ -126,6 +148,7 @@ function buildCodingResult(route: FencedEditReplacementRoute): CodingResultSumma
     evidence: [
       ...route.evidence,
       ...fencedEditOutcomeEvidence(outcome),
+      ...(editRecovery ? editRecovery.evidence : []),
       "fenced-edit-result:operation:fenced-replacement",
       success
         ? "fenced-edit-result:coding-result-success"
@@ -144,7 +167,7 @@ function buildCodingResult(route: FencedEditReplacementRoute): CodingResultSumma
               "Post-write verification confirmed the exact fenced replacement content.",
           }
         : {
-            status: "blocked",
+            status: outcome.state === "failed" ? "failed" : "blocked",
             reason,
             ...(blocker
               ? {
@@ -273,17 +296,43 @@ function buildTerminalInput(route: FencedEditReplacementRoute): QueryTerminal {
 
 function buildOutput(route: FencedEditReplacementRoute): string {
   if (route.status === "written") {
+    const recovery = route.snapshotReceipt
+      ? projectEditRecoveryResult({
+          routeStatus: route.status,
+          terminalClassification: route.terminalClassification,
+          snapshotReceipt: route.snapshotReceipt,
+          recoverySurface: projectRecoverySurfaceSummary({
+            routeId: "fenced-edit-replacement",
+            recoveryAuthorityCapture: route.workspaceRoute.recoveryAuthorityCapture,
+          }),
+        }).terminalSummary
+      : "Snapshot: not recorded.";
     return [
       "fenced replacement succeeded.",
       `Changed: ${route.changedFiles.join(", ")}`,
       "Verified: post-write content matched exact fenced replacement",
+      recovery,
     ].join("\n");
   }
+  const recovery = route.snapshotReceipt
+    ? projectEditRecoveryResult({
+        routeStatus: route.status,
+        terminalClassification: route.terminalClassification,
+        snapshotReceipt: route.snapshotReceipt,
+        recoverySurface: route.workspaceRoute
+          ? projectRecoverySurfaceSummary({
+              routeId: "fenced-edit-replacement",
+              recoveryAuthorityCapture: route.workspaceRoute.recoveryAuthorityCapture,
+            })
+          : undefined,
+      }).terminalSummary
+    : "Snapshot: not created because no writer ran; rollback readiness=rollback-not-run; automatic rollback=no.";
   return [
     route.terminalClassification === "error"
       ? "fenced replacement failed during execution."
       : "fenced replacement stopped before writing.",
     route.terminalClassification === "error" ? "Changed: unverified" : "Changed: none",
+    recovery,
     `Reason: ${route.nextAction}`,
     `Next: ${route.nextAction}`,
   ].join("\n");

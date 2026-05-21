@@ -68,6 +68,9 @@
         "packages/ts-shell/src/orchestration/fencedEditRoute.ts",
         "packages/ts-shell/src/orchestration/fencedEditOutcome.ts",
         "packages/ts-shell/src/orchestration/fencedEditResult.ts",
+        "packages/ts-shell/src/orchestration/editSnapshot.ts",
+        "packages/ts-shell/src/orchestration/editRecoveryResult.ts",
+        "packages/ts-shell/src/orchestration/editRollback.ts",
         "packages/ts-shell/src/orchestration/futureEditContract.ts",
         "packages/ts-shell/src/orchestration/futureEditPlanner.ts",
         "packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.ts",
@@ -78,6 +81,7 @@
         "current bounded edit/write expectations",
         "runtime activation selection for exact fenced replacement",
         "exact fenced replacement planning, outcome taxonomy, and route projection",
+        "single-file pre-write snapshot receipts and explicit rollback readiness projection",
         "future-only edit planning contracts",
         "workspace write authority facts",
         "stale-read and mutation result projections"

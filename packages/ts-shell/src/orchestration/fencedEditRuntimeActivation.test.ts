@@ -54,6 +54,8 @@ describe("fenced edit runtime activation", () => {
         "fenced-edit-route:exact-replacement-written",
         "apply-patch-workspace-write-route:final-stale-read-immediately-before-writer",
         "apply-patch-workspace-write-route:post-write-verification-passed",
+        "edit-snapshot-status:snapshot-created",
+        "edit-recovery-rollback:rollback-not-needed-success",
       ]),
     );
     expect(result.codingResult?.continuation.evidence).toContain(
@@ -140,6 +142,7 @@ describe("fenced edit runtime activation", () => {
         expect.arrayContaining([
           entry.marker,
           "fenced-edit-mutation:not-run",
+          "edit-snapshot-status:snapshot-not-needed-no-write",
           "actionable-blocker-kind:unsupported-future-edit",
         ]),
       );
