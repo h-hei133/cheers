@@ -26,6 +26,8 @@ const CONTINUATION_EVIDENCE_PREFIXES: ReadonlyArray<{
   { label: "verification-repair-prompt", prefixes: ["verification-repair-prompt loop="] },
   { label: "context-packet", prefixes: ["context-packet ", "context-packet:id:"] },
   { label: "context-plan", prefixes: ["context-plan ", "context-plan:readiness:"] },
+  { label: "context-graph", prefixes: ["context-graph ", "context-graph:id:"] },
+  { label: "test-impact", prefixes: ["test-impact ", "test-impact:id:"] },
   { label: "agent-plan", prefixes: ["agent-plan ", "agent-plan:readiness:"] },
   { label: "proposal-review", prefixes: ["edit-proposal-review proposal="] },
   { label: "proposal-apply", prefixes: ["edit-proposal-apply proposal="] },

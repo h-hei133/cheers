@@ -94,7 +94,10 @@ function projectCapabilityArea(evidence: readonly string[]): string | undefined 
   if (
     evidence.some(
       (entry) =>
-        entry.startsWith("context-packet") || entry.startsWith("context-plan"),
+        entry.startsWith("context-packet") ||
+        entry.startsWith("context-plan") ||
+        entry.startsWith("context-graph") ||
+        entry.startsWith("test-impact"),
     )
   ) {
     return "workspace-file-context";
@@ -141,7 +144,7 @@ function extractSuggestedReads(evidence: readonly string[]): string | undefined 
 }
 
 function isParityEvidenceMarker(entry: string): boolean {
-  return /^(?:actionable-blocker-kind|verify-blocker-kind|context-packet|context-plan|agent-plan|generated-edit|provider-edit|context-aware-provider|edit-proposal|proposal-hunk-set|edit-repair|verification-command|verification-repair|target-set-edit|edit-recovery)/.test(
+  return /^(?:actionable-blocker-kind|verify-blocker-kind|context-packet|context-plan|context-graph|test-impact|agent-plan|generated-edit|provider-edit|context-aware-provider|edit-proposal|proposal-hunk-set|edit-repair|verification-command|verification-repair|target-set-edit|edit-recovery)/.test(
     entry,
   );
 }

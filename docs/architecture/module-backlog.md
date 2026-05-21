@@ -489,6 +489,26 @@ as an import-policing rule.
   schema/CLI/dependency changes, and broad `runMvpIntegratedFlow.ts` refactors
   remain closed.
 
+### Route 187: Context Graph And Test Impact
+
+- Route 187 adds bounded deterministic context graph and test-impact planning
+  facades over Route 181/182 context packets and Agent Plan facts:
+  `contextGraph.ts`, `contextGraphDiscovery.ts`, `contextGraphBudget.ts`,
+  `contextGraphScore.ts`, `contextGraphPlanning.ts`,
+  `contextGraphResult.ts`, and `testImpactPlan.ts`.
+- Explicit targets can now surface graph nodes for direct imports, exported
+  symbol hints, sibling files, nearby tests, docs/readme references, reverse
+  call-site candidates, and second-hop candidates, with included/omitted
+  status, strict budget reasons, coverage score, readiness, suggested reads,
+  likely tests, and verification command candidates.
+- Agent Plan, context-aware provider input/prompt/result, verification command
+  planning, Result Surface, Session / Continue parity, and the
+  context-planning verifier consume graph/test-impact summaries without raw
+  file content, provider calls, command execution, or mutation authority.
+- LSP, embeddings, full-repo semantic indexing, command allowlist expansion,
+  provider/model calls, mutation behavior changes, CLI/schema/dependency
+  changes, and broad `runMvpIntegratedFlow.ts` refactors remain closed.
+
 ## Module-First Route Rule
 
 Future routes must state:

@@ -8,6 +8,8 @@ describe("continuation evidence parity", () => {
       makeCodingResult([
         "context-packet ctx_abc; target=src/a.ts; included=2; omitted=1; mutationAuthority=not-granted; raw-full-content-excluded",
         "context-plan ctx_abc; readiness=needs-more-context; suggestedReads=1; tests=0; mutationAuthority=not-granted",
+        "context-graph ctx_graph_abc; root=src/a.ts; nodes=5; included=4; omitted=1; mutationAuthority=not-granted; raw-content-excluded",
+        "test-impact test_impact_abc; graph=ctx_graph_abc; tests=1; commands=2; readiness=ready; mutationAuthority=not-granted",
         "agent-plan plan_abc; owner=workspace-file-context; readiness=needs-more-context; confidence=medium; missingFacts=1; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
         "generated-edit proposal=generated-edit-abc; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
         "context-aware-provider proposal=provider-edit-abc; status=review-required-proposal; contextPacket=ctx_abc; agentPlan=plan_abc; mutationAuthority=not-granted; raw-content-excluded",
@@ -21,6 +23,12 @@ describe("continuation evidence parity", () => {
 
     expect(details).toContain(
       "context-packet=context-packet ctx_abc; target=src/a.ts; included=2; omitted=1; mutationAuthority=not-granted; raw-full-content-excluded",
+    );
+    expect(details).toContain(
+      "context-graph=context-graph ctx_graph_abc; root=src/a.ts; nodes=5; included=4; omitted=1; mutationAuthority=not-granted; raw-content-excluded",
+    );
+    expect(details).toContain(
+      "test-impact=test-impact test_impact_abc; graph=ctx_graph_abc; tests=1; commands=2; readiness=ready; mutationAuthority=not-granted",
     );
     expect(details).toContain(
       "agent-plan=agent-plan plan_abc; owner=workspace-file-context; readiness=needs-more-context; confidence=medium; missingFacts=1; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",

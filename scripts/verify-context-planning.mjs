@@ -5,6 +5,11 @@ import { readFileSync } from 'node:fs'
 const focusedTests = [
   'src/orchestration/contextBudget.test.ts',
   'src/orchestration/contextDiscovery.test.ts',
+  'src/orchestration/contextGraphDiscovery.test.ts',
+  'src/orchestration/contextGraphScore.test.ts',
+  'src/orchestration/contextGraphPlanning.test.ts',
+  'src/orchestration/testImpactPlan.test.ts',
+  'src/orchestration/contextGraphResult.test.ts',
   'src/orchestration/contextPacket.test.ts',
   'src/orchestration/contextPlan.test.ts',
   'src/orchestration/contextPacketResult.test.ts',
@@ -39,6 +44,12 @@ const focusedTests = [
 console.log('gate name=context-planning')
 console.log('marker explicit-target-context-packet')
 console.log('marker deterministic-import-sibling-test-docs-callsite')
+console.log('marker context-graph-explicit-target')
+console.log('marker context-graph-second-hop-candidates')
+console.log('marker context-graph-budget-omission-reasons')
+console.log('marker context-graph-score-readiness')
+console.log('marker test-impact-suggested-tests')
+console.log('marker test-impact-verification-candidates')
 console.log('marker budget-redaction-no-write')
 console.log('marker continuation-safe-summary')
 console.log('marker context-packet-feeds-agent-plan')
@@ -111,13 +122,14 @@ const runMvpSource = readFileSync(
   'utf8',
 )
 
-if (!runMvpSource.includes('projectWorkflowTaskPlanToAgentPlan')) {
-  console.log('[product-regression] context-planning - runMvp does not call agent plan facade')
+if (!runMvpSource.includes('buildContextGraphPlanningBundle')) {
+  console.log('[product-regression] context-planning - runMvp does not call context graph planning facade')
   process.exit(1)
 }
 
 if (
   runMvpSource.includes('function buildAgentPlan') ||
+  runMvpSource.includes('function discoverContextGraph') ||
   runMvpSource.includes('projectContextPacketRuntimeOutcome')
 ) {
   console.log('[product-regression] context-planning - planning helpers are implemented inline or bypass facade')

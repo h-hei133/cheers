@@ -40,8 +40,14 @@ function buildCodingResult(
     ...(plan.input.contextPacketId
       ? [`contextPacket=${plan.input.contextPacketId}`]
       : []),
+    ...(plan.input.contextGraphId
+      ? [`contextGraph=${plan.input.contextGraphId}`]
+      : []),
     ...(plan.input.agentPlanId ? [`agentPlan=${plan.input.agentPlanId}`] : []),
     `contextCompleteness=${plan.input.contextCompleteness}`,
+    `graphReadiness=${plan.input.contextGraphReadiness ?? "none"}`,
+    `coverage=${plan.input.contextCoverageScore ?? "none"}`,
+    `testImpact=${plan.input.testImpactSummary ?? "none"}`,
     `planConfidence=${plan.input.planConfidence}`,
     `missingFacts=${plan.input.missingFacts.length}`,
     `suggestedReads=${plan.input.suggestedReads.length}`,
@@ -185,6 +191,7 @@ function buildOutput(plan: ContextAwareProviderProposalPlan): string {
     `Proposal: ${manifest?.proposalId ?? "(none)"}`,
     `Status: ${plan.status}`,
     `Context packet: ${plan.input.contextPacketId ?? "(none)"}`,
+    `Context graph: ${plan.input.contextGraphId ?? "(none)"}`,
     `Agent Plan: ${plan.input.agentPlanId ?? "(none)"}`,
     `Readiness: ${manifest?.handoffReadiness ?? "none"}`,
     `Next: ${plan.nextAction}`,

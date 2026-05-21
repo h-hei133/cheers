@@ -43,6 +43,32 @@ describe("session result parity", () => {
     expect(projection.reason).toContain("Context packet needs more related reads");
   });
 
+  it("projects context graph and test-impact markers for session consumers", () => {
+    const projection = projectSessionResultParity({
+      terminalClassification: "stopped",
+      stopReason: "Read omitted graph candidates before provider planning.",
+      codingResult: makeCodingResult({
+        reason: "Context graph is budget limited.",
+        nextAction: "Read omitted graph candidates before provider planning.",
+        evidence: [
+          "context-graph ctx_graph_abc; root=src/target.ts; nodes=8; included=6; omitted=2; mutationAuthority=not-granted; raw-content-excluded",
+          "test-impact test_impact_abc; graph=ctx_graph_abc; tests=1; commands=2; readiness=ready; mutationAuthority=not-granted",
+          "context-graph-score:readiness:budget-limited",
+        ],
+      }),
+    });
+
+    expect(projection.capabilityArea).toBe("workspace-file-context");
+    expect(projection.mutationAuthority).toBe("not-granted");
+    expect(projection.redactionStatus).toBe("raw-content-excluded");
+    expect(projection.evidenceMarkers).toContain(
+      "context-graph ctx_graph_abc; root=src/target.ts; nodes=8; included=6; omitted=2; mutationAuthority=not-granted; raw-content-excluded",
+    );
+    expect(projection.evidenceMarkers).toContain(
+      "test-impact test_impact_abc; graph=ctx_graph_abc; tests=1; commands=2; readiness=ready; mutationAuthority=not-granted",
+    );
+  });
+
   it("projects context-aware provider proposal markers for session consumers", () => {
     const projection = projectSessionResultParity({
       terminalClassification: "stopped",

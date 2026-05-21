@@ -5,6 +5,7 @@ import { redactProviderEditText } from "./providerEditContext.js";
 export interface ContextAwareProviderPromptContext {
   readonly requestId: string;
   readonly contextPacketId: string;
+  readonly contextGraphId?: string;
   readonly agentPlanId: string;
   readonly userRequest: string;
   readonly targetSummary: string;
@@ -24,6 +25,8 @@ export interface ContextAwareProviderPromptContext {
   readonly suggestedReads: readonly string[];
   readonly suggestedVerification: readonly string[];
   readonly omittedContentReasons: readonly string[];
+  readonly contextReadiness?: string;
+  readonly testImpactSummary?: string;
   readonly verificationExpectation: "review-before-apply";
   readonly mutationAuthority: "not-granted";
   readonly redactionStatus: "redacted-and-budgeted";
@@ -66,11 +69,15 @@ export function buildContextAwareProviderPrompt(input: {
     "Create a review-only provider edit proposal from explicit context.",
     `Request: ${redactProviderEditText(input.userRequest)}`,
     `Context packet: ${contextPacketId}`,
+    `Context graph: ${input.editInput.contextGraphId ?? "none"}`,
     `Agent Plan: ${agentPlanId}`,
     `Target: ${input.contextPacket.targetSafeLabel}`,
     `Target summary: ${redactProviderEditText(targetSource?.summary ?? input.editInput.targetSummary)}`,
     `Context completeness: ${input.editInput.contextCompleteness}`,
     `Plan confidence: ${input.editInput.planConfidence}`,
+    `Graph readiness: ${input.editInput.contextGraphReadiness ?? "none"}`,
+    `Context coverage score: ${input.editInput.contextCoverageScore ?? "none"}`,
+    `Test impact: ${input.editInput.testImpactSummary ?? "none"}`,
     `Missing facts: ${input.editInput.missingFacts.join("; ") || "none"}`,
     `Suggested reads: ${input.editInput.suggestedReads.join("; ") || "none"}`,
     `Suggested verification: ${input.editInput.suggestedVerification.join("; ") || "none"}`,
@@ -81,6 +88,7 @@ export function buildContextAwareProviderPrompt(input: {
   return {
     requestId: input.editInput.requestId,
     contextPacketId,
+    ...(input.editInput.contextGraphId ? { contextGraphId: input.editInput.contextGraphId } : {}),
     agentPlanId,
     userRequest: redactProviderEditText(input.userRequest),
     targetSummary: redactProviderEditText(input.editInput.targetSummary),
@@ -97,12 +105,17 @@ export function buildContextAwareProviderPrompt(input: {
       redactProviderEditText,
     ),
     omittedContentReasons,
+    ...(input.editInput.contextGraphReadiness ? { contextReadiness: input.editInput.contextGraphReadiness } : {}),
+    ...(input.editInput.testImpactSummary ? { testImpactSummary: input.editInput.testImpactSummary } : {}),
     verificationExpectation: "review-before-apply",
     mutationAuthority: "not-granted",
     redactionStatus: "redacted-and-budgeted",
     providerPrompt: promptLines.join("\n"),
     evidence: [
       `context-aware-provider-prompt:context-packet:${contextPacketId}`,
+      ...(input.editInput.contextGraphId
+        ? [`context-aware-provider-prompt:context-graph:${input.editInput.contextGraphId}`]
+        : []),
       `context-aware-provider-prompt:agent-plan:${agentPlanId}`,
       "context-aware-provider-prompt:redacted-and-budgeted",
       "context-aware-provider-prompt:raw-full-content-excluded",

@@ -1,5 +1,8 @@
 import type { AgentPlan } from "./agentPlan.js";
+import type { ContextGraph } from "./contextGraph.js";
+import type { ContextGraphScore } from "./contextGraphScore.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
+import type { TestImpactPlan } from "./testImpactPlan.js";
 import {
   buildContextAwareProviderEditInput,
   type ContextAwareProviderEditInput,
@@ -70,6 +73,9 @@ export async function planContextAwareProviderProposal(input: {
   readonly requestId: string;
   readonly targetSummary: string;
   readonly contextPacket?: TargetedContextPacket;
+  readonly contextGraph?: ContextGraph;
+  readonly contextGraphScore?: ContextGraphScore;
+  readonly testImpactPlan?: TestImpactPlan;
   readonly agentPlan?: AgentPlan;
   readonly userRequest: string;
   readonly constraints?: readonly string[];
@@ -82,6 +88,9 @@ export async function planContextAwareProviderProposal(input: {
     requestId: input.requestId,
     targetSummary: input.targetSummary,
     contextPacket: input.contextPacket,
+    contextGraph: input.contextGraph,
+    contextGraphScore: input.contextGraphScore,
+    testImpactPlan: input.testImpactPlan,
     agentPlan: input.agentPlan,
     providerReadinessState: input.availability.kind,
     allowReviewOnlyWithMissingContext: input.allowReviewOnlyWithMissingContext,

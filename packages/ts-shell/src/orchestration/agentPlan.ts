@@ -43,6 +43,10 @@ export interface AgentPlan {
   readonly requestedActionKind: AgentPlanRequestedActionKind;
   readonly targetSummary: string;
   readonly contextPacketIds: readonly string[];
+  readonly contextGraphIds?: readonly string[];
+  readonly graphReadiness?: string;
+  readonly contextCoverageScore?: number;
+  readonly testImpactSummary?: string;
   readonly contextCompleteness: AgentPlanContextCompleteness;
   readonly confidence: AgentPlanConfidence;
   readonly executionReadiness: AgentPlanExecutionReadiness;
@@ -67,6 +71,13 @@ export function buildAgentPlan(
     `readiness=${input.executionReadiness}`,
     `confidence=${input.confidence}`,
     `contextPackets=${input.contextPacketIds.length}`,
+    ...(input.contextGraphIds?.length
+      ? [`contextGraphs=${input.contextGraphIds.length}`]
+      : []),
+    ...(input.graphReadiness ? [`graphReadiness=${input.graphReadiness}`] : []),
+    ...(typeof input.contextCoverageScore === "number"
+      ? [`coverage=${input.contextCoverageScore}`]
+      : []),
     `missingFacts=${input.missingFacts.length}`,
     `suggestedReads=${input.suggestedReads.length}`,
     "mutationAuthority=not-granted",
@@ -87,6 +98,10 @@ function buildAgentPlanId(input: Omit<AgentPlan, "planId" | "replaySafeSummary">
     requestedActionKind: input.requestedActionKind,
     targetSummary: input.targetSummary,
     contextPacketIds: input.contextPacketIds,
+    contextGraphIds: input.contextGraphIds,
+    graphReadiness: input.graphReadiness,
+    contextCoverageScore: input.contextCoverageScore,
+    testImpactSummary: input.testImpactSummary,
     contextCompleteness: input.contextCompleteness,
     confidence: input.confidence,
     executionReadiness: input.executionReadiness,

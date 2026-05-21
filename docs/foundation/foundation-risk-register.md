@@ -14,6 +14,35 @@ None open after Route 165.
 
 ## Resolved
 
+### Context graph and test-impact planning
+
+- Affected modules: Workspace / File Context, Agent Loop, Provider / Model,
+  Runtime / Verification, Result Surface, Session / Continue, Harness / Eval.
+- Why it was a calibration gap: Route 181 context packets were bounded and
+  read-only, but still mostly one-hop. Agent Plan, provider proposal context,
+  and verification planning could consume packet facts, but lacked graph-level
+  coverage, second-hop candidates, omitted graph reasons, and deterministic
+  test-impact summaries.
+- Resolution: Route 187 adds `contextGraph.ts`,
+  `contextGraphDiscovery.ts`, `contextGraphBudget.ts`,
+  `contextGraphScore.ts`, `contextGraphPlanning.ts`,
+  `contextGraphResult.ts`, and `testImpactPlan.ts`. Explicit targets now build
+  bounded deterministic graphs over imports, exported symbol hints, sibling
+  files, nearby tests, docs/readme references, reverse call-site candidates,
+  and second-hop candidates. Agent Plan, context-aware provider inputs,
+  verification command planning, Result Surface, and Session / Continue consume
+  replay-safe graph/test-impact facts without raw file content or mutation
+  authority.
+- Evidence: context graph discovery/score/result tests, test-impact plan tests,
+  Agent Plan/provider/verification/session parity regressions, focused
+  context-planning verifier, result-contract, and build.
+- Recommended next action: keep LSP, embeddings, full-repo semantic indexing,
+  provider/model calls, command execution, command allowlist expansion,
+  mutation behavior changes, CLI/schema/dependency changes, and broad
+  `runMvpIntegratedFlow.ts` rewrites closed until separate routes define them.
+- Should become a route: no, resolved by Route 187 for deterministic graph and
+  test-impact planning only.
+
 ### Command-driven verification repair bridge
 
 - Affected modules: Tool / Runtime, Edit / Patch, Provider / Model, Result

@@ -39,6 +39,35 @@ export {
   type ContextPacketResultProjection,
 } from "./contextPacketResult.js";
 export {
+  buildContextGraph,
+  type ContextGraph,
+  type ContextGraphNode,
+  type ContextGraphEdge,
+} from "./contextGraph.js";
+export {
+  discoverContextGraph,
+} from "./contextGraphDiscovery.js";
+export {
+  createContextGraphBudgetState,
+  type ContextGraphBudgetLimits,
+} from "./contextGraphBudget.js";
+export {
+  scoreContextGraph,
+  type ContextGraphScore,
+} from "./contextGraphScore.js";
+export {
+  buildTestImpactPlan,
+  type TestImpactPlan,
+} from "./testImpactPlan.js";
+export {
+  buildContextGraphResult,
+  type ContextGraphResultProjection,
+} from "./contextGraphResult.js";
+export {
+  buildContextGraphPlanningBundle,
+  type ContextGraphPlanningBundle,
+} from "./contextGraphPlanning.js";
+export {
   buildAgentPlan,
   type AgentPlan,
 } from "./agentPlan.js";

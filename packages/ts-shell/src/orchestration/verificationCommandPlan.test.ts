@@ -71,6 +71,46 @@ describe("verificationCommandPlan", () => {
     expect(editResultPlan.sourceEditTransactionId).toBe("txn_186");
   });
 
+  it("can select allowlisted test-impact verification candidates without executing them", () => {
+    const plan = buildVerificationCommandPlan({
+      testImpactPlan: {
+        impactPlanId: "test_impact_187",
+        graphId: "ctx_graph_187",
+        likelyTestFiles: ["src/target.test.ts"],
+        likelyVerificationCommandCandidates: [
+          {
+            command: "npm test -- src/target.test.ts",
+            source: "targeted-test",
+            readiness: "not-allowlisted",
+            reason: "outside allowlist",
+          },
+          {
+            command: "npm test -- --help",
+            source: "allowlisted-generic",
+            readiness: "ready",
+            reason: "allowlisted",
+          },
+        ],
+        confidence: "medium",
+        missingTestContext: [],
+        suggestedReads: [],
+        commandReadiness: "ready",
+        noWriteEvidence: ["test-impact:commands:not-executed"],
+        replaySafeSummary: "test-impact test_impact_187",
+        evidence: ["test-impact:id:test_impact_187"],
+      },
+    });
+
+    expect(plan.state).toBe("ready");
+    expect(plan.source).toBe("test-impact");
+    expect(plan.command).toBe("npm test -- --help");
+    expect(plan.sourceContextGraphId).toBe("ctx_graph_187");
+    expect(plan.sourceTestImpactPlanId).toBe("test_impact_187");
+    expect(plan.evidence).toContain(
+      "verification-command-plan:test-impact:test_impact_187",
+    );
+  });
+
   it("surfaces explicit approval-required plans without dispatch authority", () => {
     const plan = buildVerificationCommandPlan({
       explicitCommand: "node --version",

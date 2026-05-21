@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import type { AgentPlan } from "./agentPlan.js";
 import { blockedCommandReason, isAllowlistedRunCommand } from "./capabilityBoundaryProjection.js";
 import { redactProviderEditText } from "./providerEditContext.js";
+import type { TestImpactPlan } from "./testImpactPlan.js";
 
 export type VerificationCommandPlanState =
   | "ready"
@@ -22,6 +23,7 @@ export type VerificationCommandKind =
 export type VerificationCommandSource =
   | "explicit"
   | "agent-plan"
+  | "test-impact"
   | "proposal"
   | "edit-result"
   | "none";
@@ -34,6 +36,8 @@ export interface VerificationCommandPlan {
   readonly sourceProposalId?: string;
   readonly sourceEditTransactionId?: string;
   readonly sourceContextPacketId?: string;
+  readonly sourceContextGraphId?: string;
+  readonly sourceTestImpactPlanId?: string;
   readonly command?: string;
   readonly commandSafeLabel?: string;
   readonly commandKind: VerificationCommandKind;
@@ -57,6 +61,7 @@ export interface VerificationCommandPlan {
 
 export function buildVerificationCommandPlan(input: {
   readonly agentPlan?: AgentPlan;
+  readonly testImpactPlan?: TestImpactPlan;
   readonly explicitCommand?: string;
   readonly proposalVerificationCommand?: string;
   readonly editResultVerificationCommand?: string;
@@ -76,6 +81,8 @@ export function buildVerificationCommandPlan(input: {
   const commandSafeLabel = command ? safeLabel(command, 180) : undefined;
   const sourceContextPacketId =
     input.sourceContextPacketId ?? input.agentPlan?.contextPacketIds[0];
+  const sourceContextGraphId =
+    input.testImpactPlan?.graphId ?? input.agentPlan?.contextGraphIds?.[0];
   const permissionState = input.permissionState ?? "runtime-check";
   const cwdSafeLabel = safeLabel(input.cwdLabel ?? "workspace-root", 180);
   const commandKind = classifyCommandKind(command);
@@ -109,6 +116,8 @@ export function buildVerificationCommandPlan(input: {
     sourceProposalId: input.sourceProposalId,
     sourceEditTransactionId: input.sourceEditTransactionId,
     sourceContextPacketId,
+    sourceContextGraphId,
+    sourceTestImpactPlanId: input.testImpactPlan?.impactPlanId,
     commandSafeLabel,
     state,
   });
@@ -121,6 +130,10 @@ export function buildVerificationCommandPlan(input: {
     ...(input.sourceProposalId ? { sourceProposalId: input.sourceProposalId } : {}),
     ...(input.sourceEditTransactionId ? { sourceEditTransactionId: input.sourceEditTransactionId } : {}),
     ...(sourceContextPacketId ? { sourceContextPacketId } : {}),
+    ...(sourceContextGraphId ? { sourceContextGraphId } : {}),
+    ...(input.testImpactPlan?.impactPlanId
+      ? { sourceTestImpactPlanId: input.testImpactPlan.impactPlanId }
+      : {}),
     ...(command ? { command } : {}),
     ...(commandSafeLabel ? { commandSafeLabel } : {}),
     commandKind,
@@ -139,6 +152,9 @@ export function buildVerificationCommandPlan(input: {
       `verification-command-plan:state:${state}`,
       `verification-command-plan:id:${verificationPlanId}`,
       `verification-command-plan:source:${candidate.source}`,
+      ...(input.testImpactPlan
+        ? [`verification-command-plan:test-impact:${input.testImpactPlan.impactPlanId}`]
+        : []),
       `verification-command-plan:kind:${commandKind}`,
       `verification-command-plan:allowlist:${allowlistStatus}`,
       `verification-command-plan:permission:${permissionRequirement}`,
@@ -153,6 +169,7 @@ export function buildVerificationCommandPlan(input: {
 
 function selectCommandCandidate(input: {
   readonly agentPlan?: AgentPlan;
+  readonly testImpactPlan?: TestImpactPlan;
   readonly explicitCommand?: string;
   readonly proposalVerificationCommand?: string;
   readonly editResultVerificationCommand?: string;
@@ -165,6 +182,12 @@ function selectCommandCandidate(input: {
   );
   if (agentPlanCommand) {
     return { source: "agent-plan", command: agentPlanCommand };
+  }
+  const testImpactCommand = input.testImpactPlan?.likelyVerificationCommandCandidates.find(
+    (entry) => entry.readiness === "ready" && Boolean(entry.command.trim()),
+  );
+  if (testImpactCommand) {
+    return { source: "test-impact", command: testImpactCommand.command };
   }
   if (input.proposalVerificationCommand?.trim()) {
     return { source: "proposal", command: input.proposalVerificationCommand };
@@ -284,6 +307,8 @@ function buildPlanId(input: {
   readonly sourceProposalId?: string;
   readonly sourceEditTransactionId?: string;
   readonly sourceContextPacketId?: string;
+  readonly sourceContextGraphId?: string;
+  readonly sourceTestImpactPlanId?: string;
   readonly commandSafeLabel?: string;
   readonly state: VerificationCommandPlanState;
 }): string {

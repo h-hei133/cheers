@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "./agentPlan.js";
 import { buildContextAwareProviderEditInput } from "./contextAwareProviderEdit.js";
+import type { ContextGraph } from "./contextGraph.js";
+import type { ContextGraphScore } from "./contextGraphScore.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
+import type { TestImpactPlan } from "./testImpactPlan.js";
 
 describe("contextAwareProviderEdit", () => {
   it("projects context packet and Agent Plan facts into provider proposal input", () => {
@@ -75,6 +78,65 @@ describe("contextAwareProviderEdit", () => {
       }).status,
     ).toBe("plan-needs-more-context");
   });
+
+  it("consumes graph and test-impact summaries without granting provider mutation", () => {
+    const packet = buildPacket({ completenessStatus: "complete" });
+    const plan = buildPlan(packet, "ready");
+    const graph = buildGraph();
+    const score: ContextGraphScore = {
+      graphId: graph.graphId,
+      rootTargetConfidence: "high",
+      importCoverage: 1,
+      testCoverage: 1,
+      docsCoverage: 1,
+      callSiteCoverage: 1,
+      omittedRiskLevel: "none",
+      planningReadiness: "context-ready",
+      coverageScore: 100,
+      evidence: [],
+    };
+    const testImpact: TestImpactPlan = {
+      impactPlanId: "test_impact_provider",
+      graphId: graph.graphId,
+      likelyTestFiles: ["src/app.test.ts"],
+      likelyVerificationCommandCandidates: [
+        {
+          command: "npm test -- --help",
+          source: "allowlisted-generic",
+          readiness: "ready",
+          reason: "allowlisted",
+        },
+      ],
+      confidence: "high",
+      missingTestContext: [],
+      suggestedReads: [],
+      commandReadiness: "ready",
+      noWriteEvidence: ["test-impact:mutation-authority:not-granted"],
+      replaySafeSummary: "test-impact test_impact_provider",
+      evidence: [],
+    };
+
+    const input = buildContextAwareProviderEditInput({
+      requestId: "req-graph",
+      targetSummary: "src/app.ts",
+      contextPacket: packet,
+      contextGraph: graph,
+      contextGraphScore: score,
+      testImpactPlan: testImpact,
+      agentPlan: plan,
+      providerReadinessState: "available",
+    });
+
+    expect(input.status).toBe("ready");
+    expect(input.contextGraphId).toBe("ctx_graph_provider");
+    expect(input.contextGraphReadiness).toBe("context-ready");
+    expect(input.contextCoverageScore).toBe(100);
+    expect(input.testImpactSummary).toContain("tests=1");
+    expect(input.mutationAuthority).toBe("not-granted");
+    expect(input.evidence).toContain(
+      "context-aware-provider-edit:context-graph:ctx_graph_provider",
+    );
+  });
 });
 
 function buildPlan(
@@ -101,6 +163,21 @@ function buildPlan(
     redactionStatus: "redacted-and-budgeted",
     doNext: "review provider proposal",
   });
+}
+
+function buildGraph(): ContextGraph {
+  return {
+    graphId: "ctx_graph_provider",
+    rootTarget: "src/app.ts",
+    nodes: [],
+    edges: [],
+    includedCandidates: [],
+    omittedCandidates: [],
+    mutationAuthority: "not-granted",
+    redactionStatus: "redacted-and-budgeted",
+    replaySafeSummary: "context-graph ctx_graph_provider",
+    evidence: [],
+  };
 }
 
 function buildPacket(input: {

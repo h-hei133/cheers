@@ -13,6 +13,10 @@ describe("contextAwareProviderPrompt", () => {
       requestedActionKind: "edit",
       targetSummary: "src/app.ts",
       contextPacketIds: [packet.packetId],
+      contextGraphIds: ["ctx_graph_prompt"],
+      graphReadiness: "context-ready",
+      contextCoverageScore: 90,
+      testImpactSummary: "tests=1; commands=2; readiness=ready",
       contextCompleteness: "complete",
       confidence: "high",
       executionReadiness: "ready",
@@ -42,6 +46,9 @@ describe("contextAwareProviderPrompt", () => {
     });
 
     expect(prompt.contextPacketId).toBe(packet.packetId);
+    expect(prompt.contextGraphId).toBe("ctx_graph_prompt");
+    expect(prompt.contextReadiness).toBe("context-ready");
+    expect(prompt.testImpactSummary).toContain("tests=1");
     expect(prompt.agentPlanId).toBe(plan.planId);
     expect(prompt.target.summary).toContain("runApp");
     expect(prompt.relatedContext[0]?.pathLabel).toBe("src/app.test.ts");
@@ -51,6 +58,9 @@ describe("contextAwareProviderPrompt", () => {
     expect(JSON.stringify(prompt)).not.toContain(".private-agents-real/config");
     expect(prompt.evidence).toContain(
       "context-aware-provider-prompt:raw-full-content-excluded",
+    );
+    expect(prompt.evidence).toContain(
+      "context-aware-provider-prompt:context-graph:ctx_graph_prompt",
     );
   });
 });

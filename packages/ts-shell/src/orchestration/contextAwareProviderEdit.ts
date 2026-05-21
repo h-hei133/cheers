@@ -1,5 +1,8 @@
 import type { AgentPlan } from "./agentPlan.js";
+import type { ContextGraph } from "./contextGraph.js";
+import type { ContextGraphScore } from "./contextGraphScore.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
+import type { TestImpactPlan } from "./testImpactPlan.js";
 import { redactProviderEditText } from "./providerEditContext.js";
 
 export type ContextAwareProviderProposalMode = "provider-edit-proposal";
@@ -16,6 +19,10 @@ export interface ContextAwareProviderEditInput {
   readonly targetSummary: string;
   readonly targetLabels: readonly string[];
   readonly contextPacketId?: string;
+  readonly contextGraphId?: string;
+  readonly contextGraphReadiness?: string;
+  readonly contextCoverageScore?: number;
+  readonly testImpactSummary?: string;
   readonly agentPlanId?: string;
   readonly contextCompleteness: AgentPlan["contextCompleteness"];
   readonly planConfidence: AgentPlan["confidence"];
@@ -36,6 +43,9 @@ export function buildContextAwareProviderEditInput(input: {
   readonly requestId: string;
   readonly targetSummary: string;
   readonly contextPacket?: TargetedContextPacket;
+  readonly contextGraph?: ContextGraph;
+  readonly contextGraphScore?: ContextGraphScore;
+  readonly testImpactPlan?: TestImpactPlan;
   readonly agentPlan?: AgentPlan;
   readonly providerReadinessState: string;
   readonly proposalMode?: ContextAwareProviderProposalMode;
@@ -43,6 +53,12 @@ export function buildContextAwareProviderEditInput(input: {
 }): ContextAwareProviderEditInput {
   const packet = input.contextPacket;
   const plan = input.agentPlan;
+  const contextGraphId = input.contextGraph?.graphId ?? plan?.contextGraphIds?.[0];
+  const graphReadiness = input.contextGraphScore?.planningReadiness ?? plan?.graphReadiness;
+  const graphLowReadiness =
+    graphReadiness === "budget-limited" ||
+    graphReadiness === "low-confidence" ||
+    graphReadiness === "unsupported";
   const targetLabels = packet ? [packet.targetSafeLabel] : [];
   const omittedContentReasons = packet
     ? Array.from(
@@ -65,6 +81,8 @@ export function buildContextAwareProviderEditInput(input: {
       ? "missing-context"
       : overBudget
         ? "context-over-budget"
+        : graphLowReadiness
+          ? "plan-needs-more-context"
         : planNeedsMoreContext
           ? "plan-needs-more-context"
           : "ready";
@@ -78,6 +96,20 @@ export function buildContextAwareProviderEditInput(input: {
     targetSummary: redactProviderEditText(input.targetSummary),
     targetLabels,
     ...(packet ? { contextPacketId: packet.packetId } : {}),
+    ...(contextGraphId ? { contextGraphId } : {}),
+    ...(graphReadiness ? { contextGraphReadiness: graphReadiness } : {}),
+    ...(typeof input.contextGraphScore?.coverageScore === "number"
+      ? { contextCoverageScore: input.contextGraphScore.coverageScore }
+      : typeof plan?.contextCoverageScore === "number"
+        ? { contextCoverageScore: plan.contextCoverageScore }
+        : {}),
+    ...(input.testImpactPlan
+      ? {
+          testImpactSummary: `tests=${input.testImpactPlan.likelyTestFiles.length}; commands=${input.testImpactPlan.likelyVerificationCommandCandidates.length}; readiness=${input.testImpactPlan.commandReadiness}`,
+        }
+      : plan?.testImpactSummary
+        ? { testImpactSummary: plan.testImpactSummary }
+        : {}),
     ...(plan ? { agentPlanId: plan.planId } : {}),
     contextCompleteness: plan?.contextCompleteness ?? "missing-context",
     planConfidence: plan?.confidence ?? "low",
@@ -98,6 +130,8 @@ export function buildContextAwareProviderEditInput(input: {
     evidence: [
       `context-aware-provider-edit:status:${status}`,
       ...(packet ? [`context-aware-provider-edit:context-packet:${packet.packetId}`] : []),
+      ...(contextGraphId ? [`context-aware-provider-edit:context-graph:${contextGraphId}`] : []),
+      ...(graphReadiness ? [`context-aware-provider-edit:graph-readiness:${graphReadiness}`] : []),
       ...(plan ? [`context-aware-provider-edit:agent-plan:${plan.planId}`] : []),
       `context-aware-provider-edit:context-completeness:${plan?.contextCompleteness ?? "missing-context"}`,
       `context-aware-provider-edit:plan-confidence:${plan?.confidence ?? "low"}`,

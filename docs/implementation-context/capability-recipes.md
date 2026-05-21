@@ -150,24 +150,28 @@ not import restrictions.
   Result Surface, Session / Continue, and Harness / Eval.
 - Use facades/contracts: `readInspectModule.ts`, `contextPacket.ts`,
   `contextDiscovery.ts`, `contextBudget.ts`, `contextPlan.ts`,
-  `contextPacketResult.ts`, `agentPlan.ts`, `agentPlanContext.ts`,
+  `contextPacketResult.ts`, `contextGraph.ts`, `contextGraphDiscovery.ts`,
+  `contextGraphBudget.ts`, `contextGraphScore.ts`,
+  `contextGraphPlanning.ts`, `contextGraphResult.ts`,
+  `testImpactPlan.ts`, `agentPlan.ts`, `agentPlanContext.ts`,
   `agentPlanProjection.ts`, `agentPlanResult.ts`, `workspaceFileContract.ts`,
   `workspaceTargetProjection.ts`, `continuationModule.ts`,
   `resultSurfaceModule.ts`, and Session / Continue continuity helpers.
 - Consume: one explicit in-workspace code target, current read-only file facts,
-  bounded local filesystem discovery candidates, and optional prompt intent for
-  context packet / planning context.
+  bounded local filesystem discovery candidates, bounded second-hop graph
+  candidates, and optional prompt intent for context packet / planning context.
 - Emit: deterministic packet id, target safe label, included and omitted source
-  summaries, budget and redaction status, replay-safe summary, suggested next
-  reads, likely tests, verification candidates, agent plan readiness,
-  confidence, missing facts, suggested reads, do-next text, and
-  `mutationAuthority:not-granted`.
+  summaries, deterministic graph id, graph readiness, coverage score,
+  omitted graph reasons, test-impact summary, suggested next reads, likely
+  tests, verification candidates, agent plan readiness, confidence, missing
+  facts, suggested reads, do-next text, and `mutationAuthority:not-granted`.
 - Do not bypass: workspace boundaries, raw full-content exclusion, provider
   config and credential redaction, Result Surface truthfulness, transcript
   replay safety, write authority, final stale-read, or edit confirmation. Do
   not add LSP, embeddings, full-repo semantic index, browser work, provider
   calls, schema/CLI/dependency changes, or mutation reachability.
 - Validate: context packet/discovery/budget/plan/result tests,
+  context graph discovery/budget/score/result tests, test-impact plan tests,
   agent plan/context/projection/result tests,
   read/inspect and target-resolution regressions, Session / Continue
   regressions, focused runMvp context planning tests, focused verifier gate,
