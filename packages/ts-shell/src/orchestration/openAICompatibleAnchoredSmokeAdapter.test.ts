@@ -15,12 +15,14 @@ describe("openAICompatibleAnchoredSmokeAdapter", () => {
 
   it("calls the existing OpenAI-compatible adapter boundary and parses proposal JSON", async () => {
     const requests: string[] = [];
+    const bodies: string[] = [];
     const adapter = createOpenAICompatibleAnchoredSmokeAdapter({
       apiKey: "test-key",
       baseUrl: "https://api.siliconflow.cn/v1/",
       model: "deepseek-ai/DeepSeek-V4-Flash",
-      fetchImpl: async (input) => {
+      fetchImpl: async (input, init) => {
         requests.push(String(input));
+        bodies.push(String(init?.body ?? ""));
         return new Response(sse(JSON.stringify({
           operationKind: "exact-fenced-replacement",
           targets: [
@@ -44,6 +46,8 @@ describe("openAICompatibleAnchoredSmokeAdapter", () => {
     const proposal = await adapter.proposeEdit(fixture.promptContext);
 
     expect(requests).toEqual(["https://api.siliconflow.cn/v1/chat/completions"]);
+    expect(bodies.join("\n")).toContain("Multiple targets in the same file are allowed");
+    expect(bodies.join("\n")).toContain("include a second exact target for that call site");
     expect(proposal.operationKind).toBe("exact-fenced-replacement");
     expect(proposal.targets?.[0]?.path).toBe("src/smoke.ts");
     expect(proposal.targets?.[0]?.oldText).toBe("export function startApp() {");

@@ -706,6 +706,24 @@ as an import-policing rule.
   apply, provider call during apply, new writer, command/allowlist change,
   CLI/schema/deps change, or broad `runMvpIntegratedFlow.ts` refactor is added.
 
+### Route 200: Real Provider Task Loop MVP
+
+- Route 200 adds the first controlled task-loop MVP as a verifier-driven
+  fixture path: temp workspace, task lifecycle/context/analysis/plan,
+  explicit provider proposal boundary, output validation/anchoring, explicit
+  confirmation, existing exact apply lane, snapshot/recovery evidence, safe
+  readback verification, result/session evidence, and scorecard markers.
+- Default verifier mode safe-skips provider and apply. Live provider calls
+  require `PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1` plus
+  `PRIVATE_AGENTS_LIVE_TASK_LOOP_SMOKE=1`, and controlled fixture apply also
+  requires `PRIVATE_AGENTS_CONFIRM_TASK_LOOP_APPLY=1`.
+- Apply reuses existing proposal hunk-set / fenced edit routes and remains
+  limited to the controlled temp fixture. Provider output never grants mutation
+  authority, and apply never calls the provider.
+- No production workspace mutation, direct provider mutation, fuzzy/broad apply,
+  new writer, command allowlist expansion, CLI/schema/dependency change, or
+  broad `runMvpIntegratedFlow.ts` refactor is added.
+
 ## Module-First Route Rule
 
 Future routes must state:
