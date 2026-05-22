@@ -649,6 +649,25 @@ as an import-policing rule.
   provider call during apply, default provider call, private config read,
   CLI/schema/deps change, or broad `runMvpIntegratedFlow.ts` refactor is added.
 
+### Route 195: Anchored Proposal Runtime Eval
+
+- Route 195 activates provider/generated anchored proposals through the task
+  lifecycle runtime path without granting mutation authority.
+- New facades own anchored proposal activation, deterministic fake-provider
+  runtime, proposal quality eval, and anchored proposal scorecard evidence.
+- Explicit fake anchored proposal runtime prompts can reach the lifecycle path;
+  missing lifecycle, missing/low analysis quality, low Plan Quality, missing
+  dry-run mode, provider unavailable, and redaction risk stop no-write before
+  provider dry-run.
+- When lifecycle gates are ready, fake-provider output reuses the existing
+  dry-run, prompt audit, output validation, anchor extraction/matching/conflict,
+  anchored proposal manifest, review surface, Result Surface, Session /
+  Continue, Harness trace/scorecard, and verifier paths.
+- Exact anchored hunks are handoff-ready for existing review/apply confirmation
+  only. No provider-generated mutation, unconfirmed apply, default provider
+  call, provider call during apply, new writer, command/allowlist change,
+  CLI/schema/deps change, or broad `runMvpIntegratedFlow.ts` refactor is added.
+
 ## Module-First Route Rule
 
 Future routes must state:

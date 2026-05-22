@@ -147,6 +147,32 @@ describe("session result parity", () => {
     );
   });
 
+  it("projects anchored proposal runtime eval and scorecard markers as provider-model evidence", () => {
+    const projection = projectSessionResultParity({
+      terminalClassification: "stopped",
+      stopReason: "Review and explicitly confirm exact hunks before apply.",
+      codingResult: makeCodingResult({
+        reason: "Anchored proposal runtime produced no-write review evidence.",
+        nextAction: "Review and explicitly confirm exact hunks before apply.",
+        evidence: [
+          "anchored-proposal-eval anchored_proposal_eval_abc; activation=anchored_proposal_activation_abc; dryRun=real_provider_proposal_dry_run_abc; overall=pass; promptAudit=pass; output=pass; anchoring=pass; review=pass; handoff=pass; noWrite=pass; mutationAuthority=not-granted; raw-content-excluded",
+          "anchored-proposal-scorecard anchored_proposal_scorecard_abc; proposal=provider-edit-abc; anchoredProposal=provider-anchored-proposal-abc; dryRun=real_provider_proposal_dry_run_abc; promptAudit=provider_prompt_audit_abc; outputValidation=provider_output_validation_abc; anchorQuality=provider_anchor_quality_abc; exact=1; partial=0; unsupported=0; failureClass=none; noWrite=pass; mutationAuthority=not-granted; raw-content-excluded",
+          "anchored-proposal-runtime:status:runtime-handoff-ready-no-write",
+        ],
+      }),
+    });
+
+    expect(projection.capabilityArea).toBe("provider-model");
+    expect(projection.mutationAuthority).toBe("not-granted");
+    expect(projection.redactionStatus).toBe("raw-content-excluded");
+    expect(projection.evidenceMarkers).toEqual(
+      expect.arrayContaining([
+        "anchored-proposal-eval anchored_proposal_eval_abc; activation=anchored_proposal_activation_abc; dryRun=real_provider_proposal_dry_run_abc; overall=pass; promptAudit=pass; output=pass; anchoring=pass; review=pass; handoff=pass; noWrite=pass; mutationAuthority=not-granted; raw-content-excluded",
+        "anchored-proposal-runtime:status:runtime-handoff-ready-no-write",
+      ]),
+    );
+  });
+
   it("projects verification repair loop markers for session consumers", () => {
     const projection = projectSessionResultParity({
       terminalClassification: "stopped",

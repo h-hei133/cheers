@@ -23,6 +23,7 @@ describe("continuation evidence parity", () => {
         "generated-edit proposal=generated-edit-abc; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
         "context-aware-provider proposal=provider-edit-abc; status=review-required-proposal; contextPacket=ctx_abc; agentPlan=plan_abc; mutationAuthority=not-granted; raw-content-excluded",
         "real-provider-proposal-dry-run id=real_provider_proposal_dry_run_abc; status=dry-run-exact-ready-no-write; provider=fake-real-provider; providerCalled=true; gate=allow-dry-run; promptAudit=pass; outputValidation=valid-exact-single-target; anchorQuality=exact-ready; proposal=provider-edit-abc; mutationAuthority=not-granted; raw-content-excluded",
+        "anchored-proposal-scorecard anchored_proposal_scorecard_abc; proposal=provider-edit-abc; anchoredProposal=provider-anchored-proposal-abc; dryRun=real_provider_proposal_dry_run_abc; promptAudit=provider_prompt_audit_abc; outputValidation=provider_output_validation_abc; anchorQuality=provider_anchor_quality_abc; exact=1; partial=0; unsupported=0; failureClass=none; noWrite=pass; mutationAuthority=not-granted; raw-content-excluded",
         "edit-repair-proposal id=edit-repair-proposal-def; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
         "verification-command id=verification-command-plan-abc:result:failed; plan=verification-command-plan-abc; command=npm test -- --help; outcome=failed; failureClass=test-failed; runtimeReceipts=1; repairEligible=yes; mutation:not-run; raw-content-excluded",
         "verification-repair-loop id=verification-repair-loop-abc; state=repair-review-required; repairContext=edit-repair-context-def; repairProposal=edit-repair-proposal-def; contextPacket=ctx_abc; agentPlan=plan_abc; verification=failed; runtimeReceipts=1; provider=proposal-only; next=review; raw-content-excluded",
@@ -83,6 +84,12 @@ describe("continuation evidence parity", () => {
       ) &&
       detail.includes("promptAudit=pass") &&
       detail.includes("anchorQuality=exact-ready"),
+    )).toBe(true);
+    expect(details.some((detail) =>
+      detail.startsWith(
+        "anchored-proposal-runtime=anchored-proposal-scorecard anchored_proposal_scorecard_abc;",
+      ) &&
+      detail.includes("anchoredProposal=provider-anchored-proposal-abc"),
     )).toBe(true);
     expect(details.some((detail) =>
       detail.startsWith(

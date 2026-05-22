@@ -27,6 +27,14 @@ const CONTINUATION_EVIDENCE_PREFIXES: ReadonlyArray<{
     label: "provider-anchored-proposal",
     prefixes: ["provider-anchored-proposal id=", "provider-anchoring proposal="],
   },
+  {
+    label: "anchored-proposal-runtime",
+    prefixes: [
+      "anchored-proposal-eval ",
+      "anchored-proposal-scorecard ",
+      "anchored-proposal-runtime:status:",
+    ],
+  },
   { label: "edit-repair-context", prefixes: ["edit-repair-context id="] },
   { label: "edit-repair-proposal", prefixes: ["edit-repair-proposal id="] },
   { label: "verification-command", prefixes: ["verification-command id="] },

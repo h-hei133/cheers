@@ -54,7 +54,8 @@ not import restrictions.
   proposal dry-run generation is opened,
   provider/generated proposal anchor candidates, current safe-read match facts,
   conflict results, and anchored proposal review facts when provider anchoring
-  is opened,
+  is opened, anchored proposal activation/runtime/eval/scorecard facts when
+  lifecycle provider proposal runtime is opened,
   allowlisted verification command candidates from Agent Plan / proposal /
   edit result facts, existing runtime receipt markers, and command failure
   classifications when command-driven verification opens repair planning,
@@ -85,6 +86,9 @@ not import restrictions.
   audit, output validation, anchor extraction, safe-read match outcome,
   conflict detection, anchor quality, anchored proposal ids, proposal manifest
   ids, provider called/not-called status, and review/handoff readiness,
+  anchored proposal runtime activation, fake-provider dry-run, deterministic
+  eval, scorecard, review requirement, handoff readiness, Session / Continue,
+  and Harness evidence,
   verification command plan/runner/result evidence for allowlisted success,
   failed, blocked, skipped, timeout, budget/redaction, and no-dispatch
   not-allowlisted states,
@@ -145,6 +149,10 @@ not import restrictions.
   authority and apply lanes must not call providers. Partial, fuzzy, broad,
   stale, ambiguous, conflicting, malformed, or unsafe anchored output remains
   review-only or stopped no-write.
+  Anchored proposal runtime activation must not grant mutation authority; fake
+  provider runtime is deterministic test/eval coverage only, and exact anchored
+  proposals remain review-required until an existing explicit apply path is
+  invoked.
   Do not run automatic rollback.
 - Validate: focused edit/write route tests, stale-read/authority regression,
   fenced edit activation/runtime tests, discovery edit
@@ -153,7 +161,8 @@ not import restrictions.
   context/proposal/planner/confirmation/result tests, context-aware provider
   edit/prompt/proposal/result tests, real-provider proposal gate/prompt
   audit/output validator/anchor candidate/extraction/matcher/conflict/anchored
-  proposal/anchoring result/anchor quality/dry-run result tests, edit repair
+  proposal/anchoring result/anchor quality/dry-run result tests, anchored
+  proposal activation/runtime/eval/scorecard tests, edit repair
   context/proposal/planner/result tests, verification command
   plan/runner/result/classifier/bridge tests, verification repair
   context/planner/result/loop tests, proposal review/selection/apply/result

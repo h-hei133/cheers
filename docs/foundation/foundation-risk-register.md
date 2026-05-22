@@ -281,6 +281,32 @@ None open after Route 165.
 - Should become a route: no, resolved by Route 194 for no-write provider
   proposal anchoring and review/apply handoff only.
 
+### Anchored proposal runtime eval readiness
+
+- Affected modules: Agent Loop, Provider / Model, Edit / Patch, Result Surface,
+  Session / Continue, Harness / Eval.
+- Why it was a calibration gap: Route 194 made provider/generated proposal
+  anchoring available as focused modules, but the task lifecycle runtime path
+  did not yet expose an anchored proposal activation facade, deterministic fake
+  provider runtime, proposal quality eval, or anchored proposal scorecard.
+- Resolution: Route 195 adds `anchoredProposalActivation.ts`,
+  `anchoredProposalRuntime.ts`, `anchoredProposalEval.ts`, and
+  `anchoredProposalScorecard.ts`. Explicit fake anchored proposal runtime
+  prompts can enter the lifecycle path, stop on lifecycle/analysis/Plan Quality
+  gates, or run deterministic fake-provider dry-run when those gates are ready.
+  Exact anchors become review-required handoff-ready evidence only; partial,
+  fuzzy, malformed, ambiguous, stale, or conflicting output remains no-write.
+- Evidence: anchored proposal activation/runtime/eval/scorecard tests,
+  provider dry-run and anchoring regressions, Session / Continue parity tests,
+  focused context-planning and edit closeout verifiers, result-contract, and
+  build.
+- Recommended next action: keep default real-provider calls, direct provider
+  mutation, provider calls during apply, new writers, command/allowlist changes,
+  CLI/schema/dependency changes, and broad `runMvpIntegratedFlow.ts` rewrites
+  closed until separate routes define them.
+- Should become a route: no, resolved by Route 195 for no-write anchored
+  proposal runtime activation and deterministic eval only.
+
 ### Session result parity after context and planning
 
 - Affected modules: Result Surface, Session / Continue, Workspace / File

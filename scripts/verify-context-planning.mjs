@@ -56,6 +56,10 @@ const focusedTests = [
   'src/orchestration/providerAnchoringResult.test.ts',
   'src/orchestration/realProviderProposalDryRun.test.ts',
   'src/orchestration/providerDryRunResult.test.ts',
+  'src/orchestration/anchoredProposalActivation.test.ts',
+  'src/orchestration/anchoredProposalRuntime.test.ts',
+  'src/orchestration/anchoredProposalEval.test.ts',
+  'src/orchestration/anchoredProposalScorecard.test.ts',
   'src/orchestration/verificationCommandPlan.test.ts',
   'src/orchestration/verificationCommandRunner.test.ts',
   'src/orchestration/verificationCommandResult.test.ts',
@@ -149,6 +153,10 @@ console.log('marker provider-anchored-proposal-manifest')
 console.log('marker provider-anchoring-result-session-continue')
 console.log('marker provider-dry-run-result-session-continue')
 console.log('marker provider-dry-run-harness-scorecard')
+console.log('marker anchored-proposal-runtime-activation')
+console.log('marker anchored-proposal-fake-provider-runtime')
+console.log('marker anchored-proposal-eval-scorecard')
+console.log('marker anchored-proposal-session-continue')
 console.log('marker verification-repair-context-packet-agent-plan-ids')
 console.log('marker verification-command-plan-agent-plan-candidate')
 console.log('marker verification-command-runtime-receipt-captured')

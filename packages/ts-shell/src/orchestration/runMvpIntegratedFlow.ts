@@ -119,6 +119,10 @@ import {
   formatTaskLifecycleActivationOutput,
 } from "./taskLifecycleActivation.js";
 import {
+  runAnchoredProposalRuntime,
+  shouldActivateAnchoredProposalRuntimePrompt,
+} from "./anchoredProposalRuntime.js";
+import {
   planWorkflowVerification,
   planWorkflowVerificationRetry,
   projectNotRequestedWorkflowVerification,
@@ -399,6 +403,21 @@ function pathStaysInsideWorkspace(
   );
 }
 
+function readAnchoredProposalCurrentContent(input: {
+  readonly workspaceRoot: string;
+  readonly targetPath?: string;
+  readonly targetLabel?: string;
+}): ReadonlyMap<string, string> | undefined {
+  if (!input.targetPath || !input.targetLabel) return undefined;
+  const absolutePath = path.resolve(input.workspaceRoot, input.targetPath);
+  if (!pathStaysInsideWorkspace(input.workspaceRoot, absolutePath)) return undefined;
+  try {
+    return new Map([[input.targetLabel, fs.readFileSync(absolutePath, "utf8")]]);
+  } catch {
+    return undefined;
+  }
+}
+
 function createIntegratedRunner(
   workspaceRoot: string,
   dispatcher: ToolDispatcher,
@@ -528,6 +547,7 @@ function createIntegratedRunner(
         turn,
         workspaceRoot,
         enforcer,
+        providerMode,
         abortSignal,
       });
       const notes = [
@@ -4072,6 +4092,7 @@ async function executeWorkflowTaskPlan(input: {
   readonly turn: number;
   readonly workspaceRoot: string;
   readonly enforcer: SandboxEnforcer;
+  readonly providerMode: "synthetic" | "real";
   readonly abortSignal?: AbortSignal;
 }): Promise<WorkflowExecutionResult> {
   const notes: string[] = [];
@@ -4099,6 +4120,51 @@ async function executeWorkflowTaskPlan(input: {
     workflowPlan: input.plan,
   });
   if (taskLifecycleActivation) {
+    if (
+      input.providerMode === "synthetic" &&
+      shouldActivateAnchoredProposalRuntimePrompt(input.prompt)
+    ) {
+      const anchoredRuntime = await runAnchoredProposalRuntime({
+        requestId: `runmvp-${input.sessionId}-${input.turn}`,
+        sessionId: input.sessionId,
+        prompt: input.prompt,
+        taskActivation: taskLifecycleActivation,
+        dryRunMode: "fake",
+        currentContentByTargetLabel: readAnchoredProposalCurrentContent({
+          workspaceRoot: input.workspaceRoot,
+          targetPath: input.plan.targetPath,
+          targetLabel: taskLifecycleActivation.contextBundle?.packet.targetSafeLabel,
+        }),
+        inWorkspaceTargetLabels: taskLifecycleActivation.contextBundle
+          ? [taskLifecycleActivation.contextBundle.packet.targetSafeLabel]
+          : [],
+      });
+      return {
+        events,
+        notes: [
+          ...notes,
+          ...taskLifecycleActivation.notes,
+          anchoredRuntime.evalResult.replaySafeSummary,
+          anchoredRuntime.scorecard.replaySafeSummary,
+          anchoredRuntime.harnessTrace.replaySafeSummary,
+          anchoredRuntime.harnessScorecard.replaySafeSummary,
+          ...anchoredRuntime.evidence,
+        ],
+        codingResult: anchoredRuntime.orchestrationResult?.codingResult ?? {
+          ...taskLifecycleActivation.runtimeOutcome.codingResult,
+          evidence: [...anchoredRuntime.evidence],
+          continuation: {
+            ...taskLifecycleActivation.runtimeOutcome.codingResult.continuation,
+            evidence: [...anchoredRuntime.evidence],
+          },
+          taskSatisfaction: {
+            ...taskLifecycleActivation.runtimeOutcome.codingResult.taskSatisfaction,
+            observedEvidence: [...anchoredRuntime.evidence],
+          },
+        },
+        userFacingOutput: anchoredRuntime.output,
+      };
+    }
     return {
       events,
       notes: [
