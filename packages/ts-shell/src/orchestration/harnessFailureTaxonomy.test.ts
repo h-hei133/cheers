@@ -56,4 +56,13 @@ describe("harnessFailureTaxonomy", () => {
     expect(classifyHarnessFailure({ status: "smoke corpus regression" }).failureClass).toBe("smoke-corpus-regression");
     expect(classifyHarnessFailure({ status: "smoke anchoring failed" }).failureClass).toBe("smoke-anchoring-failed");
   });
+
+  it("classifies live smoke reachability and evidence regressions", () => {
+    expect(classifyHarnessFailure({ status: "live-smoke-opt-in-not-honored" }).failureClass)
+      .toBe("live-smoke-opt-in-not-honored");
+    expect(classifyHarnessFailure({ status: "live-smoke-fixture-evidence-missing" }).failureClass)
+      .toBe("live-smoke-fixture-evidence-missing");
+    expect(classifyHarnessFailure({ status: "live-smoke-provider-boundary-unreachable" }).failureClass)
+      .toBe("live-smoke-provider-boundary-unreachable");
+  });
 });

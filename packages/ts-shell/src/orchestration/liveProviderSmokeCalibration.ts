@@ -2,6 +2,10 @@ import { evaluateAnchoredProviderSmokeGate, type AnchoredProviderSmokeGate } fro
 import { buildHarnessScorecard, type HarnessScorecard } from "./harnessScorecard.js";
 import { buildHarnessTrace, type HarnessTrace } from "./harnessTrace.js";
 import type { LiveProviderSmokeFixture } from "./liveProviderSmokeFixture.js";
+import {
+  normalizeLiveProviderSmokeEvidence,
+  type LiveProviderSmokeEvidence,
+} from "./liveProviderSmokeEvidence.js";
 import { buildLiveProviderSmokeResult, type LiveProviderSmokeResult } from "./liveProviderSmokeResult.js";
 import { buildProposalQualityReport, type ProposalQualityReport } from "./proposalQualityReport.js";
 import type { ProviderEditAvailability } from "./providerEditPlanner.js";
@@ -24,6 +28,7 @@ export interface LiveProviderSmokeCalibration {
   readonly harnessTrace: HarnessTrace;
   readonly harnessScorecard: HarnessScorecard;
   readonly result: LiveProviderSmokeResult;
+  readonly normalizedEvidence: LiveProviderSmokeEvidence;
   readonly changedFiles: readonly [];
   readonly mutationAuthority: "not-granted";
   readonly evidence: readonly string[];
@@ -49,20 +54,21 @@ export async function runLiveProviderSmokeCalibration(input: {
   readonly provider?: RealProviderProposalDryRunProvider;
 }): Promise<LiveProviderSmokeCalibration> {
   const runId = `live_smoke_calibration_${input.requestId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+  const normalizedEvidence = normalizeLiveProviderSmokeEvidence(input);
 
   const gate = evaluateAnchoredProviderSmokeGate({
     requestId: input.requestId,
     mode: input.mode === "fake-corpus" ? "fake-corpus" : "real-provider",
     explicitSmokeOptIn: input.explicitSmokeOptIn,
     providerAvailability: input.providerAvailability,
-    lifecycleId: input.lifecycleId,
-    analysisBriefId: input.analysisBriefId,
-    analysisQualityId: input.analysisQualityId,
-    analysisQualityDecision: input.analysisQualityDecision,
-    planQualityId: input.planQualityId,
-    planQualityLevel: input.planQualityLevel,
+    lifecycleId: normalizedEvidence.lifecycleId,
+    analysisBriefId: normalizedEvidence.analysisBriefId,
+    analysisQualityId: normalizedEvidence.analysisQualityId,
+    analysisQualityDecision: normalizedEvidence.analysisQualityDecision,
+    planQualityId: normalizedEvidence.planQualityId,
+    planQualityLevel: normalizedEvidence.planQualityLevel,
     dryRunMode: "no-write",
-    redactionStatus: input.redactionStatus,
+    redactionStatus: normalizedEvidence.redactionStatus,
   });
 
   if (!gate.allowed) {
@@ -72,7 +78,7 @@ export async function runLiveProviderSmokeCalibration(input: {
       providerSafeLabel: gate.providerSafeLabel,
       gate,
     });
-    return finishCalibration({ runId, mode: input.mode, gate, qualityReport: report });
+    return finishCalibration({ runId, mode: input.mode, gate, normalizedEvidence, qualityReport: report });
   }
 
   const promptAudit = auditProviderPrompt({
@@ -91,6 +97,7 @@ export async function runLiveProviderSmokeCalibration(input: {
       runId,
       mode: input.mode,
       gate,
+      normalizedEvidence,
       promptAudit,
       qualityReport: report,
     });
@@ -107,6 +114,7 @@ export async function runLiveProviderSmokeCalibration(input: {
       runId,
       mode: input.mode,
       gate: { ...gate, decision: "skip-provider-not-ready", allowed: false, skipReason: "provider-not-ready", reason: "No provider adapter supplied", nextAction: "Supply a provider adapter or use fake corpus", providerCall: "not-run", evidence: [...gate.evidence, "live-smoke-calibration:provider-adapter:missing"] } as AnchoredProviderSmokeGate,
+      normalizedEvidence,
       promptAudit,
       qualityReport: report,
     });
@@ -123,6 +131,7 @@ export async function runLiveProviderSmokeCalibration(input: {
       runId,
       mode: input.mode,
       gate,
+      normalizedEvidence,
       promptAudit,
       qualityReport: report,
     });
@@ -133,18 +142,18 @@ export async function runLiveProviderSmokeCalibration(input: {
     dryRunOptIn: true,
     promptContext: input.fixture.promptContext,
     explicitTargetLabels: [input.fixture.targetLabel],
-    lifecycleId: input.lifecycleId,
-    analysisBriefId: input.analysisBriefId,
-    analysisQualityId: input.analysisQualityId,
-    analysisQualityDecision: input.analysisQualityDecision,
-    planQualityId: input.planQualityId,
-    planQualityLevel: input.planQualityLevel,
-    contextPacketId: input.contextPacketId,
-    contextGraphId: input.contextGraphId,
-    codeGraphTraceId: input.codeGraphTraceId,
-    taskExecutionPlanId: input.taskExecutionPlanId,
+    lifecycleId: normalizedEvidence.lifecycleId,
+    analysisBriefId: normalizedEvidence.analysisBriefId,
+    analysisQualityId: normalizedEvidence.analysisQualityId,
+    analysisQualityDecision: normalizedEvidence.analysisQualityDecision,
+    planQualityId: normalizedEvidence.planQualityId,
+    planQualityLevel: normalizedEvidence.planQualityLevel,
+    contextPacketId: normalizedEvidence.contextPacketId,
+    contextGraphId: normalizedEvidence.contextGraphId,
+    codeGraphTraceId: normalizedEvidence.codeGraphTraceId,
+    taskExecutionPlanId: normalizedEvidence.taskExecutionPlanId,
     providerAvailability: input.providerAvailability,
-    redactionStatus: input.redactionStatus,
+    redactionStatus: normalizedEvidence.redactionStatus,
     provider: input.provider,
     currentContentByTargetLabel: new Map([[input.fixture.targetLabel, input.fixture.currentContent]]),
     inWorkspaceTargetLabels: [input.fixture.targetLabel],
@@ -162,6 +171,7 @@ export async function runLiveProviderSmokeCalibration(input: {
     runId,
     mode: input.mode,
     gate,
+    normalizedEvidence,
     promptAudit,
     dryRun,
     qualityReport: report,
@@ -172,15 +182,16 @@ function finishCalibration(input: {
   readonly runId: string;
   readonly mode: LiveSmokeCalibrationMode;
   readonly gate: AnchoredProviderSmokeGate;
+  readonly normalizedEvidence: LiveProviderSmokeEvidence;
   readonly promptAudit?: ProviderPromptAudit | null;
   readonly dryRun?: RealProviderProposalDryRunResult | null;
   readonly qualityReport: ProposalQualityReport;
 }): LiveProviderSmokeCalibration {
   const harnessTrace = buildHarnessTrace({
     routeId: "route197-live-provider-smoke-calibration",
-    taskLifecycleId: input.dryRun?.gate.evidence.find((e) => e.startsWith("real-provider-proposal-gate:lifecycle:"))?.split(":").at(-1),
-    analysisBriefId: input.dryRun?.gate.evidence.find((e) => e.startsWith("real-provider-proposal-gate:analysis-brief:"))?.split(":").at(-1),
-    planQualityId: input.dryRun?.gate.evidence.find((e) => e.startsWith("real-provider-proposal-gate:plan-quality:"))?.split(":").at(-1),
+    taskLifecycleId: input.normalizedEvidence.lifecycleId,
+    analysisBriefId: input.normalizedEvidence.analysisBriefId,
+    planQualityId: input.normalizedEvidence.planQualityId,
     providerDryRunId: input.dryRun?.dryRunId,
     providerDryRunGateDecision: input.dryRun?.gate.decision ?? input.gate.decision,
     providerPromptAuditStatus: input.dryRun?.promptAudit?.status ?? input.promptAudit?.status,
@@ -199,7 +210,7 @@ function finishCalibration(input: {
     providerSmokeReportId: input.qualityReport.reportId,
     status: input.qualityReport.failureClass,
     reason: input.dryRun?.reason ?? input.gate.reason,
-    evidence: [...input.gate.evidence, ...input.qualityReport.evidence],
+    evidence: [...input.normalizedEvidence.evidence, ...input.gate.evidence, ...input.qualityReport.evidence],
   });
 
   const harnessScorecard = buildHarnessScorecard({
@@ -254,6 +265,7 @@ function finishCalibration(input: {
   });
 
   const evidence = [
+    ...input.normalizedEvidence.evidence,
     ...input.gate.evidence,
     ...(input.promptAudit ? input.promptAudit.evidence : []),
     ...(input.dryRun ? input.dryRun.evidence : []),
@@ -278,6 +290,7 @@ function finishCalibration(input: {
     harnessTrace,
     harnessScorecard,
     result,
+    normalizedEvidence: input.normalizedEvidence,
     changedFiles: [],
     mutationAuthority: "not-granted",
     evidence,

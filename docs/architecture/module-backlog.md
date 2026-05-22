@@ -686,6 +686,26 @@ as an import-policing rule.
   apply, provider call during apply, new writer, command/allowlist change,
   CLI/schema/deps change, or broad `runMvpIntegratedFlow.ts` refactor is added.
 
+### Routes 197-198: Live Provider Smoke Calibration
+
+- Route 197 adds live-provider anchored smoke fixture, calibration, result,
+  verifier, fake/live report parity, and live smoke failure taxonomy over the
+  Route 196 smoke surface.
+- Route 198 hardens that path so explicit
+  `PRIVATE_AGENTS_LIVE_ANCHORED_PROVIDER_SMOKE=1` is preserved by the verifier
+  and unavailable provider readiness safe-skips without provider calls.
+- Live smoke calibration now normalizes lifecycle, analysis, Plan Quality,
+  context packet/graph, code graph, execution-plan, and redaction evidence from
+  explicit input or fixture promptContext before gate evaluation and dry-run
+  handoff.
+- Focused fake-ready provider boundary tests prove provider-called true reaches
+  prompt audit, output validation, anchoring, quality report, Harness, Result,
+  and Session / Continue evidence while preserving no-write/no-apply status and
+  raw output exclusion.
+- No private provider config manual read, default provider call, mutation,
+  apply, provider call during apply, new writer, command/allowlist change,
+  CLI/schema/deps change, or broad `runMvpIntegratedFlow.ts` refactor is added.
+
 ## Module-First Route Rule
 
 Future routes must state:

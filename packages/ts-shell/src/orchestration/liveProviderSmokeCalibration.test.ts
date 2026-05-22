@@ -102,6 +102,60 @@ describe("liveProviderSmokeCalibration", () => {
     expect(cal.harnessScorecard.providerSmokeNoWrite).toBe("pass");
   });
 
+  it("uses fixture promptContext evidence when top-level ids are absent", async () => {
+    let calls = 0;
+    const fixture = buildLiveSmokeFixture({
+      fixtureId: "cal-prompt-context-evidence",
+      requestId: "cal-prompt-context-evidence-1",
+      lifecycleId: "life_from_prompt",
+      analysisBriefId: "analysis_from_prompt",
+      analysisQualityId: "analysis_quality_from_prompt",
+      planQualityId: "plan_quality_from_prompt",
+      planQualityLevel: "ready",
+      contextPacketId: "ctx_from_prompt",
+      contextGraphId: "graph_from_prompt",
+      codeGraphTraceId: "code_trace_from_prompt",
+      taskExecutionPlanId: "exec_from_prompt",
+    });
+
+    const cal = await runLiveProviderSmokeCalibration({
+      requestId: "cal-prompt-context-evidence",
+      mode: "live-provider-smoke",
+      explicitSmokeOptIn: true,
+      providerAvailability: { kind: "available", providerKindLabel: "fake-ready" },
+      fixture,
+      provider: {
+        proposeEdit: () => {
+          calls += 1;
+          return {
+            operationKind: "exact-fenced-replacement",
+            targets: [
+              {
+                path: "src/smoke.ts",
+                summary: "rename startApp to runApp",
+                oldText: "export function startApp() {",
+                newText: "export function runApp() {",
+              },
+            ],
+            verificationPlan: ["npm test -- smoke"],
+          };
+        },
+      },
+    });
+
+    expect(calls).toBe(1);
+    expect(cal.gate.decision).toBe("allow-real-provider-smoke");
+    expect(cal.normalizedEvidence.lifecycleId).toBe("life_from_prompt");
+    expect(cal.normalizedEvidence.analysisQualityId).toBe("analysis_quality_from_prompt");
+    expect(cal.normalizedEvidence.planQualityId).toBe("plan_quality_from_prompt");
+    expect(cal.result.providerCalled).toBe(true);
+    expect(cal.qualityReport.outputValidationStatus).toBe("valid-exact-single-target");
+    expect(cal.qualityReport.anchorQuality).toBe("exact-ready");
+    expect(cal.qualityReport.rawOutput).toBe("excluded");
+    expect(cal.result.redactionStatus).toBe("raw-content-excluded");
+    expect(cal.changedFiles).toEqual([]);
+  });
+
   it("produces harness trace and scorecard on skip", async () => {
     const cal = await runLiveProviderSmokeCalibration({
       requestId: "cal-skip-trace",
@@ -159,20 +213,25 @@ describe("liveProviderSmokeCalibration", () => {
     expect(cal.mutationAuthority).toBe("not-granted");
   });
 
-  it("stops on missing lifecycle evidence in real-provider mode", async () => {
+  it("stops on missing lifecycle evidence after promptContext normalization", async () => {
+    const fixtureWithoutLifecycle = {
+      ...baseFixture,
+      promptContext: {
+        ...baseFixture.promptContext,
+        taskLifecycleId: undefined,
+      },
+    };
+
     const cal = await runLiveProviderSmokeCalibration({
       requestId: "cal-no-lifecycle",
       mode: "live-provider-smoke",
       explicitSmokeOptIn: true,
       providerAvailability: { kind: "available", providerKindLabel: "openai" },
-      fixture: buildLiveSmokeFixture({
-        fixtureId: "cal-no-life",
-        requestId: "cal-no-life-1",
-        lifecycleId: undefined,
-      }),
+      fixture: fixtureWithoutLifecycle,
     });
 
     expect(cal.gate.allowed).toBe(false);
+    expect(cal.gate.decision).toBe("stop-missing-lifecycle");
     expect(cal.result.providerCalled).toBe(false);
   });
 

@@ -33,6 +33,9 @@ export type HarnessFailureClass =
   | "smoke-exact-ready-no-write"
   | "smoke-corpus-regression"
   | "live-smoke-no-opt-in"
+  | "live-smoke-opt-in-not-honored"
+  | "live-smoke-fixture-evidence-missing"
+  | "live-smoke-provider-boundary-unreachable"
   | "live-smoke-provider-unavailable"
   | "live-smoke-output-invalid"
   | "live-smoke-anchor-failed"
@@ -346,6 +349,30 @@ const TAXONOMY: Record<HarnessFailureClass, HarnessFailureTaxonomyEntry> = {
     suggestedNextAction: "Use fake corpus or set explicit smoke opt-in.",
     verifierMarker: "harness-failure:live-smoke-no-opt-in",
   },
+  "live-smoke-opt-in-not-honored": {
+    failureClass: "live-smoke-opt-in-not-honored",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Explicit live anchored provider smoke opt-in was not preserved.",
+    suggestedNextAction: "Preserve the opt-in environment through the verifier and provider boundary.",
+    verifierMarker: "harness-failure:live-smoke-opt-in-not-honored",
+  },
+  "live-smoke-fixture-evidence-missing": {
+    failureClass: "live-smoke-fixture-evidence-missing",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Fixture prompt context evidence was not normalized into the live smoke gate.",
+    suggestedNextAction: "Normalize lifecycle, analysis, plan, context, and redaction ids before calibration.",
+    verifierMarker: "harness-failure:live-smoke-fixture-evidence-missing",
+  },
+  "live-smoke-provider-boundary-unreachable": {
+    failureClass: "live-smoke-provider-boundary-unreachable",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Opt-in with provider readiness did not reach the explicit provider boundary.",
+    suggestedNextAction: "Keep opt-in/readiness evidence intact and call only the approved no-write provider boundary.",
+    verifierMarker: "harness-failure:live-smoke-provider-boundary-unreachable",
+  },
   "live-smoke-provider-unavailable": {
     failureClass: "live-smoke-provider-unavailable",
     capabilityArea: "provider-model",
@@ -489,6 +516,9 @@ export function classifyHarnessFailure(input: {
   if (/smoke corpus regression|smoke-corpus-regression/.test(text)) return TAXONOMY["smoke-corpus-regression"];
   if (/smoke anchoring failed|smoke-anchoring-failed/.test(text)) return TAXONOMY["smoke-anchoring-failed"];
   if (/live-smoke-no-opt-in|live.*smoke.*no.*opt/.test(text)) return TAXONOMY["live-smoke-no-opt-in"];
+  if (/live-smoke-opt-in-not-honored|opt-in.*not.*honored/.test(text)) return TAXONOMY["live-smoke-opt-in-not-honored"];
+  if (/live-smoke-fixture-evidence-missing|fixture.*evidence.*missing/.test(text)) return TAXONOMY["live-smoke-fixture-evidence-missing"];
+  if (/live-smoke-provider-boundary-unreachable|provider.*boundary.*unreachable/.test(text)) return TAXONOMY["live-smoke-provider-boundary-unreachable"];
   if (/live-smoke-provider-unavailable|live.*smoke.*provider.*unavailable/.test(text)) return TAXONOMY["live-smoke-provider-unavailable"];
   if (/live-smoke-output-invalid|live.*smoke.*output.*invalid/.test(text)) return TAXONOMY["live-smoke-output-invalid"];
   if (/live-smoke-anchor-failed|live.*smoke.*anchor.*fail/.test(text)) return TAXONOMY["live-smoke-anchor-failed"];

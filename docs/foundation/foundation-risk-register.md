@@ -335,6 +335,36 @@ None open after Route 165.
 - Should become a route: no, resolved by Route 196 for no-write anchored
   provider smoke and deterministic proposal quality corpus only.
 
+### Live provider smoke reachability hardening
+
+- Affected modules: Provider / Model, Harness / Eval, Result Surface,
+  Session / Continue.
+- Why it was a calibration gap: Route 197 live-provider anchored smoke could
+  safe-skip by default, but the verifier could scrub explicit live-smoke
+  opt-in/provider readiness before focused tests ran, and calibration gates
+  consumed only top-level lifecycle/analysis/plan/context ids even when fixture
+  promptContext already carried those facts.
+- Resolution: Route 198 adds `liveProviderSmokeEvidence.ts` and routes live
+  smoke calibration through normalized evidence from explicit input or fixture
+  promptContext. The verifier now reports opt-in, provider-called, skip reason,
+  no-write, and private-config-manual-read markers while preserving opt-in and
+  provider readiness environment for the live branch. Focused tests prove
+  default no-provider skip, opt-in unavailable skip, fake-ready provider
+  boundary reachability, output validation, anchoring, report, Harness, and
+  Session / Continue evidence without mutation.
+- Evidence: live provider smoke evidence/fixture/calibration/result tests,
+  anchored provider smoke gate/report/result regressions, Harness
+  scorecard/failure taxonomy tests, Session / Continue parity tests,
+  live-provider anchored smoke verifier default and opt-in safe-skip runs,
+  result-contract, and build.
+- Recommended next action: keep live provider calls explicit and isolated; do
+  not add default provider calls, private provider config manual reads,
+  provider-generated mutation, provider calls during apply, new writers,
+  command/allowlist changes, CLI/schema/dependency changes, or broad
+  `runMvpIntegratedFlow.ts` rewrites.
+- Should become a route: no, resolved by Route 198 for live-provider anchored
+  smoke reachability and fixture evidence alignment only.
+
 ### Session result parity after context and planning
 
 - Affected modules: Result Surface, Session / Continue, Workspace / File

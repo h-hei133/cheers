@@ -89,10 +89,12 @@ not import restrictions.
   anchored proposal runtime activation, fake-provider dry-run, deterministic
   eval, scorecard, review requirement, handoff readiness, Session / Continue,
   and Harness evidence,
-  anchored-provider smoke gate, deterministic proposal-quality corpus, shared
-  fake/real proposal quality report, no-write smoke result, provider-called
-  status, skip reason, prompt audit, output validation, anchor quality,
-  no-write compliance, failure taxonomy, and Session / Continue summaries,
+  anchored-provider smoke gate, deterministic proposal-quality corpus, live
+  smoke evidence normalization from explicit input or fixture promptContext,
+  shared fake/real proposal quality report, no-write smoke result,
+  provider-called status, skip reason, prompt audit, output validation, anchor
+  quality, no-write compliance, failure taxonomy, and Session / Continue
+  summaries,
   verification command plan/runner/result evidence for allowlisted success,
   failed, blocked, skipped, timeout, budget/redaction, and no-dispatch
   not-allowlisted states,
@@ -158,7 +160,8 @@ not import restrictions.
   proposals remain review-required until an existing explicit apply path is
   invoked.
   Anchored-provider smoke must be explicit opt-in for real providers, safe-skip
-  when no opt-in or provider readiness is missing, never read private provider
+  when no opt-in or provider readiness is missing, normalize fixture
+  promptContext evidence before calibration gates, never read private provider
   config manually, never apply output, and never call providers during apply.
   Do not run automatic rollback.
 - Validate: focused edit/write route tests, stale-read/authority regression,
@@ -170,7 +173,7 @@ not import restrictions.
   audit/output validator/anchor candidate/extraction/matcher/conflict/anchored
   proposal/anchoring result/anchor quality/dry-run result tests, anchored
   proposal activation/runtime/eval/scorecard tests, anchored provider smoke
-  gate/corpus/report/result/runner tests and verifier, edit repair
+  gate/evidence/corpus/report/result/runner tests and verifier, edit repair
   context/proposal/planner/result tests, verification command
   plan/runner/result/classifier/bridge tests, verification repair
   context/planner/result/loop tests, proposal review/selection/apply/result

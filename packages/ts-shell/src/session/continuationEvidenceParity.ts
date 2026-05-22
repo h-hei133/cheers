@@ -44,6 +44,14 @@ const CONTINUATION_EVIDENCE_PREFIXES: ReadonlyArray<{
       "provider-smoke-result:",
     ],
   },
+  {
+    label: "live-provider-smoke",
+    prefixes: [
+      "live-smoke-evidence:",
+      "live-provider-smoke-result:",
+      "proposal-quality-report:mode:live-provider-smoke",
+    ],
+  },
   { label: "edit-repair-context", prefixes: ["edit-repair-context id="] },
   { label: "edit-repair-proposal", prefixes: ["edit-repair-proposal id="] },
   { label: "verification-command", prefixes: ["verification-command id="] },

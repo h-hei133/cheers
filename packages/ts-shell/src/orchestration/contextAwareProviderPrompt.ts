@@ -9,6 +9,10 @@ export interface ContextAwareProviderPromptContext {
   readonly agentPlanId: string;
   readonly taskLifecycleId?: string;
   readonly analysisBriefId?: string;
+  readonly analysisQualityId?: string;
+  readonly analysisQualityDecision?: string;
+  readonly planQualityId?: string;
+  readonly planQualityLevel?: string;
   readonly taskExecutionPlanId?: string;
   readonly userRequest: string;
   readonly targetSummary: string;
@@ -84,6 +88,8 @@ export function buildContextAwareProviderPrompt(input: {
     `Agent Plan: ${agentPlanId}`,
     `Task lifecycle: ${input.editInput.taskLifecycleId ?? "none"}`,
     `Analysis brief: ${input.editInput.analysisBriefId ?? "none"}`,
+    `Analysis quality: ${input.editInput.analysisQualityGateId ?? "none"}`,
+    `Plan quality: ${input.editInput.planQualityId ?? "none"}`,
     `Task execution plan: ${input.editInput.taskExecutionPlanId ?? "none"}`,
     `Target: ${input.contextPacket.targetSafeLabel}`,
     `Target summary: ${redactProviderEditText(targetSource?.summary ?? input.editInput.targetSummary)}`,
@@ -110,6 +116,10 @@ export function buildContextAwareProviderPrompt(input: {
     agentPlanId,
     ...(input.editInput.taskLifecycleId ? { taskLifecycleId: input.editInput.taskLifecycleId } : {}),
     ...(input.editInput.analysisBriefId ? { analysisBriefId: input.editInput.analysisBriefId } : {}),
+    ...(input.editInput.analysisQualityGateId ? { analysisQualityId: input.editInput.analysisQualityGateId } : {}),
+    ...(input.editInput.analysisQualityGateDecision ? { analysisQualityDecision: input.editInput.analysisQualityGateDecision } : {}),
+    ...(input.editInput.planQualityId ? { planQualityId: input.editInput.planQualityId } : {}),
+    ...(input.editInput.planQualityLevel ? { planQualityLevel: input.editInput.planQualityLevel } : {}),
     ...(input.editInput.taskExecutionPlanId ? { taskExecutionPlanId: input.editInput.taskExecutionPlanId } : {}),
     userRequest: redactProviderEditText(input.userRequest),
     targetSummary: redactProviderEditText(input.editInput.targetSummary),
@@ -163,6 +173,12 @@ export function buildContextAwareProviderPrompt(input: {
         : []),
       ...(input.editInput.analysisBriefId
         ? [`context-aware-provider-prompt:analysis-brief:${input.editInput.analysisBriefId}`]
+        : []),
+      ...(input.editInput.analysisQualityGateId
+        ? [`context-aware-provider-prompt:analysis-quality:${input.editInput.analysisQualityGateId}`]
+        : []),
+      ...(input.editInput.planQualityId
+        ? [`context-aware-provider-prompt:plan-quality:${input.editInput.planQualityId}`]
         : []),
       ...(input.editInput.taskExecutionPlanId
         ? [`context-aware-provider-prompt:execution-plan:${input.editInput.taskExecutionPlanId}`]

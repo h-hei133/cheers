@@ -42,6 +42,8 @@ export interface ContextAwareProviderEditInput {
   readonly contextSufficiencyState?: string;
   readonly analysisQualityGateId?: string;
   readonly analysisQualityGateDecision?: string;
+  readonly planQualityId?: string;
+  readonly planQualityLevel?: string;
   readonly taskExecutionPlanId?: string;
   readonly analysisBriefSummary?: string;
   readonly executionPlanConstraints?: readonly string[];
@@ -173,6 +175,8 @@ export function buildContextAwareProviderEditInput(input: {
     ...(input.taskContextSufficiency ? { contextSufficiencyState: input.taskContextSufficiency.state } : {}),
     ...(input.analysisQualityGate ? { analysisQualityGateId: input.analysisQualityGate.gateId } : {}),
     ...(input.analysisQualityGate ? { analysisQualityGateDecision: input.analysisQualityGate.decision } : {}),
+    ...(plan?.planQualityId ? { planQualityId: plan.planQualityId } : {}),
+    ...(plan?.planQualityLevel ? { planQualityLevel: plan.planQualityLevel } : {}),
     ...(executionPlanId ? { taskExecutionPlanId: executionPlanId } : {}),
     ...(input.analysisBrief
       ? {
@@ -227,6 +231,7 @@ export function buildContextAwareProviderEditInput(input: {
       ...(input.taskContextSufficiency ? [`context-aware-provider-edit:context-sufficiency:${input.taskContextSufficiency.sufficiencyId}`] : []),
       ...(input.analysisQualityGate ? [`context-aware-provider-edit:analysis-quality-gate:${input.analysisQualityGate.gateId}`] : []),
       ...(input.analysisQualityGate ? [`context-aware-provider-edit:analysis-quality-decision:${input.analysisQualityGate.decision}`] : []),
+      ...(plan?.planQualityId ? [`context-aware-provider-edit:plan-quality:${plan.planQualityId}`] : []),
       ...(executionPlanId ? [`context-aware-provider-edit:execution-plan:${executionPlanId}`] : []),
       `context-aware-provider-edit:context-completeness:${plan?.contextCompleteness ?? "missing-context"}`,
       `context-aware-provider-edit:plan-confidence:${plan?.confidence ?? "low"}`,

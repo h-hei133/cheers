@@ -114,6 +114,10 @@ function buildLiveSmokePromptContext(input: {
     agentPlanId: "live_smoke_agent_plan",
     taskLifecycleId: input.lifecycleId,
     analysisBriefId: input.analysisBriefId,
+    analysisQualityId: input.analysisQualityId,
+    analysisQualityDecision: "allow",
+    planQualityId: input.planQualityId,
+    planQualityLevel: input.planQualityLevel,
     taskExecutionPlanId: input.taskExecutionPlanId,
     userRequest: input.userRequest,
     targetSummary: input.targetLabel,
@@ -135,6 +139,8 @@ function buildLiveSmokePromptContext(input: {
       `Context packet: ${input.contextPacketId}`,
       `Code graph trace: ${input.codeGraphTraceId}`,
       `Analysis brief: ${input.analysisBriefId}`,
+      `Analysis quality: ${input.analysisQualityId}`,
+      `Plan quality: ${input.planQualityId}`,
       `Target: ${input.targetLabel}`,
       "Current content contains: export function startApp() { ... }",
       "Return a bounded proposal only; mutation authority is not granted.",
@@ -143,6 +149,8 @@ function buildLiveSmokePromptContext(input: {
       "context-aware-provider-prompt:redacted-and-budgeted",
       "context-aware-provider-prompt:raw-full-content-excluded",
       "context-aware-provider-prompt:mutation-authority:not-granted",
+      `context-aware-provider-prompt:analysis-quality:${input.analysisQualityId}`,
+      `context-aware-provider-prompt:plan-quality:${input.planQualityId}`,
     ],
   };
 }

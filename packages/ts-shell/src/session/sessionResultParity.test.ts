@@ -200,6 +200,34 @@ describe("session result parity", () => {
     );
   });
 
+  it("projects live provider smoke normalized evidence as provider-model evidence", () => {
+    const projection = projectSessionResultParity({
+      terminalClassification: "stopped",
+      stopReason: "Live provider smoke skipped because provider was unavailable.",
+      codingResult: makeCodingResult({
+        reason: "Live provider smoke preserved opt-in and remained no-write.",
+        nextAction: "Use fake-ready boundary coverage or configure provider through the approved gate.",
+        evidence: [
+          "live-smoke-evidence:lifecycle:life_from_prompt",
+          "live-provider-smoke-result:provider-called:true",
+          "live-provider-smoke-result:no-write:pass",
+          "live-provider-smoke-result:redaction:raw-content-excluded",
+          "live-provider-smoke-result:mutation-authority:not-granted",
+        ],
+      }),
+    });
+
+    expect(projection.capabilityArea).toBe("provider-model");
+    expect(projection.mutationAuthority).toBe("not-granted");
+    expect(projection.redactionStatus).toBe("raw-content-excluded");
+    expect(projection.evidenceMarkers).toEqual(
+      expect.arrayContaining([
+        "live-smoke-evidence:lifecycle:life_from_prompt",
+        "live-provider-smoke-result:provider-called:true",
+      ]),
+    );
+  });
+
   it("projects verification repair loop markers for session consumers", () => {
     const projection = projectSessionResultParity({
       terminalClassification: "stopped",

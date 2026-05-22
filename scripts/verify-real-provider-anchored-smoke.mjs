@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process'
 
 const focusedTests = [
   'src/orchestration/liveProviderSmokeFixture.test.ts',
+  'src/orchestration/liveProviderSmokeEvidence.test.ts',
   'src/orchestration/liveProviderSmokeCalibration.test.ts',
   'src/orchestration/liveProviderSmokeResult.test.ts',
   'src/orchestration/anchoredProviderSmokeGate.test.ts',
@@ -49,21 +50,38 @@ console.log('marker live-smoke-raw-output-excluded')
 console.log('marker live-smoke-failure-taxonomy')
 
 const optIn = process.env.PRIVATE_AGENTS_LIVE_ANCHORED_PROVIDER_SMOKE?.trim() === '1'
+const hasProviderReadinessSource = Boolean(process.env.PRIVATE_AGENTS_REAL_HOME?.trim())
+console.log(`live-smoke-opt-in=${optIn ? 'true' : 'false'}`)
+console.log('private-config-manual-read=false')
 if (!optIn) {
   console.log('[skip] live-anchored-provider-smoke-opt-in')
   console.log('skip-reason=no-opt-in')
   console.log('provider-called=false')
-  console.log('no-write=pass')
+  console.log('no-write=true')
   console.log('Set PRIVATE_AGENTS_LIVE_ANCHORED_PROVIDER_SMOKE=1 to request the optional live provider smoke.')
   console.log('Requires: PRIVATE_AGENTS_REAL_HOME, PRIVATE_AGENTS_TEST_ROOT, and valid provider config.')
-} else {
-  console.log('[skip] live-anchored-provider-smoke-provider')
+} else if (!hasProviderReadinessSource) {
+  console.log('[skip] live-anchored-provider-smoke-provider-readiness')
   console.log('skip-reason=provider-not-configured')
   console.log('provider-called=false')
-  console.log('no-write=pass')
-  console.log('Live provider smoke requires explicit PRIVATE_AGENTS_REAL_HOME and a connected provider.')
+  console.log('no-write=true')
+  console.log('PRIVATE_AGENTS_REAL_HOME was not supplied; no private config was read.')
+} else {
+  console.log('[skip] live-anchored-provider-smoke-provider-boundary')
+  console.log('skip-reason=provider-not-ready')
+  console.log('provider-called=false')
+  console.log('no-write=true')
+  console.log('Explicit opt-in and provider readiness source were preserved for the live path.')
+  console.log('No approved live provider adapter is supplied by this verifier, so it safe-skips before any provider call.')
   console.log('Run scripts/verify-real-provider-readiness-smoke.mjs first to verify provider readiness.')
-  console.log('Module-level anchored provider smoke tests prove safe provider-unavailable skip.')
+  console.log('Module-level anchored provider smoke tests prove fake-ready provider boundary reachability.')
+}
+
+const testEnv = { ...process.env }
+if (!optIn) {
+  testEnv.PRIVATE_AGENTS_PROVIDER_MODE = 'synthetic'
+  testEnv.PRIVATE_AGENTS_REAL_HOME = ''
+  testEnv.PRIVATE_AGENTS_LIVE_ANCHORED_PROVIDER_SMOKE = ''
 }
 
 const result = spawnSync(
@@ -71,12 +89,7 @@ const result = spawnSync(
   ['run', 'test', '-w', 'packages/ts-shell', '--', ...focusedTests],
   {
     stdio: 'inherit',
-    env: {
-      ...process.env,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
-      PRIVATE_AGENTS_REAL_HOME: '',
-      PRIVATE_AGENTS_LIVE_ANCHORED_PROVIDER_SMOKE: '',
-    },
+    env: testEnv,
   },
 )
 
