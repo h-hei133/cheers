@@ -90,6 +90,36 @@ describe("planQuality", () => {
     expect(quality.missingFacts).toContain("context packet missing");
     expect(quality.evidence).toContain("plan-quality:mutation-authority:not-granted");
   });
+
+  it("requires analysis brief evidence for lifecycle-backed planning", () => {
+    const agentPlan = buildAgentPlan({
+      ownerCapability: "agent-loop",
+      taskKind: "edit-file",
+      requestedActionKind: "edit",
+      targetSummary: "src/app.ts",
+      taskLifecycleId: "task_lifecycle_quality",
+      taskLifecycleCurrentStage: "plan",
+      contextPacketIds: ["ctx_packet_188"],
+      contextCompleteness: "complete",
+      confidence: "high",
+      executionReadiness: "ready",
+      missingFacts: [],
+      suggestedReads: [],
+      suggestedVerification: ["npm test -- --help"],
+      safeEvidenceMarkers: [],
+      mutationAuthority: "not-granted",
+      redactionStatus: "redacted-and-budgeted",
+      doNext: "verify",
+    });
+
+    const quality = buildPlanQuality({ agentPlan, contextPacket: packet() });
+
+    expect(quality.level).toBe("needs-more-context");
+    expect(quality.taskLifecycleId).toBe("task_lifecycle_quality");
+    expect(quality.missingFacts).toContain(
+      "analysis brief missing for lifecycle task",
+    );
+  });
 });
 
 function readyGraph() {

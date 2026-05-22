@@ -6,6 +6,8 @@ import { redactProviderEditText } from "./providerEditContext.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
 import type { PlanQuality } from "./planQuality.js";
 import type { CodeGraphImpact } from "./codeGraphImpact.js";
+import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
+import type { TaskLifecycle } from "./taskLifecycle.js";
 import { evaluatePlanQualityGate } from "./planQualityGate.js";
 
 export type VerificationCommandPlanState =
@@ -45,6 +47,9 @@ export interface VerificationCommandPlan {
   readonly sourceTestImpactPlanId?: string;
   readonly sourceImpactQueryId?: string;
   readonly sourcePlanQualityId?: string;
+  readonly sourceTaskLifecycleId?: string;
+  readonly sourceAnalysisBriefId?: string;
+  readonly sourceTaskExecutionPlanId?: string;
   readonly command?: string;
   readonly commandSafeLabel?: string;
   readonly commandKind: VerificationCommandKind;
@@ -71,6 +76,8 @@ export function buildVerificationCommandPlan(input: {
   readonly testImpactPlan?: TestImpactPlan;
   readonly codeGraphImpact?: CodeGraphImpact;
   readonly planQuality?: PlanQuality;
+  readonly taskLifecycle?: TaskLifecycle;
+  readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly explicitCommand?: string;
   readonly proposalVerificationCommand?: string;
   readonly editResultVerificationCommand?: string;
@@ -143,6 +150,10 @@ export function buildVerificationCommandPlan(input: {
     sourceTestImpactPlanId: input.testImpactPlan?.impactPlanId,
     sourceImpactQueryId: input.codeGraphImpact?.impactQueryId,
     sourcePlanQualityId: input.planQuality?.qualityId,
+    sourceTaskLifecycleId: input.taskLifecycle?.lifecycleId ?? input.agentPlan?.taskLifecycleId,
+    sourceAnalysisBriefId: input.planQuality?.analysisBriefId ?? input.agentPlan?.analysisBriefId,
+    sourceTaskExecutionPlanId:
+      input.taskExecutionPlan?.executionPlanId ?? input.agentPlan?.taskExecutionPlanId,
     commandSafeLabel,
     state: gatedState,
   });
@@ -164,6 +175,15 @@ export function buildVerificationCommandPlan(input: {
       : {}),
     ...(input.planQuality?.qualityId
       ? { sourcePlanQualityId: input.planQuality.qualityId }
+      : {}),
+    ...(input.taskLifecycle?.lifecycleId ?? input.agentPlan?.taskLifecycleId
+      ? { sourceTaskLifecycleId: input.taskLifecycle?.lifecycleId ?? input.agentPlan?.taskLifecycleId }
+      : {}),
+    ...(input.planQuality?.analysisBriefId ?? input.agentPlan?.analysisBriefId
+      ? { sourceAnalysisBriefId: input.planQuality?.analysisBriefId ?? input.agentPlan?.analysisBriefId }
+      : {}),
+    ...(input.taskExecutionPlan?.executionPlanId ?? input.agentPlan?.taskExecutionPlanId
+      ? { sourceTaskExecutionPlanId: input.taskExecutionPlan?.executionPlanId ?? input.agentPlan?.taskExecutionPlanId }
       : {}),
     ...(command ? { command } : {}),
     ...(commandSafeLabel ? { commandSafeLabel } : {}),
@@ -191,6 +211,17 @@ export function buildVerificationCommandPlan(input: {
         : []),
       ...(input.planQuality
         ? [`verification-command-plan:plan-quality:${input.planQuality.qualityId}`]
+        : []),
+      ...(input.taskLifecycle
+        ? [`verification-command-plan:task-lifecycle:${input.taskLifecycle.lifecycleId}`]
+        : input.agentPlan?.taskLifecycleId
+          ? [`verification-command-plan:task-lifecycle:${input.agentPlan.taskLifecycleId}`]
+          : []),
+      ...(input.planQuality?.analysisBriefId ?? input.agentPlan?.analysisBriefId
+        ? [`verification-command-plan:analysis-brief:${input.planQuality?.analysisBriefId ?? input.agentPlan?.analysisBriefId}`]
+        : []),
+      ...(input.taskExecutionPlan?.executionPlanId ?? input.agentPlan?.taskExecutionPlanId
+        ? [`verification-command-plan:execution-plan:${input.taskExecutionPlan?.executionPlanId ?? input.agentPlan?.taskExecutionPlanId}`]
         : []),
       ...(qualityGate ? [`verification-command-plan:quality-gate:${qualityGate.decision}`] : []),
       `verification-command-plan:kind:${commandKind}`,
@@ -366,6 +397,9 @@ function buildPlanId(input: {
   readonly sourceTestImpactPlanId?: string;
   readonly sourceImpactQueryId?: string;
   readonly sourcePlanQualityId?: string;
+  readonly sourceTaskLifecycleId?: string;
+  readonly sourceAnalysisBriefId?: string;
+  readonly sourceTaskExecutionPlanId?: string;
   readonly commandSafeLabel?: string;
   readonly state: VerificationCommandPlanState;
 }): string {

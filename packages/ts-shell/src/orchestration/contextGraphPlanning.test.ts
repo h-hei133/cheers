@@ -58,6 +58,21 @@ describe("buildContextGraphPlanningBundle", () => {
     expect(bundle.agentPlan.impactQueryId).toBe(bundle.codeGraphImpact.impactQueryId);
     expect(bundle.agentPlan.likelyAffectedTests).toContain("src/target.test.ts");
     expect(bundle.agentPlan.suggestedVerification).toContain("npm test -- --help");
+    expect(bundle.taskLifecycle.lifecycleId).toMatch(/^task_lifecycle_/);
+    expect(bundle.taskReadPlan.requiredReads).toContain("src/target.ts");
+    expect(bundle.analysisBrief.supportingEvidenceIds).toContain(bundle.taskReadPlan.readPlanId);
+    expect(bundle.taskExecutionPlan.analysisBriefId).toBe(bundle.analysisBrief.briefId);
+    expect(bundle.agentPlan.taskLifecycleId).toBe(bundle.taskLifecycle.lifecycleId);
+    expect(bundle.agentPlan.analysisBriefId).toBe(bundle.analysisBrief.briefId);
+    expect(bundle.agentPlan.taskExecutionPlanId).toBe(bundle.taskExecutionPlan.executionPlanId);
+    expect(bundle.planQuality.taskLifecycleId).toBe(bundle.taskLifecycle.lifecycleId);
+    expect(bundle.planQuality.analysisBriefId).toBe(bundle.analysisBrief.briefId);
+    expect(bundle.harnessTrace.taskLifecycleId).toBe(bundle.taskLifecycle.lifecycleId);
+    expect(bundle.harnessTrace.lifecycleStages).toContain("analyze");
+    expect(bundle.taskLifecycleTrace.planQualityId).toBe(bundle.planQuality.qualityId);
+    expect(bundle.taskLifecycleResult.evidence).toContain(
+      "task-lifecycle-result:mutation-authority:not-granted",
+    );
     expect(bundle.planQuality.impactQueryId).toBe(bundle.codeGraphImpact.impactQueryId);
     expect(bundle.codeGraphResult.evidence).toContain(
       "code-graph-result:mutation-authority:not-granted",

@@ -155,7 +155,10 @@ not import restrictions.
   `contextGraphReadiness.ts`, `contextGraphPlanning.ts`,
   `contextGraphResult.ts`, `testImpactPlan.ts`, `codeGraphFacts.ts`,
   `codeGraphTrace.ts`, `codeGraphQuery.ts`, `codeGraphStaleness.ts`,
-  `codeGraphImpact.ts`, `codeGraphResult.ts`, `agentPlan.ts`,
+  `codeGraphImpact.ts`, `codeGraphResult.ts`, `taskIntent.ts`,
+  `taskStage.ts`, `taskLifecycle.ts`, `taskReadPlan.ts`,
+  `analysisBrief.ts`, `taskExecutionPlan.ts`, `taskLifecycleResult.ts`,
+  `taskLifecycleTrace.ts`, `agentPlan.ts`,
   `agentPlanContext.ts`, `agentPlanProjection.ts`, `agentPlanResult.ts`,
   `planQuality.ts`, `planQualityScore.ts`, `planQualityGate.ts`,
   `planQualityResult.ts`, `harnessTrace.ts`, `harnessScorecard.ts`,
@@ -171,7 +174,9 @@ not import restrictions.
   tests, verification candidates, normalized code graph facts, trace id,
   bounded impact query id, staleness/freshness warnings, affected file/test
   summaries, docs/call-site/import summaries, agent plan readiness,
-  confidence, missing facts, suggested reads, deterministic plan quality score,
+  confidence, missing facts, suggested reads, task intent, lifecycle stage
+  readiness, task-driven read plan, evidence-grounded analysis brief,
+  review-gated execution plan, lifecycle result/trace, deterministic plan quality score,
   quality gate decisions, safe harness trace ids, scorecard status, failure
   class, do-next text, and `mutationAuthority:not-granted`.
 - Do not bypass: workspace boundaries, raw full-content exclusion, provider
@@ -179,9 +184,13 @@ not import restrictions.
   replay safety, write authority, final stale-read, or edit confirmation. Do
   not add LSP, embeddings, full-repo semantic index, browser work, provider
   calls, schema/CLI/dependency changes, or mutation reachability.
+  Do not let lifecycle, analysis, or execution-plan facts grant mutation
+  authority, persist hidden chain-of-thought, execute commands, call providers
+  by default, or bypass proposal review/apply confirmation.
 - Validate: context packet/discovery/budget/plan/result tests,
   context graph discovery/budget/score/readiness/result tests, test-impact
-  plan tests, code graph facts/trace/query/staleness/impact/result tests, plan
+  plan tests, code graph facts/trace/query/staleness/impact/result tests, task
+  lifecycle/read-plan/analysis/execution/result/trace tests, plan
   quality/gate/result tests, harness trace/scorecard/failure taxonomy tests,
   agent plan/context/projection/result tests,
   read/inspect and target-resolution regressions, Session / Continue

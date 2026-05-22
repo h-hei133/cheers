@@ -50,6 +50,13 @@ export interface AgentPlan {
   readonly taskKind: CodingTaskKind;
   readonly requestedActionKind: AgentPlanRequestedActionKind;
   readonly targetSummary: string;
+  readonly taskLifecycleId?: string;
+  readonly taskLifecycleCurrentStage?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
+  readonly taskLifecycleReadiness?: string;
+  readonly taskLifecycleMissingFacts?: readonly string[];
+  readonly suggestedNextTaskStage?: string;
   readonly contextPacketIds: readonly string[];
   readonly contextGraphIds?: readonly string[];
   readonly codeGraphTraceIds?: readonly string[];
@@ -86,6 +93,15 @@ export function buildAgentPlan(
     `action=${input.requestedActionKind}`,
     `readiness=${input.executionReadiness}`,
     `confidence=${input.confidence}`,
+    ...(input.taskLifecycleId ? [`taskLifecycle=${input.taskLifecycleId}`] : []),
+    ...(input.taskLifecycleCurrentStage ? [`taskStage=${input.taskLifecycleCurrentStage}`] : []),
+    ...(input.analysisBriefId ? [`analysisBrief=${input.analysisBriefId}`] : []),
+    ...(input.taskExecutionPlanId ? [`executionPlan=${input.taskExecutionPlanId}`] : []),
+    ...(input.taskLifecycleReadiness ? [`lifecycleReadiness=${input.taskLifecycleReadiness}`] : []),
+    ...(input.taskLifecycleMissingFacts?.length
+      ? [`lifecycleMissingFacts=${input.taskLifecycleMissingFacts.length}`]
+      : []),
+    ...(input.suggestedNextTaskStage ? [`nextTaskStage=${input.suggestedNextTaskStage}`] : []),
     `contextPackets=${input.contextPacketIds.length}`,
     ...(input.contextGraphIds?.length
       ? [`contextGraphs=${input.contextGraphIds.length}`]
@@ -129,6 +145,13 @@ function buildAgentPlanId(input: Omit<AgentPlan, "planId" | "replaySafeSummary">
     taskKind: input.taskKind,
     requestedActionKind: input.requestedActionKind,
     targetSummary: input.targetSummary,
+    taskLifecycleId: input.taskLifecycleId,
+    taskLifecycleCurrentStage: input.taskLifecycleCurrentStage,
+    analysisBriefId: input.analysisBriefId,
+    taskExecutionPlanId: input.taskExecutionPlanId,
+    taskLifecycleReadiness: input.taskLifecycleReadiness,
+    taskLifecycleMissingFacts: input.taskLifecycleMissingFacts,
+    suggestedNextTaskStage: input.suggestedNextTaskStage,
     contextPacketIds: input.contextPacketIds,
     contextGraphIds: input.contextGraphIds,
     codeGraphTraceIds: input.codeGraphTraceIds,

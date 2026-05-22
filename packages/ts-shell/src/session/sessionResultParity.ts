@@ -92,6 +92,13 @@ function projectCapabilityArea(evidence: readonly string[]): string | undefined 
     return "agent-loop";
   }
   if (
+    evidence.some((entry) =>
+      /^(task-intent|task-read-plan|analysis-brief|task-lifecycle|task-execution-plan|task-lifecycle-trace)/.test(entry),
+    )
+  ) {
+    return "agent-loop";
+  }
+  if (
     evidence.some(
       (entry) =>
         entry.startsWith("context-packet") ||
@@ -148,7 +155,7 @@ function extractSuggestedReads(evidence: readonly string[]): string | undefined 
 }
 
 function isParityEvidenceMarker(entry: string): boolean {
-  return /^(?:actionable-blocker-kind|verify-blocker-kind|context-packet|context-plan|context-graph|code-graph|test-impact|plan-quality|plan-quality-gate|harness-trace|harness-scorecard|harness-failure|agent-plan|generated-edit|provider-edit|context-aware-provider|edit-proposal|proposal-hunk-set|edit-repair|verification-command|verification-repair|target-set-edit|edit-recovery)/.test(
+  return /^(?:actionable-blocker-kind|verify-blocker-kind|context-packet|context-plan|context-graph|code-graph|task-intent|task-read-plan|analysis-brief|task-lifecycle|task-execution-plan|test-impact|plan-quality|plan-quality-gate|harness-trace|harness-scorecard|harness-failure|agent-plan|generated-edit|provider-edit|context-aware-provider|edit-proposal|proposal-hunk-set|edit-repair|verification-command|verification-repair|target-set-edit|edit-recovery)/.test(
     entry,
   );
 }

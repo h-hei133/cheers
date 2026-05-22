@@ -29,6 +29,14 @@ import { buildCodeGraphTrace, type CodeGraphTrace } from "./codeGraphTrace.js";
 import { checkCodeGraphStaleness, type CodeGraphStalenessCheck } from "./codeGraphStaleness.js";
 import { buildCodeGraphImpact, type CodeGraphImpact } from "./codeGraphImpact.js";
 import { buildCodeGraphResult, type CodeGraphResultProjection } from "./codeGraphResult.js";
+import { buildAnalysisBrief, type AnalysisBrief } from "./analysisBrief.js";
+import { buildTaskExecutionPlan, type TaskExecutionPlan } from "./taskExecutionPlan.js";
+import { buildTaskIntent, type TaskIntent } from "./taskIntent.js";
+import { buildTaskLifecycle, type TaskLifecycle } from "./taskLifecycle.js";
+import { buildTaskLifecycleResult, type TaskLifecycleResultProjection } from "./taskLifecycleResult.js";
+import { buildTaskLifecycleTrace, type TaskLifecycleTrace } from "./taskLifecycleTrace.js";
+import { buildTaskReadPlan, type TaskReadPlan } from "./taskReadPlan.js";
+import { buildTaskStage } from "./taskStage.js";
 
 export interface ContextGraphPlanningBundle {
   readonly packet: TargetedContextPacket;
@@ -41,6 +49,13 @@ export interface ContextGraphPlanningBundle {
   readonly codeGraphTrace: CodeGraphTrace;
   readonly codeGraphImpact: CodeGraphImpact;
   readonly codeGraphResult: CodeGraphResultProjection;
+  readonly taskIntent: TaskIntent;
+  readonly taskReadPlan: TaskReadPlan;
+  readonly analysisBrief: AnalysisBrief;
+  readonly taskLifecycle: TaskLifecycle;
+  readonly taskExecutionPlan: TaskExecutionPlan;
+  readonly taskLifecycleResult: TaskLifecycleResultProjection;
+  readonly taskLifecycleTrace: TaskLifecycleTrace;
   readonly graphResult: ContextGraphResultProjection;
   readonly planQuality: PlanQuality;
   readonly harnessTrace: HarnessTrace;
@@ -89,32 +104,118 @@ export async function buildContextGraphPlanningBundle(input: {
   });
   const packetResult = buildContextPacketResult(packet);
   const graphResult = buildContextGraphResult({ graph, score: graphScore, testImpact });
+  const contextProjection = projectContextPacketToAgentPlanContext(packet, {
+    graph,
+    score: graphScore,
+    testImpact,
+    codeGraphTrace,
+    codeGraphImpact,
+  });
   const baseAgentPlan = projectWorkflowTaskPlanToAgentPlan({
     workflowPlan: input.workflowPlan,
-    context: projectContextPacketToAgentPlanContext(packet, {
-      graph,
-      score: graphScore,
-      testImpact,
-      codeGraphTrace,
-      codeGraphImpact,
-    }),
+    context: contextProjection,
+  });
+  const taskIntent = buildTaskIntent({
+    userRequest: input.workflowPlan.reason,
+    workflowPlan: input.workflowPlan,
+    requestedActionKind: baseAgentPlan.requestedActionKind,
+  });
+  const taskReadPlan = buildTaskReadPlan({
+    intent: taskIntent,
+    contextPacket: packet,
+    contextGraph: graph,
+    testImpactPlan: testImpact,
+    codeGraphImpact,
+  });
+  const analysisBrief = buildAnalysisBrief({
+    intent: taskIntent,
+    readPlan: taskReadPlan,
+    agentPlan: baseAgentPlan,
+  });
+  const taskLifecycle = buildTaskLifecycle({
+    intent: taskIntent,
+    stages: [
+      buildTaskStage({
+        kind: "read",
+        readiness: packet.completenessStatus === "missing-context" ? "needs-evidence" : "complete",
+        outputEvidenceIds: [packet.packetId, graph.graphId, testImpact.impactPlanId, codeGraphTrace.traceId],
+        missingFacts: packet.completenessStatus === "missing-context" ? taskReadPlan.suggestedNextReads : [],
+        verifierMarker: "task-stage:read:context-packet-code-graph",
+      }),
+      buildTaskStage({
+        kind: "analyze",
+        readiness: analysisBrief.missingFacts.length > 0 ? "needs-evidence" : "complete",
+        inputEvidenceIds: [taskReadPlan.readPlanId],
+        outputEvidenceIds: [analysisBrief.briefId],
+        missingFacts: analysisBrief.missingFacts,
+        verifierMarker: "task-stage:analyze:analysis-brief",
+      }),
+      buildTaskStage({
+        kind: "plan",
+        readiness: baseAgentPlan.executionReadiness === "ready" ? "ready" : "needs-evidence",
+        inputEvidenceIds: [analysisBrief.briefId, baseAgentPlan.planId],
+        outputEvidenceIds: [baseAgentPlan.planId],
+        missingFacts: baseAgentPlan.missingFacts,
+        verifierMarker: "task-stage:plan:agent-plan",
+      }),
+    ],
+  });
+  const taskExecutionPlan = buildTaskExecutionPlan({
+    brief: analysisBrief,
+    readPlan: taskReadPlan,
+    lifecycle: taskLifecycle,
+    agentPlan: baseAgentPlan,
+  });
+  const agentPlanWithLifecycle = projectWorkflowTaskPlanToAgentPlan({
+    workflowPlan: input.workflowPlan,
+    context: {
+      ...contextProjection,
+      taskLifecycleId: taskLifecycle.lifecycleId,
+      taskLifecycleCurrentStage: taskLifecycle.currentStage,
+      analysisBriefId: analysisBrief.briefId,
+      taskExecutionPlanId: taskExecutionPlan.executionPlanId,
+      taskLifecycleReadiness: taskLifecycle.overallStatus,
+      taskLifecycleMissingFacts: taskLifecycle.missingFacts,
+      suggestedNextTaskStage: taskLifecycle.nextRecommendedStage,
+      replaySafeEvidence: [
+        ...contextProjection.replaySafeEvidence,
+        taskLifecycle.replaySafeSummary,
+        analysisBrief.replaySafeSummary,
+        taskExecutionPlan.replaySafeSummary,
+        ...taskLifecycle.evidence,
+        ...analysisBrief.evidence,
+        ...taskExecutionPlan.evidence,
+      ],
+    },
   });
   const planQuality = buildPlanQuality({
-    agentPlan: baseAgentPlan,
+    agentPlan: agentPlanWithLifecycle,
     contextPacket: packet,
     contextGraph: graph,
     contextGraphScore: graphScore,
     testImpactPlan: testImpact,
     codeGraphTrace,
     codeGraphImpact,
+    taskLifecycle,
+    analysisBrief,
+    taskExecutionPlan,
   });
   const agentPlan = attachPlanQualityToAgentPlan({
-    agentPlan: baseAgentPlan,
+    agentPlan: agentPlanWithLifecycle,
     planQuality,
+  });
+  const taskLifecycleResult = buildTaskLifecycleResult({
+    lifecycle: taskLifecycle,
+    readPlan: taskReadPlan,
+    analysisBrief,
+    executionPlan: taskExecutionPlan,
   });
   const harnessTrace = buildHarnessTrace({
     routeId: "route188-plan-quality-harness-trace",
     taskId: `${input.workflowPlan.taskKind}:${input.targetPath}`,
+    taskLifecycleId: taskLifecycle.lifecycleId,
+    analysisBriefId: analysisBrief.briefId,
+    taskExecutionPlanId: taskExecutionPlan.executionPlanId,
     contextPacketId: packet.packetId,
     contextGraphId: graph.graphId,
     agentPlanId: agentPlan.planId,
@@ -122,6 +223,15 @@ export async function buildContextGraphPlanningBundle(input: {
     status: planQuality.level,
     reason: planQuality.missingFacts.join("; "),
     evidence: planQuality.evidence,
+  });
+  const taskLifecycleTrace = buildTaskLifecycleTrace({
+    lifecycle: taskLifecycle,
+    readPlan: taskReadPlan,
+    analysisBrief,
+    executionPlan: taskExecutionPlan,
+    harnessTrace,
+    planQualityId: planQuality.qualityId,
+    codeGraphTraceId: codeGraphTrace.traceId,
   });
   const harnessScorecard = buildHarnessScorecard({
     planQuality,
@@ -141,6 +251,13 @@ export async function buildContextGraphPlanningBundle(input: {
     codeGraphTrace,
     codeGraphImpact,
     codeGraphResult,
+    taskIntent,
+    taskReadPlan,
+    analysisBrief,
+    taskLifecycle,
+    taskExecutionPlan,
+    taskLifecycleResult,
+    taskLifecycleTrace,
     graphResult,
     planQuality,
     harnessTrace,

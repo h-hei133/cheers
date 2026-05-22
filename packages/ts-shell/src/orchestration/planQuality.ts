@@ -10,6 +10,9 @@ import type { VerificationCommandPlan } from "./verificationCommandPlan.js";
 import type { VerificationRepairContext } from "./verificationRepairContext.js";
 import type { CodeGraphTrace } from "./codeGraphTrace.js";
 import type { CodeGraphImpact } from "./codeGraphImpact.js";
+import type { AnalysisBrief } from "./analysisBrief.js";
+import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
+import type { TaskLifecycle } from "./taskLifecycle.js";
 
 export type PlanQualityLevel =
   | "ready"
@@ -43,6 +46,10 @@ export interface PlanQuality {
   readonly testImpactPlanId?: string;
   readonly codeGraphTraceId?: string;
   readonly impactQueryId?: string;
+  readonly taskLifecycleId?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
+  readonly analysisConfidence?: AnalysisBrief["confidence"];
   readonly verificationPlanId?: string;
   readonly repairLoopId?: string;
   readonly score: number;
@@ -67,6 +74,9 @@ export function buildPlanQuality(input: {
   readonly testImpactPlan?: TestImpactPlan;
   readonly codeGraphTrace?: CodeGraphTrace;
   readonly codeGraphImpact?: CodeGraphImpact;
+  readonly taskLifecycle?: TaskLifecycle;
+  readonly analysisBrief?: AnalysisBrief;
+  readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly verificationCommandPlan?: VerificationCommandPlan;
   readonly repairContext?: VerificationRepairContext;
   readonly providerReadiness?: "ready" | "missing" | "blocked" | "unsupported";
@@ -113,6 +123,15 @@ export function buildPlanQuality(input: {
       ...(input.codeGraphImpact?.readiness === "no-impact-candidates"
         ? ["code graph impact has no candidates"]
         : []),
+      ...(input.taskLifecycle?.missingFacts ?? input.agentPlan.taskLifecycleMissingFacts ?? []),
+      ...(input.agentPlan.taskLifecycleId && !input.analysisBrief && !input.agentPlan.analysisBriefId
+        ? ["analysis brief missing for lifecycle task"]
+        : []),
+      ...(input.analysisBrief?.missingFacts ?? []),
+      ...(input.analysisBrief?.verificationExpectation.startsWith("attach an explicit")
+        ? ["analysis brief missing verification expectation"]
+        : []),
+      ...(input.taskExecutionPlan?.stopConditions ?? []),
       ...(input.verificationCommandPlan?.state && input.verificationCommandPlan.state !== "ready"
         ? [`verification command plan ${input.verificationCommandPlan.state}`]
         : []),
@@ -127,6 +146,9 @@ export function buildPlanQuality(input: {
     testImpactPlan: input.testImpactPlan,
     codeGraphTrace: input.codeGraphTrace,
     codeGraphImpact: input.codeGraphImpact,
+    taskLifecycle: input.taskLifecycle,
+    analysisBrief: input.analysisBrief,
+    taskExecutionPlan: input.taskExecutionPlan,
     verificationCommandPlan: input.verificationCommandPlan,
     repairContext: input.repairContext,
     score,
@@ -138,6 +160,10 @@ export function buildPlanQuality(input: {
     testImpactPlanId: input.testImpactPlan?.impactPlanId,
     codeGraphTraceId: input.codeGraphTrace?.traceId,
     impactQueryId: input.codeGraphImpact?.impactQueryId,
+    taskLifecycleId: input.taskLifecycle?.lifecycleId ?? input.agentPlan.taskLifecycleId,
+    analysisBriefId: input.analysisBrief?.briefId ?? input.agentPlan.analysisBriefId,
+    taskExecutionPlanId: input.taskExecutionPlan?.executionPlanId ?? input.agentPlan.taskExecutionPlanId,
+    analysisConfidence: input.analysisBrief?.confidence,
     score,
     level,
     missingFacts,
@@ -173,6 +199,9 @@ export function buildPlanQuality(input: {
     input.testImpactPlan ? `testImpact=${input.testImpactPlan.impactPlanId}` : undefined,
     input.codeGraphTrace ? `codeGraphTrace=${input.codeGraphTrace.traceId}` : undefined,
     input.codeGraphImpact ? `impact=${input.codeGraphImpact.impactQueryId}` : undefined,
+    input.taskLifecycle ? `taskLifecycle=${input.taskLifecycle.lifecycleId}` : input.agentPlan.taskLifecycleId ? `taskLifecycle=${input.agentPlan.taskLifecycleId}` : undefined,
+    input.analysisBrief ? `analysisBrief=${input.analysisBrief.briefId}` : input.agentPlan.analysisBriefId ? `analysisBrief=${input.agentPlan.analysisBriefId}` : undefined,
+    input.taskExecutionPlan ? `executionPlan=${input.taskExecutionPlan.executionPlanId}` : input.agentPlan.taskExecutionPlanId ? `executionPlan=${input.agentPlan.taskExecutionPlanId}` : undefined,
     `level=${level}`,
     `score=${score}`,
     `missingFacts=${missingFacts.length}`,
@@ -188,6 +217,16 @@ export function buildPlanQuality(input: {
     ...(input.testImpactPlan ? { testImpactPlanId: input.testImpactPlan.impactPlanId } : {}),
     ...(input.codeGraphTrace ? { codeGraphTraceId: input.codeGraphTrace.traceId } : {}),
     ...(input.codeGraphImpact ? { impactQueryId: input.codeGraphImpact.impactQueryId } : {}),
+    ...(input.taskLifecycle?.lifecycleId ?? input.agentPlan.taskLifecycleId
+      ? { taskLifecycleId: input.taskLifecycle?.lifecycleId ?? input.agentPlan.taskLifecycleId }
+      : {}),
+    ...(input.analysisBrief?.briefId ?? input.agentPlan.analysisBriefId
+      ? { analysisBriefId: input.analysisBrief?.briefId ?? input.agentPlan.analysisBriefId }
+      : {}),
+    ...(input.taskExecutionPlan?.executionPlanId ?? input.agentPlan.taskExecutionPlanId
+      ? { taskExecutionPlanId: input.taskExecutionPlan?.executionPlanId ?? input.agentPlan.taskExecutionPlanId }
+      : {}),
+    ...(input.analysisBrief ? { analysisConfidence: input.analysisBrief.confidence } : {}),
     ...(input.verificationCommandPlan ? { verificationPlanId: input.verificationCommandPlan.verificationPlanId } : {}),
     ...(input.repairContext ? { repairLoopId: input.repairContext.repairLoopId } : {}),
     score,
@@ -209,6 +248,9 @@ export function buildPlanQuality(input: {
       ...(input.testImpactPlan ? [`plan-quality:test-impact:${input.testImpactPlan.impactPlanId}`] : []),
       ...(input.codeGraphTrace ? [`plan-quality:code-graph-trace:${input.codeGraphTrace.traceId}`] : []),
       ...(input.codeGraphImpact ? [`plan-quality:impact-query:${input.codeGraphImpact.impactQueryId}`] : []),
+      ...(input.taskLifecycle ? [`plan-quality:task-lifecycle:${input.taskLifecycle.lifecycleId}`] : input.agentPlan.taskLifecycleId ? [`plan-quality:task-lifecycle:${input.agentPlan.taskLifecycleId}`] : []),
+      ...(input.analysisBrief ? [`plan-quality:analysis-brief:${input.analysisBrief.briefId}`] : input.agentPlan.analysisBriefId ? [`plan-quality:analysis-brief:${input.agentPlan.analysisBriefId}`] : []),
+      ...(input.taskExecutionPlan ? [`plan-quality:execution-plan:${input.taskExecutionPlan.executionPlanId}`] : input.agentPlan.taskExecutionPlanId ? [`plan-quality:execution-plan:${input.agentPlan.taskExecutionPlanId}`] : []),
       `plan-quality:level:${level}`,
       `plan-quality:score:${score}`,
       `plan-quality:missing-facts:${missingFacts.length}`,
@@ -246,6 +288,9 @@ function buildDimensions(input: {
   readonly testImpactPlan?: TestImpactPlan;
   readonly codeGraphTrace?: CodeGraphTrace;
   readonly codeGraphImpact?: CodeGraphImpact;
+  readonly taskLifecycle?: TaskLifecycle;
+  readonly analysisBrief?: AnalysisBrief;
+  readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly verificationCommandPlan?: VerificationCommandPlan;
   readonly repairContext?: VerificationRepairContext;
   readonly providerReadiness?: "ready" | "missing" | "blocked" | "unsupported";
@@ -282,6 +327,9 @@ function classifyLevel(input: {
   readonly testImpactPlan?: TestImpactPlan;
   readonly codeGraphTrace?: CodeGraphTrace;
   readonly codeGraphImpact?: CodeGraphImpact;
+  readonly taskLifecycle?: TaskLifecycle;
+  readonly analysisBrief?: AnalysisBrief;
+  readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly verificationCommandPlan?: VerificationCommandPlan;
   readonly repairContext?: VerificationRepairContext;
   readonly score: number;
@@ -297,12 +345,16 @@ function classifyLevel(input: {
   }
   if (
     input.codeGraphTrace?.stalenessSummary.status === "stale" ||
-    input.codeGraphImpact?.readiness === "stale-warning"
+    input.codeGraphImpact?.readiness === "stale-warning" ||
+    input.analysisBrief?.confidence === "low"
   ) {
     return "low-confidence";
   }
   if (
     input.agentPlan.executionReadiness !== "ready" ||
+    (input.agentPlan.taskLifecycleId && !input.analysisBrief && !input.agentPlan.analysisBriefId) ||
+    (input.analysisBrief?.missingFacts.length ?? 0) > 0 ||
+    input.analysisBrief?.verificationExpectation.startsWith("attach an explicit") ||
     input.graphReadiness?.graphReadiness === "partial" ||
     !input.testImpactPlan ||
     input.testImpactPlan.commandReadiness === "missing-verification" ||
@@ -368,6 +420,10 @@ function buildQualityId(input: {
   readonly testImpactPlanId?: string;
   readonly codeGraphTraceId?: string;
   readonly impactQueryId?: string;
+  readonly taskLifecycleId?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
+  readonly analysisConfidence?: AnalysisBrief["confidence"];
   readonly score: number;
   readonly level: PlanQualityLevel;
   readonly missingFacts: readonly string[];

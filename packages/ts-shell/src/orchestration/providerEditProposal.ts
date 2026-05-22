@@ -37,6 +37,9 @@ export interface ProviderEditProposalManifest {
   readonly providerKindLabel: string;
   readonly contextPacketId?: string;
   readonly agentPlanId?: string;
+  readonly taskLifecycleId?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
   readonly targetScope: "explicit-target" | "confirmed-target-set" | "unknown";
   readonly proposedOperationKind: ProviderEditOperationKind;
   readonly targets: readonly ProviderEditProposalTarget[];
@@ -87,6 +90,9 @@ export function normalizeProviderEditProposal(input: {
   readonly explicitTargetLabels: readonly string[];
   readonly contextPacketId?: string;
   readonly agentPlanId?: string;
+  readonly taskLifecycleId?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
   readonly contextConfidence?: "low" | "medium" | "high";
   readonly contextReadiness?: "ready" | "needs-more-context";
 }): ProviderEditProposalNormalization {
@@ -145,6 +151,9 @@ export function normalizeProviderEditProposal(input: {
     providerKindLabel: input.providerKindLabel,
     contextPacketId: input.contextPacketId,
     agentPlanId: input.agentPlanId,
+    taskLifecycleId: input.taskLifecycleId,
+    analysisBriefId: input.analysisBriefId,
+    taskExecutionPlanId: input.taskExecutionPlanId,
     targetLabels: targets.map((target) => target.pathLabel),
     proposedOperationKind: operationKind,
     targetSummaries: targets.map((target) => target.proposedSummary),
@@ -166,6 +175,9 @@ export function buildProviderEditProposalManifest(input: {
   readonly providerKindLabel: string;
   readonly contextPacketId?: string;
   readonly agentPlanId?: string;
+  readonly taskLifecycleId?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
   readonly targetLabels: readonly string[];
   readonly proposedOperationKind: ProviderEditOperationKind;
   readonly targetSummaries: readonly string[];
@@ -215,6 +227,9 @@ export function buildProviderEditProposalManifest(input: {
     `provider=${input.providerKindLabel}`,
     ...(input.contextPacketId ? [`contextPacket=${input.contextPacketId}`] : []),
     ...(input.agentPlanId ? [`agentPlan=${input.agentPlanId}`] : []),
+    ...(input.taskLifecycleId ? [`taskLifecycle=${input.taskLifecycleId}`] : []),
+    ...(input.analysisBriefId ? [`analysisBrief=${input.analysisBriefId}`] : []),
+    ...(input.taskExecutionPlanId ? [`executionPlan=${input.taskExecutionPlanId}`] : []),
     `operation=${input.proposedOperationKind}`,
     `readiness=${handoffReadiness}`,
     `confirmation=${confirmationStatus}`,
@@ -226,6 +241,9 @@ export function buildProviderEditProposalManifest(input: {
     `provider=${input.providerKindLabel}`,
     ...(input.contextPacketId ? [`contextPacket=${input.contextPacketId}`] : []),
     ...(input.agentPlanId ? [`agentPlan=${input.agentPlanId}`] : []),
+    ...(input.taskLifecycleId ? [`taskLifecycle=${input.taskLifecycleId}`] : []),
+    ...(input.analysisBriefId ? [`analysisBrief=${input.analysisBriefId}`] : []),
+    ...(input.taskExecutionPlanId ? [`executionPlan=${input.taskExecutionPlanId}`] : []),
     `targets=${input.targetLabels.join(", ") || "(none)"}`,
     `readiness=${handoffReadiness}`,
     `confirmation=${confirmationStatus}`,
@@ -238,6 +256,9 @@ export function buildProviderEditProposalManifest(input: {
     providerKindLabel: input.providerKindLabel,
     ...(input.contextPacketId ? { contextPacketId: input.contextPacketId } : {}),
     ...(input.agentPlanId ? { agentPlanId: input.agentPlanId } : {}),
+    ...(input.taskLifecycleId ? { taskLifecycleId: input.taskLifecycleId } : {}),
+    ...(input.analysisBriefId ? { analysisBriefId: input.analysisBriefId } : {}),
+    ...(input.taskExecutionPlanId ? { taskExecutionPlanId: input.taskExecutionPlanId } : {}),
     targetScope,
     proposedOperationKind: input.proposedOperationKind,
     targets,
@@ -264,6 +285,15 @@ export function buildProviderEditProposalManifest(input: {
         : []),
       ...(input.agentPlanId
         ? [`provider-edit-proposal:agent-plan:${input.agentPlanId}`]
+        : []),
+      ...(input.taskLifecycleId
+        ? [`provider-edit-proposal:task-lifecycle:${input.taskLifecycleId}`]
+        : []),
+      ...(input.analysisBriefId
+        ? [`provider-edit-proposal:analysis-brief:${input.analysisBriefId}`]
+        : []),
+      ...(input.taskExecutionPlanId
+        ? [`provider-edit-proposal:execution-plan:${input.taskExecutionPlanId}`]
         : []),
       `provider-edit-proposal:operation:${input.proposedOperationKind}`,
       `provider-edit-proposal:readiness:${handoffReadiness}`,

@@ -4,12 +4,16 @@ import type { ContextGraphScore } from "./contextGraphScore.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
 import type { CodeGraphImpact } from "./codeGraphImpact.js";
+import type { AnalysisBrief } from "./analysisBrief.js";
+import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
+import type { TaskLifecycle } from "./taskLifecycle.js";
 import { redactProviderEditText } from "./providerEditContext.js";
 
 export type ContextAwareProviderProposalMode = "provider-edit-proposal";
 export type ContextAwareProviderInputStatus =
   | "ready"
   | "missing-context"
+  | "missing-analysis-brief"
   | "context-over-budget"
   | "plan-needs-more-context";
 
@@ -29,6 +33,12 @@ export interface ContextAwareProviderEditInput {
   readonly impactReadiness?: string;
   readonly impactSummary?: string;
   readonly agentPlanId?: string;
+  readonly taskLifecycleId?: string;
+  readonly taskLifecycleStage?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
+  readonly analysisBriefSummary?: string;
+  readonly executionPlanConstraints?: readonly string[];
   readonly contextCompleteness: AgentPlan["contextCompleteness"];
   readonly planConfidence: AgentPlan["confidence"];
   readonly missingFacts: readonly string[];
@@ -53,6 +63,9 @@ export function buildContextAwareProviderEditInput(input: {
   readonly testImpactPlan?: TestImpactPlan;
   readonly codeGraphImpact?: CodeGraphImpact;
   readonly agentPlan?: AgentPlan;
+  readonly taskLifecycle?: TaskLifecycle;
+  readonly analysisBrief?: AnalysisBrief;
+  readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly providerReadinessState: string;
   readonly proposalMode?: ContextAwareProviderProposalMode;
   readonly allowReviewOnlyWithMissingContext?: boolean;
@@ -81,10 +94,16 @@ export function buildContextAwareProviderEditInput(input: {
   const planNeedsMoreContext =
     plan?.executionReadiness === "needs-more-context" &&
     input.allowReviewOnlyWithMissingContext !== true;
+  const lifecycleId = input.taskLifecycle?.lifecycleId ?? plan?.taskLifecycleId;
+  const analysisBriefId = input.analysisBrief?.briefId ?? plan?.analysisBriefId;
+  const executionPlanId =
+    input.taskExecutionPlan?.executionPlanId ?? plan?.taskExecutionPlanId;
 
   const status: ContextAwareProviderInputStatus =
     !packet || !plan || packet.completenessStatus === "missing-context"
       ? "missing-context"
+      : lifecycleId && !analysisBriefId
+        ? "missing-analysis-brief"
       : overBudget
         ? "context-over-budget"
         : graphLowReadiness
@@ -131,6 +150,26 @@ export function buildContextAwareProviderEditInput(input: {
           }
         : {}),
     ...(plan ? { agentPlanId: plan.planId } : {}),
+    ...(lifecycleId ? { taskLifecycleId: lifecycleId } : {}),
+    ...(input.taskLifecycle?.currentStage ?? plan?.taskLifecycleCurrentStage
+      ? { taskLifecycleStage: input.taskLifecycle?.currentStage ?? plan?.taskLifecycleCurrentStage }
+      : {}),
+    ...(analysisBriefId ? { analysisBriefId } : {}),
+    ...(executionPlanId ? { taskExecutionPlanId: executionPlanId } : {}),
+    ...(input.analysisBrief
+      ? {
+          analysisBriefSummary: redactProviderEditText(
+            `${input.analysisBrief.confidence}; ${input.analysisBrief.recommendedStrategy}`,
+          ),
+        }
+      : {}),
+    ...(input.taskExecutionPlan
+      ? {
+          executionPlanConstraints: input.taskExecutionPlan.requiredConfirmation.map(
+            redactProviderEditText,
+          ),
+        }
+      : {}),
     contextCompleteness: plan?.contextCompleteness ?? "missing-context",
     planConfidence: plan?.confidence ?? "low",
     missingFacts: (plan?.missingFacts ?? ["context packet and Agent Plan are required"]).map(
@@ -165,6 +204,9 @@ export function buildContextAwareProviderEditInput(input: {
           ]
         : []),
       ...(plan ? [`context-aware-provider-edit:agent-plan:${plan.planId}`] : []),
+      ...(lifecycleId ? [`context-aware-provider-edit:task-lifecycle:${lifecycleId}`] : []),
+      ...(analysisBriefId ? [`context-aware-provider-edit:analysis-brief:${analysisBriefId}`] : []),
+      ...(executionPlanId ? [`context-aware-provider-edit:execution-plan:${executionPlanId}`] : []),
       `context-aware-provider-edit:context-completeness:${plan?.contextCompleteness ?? "missing-context"}`,
       `context-aware-provider-edit:plan-confidence:${plan?.confidence ?? "low"}`,
       "context-aware-provider-edit:redacted-and-budgeted",
@@ -183,6 +225,8 @@ function buildStoppedReason(
       return undefined;
     case "missing-context":
       return "Provider proposal requires a complete targeted context packet and Agent Plan before provider invocation.";
+    case "missing-analysis-brief":
+      return "Provider proposal requires a lifecycle analysis brief before provider invocation.";
     case "context-over-budget":
       return `Provider proposal context exceeded budget: ${omittedContentReasons.join(", ") || "over budget"}.`;
     case "plan-needs-more-context":
@@ -201,6 +245,8 @@ function buildNextAction(
       return undefined;
     case "missing-context":
       return "Build a targeted context packet and Agent Plan for the explicit target first.";
+    case "missing-analysis-brief":
+      return "Create an evidence-grounded lifecycle analysis brief before provider proposal.";
     case "context-over-budget":
       return "Reduce or summarize context sources before requesting a provider proposal.";
     case "plan-needs-more-context":

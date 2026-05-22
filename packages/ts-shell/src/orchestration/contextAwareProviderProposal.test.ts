@@ -174,17 +174,55 @@ describe("contextAwareProviderProposal", () => {
       ]),
     );
   });
+
+  it("stops lifecycle provider proposal when analysis brief is missing", async () => {
+    let calls = 0;
+    const packet = buildPacket("complete");
+    const plan = buildPlan(packet, "ready", {
+      taskLifecycleId: "task_lifecycle_provider",
+      taskLifecycleCurrentStage: "plan",
+    });
+
+    const result = await planContextAwareProviderProposal({
+      requestId: "req-missing-analysis",
+      targetSummary: "src/app.ts",
+      contextPacket: packet,
+      agentPlan: plan,
+      userRequest: "rename runApp",
+      availability: { kind: "available", providerKindLabel: "fake-provider" },
+      provider: {
+        proposeEdit: () => {
+          calls += 1;
+          return { operationKind: "generated-replacement" as const };
+        },
+      },
+    });
+
+    expect(result.status).toBe("context-missing-stopped");
+    expect(result.reason).toContain("analysis brief");
+    expect(result.evidence).toContain(
+      "context-aware-provider-edit:task-lifecycle:task_lifecycle_provider",
+    );
+    expect(calls).toBe(0);
+  });
 });
 
 function buildPlan(
   packet: TargetedContextPacket,
   executionReadiness: "ready" | "needs-more-context",
+  lifecycle?: {
+    readonly taskLifecycleId?: string;
+    readonly taskLifecycleCurrentStage?: string;
+    readonly analysisBriefId?: string;
+    readonly taskExecutionPlanId?: string;
+  },
 ) {
   return buildAgentPlan({
     ownerCapability: "edit-patch",
     taskKind: "edit-file",
     requestedActionKind: "edit",
     targetSummary: packet.targetSafeLabel,
+    ...lifecycle,
     contextPacketIds: [packet.packetId],
     contextCompleteness:
       executionReadiness === "ready" ? "complete" : "partial",

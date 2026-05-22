@@ -14,6 +14,37 @@ None open after Route 165.
 
 ## Resolved
 
+### Task lifecycle loop readiness
+
+- Affected modules: Agent Loop, Workspace / File Context, Provider / Model,
+  Runtime / Verification, Edit / Patch, Result Surface, Session / Continue,
+  Harness / Eval.
+- Why it was a calibration gap: targeted context packets, context graphs, code
+  graph impact, Agent Plan, Plan Quality, provider proposal, verification, and
+  repair facts existed as separate lanes. Downstream surfaces could not name
+  the task stage, safe analysis brief, execution plan, or lifecycle stop point
+  without inferring them ad hoc from local evidence.
+- Resolution: Route 190 adds `taskIntent.ts`, `taskStage.ts`,
+  `taskLifecycle.ts`, `taskReadPlan.ts`, `analysisBrief.ts`,
+  `taskExecutionPlan.ts`, `taskLifecycleResult.ts`, and
+  `taskLifecycleTrace.ts`. Agent Plan and Plan Quality can carry lifecycle,
+  analysis brief, and execution plan ids; provider proposal, verification
+  command planning, and repair context consume those ids as no-write readiness
+  evidence; Result Surface, Session / Continue, and Harness / Eval preserve
+  lifecycle stop/next-stage facts.
+- Evidence: task lifecycle tests, context graph planning regression, Agent Plan
+  / Plan Quality regressions, provider proposal regression, verification
+  command planning regression, verification repair context regression,
+  Session / Continue parity regressions, focused context-planning verifier,
+  result-contract, and build.
+- Recommended next action: keep mutation behavior, provider/model calls,
+  command execution behavior, command allowlist expansion, LSP, embeddings,
+  full-repo indexing, persistent graph backends, hidden chain-of-thought
+  persistence, session publishing, CLI/schema/dependency changes, and broad
+  `runMvpIntegratedFlow.ts` rewrites closed until separate routes define them.
+- Should become a route: no, resolved by Route 190 for bounded task lifecycle
+  evidence and readiness handoff only.
+
 ### Code intelligence graph trace and staleness readiness
 
 - Affected modules: Workspace / File Context, Agent Loop, Provider / Model,

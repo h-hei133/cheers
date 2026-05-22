@@ -44,6 +44,14 @@
         "packages/ts-shell/src/orchestration/planQualityScore.ts",
         "packages/ts-shell/src/orchestration/planQualityGate.ts",
         "packages/ts-shell/src/orchestration/planQualityResult.ts",
+        "packages/ts-shell/src/orchestration/taskIntent.ts",
+        "packages/ts-shell/src/orchestration/taskLifecycle.ts",
+        "packages/ts-shell/src/orchestration/taskStage.ts",
+        "packages/ts-shell/src/orchestration/taskReadPlan.ts",
+        "packages/ts-shell/src/orchestration/analysisBrief.ts",
+        "packages/ts-shell/src/orchestration/taskExecutionPlan.ts",
+        "packages/ts-shell/src/orchestration/taskLifecycleResult.ts",
+        "packages/ts-shell/src/orchestration/taskLifecycleTrace.ts",
         "packages/ts-shell/src/orchestration/codeGraphImpact.ts"
       ],
       "owns": [
@@ -52,6 +60,7 @@
         "module facade composition",
         "deterministic context-aware planning facade projection",
         "deterministic plan quality scoring and downstream planning gates",
+        "task-level read/analyze/plan lifecycle evidence and safe analysis brief projection",
         "bounded code intelligence impact summaries consumed by Agent Plan and Plan Quality",
         "receipt and result handoff aggregation"
       ]

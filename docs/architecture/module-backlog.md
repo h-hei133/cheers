@@ -553,6 +553,28 @@ as an import-policing rule.
   backends, MCP, session publishing, CLI/schema/dependency changes, and broad
   `runMvpIntegratedFlow.ts` refactors remain closed.
 
+### Route 190: Task Lifecycle Loop
+
+- Route 190 adds a task-level read/analyze/plan spine over existing context,
+  code graph, Agent Plan, Plan Quality, provider proposal, verification, and
+  repair lanes: `taskIntent.ts`, `taskStage.ts`, `taskLifecycle.ts`,
+  `taskReadPlan.ts`, `analysisBrief.ts`, `taskExecutionPlan.ts`,
+  `taskLifecycleResult.ts`, and `taskLifecycleTrace.ts`.
+- Lifecycle stages record input/output evidence ids, readiness, missing facts,
+  stop reasons, do-next text, verifier markers, redaction status, and
+  `mutationAuthority:not-granted`. Analysis is persisted only as a safe
+  evidence-grounded brief; hidden chain-of-thought and raw content remain
+  excluded.
+- Agent Plan, Plan Quality, context-aware provider proposal, verification
+  command planning, verification repair context, Result Surface, Session /
+  Continue parity, Harness trace/scorecard, and the context-planning verifier
+  consume lifecycle/brief/execution-plan ids without expanding provider calls,
+  command dispatch, edit/apply authority, or session schema.
+- Mutation behavior, provider/model calls by default, command execution
+  behavior, command allowlist expansion, LSP, embeddings, full-repo indexing,
+  persistent graph backends, hidden CoT persistence, MCP, CLI/schema/dependency
+  changes, and broad `runMvpIntegratedFlow.ts` refactors remain closed.
+
 ## Module-First Route Rule
 
 Future routes must state:

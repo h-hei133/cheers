@@ -7,6 +7,9 @@ export interface ContextAwareProviderPromptContext {
   readonly contextPacketId: string;
   readonly contextGraphId?: string;
   readonly agentPlanId: string;
+  readonly taskLifecycleId?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
   readonly userRequest: string;
   readonly targetSummary: string;
   readonly target: {
@@ -31,6 +34,8 @@ export interface ContextAwareProviderPromptContext {
   readonly impactQueryId?: string;
   readonly impactReadiness?: string;
   readonly impactSummary?: string;
+  readonly analysisBriefSummary?: string;
+  readonly executionPlanConstraints?: readonly string[];
   readonly verificationExpectation: "review-before-apply";
   readonly mutationAuthority: "not-granted";
   readonly redactionStatus: "redacted-and-budgeted";
@@ -77,6 +82,9 @@ export function buildContextAwareProviderPrompt(input: {
     `Code graph trace: ${input.editInput.codeGraphTraceId ?? "none"}`,
     `Impact query: ${input.editInput.impactQueryId ?? "none"}`,
     `Agent Plan: ${agentPlanId}`,
+    `Task lifecycle: ${input.editInput.taskLifecycleId ?? "none"}`,
+    `Analysis brief: ${input.editInput.analysisBriefId ?? "none"}`,
+    `Task execution plan: ${input.editInput.taskExecutionPlanId ?? "none"}`,
     `Target: ${input.contextPacket.targetSafeLabel}`,
     `Target summary: ${redactProviderEditText(targetSource?.summary ?? input.editInput.targetSummary)}`,
     `Context completeness: ${input.editInput.contextCompleteness}`,
@@ -86,6 +94,8 @@ export function buildContextAwareProviderPrompt(input: {
     `Test impact: ${input.editInput.testImpactSummary ?? "none"}`,
     `Code graph impact: ${input.editInput.impactSummary ?? "none"}`,
     `Impact readiness: ${input.editInput.impactReadiness ?? "none"}`,
+    `Analysis brief summary: ${input.editInput.analysisBriefSummary ?? "none"}`,
+    `Execution constraints: ${input.editInput.executionPlanConstraints?.join("; ") ?? "none"}`,
     `Missing facts: ${input.editInput.missingFacts.join("; ") || "none"}`,
     `Suggested reads: ${input.editInput.suggestedReads.join("; ") || "none"}`,
     `Suggested verification: ${input.editInput.suggestedVerification.join("; ") || "none"}`,
@@ -98,6 +108,9 @@ export function buildContextAwareProviderPrompt(input: {
     contextPacketId,
     ...(input.editInput.contextGraphId ? { contextGraphId: input.editInput.contextGraphId } : {}),
     agentPlanId,
+    ...(input.editInput.taskLifecycleId ? { taskLifecycleId: input.editInput.taskLifecycleId } : {}),
+    ...(input.editInput.analysisBriefId ? { analysisBriefId: input.editInput.analysisBriefId } : {}),
+    ...(input.editInput.taskExecutionPlanId ? { taskExecutionPlanId: input.editInput.taskExecutionPlanId } : {}),
     userRequest: redactProviderEditText(input.userRequest),
     targetSummary: redactProviderEditText(input.editInput.targetSummary),
     target: {
@@ -119,6 +132,16 @@ export function buildContextAwareProviderPrompt(input: {
     ...(input.editInput.impactQueryId ? { impactQueryId: input.editInput.impactQueryId } : {}),
     ...(input.editInput.impactReadiness ? { impactReadiness: input.editInput.impactReadiness } : {}),
     ...(input.editInput.impactSummary ? { impactSummary: redactProviderEditText(input.editInput.impactSummary) } : {}),
+    ...(input.editInput.analysisBriefSummary
+      ? { analysisBriefSummary: redactProviderEditText(input.editInput.analysisBriefSummary) }
+      : {}),
+    ...(input.editInput.executionPlanConstraints
+      ? {
+          executionPlanConstraints: input.editInput.executionPlanConstraints.map(
+            redactProviderEditText,
+          ),
+        }
+      : {}),
     verificationExpectation: "review-before-apply",
     mutationAuthority: "not-granted",
     redactionStatus: "redacted-and-budgeted",
@@ -135,6 +158,15 @@ export function buildContextAwareProviderPrompt(input: {
         ? [`context-aware-provider-prompt:impact-query:${input.editInput.impactQueryId}`]
         : []),
       `context-aware-provider-prompt:agent-plan:${agentPlanId}`,
+      ...(input.editInput.taskLifecycleId
+        ? [`context-aware-provider-prompt:task-lifecycle:${input.editInput.taskLifecycleId}`]
+        : []),
+      ...(input.editInput.analysisBriefId
+        ? [`context-aware-provider-prompt:analysis-brief:${input.editInput.analysisBriefId}`]
+        : []),
+      ...(input.editInput.taskExecutionPlanId
+        ? [`context-aware-provider-prompt:execution-plan:${input.editInput.taskExecutionPlanId}`]
+        : []),
       "context-aware-provider-prompt:redacted-and-budgeted",
       "context-aware-provider-prompt:raw-full-content-excluded",
       "context-aware-provider-prompt:provider-config-excluded",

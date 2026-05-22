@@ -9,6 +9,7 @@ const focusedTests = [
   'src/orchestration/contextGraphScore.test.ts',
   'src/orchestration/contextGraphReadiness.test.ts',
   'src/orchestration/contextGraphPlanning.test.ts',
+  'src/orchestration/taskLifecycle.test.ts',
   'src/orchestration/codeGraphFacts.test.ts',
   'src/orchestration/codeGraphTrace.test.ts',
   'src/orchestration/codeGraphQuery.test.ts',
@@ -68,6 +69,16 @@ console.log('marker code-graph-staleness-downgrades-readiness')
 console.log('marker code-graph-provider-impact-context')
 console.log('marker code-graph-verification-candidates')
 console.log('marker code-graph-session-continue-evidence')
+console.log('marker task-lifecycle-read-analyze-plan-created')
+console.log('marker task-read-plan-uses-context-code-graph')
+console.log('marker analysis-brief-evidence-grounded')
+console.log('marker analysis-brief-blocks-provider-proposal')
+console.log('marker task-execution-plan-review-gated')
+console.log('marker task-lifecycle-agent-plan-plan-quality')
+console.log('marker task-lifecycle-provider-verification-repair-handoff')
+console.log('marker task-lifecycle-result-session-continue')
+console.log('marker task-lifecycle-harness-trace-scorecard')
+console.log('marker task-lifecycle-hidden-cot-excluded')
 console.log('marker test-impact-suggested-tests')
 console.log('marker test-impact-verification-candidates')
 console.log('marker plan-quality-ready-score')
@@ -162,6 +173,9 @@ if (
   runMvpSource.includes('function queryCodeGraphTrace') ||
   runMvpSource.includes('function buildCodeGraphImpact') ||
   runMvpSource.includes('function buildHarnessTrace') ||
+  runMvpSource.includes('function buildTaskLifecycle') ||
+  runMvpSource.includes('function buildAnalysisBrief') ||
+  runMvpSource.includes('function buildTaskExecutionPlan') ||
   runMvpSource.includes('projectContextPacketRuntimeOutcome')
 ) {
   console.log('[product-regression] context-planning - planning helpers are implemented inline or bypass facade')

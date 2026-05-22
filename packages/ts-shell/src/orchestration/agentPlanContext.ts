@@ -8,6 +8,9 @@ import type { ContextGraphScore } from "./contextGraphScore.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
 import type { CodeGraphTrace } from "./codeGraphTrace.js";
 import type { CodeGraphImpact } from "./codeGraphImpact.js";
+import type { AnalysisBrief } from "./analysisBrief.js";
+import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
+import type { TaskLifecycle } from "./taskLifecycle.js";
 import type {
   AgentPlanConfidence,
   AgentPlanContextCompleteness,
@@ -17,6 +20,13 @@ import type {
 export interface AgentPlanContextProjection {
   readonly packetId: string;
   readonly contextPacketIds: readonly string[];
+  readonly taskLifecycleId?: string;
+  readonly taskLifecycleCurrentStage?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
+  readonly taskLifecycleReadiness?: string;
+  readonly taskLifecycleMissingFacts?: readonly string[];
+  readonly suggestedNextTaskStage?: string;
   readonly contextGraphIds: readonly string[];
   readonly codeGraphTraceIds: readonly string[];
   readonly impactQueryId?: string;
@@ -48,6 +58,11 @@ export function projectContextPacketToAgentPlanContext(
     readonly codeGraphTrace?: CodeGraphTrace;
     readonly codeGraphImpact?: CodeGraphImpact;
   },
+  lifecycleFacts?: {
+    readonly lifecycle: TaskLifecycle;
+    readonly analysisBrief?: AnalysisBrief;
+    readonly executionPlan?: TaskExecutionPlan;
+  },
 ): AgentPlanContextProjection {
   const contextSummary = buildContextPlanningSummary(packet);
   const packetReadiness =
@@ -64,6 +79,19 @@ export function projectContextPacketToAgentPlanContext(
   return {
     packetId: packet.packetId,
     contextPacketIds: [packet.packetId],
+    ...(lifecycleFacts
+      ? {
+          taskLifecycleId: lifecycleFacts.lifecycle.lifecycleId,
+          taskLifecycleCurrentStage: lifecycleFacts.lifecycle.currentStage,
+          taskLifecycleReadiness: lifecycleFacts.lifecycle.overallStatus,
+          taskLifecycleMissingFacts: lifecycleFacts.lifecycle.missingFacts,
+        }
+      : {}),
+    ...(lifecycleFacts?.analysisBrief ? { analysisBriefId: lifecycleFacts.analysisBrief.briefId } : {}),
+    ...(lifecycleFacts?.executionPlan ? { taskExecutionPlanId: lifecycleFacts.executionPlan.executionPlanId } : {}),
+    ...(lifecycleFacts?.lifecycle.nextRecommendedStage
+      ? { suggestedNextTaskStage: lifecycleFacts.lifecycle.nextRecommendedStage }
+      : {}),
     contextGraphIds: graphFacts ? [graphFacts.graph.graphId] : [],
     codeGraphTraceIds: graphFacts?.codeGraphTrace ? [graphFacts.codeGraphTrace.traceId] : [],
     ...(graphFacts?.codeGraphImpact ? { impactQueryId: graphFacts.codeGraphImpact.impactQueryId } : {}),
@@ -100,6 +128,8 @@ export function projectContextPacketToAgentPlanContext(
       ...(graphFacts?.score.planningReadiness === "budget-limited"
         ? ["context graph budget limited"]
         : []),
+      ...(lifecycleFacts?.lifecycle.missingFacts ?? []),
+      ...(lifecycleFacts?.analysisBrief?.missingFacts ?? []),
     ],
     suggestedReads: Array.from(
       new Set([
@@ -131,6 +161,24 @@ export function projectContextPacketToAgentPlanContext(
             ...graphFacts.testImpact.evidence,
             ...(graphFacts.codeGraphTrace?.evidence ?? []),
             ...(graphFacts.codeGraphImpact?.evidence ?? []),
+          ]
+        : []),
+      ...(lifecycleFacts
+        ? [
+            lifecycleFacts.lifecycle.replaySafeSummary,
+            ...lifecycleFacts.lifecycle.evidence,
+            ...(lifecycleFacts.analysisBrief
+              ? [
+                  lifecycleFacts.analysisBrief.replaySafeSummary,
+                  ...lifecycleFacts.analysisBrief.evidence,
+                ]
+              : []),
+            ...(lifecycleFacts.executionPlan
+              ? [
+                  lifecycleFacts.executionPlan.replaySafeSummary,
+                  ...lifecycleFacts.executionPlan.evidence,
+                ]
+              : []),
           ]
         : []),
     ],

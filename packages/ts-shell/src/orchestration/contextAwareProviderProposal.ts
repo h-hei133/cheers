@@ -5,6 +5,9 @@ import type { TargetedContextPacket } from "./contextPacket.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
 import type { PlanQuality } from "./planQuality.js";
 import type { CodeGraphImpact } from "./codeGraphImpact.js";
+import type { AnalysisBrief } from "./analysisBrief.js";
+import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
+import type { TaskLifecycle } from "./taskLifecycle.js";
 import { evaluatePlanQualityGate } from "./planQualityGate.js";
 import {
   buildContextAwareProviderEditInput,
@@ -83,6 +86,9 @@ export async function planContextAwareProviderProposal(input: {
   readonly codeGraphImpact?: CodeGraphImpact;
   readonly agentPlan?: AgentPlan;
   readonly planQuality?: PlanQuality;
+  readonly taskLifecycle?: TaskLifecycle;
+  readonly analysisBrief?: AnalysisBrief;
+  readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly userRequest: string;
   readonly constraints?: readonly string[];
   readonly nonGoals?: readonly string[];
@@ -99,6 +105,9 @@ export async function planContextAwareProviderProposal(input: {
     testImpactPlan: input.testImpactPlan,
     codeGraphImpact: input.codeGraphImpact,
     agentPlan: input.agentPlan,
+    taskLifecycle: input.taskLifecycle,
+    analysisBrief: input.analysisBrief,
+    taskExecutionPlan: input.taskExecutionPlan,
     providerReadinessState: input.availability.kind,
     allowReviewOnlyWithMissingContext: input.allowReviewOnlyWithMissingContext,
   });
@@ -175,6 +184,9 @@ export async function planContextAwareProviderProposal(input: {
     explicitTargetLabels: editInput.targetLabels,
     contextPacketId: input.contextPacket.packetId,
     agentPlanId: input.agentPlan.planId,
+    taskLifecycleId: editInput.taskLifecycleId,
+    analysisBriefId: editInput.analysisBriefId,
+    taskExecutionPlanId: editInput.taskExecutionPlanId,
     contextConfidence: input.agentPlan.confidence,
     contextReadiness: input.agentPlan.executionReadiness === "ready" ? "ready" : "needs-more-context",
   });
@@ -248,6 +260,7 @@ function mapInputStoppedStatus(
     case "context-over-budget":
       return "context-over-budget-stopped";
     case "missing-context":
+    case "missing-analysis-brief":
     case "plan-needs-more-context":
       return "context-missing-stopped";
     case "ready":

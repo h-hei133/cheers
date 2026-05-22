@@ -33,6 +33,9 @@ describe("verificationRepairContext", () => {
     expect(context.status).toBe("repair-loop-context-created");
     expect(context.sourceContextPacketId).toBe(packet.packetId);
     expect(context.sourceAgentPlanId).toBe(plan.planId);
+    expect(context.sourceTaskLifecycleId).toBe("task_lifecycle_repair");
+    expect(context.sourceAnalysisBriefId).toBe("analysis_brief_repair");
+    expect(context.sourceTaskExecutionPlanId).toBe("task_execution_plan_repair");
     expect(context.runtimeReceiptMarkers).toEqual(["runtime-receipt-result:failed"]);
     expect(context.changedFileLabels).toEqual(["src/app.ts"]);
     expect(context.safeSummary).toContain("raw-content-excluded");
@@ -40,6 +43,8 @@ describe("verificationRepairContext", () => {
       expect.arrayContaining([
         `verification-repair-context:context-packet:${packet.packetId}`,
         `verification-repair-context:agent-plan:${plan.planId}`,
+        "verification-repair-context:task-lifecycle:task_lifecycle_repair",
+        "verification-repair-context:analysis-brief:analysis_brief_repair",
         "verification-repair-context:runtime-receipts:1",
         "verification-repair-context:mutation:not-run",
       ]),
@@ -118,6 +123,9 @@ function planFixture(packet: TargetedContextPacket) {
     taskKind: "edit-file",
     requestedActionKind: "edit",
     targetSummary: packet.targetSafeLabel,
+    taskLifecycleId: "task_lifecycle_repair",
+    analysisBriefId: "analysis_brief_repair",
+    taskExecutionPlanId: "task_execution_plan_repair",
     contextPacketIds: [packet.packetId],
     contextCompleteness: "complete",
     confidence: "high",

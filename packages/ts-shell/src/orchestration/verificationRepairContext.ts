@@ -7,6 +7,9 @@ import {
   type EditRepairContext,
 } from "./editRepairContext.js";
 import { redactProviderEditText } from "./providerEditContext.js";
+import type { AnalysisBrief } from "./analysisBrief.js";
+import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
+import type { TaskLifecycle } from "./taskLifecycle.js";
 import type {
   CodingResultSummary,
   CodingVerificationSummary,
@@ -28,6 +31,9 @@ export interface VerificationRepairContext {
   readonly sourceProposalId?: string;
   readonly sourceContextPacketId?: string;
   readonly sourceAgentPlanId?: string;
+  readonly sourceTaskLifecycleId?: string;
+  readonly sourceAnalysisBriefId?: string;
+  readonly sourceTaskExecutionPlanId?: string;
   readonly verificationCommandSafeLabel?: string;
   readonly verificationOutcome: CodingVerificationSummary["status"];
   readonly runtimeReceiptMarkers: readonly string[];
@@ -48,6 +54,9 @@ export function buildVerificationRepairContext(input: {
   readonly sourceProposalId?: string;
   readonly contextPacket?: TargetedContextPacket;
   readonly agentPlan?: AgentPlan;
+  readonly taskLifecycle?: TaskLifecycle;
+  readonly analysisBrief?: AnalysisBrief;
+  readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly verification?: CodingVerificationSummary;
   readonly failedFiles?: ReadonlyArray<{ readonly path: string; readonly reason?: string }>;
   readonly changedFiles?: readonly string[];
@@ -89,6 +98,10 @@ export function buildVerificationRepairContext(input: {
     sourceProposalId: input.sourceProposalId,
     sourceContextPacketId: input.contextPacket?.packetId,
     sourceAgentPlanId: input.agentPlan?.planId,
+    sourceTaskLifecycleId: input.taskLifecycle?.lifecycleId ?? input.agentPlan?.taskLifecycleId,
+    sourceAnalysisBriefId: input.analysisBrief?.briefId ?? input.agentPlan?.analysisBriefId,
+    sourceTaskExecutionPlanId:
+      input.taskExecutionPlan?.executionPlanId ?? input.agentPlan?.taskExecutionPlanId,
     verificationProvided: Boolean(input.verification),
   });
 }
@@ -99,6 +112,9 @@ export function buildVerificationRepairContextFromCodingResult(input: {
   readonly sourceProposalId?: string;
   readonly contextPacket?: TargetedContextPacket;
   readonly agentPlan?: AgentPlan;
+  readonly taskLifecycle?: TaskLifecycle;
+  readonly analysisBrief?: AnalysisBrief;
+  readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly maxFailureExcerptChars?: number;
 }): VerificationRepairContext {
   const editRepairContext = buildEditRepairContextFromCodingResult({
@@ -113,6 +129,10 @@ export function buildVerificationRepairContextFromCodingResult(input: {
     sourceProposalId: input.sourceProposalId,
     sourceContextPacketId: input.contextPacket?.packetId,
     sourceAgentPlanId: input.agentPlan?.planId,
+    sourceTaskLifecycleId: input.taskLifecycle?.lifecycleId ?? input.agentPlan?.taskLifecycleId,
+    sourceAnalysisBriefId: input.analysisBrief?.briefId ?? input.agentPlan?.analysisBriefId,
+    sourceTaskExecutionPlanId:
+      input.taskExecutionPlan?.executionPlanId ?? input.agentPlan?.taskExecutionPlanId,
     verificationProvided: input.codingResult.verification.status !== "not-requested",
   });
 }
@@ -123,6 +143,9 @@ export function buildVerificationRepairContextFromEditContext(input: {
   readonly sourceProposalId?: string;
   readonly sourceContextPacketId?: string;
   readonly sourceAgentPlanId?: string;
+  readonly sourceTaskLifecycleId?: string;
+  readonly sourceAnalysisBriefId?: string;
+  readonly sourceTaskExecutionPlanId?: string;
   readonly verificationProvided?: boolean;
 }): VerificationRepairContext {
   const omittedEvidenceReasons = new Set(input.editRepairContext.omittedContentReasons);
@@ -155,6 +178,9 @@ export function buildVerificationRepairContextFromEditContext(input: {
     `repairContext=${input.editRepairContext.repairContextId}`,
     input.sourceContextPacketId ? `contextPacket=${input.sourceContextPacketId}` : undefined,
     input.sourceAgentPlanId ? `agentPlan=${input.sourceAgentPlanId}` : undefined,
+    input.sourceTaskLifecycleId ? `taskLifecycle=${input.sourceTaskLifecycleId}` : undefined,
+    input.sourceAnalysisBriefId ? `analysisBrief=${input.sourceAnalysisBriefId}` : undefined,
+    input.sourceTaskExecutionPlanId ? `executionPlan=${input.sourceTaskExecutionPlanId}` : undefined,
     `verification=${input.editRepairContext.failedVerificationSummary.status}`,
     `runtimeReceipts=${input.editRepairContext.runtimeReceiptMarkers.length}`,
     "mutationAuthority=not-granted",
@@ -167,6 +193,9 @@ export function buildVerificationRepairContextFromEditContext(input: {
     input.sourceProposalId ? `sourceProposal=${input.sourceProposalId}` : undefined,
     input.sourceContextPacketId ? `contextPacket=${input.sourceContextPacketId}` : undefined,
     input.sourceAgentPlanId ? `agentPlan=${input.sourceAgentPlanId}` : undefined,
+    input.sourceTaskLifecycleId ? `taskLifecycle=${input.sourceTaskLifecycleId}` : undefined,
+    input.sourceAnalysisBriefId ? `analysisBrief=${input.sourceAnalysisBriefId}` : undefined,
+    input.sourceTaskExecutionPlanId ? `executionPlan=${input.sourceTaskExecutionPlanId}` : undefined,
     `status=${status}`,
     `verification=${input.editRepairContext.failedVerificationSummary.status}`,
     `runtimeReceipts=${input.editRepairContext.runtimeReceiptMarkers.length}`,
@@ -182,6 +211,9 @@ export function buildVerificationRepairContextFromEditContext(input: {
     ...(input.sourceProposalId ? { sourceProposalId: input.sourceProposalId } : {}),
     ...(input.sourceContextPacketId ? { sourceContextPacketId: input.sourceContextPacketId } : {}),
     ...(input.sourceAgentPlanId ? { sourceAgentPlanId: input.sourceAgentPlanId } : {}),
+    ...(input.sourceTaskLifecycleId ? { sourceTaskLifecycleId: input.sourceTaskLifecycleId } : {}),
+    ...(input.sourceAnalysisBriefId ? { sourceAnalysisBriefId: input.sourceAnalysisBriefId } : {}),
+    ...(input.sourceTaskExecutionPlanId ? { sourceTaskExecutionPlanId: input.sourceTaskExecutionPlanId } : {}),
     ...(verificationCommandSafeLabel ? { verificationCommandSafeLabel } : {}),
     verificationOutcome: input.editRepairContext.failedVerificationSummary.status,
     runtimeReceiptMarkers: input.editRepairContext.runtimeReceiptMarkers,
@@ -204,6 +236,15 @@ export function buildVerificationRepairContextFromEditContext(input: {
         : []),
       ...(input.sourceAgentPlanId
         ? [`verification-repair-context:agent-plan:${input.sourceAgentPlanId}`]
+        : []),
+      ...(input.sourceTaskLifecycleId
+        ? [`verification-repair-context:task-lifecycle:${input.sourceTaskLifecycleId}`]
+        : []),
+      ...(input.sourceAnalysisBriefId
+        ? [`verification-repair-context:analysis-brief:${input.sourceAnalysisBriefId}`]
+        : []),
+      ...(input.sourceTaskExecutionPlanId
+        ? [`verification-repair-context:execution-plan:${input.sourceTaskExecutionPlanId}`]
         : []),
       `verification-repair-context:verification:${input.editRepairContext.failedVerificationSummary.status}`,
       `verification-repair-context:runtime-receipts:${input.editRepairContext.runtimeReceiptMarkers.length}`,

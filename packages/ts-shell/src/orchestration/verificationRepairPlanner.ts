@@ -31,6 +31,9 @@ export interface VerificationRepairPromptContext {
   readonly repairContextId: string;
   readonly contextPacketId: string;
   readonly agentPlanId: string;
+  readonly taskLifecycleId?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
   readonly verificationFailureSummary: string;
   readonly verificationCommandSafeLabel?: string;
   readonly verificationOutcome: VerificationRepairContext["verificationOutcome"];
@@ -265,6 +268,9 @@ function buildVerificationRepairPromptContext(input: {
 }): VerificationRepairPromptContext {
   const contextPacketId = input.context.sourceContextPacketId ?? "(missing-context-packet)";
   const agentPlanId = input.context.sourceAgentPlanId ?? "(missing-agent-plan)";
+  const taskLifecycleId = input.context.sourceTaskLifecycleId;
+  const analysisBriefId = input.context.sourceAnalysisBriefId;
+  const taskExecutionPlanId = input.context.sourceTaskExecutionPlanId;
   const constraints = [
     ...(input.constraints ?? []),
     "repair proposal must be review-required",
@@ -283,6 +289,9 @@ function buildVerificationRepairPromptContext(input: {
     `Repair context: ${input.context.editRepairContext.repairContextId}`,
     `Context packet: ${contextPacketId}`,
     `Agent Plan: ${agentPlanId}`,
+    `Task lifecycle: ${taskLifecycleId ?? "none"}`,
+    `Analysis brief: ${analysisBriefId ?? "none"}`,
+    `Task execution plan: ${taskExecutionPlanId ?? "none"}`,
     `Verification outcome: ${input.context.verificationOutcome}`,
     `Verification failure: ${input.context.safeFailureExcerpt}`,
     `Runtime receipt markers: ${input.context.runtimeReceiptMarkers.join("; ") || "none"}`,
@@ -297,6 +306,9 @@ function buildVerificationRepairPromptContext(input: {
     repairContextId: input.context.editRepairContext.repairContextId,
     contextPacketId,
     agentPlanId,
+    ...(taskLifecycleId ? { taskLifecycleId } : {}),
+    ...(analysisBriefId ? { analysisBriefId } : {}),
+    ...(taskExecutionPlanId ? { taskExecutionPlanId } : {}),
     verificationFailureSummary: input.context.safeFailureExcerpt,
     ...(input.context.verificationCommandSafeLabel
       ? { verificationCommandSafeLabel: input.context.verificationCommandSafeLabel }
@@ -323,6 +335,9 @@ function buildVerificationRepairPromptContext(input: {
       `verification-repair-prompt:context:${input.context.editRepairContext.repairContextId}`,
       `verification-repair-prompt:context-packet:${contextPacketId}`,
       `verification-repair-prompt:agent-plan:${agentPlanId}`,
+      ...(taskLifecycleId ? [`verification-repair-prompt:task-lifecycle:${taskLifecycleId}`] : []),
+      ...(analysisBriefId ? [`verification-repair-prompt:analysis-brief:${analysisBriefId}`] : []),
+      ...(taskExecutionPlanId ? [`verification-repair-prompt:execution-plan:${taskExecutionPlanId}`] : []),
       `verification-repair-prompt:runtime-receipts:${input.context.runtimeReceiptMarkers.length}`,
       "verification-repair-prompt:redacted-and-budgeted",
       "verification-repair-prompt:raw-full-content-excluded",

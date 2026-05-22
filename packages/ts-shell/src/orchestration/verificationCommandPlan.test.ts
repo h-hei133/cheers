@@ -14,6 +14,9 @@ describe("verificationCommandPlan", () => {
       taskKind: "edit-file",
       requestedActionKind: "verify",
       targetSummary: "src/app.ts",
+      taskLifecycleId: "task_lifecycle_verify",
+      analysisBriefId: "analysis_brief_verify",
+      taskExecutionPlanId: "task_execution_plan_verify",
       contextPacketIds: ["ctx_186"],
       contextCompleteness: "complete",
       confidence: "high",
@@ -32,6 +35,9 @@ describe("verificationCommandPlan", () => {
     expect(plan.state).toBe("ready");
     expect(plan.commandSafeLabel).toBe("npm test -- --help");
     expect(plan.sourceAgentPlanId).toBe(agentPlan.planId);
+    expect(plan.sourceTaskLifecycleId).toBe("task_lifecycle_verify");
+    expect(plan.sourceAnalysisBriefId).toBe("analysis_brief_verify");
+    expect(plan.sourceTaskExecutionPlanId).toBe("task_execution_plan_verify");
     expect(plan.sourceContextPacketId).toBe("ctx_186");
     expect(plan.allowlistStatus).toBe("allowlisted");
     expect(plan.permissionRequirement).toBe("checked-by-existing-runtime");
@@ -42,6 +48,7 @@ describe("verificationCommandPlan", () => {
         "verification-command-plan:allowlist:allowlisted",
         "verification-command-plan:mutation:not-run",
         "verification-command-plan:provider-call:not-run",
+        "verification-command-plan:task-lifecycle:task_lifecycle_verify",
       ]),
     );
   });

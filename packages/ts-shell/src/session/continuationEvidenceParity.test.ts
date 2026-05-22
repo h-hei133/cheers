@@ -11,6 +11,10 @@ describe("continuation evidence parity", () => {
         "context-graph ctx_graph_abc; root=src/a.ts; nodes=5; included=4; omitted=1; mutationAuthority=not-granted; raw-content-excluded",
         "code-graph-trace code_graph_trace_abc; root=src/a.ts; contextGraph=ctx_graph_abc; facts=8; files=4; symbols=1; tests=1; docs=1; callSites=1; freshness=fresh; readiness=impact-ready; mutationAuthority=not-granted; raw-content-excluded",
         "code-graph-impact code_graph_impact_abc; trace=code_graph_trace_abc; target=src/a.ts; tests=1; callSites=1; docs=1; verification=1; stale=0; readiness=impact-ready; mutationAuthority=not-granted; raw-content-excluded",
+        "task-lifecycle task_lifecycle_abc; task=task_abc; current=plan; next=proposal; status=ready; stages=read,analyze,plan; missingFacts=0; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
+        "analysis-brief analysis_brief_abc; task=task_abc; readPlan=task_read_plan_abc; agentPlan=plan_abc; confidence=high; observations=2; missingFacts=0; verification=npm test -- --help; mutationAuthority=not-granted; hidden-cot-excluded",
+        "task-execution-plan task_execution_plan_abc; task=task_abc; lifecycle=task_lifecycle_abc; brief=analysis_brief_abc; readPlan=task_read_plan_abc; agentPlan=plan_abc; quality=plan_quality_abc; proposal=ready; edit=review-only; verification=ready; repair=review-only; stops=0; mutationAuthority=not-granted",
+        "task-lifecycle-trace task_lifecycle_trace_abc; task=task_abc; lifecycle=task_lifecycle_abc; stages=read,analyze,plan; planQuality=plan_quality_abc; codeGraphTrace=code_graph_trace_abc; failureClass=none; mutationAuthority=not-granted; raw-content-excluded",
         "test-impact test_impact_abc; graph=ctx_graph_abc; tests=1; commands=2; readiness=ready; mutationAuthority=not-granted",
         "agent-plan plan_abc; owner=workspace-file-context; readiness=needs-more-context; confidence=medium; missingFacts=1; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
         "plan-quality plan_quality_abc; agentPlan=plan_abc; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; level=needs-more-context; score=62; mutationAuthority=not-granted; raw-content-excluded",
@@ -38,6 +42,19 @@ describe("continuation evidence parity", () => {
     expect(details).toContain(
       "code-graph-impact=code-graph-impact code_graph_impact_abc; trace=code_graph_trace_abc; target=src/a.ts; tests=1; callSites=1; docs=1; verification=1; stale=0; readiness=impact-ready; mutationAuthority=not-granted; raw-content-excluded",
     );
+    expect(details).toContain(
+      "task-lifecycle=task-lifecycle task_lifecycle_abc; task=task_abc; current=plan; next=proposal; status=ready; stages=read,analyze,plan; missingFacts=0; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
+    );
+    expect(details).toContain(
+      "analysis-brief=analysis-brief analysis_brief_abc; task=task_abc; readPlan=task_read_plan_abc; agentPlan=plan_abc; confidence=high; observations=2; missingFacts=0; verification=npm test -- --help; mutationAuthority=not-granted; hidden-cot-excluded",
+    );
+    expect(details.some((detail) =>
+      detail.startsWith(
+        "task-execution-plan=task-execution-plan task_execution_plan_abc;",
+      ) &&
+      detail.includes("analysis_brief_abc") &&
+      detail.includes("mutationAuthority"),
+    )).toBe(true);
     expect(details).toContain(
       "test-impact=test-impact test_impact_abc; graph=ctx_graph_abc; tests=1; commands=2; readiness=ready; mutationAuthority=not-granted",
     );

@@ -70,6 +70,13 @@ function classifyDecision(input: {
   if (input.planQuality.level === "budget-limited") {
     return "stop-budget-limited";
   }
+  if (
+    input.action === "provider-proposal" &&
+    input.planQuality.taskLifecycleId &&
+    !input.planQuality.analysisBriefId
+  ) {
+    return "stop-low-confidence";
+  }
   if (input.action === "verification-command-plan") {
     if (!input.planQuality.testImpactPlanId) {
       return "stop-missing-verification";

@@ -4,8 +4,10 @@ import { classifyHarnessFailure, type HarnessFailureTaxonomyEntry } from "./harn
 
 export type HarnessTraceLifecycleStage =
   | "read"
+  | "analyze"
   | "plan"
   | "proposal"
+  | "edit"
   | "verification"
   | "repair"
   | "result";
@@ -14,6 +16,9 @@ export interface HarnessTrace {
   readonly traceId: string;
   readonly routeId?: string;
   readonly taskId?: string;
+  readonly taskLifecycleId?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
   readonly contextPacketId?: string;
   readonly contextGraphId?: string;
   readonly agentPlanId?: string;
@@ -35,6 +40,9 @@ export interface HarnessTrace {
 export function buildHarnessTrace(input: {
   readonly routeId?: string;
   readonly taskId?: string;
+  readonly taskLifecycleId?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
   readonly contextPacketId?: string;
   readonly contextGraphId?: string;
   readonly agentPlanId?: string;
@@ -61,6 +69,9 @@ export function buildHarnessTrace(input: {
     `harness-trace ${traceId}`,
     input.routeId ? `route=${input.routeId}` : undefined,
     input.taskId ? `task=${input.taskId}` : undefined,
+    input.taskLifecycleId ? `taskLifecycle=${input.taskLifecycleId}` : undefined,
+    input.analysisBriefId ? `analysisBrief=${input.analysisBriefId}` : undefined,
+    input.taskExecutionPlanId ? `executionPlan=${input.taskExecutionPlanId}` : undefined,
     input.contextPacketId ? `contextPacket=${input.contextPacketId}` : undefined,
     input.contextGraphId ? `contextGraph=${input.contextGraphId}` : undefined,
     input.agentPlanId ? `agentPlan=${input.agentPlanId}` : undefined,
@@ -76,6 +87,9 @@ export function buildHarnessTrace(input: {
     traceId,
     ...(input.routeId ? { routeId: input.routeId } : {}),
     ...(input.taskId ? { taskId: input.taskId } : {}),
+    ...(input.taskLifecycleId ? { taskLifecycleId: input.taskLifecycleId } : {}),
+    ...(input.analysisBriefId ? { analysisBriefId: input.analysisBriefId } : {}),
+    ...(input.taskExecutionPlanId ? { taskExecutionPlanId: input.taskExecutionPlanId } : {}),
     ...(input.contextPacketId ? { contextPacketId: input.contextPacketId } : {}),
     ...(input.contextGraphId ? { contextGraphId: input.contextGraphId } : {}),
     ...(input.agentPlanId ? { agentPlanId: input.agentPlanId } : {}),
@@ -94,6 +108,9 @@ export function buildHarnessTrace(input: {
     evidence: [
       `harness-trace:id:${traceId}`,
       ...(input.contextPacketId ? [`harness-trace:context-packet:${input.contextPacketId}`] : []),
+      ...(input.taskLifecycleId ? [`harness-trace:task-lifecycle:${input.taskLifecycleId}`] : []),
+      ...(input.analysisBriefId ? [`harness-trace:analysis-brief:${input.analysisBriefId}`] : []),
+      ...(input.taskExecutionPlanId ? [`harness-trace:execution-plan:${input.taskExecutionPlanId}`] : []),
       ...(input.contextGraphId ? [`harness-trace:context-graph:${input.contextGraphId}`] : []),
       ...(input.agentPlanId ? [`harness-trace:agent-plan:${input.agentPlanId}`] : []),
       ...(input.planQualityId ? [`harness-trace:plan-quality:${input.planQualityId}`] : []),
@@ -110,6 +127,9 @@ export function buildHarnessTrace(input: {
 
 function deriveStages(input: {
   readonly contextPacketId?: string;
+  readonly taskLifecycleId?: string;
+  readonly analysisBriefId?: string;
+  readonly taskExecutionPlanId?: string;
   readonly contextGraphId?: string;
   readonly agentPlanId?: string;
   readonly planQualityId?: string;
@@ -120,8 +140,10 @@ function deriveStages(input: {
 }): readonly HarnessTraceLifecycleStage[] {
   const stages: HarnessTraceLifecycleStage[] = [];
   if (input.contextPacketId || input.contextGraphId) stages.push("read");
+  if (input.analysisBriefId) stages.push("analyze");
   if (input.agentPlanId || input.planQualityId) stages.push("plan");
   if (input.providerProposalId) stages.push("proposal");
+  if (input.taskExecutionPlanId) stages.push("edit");
   if (input.verificationCommandPlanId) stages.push("verification");
   if (input.repairContextId) stages.push("repair");
   if (input.resultStatus) stages.push("result");
