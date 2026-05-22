@@ -1,0 +1,575 @@
+{
+  "route": "docs/agent-routes/route201-project-map-freeze.md",
+  "projectPhase": {
+    "label": "bounded pre-refactor coding-agent control plane",
+    "summary": "The current system has deterministic read/context/planning surfaces, guarded edit/apply routes, provider no-write proposal and anchored smoke surfaces, and result/session truthfulness gates. It is not broad/general release ready and does not have live provider task-loop apply/verification evidence.",
+    "broadReleaseReady": false,
+    "externalMcpReady": false,
+    "browserLiveReady": false,
+    "defaultRealProviderExecutionReady": false
+  },
+  "capabilities": [
+    {
+      "name": "Read / Context",
+      "responsibility": "Read explicit targets, inspect candidate files, and emit replay-safe context.",
+      "mainFiles": [
+        "packages/ts-shell/src/orchestration/readInspectModule.ts",
+        "packages/ts-shell/src/orchestration/readInspectIntent.ts",
+        "packages/ts-shell/src/orchestration/targetResolution.ts",
+        "packages/ts-shell/src/orchestration/workspaceFileContract.ts",
+        "packages/ts-shell/src/orchestration/workspaceTargetProjection.ts"
+      ],
+      "evidenceLevel": "focused-unit-tests",
+      "works": [
+        "explicit file read",
+        "missing/ambiguous/out-of-workspace target stop",
+        "read continuation target recovery"
+      ],
+      "doesNotWork": [
+        "broad semantic repository discovery",
+        "LSP-backed symbol understanding"
+      ]
+    },
+    {
+      "name": "Context Graph / Code Graph",
+      "responsibility": "Produce deterministic context packets, graph candidates, test impact, code graph traces, and staleness evidence.",
+      "mainFiles": [
+        "packages/ts-shell/src/orchestration/contextPacket.ts",
+        "packages/ts-shell/src/orchestration/contextDiscovery.ts",
+        "packages/ts-shell/src/orchestration/contextBudget.ts",
+        "packages/ts-shell/src/orchestration/contextGraph.ts",
+        "packages/ts-shell/src/orchestration/codeGraphTrace.ts",
+        "packages/ts-shell/src/orchestration/codeGraphImpact.ts"
+      ],
+      "evidenceLevel": "focused-unit-tests",
+      "works": [
+        "budgeted explicit-target context",
+        "import/sibling/test/docs/call-site heuristic candidates",
+        "redacted replay-safe summaries"
+      ],
+      "doesNotWork": [
+        "full semantic dependency graph",
+        "persistent index",
+        "embeddings"
+      ]
+    },
+    {
+      "name": "Analyze",
+      "responsibility": "Project evidence-grounded analysis confidence, risk, missing facts, and quality gates.",
+      "mainFiles": [
+        "packages/ts-shell/src/orchestration/analysisBrief.ts",
+        "packages/ts-shell/src/orchestration/analysisBriefCalibration.ts",
+        "packages/ts-shell/src/orchestration/analysisQualityGate.ts",
+        "packages/ts-shell/src/orchestration/taskContextResult.ts"
+      ],
+      "evidenceLevel": "focused-unit-tests",
+      "works": [
+        "deterministic analysis calibration",
+        "under-evidenced analysis blocking"
+      ],
+      "doesNotWork": [
+        "broad model-assisted diagnosis by default"
+      ]
+    },
+    {
+      "name": "Plan / Plan Quality",
+      "responsibility": "Build Agent Plan and Plan Quality readiness without granting mutation authority.",
+      "mainFiles": [
+        "packages/ts-shell/src/orchestration/agentPlan.ts",
+        "packages/ts-shell/src/orchestration/agentPlanResult.ts",
+        "packages/ts-shell/src/orchestration/planQuality.ts",
+        "packages/ts-shell/src/orchestration/planQualityGate.ts",
+        "packages/ts-shell/src/orchestration/planQualityResult.ts"
+      ],
+      "evidenceLevel": "focused-unit-tests",
+      "works": [
+        "plan ids",
+        "readiness",
+        "missing facts",
+        "quality score"
+      ],
+      "doesNotWork": [
+        "single owner for all planning decisions",
+        "plan as write authority"
+      ]
+    },
+    {
+      "name": "Task Lifecycle",
+      "responsibility": "Represent task intent, stages, lifecycle readiness, activation, and task-loop state.",
+      "mainFiles": [
+        "packages/ts-shell/src/orchestration/taskLifecycle.ts",
+        "packages/ts-shell/src/orchestration/taskLifecycleActivation.ts",
+        "packages/ts-shell/src/orchestration/taskLifecycleHandoff.ts",
+        "packages/ts-shell/src/orchestration/realTaskLoopRuntime.ts",
+        "packages/ts-shell/src/orchestration/realTaskLoopResult.ts"
+      ],
+      "evidenceLevel": "focused-unit-tests",
+      "works": [
+        "lifecycle ids",
+        "stage readiness",
+        "no-write handoff"
+      ],
+      "doesNotWork": [
+        "Route 200 live provider-called task loop"
+      ]
+    },
+    {
+      "name": "Provider / Model",
+      "responsibility": "Classify readiness, gate opt-in provider proposal dry-runs, validate provider output, and preserve redaction.",
+      "mainFiles": [
+        "packages/ts-shell/src/core/shell/providerReadiness.ts",
+        "packages/ts-shell/src/orchestration/realProviderProposalGate.ts",
+        "packages/ts-shell/src/orchestration/realProviderProposalDryRun.ts",
+        "packages/ts-shell/src/orchestration/providerOutputValidator.ts",
+        "packages/ts-shell/src/orchestration/providerAnchorQuality.ts"
+      ],
+      "evidenceLevel": "live-provider-called",
+      "works": [
+        "Route 199 provider-called no-write",
+        "readiness taxonomy",
+        "provider output validation"
+      ],
+      "doesNotWork": [
+        "default real-provider execution",
+        "Route 200 live task-loop provider call"
+      ]
+    },
+    {
+      "name": "Edit / Apply",
+      "responsibility": "Perform guarded selected-workspace exact mutations and truthfully surface failures.",
+      "mainFiles": [
+        "packages/ts-shell/src/orchestration/fencedEditRoute.ts",
+        "packages/ts-shell/src/orchestration/targetSetEditRoute.ts",
+        "packages/ts-shell/src/orchestration/proposalHunkSetRoute.ts",
+        "packages/ts-shell/src/orchestration/exactHunkApply.ts",
+        "packages/ts-shell/src/orchestration/patchResult/workspaceWriteRoute.ts"
+      ],
+      "evidenceLevel": "focused-unit-tests",
+      "works": [
+        "exact fenced replacement",
+        "single-file update",
+        "candidate single-file create",
+        "candidate exactly-two-file update",
+        "partial failure stopped surface"
+      ],
+      "doesNotWork": [
+        "broad/fuzzy apply_patch",
+        "automatic rollback",
+        "arbitrary project mutation"
+      ]
+    },
+    {
+      "name": "Verification / Runtime",
+      "responsibility": "Plan low-risk verification and run allowlisted commands through the tool runtime.",
+      "mainFiles": [
+        "packages/ts-shell/src/orchestration/verificationModule.ts",
+        "packages/ts-shell/src/orchestration/verificationCommandPlan.ts",
+        "packages/ts-shell/src/orchestration/verificationCommandRunner.ts",
+        "packages/ts-shell/src/orchestration/verificationCommandResult.ts"
+      ],
+      "evidenceLevel": "focused-unit-tests",
+      "works": [
+        "content/unchanged/consistency readback",
+        "allowlisted command receipt",
+        "blocked/failed/passed classification"
+      ],
+      "doesNotWork": [
+        "arbitrary shell verification by default"
+      ]
+    },
+    {
+      "name": "Repair",
+      "responsibility": "Generate no-write repair context/proposals and review-required handoff readiness.",
+      "mainFiles": [
+        "packages/ts-shell/src/orchestration/editRepairPlanner.ts",
+        "packages/ts-shell/src/orchestration/verificationRepairLoop.ts",
+        "packages/ts-shell/src/orchestration/verificationRepairPlanner.ts",
+        "packages/ts-shell/src/orchestration/verificationRepairResult.ts"
+      ],
+      "evidenceLevel": "focused-unit-tests",
+      "works": [
+        "repair context",
+        "fake-provider repair proposal",
+        "no automatic repair"
+      ],
+      "doesNotWork": [
+        "automatic repair mutation"
+      ]
+    },
+    {
+      "name": "Result Surface",
+      "responsibility": "Map coding results to truthful success/stopped/error terminal state.",
+      "mainFiles": [
+        "packages/ts-shell/src/core/query/resultMapper.ts",
+        "packages/ts-shell/src/orchestration/resultSurfaceModule.ts",
+        "packages/ts-shell/src/core/shell/sessionTerminalState.ts",
+        "packages/ts-shell/src/core/shell/sessionStateSurface.ts"
+      ],
+      "evidenceLevel": "focused-unit-tests",
+      "works": [
+        "stopped/error truthfulness",
+        "partial mutation blockers",
+        "verification blocker surface"
+      ],
+      "doesNotWork": [
+        "universal proof for every future capability branch"
+      ]
+    },
+    {
+      "name": "Session / Continue",
+      "responsibility": "Persist sessions and carry stopped/success evidence through resume, continue, and compact summaries.",
+      "mainFiles": [
+        "packages/ts-shell/src/session/SessionManager.ts",
+        "packages/ts-shell/src/session/stoppedSessionContinuity.ts",
+        "packages/ts-shell/src/session/compactContinuitySummary.ts",
+        "packages/ts-shell/src/core/shell/continueShellActionRuntime.ts"
+      ],
+      "evidenceLevel": "focused-unit-tests",
+      "works": [
+        "continuity snapshots",
+        "stopped guidance",
+        "failure handoff",
+        "changed/failed/planned file summaries"
+      ],
+      "doesNotWork": [
+        "broad live-provider long-session proof"
+      ]
+    },
+    {
+      "name": "Harness / Eval",
+      "responsibility": "Run gates, classify evidence, write reports, and preserve safety markers.",
+      "mainFiles": [
+        "scripts/verify-context-planning.mjs",
+        "scripts/verify-edit-capability-closeout.mjs",
+        "scripts/verify-release-deterministic.mjs",
+        "scripts/verify/index.mjs",
+        "scripts/verify/cases.mjs"
+      ],
+      "evidenceLevel": "default-safe-skip",
+      "works": [
+        "deterministic gates",
+        "candidate mutation suite",
+        "real-provider dry-run boundaries",
+        "report fields"
+      ],
+      "doesNotWork": [
+        "single gate proving broad product readiness"
+      ]
+    },
+    {
+      "name": "Browser",
+      "responsibility": "Browser planning, controlled runtime/transaction, safe observation, and cleanup projection.",
+      "mainFiles": [
+        "packages/ts-shell/src/orchestration/browserModule.ts",
+        "packages/ts-shell/src/core/context/browserTxn.ts",
+        "packages/ts-shell/src/core/context/browserRuntimeSurface.ts"
+      ],
+      "evidenceLevel": "scaffold-only",
+      "works": [
+        "local/controlled browser surfaces exist"
+      ],
+      "doesNotWork": [
+        "Route 201 live browser proof",
+        "external/public browser readiness"
+      ]
+    },
+    {
+      "name": "CLI / UX",
+      "responsibility": "Parse CLI args, select mode, bootstrap session/runtime, route slash commands, bridge approvals.",
+      "mainFiles": [
+        "packages/ts-shell/src/entrypoints/cli.tsx",
+        "packages/ts-shell/src/entrypoints/cliRuntimeModule.ts",
+        "packages/ts-shell/src/entrypoints/cliSessionModule.ts",
+        "packages/ts-shell/src/entrypoints/slashCommandRegistry.ts"
+      ],
+      "evidenceLevel": "focused-unit-tests",
+      "works": [
+        "print/stdin/interactive/replay wiring",
+        "slash command registry",
+        "session/workspace/MCP/permission surfaces"
+      ],
+      "doesNotWork": [
+        "small entrypoint shell only"
+      ]
+    },
+    {
+      "name": "Permission / Policy",
+      "responsibility": "Preserve approval, workspace authority, command allowlist, provider/browser/MCP policy decisions.",
+      "mainFiles": [
+        "packages/ts-shell/src/core/shell/approvalTrustPolicy.ts",
+        "packages/ts-shell/src/entrypoints/cliApprovalModule.ts",
+        "packages/ts-shell/src/orchestration/approvalAuthorityProjection.ts",
+        "packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.ts"
+      ],
+      "evidenceLevel": "focused-unit-tests",
+      "works": [
+        "approval provenance",
+        "workspace authority",
+        "default opt-in boundaries"
+      ],
+      "doesNotWork": [
+        "single shared policy outcome vocabulary"
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "name": "Agent Loop",
+      "mainFiles": [
+        "packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+        "packages/ts-shell/src/orchestration/MultiAgentOrchestrator.ts"
+      ],
+      "couplingLevel": "high",
+      "role": "central glue",
+      "ownedLifecycleStages": [
+        "planning",
+        "execution",
+        "evidence",
+        "result mapping handoff"
+      ],
+      "defects": [
+        "overgrown composition root",
+        "mixed capability dispatch and execution"
+      ]
+    },
+    {
+      "name": "CLI / UX",
+      "mainFiles": [
+        "packages/ts-shell/src/entrypoints/cli.tsx"
+      ],
+      "couplingLevel": "high",
+      "role": "central entrypoint",
+      "ownedLifecycleStages": [
+        "availability",
+        "policy",
+        "transcript entrypoint",
+        "report"
+      ],
+      "defects": [
+        "large entrypoint wiring"
+      ]
+    },
+    {
+      "name": "Session / Continue",
+      "mainFiles": [
+        "packages/ts-shell/src/session/SessionManager.ts"
+      ],
+      "couplingLevel": "high",
+      "role": "central persistence",
+      "ownedLifecycleStages": [
+        "transcript",
+        "continue/replay",
+        "cleanup"
+      ],
+      "defects": [
+        "large persistence and continuity root"
+      ]
+    },
+    {
+      "name": "Harness / Eval",
+      "mainFiles": [
+        "scripts/verify/index.mjs",
+        "scripts/verify/cases.mjs"
+      ],
+      "couplingLevel": "high",
+      "role": "central evidence layer",
+      "ownedLifecycleStages": [
+        "eval",
+        "report",
+        "cleanup",
+        "redaction"
+      ],
+      "defects": [
+        "evidence categories can be overread"
+      ]
+    }
+  ],
+  "entrypoints": [
+    {
+      "name": "CLI prompt",
+      "entrypoint": "packages/ts-shell/src/entrypoints/cli.tsx",
+      "status": "focused-test-only",
+      "proves": [
+        "shared shell runtime path wiring"
+      ],
+      "doesNotProve": [
+        "all modes identical for every capability"
+      ]
+    },
+    {
+      "name": "runMvpIntegratedFlow",
+      "entrypoint": "packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "status": "partially closed",
+      "proves": [
+        "central integrated turn path"
+      ],
+      "doesNotProve": [
+        "clean module boundary"
+      ]
+    },
+    {
+      "name": "Route 199 anchored provider smoke",
+      "entrypoint": "scripts/verify-real-provider-anchored-smoke.mjs",
+      "status": "live-provider-called",
+      "proves": [
+        "openai-compatible provider-called exact-ready no-write smoke"
+      ],
+      "doesNotProve": [
+        "workspace apply",
+        "post-apply verification"
+      ]
+    },
+    {
+      "name": "Route 200 real task loop",
+      "entrypoint": "scripts/verify-real-provider-task-loop-mvp.mjs",
+      "status": "live-provider-no-write stopped",
+      "proves": [
+        "task-loop stopped reporting"
+      ],
+      "doesNotProve": [
+        "provider call",
+        "apply",
+        "verification"
+      ]
+    }
+  ],
+  "verifiers": [
+    {
+      "name": "verify:context-planning",
+      "command": "rtk npm run verify:context-planning",
+      "evidenceType": "focused-unit-tests",
+      "callsProvider": false,
+      "canMutateWorkspace": false,
+      "falseCompleteRisk": "Can be misread as execution readiness."
+    },
+    {
+      "name": "verify:edit-capability-closeout",
+      "command": "rtk npm run verify:edit-capability-closeout",
+      "evidenceType": "focused-unit-tests",
+      "callsProvider": false,
+      "canMutateWorkspace": "isolated fixtures only",
+      "falseCompleteRisk": "Can be misread as broad edit readiness."
+    },
+    {
+      "name": "verify:result-contract",
+      "command": "rtk npm run verify:result-contract",
+      "evidenceType": "focused-unit-tests",
+      "callsProvider": false,
+      "canMutateWorkspace": "isolated fixtures only",
+      "falseCompleteRisk": "Does not cover every capability branch."
+    },
+    {
+      "name": "verify:release:deterministic",
+      "command": "rtk npm run verify:release:deterministic",
+      "evidenceType": "default-safe-skip",
+      "callsProvider": false,
+      "canMutateWorkspace": "isolated fixtures only",
+      "falseCompleteRisk": "Deterministic release-candidate ready is not broad release ready."
+    },
+    {
+      "name": "verify-real-provider-anchored-smoke",
+      "command": "rtk npm run verify:provider-readiness:real or node scripts/verify-real-provider-anchored-smoke.mjs when explicitly opted in",
+      "evidenceType": "live-provider-called for Route 199 user-observed evidence; default-safe-skip by default",
+      "callsProvider": "only explicit opt-in",
+      "canMutateWorkspace": false,
+      "falseCompleteRisk": "No-write exact-ready can be misread as applied."
+    },
+    {
+      "name": "verify-real-provider-task-loop-mvp",
+      "command": "node scripts/verify-real-provider-task-loop-mvp.mjs when explicitly opted in",
+      "evidenceType": "live-provider-no-write stopped for Route 200 observed evidence",
+      "callsProvider": false,
+      "canMutateWorkspace": false,
+      "falseCompleteRisk": "Script name can be misread as live task-loop success."
+    }
+  ],
+  "evidenceLedger": [
+    {
+      "area": "Route 199",
+      "evidenceType": "live-provider-called",
+      "providerCalled": true,
+      "applyHappened": false,
+      "verificationHappened": false,
+      "workspaceMutated": false,
+      "mutationScope": "none",
+      "result": "valid-exact-single-target exact-ready no-write",
+      "confidence": "high"
+    },
+    {
+      "area": "Route 200",
+      "evidenceType": "live-provider-no-write",
+      "providerCalled": false,
+      "applyHappened": false,
+      "verificationHappened": false,
+      "workspaceMutated": false,
+      "mutationScope": "none",
+      "result": "task-loop-stopped",
+      "confidence": "high"
+    },
+    {
+      "area": "candidate mutation synthetic suite",
+      "evidenceType": "focused-unit-tests",
+      "providerCalled": false,
+      "applyHappened": "case-dependent synthetic isolated fixture",
+      "verificationHappened": "case-dependent",
+      "workspaceMutated": "isolated fixture only",
+      "mutationScope": "selected-workspace bounded cases",
+      "result": "candidate evidence only",
+      "confidence": "medium-high"
+    }
+  ],
+  "riskFlags": [
+    {
+      "id": "risk-false-route200-success",
+      "severity": "blocking-for-claim-accuracy",
+      "description": "Route 200 must not be labeled live task-loop success because provider-called=false, apply=not-run, verification=not-run."
+    },
+    {
+      "id": "risk-runmvp-coupling",
+      "severity": "high",
+      "description": "runMvpIntegratedFlow.ts remains the primary overgrown composition root."
+    },
+    {
+      "id": "risk-session-coupling",
+      "severity": "high",
+      "description": "SessionManager.ts remains a large persistence and continuity root."
+    },
+    {
+      "id": "risk-evidence-confusion",
+      "severity": "high",
+      "description": "Fake, default-safe, focused, deterministic, and live evidence can be confused without labels."
+    },
+    {
+      "id": "risk-broad-edit-overclaim",
+      "severity": "high",
+      "description": "Bounded exact selected-workspace write support does not imply broad/fuzzy/arbitrary project mutation."
+    },
+    {
+      "id": "risk-external-mcp-overclaim",
+      "severity": "medium",
+      "description": "Local deterministic MCP evidence does not imply external/user-configured MCP readiness."
+    }
+  ],
+  "liveEvidenceSummary": {
+    "providerAnchoredSmoke": {
+      "providerCalled": true,
+      "providerKind": "openai-compatible",
+      "adapterApproved": true,
+      "outputValidation": "valid-exact-single-target",
+      "anchorQuality": "exact-ready",
+      "noWrite": true,
+      "mutationAuthority": "not-granted",
+      "rawProviderOutput": "excluded"
+    },
+    "realProviderTaskLoop": {
+      "liveTaskLoopOptIn": true,
+      "realProviderSmokeOptIn": true,
+      "providerCalled": false,
+      "anchorQuality": "none",
+      "apply": "not-run",
+      "verification": "not-run",
+      "mutationScope": "none",
+      "status": "task-loop-stopped"
+    }
+  }
+}
