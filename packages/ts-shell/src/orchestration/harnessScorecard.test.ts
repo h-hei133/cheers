@@ -22,4 +22,31 @@ describe("harnessScorecard", () => {
     expect(scorecard.failureClass).toBe("provider-unavailable");
     expect(scorecard.evidence).toContain("harness-scorecard:raw-content-excluded");
   });
+
+  it("records provider dry-run prompt output anchor redaction and no-write scores", () => {
+    const scorecard = buildHarnessScorecard({
+      providerDryRun: {
+        promptAuditStatus: "pass",
+        outputValidationStatus: "partial-anchor",
+        anchorQualityLevel: "needs-anchoring",
+        redactionStatus: "redacted-and-budgeted",
+        noWrite: true,
+      },
+    });
+
+    expect(scorecard.providerDryRunPromptReadiness).toBe("pass");
+    expect(scorecard.providerDryRunOutputValidity).toBe("warn");
+    expect(scorecard.providerDryRunAnchorQuality).toBe("warn");
+    expect(scorecard.providerDryRunRedaction).toBe("pass");
+    expect(scorecard.providerDryRunNoWrite).toBe("pass");
+    expect(scorecard.evidence).toEqual(
+      expect.arrayContaining([
+        "harness-scorecard:provider-dry-run-prompt:pass",
+        "harness-scorecard:provider-dry-run-output:warn",
+        "harness-scorecard:provider-dry-run-anchor:warn",
+        "harness-scorecard:provider-dry-run-redaction:pass",
+        "harness-scorecard:provider-dry-run-no-write:pass",
+      ]),
+    );
+  });
 });

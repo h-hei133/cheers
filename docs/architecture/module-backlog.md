@@ -611,6 +611,24 @@ as an import-policing rule.
   persistence, CLI/schema/dependency changes, and broad `runMvpIntegratedFlow.ts`
   refactors remain closed.
 
+### Route 193: Real-Provider Proposal Dry-Run
+
+- Route 193 adds an explicit no-write real-provider proposal dry-run gate over
+  lifecycle, analysis, Plan Quality, context/code graph, redaction, and provider
+  availability preconditions.
+- New provider dry-run facades own prompt audit, provider output validation,
+  anchor quality classification, dry-run execution, and no-write result
+  projection.
+- Provider proposal manifests can carry dry-run, prompt audit, output
+  validation, anchor quality, lifecycle, analysis brief, Plan Quality, and
+  execution-plan ids while preserving `mutationAuthority: not-granted`.
+- Session / Continue and Harness scorecard evidence now preserve provider
+  called/not-called status, prompt readiness, output validity, anchor quality,
+  redaction, failure class, and no-write status.
+- Stop condition: no provider call by default, no private provider config read,
+  no provider call during apply, no automatic apply, no command/CLI/schema/deps
+  changes, and no broad `runMvpIntegratedFlow.ts` refactor.
+
 ## Module-First Route Rule
 
 Future routes must state:

@@ -31,6 +31,12 @@ export interface HarnessTrace {
   readonly budgetLimitedContext?: boolean;
   readonly downstreamReadiness?: string;
   readonly providerProposalId?: string;
+  readonly providerDryRunId?: string;
+  readonly providerDryRunGateDecision?: string;
+  readonly providerPromptAuditStatus?: string;
+  readonly providerOutputValidationStatus?: string;
+  readonly providerAnchorQualityLevel?: string;
+  readonly providerDryRunCalled?: boolean;
   readonly verificationCommandPlanId?: string;
   readonly runtimeReceiptMarkers: readonly string[];
   readonly repairContextId?: string;
@@ -62,6 +68,12 @@ export function buildHarnessTrace(input: {
   readonly budgetLimitedContext?: boolean;
   readonly downstreamReadiness?: string;
   readonly providerProposalId?: string;
+  readonly providerDryRunId?: string;
+  readonly providerDryRunGateDecision?: string;
+  readonly providerPromptAuditStatus?: string;
+  readonly providerOutputValidationStatus?: string;
+  readonly providerAnchorQualityLevel?: string;
+  readonly providerDryRunCalled?: boolean;
   readonly verificationCommandPlanId?: string;
   readonly runtimeReceiptMarkers?: readonly string[];
   readonly repairContextId?: string;
@@ -97,6 +109,12 @@ export function buildHarnessTrace(input: {
     input.staleContext ? "staleContext=true" : undefined,
     input.budgetLimitedContext ? "budgetLimitedContext=true" : undefined,
     input.downstreamReadiness ? `downstream=${input.downstreamReadiness}` : undefined,
+    input.providerDryRunId ? `providerDryRun=${input.providerDryRunId}` : undefined,
+    input.providerDryRunGateDecision ? `dryRunGate=${input.providerDryRunGateDecision}` : undefined,
+    input.providerPromptAuditStatus ? `promptAudit=${input.providerPromptAuditStatus}` : undefined,
+    input.providerOutputValidationStatus ? `outputValidation=${input.providerOutputValidationStatus}` : undefined,
+    input.providerAnchorQualityLevel ? `anchorQuality=${input.providerAnchorQualityLevel}` : undefined,
+    typeof input.providerDryRunCalled === "boolean" ? `providerCalled=${input.providerDryRunCalled}` : undefined,
     input.verificationCommandPlanId ? `verificationPlan=${input.verificationCommandPlanId}` : undefined,
     `stages=${lifecycleStages.join(",")}`,
     `failureClass=${failureTaxonomy.failureClass}`,
@@ -123,6 +141,12 @@ export function buildHarnessTrace(input: {
     ...(typeof input.budgetLimitedContext === "boolean" ? { budgetLimitedContext: input.budgetLimitedContext } : {}),
     ...(input.downstreamReadiness ? { downstreamReadiness: input.downstreamReadiness } : {}),
     ...(input.providerProposalId ? { providerProposalId: input.providerProposalId } : {}),
+    ...(input.providerDryRunId ? { providerDryRunId: input.providerDryRunId } : {}),
+    ...(input.providerDryRunGateDecision ? { providerDryRunGateDecision: input.providerDryRunGateDecision } : {}),
+    ...(input.providerPromptAuditStatus ? { providerPromptAuditStatus: input.providerPromptAuditStatus } : {}),
+    ...(input.providerOutputValidationStatus ? { providerOutputValidationStatus: input.providerOutputValidationStatus } : {}),
+    ...(input.providerAnchorQualityLevel ? { providerAnchorQualityLevel: input.providerAnchorQualityLevel } : {}),
+    ...(typeof input.providerDryRunCalled === "boolean" ? { providerDryRunCalled: input.providerDryRunCalled } : {}),
     ...(input.verificationCommandPlanId ? { verificationCommandPlanId: input.verificationCommandPlanId } : {}),
     runtimeReceiptMarkers,
     ...(input.repairContextId ? { repairContextId: input.repairContextId } : {}),
@@ -149,6 +173,12 @@ export function buildHarnessTrace(input: {
       ...(input.staleContext ? ["harness-trace:stale-context"] : []),
       ...(input.budgetLimitedContext ? ["harness-trace:budget-limited-context"] : []),
       ...(input.downstreamReadiness ? [`harness-trace:downstream-readiness:${input.downstreamReadiness}`] : []),
+      ...(input.providerDryRunId ? [`harness-trace:provider-dry-run:${input.providerDryRunId}`] : []),
+      ...(input.providerDryRunGateDecision ? [`harness-trace:provider-dry-run-gate:${input.providerDryRunGateDecision}`] : []),
+      ...(input.providerPromptAuditStatus ? [`harness-trace:provider-prompt-audit:${input.providerPromptAuditStatus}`] : []),
+      ...(input.providerOutputValidationStatus ? [`harness-trace:provider-output-validation:${input.providerOutputValidationStatus}`] : []),
+      ...(input.providerAnchorQualityLevel ? [`harness-trace:provider-anchor-quality:${input.providerAnchorQualityLevel}`] : []),
+      ...(typeof input.providerDryRunCalled === "boolean" ? [`harness-trace:provider-called:${input.providerDryRunCalled}`] : []),
       ...(input.verificationCommandPlanId ? [`harness-trace:verification-plan:${input.verificationCommandPlanId}`] : []),
       `harness-trace:runtime-receipts:${runtimeReceiptMarkers.length}`,
       `harness-trace:failure-class:${failureTaxonomy.failureClass}`,
@@ -169,6 +199,7 @@ function deriveStages(input: {
   readonly agentPlanId?: string;
   readonly planQualityId?: string;
   readonly providerProposalId?: string;
+  readonly providerDryRunId?: string;
   readonly verificationCommandPlanId?: string;
   readonly repairContextId?: string;
   readonly resultStatus?: string;
@@ -177,7 +208,7 @@ function deriveStages(input: {
   if (input.contextPacketId || input.contextGraphId) stages.push("read");
   if (input.analysisBriefId) stages.push("analyze");
   if (input.agentPlanId || input.planQualityId) stages.push("plan");
-  if (input.providerProposalId) stages.push("proposal");
+  if (input.providerProposalId || input.providerDryRunId) stages.push("proposal");
   if (input.taskExecutionPlanId) stages.push("edit");
   if (input.verificationCommandPlanId) stages.push("verification");
   if (input.repairContextId) stages.push("repair");

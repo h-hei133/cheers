@@ -35,6 +35,12 @@ const testTargets = [
   'src/orchestration/contextAwareProviderPrompt.test.ts',
   'src/orchestration/contextAwareProviderProposal.test.ts',
   'src/orchestration/contextAwareProviderResult.test.ts',
+  'src/orchestration/realProviderProposalGate.test.ts',
+  'src/orchestration/providerPromptAudit.test.ts',
+  'src/orchestration/providerOutputValidator.test.ts',
+  'src/orchestration/providerAnchorQuality.test.ts',
+  'src/orchestration/realProviderProposalDryRun.test.ts',
+  'src/orchestration/providerDryRunResult.test.ts',
   'src/orchestration/editRepairContext.test.ts',
   'src/orchestration/editRepairProposal.test.ts',
   'src/orchestration/editRepairPlanner.test.ts',
@@ -107,6 +113,11 @@ console.log('report field generated_edit_no_raw_content=covered')
 console.log('report field provider_edit_context_packet=covered')
 console.log('report field provider_edit_fake_proposal=covered')
 console.log('report field context_aware_provider_proposal=covered')
+console.log('report field real_provider_proposal_dry_run_gate=covered')
+console.log('report field provider_prompt_audit=covered')
+console.log('report field provider_output_validator=covered')
+console.log('report field provider_anchor_quality=covered')
+console.log('report field provider_dry_run_no_write_result=covered')
 console.log('report field provider_edit_confirmation=covered')
 console.log('report field provider_edit_exact_handoff_ready=covered')
 console.log('report field provider_edit_no_raw_content=covered')

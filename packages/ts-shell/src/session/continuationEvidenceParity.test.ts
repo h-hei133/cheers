@@ -22,6 +22,7 @@ describe("continuation evidence parity", () => {
         "harness-scorecard harness_scorecard_abc; trace=harness_trace_abc; planQuality=plan_quality_abc; context=warn; plan=warn; provider=fail; verification=skip; repair=skip; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
         "generated-edit proposal=generated-edit-abc; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
         "context-aware-provider proposal=provider-edit-abc; status=review-required-proposal; contextPacket=ctx_abc; agentPlan=plan_abc; mutationAuthority=not-granted; raw-content-excluded",
+        "real-provider-proposal-dry-run id=real_provider_proposal_dry_run_abc; status=dry-run-exact-ready-no-write; provider=fake-real-provider; providerCalled=true; gate=allow-dry-run; promptAudit=pass; outputValidation=valid-exact-single-target; anchorQuality=exact-ready; proposal=provider-edit-abc; mutationAuthority=not-granted; raw-content-excluded",
         "edit-repair-proposal id=edit-repair-proposal-def; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
         "verification-command id=verification-command-plan-abc:result:failed; plan=verification-command-plan-abc; command=npm test -- --help; outcome=failed; failureClass=test-failed; runtimeReceipts=1; repairEligible=yes; mutation:not-run; raw-content-excluded",
         "verification-repair-loop id=verification-repair-loop-abc; state=repair-review-required; repairContext=edit-repair-context-def; repairProposal=edit-repair-proposal-def; contextPacket=ctx_abc; agentPlan=plan_abc; verification=failed; runtimeReceipts=1; provider=proposal-only; next=review; raw-content-excluded",
@@ -76,6 +77,13 @@ describe("continuation evidence parity", () => {
     expect(details).toContain(
       "context-aware-provider=context-aware-provider proposal=provider-edit-abc; status=review-required-proposal; contextPacket=ctx_abc; agentPlan=plan_abc; mutationAuthority=not-granted; raw-content-excluded",
     );
+    expect(details.some((detail) =>
+      detail.startsWith(
+        "real-provider-dry-run=real-provider-proposal-dry-run id=real_provider_proposal_dry_run_abc;",
+      ) &&
+      detail.includes("promptAudit=pass") &&
+      detail.includes("anchorQuality=exact-ready"),
+    )).toBe(true);
     expect(details.some((detail) =>
       detail.startsWith(
         "verification-repair-loop=verification-repair-loop id=verification-repair-loop-abc;",

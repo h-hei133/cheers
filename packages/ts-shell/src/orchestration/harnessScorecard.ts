@@ -10,6 +10,11 @@ export interface HarnessScorecard {
   readonly contextQuality: HarnessScorecardStatus;
   readonly planReadiness: HarnessScorecardStatus;
   readonly providerProposalReadiness: HarnessScorecardStatus;
+  readonly providerDryRunPromptReadiness?: HarnessScorecardStatus;
+  readonly providerDryRunOutputValidity?: HarnessScorecardStatus;
+  readonly providerDryRunAnchorQuality?: HarnessScorecardStatus;
+  readonly providerDryRunRedaction?: HarnessScorecardStatus;
+  readonly providerDryRunNoWrite?: HarnessScorecardStatus;
   readonly verificationReadiness: HarnessScorecardStatus;
   readonly repairReadiness: HarnessScorecardStatus;
   readonly resultTruthfulness: HarnessScorecardStatus;
@@ -31,6 +36,13 @@ export function buildHarnessScorecard(input: {
   readonly planQuality?: PlanQuality;
   readonly trace?: HarnessTrace;
   readonly providerProposalReady?: boolean;
+  readonly providerDryRun?: {
+    readonly promptAuditStatus?: string;
+    readonly outputValidationStatus?: string;
+    readonly anchorQualityLevel?: string;
+    readonly redactionStatus?: string;
+    readonly noWrite?: boolean;
+  };
   readonly verificationReady?: boolean;
   readonly repairReady?: boolean;
   readonly resultTruthful?: boolean;
@@ -50,6 +62,24 @@ export function buildHarnessScorecard(input: {
     : input.repairReady ? "pass" : "fail";
   const resultTruthfulness = input.resultTruthful === false ? "fail" : input.resultTruthful ? "pass" : "warn";
   const continuationReadiness = input.continuationReady === false ? "fail" : input.continuationReady ? "pass" : "warn";
+  const providerDryRunPromptReadiness = input.providerDryRun
+    ? input.providerDryRun.promptAuditStatus === "pass" ? "pass" : "fail"
+    : undefined;
+  const providerDryRunOutputValidity = input.providerDryRun
+    ? scoreProviderOutput(input.providerDryRun.outputValidationStatus)
+    : undefined;
+  const providerDryRunAnchorQuality = input.providerDryRun
+    ? scoreAnchorQuality(input.providerDryRun.anchorQualityLevel)
+    : undefined;
+  const providerDryRunRedaction = input.providerDryRun
+    ? input.providerDryRun.redactionStatus === "redacted-and-budgeted" ||
+        input.providerDryRun.redactionStatus === "raw-content-excluded"
+      ? "pass"
+      : "fail"
+    : undefined;
+  const providerDryRunNoWrite = input.providerDryRun
+    ? input.providerDryRun.noWrite === false ? "fail" : "pass"
+    : undefined;
   const scorecardId = `harness_scorecard_${[
     input.trace?.traceId ?? "no-trace",
     input.planQuality?.qualityId ?? "no-quality",
@@ -75,6 +105,11 @@ export function buildHarnessScorecard(input: {
     `context=${contextQuality}`,
     `plan=${planReadiness}`,
     `provider=${providerProposalReadiness}`,
+    providerDryRunPromptReadiness ? `dryRunPrompt=${providerDryRunPromptReadiness}` : undefined,
+    providerDryRunOutputValidity ? `dryRunOutput=${providerDryRunOutputValidity}` : undefined,
+    providerDryRunAnchorQuality ? `dryRunAnchor=${providerDryRunAnchorQuality}` : undefined,
+    providerDryRunRedaction ? `dryRunRedaction=${providerDryRunRedaction}` : undefined,
+    providerDryRunNoWrite ? `dryRunNoWrite=${providerDryRunNoWrite}` : undefined,
     `verification=${verificationReadiness}`,
     `repair=${repairReadiness}`,
     `failureClass=${failureClass}`,
@@ -89,6 +124,11 @@ export function buildHarnessScorecard(input: {
     contextQuality,
     planReadiness,
     providerProposalReadiness,
+    ...(providerDryRunPromptReadiness ? { providerDryRunPromptReadiness } : {}),
+    ...(providerDryRunOutputValidity ? { providerDryRunOutputValidity } : {}),
+    ...(providerDryRunAnchorQuality ? { providerDryRunAnchorQuality } : {}),
+    ...(providerDryRunRedaction ? { providerDryRunRedaction } : {}),
+    ...(providerDryRunNoWrite ? { providerDryRunNoWrite } : {}),
     verificationReadiness,
     repairReadiness,
     resultTruthfulness,
@@ -110,6 +150,11 @@ export function buildHarnessScorecard(input: {
       `harness-scorecard:context:${contextQuality}`,
       `harness-scorecard:plan:${planReadiness}`,
       `harness-scorecard:provider:${providerProposalReadiness}`,
+      ...(providerDryRunPromptReadiness ? [`harness-scorecard:provider-dry-run-prompt:${providerDryRunPromptReadiness}`] : []),
+      ...(providerDryRunOutputValidity ? [`harness-scorecard:provider-dry-run-output:${providerDryRunOutputValidity}`] : []),
+      ...(providerDryRunAnchorQuality ? [`harness-scorecard:provider-dry-run-anchor:${providerDryRunAnchorQuality}`] : []),
+      ...(providerDryRunRedaction ? [`harness-scorecard:provider-dry-run-redaction:${providerDryRunRedaction}`] : []),
+      ...(providerDryRunNoWrite ? [`harness-scorecard:provider-dry-run-no-write:${providerDryRunNoWrite}`] : []),
       `harness-scorecard:verification:${verificationReadiness}`,
       `harness-scorecard:repair:${repairReadiness}`,
       `harness-scorecard:failure-class:${failureClass}`,
@@ -123,6 +168,20 @@ export function buildHarnessScorecard(input: {
       "harness-scorecard:raw-content-excluded",
     ],
   };
+}
+
+function scoreProviderOutput(status: string | undefined): HarnessScorecardStatus {
+  if (!status) return "skip";
+  if (status === "valid-exact-single-target" || status === "valid-exact-hunk-set") return "pass";
+  if (status === "partial-anchor" || status === "unanchored-generated") return "warn";
+  return "fail";
+}
+
+function scoreAnchorQuality(level: string | undefined): HarnessScorecardStatus {
+  if (!level) return "skip";
+  if (level === "exact-ready") return "pass";
+  if (level === "review-only" || level === "needs-anchoring") return "warn";
+  return "fail";
 }
 
 function scoreContext(quality: PlanQuality | undefined): HarnessScorecardStatus {

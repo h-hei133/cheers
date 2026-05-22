@@ -44,6 +44,12 @@ const focusedTests = [
   'src/orchestration/contextAwareProviderPrompt.test.ts',
   'src/orchestration/contextAwareProviderProposal.test.ts',
   'src/orchestration/contextAwareProviderResult.test.ts',
+  'src/orchestration/realProviderProposalGate.test.ts',
+  'src/orchestration/providerPromptAudit.test.ts',
+  'src/orchestration/providerOutputValidator.test.ts',
+  'src/orchestration/providerAnchorQuality.test.ts',
+  'src/orchestration/realProviderProposalDryRun.test.ts',
+  'src/orchestration/providerDryRunResult.test.ts',
   'src/orchestration/verificationCommandPlan.test.ts',
   'src/orchestration/verificationCommandRunner.test.ts',
   'src/orchestration/verificationCommandResult.test.ts',
@@ -126,6 +132,12 @@ console.log('marker agent-plan-feeds-provider-proposal')
 console.log('marker context-aware-provider-missing-context-stops-before-call')
 console.log('marker context-aware-provider-prompt-redacted-budgeted')
 console.log('marker context-aware-provider-session-continue-evidence')
+console.log('marker real-provider-proposal-dry-run-gate')
+console.log('marker provider-prompt-audit-redacted-budgeted')
+console.log('marker provider-output-validator-anchor-classes')
+console.log('marker provider-anchor-quality-no-write')
+console.log('marker provider-dry-run-result-session-continue')
+console.log('marker provider-dry-run-harness-scorecard')
 console.log('marker verification-repair-context-packet-agent-plan-ids')
 console.log('marker verification-command-plan-agent-plan-candidate')
 console.log('marker verification-command-runtime-receipt-captured')

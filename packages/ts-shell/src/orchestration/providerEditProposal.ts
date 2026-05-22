@@ -39,7 +39,12 @@ export interface ProviderEditProposalManifest {
   readonly agentPlanId?: string;
   readonly taskLifecycleId?: string;
   readonly analysisBriefId?: string;
+  readonly planQualityId?: string;
   readonly taskExecutionPlanId?: string;
+  readonly dryRunId?: string;
+  readonly promptAuditId?: string;
+  readonly outputValidationId?: string;
+  readonly anchorQualityId?: string;
   readonly targetScope: "explicit-target" | "confirmed-target-set" | "unknown";
   readonly proposedOperationKind: ProviderEditOperationKind;
   readonly targets: readonly ProviderEditProposalTarget[];
@@ -92,7 +97,12 @@ export function normalizeProviderEditProposal(input: {
   readonly agentPlanId?: string;
   readonly taskLifecycleId?: string;
   readonly analysisBriefId?: string;
+  readonly planQualityId?: string;
   readonly taskExecutionPlanId?: string;
+  readonly dryRunId?: string;
+  readonly promptAuditId?: string;
+  readonly outputValidationId?: string;
+  readonly anchorQualityId?: string;
   readonly contextConfidence?: "low" | "medium" | "high";
   readonly contextReadiness?: "ready" | "needs-more-context";
 }): ProviderEditProposalNormalization {
@@ -153,7 +163,12 @@ export function normalizeProviderEditProposal(input: {
     agentPlanId: input.agentPlanId,
     taskLifecycleId: input.taskLifecycleId,
     analysisBriefId: input.analysisBriefId,
+    planQualityId: input.planQualityId,
     taskExecutionPlanId: input.taskExecutionPlanId,
+    dryRunId: input.dryRunId,
+    promptAuditId: input.promptAuditId,
+    outputValidationId: input.outputValidationId,
+    anchorQualityId: input.anchorQualityId,
     targetLabels: targets.map((target) => target.pathLabel),
     proposedOperationKind: operationKind,
     targetSummaries: targets.map((target) => target.proposedSummary),
@@ -177,7 +192,12 @@ export function buildProviderEditProposalManifest(input: {
   readonly agentPlanId?: string;
   readonly taskLifecycleId?: string;
   readonly analysisBriefId?: string;
+  readonly planQualityId?: string;
   readonly taskExecutionPlanId?: string;
+  readonly dryRunId?: string;
+  readonly promptAuditId?: string;
+  readonly outputValidationId?: string;
+  readonly anchorQualityId?: string;
   readonly targetLabels: readonly string[];
   readonly proposedOperationKind: ProviderEditOperationKind;
   readonly targetSummaries: readonly string[];
@@ -229,7 +249,12 @@ export function buildProviderEditProposalManifest(input: {
     ...(input.agentPlanId ? [`agentPlan=${input.agentPlanId}`] : []),
     ...(input.taskLifecycleId ? [`taskLifecycle=${input.taskLifecycleId}`] : []),
     ...(input.analysisBriefId ? [`analysisBrief=${input.analysisBriefId}`] : []),
+    ...(input.planQualityId ? [`planQuality=${input.planQualityId}`] : []),
     ...(input.taskExecutionPlanId ? [`executionPlan=${input.taskExecutionPlanId}`] : []),
+    ...(input.dryRunId ? [`dryRun=${input.dryRunId}`] : []),
+    ...(input.promptAuditId ? [`promptAudit=${input.promptAuditId}`] : []),
+    ...(input.outputValidationId ? [`outputValidation=${input.outputValidationId}`] : []),
+    ...(input.anchorQualityId ? [`anchorQuality=${input.anchorQualityId}`] : []),
     `operation=${input.proposedOperationKind}`,
     `readiness=${handoffReadiness}`,
     `confirmation=${confirmationStatus}`,
@@ -243,7 +268,12 @@ export function buildProviderEditProposalManifest(input: {
     ...(input.agentPlanId ? [`agentPlan=${input.agentPlanId}`] : []),
     ...(input.taskLifecycleId ? [`taskLifecycle=${input.taskLifecycleId}`] : []),
     ...(input.analysisBriefId ? [`analysisBrief=${input.analysisBriefId}`] : []),
+    ...(input.planQualityId ? [`planQuality=${input.planQualityId}`] : []),
     ...(input.taskExecutionPlanId ? [`executionPlan=${input.taskExecutionPlanId}`] : []),
+    ...(input.dryRunId ? [`dryRun=${input.dryRunId}`] : []),
+    ...(input.promptAuditId ? [`promptAudit=${input.promptAuditId}`] : []),
+    ...(input.outputValidationId ? [`outputValidation=${input.outputValidationId}`] : []),
+    ...(input.anchorQualityId ? [`anchorQuality=${input.anchorQualityId}`] : []),
     `targets=${input.targetLabels.join(", ") || "(none)"}`,
     `readiness=${handoffReadiness}`,
     `confirmation=${confirmationStatus}`,
@@ -258,7 +288,12 @@ export function buildProviderEditProposalManifest(input: {
     ...(input.agentPlanId ? { agentPlanId: input.agentPlanId } : {}),
     ...(input.taskLifecycleId ? { taskLifecycleId: input.taskLifecycleId } : {}),
     ...(input.analysisBriefId ? { analysisBriefId: input.analysisBriefId } : {}),
+    ...(input.planQualityId ? { planQualityId: input.planQualityId } : {}),
     ...(input.taskExecutionPlanId ? { taskExecutionPlanId: input.taskExecutionPlanId } : {}),
+    ...(input.dryRunId ? { dryRunId: input.dryRunId } : {}),
+    ...(input.promptAuditId ? { promptAuditId: input.promptAuditId } : {}),
+    ...(input.outputValidationId ? { outputValidationId: input.outputValidationId } : {}),
+    ...(input.anchorQualityId ? { anchorQualityId: input.anchorQualityId } : {}),
     targetScope,
     proposedOperationKind: input.proposedOperationKind,
     targets,
@@ -292,8 +327,21 @@ export function buildProviderEditProposalManifest(input: {
       ...(input.analysisBriefId
         ? [`provider-edit-proposal:analysis-brief:${input.analysisBriefId}`]
         : []),
+      ...(input.planQualityId
+        ? [`provider-edit-proposal:plan-quality:${input.planQualityId}`]
+        : []),
       ...(input.taskExecutionPlanId
         ? [`provider-edit-proposal:execution-plan:${input.taskExecutionPlanId}`]
+        : []),
+      ...(input.dryRunId ? [`provider-edit-proposal:dry-run:${input.dryRunId}`] : []),
+      ...(input.promptAuditId
+        ? [`provider-edit-proposal:prompt-audit:${input.promptAuditId}`]
+        : []),
+      ...(input.outputValidationId
+        ? [`provider-edit-proposal:output-validation:${input.outputValidationId}`]
+        : []),
+      ...(input.anchorQualityId
+        ? [`provider-edit-proposal:anchor-quality:${input.anchorQualityId}`]
         : []),
       `provider-edit-proposal:operation:${input.proposedOperationKind}`,
       `provider-edit-proposal:readiness:${handoffReadiness}`,

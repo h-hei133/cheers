@@ -223,6 +223,34 @@ None open after Route 165.
 - Should become a route: no, resolved by Route 184 for proposal context
   evidence only.
 
+### Real-provider proposal dry-run readiness
+
+- Affected modules: Provider / Model, Edit / Patch, Agent Loop, Workspace /
+  File Context, Result Surface, Session / Continue, Harness / Eval.
+- Why it was a calibration gap: context-aware provider proposals were covered
+  mostly through fake/stub providers. The project lacked an explicit no-write
+  dry-run gate that proved lifecycle, analysis, Plan Quality, context/code graph,
+  redaction, prompt audit, provider output validation, and anchor quality before
+  any opt-in real-provider proposal call.
+- Resolution: Route 193 adds `realProviderProposalGate.ts`,
+  `providerPromptAudit.ts`, `providerOutputValidator.ts`,
+  `providerAnchorQuality.ts`, `realProviderProposalDryRun.ts`, and
+  `providerDryRunResult.ts`. Proposal manifests can record dry-run, prompt
+  audit, output validation, anchor quality, and Plan Quality ids; Session /
+  Continue and Harness evidence preserve provider-called, prompt readiness,
+  output validity, anchor quality, redaction, and no-write status.
+- Evidence: real-provider proposal gate, prompt audit, output validator, anchor
+  quality, dry-run, and result tests; provider/context-aware proposal
+  regressions; Session / Continue parity tests; Harness trace/scorecard/failure
+  taxonomy tests; focused context-planning and edit closeout verifiers,
+  result-contract, and build.
+- Recommended next action: keep real-provider calls opt-in and isolated; do not
+  add default provider calls, provider calls during apply, automatic proposal
+  apply, command execution changes, CLI/schema/dependency changes, private
+  config reads, or broad `runMvpIntegratedFlow.ts` rewrites.
+- Should become a route: no, resolved by Route 193 for no-write proposal
+  dry-run readiness only.
+
 ### Session result parity after context and planning
 
 - Affected modules: Result Surface, Session / Continue, Workspace / File

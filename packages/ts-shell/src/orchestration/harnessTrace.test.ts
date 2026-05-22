@@ -28,4 +28,28 @@ describe("harnessTrace", () => {
       ]),
     );
   });
+
+  it("records provider dry-run prompt output anchor and no-write evidence", () => {
+    const trace = buildHarnessTrace({
+      routeId: "route193",
+      providerDryRunId: "real_provider_proposal_dry_run_abc",
+      providerDryRunGateDecision: "allow-dry-run",
+      providerPromptAuditStatus: "pass",
+      providerOutputValidationStatus: "valid-exact-single-target",
+      providerAnchorQualityLevel: "exact-ready",
+      providerDryRunCalled: true,
+      status: "dry-run-exact-ready-no-write",
+    });
+
+    expect(trace.lifecycleStages).toContain("proposal");
+    expect(trace.evidence).toEqual(
+      expect.arrayContaining([
+        "harness-trace:provider-dry-run:real_provider_proposal_dry_run_abc",
+        "harness-trace:provider-prompt-audit:pass",
+        "harness-trace:provider-output-validation:valid-exact-single-target",
+        "harness-trace:provider-anchor-quality:exact-ready",
+        "harness-trace:provider-called:true",
+      ]),
+    );
+  });
 });

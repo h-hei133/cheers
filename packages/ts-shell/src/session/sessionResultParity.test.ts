@@ -119,6 +119,34 @@ describe("session result parity", () => {
     );
   });
 
+  it("projects real-provider dry-run markers as provider-model evidence", () => {
+    const projection = projectSessionResultParity({
+      terminalClassification: "stopped",
+      stopReason: "Review and explicitly confirm exact hunks before apply.",
+      codingResult: makeCodingResult({
+        reason: "Provider dry-run produced an exact-ready no-write proposal.",
+        nextAction: "Review and explicitly confirm exact hunks before apply.",
+        evidence: [
+          "real-provider-proposal-dry-run id=real_provider_proposal_dry_run_abc; status=dry-run-exact-ready-no-write; provider=fake-real-provider; providerCalled=true; gate=allow-dry-run; promptAudit=pass; outputValidation=valid-exact-single-target; anchorQuality=exact-ready; proposal=provider-edit-abc; mutationAuthority=not-granted; raw-content-excluded",
+          "provider-prompt-audit:status:pass",
+          "provider-output-validation:status:valid-exact-single-target",
+          "provider-anchor-quality:level:exact-ready",
+        ],
+      }),
+    });
+
+    expect(projection.capabilityArea).toBe("provider-model");
+    expect(projection.mutationAuthority).toBe("not-granted");
+    expect(projection.redactionStatus).toBe("raw-content-excluded");
+    expect(projection.evidenceMarkers).toEqual(
+      expect.arrayContaining([
+        "real-provider-proposal-dry-run id=real_provider_proposal_dry_run_abc; status=dry-run-exact-ready-no-write; provider=fake-real-provider; providerCalled=true; gate=allow-dry-run; promptAudit=pass; outputValidation=valid-exact-single-target; anchorQuality=exact-ready; proposal=provider-edit-abc; mutationAuthority=not-granted; raw-content-excluded",
+        "provider-output-validation:status:valid-exact-single-target",
+        "provider-anchor-quality:level:exact-ready",
+      ]),
+    );
+  });
+
   it("projects verification repair loop markers for session consumers", () => {
     const projection = projectSessionResultParity({
       terminalClassification: "stopped",

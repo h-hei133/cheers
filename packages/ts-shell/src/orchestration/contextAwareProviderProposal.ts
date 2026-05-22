@@ -201,6 +201,7 @@ export async function planContextAwareProviderProposal(input: {
     agentPlanId: input.agentPlan.planId,
     taskLifecycleId: editInput.taskLifecycleId,
     analysisBriefId: editInput.analysisBriefId,
+    planQualityId: input.planQuality?.qualityId,
     taskExecutionPlanId: editInput.taskExecutionPlanId,
     contextConfidence: input.agentPlan.confidence,
     contextReadiness: input.agentPlan.executionReadiness === "ready" ? "ready" : "needs-more-context",

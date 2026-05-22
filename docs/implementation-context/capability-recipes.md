@@ -48,6 +48,10 @@ not import restrictions.
   targeted context packet ids plus Agent Plan readiness, confidence, missing
   facts, suggested reads, and verification candidates when context-aware
   provider proposal generation is opened,
+  explicit real-provider proposal dry-run opt-in, lifecycle id, analysis brief
+  and quality ids, Plan Quality id, context packet / graph / code graph trace
+  ids, prompt audit pass, and provider availability facts when real-provider
+  proposal dry-run generation is opened,
   allowlisted verification command candidates from Agent Plan / proposal /
   edit result facts, existing runtime receipt markers, and command failure
   classifications when command-driven verification opens repair planning,
@@ -74,6 +78,9 @@ not import restrictions.
   context-aware provider proposal no-write evidence with context packet and
   Agent Plan ids, missing-context stopped evidence, provider invalid-output
   stopped evidence, and review/handoff readiness,
+  real-provider proposal dry-run no-write evidence with gate decision, prompt
+  audit, output validation, anchor quality, proposal manifest ids, provider
+  called/not-called status, and review/handoff readiness,
   verification command plan/runner/result evidence for allowlisted success,
   failed, blocked, skipped, timeout, budget/redaction, and no-dispatch
   not-allowlisted states,
@@ -125,13 +132,20 @@ not import restrictions.
   targeted context or Agent Plan readiness is missing, must use only redacted
   budgeted prompt context, and must record context packet / Agent Plan ids
   without granting mutation authority.
+  Real-provider proposal dry-runs must stop before provider invocation unless
+  explicitly opted in and lifecycle, analysis, Plan Quality, context/code graph,
+  redaction, prompt audit, and provider availability preconditions pass. Dry-run
+  output must be validated and anchor-classified before a no-write proposal
+  manifest is surfaced; provider output never grants mutation authority and
+  apply lanes must not call providers.
   Do not run automatic rollback.
 - Validate: focused edit/write route tests, stale-read/authority regression,
   fenced edit activation/runtime tests, discovery edit
   manifest/planner/confirmation/result tests, generated edit
   proposal/planner/confirmation/result tests, provider edit
   context/proposal/planner/confirmation/result tests, context-aware provider
-  edit/prompt/proposal/result tests, edit repair
+  edit/prompt/proposal/result tests, real-provider proposal gate/prompt
+  audit/output validator/anchor quality/dry-run result tests, edit repair
   context/proposal/planner/result tests, verification command
   plan/runner/result/classifier/bridge tests, verification repair
   context/planner/result/loop tests, proposal review/selection/apply/result

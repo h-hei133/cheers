@@ -9,6 +9,13 @@ export type HarnessFailureClass =
   | "low-plan-quality"
   | "context-budget-limited"
   | "provider-unavailable"
+  | "provider-dry-run-not-opted-in"
+  | "provider-prompt-audit-failed"
+  | "provider-output-malformed"
+  | "provider-output-unanchored"
+  | "provider-output-unsafe"
+  | "provider-output-over-budget"
+  | "provider-anchor-quality-low"
   | "provider-invalid-output"
   | "verification-not-allowlisted"
   | "verification-failed"
@@ -126,6 +133,62 @@ const TAXONOMY: Record<HarnessFailureClass, HarnessFailureTaxonomyEntry> = {
     suggestedNextAction: "Use a deterministic fake provider or explicit isolated provider gate.",
     verifierMarker: "harness-failure:provider-unavailable",
   },
+  "provider-dry-run-not-opted-in": {
+    failureClass: "provider-dry-run-not-opted-in",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Real-provider proposal dry-run was not explicitly opted in.",
+    suggestedNextAction: "Use deterministic fake-provider coverage or explicit isolated dry-run opt-in.",
+    verifierMarker: "harness-failure:provider-dry-run-not-opted-in",
+  },
+  "provider-prompt-audit-failed": {
+    failureClass: "provider-prompt-audit-failed",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Provider prompt audit found budget, redaction, or missing evidence risk.",
+    suggestedNextAction: "Redact and budget prompt context before provider dry-run.",
+    verifierMarker: "harness-failure:provider-prompt-audit-failed",
+  },
+  "provider-output-malformed": {
+    failureClass: "provider-output-malformed",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Provider output was malformed for proposal normalization.",
+    suggestedNextAction: "Request a target-bound proposal in the supported manifest shape.",
+    verifierMarker: "harness-failure:provider-output-malformed",
+  },
+  "provider-output-unanchored": {
+    failureClass: "provider-output-unanchored",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Provider output was not anchored to explicit targets.",
+    suggestedNextAction: "Request exact old/new anchors tied to explicit target labels.",
+    verifierMarker: "harness-failure:provider-output-unanchored",
+  },
+  "provider-output-unsafe": {
+    failureClass: "provider-output-unsafe",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Provider output contained unsafe or destructive content.",
+    suggestedNextAction: "Discard the output and retry only with bounded safety constraints.",
+    verifierMarker: "harness-failure:provider-output-unsafe",
+  },
+  "provider-output-over-budget": {
+    failureClass: "provider-output-over-budget",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Provider output exceeded the dry-run output budget.",
+    suggestedNextAction: "Request a smaller bounded proposal.",
+    verifierMarker: "harness-failure:provider-output-over-budget",
+  },
+  "provider-anchor-quality-low": {
+    failureClass: "provider-anchor-quality-low",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Provider proposal anchor quality is too low for review handoff.",
+    suggestedNextAction: "Add explicit target anchors and verification expectation before review.",
+    verifierMarker: "harness-failure:provider-anchor-quality-low",
+  },
   "provider-invalid-output": {
     failureClass: "provider-invalid-output",
     capabilityArea: "provider-model",
@@ -224,10 +287,17 @@ export function classifyHarnessFailure(input: {
   if (/stale-analysis-context|stale-context|stop-stale-context/.test(text)) return TAXONOMY["stale-analysis-context"];
   if (/analysis-blocked-provider|provider.*blocked.*analysis|provider-blocked-by-analysis-quality/.test(text)) return TAXONOMY["analysis-blocked-provider"];
   if (/analysis-blocked-verification|verification.*blocked.*context|verification-blocked-by-context-sufficiency/.test(text)) return TAXONOMY["analysis-blocked-verification"];
+  if (/provider-output.*over-budget|over-budget-output/.test(text)) return TAXONOMY["provider-output-over-budget"];
   if (/budget-limited|over-budget|over-byte-budget|over-file-budget|over-node-budget/.test(text)) return TAXONOMY["context-budget-limited"];
   if (/low-plan-quality|plan-quality.*low-confidence|low-confidence/.test(text)) return TAXONOMY["low-plan-quality"];
   if (/missing-context|context-missing|context packet.*missing|agent plan.*missing/.test(text)) return TAXONOMY["missing-context"];
   if (/provider.*invalid|provider-invalid|invalid-proposal|invalid proposal|invalid output/.test(text)) return TAXONOMY["provider-invalid-output"];
+  if (/provider-dry-run-not-opted-in|dry-run-stopped-no-opt-in|stop-no-opt-in/.test(text)) return TAXONOMY["provider-dry-run-not-opted-in"];
+  if (/provider-prompt-audit-failed|dry-run-prompt-audit-failed|prompt-audit.*fail/.test(text)) return TAXONOMY["provider-prompt-audit-failed"];
+  if (/provider-output.*malformed|malformed-output/.test(text)) return TAXONOMY["provider-output-malformed"];
+  if (/provider-output.*unanchored|unanchored-generated/.test(text)) return TAXONOMY["provider-output-unanchored"];
+  if (/provider-output.*unsafe|unsafe-output|anchor-quality.*unsafe/.test(text)) return TAXONOMY["provider-output-unsafe"];
+  if (/provider-anchor-quality-low|dry-run-anchor-quality-low|anchor-quality.*low-confidence/.test(text)) return TAXONOMY["provider-anchor-quality-low"];
   if (/provider.*not[- ]configured|provider.*opt[- ]in|provider.*required|provider.*unavailable|provider-unavailable/.test(text)) return TAXONOMY["provider-unavailable"];
   if (/not-allowlisted|allowlist:not-allowlisted/.test(text)) return TAXONOMY["verification-not-allowlisted"];
   if (/runtime.*timeout|timed-out/.test(text)) return TAXONOMY["runtime-timeout"];
