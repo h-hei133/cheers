@@ -52,6 +52,11 @@ export interface AgentPlan {
   readonly targetSummary: string;
   readonly contextPacketIds: readonly string[];
   readonly contextGraphIds?: readonly string[];
+  readonly codeGraphTraceIds?: readonly string[];
+  readonly impactQueryId?: string;
+  readonly impactReadiness?: string;
+  readonly likelyAffectedFiles?: readonly string[];
+  readonly likelyAffectedTests?: readonly string[];
   readonly graphReadiness?: string;
   readonly contextCoverageScore?: number;
   readonly testImpactSummary?: string;
@@ -85,6 +90,17 @@ export function buildAgentPlan(
     ...(input.contextGraphIds?.length
       ? [`contextGraphs=${input.contextGraphIds.length}`]
       : []),
+    ...(input.codeGraphTraceIds?.length
+      ? [`codeGraphTraces=${input.codeGraphTraceIds.length}`]
+      : []),
+    ...(input.impactQueryId ? [`impactQuery=${input.impactQueryId}`] : []),
+    ...(input.impactReadiness ? [`impactReadiness=${input.impactReadiness}`] : []),
+    ...(input.likelyAffectedFiles?.length
+      ? [`affectedFiles=${input.likelyAffectedFiles.length}`]
+      : []),
+    ...(input.likelyAffectedTests?.length
+      ? [`affectedTests=${input.likelyAffectedTests.length}`]
+      : []),
     ...(input.graphReadiness ? [`graphReadiness=${input.graphReadiness}`] : []),
     ...(typeof input.contextCoverageScore === "number"
       ? [`coverage=${input.contextCoverageScore}`]
@@ -115,6 +131,11 @@ function buildAgentPlanId(input: Omit<AgentPlan, "planId" | "replaySafeSummary">
     targetSummary: input.targetSummary,
     contextPacketIds: input.contextPacketIds,
     contextGraphIds: input.contextGraphIds,
+    codeGraphTraceIds: input.codeGraphTraceIds,
+    impactQueryId: input.impactQueryId,
+    impactReadiness: input.impactReadiness,
+    likelyAffectedFiles: input.likelyAffectedFiles,
+    likelyAffectedTests: input.likelyAffectedTests,
     graphReadiness: input.graphReadiness,
     contextCoverageScore: input.contextCoverageScore,
     testImpactSummary: input.testImpactSummary,

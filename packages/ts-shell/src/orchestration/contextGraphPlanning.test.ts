@@ -50,9 +50,18 @@ describe("buildContextGraphPlanningBundle", () => {
 
     expect(bundle.packet.packetId).toMatch(/^ctx_/);
     expect(bundle.graph.graphId).toMatch(/^ctx_graph_/);
+    expect(bundle.codeGraphTrace.traceId).toMatch(/^code_graph_trace_/);
+    expect(bundle.codeGraphImpact.impactQueryId).toMatch(/^code_graph_impact_/);
     expect(bundle.testImpact.likelyTestFiles).toContain("src/target.test.ts");
     expect(bundle.agentPlan.contextGraphIds).toEqual([bundle.graph.graphId]);
+    expect(bundle.agentPlan.codeGraphTraceIds).toEqual([bundle.codeGraphTrace.traceId]);
+    expect(bundle.agentPlan.impactQueryId).toBe(bundle.codeGraphImpact.impactQueryId);
+    expect(bundle.agentPlan.likelyAffectedTests).toContain("src/target.test.ts");
     expect(bundle.agentPlan.suggestedVerification).toContain("npm test -- --help");
+    expect(bundle.planQuality.impactQueryId).toBe(bundle.codeGraphImpact.impactQueryId);
+    expect(bundle.codeGraphResult.evidence).toContain(
+      "code-graph-result:mutation-authority:not-granted",
+    );
     expect(bundle.graphResult.evidence).toContain(
       "context-graph-result:mutation-authority:not-granted",
     );

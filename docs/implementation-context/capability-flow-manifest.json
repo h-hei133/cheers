@@ -43,7 +43,8 @@
         "packages/ts-shell/src/orchestration/planQuality.ts",
         "packages/ts-shell/src/orchestration/planQualityScore.ts",
         "packages/ts-shell/src/orchestration/planQualityGate.ts",
-        "packages/ts-shell/src/orchestration/planQualityResult.ts"
+        "packages/ts-shell/src/orchestration/planQualityResult.ts",
+        "packages/ts-shell/src/orchestration/codeGraphImpact.ts"
       ],
       "owns": [
         "turn ordering",
@@ -51,6 +52,7 @@
         "module facade composition",
         "deterministic context-aware planning facade projection",
         "deterministic plan quality scoring and downstream planning gates",
+        "bounded code intelligence impact summaries consumed by Agent Plan and Plan Quality",
         "receipt and result handoff aggregation"
       ]
     },
@@ -71,6 +73,12 @@
         "packages/ts-shell/src/orchestration/contextGraphPlanning.ts",
         "packages/ts-shell/src/orchestration/contextGraphResult.ts",
         "packages/ts-shell/src/orchestration/testImpactPlan.ts",
+        "packages/ts-shell/src/orchestration/codeGraphFacts.ts",
+        "packages/ts-shell/src/orchestration/codeGraphTrace.ts",
+        "packages/ts-shell/src/orchestration/codeGraphQuery.ts",
+        "packages/ts-shell/src/orchestration/codeGraphStaleness.ts",
+        "packages/ts-shell/src/orchestration/codeGraphImpact.ts",
+        "packages/ts-shell/src/orchestration/codeGraphResult.ts",
         "packages/ts-shell/src/orchestration/agentPlanContext.ts",
         "packages/ts-shell/src/orchestration/workspaceFileContract.ts",
         "packages/ts-shell/src/orchestration/workspaceTargetProjection.ts"
@@ -81,6 +89,7 @@
         "bounded import, sibling test, docs/readme, and call-site candidate discovery",
         "bounded deterministic context graphs with second-hop and test-impact planning",
         "read-only context graph and test-impact readiness facts",
+        "bounded reusable code graph trace facts, impact queries, and staleness warnings",
         "read-only planning summaries with missing-context suggested reads",
         "workspace target summaries",
         "continuation-safe target facts",

@@ -27,6 +27,8 @@ const CONTINUATION_EVIDENCE_PREFIXES: ReadonlyArray<{
   { label: "context-packet", prefixes: ["context-packet ", "context-packet:id:"] },
   { label: "context-plan", prefixes: ["context-plan ", "context-plan:readiness:"] },
   { label: "context-graph", prefixes: ["context-graph ", "context-graph:id:"] },
+  { label: "code-graph-trace", prefixes: ["code-graph-trace ", "code-graph-trace:id:"] },
+  { label: "code-graph-impact", prefixes: ["code-graph-impact ", "code-graph-impact:id:"] },
   { label: "test-impact", prefixes: ["test-impact ", "test-impact:id:"] },
   { label: "agent-plan", prefixes: ["agent-plan ", "agent-plan:readiness:"] },
   { label: "plan-quality", prefixes: ["plan-quality ", "plan-quality:id:"] },

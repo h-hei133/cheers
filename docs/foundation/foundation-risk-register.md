@@ -14,6 +14,32 @@ None open after Route 165.
 
 ## Resolved
 
+### Code intelligence graph trace and staleness readiness
+
+- Affected modules: Workspace / File Context, Agent Loop, Provider / Model,
+  Runtime / Verification, Result Surface, Session / Continue, Harness / Eval.
+- Why it was a calibration gap: Route 187 context graph and test-impact facts
+  were bounded and deterministic, but remained mostly task-local. Downstream
+  planning could not refer to a reusable normalized trace, bounded impact query
+  id, or staleness warning without reinterpreting graph nodes directly.
+- Resolution: Route 189 adds `codeGraphFacts.ts`, `codeGraphTrace.ts`,
+  `codeGraphQuery.ts`, `codeGraphStaleness.ts`, `codeGraphImpact.ts`, and
+  `codeGraphResult.ts`. Agent Plan and Plan Quality can carry code graph trace
+  and impact ids; provider prompts consume safe impact summaries; verification
+  command planning can select allowlisted impact candidates without execution.
+- Evidence: code graph facts/trace/query/staleness/impact/result tests,
+  context graph planning regression, Agent Plan / Plan Quality regressions,
+  provider prompt regression, verification command planning regression,
+  Session / Continue parity regressions, focused context-planning verifier,
+  result-contract, and build.
+- Recommended next action: keep mutation behavior, provider/model calls,
+  command execution behavior, command allowlist expansion, LSP, embeddings,
+  full-repo indexing, persistent graph backends, MCP, session publishing,
+  CLI/schema/dependency changes, and broad `runMvpIntegratedFlow.ts` rewrites
+  closed until separate routes define them.
+- Should become a route: no, resolved by Route 189 for bounded read/plan code
+  intelligence trace only.
+
 ### Plan quality and harness trace readiness
 
 - Affected modules: Agent Loop, Workspace / File Context, Provider / Model,

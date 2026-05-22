@@ -27,6 +27,10 @@ export interface ContextAwareProviderPromptContext {
   readonly omittedContentReasons: readonly string[];
   readonly contextReadiness?: string;
   readonly testImpactSummary?: string;
+  readonly codeGraphTraceId?: string;
+  readonly impactQueryId?: string;
+  readonly impactReadiness?: string;
+  readonly impactSummary?: string;
   readonly verificationExpectation: "review-before-apply";
   readonly mutationAuthority: "not-granted";
   readonly redactionStatus: "redacted-and-budgeted";
@@ -70,6 +74,8 @@ export function buildContextAwareProviderPrompt(input: {
     `Request: ${redactProviderEditText(input.userRequest)}`,
     `Context packet: ${contextPacketId}`,
     `Context graph: ${input.editInput.contextGraphId ?? "none"}`,
+    `Code graph trace: ${input.editInput.codeGraphTraceId ?? "none"}`,
+    `Impact query: ${input.editInput.impactQueryId ?? "none"}`,
     `Agent Plan: ${agentPlanId}`,
     `Target: ${input.contextPacket.targetSafeLabel}`,
     `Target summary: ${redactProviderEditText(targetSource?.summary ?? input.editInput.targetSummary)}`,
@@ -78,6 +84,8 @@ export function buildContextAwareProviderPrompt(input: {
     `Graph readiness: ${input.editInput.contextGraphReadiness ?? "none"}`,
     `Context coverage score: ${input.editInput.contextCoverageScore ?? "none"}`,
     `Test impact: ${input.editInput.testImpactSummary ?? "none"}`,
+    `Code graph impact: ${input.editInput.impactSummary ?? "none"}`,
+    `Impact readiness: ${input.editInput.impactReadiness ?? "none"}`,
     `Missing facts: ${input.editInput.missingFacts.join("; ") || "none"}`,
     `Suggested reads: ${input.editInput.suggestedReads.join("; ") || "none"}`,
     `Suggested verification: ${input.editInput.suggestedVerification.join("; ") || "none"}`,
@@ -107,6 +115,10 @@ export function buildContextAwareProviderPrompt(input: {
     omittedContentReasons,
     ...(input.editInput.contextGraphReadiness ? { contextReadiness: input.editInput.contextGraphReadiness } : {}),
     ...(input.editInput.testImpactSummary ? { testImpactSummary: input.editInput.testImpactSummary } : {}),
+    ...(input.editInput.codeGraphTraceId ? { codeGraphTraceId: input.editInput.codeGraphTraceId } : {}),
+    ...(input.editInput.impactQueryId ? { impactQueryId: input.editInput.impactQueryId } : {}),
+    ...(input.editInput.impactReadiness ? { impactReadiness: input.editInput.impactReadiness } : {}),
+    ...(input.editInput.impactSummary ? { impactSummary: redactProviderEditText(input.editInput.impactSummary) } : {}),
     verificationExpectation: "review-before-apply",
     mutationAuthority: "not-granted",
     redactionStatus: "redacted-and-budgeted",
@@ -115,6 +127,12 @@ export function buildContextAwareProviderPrompt(input: {
       `context-aware-provider-prompt:context-packet:${contextPacketId}`,
       ...(input.editInput.contextGraphId
         ? [`context-aware-provider-prompt:context-graph:${input.editInput.contextGraphId}`]
+        : []),
+      ...(input.editInput.codeGraphTraceId
+        ? [`context-aware-provider-prompt:code-graph-trace:${input.editInput.codeGraphTraceId}`]
+        : []),
+      ...(input.editInput.impactQueryId
+        ? [`context-aware-provider-prompt:impact-query:${input.editInput.impactQueryId}`]
         : []),
       `context-aware-provider-prompt:agent-plan:${agentPlanId}`,
       "context-aware-provider-prompt:redacted-and-budgeted",

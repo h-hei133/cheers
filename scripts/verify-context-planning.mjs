@@ -9,6 +9,12 @@ const focusedTests = [
   'src/orchestration/contextGraphScore.test.ts',
   'src/orchestration/contextGraphReadiness.test.ts',
   'src/orchestration/contextGraphPlanning.test.ts',
+  'src/orchestration/codeGraphFacts.test.ts',
+  'src/orchestration/codeGraphTrace.test.ts',
+  'src/orchestration/codeGraphQuery.test.ts',
+  'src/orchestration/codeGraphStaleness.test.ts',
+  'src/orchestration/codeGraphImpact.test.ts',
+  'src/orchestration/codeGraphResult.test.ts',
   'src/orchestration/testImpactPlan.test.ts',
   'src/orchestration/contextGraphResult.test.ts',
   'src/orchestration/planQuality.test.ts',
@@ -55,6 +61,13 @@ console.log('marker context-graph-explicit-target')
 console.log('marker context-graph-second-hop-candidates')
 console.log('marker context-graph-budget-omission-reasons')
 console.log('marker context-graph-score-readiness')
+console.log('marker code-graph-facts-normalized')
+console.log('marker code-graph-trace-created')
+console.log('marker code-graph-impact-query')
+console.log('marker code-graph-staleness-downgrades-readiness')
+console.log('marker code-graph-provider-impact-context')
+console.log('marker code-graph-verification-candidates')
+console.log('marker code-graph-session-continue-evidence')
 console.log('marker test-impact-suggested-tests')
 console.log('marker test-impact-verification-candidates')
 console.log('marker plan-quality-ready-score')
@@ -146,6 +159,8 @@ if (
   runMvpSource.includes('function buildAgentPlan') ||
   runMvpSource.includes('function discoverContextGraph') ||
   runMvpSource.includes('function buildPlanQuality') ||
+  runMvpSource.includes('function queryCodeGraphTrace') ||
+  runMvpSource.includes('function buildCodeGraphImpact') ||
   runMvpSource.includes('function buildHarnessTrace') ||
   runMvpSource.includes('projectContextPacketRuntimeOutcome')
 ) {

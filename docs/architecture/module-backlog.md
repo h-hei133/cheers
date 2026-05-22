@@ -532,6 +532,27 @@ as an import-policing rule.
   publishing, CLI/schema/dependency changes, and broad
   `runMvpIntegratedFlow.ts` refactors remain closed.
 
+### Route 189: Code Intelligence Graph Trace
+
+- Route 189 adds a bounded code intelligence graph trace over Route 187 context
+  graph and test-impact facts: `codeGraphFacts.ts`, `codeGraphTrace.ts`,
+  `codeGraphQuery.ts`, `codeGraphStaleness.ts`, `codeGraphImpact.ts`, and
+  `codeGraphResult.ts`.
+- Context graph nodes, edges, omitted candidates, verification candidates, and
+  staleness warnings are normalized into replay-safe facts with trace and
+  impact query ids. Queries stay bounded to the existing trace and cover
+  imports, call-sites, tests, docs, verification candidates, and omitted/stale
+  context for an explicit target.
+- Agent Plan, Plan Quality, context-aware provider prompt context,
+  verification command planning, Result Surface, Session / Continue parity, and
+  the context-planning verifier consume code graph trace / impact summaries
+  without raw file content, provider calls, command execution, or mutation
+  authority.
+- Mutation behavior, provider/model calls, command execution behavior, command
+  allowlist expansion, LSP, embeddings, full-repo indexing, persistent graph
+  backends, MCP, session publishing, CLI/schema/dependency changes, and broad
+  `runMvpIntegratedFlow.ts` refactors remain closed.
+
 ## Module-First Route Rule
 
 Future routes must state:

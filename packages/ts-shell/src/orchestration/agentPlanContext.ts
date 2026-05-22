@@ -6,6 +6,8 @@ import type { TargetedContextPacket } from "./contextPacket.js";
 import type { ContextGraph } from "./contextGraph.js";
 import type { ContextGraphScore } from "./contextGraphScore.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
+import type { CodeGraphTrace } from "./codeGraphTrace.js";
+import type { CodeGraphImpact } from "./codeGraphImpact.js";
 import type {
   AgentPlanConfidence,
   AgentPlanContextCompleteness,
@@ -16,6 +18,11 @@ export interface AgentPlanContextProjection {
   readonly packetId: string;
   readonly contextPacketIds: readonly string[];
   readonly contextGraphIds: readonly string[];
+  readonly codeGraphTraceIds: readonly string[];
+  readonly impactQueryId?: string;
+  readonly impactReadiness?: string;
+  readonly likelyAffectedFiles: readonly string[];
+  readonly likelyAffectedTests: readonly string[];
   readonly graphReadiness?: string;
   readonly contextCoverageScore?: number;
   readonly testImpactSummary?: string;
@@ -38,6 +45,8 @@ export function projectContextPacketToAgentPlanContext(
     readonly graph: ContextGraph;
     readonly score: ContextGraphScore;
     readonly testImpact: TestImpactPlan;
+    readonly codeGraphTrace?: CodeGraphTrace;
+    readonly codeGraphImpact?: CodeGraphImpact;
   },
 ): AgentPlanContextProjection {
   const contextSummary = buildContextPlanningSummary(packet);
@@ -56,6 +65,18 @@ export function projectContextPacketToAgentPlanContext(
     packetId: packet.packetId,
     contextPacketIds: [packet.packetId],
     contextGraphIds: graphFacts ? [graphFacts.graph.graphId] : [],
+    codeGraphTraceIds: graphFacts?.codeGraphTrace ? [graphFacts.codeGraphTrace.traceId] : [],
+    ...(graphFacts?.codeGraphImpact ? { impactQueryId: graphFacts.codeGraphImpact.impactQueryId } : {}),
+    ...(graphFacts?.codeGraphImpact ? { impactReadiness: graphFacts.codeGraphImpact.readiness } : {}),
+    likelyAffectedFiles: graphFacts?.codeGraphImpact
+      ? Array.from(
+          new Set([
+            ...graphFacts.codeGraphImpact.likelyCallSites,
+            ...graphFacts.codeGraphImpact.docsReferences,
+          ]),
+        )
+      : [],
+    likelyAffectedTests: graphFacts?.codeGraphImpact?.likelyTests ?? [],
     ...(graphFacts ? { graphReadiness: graphFacts.score.planningReadiness } : {}),
     ...(graphFacts ? { contextCoverageScore: graphFacts.score.coverageScore } : {}),
     ...(graphFacts
@@ -70,6 +91,12 @@ export function projectContextPacketToAgentPlanContext(
     missingFacts: [
       ...contextSummary.missing,
       ...(graphFacts?.testImpact.missingTestContext ?? []),
+      ...(graphFacts?.codeGraphImpact?.staleContext.length
+        ? ["code graph impact has stale context"]
+        : []),
+      ...(graphFacts?.codeGraphImpact?.omittedContext.length
+        ? ["code graph impact omitted context"]
+        : []),
       ...(graphFacts?.score.planningReadiness === "budget-limited"
         ? ["context graph budget limited"]
         : []),
@@ -78,6 +105,7 @@ export function projectContextPacketToAgentPlanContext(
       new Set([
         ...contextSummary.suggestedNextReads,
         ...(graphFacts?.testImpact.suggestedReads ?? []),
+        ...(graphFacts?.codeGraphImpact?.suggestedReads ?? []),
       ]),
     ),
     suggestedVerification: Array.from(
@@ -86,6 +114,7 @@ export function projectContextPacketToAgentPlanContext(
         ...(graphFacts?.testImpact.likelyVerificationCommandCandidates
           .filter((candidate) => candidate.readiness === "ready")
           .map((candidate) => candidate.command) ?? []),
+        ...(graphFacts?.codeGraphImpact?.suggestedVerification ?? []),
       ]),
     ),
     replaySafeEvidence: [
@@ -100,6 +129,8 @@ export function projectContextPacketToAgentPlanContext(
             ...graphFacts.graph.evidence,
             ...graphFacts.score.evidence,
             ...graphFacts.testImpact.evidence,
+            ...(graphFacts.codeGraphTrace?.evidence ?? []),
+            ...(graphFacts.codeGraphImpact?.evidence ?? []),
           ]
         : []),
     ],

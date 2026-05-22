@@ -3,6 +3,7 @@ import type { ContextGraph } from "./contextGraph.js";
 import type { ContextGraphScore } from "./contextGraphScore.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
+import type { CodeGraphImpact } from "./codeGraphImpact.js";
 import { redactProviderEditText } from "./providerEditContext.js";
 
 export type ContextAwareProviderProposalMode = "provider-edit-proposal";
@@ -23,6 +24,10 @@ export interface ContextAwareProviderEditInput {
   readonly contextGraphReadiness?: string;
   readonly contextCoverageScore?: number;
   readonly testImpactSummary?: string;
+  readonly codeGraphTraceId?: string;
+  readonly impactQueryId?: string;
+  readonly impactReadiness?: string;
+  readonly impactSummary?: string;
   readonly agentPlanId?: string;
   readonly contextCompleteness: AgentPlan["contextCompleteness"];
   readonly planConfidence: AgentPlan["confidence"];
@@ -46,6 +51,7 @@ export function buildContextAwareProviderEditInput(input: {
   readonly contextGraph?: ContextGraph;
   readonly contextGraphScore?: ContextGraphScore;
   readonly testImpactPlan?: TestImpactPlan;
+  readonly codeGraphImpact?: CodeGraphImpact;
   readonly agentPlan?: AgentPlan;
   readonly providerReadinessState: string;
   readonly proposalMode?: ContextAwareProviderProposalMode;
@@ -110,13 +116,32 @@ export function buildContextAwareProviderEditInput(input: {
       : plan?.testImpactSummary
         ? { testImpactSummary: plan.testImpactSummary }
         : {}),
+    ...(input.codeGraphImpact
+      ? {
+          codeGraphTraceId: input.codeGraphImpact.traceId,
+          impactQueryId: input.codeGraphImpact.impactQueryId,
+          impactReadiness: input.codeGraphImpact.readiness,
+          impactSummary: `tests=${input.codeGraphImpact.likelyTests.length}; callSites=${input.codeGraphImpact.likelyCallSites.length}; docs=${input.codeGraphImpact.docsReferences.length}; stale=${input.codeGraphImpact.staleContext.length}; confidence=${input.codeGraphImpact.confidence}`,
+        }
+      : plan?.impactQueryId
+        ? {
+            impactQueryId: plan.impactQueryId,
+            impactReadiness: plan.impactReadiness,
+            impactSummary: `readiness=${plan.impactReadiness ?? "unknown"}`,
+          }
+        : {}),
     ...(plan ? { agentPlanId: plan.planId } : {}),
     contextCompleteness: plan?.contextCompleteness ?? "missing-context",
     planConfidence: plan?.confidence ?? "low",
     missingFacts: (plan?.missingFacts ?? ["context packet and Agent Plan are required"]).map(
       redactProviderEditText,
     ),
-    suggestedReads: (plan?.suggestedReads ?? []).map(redactProviderEditText),
+    suggestedReads: Array.from(
+      new Set([
+        ...(plan?.suggestedReads ?? []),
+        ...(input.codeGraphImpact?.suggestedReads ?? []),
+      ]),
+    ).map(redactProviderEditText),
     suggestedVerification: (plan?.suggestedVerification ?? []).map(
       redactProviderEditText,
     ),
@@ -132,6 +157,13 @@ export function buildContextAwareProviderEditInput(input: {
       ...(packet ? [`context-aware-provider-edit:context-packet:${packet.packetId}`] : []),
       ...(contextGraphId ? [`context-aware-provider-edit:context-graph:${contextGraphId}`] : []),
       ...(graphReadiness ? [`context-aware-provider-edit:graph-readiness:${graphReadiness}`] : []),
+      ...(input.codeGraphImpact
+        ? [
+            `context-aware-provider-edit:code-graph-trace:${input.codeGraphImpact.traceId}`,
+            `context-aware-provider-edit:impact-query:${input.codeGraphImpact.impactQueryId}`,
+            `context-aware-provider-edit:impact-readiness:${input.codeGraphImpact.readiness}`,
+          ]
+        : []),
       ...(plan ? [`context-aware-provider-edit:agent-plan:${plan.planId}`] : []),
       `context-aware-provider-edit:context-completeness:${plan?.contextCompleteness ?? "missing-context"}`,
       `context-aware-provider-edit:plan-confidence:${plan?.confidence ?? "low"}`,

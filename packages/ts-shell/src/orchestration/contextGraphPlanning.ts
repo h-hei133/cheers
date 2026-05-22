@@ -24,6 +24,11 @@ import {
 } from "./planQuality.js";
 import { buildHarnessTrace, type HarnessTrace } from "./harnessTrace.js";
 import { buildHarnessScorecard, type HarnessScorecard } from "./harnessScorecard.js";
+import { normalizeCodeGraphFacts, type CodeGraphFacts } from "./codeGraphFacts.js";
+import { buildCodeGraphTrace, type CodeGraphTrace } from "./codeGraphTrace.js";
+import { checkCodeGraphStaleness, type CodeGraphStalenessCheck } from "./codeGraphStaleness.js";
+import { buildCodeGraphImpact, type CodeGraphImpact } from "./codeGraphImpact.js";
+import { buildCodeGraphResult, type CodeGraphResultProjection } from "./codeGraphResult.js";
 
 export interface ContextGraphPlanningBundle {
   readonly packet: TargetedContextPacket;
@@ -31,6 +36,11 @@ export interface ContextGraphPlanningBundle {
   readonly graph: ContextGraph;
   readonly graphScore: ContextGraphScore;
   readonly testImpact: TestImpactPlan;
+  readonly codeGraphStaleness: CodeGraphStalenessCheck;
+  readonly codeGraphFacts: CodeGraphFacts;
+  readonly codeGraphTrace: CodeGraphTrace;
+  readonly codeGraphImpact: CodeGraphImpact;
+  readonly codeGraphResult: CodeGraphResultProjection;
   readonly graphResult: ContextGraphResultProjection;
   readonly planQuality: PlanQuality;
   readonly harnessTrace: HarnessTrace;
@@ -54,6 +64,29 @@ export async function buildContextGraphPlanningBundle(input: {
   });
   const graphScore = scoreContextGraph(graph);
   const testImpact = buildTestImpactPlan({ graph, score: graphScore });
+  const codeGraphStaleness = await checkCodeGraphStaleness({
+    workspaceRoot: input.workspaceRoot,
+    graph,
+  });
+  const codeGraphFacts = normalizeCodeGraphFacts({
+    graph,
+    contextPacket: packet,
+    testImpactPlan: testImpact,
+    staleLabels: codeGraphStaleness.staleLabels,
+  });
+  const codeGraphTrace = buildCodeGraphTrace({
+    graph,
+    facts: codeGraphFacts,
+    contextPacket: packet,
+  });
+  const codeGraphImpact = buildCodeGraphImpact({
+    trace: codeGraphTrace,
+    target: packet.targetSafeLabel,
+  });
+  const codeGraphResult = buildCodeGraphResult({
+    trace: codeGraphTrace,
+    impact: codeGraphImpact,
+  });
   const packetResult = buildContextPacketResult(packet);
   const graphResult = buildContextGraphResult({ graph, score: graphScore, testImpact });
   const baseAgentPlan = projectWorkflowTaskPlanToAgentPlan({
@@ -62,6 +95,8 @@ export async function buildContextGraphPlanningBundle(input: {
       graph,
       score: graphScore,
       testImpact,
+      codeGraphTrace,
+      codeGraphImpact,
     }),
   });
   const planQuality = buildPlanQuality({
@@ -70,6 +105,8 @@ export async function buildContextGraphPlanningBundle(input: {
     contextGraph: graph,
     contextGraphScore: graphScore,
     testImpactPlan: testImpact,
+    codeGraphTrace,
+    codeGraphImpact,
   });
   const agentPlan = attachPlanQualityToAgentPlan({
     agentPlan: baseAgentPlan,
@@ -99,6 +136,11 @@ export async function buildContextGraphPlanningBundle(input: {
     graph,
     graphScore,
     testImpact,
+    codeGraphStaleness,
+    codeGraphFacts,
+    codeGraphTrace,
+    codeGraphImpact,
+    codeGraphResult,
     graphResult,
     planQuality,
     harnessTrace,

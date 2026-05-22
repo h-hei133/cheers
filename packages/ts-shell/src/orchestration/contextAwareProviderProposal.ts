@@ -4,6 +4,7 @@ import type { ContextGraphScore } from "./contextGraphScore.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
 import type { PlanQuality } from "./planQuality.js";
+import type { CodeGraphImpact } from "./codeGraphImpact.js";
 import { evaluatePlanQualityGate } from "./planQualityGate.js";
 import {
   buildContextAwareProviderEditInput,
@@ -79,6 +80,7 @@ export async function planContextAwareProviderProposal(input: {
   readonly contextGraph?: ContextGraph;
   readonly contextGraphScore?: ContextGraphScore;
   readonly testImpactPlan?: TestImpactPlan;
+  readonly codeGraphImpact?: CodeGraphImpact;
   readonly agentPlan?: AgentPlan;
   readonly planQuality?: PlanQuality;
   readonly userRequest: string;
@@ -95,6 +97,7 @@ export async function planContextAwareProviderProposal(input: {
     contextGraph: input.contextGraph,
     contextGraphScore: input.contextGraphScore,
     testImpactPlan: input.testImpactPlan,
+    codeGraphImpact: input.codeGraphImpact,
     agentPlan: input.agentPlan,
     providerReadinessState: input.availability.kind,
     allowReviewOnlyWithMissingContext: input.allowReviewOnlyWithMissingContext,

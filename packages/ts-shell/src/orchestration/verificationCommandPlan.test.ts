@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "./agentPlan.js";
+import { buildCodeGraphImpact } from "./codeGraphImpact.js";
+import { normalizeCodeGraphFacts } from "./codeGraphFacts.js";
+import { buildCodeGraphTrace } from "./codeGraphTrace.js";
+import { buildContextGraph } from "./contextGraph.js";
 import { buildPlanQuality } from "./planQuality.js";
 import { buildVerificationCommandPlan } from "./verificationCommandPlan.js";
 
@@ -112,6 +116,19 @@ describe("verificationCommandPlan", () => {
     );
   });
 
+  it("can select allowlisted code graph impact verification candidates without executing them", () => {
+    const impact = impactFixture();
+    const plan = buildVerificationCommandPlan({ codeGraphImpact: impact });
+
+    expect(plan.state).toBe("ready");
+    expect(plan.source).toBe("code-graph-impact");
+    expect(plan.command).toBe("npm test -- --help");
+    expect(plan.sourceImpactQueryId).toBe(impact.impactQueryId);
+    expect(plan.evidence).toContain(
+      `verification-command-plan:impact-query:${impact.impactQueryId}`,
+    );
+  });
+
   it("surfaces explicit approval-required plans without dispatch authority", () => {
     const plan = buildVerificationCommandPlan({
       explicitCommand: "node --version",
@@ -172,3 +189,61 @@ describe("verificationCommandPlan", () => {
     );
   });
 });
+
+function impactFixture() {
+  const graph = buildContextGraph({
+    rootTarget: "src/app.ts",
+    nodes: [
+      graphNode("root-target", "src/app.ts", 0),
+      graphNode("nearby-test", "src/app.test.ts", 1),
+    ],
+    edges: [
+      { fromPathLabel: "src/app.ts", toPathLabel: "src/app.test.ts", kind: "tests", reason: "tests" },
+    ],
+  });
+  const trace = buildCodeGraphTrace({
+    graph,
+    facts: normalizeCodeGraphFacts({
+      graph,
+      testImpactPlan: {
+        impactPlanId: "test_impact_impact",
+        graphId: graph.graphId,
+        likelyTestFiles: ["src/app.test.ts"],
+        likelyVerificationCommandCandidates: [
+          {
+            command: "npm test -- --help",
+            source: "allowlisted-generic",
+            readiness: "ready",
+            reason: "allowlisted",
+          },
+        ],
+        confidence: "high",
+        missingTestContext: [],
+        suggestedReads: [],
+        commandReadiness: "ready",
+        noWriteEvidence: ["test-impact:commands:not-executed"],
+        replaySafeSummary: "test-impact test_impact_impact",
+        evidence: ["test-impact:id:test_impact_impact"],
+      },
+    }),
+  });
+  return buildCodeGraphImpact({ trace });
+}
+
+function graphNode(
+  kind: Parameters<typeof buildContextGraph>[0]["nodes"][number]["kind"],
+  pathLabel: string,
+  depth: 0 | 1 | 2,
+): Parameters<typeof buildContextGraph>[0]["nodes"][number] {
+  return {
+    kind,
+    pathLabel,
+    relation: kind,
+    sourceKind: "target-packet",
+    depth,
+    reason: kind,
+    budgetStatus: "included",
+    confidence: "high",
+    redactionStatus: "redacted-and-budgeted",
+  };
+}

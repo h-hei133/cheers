@@ -5,12 +5,20 @@ import { scoreContextGraph } from "./contextGraphScore.js";
 import { buildPlanQuality, attachPlanQualityToAgentPlan } from "./planQuality.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import { buildTestImpactPlan } from "./testImpactPlan.js";
+import { normalizeCodeGraphFacts } from "./codeGraphFacts.js";
+import { buildCodeGraphTrace } from "./codeGraphTrace.js";
+import { buildCodeGraphImpact } from "./codeGraphImpact.js";
 
 describe("planQuality", () => {
   it("scores high-quality context as ready and attaches score to Agent Plan", () => {
     const graph = readyGraph();
     const graphScore = scoreContextGraph(graph);
     const testImpactPlan = buildTestImpactPlan({ graph, score: graphScore });
+    const codeGraphTrace = buildCodeGraphTrace({
+      graph,
+      facts: normalizeCodeGraphFacts({ graph, testImpactPlan }),
+    });
+    const codeGraphImpact = buildCodeGraphImpact({ trace: codeGraphTrace });
     const agentPlan = buildAgentPlan({
       ownerCapability: "agent-loop",
       taskKind: "edit-file",
@@ -18,6 +26,11 @@ describe("planQuality", () => {
       targetSummary: "src/app.ts",
       contextPacketIds: ["ctx_packet_188"],
       contextGraphIds: [graph.graphId],
+      codeGraphTraceIds: [codeGraphTrace.traceId],
+      impactQueryId: codeGraphImpact.impactQueryId,
+      impactReadiness: codeGraphImpact.readiness,
+      likelyAffectedFiles: codeGraphImpact.likelyCallSites,
+      likelyAffectedTests: codeGraphImpact.likelyTests,
       graphReadiness: graphScore.planningReadiness,
       contextCoverageScore: graphScore.coverageScore,
       testImpactSummary: "tests=1; commands=2; readiness=ready",
@@ -39,6 +52,8 @@ describe("planQuality", () => {
       contextGraph: graph,
       contextGraphScore: graphScore,
       testImpactPlan,
+      codeGraphTrace,
+      codeGraphImpact,
     });
     const attached = attachPlanQualityToAgentPlan({ agentPlan, planQuality: quality });
 
@@ -46,6 +61,7 @@ describe("planQuality", () => {
     expect(quality.score).toBeGreaterThanOrEqual(70);
     expect(quality.mutationAuthority).toBe("not-granted");
     expect(attached.planQualityId).toBe(quality.qualityId);
+    expect(attached.impactQueryId).toBe(codeGraphImpact.impactQueryId);
     expect(attached.replaySafeSummary).toContain("qualityScore=");
   });
 
@@ -88,7 +104,12 @@ function readyGraph() {
       node("reverse-call-site", "src/main.ts", 1),
       node("second-hop-candidate", "src/helper.ts", 2),
     ],
-    edges: [],
+    edges: [
+      { fromPathLabel: "src/app.ts", toPathLabel: "src/lib.ts", kind: "imports", reason: "imports" },
+      { fromPathLabel: "src/app.ts", toPathLabel: "src/app.test.ts", kind: "tests", reason: "tests" },
+      { fromPathLabel: "src/app.ts", toPathLabel: "README.md", kind: "documents", reason: "docs" },
+      { fromPathLabel: "src/app.ts", toPathLabel: "src/main.ts", kind: "calls-or-references", reason: "uses" },
+    ],
   });
 }
 

@@ -5,6 +5,7 @@ import { blockedCommandReason, isAllowlistedRunCommand } from "./capabilityBound
 import { redactProviderEditText } from "./providerEditContext.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
 import type { PlanQuality } from "./planQuality.js";
+import type { CodeGraphImpact } from "./codeGraphImpact.js";
 import { evaluatePlanQualityGate } from "./planQualityGate.js";
 
 export type VerificationCommandPlanState =
@@ -27,6 +28,7 @@ export type VerificationCommandSource =
   | "explicit"
   | "agent-plan"
   | "test-impact"
+  | "code-graph-impact"
   | "proposal"
   | "edit-result"
   | "none";
@@ -41,6 +43,7 @@ export interface VerificationCommandPlan {
   readonly sourceContextPacketId?: string;
   readonly sourceContextGraphId?: string;
   readonly sourceTestImpactPlanId?: string;
+  readonly sourceImpactQueryId?: string;
   readonly sourcePlanQualityId?: string;
   readonly command?: string;
   readonly commandSafeLabel?: string;
@@ -66,6 +69,7 @@ export interface VerificationCommandPlan {
 export function buildVerificationCommandPlan(input: {
   readonly agentPlan?: AgentPlan;
   readonly testImpactPlan?: TestImpactPlan;
+  readonly codeGraphImpact?: CodeGraphImpact;
   readonly planQuality?: PlanQuality;
   readonly explicitCommand?: string;
   readonly proposalVerificationCommand?: string;
@@ -137,6 +141,7 @@ export function buildVerificationCommandPlan(input: {
     sourceContextPacketId,
     sourceContextGraphId,
     sourceTestImpactPlanId: input.testImpactPlan?.impactPlanId,
+    sourceImpactQueryId: input.codeGraphImpact?.impactQueryId,
     sourcePlanQualityId: input.planQuality?.qualityId,
     commandSafeLabel,
     state: gatedState,
@@ -153,6 +158,9 @@ export function buildVerificationCommandPlan(input: {
     ...(sourceContextGraphId ? { sourceContextGraphId } : {}),
     ...(input.testImpactPlan?.impactPlanId
       ? { sourceTestImpactPlanId: input.testImpactPlan.impactPlanId }
+      : {}),
+    ...(input.codeGraphImpact?.impactQueryId
+      ? { sourceImpactQueryId: input.codeGraphImpact.impactQueryId }
       : {}),
     ...(input.planQuality?.qualityId
       ? { sourcePlanQualityId: input.planQuality.qualityId }
@@ -178,6 +186,9 @@ export function buildVerificationCommandPlan(input: {
       ...(input.testImpactPlan
         ? [`verification-command-plan:test-impact:${input.testImpactPlan.impactPlanId}`]
         : []),
+      ...(input.codeGraphImpact
+        ? [`verification-command-plan:impact-query:${input.codeGraphImpact.impactQueryId}`]
+        : []),
       ...(input.planQuality
         ? [`verification-command-plan:plan-quality:${input.planQuality.qualityId}`]
         : []),
@@ -198,6 +209,7 @@ export function buildVerificationCommandPlan(input: {
 function selectCommandCandidate(input: {
   readonly agentPlan?: AgentPlan;
   readonly testImpactPlan?: TestImpactPlan;
+  readonly codeGraphImpact?: CodeGraphImpact;
   readonly explicitCommand?: string;
   readonly proposalVerificationCommand?: string;
   readonly editResultVerificationCommand?: string;
@@ -216,6 +228,12 @@ function selectCommandCandidate(input: {
   );
   if (testImpactCommand) {
     return { source: "test-impact", command: testImpactCommand.command };
+  }
+  const impactCommand = input.codeGraphImpact?.suggestedVerification.find((entry) =>
+    Boolean(entry.trim()) && isAllowlistedRunCommand(entry),
+  );
+  if (impactCommand) {
+    return { source: "code-graph-impact", command: impactCommand };
   }
   if (input.proposalVerificationCommand?.trim()) {
     return { source: "proposal", command: input.proposalVerificationCommand };
@@ -346,6 +364,7 @@ function buildPlanId(input: {
   readonly sourceContextPacketId?: string;
   readonly sourceContextGraphId?: string;
   readonly sourceTestImpactPlanId?: string;
+  readonly sourceImpactQueryId?: string;
   readonly sourcePlanQualityId?: string;
   readonly commandSafeLabel?: string;
   readonly state: VerificationCommandPlanState;

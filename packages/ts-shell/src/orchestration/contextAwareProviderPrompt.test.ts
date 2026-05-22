@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "./agentPlan.js";
 import { buildContextAwareProviderEditInput } from "./contextAwareProviderEdit.js";
 import { buildContextAwareProviderPrompt } from "./contextAwareProviderPrompt.js";
+import { buildCodeGraphImpact } from "./codeGraphImpact.js";
+import { normalizeCodeGraphFacts } from "./codeGraphFacts.js";
+import { buildCodeGraphTrace } from "./codeGraphTrace.js";
+import { buildContextGraph } from "./contextGraph.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 
 describe("contextAwareProviderPrompt", () => {
@@ -33,6 +37,7 @@ describe("contextAwareProviderPrompt", () => {
       targetSummary: "src/app.ts",
       contextPacket: packet,
       agentPlan: plan,
+      codeGraphImpact: impactFixture(),
       providerReadinessState: "available",
     });
 
@@ -47,6 +52,9 @@ describe("contextAwareProviderPrompt", () => {
 
     expect(prompt.contextPacketId).toBe(packet.packetId);
     expect(prompt.contextGraphId).toBe("ctx_graph_prompt");
+    expect(prompt.codeGraphTraceId).toMatch(/^code_graph_trace_/);
+    expect(prompt.impactQueryId).toMatch(/^code_graph_impact_/);
+    expect(prompt.impactSummary).toContain("tests=1");
     expect(prompt.contextReadiness).toBe("context-ready");
     expect(prompt.testImpactSummary).toContain("tests=1");
     expect(prompt.agentPlanId).toBe(plan.planId);
@@ -62,8 +70,44 @@ describe("contextAwareProviderPrompt", () => {
     expect(prompt.evidence).toContain(
       "context-aware-provider-prompt:context-graph:ctx_graph_prompt",
     );
+    expect(prompt.evidence.some((entry) =>
+      entry.startsWith("context-aware-provider-prompt:impact-query:code_graph_impact_"),
+    )).toBe(true);
   });
 });
+
+function impactFixture() {
+  const graph = buildContextGraph({
+    rootTarget: "src/app.ts",
+    nodes: [
+      graphNode("root-target", "src/app.ts", 0),
+      graphNode("nearby-test", "src/app.test.ts", 1),
+    ],
+    edges: [
+      { fromPathLabel: "src/app.ts", toPathLabel: "src/app.test.ts", kind: "tests", reason: "tests" },
+    ],
+  });
+  const trace = buildCodeGraphTrace({ graph, facts: normalizeCodeGraphFacts({ graph }) });
+  return buildCodeGraphImpact({ trace });
+}
+
+function graphNode(
+  kind: Parameters<typeof buildContextGraph>[0]["nodes"][number]["kind"],
+  pathLabel: string,
+  depth: 0 | 1 | 2,
+): Parameters<typeof buildContextGraph>[0]["nodes"][number] {
+  return {
+    kind,
+    pathLabel,
+    relation: kind,
+    sourceKind: "target-packet",
+    depth,
+    reason: kind,
+    budgetStatus: "included",
+    confidence: "high",
+    redactionStatus: "redacted-and-budgeted",
+  };
+}
 
 function buildPacket(): TargetedContextPacket {
   return {

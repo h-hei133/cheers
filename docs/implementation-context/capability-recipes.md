@@ -153,7 +153,9 @@ not import restrictions.
   `contextPacketResult.ts`, `contextGraph.ts`, `contextGraphDiscovery.ts`,
   `contextGraphBudget.ts`, `contextGraphScore.ts`,
   `contextGraphReadiness.ts`, `contextGraphPlanning.ts`,
-  `contextGraphResult.ts`, `testImpactPlan.ts`, `agentPlan.ts`,
+  `contextGraphResult.ts`, `testImpactPlan.ts`, `codeGraphFacts.ts`,
+  `codeGraphTrace.ts`, `codeGraphQuery.ts`, `codeGraphStaleness.ts`,
+  `codeGraphImpact.ts`, `codeGraphResult.ts`, `agentPlan.ts`,
   `agentPlanContext.ts`, `agentPlanProjection.ts`, `agentPlanResult.ts`,
   `planQuality.ts`, `planQualityScore.ts`, `planQualityGate.ts`,
   `planQualityResult.ts`, `harnessTrace.ts`, `harnessScorecard.ts`,
@@ -166,10 +168,12 @@ not import restrictions.
 - Emit: deterministic packet id, target safe label, included and omitted source
   summaries, deterministic graph id, graph readiness, coverage score,
   omitted graph reasons, test-impact summary, suggested next reads, likely
-  tests, verification candidates, agent plan readiness, confidence, missing
-  facts, suggested reads, deterministic plan quality score, quality gate
-  decisions, safe harness trace ids, scorecard status, failure class,
-  do-next text, and `mutationAuthority:not-granted`.
+  tests, verification candidates, normalized code graph facts, trace id,
+  bounded impact query id, staleness/freshness warnings, affected file/test
+  summaries, docs/call-site/import summaries, agent plan readiness,
+  confidence, missing facts, suggested reads, deterministic plan quality score,
+  quality gate decisions, safe harness trace ids, scorecard status, failure
+  class, do-next text, and `mutationAuthority:not-granted`.
 - Do not bypass: workspace boundaries, raw full-content exclusion, provider
   config and credential redaction, Result Surface truthfulness, transcript
   replay safety, write authority, final stale-read, or edit confirmation. Do
@@ -177,8 +181,9 @@ not import restrictions.
   calls, schema/CLI/dependency changes, or mutation reachability.
 - Validate: context packet/discovery/budget/plan/result tests,
   context graph discovery/budget/score/readiness/result tests, test-impact
-  plan tests, plan quality/gate/result tests, harness trace/scorecard/failure
-  taxonomy tests, agent plan/context/projection/result tests,
+  plan tests, code graph facts/trace/query/staleness/impact/result tests, plan
+  quality/gate/result tests, harness trace/scorecard/failure taxonomy tests,
+  agent plan/context/projection/result tests,
   read/inspect and target-resolution regressions, Session / Continue
   regressions, focused runMvp context planning tests, focused verifier gate,
   `verify:result-contract`, and build if TypeScript source changes.

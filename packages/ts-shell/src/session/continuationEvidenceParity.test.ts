@@ -9,6 +9,8 @@ describe("continuation evidence parity", () => {
         "context-packet ctx_abc; target=src/a.ts; included=2; omitted=1; mutationAuthority=not-granted; raw-full-content-excluded",
         "context-plan ctx_abc; readiness=needs-more-context; suggestedReads=1; tests=0; mutationAuthority=not-granted",
         "context-graph ctx_graph_abc; root=src/a.ts; nodes=5; included=4; omitted=1; mutationAuthority=not-granted; raw-content-excluded",
+        "code-graph-trace code_graph_trace_abc; root=src/a.ts; contextGraph=ctx_graph_abc; facts=8; files=4; symbols=1; tests=1; docs=1; callSites=1; freshness=fresh; readiness=impact-ready; mutationAuthority=not-granted; raw-content-excluded",
+        "code-graph-impact code_graph_impact_abc; trace=code_graph_trace_abc; target=src/a.ts; tests=1; callSites=1; docs=1; verification=1; stale=0; readiness=impact-ready; mutationAuthority=not-granted; raw-content-excluded",
         "test-impact test_impact_abc; graph=ctx_graph_abc; tests=1; commands=2; readiness=ready; mutationAuthority=not-granted",
         "agent-plan plan_abc; owner=workspace-file-context; readiness=needs-more-context; confidence=medium; missingFacts=1; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
         "plan-quality plan_quality_abc; agentPlan=plan_abc; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; level=needs-more-context; score=62; mutationAuthority=not-granted; raw-content-excluded",
@@ -29,6 +31,12 @@ describe("continuation evidence parity", () => {
     );
     expect(details).toContain(
       "context-graph=context-graph ctx_graph_abc; root=src/a.ts; nodes=5; included=4; omitted=1; mutationAuthority=not-granted; raw-content-excluded",
+    );
+    expect(details).toContain(
+      "code-graph-trace=code-graph-trace code_graph_trace_abc; root=src/a.ts; contextGraph=ctx_graph_abc; facts=8; files=4; symbols=1; tests=1; docs=1; callSites=1; freshness=fresh; readiness=impact-ready; mutationAuthority=not-granted; raw-content-excluded",
+    );
+    expect(details).toContain(
+      "code-graph-impact=code-graph-impact code_graph_impact_abc; trace=code_graph_trace_abc; target=src/a.ts; tests=1; callSites=1; docs=1; verification=1; stale=0; readiness=impact-ready; mutationAuthority=not-granted; raw-content-excluded",
     );
     expect(details).toContain(
       "test-impact=test-impact test_impact_abc; graph=ctx_graph_abc; tests=1; commands=2; readiness=ready; mutationAuthority=not-granted",

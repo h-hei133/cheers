@@ -14,6 +14,11 @@ describe("agent plan result projection", () => {
       requestedActionKind: "context-planning",
       targetSummary: "src/target.ts",
       contextPacketIds: ["ctx_test"],
+      codeGraphTraceIds: ["code_graph_trace_test"],
+      impactQueryId: "code_graph_impact_test",
+      impactReadiness: "impact-ready",
+      likelyAffectedFiles: ["src/consumer.ts"],
+      likelyAffectedTests: ["src/target.test.ts"],
       contextCompleteness: "missing-context",
       confidence: "low",
       executionReadiness: "needs-more-context",
@@ -31,6 +36,9 @@ describe("agent plan result projection", () => {
 
     expect(result.outcome).toBe("needs-more-context");
     expect(result.output).toContain("Agent plan: needs-more-context");
+    expect(result.output).toContain("Code graph traces: code_graph_trace_test");
+    expect(result.output).toContain("Impact query: code_graph_impact_test");
+    expect(result.output).toContain("Likely affected tests: src/target.test.ts");
     expect(result.output).toContain("Mutation authority: not-granted");
     expect(runtime.codingResult.taskSatisfaction.verdict).toBe(
       "insufficient-evidence",
