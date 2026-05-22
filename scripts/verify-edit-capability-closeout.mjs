@@ -51,6 +51,11 @@ const testTargets = [
   'src/orchestration/anchoredProposalRuntime.test.ts',
   'src/orchestration/anchoredProposalEval.test.ts',
   'src/orchestration/anchoredProposalScorecard.test.ts',
+  'src/orchestration/anchoredProviderSmokeGate.test.ts',
+  'src/orchestration/proposalQualityCorpus.test.ts',
+  'src/orchestration/proposalQualityReport.test.ts',
+  'src/orchestration/providerSmokeResult.test.ts',
+  'src/orchestration/anchoredProviderSmoke.test.ts',
   'src/orchestration/editRepairContext.test.ts',
   'src/orchestration/editRepairProposal.test.ts',
   'src/orchestration/editRepairPlanner.test.ts',
@@ -138,6 +143,11 @@ console.log('report field anchored_proposal_activation=covered')
 console.log('report field anchored_proposal_runtime=covered')
 console.log('report field anchored_proposal_eval=covered')
 console.log('report field anchored_proposal_scorecard=covered')
+console.log('report field anchored_provider_smoke_gate=covered')
+console.log('report field proposal_quality_corpus=covered')
+console.log('report field proposal_quality_report=covered')
+console.log('report field provider_smoke_result=covered')
+console.log('report field anchored_provider_smoke_runner=covered')
 console.log('report field provider_edit_confirmation=covered')
 console.log('report field provider_edit_exact_handoff_ready=covered')
 console.log('report field provider_edit_no_raw_content=covered')
@@ -244,6 +254,11 @@ console.log('marker provider-anchoring-result-raw-content-excluded')
 console.log('marker anchored-proposal-runtime-fake-provider-no-write')
 console.log('marker anchored-proposal-eval-no-model-scoring')
 console.log('marker anchored-proposal-scorecard-no-write')
+console.log('marker anchored-provider-smoke-default-no-provider-call')
+console.log('marker anchored-provider-smoke-no-opt-in-safe-skip')
+console.log('marker anchored-provider-smoke-provider-not-configured-safe-skip')
+console.log('marker anchored-provider-smoke-fake-corpus')
+console.log('marker provider-smoke-result-no-write')
 console.log('marker provider-edit-proposal-no-mutation-without-execution-path')
 console.log('marker provider-edit-session-report-raw-content-and-secrets-excluded')
 console.log('marker context-aware-provider-context-packet-feeds-proposal')

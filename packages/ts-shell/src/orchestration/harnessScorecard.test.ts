@@ -58,4 +58,35 @@ describe("harnessScorecard", () => {
       ]),
     );
   });
+
+  it("records anchored provider smoke mode case skip called status quality and no-write", () => {
+    const scorecard = buildHarnessScorecard({
+      providerSmoke: {
+        mode: "real-provider-smoke",
+        caseId: "exact-single-target",
+        skipReason: "no-opt-in",
+        reportId: "proposal_quality_report_196",
+        providerCalled: false,
+        noWriteStatus: "pass",
+        scorecardStatus: "skip",
+      },
+    });
+
+    expect(scorecard.providerSmokeMode).toBe("real-provider-smoke");
+    expect(scorecard.providerSmokeCaseId).toBe("exact-single-target");
+    expect(scorecard.providerSmokeSkipReason).toBe("no-opt-in");
+    expect(scorecard.providerSmokeProviderCalled).toBe(false);
+    expect(scorecard.providerSmokeNoWrite).toBe("pass");
+    expect(scorecard.providerSmokeQuality).toBe("skip");
+    expect(scorecard.evidence).toEqual(
+      expect.arrayContaining([
+        "harness-scorecard:provider-smoke-mode:real-provider-smoke",
+        "harness-scorecard:provider-smoke-case:exact-single-target",
+        "harness-scorecard:provider-smoke-skip:no-opt-in",
+        "harness-scorecard:provider-smoke-called:false",
+        "harness-scorecard:provider-smoke-no-write:pass",
+        "harness-scorecard:provider-smoke-quality:skip",
+      ]),
+    );
+  });
 });

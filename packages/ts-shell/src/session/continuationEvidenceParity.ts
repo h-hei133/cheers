@@ -35,6 +35,15 @@ const CONTINUATION_EVIDENCE_PREFIXES: ReadonlyArray<{
       "anchored-proposal-runtime:status:",
     ],
   },
+  {
+    label: "anchored-provider-smoke",
+    prefixes: [
+      "anchored-provider-smoke:run:",
+      "anchored-provider-smoke-gate:",
+      "proposal-quality-report:",
+      "provider-smoke-result:",
+    ],
+  },
   { label: "edit-repair-context", prefixes: ["edit-repair-context id="] },
   { label: "edit-repair-proposal", prefixes: ["edit-repair-proposal id="] },
   { label: "verification-command", prefixes: ["verification-command id="] },

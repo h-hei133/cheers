@@ -24,6 +24,14 @@ export type HarnessFailureClass =
   | "provider-anchor-unsafe-output"
   | "provider-anchor-malformed-output"
   | "provider-invalid-output"
+  | "smoke-no-opt-in"
+  | "smoke-provider-unavailable"
+  | "smoke-prompt-audit-failed"
+  | "smoke-output-invalid"
+  | "smoke-anchoring-failed"
+  | "smoke-unsafe-output"
+  | "smoke-exact-ready-no-write"
+  | "smoke-corpus-regression"
   | "verification-not-allowlisted"
   | "verification-failed"
   | "runtime-timeout"
@@ -260,6 +268,70 @@ const TAXONOMY: Record<HarnessFailureClass, HarnessFailureTaxonomyEntry> = {
     suggestedNextAction: "Request a bounded exact proposal tied to context ids.",
     verifierMarker: "harness-failure:provider-invalid-output",
   },
+  "smoke-no-opt-in": {
+    failureClass: "smoke-no-opt-in",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Anchored real-provider smoke was not explicitly opted in.",
+    suggestedNextAction: "Run fake corpus or pass the explicit anchored smoke opt-in.",
+    verifierMarker: "harness-failure:smoke-no-opt-in",
+  },
+  "smoke-provider-unavailable": {
+    failureClass: "smoke-provider-unavailable",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Anchored real-provider smoke provider was unavailable or not configured.",
+    suggestedNextAction: "Use fake corpus or run the approved readiness gate before smoke.",
+    verifierMarker: "harness-failure:smoke-provider-unavailable",
+  },
+  "smoke-prompt-audit-failed": {
+    failureClass: "smoke-prompt-audit-failed",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Anchored provider smoke prompt audit failed.",
+    suggestedNextAction: "Redact, budget, and complete provider prompt context before smoke.",
+    verifierMarker: "harness-failure:smoke-prompt-audit-failed",
+  },
+  "smoke-output-invalid": {
+    failureClass: "smoke-output-invalid",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Anchored provider smoke output was invalid for a safe proposal.",
+    suggestedNextAction: "Request bounded target-bound old/new anchors.",
+    verifierMarker: "harness-failure:smoke-output-invalid",
+  },
+  "smoke-anchoring-failed": {
+    failureClass: "smoke-anchoring-failed",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Anchored provider smoke could not produce exact anchored handoff evidence.",
+    suggestedNextAction: "Refresh target context or request more precise anchors.",
+    verifierMarker: "harness-failure:smoke-anchoring-failed",
+  },
+  "smoke-unsafe-output": {
+    failureClass: "smoke-unsafe-output",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Anchored provider smoke output was unsafe.",
+    suggestedNextAction: "Discard unsafe output and retry only with bounded safety constraints.",
+    verifierMarker: "harness-failure:smoke-unsafe-output",
+  },
+  "smoke-exact-ready-no-write": {
+    failureClass: "smoke-exact-ready-no-write",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Anchored provider smoke produced exact-ready no-write evidence.",
+    suggestedNextAction: "Review and explicitly confirm before any existing apply lane.",
+    verifierMarker: "harness-failure:smoke-exact-ready-no-write",
+  },
+  "smoke-corpus-regression": {
+    failureClass: "smoke-corpus-regression",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Deterministic anchored fake corpus did not match expected quality outcomes.",
+    suggestedNextAction: "Fix the corpus, report scoring, or anchored dry-run regression.",
+    verifierMarker: "harness-failure:smoke-corpus-regression",
+  },
   "verification-not-allowlisted": {
     failureClass: "verification-not-allowlisted",
     capabilityArea: "runtime-verification",
@@ -354,6 +426,14 @@ export function classifyHarnessFailure(input: {
   if (/budget-limited|over-budget|over-byte-budget|over-file-budget|over-node-budget/.test(text)) return TAXONOMY["context-budget-limited"];
   if (/low-plan-quality|plan-quality.*low-confidence|low-confidence/.test(text)) return TAXONOMY["low-plan-quality"];
   if (/missing-context|context-missing|context packet.*missing|agent plan.*missing/.test(text)) return TAXONOMY["missing-context"];
+  if (/smoke no opt-in|smoke-no-opt-in|anchored-provider-smoke-gate:skip-reason:no-opt-in/.test(text)) return TAXONOMY["smoke-no-opt-in"];
+  if (/smoke provider unavailable|smoke-provider-unavailable|provider-smoke.*provider-unavailable|anchored-provider-smoke-gate:skip-reason:provider/.test(text)) return TAXONOMY["smoke-provider-unavailable"];
+  if (/smoke prompt audit failed|smoke-prompt-audit-failed/.test(text)) return TAXONOMY["smoke-prompt-audit-failed"];
+  if (/smoke output invalid|smoke-output-invalid/.test(text)) return TAXONOMY["smoke-output-invalid"];
+  if (/smoke unsafe output|smoke-unsafe-output/.test(text)) return TAXONOMY["smoke-unsafe-output"];
+  if (/smoke exact-ready no-write|smoke-exact-ready-no-write/.test(text)) return TAXONOMY["smoke-exact-ready-no-write"];
+  if (/smoke corpus regression|smoke-corpus-regression/.test(text)) return TAXONOMY["smoke-corpus-regression"];
+  if (/smoke anchoring failed|smoke-anchoring-failed/.test(text)) return TAXONOMY["smoke-anchoring-failed"];
   if (/provider.*invalid|provider-invalid|invalid-proposal|invalid proposal|invalid output/.test(text)) return TAXONOMY["provider-invalid-output"];
   if (/provider-dry-run-not-opted-in|dry-run-stopped-no-opt-in|stop-no-opt-in/.test(text)) return TAXONOMY["provider-dry-run-not-opted-in"];
   if (/provider-prompt-audit-failed|dry-run-prompt-audit-failed|prompt-audit.*fail/.test(text)) return TAXONOMY["provider-prompt-audit-failed"];

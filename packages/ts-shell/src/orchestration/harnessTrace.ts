@@ -43,6 +43,10 @@ export interface HarnessTrace {
   readonly providerAnchoringReviewReadiness?: string;
   readonly providerAnchoringNoWrite?: boolean;
   readonly providerDryRunCalled?: boolean;
+  readonly providerSmokeMode?: string;
+  readonly providerSmokeCaseId?: string;
+  readonly providerSmokeSkipReason?: string;
+  readonly providerSmokeReportId?: string;
   readonly verificationCommandPlanId?: string;
   readonly runtimeReceiptMarkers: readonly string[];
   readonly repairContextId?: string;
@@ -86,6 +90,10 @@ export function buildHarnessTrace(input: {
   readonly providerAnchoringReviewReadiness?: string;
   readonly providerAnchoringNoWrite?: boolean;
   readonly providerDryRunCalled?: boolean;
+  readonly providerSmokeMode?: string;
+  readonly providerSmokeCaseId?: string;
+  readonly providerSmokeSkipReason?: string;
+  readonly providerSmokeReportId?: string;
   readonly verificationCommandPlanId?: string;
   readonly runtimeReceiptMarkers?: readonly string[];
   readonly repairContextId?: string;
@@ -133,6 +141,10 @@ export function buildHarnessTrace(input: {
     input.providerAnchoringReviewReadiness ? `anchoringReview=${input.providerAnchoringReviewReadiness}` : undefined,
     typeof input.providerAnchoringNoWrite === "boolean" ? `anchoringNoWrite=${input.providerAnchoringNoWrite}` : undefined,
     typeof input.providerDryRunCalled === "boolean" ? `providerCalled=${input.providerDryRunCalled}` : undefined,
+    input.providerSmokeMode ? `providerSmokeMode=${input.providerSmokeMode}` : undefined,
+    input.providerSmokeCaseId ? `providerSmokeCase=${input.providerSmokeCaseId}` : undefined,
+    input.providerSmokeSkipReason ? `providerSmokeSkip=${input.providerSmokeSkipReason}` : undefined,
+    input.providerSmokeReportId ? `providerSmokeReport=${input.providerSmokeReportId}` : undefined,
     input.verificationCommandPlanId ? `verificationPlan=${input.verificationCommandPlanId}` : undefined,
     `stages=${lifecycleStages.join(",")}`,
     `failureClass=${failureTaxonomy.failureClass}`,
@@ -171,6 +183,10 @@ export function buildHarnessTrace(input: {
     ...(input.providerAnchoringReviewReadiness ? { providerAnchoringReviewReadiness: input.providerAnchoringReviewReadiness } : {}),
     ...(typeof input.providerAnchoringNoWrite === "boolean" ? { providerAnchoringNoWrite: input.providerAnchoringNoWrite } : {}),
     ...(typeof input.providerDryRunCalled === "boolean" ? { providerDryRunCalled: input.providerDryRunCalled } : {}),
+    ...(input.providerSmokeMode ? { providerSmokeMode: input.providerSmokeMode } : {}),
+    ...(input.providerSmokeCaseId ? { providerSmokeCaseId: input.providerSmokeCaseId } : {}),
+    ...(input.providerSmokeSkipReason ? { providerSmokeSkipReason: input.providerSmokeSkipReason } : {}),
+    ...(input.providerSmokeReportId ? { providerSmokeReportId: input.providerSmokeReportId } : {}),
     ...(input.verificationCommandPlanId ? { verificationCommandPlanId: input.verificationCommandPlanId } : {}),
     runtimeReceiptMarkers,
     ...(input.repairContextId ? { repairContextId: input.repairContextId } : {}),
@@ -209,6 +225,10 @@ export function buildHarnessTrace(input: {
       ...(input.providerAnchoringReviewReadiness ? [`harness-trace:provider-anchoring-review:${input.providerAnchoringReviewReadiness}`] : []),
       ...(typeof input.providerAnchoringNoWrite === "boolean" ? [`harness-trace:provider-anchoring-no-write:${input.providerAnchoringNoWrite}`] : []),
       ...(typeof input.providerDryRunCalled === "boolean" ? [`harness-trace:provider-called:${input.providerDryRunCalled}`] : []),
+      ...(input.providerSmokeMode ? [`harness-trace:provider-smoke-mode:${input.providerSmokeMode}`] : []),
+      ...(input.providerSmokeCaseId ? [`harness-trace:provider-smoke-case:${input.providerSmokeCaseId}`] : []),
+      ...(input.providerSmokeSkipReason ? [`harness-trace:provider-smoke-skip:${input.providerSmokeSkipReason}`] : []),
+      ...(input.providerSmokeReportId ? [`harness-trace:provider-smoke-report:${input.providerSmokeReportId}`] : []),
       ...(input.verificationCommandPlanId ? [`harness-trace:verification-plan:${input.verificationCommandPlanId}`] : []),
       `harness-trace:runtime-receipts:${runtimeReceiptMarkers.length}`,
       `harness-trace:failure-class:${failureTaxonomy.failureClass}`,

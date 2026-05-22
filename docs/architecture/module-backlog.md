@@ -668,6 +668,24 @@ as an import-policing rule.
   call, provider call during apply, new writer, command/allowlist change,
   CLI/schema/deps change, or broad `runMvpIntegratedFlow.ts` refactor is added.
 
+### Route 196: Anchored Provider Smoke
+
+- Route 196 adds an anchored-proposal-specific smoke layer without granting
+  mutation authority.
+- New facades own the real-provider smoke safe-skip gate, deterministic fake
+  proposal-quality corpus, shared fake/real proposal quality report,
+  no-write smoke result, and smoke runner evidence.
+- Fake corpus cases cover exact single-target, exact multi-hunk, partial,
+  unanchored, fuzzy, broad, malformed, unsafe, stale, ambiguous, and
+  conflicting proposal outputs through the existing dry-run, prompt audit,
+  output validation, anchoring, scorecard, Harness, and Session / Continue
+  paths.
+- Real-provider smoke requires explicit opt-in and provider readiness; missing
+  opt-in or unavailable provider safe-skips with provider-called false.
+- No private provider config manual read, default provider call, mutation,
+  apply, provider call during apply, new writer, command/allowlist change,
+  CLI/schema/deps change, or broad `runMvpIntegratedFlow.ts` refactor is added.
+
 ## Module-First Route Rule
 
 Future routes must state:

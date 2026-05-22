@@ -43,4 +43,17 @@ describe("harnessFailureTaxonomy", () => {
     expect(classifyHarnessFailure({ evidence: ["provider-anchor-candidate:unsupported:malformed provider output"] }).failureClass)
       .toBe("provider-anchor-malformed-output");
   });
+
+  it("classifies anchored provider smoke failures and no-write exact readiness", () => {
+    expect(classifyHarnessFailure({ status: "smoke no opt-in" }).failureClass).toBe("smoke-no-opt-in");
+    expect(classifyHarnessFailure({ evidence: ["anchored-provider-smoke-gate:skip-reason:provider-not-configured"] }).failureClass)
+      .toBe("smoke-provider-unavailable");
+    expect(classifyHarnessFailure({ status: "smoke prompt audit failed" }).failureClass).toBe("smoke-prompt-audit-failed");
+    expect(classifyHarnessFailure({ status: "smoke output invalid" }).failureClass).toBe("smoke-output-invalid");
+    expect(classifyHarnessFailure({ status: "smoke unsafe output", evidence: ["provider-output-validation:status:unsafe-output"] }).failureClass)
+      .toBe("smoke-unsafe-output");
+    expect(classifyHarnessFailure({ status: "smoke exact-ready no-write" }).failureClass).toBe("smoke-exact-ready-no-write");
+    expect(classifyHarnessFailure({ status: "smoke corpus regression" }).failureClass).toBe("smoke-corpus-regression");
+    expect(classifyHarnessFailure({ status: "smoke anchoring failed" }).failureClass).toBe("smoke-anchoring-failed");
+  });
 });

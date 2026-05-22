@@ -173,6 +173,33 @@ describe("session result parity", () => {
     );
   });
 
+  it("projects anchored provider smoke quality report markers as provider-model evidence", () => {
+    const projection = projectSessionResultParity({
+      terminalClassification: "stopped",
+      stopReason: "Anchored provider smoke skipped no opt-in.",
+      codingResult: makeCodingResult({
+        reason: "Anchored provider smoke evaluated no-write.",
+        nextAction: "Run fake corpus or explicitly opt in.",
+        evidence: [
+          "anchored-provider-smoke:run:anchored_provider_smoke_abc",
+          "proposal-quality-report:mode:real-provider-smoke",
+          "proposal-quality-report:provider-called:false",
+          "provider-smoke-result:status:real-provider-smoke-skipped-no-opt-in",
+          "provider-smoke-result:mutation-authority:not-granted",
+        ],
+      }),
+    });
+
+    expect(projection.capabilityArea).toBe("provider-model");
+    expect(projection.mutationAuthority).toBe("not-granted");
+    expect(projection.evidenceMarkers).toEqual(
+      expect.arrayContaining([
+        "anchored-provider-smoke:run:anchored_provider_smoke_abc",
+        "provider-smoke-result:status:real-provider-smoke-skipped-no-opt-in",
+      ]),
+    );
+  });
+
   it("projects verification repair loop markers for session consumers", () => {
     const projection = projectSessionResultParity({
       terminalClassification: "stopped",

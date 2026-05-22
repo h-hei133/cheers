@@ -17,6 +17,13 @@ export interface HarnessScorecard {
   readonly providerAnchoringNoWrite?: HarnessScorecardStatus;
   readonly providerDryRunRedaction?: HarnessScorecardStatus;
   readonly providerDryRunNoWrite?: HarnessScorecardStatus;
+  readonly providerSmokeMode?: string;
+  readonly providerSmokeCaseId?: string;
+  readonly providerSmokeSkipReason?: string;
+  readonly providerSmokeReportId?: string;
+  readonly providerSmokeProviderCalled?: boolean;
+  readonly providerSmokeNoWrite?: HarnessScorecardStatus;
+  readonly providerSmokeQuality?: HarnessScorecardStatus;
   readonly verificationReadiness: HarnessScorecardStatus;
   readonly repairReadiness: HarnessScorecardStatus;
   readonly resultTruthfulness: HarnessScorecardStatus;
@@ -48,6 +55,15 @@ export function buildHarnessScorecard(input: {
     readonly anchoringNoWrite?: boolean;
     readonly redactionStatus?: string;
     readonly noWrite?: boolean;
+  };
+  readonly providerSmoke?: {
+    readonly mode?: string;
+    readonly caseId?: string;
+    readonly skipReason?: string;
+    readonly reportId?: string;
+    readonly providerCalled?: boolean;
+    readonly noWriteStatus?: string;
+    readonly scorecardStatus?: string;
   };
   readonly verificationReady?: boolean;
   readonly repairReady?: boolean;
@@ -92,6 +108,12 @@ export function buildHarnessScorecard(input: {
   const providerDryRunNoWrite = input.providerDryRun
     ? input.providerDryRun.noWrite === false ? "fail" : "pass"
     : undefined;
+  const providerSmokeNoWrite = input.providerSmoke
+    ? input.providerSmoke.noWriteStatus === "fail" ? "fail" : "pass"
+    : undefined;
+  const providerSmokeQuality = input.providerSmoke
+    ? scoreSmokeQuality(input.providerSmoke.scorecardStatus)
+    : undefined;
   const scorecardId = `harness_scorecard_${[
     input.trace?.traceId ?? "no-trace",
     input.planQuality?.qualityId ?? "no-quality",
@@ -124,6 +146,13 @@ export function buildHarnessScorecard(input: {
     providerAnchoringNoWrite ? `anchoringNoWrite=${providerAnchoringNoWrite}` : undefined,
     providerDryRunRedaction ? `dryRunRedaction=${providerDryRunRedaction}` : undefined,
     providerDryRunNoWrite ? `dryRunNoWrite=${providerDryRunNoWrite}` : undefined,
+    input.providerSmoke?.mode ? `providerSmokeMode=${input.providerSmoke.mode}` : undefined,
+    input.providerSmoke?.caseId ? `providerSmokeCase=${input.providerSmoke.caseId}` : undefined,
+    input.providerSmoke?.skipReason ? `providerSmokeSkip=${input.providerSmoke.skipReason}` : undefined,
+    input.providerSmoke?.reportId ? `providerSmokeReport=${input.providerSmoke.reportId}` : undefined,
+    typeof input.providerSmoke?.providerCalled === "boolean" ? `providerSmokeCalled=${input.providerSmoke.providerCalled}` : undefined,
+    providerSmokeNoWrite ? `providerSmokeNoWrite=${providerSmokeNoWrite}` : undefined,
+    providerSmokeQuality ? `providerSmokeQuality=${providerSmokeQuality}` : undefined,
     `verification=${verificationReadiness}`,
     `repair=${repairReadiness}`,
     `failureClass=${failureClass}`,
@@ -145,6 +174,13 @@ export function buildHarnessScorecard(input: {
     ...(providerAnchoringNoWrite ? { providerAnchoringNoWrite } : {}),
     ...(providerDryRunRedaction ? { providerDryRunRedaction } : {}),
     ...(providerDryRunNoWrite ? { providerDryRunNoWrite } : {}),
+    ...(input.providerSmoke?.mode ? { providerSmokeMode: input.providerSmoke.mode } : {}),
+    ...(input.providerSmoke?.caseId ? { providerSmokeCaseId: input.providerSmoke.caseId } : {}),
+    ...(input.providerSmoke?.skipReason ? { providerSmokeSkipReason: input.providerSmoke.skipReason } : {}),
+    ...(input.providerSmoke?.reportId ? { providerSmokeReportId: input.providerSmoke.reportId } : {}),
+    ...(typeof input.providerSmoke?.providerCalled === "boolean" ? { providerSmokeProviderCalled: input.providerSmoke.providerCalled } : {}),
+    ...(providerSmokeNoWrite ? { providerSmokeNoWrite } : {}),
+    ...(providerSmokeQuality ? { providerSmokeQuality } : {}),
     verificationReadiness,
     repairReadiness,
     resultTruthfulness,
@@ -175,6 +211,13 @@ export function buildHarnessScorecard(input: {
       ...(providerAnchoringNoWrite ? [`harness-scorecard:provider-anchoring-no-write:${providerAnchoringNoWrite}`] : []),
       ...(providerDryRunRedaction ? [`harness-scorecard:provider-dry-run-redaction:${providerDryRunRedaction}`] : []),
       ...(providerDryRunNoWrite ? [`harness-scorecard:provider-dry-run-no-write:${providerDryRunNoWrite}`] : []),
+      ...(input.providerSmoke?.mode ? [`harness-scorecard:provider-smoke-mode:${input.providerSmoke.mode}`] : []),
+      ...(input.providerSmoke?.caseId ? [`harness-scorecard:provider-smoke-case:${input.providerSmoke.caseId}`] : []),
+      ...(input.providerSmoke?.skipReason ? [`harness-scorecard:provider-smoke-skip:${input.providerSmoke.skipReason}`] : []),
+      ...(input.providerSmoke?.reportId ? [`harness-scorecard:provider-smoke-report:${input.providerSmoke.reportId}`] : []),
+      ...(typeof input.providerSmoke?.providerCalled === "boolean" ? [`harness-scorecard:provider-smoke-called:${input.providerSmoke.providerCalled}`] : []),
+      ...(providerSmokeNoWrite ? [`harness-scorecard:provider-smoke-no-write:${providerSmokeNoWrite}`] : []),
+      ...(providerSmokeQuality ? [`harness-scorecard:provider-smoke-quality:${providerSmokeQuality}`] : []),
       `harness-scorecard:verification:${verificationReadiness}`,
       `harness-scorecard:repair:${repairReadiness}`,
       `harness-scorecard:failure-class:${failureClass}`,
@@ -201,6 +244,13 @@ function scoreAnchorQuality(level: string | undefined): HarnessScorecardStatus {
   if (!level) return "skip";
   if (level === "exact-ready") return "pass";
   if (level === "review-only" || level === "needs-anchoring" || level === "ambiguous" || level === "stale") return "warn";
+  return "fail";
+}
+
+function scoreSmokeQuality(status: string | undefined): HarnessScorecardStatus {
+  if (!status) return "skip";
+  if (status === "pass") return "pass";
+  if (status === "warn" || status === "skip") return status;
   return "fail";
 }
 

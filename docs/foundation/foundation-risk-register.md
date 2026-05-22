@@ -307,6 +307,34 @@ None open after Route 165.
 - Should become a route: no, resolved by Route 195 for no-write anchored
   proposal runtime activation and deterministic eval only.
 
+### Anchored provider smoke and proposal quality corpus
+
+- Affected modules: Provider / Model, Harness / Eval, Edit / Patch, Result
+  Surface, Session / Continue.
+- Why it was a calibration gap: Route 195 activated deterministic fake
+  anchored proposal runtime eval, but there was no anchored-proposal-specific
+  opt-in real-provider smoke gate, no fake proposal-quality corpus covering
+  low-quality provider outputs, and no shared report/result shape for fake and
+  real smoke summaries.
+- Resolution: Route 196 adds `anchoredProviderSmokeGate.ts`,
+  `proposalQualityCorpus.ts`, `proposalQualityReport.ts`,
+  `providerSmokeResult.ts`, and `anchoredProviderSmoke.ts`. The smoke gate
+  safe-skips real-provider smoke without explicit opt-in or provider readiness;
+  fake corpus cases run through the existing dry-run, prompt audit, output
+  validation, anchoring, scorecard, Harness, and Session / Continue evidence
+  paths; all smoke results remain no-write and raw provider output excluded.
+- Evidence: anchored provider smoke gate/corpus/report/result/runner tests,
+  provider dry-run and anchoring regressions, Harness scorecard/failure
+  taxonomy tests, Session / Continue parity tests, anchored provider smoke
+  verifier, focused context-planning and edit closeout verifiers,
+  result-contract, and build.
+- Recommended next action: keep real-provider smoke opt-in and isolated; do not
+  add default provider calls, manual private config reads, provider-generated
+  mutation, provider calls during apply, new writers, command/allowlist changes,
+  CLI/schema/dependency changes, or broad `runMvpIntegratedFlow.ts` rewrites.
+- Should become a route: no, resolved by Route 196 for no-write anchored
+  provider smoke and deterministic proposal quality corpus only.
+
 ### Session result parity after context and planning
 
 - Affected modules: Result Surface, Session / Continue, Workspace / File

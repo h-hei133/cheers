@@ -60,6 +60,11 @@ const focusedTests = [
   'src/orchestration/anchoredProposalRuntime.test.ts',
   'src/orchestration/anchoredProposalEval.test.ts',
   'src/orchestration/anchoredProposalScorecard.test.ts',
+  'src/orchestration/anchoredProviderSmokeGate.test.ts',
+  'src/orchestration/proposalQualityCorpus.test.ts',
+  'src/orchestration/proposalQualityReport.test.ts',
+  'src/orchestration/providerSmokeResult.test.ts',
+  'src/orchestration/anchoredProviderSmoke.test.ts',
   'src/orchestration/verificationCommandPlan.test.ts',
   'src/orchestration/verificationCommandRunner.test.ts',
   'src/orchestration/verificationCommandResult.test.ts',
@@ -157,6 +162,11 @@ console.log('marker anchored-proposal-runtime-activation')
 console.log('marker anchored-proposal-fake-provider-runtime')
 console.log('marker anchored-proposal-eval-scorecard')
 console.log('marker anchored-proposal-session-continue')
+console.log('marker anchored-provider-smoke-gate')
+console.log('marker anchored-provider-smoke-fake-corpus')
+console.log('marker anchored-provider-smoke-default-no-provider-call')
+console.log('marker proposal-quality-report-shared-fake-real-shape')
+console.log('marker anchored-provider-smoke-session-continue')
 console.log('marker verification-repair-context-packet-agent-plan-ids')
 console.log('marker verification-command-plan-agent-plan-candidate')
 console.log('marker verification-command-runtime-receipt-captured')
