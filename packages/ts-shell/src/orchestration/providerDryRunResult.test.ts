@@ -28,6 +28,7 @@ describe("providerDryRunResult", () => {
           targets: [{ path: "src/app.ts", oldText: "runApp", newText: "startApp" }],
         }),
       },
+      currentContentByTargetLabel: new Map([["src/app.ts", "runApp\n"]]),
     });
     const result = buildProviderDryRunResult({
       sessionId: "session-193",
@@ -40,6 +41,8 @@ describe("providerDryRunResult", () => {
     expect(result.codingResult?.evidence).toEqual(
       expect.arrayContaining([
         `real-provider-proposal-dry-run-result:status:${dryRun.status}`,
+        `provider-anchored-proposal:id:${dryRun.anchoredProposal.anchoredProposalId}`,
+        "provider-anchoring-result:status:anchored-proposal-handoff-ready",
         "real-provider-proposal-dry-run-result:mutation-authority:not-granted",
       ]),
     );

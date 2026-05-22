@@ -39,6 +39,12 @@ const testTargets = [
   'src/orchestration/providerPromptAudit.test.ts',
   'src/orchestration/providerOutputValidator.test.ts',
   'src/orchestration/providerAnchorQuality.test.ts',
+  'src/orchestration/providerAnchorCandidate.test.ts',
+  'src/orchestration/providerProposalAnchors.test.ts',
+  'src/orchestration/providerAnchorMatcher.test.ts',
+  'src/orchestration/providerAnchorConflict.test.ts',
+  'src/orchestration/providerAnchoredProposal.test.ts',
+  'src/orchestration/providerAnchoringResult.test.ts',
   'src/orchestration/realProviderProposalDryRun.test.ts',
   'src/orchestration/providerDryRunResult.test.ts',
   'src/orchestration/editRepairContext.test.ts',
@@ -117,6 +123,12 @@ console.log('report field real_provider_proposal_dry_run_gate=covered')
 console.log('report field provider_prompt_audit=covered')
 console.log('report field provider_output_validator=covered')
 console.log('report field provider_anchor_quality=covered')
+console.log('report field provider_anchor_candidate=covered')
+console.log('report field provider_anchor_extraction=covered')
+console.log('report field provider_anchor_matching=covered')
+console.log('report field provider_anchor_conflict_detection=covered')
+console.log('report field provider_anchored_proposal=covered')
+console.log('report field provider_anchoring_result=covered')
 console.log('report field provider_dry_run_no_write_result=covered')
 console.log('report field provider_edit_confirmation=covered')
 console.log('report field provider_edit_exact_handoff_ready=covered')
@@ -213,6 +225,14 @@ console.log('marker provider-edit-context-over-budget-stopped')
 console.log('marker provider-edit-invalid-proposal-stopped')
 console.log('marker provider-edit-exact-single-target-handoff-ready')
 console.log('marker provider-edit-exact-target-set-handoff-ready')
+console.log('marker provider-anchor-candidate-mutation-authority-not-granted')
+console.log('marker provider-anchor-extraction-no-write')
+console.log('marker provider-anchor-match-current-safe-read')
+console.log('marker provider-anchor-ambiguous-stale-no-write')
+console.log('marker provider-anchor-conflict-overlap-no-write')
+console.log('marker provider-anchored-proposal-review-handoff')
+console.log('marker provider-anchored-proposal-no-mutation-authority')
+console.log('marker provider-anchoring-result-raw-content-excluded')
 console.log('marker provider-edit-proposal-no-mutation-without-execution-path')
 console.log('marker provider-edit-session-report-raw-content-and-secrets-excluded')
 console.log('marker context-aware-provider-context-packet-feeds-proposal')

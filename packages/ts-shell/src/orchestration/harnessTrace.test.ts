@@ -37,6 +37,12 @@ describe("harnessTrace", () => {
       providerPromptAuditStatus: "pass",
       providerOutputValidationStatus: "valid-exact-single-target",
       providerAnchorQualityLevel: "exact-ready",
+      providerAnchoringAttempted: true,
+      providerAnchoringOutcome: "anchored-proposal-handoff-ready",
+      providerAnchoredProposalId: "provider-anchored-194",
+      providerAnchoringExactness: "exact",
+      providerAnchoringReviewReadiness: "explicit-review-and-confirmation",
+      providerAnchoringNoWrite: true,
       providerDryRunCalled: true,
       status: "dry-run-exact-ready-no-write",
     });
@@ -48,6 +54,9 @@ describe("harnessTrace", () => {
         "harness-trace:provider-prompt-audit:pass",
         "harness-trace:provider-output-validation:valid-exact-single-target",
         "harness-trace:provider-anchor-quality:exact-ready",
+        "harness-trace:provider-anchoring-outcome:anchored-proposal-handoff-ready",
+        "harness-trace:provider-anchored-proposal:provider-anchored-194",
+        "harness-trace:provider-anchoring-no-write:true",
         "harness-trace:provider-called:true",
       ]),
     );

@@ -36,6 +36,12 @@ export interface HarnessTrace {
   readonly providerPromptAuditStatus?: string;
   readonly providerOutputValidationStatus?: string;
   readonly providerAnchorQualityLevel?: string;
+  readonly providerAnchoringAttempted?: boolean;
+  readonly providerAnchoringOutcome?: string;
+  readonly providerAnchoredProposalId?: string;
+  readonly providerAnchoringExactness?: string;
+  readonly providerAnchoringReviewReadiness?: string;
+  readonly providerAnchoringNoWrite?: boolean;
   readonly providerDryRunCalled?: boolean;
   readonly verificationCommandPlanId?: string;
   readonly runtimeReceiptMarkers: readonly string[];
@@ -73,6 +79,12 @@ export function buildHarnessTrace(input: {
   readonly providerPromptAuditStatus?: string;
   readonly providerOutputValidationStatus?: string;
   readonly providerAnchorQualityLevel?: string;
+  readonly providerAnchoringAttempted?: boolean;
+  readonly providerAnchoringOutcome?: string;
+  readonly providerAnchoredProposalId?: string;
+  readonly providerAnchoringExactness?: string;
+  readonly providerAnchoringReviewReadiness?: string;
+  readonly providerAnchoringNoWrite?: boolean;
   readonly providerDryRunCalled?: boolean;
   readonly verificationCommandPlanId?: string;
   readonly runtimeReceiptMarkers?: readonly string[];
@@ -114,6 +126,12 @@ export function buildHarnessTrace(input: {
     input.providerPromptAuditStatus ? `promptAudit=${input.providerPromptAuditStatus}` : undefined,
     input.providerOutputValidationStatus ? `outputValidation=${input.providerOutputValidationStatus}` : undefined,
     input.providerAnchorQualityLevel ? `anchorQuality=${input.providerAnchorQualityLevel}` : undefined,
+    typeof input.providerAnchoringAttempted === "boolean" ? `anchoringAttempted=${input.providerAnchoringAttempted}` : undefined,
+    input.providerAnchoringOutcome ? `anchoring=${input.providerAnchoringOutcome}` : undefined,
+    input.providerAnchoredProposalId ? `anchoredProposal=${input.providerAnchoredProposalId}` : undefined,
+    input.providerAnchoringExactness ? `anchoringExactness=${input.providerAnchoringExactness}` : undefined,
+    input.providerAnchoringReviewReadiness ? `anchoringReview=${input.providerAnchoringReviewReadiness}` : undefined,
+    typeof input.providerAnchoringNoWrite === "boolean" ? `anchoringNoWrite=${input.providerAnchoringNoWrite}` : undefined,
     typeof input.providerDryRunCalled === "boolean" ? `providerCalled=${input.providerDryRunCalled}` : undefined,
     input.verificationCommandPlanId ? `verificationPlan=${input.verificationCommandPlanId}` : undefined,
     `stages=${lifecycleStages.join(",")}`,
@@ -146,6 +164,12 @@ export function buildHarnessTrace(input: {
     ...(input.providerPromptAuditStatus ? { providerPromptAuditStatus: input.providerPromptAuditStatus } : {}),
     ...(input.providerOutputValidationStatus ? { providerOutputValidationStatus: input.providerOutputValidationStatus } : {}),
     ...(input.providerAnchorQualityLevel ? { providerAnchorQualityLevel: input.providerAnchorQualityLevel } : {}),
+    ...(typeof input.providerAnchoringAttempted === "boolean" ? { providerAnchoringAttempted: input.providerAnchoringAttempted } : {}),
+    ...(input.providerAnchoringOutcome ? { providerAnchoringOutcome: input.providerAnchoringOutcome } : {}),
+    ...(input.providerAnchoredProposalId ? { providerAnchoredProposalId: input.providerAnchoredProposalId } : {}),
+    ...(input.providerAnchoringExactness ? { providerAnchoringExactness: input.providerAnchoringExactness } : {}),
+    ...(input.providerAnchoringReviewReadiness ? { providerAnchoringReviewReadiness: input.providerAnchoringReviewReadiness } : {}),
+    ...(typeof input.providerAnchoringNoWrite === "boolean" ? { providerAnchoringNoWrite: input.providerAnchoringNoWrite } : {}),
     ...(typeof input.providerDryRunCalled === "boolean" ? { providerDryRunCalled: input.providerDryRunCalled } : {}),
     ...(input.verificationCommandPlanId ? { verificationCommandPlanId: input.verificationCommandPlanId } : {}),
     runtimeReceiptMarkers,
@@ -178,6 +202,12 @@ export function buildHarnessTrace(input: {
       ...(input.providerPromptAuditStatus ? [`harness-trace:provider-prompt-audit:${input.providerPromptAuditStatus}`] : []),
       ...(input.providerOutputValidationStatus ? [`harness-trace:provider-output-validation:${input.providerOutputValidationStatus}`] : []),
       ...(input.providerAnchorQualityLevel ? [`harness-trace:provider-anchor-quality:${input.providerAnchorQualityLevel}`] : []),
+      ...(typeof input.providerAnchoringAttempted === "boolean" ? [`harness-trace:provider-anchoring-attempted:${input.providerAnchoringAttempted}`] : []),
+      ...(input.providerAnchoringOutcome ? [`harness-trace:provider-anchoring-outcome:${input.providerAnchoringOutcome}`] : []),
+      ...(input.providerAnchoredProposalId ? [`harness-trace:provider-anchored-proposal:${input.providerAnchoredProposalId}`] : []),
+      ...(input.providerAnchoringExactness ? [`harness-trace:provider-anchoring-exactness:${input.providerAnchoringExactness}`] : []),
+      ...(input.providerAnchoringReviewReadiness ? [`harness-trace:provider-anchoring-review:${input.providerAnchoringReviewReadiness}`] : []),
+      ...(typeof input.providerAnchoringNoWrite === "boolean" ? [`harness-trace:provider-anchoring-no-write:${input.providerAnchoringNoWrite}`] : []),
       ...(typeof input.providerDryRunCalled === "boolean" ? [`harness-trace:provider-called:${input.providerDryRunCalled}`] : []),
       ...(input.verificationCommandPlanId ? [`harness-trace:verification-plan:${input.verificationCommandPlanId}`] : []),
       `harness-trace:runtime-receipts:${runtimeReceiptMarkers.length}`,
@@ -200,6 +230,7 @@ function deriveStages(input: {
   readonly planQualityId?: string;
   readonly providerProposalId?: string;
   readonly providerDryRunId?: string;
+  readonly providerAnchoredProposalId?: string;
   readonly verificationCommandPlanId?: string;
   readonly repairContextId?: string;
   readonly resultStatus?: string;
@@ -208,7 +239,7 @@ function deriveStages(input: {
   if (input.contextPacketId || input.contextGraphId) stages.push("read");
   if (input.analysisBriefId) stages.push("analyze");
   if (input.agentPlanId || input.planQualityId) stages.push("plan");
-  if (input.providerProposalId || input.providerDryRunId) stages.push("proposal");
+  if (input.providerProposalId || input.providerDryRunId || input.providerAnchoredProposalId) stages.push("proposal");
   if (input.taskExecutionPlanId) stages.push("edit");
   if (input.verificationCommandPlanId) stages.push("verification");
   if (input.repairContextId) stages.push("repair");

@@ -23,6 +23,10 @@ const CONTINUATION_EVIDENCE_PREFIXES: ReadonlyArray<{
     label: "real-provider-dry-run",
     prefixes: ["real-provider-proposal-dry-run id="],
   },
+  {
+    label: "provider-anchored-proposal",
+    prefixes: ["provider-anchored-proposal id=", "provider-anchoring proposal="],
+  },
   { label: "edit-repair-context", prefixes: ["edit-repair-context id="] },
   { label: "edit-repair-proposal", prefixes: ["edit-repair-proposal id="] },
   { label: "verification-command", prefixes: ["verification-command id="] },

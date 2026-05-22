@@ -48,6 +48,12 @@ const focusedTests = [
   'src/orchestration/providerPromptAudit.test.ts',
   'src/orchestration/providerOutputValidator.test.ts',
   'src/orchestration/providerAnchorQuality.test.ts',
+  'src/orchestration/providerAnchorCandidate.test.ts',
+  'src/orchestration/providerProposalAnchors.test.ts',
+  'src/orchestration/providerAnchorMatcher.test.ts',
+  'src/orchestration/providerAnchorConflict.test.ts',
+  'src/orchestration/providerAnchoredProposal.test.ts',
+  'src/orchestration/providerAnchoringResult.test.ts',
   'src/orchestration/realProviderProposalDryRun.test.ts',
   'src/orchestration/providerDryRunResult.test.ts',
   'src/orchestration/verificationCommandPlan.test.ts',
@@ -136,6 +142,11 @@ console.log('marker real-provider-proposal-dry-run-gate')
 console.log('marker provider-prompt-audit-redacted-budgeted')
 console.log('marker provider-output-validator-anchor-classes')
 console.log('marker provider-anchor-quality-no-write')
+console.log('marker provider-anchor-candidates-extracted')
+console.log('marker provider-anchor-matches-current-safe-read')
+console.log('marker provider-anchor-conflict-detection')
+console.log('marker provider-anchored-proposal-manifest')
+console.log('marker provider-anchoring-result-session-continue')
 console.log('marker provider-dry-run-result-session-continue')
 console.log('marker provider-dry-run-harness-scorecard')
 console.log('marker verification-repair-context-packet-agent-plan-ids')

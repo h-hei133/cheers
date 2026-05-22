@@ -52,6 +52,9 @@ not import restrictions.
   and quality ids, Plan Quality id, context packet / graph / code graph trace
   ids, prompt audit pass, and provider availability facts when real-provider
   proposal dry-run generation is opened,
+  provider/generated proposal anchor candidates, current safe-read match facts,
+  conflict results, and anchored proposal review facts when provider anchoring
+  is opened,
   allowlisted verification command candidates from Agent Plan / proposal /
   edit result facts, existing runtime receipt markers, and command failure
   classifications when command-driven verification opens repair planning,
@@ -79,8 +82,9 @@ not import restrictions.
   Agent Plan ids, missing-context stopped evidence, provider invalid-output
   stopped evidence, and review/handoff readiness,
   real-provider proposal dry-run no-write evidence with gate decision, prompt
-  audit, output validation, anchor quality, proposal manifest ids, provider
-  called/not-called status, and review/handoff readiness,
+  audit, output validation, anchor extraction, safe-read match outcome,
+  conflict detection, anchor quality, anchored proposal ids, proposal manifest
+  ids, provider called/not-called status, and review/handoff readiness,
   verification command plan/runner/result evidence for allowlisted success,
   failed, blocked, skipped, timeout, budget/redaction, and no-dispatch
   not-allowlisted states,
@@ -135,9 +139,12 @@ not import restrictions.
   Real-provider proposal dry-runs must stop before provider invocation unless
   explicitly opted in and lifecycle, analysis, Plan Quality, context/code graph,
   redaction, prompt audit, and provider availability preconditions pass. Dry-run
-  output must be validated and anchor-classified before a no-write proposal
-  manifest is surfaced; provider output never grants mutation authority and
-  apply lanes must not call providers.
+  output must be validated, anchor-extracted, matched against current safe-read
+  facts when available, conflict-checked, and anchor-classified before a
+  no-write proposal manifest is surfaced; provider output never grants mutation
+  authority and apply lanes must not call providers. Partial, fuzzy, broad,
+  stale, ambiguous, conflicting, malformed, or unsafe anchored output remains
+  review-only or stopped no-write.
   Do not run automatic rollback.
 - Validate: focused edit/write route tests, stale-read/authority regression,
   fenced edit activation/runtime tests, discovery edit
@@ -145,7 +152,8 @@ not import restrictions.
   proposal/planner/confirmation/result tests, provider edit
   context/proposal/planner/confirmation/result tests, context-aware provider
   edit/prompt/proposal/result tests, real-provider proposal gate/prompt
-  audit/output validator/anchor quality/dry-run result tests, edit repair
+  audit/output validator/anchor candidate/extraction/matcher/conflict/anchored
+  proposal/anchoring result/anchor quality/dry-run result tests, edit repair
   context/proposal/planner/result tests, verification command
   plan/runner/result/classifier/bridge tests, verification repair
   context/planner/result/loop tests, proposal review/selection/apply/result

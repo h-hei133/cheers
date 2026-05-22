@@ -16,6 +16,13 @@ export type HarnessFailureClass =
   | "provider-output-unsafe"
   | "provider-output-over-budget"
   | "provider-anchor-quality-low"
+  | "provider-anchor-no-match"
+  | "provider-anchor-ambiguous"
+  | "provider-anchor-stale-context"
+  | "provider-anchor-conflict"
+  | "provider-anchor-unsupported-fuzzy-output"
+  | "provider-anchor-unsafe-output"
+  | "provider-anchor-malformed-output"
   | "provider-invalid-output"
   | "verification-not-allowlisted"
   | "verification-failed"
@@ -189,6 +196,62 @@ const TAXONOMY: Record<HarnessFailureClass, HarnessFailureTaxonomyEntry> = {
     suggestedNextAction: "Add explicit target anchors and verification expectation before review.",
     verifierMarker: "harness-failure:provider-anchor-quality-low",
   },
+  "provider-anchor-no-match": {
+    failureClass: "provider-anchor-no-match",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Provider anchor did not match current target content.",
+    suggestedNextAction: "Refresh target context or request an exact current old anchor.",
+    verifierMarker: "harness-failure:provider-anchor-no-match",
+  },
+  "provider-anchor-ambiguous": {
+    failureClass: "provider-anchor-ambiguous",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Provider anchor matched ambiguously or needs target selection.",
+    suggestedNextAction: "Select one target/hunk or request a unique exact old anchor.",
+    verifierMarker: "harness-failure:provider-anchor-ambiguous",
+  },
+  "provider-anchor-stale-context": {
+    failureClass: "provider-anchor-stale-context",
+    capabilityArea: "workspace-file-context",
+    lifecycleStage: "proposal",
+    safeReason: "Provider anchoring is blocked by stale context.",
+    suggestedNextAction: "Re-read target files before anchoring provider output.",
+    verifierMarker: "harness-failure:provider-anchor-stale-context",
+  },
+  "provider-anchor-conflict": {
+    failureClass: "provider-anchor-conflict",
+    capabilityArea: "edit-patch",
+    lifecycleStage: "proposal",
+    safeReason: "Anchored provider hunks overlap or conflict before apply.",
+    suggestedNextAction: "Resolve overlapping or conflicting anchored hunks before review handoff.",
+    verifierMarker: "harness-failure:provider-anchor-conflict",
+  },
+  "provider-anchor-unsupported-fuzzy-output": {
+    failureClass: "provider-anchor-unsupported-fuzzy-output",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Fuzzy or broad provider output is unsupported for anchoring.",
+    suggestedNextAction: "Request bounded exact anchors; do not fuzzy apply.",
+    verifierMarker: "harness-failure:provider-anchor-unsupported-fuzzy-output",
+  },
+  "provider-anchor-unsafe-output": {
+    failureClass: "provider-anchor-unsafe-output",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Provider anchor output was unsafe.",
+    suggestedNextAction: "Discard unsafe provider output and retry with safety constraints.",
+    verifierMarker: "harness-failure:provider-anchor-unsafe-output",
+  },
+  "provider-anchor-malformed-output": {
+    failureClass: "provider-anchor-malformed-output",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Provider anchor output was malformed.",
+    suggestedNextAction: "Request a supported target-bound proposal shape.",
+    verifierMarker: "harness-failure:provider-anchor-malformed-output",
+  },
   "provider-invalid-output": {
     failureClass: "provider-invalid-output",
     capabilityArea: "provider-model",
@@ -297,6 +360,13 @@ export function classifyHarnessFailure(input: {
   if (/provider-output.*malformed|malformed-output/.test(text)) return TAXONOMY["provider-output-malformed"];
   if (/provider-output.*unanchored|unanchored-generated/.test(text)) return TAXONOMY["provider-output-unanchored"];
   if (/provider-output.*unsafe|unsafe-output|anchor-quality.*unsafe/.test(text)) return TAXONOMY["provider-output-unsafe"];
+  if (/provider-anchor-match:outcome:no-match|provider-anchoring-result:status:no-anchors-found|anchor no-match/.test(text)) return TAXONOMY["provider-anchor-no-match"];
+  if (/provider-anchor-match:outcome:multiple-candidates-ambiguous|provider-anchoring-result:status:ambiguous-anchors|anchor ambiguous|target-selection-required/.test(text)) return TAXONOMY["provider-anchor-ambiguous"];
+  if (/provider-anchor-match:outcome:stale-context|provider-anchor-conflict:kind:stale-match-facts|stale-context-blocks-anchoring/.test(text)) return TAXONOMY["provider-anchor-stale-context"];
+  if (/provider-anchor-conflict:kind:(?:overlapping-hunks|conflicting-replacements|same-target-range|duplicate-candidate|hunk-set-over-max|target-set-over-max)|anchor conflict/.test(text)) return TAXONOMY["provider-anchor-conflict"];
+  if (/unsupported-fuzzy-or-broad-output|provider-anchor-candidate:unsupported:unsupported fuzzy output|provider-anchor-candidate:unsupported:unsupported broad refactor output/.test(text)) return TAXONOMY["provider-anchor-unsupported-fuzzy-output"];
+  if (/provider-anchor-candidate:unsupported:unsafe provider output|provider-anchoring-result:status:unsafe-or-malformed-provider-output/.test(text)) return TAXONOMY["provider-anchor-unsafe-output"];
+  if (/provider-anchor-candidate:unsupported:malformed provider output|provider-anchor-malformed-output/.test(text)) return TAXONOMY["provider-anchor-malformed-output"];
   if (/provider-anchor-quality-low|dry-run-anchor-quality-low|anchor-quality.*low-confidence/.test(text)) return TAXONOMY["provider-anchor-quality-low"];
   if (/provider.*not[- ]configured|provider.*opt[- ]in|provider.*required|provider.*unavailable|provider-unavailable/.test(text)) return TAXONOMY["provider-unavailable"];
   if (/not-allowlisted|allowlist:not-allowlisted/.test(text)) return TAXONOMY["verification-not-allowlisted"];

@@ -90,7 +90,7 @@ function collectEvidence(
 function projectCapabilityArea(evidence: readonly string[]): string | undefined {
   if (
     evidence.some((entry) =>
-      /^(real-provider-proposal-dry-run|provider-prompt-audit|provider-output-validation|provider-anchor-quality)/.test(entry),
+      /^(real-provider-proposal-dry-run|provider-prompt-audit|provider-output-validation|provider-anchor-quality|provider-anchor-|provider-anchored-proposal|provider-anchoring-result)/.test(entry),
     )
   ) {
     return "provider-model";
@@ -162,7 +162,7 @@ function extractSuggestedReads(evidence: readonly string[]): string | undefined 
 }
 
 function isParityEvidenceMarker(entry: string): boolean {
-  return /^(?:actionable-blocker-kind|verify-blocker-kind|context-packet|context-plan|context-graph|code-graph|task-intent|task-read-plan|analysis-brief|task-lifecycle|task-execution-plan|test-impact|plan-quality|plan-quality-gate|harness-trace|harness-scorecard|harness-failure|agent-plan|generated-edit|provider-edit|context-aware-provider|real-provider-proposal-dry-run|provider-prompt-audit|provider-output-validation|provider-anchor-quality|edit-proposal|proposal-hunk-set|edit-repair|verification-command|verification-repair|target-set-edit|edit-recovery)/.test(
+  return /^(?:actionable-blocker-kind|verify-blocker-kind|context-packet|context-plan|context-graph|code-graph|task-intent|task-read-plan|analysis-brief|task-lifecycle|task-execution-plan|test-impact|plan-quality|plan-quality-gate|harness-trace|harness-scorecard|harness-failure|agent-plan|generated-edit|provider-edit|provider-anchor|provider-anchored-proposal|provider-anchoring-result|context-aware-provider|real-provider-proposal-dry-run|provider-prompt-audit|provider-output-validation|provider-anchor-quality|edit-proposal|proposal-hunk-set|edit-repair|verification-command|verification-repair|target-set-edit|edit-recovery)/.test(
     entry,
   );
 }

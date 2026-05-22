@@ -251,6 +251,36 @@ None open after Route 165.
 - Should become a route: no, resolved by Route 193 for no-write proposal
   dry-run readiness only.
 
+### Provider proposal anchoring readiness
+
+- Affected modules: Provider / Model, Edit / Patch, Workspace / File Context,
+  Agent Loop, Result Surface, Session / Continue, Harness / Eval.
+- Why it was a calibration gap: Route 193 validated provider output and
+  classified anchor quality from the raw proposal shape, but did not convert
+  provider/generated output into exact current-content anchors, detect conflicts,
+  or produce an anchored proposal manifest for the existing review/apply bridge.
+- Resolution: Route 194 adds `providerAnchorCandidate.ts`,
+  `providerProposalAnchors.ts`, `providerAnchorMatcher.ts`,
+  `providerAnchorConflict.ts`, `providerAnchoredProposal.ts`, and
+  `providerAnchoringResult.ts`. Exact candidates must match current safe-read
+  content before handoff; partial, fuzzy, broad, stale, ambiguous, conflicting,
+  malformed, and unsafe output remains review-only or stopped no-write.
+  Anchored proposals carry Plan Quality, anchor quality, candidate, conflict,
+  review requirement, handoff readiness, redaction, and mutation-authority
+  evidence; confirmed exact anchored hunks reuse the existing proposal
+  review/selection/apply and hunk-set paths.
+- Evidence: anchor candidate/extraction/matcher/conflict/anchored
+  proposal/anchoring result tests; provider anchor quality, dry-run result,
+  edit proposal apply, Plan Quality, Harness, Session / Continue regressions;
+  focused context-planning and edit closeout verifiers, result-contract, and
+  build.
+- Recommended next action: keep direct fuzzy/generated mutation, unconfirmed
+  apply, new writers, provider calls during apply, default provider calls,
+  private config reads, CLI/schema/dependency changes, and broad
+  `runMvpIntegratedFlow.ts` rewrites closed until separate routes define them.
+- Should become a route: no, resolved by Route 194 for no-write provider
+  proposal anchoring and review/apply handoff only.
+
 ### Session result parity after context and planning
 
 - Affected modules: Result Surface, Session / Continue, Workspace / File

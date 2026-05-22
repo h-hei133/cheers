@@ -16,6 +16,8 @@ import type { TaskLifecycle } from "./taskLifecycle.js";
 import type { AnalysisBriefCalibration } from "./analysisBriefCalibration.js";
 import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
 import type { TaskContextSufficiency } from "./taskContextSufficiency.js";
+import type { ProviderAnchoredProposalManifest } from "./providerAnchoredProposal.js";
+import type { ProviderAnchoringResult } from "./providerAnchoringResult.js";
 
 export type PlanQualityLevel =
   | "ready"
@@ -61,6 +63,10 @@ export interface PlanQuality {
   readonly analysisQualityGateDecision?: string;
   readonly verificationPlanId?: string;
   readonly repairLoopId?: string;
+  readonly providerAnchoredProposalId?: string;
+  readonly providerAnchorQualityLevel?: string;
+  readonly providerAnchoringOutcome?: string;
+  readonly providerAnchoringHandoffReadiness?: string;
   readonly score: number;
   readonly level: PlanQualityLevel;
   readonly dimensions: PlanQualityDimensions;
@@ -73,6 +79,99 @@ export interface PlanQuality {
   readonly mutationAuthority: "not-granted";
   readonly replaySafeSummary: string;
   readonly evidence: readonly string[];
+}
+
+export function attachProviderAnchoringToPlanQuality(input: {
+  readonly planQuality: PlanQuality;
+  readonly anchoredProposal: ProviderAnchoredProposalManifest;
+  readonly anchoringResult: ProviderAnchoringResult;
+}): PlanQuality {
+  const applyReadiness =
+    input.anchoredProposal.handoffReadiness === "exact-single-target" ||
+    input.anchoredProposal.handoffReadiness === "exact-hunk-set"
+      ? 85
+      : input.anchoredProposal.handoffReadiness === "review-only"
+        ? 45
+        : 15;
+  const missingFacts = Array.from(
+    new Set([
+      ...input.planQuality.missingFacts,
+      ...input.anchoringResult.missingFacts,
+      ...(input.anchoredProposal.reviewRequirement === "target-selection-required"
+        ? ["provider anchor target selection required"]
+        : []),
+      ...(input.anchoredProposal.reviewRequirement === "context-refresh-required"
+        ? ["provider anchor context refresh required"]
+        : []),
+      ...(input.anchoredProposal.reviewRequirement === "blocked"
+        ? ["provider anchor handoff blocked"]
+        : []),
+    ]),
+  );
+  const suggestedReads = Array.from(
+    new Set([...input.planQuality.suggestedReads, ...input.anchoringResult.suggestedReads]),
+  );
+  const suggestedNextAction =
+    input.anchoredProposal.handoffReadiness === "exact-single-target" ||
+    input.anchoredProposal.handoffReadiness === "exact-hunk-set"
+      ? "Review and explicitly confirm anchored provider hunks before existing apply path."
+      : input.anchoringResult.nextAction;
+  const dimensions = {
+    ...input.planQuality.dimensions,
+    applyReadiness,
+  };
+  const score = Math.round(
+    (
+      dimensions.targetConfidence +
+      dimensions.contextPacketCompleteness +
+      dimensions.contextGraphCoverage +
+      dimensions.importCallSiteCoverage +
+      dimensions.testImpactCoverage +
+      dimensions.codeGraphTraceFreshness +
+      dimensions.codeGraphImpactCoverage +
+      dimensions.docsCoverage +
+      dimensions.omittedRisk +
+      dimensions.providerReadiness +
+      dimensions.verificationReadiness +
+      dimensions.repairLoopReadiness +
+      dimensions.applyReadiness
+    ) / 13,
+  );
+  const level =
+    input.planQuality.level === "ready" &&
+    input.anchoredProposal.handoffReadiness === "blocked"
+      ? "needs-more-context"
+      : input.planQuality.level;
+
+  return {
+    ...input.planQuality,
+    providerAnchoredProposalId: input.anchoredProposal.anchoredProposalId,
+    providerAnchorQualityLevel: input.anchoredProposal.anchorQualityLevel,
+    providerAnchoringOutcome: input.anchoringResult.status,
+    providerAnchoringHandoffReadiness: input.anchoredProposal.handoffReadiness,
+    score,
+    level,
+    dimensions,
+    missingFacts,
+    suggestedReads,
+    suggestedNextAction,
+    replaySafeSummary: [
+      input.planQuality.replaySafeSummary,
+      `providerAnchoredProposal=${input.anchoredProposal.anchoredProposalId}`,
+      `providerAnchoring=${input.anchoringResult.status}`,
+      `providerAnchorQuality=${input.anchoredProposal.anchorQualityLevel}`,
+      `providerHandoff=${input.anchoredProposal.handoffReadiness}`,
+    ].join("; "),
+    evidence: [
+      ...input.planQuality.evidence,
+      `plan-quality:provider-anchored-proposal:${input.anchoredProposal.anchoredProposalId}`,
+      `plan-quality:provider-anchoring:${input.anchoringResult.status}`,
+      `plan-quality:provider-anchor-quality:${input.anchoredProposal.anchorQualityLevel}`,
+      `plan-quality:provider-handoff:${input.anchoredProposal.handoffReadiness}`,
+      "plan-quality:provider-anchoring-mutation-authority:not-granted",
+      ...input.anchoringResult.evidence,
+    ],
+  };
 }
 
 export function buildPlanQuality(input: {

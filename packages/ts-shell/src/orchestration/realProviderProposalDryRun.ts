@@ -1,6 +1,13 @@
 import type { ContextAwareProviderPromptContext } from "./contextAwareProviderPrompt.js";
 import type { ProviderAnchorQuality } from "./providerAnchorQuality.js";
 import { classifyProviderAnchorQuality } from "./providerAnchorQuality.js";
+import type { ProviderAnchoredProposalManifest } from "./providerAnchoredProposal.js";
+import { buildProviderAnchoredProposal } from "./providerAnchoredProposal.js";
+import { detectProviderAnchorConflicts } from "./providerAnchorConflict.js";
+import { matchProviderAnchorCandidates } from "./providerAnchorMatcher.js";
+import type { ProviderAnchoringResult } from "./providerAnchoringResult.js";
+import { buildProviderAnchoringResult } from "./providerAnchoringResult.js";
+import { extractProviderProposalAnchors } from "./providerProposalAnchors.js";
 import type { ProviderPromptAudit } from "./providerPromptAudit.js";
 import { auditProviderPrompt } from "./providerPromptAudit.js";
 import {
@@ -51,6 +58,8 @@ export type RealProviderProposalDryRunResult =
       readonly promptAudit: ProviderPromptAudit;
       readonly outputValidation: ProviderOutputValidation;
       readonly anchorQuality: ProviderAnchorQuality;
+      readonly anchoredProposal: ProviderAnchoredProposalManifest;
+      readonly anchoringResult: ProviderAnchoringResult;
       readonly manifest: ProviderEditProposalManifest;
       readonly providerCalled: true;
       readonly changedFiles: readonly [];
@@ -73,6 +82,8 @@ export type RealProviderProposalDryRunResult =
       readonly promptAudit?: ProviderPromptAudit;
       readonly outputValidation?: ProviderOutputValidation;
       readonly anchorQuality?: ProviderAnchorQuality;
+      readonly anchoredProposal?: ProviderAnchoredProposalManifest;
+      readonly anchoringResult?: ProviderAnchoringResult;
       readonly providerCalled: boolean;
       readonly changedFiles: readonly [];
       readonly mutationAuthority: "not-granted";
@@ -101,6 +112,9 @@ export async function runRealProviderProposalDryRun(input: {
   readonly redactionStatus?: string;
   readonly contextOverBudget?: boolean;
   readonly provider?: RealProviderProposalDryRunProvider;
+  readonly currentContentByTargetLabel?: ReadonlyMap<string, string>;
+  readonly staleTargetLabels?: readonly string[];
+  readonly inWorkspaceTargetLabels?: readonly string[];
   readonly maxPromptChars?: number;
 }): Promise<RealProviderProposalDryRunResult> {
   const gate = evaluateRealProviderProposalGate({
@@ -170,37 +184,14 @@ export async function runRealProviderProposalDryRun(input: {
     rawOutput,
     explicitTargetLabels: input.explicitTargetLabels,
   });
-  const anchorQuality = classifyProviderAnchorQuality({
-    requestId: input.requestId,
-    validation: outputValidation,
-    verificationPlan: rawOutput.verificationPlan,
-  });
-
-  if (!outputValidation.validForManifest) {
-    return stoppedDryRun({
-      status:
-        outputValidation.status === "unsafe-output"
-          ? "dry-run-anchor-quality-low"
-          : "dry-run-provider-invalid-output",
-      dryRunId,
-      gate,
-      promptAudit,
-      outputValidation,
-      anchorQuality,
-      providerCalled: true,
-      reason: outputValidation.reason,
-      nextAction: "Request a bounded target-bound proposal with exact anchors before review.",
-      evidence: [
-        ...gate.evidence,
-        ...promptAudit.evidence,
-        ...outputValidation.evidence,
-        ...anchorQuality.evidence,
-      ],
-    });
-  }
 
   const availability = input.providerAvailability;
   if (availability.kind !== "available") {
+    const anchorQuality = classifyProviderAnchorQuality({
+      requestId: input.requestId,
+      validation: outputValidation,
+      verificationPlan: rawOutput.verificationPlan,
+    });
     return stoppedDryRun({
       status: "dry-run-unsupported",
       dryRunId,
@@ -216,6 +207,100 @@ export async function runRealProviderProposalDryRun(input: {
         ...promptAudit.evidence,
         ...outputValidation.evidence,
         ...anchorQuality.evidence,
+      ],
+    });
+  }
+
+  const preliminaryNormalized = outputValidation.validForManifest
+    ? normalizeProviderEditProposal({
+        providerKindLabel: availability.providerKindLabel,
+        rawProposal: rawOutput,
+        explicitTargetLabels: input.explicitTargetLabels,
+        contextPacketId: input.contextPacketId,
+        agentPlanId: input.promptContext.agentPlanId,
+        taskLifecycleId: input.lifecycleId,
+        analysisBriefId: input.analysisBriefId,
+        planQualityId: input.planQualityId,
+        taskExecutionPlanId: input.taskExecutionPlanId,
+        dryRunId,
+        promptAuditId: promptAudit.auditId,
+        outputValidationId: outputValidation.validationId,
+        contextReadiness: "ready",
+      })
+    : undefined;
+  const extraction = extractProviderProposalAnchors({
+    requestId: input.requestId,
+    rawOutput,
+    validation: outputValidation,
+    sourceProposalId: preliminaryNormalized?.ok ? preliminaryNormalized.manifest.proposalId : undefined,
+    sourceDryRunId: dryRunId,
+  });
+  const matchResult = matchProviderAnchorCandidates({
+    requestId: input.requestId,
+    candidates: extraction.candidates,
+    explicitTargetLabels: input.explicitTargetLabels,
+    currentContentByTargetLabel: input.currentContentByTargetLabel,
+    staleTargetLabels: input.staleTargetLabels,
+    inWorkspaceTargetLabels: input.inWorkspaceTargetLabels,
+  });
+  const conflict = detectProviderAnchorConflicts({
+    requestId: input.requestId,
+    matchResult,
+    currentContentByTargetLabel: input.currentContentByTargetLabel,
+  });
+  const anchorQuality = classifyProviderAnchorQuality({
+    requestId: input.requestId,
+    validation: outputValidation,
+    extraction,
+    matchResult,
+    conflict,
+    verificationPlan: rawOutput.verificationPlan,
+  });
+  const anchoredProposal = buildProviderAnchoredProposal({
+    requestId: input.requestId,
+    extraction,
+    matchResult,
+    conflict,
+    anchorQuality,
+    planQualityId: input.planQualityId,
+  });
+  const anchoringResult = buildProviderAnchoringResult({
+    manifest: anchoredProposal,
+    candidateCount: extraction.candidates.length,
+    exactCount: anchoredProposal.exactHunkIds.length,
+    partialCount: anchoredProposal.partialCandidateIds.length,
+    unsupportedCount: anchoredProposal.unsupportedCandidateIds.length,
+    anchorQualityLevel: anchorQuality.level,
+    matchOutcome: matchResult.outcome,
+    conflictKind: conflict.kind,
+    suggestedReads: matchResult.suggestedReads,
+    evidence: anchoredProposal.evidence,
+  });
+
+  if (!outputValidation.validForManifest || preliminaryNormalized?.ok === false) {
+    return stoppedDryRun({
+      status:
+        outputValidation.status === "unsafe-output"
+          ? "dry-run-anchor-quality-low"
+          : "dry-run-provider-invalid-output",
+      dryRunId,
+      gate,
+      promptAudit,
+      outputValidation,
+      anchorQuality,
+      anchoredProposal,
+      anchoringResult,
+      providerCalled: true,
+      reason: preliminaryNormalized?.ok === false ? preliminaryNormalized.reason : outputValidation.reason,
+      nextAction: anchoringResult.nextAction,
+      evidence: [
+        ...gate.evidence,
+        ...promptAudit.evidence,
+        ...outputValidation.evidence,
+        ...anchorQuality.evidence,
+        ...anchoredProposal.evidence,
+        ...anchoringResult.evidence,
+        ...(preliminaryNormalized?.ok === false ? preliminaryNormalized.evidence : []),
       ],
     });
   }
@@ -244,21 +329,26 @@ export async function runRealProviderProposalDryRun(input: {
       promptAudit,
       outputValidation,
       anchorQuality,
+      anchoredProposal,
+      anchoringResult,
       providerCalled: true,
       reason: normalized.reason,
-      nextAction: "Request a normalized target-bound proposal before review.",
+      nextAction: anchoringResult.nextAction,
       evidence: [
         ...gate.evidence,
         ...promptAudit.evidence,
         ...outputValidation.evidence,
         ...anchorQuality.evidence,
+        ...anchoredProposal.evidence,
+        ...anchoringResult.evidence,
         ...normalized.evidence,
       ],
     });
   }
 
   const status =
-    anchorQuality.level === "exact-ready"
+    anchoredProposal.handoffReadiness === "exact-single-target" ||
+    anchoredProposal.handoffReadiness === "exact-hunk-set"
       ? "dry-run-exact-ready-no-write"
       : normalized.manifest.reviewRequired
         ? "dry-run-review-required"
@@ -271,6 +361,8 @@ export async function runRealProviderProposalDryRun(input: {
     promptAudit,
     outputValidation,
     anchorQuality,
+    anchoredProposal,
+    anchoringResult,
     manifest: normalized.manifest,
     providerCalled: true,
     changedFiles: [],
@@ -289,6 +381,8 @@ export async function runRealProviderProposalDryRun(input: {
       ...promptAudit.evidence,
       ...outputValidation.evidence,
       ...anchorQuality.evidence,
+      ...anchoredProposal.evidence,
+      ...anchoringResult.evidence,
       ...normalized.manifest.evidence,
       `real-provider-proposal-dry-run:id:${dryRunId}`,
       `real-provider-proposal-dry-run:status:${status}`,
@@ -312,6 +406,8 @@ function stoppedDryRun(input: {
   readonly promptAudit?: ProviderPromptAudit;
   readonly outputValidation?: ProviderOutputValidation;
   readonly anchorQuality?: ProviderAnchorQuality;
+  readonly anchoredProposal?: ProviderAnchoredProposalManifest;
+  readonly anchoringResult?: ProviderAnchoringResult;
   readonly providerCalled: boolean;
   readonly reason: string;
   readonly nextAction: string;
@@ -325,6 +421,8 @@ function stoppedDryRun(input: {
     ...(input.promptAudit ? { promptAudit: input.promptAudit } : {}),
     ...(input.outputValidation ? { outputValidation: input.outputValidation } : {}),
     ...(input.anchorQuality ? { anchorQuality: input.anchorQuality } : {}),
+    ...(input.anchoredProposal ? { anchoredProposal: input.anchoredProposal } : {}),
+    ...(input.anchoringResult ? { anchoringResult: input.anchoringResult } : {}),
     providerCalled: input.providerCalled,
     changedFiles: [],
     mutationAuthority: "not-granted",

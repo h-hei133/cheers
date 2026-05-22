@@ -128,6 +128,7 @@ describe("realProviderProposalDryRun", () => {
           };
         },
       },
+      currentContentByTargetLabel: new Map([["src/app.ts", "runApp\n"]]),
     });
 
     expect(result.status).toBe("dry-run-exact-ready-no-write");
@@ -139,6 +140,26 @@ describe("realProviderProposalDryRun", () => {
     expect(result.manifest.outputValidationId).toBe(result.outputValidation.validationId);
     expect(result.manifest.anchorQualityId).toBe(result.anchorQuality.qualityId);
     expect(result.manifest.planQualityId).toBe("plan_quality_193");
+    expect(result.anchoredProposal.handoffReadiness).toBe("exact-single-target");
+    expect(result.anchoringResult.status).toBe("anchored-proposal-handoff-ready");
+    expect(result.evidence).toContain("provider-anchored-proposal:mutation-authority:not-granted");
+  });
+
+  it("keeps exact provider output review-only until current safe reads anchor it", async () => {
+    const result = await runRealProviderProposalDryRun({
+      ...readyInput("needs-current-read"),
+      provider: {
+        proposeEdit: () => ({
+          operationKind: "exact-fenced-replacement",
+          targets: [{ path: "src/app.ts", oldText: "runApp", newText: "startApp" }],
+        }),
+      },
+    });
+
+    expect(result.status).toBe("dry-run-review-required");
+    expect(result.anchorQuality.level).toBe("review-only");
+    expect(result.anchoringResult.suggestedReads).toEqual(["src/app.ts"]);
+    expect(result.changedFiles).toEqual([]);
   });
 
   it("keeps unanchored malformed and unsafe fake-provider outputs no-write", async () => {

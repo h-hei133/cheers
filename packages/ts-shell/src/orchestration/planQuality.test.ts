@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "./agentPlan.js";
 import { buildContextGraph } from "./contextGraph.js";
 import { scoreContextGraph } from "./contextGraphScore.js";
-import { buildPlanQuality, attachPlanQualityToAgentPlan } from "./planQuality.js";
+import { buildPlanQuality, attachPlanQualityToAgentPlan, attachProviderAnchoringToPlanQuality } from "./planQuality.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import { buildTestImpactPlan } from "./testImpactPlan.js";
 import { normalizeCodeGraphFacts } from "./codeGraphFacts.js";
@@ -119,6 +119,74 @@ describe("planQuality", () => {
     expect(quality.missingFacts).toContain(
       "analysis brief missing for lifecycle task",
     );
+  });
+
+  it("consumes anchored provider proposal readiness without granting mutation", () => {
+    const agentPlan = buildAgentPlan({
+      ownerCapability: "agent-loop",
+      taskKind: "edit-file",
+      requestedActionKind: "edit",
+      targetSummary: "src/app.ts",
+      contextPacketIds: ["ctx_packet_188"],
+      contextCompleteness: "complete",
+      confidence: "high",
+      executionReadiness: "ready",
+      missingFacts: [],
+      suggestedReads: [],
+      suggestedVerification: [],
+      safeEvidenceMarkers: [],
+      mutationAuthority: "not-granted",
+      redactionStatus: "redacted-and-budgeted",
+      doNext: "review provider anchors",
+    });
+    const quality = buildPlanQuality({ agentPlan, contextPacket: packet() });
+    const attached = attachProviderAnchoringToPlanQuality({
+      planQuality: quality,
+      anchoredProposal: {
+        anchoredProposalId: "provider-anchored-194",
+        sourceOutputValidationId: "validation-194",
+        extractionId: "extraction-194",
+        matchResultId: "match-194",
+        conflictId: "conflict-194",
+        candidateIds: ["candidate-194"],
+        exactHunkIds: ["hunk-194"],
+        partialCandidateIds: [],
+        unsupportedCandidateIds: [],
+        hunks: [],
+        anchorQualityId: "anchor-quality-194",
+        anchorQualityLevel: "exact-ready",
+        reviewRequirement: "explicit-review-and-confirmation",
+        handoffReadiness: "exact-single-target",
+        mutationAuthority: "not-granted",
+        redactionStatus: "raw-content-excluded",
+        safeSummary: "provider anchored proposal",
+        transcriptSummary: "provider-anchored-proposal id=provider-anchored-194",
+        evidence: ["provider-anchored-proposal:id:provider-anchored-194"],
+      },
+      anchoringResult: {
+        status: "anchored-proposal-handoff-ready",
+        anchoredProposalId: "provider-anchored-194",
+        candidateCount: 1,
+        exactCount: 1,
+        partialCount: 0,
+        unsupportedCount: 0,
+        anchorQualityLevel: "exact-ready",
+        missingFacts: [],
+        suggestedReads: [],
+        noWrite: true,
+        mutationAuthority: "not-granted",
+        redactionStatus: "raw-content-excluded",
+        reason: "ready",
+        nextAction: "review",
+        safeSummary: "provider-anchoring proposal=provider-anchored-194",
+        evidence: ["provider-anchoring-result:status:anchored-proposal-handoff-ready"],
+      },
+    });
+
+    expect(attached.providerAnchoredProposalId).toBe("provider-anchored-194");
+    expect(attached.providerAnchoringOutcome).toBe("anchored-proposal-handoff-ready");
+    expect(attached.evidence).toContain("plan-quality:provider-handoff:exact-single-target");
+    expect(attached.mutationAuthority).toBe("not-granted");
   });
 });
 

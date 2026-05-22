@@ -13,6 +13,8 @@ export interface HarnessScorecard {
   readonly providerDryRunPromptReadiness?: HarnessScorecardStatus;
   readonly providerDryRunOutputValidity?: HarnessScorecardStatus;
   readonly providerDryRunAnchorQuality?: HarnessScorecardStatus;
+  readonly providerAnchoringReadiness?: HarnessScorecardStatus;
+  readonly providerAnchoringNoWrite?: HarnessScorecardStatus;
   readonly providerDryRunRedaction?: HarnessScorecardStatus;
   readonly providerDryRunNoWrite?: HarnessScorecardStatus;
   readonly verificationReadiness: HarnessScorecardStatus;
@@ -40,6 +42,10 @@ export function buildHarnessScorecard(input: {
     readonly promptAuditStatus?: string;
     readonly outputValidationStatus?: string;
     readonly anchorQualityLevel?: string;
+    readonly anchoringOutcome?: string;
+    readonly anchoredProposalId?: string;
+    readonly anchoringReviewReadiness?: string;
+    readonly anchoringNoWrite?: boolean;
     readonly redactionStatus?: string;
     readonly noWrite?: boolean;
   };
@@ -70,6 +76,12 @@ export function buildHarnessScorecard(input: {
     : undefined;
   const providerDryRunAnchorQuality = input.providerDryRun
     ? scoreAnchorQuality(input.providerDryRun.anchorQualityLevel)
+    : undefined;
+  const providerAnchoringReadiness = input.providerDryRun
+    ? scoreAnchoring(input.providerDryRun.anchoringOutcome, input.providerDryRun.anchoringReviewReadiness)
+    : undefined;
+  const providerAnchoringNoWrite = input.providerDryRun
+    ? input.providerDryRun.anchoringNoWrite === false ? "fail" : "pass"
     : undefined;
   const providerDryRunRedaction = input.providerDryRun
     ? input.providerDryRun.redactionStatus === "redacted-and-budgeted" ||
@@ -108,6 +120,8 @@ export function buildHarnessScorecard(input: {
     providerDryRunPromptReadiness ? `dryRunPrompt=${providerDryRunPromptReadiness}` : undefined,
     providerDryRunOutputValidity ? `dryRunOutput=${providerDryRunOutputValidity}` : undefined,
     providerDryRunAnchorQuality ? `dryRunAnchor=${providerDryRunAnchorQuality}` : undefined,
+    providerAnchoringReadiness ? `anchoring=${providerAnchoringReadiness}` : undefined,
+    providerAnchoringNoWrite ? `anchoringNoWrite=${providerAnchoringNoWrite}` : undefined,
     providerDryRunRedaction ? `dryRunRedaction=${providerDryRunRedaction}` : undefined,
     providerDryRunNoWrite ? `dryRunNoWrite=${providerDryRunNoWrite}` : undefined,
     `verification=${verificationReadiness}`,
@@ -127,6 +141,8 @@ export function buildHarnessScorecard(input: {
     ...(providerDryRunPromptReadiness ? { providerDryRunPromptReadiness } : {}),
     ...(providerDryRunOutputValidity ? { providerDryRunOutputValidity } : {}),
     ...(providerDryRunAnchorQuality ? { providerDryRunAnchorQuality } : {}),
+    ...(providerAnchoringReadiness ? { providerAnchoringReadiness } : {}),
+    ...(providerAnchoringNoWrite ? { providerAnchoringNoWrite } : {}),
     ...(providerDryRunRedaction ? { providerDryRunRedaction } : {}),
     ...(providerDryRunNoWrite ? { providerDryRunNoWrite } : {}),
     verificationReadiness,
@@ -153,6 +169,10 @@ export function buildHarnessScorecard(input: {
       ...(providerDryRunPromptReadiness ? [`harness-scorecard:provider-dry-run-prompt:${providerDryRunPromptReadiness}`] : []),
       ...(providerDryRunOutputValidity ? [`harness-scorecard:provider-dry-run-output:${providerDryRunOutputValidity}`] : []),
       ...(providerDryRunAnchorQuality ? [`harness-scorecard:provider-dry-run-anchor:${providerDryRunAnchorQuality}`] : []),
+      ...(providerAnchoringReadiness ? [`harness-scorecard:provider-anchoring:${providerAnchoringReadiness}`] : []),
+      ...(input.providerDryRun?.anchoringOutcome ? [`harness-scorecard:provider-anchoring-outcome:${input.providerDryRun.anchoringOutcome}`] : []),
+      ...(input.providerDryRun?.anchoredProposalId ? [`harness-scorecard:provider-anchored-proposal:${input.providerDryRun.anchoredProposalId}`] : []),
+      ...(providerAnchoringNoWrite ? [`harness-scorecard:provider-anchoring-no-write:${providerAnchoringNoWrite}`] : []),
       ...(providerDryRunRedaction ? [`harness-scorecard:provider-dry-run-redaction:${providerDryRunRedaction}`] : []),
       ...(providerDryRunNoWrite ? [`harness-scorecard:provider-dry-run-no-write:${providerDryRunNoWrite}`] : []),
       `harness-scorecard:verification:${verificationReadiness}`,
@@ -180,7 +200,32 @@ function scoreProviderOutput(status: string | undefined): HarnessScorecardStatus
 function scoreAnchorQuality(level: string | undefined): HarnessScorecardStatus {
   if (!level) return "skip";
   if (level === "exact-ready") return "pass";
-  if (level === "review-only" || level === "needs-anchoring") return "warn";
+  if (level === "review-only" || level === "needs-anchoring" || level === "ambiguous" || level === "stale") return "warn";
+  return "fail";
+}
+
+function scoreAnchoring(
+  outcome: string | undefined,
+  reviewReadiness: string | undefined,
+): HarnessScorecardStatus {
+  if (!outcome && !reviewReadiness) return "skip";
+  if (
+    outcome === "anchored-proposal-handoff-ready" ||
+    outcome === "exact-anchors-ready-for-review" ||
+    reviewReadiness === "explicit-review-and-confirmation"
+  ) {
+    return "pass";
+  }
+  if (
+    outcome === "partial-anchors-review-only" ||
+    outcome === "ambiguous-anchors-need-target-selection" ||
+    outcome === "stale-context-blocks-anchoring" ||
+    reviewReadiness === "review-only" ||
+    reviewReadiness === "target-selection-required" ||
+    reviewReadiness === "context-refresh-required"
+  ) {
+    return "warn";
+  }
   return "fail";
 }
 

@@ -26,4 +26,21 @@ describe("harnessFailureTaxonomy", () => {
     expect(classifyHarnessFailure({ status: "dry-run-anchor-quality-low" }).failureClass)
       .toBe("provider-anchor-quality-low");
   });
+
+  it("classifies provider anchoring failures", () => {
+    expect(classifyHarnessFailure({ evidence: ["provider-anchor-match:outcome:no-match"] }).failureClass)
+      .toBe("provider-anchor-no-match");
+    expect(classifyHarnessFailure({ evidence: ["provider-anchor-match:outcome:multiple-candidates-ambiguous"] }).failureClass)
+      .toBe("provider-anchor-ambiguous");
+    expect(classifyHarnessFailure({ evidence: ["provider-anchor-conflict:kind:stale-match-facts"] }).failureClass)
+      .toBe("provider-anchor-stale-context");
+    expect(classifyHarnessFailure({ evidence: ["provider-anchor-conflict:kind:overlapping-hunks"] }).failureClass)
+      .toBe("provider-anchor-conflict");
+    expect(classifyHarnessFailure({ evidence: ["provider-anchoring-result:status:unsupported-fuzzy-or-broad-output"] }).failureClass)
+      .toBe("provider-anchor-unsupported-fuzzy-output");
+    expect(classifyHarnessFailure({ evidence: ["provider-anchor-candidate:unsupported:unsafe provider output"] }).failureClass)
+      .toBe("provider-anchor-unsafe-output");
+    expect(classifyHarnessFailure({ evidence: ["provider-anchor-candidate:unsupported:malformed provider output"] }).failureClass)
+      .toBe("provider-anchor-malformed-output");
+  });
 });

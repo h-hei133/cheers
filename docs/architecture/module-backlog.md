@@ -629,6 +629,26 @@ as an import-policing rule.
   no provider call during apply, no automatic apply, no command/CLI/schema/deps
   changes, and no broad `runMvpIntegratedFlow.ts` refactor.
 
+### Route 194: Provider Proposal Anchoring
+
+- Route 194 adds a no-write anchoring layer for provider/generated proposal
+  output after validation and before any review/apply handoff.
+- New provider anchoring facades own candidate modeling, extraction, current
+  safe-read matching, conflict detection, anchored proposal manifests, and
+  anchoring result summaries.
+- Exact candidates can become anchored proposal hunks only after target binding,
+  current-content match uniqueness, and conflict checks. Partial, fuzzy, broad,
+  stale, ambiguous, conflicting, malformed, and unsafe output remains
+  review-only or stopped no-write.
+- Plan Quality, Harness trace/scorecard/failure taxonomy, Session / Continue,
+  real-provider dry-run result, and edit closeout verifiers preserve anchored
+  proposal ids, anchor quality, counts, review requirements, handoff readiness,
+  no-write status, and redaction evidence.
+- Confirmed exact anchored hunks reuse the existing proposal
+  review/selection/apply and hunk-set routes. No new writer, direct fuzzy apply,
+  provider call during apply, default provider call, private config read,
+  CLI/schema/deps change, or broad `runMvpIntegratedFlow.ts` refactor is added.
+
 ## Module-First Route Rule
 
 Future routes must state:

@@ -29,6 +29,10 @@ describe("harnessScorecard", () => {
         promptAuditStatus: "pass",
         outputValidationStatus: "partial-anchor",
         anchorQualityLevel: "needs-anchoring",
+        anchoringOutcome: "partial-anchors-review-only",
+        anchoredProposalId: "provider-anchored-194",
+        anchoringReviewReadiness: "review-only",
+        anchoringNoWrite: true,
         redactionStatus: "redacted-and-budgeted",
         noWrite: true,
       },
@@ -37,6 +41,8 @@ describe("harnessScorecard", () => {
     expect(scorecard.providerDryRunPromptReadiness).toBe("pass");
     expect(scorecard.providerDryRunOutputValidity).toBe("warn");
     expect(scorecard.providerDryRunAnchorQuality).toBe("warn");
+    expect(scorecard.providerAnchoringReadiness).toBe("warn");
+    expect(scorecard.providerAnchoringNoWrite).toBe("pass");
     expect(scorecard.providerDryRunRedaction).toBe("pass");
     expect(scorecard.providerDryRunNoWrite).toBe("pass");
     expect(scorecard.evidence).toEqual(
@@ -44,6 +50,9 @@ describe("harnessScorecard", () => {
         "harness-scorecard:provider-dry-run-prompt:pass",
         "harness-scorecard:provider-dry-run-output:warn",
         "harness-scorecard:provider-dry-run-anchor:warn",
+        "harness-scorecard:provider-anchoring:warn",
+        "harness-scorecard:provider-anchored-proposal:provider-anchored-194",
+        "harness-scorecard:provider-anchoring-no-write:pass",
         "harness-scorecard:provider-dry-run-redaction:pass",
         "harness-scorecard:provider-dry-run-no-write:pass",
       ]),

@@ -8,6 +8,16 @@ import {
   buildGeneratedEditProposalReview,
   buildProviderEditProposalReview,
 } from "./editProposalReview.js";
+import {
+  buildAnchoredProposalMappingByHunkId,
+  buildAnchoredProviderProposalReview,
+  buildProviderAnchoredProposal,
+} from "./providerAnchoredProposal.js";
+import { detectProviderAnchorConflicts } from "./providerAnchorConflict.js";
+import { matchProviderAnchorCandidates } from "./providerAnchorMatcher.js";
+import { extractProviderProposalAnchors } from "./providerProposalAnchors.js";
+import { classifyProviderAnchorQuality } from "./providerAnchorQuality.js";
+import { validateProviderOutput } from "./providerOutputValidator.js";
 import { selectEditProposalHunks } from "./editProposalSelection.js";
 import { applyEditProposalSelection } from "./editProposalApply.js";
 import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
@@ -246,6 +256,79 @@ describe("editProposalApply", () => {
     expect(result.source).toBe("generated");
     expect(result.changedFiles).toEqual(["src/a.ts", "src/b.ts"]);
     expect(result.evidence).toContain("edit-proposal-apply:no-provider-call");
+  });
+
+  it("hands confirmed exact anchored provider hunks to the existing hunk-set path", async () => {
+    const fixture = createFixture({
+      "src/app.ts": "runApp\nstopApp\n",
+    });
+    const rawOutput = {
+      operationKind: "exact-fenced-replacement" as const,
+      targets: [
+        { path: "src/app.ts", oldText: "runApp", newText: "startApp" },
+        { path: "src/app.ts", oldText: "stopApp", newText: "finishApp" },
+      ],
+    };
+    const validation = validateProviderOutput({
+      requestId: "apply-anchored",
+      rawOutput,
+      explicitTargetLabels: ["src/app.ts"],
+    });
+    const extraction = extractProviderProposalAnchors({
+      requestId: "apply-anchored",
+      rawOutput,
+      validation,
+    });
+    const currentContentByTargetLabel = new Map([["src/app.ts", "runApp\nstopApp\n"]]);
+    const matchResult = matchProviderAnchorCandidates({
+      requestId: "apply-anchored",
+      candidates: extraction.candidates,
+      explicitTargetLabels: ["src/app.ts"],
+      currentContentByTargetLabel,
+    });
+    const conflict = detectProviderAnchorConflicts({
+      requestId: "apply-anchored",
+      matchResult,
+      currentContentByTargetLabel,
+    });
+    const anchorQuality = classifyProviderAnchorQuality({
+      requestId: "apply-anchored",
+      validation,
+      extraction,
+      matchResult,
+      conflict,
+    });
+    const anchored = buildProviderAnchoredProposal({
+      requestId: "apply-anchored",
+      extraction,
+      matchResult,
+      conflict,
+      anchorQuality,
+    });
+    const review = buildAnchoredProviderProposalReview(anchored);
+    const selection = selectEditProposalHunks({
+      review,
+      action: "select-all-exact",
+      explicitConfirmation: true,
+    });
+    const result = await applyEditProposalSelection({
+      selection,
+      mappingByHunkId: buildAnchoredProposalMappingByHunkId({ manifest: anchored, matchResult }),
+      targetPathByLabel: new Map([["src/app.ts", "src/app.ts"]]),
+      fencedOptions: fixture.options,
+      targetSetOptions: fixture.options,
+    });
+
+    expect(selection.state).toBe("confirmed-exact-target-set");
+    expect(result.status).toBe("hunk-set-applied");
+    expect(readFile(fixture.workspaceRoot, "src/app.ts")).toBe("startApp\nfinishApp\n");
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "edit-proposal-review:anchored-provider-proposal",
+        "edit-proposal-apply:hunk-set-route",
+        "edit-proposal-apply:no-provider-call",
+      ]),
+    );
   });
 });
 
