@@ -2,7 +2,7 @@ import type { AnchoredProviderSmokeGate } from "./anchoredProviderSmokeGate.js";
 import type { ProposalQualityCorpusCase } from "./proposalQualityCorpus.js";
 import type { RealProviderProposalDryRunResult } from "./realProviderProposalDryRun.js";
 
-export type ProposalQualityReportMode = "fake-corpus" | "real-provider-smoke";
+export type ProposalQualityReportMode = "fake-corpus" | "real-provider-smoke" | "live-provider-smoke";
 export type ProposalQualityReportStatus = "pass" | "warn" | "fail" | "skip";
 
 export interface ProposalQualityReport {

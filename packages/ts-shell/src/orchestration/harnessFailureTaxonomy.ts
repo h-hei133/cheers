@@ -32,6 +32,12 @@ export type HarnessFailureClass =
   | "smoke-unsafe-output"
   | "smoke-exact-ready-no-write"
   | "smoke-corpus-regression"
+  | "live-smoke-no-opt-in"
+  | "live-smoke-provider-unavailable"
+  | "live-smoke-output-invalid"
+  | "live-smoke-anchor-failed"
+  | "live-smoke-unsafe-output"
+  | "live-smoke-no-write-violation"
   | "verification-not-allowlisted"
   | "verification-failed"
   | "runtime-timeout"
@@ -332,6 +338,54 @@ const TAXONOMY: Record<HarnessFailureClass, HarnessFailureTaxonomyEntry> = {
     suggestedNextAction: "Fix the corpus, report scoring, or anchored dry-run regression.",
     verifierMarker: "harness-failure:smoke-corpus-regression",
   },
+  "live-smoke-no-opt-in": {
+    failureClass: "live-smoke-no-opt-in",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Live anchored provider smoke was not explicitly opted in.",
+    suggestedNextAction: "Use fake corpus or set explicit smoke opt-in.",
+    verifierMarker: "harness-failure:live-smoke-no-opt-in",
+  },
+  "live-smoke-provider-unavailable": {
+    failureClass: "live-smoke-provider-unavailable",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Live anchored provider smoke provider is unavailable or not configured.",
+    suggestedNextAction: "Run readiness checks through approved isolated gate or use fake corpus.",
+    verifierMarker: "harness-failure:live-smoke-provider-unavailable",
+  },
+  "live-smoke-output-invalid": {
+    failureClass: "live-smoke-output-invalid",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Live anchored provider smoke output was invalid.",
+    suggestedNextAction: "Request bounded target-bound old/new anchors.",
+    verifierMarker: "harness-failure:live-smoke-output-invalid",
+  },
+  "live-smoke-anchor-failed": {
+    failureClass: "live-smoke-anchor-failed",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Live anchored provider smoke could not produce exact anchor evidence.",
+    suggestedNextAction: "Refresh target context or request more precise anchors.",
+    verifierMarker: "harness-failure:live-smoke-anchor-failed",
+  },
+  "live-smoke-unsafe-output": {
+    failureClass: "live-smoke-unsafe-output",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Live anchored provider smoke output was unsafe.",
+    suggestedNextAction: "Discard unsafe output and retry with bounded safety constraints.",
+    verifierMarker: "harness-failure:live-smoke-unsafe-output",
+  },
+  "live-smoke-no-write-violation": {
+    failureClass: "live-smoke-no-write-violation",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Live anchored provider smoke produced output with potential write/mutation evidence.",
+    suggestedNextAction: "Keep no-write enforcement; do not apply live smoke output.",
+    verifierMarker: "harness-failure:live-smoke-no-write-violation",
+  },
   "verification-not-allowlisted": {
     failureClass: "verification-not-allowlisted",
     capabilityArea: "runtime-verification",
@@ -434,6 +488,12 @@ export function classifyHarnessFailure(input: {
   if (/smoke exact-ready no-write|smoke-exact-ready-no-write/.test(text)) return TAXONOMY["smoke-exact-ready-no-write"];
   if (/smoke corpus regression|smoke-corpus-regression/.test(text)) return TAXONOMY["smoke-corpus-regression"];
   if (/smoke anchoring failed|smoke-anchoring-failed/.test(text)) return TAXONOMY["smoke-anchoring-failed"];
+  if (/live-smoke-no-opt-in|live.*smoke.*no.*opt/.test(text)) return TAXONOMY["live-smoke-no-opt-in"];
+  if (/live-smoke-provider-unavailable|live.*smoke.*provider.*unavailable/.test(text)) return TAXONOMY["live-smoke-provider-unavailable"];
+  if (/live-smoke-output-invalid|live.*smoke.*output.*invalid/.test(text)) return TAXONOMY["live-smoke-output-invalid"];
+  if (/live-smoke-anchor-failed|live.*smoke.*anchor.*fail/.test(text)) return TAXONOMY["live-smoke-anchor-failed"];
+  if (/live-smoke-unsafe-output|live.*smoke.*unsafe/.test(text)) return TAXONOMY["live-smoke-unsafe-output"];
+  if (/live-smoke-no-write-violation|live.*smoke.*write.*violation/.test(text)) return TAXONOMY["live-smoke-no-write-violation"];
   if (/provider.*invalid|provider-invalid|invalid-proposal|invalid proposal|invalid output/.test(text)) return TAXONOMY["provider-invalid-output"];
   if (/provider-dry-run-not-opted-in|dry-run-stopped-no-opt-in|stop-no-opt-in/.test(text)) return TAXONOMY["provider-dry-run-not-opted-in"];
   if (/provider-prompt-audit-failed|dry-run-prompt-audit-failed|prompt-audit.*fail/.test(text)) return TAXONOMY["provider-prompt-audit-failed"];
