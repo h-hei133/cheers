@@ -4,6 +4,8 @@ import type { AgentPlan } from "./agentPlan.js";
 import { blockedCommandReason, isAllowlistedRunCommand } from "./capabilityBoundaryProjection.js";
 import { redactProviderEditText } from "./providerEditContext.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
+import type { PlanQuality } from "./planQuality.js";
+import { evaluatePlanQualityGate } from "./planQualityGate.js";
 
 export type VerificationCommandPlanState =
   | "ready"
@@ -12,6 +14,7 @@ export type VerificationCommandPlanState =
   | "permission-required"
   | "blocked-by-policy"
   | "context-missing"
+  | "quality-blocked"
   | "unsupported";
 
 export type VerificationCommandKind =
@@ -38,6 +41,7 @@ export interface VerificationCommandPlan {
   readonly sourceContextPacketId?: string;
   readonly sourceContextGraphId?: string;
   readonly sourceTestImpactPlanId?: string;
+  readonly sourcePlanQualityId?: string;
   readonly command?: string;
   readonly commandSafeLabel?: string;
   readonly commandKind: VerificationCommandKind;
@@ -62,6 +66,7 @@ export interface VerificationCommandPlan {
 export function buildVerificationCommandPlan(input: {
   readonly agentPlan?: AgentPlan;
   readonly testImpactPlan?: TestImpactPlan;
+  readonly planQuality?: PlanQuality;
   readonly explicitCommand?: string;
   readonly proposalVerificationCommand?: string;
   readonly editResultVerificationCommand?: string;
@@ -101,15 +106,29 @@ export function buildVerificationCommandPlan(input: {
     hasContext: Boolean(sourceContextPacketId && input.agentPlan?.planId),
     permissionState,
   });
+  const qualityGate = input.planQuality
+    ? evaluatePlanQualityGate({
+        planQuality: input.planQuality,
+        action: "verification-command-plan",
+      })
+    : undefined;
+  const gatedState: VerificationCommandPlanState =
+    qualityGate && !qualityGate.allowed ? "quality-blocked" : state;
   const allowlistStatus = command
     ? isAllowlistedRunCommand(command)
       ? "allowlisted"
       : "not-allowlisted"
     : "not-applicable";
-  const permissionRequirement = classifyPermissionRequirement(state, permissionState);
-  const executionReadiness = state === "ready" ? "ready" : "not-ready";
-  const reason = buildReason({ state, command, commandSafeLabel });
-  const nextAction = buildNextAction({ state, command });
+  const permissionRequirement = classifyPermissionRequirement(gatedState, permissionState);
+  const executionReadiness = gatedState === "ready" ? "ready" : "not-ready";
+  const reason =
+    qualityGate && !qualityGate.allowed
+      ? qualityGate.reason
+      : buildReason({ state: gatedState, command, commandSafeLabel });
+  const nextAction =
+    qualityGate && !qualityGate.allowed
+      ? qualityGate.nextAction
+      : buildNextAction({ state: gatedState, command });
   const verificationPlanId = buildPlanId({
     source: candidate.source,
     sourceAgentPlanId: input.agentPlan?.planId,
@@ -118,13 +137,14 @@ export function buildVerificationCommandPlan(input: {
     sourceContextPacketId,
     sourceContextGraphId,
     sourceTestImpactPlanId: input.testImpactPlan?.impactPlanId,
+    sourcePlanQualityId: input.planQuality?.qualityId,
     commandSafeLabel,
-    state,
+    state: gatedState,
   });
 
   return {
     verificationPlanId,
-    state,
+    state: gatedState,
     source: candidate.source,
     ...(input.agentPlan?.planId ? { sourceAgentPlanId: input.agentPlan.planId } : {}),
     ...(input.sourceProposalId ? { sourceProposalId: input.sourceProposalId } : {}),
@@ -133,6 +153,9 @@ export function buildVerificationCommandPlan(input: {
     ...(sourceContextGraphId ? { sourceContextGraphId } : {}),
     ...(input.testImpactPlan?.impactPlanId
       ? { sourceTestImpactPlanId: input.testImpactPlan.impactPlanId }
+      : {}),
+    ...(input.planQuality?.qualityId
+      ? { sourcePlanQualityId: input.planQuality.qualityId }
       : {}),
     ...(command ? { command } : {}),
     ...(commandSafeLabel ? { commandSafeLabel } : {}),
@@ -149,12 +172,16 @@ export function buildVerificationCommandPlan(input: {
     reason,
     nextAction,
     evidence: [
-      `verification-command-plan:state:${state}`,
+      `verification-command-plan:state:${gatedState}`,
       `verification-command-plan:id:${verificationPlanId}`,
       `verification-command-plan:source:${candidate.source}`,
       ...(input.testImpactPlan
         ? [`verification-command-plan:test-impact:${input.testImpactPlan.impactPlanId}`]
         : []),
+      ...(input.planQuality
+        ? [`verification-command-plan:plan-quality:${input.planQuality.qualityId}`]
+        : []),
+      ...(qualityGate ? [`verification-command-plan:quality-gate:${qualityGate.decision}`] : []),
       `verification-command-plan:kind:${commandKind}`,
       `verification-command-plan:allowlist:${allowlistStatus}`,
       `verification-command-plan:permission:${permissionRequirement}`,
@@ -163,6 +190,7 @@ export function buildVerificationCommandPlan(input: {
       "verification-command-plan:provider-call:not-run",
       "verification-command-plan:redacted-and-budgeted",
       "verification-command-plan:raw-content-excluded",
+      ...(qualityGate?.evidence ?? []),
     ],
   };
 }
@@ -227,7 +255,12 @@ function classifyPermissionRequirement(
   state: VerificationCommandPlanState,
   permissionState: "runtime-check" | "approval-required" | "blocked",
 ): VerificationCommandPlan["permissionRequirement"] {
-  if (state === "missing-command" || state === "not-allowlisted" || state === "context-missing") {
+  if (
+    state === "missing-command" ||
+    state === "not-allowlisted" ||
+    state === "context-missing" ||
+    state === "quality-blocked"
+  ) {
     return "not-applicable";
   }
   if (permissionState === "blocked" || state === "blocked-by-policy") {
@@ -270,6 +303,8 @@ function buildReason(input: {
       return "Verification command execution is blocked by policy before runtime dispatch.";
     case "context-missing":
       return "Verification command repair flow requires context packet and Agent Plan ids.";
+    case "quality-blocked":
+      return "Plan quality gate blocked verification command planning before runtime dispatch.";
     case "unsupported":
       return "Verification command candidate is unsupported.";
   }
@@ -292,6 +327,8 @@ function buildNextAction(input: {
       return "Resolve the policy blocker or choose a supported allowlisted verification command.";
     case "context-missing":
       return "Build targeted context and an Agent Plan before repair-loop bridging.";
+    case "quality-blocked":
+      return "Resolve plan quality blockers before creating the verification command plan.";
     case "unsupported":
       return "Use a supported allowlisted verification command.";
   }
@@ -309,6 +346,7 @@ function buildPlanId(input: {
   readonly sourceContextPacketId?: string;
   readonly sourceContextGraphId?: string;
   readonly sourceTestImpactPlanId?: string;
+  readonly sourcePlanQualityId?: string;
   readonly commandSafeLabel?: string;
   readonly state: VerificationCommandPlanState;
 }): string {

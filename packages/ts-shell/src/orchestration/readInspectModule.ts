@@ -68,9 +68,38 @@ export {
   type ContextGraphPlanningBundle,
 } from "./contextGraphPlanning.js";
 export {
+  buildContextGraphReadinessFacts,
+  type ContextGraphReadinessFacts,
+} from "./contextGraphReadiness.js";
+export {
   buildAgentPlan,
   type AgentPlan,
 } from "./agentPlan.js";
+export {
+  buildPlanQuality,
+  attachPlanQualityToAgentPlan,
+  type PlanQuality,
+} from "./planQuality.js";
+export {
+  evaluatePlanQualityGate,
+  type PlanQualityGateResult,
+} from "./planQualityGate.js";
+export {
+  buildHarnessTrace,
+  type HarnessTrace,
+} from "./harnessTrace.js";
+export {
+  buildHarnessScorecard,
+  type HarnessScorecard,
+} from "./harnessScorecard.js";
+export {
+  classifyHarnessFailure,
+  getHarnessFailureTaxonomyEntry,
+  type HarnessFailureTaxonomyEntry,
+} from "./harnessFailureTaxonomy.js";
+export {
+  buildPlanQualityCodingResult,
+} from "./planQualityResult.js";
 export {
   projectContextPacketToAgentPlanContext,
   type AgentPlanContextProjection,

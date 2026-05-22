@@ -509,6 +509,29 @@ as an import-policing rule.
   provider/model calls, mutation behavior changes, CLI/schema/dependency
   changes, and broad `runMvpIntegratedFlow.ts` refactors remain closed.
 
+### Route 188: Plan Quality And Harness Trace
+
+- Route 188 adds deterministic plan quality and harness trace facades across
+  context packet, context graph, test-impact, Agent Plan, provider proposal
+  readiness, verification readiness, repair readiness, failure taxonomy, and
+  scorecard: `contextGraphReadiness.ts`, `planQuality.ts`,
+  `planQualityScore.ts`, `planQualityGate.ts`, `planQualityResult.ts`,
+  `harnessTrace.ts`, `harnessScorecard.ts`, and
+  `harnessFailureTaxonomy.ts`.
+- Agent Plan can now carry plan quality id, level, and score. Provider
+  proposal, verification command planning, and verification repair planning
+  consume quality gates and stop before provider invocation, command dispatch,
+  or repair proposal generation when context, test-impact, or runtime receipt
+  evidence is insufficient.
+- Result Surface and Session / Continue parity consume replay-safe quality,
+  trace, scorecard, and failure-class markers without raw file content,
+  provider diagnostics, command output dumps, hidden reasoning, or mutation
+  authority.
+- Mutation behavior, provider/model calls, command execution behavior,
+  command allowlist expansion, graph backends, LSP, embeddings, session
+  publishing, CLI/schema/dependency changes, and broad
+  `runMvpIntegratedFlow.ts` refactors remain closed.
+
 ## Module-First Route Rule
 
 Future routes must state:

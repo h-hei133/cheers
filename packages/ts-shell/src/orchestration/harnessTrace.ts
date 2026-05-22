@@ -1,0 +1,133 @@
+import crypto from "node:crypto";
+
+import { classifyHarnessFailure, type HarnessFailureTaxonomyEntry } from "./harnessFailureTaxonomy.js";
+
+export type HarnessTraceLifecycleStage =
+  | "read"
+  | "plan"
+  | "proposal"
+  | "verification"
+  | "repair"
+  | "result";
+
+export interface HarnessTrace {
+  readonly traceId: string;
+  readonly routeId?: string;
+  readonly taskId?: string;
+  readonly contextPacketId?: string;
+  readonly contextGraphId?: string;
+  readonly agentPlanId?: string;
+  readonly planQualityId?: string;
+  readonly providerProposalId?: string;
+  readonly verificationCommandPlanId?: string;
+  readonly runtimeReceiptMarkers: readonly string[];
+  readonly repairContextId?: string;
+  readonly repairProposalId?: string;
+  readonly resultStatus?: string;
+  readonly lifecycleStages: readonly HarnessTraceLifecycleStage[];
+  readonly failureTaxonomy: HarnessFailureTaxonomyEntry;
+  readonly redactionStatus: "redacted-and-budgeted";
+  readonly mutationAuthority: "not-granted";
+  readonly replaySafeSummary: string;
+  readonly evidence: readonly string[];
+}
+
+export function buildHarnessTrace(input: {
+  readonly routeId?: string;
+  readonly taskId?: string;
+  readonly contextPacketId?: string;
+  readonly contextGraphId?: string;
+  readonly agentPlanId?: string;
+  readonly planQualityId?: string;
+  readonly providerProposalId?: string;
+  readonly verificationCommandPlanId?: string;
+  readonly runtimeReceiptMarkers?: readonly string[];
+  readonly repairContextId?: string;
+  readonly repairProposalId?: string;
+  readonly resultStatus?: string;
+  readonly status?: string;
+  readonly reason?: string;
+  readonly evidence?: readonly string[];
+}): HarnessTrace {
+  const runtimeReceiptMarkers = input.runtimeReceiptMarkers ?? [];
+  const lifecycleStages = deriveStages(input);
+  const failureTaxonomy = classifyHarnessFailure({
+    status: input.status ?? input.resultStatus,
+    reason: input.reason,
+    evidence: input.evidence,
+  });
+  const traceId = buildTraceId({ ...input, lifecycleStages, failureClass: failureTaxonomy.failureClass });
+  const replaySafeSummary = [
+    `harness-trace ${traceId}`,
+    input.routeId ? `route=${input.routeId}` : undefined,
+    input.taskId ? `task=${input.taskId}` : undefined,
+    input.contextPacketId ? `contextPacket=${input.contextPacketId}` : undefined,
+    input.contextGraphId ? `contextGraph=${input.contextGraphId}` : undefined,
+    input.agentPlanId ? `agentPlan=${input.agentPlanId}` : undefined,
+    input.planQualityId ? `planQuality=${input.planQualityId}` : undefined,
+    input.verificationCommandPlanId ? `verificationPlan=${input.verificationCommandPlanId}` : undefined,
+    `stages=${lifecycleStages.join(",")}`,
+    `failureClass=${failureTaxonomy.failureClass}`,
+    "mutationAuthority=not-granted",
+    "raw-content-excluded",
+  ].filter(Boolean).join("; ");
+
+  return {
+    traceId,
+    ...(input.routeId ? { routeId: input.routeId } : {}),
+    ...(input.taskId ? { taskId: input.taskId } : {}),
+    ...(input.contextPacketId ? { contextPacketId: input.contextPacketId } : {}),
+    ...(input.contextGraphId ? { contextGraphId: input.contextGraphId } : {}),
+    ...(input.agentPlanId ? { agentPlanId: input.agentPlanId } : {}),
+    ...(input.planQualityId ? { planQualityId: input.planQualityId } : {}),
+    ...(input.providerProposalId ? { providerProposalId: input.providerProposalId } : {}),
+    ...(input.verificationCommandPlanId ? { verificationCommandPlanId: input.verificationCommandPlanId } : {}),
+    runtimeReceiptMarkers,
+    ...(input.repairContextId ? { repairContextId: input.repairContextId } : {}),
+    ...(input.repairProposalId ? { repairProposalId: input.repairProposalId } : {}),
+    ...(input.resultStatus ? { resultStatus: input.resultStatus } : {}),
+    lifecycleStages,
+    failureTaxonomy,
+    redactionStatus: "redacted-and-budgeted",
+    mutationAuthority: "not-granted",
+    replaySafeSummary,
+    evidence: [
+      `harness-trace:id:${traceId}`,
+      ...(input.contextPacketId ? [`harness-trace:context-packet:${input.contextPacketId}`] : []),
+      ...(input.contextGraphId ? [`harness-trace:context-graph:${input.contextGraphId}`] : []),
+      ...(input.agentPlanId ? [`harness-trace:agent-plan:${input.agentPlanId}`] : []),
+      ...(input.planQualityId ? [`harness-trace:plan-quality:${input.planQualityId}`] : []),
+      ...(input.verificationCommandPlanId ? [`harness-trace:verification-plan:${input.verificationCommandPlanId}`] : []),
+      `harness-trace:runtime-receipts:${runtimeReceiptMarkers.length}`,
+      `harness-trace:failure-class:${failureTaxonomy.failureClass}`,
+      failureTaxonomy.verifierMarker,
+      "harness-trace:mutation-authority:not-granted",
+      "harness-trace:redacted-and-budgeted",
+      "harness-trace:raw-content-excluded",
+    ],
+  };
+}
+
+function deriveStages(input: {
+  readonly contextPacketId?: string;
+  readonly contextGraphId?: string;
+  readonly agentPlanId?: string;
+  readonly planQualityId?: string;
+  readonly providerProposalId?: string;
+  readonly verificationCommandPlanId?: string;
+  readonly repairContextId?: string;
+  readonly resultStatus?: string;
+}): readonly HarnessTraceLifecycleStage[] {
+  const stages: HarnessTraceLifecycleStage[] = [];
+  if (input.contextPacketId || input.contextGraphId) stages.push("read");
+  if (input.agentPlanId || input.planQualityId) stages.push("plan");
+  if (input.providerProposalId) stages.push("proposal");
+  if (input.verificationCommandPlanId) stages.push("verification");
+  if (input.repairContextId) stages.push("repair");
+  if (input.resultStatus) stages.push("result");
+  return stages.length ? stages : ["plan"];
+}
+
+function buildTraceId(input: object): string {
+  return `harness_trace_${crypto.createHash("sha256").update(JSON.stringify(input)).digest("hex").slice(0, 12)}`;
+}

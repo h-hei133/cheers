@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "./agentPlan.js";
+import { buildPlanQuality } from "./planQuality.js";
 import { buildVerificationCommandPlan } from "./verificationCommandPlan.js";
 
 describe("verificationCommandPlan", () => {
@@ -131,5 +132,43 @@ describe("verificationCommandPlan", () => {
     expect(plan.state).toBe("context-missing");
     expect(plan.commandSafeLabel).toBe("node --version");
     expect(plan.permissionRequirement).toBe("not-applicable");
+  });
+
+  it("respects plan quality gate before command dispatch planning", () => {
+    const agentPlan = buildAgentPlan({
+      ownerCapability: "edit-patch",
+      taskKind: "edit-file",
+      requestedActionKind: "verify",
+      targetSummary: "src/app.ts",
+      contextPacketIds: ["ctx_188"],
+      contextCompleteness: "complete",
+      confidence: "high",
+      executionReadiness: "ready",
+      missingFacts: [],
+      suggestedReads: [],
+      suggestedVerification: ["npm test -- --help"],
+      safeEvidenceMarkers: [],
+      mutationAuthority: "not-granted",
+      redactionStatus: "redacted-and-budgeted",
+      doNext: "run verification",
+    });
+    const quality = buildPlanQuality({ agentPlan });
+
+    const plan = buildVerificationCommandPlan({
+      agentPlan,
+      planQuality: quality,
+      requireContext: true,
+    });
+
+    expect(plan.state).toBe("quality-blocked");
+    expect(plan.executionReadiness).toBe("not-ready");
+    expect(plan.sourcePlanQualityId).toBe(quality.qualityId);
+    expect(plan.evidence).toEqual(
+      expect.arrayContaining([
+        `verification-command-plan:plan-quality:${quality.qualityId}`,
+        "verification-command-plan:quality-gate:stop-missing-verification",
+        "plan-quality-gate:command:not-executed",
+      ]),
+    );
   });
 });

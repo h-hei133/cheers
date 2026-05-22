@@ -29,6 +29,9 @@ const CONTINUATION_EVIDENCE_PREFIXES: ReadonlyArray<{
   { label: "context-graph", prefixes: ["context-graph ", "context-graph:id:"] },
   { label: "test-impact", prefixes: ["test-impact ", "test-impact:id:"] },
   { label: "agent-plan", prefixes: ["agent-plan ", "agent-plan:readiness:"] },
+  { label: "plan-quality", prefixes: ["plan-quality ", "plan-quality:id:"] },
+  { label: "harness-trace", prefixes: ["harness-trace ", "harness-trace:id:"] },
+  { label: "harness-scorecard", prefixes: ["harness-scorecard ", "harness-scorecard:id:"] },
   { label: "proposal-review", prefixes: ["edit-proposal-review proposal="] },
   { label: "proposal-apply", prefixes: ["edit-proposal-apply proposal="] },
   {

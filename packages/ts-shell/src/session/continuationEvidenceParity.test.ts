@@ -11,6 +11,9 @@ describe("continuation evidence parity", () => {
         "context-graph ctx_graph_abc; root=src/a.ts; nodes=5; included=4; omitted=1; mutationAuthority=not-granted; raw-content-excluded",
         "test-impact test_impact_abc; graph=ctx_graph_abc; tests=1; commands=2; readiness=ready; mutationAuthority=not-granted",
         "agent-plan plan_abc; owner=workspace-file-context; readiness=needs-more-context; confidence=medium; missingFacts=1; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
+        "plan-quality plan_quality_abc; agentPlan=plan_abc; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; level=needs-more-context; score=62; mutationAuthority=not-granted; raw-content-excluded",
+        "harness-trace harness_trace_abc; route=route188; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; agentPlan=plan_abc; planQuality=plan_quality_abc; stages=read,plan; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
+        "harness-scorecard harness_scorecard_abc; trace=harness_trace_abc; planQuality=plan_quality_abc; context=warn; plan=warn; provider=fail; verification=skip; repair=skip; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
         "generated-edit proposal=generated-edit-abc; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
         "context-aware-provider proposal=provider-edit-abc; status=review-required-proposal; contextPacket=ctx_abc; agentPlan=plan_abc; mutationAuthority=not-granted; raw-content-excluded",
         "edit-repair-proposal id=edit-repair-proposal-def; targets=src/a.ts; confirmation=review-required; mutationAuthority:not-granted; raw-content-excluded",
@@ -32,6 +35,15 @@ describe("continuation evidence parity", () => {
     );
     expect(details).toContain(
       "agent-plan=agent-plan plan_abc; owner=workspace-file-context; readiness=needs-more-context; confidence=medium; missingFacts=1; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
+    );
+    expect(details).toContain(
+      "plan-quality=plan-quality plan_quality_abc; agentPlan=plan_abc; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; level=needs-more-context; score=62; mutationAuthority=not-granted; raw-content-excluded",
+    );
+    expect(details).toContain(
+      "harness-trace=harness-trace harness_trace_abc; route=route188; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; agentPlan=plan_abc; planQuality=plan_quality_abc; stages=read,plan; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
+    );
+    expect(details).toContain(
+      "harness-scorecard=harness-scorecard harness_scorecard_abc; trace=harness_trace_abc; planQuality=plan_quality_abc; context=warn; plan=warn; provider=fail; verification=skip; repair=skip; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
     );
     expect(details).toContain(
       "proposal-hunk-set=proposal-hunk-set proposal=provider-edit-abc; hunkSet=proposal-hunk-set-def; source=provider; targets=src/a.ts; mutationAuthority:not-granted; raw-content-excluded",

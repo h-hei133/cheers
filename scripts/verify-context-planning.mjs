@@ -7,9 +7,16 @@ const focusedTests = [
   'src/orchestration/contextDiscovery.test.ts',
   'src/orchestration/contextGraphDiscovery.test.ts',
   'src/orchestration/contextGraphScore.test.ts',
+  'src/orchestration/contextGraphReadiness.test.ts',
   'src/orchestration/contextGraphPlanning.test.ts',
   'src/orchestration/testImpactPlan.test.ts',
   'src/orchestration/contextGraphResult.test.ts',
+  'src/orchestration/planQuality.test.ts',
+  'src/orchestration/planQualityGate.test.ts',
+  'src/orchestration/planQualityResult.test.ts',
+  'src/orchestration/harnessTrace.test.ts',
+  'src/orchestration/harnessScorecard.test.ts',
+  'src/orchestration/harnessFailureTaxonomy.test.ts',
   'src/orchestration/contextPacket.test.ts',
   'src/orchestration/contextPlan.test.ts',
   'src/orchestration/contextPacketResult.test.ts',
@@ -50,6 +57,14 @@ console.log('marker context-graph-budget-omission-reasons')
 console.log('marker context-graph-score-readiness')
 console.log('marker test-impact-suggested-tests')
 console.log('marker test-impact-verification-candidates')
+console.log('marker plan-quality-ready-score')
+console.log('marker plan-quality-needs-more-context')
+console.log('marker plan-quality-budget-limited-provider-block')
+console.log('marker plan-quality-test-impact-verification-block')
+console.log('marker plan-quality-repair-runtime-receipt-block')
+console.log('marker harness-trace-lifecycle-ids')
+console.log('marker harness-scorecard-pass-warn-fail-skip')
+console.log('marker harness-failure-taxonomy')
 console.log('marker budget-redaction-no-write')
 console.log('marker continuation-safe-summary')
 console.log('marker context-packet-feeds-agent-plan')
@@ -130,6 +145,8 @@ if (!runMvpSource.includes('buildContextGraphPlanningBundle')) {
 if (
   runMvpSource.includes('function buildAgentPlan') ||
   runMvpSource.includes('function discoverContextGraph') ||
+  runMvpSource.includes('function buildPlanQuality') ||
+  runMvpSource.includes('function buildHarnessTrace') ||
   runMvpSource.includes('projectContextPacketRuntimeOutcome')
 ) {
   console.log('[product-regression] context-planning - planning helpers are implemented inline or bypass facade')

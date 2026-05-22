@@ -6,12 +6,16 @@ import {
 } from "./editRepairPlanner.js";
 import type { EditRepairRawProposal } from "./editRepairProposal.js";
 import type { ProviderEditAvailability } from "./providerEditPlanner.js";
+import type { PlanQuality } from "./planQuality.js";
+import { evaluatePlanQualityGate } from "./planQualityGate.js";
 import type { VerificationRepairContext } from "./verificationRepairContext.js";
 
 export type VerificationRepairPlannerStatus =
   | "repair-loop-context-created"
   | "repair-loop-missing-verification"
   | "repair-loop-missing-context"
+  | "repair-loop-missing-runtime-receipt"
+  | "repair-loop-quality-blocked"
   | "repair-loop-provider-not-configured"
   | "repair-loop-provider-opt-in-required"
   | "repair-loop-context-over-budget"
@@ -94,6 +98,7 @@ export async function planVerificationRepairLoop(input: {
   readonly availability: ProviderEditAvailability;
   readonly provider?: VerificationRepairFakeProvider;
   readonly rawProposal?: EditRepairRawProposal;
+  readonly planQuality?: PlanQuality;
   readonly constraints?: readonly string[];
   readonly nonGoals?: readonly string[];
   readonly maxHunks?: number;
@@ -101,6 +106,26 @@ export async function planVerificationRepairLoop(input: {
   const preflight = preflightStoppedPlan(input.context);
   if (preflight) {
     return preflight;
+  }
+
+  if (input.planQuality) {
+    const qualityGate = evaluatePlanQualityGate({
+      planQuality: input.planQuality,
+      action: "repair-loop",
+      hasRuntimeReceipt: input.context.runtimeReceiptMarkers.length > 0,
+    });
+    if (!qualityGate.allowed) {
+      return stoppedPlan({
+        status:
+          qualityGate.decision === "stop-missing-runtime-receipt"
+            ? "repair-loop-missing-runtime-receipt"
+            : "repair-loop-quality-blocked",
+        context: input.context,
+        reason: qualityGate.reason,
+        nextAction: qualityGate.nextAction,
+        evidence: [...input.context.evidence, ...input.planQuality.evidence, ...qualityGate.evidence],
+      });
+    }
   }
 
   const unavailable = classifyProviderAvailability(input.availability);

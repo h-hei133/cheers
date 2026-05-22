@@ -30,6 +30,14 @@ export type AgentPlanExecutionReadiness =
   | "stopped"
   | "unsupported";
 
+export type AgentPlanQualityLevel =
+  | "ready"
+  | "needs-more-context"
+  | "budget-limited"
+  | "low-confidence"
+  | "blocked"
+  | "unsupported";
+
 export type AgentPlanContextCompleteness =
   | "complete"
   | "partial"
@@ -47,6 +55,9 @@ export interface AgentPlan {
   readonly graphReadiness?: string;
   readonly contextCoverageScore?: number;
   readonly testImpactSummary?: string;
+  readonly planQualityId?: string;
+  readonly planQualityLevel?: AgentPlanQualityLevel;
+  readonly planQualityScore?: number;
   readonly contextCompleteness: AgentPlanContextCompleteness;
   readonly confidence: AgentPlanConfidence;
   readonly executionReadiness: AgentPlanExecutionReadiness;
@@ -78,6 +89,11 @@ export function buildAgentPlan(
     ...(typeof input.contextCoverageScore === "number"
       ? [`coverage=${input.contextCoverageScore}`]
       : []),
+    ...(input.planQualityId ? [`planQuality=${input.planQualityId}`] : []),
+    ...(input.planQualityLevel ? [`qualityLevel=${input.planQualityLevel}`] : []),
+    ...(typeof input.planQualityScore === "number"
+      ? [`qualityScore=${input.planQualityScore}`]
+      : []),
     `missingFacts=${input.missingFacts.length}`,
     `suggestedReads=${input.suggestedReads.length}`,
     "mutationAuthority=not-granted",
@@ -102,6 +118,9 @@ function buildAgentPlanId(input: Omit<AgentPlan, "planId" | "replaySafeSummary">
     graphReadiness: input.graphReadiness,
     contextCoverageScore: input.contextCoverageScore,
     testImpactSummary: input.testImpactSummary,
+    planQualityId: input.planQualityId,
+    planQualityLevel: input.planQualityLevel,
+    planQualityScore: input.planQualityScore,
     contextCompleteness: input.contextCompleteness,
     confidence: input.confidence,
     executionReadiness: input.executionReadiness,

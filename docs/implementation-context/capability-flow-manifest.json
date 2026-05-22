@@ -39,13 +39,18 @@
         "packages/ts-shell/src/orchestration/agentPlan.ts",
         "packages/ts-shell/src/orchestration/agentPlanContext.ts",
         "packages/ts-shell/src/orchestration/agentPlanProjection.ts",
-        "packages/ts-shell/src/orchestration/agentPlanResult.ts"
+        "packages/ts-shell/src/orchestration/agentPlanResult.ts",
+        "packages/ts-shell/src/orchestration/planQuality.ts",
+        "packages/ts-shell/src/orchestration/planQualityScore.ts",
+        "packages/ts-shell/src/orchestration/planQualityGate.ts",
+        "packages/ts-shell/src/orchestration/planQualityResult.ts"
       ],
       "owns": [
         "turn ordering",
         "capability branch selection",
         "module facade composition",
         "deterministic context-aware planning facade projection",
+        "deterministic plan quality scoring and downstream planning gates",
         "receipt and result handoff aggregation"
       ]
     },
@@ -62,6 +67,7 @@
         "packages/ts-shell/src/orchestration/contextGraphDiscovery.ts",
         "packages/ts-shell/src/orchestration/contextGraphBudget.ts",
         "packages/ts-shell/src/orchestration/contextGraphScore.ts",
+        "packages/ts-shell/src/orchestration/contextGraphReadiness.ts",
         "packages/ts-shell/src/orchestration/contextGraphPlanning.ts",
         "packages/ts-shell/src/orchestration/contextGraphResult.ts",
         "packages/ts-shell/src/orchestration/testImpactPlan.ts",
@@ -74,6 +80,7 @@
         "deterministic targeted context packets for explicit code targets",
         "bounded import, sibling test, docs/readme, and call-site candidate discovery",
         "bounded deterministic context graphs with second-hop and test-impact planning",
+        "read-only context graph and test-impact readiness facts",
         "read-only planning summaries with missing-context suggested reads",
         "workspace target summaries",
         "continuation-safe target facts",
@@ -256,12 +263,16 @@
         "scripts/verify/verifierCliModule.mjs",
         "scripts/verify/verifierCaseModule.mjs",
         "scripts/verify/verifierSafetyModule.mjs",
-        "scripts/verify/verifierReportModule.mjs"
+        "scripts/verify/verifierReportModule.mjs",
+        "packages/ts-shell/src/orchestration/harnessTrace.ts",
+        "packages/ts-shell/src/orchestration/harnessScorecard.ts",
+        "packages/ts-shell/src/orchestration/harnessFailureTaxonomy.ts"
       ],
       "owns": [
         "verifier option and case planning",
         "selection safety and dry-run facts",
         "report object construction",
+        "safe planning harness trace, scorecard, and failure taxonomy facts",
         "marker and exit-code compatibility"
       ]
     }

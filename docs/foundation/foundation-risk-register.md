@@ -14,6 +14,34 @@ None open after Route 165.
 
 ## Resolved
 
+### Plan quality and harness trace readiness
+
+- Affected modules: Agent Loop, Workspace / File Context, Provider / Model,
+  Runtime / Verification, Edit / Patch, Result Surface, Session / Continue,
+  Harness / Eval.
+- Why it was a calibration gap: context packets, context graphs,
+  test-impact plans, Agent Plans, provider proposals, verification command
+  plans, and repair loops had safe local facts, but no deterministic
+  cross-stage score, downstream gate, harness trace, scorecard, or normalized
+  failure taxonomy to explain why provider/verification/repair should stop.
+- Resolution: Route 188 adds `contextGraphReadiness.ts`,
+  `planQuality.ts`, `planQualityScore.ts`, `planQualityGate.ts`,
+  `planQualityResult.ts`, `harnessTrace.ts`, `harnessScorecard.ts`, and
+  `harnessFailureTaxonomy.ts`. Agent Plan can carry quality id/level/score;
+  provider proposal, verification command planning, and verification repair
+  planning can stop before provider calls, command dispatch, or repair proposal
+  generation when quality, test-impact, or runtime receipt evidence is missing.
+- Evidence: plan quality/gate tests, context graph readiness tests, harness
+  trace/scorecard/failure taxonomy tests, provider/verification/repair
+  regressions, Session / Continue parity regressions, focused
+  context-planning verifier, result-contract, and build.
+- Recommended next action: keep mutation behavior, provider/model calls,
+  command execution behavior, command allowlist expansion, LSP, embeddings,
+  graph backends, session publishing, CLI/schema/dependency changes, and broad
+  `runMvpIntegratedFlow.ts` rewrites closed until separate routes define them.
+- Should become a route: no, resolved by Route 188 for deterministic
+  plan-quality and harness-trace readiness only.
+
 ### Context graph and test-impact planning
 
 - Affected modules: Workspace / File Context, Agent Loop, Provider / Model,

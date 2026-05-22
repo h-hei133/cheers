@@ -3,6 +3,8 @@ import type { ContextGraph } from "./contextGraph.js";
 import type { ContextGraphScore } from "./contextGraphScore.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
+import type { PlanQuality } from "./planQuality.js";
+import { evaluatePlanQualityGate } from "./planQualityGate.js";
 import {
   buildContextAwareProviderEditInput,
   type ContextAwareProviderEditInput,
@@ -26,6 +28,7 @@ export type ContextAwareProviderProposalStatus =
   | "provider-opt-in-required"
   | "provider-unsupported"
   | "provider-request-blocked"
+  | "provider-quality-blocked"
   | "provider-invalid-proposal"
   | "review-required-proposal"
   | "handoff-ready-proposal";
@@ -77,6 +80,7 @@ export async function planContextAwareProviderProposal(input: {
   readonly contextGraphScore?: ContextGraphScore;
   readonly testImpactPlan?: TestImpactPlan;
   readonly agentPlan?: AgentPlan;
+  readonly planQuality?: PlanQuality;
   readonly userRequest: string;
   readonly constraints?: readonly string[];
   readonly nonGoals?: readonly string[];
@@ -104,6 +108,22 @@ export async function planContextAwareProviderProposal(input: {
       nextAction: editInput.nextAction ?? "Build context before provider proposal.",
       evidence: editInput.evidence,
     });
+  }
+
+  if (input.planQuality) {
+    const qualityGate = evaluatePlanQualityGate({
+      planQuality: input.planQuality,
+      action: "provider-proposal",
+    });
+    if (!qualityGate.allowed) {
+      return stoppedPlan({
+        status: "provider-quality-blocked",
+        input: editInput,
+        reason: qualityGate.reason,
+        nextAction: qualityGate.nextAction,
+        evidence: [...editInput.evidence, ...input.planQuality.evidence, ...qualityGate.evidence],
+      });
+    }
   }
 
   const unavailable = classifyAvailability(input.availability);
@@ -218,6 +238,7 @@ function mapInputStoppedStatus(
   | "provider-opt-in-required"
   | "provider-unsupported"
   | "provider-request-blocked"
+  | "provider-quality-blocked"
   | "provider-invalid-proposal"
 > {
   switch (status) {

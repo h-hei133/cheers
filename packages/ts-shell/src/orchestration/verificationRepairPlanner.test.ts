@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "./agentPlan.js";
+import { buildPlanQuality } from "./planQuality.js";
 import { selectEditProposalHunks } from "./editProposalSelection.js";
 import { buildEditRepairProposalReview } from "./editProposalReview.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
@@ -147,6 +148,44 @@ describe("verificationRepairPlanner", () => {
       expect.arrayContaining([
         "verification-repair-planner:handoff:existing-hunk-set-route",
         "verification-repair-planner:exact-hunk-set-only",
+      ]),
+    );
+  });
+
+  it("blocks repair planning when plan quality gate lacks runtime receipt evidence", async () => {
+    let calls = 0;
+    const packet = packetFixture();
+    const agentPlan = planFixture(packet);
+    const context = buildVerificationRepairContext({
+      sourceEditTransactionId: "txn-no-runtime",
+      contextPacket: packet,
+      agentPlan,
+      verification: { status: "failed", reason: "verification failed" },
+      failedFiles: [{ path: "src/app.ts" }],
+      changedFiles: ["src/app.ts"],
+      runtimeReceiptMarkers: [],
+    });
+    const quality = buildPlanQuality({ agentPlan, contextPacket: packet, repairContext: context });
+
+    const plan = await planVerificationRepairLoop({
+      context,
+      planQuality: quality,
+      availability: { kind: "available", providerKindLabel: "fake-provider" },
+      provider: {
+        proposeRepair: () => {
+          calls += 1;
+          return { hunks: [{ targetPath: "src/app.ts", oldText: "a", newText: "b" }] };
+        },
+      },
+    });
+
+    expect(plan.status).toBe("repair-loop-missing-runtime-receipt");
+    expect(calls).toBe(0);
+    expect(plan.evidence).toEqual(
+      expect.arrayContaining([
+        `plan-quality:agent-plan:${agentPlan.planId}`,
+        "plan-quality-gate:decision:stop-missing-runtime-receipt",
+        "verification-repair-planner:provider-call:not-run-or-invalid",
       ]),
     );
   });

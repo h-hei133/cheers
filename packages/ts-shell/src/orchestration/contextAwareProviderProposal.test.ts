@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "./agentPlan.js";
 import { planContextAwareProviderProposal } from "./contextAwareProviderProposal.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
+import { buildPlanQuality } from "./planQuality.js";
 
 describe("contextAwareProviderProposal", () => {
   it("creates a context-aware fake-provider proposal with context and plan ids no-write", async () => {
@@ -138,6 +139,40 @@ describe("contextAwareProviderProposal", () => {
     expect(optIn.changedFiles).toEqual([]);
     expect(invalid.changedFiles).toEqual([]);
     expect(invalid.evidence).toContain("provider-edit-proposal:invalid");
+  });
+
+  it("blocks provider proposal by low plan quality before fake provider call", async () => {
+    let calls = 0;
+    const packet = buildPacket("complete");
+    const plan = buildPlan(packet, "ready");
+    const quality = buildPlanQuality({ agentPlan: plan, contextPacket: packet });
+
+    const result = await planContextAwareProviderProposal({
+      requestId: "req-quality",
+      targetSummary: "src/app.ts",
+      contextPacket: packet,
+      agentPlan: plan,
+      planQuality: quality,
+      userRequest: "rename runApp",
+      availability: { kind: "available", providerKindLabel: "fake-provider" },
+      provider: {
+        proposeEdit: () => {
+          calls += 1;
+          return { operationKind: "generated-replacement" as const };
+        },
+      },
+    });
+
+    expect(result.status).toBe("provider-quality-blocked");
+    expect(calls).toBe(0);
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        `context-aware-provider-edit:agent-plan:${plan.planId}`,
+        `plan-quality:agent-plan:${plan.planId}`,
+        "plan-quality-gate:provider-call:not-run",
+        "context-aware-provider-proposal:mutation:not-run",
+      ]),
+    );
   });
 });
 

@@ -69,6 +69,34 @@ describe("session result parity", () => {
     );
   });
 
+  it("projects plan quality harness trace and scorecard markers for session consumers", () => {
+    const projection = projectSessionResultParity({
+      terminalClassification: "stopped",
+      stopReason: "Read missing context before provider proposal.",
+      codingResult: makeCodingResult({
+        reason: "Provider proposal blocked by plan quality.",
+        nextAction: "Read missing context before provider proposal.",
+        evidence: [
+          "plan-quality plan_quality_abc; agentPlan=plan_abc; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; level=needs-more-context; score=62; suggestedReads=2; mutationAuthority=not-granted; raw-content-excluded",
+          "harness-trace harness_trace_abc; route=route188; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; agentPlan=plan_abc; planQuality=plan_quality_abc; stages=read,plan; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
+          "harness-scorecard harness_scorecard_abc; trace=harness_trace_abc; planQuality=plan_quality_abc; context=warn; plan=warn; provider=fail; verification=skip; repair=skip; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
+        ],
+      }),
+    });
+
+    expect(projection.capabilityArea).toBe("workspace-file-context");
+    expect(projection.mutationAuthority).toBe("not-granted");
+    expect(projection.redactionStatus).toBe("raw-content-excluded");
+    expect(projection.suggestedReads).toBe("2");
+    expect(projection.evidenceMarkers).toEqual(
+      expect.arrayContaining([
+        "plan-quality plan_quality_abc; agentPlan=plan_abc; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; level=needs-more-context; score=62; suggestedReads=2; mutationAuthority=not-granted; raw-content-excluded",
+        "harness-trace harness_trace_abc; route=route188; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; agentPlan=plan_abc; planQuality=plan_quality_abc; stages=read,plan; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
+        "harness-scorecard harness_scorecard_abc; trace=harness_trace_abc; planQuality=plan_quality_abc; context=warn; plan=warn; provider=fail; verification=skip; repair=skip; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
+      ]),
+    );
+  });
+
   it("projects context-aware provider proposal markers for session consumers", () => {
     const projection = projectSessionResultParity({
       terminalClassification: "stopped",
