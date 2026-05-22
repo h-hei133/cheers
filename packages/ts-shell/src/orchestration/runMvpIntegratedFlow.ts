@@ -115,6 +115,10 @@ import {
   projectAgentPlanRuntimeOutcome,
 } from "./agentPlanResult.js";
 import {
+  activateTaskLifecycle,
+  formatTaskLifecycleActivationOutput,
+} from "./taskLifecycleActivation.js";
+import {
   planWorkflowVerification,
   planWorkflowVerificationRetry,
   projectNotRequestedWorkflowVerification,
@@ -2508,7 +2512,7 @@ function buildWorkflowTaskPlan(
 }
 
 function shouldBuildContextPlanningSurface(prompt: string): boolean {
-  return /\b(?:context packet|targeted context|planning context|related files|related tests|suggested reads|missing context|plan(?:ning)? surface)\b/i.test(
+  return /\b(?:context packet|targeted context|planning context|related files|related tests|suggested reads|missing context|plan(?:ning)? surface|analysis brief|execution plan|analy[sz]e|plan)\b/i.test(
     prompt,
   );
 }
@@ -4089,6 +4093,31 @@ async function executeWorkflowTaskPlan(input: {
     evidence.push(...input.plan.continuationLineage!);
   }
   appendSingleFileEditRepairObservability(evidence, input.plan);
+  const taskLifecycleActivation = await activateTaskLifecycle({
+    workspaceRoot: input.workspaceRoot,
+    prompt: input.prompt,
+    workflowPlan: input.plan,
+  });
+  if (taskLifecycleActivation) {
+    return {
+      events,
+      notes: [
+        ...notes,
+        ...taskLifecycleActivation.notes,
+      ],
+      codingResult: taskLifecycleActivation.runtimeOutcome.codingResult,
+      userFacingOutput: formatTaskLifecycleActivationOutput({
+        activation: taskLifecycleActivation,
+        baseOutput: taskLifecycleActivation.contextBundle
+          ? [
+              taskLifecycleActivation.contextBundle.packetResult.output,
+              "",
+              taskLifecycleActivation.contextBundle.graphResult.output,
+            ].join("\n")
+          : undefined,
+      }),
+    };
+  }
   const discoveryEditRequest = buildDiscoveryEditRuntimeRequest({
     prompt: input.prompt,
     workspaceRoot: input.workspaceRoot,

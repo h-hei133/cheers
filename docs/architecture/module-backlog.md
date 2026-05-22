@@ -575,6 +575,23 @@ as an import-policing rule.
   persistent graph backends, hidden CoT persistence, MCP, CLI/schema/dependency
   changes, and broad `runMvpIntegratedFlow.ts` refactors remain closed.
 
+### Route 191: Task Lifecycle Activation
+
+- Route 191 activates the Route 190 spine through real prompt / agent-loop
+  paths with `taskLifecycleRouter.ts`, `taskLifecycleActivation.ts`, and
+  `taskLifecycleHandoff.ts`.
+- Read/analyze/plan prompts and missing-context proposal prompts can now create
+  lifecycle state, evidence-grounded analysis briefs, execution plans, Result
+  Surface output, continuation evidence, harness trace/scorecard facts, and
+  provider/verification/repair readiness handoff evidence.
+- `runMvpIntegratedFlow.ts` remains a thin composition point that calls the
+  activation facade and formats its result; lifecycle logic stays in focused
+  modules.
+- Mutation behavior, provider/model calls by default, command dispatch,
+  command allowlist expansion, LSP, embeddings, full-repo indexing, hidden CoT
+  persistence, CLI/schema/dependency changes, and broad `runMvpIntegratedFlow.ts`
+  refactors remain closed.
+
 ## Module-First Route Rule
 
 Future routes must state:

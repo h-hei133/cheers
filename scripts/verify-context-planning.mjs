@@ -10,6 +10,9 @@ const focusedTests = [
   'src/orchestration/contextGraphReadiness.test.ts',
   'src/orchestration/contextGraphPlanning.test.ts',
   'src/orchestration/taskLifecycle.test.ts',
+  'src/orchestration/taskLifecycleRouter.test.ts',
+  'src/orchestration/taskLifecycleActivation.test.ts',
+  'src/orchestration/taskLifecycleHandoff.test.ts',
   'src/orchestration/codeGraphFacts.test.ts',
   'src/orchestration/codeGraphTrace.test.ts',
   'src/orchestration/codeGraphQuery.test.ts',
@@ -70,6 +73,9 @@ console.log('marker code-graph-provider-impact-context')
 console.log('marker code-graph-verification-candidates')
 console.log('marker code-graph-session-continue-evidence')
 console.log('marker task-lifecycle-read-analyze-plan-created')
+console.log('marker task-lifecycle-runtime-router')
+console.log('marker task-lifecycle-activation-real-prompt-path')
+console.log('marker task-lifecycle-handoff-facade')
 console.log('marker task-read-plan-uses-context-code-graph')
 console.log('marker analysis-brief-evidence-grounded')
 console.log('marker analysis-brief-blocks-provider-proposal')
@@ -161,8 +167,8 @@ const runMvpSource = readFileSync(
   'utf8',
 )
 
-if (!runMvpSource.includes('buildContextGraphPlanningBundle')) {
-  console.log('[product-regression] context-planning - runMvp does not call context graph planning facade')
+if (!runMvpSource.includes('activateTaskLifecycle')) {
+  console.log('[product-regression] context-planning - runMvp does not call task lifecycle activation facade')
   process.exit(1)
 }
 

@@ -52,6 +52,9 @@
         "packages/ts-shell/src/orchestration/taskExecutionPlan.ts",
         "packages/ts-shell/src/orchestration/taskLifecycleResult.ts",
         "packages/ts-shell/src/orchestration/taskLifecycleTrace.ts",
+        "packages/ts-shell/src/orchestration/taskLifecycleRouter.ts",
+        "packages/ts-shell/src/orchestration/taskLifecycleActivation.ts",
+        "packages/ts-shell/src/orchestration/taskLifecycleHandoff.ts",
         "packages/ts-shell/src/orchestration/codeGraphImpact.ts"
       ],
       "owns": [
@@ -61,6 +64,7 @@
         "deterministic context-aware planning facade projection",
         "deterministic plan quality scoring and downstream planning gates",
         "task-level read/analyze/plan lifecycle evidence and safe analysis brief projection",
+        "task lifecycle activation, prompt routing, and provider/verification/repair handoff facades",
         "bounded code intelligence impact summaries consumed by Agent Plan and Plan Quality",
         "receipt and result handoff aggregation"
       ]

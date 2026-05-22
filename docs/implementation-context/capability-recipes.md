@@ -158,7 +158,8 @@ not import restrictions.
   `codeGraphImpact.ts`, `codeGraphResult.ts`, `taskIntent.ts`,
   `taskStage.ts`, `taskLifecycle.ts`, `taskReadPlan.ts`,
   `analysisBrief.ts`, `taskExecutionPlan.ts`, `taskLifecycleResult.ts`,
-  `taskLifecycleTrace.ts`, `agentPlan.ts`,
+  `taskLifecycleTrace.ts`, `taskLifecycleRouter.ts`,
+  `taskLifecycleActivation.ts`, `taskLifecycleHandoff.ts`, `agentPlan.ts`,
   `agentPlanContext.ts`, `agentPlanProjection.ts`, `agentPlanResult.ts`,
   `planQuality.ts`, `planQualityScore.ts`, `planQualityGate.ts`,
   `planQualityResult.ts`, `harnessTrace.ts`, `harnessScorecard.ts`,
@@ -177,6 +178,8 @@ not import restrictions.
   confidence, missing facts, suggested reads, task intent, lifecycle stage
   readiness, task-driven read plan, evidence-grounded analysis brief,
   review-gated execution plan, lifecycle result/trace, deterministic plan quality score,
+  lifecycle runtime route, lifecycle activation evidence, provider proposal
+  preflight handoff, verification command handoff, repair context handoff,
   quality gate decisions, safe harness trace ids, scorecard status, failure
   class, do-next text, and `mutationAuthority:not-granted`.
 - Do not bypass: workspace boundaries, raw full-content exclusion, provider
@@ -192,6 +195,7 @@ not import restrictions.
   plan tests, code graph facts/trace/query/staleness/impact/result tests, task
   lifecycle/read-plan/analysis/execution/result/trace tests, plan
   quality/gate/result tests, harness trace/scorecard/failure taxonomy tests,
+  task lifecycle router/activation/handoff tests,
   agent plan/context/projection/result tests,
   read/inspect and target-resolution regressions, Session / Continue
   regressions, focused runMvp context planning tests, focused verifier gate,

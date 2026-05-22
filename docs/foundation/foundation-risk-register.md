@@ -32,6 +32,13 @@ None open after Route 165.
   command planning, and repair context consume those ids as no-write readiness
   evidence; Result Surface, Session / Continue, and Harness / Eval preserve
   lifecycle stop/next-stage facts.
+- Route 191 activates that spine through real prompt / agent-loop paths via
+  `taskLifecycleRouter.ts`, `taskLifecycleActivation.ts`, and
+  `taskLifecycleHandoff.ts`. Read/analyze/plan and missing-context proposal
+  prompts can now surface lifecycle state, analysis brief ids, execution plan
+  ids, no-write result evidence, continuation evidence, harness scorecard
+  facts, and provider/verification/repair handoff readiness while keeping
+  provider calls, command dispatch, and mutation authority closed by default.
 - Evidence: task lifecycle tests, context graph planning regression, Agent Plan
   / Plan Quality regressions, provider proposal regression, verification
   command planning regression, verification repair context regression,
