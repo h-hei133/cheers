@@ -8,6 +8,8 @@ import {
 } from "./editRepairContext.js";
 import { redactProviderEditText } from "./providerEditContext.js";
 import type { AnalysisBrief } from "./analysisBrief.js";
+import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
+import type { TaskContextSufficiency } from "./taskContextSufficiency.js";
 import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";
 import type {
@@ -34,6 +36,8 @@ export interface VerificationRepairContext {
   readonly sourceTaskLifecycleId?: string;
   readonly sourceAnalysisBriefId?: string;
   readonly sourceTaskExecutionPlanId?: string;
+  readonly sourceContextSufficiencyId?: string;
+  readonly sourceAnalysisQualityGateId?: string;
   readonly verificationCommandSafeLabel?: string;
   readonly verificationOutcome: CodingVerificationSummary["status"];
   readonly runtimeReceiptMarkers: readonly string[];
@@ -57,6 +61,8 @@ export function buildVerificationRepairContext(input: {
   readonly taskLifecycle?: TaskLifecycle;
   readonly analysisBrief?: AnalysisBrief;
   readonly taskExecutionPlan?: TaskExecutionPlan;
+  readonly taskContextSufficiency?: TaskContextSufficiency;
+  readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly verification?: CodingVerificationSummary;
   readonly failedFiles?: ReadonlyArray<{ readonly path: string; readonly reason?: string }>;
   readonly changedFiles?: readonly string[];
@@ -102,6 +108,8 @@ export function buildVerificationRepairContext(input: {
     sourceAnalysisBriefId: input.analysisBrief?.briefId ?? input.agentPlan?.analysisBriefId,
     sourceTaskExecutionPlanId:
       input.taskExecutionPlan?.executionPlanId ?? input.agentPlan?.taskExecutionPlanId,
+    sourceContextSufficiencyId: input.taskContextSufficiency?.sufficiencyId,
+    sourceAnalysisQualityGateId: input.analysisQualityGate?.gateId,
     verificationProvided: Boolean(input.verification),
   });
 }
@@ -115,6 +123,8 @@ export function buildVerificationRepairContextFromCodingResult(input: {
   readonly taskLifecycle?: TaskLifecycle;
   readonly analysisBrief?: AnalysisBrief;
   readonly taskExecutionPlan?: TaskExecutionPlan;
+  readonly taskContextSufficiency?: TaskContextSufficiency;
+  readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly maxFailureExcerptChars?: number;
 }): VerificationRepairContext {
   const editRepairContext = buildEditRepairContextFromCodingResult({
@@ -133,6 +143,8 @@ export function buildVerificationRepairContextFromCodingResult(input: {
     sourceAnalysisBriefId: input.analysisBrief?.briefId ?? input.agentPlan?.analysisBriefId,
     sourceTaskExecutionPlanId:
       input.taskExecutionPlan?.executionPlanId ?? input.agentPlan?.taskExecutionPlanId,
+    sourceContextSufficiencyId: input.taskContextSufficiency?.sufficiencyId,
+    sourceAnalysisQualityGateId: input.analysisQualityGate?.gateId,
     verificationProvided: input.codingResult.verification.status !== "not-requested",
   });
 }
@@ -146,6 +158,8 @@ export function buildVerificationRepairContextFromEditContext(input: {
   readonly sourceTaskLifecycleId?: string;
   readonly sourceAnalysisBriefId?: string;
   readonly sourceTaskExecutionPlanId?: string;
+  readonly sourceContextSufficiencyId?: string;
+  readonly sourceAnalysisQualityGateId?: string;
   readonly verificationProvided?: boolean;
 }): VerificationRepairContext {
   const omittedEvidenceReasons = new Set(input.editRepairContext.omittedContentReasons);
@@ -154,6 +168,9 @@ export function buildVerificationRepairContextFromEditContext(input: {
   }
   if (!input.sourceContextPacketId || !input.sourceAgentPlanId) {
     omittedEvidenceReasons.add("context-packet-or-agent-plan-missing");
+  }
+  if (input.sourceAnalysisQualityGateId && !input.sourceContextSufficiencyId) {
+    omittedEvidenceReasons.add("context-sufficiency-missing-for-analysis-gate");
   }
 
   const status = classifyVerificationRepairContext({
@@ -181,6 +198,8 @@ export function buildVerificationRepairContextFromEditContext(input: {
     input.sourceTaskLifecycleId ? `taskLifecycle=${input.sourceTaskLifecycleId}` : undefined,
     input.sourceAnalysisBriefId ? `analysisBrief=${input.sourceAnalysisBriefId}` : undefined,
     input.sourceTaskExecutionPlanId ? `executionPlan=${input.sourceTaskExecutionPlanId}` : undefined,
+    input.sourceContextSufficiencyId ? `contextSufficiency=${input.sourceContextSufficiencyId}` : undefined,
+    input.sourceAnalysisQualityGateId ? `analysisQualityGate=${input.sourceAnalysisQualityGateId}` : undefined,
     `verification=${input.editRepairContext.failedVerificationSummary.status}`,
     `runtimeReceipts=${input.editRepairContext.runtimeReceiptMarkers.length}`,
     "mutationAuthority=not-granted",
@@ -196,6 +215,8 @@ export function buildVerificationRepairContextFromEditContext(input: {
     input.sourceTaskLifecycleId ? `taskLifecycle=${input.sourceTaskLifecycleId}` : undefined,
     input.sourceAnalysisBriefId ? `analysisBrief=${input.sourceAnalysisBriefId}` : undefined,
     input.sourceTaskExecutionPlanId ? `executionPlan=${input.sourceTaskExecutionPlanId}` : undefined,
+    input.sourceContextSufficiencyId ? `contextSufficiency=${input.sourceContextSufficiencyId}` : undefined,
+    input.sourceAnalysisQualityGateId ? `analysisQualityGate=${input.sourceAnalysisQualityGateId}` : undefined,
     `status=${status}`,
     `verification=${input.editRepairContext.failedVerificationSummary.status}`,
     `runtimeReceipts=${input.editRepairContext.runtimeReceiptMarkers.length}`,
@@ -214,6 +235,8 @@ export function buildVerificationRepairContextFromEditContext(input: {
     ...(input.sourceTaskLifecycleId ? { sourceTaskLifecycleId: input.sourceTaskLifecycleId } : {}),
     ...(input.sourceAnalysisBriefId ? { sourceAnalysisBriefId: input.sourceAnalysisBriefId } : {}),
     ...(input.sourceTaskExecutionPlanId ? { sourceTaskExecutionPlanId: input.sourceTaskExecutionPlanId } : {}),
+    ...(input.sourceContextSufficiencyId ? { sourceContextSufficiencyId: input.sourceContextSufficiencyId } : {}),
+    ...(input.sourceAnalysisQualityGateId ? { sourceAnalysisQualityGateId: input.sourceAnalysisQualityGateId } : {}),
     ...(verificationCommandSafeLabel ? { verificationCommandSafeLabel } : {}),
     verificationOutcome: input.editRepairContext.failedVerificationSummary.status,
     runtimeReceiptMarkers: input.editRepairContext.runtimeReceiptMarkers,
@@ -245,6 +268,12 @@ export function buildVerificationRepairContextFromEditContext(input: {
         : []),
       ...(input.sourceTaskExecutionPlanId
         ? [`verification-repair-context:execution-plan:${input.sourceTaskExecutionPlanId}`]
+        : []),
+      ...(input.sourceContextSufficiencyId
+        ? [`verification-repair-context:context-sufficiency:${input.sourceContextSufficiencyId}`]
+        : []),
+      ...(input.sourceAnalysisQualityGateId
+        ? [`verification-repair-context:analysis-quality-gate:${input.sourceAnalysisQualityGateId}`]
         : []),
       `verification-repair-context:verification:${input.editRepairContext.failedVerificationSummary.status}`,
       `verification-repair-context:runtime-receipts:${input.editRepairContext.runtimeReceiptMarkers.length}`,

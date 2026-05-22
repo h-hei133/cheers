@@ -74,6 +74,8 @@ describe("activateTaskLifecycle", () => {
       reason: "write/edit intent without resolvable target",
       blockedReason: "The edit request did not identify one unique in-workspace target file.",
       targetMissing: true,
+      contextPlanningRequested: true,
+      contextPlanningReason: "missing-edit-context",
       inspectFirst: true,
       verifyAfterEdit: false,
     };

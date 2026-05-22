@@ -8,6 +8,8 @@ import type { PlanQuality } from "./planQuality.js";
 import type { CodeGraphImpact } from "./codeGraphImpact.js";
 import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";
+import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
+import type { TaskContextSufficiency } from "./taskContextSufficiency.js";
 import { evaluatePlanQualityGate } from "./planQualityGate.js";
 
 export type VerificationCommandPlanState =
@@ -47,6 +49,8 @@ export interface VerificationCommandPlan {
   readonly sourceTestImpactPlanId?: string;
   readonly sourceImpactQueryId?: string;
   readonly sourcePlanQualityId?: string;
+  readonly sourceContextSufficiencyId?: string;
+  readonly sourceAnalysisQualityGateId?: string;
   readonly sourceTaskLifecycleId?: string;
   readonly sourceAnalysisBriefId?: string;
   readonly sourceTaskExecutionPlanId?: string;
@@ -76,6 +80,8 @@ export function buildVerificationCommandPlan(input: {
   readonly testImpactPlan?: TestImpactPlan;
   readonly codeGraphImpact?: CodeGraphImpact;
   readonly planQuality?: PlanQuality;
+  readonly taskContextSufficiency?: TaskContextSufficiency;
+  readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly taskLifecycle?: TaskLifecycle;
   readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly explicitCommand?: string;
@@ -123,8 +129,14 @@ export function buildVerificationCommandPlan(input: {
         action: "verification-command-plan",
       })
     : undefined;
+  const analysisBlocked =
+    input.analysisQualityGate && !input.analysisQualityGate.allowed;
+  const contextBlocksVerification =
+    input.taskContextSufficiency?.verificationPlanningReadiness === "blocked";
   const gatedState: VerificationCommandPlanState =
-    qualityGate && !qualityGate.allowed ? "quality-blocked" : state;
+    qualityGate && !qualityGate.allowed || analysisBlocked || contextBlocksVerification
+      ? "quality-blocked"
+      : state;
   const allowlistStatus = command
     ? isAllowlistedRunCommand(command)
       ? "allowlisted"
@@ -150,6 +162,8 @@ export function buildVerificationCommandPlan(input: {
     sourceTestImpactPlanId: input.testImpactPlan?.impactPlanId,
     sourceImpactQueryId: input.codeGraphImpact?.impactQueryId,
     sourcePlanQualityId: input.planQuality?.qualityId,
+    sourceContextSufficiencyId: input.taskContextSufficiency?.sufficiencyId,
+    sourceAnalysisQualityGateId: input.analysisQualityGate?.gateId,
     sourceTaskLifecycleId: input.taskLifecycle?.lifecycleId ?? input.agentPlan?.taskLifecycleId,
     sourceAnalysisBriefId: input.planQuality?.analysisBriefId ?? input.agentPlan?.analysisBriefId,
     sourceTaskExecutionPlanId:
@@ -175,6 +189,12 @@ export function buildVerificationCommandPlan(input: {
       : {}),
     ...(input.planQuality?.qualityId
       ? { sourcePlanQualityId: input.planQuality.qualityId }
+      : {}),
+    ...(input.taskContextSufficiency?.sufficiencyId
+      ? { sourceContextSufficiencyId: input.taskContextSufficiency.sufficiencyId }
+      : {}),
+    ...(input.analysisQualityGate?.gateId
+      ? { sourceAnalysisQualityGateId: input.analysisQualityGate.gateId }
       : {}),
     ...(input.taskLifecycle?.lifecycleId ?? input.agentPlan?.taskLifecycleId
       ? { sourceTaskLifecycleId: input.taskLifecycle?.lifecycleId ?? input.agentPlan?.taskLifecycleId }
@@ -212,6 +232,12 @@ export function buildVerificationCommandPlan(input: {
       ...(input.planQuality
         ? [`verification-command-plan:plan-quality:${input.planQuality.qualityId}`]
         : []),
+      ...(input.taskContextSufficiency
+        ? [`verification-command-plan:context-sufficiency:${input.taskContextSufficiency.sufficiencyId}`]
+        : []),
+      ...(input.analysisQualityGate
+        ? [`verification-command-plan:analysis-quality-gate:${input.analysisQualityGate.gateId}`]
+        : []),
       ...(input.taskLifecycle
         ? [`verification-command-plan:task-lifecycle:${input.taskLifecycle.lifecycleId}`]
         : input.agentPlan?.taskLifecycleId
@@ -224,6 +250,7 @@ export function buildVerificationCommandPlan(input: {
         ? [`verification-command-plan:execution-plan:${input.taskExecutionPlan?.executionPlanId ?? input.agentPlan?.taskExecutionPlanId}`]
         : []),
       ...(qualityGate ? [`verification-command-plan:quality-gate:${qualityGate.decision}`] : []),
+      ...(input.analysisQualityGate ? [`verification-command-plan:analysis-gate:${input.analysisQualityGate.decision}`] : []),
       `verification-command-plan:kind:${commandKind}`,
       `verification-command-plan:allowlist:${allowlistStatus}`,
       `verification-command-plan:permission:${permissionRequirement}`,
@@ -397,6 +424,8 @@ function buildPlanId(input: {
   readonly sourceTestImpactPlanId?: string;
   readonly sourceImpactQueryId?: string;
   readonly sourcePlanQualityId?: string;
+  readonly sourceContextSufficiencyId?: string;
+  readonly sourceAnalysisQualityGateId?: string;
   readonly sourceTaskLifecycleId?: string;
   readonly sourceAnalysisBriefId?: string;
   readonly sourceTaskExecutionPlanId?: string;

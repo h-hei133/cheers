@@ -7,6 +7,8 @@ import {
   projectWorkflowTaskPlanToAgentPlan,
 } from "./agentPlanProjection.js";
 import { buildAnalysisBrief, type AnalysisBrief } from "./analysisBrief.js";
+import { calibrateAnalysisBrief, type AnalysisBriefCalibration } from "./analysisBriefCalibration.js";
+import { evaluateAnalysisQualityGate, type AnalysisQualityGateResult } from "./analysisQualityGate.js";
 import {
   buildContextGraphPlanningBundle,
   type ContextGraphPlanningBundle,
@@ -21,6 +23,10 @@ import {
 } from "./taskLifecycleResult.js";
 import { routeTaskLifecycleRuntime, type TaskLifecycleRuntimeRoute } from "./taskLifecycleRouter.js";
 import { buildTaskExecutionPlan, type TaskExecutionPlan } from "./taskExecutionPlan.js";
+import { buildTaskContextAcquisition, type TaskContextAcquisition } from "./taskContextAcquisition.js";
+import { buildTaskContextNeeds, type TaskContextNeedSet } from "./taskContextNeed.js";
+import { buildTaskContextResult, type TaskContextResult } from "./taskContextResult.js";
+import { evaluateTaskContextSufficiency, type TaskContextSufficiency } from "./taskContextSufficiency.js";
 import { buildTaskIntent, type TaskIntent } from "./taskIntent.js";
 import { buildTaskLifecycle, type TaskLifecycle } from "./taskLifecycle.js";
 import { buildTaskLifecycleTrace, type TaskLifecycleTrace } from "./taskLifecycleTrace.js";
@@ -33,7 +39,13 @@ export interface TaskLifecycleActivation {
   readonly route: TaskLifecycleRuntimeRoute;
   readonly taskIntent: TaskIntent;
   readonly readPlan: TaskReadPlan;
+  readonly taskContextNeeds: TaskContextNeedSet;
+  readonly taskContextAcquisition: TaskContextAcquisition;
+  readonly taskContextSufficiency: TaskContextSufficiency;
   readonly analysisBrief: AnalysisBrief;
+  readonly analysisCalibration: AnalysisBriefCalibration;
+  readonly analysisQualityGate: AnalysisQualityGateResult;
+  readonly taskContextResult: TaskContextResult;
   readonly taskLifecycle: TaskLifecycle;
   readonly taskExecutionPlan: TaskExecutionPlan;
   readonly taskLifecycleResult: TaskLifecycleResultProjection;
@@ -86,6 +98,7 @@ export function formatTaskLifecycleActivationOutput(input: {
     input.activation.contextBundle
       ? buildAgentPlanResult(input.activation.contextBundle.agentPlan).output
       : undefined,
+    input.activation.taskContextResult.output,
     input.activation.taskLifecycleResult.output,
     `Analysis brief: ${input.activation.analysisBrief.briefId}`,
     `Execution plan: ${input.activation.taskExecutionPlan.executionPlanId}`,
@@ -112,9 +125,14 @@ function fromContextBundle(input: {
     ...input.contextBundle.packetResult.evidence,
     ...input.contextBundle.graphResult.evidence,
     ...agentPlanResult.evidence,
+    ...input.contextBundle.taskContextResult.evidence,
     ...input.contextBundle.taskLifecycleResult.evidence,
     input.contextBundle.packet.replaySafeSummary,
     input.contextBundle.graph.replaySafeSummary,
+    input.contextBundle.taskContextNeeds.replaySafeSummary,
+    input.contextBundle.taskContextAcquisition.replaySafeSummary,
+    input.contextBundle.taskContextSufficiency.replaySafeSummary,
+    input.contextBundle.analysisCalibration.replaySafeSummary,
     input.contextBundle.agentPlan.replaySafeSummary,
     input.contextBundle.taskLifecycleTrace.replaySafeSummary,
     input.contextBundle.harnessTrace.replaySafeSummary,
@@ -128,7 +146,13 @@ function fromContextBundle(input: {
     route: input.route,
     taskIntent: input.contextBundle.taskIntent,
     readPlan: input.contextBundle.taskReadPlan,
+    taskContextNeeds: input.contextBundle.taskContextNeeds,
+    taskContextAcquisition: input.contextBundle.taskContextAcquisition,
+    taskContextSufficiency: input.contextBundle.taskContextSufficiency,
     analysisBrief: input.contextBundle.analysisBrief,
+    analysisCalibration: input.contextBundle.analysisCalibration,
+    analysisQualityGate: input.contextBundle.analysisQualityGate,
+    taskContextResult: input.contextBundle.taskContextResult,
     taskLifecycle: input.contextBundle.taskLifecycle,
     taskExecutionPlan: input.contextBundle.taskExecutionPlan,
     taskLifecycleResult: input.contextBundle.taskLifecycleResult,
@@ -155,8 +179,10 @@ function fromContextBundle(input: {
     },
     notes: [
       `task-lifecycle: route=${input.route.kind}`,
+      input.contextBundle.taskContextResult.output,
       input.contextBundle.taskLifecycle.replaySafeSummary,
       input.contextBundle.analysisBrief.replaySafeSummary,
+      input.contextBundle.analysisCalibration.replaySafeSummary,
       input.contextBundle.taskExecutionPlan.replaySafeSummary,
       input.contextBundle.taskLifecycleTrace.replaySafeSummary,
       input.contextBundle.harnessTrace.replaySafeSummary,
@@ -180,12 +206,32 @@ function buildStoppedActivation(input: {
     requestedActionKind: baseAgentPlan.requestedActionKind,
   });
   const readPlan = buildTaskReadPlan({ intent: taskIntent });
+  const taskContextNeeds = buildTaskContextNeeds({ intent: taskIntent });
+  const taskContextAcquisition = buildTaskContextAcquisition({ needSet: taskContextNeeds });
+  const taskContextSufficiency = evaluateTaskContextSufficiency({
+    needSet: taskContextNeeds,
+    acquisition: taskContextAcquisition,
+  });
   const analysisBrief = buildAnalysisBrief({
     intent: taskIntent,
     readPlan,
     agentPlan: baseAgentPlan,
-    missingFacts: input.route.missingFacts,
+    missingFacts: [...input.route.missingFacts, ...taskContextSufficiency.missingRequiredFacts],
     confidence: "low",
+  });
+  const analysisCalibration = calibrateAnalysisBrief({
+    analysisBrief,
+    contextSufficiency: taskContextSufficiency,
+    additionalEvidenceIds: [
+      taskContextNeeds.needSetId,
+      taskContextAcquisition.acquisitionId,
+      taskContextSufficiency.sufficiencyId,
+    ],
+  });
+  const analysisQualityGate = evaluateAnalysisQualityGate({
+    action: "plan",
+    calibration: analysisCalibration,
+    contextSufficiency: taskContextSufficiency,
   });
   const taskLifecycle = buildTaskLifecycle({
     intent: taskIntent,
@@ -193,18 +239,18 @@ function buildStoppedActivation(input: {
       buildTaskStage({
         kind: "read",
         readiness: "needs-evidence",
-        outputEvidenceIds: [readPlan.readPlanId],
-        missingFacts: analysisBrief.missingFacts,
+        outputEvidenceIds: [readPlan.readPlanId, taskContextNeeds.needSetId, taskContextSufficiency.sufficiencyId],
+        missingFacts: taskContextSufficiency.missingRequiredFacts,
         stopReason: input.route.reason,
         verifierMarker: "task-stage:read:missing-context",
       }),
       buildTaskStage({
         kind: "analyze",
         readiness: "needs-evidence",
-        inputEvidenceIds: [readPlan.readPlanId],
-        outputEvidenceIds: [analysisBrief.briefId],
-        missingFacts: analysisBrief.missingFacts,
-        stopReason: "analysis brief requires missing read evidence",
+        inputEvidenceIds: [readPlan.readPlanId, taskContextSufficiency.sufficiencyId],
+        outputEvidenceIds: [analysisBrief.briefId, analysisCalibration.calibrationId, analysisQualityGate.gateId],
+        missingFacts: analysisCalibration.missingFacts,
+        stopReason: analysisQualityGate.reason,
         verifierMarker: "task-stage:analyze:missing-context",
       }),
     ],
@@ -219,6 +265,9 @@ function buildStoppedActivation(input: {
     agentPlan: baseAgentPlan,
     taskLifecycle,
     analysisBrief,
+    contextSufficiency: taskContextSufficiency,
+    analysisCalibration,
+    analysisQualityGate,
     taskExecutionPlan: executionPlanWithoutQuality,
   });
   const taskExecutionPlan = buildTaskExecutionPlan({
@@ -238,11 +287,26 @@ function buildStoppedActivation(input: {
       taskLifecycleReadiness: taskLifecycle.overallStatus,
       taskLifecycleMissingFacts: taskLifecycle.missingFacts,
       suggestedNextTaskStage: taskLifecycle.nextRecommendedStage,
+      taskContextNeedIds: taskContextNeeds.needs.map((need) => need.needId),
+      taskContextSufficiencyState: taskContextSufficiency.state,
+      analysisConfidence: analysisCalibration.confidence,
+      analysisMissingFacts: analysisCalibration.missingFacts,
+      analysisRiskLevel: analysisCalibration.riskLevel,
+      analysisQualityGateId: analysisQualityGate.gateId,
       safeEvidenceMarkers: [
         ...baseAgentPlan.safeEvidenceMarkers,
+        taskContextNeeds.replaySafeSummary,
+        taskContextAcquisition.replaySafeSummary,
+        taskContextSufficiency.replaySafeSummary,
         taskLifecycle.replaySafeSummary,
         analysisBrief.replaySafeSummary,
+        analysisCalibration.replaySafeSummary,
         taskExecutionPlan.replaySafeSummary,
+        ...taskContextNeeds.evidence,
+        ...taskContextAcquisition.evidence,
+        ...taskContextSufficiency.evidence,
+        ...analysisCalibration.evidence,
+        ...analysisQualityGate.evidence,
       ],
     }),
     planQuality,
@@ -253,6 +317,13 @@ function buildStoppedActivation(input: {
     analysisBrief,
     executionPlan: taskExecutionPlan,
   });
+  const taskContextResult = buildTaskContextResult({
+    needSet: taskContextNeeds,
+    acquisition: taskContextAcquisition,
+    sufficiency: taskContextSufficiency,
+    calibration: analysisCalibration,
+    analysisQualityGate,
+  });
   const harnessTrace = buildHarnessTrace({
     routeId: "route191-task-lifecycle-activation",
     taskId: taskIntent.taskId,
@@ -261,9 +332,21 @@ function buildStoppedActivation(input: {
     taskExecutionPlanId: taskExecutionPlan.executionPlanId,
     agentPlanId: agentPlan.planId,
     planQualityId: planQuality.qualityId,
+    contextSufficiencyState: taskContextSufficiency.state,
+    analysisConfidence: analysisCalibration.confidence,
+    underEvidencedClaimsCount: analysisCalibration.underEvidencedClaims.length,
+    missingRequiredContextCount: taskContextSufficiency.missingRequiredFacts.length,
+    staleContext: taskContextSufficiency.state === "stale-context",
+    budgetLimitedContext: taskContextSufficiency.state === "budget-limited",
+    downstreamReadiness: `provider=${taskContextSufficiency.providerProposalReadiness}; verification=${taskContextSufficiency.verificationPlanningReadiness}; repair=${taskContextSufficiency.repairProposalReadiness}`,
     status: planQuality.level,
     reason: input.route.reason,
-    evidence: planQuality.evidence,
+    evidence: [
+      ...planQuality.evidence,
+      ...taskContextSufficiency.evidence,
+      ...analysisCalibration.evidence,
+      ...analysisQualityGate.evidence,
+    ],
   });
   const taskLifecycleTrace = buildTaskLifecycleTrace({
     lifecycle: taskLifecycle,
@@ -287,7 +370,12 @@ function buildStoppedActivation(input: {
   });
   const evidence = [
     ...input.route.evidence,
+    ...taskContextResult.evidence,
     ...result.evidence,
+    taskContextNeeds.replaySafeSummary,
+    taskContextAcquisition.replaySafeSummary,
+    taskContextSufficiency.replaySafeSummary,
+    analysisCalibration.replaySafeSummary,
     taskLifecycleTrace.replaySafeSummary,
     harnessTrace.replaySafeSummary,
     harnessScorecard.replaySafeSummary,
@@ -301,7 +389,13 @@ function buildStoppedActivation(input: {
     route: input.route,
     taskIntent,
     readPlan,
+    taskContextNeeds,
+    taskContextAcquisition,
+    taskContextSufficiency,
     analysisBrief,
+    analysisCalibration,
+    analysisQualityGate,
+    taskContextResult,
     taskLifecycle,
     taskExecutionPlan,
     taskLifecycleResult: result,
@@ -327,8 +421,10 @@ function buildStoppedActivation(input: {
     },
     notes: [
       `task-lifecycle: route=${input.route.kind}`,
+      taskContextResult.output,
       taskLifecycle.replaySafeSummary,
       analysisBrief.replaySafeSummary,
+      analysisCalibration.replaySafeSummary,
       taskExecutionPlan.replaySafeSummary,
       taskLifecycleTrace.replaySafeSummary,
       harnessTrace.replaySafeSummary,

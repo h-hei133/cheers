@@ -30,7 +30,13 @@ import { checkCodeGraphStaleness, type CodeGraphStalenessCheck } from "./codeGra
 import { buildCodeGraphImpact, type CodeGraphImpact } from "./codeGraphImpact.js";
 import { buildCodeGraphResult, type CodeGraphResultProjection } from "./codeGraphResult.js";
 import { buildAnalysisBrief, type AnalysisBrief } from "./analysisBrief.js";
+import { calibrateAnalysisBrief, type AnalysisBriefCalibration } from "./analysisBriefCalibration.js";
+import { evaluateAnalysisQualityGate, type AnalysisQualityGateResult } from "./analysisQualityGate.js";
 import { buildTaskExecutionPlan, type TaskExecutionPlan } from "./taskExecutionPlan.js";
+import { buildTaskContextAcquisition, type TaskContextAcquisition } from "./taskContextAcquisition.js";
+import { buildTaskContextNeeds, type TaskContextNeedSet } from "./taskContextNeed.js";
+import { buildTaskContextResult, type TaskContextResult } from "./taskContextResult.js";
+import { evaluateTaskContextSufficiency, type TaskContextSufficiency } from "./taskContextSufficiency.js";
 import { buildTaskIntent, type TaskIntent } from "./taskIntent.js";
 import { buildTaskLifecycle, type TaskLifecycle } from "./taskLifecycle.js";
 import { buildTaskLifecycleResult, type TaskLifecycleResultProjection } from "./taskLifecycleResult.js";
@@ -51,7 +57,13 @@ export interface ContextGraphPlanningBundle {
   readonly codeGraphResult: CodeGraphResultProjection;
   readonly taskIntent: TaskIntent;
   readonly taskReadPlan: TaskReadPlan;
+  readonly taskContextNeeds: TaskContextNeedSet;
+  readonly taskContextAcquisition: TaskContextAcquisition;
+  readonly taskContextSufficiency: TaskContextSufficiency;
   readonly analysisBrief: AnalysisBrief;
+  readonly analysisCalibration: AnalysisBriefCalibration;
+  readonly analysisQualityGate: AnalysisQualityGateResult;
+  readonly taskContextResult: TaskContextResult;
   readonly taskLifecycle: TaskLifecycle;
   readonly taskExecutionPlan: TaskExecutionPlan;
   readonly taskLifecycleResult: TaskLifecycleResultProjection;
@@ -127,27 +139,81 @@ export async function buildContextGraphPlanningBundle(input: {
     testImpactPlan: testImpact,
     codeGraphImpact,
   });
+  const taskContextNeeds = buildTaskContextNeeds({
+    intent: taskIntent,
+    contextPacket: packet,
+    contextGraph: graph,
+    testImpactPlan: testImpact,
+    codeGraphImpact,
+  });
+  const taskContextAcquisition = buildTaskContextAcquisition({
+    needSet: taskContextNeeds,
+    contextPacket: packet,
+    contextGraph: graph,
+    testImpactPlan: testImpact,
+    codeGraphImpact,
+  });
+  const taskContextSufficiency = evaluateTaskContextSufficiency({
+    needSet: taskContextNeeds,
+    acquisition: taskContextAcquisition,
+    contextPacket: packet,
+    contextGraphScore: graphScore,
+    testImpactPlan: testImpact,
+    codeGraphImpact,
+    codeGraphStaleness,
+  });
   const analysisBrief = buildAnalysisBrief({
     intent: taskIntent,
     readPlan: taskReadPlan,
     agentPlan: baseAgentPlan,
+    missingFacts: taskContextSufficiency.missingRequiredFacts,
+  });
+  const analysisCalibration = calibrateAnalysisBrief({
+    analysisBrief,
+    contextSufficiency: taskContextSufficiency,
+    additionalEvidenceIds: [
+      taskContextNeeds.needSetId,
+      taskContextAcquisition.acquisitionId,
+      taskContextSufficiency.sufficiencyId,
+    ],
+  });
+  const analysisQualityGate = evaluateAnalysisQualityGate({
+    action: "plan",
+    calibration: analysisCalibration,
+    contextSufficiency: taskContextSufficiency,
   });
   const taskLifecycle = buildTaskLifecycle({
     intent: taskIntent,
     stages: [
       buildTaskStage({
         kind: "read",
-        readiness: packet.completenessStatus === "missing-context" ? "needs-evidence" : "complete",
-        outputEvidenceIds: [packet.packetId, graph.graphId, testImpact.impactPlanId, codeGraphTrace.traceId],
-        missingFacts: packet.completenessStatus === "missing-context" ? taskReadPlan.suggestedNextReads : [],
+        readiness: taskContextSufficiency.analysisReadiness === "ready" ? "complete" : "needs-evidence",
+        outputEvidenceIds: [
+          packet.packetId,
+          graph.graphId,
+          testImpact.impactPlanId,
+          codeGraphTrace.traceId,
+          taskContextNeeds.needSetId,
+          taskContextAcquisition.acquisitionId,
+          taskContextSufficiency.sufficiencyId,
+        ],
+        missingFacts: [
+          ...taskContextSufficiency.missingRequiredFacts,
+          ...taskContextSufficiency.missingOptionalFacts,
+        ],
+        stopReason:
+          taskContextSufficiency.state === "sufficient"
+            ? undefined
+            : taskContextSufficiency.readinessDowngrade,
         verifierMarker: "task-stage:read:context-packet-code-graph",
       }),
       buildTaskStage({
         kind: "analyze",
-        readiness: analysisBrief.missingFacts.length > 0 ? "needs-evidence" : "complete",
-        inputEvidenceIds: [taskReadPlan.readPlanId],
-        outputEvidenceIds: [analysisBrief.briefId],
-        missingFacts: analysisBrief.missingFacts,
+        readiness: analysisQualityGate.allowed ? "complete" : "needs-evidence",
+        inputEvidenceIds: [taskReadPlan.readPlanId, taskContextSufficiency.sufficiencyId],
+        outputEvidenceIds: [analysisBrief.briefId, analysisCalibration.calibrationId, analysisQualityGate.gateId],
+        missingFacts: analysisCalibration.missingFacts,
+        stopReason: analysisQualityGate.allowed ? undefined : analysisQualityGate.reason,
         verifierMarker: "task-stage:analyze:analysis-brief",
       }),
       buildTaskStage({
@@ -177,13 +243,28 @@ export async function buildContextGraphPlanningBundle(input: {
       taskLifecycleReadiness: taskLifecycle.overallStatus,
       taskLifecycleMissingFacts: taskLifecycle.missingFacts,
       suggestedNextTaskStage: taskLifecycle.nextRecommendedStage,
+      taskContextNeedIds: taskContextNeeds.needs.map((need) => need.needId),
+      taskContextSufficiencyState: taskContextSufficiency.state,
+      analysisConfidence: analysisCalibration.confidence,
+      analysisMissingFacts: analysisCalibration.missingFacts,
+      analysisRiskLevel: analysisCalibration.riskLevel,
+      analysisQualityGateId: analysisQualityGate.gateId,
       replaySafeEvidence: [
         ...contextProjection.replaySafeEvidence,
+        taskContextNeeds.replaySafeSummary,
+        taskContextAcquisition.replaySafeSummary,
+        taskContextSufficiency.replaySafeSummary,
         taskLifecycle.replaySafeSummary,
         analysisBrief.replaySafeSummary,
+        analysisCalibration.replaySafeSummary,
         taskExecutionPlan.replaySafeSummary,
+        ...taskContextNeeds.evidence,
+        ...taskContextAcquisition.evidence,
+        ...taskContextSufficiency.evidence,
         ...taskLifecycle.evidence,
         ...analysisBrief.evidence,
+        ...analysisCalibration.evidence,
+        ...analysisQualityGate.evidence,
         ...taskExecutionPlan.evidence,
       ],
     },
@@ -198,11 +279,21 @@ export async function buildContextGraphPlanningBundle(input: {
     codeGraphImpact,
     taskLifecycle,
     analysisBrief,
+    contextSufficiency: taskContextSufficiency,
+    analysisCalibration,
+    analysisQualityGate,
     taskExecutionPlan,
   });
   const agentPlan = attachPlanQualityToAgentPlan({
     agentPlan: agentPlanWithLifecycle,
     planQuality,
+  });
+  const taskContextResult = buildTaskContextResult({
+    needSet: taskContextNeeds,
+    acquisition: taskContextAcquisition,
+    sufficiency: taskContextSufficiency,
+    calibration: analysisCalibration,
+    analysisQualityGate,
   });
   const taskLifecycleResult = buildTaskLifecycleResult({
     lifecycle: taskLifecycle,
@@ -220,9 +311,21 @@ export async function buildContextGraphPlanningBundle(input: {
     contextGraphId: graph.graphId,
     agentPlanId: agentPlan.planId,
     planQualityId: planQuality.qualityId,
+    contextSufficiencyState: taskContextSufficiency.state,
+    analysisConfidence: analysisCalibration.confidence,
+    underEvidencedClaimsCount: analysisCalibration.underEvidencedClaims.length,
+    missingRequiredContextCount: taskContextSufficiency.missingRequiredFacts.length,
+    staleContext: taskContextSufficiency.state === "stale-context",
+    budgetLimitedContext: taskContextSufficiency.state === "budget-limited",
+    downstreamReadiness: `provider=${taskContextSufficiency.providerProposalReadiness}; verification=${taskContextSufficiency.verificationPlanningReadiness}; repair=${taskContextSufficiency.repairProposalReadiness}`,
     status: planQuality.level,
     reason: planQuality.missingFacts.join("; "),
-    evidence: planQuality.evidence,
+    evidence: [
+      ...planQuality.evidence,
+      ...taskContextSufficiency.evidence,
+      ...analysisCalibration.evidence,
+      ...analysisQualityGate.evidence,
+    ],
   });
   const taskLifecycleTrace = buildTaskLifecycleTrace({
     lifecycle: taskLifecycle,
@@ -253,7 +356,13 @@ export async function buildContextGraphPlanningBundle(input: {
     codeGraphResult,
     taskIntent,
     taskReadPlan,
+    taskContextNeeds,
+    taskContextAcquisition,
+    taskContextSufficiency,
     analysisBrief,
+    analysisCalibration,
+    analysisQualityGate,
+    taskContextResult,
     taskLifecycle,
     taskExecutionPlan,
     taskLifecycleResult,

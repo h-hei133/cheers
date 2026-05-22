@@ -57,6 +57,12 @@ export interface AgentPlan {
   readonly taskLifecycleReadiness?: string;
   readonly taskLifecycleMissingFacts?: readonly string[];
   readonly suggestedNextTaskStage?: string;
+  readonly taskContextNeedIds?: readonly string[];
+  readonly taskContextSufficiencyState?: string;
+  readonly analysisConfidence?: string;
+  readonly analysisMissingFacts?: readonly string[];
+  readonly analysisRiskLevel?: string;
+  readonly analysisQualityGateId?: string;
   readonly contextPacketIds: readonly string[];
   readonly contextGraphIds?: readonly string[];
   readonly codeGraphTraceIds?: readonly string[];
@@ -102,6 +108,12 @@ export function buildAgentPlan(
       ? [`lifecycleMissingFacts=${input.taskLifecycleMissingFacts.length}`]
       : []),
     ...(input.suggestedNextTaskStage ? [`nextTaskStage=${input.suggestedNextTaskStage}`] : []),
+    ...(input.taskContextNeedIds?.length ? [`contextNeeds=${input.taskContextNeedIds.length}`] : []),
+    ...(input.taskContextSufficiencyState ? [`contextSufficiency=${input.taskContextSufficiencyState}`] : []),
+    ...(input.analysisConfidence ? [`analysisConfidence=${input.analysisConfidence}`] : []),
+    ...(input.analysisMissingFacts?.length ? [`analysisMissingFacts=${input.analysisMissingFacts.length}`] : []),
+    ...(input.analysisRiskLevel ? [`analysisRisk=${input.analysisRiskLevel}`] : []),
+    ...(input.analysisQualityGateId ? [`analysisQualityGate=${input.analysisQualityGateId}`] : []),
     `contextPackets=${input.contextPacketIds.length}`,
     ...(input.contextGraphIds?.length
       ? [`contextGraphs=${input.contextGraphIds.length}`]
@@ -152,6 +164,12 @@ function buildAgentPlanId(input: Omit<AgentPlan, "planId" | "replaySafeSummary">
     taskLifecycleReadiness: input.taskLifecycleReadiness,
     taskLifecycleMissingFacts: input.taskLifecycleMissingFacts,
     suggestedNextTaskStage: input.suggestedNextTaskStage,
+    taskContextNeedIds: input.taskContextNeedIds,
+    taskContextSufficiencyState: input.taskContextSufficiencyState,
+    analysisConfidence: input.analysisConfidence,
+    analysisMissingFacts: input.analysisMissingFacts,
+    analysisRiskLevel: input.analysisRiskLevel,
+    analysisQualityGateId: input.analysisQualityGateId,
     contextPacketIds: input.contextPacketIds,
     contextGraphIds: input.contextGraphIds,
     codeGraphTraceIds: input.codeGraphTraceIds,

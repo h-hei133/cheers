@@ -592,6 +592,25 @@ as an import-policing rule.
   persistence, CLI/schema/dependency changes, and broad `runMvpIntegratedFlow.ts`
   refactors remain closed.
 
+### Route 192: Task-Driven Context Analysis
+
+- Route 192 makes lifecycle read/analyze stages task-driven with
+  `taskContextNeed.ts`, `taskContextAcquisition.ts`,
+  `taskContextSufficiency.ts`, `analysisBriefCalibration.ts`,
+  `analysisQualityGate.ts`, and `taskContextResult.ts`.
+- Task intent now drives required/optional context categories, staged
+  acquisition from existing bounded context/code-graph facts, context
+  sufficiency, calibrated analysis confidence/risk/missing facts, analysis
+  quality gate decisions, and no-write task context result output.
+- Agent Plan, Plan Quality, context-aware provider proposal, verification
+  command planning, verification repair context, Result Surface, Session /
+  Continue evidence, Harness trace/scorecard, failure taxonomy, and the
+  context-planning verifier consume the new context/analysis quality ids.
+- Mutation behavior, provider/model calls by default, command dispatch,
+  command allowlist expansion, LSP, embeddings, full-repo indexing, hidden CoT
+  persistence, CLI/schema/dependency changes, and broad `runMvpIntegratedFlow.ts`
+  refactors remain closed.
+
 ## Module-First Route Rule
 
 Future routes must state:

@@ -160,6 +160,9 @@ not import restrictions.
   `analysisBrief.ts`, `taskExecutionPlan.ts`, `taskLifecycleResult.ts`,
   `taskLifecycleTrace.ts`, `taskLifecycleRouter.ts`,
   `taskLifecycleActivation.ts`, `taskLifecycleHandoff.ts`, `agentPlan.ts`,
+  `taskContextNeed.ts`, `taskContextAcquisition.ts`,
+  `taskContextSufficiency.ts`, `analysisBriefCalibration.ts`,
+  `analysisQualityGate.ts`, `taskContextResult.ts`,
   `agentPlanContext.ts`, `agentPlanProjection.ts`, `agentPlanResult.ts`,
   `planQuality.ts`, `planQualityScore.ts`, `planQualityGate.ts`,
   `planQualityResult.ts`, `harnessTrace.ts`, `harnessScorecard.ts`,
@@ -177,6 +180,9 @@ not import restrictions.
   summaries, docs/call-site/import summaries, agent plan readiness,
   confidence, missing facts, suggested reads, task intent, lifecycle stage
   readiness, task-driven read plan, evidence-grounded analysis brief,
+  context need ids, staged acquisition summaries, context sufficiency state,
+  calibrated analysis confidence/risk/missing facts, analysis quality gate
+  decision, task context result surface,
   review-gated execution plan, lifecycle result/trace, deterministic plan quality score,
   lifecycle runtime route, lifecycle activation evidence, provider proposal
   preflight handoff, verification command handoff, repair context handoff,
@@ -193,7 +199,9 @@ not import restrictions.
 - Validate: context packet/discovery/budget/plan/result tests,
   context graph discovery/budget/score/readiness/result tests, test-impact
   plan tests, code graph facts/trace/query/staleness/impact/result tests, task
-  lifecycle/read-plan/analysis/execution/result/trace tests, plan
+  lifecycle/read-plan/analysis/execution/result/trace tests, task context
+  need/acquisition/sufficiency/result tests, analysis calibration and quality
+  gate tests, plan
   quality/gate/result tests, harness trace/scorecard/failure taxonomy tests,
   task lifecycle router/activation/handoff tests,
   agent plan/context/projection/result tests,

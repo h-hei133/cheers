@@ -1,6 +1,11 @@
 export type HarnessFailureClass =
   | "missing-target"
   | "missing-context"
+  | "missing-required-context"
+  | "under-evidenced-analysis"
+  | "stale-analysis-context"
+  | "analysis-blocked-provider"
+  | "analysis-blocked-verification"
   | "low-plan-quality"
   | "context-budget-limited"
   | "provider-unavailable"
@@ -56,6 +61,46 @@ const TAXONOMY: Record<HarnessFailureClass, HarnessFailureTaxonomyEntry> = {
     safeReason: "Required context packet, graph, or Agent Plan facts are missing.",
     suggestedNextAction: "Build targeted context packet, graph, and Agent Plan facts first.",
     verifierMarker: "harness-failure:missing-context",
+  },
+  "missing-required-context": {
+    failureClass: "missing-required-context",
+    capabilityArea: "workspace-file-context",
+    lifecycleStage: "read",
+    safeReason: "Required task context is missing.",
+    suggestedNextAction: "Read the required task context before analysis, provider, verification, or repair planning.",
+    verifierMarker: "harness-failure:missing-required-context",
+  },
+  "under-evidenced-analysis": {
+    failureClass: "under-evidenced-analysis",
+    capabilityArea: "agent-loop",
+    lifecycleStage: "plan",
+    safeReason: "Analysis claims are missing explicit evidence or confidence is too low.",
+    suggestedNextAction: "Ground analysis observations in explicit evidence ids before downstream planning.",
+    verifierMarker: "harness-failure:under-evidenced-analysis",
+  },
+  "stale-analysis-context": {
+    failureClass: "stale-analysis-context",
+    capabilityArea: "workspace-file-context",
+    lifecycleStage: "plan",
+    safeReason: "Analysis context has stale facts.",
+    suggestedNextAction: "Refresh stale context before downstream readiness.",
+    verifierMarker: "harness-failure:stale-analysis-context",
+  },
+  "analysis-blocked-provider": {
+    failureClass: "analysis-blocked-provider",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Analysis quality blocked provider proposal readiness.",
+    suggestedNextAction: "Acquire missing context or strengthen analysis before provider preflight.",
+    verifierMarker: "harness-failure:analysis-blocked-provider",
+  },
+  "analysis-blocked-verification": {
+    failureClass: "analysis-blocked-verification",
+    capabilityArea: "runtime-verification",
+    lifecycleStage: "verification",
+    safeReason: "Analysis or context sufficiency blocked verification readiness.",
+    suggestedNextAction: "Acquire test-impact or verification evidence before verification planning.",
+    verifierMarker: "harness-failure:analysis-blocked-verification",
   },
   "low-plan-quality": {
     failureClass: "low-plan-quality",
@@ -174,6 +219,11 @@ export function classifyHarnessFailure(input: {
     ...(input.evidence ?? []),
   ].join(" ").toLowerCase();
   if (/missing-target|target.*missing|missing target/.test(text)) return TAXONOMY["missing-target"];
+  if (/missing-required-context|missing required context|needs-required-context/.test(text)) return TAXONOMY["missing-required-context"];
+  if (/under-evidenced-analysis|under-evidenced|stop-under-evidenced-analysis/.test(text)) return TAXONOMY["under-evidenced-analysis"];
+  if (/stale-analysis-context|stale-context|stop-stale-context/.test(text)) return TAXONOMY["stale-analysis-context"];
+  if (/analysis-blocked-provider|provider.*blocked.*analysis|provider-blocked-by-analysis-quality/.test(text)) return TAXONOMY["analysis-blocked-provider"];
+  if (/analysis-blocked-verification|verification.*blocked.*context|verification-blocked-by-context-sufficiency/.test(text)) return TAXONOMY["analysis-blocked-verification"];
   if (/budget-limited|over-budget|over-byte-budget|over-file-budget|over-node-budget/.test(text)) return TAXONOMY["context-budget-limited"];
   if (/low-plan-quality|plan-quality.*low-confidence|low-confidence/.test(text)) return TAXONOMY["low-plan-quality"];
   if (/missing-context|context-missing|context packet.*missing|agent plan.*missing/.test(text)) return TAXONOMY["missing-context"];

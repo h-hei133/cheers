@@ -5,6 +5,8 @@ import type { TargetedContextPacket } from "./contextPacket.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
 import type { CodeGraphImpact } from "./codeGraphImpact.js";
 import type { AnalysisBrief } from "./analysisBrief.js";
+import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
+import type { TaskContextSufficiency } from "./taskContextSufficiency.js";
 import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";
 import { redactProviderEditText } from "./providerEditContext.js";
@@ -36,6 +38,10 @@ export interface ContextAwareProviderEditInput {
   readonly taskLifecycleId?: string;
   readonly taskLifecycleStage?: string;
   readonly analysisBriefId?: string;
+  readonly contextSufficiencyId?: string;
+  readonly contextSufficiencyState?: string;
+  readonly analysisQualityGateId?: string;
+  readonly analysisQualityGateDecision?: string;
   readonly taskExecutionPlanId?: string;
   readonly analysisBriefSummary?: string;
   readonly executionPlanConstraints?: readonly string[];
@@ -65,6 +71,8 @@ export function buildContextAwareProviderEditInput(input: {
   readonly agentPlan?: AgentPlan;
   readonly taskLifecycle?: TaskLifecycle;
   readonly analysisBrief?: AnalysisBrief;
+  readonly taskContextSufficiency?: TaskContextSufficiency;
+  readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly providerReadinessState: string;
   readonly proposalMode?: ContextAwareProviderProposalMode;
@@ -96,6 +104,10 @@ export function buildContextAwareProviderEditInput(input: {
     input.allowReviewOnlyWithMissingContext !== true;
   const lifecycleId = input.taskLifecycle?.lifecycleId ?? plan?.taskLifecycleId;
   const analysisBriefId = input.analysisBrief?.briefId ?? plan?.analysisBriefId;
+  const contextSufficiencyBlocked =
+    input.taskContextSufficiency?.providerProposalReadiness === "blocked";
+  const analysisQualityBlocked =
+    input.analysisQualityGate && !input.analysisQualityGate.allowed;
   const executionPlanId =
     input.taskExecutionPlan?.executionPlanId ?? plan?.taskExecutionPlanId;
 
@@ -106,6 +118,8 @@ export function buildContextAwareProviderEditInput(input: {
         ? "missing-analysis-brief"
       : overBudget
         ? "context-over-budget"
+        : contextSufficiencyBlocked || analysisQualityBlocked
+          ? "plan-needs-more-context"
         : graphLowReadiness
           ? "plan-needs-more-context"
         : planNeedsMoreContext
@@ -155,6 +169,10 @@ export function buildContextAwareProviderEditInput(input: {
       ? { taskLifecycleStage: input.taskLifecycle?.currentStage ?? plan?.taskLifecycleCurrentStage }
       : {}),
     ...(analysisBriefId ? { analysisBriefId } : {}),
+    ...(input.taskContextSufficiency ? { contextSufficiencyId: input.taskContextSufficiency.sufficiencyId } : {}),
+    ...(input.taskContextSufficiency ? { contextSufficiencyState: input.taskContextSufficiency.state } : {}),
+    ...(input.analysisQualityGate ? { analysisQualityGateId: input.analysisQualityGate.gateId } : {}),
+    ...(input.analysisQualityGate ? { analysisQualityGateDecision: input.analysisQualityGate.decision } : {}),
     ...(executionPlanId ? { taskExecutionPlanId: executionPlanId } : {}),
     ...(input.analysisBrief
       ? {
@@ -206,6 +224,9 @@ export function buildContextAwareProviderEditInput(input: {
       ...(plan ? [`context-aware-provider-edit:agent-plan:${plan.planId}`] : []),
       ...(lifecycleId ? [`context-aware-provider-edit:task-lifecycle:${lifecycleId}`] : []),
       ...(analysisBriefId ? [`context-aware-provider-edit:analysis-brief:${analysisBriefId}`] : []),
+      ...(input.taskContextSufficiency ? [`context-aware-provider-edit:context-sufficiency:${input.taskContextSufficiency.sufficiencyId}`] : []),
+      ...(input.analysisQualityGate ? [`context-aware-provider-edit:analysis-quality-gate:${input.analysisQualityGate.gateId}`] : []),
+      ...(input.analysisQualityGate ? [`context-aware-provider-edit:analysis-quality-decision:${input.analysisQualityGate.decision}`] : []),
       ...(executionPlanId ? [`context-aware-provider-edit:execution-plan:${executionPlanId}`] : []),
       `context-aware-provider-edit:context-completeness:${plan?.contextCompleteness ?? "missing-context"}`,
       `context-aware-provider-edit:plan-confidence:${plan?.confidence ?? "low"}`,

@@ -39,18 +39,29 @@ None open after Route 165.
   ids, no-write result evidence, continuation evidence, harness scorecard
   facts, and provider/verification/repair handoff readiness while keeping
   provider calls, command dispatch, and mutation authority closed by default.
+- Route 192 makes the read/analyze stages task-driven through
+  `taskContextNeed.ts`, `taskContextAcquisition.ts`,
+  `taskContextSufficiency.ts`, `analysisBriefCalibration.ts`,
+  `analysisQualityGate.ts`, and `taskContextResult.ts`. Task intent now
+  determines required and optional context categories, staged acquisition is
+  selected from existing bounded context/code-graph facts, sufficiency gates
+  provider/verification/repair readiness, analysis confidence/risk/missing
+  facts feed Agent Plan and Plan Quality, and Session / Harness / Result
+  surfaces preserve replay-safe no-write evidence.
 - Evidence: task lifecycle tests, context graph planning regression, Agent Plan
-  / Plan Quality regressions, provider proposal regression, verification
-  command planning regression, verification repair context regression,
-  Session / Continue parity regressions, focused context-planning verifier,
-  result-contract, and build.
+  / Plan Quality regressions, task context need/acquisition/sufficiency/result
+  tests, analysis calibration / quality gate tests, provider proposal
+  regression, verification command planning regression, verification repair
+  context regression, Session / Continue parity regressions, focused
+  context-planning verifier, result-contract, and build.
 - Recommended next action: keep mutation behavior, provider/model calls,
   command execution behavior, command allowlist expansion, LSP, embeddings,
   full-repo indexing, persistent graph backends, hidden chain-of-thought
   persistence, session publishing, CLI/schema/dependency changes, and broad
   `runMvpIntegratedFlow.ts` rewrites closed until separate routes define them.
-- Should become a route: no, resolved by Route 190 for bounded task lifecycle
-  evidence and readiness handoff only.
+- Should become a route: no, resolved by Routes 190-192 for bounded task
+  lifecycle evidence, runtime activation, and task-driven read/analyze
+  calibration only.
 
 ### Code intelligence graph trace and staleness readiness
 

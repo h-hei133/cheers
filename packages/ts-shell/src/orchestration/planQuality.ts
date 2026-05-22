@@ -13,6 +13,9 @@ import type { CodeGraphImpact } from "./codeGraphImpact.js";
 import type { AnalysisBrief } from "./analysisBrief.js";
 import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";
+import type { AnalysisBriefCalibration } from "./analysisBriefCalibration.js";
+import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
+import type { TaskContextSufficiency } from "./taskContextSufficiency.js";
 
 export type PlanQualityLevel =
   | "ready"
@@ -50,6 +53,12 @@ export interface PlanQuality {
   readonly analysisBriefId?: string;
   readonly taskExecutionPlanId?: string;
   readonly analysisConfidence?: AnalysisBrief["confidence"];
+  readonly contextSufficiencyId?: string;
+  readonly contextSufficiencyState?: string;
+  readonly analysisCalibrationId?: string;
+  readonly analysisRiskLevel?: string;
+  readonly analysisQualityGateId?: string;
+  readonly analysisQualityGateDecision?: string;
   readonly verificationPlanId?: string;
   readonly repairLoopId?: string;
   readonly score: number;
@@ -76,6 +85,9 @@ export function buildPlanQuality(input: {
   readonly codeGraphImpact?: CodeGraphImpact;
   readonly taskLifecycle?: TaskLifecycle;
   readonly analysisBrief?: AnalysisBrief;
+  readonly contextSufficiency?: TaskContextSufficiency;
+  readonly analysisCalibration?: AnalysisBriefCalibration;
+  readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly verificationCommandPlan?: VerificationCommandPlan;
   readonly repairContext?: VerificationRepairContext;
@@ -128,6 +140,16 @@ export function buildPlanQuality(input: {
         ? ["analysis brief missing for lifecycle task"]
         : []),
       ...(input.analysisBrief?.missingFacts ?? []),
+      ...(input.contextSufficiency?.missingRequiredFacts ?? []),
+      ...(input.contextSufficiency?.state === "stale-context" ? ["task context is stale"] : []),
+      ...(input.contextSufficiency?.state === "budget-limited" ? ["task context budget limited"] : []),
+      ...(input.analysisCalibration?.underEvidencedClaims.length
+        ? [`analysis under-evidenced claims ${input.analysisCalibration.underEvidencedClaims.length}`]
+        : []),
+      ...(input.analysisCalibration?.missingFacts ?? []),
+      ...(input.analysisQualityGate && !input.analysisQualityGate.allowed
+        ? [`analysis quality gate ${input.analysisQualityGate.decision}`]
+        : []),
       ...(input.analysisBrief?.verificationExpectation.startsWith("attach an explicit")
         ? ["analysis brief missing verification expectation"]
         : []),
@@ -148,6 +170,9 @@ export function buildPlanQuality(input: {
     codeGraphImpact: input.codeGraphImpact,
     taskLifecycle: input.taskLifecycle,
     analysisBrief: input.analysisBrief,
+    contextSufficiency: input.contextSufficiency,
+    analysisCalibration: input.analysisCalibration,
+    analysisQualityGate: input.analysisQualityGate,
     taskExecutionPlan: input.taskExecutionPlan,
     verificationCommandPlan: input.verificationCommandPlan,
     repairContext: input.repairContext,
@@ -162,6 +187,12 @@ export function buildPlanQuality(input: {
     impactQueryId: input.codeGraphImpact?.impactQueryId,
     taskLifecycleId: input.taskLifecycle?.lifecycleId ?? input.agentPlan.taskLifecycleId,
     analysisBriefId: input.analysisBrief?.briefId ?? input.agentPlan.analysisBriefId,
+    contextSufficiencyId: input.contextSufficiency?.sufficiencyId,
+    contextSufficiencyState: input.contextSufficiency?.state,
+    analysisCalibrationId: input.analysisCalibration?.calibrationId,
+    analysisRiskLevel: input.analysisCalibration?.riskLevel,
+    analysisQualityGateId: input.analysisQualityGate?.gateId,
+    analysisQualityGateDecision: input.analysisQualityGate?.decision,
     taskExecutionPlanId: input.taskExecutionPlan?.executionPlanId ?? input.agentPlan.taskExecutionPlanId,
     analysisConfidence: input.analysisBrief?.confidence,
     score,
@@ -204,6 +235,11 @@ export function buildPlanQuality(input: {
     input.taskExecutionPlan ? `executionPlan=${input.taskExecutionPlan.executionPlanId}` : input.agentPlan.taskExecutionPlanId ? `executionPlan=${input.agentPlan.taskExecutionPlanId}` : undefined,
     `level=${level}`,
     `score=${score}`,
+    input.contextSufficiency ? `contextSufficiency=${input.contextSufficiency.state}` : undefined,
+    input.analysisCalibration ? `analysisCalibration=${input.analysisCalibration.calibrationId}` : undefined,
+    input.analysisCalibration ? `analysisConfidence=${input.analysisCalibration.confidence}` : undefined,
+    input.analysisCalibration ? `analysisRisk=${input.analysisCalibration.riskLevel}` : undefined,
+    input.analysisQualityGate ? `analysisGate=${input.analysisQualityGate.decision}` : undefined,
     `missingFacts=${missingFacts.length}`,
     "mutationAuthority=not-granted",
     "raw-content-excluded",
@@ -227,6 +263,12 @@ export function buildPlanQuality(input: {
       ? { taskExecutionPlanId: input.taskExecutionPlan?.executionPlanId ?? input.agentPlan.taskExecutionPlanId }
       : {}),
     ...(input.analysisBrief ? { analysisConfidence: input.analysisBrief.confidence } : {}),
+    ...(input.contextSufficiency ? { contextSufficiencyId: input.contextSufficiency.sufficiencyId } : {}),
+    ...(input.contextSufficiency ? { contextSufficiencyState: input.contextSufficiency.state } : {}),
+    ...(input.analysisCalibration ? { analysisCalibrationId: input.analysisCalibration.calibrationId } : {}),
+    ...(input.analysisCalibration ? { analysisRiskLevel: input.analysisCalibration.riskLevel } : {}),
+    ...(input.analysisQualityGate ? { analysisQualityGateId: input.analysisQualityGate.gateId } : {}),
+    ...(input.analysisQualityGate ? { analysisQualityGateDecision: input.analysisQualityGate.decision } : {}),
     ...(input.verificationCommandPlan ? { verificationPlanId: input.verificationCommandPlan.verificationPlanId } : {}),
     ...(input.repairContext ? { repairLoopId: input.repairContext.repairLoopId } : {}),
     score,
@@ -250,6 +292,10 @@ export function buildPlanQuality(input: {
       ...(input.codeGraphImpact ? [`plan-quality:impact-query:${input.codeGraphImpact.impactQueryId}`] : []),
       ...(input.taskLifecycle ? [`plan-quality:task-lifecycle:${input.taskLifecycle.lifecycleId}`] : input.agentPlan.taskLifecycleId ? [`plan-quality:task-lifecycle:${input.agentPlan.taskLifecycleId}`] : []),
       ...(input.analysisBrief ? [`plan-quality:analysis-brief:${input.analysisBrief.briefId}`] : input.agentPlan.analysisBriefId ? [`plan-quality:analysis-brief:${input.agentPlan.analysisBriefId}`] : []),
+      ...(input.contextSufficiency ? [`plan-quality:context-sufficiency:${input.contextSufficiency.sufficiencyId}`] : []),
+      ...(input.analysisCalibration ? [`plan-quality:analysis-calibration:${input.analysisCalibration.calibrationId}`] : []),
+      ...(input.analysisQualityGate ? [`plan-quality:analysis-quality-gate:${input.analysisQualityGate.gateId}`] : []),
+      ...(input.analysisQualityGate ? [`plan-quality:analysis-quality-decision:${input.analysisQualityGate.decision}`] : []),
       ...(input.taskExecutionPlan ? [`plan-quality:execution-plan:${input.taskExecutionPlan.executionPlanId}`] : input.agentPlan.taskExecutionPlanId ? [`plan-quality:execution-plan:${input.agentPlan.taskExecutionPlanId}`] : []),
       `plan-quality:level:${level}`,
       `plan-quality:score:${score}`,
@@ -290,6 +336,9 @@ function buildDimensions(input: {
   readonly codeGraphImpact?: CodeGraphImpact;
   readonly taskLifecycle?: TaskLifecycle;
   readonly analysisBrief?: AnalysisBrief;
+  readonly contextSufficiency?: TaskContextSufficiency;
+  readonly analysisCalibration?: AnalysisBriefCalibration;
+  readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly verificationCommandPlan?: VerificationCommandPlan;
   readonly repairContext?: VerificationRepairContext;
@@ -329,6 +378,9 @@ function classifyLevel(input: {
   readonly codeGraphImpact?: CodeGraphImpact;
   readonly taskLifecycle?: TaskLifecycle;
   readonly analysisBrief?: AnalysisBrief;
+  readonly contextSufficiency?: TaskContextSufficiency;
+  readonly analysisCalibration?: AnalysisBriefCalibration;
+  readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly verificationCommandPlan?: VerificationCommandPlan;
   readonly repairContext?: VerificationRepairContext;
@@ -346,14 +398,30 @@ function classifyLevel(input: {
   if (
     input.codeGraphTrace?.stalenessSummary.status === "stale" ||
     input.codeGraphImpact?.readiness === "stale-warning" ||
-    input.analysisBrief?.confidence === "low"
+      input.analysisBrief?.confidence === "low"
   ) {
     return "low-confidence";
+  }
+  if (
+    input.contextSufficiency?.state === "stale-context" ||
+    input.contextSufficiency?.state === "budget-limited" ||
+    input.contextSufficiency?.state === "unsupported" ||
+    input.analysisCalibration?.readiness === "stale-context" ||
+    input.analysisCalibration?.readiness === "unsupported" ||
+    (input.analysisQualityGate && !input.analysisQualityGate.allowed)
+  ) {
+    return input.contextSufficiency?.state === "budget-limited"
+      ? "budget-limited"
+      : input.contextSufficiency?.state === "unsupported" || input.analysisCalibration?.readiness === "unsupported"
+        ? "unsupported"
+        : "low-confidence";
   }
   if (
     input.agentPlan.executionReadiness !== "ready" ||
     (input.agentPlan.taskLifecycleId && !input.analysisBrief && !input.agentPlan.analysisBriefId) ||
     (input.analysisBrief?.missingFacts.length ?? 0) > 0 ||
+    (input.contextSufficiency?.missingRequiredFacts.length ?? 0) > 0 ||
+    (input.analysisCalibration?.missingFacts.length ?? 0) > 0 ||
     input.analysisBrief?.verificationExpectation.startsWith("attach an explicit") ||
     input.graphReadiness?.graphReadiness === "partial" ||
     !input.testImpactPlan ||
@@ -422,6 +490,12 @@ function buildQualityId(input: {
   readonly impactQueryId?: string;
   readonly taskLifecycleId?: string;
   readonly analysisBriefId?: string;
+  readonly contextSufficiencyId?: string;
+  readonly contextSufficiencyState?: string;
+  readonly analysisCalibrationId?: string;
+  readonly analysisRiskLevel?: string;
+  readonly analysisQualityGateId?: string;
+  readonly analysisQualityGateDecision?: string;
   readonly taskExecutionPlanId?: string;
   readonly analysisConfidence?: AnalysisBrief["confidence"];
   readonly score: number;

@@ -15,6 +15,12 @@ export interface HarnessScorecard {
   readonly resultTruthfulness: HarnessScorecardStatus;
   readonly continuationReadiness: HarnessScorecardStatus;
   readonly failureClass: string;
+  readonly contextSufficiencyState?: string;
+  readonly analysisConfidence?: string;
+  readonly underEvidencedClaimsCount?: number;
+  readonly missingRequiredContextCount?: number;
+  readonly staleContext?: boolean;
+  readonly budgetLimitedContext?: boolean;
   readonly nextSuggestedRouteAction: string;
   readonly mutationAuthority: "not-granted";
   readonly replaySafeSummary: string;
@@ -62,6 +68,10 @@ export function buildHarnessScorecard(input: {
     `harness-scorecard ${scorecardId}`,
     input.trace ? `trace=${input.trace.traceId}` : undefined,
     input.planQuality ? `planQuality=${input.planQuality.qualityId}` : undefined,
+    input.trace?.contextSufficiencyState ? `contextSufficiency=${input.trace.contextSufficiencyState}` : undefined,
+    input.trace?.analysisConfidence ? `analysisConfidence=${input.trace.analysisConfidence}` : undefined,
+    typeof input.trace?.underEvidencedClaimsCount === "number" ? `underEvidenced=${input.trace.underEvidencedClaimsCount}` : undefined,
+    typeof input.trace?.missingRequiredContextCount === "number" ? `missingRequiredContext=${input.trace.missingRequiredContextCount}` : undefined,
     `context=${contextQuality}`,
     `plan=${planReadiness}`,
     `provider=${providerProposalReadiness}`,
@@ -84,6 +94,12 @@ export function buildHarnessScorecard(input: {
     resultTruthfulness,
     continuationReadiness,
     failureClass,
+    ...(input.trace?.contextSufficiencyState ? { contextSufficiencyState: input.trace.contextSufficiencyState } : {}),
+    ...(input.trace?.analysisConfidence ? { analysisConfidence: input.trace.analysisConfidence } : {}),
+    ...(typeof input.trace?.underEvidencedClaimsCount === "number" ? { underEvidencedClaimsCount: input.trace.underEvidencedClaimsCount } : {}),
+    ...(typeof input.trace?.missingRequiredContextCount === "number" ? { missingRequiredContextCount: input.trace.missingRequiredContextCount } : {}),
+    ...(typeof input.trace?.staleContext === "boolean" ? { staleContext: input.trace.staleContext } : {}),
+    ...(typeof input.trace?.budgetLimitedContext === "boolean" ? { budgetLimitedContext: input.trace.budgetLimitedContext } : {}),
     nextSuggestedRouteAction,
     mutationAuthority: "not-granted",
     replaySafeSummary,
@@ -97,6 +113,12 @@ export function buildHarnessScorecard(input: {
       `harness-scorecard:verification:${verificationReadiness}`,
       `harness-scorecard:repair:${repairReadiness}`,
       `harness-scorecard:failure-class:${failureClass}`,
+      ...(input.trace?.contextSufficiencyState ? [`harness-scorecard:context-sufficiency:${input.trace.contextSufficiencyState}`] : []),
+      ...(input.trace?.analysisConfidence ? [`harness-scorecard:analysis-confidence:${input.trace.analysisConfidence}`] : []),
+      ...(typeof input.trace?.underEvidencedClaimsCount === "number" ? [`harness-scorecard:under-evidenced:${input.trace.underEvidencedClaimsCount}`] : []),
+      ...(typeof input.trace?.missingRequiredContextCount === "number" ? [`harness-scorecard:missing-required-context:${input.trace.missingRequiredContextCount}`] : []),
+      ...(input.trace?.staleContext ? ["harness-scorecard:stale-context"] : []),
+      ...(input.trace?.budgetLimitedContext ? ["harness-scorecard:budget-limited-context"] : []),
       "harness-scorecard:mutation-authority:not-granted",
       "harness-scorecard:raw-content-excluded",
     ],

@@ -55,6 +55,12 @@
         "packages/ts-shell/src/orchestration/taskLifecycleRouter.ts",
         "packages/ts-shell/src/orchestration/taskLifecycleActivation.ts",
         "packages/ts-shell/src/orchestration/taskLifecycleHandoff.ts",
+        "packages/ts-shell/src/orchestration/taskContextNeed.ts",
+        "packages/ts-shell/src/orchestration/taskContextAcquisition.ts",
+        "packages/ts-shell/src/orchestration/taskContextSufficiency.ts",
+        "packages/ts-shell/src/orchestration/analysisBriefCalibration.ts",
+        "packages/ts-shell/src/orchestration/analysisQualityGate.ts",
+        "packages/ts-shell/src/orchestration/taskContextResult.ts",
         "packages/ts-shell/src/orchestration/codeGraphImpact.ts"
       ],
       "owns": [
@@ -65,6 +71,7 @@
         "deterministic plan quality scoring and downstream planning gates",
         "task-level read/analyze/plan lifecycle evidence and safe analysis brief projection",
         "task lifecycle activation, prompt routing, and provider/verification/repair handoff facades",
+        "task-driven context need, staged acquisition, sufficiency, analysis calibration, analysis quality gate, and no-write context result projections",
         "bounded code intelligence impact summaries consumed by Agent Plan and Plan Quality",
         "receipt and result handoff aggregation"
       ]

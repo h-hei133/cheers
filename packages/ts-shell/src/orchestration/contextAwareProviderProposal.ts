@@ -6,6 +6,8 @@ import type { TestImpactPlan } from "./testImpactPlan.js";
 import type { PlanQuality } from "./planQuality.js";
 import type { CodeGraphImpact } from "./codeGraphImpact.js";
 import type { AnalysisBrief } from "./analysisBrief.js";
+import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
+import type { TaskContextSufficiency } from "./taskContextSufficiency.js";
 import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";
 import { evaluatePlanQualityGate } from "./planQualityGate.js";
@@ -88,6 +90,8 @@ export async function planContextAwareProviderProposal(input: {
   readonly planQuality?: PlanQuality;
   readonly taskLifecycle?: TaskLifecycle;
   readonly analysisBrief?: AnalysisBrief;
+  readonly taskContextSufficiency?: TaskContextSufficiency;
+  readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly userRequest: string;
   readonly constraints?: readonly string[];
@@ -107,6 +111,8 @@ export async function planContextAwareProviderProposal(input: {
     agentPlan: input.agentPlan,
     taskLifecycle: input.taskLifecycle,
     analysisBrief: input.analysisBrief,
+    taskContextSufficiency: input.taskContextSufficiency,
+    analysisQualityGate: input.analysisQualityGate,
     taskExecutionPlan: input.taskExecutionPlan,
     providerReadinessState: input.availability.kind,
     allowReviewOnlyWithMissingContext: input.allowReviewOnlyWithMissingContext,
@@ -136,6 +142,15 @@ export async function planContextAwareProviderProposal(input: {
         evidence: [...editInput.evidence, ...input.planQuality.evidence, ...qualityGate.evidence],
       });
     }
+  }
+  if (input.analysisQualityGate && !input.analysisQualityGate.allowed) {
+    return stoppedPlan({
+      status: "provider-quality-blocked",
+      input: editInput,
+      reason: input.analysisQualityGate.reason,
+      nextAction: input.analysisQualityGate.nextAction,
+      evidence: [...editInput.evidence, ...input.analysisQualityGate.evidence],
+    });
   }
 
   const unavailable = classifyAvailability(input.availability);

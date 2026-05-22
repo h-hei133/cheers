@@ -9,6 +9,12 @@ const focusedTests = [
   'src/orchestration/contextGraphScore.test.ts',
   'src/orchestration/contextGraphReadiness.test.ts',
   'src/orchestration/contextGraphPlanning.test.ts',
+  'src/orchestration/taskContextNeed.test.ts',
+  'src/orchestration/taskContextAcquisition.test.ts',
+  'src/orchestration/taskContextSufficiency.test.ts',
+  'src/orchestration/analysisBriefCalibration.test.ts',
+  'src/orchestration/analysisQualityGate.test.ts',
+  'src/orchestration/taskContextResult.test.ts',
   'src/orchestration/taskLifecycle.test.ts',
   'src/orchestration/taskLifecycleRouter.test.ts',
   'src/orchestration/taskLifecycleActivation.test.ts',
@@ -85,6 +91,23 @@ console.log('marker task-lifecycle-provider-verification-repair-handoff')
 console.log('marker task-lifecycle-result-session-continue')
 console.log('marker task-lifecycle-harness-trace-scorecard')
 console.log('marker task-lifecycle-hidden-cot-excluded')
+console.log('marker task-context-need-model')
+console.log('marker task-context-acquisition-staged')
+console.log('marker task-context-sufficiency-provider-block')
+console.log('marker analysis-brief-calibration-confidence-risk')
+console.log('marker analysis-quality-gate-blocks-provider')
+console.log('marker task-context-result-no-write-surface')
+console.log('marker bug-investigation-source-tests-callsite-context')
+console.log('marker test-failure-verification-output-required')
+console.log('marker refactor-planning-callsite-test-impact-context')
+console.log('marker missing-required-context-stops-provider-proposal')
+console.log('marker under-evidenced-analysis-stops-provider-proposal')
+console.log('marker sufficient-analysis-allows-provider-readiness')
+console.log('marker missing-test-impact-blocks-verification-readiness')
+console.log('marker analysis-quality-id-agent-plan-plan-quality-session')
+console.log('marker continue-preserves-missing-facts-suggested-reads')
+console.log('marker harness-scorecard-analysis-confidence')
+console.log('marker raw-content-hidden-reasoning-excluded')
 console.log('marker test-impact-suggested-tests')
 console.log('marker test-impact-verification-candidates')
 console.log('marker plan-quality-ready-score')
@@ -181,6 +204,10 @@ if (
   runMvpSource.includes('function buildHarnessTrace') ||
   runMvpSource.includes('function buildTaskLifecycle') ||
   runMvpSource.includes('function buildAnalysisBrief') ||
+  runMvpSource.includes('function buildTaskContextNeeds') ||
+  runMvpSource.includes('function evaluateTaskContextSufficiency') ||
+  runMvpSource.includes('function calibrateAnalysisBrief') ||
+  runMvpSource.includes('function evaluateAnalysisQualityGate') ||
   runMvpSource.includes('function buildTaskExecutionPlan') ||
   runMvpSource.includes('projectContextPacketRuntimeOutcome')
 ) {

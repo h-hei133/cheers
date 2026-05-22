@@ -59,6 +59,27 @@ export function routeTaskLifecycleRuntime(input: {
     };
   }
 
+  if (
+    (input.workflowPlan.taskKind === "edit-file" || input.workflowPlan.taskKind === "write-file") &&
+    (input.workflowPlan.blockedReason || input.workflowPlan.targetMissing) &&
+    !input.workflowPlan.contextPlanningRequested
+  ) {
+    return {
+      kind: "not-lifecycle-routed",
+      intentKind,
+      shouldActivate: false,
+      surface: "none",
+      reason: "Existing edit stopped route remains authoritative.",
+      missingFacts,
+      evidence: [
+        "task-lifecycle-router:not-activated",
+        `task-lifecycle-router:intent:${intentKind}`,
+        "task-lifecycle-router:edit-stopped-route-preserved",
+        "task-lifecycle-router:mutation-authority:not-granted",
+      ],
+    };
+  }
+
   if (input.workflowPlan.repairContextUsed || input.workflowPlan.continuationRepairReplan) {
     return route({
       kind: "repair-readiness",

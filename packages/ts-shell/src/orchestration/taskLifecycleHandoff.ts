@@ -1,5 +1,7 @@
 import type { AnalysisBrief } from "./analysisBrief.js";
+import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
 import type { PlanQuality } from "./planQuality.js";
+import type { TaskContextSufficiency } from "./taskContextSufficiency.js";
 import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";
 import type { TaskLifecycleActivation } from "./taskLifecycleActivation.js";
@@ -17,7 +19,8 @@ export type TaskLifecycleProviderHandoffStatus =
   | "provider-proposal-ready"
   | "provider-proposal-blocked-missing-analysis"
   | "provider-proposal-blocked-low-confidence"
-  | "provider-proposal-blocked-execution-plan";
+  | "provider-proposal-blocked-execution-plan"
+  | "provider-proposal-blocked-analysis-quality";
 
 export interface TaskLifecycleProviderHandoff {
   readonly status: TaskLifecycleProviderHandoffStatus;
@@ -52,12 +55,16 @@ export function buildTaskLifecycleHandoff(input: {
     analysisBrief: input.activation.analysisBrief,
     taskExecutionPlan: input.activation.taskExecutionPlan,
     planQuality: input.activation.planQuality,
+    taskContextSufficiency: input.activation.taskContextSufficiency,
+    analysisQualityGate: input.activation.analysisQualityGate,
   });
   const verificationCommandPlan = buildVerificationCommandPlan({
     agentPlan: input.activation.agentPlan,
     testImpactPlan: input.activation.contextBundle?.testImpact,
     codeGraphImpact: input.activation.contextBundle?.codeGraphImpact,
     planQuality: input.activation.planQuality,
+    taskContextSufficiency: input.activation.taskContextSufficiency,
+    analysisQualityGate: input.activation.analysisQualityGate,
     taskLifecycle: input.activation.taskLifecycle,
     taskExecutionPlan: input.activation.taskExecutionPlan,
     explicitCommand: input.activation.agentPlan.suggestedVerification[0],
@@ -76,6 +83,8 @@ export function buildTaskLifecycleHandoff(input: {
         taskLifecycle: input.activation.taskLifecycle,
         analysisBrief: input.activation.analysisBrief,
         taskExecutionPlan: input.activation.taskExecutionPlan,
+        taskContextSufficiency: input.activation.taskContextSufficiency,
+        analysisQualityGate: input.activation.analysisQualityGate,
         verification: input.verification,
         failedFiles: input.failedFiles,
         changedFiles: input.changedFiles,
@@ -105,6 +114,8 @@ function buildProviderHandoff(input: {
   readonly analysisBrief?: AnalysisBrief;
   readonly taskExecutionPlan?: TaskExecutionPlan;
   readonly planQuality?: PlanQuality;
+  readonly taskContextSufficiency?: TaskContextSufficiency;
+  readonly analysisQualityGate?: AnalysisQualityGateResult;
 }): TaskLifecycleProviderHandoff {
   const status = classifyProviderHandoff(input);
   const reason = buildProviderReason(status);
@@ -125,6 +136,8 @@ function buildProviderHandoff(input: {
       ...(input.analysisBrief ? [`task-lifecycle-provider-handoff:analysis-brief:${input.analysisBrief.briefId}`] : []),
       ...(input.taskExecutionPlan ? [`task-lifecycle-provider-handoff:execution-plan:${input.taskExecutionPlan.executionPlanId}`] : []),
       ...(input.planQuality ? [`task-lifecycle-provider-handoff:plan-quality:${input.planQuality.qualityId}`] : []),
+      ...(input.analysisQualityGate ? [`task-lifecycle-provider-handoff:analysis-quality-gate:${input.analysisQualityGate.gateId}`] : []),
+      ...(input.taskContextSufficiency ? [`task-lifecycle-provider-handoff:context-sufficiency:${input.taskContextSufficiency.sufficiencyId}`] : []),
       "task-lifecycle-provider-handoff:provider-call:not-run",
       "task-lifecycle-provider-handoff:mutation-authority:not-granted",
       "task-lifecycle-provider-handoff:raw-content-excluded",
@@ -135,9 +148,20 @@ function buildProviderHandoff(input: {
 function classifyProviderHandoff(input: {
   readonly analysisBrief?: AnalysisBrief;
   readonly taskExecutionPlan?: TaskExecutionPlan;
+  readonly taskContextSufficiency?: TaskContextSufficiency;
+  readonly analysisQualityGate?: AnalysisQualityGateResult;
 }): TaskLifecycleProviderHandoffStatus {
   if (!input.analysisBrief) {
     return "provider-proposal-blocked-missing-analysis";
+  }
+  if (input.analysisQualityGate && !input.analysisQualityGate.allowed) {
+    return "provider-proposal-blocked-analysis-quality";
+  }
+  if (
+    input.taskContextSufficiency &&
+    input.taskContextSufficiency.providerProposalReadiness === "blocked"
+  ) {
+    return "provider-proposal-blocked-analysis-quality";
   }
   if (input.analysisBrief.confidence === "low" || input.analysisBrief.missingFacts.length > 0) {
     return "provider-proposal-blocked-low-confidence";
@@ -158,6 +182,8 @@ function buildProviderReason(status: TaskLifecycleProviderHandoffStatus): string
       return "Provider proposal is blocked until analysis confidence and missing facts are resolved.";
     case "provider-proposal-blocked-execution-plan":
       return "Provider proposal is blocked until execution plan proposal readiness is ready.";
+    case "provider-proposal-blocked-analysis-quality":
+      return "Provider proposal is blocked until analysis quality gate allows provider preflight.";
   }
 }
 
@@ -171,5 +197,7 @@ function buildProviderNextAction(status: TaskLifecycleProviderHandoffStatus): st
       return "Read missing evidence and rebuild the analysis brief.";
     case "provider-proposal-blocked-execution-plan":
       return "Rebuild execution plan readiness before provider proposal.";
+    case "provider-proposal-blocked-analysis-quality":
+      return "Acquire missing context or strengthen analysis evidence before provider proposal.";
   }
 }

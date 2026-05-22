@@ -11,6 +11,10 @@ import type { CodeGraphImpact } from "./codeGraphImpact.js";
 import type { AnalysisBrief } from "./analysisBrief.js";
 import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";
+import type { AnalysisBriefCalibration } from "./analysisBriefCalibration.js";
+import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
+import type { TaskContextNeedSet } from "./taskContextNeed.js";
+import type { TaskContextSufficiency } from "./taskContextSufficiency.js";
 import type {
   AgentPlanConfidence,
   AgentPlanContextCompleteness,
@@ -27,6 +31,12 @@ export interface AgentPlanContextProjection {
   readonly taskLifecycleReadiness?: string;
   readonly taskLifecycleMissingFacts?: readonly string[];
   readonly suggestedNextTaskStage?: string;
+  readonly taskContextNeedIds?: readonly string[];
+  readonly taskContextSufficiencyState?: string;
+  readonly analysisConfidence?: string;
+  readonly analysisMissingFacts?: readonly string[];
+  readonly analysisRiskLevel?: string;
+  readonly analysisQualityGateId?: string;
   readonly contextGraphIds: readonly string[];
   readonly codeGraphTraceIds: readonly string[];
   readonly impactQueryId?: string;
@@ -62,6 +72,10 @@ export function projectContextPacketToAgentPlanContext(
     readonly lifecycle: TaskLifecycle;
     readonly analysisBrief?: AnalysisBrief;
     readonly executionPlan?: TaskExecutionPlan;
+    readonly contextNeeds?: TaskContextNeedSet;
+    readonly contextSufficiency?: TaskContextSufficiency;
+    readonly analysisCalibration?: AnalysisBriefCalibration;
+    readonly analysisQualityGate?: AnalysisQualityGateResult;
   },
 ): AgentPlanContextProjection {
   const contextSummary = buildContextPlanningSummary(packet);
@@ -92,6 +106,21 @@ export function projectContextPacketToAgentPlanContext(
     ...(lifecycleFacts?.lifecycle.nextRecommendedStage
       ? { suggestedNextTaskStage: lifecycleFacts.lifecycle.nextRecommendedStage }
       : {}),
+    ...(lifecycleFacts?.contextNeeds ? { taskContextNeedIds: lifecycleFacts.contextNeeds.needs.map((need) => need.needId) } : {}),
+    ...(lifecycleFacts?.contextSufficiency ? { taskContextSufficiencyState: lifecycleFacts.contextSufficiency.state } : {}),
+    ...(lifecycleFacts?.analysisCalibration
+      ? {
+          analysisConfidence: lifecycleFacts.analysisCalibration.confidence,
+          analysisMissingFacts: lifecycleFacts.analysisCalibration.missingFacts,
+          analysisRiskLevel: lifecycleFacts.analysisCalibration.riskLevel,
+        }
+      : lifecycleFacts?.analysisBrief
+        ? {
+            analysisConfidence: lifecycleFacts.analysisBrief.confidence,
+            analysisMissingFacts: lifecycleFacts.analysisBrief.missingFacts,
+          }
+        : {}),
+    ...(lifecycleFacts?.analysisQualityGate ? { analysisQualityGateId: lifecycleFacts.analysisQualityGate.gateId } : {}),
     contextGraphIds: graphFacts ? [graphFacts.graph.graphId] : [],
     codeGraphTraceIds: graphFacts?.codeGraphTrace ? [graphFacts.codeGraphTrace.traceId] : [],
     ...(graphFacts?.codeGraphImpact ? { impactQueryId: graphFacts.codeGraphImpact.impactQueryId } : {}),
@@ -130,6 +159,8 @@ export function projectContextPacketToAgentPlanContext(
         : []),
       ...(lifecycleFacts?.lifecycle.missingFacts ?? []),
       ...(lifecycleFacts?.analysisBrief?.missingFacts ?? []),
+      ...(lifecycleFacts?.contextSufficiency?.missingRequiredFacts ?? []),
+      ...(lifecycleFacts?.analysisCalibration?.missingFacts ?? []),
     ],
     suggestedReads: Array.from(
       new Set([
@@ -178,6 +209,27 @@ export function projectContextPacketToAgentPlanContext(
                   lifecycleFacts.executionPlan.replaySafeSummary,
                   ...lifecycleFacts.executionPlan.evidence,
                 ]
+              : []),
+            ...(lifecycleFacts.contextNeeds
+              ? [
+                  lifecycleFacts.contextNeeds.replaySafeSummary,
+                  ...lifecycleFacts.contextNeeds.evidence,
+                ]
+              : []),
+            ...(lifecycleFacts.contextSufficiency
+              ? [
+                  lifecycleFacts.contextSufficiency.replaySafeSummary,
+                  ...lifecycleFacts.contextSufficiency.evidence,
+                ]
+              : []),
+            ...(lifecycleFacts.analysisCalibration
+              ? [
+                  lifecycleFacts.analysisCalibration.replaySafeSummary,
+                  ...lifecycleFacts.analysisCalibration.evidence,
+                ]
+              : []),
+            ...(lifecycleFacts.analysisQualityGate
+              ? lifecycleFacts.analysisQualityGate.evidence
               : []),
           ]
         : []),
