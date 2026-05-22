@@ -63,27 +63,42 @@ describe("harnessScorecard", () => {
     const scorecard = buildHarnessScorecard({
       providerSmoke: {
         mode: "real-provider-smoke",
+        providerKind: "openai-compatible",
+        adapterApproved: false,
         caseId: "exact-single-target",
         skipReason: "no-opt-in",
         reportId: "proposal_quality_report_196",
         providerCalled: false,
+        providerErrorClass: "none",
+        outputValidationStatus: "none",
+        anchorQuality: "none",
         noWriteStatus: "pass",
         scorecardStatus: "skip",
       },
     });
 
     expect(scorecard.providerSmokeMode).toBe("real-provider-smoke");
+    expect(scorecard.providerSmokeProviderKind).toBe("openai-compatible");
+    expect(scorecard.providerSmokeAdapterApproved).toBe(false);
     expect(scorecard.providerSmokeCaseId).toBe("exact-single-target");
     expect(scorecard.providerSmokeSkipReason).toBe("no-opt-in");
     expect(scorecard.providerSmokeProviderCalled).toBe(false);
+    expect(scorecard.providerSmokeProviderErrorClass).toBe("none");
+    expect(scorecard.providerSmokeOutputValidation).toBe("none");
+    expect(scorecard.providerSmokeAnchorQuality).toBe("none");
     expect(scorecard.providerSmokeNoWrite).toBe("pass");
     expect(scorecard.providerSmokeQuality).toBe("skip");
     expect(scorecard.evidence).toEqual(
       expect.arrayContaining([
         "harness-scorecard:provider-smoke-mode:real-provider-smoke",
+        "harness-scorecard:provider-smoke-provider:openai-compatible",
+        "harness-scorecard:provider-smoke-adapter-approved:false",
         "harness-scorecard:provider-smoke-case:exact-single-target",
         "harness-scorecard:provider-smoke-skip:no-opt-in",
         "harness-scorecard:provider-smoke-called:false",
+        "harness-scorecard:provider-smoke-error:none",
+        "harness-scorecard:provider-smoke-output:none",
+        "harness-scorecard:provider-smoke-anchor:none",
         "harness-scorecard:provider-smoke-no-write:pass",
         "harness-scorecard:provider-smoke-quality:skip",
       ]),

@@ -12,6 +12,7 @@ export interface ProposalQualityReport {
   readonly providerSafeLabel: string;
   readonly caseId?: string;
   readonly providerCalled: boolean;
+  readonly providerErrorClass: string;
   readonly skipReason?: string;
   readonly promptAuditStatus: string;
   readonly outputValidationStatus: string;
@@ -52,6 +53,7 @@ export function buildProposalQualityReport(input: {
   const failureClass = input.failureClass ?? classifyReportFailure(input.gate, dryRun);
   const providerSafeLabel =
     input.providerSafeLabel ?? dryRun?.providerSafeLabel ?? input.gate?.providerSafeLabel ?? "unknown";
+  const providerErrorClass = dryRun?.providerErrorClass ?? "none";
   const reportId = [
     "proposal_quality_report",
     input.runId,
@@ -72,6 +74,7 @@ export function buildProposalQualityReport(input: {
     providerSafeLabel,
     ...(input.case ? { caseId: input.case.caseId } : {}),
     providerCalled: dryRun?.providerCalled ?? false,
+    providerErrorClass,
     ...(input.gate?.skipReason ? { skipReason: input.gate.skipReason } : {}),
     promptAuditStatus: dryRun?.promptAudit?.status ?? input.gate?.evidence.find((entry) => entry.startsWith("anchored-provider-smoke-gate:prompt-audit:"))?.split(":").at(-1) ?? "none",
     outputValidationStatus: dryRun?.outputValidation?.status ?? "none",
@@ -92,6 +95,7 @@ export function buildProposalQualityReport(input: {
       ...(input.case ? [`proposal-quality-report:case:${input.case.caseId}`] : []),
       `proposal-quality-report:provider:${providerSafeLabel}`,
       `proposal-quality-report:provider-called:${dryRun?.providerCalled ?? false}`,
+      `proposal-quality-report:provider-error-class:${providerErrorClass}`,
       ...(input.gate?.skipReason ? [`proposal-quality-report:skip-reason:${input.gate.skipReason}`] : []),
       `proposal-quality-report:prompt-audit:${dryRun?.promptAudit?.status ?? "none"}`,
       `proposal-quality-report:output-validation:${dryRun?.outputValidation?.status ?? "none"}`,
@@ -147,6 +151,17 @@ function classifyReportFailure(
   }
   if (dryRun.status === "dry-run-exact-ready-no-write") return "smoke exact-ready no-write";
   if (dryRun.status === "dry-run-review-required") return "smoke anchoring partial";
+  if (dryRun.status === "dry-run-provider-error") {
+    switch (dryRun.providerErrorClass) {
+      case "auth":
+        return "live-smoke-provider-auth";
+      case "network":
+      case "timeout":
+        return "live-smoke-provider-network";
+      default:
+        return "live-smoke-openai-compatible-provider-error";
+    }
+  }
   if (dryRun.status === "dry-run-prompt-audit-failed") return "smoke prompt audit failed";
   if (dryRun.status === "dry-run-anchor-quality-low" || dryRun.anchorQuality?.level === "unsafe") {
     return "smoke unsafe output";

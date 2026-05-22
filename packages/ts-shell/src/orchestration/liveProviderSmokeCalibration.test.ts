@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { runLiveProviderSmokeCalibration } from "./liveProviderSmokeCalibration.js";
+import { approveLiveProviderAdapter } from "./liveProviderAdapterApproval.js";
 import { buildLiveSmokeFixture } from "./liveProviderSmokeFixture.js";
 
 describe("liveProviderSmokeCalibration", () => {
@@ -56,12 +57,23 @@ describe("liveProviderSmokeCalibration", () => {
 
   it("calls provider when opt-in and readiness gates pass", async () => {
     let calls = 0;
+    const adapterApproval = approveLiveProviderAdapter({
+      explicitLiveSmokeOptIn: true,
+      realProviderSmokeOptIn: true,
+      providerReadinessStatus: "ready",
+      providerKind: "openai-compatible",
+      providerSafeLabel: "openai-compatible",
+      privateConfigManualRead: false,
+      fixtureSafetyStatus: "safe",
+      redactionStatus: "redacted-and-budgeted",
+    });
     const cal = await runLiveProviderSmokeCalibration({
       requestId: "cal-real-call",
       mode: "live-provider-smoke",
       explicitSmokeOptIn: true,
-      providerAvailability: { kind: "available", providerKindLabel: "fake-real" },
+      providerAvailability: { kind: "available", providerKindLabel: "openai-compatible" },
       fixture: baseFixture,
+      adapterApproval,
       lifecycleId: "life_197",
       analysisBriefId: "analysis_197",
       analysisQualityId: "analysis_quality_197",
@@ -96,10 +108,60 @@ describe("liveProviderSmokeCalibration", () => {
     expect(cal.gate.decision).toBe("allow-real-provider-smoke");
     expect(cal.result.providerCalled).toBe(true);
     expect(cal.result.status).toBe("provider-called-anchor-exact");
+    expect(cal.result.adapterApproved).toBe(true);
+    expect(cal.result.providerKind).toBe("openai-compatible");
+    expect(cal.qualityReport.providerErrorClass).toBe("none");
     expect(cal.changedFiles).toEqual([]);
     expect(cal.mutationAuthority).toBe("not-granted");
     expect(cal.harnessScorecard.providerSmokeProviderCalled).toBe(true);
+    expect(cal.harnessScorecard.providerSmokeProviderKind).toBe("openai-compatible");
+    expect(cal.harnessScorecard.providerSmokeAdapterApproved).toBe(true);
     expect(cal.harnessScorecard.providerSmokeNoWrite).toBe("pass");
+  });
+
+  it("classifies provider adapter errors as provider-called no-write results", async () => {
+    const cal = await runLiveProviderSmokeCalibration({
+      requestId: "cal-provider-error",
+      mode: "live-provider-smoke",
+      explicitSmokeOptIn: true,
+      providerAvailability: { kind: "available", providerKindLabel: "openai-compatible" },
+      fixture: baseFixture,
+      lifecycleId: "life_199",
+      analysisBriefId: "analysis_199",
+      analysisQualityId: "analysis_quality_199",
+      analysisQualityDecision: "allow",
+      planQualityId: "plan_quality_199",
+      planQualityLevel: "ready",
+      contextPacketId: "ctx_199",
+      contextGraphId: "graph_199",
+      codeGraphTraceId: "code_trace_199",
+      taskExecutionPlanId: "exec_199",
+      redactionStatus: "redacted-and-budgeted",
+      adapterApproval: approveLiveProviderAdapter({
+        explicitLiveSmokeOptIn: true,
+        realProviderSmokeOptIn: true,
+        providerReadinessStatus: "ready",
+        providerKind: "openai-compatible",
+        providerSafeLabel: "openai-compatible",
+        privateConfigManualRead: false,
+        fixtureSafetyStatus: "safe",
+        redactionStatus: "redacted-and-budgeted",
+      }),
+      provider: {
+        proposeEdit: () => {
+          throw new Error("fetch failed");
+        },
+      },
+    });
+
+    expect(cal.result.providerCalled).toBe(true);
+    expect(cal.result.providerErrorClass).toBe("network");
+    expect(cal.result.status).toBe("provider-called-provider-error");
+    expect(cal.qualityReport.failureClass).toBe("live-smoke-provider-network");
+    expect(cal.changedFiles).toEqual([]);
+    expect(cal.mutationAuthority).toBe("not-granted");
+    expect(cal.evidence).toContain("real-provider-proposal-dry-run:provider-error-class:network");
+    expect(cal.result.output).toContain("Raw provider output: excluded");
   });
 
   it("uses fixture promptContext evidence when top-level ids are absent", async () => {

@@ -55,6 +55,28 @@ describe("liveProviderSmokeResult", () => {
     expect(result.status).toBe("skipped-provider-not-ready");
   });
 
+  it("classifies provider auth and network skips", () => {
+    expect(buildLiveProviderSmokeResult({
+      runId: "run-auth",
+      mode: "live-provider-smoke",
+      providerSafeLabel: "openai-compatible",
+      providerKind: "openai-compatible",
+      providerCalled: false,
+      skipReason: "provider-auth",
+      providerErrorClass: "auth",
+    }).status).toBe("skipped-provider-auth");
+
+    expect(buildLiveProviderSmokeResult({
+      runId: "run-network",
+      mode: "live-provider-smoke",
+      providerSafeLabel: "openai-compatible",
+      providerKind: "openai-compatible",
+      providerCalled: false,
+      skipReason: "provider-network",
+      providerErrorClass: "network",
+    }).status).toBe("skipped-provider-network");
+  });
+
   it("classifies prompt-audit-failed when prompt audit did not pass", () => {
     const result = buildLiveProviderSmokeResult({
       runId: "run-5",
@@ -116,6 +138,23 @@ describe("liveProviderSmokeResult", () => {
     expect(result.status).toBe("provider-called-output-invalid");
   });
 
+  it("classifies provider-called-provider-error before output validation", () => {
+    const result = buildLiveProviderSmokeResult({
+      runId: "run-provider-error",
+      mode: "live-provider-smoke",
+      providerSafeLabel: "openai-compatible",
+      providerKind: "openai-compatible",
+      adapterApproved: true,
+      providerCalled: true,
+      providerErrorClass: "auth",
+    });
+
+    expect(result.status).toBe("provider-called-provider-error");
+    expect(result.providerErrorClass).toBe("auth");
+    expect(result.adapterApproved).toBe(true);
+    expect(result.evidence).toContain("live-provider-smoke-result:provider-error-class:auth");
+  });
+
   it("classifies provider-called-anchor-failed for unsupported anchor quality", () => {
     const result = buildLiveProviderSmokeResult({
       runId: "run-10",
@@ -144,6 +183,8 @@ describe("liveProviderSmokeResult", () => {
     });
 
     expect(result.evidence).toContain("live-provider-smoke-result:mutation-authority:not-granted");
+    expect(result.evidence).toContain("live-provider-smoke-result:adapter-approved:false");
+    expect(result.evidence).toContain("live-provider-smoke-result:provider-error-class:none");
     expect(result.evidence).toContain("live-provider-smoke-result:raw-output-excluded");
     expect(result.evidence).toContain("live-provider-smoke-result:no-apply");
     expect(result.mutationAuthority).toBe("not-granted");

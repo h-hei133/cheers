@@ -18,10 +18,15 @@ export interface HarnessScorecard {
   readonly providerDryRunRedaction?: HarnessScorecardStatus;
   readonly providerDryRunNoWrite?: HarnessScorecardStatus;
   readonly providerSmokeMode?: string;
+  readonly providerSmokeProviderKind?: string;
+  readonly providerSmokeAdapterApproved?: boolean;
   readonly providerSmokeCaseId?: string;
   readonly providerSmokeSkipReason?: string;
   readonly providerSmokeReportId?: string;
   readonly providerSmokeProviderCalled?: boolean;
+  readonly providerSmokeProviderErrorClass?: string;
+  readonly providerSmokeOutputValidation?: string;
+  readonly providerSmokeAnchorQuality?: string;
   readonly providerSmokeNoWrite?: HarnessScorecardStatus;
   readonly providerSmokeQuality?: HarnessScorecardStatus;
   readonly verificationReadiness: HarnessScorecardStatus;
@@ -58,10 +63,15 @@ export function buildHarnessScorecard(input: {
   };
   readonly providerSmoke?: {
     readonly mode?: string;
+    readonly providerKind?: string;
+    readonly adapterApproved?: boolean;
     readonly caseId?: string;
     readonly skipReason?: string;
     readonly reportId?: string;
     readonly providerCalled?: boolean;
+    readonly providerErrorClass?: string;
+    readonly outputValidationStatus?: string;
+    readonly anchorQuality?: string;
     readonly noWriteStatus?: string;
     readonly scorecardStatus?: string;
   };
@@ -147,10 +157,15 @@ export function buildHarnessScorecard(input: {
     providerDryRunRedaction ? `dryRunRedaction=${providerDryRunRedaction}` : undefined,
     providerDryRunNoWrite ? `dryRunNoWrite=${providerDryRunNoWrite}` : undefined,
     input.providerSmoke?.mode ? `providerSmokeMode=${input.providerSmoke.mode}` : undefined,
+    input.providerSmoke?.providerKind ? `providerSmokeProvider=${input.providerSmoke.providerKind}` : undefined,
+    typeof input.providerSmoke?.adapterApproved === "boolean" ? `providerSmokeAdapterApproved=${input.providerSmoke.adapterApproved}` : undefined,
     input.providerSmoke?.caseId ? `providerSmokeCase=${input.providerSmoke.caseId}` : undefined,
     input.providerSmoke?.skipReason ? `providerSmokeSkip=${input.providerSmoke.skipReason}` : undefined,
     input.providerSmoke?.reportId ? `providerSmokeReport=${input.providerSmoke.reportId}` : undefined,
     typeof input.providerSmoke?.providerCalled === "boolean" ? `providerSmokeCalled=${input.providerSmoke.providerCalled}` : undefined,
+    input.providerSmoke?.providerErrorClass ? `providerSmokeError=${input.providerSmoke.providerErrorClass}` : undefined,
+    input.providerSmoke?.outputValidationStatus ? `providerSmokeOutput=${input.providerSmoke.outputValidationStatus}` : undefined,
+    input.providerSmoke?.anchorQuality ? `providerSmokeAnchor=${input.providerSmoke.anchorQuality}` : undefined,
     providerSmokeNoWrite ? `providerSmokeNoWrite=${providerSmokeNoWrite}` : undefined,
     providerSmokeQuality ? `providerSmokeQuality=${providerSmokeQuality}` : undefined,
     `verification=${verificationReadiness}`,
@@ -175,10 +190,15 @@ export function buildHarnessScorecard(input: {
     ...(providerDryRunRedaction ? { providerDryRunRedaction } : {}),
     ...(providerDryRunNoWrite ? { providerDryRunNoWrite } : {}),
     ...(input.providerSmoke?.mode ? { providerSmokeMode: input.providerSmoke.mode } : {}),
+    ...(input.providerSmoke?.providerKind ? { providerSmokeProviderKind: input.providerSmoke.providerKind } : {}),
+    ...(typeof input.providerSmoke?.adapterApproved === "boolean" ? { providerSmokeAdapterApproved: input.providerSmoke.adapterApproved } : {}),
     ...(input.providerSmoke?.caseId ? { providerSmokeCaseId: input.providerSmoke.caseId } : {}),
     ...(input.providerSmoke?.skipReason ? { providerSmokeSkipReason: input.providerSmoke.skipReason } : {}),
     ...(input.providerSmoke?.reportId ? { providerSmokeReportId: input.providerSmoke.reportId } : {}),
     ...(typeof input.providerSmoke?.providerCalled === "boolean" ? { providerSmokeProviderCalled: input.providerSmoke.providerCalled } : {}),
+    ...(input.providerSmoke?.providerErrorClass ? { providerSmokeProviderErrorClass: input.providerSmoke.providerErrorClass } : {}),
+    ...(input.providerSmoke?.outputValidationStatus ? { providerSmokeOutputValidation: input.providerSmoke.outputValidationStatus } : {}),
+    ...(input.providerSmoke?.anchorQuality ? { providerSmokeAnchorQuality: input.providerSmoke.anchorQuality } : {}),
     ...(providerSmokeNoWrite ? { providerSmokeNoWrite } : {}),
     ...(providerSmokeQuality ? { providerSmokeQuality } : {}),
     verificationReadiness,
@@ -212,10 +232,15 @@ export function buildHarnessScorecard(input: {
       ...(providerDryRunRedaction ? [`harness-scorecard:provider-dry-run-redaction:${providerDryRunRedaction}`] : []),
       ...(providerDryRunNoWrite ? [`harness-scorecard:provider-dry-run-no-write:${providerDryRunNoWrite}`] : []),
       ...(input.providerSmoke?.mode ? [`harness-scorecard:provider-smoke-mode:${input.providerSmoke.mode}`] : []),
+      ...(input.providerSmoke?.providerKind ? [`harness-scorecard:provider-smoke-provider:${input.providerSmoke.providerKind}`] : []),
+      ...(typeof input.providerSmoke?.adapterApproved === "boolean" ? [`harness-scorecard:provider-smoke-adapter-approved:${input.providerSmoke.adapterApproved}`] : []),
       ...(input.providerSmoke?.caseId ? [`harness-scorecard:provider-smoke-case:${input.providerSmoke.caseId}`] : []),
       ...(input.providerSmoke?.skipReason ? [`harness-scorecard:provider-smoke-skip:${input.providerSmoke.skipReason}`] : []),
       ...(input.providerSmoke?.reportId ? [`harness-scorecard:provider-smoke-report:${input.providerSmoke.reportId}`] : []),
       ...(typeof input.providerSmoke?.providerCalled === "boolean" ? [`harness-scorecard:provider-smoke-called:${input.providerSmoke.providerCalled}`] : []),
+      ...(input.providerSmoke?.providerErrorClass ? [`harness-scorecard:provider-smoke-error:${input.providerSmoke.providerErrorClass}`] : []),
+      ...(input.providerSmoke?.outputValidationStatus ? [`harness-scorecard:provider-smoke-output:${input.providerSmoke.outputValidationStatus}`] : []),
+      ...(input.providerSmoke?.anchorQuality ? [`harness-scorecard:provider-smoke-anchor:${input.providerSmoke.anchorQuality}`] : []),
       ...(providerSmokeNoWrite ? [`harness-scorecard:provider-smoke-no-write:${providerSmokeNoWrite}`] : []),
       ...(providerSmokeQuality ? [`harness-scorecard:provider-smoke-quality:${providerSmokeQuality}`] : []),
       `harness-scorecard:verification:${verificationReadiness}`,

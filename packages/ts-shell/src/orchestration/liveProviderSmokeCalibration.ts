@@ -7,6 +7,7 @@ import {
   type LiveProviderSmokeEvidence,
 } from "./liveProviderSmokeEvidence.js";
 import { buildLiveProviderSmokeResult, type LiveProviderSmokeResult } from "./liveProviderSmokeResult.js";
+import type { LiveProviderAdapterApproval } from "./liveProviderAdapterApproval.js";
 import { buildProposalQualityReport, type ProposalQualityReport } from "./proposalQualityReport.js";
 import type { ProviderEditAvailability } from "./providerEditPlanner.js";
 import { auditProviderPrompt, type ProviderPromptAudit } from "./providerPromptAudit.js";
@@ -52,6 +53,7 @@ export async function runLiveProviderSmokeCalibration(input: {
   readonly taskExecutionPlanId?: string;
   readonly redactionStatus?: string;
   readonly provider?: RealProviderProposalDryRunProvider;
+  readonly adapterApproval?: LiveProviderAdapterApproval;
 }): Promise<LiveProviderSmokeCalibration> {
   const runId = `live_smoke_calibration_${input.requestId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
   const normalizedEvidence = normalizeLiveProviderSmokeEvidence(input);
@@ -78,7 +80,7 @@ export async function runLiveProviderSmokeCalibration(input: {
       providerSafeLabel: gate.providerSafeLabel,
       gate,
     });
-    return finishCalibration({ runId, mode: input.mode, gate, normalizedEvidence, qualityReport: report });
+    return finishCalibration({ runId, mode: input.mode, gate, normalizedEvidence, qualityReport: report, adapterApproval: input.adapterApproval });
   }
 
   const promptAudit = auditProviderPrompt({
@@ -100,6 +102,7 @@ export async function runLiveProviderSmokeCalibration(input: {
       normalizedEvidence,
       promptAudit,
       qualityReport: report,
+      adapterApproval: input.adapterApproval,
     });
   }
 
@@ -117,6 +120,7 @@ export async function runLiveProviderSmokeCalibration(input: {
       normalizedEvidence,
       promptAudit,
       qualityReport: report,
+      adapterApproval: input.adapterApproval,
     });
   }
 
@@ -134,6 +138,7 @@ export async function runLiveProviderSmokeCalibration(input: {
       normalizedEvidence,
       promptAudit,
       qualityReport: report,
+      adapterApproval: input.adapterApproval,
     });
   }
 
@@ -175,6 +180,7 @@ export async function runLiveProviderSmokeCalibration(input: {
     promptAudit,
     dryRun,
     qualityReport: report,
+    adapterApproval: input.adapterApproval,
   });
 }
 
@@ -186,6 +192,7 @@ function finishCalibration(input: {
   readonly promptAudit?: ProviderPromptAudit | null;
   readonly dryRun?: RealProviderProposalDryRunResult | null;
   readonly qualityReport: ProposalQualityReport;
+  readonly adapterApproval?: LiveProviderAdapterApproval;
 }): LiveProviderSmokeCalibration {
   const harnessTrace = buildHarnessTrace({
     routeId: "route197-live-provider-smoke-calibration",
@@ -205,6 +212,9 @@ function finishCalibration(input: {
     providerAnchoringNoWrite: input.dryRun?.anchoringResult?.noWrite,
     providerDryRunCalled: input.qualityReport.providerCalled,
     providerSmokeMode: input.qualityReport.mode,
+    providerSmokeProviderKind: input.adapterApproval?.providerKind ?? input.qualityReport.providerSafeLabel,
+    providerSmokeAdapterApproved: input.adapterApproval?.adapterApproved ?? false,
+    providerSmokeProviderErrorClass: input.qualityReport.providerErrorClass,
     providerSmokeCaseId: input.qualityReport.caseId,
     providerSmokeSkipReason: input.qualityReport.skipReason,
     providerSmokeReportId: input.qualityReport.reportId,
@@ -231,10 +241,15 @@ function finishCalibration(input: {
       : undefined,
     providerSmoke: {
       mode: input.qualityReport.mode,
+      providerKind: input.adapterApproval?.providerKind ?? input.qualityReport.providerSafeLabel,
+      adapterApproved: input.adapterApproval?.adapterApproved ?? false,
       caseId: input.qualityReport.caseId,
       skipReason: input.qualityReport.skipReason,
       reportId: input.qualityReport.reportId,
       providerCalled: input.qualityReport.providerCalled,
+      providerErrorClass: input.qualityReport.providerErrorClass,
+      outputValidationStatus: input.qualityReport.outputValidationStatus,
+      anchorQuality: input.qualityReport.anchorQuality,
       noWriteStatus: input.qualityReport.noWriteStatus,
       scorecardStatus: input.qualityReport.scorecardStatus,
     },
@@ -246,7 +261,10 @@ function finishCalibration(input: {
     runId: input.runId,
     mode: input.mode,
     providerSafeLabel: input.qualityReport.providerSafeLabel,
+    providerKind: input.adapterApproval?.providerKind ?? input.qualityReport.providerSafeLabel,
+    adapterApproved: input.adapterApproval?.adapterApproved ?? false,
     providerCalled: input.qualityReport.providerCalled,
+    providerErrorClass: input.qualityReport.providerErrorClass,
     skipReason: input.qualityReport.skipReason,
     gateDecision: input.gate.decision,
     promptAuditId: input.dryRun?.promptAudit?.auditId ?? input.promptAudit?.auditId,
@@ -266,6 +284,7 @@ function finishCalibration(input: {
 
   const evidence = [
     ...input.normalizedEvidence.evidence,
+    ...(input.adapterApproval ? input.adapterApproval.evidence : []),
     ...input.gate.evidence,
     ...(input.promptAudit ? input.promptAudit.evidence : []),
     ...(input.dryRun ? input.dryRun.evidence : []),

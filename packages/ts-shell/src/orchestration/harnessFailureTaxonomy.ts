@@ -35,8 +35,12 @@ export type HarnessFailureClass =
   | "live-smoke-no-opt-in"
   | "live-smoke-opt-in-not-honored"
   | "live-smoke-fixture-evidence-missing"
+  | "live-smoke-adapter-not-approved"
   | "live-smoke-provider-boundary-unreachable"
   | "live-smoke-provider-unavailable"
+  | "live-smoke-openai-compatible-provider-error"
+  | "live-smoke-provider-auth"
+  | "live-smoke-provider-network"
   | "live-smoke-output-invalid"
   | "live-smoke-anchor-failed"
   | "live-smoke-unsafe-output"
@@ -365,6 +369,14 @@ const TAXONOMY: Record<HarnessFailureClass, HarnessFailureTaxonomyEntry> = {
     suggestedNextAction: "Normalize lifecycle, analysis, plan, context, and redaction ids before calibration.",
     verifierMarker: "harness-failure:live-smoke-fixture-evidence-missing",
   },
+  "live-smoke-adapter-not-approved": {
+    failureClass: "live-smoke-adapter-not-approved",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Live anchored provider smoke did not have an approved adapter.",
+    suggestedNextAction: "Approve only an explicit openai-compatible no-write adapter after readiness passes.",
+    verifierMarker: "harness-failure:live-smoke-adapter-not-approved",
+  },
   "live-smoke-provider-boundary-unreachable": {
     failureClass: "live-smoke-provider-boundary-unreachable",
     capabilityArea: "provider-model",
@@ -380,6 +392,30 @@ const TAXONOMY: Record<HarnessFailureClass, HarnessFailureTaxonomyEntry> = {
     safeReason: "Live anchored provider smoke provider is unavailable or not configured.",
     suggestedNextAction: "Run readiness checks through approved isolated gate or use fake corpus.",
     verifierMarker: "harness-failure:live-smoke-provider-unavailable",
+  },
+  "live-smoke-openai-compatible-provider-error": {
+    failureClass: "live-smoke-openai-compatible-provider-error",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "OpenAI-compatible live smoke provider call failed inside the approved no-write boundary.",
+    suggestedNextAction: "Classify provider error class and retry only through the explicit opt-in smoke.",
+    verifierMarker: "harness-failure:live-smoke-openai-compatible-provider-error",
+  },
+  "live-smoke-provider-auth": {
+    failureClass: "live-smoke-provider-auth",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Live anchored provider smoke authentication was rejected.",
+    suggestedNextAction: "Fix provider credentials through the approved readiness configuration.",
+    verifierMarker: "harness-failure:live-smoke-provider-auth",
+  },
+  "live-smoke-provider-network": {
+    failureClass: "live-smoke-provider-network",
+    capabilityArea: "provider-model",
+    lifecycleStage: "proposal",
+    safeReason: "Live anchored provider smoke could not reach the provider endpoint.",
+    suggestedNextAction: "Retry after provider network/proxy reachability is restored.",
+    verifierMarker: "harness-failure:live-smoke-provider-network",
   },
   "live-smoke-output-invalid": {
     failureClass: "live-smoke-output-invalid",
@@ -518,8 +554,12 @@ export function classifyHarnessFailure(input: {
   if (/live-smoke-no-opt-in|live.*smoke.*no.*opt/.test(text)) return TAXONOMY["live-smoke-no-opt-in"];
   if (/live-smoke-opt-in-not-honored|opt-in.*not.*honored/.test(text)) return TAXONOMY["live-smoke-opt-in-not-honored"];
   if (/live-smoke-fixture-evidence-missing|fixture.*evidence.*missing/.test(text)) return TAXONOMY["live-smoke-fixture-evidence-missing"];
+  if (/live-smoke-adapter-not-approved|adapter.*not.*approved/.test(text)) return TAXONOMY["live-smoke-adapter-not-approved"];
   if (/live-smoke-provider-boundary-unreachable|provider.*boundary.*unreachable/.test(text)) return TAXONOMY["live-smoke-provider-boundary-unreachable"];
   if (/live-smoke-provider-unavailable|live.*smoke.*provider.*unavailable/.test(text)) return TAXONOMY["live-smoke-provider-unavailable"];
+  if (/live-smoke-provider-auth|provider-error-class:auth|provider.*auth/.test(text)) return TAXONOMY["live-smoke-provider-auth"];
+  if (/live-smoke-provider-network|provider-error-class:(network|timeout)|provider.*network/.test(text)) return TAXONOMY["live-smoke-provider-network"];
+  if (/live-smoke-openai-compatible-provider-error|openai-compatible.*provider.*error|provider-error-class:(missing-key|unsupported|malformed-response|unknown)/.test(text)) return TAXONOMY["live-smoke-openai-compatible-provider-error"];
   if (/live-smoke-output-invalid|live.*smoke.*output.*invalid/.test(text)) return TAXONOMY["live-smoke-output-invalid"];
   if (/live-smoke-anchor-failed|live.*smoke.*anchor.*fail/.test(text)) return TAXONOMY["live-smoke-anchor-failed"];
   if (/live-smoke-unsafe-output|live.*smoke.*unsafe/.test(text)) return TAXONOMY["live-smoke-unsafe-output"];

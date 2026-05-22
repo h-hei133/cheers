@@ -20,6 +20,7 @@ import type { ProviderOutputValidation } from "./providerOutputValidator.js";
 import { validateProviderOutput } from "./providerOutputValidator.js";
 import type { RealProviderProposalGateResult } from "./realProviderProposalGate.js";
 import { evaluateRealProviderProposalGate } from "./realProviderProposalGate.js";
+import { classifyOpenAICompatibleAnchoredSmokeError } from "./openAICompatibleAnchoredSmokeAdapter.js";
 
 export type RealProviderProposalDryRunStatus =
   | "dry-run-proposal-created"
@@ -36,6 +37,7 @@ export type RealProviderProposalDryRunStatus =
   | "dry-run-context-over-budget"
   | "dry-run-redaction-risk"
   | "dry-run-prompt-audit-failed"
+  | "dry-run-provider-error"
   | "dry-run-provider-invalid-output"
   | "dry-run-anchor-quality-low"
   | "dry-run-unsupported";
@@ -62,6 +64,7 @@ export type RealProviderProposalDryRunResult =
       readonly anchoringResult: ProviderAnchoringResult;
       readonly manifest: ProviderEditProposalManifest;
       readonly providerCalled: true;
+      readonly providerErrorClass?: string;
       readonly changedFiles: readonly [];
       readonly mutationAuthority: "not-granted";
       readonly mutation: "not-run";
@@ -85,6 +88,7 @@ export type RealProviderProposalDryRunResult =
       readonly anchoredProposal?: ProviderAnchoredProposalManifest;
       readonly anchoringResult?: ProviderAnchoringResult;
       readonly providerCalled: boolean;
+      readonly providerErrorClass?: string;
       readonly changedFiles: readonly [];
       readonly mutationAuthority: "not-granted";
       readonly mutation: "not-run";
@@ -178,7 +182,27 @@ export async function runRealProviderProposalDryRun(input: {
     });
   }
 
-  const rawOutput = await input.provider.proposeEdit(input.promptContext);
+  let rawOutput: ProviderEditRawProposal;
+  try {
+    rawOutput = await input.provider.proposeEdit(input.promptContext);
+  } catch (error) {
+    const providerErrorClass = classifyOpenAICompatibleAnchoredSmokeError(error);
+    return stoppedDryRun({
+      status: "dry-run-provider-error",
+      dryRunId,
+      gate,
+      promptAudit,
+      providerCalled: true,
+      providerErrorClass,
+      reason: `Provider call failed during no-write dry-run with class ${providerErrorClass}.`,
+      nextAction: "Classify provider readiness/auth/network state and retry only through the approved smoke boundary.",
+      evidence: [
+        ...gate.evidence,
+        ...promptAudit.evidence,
+        `real-provider-proposal-dry-run:provider-error-class:${providerErrorClass}`,
+      ],
+    });
+  }
   const outputValidation = validateProviderOutput({
     requestId: input.requestId,
     rawOutput,
@@ -409,6 +433,7 @@ function stoppedDryRun(input: {
   readonly anchoredProposal?: ProviderAnchoredProposalManifest;
   readonly anchoringResult?: ProviderAnchoringResult;
   readonly providerCalled: boolean;
+  readonly providerErrorClass?: string;
   readonly reason: string;
   readonly nextAction: string;
   readonly evidence: readonly string[];
@@ -424,6 +449,7 @@ function stoppedDryRun(input: {
     ...(input.anchoredProposal ? { anchoredProposal: input.anchoredProposal } : {}),
     ...(input.anchoringResult ? { anchoringResult: input.anchoringResult } : {}),
     providerCalled: input.providerCalled,
+    ...(input.providerErrorClass ? { providerErrorClass: input.providerErrorClass } : {}),
     changedFiles: [],
     mutationAuthority: "not-granted",
     mutation: "not-run",
@@ -434,6 +460,7 @@ function stoppedDryRun(input: {
       `real-provider-proposal-dry-run:id:${input.dryRunId}`,
       `real-provider-proposal-dry-run:status:${input.status}`,
       `real-provider-proposal-dry-run:provider-called:${input.providerCalled ? "explicit-dry-run" : "not-run"}`,
+      `real-provider-proposal-dry-run:provider-error-class:${input.providerErrorClass ?? "none"}`,
       "real-provider-proposal-dry-run:mutation:not-run",
       "real-provider-proposal-dry-run:mutation-authority:not-granted",
       "real-provider-proposal-dry-run:raw-content-excluded",

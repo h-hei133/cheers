@@ -7,7 +7,10 @@ export type LiveProviderSmokeResultStatus =
   | "skipped-provider-not-configured"
   | "skipped-provider-unsupported"
   | "skipped-provider-not-ready"
+  | "skipped-provider-auth"
+  | "skipped-provider-network"
   | "prompt-audit-failed"
+  | "provider-called-provider-error"
   | "provider-called-output-valid"
   | "provider-called-output-invalid"
   | "provider-called-anchor-exact"
@@ -22,10 +25,14 @@ export interface LiveProviderSmokeResult {
   readonly status: LiveProviderSmokeResultStatus;
   readonly mode: "live-provider-smoke" | "fake-corpus";
   readonly providerSafeLabel: string;
+  readonly providerKind: string;
+  readonly adapterApproved: boolean;
   readonly providerCalled: boolean;
+  readonly providerErrorClass: string;
   readonly skipReason?: string;
   readonly promptAuditId?: string;
   readonly outputValidationId?: string;
+  readonly outputValidationStatus: string;
   readonly anchoredProposalId?: string;
   readonly anchorQuality: string;
   readonly qualityReportId?: string;
@@ -42,7 +49,10 @@ export function buildLiveProviderSmokeResult(input: {
   readonly runId: string;
   readonly mode: "live-provider-smoke" | "fake-corpus";
   readonly providerSafeLabel: string;
+  readonly providerKind?: string;
+  readonly adapterApproved?: boolean;
   readonly providerCalled: boolean;
+  readonly providerErrorClass?: string;
   readonly skipReason?: string;
   readonly gateDecision?: string;
   readonly promptAuditId?: string;
@@ -66,7 +76,10 @@ export function buildLiveProviderSmokeResult(input: {
     "live provider anchored smoke evaluated; mutation did not run.",
     `Mode: ${input.mode}`,
     `Provider: ${input.providerSafeLabel}`,
+    `Provider kind: ${input.providerKind ?? input.providerSafeLabel}`,
+    `Adapter approved: ${input.adapterApproved ? "yes" : "no"}`,
     `Provider called: ${input.providerCalled ? "yes" : "no"}`,
+    `Provider error class: ${input.providerErrorClass ?? "none"}`,
     input.skipReason ? `Skip reason: ${input.skipReason}` : undefined,
     `Status: ${status}`,
     input.promptAuditId ? `Prompt audit: ${input.promptAuditId}` : undefined,
@@ -83,10 +96,14 @@ export function buildLiveProviderSmokeResult(input: {
     status,
     mode: input.mode,
     providerSafeLabel: input.providerSafeLabel,
+    providerKind: input.providerKind ?? input.providerSafeLabel,
+    adapterApproved: input.adapterApproved ?? false,
     providerCalled: input.providerCalled,
+    providerErrorClass: input.providerErrorClass ?? "none",
     ...(input.skipReason ? { skipReason: input.skipReason } : {}),
     ...(input.promptAuditId ? { promptAuditId: input.promptAuditId } : {}),
     ...(input.outputValidationId ? { outputValidationId: input.outputValidationId } : {}),
+    outputValidationStatus: input.outputValidationStatus ?? "none",
     ...(input.anchoredProposalId ? { anchoredProposalId: input.anchoredProposalId } : {}),
     anchorQuality: input.anchorQuality ?? "none",
     ...(input.qualityReportId ? { qualityReportId: input.qualityReportId } : {}),
@@ -104,10 +121,14 @@ export function buildLiveProviderSmokeResult(input: {
       `live-provider-smoke-result:mode:${input.mode}`,
       `live-provider-smoke-result:status:${status}`,
       `live-provider-smoke-result:provider:${input.providerSafeLabel}`,
+      `live-provider-smoke-result:provider-kind:${input.providerKind ?? input.providerSafeLabel}`,
+      `live-provider-smoke-result:adapter-approved:${input.adapterApproved ?? false}`,
       `live-provider-smoke-result:provider-called:${input.providerCalled}`,
+      `live-provider-smoke-result:provider-error-class:${input.providerErrorClass ?? "none"}`,
       ...(input.skipReason ? [`live-provider-smoke-result:skip-reason:${input.skipReason}`] : []),
       ...(input.promptAuditId ? [`live-provider-smoke-result:prompt-audit:${input.promptAuditId}`] : []),
       ...(input.outputValidationId ? [`live-provider-smoke-result:output-validation:${input.outputValidationId}`] : []),
+      `live-provider-smoke-result:output-validation-status:${input.outputValidationStatus ?? "none"}`,
       ...(input.anchorQuality ? [`live-provider-smoke-result:anchor-quality:${input.anchorQuality}`] : []),
       ...(input.qualityReportId ? [`live-provider-smoke-result:quality-report:${input.qualityReportId}`] : []),
       ...(input.scorecardId ? [`live-provider-smoke-result:scorecard:${input.scorecardId}`] : []),
@@ -129,11 +150,14 @@ function classifyResult(input: {
   readonly outputValidationStatus?: string;
   readonly anchorQuality?: string;
   readonly dryRunStatus?: string;
+  readonly providerErrorClass?: string;
 }): LiveProviderSmokeResultStatus {
   if (!input.providerCalled) {
     if (input.skipReason === "no-opt-in") return "skipped-no-opt-in";
     if (input.skipReason === "provider-not-configured") return "skipped-provider-not-configured";
     if (input.skipReason === "provider-unsupported") return "skipped-provider-unsupported";
+    if (input.skipReason === "provider-auth") return "skipped-provider-auth";
+    if (input.skipReason === "provider-network") return "skipped-provider-network";
     if (input.skipReason === "provider-not-ready") return "skipped-provider-not-ready";
     if (input.promptAuditStatus && input.promptAuditStatus !== "pass") return "prompt-audit-failed";
     if (input.gateDecision?.startsWith("stop-")) return "skipped-provider-not-ready";
@@ -142,10 +166,16 @@ function classifyResult(input: {
         case "skip-no-opt-in": return "skipped-no-opt-in";
         case "skip-provider-not-configured": return "skipped-provider-not-configured";
         case "skip-provider-unsupported": return "skipped-provider-unsupported";
+        case "skip-provider-auth": return "skipped-provider-auth";
+        case "skip-provider-network": return "skipped-provider-network";
         default: return "skipped-provider-not-ready";
       }
     }
     return "skipped-provider-not-ready";
+  }
+
+  if (input.providerErrorClass && input.providerErrorClass !== "none") {
+    return "provider-called-provider-error";
   }
 
   if (input.anchorQuality === "exact-ready") return "provider-called-anchor-exact";

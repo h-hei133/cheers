@@ -44,6 +44,9 @@ export interface HarnessTrace {
   readonly providerAnchoringNoWrite?: boolean;
   readonly providerDryRunCalled?: boolean;
   readonly providerSmokeMode?: string;
+  readonly providerSmokeProviderKind?: string;
+  readonly providerSmokeAdapterApproved?: boolean;
+  readonly providerSmokeProviderErrorClass?: string;
   readonly providerSmokeCaseId?: string;
   readonly providerSmokeSkipReason?: string;
   readonly providerSmokeReportId?: string;
@@ -91,6 +94,9 @@ export function buildHarnessTrace(input: {
   readonly providerAnchoringNoWrite?: boolean;
   readonly providerDryRunCalled?: boolean;
   readonly providerSmokeMode?: string;
+  readonly providerSmokeProviderKind?: string;
+  readonly providerSmokeAdapterApproved?: boolean;
+  readonly providerSmokeProviderErrorClass?: string;
   readonly providerSmokeCaseId?: string;
   readonly providerSmokeSkipReason?: string;
   readonly providerSmokeReportId?: string;
@@ -142,6 +148,9 @@ export function buildHarnessTrace(input: {
     typeof input.providerAnchoringNoWrite === "boolean" ? `anchoringNoWrite=${input.providerAnchoringNoWrite}` : undefined,
     typeof input.providerDryRunCalled === "boolean" ? `providerCalled=${input.providerDryRunCalled}` : undefined,
     input.providerSmokeMode ? `providerSmokeMode=${input.providerSmokeMode}` : undefined,
+    input.providerSmokeProviderKind ? `providerSmokeProvider=${input.providerSmokeProviderKind}` : undefined,
+    typeof input.providerSmokeAdapterApproved === "boolean" ? `providerSmokeAdapterApproved=${input.providerSmokeAdapterApproved}` : undefined,
+    input.providerSmokeProviderErrorClass ? `providerSmokeError=${input.providerSmokeProviderErrorClass}` : undefined,
     input.providerSmokeCaseId ? `providerSmokeCase=${input.providerSmokeCaseId}` : undefined,
     input.providerSmokeSkipReason ? `providerSmokeSkip=${input.providerSmokeSkipReason}` : undefined,
     input.providerSmokeReportId ? `providerSmokeReport=${input.providerSmokeReportId}` : undefined,
@@ -184,6 +193,9 @@ export function buildHarnessTrace(input: {
     ...(typeof input.providerAnchoringNoWrite === "boolean" ? { providerAnchoringNoWrite: input.providerAnchoringNoWrite } : {}),
     ...(typeof input.providerDryRunCalled === "boolean" ? { providerDryRunCalled: input.providerDryRunCalled } : {}),
     ...(input.providerSmokeMode ? { providerSmokeMode: input.providerSmokeMode } : {}),
+    ...(input.providerSmokeProviderKind ? { providerSmokeProviderKind: input.providerSmokeProviderKind } : {}),
+    ...(typeof input.providerSmokeAdapterApproved === "boolean" ? { providerSmokeAdapterApproved: input.providerSmokeAdapterApproved } : {}),
+    ...(input.providerSmokeProviderErrorClass ? { providerSmokeProviderErrorClass: input.providerSmokeProviderErrorClass } : {}),
     ...(input.providerSmokeCaseId ? { providerSmokeCaseId: input.providerSmokeCaseId } : {}),
     ...(input.providerSmokeSkipReason ? { providerSmokeSkipReason: input.providerSmokeSkipReason } : {}),
     ...(input.providerSmokeReportId ? { providerSmokeReportId: input.providerSmokeReportId } : {}),
@@ -226,6 +238,9 @@ export function buildHarnessTrace(input: {
       ...(typeof input.providerAnchoringNoWrite === "boolean" ? [`harness-trace:provider-anchoring-no-write:${input.providerAnchoringNoWrite}`] : []),
       ...(typeof input.providerDryRunCalled === "boolean" ? [`harness-trace:provider-called:${input.providerDryRunCalled}`] : []),
       ...(input.providerSmokeMode ? [`harness-trace:provider-smoke-mode:${input.providerSmokeMode}`] : []),
+      ...(input.providerSmokeProviderKind ? [`harness-trace:provider-smoke-provider:${input.providerSmokeProviderKind}`] : []),
+      ...(typeof input.providerSmokeAdapterApproved === "boolean" ? [`harness-trace:provider-smoke-adapter-approved:${input.providerSmokeAdapterApproved}`] : []),
+      ...(input.providerSmokeProviderErrorClass ? [`harness-trace:provider-smoke-error:${input.providerSmokeProviderErrorClass}`] : []),
       ...(input.providerSmokeCaseId ? [`harness-trace:provider-smoke-case:${input.providerSmokeCaseId}`] : []),
       ...(input.providerSmokeSkipReason ? [`harness-trace:provider-smoke-skip:${input.providerSmokeSkipReason}`] : []),
       ...(input.providerSmokeReportId ? [`harness-trace:provider-smoke-report:${input.providerSmokeReportId}`] : []),

@@ -62,7 +62,15 @@ describe("harnessFailureTaxonomy", () => {
       .toBe("live-smoke-opt-in-not-honored");
     expect(classifyHarnessFailure({ status: "live-smoke-fixture-evidence-missing" }).failureClass)
       .toBe("live-smoke-fixture-evidence-missing");
+    expect(classifyHarnessFailure({ status: "live-smoke-adapter-not-approved" }).failureClass)
+      .toBe("live-smoke-adapter-not-approved");
     expect(classifyHarnessFailure({ status: "live-smoke-provider-boundary-unreachable" }).failureClass)
       .toBe("live-smoke-provider-boundary-unreachable");
+    expect(classifyHarnessFailure({ evidence: ["live-provider-smoke-result:provider-error-class:auth"] }).failureClass)
+      .toBe("live-smoke-provider-auth");
+    expect(classifyHarnessFailure({ evidence: ["live-provider-smoke-result:provider-error-class:network"] }).failureClass)
+      .toBe("live-smoke-provider-network");
+    expect(classifyHarnessFailure({ evidence: ["live-provider-smoke-result:provider-error-class:malformed-response"] }).failureClass)
+      .toBe("live-smoke-openai-compatible-provider-error");
   });
 });
