@@ -54,6 +54,7 @@
     "verify:result-contract": "node scripts/verify-result-contract.mjs",
     "verify:route205-repair-proof-chain": "node scripts/verify-route205-repair-proof-chain.mjs",
     "verify:route206-controlled-multifile-proof-chain": "node scripts/verify-route206-controlled-multifile-proof-chain.mjs",
+    "demo:route207": "tsx scripts/route207-demo.ts",
     "verify:edit-capability-closeout": "node scripts/verify-edit-capability-closeout.mjs",
     "verify:browser-txn-gate": "node scripts/verify-browser-txn-gate.mjs",
     "verify:workspace-safety": "node scripts/verify-workspace-safety.mjs",

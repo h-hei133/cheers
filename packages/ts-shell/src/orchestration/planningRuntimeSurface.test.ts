@@ -1,0 +1,165 @@
+import { describe, expect, it } from "vitest";
+
+import { projectPlanningRuntimeSurface } from "./planningRuntimeSurface.js";
+import type { PlanningRuntimeResult } from "./planningRuntime.js";
+
+describe("projectPlanningRuntimeSurface", () => {
+  it("projects planning runtime output without granting mutation or execution authority", () => {
+    const result: PlanningRuntimeResult = {
+      runtimeId: "planning_runtime_test",
+      status: "needs-more-context",
+      context: {
+        engineId: "context_engine_test",
+        status: "reused-memory",
+        userTask: "fix target ranking",
+        repo: {
+          snapshot: {
+            snapshotId: "repo_intel_test",
+            workspaceRootLabel: "fixture",
+            packageMap: [],
+            moduleMap: [],
+            entrypointMap: [],
+            testMap: [],
+            configMap: [],
+            boundaryHints: [],
+            files: [],
+            cacheStatus: "disabled",
+            staleIndexWarnings: [],
+            evidence: [],
+          },
+          candidates: [
+            {
+              path: "src/app.ts",
+              safeLabel: "src/app.ts",
+              role: "source",
+              score: 99,
+              reasons: ["path-name-match"],
+              symbolHints: ["app"],
+              freshness: "fresh-stat",
+            },
+          ],
+          recentRelevantFiles: ["src/app.ts"],
+          missingFacts: [],
+          nextReadSuggestions: [],
+          evidence: [],
+        },
+        workflowPlan: {
+          taskKind: "edit-file",
+          reason: "fix target ranking",
+          targetPath: "src/app.ts",
+          inspectFirst: true,
+          verifyAfterEdit: true,
+        },
+        memory: {
+          memoryId: "ctx_mem_test",
+          taskFingerprint: "task_fp_test",
+          repoSnapshotId: "repo_intel_test",
+          selectedTargetPath: "src/app.ts",
+          candidateFiles: ["src/app.ts"],
+          fileReceipts: [],
+          compactSummary: "target=src/app.ts",
+          missingFacts: ["call-site context missing"],
+          planningWarnings: ["adjacent verification is inferred"],
+          planQualityLevel: "needs-more-context",
+          contextSufficiencyState: "needs-optional-context",
+          editTargetRationale: ["src/app.ts: selected"],
+          verificationIntent: ["npm test -- --help"],
+          handoffSummary: "handoff=blocked",
+          invalidation: {
+            policy: "stat-size-mtime",
+            staleFiles: [],
+          },
+          redactionStatus: "redacted-and-budgeted",
+          mutationAuthority: "not-granted",
+          evidence: [],
+        },
+        filesRead: [],
+        contextBudget: {
+          candidateFiles: 1,
+          filesRead: 0,
+          bytesUsed: 0,
+          cacheStatus: "disabled",
+        },
+        missingFacts: ["call-site context missing"],
+        nextReadSuggestions: [],
+        evidence: [],
+      },
+      groundedAnalysis: {
+        summary: "target=src/app.ts",
+        confidence: "medium",
+        missingFacts: ["call-site context missing"],
+        planningWarnings: ["adjacent verification is inferred"],
+        evidenceIds: ["ctx_mem_test"],
+      },
+      executablePlan: {
+        summary: "review selected target",
+        steps: ["Review selected edit targets."],
+      },
+      editTargets: [
+        {
+          path: "src/app.ts",
+          rationale: "selected",
+          handoffRoute: "existing-proof-carrying-mutation-runtime",
+          readiness: "needs-more-context",
+        },
+      ],
+      verificationIntent: {
+        state: "context-not-ready",
+        commands: ["npm test -- --help"],
+        evidence: ["verification:not-executed"],
+      },
+      mutationHandoff: {
+        readiness: "blocked",
+        targetPaths: ["src/app.ts"],
+        route: "Route203-206-proof-carrying-backend",
+        reason: "needs context",
+        mutationAuthority: "not-granted",
+      },
+      continuationMemory: {
+        memoryId: "ctx_mem_test",
+        taskFingerprint: "task_fp_test",
+        repoSnapshotId: "repo_intel_test",
+        selectedTargetPath: "src/app.ts",
+        candidateFiles: ["src/app.ts"],
+        fileReceipts: [],
+        compactSummary: "target=src/app.ts",
+        missingFacts: ["call-site context missing"],
+        planningWarnings: ["adjacent verification is inferred"],
+        planQualityLevel: "needs-more-context",
+        contextSufficiencyState: "needs-optional-context",
+        editTargetRationale: ["src/app.ts: selected"],
+        verificationIntent: ["npm test -- --help"],
+        handoffSummary: "handoff=blocked",
+        invalidation: {
+          policy: "stat-size-mtime",
+          staleFiles: [],
+        },
+        redactionStatus: "redacted-and-budgeted",
+        mutationAuthority: "not-granted",
+        evidence: [],
+      },
+      evidence: [],
+    };
+
+    const surface = projectPlanningRuntimeSurface(result);
+
+    expect(surface.candidates[0]?.path).toBe("src/app.ts");
+    expect(surface.enoughContext).toBe("missing-facts");
+    expect(surface.planningWarnings).toEqual(["adjacent verification is inferred"]);
+    expect(surface.groundedAnalysis.planningWarnings).toEqual(["adjacent verification is inferred"]);
+    expect(surface.memory.planningWarnings).toBe(1);
+    expect(surface.verificationIntent).toMatchObject({
+      state: "context-not-ready",
+      command: "npm test -- --help",
+      readiness: "not-ready",
+    });
+    expect(surface.mutationHandoff.readiness).toBe("blocked");
+    expect(surface.safety).toEqual({
+      mutationAuthority: "not-granted",
+      providerCall: "not-run",
+      commandDispatch: "not-run",
+    });
+    expect(surface.evidence).toContain("planning-runtime-surface:raw-content-excluded");
+    expect(surface.evidence).toContain("planning-runtime-surface:warnings:1");
+  });
+});

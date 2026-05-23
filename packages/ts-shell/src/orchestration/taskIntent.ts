@@ -124,9 +124,6 @@ function classifyTaskIntent(
   if (plan.repairContextUsed || plan.continuationRepairReplan || plan.repairedFailureReason) {
     return "repair";
   }
-  if (plan.verifyAfterEdit || plan.verifyCommand || requestedActionKind === "verify") {
-    return "verification";
-  }
   if (plan.taskKind === "read-file" || plan.taskKind === "repo-explain") {
     return plan.groundedDeliverableMode === "explain" ? "read-explain" : "analyze";
   }
@@ -143,6 +140,9 @@ function classifyTaskIntent(
   }
   if (plan.taskKind === "edit-file" || plan.taskKind === "write-file") {
     return "edit-proposal";
+  }
+  if (plan.verifyAfterEdit || plan.verifyCommand || requestedActionKind === "verify") {
+    return "verification";
   }
   if (plan.blockedReason || plan.targetMissing) {
     return "ambiguous";

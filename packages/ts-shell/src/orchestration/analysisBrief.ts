@@ -51,7 +51,6 @@ export function buildAnalysisBrief(input: {
   ]);
   const missingFacts = unique([
     ...input.intent.missingTargetFacts,
-    ...input.readPlan.suggestedNextReads,
     ...(input.agentPlan?.missingFacts ?? []),
     ...(input.missingFacts ?? []),
   ]);

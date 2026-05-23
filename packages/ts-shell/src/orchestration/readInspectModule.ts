@@ -68,6 +68,34 @@ export {
   type ContextGraphPlanningBundle,
 } from "./contextGraphPlanning.js";
 export {
+  buildRepoIntelligence,
+  rankRepoCandidates,
+  type RepoIntelligenceCandidate,
+  type RepoIntelligenceFile,
+  type RepoIntelligenceResult,
+  type RepoIntelligenceSnapshot,
+} from "./repoIntelligence.js";
+export {
+  buildContextWorkingMemory,
+  canReuseContextMemory,
+  evaluateContextMemoryFreshness,
+  type ContextMemoryFileReceipt,
+  type ContextWorkingMemory,
+} from "./contextMemory.js";
+export {
+  runContextEngine,
+  type ContextEngineResult,
+} from "./contextEngine.js";
+export {
+  runPlanningRuntime,
+  type PlanningRuntimeEditTarget,
+  type PlanningRuntimeResult,
+} from "./planningRuntime.js";
+export {
+  projectPlanningRuntimeSurface,
+  type PlanningRuntimeSurface,
+} from "./planningRuntimeSurface.js";
+export {
   buildContextGraphReadinessFacts,
   type ContextGraphReadinessFacts,
 } from "./contextGraphReadiness.js";

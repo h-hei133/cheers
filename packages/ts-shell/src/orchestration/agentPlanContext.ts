@@ -89,6 +89,11 @@ export function projectContextPacketToAgentPlanContext(
     graphFacts.score.planningReadiness !== "needs-more-context"
       ? "needs-more-context"
       : packetReadiness;
+  const codeGraphOmittedMissingFact =
+    graphFacts?.codeGraphImpact?.omittedContext.length &&
+    graphFacts.codeGraphImpact.planQualityContribution.omittedRisk === "high"
+      ? ["code graph impact omitted context"]
+      : [];
 
   return {
     packetId: packet.packetId,
@@ -151,9 +156,7 @@ export function projectContextPacketToAgentPlanContext(
       ...(graphFacts?.codeGraphImpact?.staleContext.length
         ? ["code graph impact has stale context"]
         : []),
-      ...(graphFacts?.codeGraphImpact?.omittedContext.length
-        ? ["code graph impact omitted context"]
-        : []),
+      ...codeGraphOmittedMissingFact,
       ...(graphFacts?.score.planningReadiness === "budget-limited"
         ? ["context graph budget limited"]
         : []),
