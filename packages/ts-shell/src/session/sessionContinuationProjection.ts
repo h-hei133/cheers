@@ -60,6 +60,8 @@ export function selectContinuationEvidenceForSnapshot(
     "browser-observation:",
     "browser-agent-result:",
     "browser-agent-reason:",
+    "claim-ledger ",
+    "claim-ledger:",
   ];
 
   for (const entry of safeEvidence) {

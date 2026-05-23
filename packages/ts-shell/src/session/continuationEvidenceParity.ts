@@ -34,6 +34,10 @@ const CONTINUATION_EVIDENCE_PREFIXES: ReadonlyArray<{
     ],
   },
   {
+    label: "claim-ledger",
+    prefixes: ["claim-ledger ", "claim-ledger:"],
+  },
+  {
     label: "provider-anchored-proposal",
     prefixes: ["provider-anchored-proposal id=", "provider-anchoring proposal="],
   },

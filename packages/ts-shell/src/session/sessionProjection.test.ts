@@ -159,6 +159,7 @@ describe("session substrate projections", () => {
       "authorization: bearer token",
       "verify-command-hint:npm test",
       "browser-agent-transaction-trace:trace_1",
+      "claim-ledger claim_ledger_abc; version=v1; terminal=confirmation-required; raw-content-excluded",
       "raw-file:src/app.ts=full dump",
     ]);
 
@@ -173,6 +174,7 @@ describe("session substrate projections", () => {
       "eight",
       "verify-command-hint:npm test",
       "browser-agent-transaction-trace:trace_1",
+      "claim-ledger claim_ledger_abc; version=v1; terminal=confirmation-required; raw-content-excluded",
     ]);
     expect(projected.join("\n")).not.toMatch(/<html|secret|token|raw-file/i);
   });

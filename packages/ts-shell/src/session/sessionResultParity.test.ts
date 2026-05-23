@@ -156,6 +156,8 @@ describe("session result parity", () => {
         nextAction: "Review and explicitly confirm before controlled apply.",
         evidence: [
           "real-task-loop-result taskLoop=real_task_loop_abc; providerCalled=true; outputValidation=valid-exact-single-target; anchorQuality=exact-ready; confirmation=required; apply=not-run; verification=not-run; snapshot=not-run; recovery=not-run; mutationScope=none; providerCallDuringApply=false; raw-content-excluded",
+          "claim-ledger claim_ledger_abc; version=v1; source=live-provider; terminal=confirmation-required; result=confirmation-required; liveSuccess=false; notProven=authority,mutation,verification,recovery; provider=proven; proposal=proven; anchor=proven; authority=blocked; mutation=not-run; verification=not-run; recovery=not-run; raw-content-excluded",
+          "claim-ledger:terminal:confirmation-required",
           "real-task-loop-session:provider-called:true",
           "real-task-loop-session:output-validation:valid-exact-single-target",
           "real-task-loop-result:anchor-quality:exact-ready",
@@ -167,6 +169,12 @@ describe("session result parity", () => {
     expect(projection.redactionStatus).toBe("raw-content-excluded");
     expect(projection.evidenceMarkers).toContain(
       "real-task-loop-result taskLoop=real_task_loop_abc; providerCalled=true; outputValidation=valid-exact-single-target; anchorQuality=exact-ready; confirmation=required; apply=not-run; verification=not-run; snapshot=not-run; recovery=not-run; mutationScope=none; providerCallDuringApply=false; raw-content-excluded",
+    );
+    expect(projection.evidenceMarkers).toContain(
+      "claim-ledger claim_ledger_abc; version=v1; source=live-provider; terminal=confirmation-required; result=confirmation-required; liveSuccess=false; notProven=authority,mutation,verification,recovery; provider=proven; proposal=proven; anchor=proven; authority=blocked; mutation=not-run; verification=not-run; recovery=not-run; raw-content-excluded",
+    );
+    expect(projection.evidenceMarkers).toContain(
+      "claim-ledger:terminal:confirmation-required",
     );
   });
 

@@ -50,11 +50,15 @@ describe("realTaskLoopRuntime", () => {
     expect(output.result.snapshotStatus).toBe("created");
     expect(output.result.recoveryStatus).toBe("available");
     expect(output.result.providerCallDuringApply).toBe(false);
-    expect(output.result.status).toBe("task-loop-complete");
+    expect(output.result.status).toBe("verification-succeeded");
+    expect(output.result.claimLedger.terminal.status).toBe("verification-succeeded-not-live");
+    expect(output.result.claimLedger.terminal.liveSuccess).toBe(false);
     expect(output.result.evidence).toEqual(
       expect.arrayContaining([
         "edit-proposal-apply:existing-fenced-route",
         "real-task-loop-readback:status:passed",
+        "claim-ledger:terminal:verification-succeeded-not-live",
+        "claim-ledger:live-success:false",
         "real-task-loop-result:output-validation:valid-exact-single-target",
         "real-task-loop-result:confirmation:trusted-confirmed",
         "real-task-loop-result:apply:succeeded",
@@ -142,6 +146,9 @@ describe("realTaskLoopRuntime", () => {
     expect(output.result.verificationStatus).toBe("not-run");
     expect(output.result.changedFiles).toEqual([]);
     expect(output.result.providerCallDuringApply).toBe(false);
+    expect(output.result.claimLedger.authority.status).toBe("invalid");
+    expect(output.result.claimLedger.terminal.status).toBe("review-required");
+    expect(output.result.status).toBe("review-required");
   });
 
   it("real opt-in with approved available adapter applies only confirmed controlled fixture", async () => {
@@ -165,8 +172,34 @@ describe("realTaskLoopRuntime", () => {
     expect(output.result.recoveryStatus).toBe("available");
     expect(output.result.verificationStatus).toBe("succeeded");
     expect(output.result.providerCallDuringApply).toBe(false);
-    expect(output.result.status).toBe("task-loop-complete");
+    expect(output.result.status).toBe("verification-succeeded");
+    expect(output.result.claimLedger.evidenceSource).toBe("focused-tests");
+    expect(output.result.claimLedger.terminal.status).toBe("verification-succeeded-not-live");
+    expect(output.result.claimLedger.terminal.liveSuccess).toBe(false);
     expect(output.result.evidence).toContain("real-task-loop-result:no-provider-call-during-apply");
+  });
+
+  it("explicit live provenance is required before confirmed readback becomes verified success", async () => {
+    const output = await runRealTaskLoopRuntime({
+      requestId: "route204-real-opt-in-approved-confirm-live",
+      providerMode: "real-opt-in",
+      confirmApply: true,
+      evidenceSource: "live-provider",
+      providerAvailability: { kind: "available", providerKindLabel: "openai-compatible" },
+      provider: {
+        proposeEdit: () => buildSingleTargetProposal(),
+      },
+    });
+
+    expect(output.result.providerCalled).toBe(true);
+    expect(output.result.outputValidationStatus).toBe("valid-exact-single-target");
+    expect(output.result.applyStatus).toBe("succeeded");
+    expect(output.result.verificationStatus).toBe("succeeded");
+    expect(output.result.providerCallDuringApply).toBe(false);
+    expect(output.result.status).toBe("task-loop-complete");
+    expect(output.result.claimLedger.evidenceSource).toBe("live-provider");
+    expect(output.result.claimLedger.terminal.status).toBe("verified-success");
+    expect(output.result.claimLedger.terminal.liveSuccess).toBe(true);
   });
 
   it("unsupported anchors remain review-required and no-write", async () => {
@@ -196,6 +229,8 @@ describe("realTaskLoopRuntime", () => {
     expect(output.result.applyStatus).toBe("not-run");
     expect(output.result.verificationStatus).toBe("not-run");
     expect(output.result.status).toBe("review-required");
+    expect(output.result.claimLedger.terminal.status).toBe("review-required");
+    expect(output.result.claimLedger.terminal.liveSuccess).toBe(false);
     expect(output.result.evidence).toContain("real-task-loop-result:anchor-quality:unsupported");
   });
 });

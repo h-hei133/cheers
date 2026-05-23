@@ -41,8 +41,13 @@ describe("realTaskLoopResult", () => {
       expect(result.sessionEvidence).toContain("real-task-loop-session:provider-called:false");
       expect(result.sessionEvidence).toContain("real-task-loop-session:output-validation:none");
       expect(result.sessionEvidence).toContain("real-task-loop-session:provider-call-during-apply:false");
+      expect(result.sessionEvidence).toContain("claim-ledger:evidence-source:default-safe");
+      expect(result.sessionEvidence).toContain("claim-ledger:terminal:skipped");
+      expect(result.sessionEvidence).toContain("claim-ledger:live-success:false");
+      expect(result.claimLedger.terminal.resultStatus).toBe("skipped-no-provider-opt-in");
       expect(result.output).toContain("Raw provider output: excluded");
       expect(result.output).toContain("Output validation: none");
+      expect(result.output).toContain("Claim terminal: skipped");
     } finally {
       removeRealTaskLoopFixture(fixture);
     }

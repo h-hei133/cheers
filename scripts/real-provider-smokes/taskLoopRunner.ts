@@ -211,6 +211,7 @@ async function runApproved(input: {
     confirmApply,
     providerAvailability: input.providerAvailability,
     provider: input.provider,
+    evidenceSource: config.fakeReady ? "fake-ready" : "live-provider",
     ...(testRoot ? { testRoot } : {}),
   });
   printRuntimeOutput(output, {
@@ -238,6 +239,11 @@ function printRuntimeOutput(
     `snapshot=${output.result.snapshotStatus}`,
     `recovery=${output.result.recoveryStatus}`,
     `status=${output.result.status}`,
+    `claim-ledger=${output.result.claimLedger.ledgerId}`,
+    `claim-ledger-source=${output.result.claimLedger.evidenceSource}`,
+    `claim-ledger-terminal=${output.result.claimLedger.terminal.status}`,
+    `claim-ledger-live-success=${output.result.claimLedger.terminal.liveSuccess}`,
+    `claim-ledger-not-proven=${output.result.claimLedger.notProvenClaims.length === 0 ? "none" : output.result.claimLedger.notProvenClaims.map((claim) => claim.group).join(",")}`,
     "no-broad-mutation=true",
     `provider-call-during-apply=${output.result.providerCallDuringApply}`,
   ]) {
@@ -404,20 +410,31 @@ function exitCodeForOutput(
   if (!realProviderOptIn) return 3;
 
   if (confirmApply) {
-    return output.result.providerCalled === true &&
-      output.result.outputValidationStatus === "valid-exact-single-target" &&
-      output.result.anchorQuality === "exact-ready" &&
-      output.result.confirmationStatus === "trusted-confirmed" &&
-      output.result.applyStatus === "succeeded" &&
-      output.result.verificationStatus === "succeeded" &&
-      output.result.mutationScope === "controlled-temp-workspace" &&
-      output.result.providerCallDuringApply === false &&
-      (output.result.snapshotStatus === "created" || output.result.recoveryStatus === "available")
+    if (config.fakeReady) {
+      return output.result.claimLedger.evidenceSource === "fake-ready" &&
+        output.result.claimLedger.terminal.liveSuccess === false &&
+        output.result.claimLedger.terminal.status === "verification-succeeded-not-live" &&
+        output.result.providerCalled === true &&
+        output.result.outputValidationStatus === "valid-exact-single-target" &&
+        output.result.anchorQuality === "exact-ready" &&
+        output.result.confirmationStatus === "trusted-confirmed" &&
+        output.result.applyStatus === "succeeded" &&
+        output.result.verificationStatus === "succeeded" &&
+        output.result.mutationScope === "controlled-temp-workspace" &&
+        output.result.providerCallDuringApply === false &&
+        (output.result.snapshotStatus === "created" || output.result.recoveryStatus === "available")
+        ? 0
+        : 1;
+    }
+    return output.result.claimLedger.evidenceSource === "live-provider" &&
+      output.result.claimLedger.terminal.status === "verified-success" &&
+      output.result.claimLedger.terminal.liveSuccess === true
       ? 0
       : 1;
   }
 
-  return output.result.providerCalled === true &&
+  return output.result.claimLedger.terminal.status === "confirmation-required" &&
+    output.result.providerCalled === true &&
     output.result.outputValidationStatus === "valid-exact-single-target" &&
     output.result.anchorQuality === "exact-ready" &&
     output.result.confirmationStatus === "required" &&

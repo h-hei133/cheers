@@ -37,6 +37,7 @@ import {
   classifyRealTaskLoopVerificationStatus,
   type RealTaskLoopResult,
 } from "./realTaskLoopResult.js";
+import type { ClaimLedgerEvidenceSource } from "./claimLedgerProjection.js";
 import { extractProviderProposalAnchors } from "./providerProposalAnchors.js";
 import { matchProviderAnchorCandidates } from "./providerAnchorMatcher.js";
 import { detectProviderAnchorConflicts } from "./providerAnchorConflict.js";
@@ -61,6 +62,7 @@ export async function runRealTaskLoopRuntime(input: {
   readonly testRoot?: string;
   readonly cleanupFixture?: boolean;
   readonly simulateVerificationFailure?: boolean;
+  readonly evidenceSource?: ClaimLedgerEvidenceSource;
 }): Promise<RealTaskLoopRuntimeOutput> {
   const requestId = input.requestId ?? "route200-real-task-loop";
   const fixture = createRealTaskLoopFixture({
@@ -177,6 +179,7 @@ export async function runRealTaskLoopRuntime(input: {
       scorecard,
       liveOptIn: input.providerMode === "real-opt-in",
       confirmApply: input.confirmApply ?? false,
+      evidenceSource: resolveClaimLedgerEvidenceSource(input),
       providerCallDuringApply,
     });
     return { fixture, runtime, ...(applyResult ? { applyResult } : {}), result, cleanup };
@@ -365,10 +368,26 @@ function buildStoppedDefault(input: {
     scorecard,
     liveOptIn: false,
     confirmApply: false,
+    evidenceSource: "default-safe",
   });
   return {
     fixture: input.fixture,
     result,
     cleanup: input.cleanup,
   };
+}
+
+function evidenceSourceForProviderMode(
+  providerMode: RealTaskLoopProviderMode,
+): ClaimLedgerEvidenceSource {
+  if (providerMode === "default-skip") return "default-safe";
+  if (providerMode === "fake") return "fake-provider";
+  return "focused-tests";
+}
+
+function resolveClaimLedgerEvidenceSource(input: {
+  readonly providerMode: RealTaskLoopProviderMode;
+  readonly evidenceSource?: ClaimLedgerEvidenceSource;
+}): ClaimLedgerEvidenceSource {
+  return input.evidenceSource ?? evidenceSourceForProviderMode(input.providerMode);
 }

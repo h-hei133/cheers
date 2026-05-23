@@ -19,6 +19,7 @@ const runnerPath = path.join(repoRoot, 'scripts', 'real-provider-smokes', 'taskL
 const focusedTests = [
   'src/orchestration/realTaskLoopFixture.test.ts',
   'src/orchestration/realTaskLoopPlan.test.ts',
+  'src/orchestration/claimLedgerProjection.test.ts',
   'src/orchestration/realTaskLoopRuntime.test.ts',
   'src/orchestration/realTaskLoopResult.test.ts',
   'src/orchestration/realTaskLoopScorecard.test.ts',
@@ -144,14 +145,19 @@ function validateRunnerSuccessMarkers(stdout, env) {
 function expectedRunnerSuccessMarkers(env) {
   const liveOptIn = env.PRIVATE_AGENTS_LIVE_TASK_LOOP_SMOKE?.trim() === '1'
   const confirmApply = env.PRIVATE_AGENTS_CONFIRM_TASK_LOOP_APPLY?.trim() === '1'
+  const fakeReady = env.PRIVATE_AGENTS_TASK_LOOP_FAKE_READY?.trim() === '1'
   const base = [
     'no-broad-mutation=true',
     'provider-call-during-apply=false',
     'Raw provider output: excluded',
+    'claim-ledger=claim_ledger_',
   ]
   if (!liveOptIn) {
     return [
       ...base,
+      'claim-ledger-source=default-safe',
+      'claim-ledger-terminal=skipped',
+      'claim-ledger-live-success=false',
       'provider-called=false',
       'output-validation=none',
       'anchor-quality=none',
@@ -162,8 +168,31 @@ function expectedRunnerSuccessMarkers(env) {
     ]
   }
   if (confirmApply) {
+    if (fakeReady) {
+      return [
+        ...base,
+        'claim-ledger-source=fake-ready',
+        'claim-ledger-terminal=verification-succeeded-not-live',
+        'claim-ledger-live-success=false',
+        'claim-ledger-not-proven=provider',
+        'provider-called=true',
+        'output-validation=valid-exact-single-target',
+        'anchor-quality=exact-ready',
+        'confirmation=trusted-confirmed',
+        'apply=succeeded',
+        'verification=succeeded',
+        'mutation-scope=controlled-temp-workspace',
+        'snapshot=created',
+        'recovery=available',
+        'status=verification-succeeded',
+      ]
+    }
     return [
       ...base,
+      'claim-ledger-source=live-provider',
+      'claim-ledger-terminal=verified-success',
+      'claim-ledger-live-success=true',
+      'claim-ledger-not-proven=none',
       'provider-called=true',
       'output-validation=valid-exact-single-target',
       'anchor-quality=exact-ready',
@@ -178,6 +207,9 @@ function expectedRunnerSuccessMarkers(env) {
   }
   return [
     ...base,
+    `claim-ledger-source=${fakeReady ? 'fake-ready' : 'live-provider'}`,
+    'claim-ledger-terminal=confirmation-required',
+    'claim-ledger-live-success=false',
     'provider-called=true',
     'output-validation=valid-exact-single-target',
     'anchor-quality=exact-ready',
