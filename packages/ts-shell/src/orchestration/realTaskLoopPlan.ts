@@ -25,7 +25,12 @@ export interface RealTaskLoopPlan {
   readonly providerKind: "fake-provider" | "openai-compatible" | "none";
   readonly dryRunId?: string;
   readonly anchoredProposalId?: string;
-  readonly confirmationState: "not-requested" | "required" | "confirmed" | "invalid";
+  readonly confirmationState:
+    | "not-requested"
+    | "required"
+    | "trusted-confirmed"
+    | "confirmed"
+    | "invalid";
   readonly applyPlanId?: string;
   readonly verificationPlanId: string;
   readonly repairEligibility: "not-needed" | "eligible" | "not-eligible";
@@ -97,7 +102,12 @@ function inferState(input: {
 }): RealTaskLoopPlanState {
   if (!input.dryRunId) return "ready-for-provider-proposal";
   if (!input.anchoredProposalId) return "proposal-created";
-  if (input.confirmationState === "confirmed") return "confirmed-for-apply";
+  if (
+    input.confirmationState === "trusted-confirmed" ||
+    input.confirmationState === "confirmed"
+  ) {
+    return "confirmed-for-apply";
+  }
   return "confirmation-required";
 }
 

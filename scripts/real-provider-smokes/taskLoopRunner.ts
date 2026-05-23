@@ -45,12 +45,11 @@ console.log(`confirm-apply=${confirmApply}`);
 console.log("private-config-manual-read=false");
 
 run().catch((error) => {
-  console.log(`provider-error-class=${classifyOpenAICompatibleAnchoredSmokeError(error)}`);
-  console.log("provider-called=true");
-  console.log("apply=not-run");
-  console.log("verification=not-run");
-  console.log("mutation-scope=none");
-  process.exitCode = 0;
+  const providerErrorClass = classifyOpenAICompatibleAnchoredSmokeError(error);
+  console.log("runner-error=true");
+  console.log("runtime-state=unavailable");
+  console.log(`provider-error-class=${providerErrorClass}`);
+  process.exitCode = exitCodeForProviderErrorClass(providerErrorClass);
 });
 
 async function run(): Promise<void> {
@@ -186,11 +185,14 @@ async function runWithApprovalSkip(input: {
   const output = await runRealTaskLoopRuntime({
     requestId: "route200-live-task-loop",
     providerMode: liveOptIn && realProviderOptIn ? "real-opt-in" : "default-skip",
-    confirmApply,
+    confirmApply: false,
     providerAvailability: input.providerAvailability,
     ...(testRoot ? { testRoot } : {}),
   });
-  printRuntimeOutput(output);
+  printRuntimeOutput(output, {
+    readinessStatus: input.providerReadinessStatus,
+    approvalProviderErrorClass: approval.providerErrorClass,
+  });
 }
 
 async function runApproved(input: {
@@ -207,20 +209,32 @@ async function runApproved(input: {
     provider: input.provider,
     ...(testRoot ? { testRoot } : {}),
   });
-  printRuntimeOutput(output);
+  printRuntimeOutput(output, {
+    readinessStatus: "ready",
+    approvalProviderErrorClass: input.approval.providerErrorClass,
+  });
 }
 
-function printRuntimeOutput(output: Awaited<ReturnType<typeof runRealTaskLoopRuntime>>): void {
+function printRuntimeOutput(
+  output: Awaited<ReturnType<typeof runRealTaskLoopRuntime>>,
+  classification: {
+    readonly readinessStatus: ReadinessStatus;
+    readonly approvalProviderErrorClass?: string;
+  },
+): void {
   console.log(output.result.output);
   for (const marker of [
     `provider-called=${output.result.providerCalled}`,
+    `confirmation=${output.result.confirmationStatus}`,
     `apply=${output.result.applyStatus}`,
     `verification=${output.result.verificationStatus}`,
     `mutation-scope=${output.result.mutationScope}`,
     `anchor-quality=${output.result.anchorQuality}`,
+    `snapshot=${output.result.snapshotStatus}`,
+    `recovery=${output.result.recoveryStatus}`,
     `status=${output.result.status}`,
     "no-broad-mutation=true",
-    "provider-call-during-apply=false",
+    `provider-call-during-apply=${output.result.providerCallDuringApply}`,
   ]) {
     console.log(marker);
   }
@@ -228,7 +242,7 @@ function printRuntimeOutput(output: Awaited<ReturnType<typeof runRealTaskLoopRun
   if (output.runtime?.dryRun?.providerErrorClass) {
     console.log(`provider-error-class=${output.runtime.dryRun.providerErrorClass}`);
   }
-  const exitCode = exitCodeForOutput(output);
+  const exitCode = exitCodeForOutput(output, classification);
   if (exitCode !== 0) process.exitCode = exitCode;
 }
 
@@ -365,10 +379,68 @@ function safeDetail(value: string): string {
     .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[REAL_PROVIDER_HOME]");
 }
 
-function exitCodeForOutput(output: RealTaskLoopRuntimeOutput): number {
-  const providerErrorClass = output.runtime?.dryRun?.providerErrorClass;
+function exitCodeForOutput(
+  output: RealTaskLoopRuntimeOutput,
+  classification: {
+    readonly readinessStatus: ReadinessStatus;
+    readonly approvalProviderErrorClass?: string;
+  },
+): number {
+  const providerErrorClass = output.runtime?.dryRun?.providerErrorClass ||
+    normalizeProviderErrorClass(classification.approvalProviderErrorClass);
+  if (providerErrorClass) return exitCodeForProviderErrorClass(providerErrorClass);
+  if (classification.readinessStatus !== "ready") {
+    return exitCodeForReadinessStatus(classification.readinessStatus);
+  }
   if (output.result.applyStatus === "failed" || output.result.verificationStatus === "failed") return 1;
-  if (!providerErrorClass) return 0;
+
+  if (!liveOptIn) {
+    return output.result.providerCalled === false &&
+      output.result.applyStatus === "not-run" &&
+      output.result.verificationStatus === "not-run"
+      ? 0
+      : 1;
+  }
+
+  if (!realProviderOptIn) return 3;
+
+  if (confirmApply) {
+    return output.result.providerCalled === true &&
+      output.result.anchorQuality === "exact-ready" &&
+      output.result.confirmationStatus === "trusted-confirmed" &&
+      output.result.applyStatus === "succeeded" &&
+      output.result.verificationStatus === "succeeded" &&
+      output.result.mutationScope === "controlled-temp-workspace" &&
+      output.result.providerCallDuringApply === false &&
+      (output.result.snapshotStatus === "created" || output.result.recoveryStatus === "available")
+      ? 0
+      : 1;
+  }
+
+  return output.result.providerCalled === true &&
+    output.result.anchorQuality === "exact-ready" &&
+    output.result.confirmationStatus === "required" &&
+    output.result.applyStatus === "not-run" &&
+    output.result.verificationStatus === "not-run"
+    ? 0
+    : 1;
+}
+
+function exitCodeForReadinessStatus(status: ReadinessStatus): number {
+  if (status === "network") return 2;
+  if (
+    status === "auth" ||
+    status === "missing-key" ||
+    status === "missing-config" ||
+    status === "unsupported" ||
+    status === "not-ready"
+  ) {
+    return 3;
+  }
+  return liveOptIn ? 3 : 0;
+}
+
+function exitCodeForProviderErrorClass(providerErrorClass: string): number {
   if (providerErrorClass === "network" || providerErrorClass === "timeout") return 2;
   if (
     providerErrorClass === "auth" ||
@@ -378,4 +450,9 @@ function exitCodeForOutput(output: RealTaskLoopRuntimeOutput): number {
     return 3;
   }
   return 1;
+}
+
+function normalizeProviderErrorClass(value: string | undefined): string | undefined {
+  if (!value || value === "none") return undefined;
+  return value;
 }

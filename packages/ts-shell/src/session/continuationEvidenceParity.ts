@@ -24,6 +24,14 @@ const CONTINUATION_EVIDENCE_PREFIXES: ReadonlyArray<{
     prefixes: ["real-provider-proposal-dry-run id="],
   },
   {
+    label: "real-task-loop",
+    prefixes: [
+      "real-task-loop-result:",
+      "real-task-loop-scorecard:",
+      "real-task-loop-session:",
+    ],
+  },
+  {
     label: "provider-anchored-proposal",
     prefixes: ["provider-anchored-proposal id=", "provider-anchoring proposal="],
   },

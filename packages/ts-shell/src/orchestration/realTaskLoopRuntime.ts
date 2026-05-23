@@ -26,7 +26,15 @@ import {
 } from "./realTaskLoopFixture.js";
 import { buildRealTaskLoopPlan } from "./realTaskLoopPlan.js";
 import { buildRealTaskLoopScorecard } from "./realTaskLoopScorecard.js";
-import { buildRealTaskLoopResult, type RealTaskLoopResult } from "./realTaskLoopResult.js";
+import {
+  buildRealTaskLoopResult,
+  classifyRealTaskLoopApplyStatus,
+  classifyRealTaskLoopMutationScope,
+  classifyRealTaskLoopRecoveryStatus,
+  classifyRealTaskLoopSnapshotStatus,
+  classifyRealTaskLoopVerificationStatus,
+  type RealTaskLoopResult,
+} from "./realTaskLoopResult.js";
 import { extractProviderProposalAnchors } from "./providerProposalAnchors.js";
 import { matchProviderAnchorCandidates } from "./providerAnchorMatcher.js";
 import { detectProviderAnchorConflicts } from "./providerAnchorConflict.js";
@@ -86,8 +94,11 @@ export async function runRealTaskLoopRuntime(input: {
     });
 
     const rawOutput = providerRecorder.getRawOutput();
+    const exactReady = isExactReadyAnchoredProposal(runtime);
+    const trustedConfirmation = Boolean(input.confirmApply && exactReady && rawOutput);
+    const providerCallsBeforeApply = providerRecorder.getCallCount();
     const applyResult =
-      input.confirmApply && runtime.anchoredProposal && rawOutput
+      trustedConfirmation
         ? await applyAnchoredProposal({
             fixture,
             runtime,
@@ -104,6 +115,15 @@ export async function runRealTaskLoopRuntime(input: {
               : undefined,
           })
         : undefined;
+    const providerCallsAfterApply = providerRecorder.getCallCount();
+    const providerCallDuringApply = Boolean(
+      applyResult && providerCallsAfterApply > providerCallsBeforeApply,
+    );
+    const applyStatus = classifyRealTaskLoopApplyStatus(applyResult);
+    const verificationStatus = classifyRealTaskLoopVerificationStatus(readback);
+    const snapshotStatus = classifyRealTaskLoopSnapshotStatus(applyResult);
+    const recoveryStatus = classifyRealTaskLoopRecoveryStatus(applyResult);
+    const mutationScope = classifyRealTaskLoopMutationScope(applyResult?.changedFiles ?? []);
     const plan = buildRealTaskLoopPlan({
       fixtureId: fixture.fixtureId,
       lifecycleId: activation.taskLifecycle.lifecycleId,
@@ -113,17 +133,19 @@ export async function runRealTaskLoopRuntime(input: {
       dryRunId: runtime.dryRun?.dryRunId,
       anchoredProposalId: runtime.anchoredProposal?.anchoredProposalId,
       confirmationState: input.confirmApply
-        ? runtime.anchoredProposal ? "confirmed" : "invalid"
-        : runtime.anchoredProposal ? "required" : "not-requested",
-      applyPlanId: runtime.anchoredProposal?.anchoredProposalId,
-      repairEligibility: readback?.status === "failed" ? "eligible" : "not-needed",
-      state: readback?.status === "passed"
+        ? trustedConfirmation ? "trusted-confirmed" : "invalid"
+        : exactReady ? "required" : "not-requested",
+      ...(trustedConfirmation && runtime.anchoredProposal
+        ? { applyPlanId: runtime.anchoredProposal.anchoredProposalId }
+        : {}),
+      repairEligibility: verificationStatus === "failed" ? "eligible" : "not-needed",
+      state: verificationStatus === "succeeded"
         ? "verification-succeeded"
-        : readback?.status === "failed"
+        : verificationStatus === "failed"
           ? "verification-failed"
-          : applyResult
-            ? applyResult.changedFiles.length > 0 ? "apply-succeeded" : "apply-stopped"
-            : runtime.anchoredProposal ? "confirmation-required" : "review-required",
+        : applyResult
+            ? applyStatus === "succeeded" ? "apply-succeeded" : "apply-stopped"
+            : exactReady ? "confirmation-required" : "review-required",
     });
     const scorecard = buildRealTaskLoopScorecard({
       taskLoopId: plan.taskLoopId,
@@ -135,14 +157,14 @@ export async function runRealTaskLoopRuntime(input: {
       outputValidationStatus: runtime.dryRun?.outputValidation?.status,
       anchorQuality: runtime.dryRun?.anchorQuality?.level,
       confirmationState: plan.confirmationState,
-      applyStatus: applyResult
-        ? applyResult.changedFiles.length > 0 ? "applied" : "stopped"
-        : "not-run",
-      snapshotRecoveryReady: Boolean(applyResult?.evidence.some((entry) => /snapshot|recovery|rollback-ready/.test(entry))),
-      verificationStatus: readback?.status ?? "not-run",
-      repairEligible: readback?.status === "failed",
+      applyStatus,
+      snapshotRecoveryReady: snapshotStatus === "created" || recoveryStatus === "available",
+      verificationStatus,
+      repairEligible: verificationStatus === "failed",
       defaultNoProviderNoApply: false,
-      mutationScope: applyResult?.changedFiles.length ? "controlled-temp-fixture" : "none",
+      mutationScope,
+      providerCallDuringApply,
+      providerErrorClass: runtime.dryRun?.providerErrorClass,
     });
     const result = buildRealTaskLoopResult({
       fixture,
@@ -153,6 +175,7 @@ export async function runRealTaskLoopRuntime(input: {
       scorecard,
       liveOptIn: input.providerMode === "real-opt-in",
       confirmApply: input.confirmApply ?? false,
+      providerCallDuringApply,
     });
     return { fixture, runtime, ...(applyResult ? { applyResult } : {}), result, cleanup };
   } finally {
@@ -224,17 +247,26 @@ function buildRealTaskLoopFakeProvider(): RealProviderProposalDryRunProvider {
 function recordProviderOutput(provider: RealProviderProposalDryRunProvider): {
   readonly provider: RealProviderProposalDryRunProvider;
   readonly getRawOutput: () => ProviderEditRawProposal | undefined;
+  readonly getCallCount: () => number;
 } {
   let rawOutput: ProviderEditRawProposal | undefined;
+  let callCount = 0;
   return {
     provider: {
       proposeEdit: async (context) => {
+        callCount += 1;
         rawOutput = await provider.proposeEdit(context);
         return rawOutput;
       },
     },
     getRawOutput: () => rawOutput,
+    getCallCount: () => callCount,
   };
+}
+
+function isExactReadyAnchoredProposal(runtime: AnchoredProposalRuntimeResult): boolean {
+  return runtime.anchoredProposal?.handoffReadiness === "exact-single-target" ||
+    runtime.anchoredProposal?.handoffReadiness === "exact-hunk-set";
 }
 
 async function applyAnchoredProposal(input: {

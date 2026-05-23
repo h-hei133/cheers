@@ -4,6 +4,18 @@ import type { RealTaskLoopFixture } from "./realTaskLoopFixture.js";
 import type { RealTaskLoopPlan } from "./realTaskLoopPlan.js";
 import type { RealTaskLoopScorecard } from "./realTaskLoopScorecard.js";
 
+interface SnapshotInspectableRoute {
+  readonly snapshotReceipt?: { readonly status?: string };
+  readonly recoveryReadiness?: string;
+  readonly fileResults?: readonly SnapshotInspectableFileResult[];
+}
+
+interface SnapshotInspectableFileResult {
+  readonly route?: SnapshotInspectableRoute;
+  readonly exactRoute?: SnapshotInspectableRoute;
+  readonly recoveryReadiness?: string;
+}
+
 export type RealTaskLoopResultStatus =
   | "skipped-no-provider-opt-in"
   | "provider-unavailable"
@@ -25,14 +37,16 @@ export interface RealTaskLoopResult {
   readonly fixtureId: string;
   readonly providerCalled: boolean;
   readonly anchorQuality: string;
-  readonly confirmationStatus: "not-requested" | "required" | "confirmed" | "invalid";
-  readonly applyStatus: "not-run" | "applied" | "stopped" | "failed";
-  readonly verificationStatus: "not-run" | "passed" | "failed";
-  readonly recoveryStatus: "not-run" | "ready" | "blocked";
+  readonly confirmationStatus: RealTaskLoopPlan["confirmationState"];
+  readonly applyStatus: "not-run" | "succeeded" | "stopped" | "failed";
+  readonly verificationStatus: "not-run" | "succeeded" | "failed";
+  readonly snapshotStatus: "not-run" | "created" | "blocked";
+  readonly recoveryStatus: "not-run" | "available" | "blocked";
   readonly repairEligibility: "not-needed" | "eligible";
   readonly scorecardStatus: "pass" | "warn" | "fail" | "skip";
   readonly changedFiles: readonly string[];
-  readonly mutationScope: "none" | "controlled-temp-fixture";
+  readonly mutationScope: "none" | "controlled-temp-workspace";
+  readonly providerCallDuringApply: boolean;
   readonly output: string;
   readonly sessionEvidence: readonly string[];
   readonly evidence: readonly string[];
@@ -47,14 +61,17 @@ export function buildRealTaskLoopResult(input: {
   readonly scorecard: RealTaskLoopScorecard;
   readonly liveOptIn: boolean;
   readonly confirmApply: boolean;
+  readonly providerCallDuringApply?: boolean;
 }): RealTaskLoopResult {
   const providerCalled = input.runtime?.dryRun?.providerCalled ?? false;
   const anchorQuality = input.runtime?.dryRun?.anchorQuality?.level ?? "none";
-  const applyStatus = classifyApplyStatus(input.applyResult);
-  const verificationStatus = input.readback?.status ?? "not-run";
+  const applyStatus = classifyRealTaskLoopApplyStatus(input.applyResult);
+  const verificationStatus = classifyRealTaskLoopVerificationStatus(input.readback);
   const changedFiles = input.applyResult?.changedFiles ?? [];
-  const recoveryStatus = classifyRecoveryStatus(input.applyResult);
+  const snapshotStatus = classifyRealTaskLoopSnapshotStatus(input.applyResult);
+  const recoveryStatus = classifyRealTaskLoopRecoveryStatus(input.applyResult);
   const repairEligibility = verificationStatus === "failed" ? "eligible" : "not-needed";
+  const providerCallDuringApply = input.providerCallDuringApply ?? false;
   const status = classifyResultStatus({
     liveOptIn: input.liveOptIn,
     runtime: input.runtime,
@@ -62,7 +79,7 @@ export function buildRealTaskLoopResult(input: {
     applyStatus,
     verificationStatus,
   });
-  const mutationScope = changedFiles.length > 0 ? "controlled-temp-fixture" : "none";
+  const mutationScope = classifyRealTaskLoopMutationScope(changedFiles);
   const sessionEvidence = [
     `real-task-loop-session:task-loop:${input.plan.taskLoopId}`,
     `real-task-loop-session:fixture:${input.fixture.fixtureId}`,
@@ -74,7 +91,10 @@ export function buildRealTaskLoopResult(input: {
     `real-task-loop-session:confirmation:${input.plan.confirmationState}`,
     `real-task-loop-session:apply:${applyStatus}`,
     `real-task-loop-session:verification:${verificationStatus}`,
+    `real-task-loop-session:snapshot:${snapshotStatus}`,
     `real-task-loop-session:recovery:${recoveryStatus}`,
+    `real-task-loop-session:mutation-scope:${mutationScope}`,
+    `real-task-loop-session:provider-call-during-apply:${providerCallDuringApply}`,
     `real-task-loop-session:repair:${repairEligibility}`,
     `real-task-loop-session:scorecard:${input.scorecard.scorecardId}`,
     "real-task-loop-session:raw-content-excluded",
@@ -88,7 +108,9 @@ export function buildRealTaskLoopResult(input: {
     `Confirmation: ${input.plan.confirmationState}`,
     `Apply: ${applyStatus}`,
     `Verification: ${verificationStatus}`,
+    `Snapshot: ${snapshotStatus}`,
     `Recovery: ${recoveryStatus}`,
+    `Provider call during apply: ${providerCallDuringApply ? "yes" : "no"}`,
     `Repair eligibility: ${repairEligibility}`,
     `Scorecard: ${input.scorecard.scorecardId}`,
     `Mutation scope: ${mutationScope}`,
@@ -106,15 +128,24 @@ export function buildRealTaskLoopResult(input: {
     confirmationStatus: input.plan.confirmationState,
     applyStatus,
     verificationStatus,
+    snapshotStatus,
     recoveryStatus,
     repairEligibility,
-    scorecardStatus: input.scorecard.verification === "fail" || input.scorecard.providerCall === "fail"
+    scorecardStatus: input.scorecard.verification === "fail" ||
+      input.scorecard.providerCall === "fail" ||
+      input.scorecard.outputValidation === "fail" ||
+      input.scorecard.anchorQuality === "fail" ||
+      input.scorecard.snapshotRecovery === "fail" ||
+      input.scorecard.providerCallDuringApply === "fail"
       ? "fail"
-      : input.scorecard.applyResult === "warn" || input.scorecard.confirmation === "warn"
+      : input.scorecard.applyResult === "warn" ||
+          input.scorecard.confirmation === "warn" ||
+          input.scorecard.anchorQuality === "warn"
         ? "warn"
         : "pass",
     changedFiles,
     mutationScope,
+    providerCallDuringApply,
     output,
     sessionEvidence,
     evidence: [
@@ -127,11 +158,16 @@ export function buildRealTaskLoopResult(input: {
       ...sessionEvidence,
       `real-task-loop-result:status:${status}`,
       `real-task-loop-result:provider-called:${providerCalled}`,
+      `real-task-loop-result:anchor-quality:${anchorQuality}`,
+      `real-task-loop-result:confirmation:${input.plan.confirmationState}`,
       `real-task-loop-result:apply:${applyStatus}`,
       `real-task-loop-result:verification:${verificationStatus}`,
+      `real-task-loop-result:snapshot:${snapshotStatus}`,
+      `real-task-loop-result:recovery:${recoveryStatus}`,
       `real-task-loop-result:mutation-scope:${mutationScope}`,
+      `real-task-loop-result:provider-call-during-apply:${providerCallDuringApply}`,
       "real-task-loop-result:no-direct-provider-mutation",
-      "real-task-loop-result:no-provider-call-during-apply",
+      ...(providerCallDuringApply ? [] : ["real-task-loop-result:no-provider-call-during-apply"]),
       "real-task-loop-result:no-fuzzy-or-broad-apply",
       "real-task-loop-result:no-new-writer",
       "real-task-loop-result:raw-content-excluded",
@@ -139,7 +175,7 @@ export function buildRealTaskLoopResult(input: {
   };
 }
 
-function classifyApplyStatus(
+export function classifyRealTaskLoopApplyStatus(
   applyResult: EditProposalApplyResult | undefined,
 ): RealTaskLoopResult["applyStatus"] {
   if (!applyResult) return "not-run";
@@ -148,7 +184,7 @@ function classifyApplyStatus(
     applyResult.status === "target-set-applied" ||
     applyResult.status === "hunk-set-applied"
   ) {
-    return "applied";
+    return "succeeded";
   }
   if (applyResult.status.includes("failed") || applyResult.status.includes("partial-failure")) {
     return "failed";
@@ -156,9 +192,72 @@ function classifyApplyStatus(
   return "stopped";
 }
 
-function classifyRecoveryStatus(applyResult: EditProposalApplyResult | undefined): RealTaskLoopResult["recoveryStatus"] {
+export function classifyRealTaskLoopVerificationStatus(
+  readback:
+    | { readonly status: "passed" | "failed"; readonly summary: string; readonly evidence: readonly string[] }
+    | undefined,
+): RealTaskLoopResult["verificationStatus"] {
+  if (!readback) return "not-run";
+  return readback.status === "passed" ? "succeeded" : "failed";
+}
+
+export function classifyRealTaskLoopSnapshotStatus(
+  applyResult: EditProposalApplyResult | undefined,
+): RealTaskLoopResult["snapshotStatus"] {
   if (!applyResult) return "not-run";
-  return applyResult.evidence.some((entry) => /snapshot|recovery|rollback-ready/.test(entry)) ? "ready" : "blocked";
+  return applyResultHasSnapshotCreated(applyResult) ? "created" : "blocked";
+}
+
+export function classifyRealTaskLoopRecoveryStatus(
+  applyResult: EditProposalApplyResult | undefined,
+): RealTaskLoopResult["recoveryStatus"] {
+  if (!applyResult) return "not-run";
+  return applyResultHasRollbackReady(applyResult) || applyResultHasSnapshotCreated(applyResult)
+    ? "available"
+    : "blocked";
+}
+
+export function classifyRealTaskLoopMutationScope(
+  changedFiles: readonly string[],
+): RealTaskLoopResult["mutationScope"] {
+  return changedFiles.length > 0 ? "controlled-temp-workspace" : "none";
+}
+
+function applyResultHasSnapshotCreated(applyResult: EditProposalApplyResult): boolean {
+  if (!("route" in applyResult)) return false;
+  return routeHasSnapshotCreated(applyResult.route);
+}
+
+function applyResultHasRollbackReady(applyResult: EditProposalApplyResult): boolean {
+  if (!("route" in applyResult)) return false;
+  return routeHasRollbackReady(applyResult.route);
+}
+
+function routeHasSnapshotCreated(route: SnapshotInspectableRoute): boolean {
+  if (route.snapshotReceipt?.status === "snapshot-created") {
+    return true;
+  }
+  if (route.fileResults) {
+    return route.fileResults.some((fileResult) =>
+      (fileResult.route ? routeHasSnapshotCreated(fileResult.route) : false) ||
+      (fileResult.exactRoute ? routeHasSnapshotCreated(fileResult.exactRoute) : false)
+    );
+  }
+  return false;
+}
+
+function routeHasRollbackReady(route: SnapshotInspectableRoute): boolean {
+  if (route.recoveryReadiness === "rollback-ready") {
+    return true;
+  }
+  if (route.fileResults) {
+    return route.fileResults.some((fileResult) =>
+      fileResult.recoveryReadiness === "rollback-ready" ||
+      (fileResult.route ? routeHasRollbackReady(fileResult.route) : false) ||
+      (fileResult.exactRoute ? routeHasRollbackReady(fileResult.exactRoute) : false)
+    );
+  }
+  return false;
 }
 
 function classifyResultStatus(input: {
@@ -169,10 +268,12 @@ function classifyResultStatus(input: {
   readonly verificationStatus: RealTaskLoopResult["verificationStatus"];
 }): RealTaskLoopResultStatus {
   if (!input.runtime) return input.liveOptIn ? "provider-unavailable" : "skipped-no-provider-opt-in";
-  if (input.runtime.status === "runtime-stopped-no-write") return "task-loop-stopped";
-  if (input.verificationStatus === "passed") return "task-loop-complete";
+  if (input.runtime.status === "runtime-stopped-no-write") {
+    return input.liveOptIn ? "provider-unavailable" : "task-loop-stopped";
+  }
+  if (input.verificationStatus === "succeeded") return "task-loop-complete";
   if (input.verificationStatus === "failed") return "repair-eligible";
-  if (input.applyStatus === "applied") return "apply-succeeded";
+  if (input.applyStatus === "succeeded") return "apply-succeeded";
   if (input.applyStatus === "stopped" || input.applyStatus === "failed") return "apply-stopped";
   if (input.runtime.anchoredProposal?.handoffReadiness === "exact-single-target" ||
       input.runtime.anchoredProposal?.handoffReadiness === "exact-hunk-set") {

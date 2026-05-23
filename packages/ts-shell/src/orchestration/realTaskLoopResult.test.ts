@@ -39,6 +39,7 @@ describe("realTaskLoopResult", () => {
       });
 
       expect(result.sessionEvidence).toContain("real-task-loop-session:provider-called:false");
+      expect(result.sessionEvidence).toContain("real-task-loop-session:provider-call-during-apply:false");
       expect(result.output).toContain("Raw provider output: excluded");
     } finally {
       removeRealTaskLoopFixture(fixture);

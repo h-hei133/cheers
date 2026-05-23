@@ -19,4 +19,18 @@ describe("realTaskLoopPlan", () => {
     expect(plan.mutationAuthority).toBe("not-granted");
     expect(plan.evidence).toContain("real-task-loop-plan:confirmation:required");
   });
+
+  it("records trusted confirmation as ready for apply without changing mutation authority", () => {
+    const plan = buildRealTaskLoopPlan({
+      fixtureId: "fixture-2",
+      providerKind: "openai-compatible",
+      dryRunId: "dry-run-2",
+      anchoredProposalId: "anchored-2",
+      confirmationState: "trusted-confirmed",
+    });
+
+    expect(plan.state).toBe("confirmed-for-apply");
+    expect(plan.mutationAuthority).toBe("not-granted");
+    expect(plan.evidence).toContain("real-task-loop-plan:confirmation:trusted-confirmed");
+  });
 });

@@ -17,7 +17,8 @@ export interface RealTaskLoopScorecard {
   readonly verification: RealTaskLoopScore;
   readonly repairEligibility: RealTaskLoopScore;
   readonly defaultSafety: RealTaskLoopScore;
-  readonly mutationScope: "none" | "controlled-temp-fixture" | "blocked";
+  readonly providerCallDuringApply: RealTaskLoopScore;
+  readonly mutationScope: "none" | "controlled-temp-workspace" | "blocked";
   readonly failureClass: string;
   readonly evidence: readonly string[];
   readonly replaySafeSummary: string;
@@ -33,13 +34,15 @@ export function buildRealTaskLoopScorecard(input: {
   readonly outputValidationStatus?: string;
   readonly anchorQuality?: string;
   readonly confirmationState: string;
-  readonly applyStatus: "not-run" | "applied" | "stopped" | "failed";
+  readonly applyStatus: "not-run" | "succeeded" | "stopped" | "failed";
   readonly snapshotRecoveryReady: boolean;
-  readonly verificationStatus: "not-run" | "passed" | "failed";
+  readonly verificationStatus: "not-run" | "succeeded" | "failed";
   readonly repairEligible: boolean;
   readonly defaultNoProviderNoApply: boolean;
   readonly mutationScope: RealTaskLoopScorecard["mutationScope"];
+  readonly providerCallDuringApply?: boolean;
   readonly failureClass?: string;
+  readonly providerErrorClass?: string;
 }): RealTaskLoopScorecard {
   const lifecycleReadiness = input.lifecycleReady ? "pass" : "fail";
   const analysisQuality = input.analysisAllowed ? "pass" : "fail";
@@ -50,31 +53,45 @@ export function buildRealTaskLoopScorecard(input: {
   const outputValidation = scoreOutputValidation(input.outputValidationStatus);
   const anchorQuality = scoreAnchorQuality(input.anchorQuality);
   const confirmation =
+    input.confirmationState === "trusted-confirmed" ||
     input.confirmationState === "confirmed"
       ? "pass"
       : input.confirmationState === "required"
         ? "warn"
-        : "skip";
+        : input.confirmationState === "invalid"
+          ? "fail"
+          : "skip";
   const applyResult =
-    input.applyStatus === "applied" ? "pass" :
+    input.applyStatus === "succeeded" ? "pass" :
       input.applyStatus === "not-run" ? "skip" :
         input.applyStatus === "stopped" ? "warn" : "fail";
   const snapshotRecovery =
     input.applyStatus === "not-run" ? "skip" : input.snapshotRecoveryReady ? "pass" : "fail";
   const verification =
-    input.verificationStatus === "passed" ? "pass" :
+    input.verificationStatus === "succeeded" ? "pass" :
       input.verificationStatus === "not-run" ? "skip" : "fail";
   const repairEligibility =
     input.repairEligible ? "warn" : input.verificationStatus === "failed" ? "fail" : "skip";
-  const defaultSafety = input.defaultNoProviderNoApply ? "pass" : "fail";
-  const failureClass = input.failureClass ?? inferFailureClass({ ...input, providerCall, verification });
+  const defaultSafety = input.providerExpected ? "skip" : input.defaultNoProviderNoApply ? "pass" : "fail";
+  const providerCallDuringApply = input.providerCallDuringApply ? "fail" : "pass";
+  const failureClass = input.failureClass ?? inferFailureClass({
+    ...input,
+    providerCall,
+    outputValidation,
+    anchorQuality,
+    snapshotRecovery,
+    verification,
+    providerCallDuringApply,
+  });
   const scorecardId = `real_task_loop_scorecard_${hashContent(JSON.stringify({
     taskLoopId: input.taskLoopId,
     providerCall,
     outputValidation,
     anchorQuality,
     applyResult,
+    snapshotRecovery,
     verification,
+    providerCallDuringApply,
     failureClass,
   })).slice(0, 12)}`;
   const replaySafeSummary = [
@@ -85,6 +102,7 @@ export function buildRealTaskLoopScorecard(input: {
     `confirmation=${confirmation}`,
     `apply=${applyResult}`,
     `verification=${verification}`,
+    `providerCallDuringApply=${input.providerCallDuringApply ? "true" : "false"}`,
     `mutationScope=${input.mutationScope}`,
     `failureClass=${failureClass}`,
     "raw-content-excluded",
@@ -104,6 +122,7 @@ export function buildRealTaskLoopScorecard(input: {
     verification,
     repairEligibility,
     defaultSafety,
+    providerCallDuringApply,
     mutationScope: input.mutationScope,
     failureClass,
     replaySafeSummary,
@@ -122,6 +141,8 @@ export function buildRealTaskLoopScorecard(input: {
       `real-task-loop-scorecard:verification:${verification}`,
       `real-task-loop-scorecard:repair:${repairEligibility}`,
       `real-task-loop-scorecard:default-safety:${defaultSafety}`,
+      `real-task-loop-scorecard:provider-call-during-apply:${input.providerCallDuringApply ? "true" : "false"}`,
+      `real-task-loop-scorecard:apply-provider-call:${providerCallDuringApply}`,
       `real-task-loop-scorecard:mutation-scope:${input.mutationScope}`,
       `real-task-loop-scorecard:failure-class:${failureClass}`,
       "real-task-loop-scorecard:no-broad-mutation",
@@ -147,11 +168,21 @@ function scoreAnchorQuality(level: string | undefined): RealTaskLoopScore {
 function inferFailureClass(input: {
   readonly applyStatus: string;
   readonly verificationStatus: string;
+  readonly providerErrorClass?: string;
   readonly providerCall: RealTaskLoopScore;
+  readonly outputValidation: RealTaskLoopScore;
+  readonly anchorQuality: RealTaskLoopScore;
+  readonly snapshotRecovery: RealTaskLoopScore;
   readonly verification: RealTaskLoopScore;
+  readonly providerCallDuringApply: RealTaskLoopScore;
 }): string {
+  if (input.providerErrorClass) return `provider-${input.providerErrorClass}`;
   if (input.providerCall === "fail") return "provider-boundary";
+  if (input.outputValidation === "fail") return "provider-output";
+  if (input.anchorQuality === "fail") return "provider-anchor";
+  if (input.providerCallDuringApply === "fail") return "provider-call-during-apply";
   if (input.applyStatus === "failed") return "apply-failure";
+  if (input.snapshotRecovery === "fail") return "snapshot-recovery";
   if (input.verification === "fail") return "verification-failure";
   return "none";
 }
