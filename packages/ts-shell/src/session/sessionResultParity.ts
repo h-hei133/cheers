@@ -90,7 +90,7 @@ function collectEvidence(
 function projectCapabilityArea(evidence: readonly string[]): string | undefined {
   if (
     evidence.some((entry) =>
-      /^(anchored-proposal|anchored-provider-smoke|live-smoke-evidence|live-provider-smoke-result|proposal-quality-report|provider-smoke-result|real-provider-proposal-dry-run|provider-prompt-audit|provider-output-validation|provider-anchor-quality|provider-anchor-|provider-anchored-proposal|provider-anchoring-result)/.test(entry),
+      /^(anchored-proposal|anchored-provider-smoke|live-smoke-evidence|live-provider-smoke-result|proposal-quality-report|provider-smoke-result|real-provider-proposal-dry-run|real-task-loop|provider-prompt-audit|provider-output-validation|provider-anchor-quality|provider-anchor-|provider-anchored-proposal|provider-anchoring-result)/.test(entry),
     )
   ) {
     return "provider-model";

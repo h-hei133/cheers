@@ -124,7 +124,71 @@ function runRunner(env) {
   const stderr = fs.existsSync(stderrPath) ? fs.readFileSync(stderrPath, 'utf8') : ''
   if (stdout) fs.writeSync(process.stdout.fd, redact(stdout))
   if (stderr) fs.writeSync(process.stderr.fd, redact(stderr))
-  return result.status ?? 1
+  const runnerStatus = result.status ?? 1
+  if (runnerStatus !== 0) return runnerStatus
+  return validateRunnerSuccessMarkers(stdout, env)
+}
+
+function validateRunnerSuccessMarkers(stdout, env) {
+  const expectedMarkers = expectedRunnerSuccessMarkers(env)
+  const missing = expectedMarkers.filter((marker) => !stdout.includes(marker))
+  if (missing.length > 0) {
+    console.log('[product-regression] real-provider-task-loop-mvp runner markers missing')
+    for (const marker of missing) console.log(`missing-marker=${marker}`)
+    return 1
+  }
+  console.log('[pass] real-provider-task-loop-mvp runner markers validated')
+  return 0
+}
+
+function expectedRunnerSuccessMarkers(env) {
+  const liveOptIn = env.PRIVATE_AGENTS_LIVE_TASK_LOOP_SMOKE?.trim() === '1'
+  const confirmApply = env.PRIVATE_AGENTS_CONFIRM_TASK_LOOP_APPLY?.trim() === '1'
+  const base = [
+    'no-broad-mutation=true',
+    'provider-call-during-apply=false',
+    'Raw provider output: excluded',
+  ]
+  if (!liveOptIn) {
+    return [
+      ...base,
+      'provider-called=false',
+      'output-validation=none',
+      'anchor-quality=none',
+      'confirmation=not-requested',
+      'apply=not-run',
+      'verification=not-run',
+      'status=skipped-no-provider-opt-in',
+    ]
+  }
+  if (confirmApply) {
+    return [
+      ...base,
+      'provider-called=true',
+      'output-validation=valid-exact-single-target',
+      'anchor-quality=exact-ready',
+      'confirmation=trusted-confirmed',
+      'apply=succeeded',
+      'verification=succeeded',
+      'mutation-scope=controlled-temp-workspace',
+      'snapshot=created',
+      'recovery=available',
+      'status=task-loop-complete',
+    ]
+  }
+  return [
+    ...base,
+    'provider-called=true',
+    'output-validation=valid-exact-single-target',
+    'anchor-quality=exact-ready',
+    'confirmation=required',
+    'apply=not-run',
+    'verification=not-run',
+    'mutation-scope=none',
+    'snapshot=not-run',
+    'recovery=not-run',
+    'status=confirmation-required',
+  ]
 }
 
 function buildRunnerBundle(env) {

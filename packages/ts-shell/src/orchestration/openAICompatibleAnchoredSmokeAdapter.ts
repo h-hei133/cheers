@@ -144,22 +144,47 @@ function buildSystemPrompt(): string {
     "Do not claim that files were changed. Do not run commands. Do not request apply.",
     "The JSON shape is:",
     '{"operationKind":"exact-fenced-replacement","targets":[{"path":"src/smoke.ts","summary":"...","oldText":"...","newText":"..."}],"confidence":"medium","riskSummary":"...","verificationPlan":["..."]}',
-    "Use one target per exact oldText/newText anchor. Multiple targets in the same file are allowed when the request names multiple in-file edits.",
+    "Return exactly one target. The oldText and newText must be a bounded exact replacement block.",
   ].join("\n");
 }
 
 function buildUserPrompt(context: ContextAwareProviderPromptContext): string {
-  return [
+  const common = [
     context.providerPrompt,
     "",
-    "Return exact-fenced-replacement targets for the explicit target only.",
-    "If the request asks for a local call site, include a second exact target for that call site in the same file.",
+    "Return exactly one exact-fenced-replacement target for the explicit target only.",
     `Explicit target: ${context.target.pathLabel}`,
-    "The oldText must be the exact function declaration anchor for startApp.",
-    "The newText must rename only that declaration to runApp.",
-    "When a call site is requested, use oldText exactly \"export const bootMessage = startApp();\" and newText exactly \"export const bootMessage = runApp();\".",
+  ];
+  const routeSpecific = requestsLocalCallSite(context)
+    ? [
+        "The oldText must be this exact bounded block:",
+        "export function startApp() {",
+        "  return \"started\";",
+        "}",
+        "",
+        "export const bootMessage = startApp();",
+        "The newText must be this exact bounded block:",
+        "export function runApp() {",
+        "  return \"started\";",
+        "}",
+        "",
+        "export const bootMessage = runApp();",
+        "Do not split the declaration and call site into multiple targets.",
+      ]
+    : [
+        "The oldText must be the exact function declaration anchor for startApp.",
+        "The newText must rename only that declaration to runApp.",
+        "Do not include unrelated functions or additional targets.",
+      ];
+  return [
+    ...common,
+    ...routeSpecific,
     "Return JSON only.",
   ].join("\n");
+}
+
+function requestsLocalCallSite(context: ContextAwareProviderPromptContext): boolean {
+  return /local call site|bootMessage/i.test(`${context.userRequest}\n${context.providerPrompt}`);
 }
 
 function parseProviderProposal(text: string): ProviderEditRawProposal {

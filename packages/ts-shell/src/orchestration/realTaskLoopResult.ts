@@ -36,6 +36,7 @@ export interface RealTaskLoopResult {
   readonly taskLoopId: string;
   readonly fixtureId: string;
   readonly providerCalled: boolean;
+  readonly outputValidationStatus: string;
   readonly anchorQuality: string;
   readonly confirmationStatus: RealTaskLoopPlan["confirmationState"];
   readonly applyStatus: "not-run" | "succeeded" | "stopped" | "failed";
@@ -64,6 +65,7 @@ export function buildRealTaskLoopResult(input: {
   readonly providerCallDuringApply?: boolean;
 }): RealTaskLoopResult {
   const providerCalled = input.runtime?.dryRun?.providerCalled ?? false;
+  const outputValidationStatus = input.runtime?.dryRun?.outputValidation?.status ?? "none";
   const anchorQuality = input.runtime?.dryRun?.anchorQuality?.level ?? "none";
   const applyStatus = classifyRealTaskLoopApplyStatus(input.applyResult);
   const verificationStatus = classifyRealTaskLoopVerificationStatus(input.readback);
@@ -80,10 +82,26 @@ export function buildRealTaskLoopResult(input: {
     verificationStatus,
   });
   const mutationScope = classifyRealTaskLoopMutationScope(changedFiles);
+  const replaySafeSummary = [
+    `real-task-loop-result taskLoop=${input.plan.taskLoopId}`,
+    `providerCalled=${providerCalled}`,
+    `outputValidation=${outputValidationStatus}`,
+    `anchorQuality=${anchorQuality}`,
+    `confirmation=${input.plan.confirmationState}`,
+    `apply=${applyStatus}`,
+    `verification=${verificationStatus}`,
+    `snapshot=${snapshotStatus}`,
+    `recovery=${recoveryStatus}`,
+    `mutationScope=${mutationScope}`,
+    `providerCallDuringApply=${providerCallDuringApply}`,
+    "raw-content-excluded",
+  ].join("; ");
   const sessionEvidence = [
+    replaySafeSummary,
     `real-task-loop-session:task-loop:${input.plan.taskLoopId}`,
     `real-task-loop-session:fixture:${input.fixture.fixtureId}`,
     `real-task-loop-session:provider-called:${providerCalled}`,
+    `real-task-loop-session:output-validation:${outputValidationStatus}`,
     ...(input.runtime?.dryRun && "manifest" in input.runtime.dryRun
       ? [`real-task-loop-session:proposal:${input.runtime.dryRun.manifest.proposalId}`]
       : []),
@@ -104,6 +122,7 @@ export function buildRealTaskLoopResult(input: {
     `Task loop: ${input.plan.taskLoopId}`,
     `Fixture: ${input.fixture.fixtureId}`,
     `Provider called: ${providerCalled ? "yes" : "no"}`,
+    `Output validation: ${outputValidationStatus}`,
     `Anchor quality: ${anchorQuality}`,
     `Confirmation: ${input.plan.confirmationState}`,
     `Apply: ${applyStatus}`,
@@ -124,6 +143,7 @@ export function buildRealTaskLoopResult(input: {
     taskLoopId: input.plan.taskLoopId,
     fixtureId: input.fixture.fixtureId,
     providerCalled,
+    outputValidationStatus,
     anchorQuality,
     confirmationStatus: input.plan.confirmationState,
     applyStatus,
@@ -154,10 +174,12 @@ export function buildRealTaskLoopResult(input: {
       ...(input.runtime?.evidence ?? []),
       ...(input.applyResult?.evidence ?? []),
       ...(input.readback?.evidence ?? []),
-      ...input.scorecard.evidence,
       ...sessionEvidence,
+      input.scorecard.replaySafeSummary,
+      ...input.scorecard.evidence,
       `real-task-loop-result:status:${status}`,
       `real-task-loop-result:provider-called:${providerCalled}`,
+      `real-task-loop-result:output-validation:${outputValidationStatus}`,
       `real-task-loop-result:anchor-quality:${anchorQuality}`,
       `real-task-loop-result:confirmation:${input.plan.confirmationState}`,
       `real-task-loop-result:apply:${applyStatus}`,

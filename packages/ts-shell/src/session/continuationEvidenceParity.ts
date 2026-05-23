@@ -26,7 +26,9 @@ const CONTINUATION_EVIDENCE_PREFIXES: ReadonlyArray<{
   {
     label: "real-task-loop",
     prefixes: [
+      "real-task-loop-result ",
       "real-task-loop-result:",
+      "real-task-loop-scorecard ",
       "real-task-loop-scorecard:",
       "real-task-loop-session:",
     ],

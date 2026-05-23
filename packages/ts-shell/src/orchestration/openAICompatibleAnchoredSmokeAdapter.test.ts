@@ -46,12 +46,65 @@ describe("openAICompatibleAnchoredSmokeAdapter", () => {
     const proposal = await adapter.proposeEdit(fixture.promptContext);
 
     expect(requests).toEqual(["https://api.siliconflow.cn/v1/chat/completions"]);
-    expect(bodies.join("\n")).toContain("Multiple targets in the same file are allowed");
-    expect(bodies.join("\n")).toContain("include a second exact target for that call site");
+    expect(bodies.join("\n")).toContain("Return exactly one target");
+    expect(bodies.join("\n")).toContain("Do not include unrelated functions or additional targets");
     expect(proposal.operationKind).toBe("exact-fenced-replacement");
     expect(proposal.targets?.[0]?.path).toBe("src/smoke.ts");
     expect(proposal.targets?.[0]?.oldText).toBe("export function startApp() {");
     expect(proposal.targets?.[0]?.newText).toBe("export function runApp() {");
+  });
+
+  it("asks local-call-site task loops for one bounded exact target", async () => {
+    const bodies: string[] = [];
+    const adapter = createOpenAICompatibleAnchoredSmokeAdapter({
+      apiKey: "test-key",
+      baseUrl: "https://api.example.test/v1/",
+      model: "test-model",
+      fetchImpl: async (_input, init) => {
+        bodies.push(String(init?.body ?? ""));
+        return new Response(sse(JSON.stringify({
+          operationKind: "exact-fenced-replacement",
+          targets: [
+            {
+              path: "src/smoke.ts",
+              summary: "rename startApp declaration and local call site",
+              oldText: [
+                "export function startApp() {",
+                "  return \"started\";",
+                "}",
+                "",
+                "export const bootMessage = startApp();",
+              ].join("\n"),
+              newText: [
+                "export function runApp() {",
+                "  return \"started\";",
+                "}",
+                "",
+                "export const bootMessage = runApp();",
+              ].join("\n"),
+            },
+          ],
+          confidence: "high",
+          riskSummary: "review only",
+          verificationPlan: ["safe readback"],
+        })), {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        });
+      },
+    });
+
+    await adapter.proposeEdit({
+      ...fixture.promptContext,
+      userRequest: "Rename startApp to runApp in src/smoke.ts, including the local call site.",
+      providerPrompt: [
+        fixture.promptContext.providerPrompt,
+        "The request includes the local call site bootMessage.",
+      ].join("\n"),
+    });
+
+    expect(bodies.join("\n")).toContain("Do not split the declaration and call site into multiple targets");
+    expect(bodies.join("\n")).toContain("export const bootMessage = startApp();");
   });
 
   it("classifies malformed provider output without exposing raw output", async () => {

@@ -147,6 +147,29 @@ describe("session result parity", () => {
     );
   });
 
+  it("projects real task loop markers as provider-model evidence", () => {
+    const projection = projectSessionResultParity({
+      terminalClassification: "stopped",
+      stopReason: "Review exact-ready task loop proposal before apply.",
+      codingResult: makeCodingResult({
+        reason: "Task loop produced exact-ready confirmation-required evidence.",
+        nextAction: "Review and explicitly confirm before controlled apply.",
+        evidence: [
+          "real-task-loop-result taskLoop=real_task_loop_abc; providerCalled=true; outputValidation=valid-exact-single-target; anchorQuality=exact-ready; confirmation=required; apply=not-run; verification=not-run; snapshot=not-run; recovery=not-run; mutationScope=none; providerCallDuringApply=false; raw-content-excluded",
+          "real-task-loop-session:provider-called:true",
+          "real-task-loop-session:output-validation:valid-exact-single-target",
+          "real-task-loop-result:anchor-quality:exact-ready",
+        ],
+      }),
+    });
+
+    expect(projection.capabilityArea).toBe("provider-model");
+    expect(projection.redactionStatus).toBe("raw-content-excluded");
+    expect(projection.evidenceMarkers).toContain(
+      "real-task-loop-result taskLoop=real_task_loop_abc; providerCalled=true; outputValidation=valid-exact-single-target; anchorQuality=exact-ready; confirmation=required; apply=not-run; verification=not-run; snapshot=not-run; recovery=not-run; mutationScope=none; providerCallDuringApply=false; raw-content-excluded",
+    );
+  });
+
   it("projects anchored proposal runtime eval and scorecard markers as provider-model evidence", () => {
     const projection = projectSessionResultParity({
       terminalClassification: "stopped",

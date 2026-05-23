@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { runRealTaskLoopRuntime } from "./realTaskLoopRuntime.js";
+import {
+  realTaskLoopExactNewText,
+  realTaskLoopExactOldText,
+} from "./realTaskLoopFixture.js";
+import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 
 describe("realTaskLoopRuntime", () => {
   it("default mode does not call provider and does not apply", async () => {
@@ -22,21 +27,23 @@ describe("realTaskLoopRuntime", () => {
     });
 
     expect(output.runtime?.dryRun?.providerCalled).toBe(true);
-    expect(output.runtime?.anchoredProposal?.handoffReadiness).toBe("exact-hunk-set");
+    expect(output.result.outputValidationStatus).toBe("valid-exact-single-target");
+    expect(output.runtime?.anchoredProposal?.handoffReadiness).toBe("exact-single-target");
     expect(output.result.confirmationStatus).toBe("required");
     expect(output.result.applyStatus).toBe("not-run");
     expect(output.result.status).toBe("confirmation-required");
   });
 
-  it("explicit confirmation applies through existing hunk-set/fenced lanes and readback verifies", async () => {
+  it("explicit confirmation applies through existing exact apply lane and readback verifies", async () => {
     const output = await runRealTaskLoopRuntime({
       requestId: "route200-fake-confirm",
       providerMode: "fake",
       confirmApply: true,
     });
 
-    expect(output.applyResult?.status).toBe("hunk-set-applied");
+    expect(output.applyResult?.status).toBe("single-target-applied");
     expect(output.result.changedFiles).toEqual(["src/smoke.ts"]);
+    expect(output.result.outputValidationStatus).toBe("valid-exact-single-target");
     expect(output.result.confirmationStatus).toBe("trusted-confirmed");
     expect(output.result.applyStatus).toBe("succeeded");
     expect(output.result.verificationStatus).toBe("succeeded");
@@ -46,9 +53,9 @@ describe("realTaskLoopRuntime", () => {
     expect(output.result.status).toBe("task-loop-complete");
     expect(output.result.evidence).toEqual(
       expect.arrayContaining([
-        "edit-proposal-apply:hunk-set-route",
-        "proposal-hunk-set-route:no-new-writer",
+        "edit-proposal-apply:existing-fenced-route",
         "real-task-loop-readback:status:passed",
+        "real-task-loop-result:output-validation:valid-exact-single-target",
         "real-task-loop-result:confirmation:trusted-confirmed",
         "real-task-loop-result:apply:succeeded",
         "real-task-loop-result:verification:succeeded",
@@ -92,30 +99,12 @@ describe("realTaskLoopRuntime", () => {
       providerMode: "real-opt-in",
       providerAvailability: { kind: "available", providerKindLabel: "openai-compatible" },
       provider: {
-        proposeEdit: () => ({
-          operationKind: "exact-fenced-replacement",
-          targets: [
-            {
-              path: "src/smoke.ts",
-              summary: "rename startApp declaration to runApp",
-              oldText: "export function startApp() {",
-              newText: "export function runApp() {",
-            },
-            {
-              path: "src/smoke.ts",
-              summary: "rename startApp call site to runApp",
-              oldText: "export const bootMessage = startApp();",
-              newText: "export const bootMessage = runApp();",
-            },
-          ],
-          confidence: "high",
-          riskSummary: "controlled fixture exact rename",
-          verificationPlan: ["safe readback verifies runApp and absence of startApp"],
-        }),
+        proposeEdit: () => buildSingleTargetProposal(),
       },
     });
 
     expect(output.result.providerCalled).toBe(true);
+    expect(output.result.outputValidationStatus).toBe("valid-exact-single-target");
     expect(output.result.anchorQuality).toBe("exact-ready");
     expect(output.result.confirmationStatus).toBe("required");
     expect(output.result.status).toBe("confirmation-required");
@@ -162,30 +151,12 @@ describe("realTaskLoopRuntime", () => {
       confirmApply: true,
       providerAvailability: { kind: "available", providerKindLabel: "openai-compatible" },
       provider: {
-        proposeEdit: () => ({
-          operationKind: "exact-fenced-replacement",
-          targets: [
-            {
-              path: "src/smoke.ts",
-              summary: "rename startApp declaration to runApp",
-              oldText: "export function startApp() {",
-              newText: "export function runApp() {",
-            },
-            {
-              path: "src/smoke.ts",
-              summary: "rename startApp call site to runApp",
-              oldText: "export const bootMessage = startApp();",
-              newText: "export const bootMessage = runApp();",
-            },
-          ],
-          confidence: "high",
-          riskSummary: "controlled fixture exact rename",
-          verificationPlan: ["safe readback verifies runApp and absence of startApp"],
-        }),
+        proposeEdit: () => buildSingleTargetProposal(),
       },
     });
 
     expect(output.result.providerCalled).toBe(true);
+    expect(output.result.outputValidationStatus).toBe("valid-exact-single-target");
     expect(output.result.confirmationStatus).toBe("trusted-confirmed");
     expect(output.result.applyStatus).toBe("succeeded");
     expect(output.result.changedFiles).toEqual(["src/smoke.ts"]);
@@ -197,4 +168,51 @@ describe("realTaskLoopRuntime", () => {
     expect(output.result.status).toBe("task-loop-complete");
     expect(output.result.evidence).toContain("real-task-loop-result:no-provider-call-during-apply");
   });
+
+  it("unsupported anchors remain review-required and no-write", async () => {
+    const output = await runRealTaskLoopRuntime({
+      requestId: "route203-real-opt-in-unsupported-anchor",
+      providerMode: "real-opt-in",
+      providerAvailability: { kind: "available", providerKindLabel: "openai-compatible" },
+      provider: {
+        proposeEdit: () => ({
+          ...buildSingleTargetProposal(),
+          targets: [
+            {
+              path: "src/smoke.ts",
+              summary: "non matching bounded rename",
+              oldText: realTaskLoopExactOldText.replace("startApp();", "missingStartApp();"),
+              newText: realTaskLoopExactNewText,
+            },
+          ],
+        }),
+      },
+    });
+
+    expect(output.result.providerCalled).toBe(true);
+    expect(output.result.outputValidationStatus).toBe("valid-exact-single-target");
+    expect(output.result.anchorQuality).toBe("unsupported");
+    expect(output.result.confirmationStatus).toBe("not-requested");
+    expect(output.result.applyStatus).toBe("not-run");
+    expect(output.result.verificationStatus).toBe("not-run");
+    expect(output.result.status).toBe("review-required");
+    expect(output.result.evidence).toContain("real-task-loop-result:anchor-quality:unsupported");
+  });
 });
+
+function buildSingleTargetProposal(): ProviderEditRawProposal {
+  return {
+    operationKind: "exact-fenced-replacement",
+    targets: [
+      {
+        path: "src/smoke.ts",
+        summary: "rename startApp declaration and local call site to runApp",
+        oldText: realTaskLoopExactOldText,
+        newText: realTaskLoopExactNewText,
+      },
+    ],
+    confidence: "high",
+    riskSummary: "controlled fixture exact rename",
+    verificationPlan: ["safe readback verifies runApp and absence of startApp"],
+  };
+}

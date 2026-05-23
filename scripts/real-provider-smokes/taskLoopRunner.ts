@@ -5,6 +5,10 @@ import {
 import { checkRealProviderReadiness } from "../../packages/ts-shell/src/core/shell/providerReadiness.js";
 import { approveLiveProviderAdapter } from "../../packages/ts-shell/src/orchestration/liveProviderAdapterApproval.js";
 import { runRealTaskLoopRuntime } from "../../packages/ts-shell/src/orchestration/realTaskLoopRuntime.js";
+import {
+  realTaskLoopExactNewText,
+  realTaskLoopExactOldText,
+} from "../../packages/ts-shell/src/orchestration/realTaskLoopFixture.js";
 import type { RealTaskLoopRuntimeOutput } from "../../packages/ts-shell/src/orchestration/realTaskLoopRuntime.js";
 import type { ProviderEditAvailability } from "../../packages/ts-shell/src/orchestration/providerEditPlanner.js";
 import type { ProviderEditRawProposal } from "../../packages/ts-shell/src/orchestration/providerEditProposal.js";
@@ -225,6 +229,7 @@ function printRuntimeOutput(
   console.log(output.result.output);
   for (const marker of [
     `provider-called=${output.result.providerCalled}`,
+    `output-validation=${output.result.outputValidationStatus}`,
     `confirmation=${output.result.confirmationStatus}`,
     `apply=${output.result.applyStatus}`,
     `verification=${output.result.verificationStatus}`,
@@ -333,15 +338,9 @@ function buildTaskLoopFakeProvider(): RealProviderProposalDryRunProvider {
       targets: [
         {
           path: "src/smoke.ts",
-          summary: "rename startApp declaration to runApp",
-          oldText: "export function startApp() {",
-          newText: "export function runApp() {",
-        },
-        {
-          path: "src/smoke.ts",
-          summary: "rename startApp call site to runApp",
-          oldText: "export const bootMessage = startApp();",
-          newText: "export const bootMessage = runApp();",
+          summary: "rename startApp declaration and local call site to runApp",
+          oldText: realTaskLoopExactOldText,
+          newText: realTaskLoopExactNewText,
         },
       ],
       confidence: "high",
@@ -406,6 +405,7 @@ function exitCodeForOutput(
 
   if (confirmApply) {
     return output.result.providerCalled === true &&
+      output.result.outputValidationStatus === "valid-exact-single-target" &&
       output.result.anchorQuality === "exact-ready" &&
       output.result.confirmationStatus === "trusted-confirmed" &&
       output.result.applyStatus === "succeeded" &&
@@ -418,6 +418,7 @@ function exitCodeForOutput(
   }
 
   return output.result.providerCalled === true &&
+    output.result.outputValidationStatus === "valid-exact-single-target" &&
     output.result.anchorQuality === "exact-ready" &&
     output.result.confirmationStatus === "required" &&
     output.result.applyStatus === "not-run" &&

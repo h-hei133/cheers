@@ -20,6 +20,8 @@ import type { ProviderEditAvailability } from "./providerEditPlanner.js";
 import {
   createRealTaskLoopFixture,
   readRealTaskLoopTarget,
+  realTaskLoopExactNewText,
+  realTaskLoopExactOldText,
   removeRealTaskLoopFixture,
   verifyRealTaskLoopReadback,
   type RealTaskLoopFixture,
@@ -226,15 +228,9 @@ function buildRealTaskLoopFakeProvider(): RealProviderProposalDryRunProvider {
       targets: [
         {
           path: "src/smoke.ts",
-          summary: "rename startApp declaration to runApp",
-          oldText: "export function startApp() {",
-          newText: "export function runApp() {",
-        },
-        {
-          path: "src/smoke.ts",
-          summary: "rename startApp call site to runApp",
-          oldText: "export const bootMessage = startApp();",
-          newText: "export const bootMessage = runApp();",
+          summary: "rename startApp declaration and local call site to runApp",
+          oldText: realTaskLoopExactOldText,
+          newText: realTaskLoopExactNewText,
         },
       ],
       confidence: "high",

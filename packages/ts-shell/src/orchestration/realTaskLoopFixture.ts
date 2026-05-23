@@ -14,6 +14,22 @@ export interface RealTaskLoopFixture {
   readonly evidence: readonly string[];
 }
 
+export const realTaskLoopExactOldText = [
+  "export function startApp() {",
+  "  return \"started\";",
+  "}",
+  "",
+  "export const bootMessage = startApp();",
+].join("\n");
+
+export const realTaskLoopExactNewText = [
+  "export function runApp() {",
+  "  return \"started\";",
+  "}",
+  "",
+  "export const bootMessage = runApp();",
+].join("\n");
+
 export function createRealTaskLoopFixture(input: {
   readonly fixtureId?: string;
   readonly testRoot?: string;
@@ -23,22 +39,8 @@ export function createRealTaskLoopFixture(input: {
     path.join(input.testRoot ?? os.tmpdir(), "private-agents-real-task-loop-"),
   );
   const targetPath = "src/smoke.ts" as const;
-  const initialContent = [
-    "export function startApp() {",
-    "  return \"started\";",
-    "}",
-    "",
-    "export const bootMessage = startApp();",
-    "",
-  ].join("\n");
-  const expectedPostApplyContent = [
-    "export function runApp() {",
-    "  return \"started\";",
-    "}",
-    "",
-    "export const bootMessage = runApp();",
-    "",
-  ].join("\n");
+  const initialContent = `${realTaskLoopExactOldText}\n`;
+  const expectedPostApplyContent = `${realTaskLoopExactNewText}\n`;
 
   const absoluteTarget = path.join(workspaceRoot, targetPath);
   fs.mkdirSync(path.dirname(absoluteTarget), { recursive: true });

@@ -11,7 +11,7 @@ describe("realTaskLoopScorecard", () => {
       planReady: true,
       providerCalled: true,
       providerExpected: true,
-      outputValidationStatus: "valid-exact-hunk-set",
+      outputValidationStatus: "valid-exact-single-target",
       anchorQuality: "exact-ready",
       confirmationState: "trusted-confirmed",
       applyStatus: "succeeded",
@@ -40,7 +40,7 @@ describe("realTaskLoopScorecard", () => {
       planReady: true,
       providerCalled: true,
       providerExpected: true,
-      outputValidationStatus: "valid-exact-hunk-set",
+      outputValidationStatus: "valid-exact-single-target",
       anchorQuality: "exact-ready",
       confirmationState: "trusted-confirmed",
       applyStatus: "succeeded",
@@ -55,5 +55,31 @@ describe("realTaskLoopScorecard", () => {
     expect(scorecard.snapshotRecovery).toBe("fail");
     expect(scorecard.providerCallDuringApply).toBe("fail");
     expect(scorecard.failureClass).toBe("provider-call-during-apply");
+  });
+
+  it("fails unsupported anchors while preserving provider-output pass", () => {
+    const scorecard = buildRealTaskLoopScorecard({
+      taskLoopId: "task-loop-unsupported-anchor",
+      lifecycleReady: true,
+      analysisAllowed: true,
+      planReady: true,
+      providerCalled: true,
+      providerExpected: true,
+      outputValidationStatus: "valid-exact-single-target",
+      anchorQuality: "unsupported",
+      confirmationState: "not-requested",
+      applyStatus: "not-run",
+      snapshotRecoveryReady: false,
+      verificationStatus: "not-run",
+      repairEligible: false,
+      defaultNoProviderNoApply: false,
+      mutationScope: "none",
+      providerCallDuringApply: false,
+    });
+
+    expect(scorecard.outputValidation).toBe("pass");
+    expect(scorecard.anchorQuality).toBe("fail");
+    expect(scorecard.failureClass).toBe("provider-anchor");
+    expect(scorecard.evidence).toContain("real-task-loop-scorecard:anchor-quality:fail");
   });
 });
