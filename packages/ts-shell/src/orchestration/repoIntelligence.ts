@@ -388,7 +388,9 @@ function isSupportedRepoFile(fileName: string): boolean {
 }
 
 const IGNORED_DIRS = new Set([
+  ".codex",
   ".git",
+  ".omx",
   ".sisyphus",
   ".turbo",
   "coverage",

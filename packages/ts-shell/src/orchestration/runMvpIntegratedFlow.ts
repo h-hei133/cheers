@@ -116,7 +116,7 @@ import {
   buildAgentPlanResult,
   projectAgentPlanRuntimeOutcome,
 } from "./agentPlanResult.js";
-import { shouldRunPlanningRuntimeForBlockedVagueTask } from "./planningRuntimeProductRoute.js";
+import { selectPlanningRuntimeProductRoute } from "./planningRuntimeProductRoute.js";
 import {
   activateTaskLifecycle,
   formatTaskLifecycleActivationOutput,
@@ -4117,6 +4117,37 @@ async function executeWorkflowTaskPlan(input: {
     evidence.push(...input.plan.continuationLineage!);
   }
   appendSingleFileEditRepairObservability(evidence, input.plan);
+  const planningRuntimeProductRoute = selectPlanningRuntimeProductRoute(input.plan);
+  if (planningRuntimeProductRoute.shouldRun) {
+    if (input.plan.blockedReason) {
+      notes.push(`blocker: ${input.plan.blockedReason}`);
+    }
+    const planning = await runPlanningRuntime({
+      workspaceRoot: input.workspaceRoot,
+      userTask: input.prompt,
+      taskKindHint: planningRuntimeProductRoute.taskKind,
+    });
+    const projected = projectPlanningRuntimeProductOutcome({
+      result: planning,
+      taskKind: planningRuntimeProductRoute.taskKind,
+      routeReason: planningRuntimeProductRoute.routeReason,
+      routeEvidence: planningRuntimeProductRoute.evidence,
+      productPath: "runMvpIntegratedFlow",
+    });
+    return {
+      events,
+      notes: [
+        ...notes,
+        `planning-runtime: ${planning.runtimeId}`,
+        `context-engine: ${planning.context.engineId}`,
+        `planning-runtime-status: ${planning.status}`,
+        "planning-runtime-product:path:runMvpIntegratedFlow",
+        ...planningRuntimeProductRoute.evidence,
+        "planning-runtime-product:review-only-no-write-handoff",
+      ],
+      ...projected,
+    };
+  }
   const taskLifecycleActivation = await activateTaskLifecycle({
     workspaceRoot: input.workspaceRoot,
     prompt: input.prompt,
@@ -4426,30 +4457,6 @@ async function executeWorkflowTaskPlan(input: {
 
   if (input.plan.blockedReason) {
     notes.push(`blocker: ${input.plan.blockedReason}`);
-    if (shouldRunPlanningRuntimeForBlockedVagueTask(input.plan)) {
-      const planning = await runPlanningRuntime({
-        workspaceRoot: input.workspaceRoot,
-        userTask: input.prompt,
-      });
-      const projected = projectPlanningRuntimeProductOutcome({
-        result: planning,
-        taskKind: input.plan.taskKind,
-        blockedReason: input.plan.blockedReason,
-        productPath: "runMvpIntegratedFlow",
-      });
-      return {
-        events,
-        notes: [
-          ...notes,
-          `planning-runtime: ${planning.runtimeId}`,
-          `context-engine: ${planning.context.engineId}`,
-          `planning-runtime-status: ${planning.status}`,
-          "planning-runtime-product:path:runMvpIntegratedFlow",
-          "planning-runtime-product:review-only-no-write-handoff",
-        ],
-        ...projected,
-      };
-    }
     if (input.plan.contextPlanningRequested && input.plan.targetPath) {
       const planning = await buildContextGraphPlanningBundle({
         workspaceRoot: input.workspaceRoot,

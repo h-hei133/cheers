@@ -7457,6 +7457,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.codingResult?.changedFiles).toEqual([]);
     expect(result.finalOutput).toContain("Context packet:");
     expect(result.finalOutput).toContain("Agent plan:");
+    expect(result.finalOutput).not.toContain("Planning runtime: product-path review-only handoff");
     expect(result.finalOutput).toContain("Mutation authority: not-granted");
     expect(result.codingResult?.continuation.evidence).toEqual(
       expect.arrayContaining([
@@ -7529,6 +7530,86 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(evidence.some((entry) => entry.startsWith("planning-runtime:id:"))).toBe(true);
     expect(evidence.some((entry) => entry.startsWith("inspect: read src/planning/targetRanking.ts"))).toBe(true);
   }, 15000);
+
+  it("routes multiple vague product task classes through Planning Runtime without writes", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src", "planning"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "route208-product-path", scripts: { test: "vitest run" } }, null, 2),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "planning", "targetRanking.ts"),
+      [
+        "export function rankPlannerTargets(task: string) {",
+        "  return task.includes('planner') ? 'targetRanking.ts' : 'unknown';",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "planning", "targetRanking.test.ts"),
+      "expect(rankPlannerTargets('planner target ranking')).toBe('targetRanking.ts');\n",
+    );
+
+    const cases = [
+      {
+        sessionId: "sess_route208_vague_write",
+        prompt: "Create a planner target ranking feature and cover the adjacent test",
+        taskKind: "write-file",
+        route: "planning-runtime-product:route:blocked-vague-write",
+      },
+      {
+        sessionId: "sess_route208_vague_inspect",
+        prompt: "Analyze planner target ranking files and related tests",
+        taskKind: "inspect-files",
+        route: "planning-runtime-product:route:vague-inspect",
+      },
+      {
+        sessionId: "sess_route208_vague_repo",
+        prompt: "Why does repository planner target ranking fail across tests?",
+        taskKind: "repo-explain",
+        route: "planning-runtime-product:route:vague-repo-explain",
+      },
+    ] as const;
+
+    for (const scenario of cases) {
+      const result = await runMvpIntegratedFlow({
+        sessionId: scenario.sessionId,
+        prompt: scenario.prompt,
+        workspaceRoot,
+        maxTurns: 4,
+      });
+      const evidence = result.codingResult?.evidence ?? [];
+
+      expect(result.status).toBe("stopped_error");
+      expect(result.terminalClassification).toBe("stopped");
+      expect(result.codingResult?.taskKind).toBe(scenario.taskKind);
+      expect(result.codingResult?.changedFiles).toEqual([]);
+      expect(result.finalOutput).toContain("Planning runtime: product-path review-only handoff");
+      expect(result.finalOutput).toContain("Context engine: context-built");
+      expect(result.finalOutput).toContain("Candidates:");
+      expect(result.finalOutput).toContain("src/planning/targetRanking.ts");
+      expect(result.finalOutput).toContain("Grounded analysis:");
+      expect(result.finalOutput).toContain("Executable plan:");
+      expect(result.finalOutput).toContain("Verification intent:");
+      expect(result.finalOutput).toContain("mutationAuthority=not-granted");
+      expect(result.finalOutput).toContain("provider-called=false");
+      expect(result.finalOutput).toContain("apply=not-run");
+      expect(result.finalOutput).toContain("command-dispatch=not-run");
+      expect(evidence).toEqual(
+        expect.arrayContaining([
+          "planning-runtime-product:path:runMvpIntegratedFlow",
+          scenario.route,
+          "planning-runtime-product:product-path-consumed",
+          "session-print:stopped-final-output:include",
+          "mutationAuthority=not-granted",
+          "provider-called=false",
+          "apply=not-run",
+          "command-dispatch=not-run",
+        ]),
+      );
+    }
+  }, 20000);
 
   it("stops broad edit prompts on targeted context planning without mutation authority", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });

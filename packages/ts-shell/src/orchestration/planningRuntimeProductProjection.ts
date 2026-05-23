@@ -4,23 +4,25 @@ import {
   projectRuntimeCodingOutcome,
   type RuntimeOutcomeProjection,
 } from "./runtimeOutcomeProjection.js";
-import type { CodingTaskKind } from "./types.js";
+import type { PlanningRuntimeProductTaskKind } from "./planningRuntimeProductRoute.js";
 
 export function projectPlanningRuntimeProductOutcome(input: {
   readonly result: PlanningRuntimeResult;
-  readonly taskKind: Extract<CodingTaskKind, "edit-file" | "write-file">;
-  readonly blockedReason: string;
+  readonly taskKind: PlanningRuntimeProductTaskKind;
+  readonly routeReason: string;
+  readonly routeEvidence?: readonly string[];
   readonly productPath: "runMvpIntegratedFlow";
 }): RuntimeOutcomeProjection {
   const surface = projectPlanningRuntimeSurface(input.result);
   const targetPaths = surface.editTargets.map((target) => target.path);
   const reviewOnlyReason = [
-    input.blockedReason,
+    input.routeReason,
     "Review-only planning runtime stopped before mutation; mutationAuthority=not-granted.",
   ].join(" ");
   const verificationReason =
     "Planning runtime produced verification intent only; command-dispatch=not-run.";
-  const productEvidence = buildProductEvidence(input.result, input.productPath);
+  const productEvidence = buildProductEvidence(input.result, input.productPath, input.routeEvidence ?? []);
+  const nextAction = selectNextAction(surface.enoughContext, targetPaths);
 
   return projectRuntimeCodingOutcome({
     taskKind: input.taskKind,
@@ -42,13 +44,10 @@ export function projectPlanningRuntimeProductOutcome(input: {
       reason: verificationReason,
       selectionScope: "none",
       selectionSource: "not-requested",
-      nextAction:
-        surface.enoughContext === "yes" && targetPaths.length > 0
-          ? "Review the planning runtime output, then rerun with one explicit target and an exact approved edit."
-          : "Provide missing facts or one explicit in-workspace target before requesting mutation.",
+      nextAction,
     },
     repairNotes: [
-      input.blockedReason,
+      input.routeReason,
       "planning-runtime-product:review-only-no-write-handoff",
       "context-memory-scope:product-turn-only; session-continuation persistence not wired",
     ],
@@ -60,7 +59,7 @@ export function projectPlanningRuntimeProductOutcome(input: {
     ],
     userFacingOutput: formatPlanningRuntimeProductOutput({
       surface,
-      blockedReason: input.blockedReason,
+      routeReason: input.routeReason,
       evidence: productEvidence,
     }),
   });
@@ -69,6 +68,7 @@ export function projectPlanningRuntimeProductOutcome(input: {
 function buildProductEvidence(
   result: PlanningRuntimeResult,
   productPath: "runMvpIntegratedFlow",
+  routeEvidence: readonly string[],
 ): string[] {
   return [
     `planning-runtime-product:path:${productPath}`,
@@ -79,6 +79,7 @@ function buildProductEvidence(
     "provider-called=false",
     "apply=not-run",
     "command-dispatch=not-run",
+    ...routeEvidence,
     ...result.context.filesRead.map((file) => `inspect: read ${file.path}`),
     ...result.context.repo.candidates
       .slice(0, 5)
@@ -95,7 +96,7 @@ function buildProductEvidence(
 
 function formatPlanningRuntimeProductOutput(input: {
   readonly surface: ReturnType<typeof projectPlanningRuntimeSurface>;
-  readonly blockedReason: string;
+  readonly routeReason: string;
   readonly evidence: readonly string[];
 }): string {
   const surface = input.surface;
@@ -104,7 +105,7 @@ function formatPlanningRuntimeProductOutput(input: {
     `Runtime id: ${surface.runtimeId}`,
     `Status: ${surface.status}`,
     `Context engine: ${surface.contextStatus}`,
-    `Original blocker: ${input.blockedReason}`,
+    `Product route reason: ${input.routeReason}`,
     "",
     "Candidates:",
     ...formatCandidates(surface.candidates),
@@ -146,6 +147,19 @@ function formatPlanningRuntimeProductOutput(input: {
     "",
     `Evidence markers: ${selectEvidenceMarkers(input.evidence).join(" | ")}`,
   ].join("\n");
+}
+
+function selectNextAction(
+  enoughContext: "yes" | "missing-facts",
+  targetPaths: readonly string[],
+): string {
+  if (enoughContext === "yes" && targetPaths.length > 0) {
+    return "Review the planning runtime output, then rerun with one explicit target and an exact approved edit.";
+  }
+  if (enoughContext === "yes") {
+    return "Review the planning runtime analysis and plan; provide an explicit target only if mutation is intended.";
+  }
+  return "Provide missing facts or one explicit in-workspace target before requesting mutation.";
 }
 
 function formatCandidates(

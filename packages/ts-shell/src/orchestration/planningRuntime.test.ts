@@ -142,4 +142,34 @@ describe("runPlanningRuntime", () => {
     expect(result.mutationHandoff.mutationAuthority).toBe("not-granted");
     expect(result.evidence).toContain("planning-runtime:command-dispatch:not-run");
   });
+
+  it("preserves product task-kind hints without granting mutation authority", async () => {
+    const writeResult = await runPlanningRuntime({
+      workspaceRoot,
+      userTask: "Create a context engine ranking feature",
+      taskKindHint: "write-file",
+      maxRepoFiles: 80,
+      maxCandidates: 5,
+    });
+
+    expect(writeResult.context.workflowPlan.taskKind).toBe("write-file");
+    expect(writeResult.editTargets[0]?.path).toBe("src/contextEngine.ts");
+    expect(writeResult.mutationHandoff.readiness).toBe("review-ready");
+    expect(writeResult.mutationHandoff.mutationAuthority).toBe("not-granted");
+
+    const inspectResult = await runPlanningRuntime({
+      workspaceRoot,
+      userTask: "Analyze context engine ranking files and related tests",
+      taskKindHint: "inspect-files",
+      maxRepoFiles: 80,
+      maxCandidates: 5,
+    });
+
+    expect(inspectResult.context.workflowPlan.taskKind).toBe("inspect-files");
+    expect(inspectResult.status).toBe("ready-for-handoff");
+    expect(inspectResult.editTargets).toEqual([]);
+    expect(inspectResult.mutationHandoff.readiness).toBe("blocked");
+    expect(inspectResult.mutationHandoff.reason).toContain("Read-only planning path");
+    expect(inspectResult.mutationHandoff.mutationAuthority).toBe("not-granted");
+  });
 });

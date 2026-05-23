@@ -1,8 +1,14 @@
 import crypto from "node:crypto";
 
 import { buildVerificationCommandPlan, type VerificationCommandPlan } from "./verificationCommandPlan.js";
-import { runContextEngine, type ContextEngineResult } from "./contextEngine.js";
+import {
+  runContextEngine,
+  type ContextEngineResult,
+  type ContextEngineTaskKindHint,
+} from "./contextEngine.js";
 import type { ContextWorkingMemory } from "./contextMemory.js";
+
+export type PlanningRuntimeTaskKindHint = ContextEngineTaskKindHint;
 
 export interface PlanningRuntimeEditTarget {
   readonly path: string;
@@ -53,6 +59,7 @@ export async function runPlanningRuntime(input: {
   readonly previousMemory?: ContextWorkingMemory;
   readonly maxRepoFiles?: number;
   readonly maxCandidates?: number;
+  readonly taskKindHint?: PlanningRuntimeTaskKindHint;
 }): Promise<PlanningRuntimeResult> {
   const context = await runContextEngine({
     workspaceRoot: input.workspaceRoot,
@@ -60,6 +67,7 @@ export async function runPlanningRuntime(input: {
     previousMemory: input.previousMemory,
     maxRepoFiles: input.maxRepoFiles,
     maxCandidates: input.maxCandidates,
+    taskKindHint: input.taskKindHint,
   });
   const memoryMissingFacts = context.bundle ? [] : context.memory.missingFacts;
   const verificationIntent = context.bundle
@@ -87,8 +95,14 @@ export async function runPlanningRuntime(input: {
   const missingFacts = buildBlockingFacts({ context, memoryMissingFacts });
   const planningWarnings = buildPlanningWarnings({ context, verificationIntent, blockingFacts: missingFacts });
   const editTargets = selectEditTargets(context, missingFacts);
+  const reviewReadyMutationTarget =
+    editTargets.some((target) => target.readiness === "ready-for-review");
+  const readOnlyPlanningReady =
+    isReadOnlyPlanningTask(context.workflowPlan.taskKind) &&
+    context.status !== "insufficient-context" &&
+    missingFacts.length === 0;
   const status =
-    editTargets.some((target) => target.readiness === "ready-for-review") && missingFacts.length === 0
+    (reviewReadyMutationTarget || readOnlyPlanningReady) && missingFacts.length === 0
       ? "ready-for-handoff"
       : editTargets.length === 0 || editTargets.every((target) => target.readiness === "unsupported")
         ? "unsupported"
@@ -127,12 +141,14 @@ export async function runPlanningRuntime(input: {
     editTargets,
     verificationIntent,
     mutationHandoff: {
-      readiness: status === "ready-for-handoff" ? "review-ready" : "blocked",
+      readiness: reviewReadyMutationTarget && missingFacts.length === 0 ? "review-ready" : "blocked",
       targetPaths: editTargets.map((target) => target.path),
       route: "Route203-206-proof-carrying-backend",
       reason:
-        status === "ready-for-handoff"
+        reviewReadyMutationTarget && missingFacts.length === 0
           ? "Context, analysis, plan, target selection, and verification intent are ready for review-gated mutation handoff."
+          : readOnlyPlanningReady
+            ? "Read-only planning path produced context, analysis, and plan evidence; no mutation target was selected."
           : context.status === "reused-memory" && missingFacts.length === 0
             ? "Fresh continuation memory can be reviewed before mutation handoff."
             : "Planning runtime needs more grounded context before mutation handoff.",
@@ -152,6 +168,12 @@ export async function runPlanningRuntime(input: {
       "planning-runtime:command-dispatch:not-run",
     ],
   };
+}
+
+function isReadOnlyPlanningTask(taskKind: ContextEngineResult["workflowPlan"]["taskKind"]): boolean {
+  return taskKind === "read-file" ||
+    taskKind === "inspect-files" ||
+    taskKind === "repo-explain";
 }
 
 function selectEditTargets(

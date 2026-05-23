@@ -11,7 +11,13 @@ import {
   type RepoIntelligenceCandidate,
   type RepoIntelligenceResult,
 } from "./repoIntelligence.js";
+import type { CodingTaskKind } from "./types.js";
 import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
+
+export type ContextEngineTaskKindHint = Extract<
+  CodingTaskKind,
+  "edit-file" | "write-file" | "read-file" | "inspect-files" | "repo-explain"
+>;
 
 export interface ContextEngineResult {
   readonly engineId: string;
@@ -44,6 +50,7 @@ export async function runContextEngine(input: {
   readonly previousMemory?: ContextWorkingMemory;
   readonly maxRepoFiles?: number;
   readonly maxCandidates?: number;
+  readonly taskKindHint?: ContextEngineTaskKindHint;
   readonly cache?: { readonly enabled: boolean };
 }): Promise<ContextEngineResult> {
   const repo = await buildRepoIntelligence({
@@ -71,6 +78,7 @@ export async function runContextEngine(input: {
         userTask: input.userTask,
         targetPath: reuse.memory.selectedTargetPath,
         hasTarget: true,
+        taskKindHint: input.taskKindHint,
       }),
       memory: reuse.memory,
       filesRead: reuse.memory.fileReceipts.map((receipt) => ({
@@ -104,6 +112,7 @@ export async function runContextEngine(input: {
     const workflowPlan = buildWorkflowPlan({
       userTask: input.userTask,
       hasTarget: false,
+      taskKindHint: input.taskKindHint,
     });
     const memory = buildInsufficientMemory({
       userTask: input.userTask,
@@ -142,6 +151,7 @@ export async function runContextEngine(input: {
     userTask: input.userTask,
     targetPath: selectedCandidate.path,
     hasTarget: true,
+    taskKindHint: input.taskKindHint,
   });
   const bundle = await buildContextGraphPlanningBundle({
     workspaceRoot: input.workspaceRoot,
@@ -200,24 +210,32 @@ function buildWorkflowPlan(input: {
   readonly userTask: string;
   readonly targetPath?: string;
   readonly hasTarget: boolean;
+  readonly taskKindHint?: ContextEngineTaskKindHint;
 }): WorkflowTaskPlan {
   const lower = input.userTask.toLowerCase();
-  const taskKind =
-    /\b(edit|change|update|fix|implement|add|remove|rename)\b/.test(lower)
-      ? "edit-file"
-      : /\b(test|verify|run)\b/.test(lower)
-        ? "run-command"
-        : "repo-explain";
+  const taskKind = input.taskKindHint ?? inferTaskKind(lower);
   return {
     taskKind,
     reason: input.userTask,
     ...(input.targetPath ? { targetPath: input.targetPath } : {}),
     contextPlanningRequested: true,
     contextPlanningReason: input.hasTarget ? "explicit-context-packet" : "missing-edit-context",
-    inspectFirst: taskKind !== "run-command",
-    verifyAfterEdit: taskKind === "edit-file" || /\b(test|verify|regression)\b/.test(lower),
+    inspectFirst: taskKind !== "run-command" && taskKind !== "write-file",
+    verifyAfterEdit: taskKind === "edit-file" ||
+      taskKind === "write-file" ||
+      /\b(test|verify|regression)\b/.test(lower),
     ...(input.hasTarget ? {} : { targetMissing: true, blockedReason: "No likely in-workspace target found for vague task." }),
   };
+}
+
+function inferTaskKind(lowerTask: string): WorkflowTaskPlan["taskKind"] {
+  if (/\b(edit|change|update|fix|implement|add|remove|rename)\b/.test(lowerTask)) {
+    return "edit-file";
+  }
+  if (/\b(test|verify|run)\b/.test(lowerTask)) {
+    return "run-command";
+  }
+  return "repo-explain";
 }
 
 function buildInsufficientMemory(input: {
