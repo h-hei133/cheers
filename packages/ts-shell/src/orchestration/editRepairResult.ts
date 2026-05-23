@@ -5,6 +5,7 @@ import { createEmptyLifecycleIndex } from "../core/tools/toolResultLifecycle.js"
 import type {
   CodingPatchFailureCode,
   CodingResultSummary,
+  CodingVerificationSummary,
   OrchestrationResult,
 } from "./types.js";
 import type { EditProposalApplyResult } from "./editProposalApply.js";
@@ -12,6 +13,11 @@ import type { EditProposalReview } from "./editProposalReview.js";
 import type { EditProposalSelection } from "./editProposalSelection.js";
 import type { EditRepairContext } from "./editRepairContext.js";
 import type { EditRepairPlan } from "./editRepairPlanner.js";
+
+export interface RepairPostApplyVerification extends CodingVerificationSummary {
+  readonly runtimeDerived: true;
+  readonly evidence: readonly string[];
+}
 
 export type EditRepairResultState =
   | "repair-context-created"
@@ -33,11 +39,13 @@ export function buildEditRepairResult(input: {
   readonly review?: EditProposalReview;
   readonly selection?: EditProposalSelection;
   readonly applyResult?: EditProposalApplyResult;
+  readonly postApplyVerification?: RepairPostApplyVerification;
 }): OrchestrationResult {
   const codingResult = buildCodingResult(input);
+  const state = projectRepairResultState(input);
   return mapTerminalToOrchestrationResult(
     buildRuntimeState({ ...input, codingResult }),
-    buildTerminalInput(projectRepairResultState(input)),
+    buildTerminalInput({ state, verified: isRepairVerified(input) }),
   );
 }
 
@@ -47,9 +55,10 @@ function buildCodingResult(input: {
   readonly review?: EditProposalReview;
   readonly selection?: EditProposalSelection;
   readonly applyResult?: EditProposalApplyResult;
+  readonly postApplyVerification?: RepairPostApplyVerification;
 }): CodingResultSummary {
   const state = projectRepairResultState(input);
-  const success = state === "repair-applied";
+  const success = isRepairVerified(input);
   const partial = state === "repair-apply-partial-failure";
   const changedFiles = [...(input.applyResult?.changedFiles ?? [])];
   const reason = reasonFor(input);
@@ -61,12 +70,22 @@ function buildCodingResult(input: {
     ...(input.review?.evidence ?? []),
     ...(input.selection?.evidence ?? []),
     ...(input.applyResult?.evidence ?? []),
+    ...(input.postApplyVerification
+      ? [
+          ...input.postApplyVerification.evidence,
+          `edit-repair-result:post-apply-verification:${input.postApplyVerification.status}`,
+          "edit-repair-result:post-apply-verification:runtime-derived",
+        ]
+      : []),
     `edit-repair-result:state:${state}`,
     success
-      ? "edit-repair-result:repair-applied-through-hunk-set"
+      ? "edit-repair-result:repair-verified-through-hunk-set"
       : partial
         ? "edit-repair-result:repair-apply-partial-failure"
+        : state === "repair-applied"
+          ? "edit-repair-result:repair-apply-without-reverification"
         : "edit-repair-result:no-automatic-repair",
+    ...(success ? ["edit-repair-result:repair-applied-through-hunk-set"] : []),
     "edit-repair-result:provider-call-during-apply:not-run",
     "edit-repair-result:mutation-authority:not-granted-until-existing-route",
     "edit-repair-result:raw-content-excluded",
@@ -136,7 +155,7 @@ function buildCodingResult(input: {
         "workspace authority",
         "final stale-read",
         "snapshot/recovery",
-        "post-write verification",
+        "independent post-repair verification",
       ],
       observedEvidence: evidence,
     },
@@ -145,7 +164,7 @@ function buildCodingResult(input: {
     verification: success
       ? {
           status: "passed",
-          reason: "Confirmed repair proposal applied through the existing hunk-set route and verified.",
+          reason: input.postApplyVerification?.reason ?? "Confirmed repair proposal applied through the existing hunk-set route and verified.",
           selectionScope: "focused",
           selectionSource: "auto-from-changes",
         }
@@ -166,10 +185,13 @@ function buildCodingResult(input: {
       verification: success
         ? {
             status: "passed",
-            reason: "Confirmed repair proposal applied and verified.",
+            reason: input.postApplyVerification?.reason ?? "Confirmed repair proposal applied and verified.",
           }
         : {
-            status: input.context.failedVerificationSummary.status === "failed" ? "failed" : "blocked",
+            status:
+              state === "repair-applied"
+                ? input.postApplyVerification?.status ?? "blocked"
+                : input.context.failedVerificationSummary.status === "failed" ? "failed" : "blocked",
             reason,
             blockerKind: "unknown",
           },
@@ -187,6 +209,7 @@ function buildRuntimeState(input: {
   readonly review?: EditProposalReview;
   readonly selection?: EditProposalSelection;
   readonly applyResult?: EditProposalApplyResult;
+  readonly postApplyVerification?: RepairPostApplyVerification;
   readonly codingResult: CodingResultSummary;
 }): QueryRuntimeState {
   return {
@@ -219,8 +242,11 @@ function buildRuntimeState(input: {
   };
 }
 
-function buildTerminalInput(state: EditRepairResultState): QueryTerminal {
-  if (state === "repair-applied") {
+function buildTerminalInput(input: {
+  readonly state: EditRepairResultState;
+  readonly verified: boolean;
+}): QueryTerminal {
+  if (input.verified) {
     return {
       action: "terminal",
       terminalReason: "completed",
@@ -232,7 +258,9 @@ function buildTerminalInput(state: EditRepairResultState): QueryTerminal {
     terminalReason: "stopped_error",
     terminalClassification: "stopped",
     stopReason:
-      state === "repair-ready-for-hunk-set-handoff"
+      input.state === "repair-applied"
+        ? "Run and pass post-repair verification before claiming repair success."
+        : input.state === "repair-ready-for-hunk-set-handoff"
         ? "Confirm handoff to the existing hunk-set apply route before mutation."
         : "Review the repair proposal and explicitly confirm exact hunks before apply.",
   };
@@ -244,6 +272,7 @@ function buildOutput(input: {
   readonly review?: EditProposalReview;
   readonly selection?: EditProposalSelection;
   readonly applyResult?: EditProposalApplyResult;
+  readonly postApplyVerification?: RepairPostApplyVerification;
 }): string {
   return [
     "verification repair proposal evaluated.",
@@ -254,6 +283,7 @@ function buildOutput(input: {
     `Review: ${input.review?.reviewStatus ?? "not-run"}`,
     `Selection: ${input.selection?.state ?? "none"}`,
     `Apply: ${input.applyResult?.status ?? "not-run"}`,
+    `Post-repair verification: ${input.postApplyVerification?.status ?? "not-run"}`,
     `Changed: ${input.applyResult?.changedFiles.join(", ") || "none"}`,
     "Raw content: excluded",
   ].join("\n");
@@ -308,17 +338,24 @@ function reasonFor(input: {
   readonly context: EditRepairContext;
   readonly plan?: EditRepairPlan;
   readonly applyResult?: EditProposalApplyResult;
+  readonly postApplyVerification?: RepairPostApplyVerification;
 }): string {
   if (input.applyResult) {
-    if ("reason" in input.applyResult) {
-      return input.applyResult.reason;
-    }
     if (
       input.applyResult.status === "hunk-set-applied" ||
       input.applyResult.status === "single-target-applied" ||
       input.applyResult.status === "target-set-applied"
     ) {
-      return "Confirmed repair proposal applied through an existing exact edit lane.";
+      if (input.postApplyVerification?.status === "passed") {
+        return "Confirmed repair proposal applied through an existing exact edit lane and re-verified.";
+      }
+      if (input.postApplyVerification?.status === "failed") {
+        return input.postApplyVerification.reason ?? "Repair apply succeeded, but post-repair verification failed.";
+      }
+      return "Repair apply succeeded, but post-repair verification has not run.";
+    }
+    if ("reason" in input.applyResult) {
+      return input.applyResult.reason;
     }
     return "Repair apply stopped in the existing exact edit lane.";
   }
@@ -326,6 +363,23 @@ function reasonFor(input: {
     input.plan?.reason ??
     input.context.failedVerificationSummary.reason ??
     "Verification failed; repair proposal review is required before any mutation."
+  );
+}
+
+function isRepairVerified(input: {
+  readonly applyResult?: EditProposalApplyResult;
+  readonly postApplyVerification?: RepairPostApplyVerification;
+}): boolean {
+  if (!input.applyResult) return false;
+  return (
+    (
+      input.applyResult.status === "hunk-set-applied" ||
+      input.applyResult.status === "single-target-applied" ||
+      input.applyResult.status === "target-set-applied"
+    ) &&
+    input.postApplyVerification?.status === "passed" &&
+    input.postApplyVerification.runtimeDerived === true &&
+    input.postApplyVerification.evidence.length > 0
   );
 }
 

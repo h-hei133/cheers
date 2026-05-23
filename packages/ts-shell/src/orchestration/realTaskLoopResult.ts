@@ -8,6 +8,7 @@ import {
   type ClaimLedgerEvidenceSource,
   type ClaimLedgerProjection,
 } from "./claimLedgerProjection.js";
+import type { RealTaskLoopRepairProof } from "./realTaskLoopRepairChain.js";
 
 interface SnapshotInspectableRoute {
   readonly snapshotReceipt?: { readonly status?: string };
@@ -31,8 +32,13 @@ export type RealTaskLoopResultStatus =
   | "apply-succeeded"
   | "apply-stopped"
   | "verification-succeeded"
+  | "verification-succeeded-with-repair"
   | "verification-failed"
   | "repair-eligible"
+  | "repair-proposed"
+  | "repair-confirmation-required"
+  | "repair-applied"
+  | "task-loop-complete-with-repair"
   | "task-loop-complete"
   | "task-loop-stopped";
 
@@ -49,6 +55,7 @@ export interface RealTaskLoopResult {
   readonly snapshotStatus: "not-run" | "created" | "blocked";
   readonly recoveryStatus: "not-run" | "available" | "blocked";
   readonly repairEligibility: "not-needed" | "eligible";
+  readonly repairProof?: RealTaskLoopRepairProof;
   readonly scorecardStatus: "pass" | "warn" | "fail" | "skip";
   readonly claimLedger: ClaimLedgerProjection;
   readonly changedFiles: readonly string[];
@@ -70,6 +77,7 @@ export function buildRealTaskLoopResult(input: {
   readonly confirmApply: boolean;
   readonly evidenceSource?: ClaimLedgerEvidenceSource;
   readonly providerCallDuringApply?: boolean;
+  readonly repairProof?: RealTaskLoopRepairProof;
 }): RealTaskLoopResult {
   const providerCalled = input.runtime?.dryRun?.providerCalled ?? false;
   const outputValidationStatus = input.runtime?.dryRun?.outputValidation?.status ?? "none";
@@ -105,6 +113,24 @@ export function buildRealTaskLoopResult(input: {
     mutationScope,
     providerCallDuringApply,
     scorecardStatus,
+    ...(input.repairProof
+      ? {
+          repair: {
+            originalFailurePreserved: input.repairProof.originalFailurePreserved,
+            originalFailureRuntimeDerived: input.repairProof.originalFailureRuntimeDerived,
+            proposalStatus: input.repairProof.proposalStatus,
+            anchorStatus: input.repairProof.anchorStatus,
+            confirmationStatus: input.repairProof.confirmationStatus,
+            applyStatus: input.repairProof.applyStatus,
+            verificationStatus: input.repairProof.verificationStatus,
+            verificationRuntimeDerived: input.repairProof.verificationRuntimeDerived,
+            verificationEvidenceCount: input.repairProof.verificationEvidenceCount,
+            mutationScope: input.repairProof.mutationScope,
+            providerCallDuringApply: input.repairProof.providerCallDuringApply,
+            evidenceSource: input.repairProof.evidenceSource,
+          },
+        }
+      : {}),
   });
   const status = claimLedger.terminal.resultStatus;
   const replaySafeSummary = [
@@ -142,6 +168,17 @@ export function buildRealTaskLoopResult(input: {
     `real-task-loop-session:verification:${verificationStatus}`,
     `real-task-loop-session:snapshot:${snapshotStatus}`,
     `real-task-loop-session:recovery:${recoveryStatus}`,
+    ...(input.repairProof
+      ? [
+          "real-task-loop-session:original-verification:failed",
+          `real-task-loop-session:repair-status:${input.repairProof.status}`,
+          `real-task-loop-session:repair-source:${input.repairProof.evidenceSource}`,
+          `real-task-loop-session:repair-proposal:${input.repairProof.proposalStatus}`,
+          `real-task-loop-session:repair-confirmation:${input.repairProof.confirmationStatus}`,
+          `real-task-loop-session:repair-apply:${input.repairProof.applyStatus}`,
+          `real-task-loop-session:repair-verification:${input.repairProof.verificationStatus}`,
+        ]
+      : []),
     `real-task-loop-session:mutation-scope:${mutationScope}`,
     `real-task-loop-session:provider-call-during-apply:${providerCallDuringApply}`,
     `real-task-loop-session:repair:${repairEligibility}`,
@@ -169,6 +206,11 @@ export function buildRealTaskLoopResult(input: {
     `Claim terminal: ${claimLedger.terminal.status}`,
     `Claim live success: ${claimLedger.terminal.liveSuccess ? "yes" : "no"}`,
     `Claim not proven: ${claimLedger.notProvenClaims.length === 0 ? "none" : claimLedger.notProvenClaims.map((claim) => claim.group).join(",")}`,
+    input.repairProof ? `Repair proposal: ${input.repairProof.proposalStatus}` : undefined,
+    input.repairProof ? `Repair source: ${input.repairProof.evidenceSource}` : undefined,
+    input.repairProof ? `Repair confirmation: ${input.repairProof.confirmationStatus}` : undefined,
+    input.repairProof ? `Repair apply: ${input.repairProof.applyStatus}` : undefined,
+    input.repairProof ? `Repair verification: ${input.repairProof.verificationStatus}` : undefined,
     `Status: ${status}`,
     input.readback ? `Readback: ${input.readback.summary}` : undefined,
     "No broad mutation: yes",
@@ -187,6 +229,7 @@ export function buildRealTaskLoopResult(input: {
     snapshotStatus,
     recoveryStatus,
     repairEligibility,
+    ...(input.repairProof ? { repairProof: input.repairProof } : {}),
     scorecardStatus,
     claimLedger,
     changedFiles,
@@ -200,6 +243,7 @@ export function buildRealTaskLoopResult(input: {
       ...(input.runtime?.evidence ?? []),
       ...(input.applyResult?.evidence ?? []),
       ...(input.readback?.evidence ?? []),
+      ...(input.repairProof?.evidence ?? []),
       ...sessionEvidence,
       input.scorecard.replaySafeSummary,
       ...input.scorecard.evidence,
@@ -216,6 +260,21 @@ export function buildRealTaskLoopResult(input: {
       `real-task-loop-result:verification:${verificationStatus}`,
       `real-task-loop-result:snapshot:${snapshotStatus}`,
       `real-task-loop-result:recovery:${recoveryStatus}`,
+      ...(input.repairProof
+        ? [
+            "real-task-loop-result:original-verification:failed",
+            `real-task-loop-result:repair-status:${input.repairProof.status}`,
+            `real-task-loop-result:repair-source:${input.repairProof.evidenceSource}`,
+            `real-task-loop-result:repair-proposal:${input.repairProof.proposalStatus}`,
+            `real-task-loop-result:repair-anchor:${input.repairProof.anchorStatus}`,
+            `real-task-loop-result:repair-confirmation:${input.repairProof.confirmationStatus}`,
+            `real-task-loop-result:repair-apply:${input.repairProof.applyStatus}`,
+            `real-task-loop-result:repair-verification:${input.repairProof.verificationStatus}`,
+            `real-task-loop-result:repair-verification-runtime-derived:${input.repairProof.verificationRuntimeDerived}`,
+            `real-task-loop-result:repair-mutation-scope:${input.repairProof.mutationScope}`,
+            `real-task-loop-result:repair-provider-call-during-apply:${input.repairProof.providerCallDuringApply}`,
+          ]
+        : []),
       `real-task-loop-result:mutation-scope:${mutationScope}`,
       `real-task-loop-result:provider-call-during-apply:${providerCallDuringApply}`,
       "real-task-loop-result:no-direct-provider-mutation",
@@ -294,14 +353,19 @@ function classifyRealTaskLoopScorecardStatus(
     scorecard.outputValidation === "fail" ||
     scorecard.anchorQuality === "fail" ||
     scorecard.snapshotRecovery === "fail" ||
-    scorecard.providerCallDuringApply === "fail"
+    scorecard.providerCallDuringApply === "fail" ||
+    scorecard.repairProposal === "fail" ||
+    scorecard.repairApply === "fail" ||
+    scorecard.repairVerification === "fail"
   ) {
     return "fail";
   }
   if (
     scorecard.applyResult === "warn" ||
     scorecard.confirmation === "warn" ||
-    scorecard.anchorQuality === "warn"
+    scorecard.anchorQuality === "warn" ||
+    scorecard.verification === "warn" ||
+    scorecard.repairEligibility === "warn"
   ) {
     return "warn";
   }

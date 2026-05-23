@@ -15,7 +15,8 @@ export type ClaimLedgerClaimGroup =
   | "authority"
   | "mutation"
   | "verification"
-  | "recovery";
+  | "recovery"
+  | "repair";
 
 export type ClaimLedgerClaimStatus =
   | "proven"
@@ -28,10 +29,15 @@ export type ClaimLedgerClaimStatus =
 
 export type ClaimLedgerTerminalStatus =
   | "verified-success"
+  | "verified-success-with-repair"
   | "verification-succeeded-not-live"
+  | "verification-succeeded-with-repair-not-live"
   | "confirmation-required"
   | "review-required"
   | "repair-eligible"
+  | "repair-proposed"
+  | "repair-confirmation-required"
+  | "repair-applied"
   | "apply-succeeded"
   | "apply-stopped"
   | "provider-unavailable"
@@ -48,14 +54,60 @@ export type ClaimLedgerResultStatus =
   | "apply-succeeded"
   | "apply-stopped"
   | "verification-succeeded"
+  | "verification-succeeded-with-repair"
   | "verification-failed"
   | "repair-eligible"
+  | "repair-proposed"
+  | "repair-confirmation-required"
+  | "repair-applied"
+  | "task-loop-complete-with-repair"
   | "task-loop-complete"
   | "task-loop-stopped";
+
+export type ClaimLedgerRepairStatus =
+  | "not-required"
+  | "repair-available"
+  | "repair-not-run"
+  | "repair-proposed"
+  | "repair-confirmation-required"
+  | "repair-applied"
+  | "repair-verification-succeeded"
+  | "repair-invalid"
+  | "repair-failed";
+
+export interface ClaimLedgerRepairInput {
+  readonly originalFailurePreserved: boolean;
+  readonly originalFailureRuntimeDerived: boolean;
+  readonly proposalStatus: "not-run" | "created" | "invalid";
+  readonly anchorStatus: "not-run" | "exact-ready" | "unsupported";
+  readonly confirmationStatus:
+    | "not-requested"
+    | "required"
+    | "trusted-confirmed"
+    | "invalid";
+  readonly applyStatus: "not-run" | "succeeded" | "stopped" | "failed";
+  readonly verificationStatus: "not-run" | "succeeded" | "failed";
+  readonly verificationRuntimeDerived: boolean;
+  readonly verificationEvidenceCount: number;
+  readonly mutationScope: "none" | "controlled-temp-workspace";
+  readonly providerCallDuringApply: boolean;
+  readonly evidenceSource?: ClaimLedgerEvidenceSource;
+}
 
 export interface ClaimLedgerClaim {
   readonly group: ClaimLedgerClaimGroup;
   readonly status: ClaimLedgerClaimStatus;
+  readonly evidenceType: string;
+  readonly source: string;
+  readonly scope: string;
+  readonly reason: string;
+  readonly blocker?: string;
+  readonly receiptFields: Readonly<Record<string, string | boolean | number>>;
+}
+
+export interface ClaimLedgerRepairClaim {
+  readonly group: "repair";
+  readonly status: ClaimLedgerRepairStatus;
   readonly evidenceType: string;
   readonly source: string;
   readonly scope: string;
@@ -93,6 +145,7 @@ export interface ClaimLedgerProjection {
   readonly mutation: ClaimLedgerClaim;
   readonly verification: ClaimLedgerClaim;
   readonly recovery: ClaimLedgerClaim;
+  readonly repair: ClaimLedgerRepairClaim;
   readonly terminal: ClaimLedgerTerminalClaim;
   readonly notProvenClaims: readonly ClaimLedgerNotProvenClaim[];
   readonly replaySafeSummary: string;
@@ -118,6 +171,7 @@ export function buildClaimLedgerProjection(input: {
   readonly mutationScope: "none" | "controlled-temp-workspace";
   readonly providerCallDuringApply: boolean;
   readonly scorecardStatus?: string;
+  readonly repair?: ClaimLedgerRepairInput;
 }): ClaimLedgerProjection {
   const provider = projectProviderClaim(input);
   const proposal = projectProposalClaim(input);
@@ -126,6 +180,7 @@ export function buildClaimLedgerProjection(input: {
   const mutation = projectMutationClaim(input);
   const verification = projectVerificationClaim(input);
   const recovery = projectRecoveryClaim(input);
+  const repair = projectRepairClaim(input);
   const notProvenClaims = collectNotProvenClaims(input, {
     provider,
     proposal,
@@ -134,6 +189,7 @@ export function buildClaimLedgerProjection(input: {
     mutation,
     verification,
     recovery,
+    repair,
   });
   const terminal = projectTerminalClaim(input, {
     provider,
@@ -143,6 +199,7 @@ export function buildClaimLedgerProjection(input: {
     mutation,
     verification,
     recovery,
+    repair,
     notProvenClaims,
   });
   const ledgerId = buildLedgerId({
@@ -155,6 +212,7 @@ export function buildClaimLedgerProjection(input: {
     mutation: mutation.status,
     verification: verification.status,
     recovery: recovery.status,
+    repair: repair.status,
     terminal: terminal.status,
     resultStatus: terminal.resultStatus,
   });
@@ -176,6 +234,7 @@ export function buildClaimLedgerProjection(input: {
     `mutation=${mutation.status}`,
     `verification=${verification.status}`,
     `recovery=${recovery.status}`,
+    `repair=${repair.status}`,
     "raw-content-excluded",
   ].join("; ");
   return {
@@ -189,6 +248,7 @@ export function buildClaimLedgerProjection(input: {
     mutation,
     verification,
     recovery,
+    repair,
     terminal,
     notProvenClaims,
     replaySafeSummary,
@@ -204,6 +264,7 @@ export function buildClaimLedgerProjection(input: {
       `claim-ledger:mutation:${mutation.status}`,
       `claim-ledger:verification:${verification.status}`,
       `claim-ledger:recovery:${recovery.status}`,
+      `claim-ledger:repair:${repair.status}`,
       `claim-ledger:terminal:${terminal.status}`,
       `claim-ledger:terminal-result:${terminal.resultStatus}`,
       `claim-ledger:live-success:${terminal.liveSuccess}`,
@@ -565,17 +626,246 @@ function projectRecoveryClaim(input: {
   });
 }
 
+function projectRepairClaim(input: {
+  readonly evidenceSource: ClaimLedgerEvidenceSource;
+  readonly verificationStatus: "not-run" | "succeeded" | "failed";
+  readonly repair?: ClaimLedgerRepairInput;
+}): ClaimLedgerRepairClaim {
+  const repair = input.repair;
+  if (!repair) {
+    if (input.verificationStatus === "failed") {
+      return repairClaim({
+        status: "repair-available",
+        source: input.evidenceSource,
+        scope: "verification-failure",
+        reason: "Original verification failed; repair is available but no repair proposal has been applied.",
+        blocker: "repair-not-run",
+        receiptFields: baseRepairReceiptFields(),
+      });
+    }
+    return repairClaim({
+      status: "not-required",
+      source: input.evidenceSource,
+      scope: "verification",
+      reason: "Repair is not required because original verification did not fail.",
+      receiptFields: baseRepairReceiptFields(),
+    });
+  }
+
+  const source = repair.evidenceSource ?? input.evidenceSource;
+  const receiptFields = {
+    originalFailurePreserved: repair.originalFailurePreserved,
+    originalFailureRuntimeDerived: repair.originalFailureRuntimeDerived,
+    proposal: repair.proposalStatus,
+    anchor: repair.anchorStatus,
+    confirmation: repair.confirmationStatus,
+    apply: repair.applyStatus,
+    verification: repair.verificationStatus,
+    verificationRuntimeDerived: repair.verificationRuntimeDerived,
+    verificationEvidenceCount: repair.verificationEvidenceCount,
+    mutationScope: repair.mutationScope,
+    providerCallDuringApply: repair.providerCallDuringApply,
+  };
+  if (input.verificationStatus !== "failed") {
+    return repairClaim({
+      status: "repair-invalid",
+      source,
+      scope: "verification-failure",
+      reason: "Repair proof cannot run without preserved original verification failure evidence.",
+      blocker: "repair-without-original-failure",
+      receiptFields,
+    });
+  }
+  if (!repair.originalFailurePreserved) {
+    return repairClaim({
+      status: "repair-invalid",
+      source,
+      scope: "original-failure",
+      reason: "Repair proof did not preserve the original verification failure.",
+      blocker: "original-failure-not-preserved",
+      receiptFields,
+    });
+  }
+  if (!repair.originalFailureRuntimeDerived) {
+    return repairClaim({
+      status: "repair-invalid",
+      source,
+      scope: "original-failure",
+      reason: "Original verification failure was not backed by runtime readback evidence.",
+      blocker: "original-failure-not-runtime-derived",
+      receiptFields,
+    });
+  }
+  if (repair.providerCallDuringApply) {
+    return repairClaim({
+      status: "repair-invalid",
+      source,
+      scope: "repair-apply",
+      reason: "Repair apply called the provider during mutation.",
+      blocker: "repair-provider-call-during-apply",
+      receiptFields,
+    });
+  }
+  if (repair.proposalStatus === "invalid" || repair.anchorStatus === "unsupported") {
+    return repairClaim({
+      status: "repair-invalid",
+      source,
+      scope: "repair-proposal",
+      reason: "Repair proposal did not prove an exact-ready bounded hunk.",
+      blocker: repair.proposalStatus === "invalid" ? "repair-proposal-invalid" : "repair-anchor-not-exact-ready",
+      receiptFields,
+    });
+  }
+  if (repair.proposalStatus !== "created") {
+    return repairClaim({
+      status: "repair-not-run",
+      source,
+      scope: "repair-proposal",
+      reason: "No repair proposal was created.",
+      blocker: "repair-proposal-not-run",
+      receiptFields,
+    });
+  }
+  if (repair.anchorStatus !== "exact-ready") {
+    if (repair.confirmationStatus === "trusted-confirmed" || repair.confirmationStatus === "invalid") {
+      return repairClaim({
+        status: "repair-invalid",
+        source,
+        scope: "repair-confirmation",
+        reason: "Repair confirmation cannot authorize mutation without exact-ready repair anchors.",
+        blocker: "repair-confirmation-without-exact-anchor",
+        receiptFields,
+      });
+    }
+    return repairClaim({
+      status: "repair-proposed",
+      source,
+      scope: "repair-proposal",
+      reason: "Repair proposal exists but is not exact-ready.",
+      blocker: "repair-anchor-not-exact-ready",
+      receiptFields,
+    });
+  }
+  if (repair.confirmationStatus !== "trusted-confirmed") {
+    return repairClaim({
+      status:
+        repair.confirmationStatus === "invalid"
+          ? "repair-invalid"
+          : "repair-confirmation-required",
+      source,
+      scope: "repair-confirmation",
+      reason:
+        repair.confirmationStatus === "invalid"
+          ? "Repair confirmation was requested without an exact-ready repair proof."
+          : "Exact-ready repair proposal requires separate trusted confirmation before apply.",
+      blocker:
+        repair.confirmationStatus === "invalid"
+          ? "repair-confirmation-invalid"
+          : "repair-confirmation-required",
+      receiptFields,
+    });
+  }
+  if (repair.applyStatus !== "succeeded") {
+    return repairClaim({
+      status: repair.applyStatus === "not-run" ? "repair-proposed" : "repair-failed",
+      source,
+      scope: "repair-apply",
+      reason:
+        repair.applyStatus === "not-run"
+          ? "Repair was confirmed but did not run through the existing exact apply lane."
+          : "Repair apply did not succeed through the existing exact apply lane.",
+      blocker: repair.applyStatus === "not-run" ? "repair-apply-not-run" : "repair-apply-failed",
+      receiptFields,
+    });
+  }
+  if (repair.mutationScope !== "controlled-temp-workspace") {
+    return repairClaim({
+      status: "repair-invalid",
+      source,
+      scope: "repair-mutation-scope",
+      reason: "Repair apply did not remain in the controlled temp workspace.",
+      blocker: "repair-mutation-scope-invalid",
+      receiptFields,
+    });
+  }
+  if (repair.verificationStatus !== "succeeded") {
+    return repairClaim({
+      status:
+        repair.verificationStatus === "failed"
+          ? "repair-failed"
+          : "repair-applied",
+      source,
+      scope: "repair-readback",
+      reason:
+        repair.verificationStatus === "failed"
+          ? "Repair readback verification failed."
+          : "Repair apply succeeded, but repair readback verification did not run.",
+      blocker:
+        repair.verificationStatus === "failed"
+          ? "repair-verification-failed"
+          : "repair-verification-not-run",
+      receiptFields,
+    });
+  }
+  if (!repair.verificationRuntimeDerived || repair.verificationEvidenceCount < 1) {
+    return repairClaim({
+      status: "repair-applied",
+      source,
+      scope: "repair-readback",
+      reason: "Repair apply succeeded, but repair readback verification evidence was not runtime-derived.",
+      blocker: "repair-verification-not-runtime-derived",
+      receiptFields,
+    });
+  }
+  return repairClaim({
+    status: "repair-verification-succeeded",
+    source,
+    scope: "repair-readback",
+    reason: "Repair proposal was confirmed, applied through an existing exact lane, and re-verified.",
+    receiptFields,
+  });
+}
+
+function baseRepairReceiptFields(): Readonly<Record<string, string | boolean | number>> {
+  return {
+    proposal: "not-run",
+    anchor: "not-run",
+    confirmation: "not-requested",
+    apply: "not-run",
+    verification: "not-run",
+    mutationScope: "none",
+    providerCallDuringApply: false,
+  };
+}
+
 function collectNotProvenClaims(
   input: {
     readonly evidenceSource: ClaimLedgerEvidenceSource;
     readonly providerKind: string;
     readonly liveOptIn: boolean;
     readonly verificationStatus: "not-run" | "succeeded" | "failed";
+    readonly repair?: ClaimLedgerRepairInput;
   },
-  claims: Record<ClaimLedgerClaimGroup, ClaimLedgerClaim>,
+  claims: Record<Exclude<ClaimLedgerClaimGroup, "repair">, ClaimLedgerClaim> & {
+    readonly repair: ClaimLedgerRepairClaim;
+  },
 ): readonly ClaimLedgerNotProvenClaim[] {
   const notProven: ClaimLedgerNotProvenClaim[] = [];
-  for (const claimItem of Object.values(claims)) {
+  const repairSucceeded =
+    input.verificationStatus === "failed" &&
+    claims.repair.status === "repair-verification-succeeded";
+  for (const claimItem of [
+    claims.provider,
+    claims.proposal,
+    claims.anchor,
+    claims.authority,
+    claims.mutation,
+    claims.verification,
+    claims.recovery,
+  ]) {
+    if (claimItem.group === "verification" && repairSucceeded) {
+      continue;
+    }
     if (
       claimItem.status === "not-proven" ||
       claimItem.status === "not-run" ||
@@ -590,8 +880,26 @@ function collectNotProvenClaims(
       });
     }
   }
+  if (isBlockingRepairStatus(claims.repair.status)) {
+    notProven.push({
+      group: "repair",
+      reason: claims.repair.reason,
+      blocker: claims.repair.blocker ?? claims.repair.status,
+    });
+  }
   if (
-    input.verificationStatus === "succeeded" &&
+    repairSucceeded &&
+    input.repair?.evidenceSource &&
+    input.repair.evidenceSource !== "live-provider"
+  ) {
+    notProven.push({
+      group: "repair",
+      reason: "Repair evidence source does not prove a live repair success claim.",
+      blocker: "not-live-repair-evidence",
+    });
+  }
+  if (
+    (input.verificationStatus === "succeeded" || repairSucceeded) &&
     !canProveLiveProvider(input)
   ) {
     notProven.push({
@@ -611,8 +919,10 @@ function projectTerminalClaim(
     readonly applyStatus: "not-run" | "succeeded" | "stopped" | "failed";
     readonly verificationStatus: "not-run" | "succeeded" | "failed";
     readonly scorecardStatus?: string;
+    readonly repair?: ClaimLedgerRepairInput;
   },
-  claims: Record<ClaimLedgerClaimGroup, ClaimLedgerClaim> & {
+  claims: Record<Exclude<ClaimLedgerClaimGroup, "repair">, ClaimLedgerClaim> & {
+    readonly repair: ClaimLedgerRepairClaim;
     readonly notProvenClaims: readonly ClaimLedgerNotProvenClaim[];
   },
 ): ClaimLedgerTerminalClaim {
@@ -640,7 +950,93 @@ function projectTerminalClaim(
       receiptFields: terminalReceiptFields(input, claims),
     });
   }
+  const repairCoreClaims: readonly ClaimLedgerClaim[] = [
+    claims.provider,
+    claims.proposal,
+    claims.anchor,
+    claims.authority,
+    claims.mutation,
+    claims.recovery,
+  ];
+  const repairCoreClaimsProven = repairCoreClaims.every((claimItem) => claimItem.status === "proven");
+  const repairedVerificationSucceeded =
+    input.verificationStatus === "failed" &&
+    claims.repair.status === "repair-verification-succeeded" &&
+    repairCoreClaimsProven;
+  if (
+    repairedVerificationSucceeded &&
+    canProveLiveProvider(input) &&
+    (input.repair?.evidenceSource ?? input.evidenceSource) === "live-provider" &&
+    claims.notProvenClaims.length === 0
+  ) {
+    return terminalClaim({
+      input,
+      status: "verified-success-with-repair",
+      resultStatus: "task-loop-complete-with-repair",
+      liveSuccess: true,
+      reason: "Original verification failure was preserved; repair was confirmed, applied through an existing exact lane, and re-verified with live provider evidence.",
+      receiptFields: terminalReceiptFields(input, claims),
+    });
+  }
+  if (
+    repairedVerificationSucceeded &&
+    onlyNotLiveRepairBlockers(claims.notProvenClaims)
+  ) {
+    return terminalClaim({
+      input,
+      status: "verification-succeeded-with-repair-not-live",
+      resultStatus: "verification-succeeded-with-repair",
+      liveSuccess: false,
+      reason: "Repair readback succeeded, but provider or repair provenance is not live-provider evidence.",
+      blocker: firstBlocker(claims.notProvenClaims),
+      receiptFields: terminalReceiptFields(input, claims),
+    });
+  }
   if (claims.verification.status === "failed") {
+    if (claims.repair.status === "repair-confirmation-required") {
+      return terminalClaim({
+        input,
+        status: "repair-confirmation-required",
+        resultStatus: "repair-confirmation-required",
+        liveSuccess: false,
+        reason: "Verification failed and exact-ready repair proposal requires separate trusted confirmation.",
+        blocker: firstBlocker(claims.notProvenClaims),
+        receiptFields: terminalReceiptFields(input, claims),
+      });
+    }
+    if (claims.repair.status === "repair-proposed") {
+      return terminalClaim({
+        input,
+        status: "repair-proposed",
+        resultStatus: "repair-proposed",
+        liveSuccess: false,
+        reason: "Verification failed and a repair proposal exists, but it has not proven the full repair chain.",
+        blocker: firstBlocker(claims.notProvenClaims),
+        receiptFields: terminalReceiptFields(input, claims),
+      });
+    }
+    if (claims.repair.status === "repair-applied") {
+      return terminalClaim({
+        input,
+        status: "repair-applied",
+        resultStatus: "repair-applied",
+        liveSuccess: false,
+        reason: "Repair apply succeeded, but re-verification has not succeeded.",
+        blocker: firstBlocker(claims.notProvenClaims),
+        receiptFields: terminalReceiptFields(input, claims),
+      });
+    }
+    if (claims.repair.status === "repair-invalid" || claims.repair.status === "repair-failed") {
+      return terminalClaim({
+        input,
+        status: "review-required",
+        resultStatus: "review-required",
+        liveSuccess: false,
+        reason: "Repair proof chain is invalid or failed.",
+        blocker: firstBlocker(claims.notProvenClaims),
+        receiptFields: terminalReceiptFields(input, claims),
+      });
+    }
     return terminalClaim({
       input,
       status: "repair-eligible",
@@ -798,12 +1194,33 @@ function claim(input: {
   };
 }
 
+function repairClaim(input: {
+  readonly status: ClaimLedgerRepairStatus;
+  readonly source: ClaimLedgerEvidenceSource;
+  readonly scope: string;
+  readonly reason: string;
+  readonly blocker?: string;
+  readonly receiptFields: Readonly<Record<string, string | boolean | number>>;
+}): ClaimLedgerRepairClaim {
+  return {
+    group: "repair",
+    status: input.status,
+    evidenceType: "runtime-derived",
+    source: input.source,
+    scope: input.scope,
+    reason: input.reason,
+    ...(input.blocker ? { blocker: input.blocker } : {}),
+    receiptFields: input.receiptFields,
+  };
+}
+
 function terminalReceiptFields(
   input: {
     readonly evidenceSource: ClaimLedgerEvidenceSource;
     readonly scorecardStatus?: string;
   },
-  claims: Record<ClaimLedgerClaimGroup, ClaimLedgerClaim> & {
+  claims: Record<Exclude<ClaimLedgerClaimGroup, "repair">, ClaimLedgerClaim> & {
+    readonly repair: ClaimLedgerRepairClaim;
     readonly notProvenClaims: readonly ClaimLedgerNotProvenClaim[];
   },
 ): Readonly<Record<string, string | boolean | number>> {
@@ -816,6 +1233,7 @@ function terminalReceiptFields(
     mutation: claims.mutation.status,
     verification: claims.verification.status,
     recovery: claims.recovery.status,
+    repair: claims.repair.status,
     scorecard: input.scorecardStatus ?? "unknown",
     notProvenClaims: claims.notProvenClaims.length,
   };
@@ -846,6 +1264,20 @@ function onlyNotLiveProviderBlockers(
 ): boolean {
   return claims.length > 0 &&
     claims.every((claim) => claim.blocker === "not-live-provider-evidence");
+}
+
+function onlyNotLiveRepairBlockers(
+  claims: readonly ClaimLedgerNotProvenClaim[],
+): boolean {
+  return claims.length > 0 &&
+    claims.every((claim) =>
+      claim.blocker === "not-live-provider-evidence" ||
+      claim.blocker === "not-live-repair-evidence"
+    );
+}
+
+function isBlockingRepairStatus(status: ClaimLedgerRepairStatus): boolean {
+  return status !== "not-required" && status !== "repair-verification-succeeded";
 }
 
 function providerScope(source: ClaimLedgerEvidenceSource): string {

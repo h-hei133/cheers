@@ -197,6 +197,124 @@ describe("claimLedgerProjection", () => {
       "claim-ledger:not-proven:provider:not-live-provider-evidence",
     );
   });
+
+  it("derives live verified success with repair only from preserved failure plus re-verification", () => {
+    const ledger = buildLedger({
+      verificationStatus: "failed",
+      repair: repairProof(),
+    });
+
+    expect(ledger.verification.status).toBe("failed");
+    expect(ledger.repair.status).toBe("repair-verification-succeeded");
+    expect(ledger.terminal.status).toBe("verified-success-with-repair");
+    expect(ledger.terminal.resultStatus).toBe("task-loop-complete-with-repair");
+    expect(ledger.terminal.liveSuccess).toBe(true);
+    expect(ledger.notProvenClaims).toEqual([]);
+    expect(ledger.evidence).toEqual(
+      expect.arrayContaining([
+        "claim-ledger:verification:failed",
+        "claim-ledger:repair:repair-verification-succeeded",
+        "claim-ledger:terminal:verified-success-with-repair",
+        "claim-ledger:live-success:true",
+      ]),
+    );
+  });
+
+  it.each([
+    {
+      name: "repair proposal is review-only and cannot succeed",
+      repair: repairProof({ anchorStatus: "not-run", confirmationStatus: "not-requested", applyStatus: "not-run", verificationStatus: "not-run" }),
+      terminal: "repair-proposed",
+      blocker: "repair-anchor-not-exact-ready",
+    },
+    {
+      name: "exact-ready repair requires separate confirmation",
+      repair: repairProof({ confirmationStatus: "required", applyStatus: "not-run", verificationStatus: "not-run" }),
+      terminal: "repair-confirmation-required",
+      blocker: "repair-confirmation-required",
+    },
+    {
+      name: "repair confirmation without exact-ready is invalid",
+      repair: repairProof({ anchorStatus: "not-run", confirmationStatus: "trusted-confirmed", applyStatus: "not-run", verificationStatus: "not-run" }),
+      terminal: "review-required",
+      blocker: "repair-confirmation-without-exact-anchor",
+    },
+    {
+      name: "repair apply without re-verification cannot succeed",
+      repair: repairProof({ applyStatus: "succeeded", verificationStatus: "not-run" }),
+      terminal: "repair-applied",
+      blocker: "repair-verification-not-run",
+    },
+    {
+      name: "repair re-verification without runtime evidence cannot succeed",
+      repair: repairProof({ verificationRuntimeDerived: false, verificationEvidenceCount: 0 }),
+      terminal: "repair-applied",
+      blocker: "repair-verification-not-runtime-derived",
+    },
+    {
+      name: "repair provider call during apply cannot succeed",
+      repair: repairProof({ providerCallDuringApply: true }),
+      terminal: "review-required",
+      blocker: "repair-provider-call-during-apply",
+    },
+    {
+      name: "repair mutation outside controlled temp workspace cannot succeed",
+      repair: repairProof({ mutationScope: "none" }),
+      terminal: "review-required",
+      blocker: "repair-mutation-scope-invalid",
+    },
+    {
+      name: "original failure cannot be hidden by final repair evidence",
+      repair: repairProof({ originalFailurePreserved: false }),
+      terminal: "review-required",
+      blocker: "original-failure-not-preserved",
+    },
+    {
+      name: "original failure must be runtime-derived",
+      repair: repairProof({ originalFailureRuntimeDerived: false }),
+      terminal: "review-required",
+      blocker: "original-failure-not-runtime-derived",
+    },
+  ])("$name", ({ repair, terminal, blocker }) => {
+    const ledger = buildLedger({
+      verificationStatus: "failed",
+      repair,
+    });
+
+    expect(ledger.terminal.status).toBe(terminal);
+    expect(ledger.terminal.status).not.toBe("verified-success-with-repair");
+    expect(ledger.terminal.resultStatus).not.toBe("task-loop-complete-with-repair");
+    expect(ledger.terminal.liveSuccess).toBe(false);
+    expect(ledger.evidence.join("\n")).toContain(blocker);
+    expect(ledger.evidence).toContain("claim-ledger:verification:failed");
+  });
+
+  it("recovery availability cannot be counted as repair applied", () => {
+    const ledger = buildLedger({
+      verificationStatus: "failed",
+      recoveryStatus: "available",
+    });
+
+    expect(ledger.repair.status).toBe("repair-available");
+    expect(ledger.terminal.status).toBe("repair-eligible");
+    expect(ledger.terminal.status).not.toBe("repair-applied");
+    expect(ledger.terminal.status).not.toBe("verified-success-with-repair");
+    expect(ledger.evidence).toContain("claim-ledger:repair:repair-available");
+  });
+
+  it("fake repair evidence cannot be labeled live repair success", () => {
+    const ledger = buildLedger({
+      verificationStatus: "failed",
+      repair: repairProof({ evidenceSource: "fake-provider" }),
+    });
+
+    expect(ledger.repair.status).toBe("repair-verification-succeeded");
+    expect(ledger.terminal.status).toBe("verification-succeeded-with-repair-not-live");
+    expect(ledger.terminal.liveSuccess).toBe(false);
+    expect(ledger.evidence).toContain(
+      "claim-ledger:not-proven:repair:not-live-repair-evidence",
+    );
+  });
 });
 
 function buildLedger(
@@ -223,4 +341,24 @@ function buildLedger(
     scorecardStatus: "pass",
     ...patch,
   });
+}
+
+function repairProof(
+  patch: Partial<NonNullable<Parameters<typeof buildClaimLedgerProjection>[0]["repair"]>> = {},
+): NonNullable<Parameters<typeof buildClaimLedgerProjection>[0]["repair"]> {
+  return {
+    originalFailurePreserved: true,
+    originalFailureRuntimeDerived: true,
+    proposalStatus: "created",
+    anchorStatus: "exact-ready",
+    confirmationStatus: "trusted-confirmed",
+    applyStatus: "succeeded",
+    verificationStatus: "succeeded",
+    verificationRuntimeDerived: true,
+    verificationEvidenceCount: 4,
+    mutationScope: "controlled-temp-workspace",
+    providerCallDuringApply: false,
+    evidenceSource: "live-provider",
+    ...patch,
+  };
 }

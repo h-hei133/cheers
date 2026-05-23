@@ -30,6 +30,14 @@ export const realTaskLoopExactNewText = [
   "export const bootMessage = runApp();",
 ].join("\n");
 
+export const realTaskLoopRepairableFailedText = [
+  "export function runApp() {",
+  "  return \"started\";",
+  "}",
+  "",
+  "export const bootMessage = startApp();",
+].join("\n");
+
 export function createRealTaskLoopFixture(input: {
   readonly fixtureId?: string;
   readonly testRoot?: string;

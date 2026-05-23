@@ -23,6 +23,10 @@ const focusedTests = [
   'src/orchestration/realTaskLoopRuntime.test.ts',
   'src/orchestration/realTaskLoopResult.test.ts',
   'src/orchestration/realTaskLoopScorecard.test.ts',
+  'src/orchestration/verificationRepairPlanner.test.ts',
+  'src/orchestration/verificationRepairLoop.test.ts',
+  'src/orchestration/verificationRepairResult.test.ts',
+  'src/orchestration/editRepairResult.test.ts',
   'src/orchestration/liveProviderAdapterApproval.test.ts',
   'src/orchestration/openAICompatibleAnchoredSmokeAdapter.test.ts',
   'src/orchestration/anchoredProposalRuntime.test.ts',
@@ -52,6 +56,7 @@ console.log('marker task-loop-session-continue-evidence')
 console.log('marker task-loop-no-broad-mutation')
 console.log('marker task-loop-openai-compatible-adapter-approval')
 console.log('marker task-loop-openai-compatible-provider-boundary')
+console.log('marker task-loop-verification-repair-proof-chain')
 console.log('private-config-manual-read=false')
 
 const runnerExit = runTaskLoopRunner()
@@ -145,6 +150,8 @@ function validateRunnerSuccessMarkers(stdout, env) {
 function expectedRunnerSuccessMarkers(env) {
   const liveOptIn = env.PRIVATE_AGENTS_LIVE_TASK_LOOP_SMOKE?.trim() === '1'
   const confirmApply = env.PRIVATE_AGENTS_CONFIRM_TASK_LOOP_APPLY?.trim() === '1'
+  const repairProof = env.PRIVATE_AGENTS_TASK_LOOP_REPAIR_PROOF?.trim() === '1'
+  const confirmRepairApply = env.PRIVATE_AGENTS_CONFIRM_TASK_LOOP_REPAIR_APPLY?.trim() === '1'
   const fakeReady = env.PRIVATE_AGENTS_TASK_LOOP_FAKE_READY?.trim() === '1'
   const base = [
     'no-broad-mutation=true',
@@ -168,6 +175,95 @@ function expectedRunnerSuccessMarkers(env) {
     ]
   }
   if (confirmApply) {
+    if (repairProof && !confirmRepairApply) {
+      return [
+        ...base,
+        `claim-ledger-source=${fakeReady ? 'fake-ready' : 'live-provider'}`,
+        'claim-ledger-terminal=repair-confirmation-required',
+        'claim-ledger-live-success=false',
+        'provider-called=true',
+        'output-validation=valid-exact-single-target',
+        'anchor-quality=exact-ready',
+        'confirmation=trusted-confirmed',
+        'apply=succeeded',
+        'verification=failed',
+        'mutation-scope=controlled-temp-workspace',
+        'snapshot=created',
+        'recovery=available',
+        'repair-status=repair-confirmation-required',
+        'repair-proposal=created',
+        'repair-anchor=exact-ready',
+        'repair-confirmation=required',
+        'repair-apply=not-run',
+        'repair-verification=not-run',
+        'repair-evidence-original-readback=true',
+        'repair-evidence-proposal-source=fake-provider',
+        'repair-evidence-existing-exact-apply-lane=false',
+        'repair-evidence-final-readback=false',
+        'repair-evidence-runtime-derived=false',
+        'status=repair-confirmation-required',
+      ]
+    }
+    if (repairProof && fakeReady) {
+      return [
+        ...base,
+        'claim-ledger-source=fake-ready',
+        'claim-ledger-terminal=verification-succeeded-with-repair-not-live',
+        'claim-ledger-live-success=false',
+        'claim-ledger-not-proven=repair,provider',
+        'provider-called=true',
+        'output-validation=valid-exact-single-target',
+        'anchor-quality=exact-ready',
+        'confirmation=trusted-confirmed',
+        'apply=succeeded',
+        'verification=failed',
+        'mutation-scope=controlled-temp-workspace',
+        'snapshot=created',
+        'recovery=available',
+        'repair-status=repair-verification-succeeded',
+        'repair-proposal=created',
+        'repair-anchor=exact-ready',
+        'repair-confirmation=trusted-confirmed',
+        'repair-apply=succeeded',
+        'repair-verification=succeeded',
+        'repair-evidence-original-readback=true',
+        'repair-evidence-proposal-source=fake-provider',
+        'repair-evidence-existing-exact-apply-lane=true',
+        'repair-evidence-final-readback=true',
+        'repair-evidence-runtime-derived=true',
+        'status=verification-succeeded-with-repair',
+      ]
+    }
+    if (repairProof) {
+      return [
+        ...base,
+        'claim-ledger-source=live-provider',
+        'claim-ledger-terminal=verification-succeeded-with-repair-not-live',
+        'claim-ledger-live-success=false',
+        'claim-ledger-not-proven=repair',
+        'provider-called=true',
+        'output-validation=valid-exact-single-target',
+        'anchor-quality=exact-ready',
+        'confirmation=trusted-confirmed',
+        'apply=succeeded',
+        'verification=failed',
+        'mutation-scope=controlled-temp-workspace',
+        'snapshot=created',
+        'recovery=available',
+        'repair-status=repair-verification-succeeded',
+        'repair-proposal=created',
+        'repair-anchor=exact-ready',
+        'repair-confirmation=trusted-confirmed',
+        'repair-apply=succeeded',
+        'repair-verification=succeeded',
+        'repair-evidence-original-readback=true',
+        'repair-evidence-proposal-source=fake-provider',
+        'repair-evidence-existing-exact-apply-lane=true',
+        'repair-evidence-final-readback=true',
+        'repair-evidence-runtime-derived=true',
+        'status=verification-succeeded-with-repair',
+      ]
+    }
     if (fakeReady) {
       return [
         ...base,
@@ -247,6 +343,9 @@ function runFocusedTests() {
   testEnv.PRIVATE_AGENTS_REAL_PROVIDER_SMOKE = ''
   testEnv.PRIVATE_AGENTS_LIVE_TASK_LOOP_SMOKE = ''
   testEnv.PRIVATE_AGENTS_CONFIRM_TASK_LOOP_APPLY = ''
+  testEnv.PRIVATE_AGENTS_TASK_LOOP_SIMULATE_VERIFICATION_FAILURE = ''
+  testEnv.PRIVATE_AGENTS_TASK_LOOP_REPAIR_PROOF = ''
+  testEnv.PRIVATE_AGENTS_CONFIRM_TASK_LOOP_REPAIR_APPLY = ''
 
   const result = spawnSync(
     'npm',

@@ -8,6 +8,7 @@ import { runRealTaskLoopRuntime } from "../../packages/ts-shell/src/orchestratio
 import {
   realTaskLoopExactNewText,
   realTaskLoopExactOldText,
+  realTaskLoopRepairableFailedText,
 } from "../../packages/ts-shell/src/orchestration/realTaskLoopFixture.js";
 import type { RealTaskLoopRuntimeOutput } from "../../packages/ts-shell/src/orchestration/realTaskLoopRuntime.js";
 import type { ProviderEditAvailability } from "../../packages/ts-shell/src/orchestration/providerEditPlanner.js";
@@ -39,6 +40,9 @@ interface RunnerConfig {
 const liveOptIn = process.env.PRIVATE_AGENTS_LIVE_TASK_LOOP_SMOKE?.trim() === "1";
 const realProviderOptIn = process.env.PRIVATE_AGENTS_REAL_PROVIDER_SMOKE?.trim() === "1";
 const confirmApply = process.env.PRIVATE_AGENTS_CONFIRM_TASK_LOOP_APPLY?.trim() === "1";
+const simulateVerificationFailure = process.env.PRIVATE_AGENTS_TASK_LOOP_SIMULATE_VERIFICATION_FAILURE?.trim() === "1";
+const repairProof = process.env.PRIVATE_AGENTS_TASK_LOOP_REPAIR_PROOF?.trim() === "1";
+const confirmRepairApply = process.env.PRIVATE_AGENTS_CONFIRM_TASK_LOOP_REPAIR_APPLY?.trim() === "1";
 const testRoot = process.env.PRIVATE_AGENTS_TEST_ROOT?.trim();
 const config = readConfig();
 
@@ -46,6 +50,9 @@ console.log("task-loop-runner=route200-real-provider-task-loop-mvp");
 console.log(`live-task-loop-opt-in=${liveOptIn}`);
 console.log(`real-provider-smoke-opt-in=${realProviderOptIn}`);
 console.log(`confirm-apply=${confirmApply}`);
+console.log(`simulate-verification-failure=${simulateVerificationFailure}`);
+console.log(`repair-proof=${repairProof}`);
+console.log(`confirm-repair-apply=${confirmRepairApply}`);
 console.log("private-config-manual-read=false");
 
 run().catch((error) => {
@@ -89,7 +96,7 @@ async function run(): Promise<void> {
       fixtureSafetyStatus: "safe",
       redactionStatus: "redacted-and-budgeted",
     });
-    const provider = buildTaskLoopFakeProvider();
+    const provider = repairProof ? buildTaskLoopRepairableFailureProvider() : buildTaskLoopFakeProvider();
     await runApproved({
       provider,
       providerAvailability: { kind: "available", providerKindLabel: config.providerSafeLabel },
@@ -190,6 +197,9 @@ async function runWithApprovalSkip(input: {
     requestId: "route200-live-task-loop",
     providerMode: liveOptIn && realProviderOptIn ? "real-opt-in" : "default-skip",
     confirmApply: false,
+    simulateVerificationFailure,
+    runRepairAfterVerificationFailure: repairProof,
+    confirmRepairApply,
     providerAvailability: input.providerAvailability,
     ...(testRoot ? { testRoot } : {}),
   });
@@ -209,6 +219,9 @@ async function runApproved(input: {
     requestId: "route200-live-task-loop",
     providerMode: "real-opt-in",
     confirmApply,
+    simulateVerificationFailure,
+    runRepairAfterVerificationFailure: repairProof,
+    confirmRepairApply,
     providerAvailability: input.providerAvailability,
     provider: input.provider,
     evidenceSource: config.fakeReady ? "fake-ready" : "live-provider",
@@ -228,6 +241,7 @@ function printRuntimeOutput(
   },
 ): void {
   console.log(output.result.output);
+  const evidence = output.result.evidence.join("\n");
   for (const marker of [
     `provider-called=${output.result.providerCalled}`,
     `output-validation=${output.result.outputValidationStatus}`,
@@ -238,6 +252,17 @@ function printRuntimeOutput(
     `anchor-quality=${output.result.anchorQuality}`,
     `snapshot=${output.result.snapshotStatus}`,
     `recovery=${output.result.recoveryStatus}`,
+    `repair-status=${output.result.repairProof?.status ?? "not-run"}`,
+    `repair-proposal=${output.result.repairProof?.proposalStatus ?? "not-run"}`,
+    `repair-anchor=${output.result.repairProof?.anchorStatus ?? "not-run"}`,
+    `repair-confirmation=${output.result.repairProof?.confirmationStatus ?? "not-requested"}`,
+    `repair-apply=${output.result.repairProof?.applyStatus ?? "not-run"}`,
+    `repair-verification=${output.result.repairProof?.verificationStatus ?? "not-run"}`,
+    `repair-evidence-original-readback=${evidence.includes("real-task-loop-repair:original-readback:failed")}`,
+    `repair-evidence-proposal-source=${output.result.repairProof?.evidenceSource ?? "none"}`,
+    `repair-evidence-existing-exact-apply-lane=${evidence.includes("real-task-loop-repair:apply-route:existing-exact-lane")}`,
+    `repair-evidence-final-readback=${evidence.includes("real-task-loop-repair:readback:status:passed")}`,
+    `repair-evidence-runtime-derived=${evidence.includes("real-task-loop-repair:original-readback:failed") && evidence.includes("real-task-loop-repair:readback:status:passed")}`,
     `status=${output.result.status}`,
     `claim-ledger=${output.result.claimLedger.ledgerId}`,
     `claim-ledger-source=${output.result.claimLedger.evidenceSource}`,
@@ -356,6 +381,25 @@ function buildTaskLoopFakeProvider(): RealProviderProposalDryRunProvider {
   };
 }
 
+function buildTaskLoopRepairableFailureProvider(): RealProviderProposalDryRunProvider {
+  return {
+    proposeEdit: (): ProviderEditRawProposal => ({
+      operationKind: "exact-fenced-replacement",
+      targets: [
+        {
+          path: "src/smoke.ts",
+          summary: "rename declaration while leaving controlled readback failure for repair",
+          oldText: realTaskLoopExactOldText,
+          newText: realTaskLoopRepairableFailedText,
+        },
+      ],
+      confidence: "high",
+      riskSummary: "controlled fixture repair proof chain",
+      verificationPlan: ["readback fails before repair and succeeds after confirmed repair"],
+    }),
+  };
+}
+
 function normalizeProvider(value: string | undefined): RuntimeProvider | undefined {
   const normalized = value?.trim().toLowerCase().replace(/_/g, "-");
   switch (normalized) {
@@ -391,11 +435,59 @@ function exitCodeForOutput(
     readonly approvalProviderErrorClass?: string;
   },
 ): number {
+  const evidence = output.result.evidence.join("\n");
+  const repairRuntimeEvidence = {
+    originalReadbackFailed: evidence.includes("real-task-loop-repair:original-readback:failed"),
+    existingExactApplyLane: evidence.includes("real-task-loop-repair:apply-route:existing-exact-lane"),
+    finalReadbackPassed: evidence.includes("real-task-loop-repair:readback:status:passed"),
+    runtimeDerived: evidence.includes("real-task-loop-repair:original-readback:failed") &&
+      evidence.includes("real-task-loop-repair:readback:status:passed") &&
+      output.result.repairProof?.verificationRuntimeDerived === true,
+  };
   const providerErrorClass = output.runtime?.dryRun?.providerErrorClass ||
     normalizeProviderErrorClass(classification.approvalProviderErrorClass);
   if (providerErrorClass) return exitCodeForProviderErrorClass(providerErrorClass);
   if (classification.readinessStatus !== "ready") {
     return exitCodeForReadinessStatus(classification.readinessStatus);
+  }
+  if (repairProof) {
+    if (!confirmApply) return 1;
+    if (!confirmRepairApply) {
+      return output.result.claimLedger.terminal.status === "repair-confirmation-required" &&
+        output.result.providerCalled === true &&
+        output.result.outputValidationStatus === "valid-exact-single-target" &&
+        output.result.anchorQuality === "exact-ready" &&
+        output.result.confirmationStatus === "trusted-confirmed" &&
+        output.result.applyStatus === "succeeded" &&
+        output.result.verificationStatus === "failed" &&
+        output.result.repairProof?.proposalStatus === "created" &&
+        output.result.repairProof?.anchorStatus === "exact-ready" &&
+        output.result.repairProof?.confirmationStatus === "required" &&
+        output.result.repairProof?.applyStatus === "not-run" &&
+        output.result.repairProof?.verificationStatus === "not-run" &&
+        repairRuntimeEvidence.originalReadbackFailed === true &&
+        repairRuntimeEvidence.existingExactApplyLane === false &&
+        repairRuntimeEvidence.finalReadbackPassed === false &&
+        repairRuntimeEvidence.runtimeDerived === false &&
+        output.result.providerCallDuringApply === false
+        ? 0
+        : 1;
+    }
+    return output.result.claimLedger.terminal.status === "verification-succeeded-with-repair-not-live" &&
+      output.result.claimLedger.terminal.liveSuccess === false &&
+      output.result.providerCalled === true &&
+      output.result.applyStatus === "succeeded" &&
+      output.result.verificationStatus === "failed" &&
+      output.result.repairProof?.evidenceSource === "fake-provider" &&
+      output.result.repairProof?.applyStatus === "succeeded" &&
+      output.result.repairProof?.verificationStatus === "succeeded" &&
+      output.result.repairProof?.providerCallDuringApply === false &&
+      repairRuntimeEvidence.originalReadbackFailed === true &&
+      repairRuntimeEvidence.existingExactApplyLane === true &&
+      repairRuntimeEvidence.finalReadbackPassed === true &&
+      repairRuntimeEvidence.runtimeDerived === true
+      ? 0
+      : 1;
   }
   if (output.result.applyStatus === "failed" || output.result.verificationStatus === "failed") return 1;
 

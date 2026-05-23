@@ -106,7 +106,7 @@ describe("editRepairResult", () => {
       targetPathByLabel: new Map([["src/app.ts", "src/app.ts"]]),
       fencedOptions: fixture.options,
     });
-    const result = buildEditRepairResult({
+    const unverifiedResult = buildEditRepairResult({
       sessionId: "sess-repair-applied",
       prompt: "apply confirmed repair",
       context,
@@ -115,13 +115,36 @@ describe("editRepairResult", () => {
       selection,
       applyResult,
     });
+    const result = buildEditRepairResult({
+      sessionId: "sess-repair-verified",
+      prompt: "apply confirmed repair",
+      context,
+      plan: handoff,
+      review,
+      selection,
+      applyResult,
+      postApplyVerification: {
+        status: "passed",
+        reason: "repair readback matched expected content",
+        runtimeDerived: true,
+        evidence: ["test-repair-readback:status:passed"],
+      },
+    });
 
     expect(applyResult.status).toBe("hunk-set-applied");
+    expect(unverifiedResult.status).toBe("stopped_error");
+    expect(unverifiedResult.codingResult?.evidence).toContain(
+      "edit-repair-result:repair-apply-without-reverification",
+    );
     expect(result.status).toBe("completed");
     expect(readFile(fixture.workspaceRoot, "src/app.ts")).toBe("ALPHA\nmiddle\nOMEGA\n");
     expect(result.codingResult?.evidence).toEqual(
       expect.arrayContaining([
+        "edit-repair-result:repair-verified-through-hunk-set",
         "edit-repair-result:repair-applied-through-hunk-set",
+        "edit-repair-result:post-apply-verification:passed",
+        "edit-repair-result:post-apply-verification:runtime-derived",
+        "test-repair-readback:status:passed",
         "proposal-hunk-set-route:multi-hunk-exact-apply",
         "edit-proposal-apply:no-provider-call",
       ]),

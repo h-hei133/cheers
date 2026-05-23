@@ -16,6 +16,9 @@ export interface RealTaskLoopScorecard {
   readonly snapshotRecovery: RealTaskLoopScore;
   readonly verification: RealTaskLoopScore;
   readonly repairEligibility: RealTaskLoopScore;
+  readonly repairProposal: RealTaskLoopScore;
+  readonly repairApply: RealTaskLoopScore;
+  readonly repairVerification: RealTaskLoopScore;
   readonly defaultSafety: RealTaskLoopScore;
   readonly providerCallDuringApply: RealTaskLoopScore;
   readonly mutationScope: "none" | "controlled-temp-workspace" | "blocked";
@@ -38,6 +41,9 @@ export function buildRealTaskLoopScorecard(input: {
   readonly snapshotRecoveryReady: boolean;
   readonly verificationStatus: "not-run" | "succeeded" | "failed";
   readonly repairEligible: boolean;
+  readonly repairProposalStatus?: "not-run" | "created" | "invalid";
+  readonly repairApplyStatus?: "not-run" | "succeeded" | "stopped" | "failed";
+  readonly repairVerificationStatus?: "not-run" | "succeeded" | "failed";
   readonly defaultNoProviderNoApply: boolean;
   readonly mutationScope: RealTaskLoopScorecard["mutationScope"];
   readonly providerCallDuringApply?: boolean;
@@ -69,9 +75,13 @@ export function buildRealTaskLoopScorecard(input: {
     input.applyStatus === "not-run" ? "skip" : input.snapshotRecoveryReady ? "pass" : "fail";
   const verification =
     input.verificationStatus === "succeeded" ? "pass" :
-      input.verificationStatus === "not-run" ? "skip" : "fail";
+      input.verificationStatus === "not-run" ? "skip" :
+        input.repairVerificationStatus === "succeeded" ? "warn" : "fail";
   const repairEligibility =
     input.repairEligible ? "warn" : input.verificationStatus === "failed" ? "fail" : "skip";
+  const repairProposal = scoreRepairProposal(input.repairProposalStatus);
+  const repairApply = scoreRepairApply(input.repairApplyStatus);
+  const repairVerification = scoreRepairVerification(input.repairVerificationStatus);
   const defaultSafety = input.providerExpected ? "skip" : input.defaultNoProviderNoApply ? "pass" : "fail";
   const providerCallDuringApply = input.providerCallDuringApply ? "fail" : "pass";
   const failureClass = input.failureClass ?? inferFailureClass({
@@ -81,6 +91,9 @@ export function buildRealTaskLoopScorecard(input: {
     anchorQuality,
     snapshotRecovery,
     verification,
+    repairProposal,
+    repairApply,
+    repairVerification,
     providerCallDuringApply,
   });
   const scorecardId = `real_task_loop_scorecard_${hashContent(JSON.stringify({
@@ -102,6 +115,9 @@ export function buildRealTaskLoopScorecard(input: {
     `confirmation=${confirmation}`,
     `apply=${applyResult}`,
     `verification=${verification}`,
+    `repairProposal=${repairProposal}`,
+    `repairApply=${repairApply}`,
+    `repairVerification=${repairVerification}`,
     `providerCallDuringApply=${input.providerCallDuringApply ? "true" : "false"}`,
     `mutationScope=${input.mutationScope}`,
     `failureClass=${failureClass}`,
@@ -121,6 +137,9 @@ export function buildRealTaskLoopScorecard(input: {
     snapshotRecovery,
     verification,
     repairEligibility,
+    repairProposal,
+    repairApply,
+    repairVerification,
     defaultSafety,
     providerCallDuringApply,
     mutationScope: input.mutationScope,
@@ -140,6 +159,9 @@ export function buildRealTaskLoopScorecard(input: {
       `real-task-loop-scorecard:snapshot-recovery:${snapshotRecovery}`,
       `real-task-loop-scorecard:verification:${verification}`,
       `real-task-loop-scorecard:repair:${repairEligibility}`,
+      `real-task-loop-scorecard:repair-proposal:${repairProposal}`,
+      `real-task-loop-scorecard:repair-apply:${repairApply}`,
+      `real-task-loop-scorecard:repair-verification:${repairVerification}`,
       `real-task-loop-scorecard:default-safety:${defaultSafety}`,
       `real-task-loop-scorecard:provider-call-during-apply:${input.providerCallDuringApply ? "true" : "false"}`,
       `real-task-loop-scorecard:apply-provider-call:${providerCallDuringApply}`,
@@ -165,6 +187,22 @@ function scoreAnchorQuality(level: string | undefined): RealTaskLoopScore {
   return "fail";
 }
 
+function scoreRepairProposal(status: string | undefined): RealTaskLoopScore {
+  if (!status || status === "not-run") return "skip";
+  return status === "created" ? "pass" : "fail";
+}
+
+function scoreRepairApply(status: string | undefined): RealTaskLoopScore {
+  if (!status || status === "not-run") return "skip";
+  if (status === "succeeded") return "pass";
+  return status === "stopped" ? "warn" : "fail";
+}
+
+function scoreRepairVerification(status: string | undefined): RealTaskLoopScore {
+  if (!status || status === "not-run") return "skip";
+  return status === "succeeded" ? "pass" : "fail";
+}
+
 function inferFailureClass(input: {
   readonly applyStatus: string;
   readonly verificationStatus: string;
@@ -175,6 +213,9 @@ function inferFailureClass(input: {
   readonly snapshotRecovery: RealTaskLoopScore;
   readonly verification: RealTaskLoopScore;
   readonly providerCallDuringApply: RealTaskLoopScore;
+  readonly repairProposal: RealTaskLoopScore;
+  readonly repairApply: RealTaskLoopScore;
+  readonly repairVerification: RealTaskLoopScore;
 }): string {
   if (input.providerErrorClass) return `provider-${input.providerErrorClass}`;
   if (input.providerCall === "fail") return "provider-boundary";
@@ -184,5 +225,8 @@ function inferFailureClass(input: {
   if (input.applyStatus === "failed") return "apply-failure";
   if (input.snapshotRecovery === "fail") return "snapshot-recovery";
   if (input.verification === "fail") return "verification-failure";
+  if (input.repairProposal === "fail") return "repair-proposal";
+  if (input.repairApply === "fail") return "repair-apply";
+  if (input.repairVerification === "fail") return "repair-verification";
   return "none";
 }

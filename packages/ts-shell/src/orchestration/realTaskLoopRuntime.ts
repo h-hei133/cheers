@@ -22,10 +22,15 @@ import {
   readRealTaskLoopTarget,
   realTaskLoopExactNewText,
   realTaskLoopExactOldText,
+  realTaskLoopRepairableFailedText,
   removeRealTaskLoopFixture,
   verifyRealTaskLoopReadback,
   type RealTaskLoopFixture,
 } from "./realTaskLoopFixture.js";
+import {
+  runRealTaskLoopRepairChain,
+  type RealTaskLoopRepairChainOutput,
+} from "./realTaskLoopRepairChain.js";
 import { buildRealTaskLoopPlan } from "./realTaskLoopPlan.js";
 import { buildRealTaskLoopScorecard } from "./realTaskLoopScorecard.js";
 import {
@@ -49,6 +54,7 @@ export interface RealTaskLoopRuntimeOutput {
   readonly fixture: RealTaskLoopFixture;
   readonly runtime?: AnchoredProposalRuntimeResult;
   readonly applyResult?: EditProposalApplyResult;
+  readonly repair?: RealTaskLoopRepairChainOutput;
   readonly result: RealTaskLoopResult;
   readonly cleanup: "pending" | "removed";
 }
@@ -62,6 +68,8 @@ export async function runRealTaskLoopRuntime(input: {
   readonly testRoot?: string;
   readonly cleanupFixture?: boolean;
   readonly simulateVerificationFailure?: boolean;
+  readonly runRepairAfterVerificationFailure?: boolean;
+  readonly confirmRepairApply?: boolean;
   readonly evidenceSource?: ClaimLedgerEvidenceSource;
 }): Promise<RealTaskLoopRuntimeOutput> {
   const requestId = input.requestId ?? "route200-real-task-loop";
@@ -81,7 +89,11 @@ export async function runRealTaskLoopRuntime(input: {
     });
     const currentContent = readRealTaskLoopTarget(fixture);
     const providerRecorder = recordProviderOutput(
-      input.provider ?? buildRealTaskLoopFakeProvider(),
+      input.provider ?? (
+        input.runRepairAfterVerificationFailure
+          ? buildRealTaskLoopRepairableFailureProvider()
+          : buildRealTaskLoopFakeProvider()
+      ),
     );
     const runtime = await runAnchoredProposalRuntime({
       requestId,
@@ -125,6 +137,23 @@ export async function runRealTaskLoopRuntime(input: {
     );
     const applyStatus = classifyRealTaskLoopApplyStatus(applyResult);
     const verificationStatus = classifyRealTaskLoopVerificationStatus(readback);
+    const evidenceSource = resolveClaimLedgerEvidenceSource({
+      ...input,
+      syntheticProviderFallback: input.providerMode === "real-opt-in" && !input.provider,
+    });
+    const repair =
+      input.runRepairAfterVerificationFailure &&
+        verificationStatus === "failed" &&
+        readback?.status === "failed" &&
+        applyStatus === "succeeded"
+        ? await runRealTaskLoopRepairChain({
+            requestId,
+            fixture,
+            initialChangedFiles: applyResult?.changedFiles ?? [],
+            originalReadback: readback,
+            confirmRepairApply: input.confirmRepairApply ?? false,
+          })
+        : undefined;
     const snapshotStatus = classifyRealTaskLoopSnapshotStatus(applyResult);
     const recoveryStatus = classifyRealTaskLoopRecoveryStatus(applyResult);
     const mutationScope = classifyRealTaskLoopMutationScope(applyResult?.changedFiles ?? []);
@@ -169,6 +198,13 @@ export async function runRealTaskLoopRuntime(input: {
       mutationScope,
       providerCallDuringApply,
       providerErrorClass: runtime.dryRun?.providerErrorClass,
+      ...(repair
+        ? {
+            repairProposalStatus: repair.proof.proposalStatus,
+            repairApplyStatus: repair.proof.applyStatus,
+            repairVerificationStatus: repair.proof.verificationStatus,
+          }
+        : {}),
     });
     const result = buildRealTaskLoopResult({
       fixture,
@@ -179,10 +215,11 @@ export async function runRealTaskLoopRuntime(input: {
       scorecard,
       liveOptIn: input.providerMode === "real-opt-in",
       confirmApply: input.confirmApply ?? false,
-      evidenceSource: resolveClaimLedgerEvidenceSource(input),
+      evidenceSource,
       providerCallDuringApply,
+      ...(repair ? { repairProof: repair.proof } : {}),
     });
-    return { fixture, runtime, ...(applyResult ? { applyResult } : {}), result, cleanup };
+    return { fixture, runtime, ...(applyResult ? { applyResult } : {}), ...(repair ? { repair } : {}), result, cleanup };
   } finally {
     if (input.cleanupFixture !== false) {
       removeRealTaskLoopFixture(fixture);
@@ -239,6 +276,25 @@ function buildRealTaskLoopFakeProvider(): RealProviderProposalDryRunProvider {
       confidence: "high",
       riskSummary: "controlled fixture exact rename",
       verificationPlan: ["safe readback verifies runApp and absence of startApp"],
+    }),
+  };
+}
+
+function buildRealTaskLoopRepairableFailureProvider(): RealProviderProposalDryRunProvider {
+  return {
+    proposeEdit: (): ProviderEditRawProposal => ({
+      operationKind: "exact-fenced-replacement",
+      targets: [
+        {
+          path: "src/smoke.ts",
+          summary: "rename declaration while leaving a deterministic call-site verification failure for repair",
+          oldText: realTaskLoopExactOldText,
+          newText: realTaskLoopRepairableFailedText,
+        },
+      ],
+      confidence: "high",
+      riskSummary: "controlled fixture exact partial rename to exercise repair proof chain",
+      verificationPlan: ["safe readback must fail before repair and pass after confirmed repair"],
     }),
   };
 }
@@ -388,6 +444,10 @@ function evidenceSourceForProviderMode(
 function resolveClaimLedgerEvidenceSource(input: {
   readonly providerMode: RealTaskLoopProviderMode;
   readonly evidenceSource?: ClaimLedgerEvidenceSource;
+  readonly syntheticProviderFallback?: boolean;
 }): ClaimLedgerEvidenceSource {
+  if (input.evidenceSource === "live-provider" && input.syntheticProviderFallback) {
+    return "focused-tests";
+  }
   return input.evidenceSource ?? evidenceSourceForProviderMode(input.providerMode);
 }

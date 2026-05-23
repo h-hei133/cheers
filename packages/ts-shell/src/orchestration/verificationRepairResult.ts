@@ -1,5 +1,8 @@
 import type { OrchestrationResult } from "./types.js";
-import { buildEditRepairResult } from "./editRepairResult.js";
+import {
+  buildEditRepairResult,
+  type RepairPostApplyVerification,
+} from "./editRepairResult.js";
 import type { EditProposalApplyResult } from "./editProposalApply.js";
 import type { EditProposalReview } from "./editProposalReview.js";
 import type { EditProposalSelection } from "./editProposalSelection.js";
@@ -17,6 +20,7 @@ export type VerificationRepairResultState =
   | "repair-proposal-invalid"
   | "repair-handoff-ready"
   | "repair-applied"
+  | "repair-verification-succeeded"
   | "repair-apply-stopped"
   | "repair-apply-partial-failure"
   | "repair-stopped"
@@ -31,6 +35,7 @@ export function buildVerificationRepairResult(input: {
   readonly review?: EditProposalReview;
   readonly selection?: EditProposalSelection;
   readonly applyResult?: EditProposalApplyResult;
+  readonly postApplyVerification?: RepairPostApplyVerification;
 }): OrchestrationResult {
   const editResult = buildEditRepairResult({
     sessionId: input.sessionId,
@@ -40,6 +45,7 @@ export function buildVerificationRepairResult(input: {
     review: input.review,
     selection: input.selection,
     applyResult: input.applyResult,
+    postApplyVerification: input.postApplyVerification,
   });
   const state = projectVerificationRepairResultState(input);
   const extraEvidence = [
@@ -58,6 +64,9 @@ export function buildVerificationRepairResult(input: {
     input.applyResult
       ? "verification-repair-result:apply-route:existing-hunk-set-or-exact-lane"
       : "verification-repair-result:no-automatic-repair",
+    ...(input.postApplyVerification
+      ? [`verification-repair-result:post-apply-verification:${input.postApplyVerification.status}`]
+      : []),
     "verification-repair-result:provider-call-during-apply:not-run",
     "verification-repair-result:mutation-authority:not-granted-until-existing-route",
     "verification-repair-result:raw-content-excluded",
@@ -82,14 +91,14 @@ export function buildVerificationRepairResult(input: {
           ],
         },
         failureBoundary:
-          state === "repair-applied"
+          state === "repair-verification-succeeded"
             ? editResult.codingResult.failureBoundary
             : `verification-repair-${state}`,
       }
     : undefined;
   return {
     ...editResult,
-    ...(state === "repair-applied"
+    ...(state === "repair-verification-succeeded"
       ? {}
       : {
           status: "stopped_error" as const,
@@ -118,12 +127,16 @@ function projectVerificationRepairResultState(input: {
   readonly context: VerificationRepairContext;
   readonly plan?: VerificationRepairPlan;
   readonly applyResult?: EditProposalApplyResult;
+  readonly postApplyVerification?: RepairPostApplyVerification;
 }): VerificationRepairResultState {
   if (input.applyResult) {
     switch (input.applyResult.status) {
       case "hunk-set-applied":
       case "single-target-applied":
       case "target-set-applied":
+        if (input.postApplyVerification?.status === "passed") {
+          return "repair-verification-succeeded";
+        }
         return "repair-applied";
       case "hunk-set-partial-failure":
       case "target-set-partial-failure":

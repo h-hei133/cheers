@@ -4,6 +4,7 @@ import { runRealTaskLoopRuntime } from "./realTaskLoopRuntime.js";
 import {
   realTaskLoopExactNewText,
   realTaskLoopExactOldText,
+  realTaskLoopRepairableFailedText,
 } from "./realTaskLoopFixture.js";
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 
@@ -83,6 +84,86 @@ describe("realTaskLoopRuntime", () => {
     expect(output.result.repairEligibility).toBe("eligible");
     expect(output.result.status).toBe("repair-eligible");
     expect(output.result.evidence).toContain("real-task-loop-result:no-provider-call-during-apply");
+  });
+
+  it("creates an exact-ready repair proposal after controlled verification failure without applying repair", async () => {
+    const output = await runRealTaskLoopRuntime({
+      requestId: "route205-repair-proposal",
+      providerMode: "fake",
+      confirmApply: true,
+      runRepairAfterVerificationFailure: true,
+    });
+
+    expect(output.applyResult?.status).toBe("single-target-applied");
+    expect(output.result.verificationStatus).toBe("failed");
+    expect(output.result.repairProof?.proposalStatus).toBe("created");
+    expect(output.result.repairProof?.anchorStatus).toBe("exact-ready");
+    expect(output.result.repairProof?.confirmationStatus).toBe("required");
+    expect(output.result.repairProof?.applyStatus).toBe("not-run");
+    expect(output.result.repairProof?.verificationStatus).toBe("not-run");
+    expect(output.result.status).toBe("repair-confirmation-required");
+    expect(output.result.claimLedger.terminal.status).toBe("repair-confirmation-required");
+    expect(output.result.claimLedger.terminal.liveSuccess).toBe(false);
+    expect(output.result.changedFiles).toEqual(["src/smoke.ts"]);
+    expect(output.result.evidence).toEqual(
+      expect.arrayContaining([
+        "real-task-loop-repair:proposal:created",
+        "real-task-loop-repair:confirmation:required",
+        "real-task-loop-repair:apply:not-run",
+        "real-task-loop-repair:no-new-writer",
+        "claim-ledger:verification:failed",
+        "claim-ledger:repair:repair-confirmation-required",
+      ]),
+    );
+  });
+
+  it("applies confirmed repair through existing exact lane and re-verifies before repair success", async () => {
+    const output = await runRealTaskLoopRuntime({
+      requestId: "route205-repair-confirmed",
+      providerMode: "real-opt-in",
+      providerAvailability: { kind: "available", providerKindLabel: "openai-compatible" },
+      provider: {
+        proposeEdit: () => buildRepairableFailureProposal(),
+      },
+      confirmApply: true,
+      runRepairAfterVerificationFailure: true,
+      confirmRepairApply: true,
+      evidenceSource: "live-provider",
+    });
+
+    expect(output.applyResult?.status).toBe("single-target-applied");
+    expect(output.result.verificationStatus).toBe("failed");
+    expect(output.repair?.applyResult?.status).toBe("single-target-applied");
+    expect(output.result.repairProof?.originalFailurePreserved).toBe(true);
+    expect(output.result.repairProof?.confirmationStatus).toBe("trusted-confirmed");
+    expect(output.result.repairProof?.applyStatus).toBe("succeeded");
+    expect(output.result.repairProof?.verificationStatus).toBe("succeeded");
+    expect(output.result.repairProof?.providerCallDuringApply).toBe(false);
+    expect(output.result.repairProof?.evidenceSource).toBe("fake-provider");
+    expect(output.result.repairProof?.originalFailureRuntimeDerived).toBe(true);
+    expect(output.result.repairProof?.verificationRuntimeDerived).toBe(true);
+    expect(output.result.repairProof?.verificationEvidenceCount).toBeGreaterThan(0);
+    expect(output.result.status).toBe("verification-succeeded-with-repair");
+    expect(output.result.claimLedger.terminal.status).toBe("verification-succeeded-with-repair-not-live");
+    expect(output.result.claimLedger.terminal.liveSuccess).toBe(false);
+    expect(output.result.evidence).toEqual(
+      expect.arrayContaining([
+        "real-task-loop-result:original-verification:failed",
+        "real-task-loop-repair:original-readback:failed",
+        "real-task-loop-repair:original-failure-runtime-derived:true",
+        "real-task-loop-repair:proposal-source:fake-provider",
+        "real-task-loop-repair:existing-exact-apply-lane",
+        "real-task-loop-repair:apply-route:existing-exact-lane",
+        "real-task-loop-repair:readback:status:passed",
+        "real-task-loop-repair:verification-runtime-derived:true",
+        "real-task-loop-repair:verification:succeeded",
+        "real-task-loop-repair:provider-call-during-apply:false",
+        "claim-ledger:verification:failed",
+        "claim-ledger:repair:repair-verification-succeeded",
+        "claim-ledger:terminal:verification-succeeded-with-repair-not-live",
+        "claim-ledger:not-proven:repair:not-live-repair-evidence",
+      ]),
+    );
   });
 
   it("real opt-in with unavailable provider stops before provider call and apply", async () => {
@@ -249,5 +330,22 @@ function buildSingleTargetProposal(): ProviderEditRawProposal {
     confidence: "high",
     riskSummary: "controlled fixture exact rename",
     verificationPlan: ["safe readback verifies runApp and absence of startApp"],
+  };
+}
+
+function buildRepairableFailureProposal(): ProviderEditRawProposal {
+  return {
+    operationKind: "exact-fenced-replacement",
+    targets: [
+      {
+        path: "src/smoke.ts",
+        summary: "rename declaration while leaving a deterministic call-site verification failure",
+        oldText: realTaskLoopExactOldText,
+        newText: realTaskLoopRepairableFailedText,
+      },
+    ],
+    confidence: "high",
+    riskSummary: "controlled fixture exact repair-chain setup",
+    verificationPlan: ["readback detects remaining old call site before repair"],
   };
 }
