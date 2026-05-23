@@ -7522,6 +7522,17 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.finalOutput).toContain("Ground the proposal in read evidence");
     expect(result.finalOutput).toContain("Edit targets:");
     expect(result.finalOutput).toContain("Verification intent:");
+    expect(result.finalOutput).toContain("Review-only handoff:");
+    expect(result.finalOutput).toContain("Backend lane: generated-edit-proposal-review");
+    expect(result.finalOutput).toContain("Execution lane after inputs: existing-exact-fenced-route");
+    expect(result.finalOutput).toContain("Proposal: generated-edit-");
+    expect(result.finalOutput).toContain("Proposal review: review-required");
+    expect(result.finalOutput).toContain("Exact mapping readiness: missing");
+    expect(result.finalOutput).toContain("Requirements:");
+    expect(result.finalOutput).toContain("exact-old-new-mapping status=missing-before-execution");
+    expect(result.finalOutput).toContain("workspace-authority status=required-by-existing-route");
+    expect(result.finalOutput).toContain("claim-ledger-verdict status=required-by-existing-route");
+    expect(result.finalOutput).toContain("Permission state: not-requested");
     expect(result.finalOutput).toContain("mutationAuthority=not-granted");
     expect(result.finalOutput).toContain("provider-called=false");
     expect(result.finalOutput).toContain("apply=not-run");
@@ -7542,6 +7553,15 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         "context-acquisition:mutation-authority:not-granted",
         "grounded-planning:evidence-grounded",
         "grounded-planning:mutation-authority:not-granted",
+        "planning-mutation-handoff:readiness:review-ready",
+        "planning-mutation-handoff:backend-lane:generated-edit-proposal-review",
+        "planning-mutation-handoff:execution-lane:existing-exact-fenced-route",
+        "planning-mutation-handoff:permission:not-requested",
+        "planning-mutation-handoff:requirement:exact-old-new-mapping:missing-before-execution",
+        "planning-mutation-handoff:requirement:claim-ledger-verdict:required-by-existing-route",
+        "generated-edit-proposal:mutation-authority:not-granted",
+        "edit-proposal-review:status:review-required",
+        "edit-proposal-review:readiness:missing",
       ]),
     );
     expect(evidence.some((entry) => entry.startsWith("context-engine:status:"))).toBe(true);
@@ -7613,6 +7633,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       expect(result.finalOutput).toContain("Grounded analysis:");
       expect(result.finalOutput).toContain("Executable plan:");
       expect(result.finalOutput).toContain("Verification intent:");
+      expect(result.finalOutput).toContain("Review-only handoff:");
+      if (scenario.taskKind === "write-file") {
+        expect(result.finalOutput).toContain("Backend lane: none");
+        expect(result.finalOutput).toContain("Execution lane after inputs: none");
+        expect(result.finalOutput).toContain("Proposal review: none");
+      }
       expect(result.finalOutput).toContain("mutationAuthority=not-granted");
       expect(result.finalOutput).toContain("provider-called=false");
       expect(result.finalOutput).toContain("apply=not-run");

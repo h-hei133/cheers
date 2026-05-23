@@ -137,8 +137,19 @@ function formatPlanningRuntimeProductOutput(input: {
     "",
     "Review-only handoff:",
     `Readiness: ${surface.mutationHandoff.readiness}`,
+    `Review state: ${surface.mutationHandoff.reviewState}`,
+    `Permission state: ${surface.mutationHandoff.permissionState}`,
+    `Backend lane: ${surface.mutationHandoff.backendLane}`,
+    `Execution lane after inputs: ${surface.mutationHandoff.executionLane}`,
     `Target paths: ${surface.mutationHandoff.targetPaths.join(", ") || "none"}`,
+    `Proposal: ${surface.mutationHandoff.proposalId ?? "none"}`,
+    `Proposal review: ${surface.mutationHandoff.proposalReview?.reviewStatus ?? "none"}`,
+    `Exact mapping readiness: ${surface.mutationHandoff.proposalReview?.exactMappingReadiness ?? "none"}`,
     `Reason: ${surface.mutationHandoff.reason}`,
+    `Blocked reasons: ${surface.mutationHandoff.blockedReasons.join("; ") || "none"}`,
+    "Requirements:",
+    ...formatHandoffRequirements(surface.mutationHandoff.requirements),
+    `Next: ${surface.mutationHandoff.nextAction}`,
     "mutationAuthority=not-granted",
     "provider-called=false",
     "apply=not-run",
@@ -286,11 +297,32 @@ function formatVerificationIntent(
   ].filter(Boolean).join("; ");
 }
 
+function formatHandoffRequirements(
+  requirements: ReturnType<
+    typeof projectPlanningRuntimeSurface
+  >["mutationHandoff"]["requirements"],
+): string[] {
+  if (requirements.length === 0) {
+    return ["- none"];
+  }
+  return requirements.map((requirement) =>
+    [
+      `- ${requirement.id}`,
+      `status=${requirement.status}`,
+      `owner=${requirement.owner}`,
+      `detail=${requirement.detail}`,
+    ].join(" "),
+  );
+}
+
 function selectEvidenceMarkers(evidence: readonly string[]): readonly string[] {
   const selected = evidence.filter((entry) =>
     entry.startsWith("context-engine:") ||
     entry.startsWith("context-acquisition:") ||
     entry.startsWith("planning-runtime:") ||
+    entry.startsWith("planning-mutation-handoff:") ||
+    entry.startsWith("generated-edit-proposal:") ||
+    entry.startsWith("edit-proposal-review:") ||
     entry.startsWith("planning-runtime-product:") ||
     entry === "mutationAuthority=not-granted" ||
     entry === "provider-called=false" ||

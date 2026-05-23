@@ -3,6 +3,10 @@ import crypto from "node:crypto";
 import { buildVerificationCommandPlan, type VerificationCommandPlan } from "./verificationCommandPlan.js";
 import { buildGroundedPlanningProjection } from "./groundedPlanningProjection.js";
 import {
+  buildPlanningMutationHandoffProjection,
+  type PlanningMutationHandoffProjection,
+} from "./planningMutationHandoffProjection.js";
+import {
   runContextEngine,
   type ContextEngineResult,
   type ContextEngineTaskKindHint,
@@ -43,13 +47,7 @@ export interface PlanningRuntimeResult {
     readonly commands: readonly string[];
     readonly evidence: readonly string[];
   };
-  readonly mutationHandoff: {
-    readonly readiness: "review-ready" | "blocked";
-    readonly targetPaths: readonly string[];
-    readonly route: "Route203-206-proof-carrying-backend";
-    readonly reason: string;
-    readonly mutationAuthority: "not-granted";
-  };
+  readonly mutationHandoff: PlanningMutationHandoffProjection;
   readonly continuationMemory: ContextWorkingMemory;
   readonly evidence: readonly string[];
 }
@@ -115,6 +113,12 @@ export async function runPlanningRuntime(input: {
     editTargets: editTargets.map((target) => target.path),
     memoryId: context.memory.memoryId,
   })}`;
+  const mutationHandoff = buildPlanningMutationHandoffProjection({
+    editTargets,
+    missingFacts,
+    taskKind: context.workflowPlan.taskKind,
+    verificationIntentAvailable: hasVerificationIntent(verificationIntent),
+  });
 
   return {
     runtimeId,
@@ -142,20 +146,7 @@ export async function runPlanningRuntime(input: {
     },
     editTargets,
     verificationIntent,
-    mutationHandoff: {
-      readiness: reviewReadyMutationTarget && missingFacts.length === 0 ? "review-ready" : "blocked",
-      targetPaths: editTargets.map((target) => target.path),
-      route: "Route203-206-proof-carrying-backend",
-      reason:
-        reviewReadyMutationTarget && missingFacts.length === 0
-          ? "Context, analysis, plan, target selection, and verification intent are ready for review-gated mutation handoff."
-          : readOnlyPlanningReady
-            ? "Read-only planning path produced context, analysis, and plan evidence; no mutation target was selected."
-          : context.status === "reused-memory" && missingFacts.length === 0
-            ? "Fresh continuation memory can be reviewed before mutation handoff."
-            : "Planning runtime needs more grounded context before mutation handoff.",
-      mutationAuthority: "not-granted",
-    },
+    mutationHandoff,
     continuationMemory: context.memory,
     evidence: [
       ...context.evidence,
@@ -163,6 +154,7 @@ export async function runPlanningRuntime(input: {
       ...(context.bundle?.planQuality.evidence ?? []),
       ...(Array.isArray(verificationIntent.evidence) ? verificationIntent.evidence : []),
       ...groundedPlanning.evidence,
+      ...mutationHandoff.evidence,
       `planning-runtime:id:${runtimeId}`,
       `planning-runtime:status:${status}`,
       `planning-runtime:edit-targets:${editTargets.length}`,
@@ -171,6 +163,19 @@ export async function runPlanningRuntime(input: {
       "planning-runtime:command-dispatch:not-run",
     ],
   };
+}
+
+function hasVerificationIntent(
+  verificationIntent: PlanningRuntimeResult["verificationIntent"],
+): boolean {
+  if ("verificationPlanId" in verificationIntent) {
+    return Boolean(
+      verificationIntent.commandSafeLabel ||
+      verificationIntent.command ||
+      verificationIntent.expectedEvidence.length > 0,
+    );
+  }
+  return verificationIntent.commands.length > 0;
 }
 
 function isReadOnlyPlanningTask(taskKind: ContextEngineResult["workflowPlan"]["taskKind"]): boolean {

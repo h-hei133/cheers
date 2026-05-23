@@ -100,6 +100,11 @@ export {
   type PlanningRuntimeSurface,
 } from "./planningRuntimeSurface.js";
 export {
+  buildPlanningMutationHandoffProjection,
+  type PlanningMutationHandoffProjection,
+  type PlanningMutationHandoffRequirement,
+} from "./planningMutationHandoffProjection.js";
+export {
   projectContextAcquisition,
   type ContextAcquisitionProjection,
 } from "./contextAcquisitionProjection.js";

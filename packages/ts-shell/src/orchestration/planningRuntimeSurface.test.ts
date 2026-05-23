@@ -112,8 +112,29 @@ describe("projectPlanningRuntimeSurface", () => {
         readiness: "blocked",
         targetPaths: ["src/app.ts"],
         route: "Route203-206-proof-carrying-backend",
+        backendLane: "none",
+        executionLane: "none",
+        reviewState: "blocked",
+        permissionState: "not-requested",
+        requirements: [
+          {
+            id: "selected-target",
+            status: "available-for-review",
+            owner: "planning-runtime",
+            detail: "selected src/app.ts",
+          },
+          {
+            id: "exact-old-new-mapping",
+            status: "not-applicable",
+            owner: "reviewer",
+            detail: "blocked until context is ready",
+          },
+        ],
+        blockedReasons: ["call-site context missing"],
         reason: "needs context",
+        nextAction: "Resolve missing facts before requesting mutation.",
         mutationAuthority: "not-granted",
+        evidence: ["planning-mutation-handoff:readiness:blocked"],
       },
       continuationMemory: {
         memoryId: "ctx_mem_test",
@@ -162,6 +183,14 @@ describe("projectPlanningRuntimeSurface", () => {
       readiness: "not-ready",
     });
     expect(surface.mutationHandoff.readiness).toBe("blocked");
+    expect(surface.mutationHandoff.backendLane).toBe("none");
+    expect(surface.mutationHandoff.permissionState).toBe("not-requested");
+    expect(surface.mutationHandoff.requirements).toContainEqual(
+      expect.objectContaining({
+        id: "selected-target",
+        status: "available-for-review",
+      }),
+    );
     expect(surface.safety).toEqual({
       mutationAuthority: "not-granted",
       providerCall: "not-run",
