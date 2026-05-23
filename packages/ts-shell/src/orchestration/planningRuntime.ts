@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 import { buildVerificationCommandPlan, type VerificationCommandPlan } from "./verificationCommandPlan.js";
+import { buildGroundedPlanningProjection } from "./groundedPlanningProjection.js";
 import {
   runContextEngine,
   type ContextEngineResult,
@@ -95,6 +96,7 @@ export async function runPlanningRuntime(input: {
   const missingFacts = buildBlockingFacts({ context, memoryMissingFacts });
   const planningWarnings = buildPlanningWarnings({ context, verificationIntent, blockingFacts: missingFacts });
   const editTargets = selectEditTargets(context, missingFacts);
+  const groundedPlanning = buildGroundedPlanningProjection(context);
   const reviewReadyMutationTarget =
     editTargets.some((target) => target.readiness === "ready-for-review");
   const readOnlyPlanningReady =
@@ -119,7 +121,7 @@ export async function runPlanningRuntime(input: {
     status,
     context,
     groundedAnalysis: {
-      summary: context.bundle?.analysisBrief.replaySafeSummary ?? context.memory.compactSummary,
+      summary: groundedPlanning.analysisSummary,
       confidence: context.bundle?.analysisCalibration.confidence ?? (context.status === "reused-memory" ? "medium" : "low"),
       missingFacts,
       planningWarnings,
@@ -133,8 +135,8 @@ export async function runPlanningRuntime(input: {
       ],
     },
     executablePlan: {
-      summary: context.bundle?.taskExecutionPlan.proposedStrategy ?? context.memory.handoffSummary,
-      steps: buildExecutableSteps(context),
+      summary: groundedPlanning.planSummary,
+      steps: groundedPlanning.steps,
       ...(context.bundle ? { planQuality: context.bundle.planQuality.level } : {}),
       ...(context.bundle ? { executionPlanId: context.bundle.taskExecutionPlan.executionPlanId } : {}),
     },
@@ -160,6 +162,7 @@ export async function runPlanningRuntime(input: {
       ...(context.bundle?.agentPlan.safeEvidenceMarkers ?? []),
       ...(context.bundle?.planQuality.evidence ?? []),
       ...(Array.isArray(verificationIntent.evidence) ? verificationIntent.evidence : []),
+      ...groundedPlanning.evidence,
       `planning-runtime:id:${runtimeId}`,
       `planning-runtime:status:${status}`,
       `planning-runtime:edit-targets:${editTargets.length}`,
@@ -269,31 +272,6 @@ function buildPlanningWarnings(input: {
           : []),
       ];
   return unique(warnings).filter((warning) => !blocking.has(warning));
-}
-
-function buildExecutableSteps(context: ContextEngineResult): readonly string[] {
-  if (context.status === "reused-memory") {
-    return [
-      "Reuse fresh compact context memory.",
-      "Review selected edit targets.",
-      "Send exact proposal to existing proof-carrying mutation runtime only after review.",
-      "Run planned verification through existing runtime permission checks.",
-    ];
-  }
-  if (!context.bundle) {
-    return [
-      "Acquire a concrete in-workspace target.",
-      "Re-run context engine with a bounded candidate set.",
-      "Stop before mutation until target evidence exists.",
-    ];
-  }
-  return [
-    "Use repo intelligence candidate ranking as the target shortlist.",
-    "Read selected target and graph-adjacent files within context budget.",
-    "Ground analysis in task context sufficiency and code graph impact.",
-    "Review edit target selection before Route203-206 mutation handoff.",
-    "Use verification intent without dispatching commands in planning mode.",
-  ];
 }
 
 function unique(values: readonly string[]): readonly string[] {

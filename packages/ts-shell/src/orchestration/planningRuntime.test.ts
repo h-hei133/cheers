@@ -54,12 +54,25 @@ describe("runPlanningRuntime", () => {
       handoffRoute: "existing-proof-carrying-mutation-runtime",
     });
     expect(result.groundedAnalysis.evidenceIds.some((id) => id.startsWith("analysis_") || id.startsWith("analysis_brief_"))).toBe(true);
-    expect(result.executablePlan.steps).toContain("Review edit target selection before Route203-206 mutation handoff.");
+    expect(result.groundedAnalysis.summary).toContain("Target src/contextEngine.ts");
+    expect(result.groundedAnalysis.summary).toContain("Read evidence:");
+    expect(result.groundedAnalysis.summary).toContain("contextSufficiency=");
+    expect(result.groundedAnalysis.summary).not.toMatch(/^analysis-brief analysis_brief_/);
+    expect(result.executablePlan.summary).toContain("src/contextEngine.ts");
+    expect(result.executablePlan.steps).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Use src/contextEngine.ts as the primary planning target"),
+        expect.stringContaining("Ground the proposal in read evidence"),
+        expect.stringContaining("mutationAuthority remains not-granted"),
+      ]),
+    );
     expect(result.mutationHandoff.route).toBe("Route203-206-proof-carrying-backend");
     expect(result.mutationHandoff.mutationAuthority).toBe("not-granted");
     expect(result.evidence).toContain("planning-runtime:mutation-authority:not-granted");
     expect(result.evidence).toContain("planning-runtime:provider-call:not-run");
     expect(result.evidence).toContain("planning-runtime:command-dispatch:not-run");
+    expect(result.evidence).toContain("grounded-planning:evidence-grounded");
+    expect(result.evidence).toContain("grounded-planning:mutation-authority:not-granted");
   });
 
   it("uses continuation memory as a planning input and keeps handoff review-only", async () => {

@@ -92,6 +92,10 @@ export {
   type PlanningRuntimeResult,
 } from "./planningRuntime.js";
 export {
+  buildGroundedPlanningProjection,
+  type GroundedPlanningProjection,
+} from "./groundedPlanningProjection.js";
+export {
   projectPlanningRuntimeSurface,
   type PlanningRuntimeSurface,
 } from "./planningRuntimeSurface.js";

@@ -7513,7 +7513,13 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.finalOutput).toContain("Omitted context:");
     expect(result.finalOutput).toContain("Next reads:");
     expect(result.finalOutput).toContain("Grounded analysis:");
+    expect(result.finalOutput).toContain("Target src/planning/targetRanking.ts");
+    expect(result.finalOutput).toContain("Read evidence:");
+    expect(result.finalOutput).toContain("contextSufficiency=");
+    expect(result.finalOutput).not.toContain("analysis-brief analysis_brief_");
     expect(result.finalOutput).toContain("Executable plan:");
+    expect(result.finalOutput).toContain("Use src/planning/targetRanking.ts as the primary planning target");
+    expect(result.finalOutput).toContain("Ground the proposal in read evidence");
     expect(result.finalOutput).toContain("Edit targets:");
     expect(result.finalOutput).toContain("Verification intent:");
     expect(result.finalOutput).toContain("mutationAuthority=not-granted");
@@ -7534,6 +7540,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         "context-acquisition:stage:candidate-discovery",
         "context-acquisition:stage:initial-high-value-reads",
         "context-acquisition:mutation-authority:not-granted",
+        "grounded-planning:evidence-grounded",
+        "grounded-planning:mutation-authority:not-granted",
       ]),
     );
     expect(evidence.some((entry) => entry.startsWith("context-engine:status:"))).toBe(true);
