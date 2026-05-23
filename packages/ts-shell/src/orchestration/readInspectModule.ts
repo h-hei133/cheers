@@ -96,6 +96,10 @@ export {
   type PlanningRuntimeSurface,
 } from "./planningRuntimeSurface.js";
 export {
+  projectContextAcquisition,
+  type ContextAcquisitionProjection,
+} from "./contextAcquisitionProjection.js";
+export {
   buildContextGraphReadinessFacts,
   type ContextGraphReadinessFacts,
 } from "./contextGraphReadiness.js";

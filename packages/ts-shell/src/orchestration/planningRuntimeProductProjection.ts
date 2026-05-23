@@ -21,7 +21,7 @@ export function projectPlanningRuntimeProductOutcome(input: {
   ].join(" ");
   const verificationReason =
     "Planning runtime produced verification intent only; command-dispatch=not-run.";
-  const productEvidence = buildProductEvidence(input.result, input.productPath, input.routeEvidence ?? []);
+  const productEvidence = buildProductEvidence(input.result, input.productPath, input.routeEvidence ?? [], surface);
   const nextAction = selectNextAction(surface.enoughContext, targetPaths);
 
   return projectRuntimeCodingOutcome({
@@ -69,6 +69,7 @@ function buildProductEvidence(
   result: PlanningRuntimeResult,
   productPath: "runMvpIntegratedFlow",
   routeEvidence: readonly string[],
+  surface: ReturnType<typeof projectPlanningRuntimeSurface>,
 ): string[] {
   return [
     `planning-runtime-product:path:${productPath}`,
@@ -90,6 +91,7 @@ function buildProductEvidence(
       (file) =>
         `planning-runtime-product:read-reason:${file.path}:${file.reason}`,
     ),
+    ...surface.contextAcquisition.evidence,
     ...result.evidence,
   ];
 }
@@ -111,7 +113,7 @@ function formatPlanningRuntimeProductOutput(input: {
     ...formatCandidates(surface.candidates),
     "",
     "Read/staged context:",
-    ...formatFilesRead(surface.filesRead),
+    ...formatContextAcquisition(surface.contextAcquisition),
     "",
     `Enough context: ${surface.enoughContext}`,
     `Missing facts: ${surface.missingFacts.join("; ") || "none"}`,
@@ -177,15 +179,82 @@ function formatCandidates(
   );
 }
 
-function formatFilesRead(
-  filesRead: ReturnType<typeof projectPlanningRuntimeSurface>["filesRead"],
+function formatContextAcquisition(
+  acquisition: ReturnType<typeof projectPlanningRuntimeSurface>["contextAcquisition"],
 ): string[] {
-  if (filesRead.length === 0) {
-    return ["- none"];
+  const ids = [
+    `mode=${acquisition.mode}`,
+    acquisition.packetId ? `packet=${acquisition.packetId}` : undefined,
+    acquisition.acquisitionId ? `acquisition=${acquisition.acquisitionId}` : undefined,
+    acquisition.sufficiencyState ? `sufficiency=${acquisition.sufficiencyState}` : undefined,
+  ].filter(Boolean).join("; ");
+  return [
+    `- Acquisition: ${ids}`,
+    [
+      "- Budget:",
+      `candidateFiles=${acquisition.budget.candidateFiles}`,
+      `filesRead=${acquisition.budget.filesRead}`,
+      `bytesUsed=${acquisition.budget.bytesUsed}`,
+      acquisition.budget.maxFilesRead !== undefined ? `maxFiles=${acquisition.budget.maxFilesRead}` : undefined,
+      acquisition.budget.maxTotalBytes !== undefined ? `maxBytes=${acquisition.budget.maxTotalBytes}` : undefined,
+      `cache=${acquisition.budget.cacheStatus}`,
+    ].filter(Boolean).join(" "),
+    ...acquisition.stages.map((stage) =>
+      `- Stage ${stage.name}: status=${stage.status}; ${stage.summary}`,
+    ),
+    ...formatContextReads(acquisition.reads),
+    ...formatOmittedContext(acquisition.omitted),
+    ...formatNextReads(acquisition.nextReads),
+  ];
+}
+
+function formatContextReads(
+  reads: ReturnType<typeof projectPlanningRuntimeSurface>["contextAcquisition"]["reads"],
+): string[] {
+  if (reads.length === 0) {
+    return ["- Reads: none"];
   }
-  return filesRead.map((file) =>
-    `- ${file.path} source=${file.source} reason=${file.reason}`,
+  return reads.map((read) =>
+    [
+      `- Read ${read.path}`,
+      `stage=${read.stage}`,
+      `source=${read.source}`,
+      `why-read=${read.whyRead}`,
+      read.byteLength !== undefined ? `bytes=${read.byteLength}` : undefined,
+    ].filter(Boolean).join(" "),
   );
+}
+
+function formatOmittedContext(
+  omitted: ReturnType<typeof projectPlanningRuntimeSurface>["contextAcquisition"]["omitted"],
+): string[] {
+  if (omitted.length === 0) {
+    return ["- Omitted context: none"];
+  }
+  return [
+    "- Omitted context:",
+    ...omitted.slice(0, 8).map((item) =>
+      [
+        `  - ${item.path}`,
+        `stage=${item.stage}`,
+        `source=${item.source}`,
+        `reason=${item.reason}`,
+        item.byteLength !== undefined ? `bytes=${item.byteLength}` : undefined,
+      ].filter(Boolean).join(" "),
+    ),
+  ];
+}
+
+function formatNextReads(
+  nextReads: ReturnType<typeof projectPlanningRuntimeSurface>["contextAcquisition"]["nextReads"],
+): string[] {
+  if (nextReads.length === 0) {
+    return ["- Next reads: none required"];
+  }
+  return [
+    "- Next reads:",
+    ...nextReads.slice(0, 8).map((read) => `  - ${read}`),
+  ];
 }
 
 function formatEditTargets(
@@ -220,6 +289,7 @@ function formatVerificationIntent(
 function selectEvidenceMarkers(evidence: readonly string[]): readonly string[] {
   const selected = evidence.filter((entry) =>
     entry.startsWith("context-engine:") ||
+    entry.startsWith("context-acquisition:") ||
     entry.startsWith("planning-runtime:") ||
     entry.startsWith("planning-runtime-product:") ||
     entry === "mutationAuthority=not-granted" ||

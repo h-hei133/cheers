@@ -1,4 +1,8 @@
 import type { PlanningRuntimeResult } from "./planningRuntime.js";
+import {
+  projectContextAcquisition,
+  type ContextAcquisitionProjection,
+} from "./contextAcquisitionProjection.js";
 
 export interface PlanningRuntimeSurface {
   readonly runtimeId: string;
@@ -14,6 +18,7 @@ export interface PlanningRuntimeSurface {
     readonly reason: string;
     readonly source: string;
   }[];
+  readonly contextAcquisition: ContextAcquisitionProjection;
   readonly enoughContext: "yes" | "missing-facts";
   readonly missingFacts: readonly string[];
   readonly planningWarnings: readonly string[];
@@ -55,6 +60,7 @@ export interface PlanningRuntimeSurface {
 export function projectPlanningRuntimeSurface(
   result: PlanningRuntimeResult,
 ): PlanningRuntimeSurface {
+  const contextAcquisition = projectContextAcquisition(result.context);
   return {
     runtimeId: result.runtimeId,
     status: result.status,
@@ -69,6 +75,7 @@ export function projectPlanningRuntimeSurface(
       reason: file.reason,
       source: file.source,
     })),
+    contextAcquisition,
     enoughContext: result.groundedAnalysis.missingFacts.length === 0 ? "yes" : "missing-facts",
     missingFacts: result.groundedAnalysis.missingFacts,
     planningWarnings: result.groundedAnalysis.planningWarnings,
@@ -101,6 +108,7 @@ export function projectPlanningRuntimeSurface(
       `planning-runtime-surface:edit-targets:${result.editTargets.length}`,
       `planning-runtime-surface:missing-facts:${result.groundedAnalysis.missingFacts.length}`,
       `planning-runtime-surface:warnings:${result.groundedAnalysis.planningWarnings.length}`,
+      ...contextAcquisition.evidence,
       "planning-runtime-surface:mutation-authority:not-granted",
       "planning-runtime-surface:provider-call:not-run",
       "planning-runtime-surface:command-dispatch:not-run",

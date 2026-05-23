@@ -148,6 +148,14 @@ describe("projectPlanningRuntimeSurface", () => {
     expect(surface.planningWarnings).toEqual(["adjacent verification is inferred"]);
     expect(surface.groundedAnalysis.planningWarnings).toEqual(["adjacent verification is inferred"]);
     expect(surface.memory.planningWarnings).toBe(1);
+    expect(surface.contextAcquisition.mode).toBe("memory-reuse");
+    expect(surface.contextAcquisition.stages.map((stage) => stage.name)).toContain("memory-reuse");
+    expect(surface.contextAcquisition.budget.filesRead).toBe(0);
+    expect(surface.contextAcquisition.safety).toEqual({
+      mutationAuthority: "not-granted",
+      providerCall: "not-run",
+      commandDispatch: "not-run",
+    });
     expect(surface.verificationIntent).toMatchObject({
       state: "context-not-ready",
       command: "npm test -- --help",
@@ -161,5 +169,7 @@ describe("projectPlanningRuntimeSurface", () => {
     });
     expect(surface.evidence).toContain("planning-runtime-surface:raw-content-excluded");
     expect(surface.evidence).toContain("planning-runtime-surface:warnings:1");
+    expect(surface.evidence).toContain("context-acquisition:mode:memory-reuse");
+    expect(surface.evidence).toContain("context-acquisition:stage:memory-reuse");
   });
 });

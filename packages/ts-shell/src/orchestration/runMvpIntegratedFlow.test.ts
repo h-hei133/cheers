@@ -7506,6 +7506,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.finalOutput).toContain("Candidates:");
     expect(result.finalOutput).toContain("src/planning/targetRanking.ts");
     expect(result.finalOutput).toContain("Read/staged context:");
+    expect(result.finalOutput).toContain("Stage candidate-discovery:");
+    expect(result.finalOutput).toContain("Stage initial-high-value-reads:");
+    expect(result.finalOutput).toContain("Budget: candidateFiles=");
+    expect(result.finalOutput).toContain("why-read=explicit target");
+    expect(result.finalOutput).toContain("Omitted context:");
+    expect(result.finalOutput).toContain("Next reads:");
     expect(result.finalOutput).toContain("Grounded analysis:");
     expect(result.finalOutput).toContain("Executable plan:");
     expect(result.finalOutput).toContain("Edit targets:");
@@ -7524,6 +7530,10 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         "provider-called=false",
         "apply=not-run",
         "command-dispatch=not-run",
+        "context-acquisition:mode:staged-runtime",
+        "context-acquisition:stage:candidate-discovery",
+        "context-acquisition:stage:initial-high-value-reads",
+        "context-acquisition:mutation-authority:not-granted",
       ]),
     );
     expect(evidence.some((entry) => entry.startsWith("context-engine:status:"))).toBe(true);
@@ -7589,6 +7599,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       expect(result.finalOutput).toContain("Context engine: context-built");
       expect(result.finalOutput).toContain("Candidates:");
       expect(result.finalOutput).toContain("src/planning/targetRanking.ts");
+      expect(result.finalOutput).toContain("Read/staged context:");
+      expect(result.finalOutput).toContain("Stage sufficiency-check:");
+      expect(result.finalOutput).toContain("why-read=explicit target");
       expect(result.finalOutput).toContain("Grounded analysis:");
       expect(result.finalOutput).toContain("Executable plan:");
       expect(result.finalOutput).toContain("Verification intent:");
@@ -7606,6 +7619,8 @@ describe("MVP integrated end-to-end flow (T10)", () => {
           "provider-called=false",
           "apply=not-run",
           "command-dispatch=not-run",
+          "context-acquisition:mode:staged-runtime",
+          "context-acquisition:stage:sufficiency-check",
         ]),
       );
     }
