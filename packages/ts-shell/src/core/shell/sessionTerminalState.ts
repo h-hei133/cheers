@@ -10,6 +10,7 @@ import { projectSessionResultParity } from "../../session/sessionResultParity.js
 import type { QueryEvent } from "../query/events.js";
 import type { RuntimeEventDigest } from "./sessionEventSurface.js";
 import { renderExecutionSummaryBlock } from "./sessionEventSurface.js";
+import { selectPrintTerminalOutput } from "./sessionPrintOutputProjection.js";
 import { formatExplicitRestoreSummaryLines } from "./restoreSurfaceSummary.js";
 
 export interface SessionTerminalState {
@@ -66,14 +67,14 @@ export function renderSessionTerminalSurface(input: {
   const renderMode = input.viewMode === "verbose" ? "verbose" : "minimal";
 
   if (input.printMode) {
-    if (terminalState.terminalStatus === "completed") {
-      if (terminalState.finalOutput.length > 0) {
-        input.renderer.renderLine(terminalState.finalOutput);
-      }
-    } else {
-      input.renderer.renderLine(
-        terminalState.terminalStopReason ?? terminalState.terminalStatus,
-      );
+    const printOutput = selectPrintTerminalOutput({
+      finalOutput: terminalState.finalOutput,
+      terminalStatus: terminalState.terminalStatus,
+      terminalStopReason: terminalState.terminalStopReason,
+      codingResult: terminalState.terminalCodingResult,
+    });
+    if (printOutput) {
+      input.renderer.renderLine(printOutput);
     }
     renderTerminalResultBlock(input.renderer, {
       status: terminalState.terminalStatus,

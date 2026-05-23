@@ -7468,6 +7468,68 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
   }, 15000);
 
+  it("runs Route207 planning runtime on the product vague edit path without demo-only completion", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src", "planning"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "route207b-product-path", scripts: { test: "vitest run" } }, null, 2),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "planning", "targetRanking.ts"),
+      [
+        "export function rankPlannerTargets(task: string) {",
+        "  return task.includes('planner') ? 'targetRanking.ts' : 'unknown';",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "planning", "targetRanking.test.ts"),
+      "expect(rankPlannerTargets('planner target ranking')).toBe('targetRanking.ts');\n",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_route207b_product_path",
+      prompt: "Fix the planner target ranking bug and cover the adjacent test",
+      workspaceRoot,
+      maxTurns: 4,
+    });
+
+    const evidence = result.codingResult?.evidence ?? [];
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.taskKind).toBe("edit-file");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.finalOutput).toContain("Planning runtime: product-path review-only handoff");
+    expect(result.finalOutput).toContain("Context engine: context-built");
+    expect(result.finalOutput).toContain("Candidates:");
+    expect(result.finalOutput).toContain("src/planning/targetRanking.ts");
+    expect(result.finalOutput).toContain("Read/staged context:");
+    expect(result.finalOutput).toContain("Grounded analysis:");
+    expect(result.finalOutput).toContain("Executable plan:");
+    expect(result.finalOutput).toContain("Edit targets:");
+    expect(result.finalOutput).toContain("Verification intent:");
+    expect(result.finalOutput).toContain("mutationAuthority=not-granted");
+    expect(result.finalOutput).toContain("provider-called=false");
+    expect(result.finalOutput).toContain("apply=not-run");
+    expect(result.finalOutput).toContain("command-dispatch=not-run");
+    expect(result.finalOutput).toContain("scope=product-turn; session-continuation=not-wired");
+    expect(evidence).toEqual(
+      expect.arrayContaining([
+        "planning-runtime-product:path:runMvpIntegratedFlow",
+        "planning-runtime-product:demo-success-alone:not-product-path-success",
+        "session-print:stopped-final-output:include",
+        "mutationAuthority=not-granted",
+        "provider-called=false",
+        "apply=not-run",
+        "command-dispatch=not-run",
+      ]),
+    );
+    expect(evidence.some((entry) => entry.startsWith("context-engine:status:"))).toBe(true);
+    expect(evidence.some((entry) => entry.startsWith("planning-runtime:id:"))).toBe(true);
+    expect(evidence.some((entry) => entry.startsWith("inspect: read src/planning/targetRanking.ts"))).toBe(true);
+  }, 15000);
+
   it("stops broad edit prompts on targeted context planning without mutation authority", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(path.join(workspaceRoot, "src", "target.ts"), "export const target = 1;\n");
