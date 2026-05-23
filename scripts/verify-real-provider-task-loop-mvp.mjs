@@ -15,6 +15,8 @@ import {
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
 const runnerPath = path.join(repoRoot, 'scripts', 'real-provider-smokes', 'taskLoopRunner.ts')
+const gateName = process.env.PRIVATE_AGENTS_TASK_LOOP_GATE_NAME?.trim() || 'real-provider-task-loop-mvp'
+const routeLabel = process.env.PRIVATE_AGENTS_TASK_LOOP_ROUTE_LABEL?.trim() || 'route200-real-provider-task-loop-mvp'
 
 const focusedTests = [
   'src/orchestration/realTaskLoopFixture.test.ts',
@@ -44,8 +46,8 @@ const focusedTests = [
   'src/orchestration/harnessFailureTaxonomy.test.ts',
 ]
 
-console.log('gate name=real-provider-task-loop-mvp')
-console.log('route=route200-real-provider-task-loop-mvp')
+console.log(`gate name=${gateName}`)
+console.log(`route=${routeLabel}`)
 console.log('marker task-loop-default-no-provider-call')
 console.log('marker task-loop-default-no-apply')
 console.log('marker task-loop-fake-confirmation-required')
@@ -139,11 +141,11 @@ function validateRunnerSuccessMarkers(stdout, env) {
   const expectedMarkers = expectedRunnerSuccessMarkers(env)
   const missing = expectedMarkers.filter((marker) => !stdout.includes(marker))
   if (missing.length > 0) {
-    console.log('[product-regression] real-provider-task-loop-mvp runner markers missing')
+    console.log(`[product-regression] ${gateName} runner markers missing`)
     for (const marker of missing) console.log(`missing-marker=${marker}`)
     return 1
   }
-  console.log('[pass] real-provider-task-loop-mvp runner markers validated')
+  console.log(`[pass] ${gateName} runner markers validated`)
   return 0
 }
 
@@ -322,7 +324,7 @@ function expectedRunnerSuccessMarkers(env) {
 function buildRunnerBundle(env) {
   const esbuild = require('esbuild')
   const testRoot = env.PRIVATE_AGENTS_TEST_ROOT?.trim() || '/tmp/private-agents-test'
-  const bundleDir = path.join(testRoot, 'real-provider-task-loop-mvp', 'runner')
+  const bundleDir = path.join(testRoot, gateName, 'runner')
   fs.mkdirSync(bundleDir, { recursive: true })
   const outfile = path.join(bundleDir, 'taskLoopRunner.cjs')
   esbuild.buildSync({
@@ -356,10 +358,10 @@ function runFocusedTests() {
     },
   )
   if (result.status !== 0) {
-    console.log(`[product-regression] real-provider-task-loop-mvp focused tests exited ${result.status}`)
+    console.log(`[product-regression] ${gateName} focused tests exited ${result.status}`)
     return result.status ?? 1
   }
-  console.log('[pass] real-provider-task-loop-mvp focused tests passed')
+  console.log(`[pass] ${gateName} focused tests passed`)
   return 0
 }
 

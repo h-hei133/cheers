@@ -44,9 +44,13 @@ const simulateVerificationFailure = process.env.PRIVATE_AGENTS_TASK_LOOP_SIMULAT
 const repairProof = process.env.PRIVATE_AGENTS_TASK_LOOP_REPAIR_PROOF?.trim() === "1";
 const confirmRepairApply = process.env.PRIVATE_AGENTS_CONFIRM_TASK_LOOP_REPAIR_APPLY?.trim() === "1";
 const testRoot = process.env.PRIVATE_AGENTS_TEST_ROOT?.trim();
+const routeApprovalLabel = process.env.PRIVATE_AGENTS_TASK_LOOP_APPROVAL_LABEL?.trim() || "Route 200 task loop";
+const routeSupportLabel = process.env.PRIVATE_AGENTS_TASK_LOOP_ROUTE_LABEL?.trim() || "route200 task loop";
+const runnerLabel = process.env.PRIVATE_AGENTS_TASK_LOOP_RUNNER_LABEL?.trim() || "route200-real-provider-task-loop-mvp";
+const requestId = process.env.PRIVATE_AGENTS_TASK_LOOP_REQUEST_ID?.trim() || "route200-live-task-loop";
 const config = readConfig();
 
-console.log("task-loop-runner=route200-real-provider-task-loop-mvp");
+console.log(`task-loop-runner=${runnerLabel}`);
 console.log(`live-task-loop-opt-in=${liveOptIn}`);
 console.log(`real-provider-smoke-opt-in=${realProviderOptIn}`);
 console.log(`confirm-apply=${confirmApply}`);
@@ -108,8 +112,8 @@ async function run(): Promise<void> {
   if (config.providerKind !== "openai-compatible") {
     await runWithApprovalSkip({
       providerReadinessStatus: "unsupported",
-      skipDetail: `provider ${config.providerKind || "unknown"} is not approved for Route 200 task loop`,
-      providerAvailability: { kind: "unsupported", reason: "route200 task loop supports openai-compatible only" },
+      skipDetail: `provider ${config.providerKind || "unknown"} is not approved for ${routeApprovalLabel}`,
+      providerAvailability: { kind: "unsupported", reason: `${routeSupportLabel} supports openai-compatible only` },
     });
     return;
   }
@@ -194,7 +198,7 @@ async function runWithApprovalSkip(input: {
   console.log(`readiness-status=${input.providerReadinessStatus}`);
   console.log(`readiness-detail=${safeDetail(input.skipDetail)}`);
   const output = await runRealTaskLoopRuntime({
-    requestId: "route200-live-task-loop",
+    requestId,
     providerMode: liveOptIn && realProviderOptIn ? "real-opt-in" : "default-skip",
     confirmApply: false,
     simulateVerificationFailure,
@@ -216,7 +220,7 @@ async function runApproved(input: {
 }): Promise<void> {
   printApproval(input.approval);
   const output = await runRealTaskLoopRuntime({
-    requestId: "route200-live-task-loop",
+    requestId,
     providerMode: "real-opt-in",
     confirmApply,
     simulateVerificationFailure,

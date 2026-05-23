@@ -12,7 +12,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const taskLoopVerifier = path.join(repoRoot, 'scripts', 'verify-real-provider-task-loop-mvp.mjs')
 
 console.log('gate name=route205-repair-proof-chain')
-console.log('delegates=verify-real-provider-task-loop-mvp')
+console.log('delegates=task-loop-verifier-core')
 console.log('real-api-run=false')
 console.log('private-config-manual-read=false')
 console.log('marker route205-original-verification-failure-preserved')
@@ -56,6 +56,9 @@ const scenarios = [
       PRIVATE_AGENTS_REAL_HOME: fakeReadyHome,
     }),
     requiredOutput: [
+      'gate name=route205-repair-proof-chain',
+      'route=route205-repair-proof-chain',
+      'task-loop-runner=route205-repair-proof-chain',
       'verification=failed',
       'repair-evidence-original-readback=true',
       'claim-ledger-terminal=repair-confirmation-required',
@@ -66,7 +69,12 @@ const scenarios = [
       'provider-call-during-apply=false',
       'no-broad-mutation=true',
     ],
+    forbiddenOutput: [
+      'route=route200-real-provider-task-loop-mvp',
+      'task-loop-runner=route200-real-provider-task-loop-mvp',
+    ],
     markers: [
+      'route205-marker child-route-label=route205-repair-proof-chain',
       'route205-marker original-verification-failure-preserved=pass',
       'route205-marker repair-proposal-no-write-confirmation-required=pass',
       'route205-marker provider-call-during-apply=false',
@@ -87,6 +95,9 @@ const scenarios = [
       PRIVATE_AGENTS_REAL_HOME: fakeReadyHome,
     }),
     requiredOutput: [
+      'gate name=route205-repair-proof-chain',
+      'route=route205-repair-proof-chain',
+      'task-loop-runner=route205-repair-proof-chain',
       'verification=failed',
       'repair-evidence-original-readback=true',
       'repair-confirmation=trusted-confirmed',
@@ -103,7 +114,12 @@ const scenarios = [
       'provider-call-during-apply=false',
       'no-broad-mutation=true',
     ],
+    forbiddenOutput: [
+      'route=route200-real-provider-task-loop-mvp',
+      'task-loop-runner=route200-real-provider-task-loop-mvp',
+    ],
     markers: [
+      'route205-marker child-route-label=route205-repair-proof-chain',
       'route205-marker repair-confirmed-existing-exact-lane=pass',
       'route205-marker repair-reverification-succeeded=pass',
       'route205-marker fake-repair-not-live-success=pass',
@@ -134,6 +150,13 @@ for (const scenario of scenarios) {
     printTail(stdout, stderr)
     process.exit(1)
   }
+  const forbidden = (scenario.forbiddenOutput ?? []).filter((marker) => stdout.includes(marker))
+  if (forbidden.length > 0) {
+    console.log(`[product-regression] route205 legacy labels leaked: ${scenario.name}`)
+    for (const marker of forbidden) console.log(`forbidden-marker=${marker}`)
+    printTail(stdout, stderr)
+    process.exit(1)
+  }
   console.log(`[pass] route205 scenario ${scenario.name}`)
   for (const marker of scenario.markers) console.log(marker)
 }
@@ -151,6 +174,11 @@ function isolatedEnv(name, extra) {
     PRIVATE_AGENTS_TASK_LOOP_SIMULATE_VERIFICATION_FAILURE: '',
     PRIVATE_AGENTS_TASK_LOOP_REPAIR_PROOF: '',
     PRIVATE_AGENTS_CONFIRM_TASK_LOOP_REPAIR_APPLY: '',
+    PRIVATE_AGENTS_TASK_LOOP_GATE_NAME: 'route205-repair-proof-chain',
+    PRIVATE_AGENTS_TASK_LOOP_ROUTE_LABEL: 'route205-repair-proof-chain',
+    PRIVATE_AGENTS_TASK_LOOP_APPROVAL_LABEL: 'Route205 repair proof chain',
+    PRIVATE_AGENTS_TASK_LOOP_RUNNER_LABEL: 'route205-repair-proof-chain',
+    PRIVATE_AGENTS_TASK_LOOP_REQUEST_ID: name,
     PRIVATE_AGENTS_TEST_ROOT: root,
     HOME: `${root}-home`,
     USERPROFILE: `${root}-home`,
