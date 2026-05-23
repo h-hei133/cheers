@@ -122,6 +122,23 @@ export interface ClaimLedgerNotProvenClaim {
   readonly blocker: string;
 }
 
+export interface ClaimLedgerPerFileClaim {
+  readonly targetPath: string;
+  readonly proposalStatus: "proven" | "not-proven" | "failed";
+  readonly anchorQuality: "exact-ready" | "not-exact" | "missing";
+  readonly authorityStatus: "proven" | "blocked" | "invalid" | "not-run";
+  readonly applyStatus: "succeeded" | "failed" | "stopped" | "not-run";
+  readonly applyRuntimeDerived: boolean;
+  readonly verificationStatus: "succeeded" | "failed" | "not-run";
+  readonly readbackRuntimeDerived: boolean;
+  readonly verificationEvidenceCount: number;
+  readonly fileStatus: "changed" | "failed" | "unattempted";
+  readonly snapshotStatus: "created" | "blocked" | "not-run";
+  readonly recoveryStatus: "available" | "blocked" | "not-run";
+  readonly repairStatus?: ClaimLedgerRepairStatus;
+  readonly evidence: readonly string[];
+}
+
 export interface ClaimLedgerTerminalClaim {
   readonly status: ClaimLedgerTerminalStatus;
   readonly evidenceType: "ledger-derived";
@@ -146,6 +163,7 @@ export interface ClaimLedgerProjection {
   readonly verification: ClaimLedgerClaim;
   readonly recovery: ClaimLedgerClaim;
   readonly repair: ClaimLedgerRepairClaim;
+  readonly perFileClaims: readonly ClaimLedgerPerFileClaim[];
   readonly terminal: ClaimLedgerTerminalClaim;
   readonly notProvenClaims: readonly ClaimLedgerNotProvenClaim[];
   readonly replaySafeSummary: string;
@@ -172,6 +190,8 @@ export function buildClaimLedgerProjection(input: {
   readonly providerCallDuringApply: boolean;
   readonly scorecardStatus?: string;
   readonly repair?: ClaimLedgerRepairInput;
+  readonly perFileClaims?: readonly ClaimLedgerPerFileClaim[];
+  readonly requiredTargetPaths?: readonly string[];
 }): ClaimLedgerProjection {
   const provider = projectProviderClaim(input);
   const proposal = projectProposalClaim(input);
@@ -213,6 +233,8 @@ export function buildClaimLedgerProjection(input: {
     verification: verification.status,
     recovery: recovery.status,
     repair: repair.status,
+    perFileClaims: summarizePerFileClaims(input.perFileClaims ?? []),
+    requiredTargetPaths: input.requiredTargetPaths?.join(",") ?? "none",
     terminal: terminal.status,
     resultStatus: terminal.resultStatus,
   });
@@ -235,6 +257,8 @@ export function buildClaimLedgerProjection(input: {
     `verification=${verification.status}`,
     `recovery=${recovery.status}`,
     `repair=${repair.status}`,
+    ...(input.requiredTargetPaths?.length ? [`requiredFiles=${input.requiredTargetPaths.join(",")}`] : []),
+    ...(input.perFileClaims?.length ? [`files=${summarizePerFileClaims(input.perFileClaims)}`] : []),
     "raw-content-excluded",
   ].join("; ");
   return {
@@ -249,6 +273,7 @@ export function buildClaimLedgerProjection(input: {
     verification,
     recovery,
     repair,
+    perFileClaims: input.perFileClaims ?? [],
     terminal,
     notProvenClaims,
     replaySafeSummary,
@@ -265,6 +290,8 @@ export function buildClaimLedgerProjection(input: {
       `claim-ledger:verification:${verification.status}`,
       `claim-ledger:recovery:${recovery.status}`,
       `claim-ledger:repair:${repair.status}`,
+      ...(input.requiredTargetPaths ?? []).map((targetPath) => `claim-ledger:required-file:${targetPath}`),
+      ...projectPerFileClaimEvidence(input.perFileClaims ?? []),
       `claim-ledger:terminal:${terminal.status}`,
       `claim-ledger:terminal-result:${terminal.resultStatus}`,
       `claim-ledger:live-success:${terminal.liveSuccess}`,
@@ -342,12 +369,15 @@ function projectProposalClaim(input: {
   readonly evidenceSource: ClaimLedgerEvidenceSource;
 }): ClaimLedgerClaim {
   if (isValidExactOutput(input.outputValidationStatus)) {
+    const targetShape = input.outputValidationStatus === "valid-exact-hunk-set" ? "target-set" : "single-target";
     return claim({
       group: "proposal",
       status: "proven",
       source: input.evidenceSource,
-      scope: "single-target-exact-proposal",
-      reason: "Provider output validation proved one exact bounded target.",
+      scope: `${targetShape}-exact-proposal`,
+      reason: input.outputValidationStatus === "valid-exact-hunk-set"
+        ? "Provider output validation proved a bounded exact target set."
+        : "Provider output validation proved one exact bounded target.",
       receiptFields: { outputValidation: input.outputValidationStatus },
     });
   }
@@ -436,7 +466,7 @@ function projectAuthorityClaim(
         group: "authority",
         status: "proven",
         source: input.evidenceSource,
-        scope: "confirmed-exact-target",
+        scope: anchor.scope === "exact-hunk-set" ? "confirmed-exact-target-set" : "confirmed-exact-target",
         reason: "Trusted confirmation is backed by proven proposal and anchor claims.",
         receiptFields: { confirmation: input.confirmationStatus },
       });
@@ -845,6 +875,8 @@ function collectNotProvenClaims(
     readonly liveOptIn: boolean;
     readonly verificationStatus: "not-run" | "succeeded" | "failed";
     readonly repair?: ClaimLedgerRepairInput;
+    readonly perFileClaims?: readonly ClaimLedgerPerFileClaim[];
+    readonly requiredTargetPaths?: readonly string[];
   },
   claims: Record<Exclude<ClaimLedgerClaimGroup, "repair">, ClaimLedgerClaim> & {
     readonly repair: ClaimLedgerRepairClaim;
@@ -907,6 +939,26 @@ function collectNotProvenClaims(
       reason: "Provider provenance does not prove a live openai-compatible provider success claim.",
       blocker: "not-live-provider-evidence",
     });
+  }
+  for (const fileClaim of input.perFileClaims ?? []) {
+    const blocker = perFileClaimBlocker(fileClaim, repairSucceeded);
+    if (blocker) {
+      notProven.push({
+        group: "terminal",
+        reason: `Per-file proof is incomplete for ${fileClaim.targetPath}.`,
+        blocker,
+      });
+    }
+  }
+  const claimedTargets = new Set((input.perFileClaims ?? []).map((claim) => claim.targetPath));
+  for (const targetPath of input.requiredTargetPaths ?? []) {
+    if (!claimedTargets.has(targetPath)) {
+      notProven.push({
+        group: "terminal",
+        reason: `Required file proof is missing for ${targetPath}.`,
+        blocker: `file-missing-claim-${targetPath}`,
+      });
+    }
   }
   return notProven;
 }
@@ -1171,6 +1223,50 @@ function terminalClaim(input: {
     liveSuccess: input.liveSuccess,
     receiptFields: input.receiptFields,
   };
+}
+
+function perFileClaimBlocker(fileClaim: ClaimLedgerPerFileClaim, repairSucceeded: boolean): string | undefined {
+  if (fileClaim.proposalStatus !== "proven") return `file-proposal-${fileClaim.targetPath}`;
+  if (fileClaim.anchorQuality !== "exact-ready") return `file-anchor-${fileClaim.targetPath}`;
+  if (fileClaim.authorityStatus !== "proven") return `file-authority-${fileClaim.targetPath}`;
+  if (fileClaim.fileStatus === "unattempted") return `file-unattempted-${fileClaim.targetPath}`;
+  if (fileClaim.applyStatus !== "succeeded") return `file-apply-${fileClaim.targetPath}`;
+  if (!fileClaim.applyRuntimeDerived) return `file-apply-not-runtime-derived-${fileClaim.targetPath}`;
+  if (fileClaim.verificationStatus === "not-run") return `file-unverified-${fileClaim.targetPath}`;
+  if (!fileClaim.readbackRuntimeDerived) return `file-readback-not-runtime-derived-${fileClaim.targetPath}`;
+  if (fileClaim.verificationEvidenceCount <= 0) return `file-verification-missing-evidence-${fileClaim.targetPath}`;
+  if (fileClaim.verificationStatus === "succeeded") return undefined;
+  if (fileClaim.repairStatus === "repair-verification-succeeded" && repairSucceeded) return undefined;
+  return `file-failed-${fileClaim.targetPath}`;
+}
+
+function summarizePerFileClaims(claims: readonly ClaimLedgerPerFileClaim[]): string {
+  if (claims.length === 0) return "none";
+  return claims.map((claimItem) => [
+    claimItem.targetPath,
+    claimItem.fileStatus,
+    `apply=${claimItem.applyStatus}`,
+    `verify=${claimItem.verificationStatus}`,
+    claimItem.repairStatus ? `repair=${claimItem.repairStatus}` : undefined,
+  ].filter(Boolean).join("/")).join(",");
+}
+
+function projectPerFileClaimEvidence(claims: readonly ClaimLedgerPerFileClaim[]): readonly string[] {
+  return claims.flatMap((claimItem) => [
+    `claim-ledger:file:${claimItem.targetPath}:status:${claimItem.fileStatus}`,
+    `claim-ledger:file:${claimItem.targetPath}:proposal:${claimItem.proposalStatus}`,
+    `claim-ledger:file:${claimItem.targetPath}:anchor:${claimItem.anchorQuality}`,
+    `claim-ledger:file:${claimItem.targetPath}:authority:${claimItem.authorityStatus}`,
+    `claim-ledger:file:${claimItem.targetPath}:apply:${claimItem.applyStatus}`,
+    `claim-ledger:file:${claimItem.targetPath}:apply-runtime-derived:${claimItem.applyRuntimeDerived}`,
+    `claim-ledger:file:${claimItem.targetPath}:verification:${claimItem.verificationStatus}`,
+    `claim-ledger:file:${claimItem.targetPath}:readback-runtime-derived:${claimItem.readbackRuntimeDerived}`,
+    `claim-ledger:file:${claimItem.targetPath}:verification-evidence-count:${claimItem.verificationEvidenceCount}`,
+    `claim-ledger:file:${claimItem.targetPath}:snapshot:${claimItem.snapshotStatus}`,
+    `claim-ledger:file:${claimItem.targetPath}:recovery:${claimItem.recoveryStatus}`,
+    ...(claimItem.repairStatus ? [`claim-ledger:file:${claimItem.targetPath}:repair:${claimItem.repairStatus}`] : []),
+    ...claimItem.evidence,
+  ]);
 }
 
 function claim(input: {

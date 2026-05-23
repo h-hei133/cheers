@@ -5,6 +5,16 @@ import {
   type ClaimLedgerEvidenceSource,
 } from "./claimLedgerProjection.js";
 
+type LedgerInput = Parameters<typeof buildClaimLedgerProjection>[0];
+type LedgerPatch = Partial<LedgerInput>;
+type FailureCase = {
+  readonly name: string;
+  readonly patch: LedgerPatch;
+  readonly blocker: string;
+  readonly terminal?: string;
+  readonly result?: string;
+};
+
 describe("claimLedgerProjection", () => {
   it("derives live verified success only from the full proven claim chain", () => {
     const ledger = buildLedger();
@@ -78,7 +88,7 @@ describe("claimLedgerProjection", () => {
       terminal: "review-required",
       result: "review-required",
     },
-  ])("$name fails closed even when apply and readback succeeded", ({ patch, blocker, terminal, result }) => {
+  ] satisfies readonly FailureCase[])("$name fails closed even when apply and readback succeeded", ({ patch, blocker, terminal, result }) => {
     const ledger = buildLedger(patch);
 
     expect(ledger.terminal.status).toBe(terminal);
@@ -131,7 +141,7 @@ describe("claimLedgerProjection", () => {
       patch: { verificationStatus: "failed", recoveryStatus: "available" },
       blocker: "verification-failed",
     },
-  ])("$name cannot produce live verified success", ({ patch, blocker }) => {
+  ] satisfies readonly FailureCase[])("$name cannot produce live verified success", ({ patch, blocker }) => {
     const ledger = buildLedger(patch);
 
     expect(ledger.terminal.status).not.toBe("verified-success");
@@ -315,6 +325,75 @@ describe("claimLedgerProjection", () => {
       "claim-ledger:not-proven:repair:not-live-repair-evidence",
     );
   });
+
+  it("missing required per-file claim prevents multi-file verified success", () => {
+    const ledger = buildLedger({
+      requiredTargetPaths: ["src/a.ts", "src/b.ts"],
+      perFileClaims: [
+        perFileClaim("src/a.ts", {
+          fileStatus: "changed",
+          applyStatus: "succeeded",
+          verificationStatus: "succeeded",
+        }),
+      ],
+    });
+
+    expect(ledger.terminal.status).not.toBe("verified-success");
+    expect(ledger.terminal.liveSuccess).toBe(false);
+    expect(ledger.evidence).toEqual(
+      expect.arrayContaining([
+        "claim-ledger:required-file:src/a.ts",
+        "claim-ledger:required-file:src/b.ts",
+        "claim-ledger:file:src/a.ts:verification:succeeded",
+        "claim-ledger:not-proven:terminal:file-missing-claim-src/b.ts",
+      ]),
+    );
+  });
+
+  it("allows multi-file live verified success only when every required file is proven", () => {
+    const ledger = buildLedger({
+      requiredTargetPaths: ["src/a.ts", "src/b.ts"],
+      perFileClaims: [
+        perFileClaim("src/a.ts"),
+        perFileClaim("src/b.ts"),
+      ],
+    });
+
+    expect(ledger.terminal.status).toBe("verified-success");
+    expect(ledger.terminal.liveSuccess).toBe(true);
+    expect(ledger.evidence).toEqual(
+      expect.arrayContaining([
+        "claim-ledger:required-file:src/a.ts",
+        "claim-ledger:required-file:src/b.ts",
+        "claim-ledger:file:src/a.ts:verification:succeeded",
+        "claim-ledger:file:src/b.ts:verification:succeeded",
+        "claim-ledger:not-proven:none",
+      ]),
+    );
+  });
+
+  it("blocks marker-only per-file claims from producing live verified success", () => {
+    const ledger = buildLedger({
+      requiredTargetPaths: ["src/a.ts", "src/b.ts"],
+      perFileClaims: [
+        perFileClaim("src/a.ts", {
+          applyRuntimeDerived: false,
+          readbackRuntimeDerived: false,
+          verificationEvidenceCount: 0,
+        }),
+        perFileClaim("src/b.ts"),
+      ],
+    });
+
+    expect(ledger.terminal.status).not.toBe("verified-success");
+    expect(ledger.terminal.liveSuccess).toBe(false);
+    expect(ledger.evidence).toEqual(
+      expect.arrayContaining([
+        "claim-ledger:file:src/a.ts:apply-runtime-derived:false",
+        "claim-ledger:not-proven:terminal:file-apply-not-runtime-derived-src/a.ts",
+      ]),
+    );
+  });
 });
 
 function buildLedger(
@@ -359,6 +438,28 @@ function repairProof(
     mutationScope: "controlled-temp-workspace",
     providerCallDuringApply: false,
     evidenceSource: "live-provider",
+    ...patch,
+  };
+}
+
+function perFileClaim(
+  targetPath: string,
+  patch: Partial<NonNullable<Parameters<typeof buildClaimLedgerProjection>[0]["perFileClaims"]>[number]> = {},
+): NonNullable<Parameters<typeof buildClaimLedgerProjection>[0]["perFileClaims"]>[number] {
+  return {
+    targetPath,
+    proposalStatus: "proven",
+    anchorQuality: "exact-ready",
+    authorityStatus: "proven",
+    applyStatus: "succeeded",
+    applyRuntimeDerived: true,
+    verificationStatus: "succeeded",
+    readbackRuntimeDerived: true,
+    verificationEvidenceCount: 3,
+    fileStatus: "changed",
+    snapshotStatus: "created",
+    recoveryStatus: "available",
+    evidence: [`test:file:${targetPath}`],
     ...patch,
   };
 }

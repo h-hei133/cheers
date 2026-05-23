@@ -60,6 +60,7 @@ export async function runAnchoredProposalRuntime(input: {
   readonly providerAvailability?: ProviderEditAvailability;
   readonly provider?: RealProviderProposalDryRunProvider;
   readonly currentContentByTargetLabel?: ReadonlyMap<string, string>;
+  readonly explicitTargetLabels?: readonly string[];
   readonly staleTargetLabels?: readonly string[];
   readonly inWorkspaceTargetLabels?: readonly string[];
 }): Promise<AnchoredProposalRuntimeResult> {
@@ -122,11 +123,12 @@ export async function runAnchoredProposalRuntime(input: {
   const provider = input.dryRunMode === "fake"
     ? input.provider ?? buildDeterministicFakeProvider(input.currentContentByTargetLabel)
     : input.provider;
+  const explicitTargetLabels = input.explicitTargetLabels ?? [bundle.packet.targetSafeLabel];
   const dryRun = await runRealProviderProposalDryRun({
     requestId: input.requestId,
     dryRunOptIn: true,
     promptContext,
-    explicitTargetLabels: [bundle.packet.targetSafeLabel],
+    explicitTargetLabels,
     lifecycleId: input.taskActivation.taskLifecycle.lifecycleId,
     analysisBriefId: input.taskActivation.analysisBrief.briefId,
     analysisQualityId: input.taskActivation.analysisQualityGate.gateId,
@@ -142,7 +144,7 @@ export async function runAnchoredProposalRuntime(input: {
     provider,
     currentContentByTargetLabel: input.currentContentByTargetLabel,
     staleTargetLabels: input.staleTargetLabels,
-    inWorkspaceTargetLabels: input.inWorkspaceTargetLabels ?? [bundle.packet.targetSafeLabel],
+    inWorkspaceTargetLabels: input.inWorkspaceTargetLabels ?? explicitTargetLabels,
   });
   const orchestrationResult = buildProviderDryRunResult({
     sessionId: input.sessionId,
