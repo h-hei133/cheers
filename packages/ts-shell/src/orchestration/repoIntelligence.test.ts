@@ -37,7 +37,7 @@ describe("buildRepoIntelligence", () => {
     const result = await buildRepoIntelligence({
       workspaceRoot,
       userTask: "Fix target ranking bug",
-      maxRepoFiles: 80,
+      maxFiles: 80,
       maxCandidates: 5,
     });
 
@@ -49,5 +49,82 @@ describe("buildRepoIntelligence", () => {
     );
     expect(result.candidates.some((candidate) => candidate.safeLabel.startsWith(".codex/"))).toBe(false);
     expect(result.candidates.some((candidate) => candidate.safeLabel.startsWith(".omx/"))).toBe(false);
+  });
+
+  it("keeps code candidates ahead of route docs when a bounded scan would otherwise exhaust on docs", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "docs", "agent-routes"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "fixture" }, null, 2),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "packages", "ts-shell", "package.json"),
+      JSON.stringify({ name: "@fixture/ts-shell", scripts: { test: "vitest run" } }, null, 2),
+    );
+    for (let index = 0; index < 80; index += 1) {
+      await fs.writeFile(
+        path.join(workspaceRoot, "docs", "agent-routes", `route${index}-context-engine-target-ranking.md`),
+        "context engine target ranking route note\n",
+      );
+    }
+    await fs.writeFile(
+      path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "contextEngine.ts"),
+      [
+        "export function buildContextEngineTargetRanking(task: string) {",
+        "  return task.includes('contextEngine') ? 'contextEngine.ts' : 'unknown';",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "contextEngine.test.ts"),
+      "import { buildContextEngineTargetRanking } from './contextEngine.js';\nexpect(buildContextEngineTargetRanking('contextEngine')).toBe('contextEngine.ts');\n",
+    );
+
+    const result = await buildRepoIntelligence({
+      workspaceRoot,
+      userTask: "Fix contextEngine target ranking bug in packages ts shell orchestration and cover contextEngine test",
+      maxFiles: 40,
+      maxCandidates: 5,
+    });
+
+    expect(result.snapshot.files.map((file) => file.safeLabel)).toContain(
+      "packages/ts-shell/src/orchestration/contextEngine.ts",
+    );
+    expect(result.candidates[0]).toMatchObject({
+      safeLabel: "packages/ts-shell/src/orchestration/contextEngine.ts",
+      role: "source",
+    });
+    expect(result.candidates[1]).toMatchObject({
+      safeLabel: "packages/ts-shell/src/orchestration/contextEngine.test.ts",
+      role: "test",
+    });
+    expect(result.candidates.slice(0, 2).some((candidate) => candidate.role === "docs")).toBe(false);
+  });
+
+  it("keeps docs first for docs-only route explanation prompts", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "docs", "agent-routes"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "docs", "agent-routes", "route208-product-path-agentic-rap-edit-loop.md"),
+      "route208 product path agentic read analyze plan edit loop\n",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "route208ProductPath.ts"),
+      "export const route208ProductPath = true;\n",
+    );
+
+    const result = await buildRepoIntelligence({
+      workspaceRoot,
+      userTask: "Explain route208 product path doc",
+      maxFiles: 20,
+      maxCandidates: 5,
+    });
+
+    expect(result.candidates[0]).toMatchObject({
+      safeLabel: "docs/agent-routes/route208-product-path-agentic-rap-edit-loop.md",
+      role: "docs",
+    });
   });
 });

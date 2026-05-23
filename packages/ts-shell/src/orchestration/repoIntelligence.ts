@@ -75,7 +75,12 @@ export async function buildRepoIntelligence(input: {
   const maxFiles = input.maxFiles ?? 240;
   const maxCandidates = input.maxCandidates ?? 8;
   const packageMap = await discoverPackageMap(workspaceRoot);
-  const files = await discoverRepoFiles({ workspaceRoot, maxFiles, packageMap });
+  const files = await discoverRepoFiles({
+    workspaceRoot,
+    userTask: input.userTask,
+    maxFiles,
+    packageMap,
+  });
   const moduleMap = buildModuleMap(files);
   const snapshotId = buildSnapshotId({ packageMap, files });
   const snapshot: RepoIntelligenceSnapshot = {
@@ -134,20 +139,27 @@ export function rankRepoCandidates(input: {
 }): readonly RepoIntelligenceCandidate[] {
   const tokens = tokenize(input.userTask);
   const actionBoosts = classifyTaskBoosts(input.userTask);
+  const editLike = isEditLikeTask(input.userTask);
   return input.files
     .map((file) => {
       const pathTokens = tokenize(file.path);
       const symbolTokens = file.symbolHints.flatMap(tokenize);
+      const basenameTokens = tokenize(path.basename(file.path));
       const overlap = countOverlap(tokens, [...pathTokens, ...symbolTokens]);
       const roleBoost = actionBoosts[file.role] ?? 0;
       const scriptBoost = file.path === "package.json" && tokens.some((token) => ["script", "test", "build"].includes(token)) ? 28 : 0;
       const exactNameBoost = tokens.some((token) => path.basename(file.path).toLowerCase().includes(token)) ? 18 : 0;
-      const score = overlap * 14 + roleBoost + scriptBoost + exactNameBoost + freshnessBoost(file);
+      const primarySourceNameBoost =
+        editLike && file.role === "source" && countOverlap(tokens, basenameTokens) >= 2
+          ? 40
+          : 0;
+      const score = overlap * 14 + roleBoost + scriptBoost + exactNameBoost + primarySourceNameBoost + freshnessBoost(file);
       const reasons = [
         overlap > 0 ? `task-token-overlap:${overlap}` : undefined,
         roleBoost > 0 ? `role:${file.role}` : undefined,
         scriptBoost > 0 ? "package-script-query" : undefined,
         exactNameBoost > 0 ? "path-name-match" : undefined,
+        primarySourceNameBoost > 0 ? "primary-source-name-match" : undefined,
       ].filter((reason): reason is string => Boolean(reason));
       return {
         path: file.path,
@@ -209,16 +221,23 @@ async function discoverPackageMap(workspaceRoot: string): Promise<RepoIntelligen
 
 async function discoverRepoFiles(input: {
   readonly workspaceRoot: string;
+  readonly userTask: string;
   readonly maxFiles: number;
   readonly packageMap: RepoIntelligenceSnapshot["packageMap"];
 }): Promise<RepoIntelligenceFile[]> {
   const files: RepoIntelligenceFile[] = [];
+  const scanProfile = buildRepoScanProfile(input.userTask);
   const visit = async (directory: string): Promise<void> => {
     if (files.length >= input.maxFiles) {
       return;
     }
-    const entries = await readDir(directory);
-    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const entries = sortRepoEntries({
+      entries: await readDir(directory),
+      directory,
+      workspaceRoot: input.workspaceRoot,
+      profile: scanProfile,
+    });
+    for (const entry of entries) {
       if (files.length >= input.maxFiles) {
         return;
       }
@@ -284,7 +303,7 @@ function buildBoundaryHints(
 
 function classifyTaskBoosts(task: string): Record<RepoIntelligenceFileRole, number> {
   const lower = task.toLowerCase();
-  const editLike = /\b(edit|change|update|fix|implement|add|remove|refactor)\b/.test(lower);
+  const editLike = isEditLikeTask(task);
   const testLike = /\b(test|spec|verify|failing|failure|regression)\b/.test(lower);
   return {
     entrypoint: /\b(cli|command|start|entry|flag)\b/.test(lower) ? 34 : 8,
@@ -293,6 +312,93 @@ function classifyTaskBoosts(task: string): Record<RepoIntelligenceFileRole, numb
     docs: /\b(doc|readme|route|plan|explain)\b/.test(lower) ? 30 : 2,
     source: /\b(bug|fix|feature|implement|route|runtime|context|plan|edit|target)\b/.test(lower) ? (editLike ? 38 : 24) : 10,
   };
+}
+
+function isEditLikeTask(task: string): boolean {
+  return /\b(edit|change|update|fix|implement|add|remove|refactor)\b/.test(task.toLowerCase());
+}
+
+interface RepoScanProfile {
+  readonly tokens: readonly string[];
+  readonly codeLike: boolean;
+  readonly docsLike: boolean;
+}
+
+function buildRepoScanProfile(task: string): RepoScanProfile {
+  const lower = task.toLowerCase();
+  const codeLike = /\b(bug|fix|feature|implement|edit|change|test|spec|verify|runtime|orchestration|package|packages|src|source)\b/.test(lower);
+  const docsLike = /\b(doc|docs|readme|explain|route|plan)\b/.test(lower) && !codeLike;
+  return {
+    tokens: tokenize(task),
+    codeLike,
+    docsLike,
+  };
+}
+
+function sortRepoEntries(input: {
+  readonly entries: readonly Dirent[];
+  readonly directory: string;
+  readonly workspaceRoot: string;
+  readonly profile: RepoScanProfile;
+}): readonly Dirent[] {
+  return [...input.entries].sort((left, right) => {
+    const leftPriority = repoEntryPriority({
+      entry: left,
+      directory: input.directory,
+      workspaceRoot: input.workspaceRoot,
+      profile: input.profile,
+    });
+    const rightPriority = repoEntryPriority({
+      entry: right,
+      directory: input.directory,
+      workspaceRoot: input.workspaceRoot,
+      profile: input.profile,
+    });
+    return leftPriority - rightPriority || left.name.localeCompare(right.name);
+  });
+}
+
+function repoEntryPriority(input: {
+  readonly entry: Dirent;
+  readonly directory: string;
+  readonly workspaceRoot: string;
+  readonly profile: RepoScanProfile;
+}): number {
+  const relativePath = normalizeRelative(path.relative(
+    input.workspaceRoot,
+    path.join(input.directory, input.entry.name),
+  ));
+  const tokens = tokenize(relativePath);
+  const overlap = countOverlap(input.profile.tokens, tokens);
+  const firstSegment = relativePath.split("/")[0] ?? relativePath;
+  const sourceDir = isSourcePreferredDirectory(firstSegment, relativePath);
+  const docsDir = firstSegment === "docs" || firstSegment === "doc";
+
+  if (input.entry.isDirectory()) {
+    if (input.profile.docsLike && docsDir) return 0 - overlap * 8;
+    if (input.profile.codeLike && sourceDir) return 0 - overlap * 8;
+    if (input.profile.codeLike && docsDir) return 80 - overlap * 2;
+    if (firstSegment === "contracts") return 20 - overlap * 4;
+    return 40 - overlap * 4;
+  }
+
+  if (input.entry.name === "package.json") return 4;
+  if (input.profile.codeLike && classifyFileRole(relativePath) === "source") return 18 - overlap * 4;
+  if (input.profile.codeLike && classifyFileRole(relativePath) === "test") return 22 - overlap * 4;
+  if (input.profile.codeLike && classifyFileRole(relativePath) === "docs") return 86 - overlap * 2;
+  return 50 - overlap * 3;
+}
+
+function isSourcePreferredDirectory(firstSegment: string, relativePath: string): boolean {
+  return firstSegment === "packages" ||
+    firstSegment === "src" ||
+    firstSegment === "apps" ||
+    firstSegment === "app" ||
+    firstSegment === "lib" ||
+    firstSegment === "scripts" ||
+    firstSegment === "tests" ||
+    relativePath.includes("/src/") ||
+    relativePath.includes("/test");
 }
 
 function classifyFileRole(relativePath: string): RepoIntelligenceFileRole {
@@ -359,8 +465,8 @@ function findPackageName(
 
 function tokenize(value: string): string[] {
   return value
-    .toLowerCase()
     .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter((token) => token.length >= 3)
     .filter((token) => !STOP_WORDS.has(token));
@@ -388,6 +494,7 @@ function isSupportedRepoFile(fileName: string): boolean {
 }
 
 const IGNORED_DIRS = new Set([
+  ".claude",
   ".codex",
   ".git",
   ".omx",

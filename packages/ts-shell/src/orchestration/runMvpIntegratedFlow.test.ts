@@ -7626,6 +7626,71 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     }
   }, 20000);
 
+  it("keeps source edit candidates ahead of docs in a docs-heavy product path", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "docs", "agent-routes"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "route208-docs-heavy", scripts: { test: "vitest run" } }, null, 2),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "packages", "ts-shell", "package.json"),
+      JSON.stringify({ name: "@fixture/ts-shell", scripts: { test: "vitest run" } }, null, 2),
+    );
+    for (let index = 0; index < 80; index += 1) {
+      await fs.writeFile(
+        path.join(workspaceRoot, "docs", "agent-routes", `route${index}-context-engine-target-ranking.md`),
+        "context engine target ranking route note\n",
+      );
+    }
+    await fs.writeFile(
+      path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "contextEngine.ts"),
+      [
+        "export function buildContextEngineTargetRanking(task: string) {",
+        "  return task.includes('contextEngine') ? 'contextEngine.ts' : 'unknown';",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "contextEngine.test.ts"),
+      "import { buildContextEngineTargetRanking } from './contextEngine.js';\nexpect(buildContextEngineTargetRanking('contextEngine')).toBe('contextEngine.ts');\n",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_route208_docs_heavy_source_ranking",
+      prompt: "Fix contextEngine target ranking bug in packages ts shell orchestration and cover contextEngine test",
+      workspaceRoot,
+      maxTurns: 4,
+    });
+
+    const evidence = result.codingResult?.evidence ?? [];
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.taskKind).toBe("edit-file");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.codingResult?.failedFiles[0]?.path).toBe(
+      "packages/ts-shell/src/orchestration/contextEngine.ts",
+    );
+    expect(result.finalOutput).toContain("Planning runtime: product-path review-only handoff");
+    expect(result.finalOutput).toContain("Candidates:");
+    expect(result.finalOutput).toContain("packages/ts-shell/src/orchestration/contextEngine.ts");
+    expect(result.finalOutput).toContain("primary-source-name-match");
+    expect(result.finalOutput).toContain("Read/staged context:");
+    expect(result.finalOutput).toContain("why-read=explicit target");
+    expect(evidence).toEqual(
+      expect.arrayContaining([
+        "planning-runtime-product:path:runMvpIntegratedFlow",
+        "planning-runtime-product:candidate:packages/ts-shell/src/orchestration/contextEngine.ts",
+        "context-acquisition:mode:staged-runtime",
+        "mutationAuthority=not-granted",
+        "provider-called=false",
+        "apply=not-run",
+        "command-dispatch=not-run",
+      ]),
+    );
+  }, 20000);
+
   it("stops broad edit prompts on targeted context planning without mutation authority", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await fs.writeFile(path.join(workspaceRoot, "src", "target.ts"), "export const target = 1;\n");
