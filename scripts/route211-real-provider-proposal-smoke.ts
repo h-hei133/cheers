@@ -42,6 +42,7 @@ interface SmokeReport {
   readonly providerCalled: boolean;
   readonly liveEvidenceSource: string;
   readonly liveProviderStatus: string;
+  readonly liveProviderAnchor: string;
   readonly selectedAttempt: string;
   readonly fallbackPolicy: string;
   readonly fallbackCalled: boolean;
@@ -273,6 +274,7 @@ function buildApprovalAttempt(input: {
         baseUrl: input.config.baseUrl,
         model: input.config.model,
         providerSafeLabel: input.config.safeLabel,
+        promptMode: "context-only",
       })
     : undefined;
   return {
@@ -347,6 +349,9 @@ function projectReport(input: {
     liveProviderStatus:
       markerValue(evidence, "planning-runtime-product-proposal:live-provider-status:") ??
       "not-run",
+    liveProviderAnchor:
+      markerValue(evidence, "planning-runtime-product-proposal:live-provider-anchor:") ??
+      "not-run",
     selectedAttempt:
       markerValue(evidence, "planning-runtime-product-proposal:live-provider-selected-attempt:") ??
       "none",
@@ -393,6 +398,23 @@ function validateReport(report: SmokeReport): readonly string[] {
   if (report.providerCalled && report.proposalSource !== "live-provider-proposal") {
     failures.push(`proposalSource=${report.proposalSource}`);
   }
+  if (report.providerCalled && report.liveProviderAnchor === "blocked") {
+    failures.push("liveProviderAnchor=blocked");
+  }
+  if (
+    report.providerCalled &&
+    report.proposalState === "prepared-exact" &&
+    report.anchorState !== "exact-ready"
+  ) {
+    failures.push(`prepared-exact anchorState=${report.anchorState ?? "missing"}`);
+  }
+  if (
+    report.providerCalled &&
+    report.proposalState === "review-only" &&
+    report.anchorState !== "review-only"
+  ) {
+    failures.push(`review-only anchorState=${report.anchorState ?? "missing"}`);
+  }
   if (report.providerCalled && report.applyState !== "not-run") {
     failures.push(`applyState=${report.applyState ?? "missing"} expected not-run`);
   }
@@ -424,7 +446,11 @@ function exitCodeForReport(report: SmokeReport): number {
   if (
     report.providerCalled &&
     report.liveEvidenceSource === "live-provider" &&
-    (report.proposalState === "prepared-exact" || report.proposalState === "review-only")
+    (
+      (report.proposalState === "prepared-exact" && report.anchorState === "exact-ready") ||
+      (report.proposalState === "review-only" && report.anchorState === "review-only")
+    ) &&
+    report.liveProviderAnchor !== "blocked"
   ) {
     return 0;
   }

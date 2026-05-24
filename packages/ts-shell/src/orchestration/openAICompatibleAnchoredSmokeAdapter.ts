@@ -37,6 +37,7 @@ export interface OpenAICompatibleAnchoredSmokeAdapterConfig {
   readonly providerSafeLabel?: string;
   readonly fetchImpl?: typeof fetch;
   readonly maxOutputTokens?: number;
+  readonly promptMode?: "anchored-smoke-fixture" | "context-only";
 }
 
 export function createOpenAICompatibleAnchoredSmokeAdapter(
@@ -80,11 +81,14 @@ export function createOpenAICompatibleAnchoredSmokeAdapter(
           messages: [
             {
               role: "system",
-              content: buildSystemPrompt(),
+              content: buildSystemPrompt(config.promptMode ?? "anchored-smoke-fixture"),
             },
             {
               role: "user",
-              content: buildUserPrompt(context),
+              content: buildUserPrompt(
+                context,
+                config.promptMode ?? "anchored-smoke-fixture",
+              ),
             },
           ],
         })) {
@@ -137,7 +141,20 @@ function classifyAdapterError(error: unknown): OpenAICompatibleAnchoredSmokeProv
   );
 }
 
-function buildSystemPrompt(): string {
+function buildSystemPrompt(
+  mode: NonNullable<OpenAICompatibleAnchoredSmokeAdapterConfig["promptMode"]>,
+): string {
+  if (mode === "context-only") {
+    return [
+      "You generate review-only edit proposals for a no-write product-path smoke test.",
+      "Return JSON only. Do not use markdown fences.",
+      "Do not claim that files were changed. Do not run commands. Do not request apply.",
+      "The JSON shape is:",
+      '{"operationKind":"exact-fenced-replacement","targets":[{"path":"src/example.ts","summary":"...","oldText":"...","newText":"..."}],"confidence":"medium","riskSummary":"...","verificationPlan":["..."]}',
+      "Return exactly one target for the explicit target path.",
+      "Include oldText and newText only when the prompt provides enough exact current text; otherwise return a target-bound review-only proposal with path and summary only.",
+    ].join("\n");
+  }
   return [
     "You generate review-only edit proposals for a no-write smoke test.",
     "Return JSON only. Do not use markdown fences.",
@@ -148,13 +165,24 @@ function buildSystemPrompt(): string {
   ].join("\n");
 }
 
-function buildUserPrompt(context: ContextAwareProviderPromptContext): string {
+function buildUserPrompt(
+  context: ContextAwareProviderPromptContext,
+  mode: NonNullable<OpenAICompatibleAnchoredSmokeAdapterConfig["promptMode"]>,
+): string {
   const common = [
     context.providerPrompt,
     "",
     "Return exactly one exact-fenced-replacement target for the explicit target only.",
     `Explicit target: ${context.target.pathLabel}`,
   ];
+  if (mode === "context-only") {
+    return [
+      ...common,
+      "If exact replacement text is not available in the prompt, omit oldText/newText and keep the proposal review-only.",
+      "Do not invent anchors from files that were not included in the prompt.",
+      "Return JSON only.",
+    ].join("\n");
+  }
   const routeSpecific = requestsLocalCallSite(context)
     ? [
         "The oldText must be this exact bounded block:",

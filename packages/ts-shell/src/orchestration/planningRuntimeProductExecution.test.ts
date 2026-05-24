@@ -328,6 +328,53 @@ describe("buildPlanningRuntimeProductProofInputs", () => {
     );
   }, 15000);
 
+  it("does not promote unanchored exact provider output to prepared-exact", async () => {
+    const workspaceRoot = createWorkspace({
+      "src/planning/targetRanking.ts": sourceContent(),
+      "src/planning/targetRanking.test.ts":
+        "expect(rankPlannerTargets('planner target ranking')).toBe('targetRanking.ts');\n",
+    });
+    const planningResult = await readyPlanningResult(workspaceRoot);
+    fs.rmSync(path.join(workspaceRoot, "src", "planning", "targetRanking.ts"));
+
+    const proposalPreparation = await preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff: planningResult.mutationHandoff,
+      planningResult,
+      liveProvider: {
+        optIn: true,
+        source: "runtime-option",
+        attempts: [
+          {
+            role: "primary",
+            providerSafeLabel: "focused-fake-primary",
+            providerConfigSource: "test-fixture",
+            providerAvailability: {
+              kind: "available",
+              providerKindLabel: "focused-fake-primary",
+            },
+            readinessStatus: "ready",
+            evidenceSource: "fake-provider",
+            provider: {
+              proposeEdit: () => exactProposal(),
+            },
+          },
+        ],
+      },
+    });
+
+    expect(proposalPreparation.status).toBe("review-only");
+    expect(proposalPreparation.rawProposal?.operationKind).toBe("exact-fenced-replacement");
+    expect(proposalPreparation.providerCalled).toBe(true);
+    expect(proposalPreparation.evidence).toEqual(
+      expect.arrayContaining([
+        "planning-runtime-product-proposal:live-provider-primary:dry-run-status:dry-run-review-required",
+        "planning-runtime-product-proposal:live-provider-anchor:review-only",
+        "planning-runtime-product-proposal:raw-provider-output-excluded",
+      ]),
+    );
+  }, 15000);
+
   it("builds selected workspace proof inputs only from explicit authority", async () => {
     const workspaceRoot = createWorkspace({
       "src/planning/targetRanking.ts": sourceContent(),

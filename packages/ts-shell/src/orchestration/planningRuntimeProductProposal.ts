@@ -353,7 +353,7 @@ async function prepareLiveProviderProposal(input: {
     }
 
     if (isDryRunSuccess(dryRun)) {
-      const exact = hasExactProposal(dryRun.rawProposal);
+      const exact = isExactReadyDryRun(dryRun);
       return proposalPreparation({
         status: exact ? "prepared-exact" : "review-only",
         source: "live-provider-proposal",
@@ -596,11 +596,17 @@ function isDryRunSuccess(
   );
 }
 
-function hasExactProposal(rawProposal: ProviderEditRawProposal): boolean {
-  const targets = rawProposal.targets ?? [];
-  return targets.length > 0 && targets.every((target) =>
-    target.oldText !== undefined && target.newText !== undefined,
-  );
+function isExactReadyDryRun(
+  dryRun: Extract<
+    RealProviderProposalDryRunResult,
+    { readonly providerCalled: true; readonly rawProposal: ProviderEditRawProposal }
+  >,
+): boolean {
+  return dryRun.status === "dry-run-exact-ready-no-write" &&
+    (
+      dryRun.anchoredProposal.handoffReadiness === "exact-single-target" ||
+      dryRun.anchoredProposal.handoffReadiness === "exact-hunk-set"
+    );
 }
 
 function readCurrentContentByTargetLabel(input: {
