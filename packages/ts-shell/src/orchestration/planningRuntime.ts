@@ -308,11 +308,19 @@ function buildBlockingFacts(input: {
   }
   const sufficiency = input.context.bundle.taskContextSufficiency;
   const calibration = input.context.bundle.analysisCalibration;
+  const primaryTargetReadForReview = hasIncludedPrimaryTarget(input.context);
+  const budgetLimitedBlocks =
+    sufficiency.state === "budget-limited" &&
+    !primaryTargetReadForReview;
   const sufficiencyBlocks = sufficiency.state === "needs-required-context" ||
     sufficiency.state === "stale-context" ||
-    sufficiency.state === "budget-limited" ||
+    budgetLimitedBlocks ||
     sufficiency.state === "unsupported";
-  const calibrationBlocks = calibration.readiness === "missing-facts" ||
+  const calibrationBlocks =
+    (
+      calibration.readiness === "missing-facts" &&
+      !primaryTargetReadForReview
+    ) ||
     calibration.readiness === "stale-context" ||
     calibration.readiness === "unsupported";
   return unique([
@@ -321,6 +329,25 @@ function buildBlockingFacts(input: {
     ...(sufficiencyBlocks ? [sufficiency.readinessDowngrade] : []),
     ...(calibrationBlocks ? calibration.missingFacts : []),
   ]);
+}
+
+function hasIncludedPrimaryTarget(context: ContextEngineResult): boolean {
+  const selectedPath = context.selectedCandidate?.safeLabel;
+  return Boolean(
+    selectedPath &&
+      isCodeLikePrimaryTarget(context.selectedCandidate?.role) &&
+      context.filesRead.some((file) =>
+        file.path === selectedPath &&
+        file.reason === "explicit target" &&
+        file.source === "repo-intelligence",
+      ),
+  );
+}
+
+function isCodeLikePrimaryTarget(
+  role: NonNullable<ContextEngineResult["selectedCandidate"]>["role"] | undefined,
+): boolean {
+  return role === "source" || role === "test" || role === "entrypoint";
 }
 
 function buildPlanningWarnings(input: {

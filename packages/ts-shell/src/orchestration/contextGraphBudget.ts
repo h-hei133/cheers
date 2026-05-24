@@ -99,6 +99,20 @@ export function decideContextGraphNode(input: {
       state: input.state,
     };
   }
+  if (input.kind === "root-target") {
+    const seenPathLabels = new Set(input.state.seenPathLabels);
+    seenPathLabels.add(input.pathLabel);
+    return {
+      status: "included",
+      state: {
+        ...input.state,
+        includedNodes: input.state.includedNodes + 1,
+        filesRead: input.state.filesRead + 1,
+        bytesUsed: input.state.bytesUsed,
+        seenPathLabels,
+      },
+    };
+  }
   if (input.byteLength > input.state.limits.maxBytesPerFile) {
     return {
       status: "omitted",

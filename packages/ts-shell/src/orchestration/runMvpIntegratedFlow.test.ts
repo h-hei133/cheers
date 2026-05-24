@@ -8165,7 +8165,14 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.codingResult?.failedFiles[0]?.path).toBe(
       "packages/ts-shell/src/orchestration/contextEngine.ts",
     );
+    expect(result.codingResult?.failedFiles[0]?.reason).toContain(
+      "Planning Runtime resolved a review-ready target",
+    );
+    expect(result.codingResult?.failedFiles[0]?.reason).not.toContain(
+      "edit-target-missing",
+    );
     expect(result.finalOutput).toContain("Planning runtime: product-path review-only handoff");
+    expect(result.finalOutput).toContain("Handoff state: handoff-ready");
     expect(result.finalOutput).toContain("Candidates:");
     expect(result.finalOutput).toContain("packages/ts-shell/src/orchestration/contextEngine.ts");
     expect(result.finalOutput).toContain("primary-source-name-match");

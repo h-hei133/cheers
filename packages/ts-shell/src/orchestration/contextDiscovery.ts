@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import {
+  DEFAULT_CONTEXT_BUDGET_LIMITS,
   createContextBudgetState,
   readFileWithinContextBudget,
   type ContextBudgetDecision,
@@ -60,6 +61,7 @@ export async function discoverTargetedContext(input: {
     ? path.resolve(input.targetPath)
     : path.resolve(workspaceRoot, input.targetPath);
   let state = createContextBudgetState(input.limits);
+  const targetReadState = createContextBudgetState(targetReadLimits(input.limits));
   const targetLabel = safeTargetLabel(path.relative(workspaceRoot, targetPath) || targetPath);
   const seed: ContextDiscoveryCandidate = {
     kind: "target-file",
@@ -73,9 +75,14 @@ export async function discoverTargetedContext(input: {
   const targetRead = await readFileWithinContextBudget({
     filePath: targetPath,
     workspaceRoot,
-    state,
+    state: targetReadState,
   });
-  state = targetRead.state;
+  state = {
+    ...state,
+    filesRead: targetRead.state.filesRead,
+    bytesUsed: targetRead.state.bytesUsed,
+    includedCount: targetRead.state.includedCount,
+  };
   const targetContent = targetRead.result.redactedContent ?? "";
   const symbolHints = targetRead.result.decision === "included"
     ? extractSymbolHints(targetContent, targetPath)
@@ -130,6 +137,24 @@ export async function discoverTargetedContext(input: {
     ],
   };
 }
+
+function targetReadLimits(
+  limits: Partial<ContextBudgetLimits> | undefined,
+): Partial<ContextBudgetLimits> {
+  if (limits?.maxBytesPerFile !== undefined) {
+    return limits;
+  }
+  return {
+    ...limits,
+    maxBytesPerFile: DEFAULT_TARGET_FILE_CONTEXT_BYTES,
+    maxTotalBytes: Math.max(
+      limits?.maxTotalBytes ?? DEFAULT_CONTEXT_BUDGET_LIMITS.maxTotalBytes,
+      DEFAULT_TARGET_FILE_CONTEXT_BYTES,
+    ),
+  };
+}
+
+const DEFAULT_TARGET_FILE_CONTEXT_BYTES = 48_000;
 
 async function discoverDirectImportCandidates(input: {
   readonly content: string;

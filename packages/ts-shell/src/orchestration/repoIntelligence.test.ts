@@ -103,6 +103,44 @@ describe("buildRepoIntelligence", () => {
     expect(result.candidates.slice(0, 2).some((candidate) => candidate.role === "docs")).toBe(false);
   });
 
+  it("prefills deep path-matched product files before earlier source directories exhaust the scan budget", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "packages", "ts-shell", "src", "core"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "fixture" }, null, 2),
+    );
+    for (let index = 0; index < 80; index += 1) {
+      await fs.writeFile(
+        path.join(workspaceRoot, "packages", "ts-shell", "src", "core", `runtimeReceipt${index}.ts`),
+        `export const runtimeReceipt${index} = ${index};\n`,
+      );
+    }
+    await fs.writeFile(
+      path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "planningRuntimeProductProjection.ts"),
+      "export function formatPlanningRuntimeProductOutput() { return 'product output'; }\n",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "planningRuntimeProductProjection.test.ts"),
+      "import { formatPlanningRuntimeProductOutput } from './planningRuntimeProductProjection.js';\nexpect(formatPlanningRuntimeProductOutput()).toBe('product output');\n",
+    );
+
+    const result = await buildRepoIntelligence({
+      workspaceRoot,
+      userTask: "Fix planning runtime product output so confirmed apply results do not still look review-only",
+      maxFiles: 30,
+      maxCandidates: 5,
+    });
+
+    expect(result.snapshot.files.map((file) => file.safeLabel)).toContain(
+      "packages/ts-shell/src/orchestration/planningRuntimeProductProjection.ts",
+    );
+    expect(result.candidates[0]).toMatchObject({
+      safeLabel: "packages/ts-shell/src/orchestration/planningRuntimeProductProjection.ts",
+      role: "source",
+    });
+  });
+
   it("keeps docs first for docs-only route explanation prompts", async () => {
     await fs.mkdir(path.join(workspaceRoot, "docs", "agent-routes"), { recursive: true });
     await fs.mkdir(path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration"), { recursive: true });

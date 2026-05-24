@@ -147,6 +147,53 @@ describe("runPlanningRuntime", () => {
     expect(second.evidence).toContain("context-memory-reuse:avoids-reread:fresh-receipts");
   });
 
+  it("keeps review-only handoff available when optional context is budget-limited after the primary target read", async () => {
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "productOutput.ts"),
+      [
+        "export function formatProductOutput() {",
+        "  return 'review-only';",
+        "}",
+        "/*",
+        "x".repeat(18_000),
+        "*/",
+        "",
+      ].join("\n"),
+    );
+    for (let index = 0; index < 40; index += 1) {
+      await fs.writeFile(
+        path.join(workspaceRoot, "src", `productOutputNeighbor${index}.ts`),
+        `export const productOutputNeighbor${index} = ${index};\n`,
+      );
+    }
+
+    const result = await runPlanningRuntime({
+      workspaceRoot,
+      userTask: "Fix product output review only wording",
+      maxRepoFiles: 80,
+      maxCandidates: 5,
+    });
+
+    expect(result.context.selectedCandidate?.safeLabel).toBe("src/productOutput.ts");
+    expect(result.context.filesRead).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "src/productOutput.ts",
+          reason: "explicit target",
+          source: "repo-intelligence",
+        }),
+      ]),
+    );
+    expect(result.groundedAnalysis.planningWarnings).toContain("task context budget limited");
+    expect(result.groundedAnalysis.missingFacts).not.toContain(
+      "block downstream planning until bounded context is reduced",
+    );
+    expect(result.status).toBe("ready-for-handoff");
+    expect(result.mutationHandoff.handoffState).toBe("handoff-ready");
+    expect(result.mutationHandoff.readiness).toBe("review-ready");
+    expect(result.mutationHandoff.mutationAuthority).toBe("not-granted");
+  });
+
   it("does not hand off forged out-of-workspace continuation memory", async () => {
     const first = await runPlanningRuntime({
       workspaceRoot,

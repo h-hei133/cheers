@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { discoverTargetedContext } from "./contextDiscovery.js";
+import { discoverContextGraph } from "./contextGraphDiscovery.js";
 
 let workspaceRoot: string;
 
@@ -88,5 +89,60 @@ describe("discoverTargetedContext", () => {
     });
     expect(outside.sources[0]?.decision).toBe("omitted-out-of-workspace");
   });
-});
 
+  it("includes a large selected target under the default product-path target budget", async () => {
+    const largeTarget = [
+      "import { helperValue } from './helper.js';",
+      "export function largeTargetThing() {",
+      "  return helperValue();",
+      "}",
+      "/*",
+      "x".repeat(18_000),
+      "*/",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(workspaceRoot, "src", "largeTarget.ts"), largeTarget);
+
+    const result = await discoverTargetedContext({
+      workspaceRoot,
+      targetPath: "src/largeTarget.ts",
+    });
+
+    expect(result.sources[0]).toMatchObject({
+      kind: "target-file",
+      safeLabel: "src/largeTarget.ts",
+      decision: "included",
+    });
+    expect(result.sources[0]?.summary).toContain("largeTargetThing");
+  });
+
+  it("does not let graph node budgeting omit an included large root target", async () => {
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "largeGraphTarget.ts"),
+      [
+        "export function largeGraphTargetThing() {",
+        "  return 1;",
+        "}",
+        "/*",
+        "x".repeat(18_000),
+        "*/",
+        "",
+      ].join("\n"),
+    );
+
+    const graph = await discoverContextGraph({
+      workspaceRoot,
+      targetPath: "src/largeGraphTarget.ts",
+    });
+
+    expect(graph.includedCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "root-target",
+          pathLabel: "src/largeGraphTarget.ts",
+          budgetStatus: "included",
+        }),
+      ]),
+    );
+  });
+});

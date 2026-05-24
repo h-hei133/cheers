@@ -226,7 +226,33 @@ async function discoverRepoFiles(input: {
   readonly packageMap: RepoIntelligenceSnapshot["packageMap"];
 }): Promise<RepoIntelligenceFile[]> {
   const files: RepoIntelligenceFile[] = [];
+  const seen = new Set<string>();
   const scanProfile = buildRepoScanProfile(input.userTask);
+  const addFile = async (relativePath: string): Promise<void> => {
+    if (files.length >= input.maxFiles || seen.has(relativePath)) {
+      return;
+    }
+    seen.add(relativePath);
+    const absolutePath = path.join(input.workspaceRoot, relativePath);
+    const stat = await fs.stat(absolutePath);
+    const prefix = await readTextPrefix(absolutePath, 16_000);
+    files.push({
+      path: relativePath,
+      safeLabel: safeTargetLabel(relativePath),
+      role: classifyFileRole(relativePath),
+      sizeBytes: stat.size,
+      mtimeMs: stat.mtimeMs,
+      symbolHints: extractSymbolHints(prefix, relativePath),
+      packageName: findPackageName(relativePath, input.packageMap),
+    });
+  };
+  for (const relativePath of await discoverPathPriorityFilePaths({
+    workspaceRoot: input.workspaceRoot,
+    profile: scanProfile,
+    maxFiles: Math.min(input.maxFiles, PATH_PRIORITY_PREFILL_LIMIT),
+  })) {
+    await addFile(relativePath);
+  }
   const visit = async (directory: string): Promise<void> => {
     if (files.length >= input.maxFiles) {
       return;
@@ -252,21 +278,104 @@ async function discoverRepoFiles(input: {
         continue;
       }
       const relativePath = normalizeRelative(path.relative(input.workspaceRoot, absolutePath));
-      const stat = await fs.stat(absolutePath);
-      const prefix = await readTextPrefix(absolutePath, 16_000);
-      files.push({
-        path: relativePath,
-        safeLabel: safeTargetLabel(relativePath),
-        role: classifyFileRole(relativePath),
-        sizeBytes: stat.size,
-        mtimeMs: stat.mtimeMs,
-        symbolHints: extractSymbolHints(prefix, relativePath),
-        packageName: findPackageName(relativePath, input.packageMap),
-      });
+      await addFile(relativePath);
     }
   };
   await visit(input.workspaceRoot);
   return files;
+}
+
+async function discoverPathPriorityFilePaths(input: {
+  readonly workspaceRoot: string;
+  readonly profile: RepoScanProfile;
+  readonly maxFiles: number;
+}): Promise<readonly string[]> {
+  if (input.profile.tokens.length === 0 || input.maxFiles <= 0) {
+    return [];
+  }
+  const candidates: Array<{
+    readonly relativePath: string;
+    readonly score: number;
+  }> = [];
+  let visitedEntries = 0;
+  const visit = async (directory: string): Promise<void> => {
+    if (visitedEntries >= PATH_PRIORITY_SCAN_LIMIT) {
+      return;
+    }
+    const entries = await readDir(directory);
+    for (const entry of entries) {
+      if (visitedEntries >= PATH_PRIORITY_SCAN_LIMIT) {
+        return;
+      }
+      visitedEntries += 1;
+      const absolutePath = path.join(directory, entry.name);
+      const relativePath = normalizeRelative(path.relative(input.workspaceRoot, absolutePath));
+      if (entry.isDirectory()) {
+        if (!IGNORED_DIRS.has(entry.name)) {
+          await visit(absolutePath);
+        }
+        continue;
+      }
+      if (!entry.isFile() || !isSupportedRepoFile(entry.name)) {
+        continue;
+      }
+      const score = scorePathPriority(relativePath, input.profile);
+      if (score > 0) {
+        candidates.push({ relativePath, score });
+      }
+    }
+  };
+  await visit(input.workspaceRoot);
+  return candidates
+    .sort((left, right) =>
+      right.score - left.score || left.relativePath.localeCompare(right.relativePath),
+    )
+    .slice(0, input.maxFiles)
+    .map((candidate) => candidate.relativePath);
+}
+
+function scorePathPriority(
+  relativePath: string,
+  profile: RepoScanProfile,
+): number {
+  const pathTokens = tokenize(relativePath);
+  const basenameTokens = tokenize(path.basename(relativePath));
+  const overlap = countOverlap(profile.tokens, pathTokens);
+  if (overlap === 0) {
+    return 0;
+  }
+  const basenameOverlap = countOverlap(profile.tokens, basenameTokens);
+  const role = classifyFileRole(relativePath);
+  return overlap * 100 +
+    basenameOverlap * 24 +
+    pathPriorityRoleBoost(role, profile);
+}
+
+function pathPriorityRoleBoost(
+  role: RepoIntelligenceFileRole,
+  profile: RepoScanProfile,
+): number {
+  if (profile.docsLike) {
+    return role === "docs"
+      ? 60
+      : role === "source"
+        ? 22
+        : role === "test"
+          ? 16
+          : 8;
+  }
+  if (profile.codeLike) {
+    return role === "source"
+      ? 60
+      : role === "test"
+        ? 48
+        : role === "entrypoint"
+          ? 30
+          : role === "config"
+            ? 14
+            : 4;
+  }
+  return role === "source" ? 32 : role === "test" ? 24 : 12;
 }
 
 function buildModuleMap(files: readonly RepoIntelligenceFile[]): RepoIntelligenceSnapshot["moduleMap"] {
@@ -505,6 +614,9 @@ const IGNORED_DIRS = new Set([
   "node_modules",
   "target",
 ]);
+
+const PATH_PRIORITY_PREFILL_LIMIT = 96;
+const PATH_PRIORITY_SCAN_LIMIT = 5_000;
 
 const STOP_WORDS = new Set([
   "the",

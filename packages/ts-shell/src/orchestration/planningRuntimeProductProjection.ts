@@ -89,10 +89,11 @@ export async function projectPlanningRuntimeProductOutcome(input: {
     commandRun: commandVerification,
   });
   const targetPaths = surface.editTargets.map((target) => target.path);
-  const reviewOnlyReason = [
-    input.routeReason,
-    "Review-only planning runtime stopped before mutation; mutationAuthority=not-granted.",
-  ].join(" ");
+  const reviewOnlyReason = buildReviewOnlyReason({
+    routeReason: input.routeReason,
+    handoffState: surface.mutationHandoff.handoffState,
+    targetPaths,
+  });
   const verificationReason =
     "Planning runtime produced verification intent only; command-dispatch=not-run.";
   const productEvidence = buildProductEvidence(
@@ -203,6 +204,24 @@ export async function projectPlanningRuntimeProductOutcome(input: {
       evidence: productEvidence,
     }),
   });
+}
+
+function buildReviewOnlyReason(input: {
+  readonly routeReason: string;
+  readonly handoffState: ReturnType<typeof projectPlanningRuntimeSurface>["mutationHandoff"]["handoffState"];
+  readonly targetPaths: readonly string[];
+}): string {
+  if (input.handoffState === "handoff-ready" && input.targetPaths.length > 0) {
+    return [
+      "Planning Runtime resolved a review-ready target.",
+      "Exact proposal mapping, explicit confirmation, and workspace authority are still required before mutation.",
+      "mutationAuthority=not-granted.",
+    ].join(" ");
+  }
+  return [
+    input.routeReason,
+    "Review-only planning runtime stopped before mutation; mutationAuthority=not-granted.",
+  ].join(" ");
 }
 
 function buildProductEvidence(
