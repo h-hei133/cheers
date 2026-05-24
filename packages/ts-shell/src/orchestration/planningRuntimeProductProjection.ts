@@ -1,5 +1,8 @@
 import type { PlanningRuntimeResult } from "./planningRuntime.js";
-import { buildPlanningMutationProposalBridge } from "./planningMutationProposalBridge.js";
+import {
+  runPlanningMutationProofRoute,
+  type PlanningMutationProofRoute,
+} from "./planningMutationProofRoute.js";
 import { projectPlanningRuntimeSurface } from "./planningRuntimeSurface.js";
 import {
   projectRuntimeCodingOutcome,
@@ -7,18 +10,20 @@ import {
 } from "./runtimeOutcomeProjection.js";
 import type { PlanningRuntimeProductTaskKind } from "./planningRuntimeProductRoute.js";
 
-export function projectPlanningRuntimeProductOutcome(input: {
+export async function projectPlanningRuntimeProductOutcome(input: {
   readonly result: PlanningRuntimeResult;
   readonly taskKind: PlanningRuntimeProductTaskKind;
   readonly routeReason: string;
   readonly routeEvidence?: readonly string[];
   readonly productPath: "runMvpIntegratedFlow";
-}): RuntimeOutcomeProjection {
+}): Promise<RuntimeOutcomeProjection> {
   const surface = projectPlanningRuntimeSurface(input.result);
-  const proposalBridge = buildPlanningMutationProposalBridge({
+  const proofRoute = await runPlanningMutationProofRoute({
     requestId: `${input.productPath}:${input.result.runtimeId}`,
     handoff: surface.mutationHandoff,
+    taskKind: input.taskKind,
   });
+  const proposalBridge = proofRoute.bridge;
   const targetPaths = surface.editTargets.map((target) => target.path);
   const reviewOnlyReason = [
     input.routeReason,
@@ -31,7 +36,7 @@ export function projectPlanningRuntimeProductOutcome(input: {
     input.productPath,
     input.routeEvidence ?? [],
     surface,
-    proposalBridge,
+    proofRoute,
   );
   const nextAction = selectNextAction(surface.enoughContext, targetPaths);
 
@@ -70,7 +75,7 @@ export function projectPlanningRuntimeProductOutcome(input: {
     ],
     userFacingOutput: formatPlanningRuntimeProductOutput({
       surface,
-      proposalBridge,
+      proofRoute,
       routeReason: input.routeReason,
       evidence: productEvidence,
     }),
@@ -82,7 +87,7 @@ function buildProductEvidence(
   productPath: "runMvpIntegratedFlow",
   routeEvidence: readonly string[],
   surface: ReturnType<typeof projectPlanningRuntimeSurface>,
-  proposalBridge: ReturnType<typeof buildPlanningMutationProposalBridge>,
+  proofRoute: PlanningMutationProofRoute,
 ): string[] {
   return [
     `planning-runtime-product:path:${productPath}`,
@@ -106,18 +111,19 @@ function buildProductEvidence(
     ),
     ...surface.contextAcquisition.evidence,
     ...result.evidence,
-    ...proposalBridge.evidence,
+    ...proofRoute.evidence,
   ];
 }
 
 function formatPlanningRuntimeProductOutput(input: {
   readonly surface: ReturnType<typeof projectPlanningRuntimeSurface>;
-  readonly proposalBridge: ReturnType<typeof buildPlanningMutationProposalBridge>;
+  readonly proofRoute: PlanningMutationProofRoute;
   readonly routeReason: string;
   readonly evidence: readonly string[];
 }): string {
   const surface = input.surface;
-  const proposalBridge = input.proposalBridge;
+  const proposalBridge = input.proofRoute.bridge;
+  const proofRoute = input.proofRoute;
   return [
     "Planning runtime: product-path review-only handoff",
     `Runtime id: ${surface.runtimeId}`,
@@ -195,6 +201,24 @@ function formatPlanningRuntimeProductOutput(input: {
     `Reason: ${proposalBridge.reason}`,
     `Next: ${proposalBridge.nextAction}`,
     "mutationAuthority=not-granted",
+    "",
+    "Proof backend route:",
+    `Route id: ${proofRoute.routeId}`,
+    `State: ${proofRoute.state}`,
+    `Proof handoff: ${proofRoute.proofHandoff.state}`,
+    `Backend: ${proofRoute.proofHandoff.backendLane}`,
+    `Apply state: ${proofRoute.proofHandoff.applyState}`,
+    `Verification state: ${proofRoute.verification.verificationState}`,
+    `Claim ledger: ${proofRoute.verification.claimLedger.ledgerId}`,
+    `Claim terminal: ${proofRoute.terminalState}`,
+    `Claim result: ${proofRoute.terminalResult}`,
+    `Claim live success: ${proofRoute.liveSuccess ? "yes" : "no"}`,
+    `Changed files: ${proofRoute.changedFiles.join(", ") || "none"}`,
+    `Verified files: ${proofRoute.verifiedFiles.join(", ") || "none"}`,
+    `Unverified files: ${proofRoute.unverifiedFiles.join(", ") || "none"}`,
+    "Provider call during apply: false",
+    `Reason: ${proofRoute.verification.reason}`,
+    `Next: ${proofRoute.verification.nextAction}`,
     "",
     "Context memory scope:",
     `memory=${surface.memory.id}; scope=product-turn; session-continuation=not-wired`,
@@ -363,6 +387,10 @@ function selectEvidenceMarkers(evidence: readonly string[]): readonly string[] {
     entry.startsWith("planning-runtime:") ||
     entry.startsWith("planning-mutation-handoff:") ||
     entry.startsWith("planning-proposal-bridge:") ||
+    entry.startsWith("planning-mutation-proof-route:") ||
+    entry.startsWith("planning-mutation-proof-handoff:") ||
+    entry.startsWith("planning-mutation-proof-verification:") ||
+    entry.startsWith("claim-ledger:") ||
     entry.startsWith("generated-edit-proposal:") ||
     entry.startsWith("edit-proposal-review:") ||
     entry.startsWith("planning-runtime-product:") ||

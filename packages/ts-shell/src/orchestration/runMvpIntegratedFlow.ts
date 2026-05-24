@@ -4127,7 +4127,7 @@ async function executeWorkflowTaskPlan(input: {
       userTask: input.prompt,
       taskKindHint: planningRuntimeProductRoute.taskKind,
     });
-    const projected = projectPlanningRuntimeProductOutcome({
+    const projected = await projectPlanningRuntimeProductOutcome({
       result: planning,
       taskKind: planningRuntimeProductRoute.taskKind,
       routeReason: planningRuntimeProductRoute.routeReason,

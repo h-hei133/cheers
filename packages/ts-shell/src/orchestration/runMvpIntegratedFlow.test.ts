@@ -7554,6 +7554,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.finalOutput).toContain("Provider call: not-run");
     expect(result.finalOutput).toContain("Apply state: not-run");
     expect(result.finalOutput).toContain("Verification state: not-run");
+    expect(result.finalOutput).toContain("Proof backend route:");
+    expect(result.finalOutput).toContain("Proof handoff:");
+    expect(result.finalOutput).toContain("Claim ledger:");
+    expect(result.finalOutput).toContain("Claim terminal:");
+    expect(result.finalOutput).toContain("Provider call during apply: false");
     expect(result.finalOutput).toContain("scope=product-turn; session-continuation=not-wired");
     expect(evidence).toEqual(
       expect.arrayContaining([
@@ -7586,11 +7591,17 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         "planning-proposal-bridge:provider-call:not-run",
         "planning-proposal-bridge:apply:not-run",
         "planning-proposal-bridge:verification:not-run",
+        "planning-mutation-proof-route:state:proposal-prepared",
+        "planning-mutation-proof-route:provider-call-during-apply:false",
+        "planning-mutation-proof-handoff:bridge-not-exact-ready",
+        "planning-mutation-proof-verification:provider-call-during-apply:false",
         "generated-edit-proposal:mutation-authority:not-granted",
         "edit-proposal-review:status:review-required",
         "edit-proposal-review:readiness:missing",
       ]),
     );
+    expect(evidence.some((entry) => entry.startsWith("planning-mutation-proof-route:terminal:"))).toBe(true);
+    expect(evidence.some((entry) => entry.startsWith("claim-ledger:terminal:"))).toBe(true);
     expect(evidence.some((entry) => entry.startsWith("context-engine:status:"))).toBe(true);
     expect(evidence.some((entry) => entry.startsWith("planning-runtime:id:"))).toBe(true);
     expect(evidence.some((entry) => entry.startsWith("inspect: read src/planning/targetRanking.ts"))).toBe(true);
