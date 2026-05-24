@@ -63,6 +63,7 @@ export type RealProviderProposalDryRunResult =
       readonly anchoredProposal: ProviderAnchoredProposalManifest;
       readonly anchoringResult: ProviderAnchoringResult;
       readonly manifest: ProviderEditProposalManifest;
+      readonly rawProposal: ProviderEditRawProposal;
       readonly providerCalled: true;
       readonly providerErrorClass?: string;
       readonly changedFiles: readonly [];
@@ -388,6 +389,7 @@ export async function runRealProviderProposalDryRun(input: {
     anchoredProposal,
     anchoringResult,
     manifest: normalized.manifest,
+    rawProposal: rawOutput,
     providerCalled: true,
     changedFiles: [],
     mutationAuthority: "not-granted",

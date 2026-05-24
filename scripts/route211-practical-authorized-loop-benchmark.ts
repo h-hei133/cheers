@@ -16,7 +16,19 @@ interface Scenario {
   readonly escalationDecision?: "allow-once" | "deny";
   readonly expected: {
     readonly productPathUsed: boolean;
-    readonly providerState: "default-safe" | "CONFIG-FAILED";
+    readonly providerState:
+      | "default-safe"
+      | "CONFIG-FAILED"
+      | "NETWORK-BLOCKED"
+      | "fake-provider-called"
+      | "live-provider-called"
+      | "not-proven";
+    readonly fallbackState?:
+      | "not-run"
+      | "enabled-not-called"
+      | "fake-fallback-called"
+      | "live-fallback-called";
+    readonly liveProviderEvidenceSource?: string;
     readonly proposalState?: string;
     readonly proposalSource?: string;
     readonly confirmationState?: string;
@@ -35,8 +47,19 @@ interface ScenarioReport {
   readonly id: string;
   readonly status: ProductResult["status"];
   readonly productPathUsed: boolean;
-  readonly providerState: "default-safe" | "CONFIG-FAILED" | "not-proven";
-  readonly fallbackState: "not-run";
+  readonly providerState:
+    | "default-safe"
+    | "CONFIG-FAILED"
+    | "NETWORK-BLOCKED"
+    | "fake-provider-called"
+    | "live-provider-called"
+    | "not-proven";
+  readonly fallbackState:
+    | "not-run"
+    | "enabled-not-called"
+    | "fake-fallback-called"
+    | "live-fallback-called";
+  readonly liveProviderEvidenceSource: string;
   readonly proposalState: string;
   readonly proposalSource: string;
   readonly anchorState: string | null;
@@ -51,7 +74,8 @@ interface ScenarioReport {
   readonly changedFiles: readonly string[];
   readonly workspaceChangedFiles: readonly string[];
   readonly safety: {
-    readonly providerCalledDefaultFalse: boolean;
+    readonly providerDefaultNotCalled: boolean;
+    readonly providerCallRequiresExplicitLiveOptIn: boolean;
     readonly applyDefaultNotRun: boolean;
     readonly commandDefaultNotRun: boolean;
     readonly noNewWriter: boolean;
@@ -106,7 +130,65 @@ const scenarios: readonly Scenario[] = [
     expected: {
       productPathUsed: true,
       providerState: "CONFIG-FAILED",
+      fallbackState: "not-run",
+      liveProviderEvidenceSource: "not-proven",
       proposalState: "live-provider-config-failed",
+      proposalSource: "live-provider-proposal",
+      confirmationState: "not-confirmed",
+      workspaceAuthority: "missing",
+      applyState: "not-run",
+      commandState: "not-requested",
+      commandDispatch: "not-run",
+      repairState: "not-needed",
+      noWorkspaceChanges: true,
+    },
+  },
+  {
+    id: "live-provider-primary-network-fake-fallback-no-write",
+    prompt: "Fix the planner target ranking bug and cover the adjacent test",
+    seedKind: "planning",
+    execution: {
+      liveProviderProposal: {
+        optIn: true,
+        source: "benchmark",
+        fallbackPolicy: {
+          enabled: true,
+          reason: "primary network failure may use configured fallback once",
+        },
+        attempts: [
+          {
+            role: "primary",
+            providerSafeLabel: "siliconflow-primary-cn",
+            providerConfigSource: "approved-provider-env",
+            providerAvailability: {
+              kind: "available",
+              providerKindLabel: "siliconflow-primary-cn",
+            },
+            readinessStatus: "network",
+            evidenceSource: "live-provider",
+            provider: buildExactProposalProvider(),
+          },
+          {
+            role: "fallback",
+            providerSafeLabel: "focused-fake-fallback",
+            providerConfigSource: "benchmark-fixture",
+            providerAvailability: {
+              kind: "available",
+              providerKindLabel: "focused-fake-fallback",
+            },
+            readinessStatus: "ready",
+            evidenceSource: "fake-provider",
+            provider: buildExactProposalProvider(),
+          },
+        ],
+      },
+    },
+    expected: {
+      productPathUsed: true,
+      providerState: "fake-provider-called",
+      fallbackState: "fake-fallback-called",
+      liveProviderEvidenceSource: "fake-provider",
+      proposalState: "prepared-exact",
       proposalSource: "live-provider-proposal",
       confirmationState: "not-confirmed",
       workspaceAuthority: "missing",
@@ -128,6 +210,7 @@ const scenarios: readonly Scenario[] = [
     expected: {
       productPathUsed: true,
       providerState: "default-safe",
+      liveProviderEvidenceSource: "default-safe",
       proposalState: "prepared-exact",
       proposalSource: "planning-runtime-deterministic",
       confirmationState: "trusted-confirmed",
@@ -279,7 +362,7 @@ try {
     route: "211",
     gate: "route211-practical-authorized-loop-benchmark",
     liveProviderRealCall: "not-run",
-    liveProviderOptInClassified: "CONFIG-FAILED",
+    liveProviderOptInClassified: "CONFIG-FAILED-or-fake-provider-called",
     reports,
   }, null, 2));
   if (failures.length > 0) {
@@ -335,9 +418,20 @@ function projectReport(input: {
   const productPathUsed = evidence.includes("planning-runtime-product:path:runMvpIntegratedFlow");
   const providerState = evidence.includes("planning-runtime-product-proposal:live-provider-status:CONFIG-FAILED")
     ? "CONFIG-FAILED"
-    : evidence.includes("provider-called=false")
-      ? "default-safe"
-      : "not-proven";
+    : evidence.includes("planning-runtime-product-proposal:live-provider-status:NETWORK-BLOCKED")
+      ? "NETWORK-BLOCKED"
+      : evidence.includes("planning-runtime-product:live-provider-evidence-source:fake-provider") &&
+        evidence.includes("provider-called=true")
+        ? "fake-provider-called"
+        : evidence.includes("planning-runtime-product:live-provider-evidence-source:live-provider") &&
+          evidence.includes("provider-called=true")
+          ? "live-provider-called"
+          : evidence.includes("provider-called=false")
+            ? "default-safe"
+            : "not-proven";
+  const liveProviderEvidenceSource =
+    markerValue(evidence, "planning-runtime-product:live-provider-evidence-source:") ?? "not-proven";
+  const fallbackState = classifyFallbackState(evidence);
   const proposalState = markerValue(evidence, "planning-runtime-product-proposal:status:") ??
     (productPathUsed ? "not-run" : "not-proven");
   const proposalSource = markerValue(evidence, "planning-runtime-product-proposal:source:") ??
@@ -352,7 +446,8 @@ function projectReport(input: {
     status: input.result.status,
     productPathUsed,
     providerState,
-    fallbackState: "not-run",
+    fallbackState,
+    liveProviderEvidenceSource,
     proposalState,
     proposalSource,
     anchorState: extractLineValue(finalOutput, "Anchor state:"),
@@ -367,13 +462,17 @@ function projectReport(input: {
     changedFiles: input.result.codingResult?.changedFiles ?? [],
     workspaceChangedFiles: input.workspaceChangedFiles,
     safety: {
-      providerCalledDefaultFalse: evidence.includes("provider-called=false"),
+      providerDefaultNotCalled: input.id.includes("default")
+        ? evidence.includes("provider-called=false")
+        : true,
+      providerCallRequiresExplicitLiveOptIn: !evidence.includes("provider-called=true") ||
+        evidence.includes("planning-runtime-product:live-opt-in:true"),
       applyDefaultNotRun: input.id.includes("default") ? evidence.includes("apply=not-run") : true,
       commandDefaultNotRun: input.id.includes("default") ? evidence.includes("command-dispatch=not-run") : true,
       noNewWriter: evidence.includes("planning-mutation-proof-handoff:no-new-writer") || !productPathUsed,
       noFuzzyApply: evidence.includes("planning-mutation-proof-handoff:no-fuzzy-apply") || !productPathUsed,
-      rawProviderOutputExcluded: !JSON.stringify(evidence).includes("provider.env") &&
-        !JSON.stringify(evidence).includes("apiKey"),
+      rawProviderOutputExcluded: !JSON.stringify({ evidence, finalOutput }).includes("provider.env") &&
+        !JSON.stringify({ evidence, finalOutput }).includes("apiKey"),
     },
     failures: [],
   };
@@ -388,6 +487,8 @@ function validateReport(input: {
   const report = input.report;
   compare("productPathUsed", report.productPathUsed, expected.productPathUsed, failures);
   compareOptional("providerState", report.providerState, expected.providerState, failures);
+  compareOptional("fallbackState", report.fallbackState, expected.fallbackState, failures);
+  compareOptional("liveProviderEvidenceSource", report.liveProviderEvidenceSource, expected.liveProviderEvidenceSource, failures);
   compareOptional("proposalState", report.proposalState, expected.proposalState, failures);
   compareOptional("proposalSource", report.proposalSource, expected.proposalSource, failures);
   compareOptional("confirmationState", report.confirmationState, expected.confirmationState, failures);
@@ -405,6 +506,45 @@ function validateReport(input: {
     if (!value) failures.push(`safety.${key}=false`);
   }
   return failures;
+}
+
+function buildExactProposalProvider() {
+  return {
+    proposeEdit: () => ({
+      operationKind: "exact-fenced-replacement" as const,
+      targets: [
+        {
+          path: "src/planning/targetRanking.ts",
+          summary: "Trim the planner task string before keyword matching.",
+          oldText: "  return task.includes('planner') ? 'targetRanking.ts' : 'unknown';",
+          newText: "  return task.trim().includes('planner') ? 'targetRanking.ts' : 'unknown';",
+        },
+      ],
+      verificationPlan: [
+        "readback verifies targetRanking.ts contains the trimmed planner predicate",
+      ],
+    }),
+  };
+}
+
+function classifyFallbackState(
+  evidence: readonly string[],
+): ScenarioReport["fallbackState"] {
+  const fallbackPolicy =
+    markerValue(evidence, "planning-runtime-product-proposal:live-provider-fallback-policy:") ??
+    "disabled";
+  if (fallbackPolicy !== "enabled") return "not-run";
+  const fallbackCalled = evidence.includes(
+    "planning-runtime-product-proposal:live-provider-fallback:provider-called:true",
+  );
+  if (!fallbackCalled) return "enabled-not-called";
+  const fallbackEvidenceSource = markerValue(
+    evidence,
+    "planning-runtime-product-proposal:live-provider-fallback:evidence-source:",
+  );
+  return fallbackEvidenceSource === "live-provider"
+    ? "live-fallback-called"
+    : "fake-fallback-called";
 }
 
 function withSelectedWorkspaceRoot(

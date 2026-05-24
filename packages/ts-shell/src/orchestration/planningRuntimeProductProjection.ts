@@ -1,4 +1,5 @@
 import type { CodingVerificationSummary } from "./types.js";
+import type { ClaimLedgerEvidenceSource } from "./claimLedgerProjection.js";
 import type { PlanningRuntimeResult } from "./planningRuntime.js";
 import {
   runPlanningMutationProofRoute,
@@ -39,11 +40,12 @@ export async function projectPlanningRuntimeProductOutcome(input: {
   readonly verificationRuntime?: PlanningRuntimeProductVerificationRuntime;
 }): Promise<RuntimeOutcomeProjection> {
   const surface = projectPlanningRuntimeSurface(input.result);
-  const proposalPreparation = preparePlanningRuntimeProductProposal({
+  const proposalPreparation = await preparePlanningRuntimeProductProposal({
     workspaceRoot: input.workspaceRoot,
     handoff: surface.mutationHandoff,
+    planningResult: input.result,
     rawProposal: input.execution?.rawProposal,
-    liveProviderOptIn: input.execution?.liveProviderProposal?.optIn,
+    liveProvider: input.execution?.liveProviderProposal,
   });
   const proofInputs = buildPlanningRuntimeProductProofInputs({
     workspaceRoot: input.workspaceRoot,
@@ -68,6 +70,9 @@ export async function projectPlanningRuntimeProductOutcome(input: {
     proposalEvidenceSource: proofInputs.exactProposalSource === "none"
       ? undefined
       : proofInputs.exactProposalSource,
+    evidenceSource: proofInputs.exactProposalSource === "live-provider-proposal"
+      ? claimLedgerEvidenceSourceForLiveProvider(proofInputs.liveProviderEvidenceSource)
+      : undefined,
     providerCalled: proofInputs.providerCalled,
     liveOptIn: proofInputs.liveOptIn,
   });
@@ -336,6 +341,9 @@ function formatPlanningRuntimeProductOutput(input: {
     `Product proposal reason: ${input.proofInputs.proposalPreparation?.reason ?? "none"}`,
     `Provider called for proposal: ${input.proofInputs.providerCalled ? "true" : "false"}`,
     `Live provider opt-in: ${input.proofInputs.liveOptIn ? "true" : "false"}`,
+    `Live provider evidence source: ${input.proofInputs.liveProviderEvidenceSource}`,
+    `Live provider status: ${liveProviderStatus(input.proofInputs)}`,
+    `Live provider fallback: ${liveProviderFallback(input.proofInputs)}`,
     `Explicit confirmation: ${input.proofInputs.confirmationState}`,
     `Exact proposal input: ${input.proofInputs.exactProposalState}`,
     `Controlled workspace: ${input.proofInputs.controlledWorkspaceState}`,
@@ -415,6 +423,37 @@ function formatPlanningRuntimeProductOutput(input: {
     "",
     `Evidence markers: ${selectEvidenceMarkers(input.evidence).join(" | ")}`,
   ].join("\n");
+}
+
+function liveProviderStatus(proofInputs: PlanningRuntimeProductProofInputs): string {
+  if (!proofInputs.liveOptIn) return "not-run";
+  return proofInputs.proposalPreparation?.evidence
+    .find((entry) => entry.startsWith("planning-runtime-product-proposal:live-provider-status:"))
+    ?.split(":")
+    .at(-1) ?? proofInputs.proposalPreparation?.status ?? "unknown";
+}
+
+function liveProviderFallback(proofInputs: PlanningRuntimeProductProofInputs): string {
+  if (!proofInputs.liveOptIn) return "not-run";
+  return proofInputs.proposalPreparation?.evidence
+    .find((entry) => entry.startsWith("planning-runtime-product-proposal:live-provider-fallback-policy:"))
+    ?.split(":")
+    .at(-1) ?? "unknown";
+}
+
+function claimLedgerEvidenceSourceForLiveProvider(
+  source: PlanningRuntimeProductProofInputs["liveProviderEvidenceSource"],
+): ClaimLedgerEvidenceSource {
+  switch (source) {
+    case "live-provider":
+      return "live-provider";
+    case "fake-provider":
+      return "fake-provider";
+    case "default-safe":
+      return "default-safe";
+    case "not-proven":
+      return "unknown";
+  }
 }
 
 function selectNextAction(

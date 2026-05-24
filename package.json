@@ -58,6 +58,7 @@
     "verify:route209-planning-proof-handoff-benchmark": "tsx scripts/route209-planning-proof-handoff-benchmark.ts",
     "verify:route210-review-confirm-execute-benchmark": "tsx scripts/route210-review-confirm-execute-benchmark.ts",
     "verify:route211-practical-authorized-loop-benchmark": "tsx scripts/route211-practical-authorized-loop-benchmark.ts",
+    "verify:route211-real-provider-proposal-smoke": "tsx scripts/route211-real-provider-proposal-smoke.ts",
     "demo:route207": "tsx scripts/route207-demo.ts",
     "verify:edit-capability-closeout": "node scripts/verify-edit-capability-closeout.mjs",
     "verify:browser-txn-gate": "node scripts/verify-browser-txn-gate.mjs",

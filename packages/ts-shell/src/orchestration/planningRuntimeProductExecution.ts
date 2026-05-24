@@ -3,11 +3,14 @@ import os from "node:os";
 import path from "node:path";
 
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
+import type { ProviderEditAvailability } from "./providerEditPlanner.js";
 import type { PlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
 import type {
   PlanningRuntimeProductProposalPreparation,
   PlanningRuntimeProductProposalSource,
 } from "./planningRuntimeProductProposal.js";
+import type { LiveProviderReadinessStatus } from "./liveProviderAdapterApproval.js";
+import type { RealProviderProposalDryRunProvider } from "./realProviderProposalDryRun.js";
 import {
   type PlanningMutationProofConfirmation,
   type PlanningMutationProofWorkspace,
@@ -33,9 +36,24 @@ export interface PlanningRuntimeProductVerificationCommand {
   readonly source: "runtime-option" | "cli-flag" | "benchmark";
 }
 
+export interface PlanningRuntimeProductLiveProviderAttempt {
+  readonly role: "primary" | "fallback";
+  readonly providerSafeLabel: string;
+  readonly providerConfigSource: string;
+  readonly providerAvailability: ProviderEditAvailability;
+  readonly readinessStatus?: LiveProviderReadinessStatus;
+  readonly evidenceSource?: "live-provider" | "fake-provider";
+  readonly provider?: RealProviderProposalDryRunProvider;
+}
+
 export interface PlanningRuntimeProductLiveProviderProposal {
   readonly optIn: true;
   readonly source: "runtime-option" | "cli-flag" | "benchmark";
+  readonly attempts?: readonly PlanningRuntimeProductLiveProviderAttempt[];
+  readonly fallbackPolicy?: {
+    readonly enabled: boolean;
+    readonly reason: string;
+  };
 }
 
 export interface PlanningRuntimeProductExecutionOptions {
@@ -62,6 +80,11 @@ export interface PlanningRuntimeProductProofInputs {
   readonly exactProposalSource: PlanningRuntimeProductProposalSource | "none";
   readonly providerCalled: boolean;
   readonly liveOptIn: boolean;
+  readonly liveProviderEvidenceSource:
+    | "live-provider"
+    | "fake-provider"
+    | "default-safe"
+    | "not-proven";
   readonly proposalPreparation?: PlanningRuntimeProductProposalPreparation;
   readonly controlledWorkspaceState:
     | "trusted-controlled-temp-workspace"
@@ -144,6 +167,7 @@ export function buildPlanningRuntimeProductProofInputs(input: {
       `planning-runtime-product:exact-proposal-source:${exactProposalSource}`,
       `planning-runtime-product:provider-called:${input.proposalPreparation?.providerCalled ?? false}`,
       `planning-runtime-product:live-opt-in:${input.proposalPreparation?.liveOptIn ?? false}`,
+      `planning-runtime-product:live-provider-evidence-source:${input.proposalPreparation?.liveEvidenceSource ?? "default-safe"}`,
       `planning-runtime-product:controlled-workspace:${controlledWorkspace.state}`,
       `planning-runtime-product:controlled-workspace-source:${input.execution?.controlledWorkspace?.source ?? "none"}`,
       `planning-runtime-product:controlled-workspace-reason:${controlledWorkspace.reason}`,
@@ -170,6 +194,7 @@ export function buildPlanningRuntimeProductProofInputs(input: {
     exactProposalSource,
     providerCalled: input.proposalPreparation?.providerCalled ?? false,
     liveOptIn: input.proposalPreparation?.liveOptIn ?? false,
+    liveProviderEvidenceSource: input.proposalPreparation?.liveEvidenceSource ?? "default-safe",
     ...(input.proposalPreparation ? { proposalPreparation: input.proposalPreparation } : {}),
     controlledWorkspaceState: controlledWorkspace.state,
     controlledWorkspaceReason: controlledWorkspace.reason,
