@@ -55,6 +55,7 @@
     "verify:route205-repair-proof-chain": "node scripts/verify-route205-repair-proof-chain.mjs",
     "verify:route206-controlled-multifile-proof-chain": "node scripts/verify-route206-controlled-multifile-proof-chain.mjs",
     "verify:route208-product-path-benchmark": "tsx scripts/route208-product-path-benchmark.ts",
+    "verify:route209-planning-proof-handoff-benchmark": "tsx scripts/route209-planning-proof-handoff-benchmark.ts",
     "demo:route207": "tsx scripts/route207-demo.ts",
     "verify:edit-capability-closeout": "node scripts/verify-edit-capability-closeout.mjs",
     "verify:browser-txn-gate": "node scripts/verify-browser-txn-gate.mjs",
