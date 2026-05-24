@@ -9,8 +9,14 @@ import {
 
 export type PlanningMutationHandoffReadiness = "review-ready" | "blocked";
 
+export type PlanningMutationHandoffState =
+  | "planning-only"
+  | "handoff-ready"
+  | "unsupported"
+  | "missing-context";
+
 export type PlanningMutationHandoffBackendLane =
-  | "generated-edit-proposal-review"
+  | "generated-edit-proposal-review-only"
   | "none";
 
 export type PlanningMutationHandoffExecutionLane =
@@ -56,11 +62,52 @@ export interface PlanningMutationHandoffTargetInput {
   readonly readiness: "ready-for-review" | "needs-more-context" | "unsupported";
 }
 
+export interface PlanningMutationHandoffContextReceiptInput {
+  readonly id: string;
+  readonly path: string;
+  readonly summary: string;
+  readonly relevance: string;
+}
+
+export interface PlanningMutationHandoffReadEvidenceInput {
+  readonly id: string;
+  readonly path: string;
+  readonly reason: string;
+  readonly source: string;
+}
+
+export interface PlanningMutationHandoffTarget {
+  readonly path: string;
+  readonly rationale: string;
+  readonly readiness: PlanningMutationHandoffTargetInput["readiness"];
+  readonly handoffRoute: PlanningMutationHandoffTargetInput["handoffRoute"];
+  readonly relevantContextReceiptIds: readonly string[];
+  readonly readEvidenceIds: readonly string[];
+  readonly expectedChangeSummary: string;
+  readonly verificationIntentSummary: string;
+  readonly unsupportedReasons: readonly string[];
+}
+
+export interface PlanningMutationHandoffVerificationIntent {
+  readonly available: boolean;
+  readonly summary: string;
+  readonly evidenceIds: readonly string[];
+}
+
 export interface PlanningMutationHandoffProjection {
+  readonly handoffId: string;
+  readonly handoffState: PlanningMutationHandoffState;
   readonly readiness: PlanningMutationHandoffReadiness;
   readonly targetPaths: readonly string[];
-  readonly route: "Route203-206-proof-carrying-backend";
+  readonly targets: readonly PlanningMutationHandoffTarget[];
+  readonly contextReceiptIds: readonly string[];
+  readonly readEvidenceIds: readonly string[];
+  readonly expectedChangeSummary: string;
+  readonly verificationIntent: PlanningMutationHandoffVerificationIntent;
+  readonly unsupportedReasons: readonly string[];
+  readonly route: "Route203-206-proof-carrying-backend-target";
   readonly backendLane: PlanningMutationHandoffBackendLane;
+  readonly backendConsumption: "not-run";
   readonly executionLane: PlanningMutationHandoffExecutionLane;
   readonly proposalId?: string;
   readonly proposalSummary?: string;
@@ -81,8 +128,15 @@ export function buildPlanningMutationHandoffProjection(input: {
   readonly missingFacts: readonly string[];
   readonly taskKind: string;
   readonly verificationIntentAvailable: boolean;
+  readonly contextReceipts?: readonly PlanningMutationHandoffContextReceiptInput[];
+  readonly readEvidence?: readonly PlanningMutationHandoffReadEvidenceInput[];
+  readonly expectedChangeSummary?: string;
+  readonly verificationIntentSummary?: string;
+  readonly verificationEvidenceIds?: readonly string[];
 }): PlanningMutationHandoffProjection {
   const targetPaths = input.editTargets.map((target) => target.path);
+  const contextReceipts = input.contextReceipts ?? [];
+  const readEvidence = input.readEvidence ?? [];
   const unsupportedTargets = input.editTargets.filter(
     (target) =>
       target.readiness === "unsupported" ||
@@ -98,6 +152,47 @@ export function buildPlanningMutationHandoffProjection(input: {
     taskKind: input.taskKind,
   });
   const reviewReady = reviewReadyTargets.length > 0 && blockedReasons.length === 0;
+  const handoffState = selectHandoffState({
+    reviewReady,
+    targetCount: targetPaths.length,
+    missingFacts: input.missingFacts,
+    unsupportedTargetCount: unsupportedTargets.length,
+    taskKind: input.taskKind,
+  });
+  const expectedChangeSummary = input.expectedChangeSummary ??
+    buildExpectedChangeSummary({ targetPaths, taskKind: input.taskKind });
+  const verificationIntent = buildVerificationIntent({
+    available: input.verificationIntentAvailable,
+    summary: input.verificationIntentSummary,
+    evidenceIds: input.verificationEvidenceIds ?? [],
+  });
+  const unsupportedReasons = buildUnsupportedReasons({
+    handoffState,
+    blockedReasons,
+    unsupportedTargets,
+  });
+  const targets = input.editTargets.map((target) => ({
+    path: target.path,
+    rationale: target.rationale,
+    readiness: target.readiness,
+    handoffRoute: target.handoffRoute,
+    relevantContextReceiptIds: contextReceipts.map((receipt) => receipt.id),
+    readEvidenceIds: readEvidence.map((evidence) => evidence.id),
+    expectedChangeSummary,
+    verificationIntentSummary: verificationIntent.summary,
+    unsupportedReasons: buildTargetUnsupportedReasons({
+      target,
+      blockedReasons,
+    }),
+  }));
+  const handoffId = buildHandoffId({
+    handoffState,
+    targetPaths,
+    contextReceiptIds: contextReceipts.map((receipt) => receipt.id),
+    readEvidenceIds: readEvidence.map((evidence) => evidence.id),
+    expectedChangeSummary,
+    verificationIntentSummary: verificationIntent.summary,
+  });
   const proposal = reviewReady
     ? buildGeneratedEditProposalManifest({
         targets: targetPaths,
@@ -131,9 +226,16 @@ export function buildPlanningMutationHandoffProjection(input: {
   });
   const evidence = unique([
     "planning-mutation-handoff:projection-created",
+    `planning-mutation-handoff:id:${handoffId}`,
+    "planning-mutation-handoff:structured-contract:v1",
+    `planning-mutation-handoff:state:${handoffState}`,
     `planning-mutation-handoff:readiness:${reviewReady ? "review-ready" : "blocked"}`,
     `planning-mutation-handoff:target-count:${targetPaths.length}`,
+    `planning-mutation-handoff:context-receipts:${contextReceipts.length}`,
+    `planning-mutation-handoff:read-evidence:${readEvidence.length}`,
+    `planning-mutation-handoff:verification-intent:${verificationIntent.available ? "available" : "missing"}`,
     `planning-mutation-handoff:backend-lane:${backendLane}`,
+    "planning-mutation-handoff:backend-consumption:not-run",
     `planning-mutation-handoff:execution-lane:${executionLane}`,
     `planning-mutation-handoff:review-state:${reviewReady ? "review-required" : "blocked"}`,
     "planning-mutation-handoff:permission:not-requested",
@@ -150,10 +252,19 @@ export function buildPlanningMutationHandoffProjection(input: {
   ]);
 
   return {
+    handoffId,
+    handoffState,
     readiness: reviewReady ? "review-ready" : "blocked",
     targetPaths,
-    route: "Route203-206-proof-carrying-backend",
+    targets,
+    contextReceiptIds: contextReceipts.map((receipt) => receipt.id),
+    readEvidenceIds: readEvidence.map((evidence) => evidence.id),
+    expectedChangeSummary,
+    verificationIntent,
+    unsupportedReasons,
+    route: "Route203-206-proof-carrying-backend-target",
     backendLane,
+    backendConsumption: "not-run",
     executionLane,
     ...(proposal ? { proposalId: proposal.proposalId } : {}),
     ...(proposal ? { proposalSummary: proposal.safeSummary } : {}),
@@ -173,6 +284,28 @@ export function buildPlanningMutationHandoffProjection(input: {
     mutationAuthority: "not-granted",
     evidence,
   };
+}
+
+function selectHandoffState(input: {
+  readonly reviewReady: boolean;
+  readonly targetCount: number;
+  readonly missingFacts: readonly string[];
+  readonly unsupportedTargetCount: number;
+  readonly taskKind: string;
+}): PlanningMutationHandoffState {
+  if (input.reviewReady) {
+    return "handoff-ready";
+  }
+  if (input.missingFacts.length > 0 && input.targetCount > 0) {
+    return "missing-context";
+  }
+  if (isReadOnlyTask(input.taskKind) && input.targetCount === 0) {
+    return "planning-only";
+  }
+  if (input.unsupportedTargetCount > 0 || input.targetCount === 0) {
+    return "unsupported";
+  }
+  return "missing-context";
 }
 
 function buildBlockedReasons(input: {
@@ -196,6 +329,35 @@ function buildBlockedReasons(input: {
     reasons.push("selected target is unsupported before the mutation runtime");
   }
   return unique(reasons);
+}
+
+function buildUnsupportedReasons(input: {
+  readonly handoffState: PlanningMutationHandoffState;
+  readonly blockedReasons: readonly string[];
+  readonly unsupportedTargets: readonly PlanningMutationHandoffTargetInput[];
+}): readonly string[] {
+  if (input.handoffState === "handoff-ready") {
+    return [];
+  }
+  return unique([
+    ...input.blockedReasons,
+    ...input.unsupportedTargets.map((target) =>
+      `${target.path}: unsupported before mutation runtime`,
+    ),
+  ]);
+}
+
+function buildTargetUnsupportedReasons(input: {
+  readonly target: PlanningMutationHandoffTargetInput;
+  readonly blockedReasons: readonly string[];
+}): readonly string[] {
+  return unique([
+    ...(input.target.readiness === "needs-more-context" ? input.blockedReasons : []),
+    ...(input.target.readiness === "unsupported" ||
+      input.target.handoffRoute === "unsupported-before-mutation-runtime"
+      ? ["target is unsupported before the mutation runtime"]
+      : []),
+  ]);
 }
 
 function buildRequirements(input: {
@@ -275,7 +437,7 @@ function selectBackendLane(input: {
   if (!input.reviewReady) {
     return "none";
   }
-  return "generated-edit-proposal-review";
+  return "generated-edit-proposal-review-only";
 }
 
 function selectExecutionLane(input: {
@@ -303,11 +465,39 @@ function buildProposalSummary(input: {
     `rationale=${rationale || "none"}`,
       "content=safe-summary-only",
       "exact-mapping=not-produced",
-      "review=generated-edit-proposal-review",
+      "review=generated-edit-proposal-review-only",
       "confirmation=review-required",
       "mutationAuthority=not-granted",
       "raw-content-excluded",
   ].join("; ");
+}
+
+function buildExpectedChangeSummary(input: {
+  readonly targetPaths: readonly string[];
+  readonly taskKind: string;
+}): string {
+  if (input.targetPaths.length > 0) {
+    return `Planning selected ${input.targetPaths.join(", ")} for ${input.taskKind}; exact old/new mapping is still required.`;
+  }
+  if (isReadOnlyTask(input.taskKind)) {
+    return "Read-only planning produced analysis only; no mutation change is expected.";
+  }
+  return "No concrete mutation target was selected; no change is prepared.";
+}
+
+function buildVerificationIntent(input: {
+  readonly available: boolean;
+  readonly summary?: string;
+  readonly evidenceIds: readonly string[];
+}): PlanningMutationHandoffVerificationIntent {
+  return {
+    available: input.available,
+    summary: input.summary ??
+      (input.available
+        ? "Planning preserved verification intent for the existing execution route; command-dispatch remains not-run."
+        : "No concrete verification intent is ready for mutation execution."),
+    evidenceIds: input.evidenceIds,
+  };
 }
 
 function buildReason(input: {
@@ -345,6 +535,22 @@ function isReadOnlyTask(taskKind: string): boolean {
   return taskKind === "read-file" ||
     taskKind === "inspect-files" ||
     taskKind === "repo-explain";
+}
+
+function buildHandoffId(input: {
+  readonly handoffState: PlanningMutationHandoffState;
+  readonly targetPaths: readonly string[];
+  readonly contextReceiptIds: readonly string[];
+  readonly readEvidenceIds: readonly string[];
+  readonly expectedChangeSummary: string;
+  readonly verificationIntentSummary: string;
+}): string {
+  const payload = JSON.stringify(input);
+  let hash = 0;
+  for (let index = 0; index < payload.length; index += 1) {
+    hash = (hash * 31 + payload.charCodeAt(index)) >>> 0;
+  }
+  return `planning-mutation-handoff-${hash.toString(16).padStart(8, "0")}`;
 }
 
 function unique(values: readonly string[]): readonly string[] {

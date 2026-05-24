@@ -4,6 +4,8 @@ import { buildVerificationCommandPlan, type VerificationCommandPlan } from "./ve
 import { buildGroundedPlanningProjection } from "./groundedPlanningProjection.js";
 import {
   buildPlanningMutationHandoffProjection,
+  type PlanningMutationHandoffContextReceiptInput,
+  type PlanningMutationHandoffReadEvidenceInput,
   type PlanningMutationHandoffProjection,
 } from "./planningMutationHandoffProjection.js";
 import {
@@ -118,6 +120,11 @@ export async function runPlanningRuntime(input: {
     missingFacts,
     taskKind: context.workflowPlan.taskKind,
     verificationIntentAvailable: hasVerificationIntent(verificationIntent),
+    contextReceipts: buildHandoffContextReceipts(context),
+    readEvidence: buildHandoffReadEvidence(context),
+    expectedChangeSummary: groundedPlanning.planSummary,
+    verificationIntentSummary: summarizeVerificationIntent(verificationIntent),
+    verificationEvidenceIds: collectVerificationEvidenceIds(verificationIntent),
   });
 
   return {
@@ -165,6 +172,28 @@ export async function runPlanningRuntime(input: {
   };
 }
 
+function buildHandoffContextReceipts(
+  context: ContextEngineResult,
+): readonly PlanningMutationHandoffContextReceiptInput[] {
+  return context.memory.fileReceipts.map((receipt, index) => ({
+    id: `context-receipt:${context.memory.memoryId}:${index + 1}`,
+    path: receipt.path,
+    summary: receipt.summary,
+    relevance: receipt.relevance,
+  }));
+}
+
+function buildHandoffReadEvidence(
+  context: ContextEngineResult,
+): readonly PlanningMutationHandoffReadEvidenceInput[] {
+  return context.filesRead.map((file, index) => ({
+    id: `read-evidence:${context.engineId}:${index + 1}`,
+    path: file.path,
+    reason: file.reason,
+    source: file.source,
+  }));
+}
+
 function hasVerificationIntent(
   verificationIntent: PlanningRuntimeResult["verificationIntent"],
 ): boolean {
@@ -176,6 +205,49 @@ function hasVerificationIntent(
     );
   }
   return verificationIntent.commands.length > 0;
+}
+
+function summarizeVerificationIntent(
+  verificationIntent: PlanningRuntimeResult["verificationIntent"],
+): string {
+  if ("verificationPlanId" in verificationIntent) {
+    const command = verificationIntent.commandSafeLabel ?? "(no command)";
+    return [
+      `verificationPlan=${verificationIntent.verificationPlanId}`,
+      `state=${verificationIntent.state}`,
+      `source=${verificationIntent.source}`,
+      `command=${command}`,
+      `readiness=${verificationIntent.executionReadiness}`,
+      "command-dispatch=not-run",
+    ].join("; ");
+  }
+  return [
+    `state=${verificationIntent.state}`,
+    `commands=${verificationIntent.commands.length}`,
+    "command-dispatch=not-run",
+  ].join("; ");
+}
+
+function collectVerificationEvidenceIds(
+  verificationIntent: PlanningRuntimeResult["verificationIntent"],
+): readonly string[] {
+  if ("verificationPlanId" in verificationIntent) {
+    return [
+      verificationIntent.verificationPlanId,
+      verificationIntent.sourceAgentPlanId,
+      verificationIntent.sourceContextPacketId,
+      verificationIntent.sourceContextGraphId,
+      verificationIntent.sourceTestImpactPlanId,
+      verificationIntent.sourceImpactQueryId,
+      verificationIntent.sourcePlanQualityId,
+      verificationIntent.sourceContextSufficiencyId,
+      verificationIntent.sourceAnalysisQualityGateId,
+      verificationIntent.sourceTaskLifecycleId,
+      verificationIntent.sourceAnalysisBriefId,
+      verificationIntent.sourceTaskExecutionPlanId,
+    ].filter((id): id is string => Boolean(id));
+  }
+  return verificationIntent.evidence;
 }
 
 function isReadOnlyPlanningTask(taskKind: ContextEngineResult["workflowPlan"]["taskKind"]): boolean {

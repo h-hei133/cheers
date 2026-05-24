@@ -66,11 +66,23 @@ describe("runPlanningRuntime", () => {
         expect.stringContaining("mutationAuthority remains not-granted"),
       ]),
     );
-    expect(result.mutationHandoff.route).toBe("Route203-206-proof-carrying-backend");
-    expect(result.mutationHandoff.backendLane).toBe("generated-edit-proposal-review");
+    expect(result.mutationHandoff.route).toBe("Route203-206-proof-carrying-backend-target");
+    expect(result.mutationHandoff.handoffId).toMatch(/^planning-mutation-handoff-/);
+    expect(result.mutationHandoff.handoffState).toBe("handoff-ready");
+    expect(result.mutationHandoff.backendLane).toBe("generated-edit-proposal-review-only");
+    expect(result.mutationHandoff.backendConsumption).toBe("not-run");
     expect(result.mutationHandoff.executionLane).toBe("existing-exact-fenced-route");
     expect(result.mutationHandoff.reviewState).toBe("review-required");
     expect(result.mutationHandoff.permissionState).toBe("not-requested");
+    expect(result.mutationHandoff.contextReceiptIds.length).toBeGreaterThan(0);
+    expect(result.mutationHandoff.readEvidenceIds.length).toBeGreaterThan(0);
+    expect(result.mutationHandoff.expectedChangeSummary).toContain("review-only proposal");
+    expect(result.mutationHandoff.verificationIntent.available).toBe(true);
+    expect(result.mutationHandoff.verificationIntent.summary).toContain("command-dispatch=not-run");
+    expect(result.mutationHandoff.targets[0]).toMatchObject({
+      path: "src/contextEngine.ts",
+      unsupportedReasons: [],
+    });
     expect(result.mutationHandoff.proposalId).toMatch(/^generated-edit-/);
     expect(result.mutationHandoff.proposalReview).toMatchObject({
       reviewStatus: "review-required",
@@ -94,6 +106,8 @@ describe("runPlanningRuntime", () => {
     );
     expect(result.mutationHandoff.mutationAuthority).toBe("not-granted");
     expect(result.evidence).toContain("planning-runtime:mutation-authority:not-granted");
+    expect(result.evidence).toContain("planning-mutation-handoff:structured-contract:v1");
+    expect(result.evidence).toContain("planning-mutation-handoff:state:handoff-ready");
     expect(result.evidence).toContain("planning-mutation-handoff:readiness:review-ready");
     expect(result.evidence).toContain("planning-mutation-handoff:permission:not-requested");
     expect(result.evidence).toContain("generated-edit-proposal:mutation-authority:not-granted");
@@ -122,8 +136,9 @@ describe("runPlanningRuntime", () => {
     expect(second.context.status).toBe("reused-memory");
     expect(second.context.contextBudget.filesRead).toBe(0);
     expect(second.status).toBe("ready-for-handoff");
+    expect(second.mutationHandoff.handoffState).toBe("handoff-ready");
     expect(second.mutationHandoff.readiness).toBe("review-ready");
-    expect(second.mutationHandoff.backendLane).toBe("generated-edit-proposal-review");
+    expect(second.mutationHandoff.backendLane).toBe("generated-edit-proposal-review-only");
     expect(second.mutationHandoff.proposalReview?.reviewStatus).toBe("review-required");
     expect(second.mutationHandoff.mutationAuthority).toBe("not-granted");
     expect(second.groundedAnalysis.missingFacts).toEqual([]);
@@ -182,6 +197,7 @@ describe("runPlanningRuntime", () => {
     expect(result.context.workflowPlan.taskKind).toBe("run-command");
     expect(result.editTargets).toEqual([]);
     expect(result.mutationHandoff.readiness).toBe("blocked");
+    expect(result.mutationHandoff.handoffState).toBe("unsupported");
     expect(result.mutationHandoff.backendLane).toBe("none");
     expect(result.mutationHandoff.proposal).toBeUndefined();
     expect(result.mutationHandoff.targetPaths).toEqual([]);
@@ -201,6 +217,7 @@ describe("runPlanningRuntime", () => {
     expect(writeResult.context.workflowPlan.taskKind).toBe("write-file");
     expect(writeResult.editTargets[0]?.path).toBe("src/contextEngine.ts");
     expect(writeResult.mutationHandoff.readiness).toBe("review-ready");
+    expect(writeResult.mutationHandoff.handoffState).toBe("handoff-ready");
     expect(writeResult.mutationHandoff.executionLane).toBe("existing-exact-fenced-route");
     expect(writeResult.mutationHandoff.mutationAuthority).toBe("not-granted");
 
@@ -216,6 +233,7 @@ describe("runPlanningRuntime", () => {
     expect(inspectResult.status).toBe("ready-for-handoff");
     expect(inspectResult.editTargets).toEqual([]);
     expect(inspectResult.mutationHandoff.readiness).toBe("blocked");
+    expect(inspectResult.mutationHandoff.handoffState).toBe("planning-only");
     expect(inspectResult.mutationHandoff.backendLane).toBe("none");
     expect(inspectResult.mutationHandoff.reason).toContain("Read-only planning path");
     expect(inspectResult.mutationHandoff.mutationAuthority).toBe("not-granted");

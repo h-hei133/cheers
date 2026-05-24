@@ -16,14 +16,53 @@ describe("buildPlanningMutationHandoffProjection", () => {
       missingFacts: [],
       taskKind: "edit-file",
       verificationIntentAvailable: true,
+      contextReceipts: [
+        {
+          id: "context-receipt:ctx_mem_123:1",
+          path: "src/contextEngine.ts",
+          summary: "context engine source summary",
+          relevance: "target file",
+        },
+      ],
+      readEvidence: [
+        {
+          id: "read-evidence:context_engine_123:1",
+          path: "src/contextEngine.ts",
+          reason: "target file",
+          source: "repo-intelligence",
+        },
+      ],
+      expectedChangeSummary: "Prepare a review-only proposal for src/contextEngine.ts.",
+      verificationIntentSummary: "verificationPlan=verification_plan_123; command=npm test -- --help; command-dispatch=not-run",
+      verificationEvidenceIds: ["verification_plan_123"],
     });
 
+    expect(projection.handoffId).toMatch(/^planning-mutation-handoff-/);
+    expect(projection.handoffState).toBe("handoff-ready");
     expect(projection.readiness).toBe("review-ready");
-    expect(projection.backendLane).toBe("generated-edit-proposal-review");
+    expect(projection.backendLane).toBe("generated-edit-proposal-review-only");
+    expect(projection.backendConsumption).toBe("not-run");
     expect(projection.executionLane).toBe("existing-exact-fenced-route");
     expect(projection.reviewState).toBe("review-required");
     expect(projection.permissionState).toBe("not-requested");
     expect(projection.targetPaths).toEqual(["src/contextEngine.ts"]);
+    expect(projection.contextReceiptIds).toEqual(["context-receipt:ctx_mem_123:1"]);
+    expect(projection.readEvidenceIds).toEqual(["read-evidence:context_engine_123:1"]);
+    expect(projection.expectedChangeSummary).toBe("Prepare a review-only proposal for src/contextEngine.ts.");
+    expect(projection.verificationIntent).toEqual({
+      available: true,
+      summary: "verificationPlan=verification_plan_123; command=npm test -- --help; command-dispatch=not-run",
+      evidenceIds: ["verification_plan_123"],
+    });
+    expect(projection.unsupportedReasons).toEqual([]);
+    expect(projection.targets[0]).toMatchObject({
+      path: "src/contextEngine.ts",
+      relevantContextReceiptIds: ["context-receipt:ctx_mem_123:1"],
+      readEvidenceIds: ["read-evidence:context_engine_123:1"],
+      expectedChangeSummary: "Prepare a review-only proposal for src/contextEngine.ts.",
+      verificationIntentSummary: "verificationPlan=verification_plan_123; command=npm test -- --help; command-dispatch=not-run",
+      unsupportedReasons: [],
+    });
     expect(projection.proposalId).toMatch(/^generated-edit-/);
     expect(projection.proposal?.mutationAuthority).toBe("not-granted");
     expect(projection.proposal?.redactionStatus).toBe("raw-content-excluded");
@@ -79,8 +118,15 @@ describe("buildPlanningMutationHandoffProjection", () => {
     expect(projection.evidence).toEqual(
       expect.arrayContaining([
         "planning-mutation-handoff:projection-created",
+        expect.stringMatching(/^planning-mutation-handoff:id:planning-mutation-handoff-/),
+        "planning-mutation-handoff:structured-contract:v1",
+        "planning-mutation-handoff:state:handoff-ready",
         "planning-mutation-handoff:readiness:review-ready",
-        "planning-mutation-handoff:backend-lane:generated-edit-proposal-review",
+        "planning-mutation-handoff:context-receipts:1",
+        "planning-mutation-handoff:read-evidence:1",
+        "planning-mutation-handoff:verification-intent:available",
+        "planning-mutation-handoff:backend-lane:generated-edit-proposal-review-only",
+        "planning-mutation-handoff:backend-consumption:not-run",
         "planning-mutation-handoff:execution-lane:existing-exact-fenced-route",
         "planning-mutation-handoff:permission:not-requested",
         "planning-mutation-handoff:mutation-authority:not-granted",
@@ -106,12 +152,16 @@ describe("buildPlanningMutationHandoffProjection", () => {
     });
 
     expect(projection.readiness).toBe("blocked");
+    expect(projection.handoffState).toBe("planning-only");
     expect(projection.backendLane).toBe("none");
     expect(projection.executionLane).toBe("none");
     expect(projection.targetPaths).toEqual([]);
     expect(projection.proposal).toBeUndefined();
     expect(projection.proposalReview).toBeUndefined();
     expect(projection.blockedReasons).toEqual([
+      "read-only planning task selected no mutation target",
+    ]);
+    expect(projection.unsupportedReasons).toEqual([
       "read-only planning task selected no mutation target",
     ]);
     expect(projection.reason).toContain("Read-only planning path");
@@ -142,11 +192,13 @@ describe("buildPlanningMutationHandoffProjection", () => {
     });
 
     expect(projection.readiness).toBe("blocked");
+    expect(projection.handoffState).toBe("missing-context");
     expect(projection.backendLane).toBe("none");
     expect(projection.executionLane).toBe("none");
     expect(projection.targetPaths).toEqual(["src/app.ts"]);
     expect(projection.proposal).toBeUndefined();
     expect(projection.blockedReasons).toContain("call-site context missing");
+    expect(projection.targets[0]?.unsupportedReasons).toContain("call-site context missing");
     expect(projection.requirements).toContainEqual(
       expect.objectContaining({
         id: "exact-old-new-mapping",
@@ -178,7 +230,7 @@ describe("buildPlanningMutationHandoffProjection", () => {
     });
 
     expect(projection.readiness).toBe("review-ready");
-    expect(projection.backendLane).toBe("generated-edit-proposal-review");
+    expect(projection.backendLane).toBe("generated-edit-proposal-review-only");
     expect(projection.executionLane).toBe("existing-target-set-route");
     expect(projection.proposalReview?.targetScope).toBe("target-set");
     expect(projection.evidence).toContain(

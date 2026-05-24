@@ -7523,11 +7523,19 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.finalOutput).toContain("Edit targets:");
     expect(result.finalOutput).toContain("Verification intent:");
     expect(result.finalOutput).toContain("Review-only handoff:");
-    expect(result.finalOutput).toContain("Backend lane: generated-edit-proposal-review");
+    expect(result.finalOutput).toContain("Handoff id: planning-mutation-handoff-");
+    expect(result.finalOutput).toContain("Handoff state: handoff-ready");
+    expect(result.finalOutput).toContain("Backend lane: generated-edit-proposal-review-only");
+    expect(result.finalOutput).toContain("Backend consumption: not-run");
     expect(result.finalOutput).toContain("Execution lane after inputs: existing-exact-fenced-route");
     expect(result.finalOutput).toContain("Proposal: generated-edit-");
     expect(result.finalOutput).toContain("Proposal review: review-required");
     expect(result.finalOutput).toContain("Exact mapping readiness: missing");
+    expect(result.finalOutput).toContain("Context receipt ids: context-receipt:");
+    expect(result.finalOutput).toContain("Read evidence ids: read-evidence:");
+    expect(result.finalOutput).toContain("Expected change: Prepare a review-only proposal");
+    expect(result.finalOutput).toContain("Handoff verification intent: verificationPlan=");
+    expect(result.finalOutput).toContain("Unsupported reasons: none");
     expect(result.finalOutput).toContain("Requirements:");
     expect(result.finalOutput).toContain("exact-old-new-mapping status=missing-before-execution");
     expect(result.finalOutput).toContain("workspace-authority status=required-by-existing-route");
@@ -7553,8 +7561,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         "context-acquisition:mutation-authority:not-granted",
         "grounded-planning:evidence-grounded",
         "grounded-planning:mutation-authority:not-granted",
+        "planning-mutation-handoff:structured-contract:v1",
+        "planning-mutation-handoff:state:handoff-ready",
         "planning-mutation-handoff:readiness:review-ready",
-        "planning-mutation-handoff:backend-lane:generated-edit-proposal-review",
+        "planning-mutation-handoff:verification-intent:available",
+        "planning-mutation-handoff:backend-lane:generated-edit-proposal-review-only",
+        "planning-mutation-handoff:backend-consumption:not-run",
         "planning-mutation-handoff:execution-lane:existing-exact-fenced-route",
         "planning-mutation-handoff:permission:not-requested",
         "planning-mutation-handoff:requirement:exact-old-new-mapping:missing-before-execution",
@@ -7634,10 +7646,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       expect(result.finalOutput).toContain("Executable plan:");
       expect(result.finalOutput).toContain("Verification intent:");
       expect(result.finalOutput).toContain("Review-only handoff:");
+      expect(result.finalOutput).toContain("Handoff state:");
       if (scenario.taskKind === "write-file") {
         expect(result.finalOutput).toContain("Backend lane: none");
         expect(result.finalOutput).toContain("Execution lane after inputs: none");
         expect(result.finalOutput).toContain("Proposal review: none");
+        expect(result.finalOutput).toMatch(/Handoff state: (unsupported|missing-context)/);
       }
       expect(result.finalOutput).toContain("mutationAuthority=not-granted");
       expect(result.finalOutput).toContain("provider-called=false");
