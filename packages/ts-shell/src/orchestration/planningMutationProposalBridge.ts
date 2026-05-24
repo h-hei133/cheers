@@ -3,10 +3,12 @@ import { detectProviderAnchorConflicts } from "./providerAnchorConflict.js";
 import { classifyProviderAnchorQuality } from "./providerAnchorQuality.js";
 import { matchProviderAnchorCandidates } from "./providerAnchorMatcher.js";
 import {
+  buildAnchoredProposalMappingByHunkId,
   buildAnchoredProviderProposalReview,
   buildProviderAnchoredProposal,
   type ProviderAnchoredProposalManifest,
 } from "./providerAnchoredProposal.js";
+import type { FencedEditMapping } from "./fencedEditPlanner.js";
 import { extractProviderProposalAnchors } from "./providerProposalAnchors.js";
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 import { validateProviderOutput } from "./providerOutputValidator.js";
@@ -39,6 +41,7 @@ export interface PlanningMutationProposalBridge {
   readonly anchoredProposalId?: string;
   readonly anchoredProposal?: ProviderAnchoredProposalManifest;
   readonly anchoredReview?: EditProposalReview;
+  readonly anchoredMappingByHunkId?: ReadonlyMap<string, FencedEditMapping>;
   readonly confirmationState:
     | "not-requested"
     | "review-required"
@@ -159,6 +162,10 @@ export function buildPlanningMutationProposalBridge(input: {
     anchorQuality,
   });
   const anchoredReview = buildAnchoredProviderProposalReview(anchoredProposal);
+  const anchoredMappingByHunkId = buildAnchoredProposalMappingByHunkId({
+    manifest: anchoredProposal,
+    matchResult,
+  });
   const exactReady =
     anchoredProposal.handoffReadiness === "exact-single-target" ||
     anchoredProposal.handoffReadiness === "exact-hunk-set";
@@ -185,6 +192,7 @@ export function buildPlanningMutationProposalBridge(input: {
     evidenceSource: "focused-deterministic-proposal",
     anchoredProposal,
     anchoredReview,
+    anchoredMappingByHunkId,
     reason: exactReady
       ? "Focused deterministic proposal anchored exactly and now requires explicit confirmation before existing apply lanes can run."
       : anchoredProposal.safeSummary,
@@ -237,6 +245,7 @@ function baseBridge(input: {
   readonly evidenceSource: PlanningMutationProposalBridge["evidenceSource"];
   readonly anchoredProposal?: ProviderAnchoredProposalManifest;
   readonly anchoredReview?: EditProposalReview;
+  readonly anchoredMappingByHunkId?: ReadonlyMap<string, FencedEditMapping>;
   readonly reason: string;
   readonly nextAction: string;
   readonly extraEvidence: readonly string[];
@@ -279,6 +288,7 @@ function baseBridge(input: {
     ...(input.anchoredProposal ? { anchoredProposalId: input.anchoredProposal.anchoredProposalId } : {}),
     ...(input.anchoredProposal ? { anchoredProposal: input.anchoredProposal } : {}),
     ...(input.anchoredReview ? { anchoredReview: input.anchoredReview } : {}),
+    ...(input.anchoredMappingByHunkId ? { anchoredMappingByHunkId: input.anchoredMappingByHunkId } : {}),
     confirmationState: input.confirmationState,
     applyState: "not-run",
     verificationState: "not-run",
