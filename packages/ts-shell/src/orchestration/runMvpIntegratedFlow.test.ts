@@ -7607,6 +7607,161 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(evidence.some((entry) => entry.startsWith("inspect: read src/planning/targetRanking.ts"))).toBe(true);
   }, 15000);
 
+  it("executes a confirmed Route210 product planning handoff through the existing proof backend", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src", "planning"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "route210-product-confirmed", scripts: { test: "vitest run" } }, null, 2),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "planning", "targetRanking.ts"),
+      [
+        "export function rankPlannerTargets(task: string) {",
+        "  return task.includes('planner') ? 'targetRanking.ts' : 'unknown';",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "planning", "targetRanking.test.ts"),
+      "expect(rankPlannerTargets('planner target ranking')).toBe('targetRanking.ts');\n",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_route210_product_confirmed",
+      prompt: "Fix the planner target ranking bug and cover the adjacent test",
+      workspaceRoot,
+      maxTurns: 4,
+      planningMutationExecution: {
+        confirmation: { state: "trusted-confirmed" },
+        rawProposal: {
+          operationKind: "exact-fenced-replacement",
+          targets: [
+            {
+              path: "src/planning/targetRanking.ts",
+              oldText: "  return task.includes('planner') ? 'targetRanking.ts' : 'unknown';",
+              newText: "  return task.trim().includes('planner') ? 'targetRanking.ts' : 'unknown';",
+            },
+          ],
+          verificationPlan: ["readback verifies controlled fixture final content"],
+        },
+        controlledWorkspace: {
+          scope: "controlled-temp-workspace",
+          source: "runtime-option",
+        },
+      },
+    });
+
+    const evidence = result.codingResult?.evidence ?? [];
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "planning", "targetRanking.ts"), "utf8"),
+    ).resolves.toBe([
+      "export function rankPlannerTargets(task: string) {",
+      "  return task.trim().includes('planner') ? 'targetRanking.ts' : 'unknown';",
+      "}",
+      "",
+    ].join("\n"));
+    expect(result.finalOutput).toContain("Planning runtime: product-path review-only handoff");
+    expect(result.finalOutput).toContain("Review-confirm-execute loop:");
+    expect(result.finalOutput).toContain("Loop verdict: verified");
+    expect(result.finalOutput).toContain("Explicit confirmation: trusted-confirmed");
+    expect(result.finalOutput).toContain("Exact proposal input: provided");
+    expect(result.finalOutput).toContain("Controlled workspace: trusted-controlled-temp-workspace");
+    expect(result.finalOutput).toContain("Backend consumption: existing-proof-carrying-mutation-backend");
+    expect(result.finalOutput).toContain("Apply state: single-target-applied");
+    expect(result.finalOutput).toContain("Readback verification: succeeded");
+    expect(result.finalOutput).toContain("Terminal verdict: verification-succeeded-not-live");
+    expect(result.finalOutput).toContain("Provider call during apply: false");
+    expect(result.codingResult?.changedFiles).toEqual(["src/planning/targetRanking.ts"]);
+    expect(result.codingResult?.verifiedFiles).toEqual(["src/planning/targetRanking.ts"]);
+    expect(result.codingResult?.verification.status).toBe("passed");
+    expect(evidence).toEqual(
+      expect.arrayContaining([
+        "planning-runtime-product:path:runMvpIntegratedFlow",
+        "planning-runtime-product:review-surface:structured-handoff",
+        "planning-runtime-product:confirmation:trusted-confirmed",
+        "planning-runtime-product:exact-proposal:provided",
+        "planning-runtime-product:controlled-workspace:trusted-controlled-temp-workspace",
+        "planning-runtime-product:backend-consumption:existing-proof-carrying-mutation-backend",
+        "planning-runtime-product:proof-apply:single-target-applied",
+        "planning-runtime-product:proof-verification:succeeded",
+        "planning-runtime-product:proof-terminal:verification-succeeded-not-live",
+        "planning-mutation-proof-handoff:existing-backend-consumed",
+        "planning-mutation-proof-handoff:no-new-writer",
+        "planning-mutation-proof-handoff:no-fuzzy-apply",
+        "planning-mutation-proof-verification:file:src/planning/targetRanking.ts:readback:passed",
+        "claim-ledger:terminal:verification-succeeded-not-live",
+        "claim-ledger:live-success:false",
+      ]),
+    );
+  }, 15000);
+
+  it("keeps Route210 exact product proposals confirmation-required when explicit confirmation is missing", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src", "planning"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "route210-product-confirmation-required" }, null, 2),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "planning", "targetRanking.ts"),
+      [
+        "export function rankPlannerTargets(task: string) {",
+        "  return task.includes('planner') ? 'targetRanking.ts' : 'unknown';",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "planning", "targetRanking.test.ts"),
+      "expect(rankPlannerTargets('planner target ranking')).toBe('targetRanking.ts');\n",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "sess_route210_product_missing_confirmation",
+      prompt: "Fix the planner target ranking bug and cover the adjacent test",
+      workspaceRoot,
+      maxTurns: 4,
+      planningMutationExecution: {
+        confirmation: { state: "not-confirmed" },
+        rawProposal: {
+          operationKind: "exact-fenced-replacement",
+          targets: [
+            {
+              path: "src/planning/targetRanking.ts",
+              oldText: "  return task.includes('planner') ? 'targetRanking.ts' : 'unknown';",
+              newText: "  return task.trim().includes('planner') ? 'targetRanking.ts' : 'unknown';",
+            },
+          ],
+          verificationPlan: ["readback verifies controlled fixture final content"],
+        },
+        controlledWorkspace: {
+          scope: "controlled-temp-workspace",
+          source: "runtime-option",
+        },
+      },
+    });
+
+    await expect(
+      fs.readFile(path.join(workspaceRoot, "src", "planning", "targetRanking.ts"), "utf8"),
+    ).resolves.toContain("return task.includes('planner')");
+    expect(result.status).toBe("stopped_error");
+    expect(result.codingResult?.changedFiles).toEqual([]);
+    expect(result.finalOutput).toContain("Loop verdict: confirmation-required");
+    expect(result.finalOutput).toContain("Explicit confirmation: not-confirmed");
+    expect(result.finalOutput).toContain("Exact proposal input: provided");
+    expect(result.finalOutput).toContain("Apply state: not-run");
+    expect(result.finalOutput).toContain("Readback verification: not-run");
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        "planning-runtime-product:confirmation:not-confirmed",
+        "planning-runtime-product:exact-proposal:provided",
+        "planning-mutation-proof-handoff:explicit-confirmation-required",
+        "planning-runtime-product:proof-route-state:confirmation-required",
+        "planning-runtime-product:proof-apply:not-run",
+      ]),
+    );
+  }, 15000);
+
   it("routes multiple vague product task classes through Planning Runtime without writes", async () => {
     await fs.mkdir(path.join(workspaceRoot, "src", "planning"), { recursive: true });
     await fs.writeFile(

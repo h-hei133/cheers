@@ -116,6 +116,10 @@ describe("cli args parser", () => {
       "--migrate-session-root",
       "--apply-patch-runtime-route",
       "--apply-patch-workspace-write",
+      "--planning-mutation-confirm",
+      "--planning-mutation-controlled-workspace",
+      "--planning-mutation-proposal",
+      "proposal.json",
       "ignored prompt",
     ]);
 
@@ -128,6 +132,9 @@ describe("cli args parser", () => {
       migrateSessionRoot: true,
       applyPatchRuntimeRoute: true,
       applyPatchWorkspaceWrite: true,
+      planningMutationConfirm: true,
+      planningMutationControlledWorkspace: true,
+      planningMutationProposalPath: "proposal.json",
       promptArg: "ignored prompt",
     });
     expect(isPrintModeRequested(parsed)).toBe(true);
@@ -184,6 +191,9 @@ describe("cli args parser", () => {
     );
     expect(expectParseError(["--replay-file"]).message).toBe(
       "Missing value for --replay-file. Example: --replay-file .\\replay.txt",
+    );
+    expect(expectParseError(["--planning-mutation-proposal"]).message).toBe(
+      "Missing value for --planning-mutation-proposal. Provide a JSON file with exact old/new proposal targets.",
     );
     expect(expectParseError(["--provider", "bad-provider"]).message).toBe(
       "Invalid --provider value: bad-provider. Expected openai, anthropic, openai-compatible, google, antigravity, or claudecode.",

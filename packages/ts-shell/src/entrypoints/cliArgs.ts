@@ -18,6 +18,9 @@ export interface CliOptions {
   readonly nonInteractiveApproval?: NonInteractiveApprovalMode;
   readonly applyPatchRuntimeRoute?: boolean;
   readonly applyPatchWorkspaceWrite?: boolean;
+  readonly planningMutationConfirm?: boolean;
+  readonly planningMutationControlledWorkspace?: boolean;
+  readonly planningMutationProposalPath?: string;
 }
 
 export interface CliArgs {
@@ -57,6 +60,7 @@ const VALUE_FLAGS = new Set([
   "--api-key",
   "--replay-file",
   "--non-interactive-approval",
+  "--planning-mutation-proposal",
 ]);
 
 const RESERVED_SHELL_SLASH_COMMANDS = new Set([
@@ -181,6 +185,25 @@ export function parseCliArgs(
   );
   assignOption(
     options,
+    "planningMutationConfirm",
+    rawArgs.includes("--planning-mutation-confirm"),
+  );
+  assignOption(
+    options,
+    "planningMutationControlledWorkspace",
+    rawArgs.includes("--planning-mutation-controlled-workspace"),
+  );
+  const planningMutationProposal = parsePlanningMutationProposalPath(rawArgs);
+  if (planningMutationProposal.ok === false) {
+    return { ok: false, error: planningMutationProposal.error };
+  }
+  assignOption(
+    options,
+    "planningMutationProposalPath",
+    planningMutationProposal.value,
+  );
+  assignOption(
+    options,
     "promptArg",
     derivePromptArgument(rawArgs, options.projectPath, parseOptions.cwd),
   );
@@ -194,6 +217,24 @@ export function parseCliArgs(
       doctorRequested: rawArgs.includes("--doctor"),
     },
   };
+}
+
+function parsePlanningMutationProposalPath(
+  args: readonly string[],
+):
+  | { readonly ok: true; readonly value: string | undefined }
+  | { readonly ok: false; readonly error: CliArgParseError } {
+  const idx = args.indexOf("--planning-mutation-proposal");
+  if (idx === -1) {
+    return { ok: true, value: undefined };
+  }
+  const value = args[idx + 1];
+  if (!value) {
+    return parseError(
+      "Missing value for --planning-mutation-proposal. Provide a JSON file with exact old/new proposal targets.",
+    );
+  }
+  return { ok: true, value };
 }
 
 export function isVersionRequested(args: readonly string[]): boolean {

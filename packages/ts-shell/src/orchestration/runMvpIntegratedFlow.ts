@@ -112,6 +112,7 @@ import {
   selectRepoExplainTarget,
 } from "./readInspectModule.js";
 import { projectPlanningRuntimeProductOutcome } from "./planningRuntimeProductProjection.js";
+import type { PlanningRuntimeProductExecutionOptions } from "./planningRuntimeProductExecution.js";
 import {
   buildAgentPlanResult,
   projectAgentPlanRuntimeOutcome,
@@ -220,6 +221,7 @@ export interface MvpIntegratedFlowOptions {
   readonly runtimeSeed?: QueryRuntimeStateSeed;
   readonly applyPatchRuntimeRoute?: ApplyPatchRuntimeRouteOptions;
   readonly browserRuntimeStatus?: PwRuntimeStatus;
+  readonly planningMutationExecution?: PlanningRuntimeProductExecutionOptions;
 }
 
 export async function runMvpIntegratedFlow(
@@ -272,6 +274,7 @@ export async function runMvpIntegratedFlow(
     options.agentMode ?? "build",
     options.abortSignal,
     options.continuityState,
+    options.planningMutationExecution,
   );
 
   try {
@@ -346,6 +349,7 @@ export async function* streamMvpIntegratedFlow(
     options.agentMode ?? "build",
     options.abortSignal,
     options.continuityState,
+    options.planningMutationExecution,
   );
 
   try {
@@ -433,6 +437,7 @@ function createIntegratedRunner(
   agentMode: "plan" | "build" = "build",
   abortSignal?: AbortSignal,
   continuityState?: unknown,
+  planningMutationExecution?: PlanningRuntimeProductExecutionOptions,
 ): (input: AgentExecutionInput) => Promise<AgentExecutionOutput> {
   return async ({ role, sharedContext, turn }) => {
     if (role === "planner") {
@@ -552,6 +557,7 @@ function createIntegratedRunner(
         enforcer,
         providerMode,
         abortSignal,
+        planningMutationExecution,
       });
       const notes = [
         `plan: intent=${workflowPlan.taskKind} reason=${workflowPlan.reason}`,
@@ -4097,6 +4103,7 @@ async function executeWorkflowTaskPlan(input: {
   readonly enforcer: SandboxEnforcer;
   readonly providerMode: "synthetic" | "real";
   readonly abortSignal?: AbortSignal;
+  readonly planningMutationExecution?: PlanningRuntimeProductExecutionOptions;
 }): Promise<WorkflowExecutionResult> {
   const notes: string[] = [];
   const events: QueryEvent[] = [];
@@ -4133,6 +4140,8 @@ async function executeWorkflowTaskPlan(input: {
       routeReason: planningRuntimeProductRoute.routeReason,
       routeEvidence: planningRuntimeProductRoute.evidence,
       productPath: "runMvpIntegratedFlow",
+      workspaceRoot: input.workspaceRoot,
+      execution: input.planningMutationExecution,
     });
     return {
       events,

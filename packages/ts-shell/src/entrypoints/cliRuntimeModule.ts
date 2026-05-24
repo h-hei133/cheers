@@ -49,6 +49,7 @@ import {
   runCliRuntimeInvocation,
   type CliApplyPatchRuntimeRouteOptions,
 } from "./cliRuntimeInvocation.js";
+import type { PlanningRuntimeProductExecutionOptions } from "../orchestration/planningRuntimeProductExecution.js";
 import { runCliSessionCommand, switchRuntimeSessionProjectContext } from "./cliSessionModule.js";
 import { runCliWorkspaceCommand } from "./cliWorkspaceModule.js";
 import {
@@ -74,6 +75,7 @@ export async function* streamOrchestratedResponse(
   runtimeSeed?: QueryRuntimeStateSeed,
   continuityState?: SessionContinuitySnapshot,
   applyPatchRuntimeRoute?: CliApplyPatchRuntimeRouteOptions,
+  planningMutationExecution?: PlanningRuntimeProductExecutionOptions,
 ) {
   const invocation = runCliRuntimeInvocation({
     sessionId,
@@ -87,6 +89,7 @@ export async function* streamOrchestratedResponse(
     runtimeSeed,
     continuityState,
     applyPatchRuntimeRoute,
+    planningMutationExecution,
     providerModeEnv: process.env.PRIVATE_AGENTS_PROVIDER_MODE,
   });
   for await (const event of invocation.events) {

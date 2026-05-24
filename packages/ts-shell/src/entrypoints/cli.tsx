@@ -61,6 +61,7 @@ import {
 } from "./cliDisplayProjection.js";
 import { buildPersistentShellPrompt } from "./cliInteractiveLoopState.js";
 import { resolveCliMode } from "./cliModeDispatch.js";
+import { buildCliPlanningMutationExecutionOptions } from "./cliPlanningMutationExecution.js";
 import { runCliPrintMode } from "./cliPrintModeRunner.js";
 import { runCliStdinMode } from "./cliStdinModeRunner.js";
 import {
@@ -318,6 +319,10 @@ async function main(): Promise<void> {
                 : {}),
             }
           : undefined,
+        buildCliPlanningMutationExecutionOptions({
+          options,
+          workspaceRoot: runtimeContext.cwd,
+        }),
       );
     },
   });

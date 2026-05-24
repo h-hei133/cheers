@@ -67,7 +67,7 @@ function dependencies(): {
     deps: {
       streamIntegratedFlow: (input) => {
         calls.push(
-          `integrated:${input.providerMode}:${input.applyPatchRuntimeRoute ? "patch" : "default"}`,
+          `integrated:${input.providerMode}:${input.applyPatchRuntimeRoute ? "patch" : "default"}:${input.planningMutationExecution ? "planning-mutation" : "no-planning-mutation"}`,
         );
         return oneEvent("integrated");
       },
@@ -121,7 +121,7 @@ describe("CLI runtime invocation", () => {
     );
 
     expect(events).toEqual([event("integrated")]);
-    expect(calls).toEqual(["integrated:synthetic:patch"]);
+    expect(calls).toEqual(["integrated:synthetic:patch:no-planning-mutation"]);
   });
 
   it("routes exact fenced replacement prompts through the integrated CLI path", async () => {
@@ -147,7 +147,40 @@ describe("CLI runtime invocation", () => {
     );
 
     expect(events).toEqual([event("integrated")]);
-    expect(calls).toEqual(["integrated:synthetic:default"]);
+    expect(calls).toEqual(["integrated:synthetic:default:no-planning-mutation"]);
+  });
+
+  it("passes explicit planning mutation execution contract to integrated flow", async () => {
+    const { deps, calls } = dependencies();
+    const events = await collect(
+      runCliRuntimeInvocation(
+        baseInput({
+          providerModeEnv: "synthetic",
+          prompt: "Fix planner ranking",
+          planningMutationExecution: {
+            confirmation: { state: "trusted-confirmed" },
+            rawProposal: {
+              operationKind: "exact-fenced-replacement",
+              targets: [
+                {
+                  path: "src/app.ts",
+                  oldText: "old",
+                  newText: "new",
+                },
+              ],
+            },
+            controlledWorkspace: {
+              scope: "controlled-temp-workspace",
+              source: "cli-flag",
+            },
+          },
+        }),
+        deps,
+      ).events,
+    );
+
+    expect(events).toEqual([event("integrated")]);
+    expect(calls).toEqual(["integrated:synthetic:default:planning-mutation"]);
   });
 
   it("routes lightweight prompts through the existing lightweight provider path", async () => {

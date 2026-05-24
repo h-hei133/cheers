@@ -9,6 +9,7 @@ import {
   streamMvpIntegratedFlow,
   type ApplyPatchRuntimeRouteOptions,
 } from "../orchestration/runMvpIntegratedFlow.js";
+import type { PlanningRuntimeProductExecutionOptions } from "../orchestration/planningRuntimeProductExecution.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
@@ -31,6 +32,7 @@ export interface CliRuntimeInvocationInput {
   readonly runtimeSeed?: QueryRuntimeStateSeed;
   readonly continuityState?: SessionContinuitySnapshot;
   readonly applyPatchRuntimeRoute?: ApplyPatchRuntimeRouteOptions;
+  readonly planningMutationExecution?: PlanningRuntimeProductExecutionOptions;
   readonly providerModeEnv?: string;
 }
 
@@ -109,6 +111,7 @@ async function* streamCliRuntimeInvocation(
       agentMode: request.agentMode,
       runtimeSeed: request.runtimeSeed,
       applyPatchRuntimeRoute: request.applyPatchRuntimeRoute,
+      planningMutationExecution: request.planningMutationExecution,
     });
     return;
   }
@@ -178,5 +181,6 @@ async function* streamCliRuntimeInvocation(
     agentMode: request.agentMode,
     runtimeSeed: request.runtimeSeed,
     applyPatchRuntimeRoute: request.applyPatchRuntimeRoute,
+    planningMutationExecution: request.planningMutationExecution,
   });
 }

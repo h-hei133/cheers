@@ -9,6 +9,11 @@ import {
   type RuntimeOutcomeProjection,
 } from "./runtimeOutcomeProjection.js";
 import type { PlanningRuntimeProductTaskKind } from "./planningRuntimeProductRoute.js";
+import {
+  buildPlanningRuntimeProductProofInputs,
+  type PlanningRuntimeProductExecutionOptions,
+  type PlanningRuntimeProductProofInputs,
+} from "./planningRuntimeProductExecution.js";
 
 export async function projectPlanningRuntimeProductOutcome(input: {
   readonly result: PlanningRuntimeResult;
@@ -16,12 +21,31 @@ export async function projectPlanningRuntimeProductOutcome(input: {
   readonly routeReason: string;
   readonly routeEvidence?: readonly string[];
   readonly productPath: "runMvpIntegratedFlow";
+  readonly workspaceRoot: string;
+  readonly execution?: PlanningRuntimeProductExecutionOptions;
 }): Promise<RuntimeOutcomeProjection> {
   const surface = projectPlanningRuntimeSurface(input.result);
+  const proofInputs = buildPlanningRuntimeProductProofInputs({
+    workspaceRoot: input.workspaceRoot,
+    handoff: surface.mutationHandoff,
+    execution: input.execution,
+  });
   const proofRoute = await runPlanningMutationProofRoute({
     requestId: `${input.productPath}:${input.result.runtimeId}`,
     handoff: surface.mutationHandoff,
     taskKind: input.taskKind,
+    ...(proofInputs.rawProposal ? { rawProposal: proofInputs.rawProposal } : {}),
+    ...(proofInputs.currentContentByTargetPath
+      ? { currentContentByTargetPath: proofInputs.currentContentByTargetPath }
+      : {}),
+    ...(proofInputs.confirmation ? { confirmation: proofInputs.confirmation } : {}),
+    ...(proofInputs.workspace ? { workspace: proofInputs.workspace } : {}),
+    ...(proofInputs.readVerifiedFile ? { readVerifiedFile: proofInputs.readVerifiedFile } : {}),
+    ...(proofInputs.expectedContentByTargetPath
+      ? { expectedContentByTargetPath: proofInputs.expectedContentByTargetPath }
+      : {}),
+    providerCalled: proofInputs.exactProposalState === "provided",
+    liveOptIn: false,
   });
   const proposalBridge = proofRoute.bridge;
   const targetPaths = surface.editTargets.map((target) => target.path);
@@ -37,8 +61,36 @@ export async function projectPlanningRuntimeProductOutcome(input: {
     input.routeEvidence ?? [],
     surface,
     proofRoute,
+    proofInputs,
   );
   const nextAction = selectNextAction(surface.enoughContext, targetPaths);
+  if (shouldUseProofRuntimeOutcome(proofRoute, proofInputs)) {
+    return projectRuntimeCodingOutcome({
+      taskKind: input.taskKind,
+      changedFiles: [...proofRoute.runtimeOutcome.codingResult.changedFiles],
+      failedFiles: [...proofRoute.runtimeOutcome.codingResult.failedFiles],
+      patches: [...(proofRoute.runtimeOutcome.codingResult.patches ?? [])],
+      verifiedFiles: [...proofRoute.runtimeOutcome.codingResult.verifiedFiles],
+      unverifiedFiles: [...proofRoute.runtimeOutcome.codingResult.unverifiedFiles],
+      verification: proofRoute.runtimeOutcome.codingResult.verification,
+      repairNotes: [
+        input.routeReason,
+        ...proofRoute.runtimeOutcome.codingResult.repair.notes,
+      ],
+      evidence: productEvidence,
+      taskVerdict: proofRoute.runtimeOutcome.codingResult.taskSatisfaction.verdict,
+      taskReasons: [
+        ...proofRoute.runtimeOutcome.codingResult.taskSatisfaction.reasons,
+      ],
+      userFacingOutput: formatPlanningRuntimeProductOutput({
+        surface,
+        proofRoute,
+        proofInputs,
+        routeReason: input.routeReason,
+        evidence: productEvidence,
+      }),
+    });
+  }
 
   return projectRuntimeCodingOutcome({
     taskKind: input.taskKind,
@@ -76,6 +128,7 @@ export async function projectPlanningRuntimeProductOutcome(input: {
     userFacingOutput: formatPlanningRuntimeProductOutput({
       surface,
       proofRoute,
+      proofInputs,
       routeReason: input.routeReason,
       evidence: productEvidence,
     }),
@@ -88,15 +141,21 @@ function buildProductEvidence(
   routeEvidence: readonly string[],
   surface: ReturnType<typeof projectPlanningRuntimeSurface>,
   proofRoute: PlanningMutationProofRoute,
+  proofInputs: PlanningRuntimeProductProofInputs,
 ): string[] {
   return [
     `planning-runtime-product:path:${productPath}`,
     "planning-runtime-product:demo-success-alone:not-product-path-success",
     "planning-runtime-product:context-memory-scope:product-turn",
+    "planning-runtime-product:review-surface:structured-handoff",
     "session-print:stopped-final-output:include",
     "mutationAuthority=not-granted",
-    "provider-called=false",
-    "apply=not-run",
+    proofInputs.exactProposalState === "provided"
+      ? "provider-called=explicit-proposal-input"
+      : "provider-called=false",
+    proofRoute.proofHandoff.applyState === "not-run"
+      ? "apply=not-run"
+      : `apply=${proofRoute.proofHandoff.applyState}`,
     "command-dispatch=not-run",
     ...routeEvidence,
     ...result.context.filesRead.map((file) => `inspect: read ${file.path}`),
@@ -111,6 +170,13 @@ function buildProductEvidence(
     ),
     ...surface.contextAcquisition.evidence,
     ...result.evidence,
+    ...proofInputs.executionEvidence,
+    `planning-runtime-product:proof-route-state:${proofRoute.state}`,
+    `planning-runtime-product:backend-consumption:${proofRoute.proofHandoff.backendLane}`,
+    `planning-runtime-product:proof-apply:${proofRoute.proofHandoff.applyState}`,
+    `planning-runtime-product:proof-verification:${proofRoute.verification.verificationState}`,
+    `planning-runtime-product:proof-terminal:${proofRoute.terminalState}`,
+    `planning-runtime-product:proof-result:${proofRoute.terminalResult}`,
     ...proofRoute.evidence,
   ];
 }
@@ -118,6 +184,7 @@ function buildProductEvidence(
 function formatPlanningRuntimeProductOutput(input: {
   readonly surface: ReturnType<typeof projectPlanningRuntimeSurface>;
   readonly proofRoute: PlanningMutationProofRoute;
+  readonly proofInputs: PlanningRuntimeProductProofInputs;
   readonly routeReason: string;
   readonly evidence: readonly string[];
 }): string {
@@ -184,6 +251,23 @@ function formatPlanningRuntimeProductOutput(input: {
     "provider-called=false",
     "apply=not-run",
     "command-dispatch=not-run",
+    "",
+    "Review-confirm-execute loop:",
+    `Loop verdict: ${formatLoopVerdict(proofRoute)}`,
+    `Review surface: structured-handoff`,
+    `Explicit confirmation: ${input.proofInputs.confirmationState}`,
+    `Exact proposal input: ${input.proofInputs.exactProposalState}`,
+    `Controlled workspace: ${input.proofInputs.controlledWorkspaceState}`,
+    `Controlled workspace reason: ${input.proofInputs.controlledWorkspaceReason}`,
+    `Backend consumption: ${proofRoute.proofHandoff.backendLane}`,
+    `Apply state: ${proofRoute.proofHandoff.applyState}`,
+    `Readback verification: ${proofRoute.verification.verificationState}`,
+    `Terminal verdict: ${proofRoute.terminalState}`,
+    `Terminal result: ${proofRoute.terminalResult}`,
+    `Next action: ${formatLoopNextAction({ proofRoute, proofInputs: input.proofInputs })}`,
+    "confirmation-from-prompt=false",
+    "provider-call-during-confirmation=false",
+    "command-dispatch-during-confirmation=false",
     "",
     "Proposal/anchoring bridge:",
     `Bridge id: ${proposalBridge.bridgeId}`,
@@ -396,8 +480,57 @@ function selectEvidenceMarkers(evidence: readonly string[]): readonly string[] {
     entry.startsWith("planning-runtime-product:") ||
     entry === "mutationAuthority=not-granted" ||
     entry === "provider-called=false" ||
+    entry.startsWith("provider-called=") ||
     entry === "apply=not-run" ||
     entry === "command-dispatch=not-run"
   );
   return Array.from(new Set(selected)).slice(0, 24);
+}
+
+function shouldUseProofRuntimeOutcome(
+  proofRoute: PlanningMutationProofRoute,
+  proofInputs: PlanningRuntimeProductProofInputs,
+): boolean {
+  return (
+    proofInputs.confirmationState === "trusted-confirmed" ||
+    proofInputs.exactProposalState === "provided" ||
+    proofInputs.controlledWorkspaceState === "trusted-controlled-temp-workspace" ||
+    proofRoute.proofHandoff.backendLane === "existing-proof-carrying-mutation-backend" ||
+    proofRoute.changedFiles.length > 0 ||
+    proofRoute.verification.verificationState !== "not-run"
+  );
+}
+
+function formatLoopVerdict(proofRoute: PlanningMutationProofRoute): string {
+  if (proofRoute.state === "verified") return "verified";
+  if (proofRoute.state === "repair-ready") return "repair-ready";
+  if (proofRoute.state === "applied-unverified") return "applied-unverified";
+  if (proofRoute.state === "confirmation-required") return "confirmation-required";
+  if (proofRoute.state === "stopped") return "failed";
+  return "review-only";
+}
+
+function formatLoopNextAction(input: {
+  readonly proofRoute: PlanningMutationProofRoute;
+  readonly proofInputs: PlanningRuntimeProductProofInputs;
+}): string {
+  if (input.proofRoute.state === "verified") {
+    return "Review the Claim Ledger verdict; focused verification is not live provider success.";
+  }
+  if (input.proofRoute.state === "repair-ready") {
+    return "Use the failed readback evidence to prepare a separate repair review.";
+  }
+  if (input.proofRoute.state === "applied-unverified") {
+    return "Run readback verification before claiming task success.";
+  }
+  if (input.proofInputs.exactProposalState === "missing") {
+    return "Provide an explicit exact proposal input before confirmation can execute.";
+  }
+  if (input.proofInputs.confirmationState !== "trusted-confirmed") {
+    return "Review the exact proposal and provide explicit trusted confirmation for a controlled workspace.";
+  }
+  if (input.proofInputs.controlledWorkspaceState !== "trusted-controlled-temp-workspace") {
+    return "Provide controlled temp workspace authority; production workspace writes remain disabled by default.";
+  }
+  return input.proofRoute.verification.nextAction;
 }
