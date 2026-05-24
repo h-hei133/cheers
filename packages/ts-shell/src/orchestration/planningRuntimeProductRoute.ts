@@ -37,6 +37,7 @@ export function shouldRunPlanningRuntimeForBlockedVagueTask(
 
 export function selectPlanningRuntimeProductRoute(
   plan: WorkflowTaskPlan,
+  context?: { readonly prompt?: string },
 ): PlanningRuntimeProductRouteDecision {
   if (plan.taskKind === "run-command" || plan.taskKind === "browser" || plan.taskKind === "chat") {
     return reject("non-planning-product-task");
@@ -46,6 +47,12 @@ export function selectPlanningRuntimeProductRoute(
   }
   if (plan.directCommand) {
     return reject("command-dispatch-preserved");
+  }
+  const existingRuntimePrompt = context?.prompt
+    ? classifyExistingRuntimePrompt(context.prompt)
+    : undefined;
+  if (existingRuntimePrompt) {
+    return reject(`existing-${existingRuntimePrompt}-preserved`);
   }
 
   if (plan.blockedReason && plan.targetMissing === true) {
@@ -103,4 +110,55 @@ function reject(reason: string): PlanningRuntimeProductRouteDecision {
     shouldRun: false,
     evidence: [`planning-runtime-product:route-rejected:${reason}`],
   };
+}
+
+function classifyExistingRuntimePrompt(prompt: string):
+  | "anchored-proposal-runtime"
+  | "discovery-edit-runtime"
+  | "fenced-edit-runtime"
+  | undefined {
+  if (looksLikeAnchoredProposalRuntimePrompt(prompt)) {
+    return "anchored-proposal-runtime";
+  }
+  if (looksLikeDiscoveryEditRuntimePrompt(prompt)) {
+    return "discovery-edit-runtime";
+  }
+  if (looksLikeFencedEditRuntimePrompt(prompt)) {
+    return "fenced-edit-runtime";
+  }
+  return undefined;
+}
+
+function looksLikeAnchoredProposalRuntimePrompt(prompt: string): boolean {
+  const normalized = prompt.toLowerCase();
+  return /\b(?:anchored|anchor)\b/.test(normalized) &&
+    /\b(?:proposal|dry-run|dry run|provider)\b/.test(normalized) &&
+    /\b(?:fake|eval|evaluate|runtime)\b/.test(normalized);
+}
+
+function looksLikeDiscoveryEditRuntimePrompt(prompt: string): boolean {
+  const hasDiscoveryCue = /\b(?:find|discover|search|locate)\b/i.test(prompt);
+  const hasEditCue = /\b(?:edit|replace|update|change)\b/i.test(prompt);
+  const hasFencedCue =
+    /```[\s\S]*?```/.test(prompt) ||
+    /\b(?:fenced|block|old\/new|old\s+and\s+new)\b/i.test(prompt);
+  const hasTargetSelectionCue = /\b(?:target|file|place|location)\b/i.test(prompt);
+  return hasDiscoveryCue && hasEditCue && (hasFencedCue || hasTargetSelectionCue);
+}
+
+function looksLikeFencedEditRuntimePrompt(prompt: string): boolean {
+  const fenceCount = Array.from(prompt.matchAll(/```[\s\S]*?```/g)).length;
+  const mentionsFencedRegion =
+    /\bfenced?\s+(?:block|blocks|region|regions|replacement|edit)\b|\bcode\s+block\b/i.test(
+      prompt,
+    );
+  const hasEditVerb = /\b(?:edit|replace|update|change|swap)\b/i.test(prompt);
+  const hasUnsupportedCue =
+    /\b(?:find|discover|search|locate|similar|fuzzy|closest|nearest|all|every|each|matching|matches|broad|refactor|generate|generated|rewrite|implement|rollback|undo|snapshot|restore)\b/i.test(
+      prompt,
+    );
+  return (
+    (hasEditVerb || hasUnsupportedCue) &&
+    (fenceCount > 0 || mentionsFencedRegion)
+  );
 }

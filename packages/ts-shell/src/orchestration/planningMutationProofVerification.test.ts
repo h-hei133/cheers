@@ -143,13 +143,14 @@ describe("verifyPlanningMutationProofHandoff", () => {
 
     expect(verification.state).toBe("verified");
     expect(verification.verificationState).toBe("succeeded");
-    expect(verification.terminalState).toBe("apply-succeeded");
-    expect(verification.terminalResult).toBe("apply-succeeded");
+    expect(verification.terminalState).toBe("verification-succeeded-not-live");
+    expect(verification.terminalResult).toBe("verification-succeeded");
     expect(verification.liveSuccess).toBe(false);
     expect(verification.claimLedger.evidence).toEqual(
       expect.arrayContaining([
         "claim-ledger:provider:not-proven",
         "claim-ledger:not-proven:provider:provider-not-called",
+        "claim-ledger:not-proven:provider:not-live-provider-evidence",
       ]),
     );
   });

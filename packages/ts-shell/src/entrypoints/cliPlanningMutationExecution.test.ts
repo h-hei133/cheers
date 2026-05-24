@@ -45,7 +45,10 @@ describe("buildCliPlanningMutationExecutionOptions", () => {
       options: {
         planningMutationConfirm: true,
         planningMutationControlledWorkspace: true,
+        planningMutationSelectedWorkspace: true,
+        planningMutationLiveProviderProposal: true,
         planningMutationProposalPath: "proposal.json",
+        planningMutationVerifyCommand: "node --version",
       },
     });
 
@@ -53,6 +56,21 @@ describe("buildCliPlanningMutationExecutionOptions", () => {
     expect(result?.rawProposal?.operationKind).toBe("exact-fenced-replacement");
     expect(result?.controlledWorkspace).toEqual({
       scope: "controlled-temp-workspace",
+      source: "cli-flag",
+    });
+    expect(result?.selectedWorkspace).toEqual({
+      scope: "selected-workspace",
+      source: "cli-flag",
+      explicitWorkspaceAuthority: true,
+      allowedRoot: workspaceRoot,
+    });
+    expect(result?.verificationCommand).toEqual({
+      command: "node --version",
+      approval: "explicit",
+      source: "cli-flag",
+    });
+    expect(result?.liveProviderProposal).toEqual({
+      optIn: true,
       source: "cli-flag",
     });
   });

@@ -99,9 +99,10 @@ describe("runAnchoredProposalRuntime", () => {
     });
 
     expect(result.finalOutput).toContain("anchored proposal runtime evaluated; mutation did not run.");
-    expect(result.finalOutput).toContain("Activation decision: stop-low-analysis-quality");
+    expect(result.finalOutput).toContain("Activation decision: stop-low-plan-quality");
     expect(result.codingResult?.changedFiles).toEqual([]);
     expect(result.codingResult?.evidence).toContain("anchored-proposal-runtime:mutation:not-run");
+    expect(result.codingResult?.evidence).toContain("anchored-proposal-activation:decision:stop-low-plan-quality");
     expect(result.codingResult?.continuation.evidence.some((entry) =>
       entry.startsWith("anchored-proposal-scorecard "),
     )).toBe(true);

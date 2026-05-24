@@ -417,7 +417,7 @@ function extractLoopLineValue(output: string, label: string): string | null {
   const lines = output.split("\n");
   const index = lines.findIndex((line) => line === "Review-confirm-execute loop:");
   if (index < 0) return null;
-  const line = lines.slice(index + 1, index + 20).find((entry) => entry.startsWith(label));
+  const line = lines.slice(index + 1, index + 60).find((entry) => entry.startsWith(label));
   return line ? line.slice(label.length).trim() : null;
 }
 

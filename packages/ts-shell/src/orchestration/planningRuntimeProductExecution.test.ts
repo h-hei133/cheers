@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildPlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
 import { buildPlanningRuntimeProductProofInputs } from "./planningRuntimeProductExecution.js";
+import { preparePlanningRuntimeProductProposal } from "./planningRuntimeProductProposal.js";
 
 const tempRoots: string[] = [];
 
@@ -77,6 +78,74 @@ describe("buildPlanningRuntimeProductProofInputs", () => {
         "planning-runtime-product:confirmation:trusted-confirmed",
         "planning-runtime-product:exact-proposal:provided",
         "planning-runtime-product:controlled-workspace:trusted-controlled-temp-workspace",
+      ]),
+    );
+  });
+
+  it("uses prepared product proposals without manual JSON", () => {
+    const workspaceRoot = createWorkspace({
+      "src/planning/targetRanking.ts": sourceContent(),
+    });
+    const handoff = readyHandoff();
+    const proposalPreparation = preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff,
+    });
+
+    const result = buildPlanningRuntimeProductProofInputs({
+      workspaceRoot,
+      handoff,
+      proposalPreparation,
+      execution: {
+        confirmation: { state: "not-confirmed" },
+      },
+    });
+
+    expect(proposalPreparation.status).toBe("prepared-exact");
+    expect(result.rawProposal?.operationKind).toBe("exact-fenced-replacement");
+    expect(result.exactProposalSource).toBe("planning-runtime-deterministic");
+    expect(result.providerCalled).toBe(false);
+    expect(result.executionEvidence).toEqual(
+      expect.arrayContaining([
+        "planning-runtime-product-proposal:manual-json:not-required",
+        "planning-runtime-product:exact-proposal-source:planning-runtime-deterministic",
+        "planning-runtime-product:provider-called:false",
+      ]),
+    );
+  });
+
+  it("builds selected workspace proof inputs only from explicit authority", () => {
+    const workspaceRoot = createWorkspace({
+      "src/planning/targetRanking.ts": sourceContent(),
+    });
+    const handoff = readyHandoff();
+    const proposalPreparation = preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff,
+    });
+
+    const result = buildPlanningRuntimeProductProofInputs({
+      workspaceRoot,
+      handoff,
+      proposalPreparation,
+      execution: {
+        confirmation: { state: "trusted-confirmed" },
+        selectedWorkspace: {
+          scope: "selected-workspace",
+          source: "runtime-option",
+          explicitWorkspaceAuthority: true,
+          allowedRoot: workspaceRoot,
+        },
+      },
+    });
+
+    expect(result.workspace?.scope).toBe("selected-workspace");
+    expect(result.selectedWorkspaceState).toBe("trusted-selected-workspace");
+    expect(result.controlledWorkspaceState).toBe("missing");
+    expect(result.executionEvidence).toEqual(
+      expect.arrayContaining([
+        "planning-runtime-product:selected-workspace:trusted-selected-workspace",
+        "planning-runtime-product:selected-workspace-source:runtime-option",
       ]),
     );
   });

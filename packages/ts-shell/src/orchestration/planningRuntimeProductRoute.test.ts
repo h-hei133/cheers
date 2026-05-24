@@ -103,4 +103,64 @@ describe("planning runtime product route guard", () => {
     expect(shouldRunPlanningRuntimeForBlockedVagueTask(commandPlan)).toBe(false);
     expect(commandPlan.targetPath).toBeUndefined();
   });
+
+  it("preserves explicit anchored, discovery, and fenced edit runtime prompts", () => {
+    const plan: WorkflowTaskPlan = {
+      taskKind: "edit-file",
+      reason: "write/edit intent without resolvable target",
+      inspectFirst: true,
+      verifyAfterEdit: false,
+      targetMissing: true,
+      blockedReason: "edit-target-missing",
+    };
+
+    expect(
+      selectPlanningRuntimeProductRoute(plan, {
+        prompt: "Evaluate fake anchored provider proposal runtime dry-run",
+      }),
+    ).toEqual({
+      shouldRun: false,
+      evidence: [
+        "planning-runtime-product:route-rejected:existing-anchored-proposal-runtime-preserved",
+      ],
+    });
+    expect(
+      selectPlanningRuntimeProductRoute(plan, {
+        prompt: [
+          "Find the file that contains this exact block and replace it",
+          "```",
+          "status: draft",
+          "```",
+          "with",
+          "```",
+          "status: ready",
+          "```",
+        ].join("\n"),
+      }),
+    ).toEqual({
+      shouldRun: false,
+      evidence: [
+        "planning-runtime-product:route-rejected:existing-discovery-edit-runtime-preserved",
+      ],
+    });
+    expect(
+      selectPlanningRuntimeProductRoute(plan, {
+        prompt: [
+          "Replace the exact fenced block",
+          "```",
+          "status: draft",
+          "```",
+          "with",
+          "```",
+          "status: ready",
+          "```",
+        ].join("\n"),
+      }),
+    ).toEqual({
+      shouldRun: false,
+      evidence: [
+        "planning-runtime-product:route-rejected:existing-fenced-edit-runtime-preserved",
+      ],
+    });
+  });
 });

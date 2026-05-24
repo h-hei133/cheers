@@ -4124,7 +4124,9 @@ async function executeWorkflowTaskPlan(input: {
     evidence.push(...input.plan.continuationLineage!);
   }
   appendSingleFileEditRepairObservability(evidence, input.plan);
-  const planningRuntimeProductRoute = selectPlanningRuntimeProductRoute(input.plan);
+  const planningRuntimeProductRoute = selectPlanningRuntimeProductRoute(input.plan, {
+    prompt: input.prompt,
+  });
   if (planningRuntimeProductRoute.shouldRun) {
     if (input.plan.blockedReason) {
       notes.push(`blocker: ${input.plan.blockedReason}`);
@@ -4141,7 +4143,16 @@ async function executeWorkflowTaskPlan(input: {
       routeEvidence: planningRuntimeProductRoute.evidence,
       productPath: "runMvpIntegratedFlow",
       workspaceRoot: input.workspaceRoot,
+      sessionId: input.sessionId,
+      prompt: input.prompt,
       execution: input.planningMutationExecution,
+      verificationRuntime: {
+        dispatcher: input.dispatcher,
+        events,
+        taskId: `planning_runtime_product_verify_${input.turn}`,
+        sessionId: input.sessionId,
+        ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+      },
     });
     return {
       events,

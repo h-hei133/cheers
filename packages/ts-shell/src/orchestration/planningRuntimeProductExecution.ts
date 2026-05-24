@@ -4,6 +4,10 @@ import path from "node:path";
 
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 import type { PlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
+import type {
+  PlanningRuntimeProductProposalPreparation,
+  PlanningRuntimeProductProposalSource,
+} from "./planningRuntimeProductProposal.js";
 import {
   type PlanningMutationProofConfirmation,
   type PlanningMutationProofWorkspace,
@@ -16,10 +20,31 @@ export interface PlanningRuntimeProductControlledWorkspace {
   readonly allowedRoot?: string;
 }
 
+export interface PlanningRuntimeProductSelectedWorkspace {
+  readonly scope: "selected-workspace";
+  readonly source: "runtime-option" | "cli-flag" | "benchmark";
+  readonly explicitWorkspaceAuthority: true;
+  readonly allowedRoot?: string;
+}
+
+export interface PlanningRuntimeProductVerificationCommand {
+  readonly command: string;
+  readonly approval: "explicit";
+  readonly source: "runtime-option" | "cli-flag" | "benchmark";
+}
+
+export interface PlanningRuntimeProductLiveProviderProposal {
+  readonly optIn: true;
+  readonly source: "runtime-option" | "cli-flag" | "benchmark";
+}
+
 export interface PlanningRuntimeProductExecutionOptions {
   readonly confirmation?: PlanningMutationProofConfirmation;
   readonly rawProposal?: ProviderEditRawProposal | null;
   readonly controlledWorkspace?: PlanningRuntimeProductControlledWorkspace;
+  readonly selectedWorkspace?: PlanningRuntimeProductSelectedWorkspace;
+  readonly verificationCommand?: PlanningRuntimeProductVerificationCommand;
+  readonly liveProviderProposal?: PlanningRuntimeProductLiveProviderProposal;
   readonly expectedContentByTargetPath?: ReadonlyMap<string, string>;
   readonly readVerifiedFile?: (relativePath: string) => string | undefined;
 }
@@ -34,25 +59,45 @@ export interface PlanningRuntimeProductProofInputs {
   readonly executionEvidence: readonly string[];
   readonly confirmationState: PlanningMutationProofConfirmation["state"];
   readonly exactProposalState: "provided" | "missing";
+  readonly exactProposalSource: PlanningRuntimeProductProposalSource | "none";
+  readonly providerCalled: boolean;
+  readonly liveOptIn: boolean;
+  readonly proposalPreparation?: PlanningRuntimeProductProposalPreparation;
   readonly controlledWorkspaceState:
     | "trusted-controlled-temp-workspace"
     | "missing"
     | "rejected";
   readonly controlledWorkspaceReason: string;
+  readonly selectedWorkspaceState:
+    | "trusted-selected-workspace"
+    | "missing"
+    | "rejected";
+  readonly selectedWorkspaceReason: string;
 }
 
 export function buildPlanningRuntimeProductProofInputs(input: {
   readonly workspaceRoot: string;
   readonly handoff: PlanningMutationHandoffProjection;
   readonly execution?: PlanningRuntimeProductExecutionOptions;
+  readonly proposalPreparation?: PlanningRuntimeProductProposalPreparation;
 }): PlanningRuntimeProductProofInputs {
   const confirmation = input.execution?.confirmation;
-  const rawProposal = input.execution?.rawProposal ?? null;
+  const rawProposal =
+    input.execution?.rawProposal ?? input.proposalPreparation?.rawProposal ?? null;
   const confirmationState = confirmation?.state ?? "not-confirmed";
   const exactProposalState = rawProposal ? "provided" : "missing";
+  const exactProposalSource = rawProposal
+    ? input.execution?.rawProposal
+      ? "manual-proposal-json"
+      : input.proposalPreparation?.source ?? "planning-handoff-summary"
+    : "none";
   const controlledWorkspace = classifyControlledWorkspace({
     workspaceRoot: input.workspaceRoot,
     controlledWorkspace: input.execution?.controlledWorkspace,
+  });
+  const selectedWorkspace = classifySelectedWorkspace({
+    workspaceRoot: input.workspaceRoot,
+    selectedWorkspace: input.execution?.selectedWorkspace,
   });
   const currentContentByTargetPath = rawProposal
     ? readCurrentContentByTargetPath({
@@ -71,10 +116,14 @@ export function buildPlanningRuntimeProductProofInputs(input: {
   const authority =
     controlledWorkspace.state === "trusted-controlled-temp-workspace"
       ? createWorkspaceWriteAuthority(input.workspaceRoot)
+      : selectedWorkspace.state === "trusted-selected-workspace"
+      ? createWorkspaceWriteAuthority(input.workspaceRoot)
       : undefined;
   const workspace: PlanningMutationProofWorkspace | undefined = authority
     ? {
-        scope: "controlled-temp-workspace",
+        scope: selectedWorkspace.state === "trusted-selected-workspace"
+          ? "selected-workspace"
+          : "controlled-temp-workspace",
         fencedOptions: workspaceOptions(input.workspaceRoot, authority),
         targetSetOptions: workspaceOptions(input.workspaceRoot, authority),
       }
@@ -92,9 +141,23 @@ export function buildPlanningRuntimeProductProofInputs(input: {
     executionEvidence: [
       `planning-runtime-product:confirmation:${confirmationState}`,
       `planning-runtime-product:exact-proposal:${exactProposalState}`,
+      `planning-runtime-product:exact-proposal-source:${exactProposalSource}`,
+      `planning-runtime-product:provider-called:${input.proposalPreparation?.providerCalled ?? false}`,
+      `planning-runtime-product:live-opt-in:${input.proposalPreparation?.liveOptIn ?? false}`,
       `planning-runtime-product:controlled-workspace:${controlledWorkspace.state}`,
       `planning-runtime-product:controlled-workspace-source:${input.execution?.controlledWorkspace?.source ?? "none"}`,
       `planning-runtime-product:controlled-workspace-reason:${controlledWorkspace.reason}`,
+      `planning-runtime-product:selected-workspace:${selectedWorkspace.state}`,
+      `planning-runtime-product:selected-workspace-source:${input.execution?.selectedWorkspace?.source ?? "none"}`,
+      `planning-runtime-product:selected-workspace-reason:${selectedWorkspace.reason}`,
+      `planning-runtime-product:verification-command:${input.execution?.verificationCommand ? "explicit" : "not-run"}`,
+      ...(input.execution?.verificationCommand
+        ? [
+            `planning-runtime-product:verification-command-source:${input.execution.verificationCommand.source}`,
+            "planning-runtime-product:verification-command-approval:explicit",
+          ]
+        : []),
+      ...(input.proposalPreparation?.evidence ?? []),
       "planning-runtime-product:confirmation-from-prompt:false",
       "planning-runtime-product:provider-call-during-confirmation:false",
       "planning-runtime-product:command-dispatch-during-confirmation:false",
@@ -104,8 +167,14 @@ export function buildPlanningRuntimeProductProofInputs(input: {
     ],
     confirmationState,
     exactProposalState,
+    exactProposalSource,
+    providerCalled: input.proposalPreparation?.providerCalled ?? false,
+    liveOptIn: input.proposalPreparation?.liveOptIn ?? false,
+    ...(input.proposalPreparation ? { proposalPreparation: input.proposalPreparation } : {}),
     controlledWorkspaceState: controlledWorkspace.state,
     controlledWorkspaceReason: controlledWorkspace.reason,
+    selectedWorkspaceState: selectedWorkspace.state,
+    selectedWorkspaceReason: selectedWorkspace.reason,
   };
 }
 
@@ -144,6 +213,42 @@ function classifyControlledWorkspace(input: {
   return {
     state: "trusted-controlled-temp-workspace",
     reason: `controlled workspace is under ${safeRootLabel(matchedRoot)}`,
+  };
+}
+
+function classifySelectedWorkspace(input: {
+  readonly workspaceRoot: string;
+  readonly selectedWorkspace?: PlanningRuntimeProductSelectedWorkspace;
+}): {
+  readonly state: PlanningRuntimeProductProofInputs["selectedWorkspaceState"];
+  readonly reason: string;
+} {
+  if (!input.selectedWorkspace) {
+    return {
+      state: "missing",
+      reason: "selected workspace authority was not requested",
+    };
+  }
+  if (input.selectedWorkspace.explicitWorkspaceAuthority !== true) {
+    return {
+      state: "rejected",
+      reason: "selected workspace authority must be explicit",
+    };
+  }
+
+  const workspaceRoot = path.resolve(input.workspaceRoot);
+  const allowedRoot = path.resolve(
+    input.selectedWorkspace.allowedRoot ?? input.workspaceRoot,
+  );
+  if (!isSameOrInside(workspaceRoot, allowedRoot)) {
+    return {
+      state: "rejected",
+      reason: "selected workspace root is outside the explicit allowed root",
+    };
+  }
+  return {
+    state: "trusted-selected-workspace",
+    reason: "selected workspace authority was explicit for the active workspace",
   };
 }
 

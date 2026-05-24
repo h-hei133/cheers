@@ -8,6 +8,11 @@ export type ClaimLedgerEvidenceSource =
   | "focused-tests"
   | "unknown";
 
+export type ClaimLedgerMutationScope =
+  | "none"
+  | "controlled-temp-workspace"
+  | "selected-workspace";
+
 export type ClaimLedgerClaimGroup =
   | "provider"
   | "proposal"
@@ -89,7 +94,7 @@ export interface ClaimLedgerRepairInput {
   readonly verificationStatus: "not-run" | "succeeded" | "failed";
   readonly verificationRuntimeDerived: boolean;
   readonly verificationEvidenceCount: number;
-  readonly mutationScope: "none" | "controlled-temp-workspace";
+  readonly mutationScope: ClaimLedgerMutationScope;
   readonly providerCallDuringApply: boolean;
   readonly evidenceSource?: ClaimLedgerEvidenceSource;
 }
@@ -186,7 +191,7 @@ export function buildClaimLedgerProjection(input: {
   readonly verificationStatus: "not-run" | "succeeded" | "failed";
   readonly snapshotStatus: "not-run" | "created" | "blocked";
   readonly recoveryStatus: "not-run" | "available" | "blocked";
-  readonly mutationScope: "none" | "controlled-temp-workspace";
+  readonly mutationScope: ClaimLedgerMutationScope;
   readonly providerCallDuringApply: boolean;
   readonly scorecardStatus?: string;
   readonly repair?: ClaimLedgerRepairInput;
@@ -287,6 +292,7 @@ export function buildClaimLedgerProjection(input: {
       `claim-ledger:anchor:${anchor.status}`,
       `claim-ledger:authority:${authority.status}`,
       `claim-ledger:mutation:${mutation.status}`,
+      `claim-ledger:mutation-scope:${input.mutationScope}`,
       `claim-ledger:verification:${verification.status}`,
       `claim-ledger:recovery:${recovery.status}`,
       `claim-ledger:repair:${repair.status}`,
@@ -520,13 +526,14 @@ function projectAuthorityClaim(
 
 function projectMutationClaim(input: {
   readonly applyStatus: "not-run" | "succeeded" | "stopped" | "failed";
-  readonly mutationScope: "none" | "controlled-temp-workspace";
+  readonly mutationScope: ClaimLedgerMutationScope;
   readonly providerCallDuringApply: boolean;
   readonly evidenceSource: ClaimLedgerEvidenceSource;
 }): ClaimLedgerClaim {
   if (
     input.applyStatus === "succeeded" &&
-    input.mutationScope === "controlled-temp-workspace" &&
+    (input.mutationScope === "controlled-temp-workspace" ||
+      input.mutationScope === "selected-workspace") &&
     !input.providerCallDuringApply
   ) {
     return claim({
@@ -534,7 +541,9 @@ function projectMutationClaim(input: {
       status: "proven",
       source: input.evidenceSource,
       scope: input.mutationScope,
-      reason: "Existing exact apply lane changed the controlled temp workspace without provider calls.",
+      reason: input.mutationScope === "selected-workspace"
+        ? "Existing exact apply lane changed the explicitly selected workspace without provider calls."
+        : "Existing exact apply lane changed the controlled temp workspace without provider calls.",
       receiptFields: {
         apply: input.applyStatus,
         mutationScope: input.mutationScope,
@@ -808,7 +817,10 @@ function projectRepairClaim(input: {
       receiptFields,
     });
   }
-  if (repair.mutationScope !== "controlled-temp-workspace") {
+  if (
+    repair.mutationScope !== "controlled-temp-workspace" &&
+    repair.mutationScope !== "selected-workspace"
+  ) {
     return repairClaim({
       status: "repair-invalid",
       source,
@@ -988,6 +1000,14 @@ function projectTerminalClaim(
     claims.recovery,
   ];
   const allRequiredProven = requiredClaims.every((claimItem) => claimItem.status === "proven");
+  const allNonProviderRequiredProven = [
+    claims.proposal,
+    claims.anchor,
+    claims.authority,
+    claims.mutation,
+    claims.verification,
+    claims.recovery,
+  ].every((claimItem) => claimItem.status === "proven");
   const liveSuccess =
     canProveLiveProvider(input) &&
     allRequiredProven &&
@@ -1134,7 +1154,7 @@ function projectTerminalClaim(
   if (
     input.verificationStatus === "succeeded" &&
     input.applyStatus === "succeeded" &&
-    allRequiredProven &&
+    allNonProviderRequiredProven &&
     onlyNotLiveProviderBlockers(claims.notProvenClaims) &&
     input.evidenceSource !== "live-provider"
   ) {
@@ -1359,7 +1379,10 @@ function onlyNotLiveProviderBlockers(
   claims: readonly ClaimLedgerNotProvenClaim[],
 ): boolean {
   return claims.length > 0 &&
-    claims.every((claim) => claim.blocker === "not-live-provider-evidence");
+    claims.every((claim) =>
+      claim.blocker === "not-live-provider-evidence" ||
+      claim.blocker === "provider-not-called"
+    );
 }
 
 function onlyNotLiveRepairBlockers(

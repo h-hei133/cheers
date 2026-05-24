@@ -63,6 +63,7 @@ export async function runPlanningMutationProofRoute(input: {
   readonly currentContentByTargetPath?: ReadonlyMap<string, string>;
   readonly staleTargetPaths?: readonly string[];
   readonly inWorkspaceTargetPaths?: readonly string[];
+  readonly proposalEvidenceSource?: PlanningMutationProposalBridge["evidenceSource"];
   readonly confirmation?: PlanningMutationProofConfirmation;
   readonly workspace?: PlanningMutationProofWorkspace;
   readonly readVerifiedFile?: (relativePath: string) => string | undefined;
@@ -77,6 +78,7 @@ export async function runPlanningMutationProofRoute(input: {
     requestId: input.requestId,
     handoff: input.handoff,
     rawProposal: input.rawProposal,
+    evidenceSource: input.proposalEvidenceSource,
     currentContentByTargetPath: input.currentContentByTargetPath,
     staleTargetPaths: input.staleTargetPaths,
     inWorkspaceTargetPaths: input.inWorkspaceTargetPaths,

@@ -32,6 +32,15 @@ export type PlanningMutationProofWorkspace =
         TargetSetEditRouteOptions,
         "manifest" | "confirmedTargetSet" | "mapping"
       >;
+    }
+  | {
+      readonly scope: "selected-workspace";
+      readonly targetPathByLabel?: ReadonlyMap<string, string>;
+      readonly fencedOptions: Omit<FencedEditReplacementRouteOptions, "targetPath" | "mapping">;
+      readonly targetSetOptions?: Omit<
+        TargetSetEditRouteOptions,
+        "manifest" | "confirmedTargetSet" | "mapping"
+      >;
     };
 
 export interface PlanningMutationProofHandoff {
@@ -54,7 +63,8 @@ export interface PlanningMutationProofHandoff {
   readonly controlledWriteAuthority:
     | "not-requested"
     | "required"
-    | "trusted-controlled-workspace";
+    | "trusted-controlled-workspace"
+    | "trusted-selected-workspace";
   readonly reason: string;
   readonly nextAction: string;
   readonly applyResult?: EditProposalApplyResult;
@@ -119,7 +129,10 @@ export async function runPlanningMutationProofHandoff(input: {
     });
   }
 
-  if (workspace.scope !== "controlled-temp-workspace") {
+  if (
+    workspace.scope !== "controlled-temp-workspace" &&
+    workspace.scope !== "selected-workspace"
+  ) {
     return stoppedProofHandoff({
       bridge: input.bridge,
       confirmationState: confirmation.state,
@@ -127,11 +140,12 @@ export async function runPlanningMutationProofHandoff(input: {
       state: "stopped",
       selectionState: selection.state,
       controlledWriteAuthority: "required",
-      reason: "Trusted confirmation is present, but controlled workspace authority was not provided.",
-      nextAction: "Provide controlled-temp-workspace fenced route options; do not write the production workspace by default.",
+      reason: "Trusted confirmation is present, but explicit workspace authority was not provided.",
+      nextAction: "Provide controlled-temp or selected-workspace fenced route options; do not write the production workspace by default.",
       extraEvidence: [
         ...selection.evidence,
         "planning-mutation-proof-handoff:controlled-workspace-required",
+        "planning-mutation-proof-handoff:workspace-authority-required",
         "planning-mutation-proof-handoff:apply:not-run",
       ],
     });
@@ -148,8 +162,8 @@ export async function runPlanningMutationProofHandoff(input: {
       state: "stopped",
       selectionState: selection.state,
       controlledWriteAuthority: "required",
-      reason: "Controlled workspace authority options disagree on workspace root.",
-      nextAction: "Use one controlled workspace authority for fenced and target-set apply options.",
+      reason: "Workspace authority options disagree on workspace root.",
+      nextAction: "Use one explicit workspace authority for fenced and target-set apply options.",
       extraEvidence: [
         ...selection.evidence,
         "planning-mutation-proof-handoff:workspace-root-mismatch",
@@ -168,7 +182,7 @@ export async function runPlanningMutationProofHandoff(input: {
       workspaceScope: workspace.scope,
       state: "stopped",
       selectionState: selection.state,
-      controlledWriteAuthority: "trusted-controlled-workspace",
+      controlledWriteAuthority: workspaceAuthorityState(workspace.scope),
       reason: selection.reason,
       nextAction: selection.nextAction,
       extraEvidence: [
@@ -208,7 +222,7 @@ export async function runPlanningMutationProofHandoff(input: {
     changedFiles: applyResult.changedFiles,
     providerCallDuringApply: false,
     planningMutationAuthority: "not-granted",
-    controlledWriteAuthority: "trusted-controlled-workspace",
+    controlledWriteAuthority: workspaceAuthorityState(workspace.scope),
     reason: classifyApplyReason(applyResult),
     nextAction:
       applyResult.changedFiles.length > 0
@@ -227,6 +241,9 @@ export async function runPlanningMutationProofHandoff(input: {
       ...selection.evidence,
       ...applyResult.evidence,
       "planning-mutation-proof-handoff:existing-backend-consumed",
+      workspace.scope === "selected-workspace"
+        ? "planning-mutation-proof-handoff:selected-workspace-authority:explicit"
+        : "planning-mutation-proof-handoff:controlled-workspace-authority:explicit",
       "planning-mutation-proof-handoff:no-new-writer",
       "planning-mutation-proof-handoff:no-fuzzy-apply",
       "planning-mutation-proof-handoff:no-provider-call-during-apply",
@@ -240,6 +257,18 @@ export async function runPlanningMutationProofHandoff(input: {
       workspaceScope: workspace.scope,
     }),
   };
+}
+
+function workspaceAuthorityState(
+  scope: PlanningMutationProofWorkspace["scope"],
+): PlanningMutationProofHandoff["controlledWriteAuthority"] {
+  if (scope === "selected-workspace") {
+    return "trusted-selected-workspace";
+  }
+  if (scope === "controlled-temp-workspace") {
+    return "trusted-controlled-workspace";
+  }
+  return "required";
 }
 
 function stoppedProofHandoff(input: {

@@ -1,6 +1,7 @@
 import {
   buildClaimLedgerProjection,
   type ClaimLedgerEvidenceSource,
+  type ClaimLedgerMutationScope,
   type ClaimLedgerPerFileClaim,
   type ClaimLedgerProjection,
 } from "./claimLedgerProjection.js";
@@ -42,7 +43,7 @@ export interface PlanningMutationProofVerification {
   readonly terminalResult: ClaimLedgerProjection["terminal"]["resultStatus"];
   readonly liveSuccess: boolean;
   readonly providerCallDuringApply: false;
-  readonly mutationScope: "none" | "controlled-temp-workspace";
+  readonly mutationScope: ClaimLedgerMutationScope;
   readonly perFileClaims: readonly ClaimLedgerPerFileClaim[];
   readonly claimLedger: ClaimLedgerProjection;
   readonly reason: string;
@@ -102,9 +103,7 @@ export function verifyPlanningMutationProofHandoff(input: {
     verificationStatus,
     snapshotStatus: classifyRealTaskLoopSnapshotStatus(input.proofHandoff.applyResult),
     recoveryStatus: classifyRealTaskLoopRecoveryStatus(input.proofHandoff.applyResult),
-    mutationScope: input.proofHandoff.changedFiles.length > 0
-      ? "controlled-temp-workspace"
-      : "none",
+    mutationScope: mutationScopeFor(input.proofHandoff),
     providerCallDuringApply: input.proofHandoff.providerCallDuringApply,
     scorecardStatus: scorecardStatus({ applyStatus, verificationStatus }),
     perFileClaims,
@@ -162,9 +161,7 @@ export function verifyPlanningMutationProofHandoff(input: {
     terminalResult: claimLedger.terminal.resultStatus,
     liveSuccess: claimLedger.terminal.liveSuccess,
     providerCallDuringApply: false,
-    mutationScope: input.proofHandoff.changedFiles.length > 0
-      ? "controlled-temp-workspace"
-      : "none",
+    mutationScope: mutationScopeFor(input.proofHandoff),
     unexpectedChangedFiles,
     perFileClaims,
     claimLedger,
@@ -182,6 +179,18 @@ export function verifyPlanningMutationProofHandoff(input: {
       "raw-content-excluded",
     ].join("; "),
   };
+}
+
+function mutationScopeFor(
+  proofHandoff: PlanningMutationProofHandoff,
+): ClaimLedgerMutationScope {
+  if (proofHandoff.changedFiles.length === 0) {
+    return "none";
+  }
+  if (proofHandoff.workspaceScope === "selected-workspace") {
+    return "selected-workspace";
+  }
+  return "controlled-temp-workspace";
 }
 
 function buildTargetMappings(

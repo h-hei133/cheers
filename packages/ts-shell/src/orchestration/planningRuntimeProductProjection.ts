@@ -1,3 +1,4 @@
+import type { CodingVerificationSummary } from "./types.js";
 import type { PlanningRuntimeResult } from "./planningRuntime.js";
 import {
   runPlanningMutationProofRoute,
@@ -14,6 +15,16 @@ import {
   type PlanningRuntimeProductExecutionOptions,
   type PlanningRuntimeProductProofInputs,
 } from "./planningRuntimeProductExecution.js";
+import { preparePlanningRuntimeProductProposal } from "./planningRuntimeProductProposal.js";
+import {
+  runPlanningRuntimeProductRepairContinuation,
+  type PlanningRuntimeProductRepairContinuation,
+} from "./planningRuntimeProductRepair.js";
+import {
+  runPlanningRuntimeProductVerificationCommand,
+  type PlanningRuntimeProductVerificationCommandRun,
+  type PlanningRuntimeProductVerificationRuntime,
+} from "./planningRuntimeProductVerification.js";
 
 export async function projectPlanningRuntimeProductOutcome(input: {
   readonly result: PlanningRuntimeResult;
@@ -22,13 +33,23 @@ export async function projectPlanningRuntimeProductOutcome(input: {
   readonly routeEvidence?: readonly string[];
   readonly productPath: "runMvpIntegratedFlow";
   readonly workspaceRoot: string;
+  readonly sessionId: string;
+  readonly prompt: string;
   readonly execution?: PlanningRuntimeProductExecutionOptions;
+  readonly verificationRuntime?: PlanningRuntimeProductVerificationRuntime;
 }): Promise<RuntimeOutcomeProjection> {
   const surface = projectPlanningRuntimeSurface(input.result);
+  const proposalPreparation = preparePlanningRuntimeProductProposal({
+    workspaceRoot: input.workspaceRoot,
+    handoff: surface.mutationHandoff,
+    rawProposal: input.execution?.rawProposal,
+    liveProviderOptIn: input.execution?.liveProviderProposal?.optIn,
+  });
   const proofInputs = buildPlanningRuntimeProductProofInputs({
     workspaceRoot: input.workspaceRoot,
     handoff: surface.mutationHandoff,
     execution: input.execution,
+    proposalPreparation,
   });
   const proofRoute = await runPlanningMutationProofRoute({
     requestId: `${input.productPath}:${input.result.runtimeId}`,
@@ -44,10 +65,24 @@ export async function projectPlanningRuntimeProductOutcome(input: {
     ...(proofInputs.expectedContentByTargetPath
       ? { expectedContentByTargetPath: proofInputs.expectedContentByTargetPath }
       : {}),
-    providerCalled: proofInputs.exactProposalState === "provided",
-    liveOptIn: false,
+    proposalEvidenceSource: proofInputs.exactProposalSource === "none"
+      ? undefined
+      : proofInputs.exactProposalSource,
+    providerCalled: proofInputs.providerCalled,
+    liveOptIn: proofInputs.liveOptIn,
   });
-  const proposalBridge = proofRoute.bridge;
+  const commandVerification = await runPlanningRuntimeProductVerificationCommand({
+    workspaceRoot: input.workspaceRoot,
+    proofRoute,
+    verificationCommand: input.execution?.verificationCommand,
+    runtime: input.verificationRuntime,
+  });
+  const repairContinuation = await runPlanningRuntimeProductRepairContinuation({
+    sessionId: input.sessionId,
+    prompt: input.prompt,
+    proofRoute,
+    commandRun: commandVerification,
+  });
   const targetPaths = surface.editTargets.map((target) => target.path);
   const reviewOnlyReason = [
     input.routeReason,
@@ -62,30 +97,56 @@ export async function projectPlanningRuntimeProductOutcome(input: {
     surface,
     proofRoute,
     proofInputs,
+    commandVerification,
+    repairContinuation,
   );
   const nextAction = selectNextAction(surface.enoughContext, targetPaths);
   if (shouldUseProofRuntimeOutcome(proofRoute, proofInputs)) {
+    const verification = mergeProductVerification({
+      proofVerification: proofRoute.runtimeOutcome.codingResult.verification,
+      commandVerification,
+    });
+    const commandFailure = commandFailureFile(commandVerification);
     return projectRuntimeCodingOutcome({
       taskKind: input.taskKind,
       changedFiles: [...proofRoute.runtimeOutcome.codingResult.changedFiles],
-      failedFiles: [...proofRoute.runtimeOutcome.codingResult.failedFiles],
+      failedFiles: [
+        ...proofRoute.runtimeOutcome.codingResult.failedFiles,
+        ...(commandFailure ? [commandFailure] : []),
+      ],
       patches: [...(proofRoute.runtimeOutcome.codingResult.patches ?? [])],
-      verifiedFiles: [...proofRoute.runtimeOutcome.codingResult.verifiedFiles],
-      unverifiedFiles: [...proofRoute.runtimeOutcome.codingResult.unverifiedFiles],
-      verification: proofRoute.runtimeOutcome.codingResult.verification,
+      verifiedFiles: [
+        ...proofRoute.runtimeOutcome.codingResult.verifiedFiles,
+        ...(commandVerification.status === "passed" ? ["(verification-command)"] : []),
+      ],
+      unverifiedFiles: [
+        ...proofRoute.runtimeOutcome.codingResult.unverifiedFiles,
+        ...(commandFailure
+          ? [{ path: commandFailure.path, reason: commandFailure.reason }]
+          : []),
+      ],
+      verification,
       repairNotes: [
         input.routeReason,
         ...proofRoute.runtimeOutcome.codingResult.repair.notes,
+        `planning-runtime-product:verification-command:${commandVerification.status}`,
+        `planning-runtime-product:repair:${repairContinuation.status}`,
       ],
       evidence: productEvidence,
-      taskVerdict: proofRoute.runtimeOutcome.codingResult.taskSatisfaction.verdict,
+      taskVerdict: commandFailure
+        ? "insufficient-evidence"
+        : proofRoute.runtimeOutcome.codingResult.taskSatisfaction.verdict,
       taskReasons: [
         ...proofRoute.runtimeOutcome.codingResult.taskSatisfaction.reasons,
+        `verification-command=${commandVerification.status}`,
+        `repair-continuation=${repairContinuation.status}`,
       ],
       userFacingOutput: formatPlanningRuntimeProductOutput({
         surface,
         proofRoute,
         proofInputs,
+        commandVerification,
+        repairContinuation,
         routeReason: input.routeReason,
         evidence: productEvidence,
       }),
@@ -117,6 +178,8 @@ export async function projectPlanningRuntimeProductOutcome(input: {
     repairNotes: [
       input.routeReason,
       "planning-runtime-product:review-only-no-write-handoff",
+      `planning-runtime-product:verification-command:${commandVerification.status}`,
+      `planning-runtime-product:repair:${repairContinuation.status}`,
       "context-memory-scope:product-turn-only; session-continuation persistence not wired",
     ],
     evidence: productEvidence,
@@ -129,6 +192,8 @@ export async function projectPlanningRuntimeProductOutcome(input: {
       surface,
       proofRoute,
       proofInputs,
+      commandVerification,
+      repairContinuation,
       routeReason: input.routeReason,
       evidence: productEvidence,
     }),
@@ -142,6 +207,8 @@ function buildProductEvidence(
   surface: ReturnType<typeof projectPlanningRuntimeSurface>,
   proofRoute: PlanningMutationProofRoute,
   proofInputs: PlanningRuntimeProductProofInputs,
+  commandVerification: PlanningRuntimeProductVerificationCommandRun,
+  repairContinuation: PlanningRuntimeProductRepairContinuation,
 ): string[] {
   return [
     `planning-runtime-product:path:${productPath}`,
@@ -150,13 +217,15 @@ function buildProductEvidence(
     "planning-runtime-product:review-surface:structured-handoff",
     "session-print:stopped-final-output:include",
     "mutationAuthority=not-granted",
-    proofInputs.exactProposalState === "provided"
-      ? "provider-called=explicit-proposal-input"
-      : "provider-called=false",
+    `planning-runtime-product:proposal-preparation:${proofInputs.proposalPreparation?.status ?? "not-run"}`,
+    `planning-runtime-product:proposal-source:${proofInputs.exactProposalSource}`,
+    proofInputs.providerCalled ? "provider-called=true" : "provider-called=false",
     proofRoute.proofHandoff.applyState === "not-run"
       ? "apply=not-run"
       : `apply=${proofRoute.proofHandoff.applyState}`,
-    "command-dispatch=not-run",
+    commandVerification.commandDispatch === "existing-tool-runtime"
+      ? "command-dispatch=existing-tool-runtime"
+      : "command-dispatch=not-run",
     ...routeEvidence,
     ...result.context.filesRead.map((file) => `inspect: read ${file.path}`),
     ...result.context.repo.candidates
@@ -177,7 +246,12 @@ function buildProductEvidence(
     `planning-runtime-product:proof-verification:${proofRoute.verification.verificationState}`,
     `planning-runtime-product:proof-terminal:${proofRoute.terminalState}`,
     `planning-runtime-product:proof-result:${proofRoute.terminalResult}`,
+    `planning-runtime-product:verification-command:${commandVerification.status}`,
+    `planning-runtime-product:verification-command-dispatch:${commandVerification.commandDispatch}`,
+    `planning-runtime-product:repair:${repairContinuation.status}`,
     ...proofRoute.evidence,
+    ...commandVerification.evidence,
+    ...repairContinuation.evidence,
   ];
 }
 
@@ -185,6 +259,8 @@ function formatPlanningRuntimeProductOutput(input: {
   readonly surface: ReturnType<typeof projectPlanningRuntimeSurface>;
   readonly proofRoute: PlanningMutationProofRoute;
   readonly proofInputs: PlanningRuntimeProductProofInputs;
+  readonly commandVerification: PlanningRuntimeProductVerificationCommandRun;
+  readonly repairContinuation: PlanningRuntimeProductRepairContinuation;
   readonly routeReason: string;
   readonly evidence: readonly string[];
 }): string {
@@ -248,20 +324,32 @@ function formatPlanningRuntimeProductOutput(input: {
     ...formatHandoffRequirements(surface.mutationHandoff.requirements),
     `Next: ${surface.mutationHandoff.nextAction}`,
     "mutationAuthority=not-granted",
-    "provider-called=false",
+    `provider-called=${input.proofInputs.providerCalled ? "true" : "false"}`,
     "apply=not-run",
     "command-dispatch=not-run",
     "",
     "Review-confirm-execute loop:",
     `Loop verdict: ${formatLoopVerdict(proofRoute)}`,
     `Review surface: structured-handoff`,
+    `Product proposal preparation: ${input.proofInputs.proposalPreparation?.status ?? "not-run"}`,
+    `Product proposal source: ${input.proofInputs.exactProposalSource}`,
+    `Product proposal reason: ${input.proofInputs.proposalPreparation?.reason ?? "none"}`,
+    `Provider called for proposal: ${input.proofInputs.providerCalled ? "true" : "false"}`,
+    `Live provider opt-in: ${input.proofInputs.liveOptIn ? "true" : "false"}`,
     `Explicit confirmation: ${input.proofInputs.confirmationState}`,
     `Exact proposal input: ${input.proofInputs.exactProposalState}`,
     `Controlled workspace: ${input.proofInputs.controlledWorkspaceState}`,
     `Controlled workspace reason: ${input.proofInputs.controlledWorkspaceReason}`,
+    `Selected workspace: ${input.proofInputs.selectedWorkspaceState}`,
+    `Selected workspace reason: ${input.proofInputs.selectedWorkspaceReason}`,
     `Backend consumption: ${proofRoute.proofHandoff.backendLane}`,
     `Apply state: ${proofRoute.proofHandoff.applyState}`,
     `Readback verification: ${proofRoute.verification.verificationState}`,
+    `Verification command: ${input.commandVerification.status}`,
+    `Verification command dispatch: ${input.commandVerification.commandDispatch}`,
+    `Verification command reason: ${input.commandVerification.reason}`,
+    `Repair continuation: ${input.repairContinuation.status}`,
+    `Repair reason: ${input.repairContinuation.reason}`,
     `Terminal verdict: ${proofRoute.terminalState}`,
     `Terminal result: ${proofRoute.terminalResult}`,
     `Next action: ${formatLoopNextAction({ proofRoute, proofInputs: input.proofInputs })}`,
@@ -303,6 +391,24 @@ function formatPlanningRuntimeProductOutput(input: {
     "Provider call during apply: false",
     `Reason: ${proofRoute.verification.reason}`,
     `Next: ${proofRoute.verification.nextAction}`,
+    "",
+    "Authorized verification command:",
+    `State: ${input.commandVerification.status}`,
+    `Dispatch: ${input.commandVerification.commandDispatch}`,
+    `Plan: ${input.commandVerification.plan?.verificationPlanId ?? "none"}`,
+    `Command: ${input.commandVerification.plan?.commandSafeLabel ?? "none"}`,
+    `Outcome: ${input.commandVerification.result?.outcome ?? "none"}`,
+    `Repair eligible: ${input.commandVerification.repairEligible ? "yes" : "no"}`,
+    `Reason: ${input.commandVerification.reason}`,
+    `Next: ${input.commandVerification.nextAction}`,
+    "",
+    "Repair continuation:",
+    `State: ${input.repairContinuation.status}`,
+    `Plan: ${input.repairContinuation.run?.plan.status ?? "none"}`,
+    `Mutation: not-run`,
+    `Original failure preserved: ${input.repairContinuation.status === "repair-continuation-created" ? "yes" : "not-needed"}`,
+    `Reason: ${input.repairContinuation.reason}`,
+    `Next: ${input.repairContinuation.nextAction}`,
     "",
     "Context memory scope:",
     `memory=${surface.memory.id}; scope=product-turn; session-continuation=not-wired`,
@@ -478,6 +584,11 @@ function selectEvidenceMarkers(evidence: readonly string[]): readonly string[] {
     entry.startsWith("generated-edit-proposal:") ||
     entry.startsWith("edit-proposal-review:") ||
     entry.startsWith("planning-runtime-product:") ||
+    entry.startsWith("planning-runtime-product-proposal:") ||
+    entry.startsWith("planning-runtime-product-verification-command:") ||
+    entry.startsWith("planning-runtime-product-repair:") ||
+    entry.startsWith("verification-command-") ||
+    entry.startsWith("verification-repair-") ||
     entry === "mutationAuthority=not-granted" ||
     entry === "provider-called=false" ||
     entry.startsWith("provider-called=") ||
@@ -485,6 +596,58 @@ function selectEvidenceMarkers(evidence: readonly string[]): readonly string[] {
     entry === "command-dispatch=not-run"
   );
   return Array.from(new Set(selected)).slice(0, 24);
+}
+
+function mergeProductVerification(input: {
+  readonly proofVerification: CodingVerificationSummary;
+  readonly commandVerification: PlanningRuntimeProductVerificationCommandRun;
+}): CodingVerificationSummary {
+  if (
+    input.commandVerification.status === "not-requested" ||
+    input.commandVerification.status === "not-run"
+  ) {
+    return input.proofVerification;
+  }
+  if (input.commandVerification.status === "passed") {
+    return {
+      ...input.proofVerification,
+      status: input.proofVerification.status === "passed" ? "passed" : input.proofVerification.status,
+      command: input.commandVerification.plan?.command,
+      reason: [
+        input.proofVerification.reason,
+        "verification command succeeded",
+      ].filter(Boolean).join("; "),
+      nextAction: input.proofVerification.nextAction,
+    };
+  }
+  return {
+    status: input.commandVerification.status === "blocked" ? "blocked" : "failed",
+    ...(input.commandVerification.plan?.command
+      ? { command: input.commandVerification.plan.command }
+      : {}),
+    reason: input.commandVerification.reason,
+    selectionScope: "focused",
+    selectionSource: "explicit-user",
+    ...(input.commandVerification.status === "blocked"
+      ? { blockerKind: "environment-not-ready" as const }
+      : {}),
+    nextAction: input.commandVerification.nextAction,
+  };
+}
+
+function commandFailureFile(
+  commandVerification: PlanningRuntimeProductVerificationCommandRun,
+): { path: string; reason: string } | undefined {
+  if (
+    commandVerification.status !== "failed" &&
+    commandVerification.status !== "blocked"
+  ) {
+    return undefined;
+  }
+  return {
+    path: "(verification-command)",
+    reason: commandVerification.reason,
+  };
 }
 
 function shouldUseProofRuntimeOutcome(
@@ -495,6 +658,7 @@ function shouldUseProofRuntimeOutcome(
     proofInputs.confirmationState === "trusted-confirmed" ||
     proofInputs.exactProposalState === "provided" ||
     proofInputs.controlledWorkspaceState === "trusted-controlled-temp-workspace" ||
+    proofInputs.selectedWorkspaceState === "trusted-selected-workspace" ||
     proofRoute.proofHandoff.backendLane === "existing-proof-carrying-mutation-backend" ||
     proofRoute.changedFiles.length > 0 ||
     proofRoute.verification.verificationState !== "not-run"
@@ -527,10 +691,13 @@ function formatLoopNextAction(input: {
     return "Provide an explicit exact proposal input before confirmation can execute.";
   }
   if (input.proofInputs.confirmationState !== "trusted-confirmed") {
-    return "Review the exact proposal and provide explicit trusted confirmation for a controlled workspace.";
+    return "Review the exact proposal and provide explicit trusted confirmation for an authorized workspace.";
   }
-  if (input.proofInputs.controlledWorkspaceState !== "trusted-controlled-temp-workspace") {
-    return "Provide controlled temp workspace authority; production workspace writes remain disabled by default.";
+  if (
+    input.proofInputs.controlledWorkspaceState !== "trusted-controlled-temp-workspace" &&
+    input.proofInputs.selectedWorkspaceState !== "trusted-selected-workspace"
+  ) {
+    return "Provide controlled temp or explicit selected workspace authority; production workspace writes remain disabled by default.";
   }
   return input.proofRoute.verification.nextAction;
 }

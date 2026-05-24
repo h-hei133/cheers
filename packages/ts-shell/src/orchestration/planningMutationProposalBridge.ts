@@ -50,7 +50,12 @@ export interface PlanningMutationProposalBridge {
   readonly applyState: "not-run";
   readonly verificationState: "not-run";
   readonly providerCall: "not-run";
-  readonly evidenceSource: "planning-handoff-summary" | "focused-deterministic-proposal";
+  readonly evidenceSource:
+    | "planning-handoff-summary"
+    | "focused-deterministic-proposal"
+    | "manual-proposal-json"
+    | "planning-runtime-deterministic"
+    | "live-provider-proposal";
   readonly reason: string;
   readonly nextAction: string;
   readonly mutationAuthority: "not-granted";
@@ -61,6 +66,7 @@ export function buildPlanningMutationProposalBridge(input: {
   readonly requestId: string;
   readonly handoff: PlanningMutationHandoffProjection;
   readonly rawProposal?: ProviderEditRawProposal | null;
+  readonly evidenceSource?: PlanningMutationProposalBridge["evidenceSource"];
   readonly currentContentByTargetPath?: ReadonlyMap<string, string>;
   readonly staleTargetPaths?: readonly string[];
   readonly inWorkspaceTargetPaths?: readonly string[];
@@ -189,7 +195,7 @@ export function buildPlanningMutationProposalBridge(input: {
       : blocked
         ? "unsupported"
         : "review-required",
-    evidenceSource: "focused-deterministic-proposal",
+    evidenceSource: input.evidenceSource ?? "focused-deterministic-proposal",
     anchoredProposal,
     anchoredReview,
     anchoredMappingByHunkId,
@@ -200,7 +206,7 @@ export function buildPlanningMutationProposalBridge(input: {
       ? "Review and explicitly confirm exact hunks before invoking the existing proposal apply path."
       : "Keep the proposal review-only or supply exact current anchors.",
     extraEvidence: [
-      "planning-proposal-bridge:focused-deterministic-proposal",
+      `planning-proposal-bridge:proposal-source:${input.evidenceSource ?? "focused-deterministic-proposal"}`,
       "planning-proposal-bridge:existing-anchoring-infrastructure-consumed",
       ...validation.evidence,
       ...extraction.evidence,

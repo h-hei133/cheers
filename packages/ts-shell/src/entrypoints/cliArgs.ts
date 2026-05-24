@@ -20,7 +20,10 @@ export interface CliOptions {
   readonly applyPatchWorkspaceWrite?: boolean;
   readonly planningMutationConfirm?: boolean;
   readonly planningMutationControlledWorkspace?: boolean;
+  readonly planningMutationSelectedWorkspace?: boolean;
+  readonly planningMutationLiveProviderProposal?: boolean;
   readonly planningMutationProposalPath?: string;
+  readonly planningMutationVerifyCommand?: string;
 }
 
 export interface CliArgs {
@@ -61,6 +64,7 @@ const VALUE_FLAGS = new Set([
   "--replay-file",
   "--non-interactive-approval",
   "--planning-mutation-proposal",
+  "--planning-mutation-verify-command",
 ]);
 
 const RESERVED_SHELL_SLASH_COMMANDS = new Set([
@@ -193,6 +197,16 @@ export function parseCliArgs(
     "planningMutationControlledWorkspace",
     rawArgs.includes("--planning-mutation-controlled-workspace"),
   );
+  assignOption(
+    options,
+    "planningMutationSelectedWorkspace",
+    rawArgs.includes("--planning-mutation-selected-workspace"),
+  );
+  assignOption(
+    options,
+    "planningMutationLiveProviderProposal",
+    rawArgs.includes("--planning-mutation-live-provider-proposal"),
+  );
   const planningMutationProposal = parsePlanningMutationProposalPath(rawArgs);
   if (planningMutationProposal.ok === false) {
     return { ok: false, error: planningMutationProposal.error };
@@ -201,6 +215,15 @@ export function parseCliArgs(
     options,
     "planningMutationProposalPath",
     planningMutationProposal.value,
+  );
+  const planningMutationVerifyCommand = parsePlanningMutationVerifyCommand(rawArgs);
+  if (planningMutationVerifyCommand.ok === false) {
+    return { ok: false, error: planningMutationVerifyCommand.error };
+  }
+  assignOption(
+    options,
+    "planningMutationVerifyCommand",
+    planningMutationVerifyCommand.value,
   );
   assignOption(
     options,
@@ -217,6 +240,24 @@ export function parseCliArgs(
       doctorRequested: rawArgs.includes("--doctor"),
     },
   };
+}
+
+function parsePlanningMutationVerifyCommand(
+  args: readonly string[],
+):
+  | { readonly ok: true; readonly value: string | undefined }
+  | { readonly ok: false; readonly error: CliArgParseError } {
+  const idx = args.indexOf("--planning-mutation-verify-command");
+  if (idx === -1) {
+    return { ok: true, value: undefined };
+  }
+  const value = args[idx + 1];
+  if (!value) {
+    return parseError(
+      "Missing value for --planning-mutation-verify-command. Provide an allowlisted verification command.",
+    );
+  }
+  return { ok: true, value };
 }
 
 function parsePlanningMutationProposalPath(

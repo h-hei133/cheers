@@ -118,8 +118,12 @@ describe("cli args parser", () => {
       "--apply-patch-workspace-write",
       "--planning-mutation-confirm",
       "--planning-mutation-controlled-workspace",
+      "--planning-mutation-selected-workspace",
+      "--planning-mutation-live-provider-proposal",
       "--planning-mutation-proposal",
       "proposal.json",
+      "--planning-mutation-verify-command",
+      "node --version",
       "ignored prompt",
     ]);
 
@@ -134,7 +138,10 @@ describe("cli args parser", () => {
       applyPatchWorkspaceWrite: true,
       planningMutationConfirm: true,
       planningMutationControlledWorkspace: true,
+      planningMutationSelectedWorkspace: true,
+      planningMutationLiveProviderProposal: true,
       planningMutationProposalPath: "proposal.json",
+      planningMutationVerifyCommand: "node --version",
       promptArg: "ignored prompt",
     });
     expect(isPrintModeRequested(parsed)).toBe(true);
@@ -194,6 +201,9 @@ describe("cli args parser", () => {
     );
     expect(expectParseError(["--planning-mutation-proposal"]).message).toBe(
       "Missing value for --planning-mutation-proposal. Provide a JSON file with exact old/new proposal targets.",
+    );
+    expect(expectParseError(["--planning-mutation-verify-command"]).message).toBe(
+      "Missing value for --planning-mutation-verify-command. Provide an allowlisted verification command.",
     );
     expect(expectParseError(["--provider", "bad-provider"]).message).toBe(
       "Invalid --provider value: bad-provider. Expected openai, anthropic, openai-compatible, google, antigravity, or claudecode.",

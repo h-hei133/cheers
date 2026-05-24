@@ -12,7 +12,10 @@ export function buildCliPlanningMutationExecutionOptions(input: {
   if (
     !input.options.planningMutationConfirm &&
     !input.options.planningMutationControlledWorkspace &&
-    !input.options.planningMutationProposalPath
+    !input.options.planningMutationSelectedWorkspace &&
+    !input.options.planningMutationLiveProviderProposal &&
+    !input.options.planningMutationProposalPath &&
+    !input.options.planningMutationVerifyCommand
   ) {
     return undefined;
   }
@@ -35,6 +38,33 @@ export function buildCliPlanningMutationExecutionOptions(input: {
       ? {
           controlledWorkspace: {
             scope: "controlled-temp-workspace" as const,
+            source: "cli-flag" as const,
+          },
+        }
+      : {}),
+    ...(input.options.planningMutationSelectedWorkspace
+      ? {
+          selectedWorkspace: {
+            scope: "selected-workspace" as const,
+            source: "cli-flag" as const,
+            explicitWorkspaceAuthority: true as const,
+            allowedRoot: input.workspaceRoot,
+          },
+        }
+      : {}),
+    ...(input.options.planningMutationVerifyCommand
+      ? {
+          verificationCommand: {
+            command: input.options.planningMutationVerifyCommand,
+            approval: "explicit" as const,
+            source: "cli-flag" as const,
+          },
+        }
+      : {}),
+    ...(input.options.planningMutationLiveProviderProposal
+      ? {
+          liveProviderProposal: {
+            optIn: true as const,
             source: "cli-flag" as const,
           },
         }
