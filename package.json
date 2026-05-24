@@ -60,6 +60,7 @@
     "verify:route211-practical-authorized-loop-benchmark": "tsx scripts/route211-practical-authorized-loop-benchmark.ts",
     "verify:route211-real-provider-proposal-smoke": "tsx scripts/route211-real-provider-proposal-smoke.ts",
     "verify:route212-real-task-capability-sprint": "tsx scripts/route212-real-task-capability-sprint.ts",
+    "verify:route213-exact-proposal-generation-benchmark": "tsx scripts/route213-exact-proposal-generation-benchmark.ts",
     "demo:route207": "tsx scripts/route207-demo.ts",
     "verify:edit-capability-closeout": "node scripts/verify-edit-capability-closeout.mjs",
     "verify:browser-txn-gate": "node scripts/verify-browser-txn-gate.mjs",

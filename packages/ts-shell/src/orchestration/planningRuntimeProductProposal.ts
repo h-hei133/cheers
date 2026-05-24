@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { ContextAwareProviderPromptContext } from "./contextAwareProviderPrompt.js";
+import { buildPlanningExactProposal } from "./planningExactProposal.js";
 import type { PlanningRuntimeResult } from "./planningRuntime.js";
 import type { PlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
 import { hashContent } from "./patchRecovery/recoveryAuthorityStore.js";
@@ -44,12 +45,6 @@ export interface PlanningRuntimeProductProposalPreparation {
   readonly nextAction: string;
   readonly evidence: readonly string[];
 }
-
-const TARGET_RANKING_PATH = "src/planning/targetRanking.ts";
-const TARGET_RANKING_OLD =
-  "  return task.includes('planner') ? 'targetRanking.ts' : 'unknown';";
-const TARGET_RANKING_NEW =
-  "  return task.trim().includes('planner') ? 'targetRanking.ts' : 'unknown';";
 
 type LiveProviderTerminalClass =
   | "CONFIG-FAILED"
@@ -111,81 +106,27 @@ export async function preparePlanningRuntimeProductProposal(input: {
     });
   }
 
-  if (input.handoff.targetPaths.length !== 1) {
+  const exactProposal = buildPlanningExactProposal({
+    handoff: input.handoff,
+    planningResult: input.planningResult,
+    currentContentByTargetPath: readCurrentContentByTargetLabel({
+      workspaceRoot: input.workspaceRoot,
+      targetPaths: input.handoff.targetPaths,
+    }),
+  });
+  if (exactProposal.status !== "prepared-exact") {
     return proposalPreparation({
-      status: "review-only",
+      status: exactProposal.status,
       source: "planning-handoff-summary",
       providerCalled: false,
       liveOptIn: false,
       liveEvidenceSource: "default-safe",
-      reason:
-        "Deterministic product proposal preparation currently supports one exact target only.",
-      nextAction:
-        "Keep the planning handoff review-only or obtain an explicit provider/manual exact proposal.",
+      reason: exactProposal.reason,
+      nextAction: exactProposal.nextAction,
       evidence: [
-        `planning-runtime-product-proposal:target-count:${input.handoff.targetPaths.length}`,
-        "planning-runtime-product-proposal:deterministic:unsupported-target-count",
+        ...exactProposal.evidence,
+        "planning-runtime-product-proposal:deterministic:no-exact-proposal",
         "planning-runtime-product-proposal:provider-called:false",
-      ],
-    });
-  }
-
-  const targetPath = input.handoff.targetPaths[0];
-  if (targetPath !== TARGET_RANKING_PATH) {
-    return proposalPreparation({
-      status: "review-only",
-      source: "planning-handoff-summary",
-      providerCalled: false,
-      liveOptIn: false,
-      liveEvidenceSource: "default-safe",
-      reason:
-        "Planning handoff target is reviewable, but no deterministic exact proposal pattern matched it.",
-      nextAction:
-        "Use the review surface to obtain an exact provider/manual proposal before applying.",
-      evidence: [
-        `planning-runtime-product-proposal:target:${targetPath}`,
-        "planning-runtime-product-proposal:deterministic:no-pattern",
-        "planning-runtime-product-proposal:provider-called:false",
-      ],
-    });
-  }
-
-  const current = readWorkspaceFile(input.workspaceRoot, targetPath);
-  if (current === undefined) {
-    return proposalPreparation({
-      status: "unsupported",
-      source: "planning-handoff-summary",
-      providerCalled: false,
-      liveOptIn: false,
-      liveEvidenceSource: "default-safe",
-      reason:
-        "Deterministic product proposal could not read the selected in-workspace target.",
-      nextAction:
-        "Restore the selected target or use an explicit proposal path with current read evidence.",
-      evidence: [
-        `planning-runtime-product-proposal:target:${targetPath}`,
-        "planning-runtime-product-proposal:target-readable:false",
-        "planning-runtime-product-proposal:provider-called:false",
-      ],
-    });
-  }
-
-  if (!current.includes(TARGET_RANKING_OLD)) {
-    return proposalPreparation({
-      status: "review-only",
-      source: "planning-handoff-summary",
-      providerCalled: false,
-      liveOptIn: false,
-      liveEvidenceSource: "default-safe",
-      reason:
-        "Selected target did not contain the deterministic oldText anchor; no exact proposal was fabricated.",
-      nextAction:
-        "Refresh context and obtain a new exact proposal before requesting apply.",
-      evidence: [
-        `planning-runtime-product-proposal:target:${targetPath}`,
-        "planning-runtime-product-proposal:deterministic:old-anchor-missing",
-        "planning-runtime-product-proposal:provider-called:false",
-        "planning-runtime-product-proposal:raw-content-excluded",
       ],
     });
   }
@@ -193,33 +134,14 @@ export async function preparePlanningRuntimeProductProposal(input: {
   return proposalPreparation({
     status: "prepared-exact",
     source: "planning-runtime-deterministic",
-    rawProposal: {
-      operationKind: "exact-fenced-replacement",
-      targets: [
-        {
-          path: targetPath,
-          summary:
-            "Trim the planner task string before checking the target-ranking keyword.",
-          oldText: TARGET_RANKING_OLD,
-          newText: TARGET_RANKING_NEW,
-        },
-      ],
-      confidence: "medium",
-      riskSummary:
-        "Focused deterministic product proposal for the planning runtime fixture; requires review and explicit confirmation.",
-      verificationPlan: [
-        "readback verifies targetRanking.ts contains the trimmed planner predicate",
-      ],
-    },
+    rawProposal: exactProposal.rawProposal,
     providerCalled: false,
     liveOptIn: false,
     liveEvidenceSource: "default-safe",
-    reason:
-      "Planning Runtime handoff produced a deterministic exact proposal from current read evidence.",
-    nextAction:
-      "Review and explicitly confirm the anchored exact proposal before using the existing proof backend.",
+    reason: exactProposal.reason,
+    nextAction: exactProposal.nextAction,
     evidence: [
-      `planning-runtime-product-proposal:target:${targetPath}`,
+      ...exactProposal.evidence,
       "planning-runtime-product-proposal:deterministic:prepared-exact",
       "planning-runtime-product-proposal:manual-json:not-required",
       "planning-runtime-product-proposal:provider-called:false",

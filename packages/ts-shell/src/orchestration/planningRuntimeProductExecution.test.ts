@@ -115,6 +115,131 @@ describe("buildPlanningRuntimeProductProofInputs", () => {
     );
   });
 
+  it("prepares exact proposals from product projection read evidence", async () => {
+    const targetPath = "packages/ts-shell/src/orchestration/planningRuntimeProductProjection.ts";
+    const workspaceRoot = createWorkspace({
+      [targetPath]: [
+        "export function formatProductOutput() {",
+        '  return [',
+        '    "Planning runtime: product-path review-only handoff",',
+        '  ].join("\\n");',
+        "}",
+        "",
+      ].join("\n"),
+    });
+    const handoff = readyHandoffFor({
+      targetPath,
+      expectedChangeSummary:
+        "Fix planning runtime product output so confirmed apply results do not still look review-only.",
+    });
+
+    const proposalPreparation = await preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff,
+    });
+    const result = buildPlanningRuntimeProductProofInputs({
+      workspaceRoot,
+      handoff,
+      proposalPreparation,
+    });
+
+    expect(proposalPreparation.status).toBe("prepared-exact");
+    expect(proposalPreparation.source).toBe("planning-runtime-deterministic");
+    expect(proposalPreparation.rawProposal?.targets?.[0]?.path).toBe(targetPath);
+    expect(proposalPreparation.rawProposal?.targets?.[0]?.newText).toContain(
+      "review-confirm-execute handoff",
+    );
+    expect(result.exactProposalSource).toBe("planning-runtime-deterministic");
+    expect(proposalPreparation.evidence).toEqual(
+      expect.arrayContaining([
+        "planning-exact-proposal:source:planning-runtime-read-evidence",
+        "planning-exact-proposal:old-anchor-count:1",
+        "planning-runtime-product-proposal:deterministic:prepared-exact",
+        "planning-runtime-product-proposal:manual-json:not-required",
+      ]),
+    );
+    expect(JSON.stringify(proposalPreparation.evidence)).not.toContain(
+      "Planning runtime: product-path review-only handoff",
+    );
+  });
+
+  it("prepares exact proposals from repair-chain read evidence", async () => {
+    const targetPath = "packages/ts-shell/src/orchestration/realTaskLoopRepairChain.ts";
+    const workspaceRoot = createWorkspace({
+      [targetPath]: [
+        "export function evidence(applyResult: unknown) {",
+        "  return [",
+        '      "real-task-loop-repair:existing-exact-apply-lane",',
+        '      ...(applyResult ? ["real-task-loop-repair:apply-route:existing-exact-lane"] : []),',
+        "  ];",
+        "}",
+        "",
+      ].join("\n"),
+    });
+    const handoff = readyHandoffFor({
+      targetPath,
+      expectedChangeSummary:
+        "Improve repair loop result reporting so task results include provider anchor apply verification and repair status.",
+    });
+
+    const proposalPreparation = await preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff,
+    });
+
+    expect(proposalPreparation.status).toBe("prepared-exact");
+    expect(proposalPreparation.rawProposal?.targets?.[0]?.path).toBe(targetPath);
+    expect(proposalPreparation.rawProposal?.targets?.[0]?.newText).toContain(
+      "result-reporting:anchor-apply-verification-repair",
+    );
+    expect(proposalPreparation.evidence).toEqual(
+      expect.arrayContaining([
+        "planning-exact-proposal:source:planning-runtime-read-evidence",
+        "planning-exact-proposal:prepared-exact",
+        "planning-runtime-product-proposal:provider-called:false",
+      ]),
+    );
+  });
+
+  it("keeps deterministic proposals review-only when read evidence is missing", async () => {
+    const targetPath = "packages/ts-shell/src/orchestration/planningRuntimeProductProjection.ts";
+    const workspaceRoot = createWorkspace({
+      [targetPath]: [
+        'export const title = "Planning runtime: product-path review-only handoff";',
+        "",
+      ].join("\n"),
+    });
+    const handoff = buildPlanningMutationHandoffProjection({
+      editTargets: [
+        {
+          path: targetPath,
+          rationale: "repo score 99; primary-source-name-match",
+          handoffRoute: "existing-proof-carrying-mutation-runtime",
+          readiness: "ready-for-review",
+        },
+      ],
+      missingFacts: [],
+      taskKind: "edit-file",
+      verificationIntentAvailable: true,
+      expectedChangeSummary:
+        "Fix planning runtime product output so confirmed apply results do not still look review-only.",
+    });
+
+    const proposalPreparation = await preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff,
+    });
+
+    expect(proposalPreparation.status).toBe("review-only");
+    expect(proposalPreparation.rawProposal).toBeUndefined();
+    expect(proposalPreparation.evidence).toEqual(
+      expect.arrayContaining([
+        "planning-exact-proposal:read-evidence:missing",
+        "planning-runtime-product-proposal:deterministic:no-exact-proposal",
+      ]),
+    );
+  });
+
   it("classifies live provider opt-in without approved attempts as config failed", async () => {
     const workspaceRoot = createWorkspace({
       "src/planning/targetRanking.ts": sourceContent(),
@@ -451,6 +576,53 @@ function readyHandoff() {
     missingFacts: [],
     taskKind: "edit-file",
     verificationIntentAvailable: true,
+    readEvidence: [
+      {
+        id: "read-evidence:context_engine_123:1",
+        path: "src/planning/targetRanking.ts",
+        reason: "target file",
+        source: "repo-intelligence",
+      },
+    ],
+  });
+}
+
+function readyHandoffFor(input: {
+  readonly targetPath: string;
+  readonly expectedChangeSummary: string;
+}) {
+  return buildPlanningMutationHandoffProjection({
+    editTargets: [
+      {
+        path: input.targetPath,
+        rationale: "repo score 99; primary-source-name-match",
+        handoffRoute: "existing-proof-carrying-mutation-runtime",
+        readiness: "ready-for-review",
+      },
+    ],
+    missingFacts: [],
+    taskKind: "edit-file",
+    verificationIntentAvailable: true,
+    contextReceipts: [
+      {
+        id: "context-receipt:ctx_mem_product:1",
+        path: input.targetPath,
+        summary: "planning runtime selected target summary",
+        relevance: "target file",
+      },
+    ],
+    readEvidence: [
+      {
+        id: "read-evidence:context_engine_product:1",
+        path: input.targetPath,
+        reason: "target file",
+        source: "repo-intelligence",
+      },
+    ],
+    expectedChangeSummary: input.expectedChangeSummary,
+    verificationIntentSummary:
+      "verificationPlan=readback; state=ready; command-dispatch=not-run",
+    verificationEvidenceIds: ["verification_plan_product"],
   });
 }
 
