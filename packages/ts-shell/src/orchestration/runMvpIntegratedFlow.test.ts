@@ -7545,6 +7545,15 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.finalOutput).toContain("provider-called=false");
     expect(result.finalOutput).toContain("apply=not-run");
     expect(result.finalOutput).toContain("command-dispatch=not-run");
+    expect(result.finalOutput).toContain("Proposal/anchoring bridge:");
+    expect(result.finalOutput).toContain("State: proposal-prepared");
+    expect(result.finalOutput).toContain("Proposal state: prepared");
+    expect(result.finalOutput).toContain("Anchor state: missing-exact-mapping");
+    expect(result.finalOutput).toContain("Confirmation state: review-required");
+    expect(result.finalOutput).toContain("Evidence source: planning-handoff-summary");
+    expect(result.finalOutput).toContain("Provider call: not-run");
+    expect(result.finalOutput).toContain("Apply state: not-run");
+    expect(result.finalOutput).toContain("Verification state: not-run");
     expect(result.finalOutput).toContain("scope=product-turn; session-continuation=not-wired");
     expect(evidence).toEqual(
       expect.arrayContaining([
@@ -7571,6 +7580,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         "planning-mutation-handoff:permission:not-requested",
         "planning-mutation-handoff:requirement:exact-old-new-mapping:missing-before-execution",
         "planning-mutation-handoff:requirement:claim-ledger-verdict:required-by-existing-route",
+        "planning-proposal-bridge:state:proposal-prepared",
+        "planning-proposal-bridge:anchor:missing-exact-mapping",
+        "planning-proposal-bridge:confirmation:review-required",
+        "planning-proposal-bridge:provider-call:not-run",
+        "planning-proposal-bridge:apply:not-run",
+        "planning-proposal-bridge:verification:not-run",
         "generated-edit-proposal:mutation-authority:not-granted",
         "edit-proposal-review:status:review-required",
         "edit-proposal-review:readiness:missing",
@@ -7647,11 +7662,13 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       expect(result.finalOutput).toContain("Verification intent:");
       expect(result.finalOutput).toContain("Review-only handoff:");
       expect(result.finalOutput).toContain("Handoff state:");
+      expect(result.finalOutput).toContain("Proposal/anchoring bridge:");
       if (scenario.taskKind === "write-file") {
         expect(result.finalOutput).toContain("Backend lane: none");
         expect(result.finalOutput).toContain("Execution lane after inputs: none");
         expect(result.finalOutput).toContain("Proposal review: none");
         expect(result.finalOutput).toMatch(/Handoff state: (unsupported|missing-context)/);
+        expect(result.finalOutput).toMatch(/State: (unsupported|missing-context)/);
       }
       expect(result.finalOutput).toContain("mutationAuthority=not-granted");
       expect(result.finalOutput).toContain("provider-called=false");

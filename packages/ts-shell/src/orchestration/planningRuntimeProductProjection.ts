@@ -1,4 +1,5 @@
 import type { PlanningRuntimeResult } from "./planningRuntime.js";
+import { buildPlanningMutationProposalBridge } from "./planningMutationProposalBridge.js";
 import { projectPlanningRuntimeSurface } from "./planningRuntimeSurface.js";
 import {
   projectRuntimeCodingOutcome,
@@ -14,6 +15,10 @@ export function projectPlanningRuntimeProductOutcome(input: {
   readonly productPath: "runMvpIntegratedFlow";
 }): RuntimeOutcomeProjection {
   const surface = projectPlanningRuntimeSurface(input.result);
+  const proposalBridge = buildPlanningMutationProposalBridge({
+    requestId: `${input.productPath}:${input.result.runtimeId}`,
+    handoff: surface.mutationHandoff,
+  });
   const targetPaths = surface.editTargets.map((target) => target.path);
   const reviewOnlyReason = [
     input.routeReason,
@@ -21,7 +26,13 @@ export function projectPlanningRuntimeProductOutcome(input: {
   ].join(" ");
   const verificationReason =
     "Planning runtime produced verification intent only; command-dispatch=not-run.";
-  const productEvidence = buildProductEvidence(input.result, input.productPath, input.routeEvidence ?? [], surface);
+  const productEvidence = buildProductEvidence(
+    input.result,
+    input.productPath,
+    input.routeEvidence ?? [],
+    surface,
+    proposalBridge,
+  );
   const nextAction = selectNextAction(surface.enoughContext, targetPaths);
 
   return projectRuntimeCodingOutcome({
@@ -59,6 +70,7 @@ export function projectPlanningRuntimeProductOutcome(input: {
     ],
     userFacingOutput: formatPlanningRuntimeProductOutput({
       surface,
+      proposalBridge,
       routeReason: input.routeReason,
       evidence: productEvidence,
     }),
@@ -70,6 +82,7 @@ function buildProductEvidence(
   productPath: "runMvpIntegratedFlow",
   routeEvidence: readonly string[],
   surface: ReturnType<typeof projectPlanningRuntimeSurface>,
+  proposalBridge: ReturnType<typeof buildPlanningMutationProposalBridge>,
 ): string[] {
   return [
     `planning-runtime-product:path:${productPath}`,
@@ -93,15 +106,18 @@ function buildProductEvidence(
     ),
     ...surface.contextAcquisition.evidence,
     ...result.evidence,
+    ...proposalBridge.evidence,
   ];
 }
 
 function formatPlanningRuntimeProductOutput(input: {
   readonly surface: ReturnType<typeof projectPlanningRuntimeSurface>;
+  readonly proposalBridge: ReturnType<typeof buildPlanningMutationProposalBridge>;
   readonly routeReason: string;
   readonly evidence: readonly string[];
 }): string {
   const surface = input.surface;
+  const proposalBridge = input.proposalBridge;
   return [
     "Planning runtime: product-path review-only handoff",
     `Runtime id: ${surface.runtimeId}`,
@@ -162,6 +178,23 @@ function formatPlanningRuntimeProductOutput(input: {
     "provider-called=false",
     "apply=not-run",
     "command-dispatch=not-run",
+    "",
+    "Proposal/anchoring bridge:",
+    `Bridge id: ${proposalBridge.bridgeId}`,
+    `State: ${proposalBridge.state}`,
+    `Proposal state: ${proposalBridge.proposalState}`,
+    `Proposal: ${proposalBridge.proposalId ?? "none"}`,
+    `Proposal review: ${proposalBridge.proposalReviewStatus ?? "none"}`,
+    `Anchor state: ${proposalBridge.anchorState}`,
+    `Anchored proposal: ${proposalBridge.anchoredProposalId ?? "none"}`,
+    `Confirmation state: ${proposalBridge.confirmationState}`,
+    `Evidence source: ${proposalBridge.evidenceSource}`,
+    `Provider call: ${proposalBridge.providerCall}`,
+    `Apply state: ${proposalBridge.applyState}`,
+    `Verification state: ${proposalBridge.verificationState}`,
+    `Reason: ${proposalBridge.reason}`,
+    `Next: ${proposalBridge.nextAction}`,
+    "mutationAuthority=not-granted",
     "",
     "Context memory scope:",
     `memory=${surface.memory.id}; scope=product-turn; session-continuation=not-wired`,
@@ -329,6 +362,7 @@ function selectEvidenceMarkers(evidence: readonly string[]): readonly string[] {
     entry.startsWith("context-acquisition:") ||
     entry.startsWith("planning-runtime:") ||
     entry.startsWith("planning-mutation-handoff:") ||
+    entry.startsWith("planning-proposal-bridge:") ||
     entry.startsWith("generated-edit-proposal:") ||
     entry.startsWith("edit-proposal-review:") ||
     entry.startsWith("planning-runtime-product:") ||
