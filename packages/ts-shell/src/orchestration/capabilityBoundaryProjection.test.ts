@@ -14,6 +14,12 @@ describe("capability boundary projection", () => {
     expect(detectCommand("run something")).toBe("node --version");
 
     expect(isAllowlistedRunCommand("node --version")).toBe(true);
+    expect(isAllowlistedRunCommand(
+      "npm test -w packages/ts-shell -- src/orchestration/verificationCommandPlan.test.ts",
+    )).toBe(true);
+    expect(isAllowlistedRunCommand(
+      "npm test -w packages/ts-shell -- src/orchestration/doesNotExist.test.ts",
+    )).toBe(false);
     expect(isAllowlistedRunCommand("npm publish")).toBe(false);
   });
 
@@ -28,7 +34,7 @@ describe("capability boundary projection", () => {
 
   it("formats blocked command guidance with the stable allowlist", () => {
     expect(blockedCommandReason("curl")).toBe(
-      "Run-command intent is not allowed in the MVP allowlist: curl Allowed commands: node --version, npm test -- --help, npm run build -- --help Please rephrase your request to one of the allowed command intents.",
+      "Run-command intent is not allowed in the MVP allowlist: curl Allowed commands: node --version, npm test -- --help, npm run build -- --help, npm run verify:route219-real-task-quality-benchmark, npm test -w packages/ts-shell -- src/orchestration/<test>.test.ts Please rephrase your request to one of the allowed command intents.",
     );
   });
 });

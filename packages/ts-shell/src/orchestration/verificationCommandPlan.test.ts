@@ -65,6 +65,62 @@ describe("verificationCommandPlan", () => {
     expect(plan.nextAction).toContain("Allowed commands");
   });
 
+  it("selects focused task-relevant ts-shell test commands without granting dispatch", () => {
+    const plan = buildVerificationCommandPlan({
+      explicitCommand:
+        "npm test -w packages/ts-shell -- src/orchestration/verificationCommandPlan.test.ts",
+      sourceProposalId: "proposal_route219",
+    });
+
+    expect(plan.state).toBe("ready");
+    expect(plan.commandKind).toBe("npm-test-focused");
+    expect(plan.allowlistStatus).toBe("allowlisted");
+    expect(plan.permissionRequirement).toBe("checked-by-existing-runtime");
+    expect(plan.executionReadiness).toBe("ready");
+    expect(plan.evidence).toEqual(
+      expect.arrayContaining([
+        "verification-command-plan:kind:npm-test-focused",
+        "verification-command-plan:mutation:not-run",
+        "verification-command-plan:provider-call:not-run",
+      ]),
+    );
+  });
+
+  it("selects the Route219 benchmark verifier without widening shell access", () => {
+    const plan = buildVerificationCommandPlan({
+      explicitCommand: "npm run verify:route219-real-task-quality-benchmark",
+      sourceProposalId: "proposal_route219_benchmark",
+    });
+
+    expect(plan.state).toBe("ready");
+    expect(plan.commandKind).toBe("route-verifier");
+    expect(plan.allowlistStatus).toBe("allowlisted");
+    expect(plan.evidence).toContain("verification-command-plan:kind:route-verifier");
+  });
+
+  it("keeps shell metacharacters outside the focused test allowlist", () => {
+    const plan = buildVerificationCommandPlan({
+      explicitCommand:
+        "npm test -w packages/ts-shell -- src/orchestration/verificationCommandPlan.test.ts; echo unsafe",
+      sourceProposalId: "proposal_route219_unsafe",
+    });
+
+    expect(plan.state).toBe("not-allowlisted");
+    expect(plan.commandKind).toBe("unsupported");
+    expect(plan.executionReadiness).toBe("not-ready");
+  });
+
+  it("keeps nonexistent focused test names outside the Route219 task allowlist", () => {
+    const plan = buildVerificationCommandPlan({
+      explicitCommand:
+        "npm test -w packages/ts-shell -- src/orchestration/doesNotExist.test.ts",
+      sourceProposalId: "proposal_route219_missing_test",
+    });
+
+    expect(plan.state).toBe("not-allowlisted");
+    expect(plan.commandKind).toBe("unsupported");
+  });
+
   it("can select proposal and edit-result verification command candidates", () => {
     const proposalPlan = buildVerificationCommandPlan({
       proposalVerificationCommand: "npm run build -- --help",

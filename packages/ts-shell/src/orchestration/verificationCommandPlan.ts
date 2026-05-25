@@ -1,7 +1,11 @@
 import crypto from "node:crypto";
 
 import type { AgentPlan } from "./agentPlan.js";
-import { blockedCommandReason, isAllowlistedRunCommand } from "./capabilityBoundaryProjection.js";
+import {
+  blockedCommandReason,
+  isAllowlistedFocusedTsShellTestCommand,
+  isAllowlistedRunCommand,
+} from "./capabilityBoundaryProjection.js";
 import { redactProviderEditText } from "./providerEditContext.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
 import type { PlanQuality } from "./planQuality.js";
@@ -26,6 +30,8 @@ export type VerificationCommandKind =
   | "node-version"
   | "npm-test-help"
   | "npm-build-help"
+  | "npm-test-focused"
+  | "route-verifier"
   | "unsupported";
 
 export type VerificationCommandSource =
@@ -349,6 +355,9 @@ function classifyPermissionRequirement(
 }
 
 function classifyCommandKind(command: string | undefined): VerificationCommandKind {
+  if (command && isAllowlistedFocusedTsShellTestCommand(command)) {
+    return "npm-test-focused";
+  }
   switch (command) {
     case "node --version":
       return "node-version";
@@ -356,6 +365,8 @@ function classifyCommandKind(command: string | undefined): VerificationCommandKi
       return "npm-test-help";
     case "npm run build -- --help":
       return "npm-build-help";
+    case "npm run verify:route219-real-task-quality-benchmark":
+      return "route-verifier";
     default:
       return "unsupported";
   }

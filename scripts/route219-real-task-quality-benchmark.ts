@@ -43,7 +43,10 @@ interface Route219TaskVerdictRow {
   readonly anchor: "not-run" | "required-later";
   readonly apply: "not-run";
   readonly verificationCommand: string;
-  readonly verification: "task-relevant-not-allowlisted" | "not-run" | "blocked";
+  readonly verification:
+    | "task-relevant-selected-not-run"
+    | "task-relevant-not-allowlisted"
+    | "blocked";
   readonly repair: "not-run" | "repair-trigger-planned";
   readonly finalVerdict: TaskVerdict;
   readonly notProvenClaims: readonly string[];
@@ -72,7 +75,7 @@ const taskPack: readonly Route219Task[] = [
     ],
     expectedVerificationCommand:
       "npm test -w packages/ts-shell -- src/orchestration/verificationCommandPlan.test.ts",
-    repairTrigger: "focused test command is rejected before runtime by the current allowlist",
+    repairTrigger: "focused test command is selected but dispatch still requires apply/readback and approval",
     needsLiveProviderPatch: true,
     needsSelectedWorkspaceApply: true,
   },
@@ -123,11 +126,11 @@ const taskPack: readonly Route219Task[] = [
       "Route219 requires multi-file task evidence, not a flattened hunk-set success marker.",
     selectedFiles: [
       "packages/ts-shell/src/orchestration/targetSetEditRoute.ts",
-      "packages/ts-shell/src/orchestration/targetSetEditResult.ts",
+      "packages/ts-shell/src/orchestration/targetSetEditVerification.ts",
       "packages/ts-shell/src/orchestration/targetSetEditRoute.test.ts",
     ],
     expectedVerificationCommand:
-      "npm test -w packages/ts-shell -- src/orchestration/targetSetEditRoute.test.ts src/orchestration/targetSetEditResult.test.ts",
+      "npm test -w packages/ts-shell -- src/orchestration/targetSetEditRoute.test.ts src/orchestration/targetSetEditVerification.test.ts",
     repairTrigger: "partial target-set failure should stop with per-file failed and unattempted evidence",
     needsLiveProviderPatch: true,
     needsSelectedWorkspaceApply: true,
@@ -164,10 +167,10 @@ const status = failures.length === 0 ? "PARTIAL" : "FAILED";
 console.log(JSON.stringify({
   route: "219",
   gate: "route219-real-task-quality-benchmark",
-  phase: "phase0-task-pack-and-baseline",
+  phase: "phase1-task-relevant-verification-selection",
   status,
   statusReason: status === "PARTIAL"
-    ? "Task pack and default-safe baseline are established; live patch, apply, task verification, and repair execution are intentionally not yet proven."
+    ? "Task pack, default-safe baseline, and task-relevant verification selection are established; live patch, apply, verification execution, and repair execution are intentionally not yet proven."
     : "Phase0 baseline invariants failed.",
   defaultSafety,
   counts: {
@@ -175,6 +178,9 @@ console.log(JSON.stringify({
     liveProviderPatchEvidence: 0,
     verifiedSuccess: 0,
     appliedAndVerified: 0,
+    taskRelevantVerificationReady: rows.filter((row) =>
+      row.verification === "task-relevant-selected-not-run"
+    ).length,
     multiFileTasks: taskPack.filter((task) => task.selectedFiles.length > 1).length,
     repairFlowReached: 0,
   },
@@ -191,7 +197,7 @@ console.log(JSON.stringify({
   })),
   verdictTable: rows,
   topBlockers: [
-    "focused task-relevant npm test commands are not yet allowlisted for product verification dispatch",
+    "focused task-relevant npm test commands can be selected, but dispatch still requires apply/readback and explicit runtime approval",
     "repair continuation exists, but repair apply and re-verification are not yet proven in the product path",
     "live provider patch evidence must be collected with explicit Route219 opt-in before COMPLETE",
     "multi-file task evidence must be preserved per file after apply/readback, not only in the task pack",
@@ -210,7 +216,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log("[pass] route219-real-task-quality-benchmark phase0-baseline");
+console.log("[pass] route219-real-task-quality-benchmark phase1-task-relevant-verification-selection");
 
 async function buildBaselineVerdictRow(task: Route219Task): Promise<Route219TaskVerdictRow> {
   const context = await selectedFilesExist(task.selectedFiles) ? "found" : "missing";
@@ -222,7 +228,7 @@ async function buildBaselineVerdictRow(task: Route219Task): Promise<Route219Task
     plan.state === "not-allowlisted"
       ? "task-relevant-not-allowlisted"
       : plan.state === "ready"
-        ? "not-run"
+        ? "task-relevant-selected-not-run"
         : "blocked";
   return {
     taskId: task.id,
@@ -291,8 +297,11 @@ function validateBaseline(input: {
   if (!input.rows.every((row) => row.finalVerdict === "review-only")) {
     failures.push("baseline-verdict-must-remain-review-only");
   }
-  if (!input.rows.some((row) => row.verification === "task-relevant-not-allowlisted")) {
-    failures.push("missing-task-relevant-verification-blocker");
+  const selectedVerificationCount = input.rows.filter((row) =>
+    row.verification === "task-relevant-selected-not-run"
+  ).length;
+  if (selectedVerificationCount < 2) {
+    failures.push(`task-relevant-verification-ready=${selectedVerificationCount}`);
   }
   if (input.defaultSafety.providerCalled !== false) failures.push("default-provider-called");
   if (input.defaultSafety.apply !== "not-run") failures.push(`default-apply=${input.defaultSafety.apply}`);
