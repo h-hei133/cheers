@@ -422,6 +422,7 @@ function buildLiveProviderPromptContext(input: {
   readonly calibration?: PlanningRuntimeProductLiveProviderProposal["calibration"];
 }): ContextAwareProviderPromptContext | undefined {
   const targetPath = input.handoff.targetPaths[0];
+  const targetPaths = input.handoff.targetPaths.slice(0, 3);
   const bundle = input.planningResult?.context.bundle;
   if (!targetPath || !bundle || input.handoff.handoffState !== "handoff-ready") {
     return undefined;
@@ -443,6 +444,13 @@ function buildLiveProviderPromptContext(input: {
         workspaceRoot: input.workspaceRoot,
         targetPath,
         maxChars: input.taskEvidence.targetContentMaxChars ?? 6000,
+      })
+    : undefined;
+  const targetSetEvidenceContent = input.taskEvidence?.mode === "small-target-set-exact-patch"
+    ? boundedTargetSetContent({
+        workspaceRoot: input.workspaceRoot,
+        targetPaths,
+        maxCharsPerTarget: input.taskEvidence.targetContentMaxChars ?? 5000,
       })
     : undefined;
   const suppliedTargetContent = calibrationContent ?? taskEvidenceContent;
@@ -486,6 +494,24 @@ function buildLiveProviderPromptContext(input: {
           "Return a single JSON object only. The first character must be { and the last character must be }.",
           "Do not include prose, markdown, code fences, diffs, analysis text, or multiple alternatives.",
           "If exact oldText/newText cannot be copied from the supplied target content, return review-only JSON with a concrete missingFact.",
+        ]
+      : []),
+    ...(input.taskEvidence?.mode === "small-target-set-exact-patch"
+      ? [
+          "Route218 small target-set mode: produce a bounded exact target-set proposal for 2-3 explicit files when the supplied target content is sufficient.",
+          ...(input.taskEvidence.taskIntentSummary
+            ? [`Route218 task intent: ${input.taskEvidence.taskIntentSummary}`]
+            : []),
+          `Explicit target set: ${targetPaths.join(", ")}`,
+          targetSetEvidenceContent
+            ? `Current target contents:\n<<<ROUTE218_TARGET_SET_CONTENT\n${targetSetEvidenceContent}\nROUTE218_TARGET_SET_CONTENT`
+            : "Current target-set content was not available; return review-only with missingFact=current target-set content.",
+          "Use the supplied current target contents as the only source for each oldText.",
+          "Return a single JSON object only. The first character must be { and the last character must be }.",
+          "Required shape: {\"operationKind\":\"exact-fenced-replacement\",\"targets\":[{\"path\":\"<explicit target>\",\"oldText\":\"<exact current text>\",\"newText\":\"<replacement text>\",\"summary\":\"<safe summary>\"}],\"verificationPlan\":[\"<safe readback/test>\"]}.",
+          "Every returned target path must be in the explicit target set, and each oldText must identify one exact region in its own file.",
+          "Do not include prose, markdown, code fences, diffs, analysis text, or alternatives.",
+          "If any required file cannot be patched exactly, return review-only JSON with a concrete missingFact rather than a partial success claim.",
         ]
       : []),
     "Do not claim files were changed. Do not run commands. Do not include provider config, API keys, headers, or content outside the supplied target evidence.",
@@ -558,6 +584,15 @@ function buildLiveProviderPromptContext(input: {
             `planning-runtime-product-proposal:live-provider-target-content:${suppliedTargetContent ? "included" : "missing"}`,
             `planning-runtime-product-proposal:live-provider-task-intent:${input.taskEvidence.taskIntentSummary ? "included" : "missing"}`,
             "planning-runtime-product-proposal:live-provider-old-new-mandatory",
+          ]
+        : []),
+      ...(input.taskEvidence?.mode === "small-target-set-exact-patch"
+        ? [
+            "planning-runtime-product-proposal:live-provider-task-evidence:small-target-set-exact-patch",
+            `planning-runtime-product-proposal:live-provider-target-set-size:${targetPaths.length}`,
+            `planning-runtime-product-proposal:live-provider-target-set-content:${targetSetEvidenceContent ? "included" : "missing"}`,
+            `planning-runtime-product-proposal:live-provider-task-intent:${input.taskEvidence.taskIntentSummary ? "included" : "missing"}`,
+            "planning-runtime-product-proposal:live-provider-target-set-old-new-mandatory",
           ]
         : []),
     ],
@@ -866,6 +901,29 @@ function boundedTargetContent(input: {
   const content = readWorkspaceFile(input.workspaceRoot, input.targetPath);
   if (content === undefined || content.length > input.maxChars) return undefined;
   return content;
+}
+
+function boundedTargetSetContent(input: {
+  readonly workspaceRoot: string;
+  readonly targetPaths: readonly string[];
+  readonly maxCharsPerTarget: number;
+}): string | undefined {
+  const sections: string[] = [];
+  for (const targetPath of input.targetPaths) {
+    const content = boundedTargetContent({
+      workspaceRoot: input.workspaceRoot,
+      targetPath,
+      maxChars: input.maxCharsPerTarget,
+    });
+    if (content === undefined) return undefined;
+    sections.push([
+      `FILE ${targetPath}`,
+      "<<<CONTENT",
+      content,
+      "CONTENT",
+    ].join("\n"));
+  }
+  return sections.length >= 2 ? sections.join("\n---\n") : undefined;
 }
 
 function isSameOrInside(candidate: string, root: string): boolean {

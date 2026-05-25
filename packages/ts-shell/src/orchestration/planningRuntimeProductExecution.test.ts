@@ -586,6 +586,80 @@ describe("buildPlanningRuntimeProductProofInputs", () => {
     expect(JSON.stringify(proposalPreparation.evidence)).not.toContain(TARGET_RANKING_OLD_TEXT);
   }, 15000);
 
+  it("includes bounded target-set evidence for Route218 small multi-file live tasks", async () => {
+    const workspaceRoot = createWorkspace({
+      "src/planning/targetRanking.ts": sourceContent(),
+      "src/result/resultSurface.ts": resultSurfaceContent(),
+      "src/planning/targetRanking.test.ts":
+        "expect(rankPlannerTargets('planner target ranking')).toBe('targetRanking.ts');\n",
+    });
+    const planningResult = await readyPlanningResult(workspaceRoot);
+    const handoff = readyTargetSetHandoff();
+    const seenPrompts: string[] = [];
+
+    const proposalPreparation = await preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff,
+      planningResult,
+      liveProvider: {
+        optIn: true,
+        source: "runtime-option",
+        taskEvidence: {
+          mode: "small-target-set-exact-patch",
+          taskIntentSummary:
+            "Update the planner fallback label and the result surface label together.",
+        },
+        attempts: [
+          {
+            role: "primary",
+            providerSafeLabel: "focused-fake-primary",
+            providerConfigSource: "test-fixture",
+            providerAvailability: {
+              kind: "available",
+              providerKindLabel: "focused-fake-primary",
+            },
+            readinessStatus: "ready",
+            evidenceSource: "fake-provider",
+            provider: {
+              proposeEdit: (context) => {
+                seenPrompts.push(context.providerPrompt);
+                return targetSetProposal();
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(seenPrompts).toHaveLength(1);
+    expect(seenPrompts[0]).toContain("Route218 small target-set mode");
+    expect(seenPrompts[0]).toContain(
+      "Explicit target set: src/planning/targetRanking.ts, src/result/resultSurface.ts",
+    );
+    expect(seenPrompts[0]).toContain("FILE src/planning/targetRanking.ts");
+    expect(seenPrompts[0]).toContain("FILE src/result/resultSurface.ts");
+    expect(seenPrompts[0]).toContain(TARGET_RANKING_OLD_TEXT);
+    expect(seenPrompts[0]).toContain(RESULT_SURFACE_OLD_TEXT);
+    expect(proposalPreparation.status).toBe("prepared-exact");
+    expect(proposalPreparation.rawProposal?.targets?.map((target) => target.path)).toEqual([
+      "src/planning/targetRanking.ts",
+      "src/result/resultSurface.ts",
+    ]);
+    expect(proposalPreparation.evidence).toEqual(
+      expect.arrayContaining([
+        "planning-runtime-product-proposal:live-provider-task-evidence:small-target-set-exact-patch",
+        "planning-runtime-product-proposal:live-provider-target-set-size:2",
+        "planning-runtime-product-proposal:live-provider-target-set-content:included",
+        "planning-runtime-product-proposal:live-provider-target-set-old-new-mandatory",
+        "provider-output-validation:status:valid-exact-hunk-set",
+        "provider-anchored-proposal:handoff:exact-hunk-set",
+        "planning-runtime-product-proposal:live-provider-exact-classification:exact-ready",
+      ]),
+    );
+    expect(JSON.stringify(proposalPreparation.evidence)).not.toContain(TARGET_RANKING_OLD_TEXT);
+    expect(JSON.stringify(proposalPreparation.evidence)).not.toContain(RESULT_SURFACE_OLD_TEXT);
+  }, 15000);
+
   it("keeps provider-call failures typed and no-write", async () => {
     const workspaceRoot = createWorkspace({
       "src/planning/targetRanking.ts": sourceContent(),
@@ -996,6 +1070,61 @@ function readyHandoffFor(input: {
   });
 }
 
+function readyTargetSetHandoff() {
+  return buildPlanningMutationHandoffProjection({
+    editTargets: [
+      {
+        path: "src/planning/targetRanking.ts",
+        rationale: "repo score 99; explicit planner target",
+        handoffRoute: "existing-proof-carrying-mutation-runtime",
+        readiness: "ready-for-review",
+      },
+      {
+        path: "src/result/resultSurface.ts",
+        rationale: "repo score 92; explicit result surface target",
+        handoffRoute: "existing-proof-carrying-mutation-runtime",
+        readiness: "ready-for-review",
+      },
+    ],
+    missingFacts: [],
+    taskKind: "edit-file",
+    verificationIntentAvailable: true,
+    contextReceipts: [
+      {
+        id: "context-receipt:ctx_route218:1",
+        path: "src/planning/targetRanking.ts",
+        summary: "planning runtime selected planner target summary",
+        relevance: "target file",
+      },
+      {
+        id: "context-receipt:ctx_route218:2",
+        path: "src/result/resultSurface.ts",
+        summary: "planning runtime selected result surface target summary",
+        relevance: "target file",
+      },
+    ],
+    readEvidence: [
+      {
+        id: "read-evidence:route218:1",
+        path: "src/planning/targetRanking.ts",
+        reason: "target file",
+        source: "repo-intelligence",
+      },
+      {
+        id: "read-evidence:route218:2",
+        path: "src/result/resultSurface.ts",
+        reason: "target file",
+        source: "repo-intelligence",
+      },
+    ],
+    expectedChangeSummary:
+      "Update the planner fallback label and result surface label together.",
+    verificationIntentSummary:
+      "verificationPlan=readback target set; state=ready; command-dispatch=not-run",
+    verificationEvidenceIds: ["verification_plan_route218_target_set"],
+  });
+}
+
 function exactProposal() {
   return {
     operationKind: "exact-fenced-replacement" as const,
@@ -1007,6 +1136,27 @@ function exactProposal() {
       },
     ],
     verificationPlan: ["readback verifies controlled fixture final content"],
+  };
+}
+
+function targetSetProposal() {
+  return {
+    operationKind: "exact-fenced-replacement" as const,
+    targets: [
+      {
+        path: "src/planning/targetRanking.ts",
+        oldText: TARGET_RANKING_OLD_TEXT,
+        newText: "  return task.includes('planner') ? 'targetRanking.ts' : 'unmatched-target';",
+        summary: "improve planner fallback label",
+      },
+      {
+        path: "src/result/resultSurface.ts",
+        oldText: RESULT_SURFACE_OLD_TEXT,
+        newText: "export const resultSurfaceLabel = 'verified-result';",
+        summary: "improve result surface label",
+      },
+    ],
+    verificationPlan: ["readback verifies both target files"],
   };
 }
 
@@ -1053,5 +1203,10 @@ function expectedContent(): string {
   ].join("\n");
 }
 
+function resultSurfaceContent(): string {
+  return `${RESULT_SURFACE_OLD_TEXT}\n`;
+}
+
 const TARGET_RANKING_OLD_TEXT =
   "  return task.includes('planner') ? 'targetRanking.ts' : 'unknown';";
+const RESULT_SURFACE_OLD_TEXT = "export const resultSurfaceLabel = 'result';";
