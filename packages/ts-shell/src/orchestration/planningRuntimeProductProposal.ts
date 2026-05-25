@@ -638,6 +638,12 @@ function classifyDryRunExactPatch(
   if (dryRun.anchoringResult?.evidence.includes("provider-anchor-match:outcome:multiple-candidates-ambiguous")) {
     return "old-text-multiple-matches";
   }
+  if (
+    dryRun.status === "dry-run-exact-ready-no-write" &&
+    dryRun.rawProposal?.diagnostics?.includes("provider-exact-patch-diagnostic:parse-status:recovered-exact-patch")
+  ) {
+    return "recovered-exact-ready";
+  }
   if (dryRun.status === "dry-run-exact-ready-no-write") return "exact-ready";
   if (dryRun.status === "dry-run-review-required") return "review-only";
   return "provider-error";

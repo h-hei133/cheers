@@ -20,7 +20,10 @@ import type { ProviderOutputValidation } from "./providerOutputValidator.js";
 import { validateProviderOutput } from "./providerOutputValidator.js";
 import type { RealProviderProposalGateResult } from "./realProviderProposalGate.js";
 import { evaluateRealProviderProposalGate } from "./realProviderProposalGate.js";
-import { classifyOpenAICompatibleAnchoredSmokeError } from "./openAICompatibleAnchoredSmokeAdapter.js";
+import {
+  classifyOpenAICompatibleAnchoredSmokeError,
+  OpenAICompatibleAnchoredSmokeProviderError,
+} from "./openAICompatibleAnchoredSmokeAdapter.js";
 
 export type RealProviderProposalDryRunStatus =
   | "dry-run-proposal-created"
@@ -188,6 +191,9 @@ export async function runRealProviderProposalDryRun(input: {
     rawOutput = await input.provider.proposeEdit(input.promptContext);
   } catch (error) {
     const providerErrorClass = classifyOpenAICompatibleAnchoredSmokeError(error);
+    const diagnosticEvidence = error instanceof OpenAICompatibleAnchoredSmokeProviderError
+      ? error.diagnosticEvidence
+      : [];
     return stoppedDryRun({
       status: "dry-run-provider-error",
       dryRunId,
@@ -201,9 +207,11 @@ export async function runRealProviderProposalDryRun(input: {
         ...gate.evidence,
         ...promptAudit.evidence,
         `real-provider-proposal-dry-run:provider-error-class:${providerErrorClass}`,
+        ...diagnosticEvidence,
       ],
     });
   }
+  const providerDiagnostics = rawOutput.diagnostics ?? [];
   const outputValidation = validateProviderOutput({
     requestId: input.requestId,
     rawOutput,
@@ -230,6 +238,7 @@ export async function runRealProviderProposalDryRun(input: {
       evidence: [
         ...gate.evidence,
         ...promptAudit.evidence,
+        ...providerDiagnostics,
         ...outputValidation.evidence,
         ...anchorQuality.evidence,
       ],
@@ -321,6 +330,7 @@ export async function runRealProviderProposalDryRun(input: {
       evidence: [
         ...gate.evidence,
         ...promptAudit.evidence,
+        ...providerDiagnostics,
         ...outputValidation.evidence,
         ...anchorQuality.evidence,
         ...anchoredProposal.evidence,
@@ -362,6 +372,7 @@ export async function runRealProviderProposalDryRun(input: {
       evidence: [
         ...gate.evidence,
         ...promptAudit.evidence,
+        ...providerDiagnostics,
         ...outputValidation.evidence,
         ...anchorQuality.evidence,
         ...anchoredProposal.evidence,
@@ -405,6 +416,7 @@ export async function runRealProviderProposalDryRun(input: {
     evidence: [
       ...gate.evidence,
       ...promptAudit.evidence,
+      ...providerDiagnostics,
       ...outputValidation.evidence,
       ...anchorQuality.evidence,
       ...anchoredProposal.evidence,

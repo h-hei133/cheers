@@ -75,6 +75,7 @@ export interface ProviderEditRawProposal {
   readonly confidence?: "low" | "medium" | "high";
   readonly riskSummary?: string;
   readonly verificationPlan?: readonly string[];
+  readonly diagnostics?: readonly string[];
 }
 
 export type ProviderEditProposalNormalization =

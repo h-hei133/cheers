@@ -44,6 +44,14 @@ interface SmokeReport {
   readonly liveProviderStatus: string;
   readonly liveProviderAnchor: string;
   readonly exactClassification: string;
+  readonly exactParseStatus: string;
+  readonly exactWrapperKind: string;
+  readonly exactOutputShapeKind: string;
+  readonly exactTargetMatched: string;
+  readonly exactOldTextPresent: string;
+  readonly exactNewTextPresent: string;
+  readonly exactOldTextLength: string;
+  readonly exactNewTextLength: string;
   readonly selectedAttempt: string;
   readonly fallbackPolicy: string;
   readonly fallbackCalled: boolean;
@@ -358,6 +366,30 @@ function projectReport(input: {
       terminalClassToRoute214Classification(
         markerValue(evidence, "planning-runtime-product-proposal:live-provider-status:"),
       ),
+    exactParseStatus:
+      markerValue(evidence, "provider-exact-patch-diagnostic:parse-status:") ??
+      "not-run",
+    exactWrapperKind:
+      markerValue(evidence, "provider-exact-patch-diagnostic:wrapper:") ??
+      "not-run",
+    exactOutputShapeKind:
+      markerValue(evidence, "provider-exact-patch-diagnostic:shape:") ??
+      "not-run",
+    exactTargetMatched:
+      markerValue(evidence, "provider-exact-patch-diagnostic:target-matched:") ??
+      "not-run",
+    exactOldTextPresent:
+      markerValue(evidence, "provider-exact-patch-diagnostic:old-text-present:") ??
+      "not-run",
+    exactNewTextPresent:
+      markerValue(evidence, "provider-exact-patch-diagnostic:new-text-present:") ??
+      "not-run",
+    exactOldTextLength:
+      markerValue(evidence, "provider-exact-patch-diagnostic:old-text-length:") ??
+      "not-run",
+    exactNewTextLength:
+      markerValue(evidence, "provider-exact-patch-diagnostic:new-text-length:") ??
+      "not-run",
     selectedAttempt:
       markerValue(evidence, "planning-runtime-product-proposal:live-provider-selected-attempt:") ??
       "none",

@@ -26,12 +26,18 @@ export class OpenAICompatibleAnchoredSmokeProviderError extends Error {
   constructor(
     providerErrorClass: OpenAICompatibleAnchoredSmokeProviderErrorClass,
     message: string,
-    options?: { readonly cause?: unknown },
+    options?: {
+      readonly cause?: unknown;
+      readonly diagnosticEvidence?: readonly string[];
+    },
   ) {
     super(message, options);
     this.name = "OpenAICompatibleAnchoredSmokeProviderError";
     this.providerErrorClass = providerErrorClass;
+    this.diagnosticEvidence = options?.diagnosticEvidence ?? [];
   }
+
+  readonly diagnosticEvidence: readonly string[];
 }
 
 export interface OpenAICompatibleAnchoredSmokeAdapterConfig {
@@ -230,6 +236,7 @@ function parseProviderProposal(
     throw new OpenAICompatibleAnchoredSmokeProviderError(
       "malformed-response",
       "OpenAI-compatible anchored smoke provider returned a target-mismatched exact patch.",
+      { diagnosticEvidence: parsedExact.diagnostics.evidence },
     );
   }
 
@@ -238,6 +245,7 @@ function parseProviderProposal(
     throw new OpenAICompatibleAnchoredSmokeProviderError(
       "malformed-response",
       "OpenAI-compatible anchored smoke provider returned no JSON object.",
+      { diagnosticEvidence: parsedExact.diagnostics.evidence },
     );
   }
 
@@ -248,7 +256,7 @@ function parseProviderProposal(
     throw new OpenAICompatibleAnchoredSmokeProviderError(
       "malformed-response",
       "OpenAI-compatible anchored smoke provider returned malformed JSON.",
-      { cause: error },
+      { cause: error, diagnosticEvidence: parsedExact.diagnostics.evidence },
     );
   }
 

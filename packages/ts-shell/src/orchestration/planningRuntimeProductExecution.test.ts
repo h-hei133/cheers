@@ -353,6 +353,64 @@ describe("buildPlanningRuntimeProductProofInputs", () => {
     );
   }, 15000);
 
+  it("surfaces recovered exact provider diagnostics without raw patch content", async () => {
+    const workspaceRoot = createWorkspace({
+      "src/planning/targetRanking.ts": sourceContent(),
+      "src/planning/targetRanking.test.ts":
+        "expect(rankPlannerTargets('planner target ranking')).toBe('targetRanking.ts');\n",
+    });
+    const planningResult = await readyPlanningResult(workspaceRoot);
+
+    const proposalPreparation = await preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff: planningResult.mutationHandoff,
+      planningResult,
+      liveProvider: {
+        optIn: true,
+        source: "runtime-option",
+        attempts: [
+          {
+            role: "primary",
+            providerSafeLabel: "focused-fake-primary",
+            providerConfigSource: "test-fixture",
+            providerAvailability: {
+              kind: "available",
+              providerKindLabel: "focused-fake-primary",
+            },
+            readinessStatus: "ready",
+            evidenceSource: "fake-provider",
+            provider: {
+              proposeEdit: () => ({
+                ...exactProposal(),
+                diagnostics: [
+                  "provider-exact-patch-diagnostic:parse-status:recovered-exact-patch",
+                  "provider-exact-patch-diagnostic:wrapper:markdown-json",
+                  "provider-exact-patch-diagnostic:shape:exact-json",
+                  "provider-exact-patch-diagnostic:old-text-length:63",
+                  "provider-exact-patch-diagnostic:new-text-length:70",
+                  "provider-exact-patch-diagnostic:raw-content-excluded",
+                ],
+              }),
+            },
+          },
+        ],
+      },
+    });
+
+    expect(proposalPreparation.status).toBe("prepared-exact");
+    expect(proposalPreparation.evidence).toEqual(
+      expect.arrayContaining([
+        "planning-runtime-product-proposal:live-provider-exact-classification:recovered-exact-ready",
+        "provider-exact-patch-diagnostic:parse-status:recovered-exact-patch",
+        "provider-exact-patch-diagnostic:wrapper:markdown-json",
+        "provider-exact-patch-diagnostic:shape:exact-json",
+        "provider-exact-patch-diagnostic:raw-content-excluded",
+      ]),
+    );
+    expect(JSON.stringify(proposalPreparation.evidence)).not.toContain(TARGET_RANKING_OLD_TEXT);
+    expect(JSON.stringify(proposalPreparation.evidence)).not.toContain("task.trim().includes");
+  }, 15000);
+
   it("keeps provider-call failures typed and no-write", async () => {
     const workspaceRoot = createWorkspace({
       "src/planning/targetRanking.ts": sourceContent(),
