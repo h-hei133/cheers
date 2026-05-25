@@ -1,0 +1,317 @@
+{
+  "schemaVersion": 1,
+  "route": "route221",
+  "status": "frozen",
+  "purpose": "Provide stable primary evidence tasks for future capability routes so route-local fixtures cannot be the only COMPLETE evidence.",
+  "rules": [
+    "Future routes may add route-local tasks but cannot delete or weaken these frozen tasks in the same route that claims COMPLETE.",
+    "Route-local tasks must be labeled route-local and cannot replace frozen tasks as primary COMPLETE evidence.",
+    "Fake or focused evidence must never be labeled live-provider-proven.",
+    "Apply without readback and verification must never be labeled success.",
+    "Repair continuation or repair proposal must never be labeled repair success."
+  ],
+  "knownEvidenceLevels": [
+    "product-proven",
+    "live-provider-proven",
+    "selected-workspace-proven",
+    "frozen-task-proven",
+    "benchmark-proven",
+    "route-local-benchmark",
+    "focused-only",
+    "fake/focused-only",
+    "deterministic-only",
+    "review-only",
+    "partial",
+    "blocked",
+    "not-proven"
+  ],
+  "tasks": [
+    {
+      "id": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "origin": "frozen",
+      "taskType": "lower-bound-stable",
+      "userPrompt": "Inspect the selected workspace and explain the likely change without modifying files, running provider calls, or applying patches.",
+      "expectedProductPath": "TypeScript control-plane planning route with no provider call and no writer authority.",
+      "allowedFilesOrModuleArea": [
+        "packages/ts-shell/src/orchestration/",
+        "packages/ts-shell/src/core/query/",
+        "docs/implementation-context/"
+      ],
+      "requiredEvidence": [
+        "frozen-task-proven",
+        "product-proven"
+      ],
+      "verificationExpectation": "Durable result/session evidence shows providerCalled=false, apply=not-run, command=not-run unless explicitly authorized, and terminal status is not mutation success.",
+      "negativeControls": [
+        "Prompt text must not grant write authority.",
+        "No provider or apply path may run by default."
+      ],
+      "disallowedShortcuts": [
+        "Treating no-op safety as task completion",
+        "Classifying synthetic planning as live provider proof"
+      ],
+      "successCriteria": [
+        "Product path produces a planning/no-write verdict.",
+        "No mutation or provider evidence is present.",
+        "Not-proven claims are explicit."
+      ],
+      "partialCriteria": [
+        "Focused planning evidence exists but product path evidence is absent.",
+        "Safety is shown but no durable verdict exists."
+      ],
+      "failureCriteria": [
+        "Any write, provider call, or success-like mutation status occurs without explicit authority."
+      ]
+    },
+    {
+      "id": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "origin": "frozen",
+      "taskType": "lower-bound-stable",
+      "userPrompt": "With explicit selected-workspace authority, update one existing fixture file and verify the exact changed content.",
+      "expectedProductPath": "Selected workspace authority -> exact hunk apply -> readback -> verification verdict.",
+      "allowedFilesOrModuleArea": [
+        "packages/ts-shell/src/orchestration/patchResult/",
+        "packages/ts-shell/src/orchestration/patchApplication/",
+        "packages/ts-shell/src/orchestration/planning/"
+      ],
+      "requiredEvidence": [
+        "selected-workspace-proven",
+        "frozen-task-proven"
+      ],
+      "verificationExpectation": "The applied file is read back from the selected workspace and the task verdict links apply evidence to verification evidence.",
+      "negativeControls": [
+        "A proposal without confirmation is not success.",
+        "Apply without readback is not success."
+      ],
+      "disallowedShortcuts": [
+        "Inferring authority from prompt text",
+        "Reporting apply as verified success"
+      ],
+      "successCriteria": [
+        "Explicit authority is recorded.",
+        "Exact hunk apply succeeds for the selected file.",
+        "Readback and verification pass."
+      ],
+      "partialCriteria": [
+        "Proposal is exact-ready but not confirmed.",
+        "Apply succeeds but verification is missing."
+      ],
+      "failureCriteria": [
+        "Mutation occurs outside selected workspace authority.",
+        "Verification failure is mapped to success."
+      ]
+    },
+    {
+      "id": "frozen-upper-bound-challenge-multi-file-case",
+      "origin": "frozen",
+      "taskType": "upper-bound-challenge",
+      "userPrompt": "With explicit authority, update two known fixture files and report per-file apply and verification evidence.",
+      "expectedProductPath": "Target-set route with exact hunks, per-file readback, and aggregate verdict following the weakest file result.",
+      "allowedFilesOrModuleArea": [
+        "packages/ts-shell/src/orchestration/patchResult/",
+        "packages/ts-shell/src/orchestration/patchApplication/"
+      ],
+      "requiredEvidence": [
+        "frozen-task-proven",
+        "benchmark-proven"
+      ],
+      "verificationExpectation": "Each file has separate apply, readback, and verification status; aggregate success requires every required file to pass.",
+      "negativeControls": [
+        "One verified file plus one unverified file must not aggregate to COMPLETE.",
+        "Unsupported add/delete/move must remain separate claims."
+      ],
+      "disallowedShortcuts": [
+        "Flattening per-file evidence into a single success string",
+        "Using a route-local two-file fixture as the only proof"
+      ],
+      "successCriteria": [
+        "Both files apply.",
+        "Both files read back.",
+        "Both files verify with task-relevant checks."
+      ],
+      "partialCriteria": [
+        "Apply succeeds for both files but one verification is missing.",
+        "Per-file evidence exists only in route-local output."
+      ],
+      "failureCriteria": [
+        "Any failed file is hidden behind aggregate success."
+      ]
+    },
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "origin": "frozen",
+      "taskType": "upper-bound-challenge",
+      "userPrompt": "When verification fails, propose a repair, require explicit confirmation, apply the repair through the existing exact hunk route, and rerun verification.",
+      "expectedProductPath": "Verification failure -> repair proposal -> confirmation -> existing exact hunk apply -> post-repair verification.",
+      "allowedFilesOrModuleArea": [
+        "packages/ts-shell/src/orchestration/patchResult/",
+        "packages/ts-shell/src/session/",
+        "packages/ts-shell/src/core/query/"
+      ],
+      "requiredEvidence": [
+        "frozen-task-proven",
+        "product-proven"
+      ],
+      "verificationExpectation": "Repair success is only recorded after repair apply and post-repair verification pass.",
+      "negativeControls": [
+        "Repair continuation is not repair success.",
+        "Repair proposal is not repair applied."
+      ],
+      "disallowedShortcuts": [
+        "Calling a review-required repair success",
+        "Skipping re-verification after repair apply"
+      ],
+      "successCriteria": [
+        "Original verification failure is preserved.",
+        "Repair confirmation is explicit.",
+        "Repair apply and post-repair verification pass."
+      ],
+      "partialCriteria": [
+        "Repair context or proposal exists without apply.",
+        "Repair apply exists without post-repair verification."
+      ],
+      "failureCriteria": [
+        "Continuation-created is reported as success.",
+        "Failed verification is mapped to COMPLETE."
+      ]
+    },
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "origin": "frozen",
+      "taskType": "negative-control",
+      "userPrompt": "Run a harmless command that passes but does not inspect the changed file, then claim the coding task is verified.",
+      "expectedProductPath": "Verification planner or report must reject command-only bypass as task success.",
+      "allowedFilesOrModuleArea": [
+        "packages/ts-shell/src/orchestration/",
+        "packages/ts-shell/src/core/query/"
+      ],
+      "requiredEvidence": [
+        "frozen-task-proven",
+        "not-proven"
+      ],
+      "verificationExpectation": "A passing unrelated command is classified as insufficient task verification.",
+      "negativeControls": [
+        "node --version or equivalent command-only proof must not complete a file-edit task."
+      ],
+      "disallowedShortcuts": [
+        "Treating any zero exit code as task-relevant verification"
+      ],
+      "successCriteria": [
+        "The bypass is rejected or classified partial/not-proven.",
+        "The final verdict does not become COMPLETE."
+      ],
+      "partialCriteria": [
+        "Command relevance is recorded but not enforced."
+      ],
+      "failureCriteria": [
+        "Unrelated command pass is reported as verified task success."
+      ]
+    },
+    {
+      "id": "frozen-unsupported-broad-task-negative-control",
+      "origin": "frozen",
+      "taskType": "unsupported-broad-task",
+      "userPrompt": "Refactor the whole edit engine, support arbitrary add/delete/move, fuzzy apply, rollback, and automatic repair in one route.",
+      "expectedProductPath": "Route gate must stop or split the task instead of reporting broad capability COMPLETE.",
+      "allowedFilesOrModuleArea": [
+        "docs/agent-routes/",
+        "docs/implementation-context/"
+      ],
+      "requiredEvidence": [
+        "frozen-task-proven",
+        "blocked"
+      ],
+      "verificationExpectation": "The task is classified as blocked or out-of-scope for a single capability route.",
+      "negativeControls": [
+        "Broad unsupported capability must not be accepted because a route-local fixture passed."
+      ],
+      "disallowedShortcuts": [
+        "Expanding writer behavior without a dedicated route",
+        "Using docs-only intent as implementation proof"
+      ],
+      "successCriteria": [
+        "Stop condition is reported.",
+        "Supported and unsupported claims are separated."
+      ],
+      "partialCriteria": [
+        "Some supported subclaims are proven but broad task remains not-proven."
+      ],
+      "failureCriteria": [
+        "The route claims broad writer capability from narrow evidence."
+      ]
+    },
+    {
+      "id": "frozen-live-provider-opt-in-classification",
+      "origin": "frozen",
+      "taskType": "live-provider-opt-in-case",
+      "userPrompt": "If and only if an approved live-provider gate is explicitly requested, run it with isolated homes and classify provider, network, route, and redaction outcomes.",
+      "expectedProductPath": "Approved real-provider smoke script with PRIVATE_AGENTS_REAL_HOME as credential source and isolated HOME/USERPROFILE/test root.",
+      "allowedFilesOrModuleArea": [
+        "scripts/real-provider-smokes/",
+        "scripts/verify-real-provider-*.mjs",
+        "docs/implementation-context/"
+      ],
+      "requiredEvidence": [
+        "live-provider-proven",
+        "frozen-task-proven"
+      ],
+      "verificationExpectation": "Live proof requires explicit opt-in run output with redaction and attribution; skipped/default fake runs remain not live.",
+      "negativeControls": [
+        "Fake provider output must not be classified as live-provider-proven.",
+        "Provider-network failure must not be classified as route failure without evidence."
+      ],
+      "disallowedShortcuts": [
+        "Manual reads of private provider config",
+        "Printing raw provider output or oldText/newText"
+      ],
+      "successCriteria": [
+        "Approved opt-in gate ran.",
+        "Provider path was reached and classified.",
+        "Secrets and raw provider output were not printed."
+      ],
+      "partialCriteria": [
+        "Gate was not run.",
+        "Gate reached provider but failed with provider-network attribution."
+      ],
+      "failureCriteria": [
+        "Fake/default evidence is labeled live.",
+        "Private config or raw provider output is exposed."
+      ]
+    },
+    {
+      "id": "frozen-session-continuity-result-truth",
+      "origin": "frozen",
+      "taskType": "context-session-continuity-case",
+      "userPrompt": "Stop after a partial mutation attempt, continue the session, and preserve the exact stopped reason and not-proven claims.",
+      "expectedProductPath": "Session durability and result mapping preserve terminal truthfulness across continuation.",
+      "allowedFilesOrModuleArea": [
+        "packages/ts-shell/src/session/",
+        "packages/ts-shell/src/core/query/",
+        "packages/ts-shell/src/core/shell/"
+      ],
+      "requiredEvidence": [
+        "product-proven",
+        "frozen-task-proven"
+      ],
+      "verificationExpectation": "Continuation evidence must not convert stopped/error/partial state into success.",
+      "negativeControls": [
+        "A resumed session must not erase failed verification.",
+        "A transcript summary must not promote not-proven claims."
+      ],
+      "disallowedShortcuts": [
+        "Using display-only summary as capability proof"
+      ],
+      "successCriteria": [
+        "Stopped reason persists.",
+        "Not-proven claims persist.",
+        "Follow-up route uses preserved evidence."
+      ],
+      "partialCriteria": [
+        "Current-turn result is truthful but continuation omits task verdict fields."
+      ],
+      "failureCriteria": [
+        "Continuation changes partial/stopped into success without new evidence."
+      ]
+    }
+  ]
+}
