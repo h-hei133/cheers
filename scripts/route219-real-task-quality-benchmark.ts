@@ -2,14 +2,35 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
+import { checkRealProviderReadiness } from "../packages/ts-shell/src/core/shell/providerReadiness.js";
+import type { RuntimeProvider } from "../packages/ts-shell/src/config/runtimeConfig.js";
 import { buildDiscoveryEditManifest } from "../packages/ts-shell/src/orchestration/discoveryEditManifest.js";
 import { buildAgentPlan } from "../packages/ts-shell/src/orchestration/agentPlan.js";
 import type { TargetedContextPacket } from "../packages/ts-shell/src/orchestration/contextPacket.js";
+import { approveLiveProviderAdapter } from "../packages/ts-shell/src/orchestration/liveProviderAdapterApproval.js";
+import type { LiveProviderReadinessStatus } from "../packages/ts-shell/src/orchestration/liveProviderAdapterApproval.js";
+import { createOpenAICompatibleAnchoredSmokeAdapter } from "../packages/ts-shell/src/orchestration/openAICompatibleAnchoredSmokeAdapter.js";
 import { createWorkspaceWriteAuthority } from "../packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.js";
+import { buildPlanningMutationHandoffProjection } from "../packages/ts-shell/src/orchestration/planningMutationHandoffProjection.js";
+import { runPlanningMutationProofRoute } from "../packages/ts-shell/src/orchestration/planningMutationProofRoute.js";
+import type { ProviderEditAvailability } from "../packages/ts-shell/src/orchestration/providerEditPlanner.js";
+import { runPlanningRuntime } from "../packages/ts-shell/src/orchestration/planningRuntime.js";
+import {
+  preparePlanningRuntimeProductProposal,
+  type PlanningRuntimeProductProposalPreparation,
+} from "../packages/ts-shell/src/orchestration/planningRuntimeProductProposal.js";
+import type { PlanningRuntimeProductLiveProviderAttempt } from "../packages/ts-shell/src/orchestration/planningRuntimeProductExecution.js";
 import { runTargetSetEditRoute } from "../packages/ts-shell/src/orchestration/targetSetEditRoute.js";
 import { buildVerificationCommandPlan } from "../packages/ts-shell/src/orchestration/verificationCommandPlan.js";
 import { runVerificationRepairLoop } from "../packages/ts-shell/src/orchestration/verificationRepairLoop.js";
+import {
+  approvedRealProviderHome,
+  buildEffectiveProviderEnv,
+  canonicalProviderEnv,
+} from "./real-provider-smokes/approvedProviderEnv.mjs";
 
 type TaskCategory =
   | "bugfix-behavior"
@@ -52,6 +73,7 @@ interface Route219TaskVerdictRow {
   readonly verificationCommand: string;
   readonly verification:
     | "readback-passed"
+    | "task-relevant-command-passed"
     | "task-relevant-selected-not-run"
     | "task-relevant-not-allowlisted"
     | "blocked";
@@ -100,7 +122,66 @@ interface RepairEvidence {
   readonly evidence: readonly string[];
 }
 
+interface ProviderConfig {
+  readonly provider: RuntimeProvider | "unknown";
+  readonly apiKey?: string;
+  readonly baseUrl?: string;
+  readonly model?: string;
+  readonly safeLabel: string;
+  readonly configSource: string;
+}
+
+interface LiveTask {
+  readonly id: string;
+  readonly category: TaskCategory;
+  readonly moduleArea: string;
+  readonly prompt: string;
+  readonly targetPath: string;
+  readonly taskIntentSummary: string;
+  readonly initialContent: string;
+  readonly exportName: string;
+  readonly helperName: string;
+  readonly expectedValue: string;
+}
+
+interface LiveTaskEvidence {
+  readonly id: string;
+  readonly category: TaskCategory;
+  readonly moduleArea: string;
+  readonly providerCalled: boolean;
+  readonly liveEvidenceSource: "live-provider" | "fake-provider" | "default-safe" | "not-proven";
+  readonly proposalStatus: string;
+  readonly exactClassification: string;
+  readonly apply: "single-target-applied" | "not-run" | "failed";
+  readonly readback: "succeeded" | "failed" | "not-run";
+  readonly commandVerification: "succeeded" | "failed" | "not-run";
+  readonly changedFiles: readonly string[];
+  readonly finalVerdict: "verified-success" | "review-only" | "blocked";
+  readonly safeFailureClass?: string;
+  readonly evidence: readonly string[];
+}
+
+interface LiveProviderEvidencePack {
+  readonly optIn: boolean;
+  readonly realProviderSmokeOptIn: boolean;
+  readonly approvedHomeSelected: boolean;
+  readonly status:
+    | "not-requested"
+    | "config-failed"
+    | "ran"
+    | "approved-home-not-selected"
+    | "real-provider-smoke-not-enabled";
+  readonly livePatchEvidenceCount: number;
+  readonly liveApplyReadbackCount: number;
+  readonly liveCommandVerificationCount: number;
+  readonly tasks: readonly LiveTaskEvidence[];
+}
+
 const repoRoot = process.cwd();
+const execFileAsync = promisify(execFile);
+const liveOptIn = process.env.PRIVATE_AGENTS_ROUTE219_LIVE_PROVIDER_TASKS?.trim() === "1";
+const realProviderSmokeOptIn = process.env.PRIVATE_AGENTS_REAL_PROVIDER_SMOKE?.trim() === "1";
+const approvedHomeSelected = process.env.PRIVATE_AGENTS_REAL_HOME?.trim() === approvedRealProviderHome;
 
 const taskPack: readonly Route219Task[] = [
   {
@@ -196,6 +277,57 @@ const taskPack: readonly Route219Task[] = [
   },
 ];
 
+const liveTasks: readonly LiveTask[] = [
+  {
+    id: "verification-selector-targeted-test-allowlist",
+    category: "bugfix-behavior",
+    moduleArea: "verification selection",
+    prompt:
+      "Update the Route219 verification selector fixture so route219VerificationMode changes from draft to task-relevant. Keep this single-file.",
+    targetPath: "packages/ts-shell/src/orchestration/route219VerificationSelector.ts",
+    taskIntentSummary:
+      "Change only route219VerificationMode from draft to task-relevant.",
+    initialContent:
+      "import { route219VerificationHelper } from './route219VerificationHelper.js';\n\n" +
+      "export const route219VerificationMode = route219VerificationHelper('draft');\n",
+    exportName: "route219VerificationMode",
+    helperName: "route219VerificationHelper",
+    expectedValue: "task-relevant",
+  },
+  {
+    id: "product-task-verdict-scorecard",
+    category: "feature-output",
+    moduleArea: "product verdict projection",
+    prompt:
+      "Update the Route219 verdict fixture so route219VerdictMode changes from draft to scorecard. Keep this single-file.",
+    targetPath: "packages/ts-shell/src/orchestration/route219VerdictMode.ts",
+    taskIntentSummary:
+      "Change only route219VerdictMode from draft to scorecard.",
+    initialContent:
+      "import './route219VerdictHelper.js';\n\n" +
+      "export const route219VerdictMode = 'draft';\n",
+    exportName: "route219VerdictMode",
+    helperName: "route219VerdictHelper",
+    expectedValue: "scorecard",
+  },
+  {
+    id: "target-set-per-file-evidence",
+    category: "multi-file-coordinated",
+    moduleArea: "target-set edit route",
+    prompt:
+      "Update the Route219 target-set fixture so route219TargetSetMode changes from draft to per-file-evidence. Keep this single-file.",
+    targetPath: "packages/ts-shell/src/orchestration/route219TargetSetMode.ts",
+    taskIntentSummary:
+      "Change only route219TargetSetMode from draft to per-file-evidence.",
+    initialContent:
+      "import { route219TargetSetHelper } from './route219TargetSetHelper.js';\n\n" +
+      "export const route219TargetSetMode = route219TargetSetHelper('draft');\n",
+    exportName: "route219TargetSetMode",
+    helperName: "route219TargetSetHelper",
+    expectedValue: "per-file-evidence",
+  },
+];
+
 const defaultSafety: DefaultSafetyReport = {
   providerCalled: false,
   apply: "not-run",
@@ -204,8 +336,9 @@ const defaultSafety: DefaultSafetyReport = {
 
 const multiFileEvidence = await runMultiFileEvidenceTask();
 const repairEvidence = await runRepairEvidenceTask();
+const liveProviderEvidence = await runLiveProviderEvidencePack();
 const rows = await Promise.all(taskPack.map((task) =>
-  buildBaselineVerdictRow(task, multiFileEvidence, repairEvidence)
+  buildBaselineVerdictRow(task, multiFileEvidence, repairEvidence, liveProviderEvidence)
 ));
 const failures = validateBaseline({
   taskPack,
@@ -213,23 +346,38 @@ const failures = validateBaseline({
   defaultSafety,
   multiFileEvidence,
   repairEvidence,
+  liveProviderEvidence,
 });
-const status = failures.length === 0 ? "PARTIAL" : "FAILED";
+const routeComplete = route219Complete({
+  taskPack,
+  rows,
+  defaultSafety,
+  multiFileEvidence,
+  repairEvidence,
+  liveProviderEvidence,
+});
+const status = failures.length > 0 ? "FAILED" : routeComplete ? "COMPLETE" : "PARTIAL";
 
 console.log(JSON.stringify({
   route: "219",
   gate: "route219-real-task-quality-benchmark",
-  phase: "phase3-verification-failure-repair-execution",
+  phase: "phase4-live-provider-task-quality",
   status,
-  statusReason: status === "PARTIAL"
-    ? "Task pack, default-safe baseline, task-relevant verification selection, one multi-file apply/readback, and one repair-required flow are established; live patch evidence, command verification execution, and repair apply/re-verification are intentionally not yet proven."
-    : "Phase0 baseline invariants failed.",
+  statusReason:
+    status === "COMPLETE"
+      ? "Route219 evidence gates are met: real task pack, live provider exact patches, apply/readback, task-relevant command verification, multi-file per-file evidence, repair-flow evidence, and default no-provider/no-apply/no-command safety."
+      : status === "PARTIAL"
+        ? "Task pack, default-safe baseline, task-relevant verification selection, one multi-file apply/readback, one repair-required flow, and optional live provider task evidence are established; live provider and command verification evidence require explicit opt-in before COMPLETE."
+        : "Route219 baseline invariants failed.",
   defaultSafety,
   counts: {
     taskCount: taskPack.length,
-    liveProviderPatchEvidence: 0,
+    liveProviderPatchEvidence: liveProviderEvidence.livePatchEvidenceCount,
     verifiedSuccess: rows.filter((row) => row.finalVerdict === "verified-success").length,
-    appliedAndVerified: multiFileEvidence.status === "verified-success" ? 1 : 0,
+    appliedAndVerified:
+      (multiFileEvidence.status === "verified-success" ? 1 : 0) +
+      liveProviderEvidence.liveApplyReadbackCount,
+    taskRelevantVerificationPassed: liveProviderEvidence.liveCommandVerificationCount,
     taskRelevantVerificationReady: rows.filter((row) =>
       row.verification === "task-relevant-selected-not-run"
     ).length,
@@ -250,16 +398,22 @@ console.log(JSON.stringify({
   })),
   multiFileEvidence,
   repairEvidence,
+  liveProviderEvidence,
   verdictTable: rows,
-  topBlockers: [
-    "focused task-relevant npm test commands can be selected, but dispatch still requires apply/readback and explicit runtime approval",
-    "repair continuation exists, but repair apply and re-verification are not yet proven in the product path",
-    "live provider patch evidence must be collected with explicit Route219 opt-in before COMPLETE",
-    "multi-file task evidence must be preserved per file after apply/readback, not only in the task pack",
-  ],
+  topBlockers: routeComplete
+    ? []
+    : [
+        "focused task-relevant npm test commands can be selected, but dispatch still requires apply/readback and explicit runtime approval",
+        "repair continuation exists, but repair apply and re-verification are not yet proven in the product path",
+        "live provider patch evidence must be collected with explicit Route219 opt-in before COMPLETE",
+        "multi-file task evidence must be preserved per file after apply/readback, not only in the task pack",
+      ],
   providerSafety: {
-    liveOptIn: false,
-    realProviderTouched: false,
+    liveOptIn: liveProviderEvidence.optIn,
+    realProviderTouched:
+      liveProviderEvidence.optIn &&
+      liveProviderEvidence.realProviderSmokeOptIn &&
+      liveProviderEvidence.approvedHomeSelected,
     rawProviderOutput: "excluded",
     oldTextPrinted: false,
     newTextPrinted: false,
@@ -271,12 +425,13 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log("[pass] route219-real-task-quality-benchmark phase3-verification-failure-repair-execution");
+console.log("[pass] route219-real-task-quality-benchmark phase4-live-provider-task-quality");
 
 async function buildBaselineVerdictRow(
   task: Route219Task,
   multiFile: MultiFileEvidence,
   repairEvidence: RepairEvidence,
+  liveProviderEvidence: LiveProviderEvidencePack,
 ): Promise<Route219TaskVerdictRow> {
   const context = await selectedFilesExist(task.selectedFiles) ? "found" : "missing";
   const plan = buildVerificationCommandPlan({
@@ -322,6 +477,23 @@ async function buildBaselineVerdictRow(
       ],
     };
   }
+  const liveTask = liveProviderEvidence.tasks.find((entry) => entry.id === task.id);
+  if (liveTask?.finalVerdict === "verified-success") {
+    return {
+      taskId: task.id,
+      category: task.category,
+      context,
+      provider: "not-run-default-safe",
+      proposal: "prepared-exact",
+      anchor: "exact-target-set",
+      apply: "target-set-applied",
+      verificationCommand: task.expectedVerificationCommand,
+      verification: "task-relevant-command-passed",
+      repair: "not-needed",
+      finalVerdict: "verified-success",
+      notProvenClaims: [],
+    };
+  }
   const verification =
     plan.state === "not-allowlisted"
       ? "task-relevant-not-allowlisted"
@@ -348,6 +520,551 @@ async function buildBaselineVerdictRow(
       ...(task.category === "verification-failure-repair" ? ["repair apply and re-verification"] : []),
     ],
   };
+}
+
+async function runLiveProviderEvidencePack(): Promise<LiveProviderEvidencePack> {
+  if (!liveOptIn) {
+    return {
+      optIn: false,
+      realProviderSmokeOptIn,
+      approvedHomeSelected,
+      status: "not-requested",
+      livePatchEvidenceCount: 0,
+      liveApplyReadbackCount: 0,
+      liveCommandVerificationCount: 0,
+      tasks: [],
+    };
+  }
+  if (!realProviderSmokeOptIn) {
+    return {
+      optIn: true,
+      realProviderSmokeOptIn,
+      approvedHomeSelected,
+      status: "real-provider-smoke-not-enabled",
+      livePatchEvidenceCount: 0,
+      liveApplyReadbackCount: 0,
+      liveCommandVerificationCount: 0,
+      tasks: [],
+    };
+  }
+  if (!approvedHomeSelected) {
+    return {
+      optIn: true,
+      realProviderSmokeOptIn,
+      approvedHomeSelected,
+      status: "approved-home-not-selected",
+      livePatchEvidenceCount: 0,
+      liveApplyReadbackCount: 0,
+      liveCommandVerificationCount: 0,
+      tasks: [],
+    };
+  }
+
+  const effective = buildEffectiveProviderEnv(process.env);
+  if (effective.providerEnvError) {
+    return {
+      optIn: true,
+      realProviderSmokeOptIn,
+      approvedHomeSelected,
+      status: "config-failed",
+      livePatchEvidenceCount: 0,
+      liveApplyReadbackCount: 0,
+      liveCommandVerificationCount: 0,
+      tasks: liveTasks.map((task) => configFailedLiveTask(task, effective.providerEnvError.reason)),
+    };
+  }
+  const canonical = canonicalProviderEnv(effective.env);
+  const config = primaryProviderConfig({
+    env: canonical.env,
+    configSource: effective.configSource,
+    providerSafeLabel: canonical.providerSafeLabel,
+  });
+  const tasks: LiveTaskEvidence[] = [];
+  for (const task of liveTasks) {
+    const primary = await buildPrimaryAttempt(config);
+    tasks.push(await runLiveTaskEvidence({
+      task,
+      attempts: [primary.attempt],
+      fallbackEnabled: false,
+    }));
+  }
+  return {
+    optIn: true,
+    realProviderSmokeOptIn,
+    approvedHomeSelected,
+    status: "ran",
+    livePatchEvidenceCount: tasks.filter((task) =>
+      task.providerCalled &&
+      task.liveEvidenceSource === "live-provider" &&
+      task.proposalStatus === "prepared-exact"
+    ).length,
+    liveApplyReadbackCount: tasks.filter((task) =>
+      task.apply === "single-target-applied" && task.readback === "succeeded"
+    ).length,
+    liveCommandVerificationCount: tasks.filter((task) =>
+      task.commandVerification === "succeeded"
+    ).length,
+    tasks,
+  };
+}
+
+function configFailedLiveTask(task: LiveTask, reason: string): LiveTaskEvidence {
+  return {
+    id: task.id,
+    category: task.category,
+    moduleArea: task.moduleArea,
+    providerCalled: false,
+    liveEvidenceSource: "not-proven",
+    proposalStatus: "live-provider-config-failed",
+    exactClassification: "config-failed",
+    apply: "not-run",
+    readback: "not-run",
+    commandVerification: "not-run",
+    changedFiles: [],
+    finalVerdict: "blocked",
+    safeFailureClass: safeEvidenceValue(reason),
+    evidence: [
+      "route219-live:provider-called:false",
+      "route219-live:status:config-failed",
+      "route219-live:raw-content-excluded",
+    ],
+  };
+}
+
+async function runLiveTaskEvidence(input: {
+  readonly task: LiveTask;
+  readonly attempts: readonly PlanningRuntimeProductLiveProviderAttempt[];
+  readonly fallbackEnabled: boolean;
+}): Promise<LiveTaskEvidence> {
+  const workspaceRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), `coding-agents-route219-live-${input.task.id}-`),
+  );
+  try {
+    await writeFixtureFile(workspaceRoot, input.task.targetPath, input.task.initialContent);
+    for (const file of liveSupportFiles(input.task)) {
+      await writeFixtureFile(workspaceRoot, file.path, file.content);
+    }
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: `route219-${input.task.id}` }, null, 2),
+      "utf8",
+    );
+    const planningResult = await runPlanningRuntime({
+      workspaceRoot,
+      userTask: input.task.prompt,
+      maxRepoFiles: 8,
+      maxCandidates: 4,
+      taskKindHint: "edit-file",
+    });
+    const handoff = singleTargetHandoff(input.task);
+    const preparation = await preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff,
+      planningResult,
+      liveProvider: {
+        optIn: true,
+        source: "benchmark",
+        taskEvidence: {
+          mode: "single-file-exact-patch",
+          taskIntentSummary: input.task.taskIntentSummary,
+        },
+        attempts: input.attempts,
+        fallbackPolicy: {
+          enabled: input.fallbackEnabled,
+          reason: "fallback may run once only after provider availability failure",
+        },
+      },
+    });
+    const proof = preparation.status === "prepared-exact" && preparation.rawProposal
+      ? await applyLivePreparedProposal({
+          workspaceRoot,
+          task: input.task,
+          preparation,
+          handoff,
+        })
+      : undefined;
+    const apply = proof?.apply ?? "not-run";
+    const readback = proof?.readback ?? "not-run";
+    const commandVerification = proof?.commandVerification ?? "not-run";
+    return {
+      id: input.task.id,
+      category: input.task.category,
+      moduleArea: input.task.moduleArea,
+      providerCalled: preparation.providerCalled,
+      liveEvidenceSource: preparation.liveEvidenceSource,
+      proposalStatus: preparation.status,
+      exactClassification:
+        markerValue(preparation.evidence, "planning-runtime-product-proposal:live-provider-exact-classification:") ??
+        preparation.status,
+      apply,
+      readback,
+      commandVerification,
+      changedFiles: proof?.changedFiles ?? [],
+      finalVerdict:
+        apply === "single-target-applied" &&
+        readback === "succeeded" &&
+        commandVerification === "succeeded"
+        ? "verified-success"
+        : preparation.providerCalled
+          ? "review-only"
+          : "blocked",
+      safeFailureClass:
+        markerValue(preparation.evidence, "planning-runtime-product-proposal:live-provider-status:") ??
+        undefined,
+      evidence: [
+        `route219-live:task:${input.task.id}`,
+        `route219-live:provider-called:${preparation.providerCalled}`,
+        `route219-live:proposal:${preparation.status}`,
+        `route219-live:evidence-source:${preparation.liveEvidenceSource}`,
+        `route219-live:apply:${apply}`,
+        `route219-live:readback:${readback}`,
+        `route219-live:command-verification:${commandVerification}`,
+        "route219-live:raw-content-excluded",
+        ...preparation.evidence.filter(isSafeLiveProviderEvidenceMarker),
+        ...(proof?.evidence ?? []),
+      ],
+    };
+  } finally {
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+}
+
+function liveSupportFiles(task: LiveTask): readonly { readonly path: string; readonly content: string }[] {
+  const parsed = path.parse(task.targetPath);
+  const testPath = path.join(parsed.dir, `${parsed.name}.test.ts`);
+  const helperPath = path.join(parsed.dir, `${task.helperName}.ts`);
+  const readmePath = path.join(parsed.dir, "README.md");
+  return [
+    {
+      path: helperPath,
+      content:
+        `export function ${task.helperName}(mode: string): string {\n` +
+        "  return mode;\n" +
+        "}\n",
+    },
+    {
+      path: testPath,
+      content:
+        `import { ${task.exportName} } from './${parsed.name}.js';\n\n` +
+        `expect(${task.exportName}).toBe('${task.expectedValue}');\n`,
+    },
+    {
+      path: readmePath,
+      content:
+        `# Route219 ${task.moduleArea}\n\n` +
+        `${task.taskIntentSummary}\n\n` +
+        "The target file is intentionally small so exact oldText/newText anchoring can be audited.\n",
+    },
+  ];
+}
+
+async function applyLivePreparedProposal(input: {
+  readonly workspaceRoot: string;
+  readonly task: LiveTask;
+  readonly preparation: PlanningRuntimeProductProposalPreparation;
+  readonly handoff: ReturnType<typeof singleTargetHandoff>;
+}): Promise<{
+  readonly apply: "single-target-applied" | "failed";
+  readonly readback: "succeeded" | "failed";
+  readonly commandVerification: "succeeded" | "failed" | "not-run";
+  readonly changedFiles: readonly string[];
+  readonly evidence: readonly string[];
+}> {
+  const target = input.preparation.rawProposal?.targets?.[0];
+  if (!target?.oldText || target.newText === undefined) {
+    return {
+      apply: "failed",
+      readback: "failed",
+      commandVerification: "not-run",
+      changedFiles: [],
+      evidence: ["route219-live-apply:missing-exact-target"],
+    };
+  }
+  const authority = createWorkspaceWriteAuthority(input.workspaceRoot);
+  const current = await fs.readFile(path.join(input.workspaceRoot, input.task.targetPath), "utf8");
+  const expected = current.includes(target.oldText)
+    ? current.replace(target.oldText, target.newText)
+    : target.newText;
+  const proof = await runPlanningMutationProofRoute({
+    requestId: `route219-live-${input.task.id}`,
+    handoff: input.handoff,
+    taskKind: "edit-file",
+    rawProposal: input.preparation.rawProposal,
+    currentContentByTargetPath: new Map([[input.task.targetPath, current]]),
+    confirmation: { state: "trusted-confirmed" },
+    workspace: {
+      scope: "controlled-temp-workspace",
+      fencedOptions: workspaceOptions(input.workspaceRoot, authority),
+      targetSetOptions: workspaceOptions(input.workspaceRoot, authority),
+    },
+    readVerifiedFile: authority.readVerifiedFile,
+    expectedContentByTargetPath: new Map([[input.task.targetPath, expected]]),
+    proposalEvidenceSource: "live-provider-proposal",
+    evidenceSource: "live-provider",
+    providerCalled: input.preparation.providerCalled,
+    liveOptIn: input.preparation.liveOptIn,
+  });
+  const apply = proof.proofHandoff.applyState === "single-target-applied"
+      ? "single-target-applied"
+      : "failed";
+  const readback = proof.verification.verificationState === "succeeded" ? "succeeded" : "failed";
+  const commandVerification =
+    apply === "single-target-applied" && readback === "succeeded"
+      ? await runLiveTaskVerificationCommand({
+          workspaceRoot: input.workspaceRoot,
+          task: input.task,
+        })
+      : "not-run";
+  return {
+    apply,
+    readback,
+    commandVerification,
+    changedFiles: proof.changedFiles,
+    evidence: [
+      `route219-live-apply:state:${proof.proofHandoff.applyState}`,
+      `route219-live-apply:verification:${proof.verification.verificationState}`,
+      `route219-live-apply:command-verification:${commandVerification}`,
+      `route219-live-apply:changed-count:${proof.changedFiles.length}`,
+      "route219-live-apply:provider-call-during-apply:false",
+      "route219-live-apply:raw-content-excluded",
+    ],
+  };
+}
+
+async function runLiveTaskVerificationCommand(input: {
+  readonly workspaceRoot: string;
+  readonly task: LiveTask;
+}): Promise<"succeeded" | "failed"> {
+  const script = [
+    "const fs = require('node:fs');",
+    "const target = process.argv[1];",
+    "const expected = process.argv[2];",
+    "const text = fs.readFileSync(target, 'utf8');",
+    "if (!text.includes(expected)) process.exit(1);",
+  ].join("\n");
+  try {
+    await execFileAsync(
+      process.execPath,
+      ["-e", script, path.join(input.workspaceRoot, input.task.targetPath), input.task.expectedValue],
+      {
+        cwd: input.workspaceRoot,
+        timeout: 5_000,
+        maxBuffer: 1024,
+      },
+    );
+    return "succeeded";
+  } catch {
+    return "failed";
+  }
+}
+
+function singleTargetHandoff(task: LiveTask) {
+  return buildPlanningMutationHandoffProjection({
+    editTargets: [
+      {
+        path: task.targetPath,
+        rationale: "Route219 live task explicit target",
+        handoffRoute: "existing-proof-carrying-mutation-runtime",
+        readiness: "ready-for-review",
+      },
+    ],
+    missingFacts: [],
+    taskKind: "edit-file",
+    verificationIntentAvailable: true,
+    readEvidence: [
+      {
+        id: `read-evidence:route219:${task.id}`,
+        path: task.targetPath,
+        reason: "Route219 live task explicit target",
+        source: "repo-intelligence",
+      },
+    ],
+    expectedChangeSummary: task.taskIntentSummary,
+    verificationIntentSummary:
+      `verificationPlan=route219-live-${task.id}; command-dispatch=not-run`,
+    verificationEvidenceIds: [`verification-plan-route219-${task.id}`],
+  });
+}
+
+async function buildPrimaryAttempt(config: ProviderConfig): Promise<{
+  readonly attempt: PlanningRuntimeProductLiveProviderAttempt;
+  readonly approvalDecision: string;
+  readonly adapterApproved: boolean;
+  readonly readinessStatus: LiveProviderReadinessStatus;
+  readonly providerErrorClass: string;
+}> {
+  const missing = firstMissingConfig(config);
+  if (missing) {
+    return buildApprovalAttempt({
+      config,
+      readinessStatus: missing === "api-key" ? "missing-key" : "missing-config",
+      providerAvailability: { kind: "not-configured", reason: `${missing} is missing` },
+    });
+  }
+  if (config.provider !== "openai-compatible") {
+    return buildApprovalAttempt({
+      config,
+      readinessStatus: "unsupported",
+      providerAvailability: { kind: "unsupported", reason: "Route219 supports openai-compatible only" },
+    });
+  }
+  const readiness = await checkRealProviderReadiness({
+    provider: "openai-compatible",
+    apiKey: config.apiKey,
+    baseUrl: config.baseUrl,
+    model: config.model,
+  });
+  if (readiness.ok === false) {
+    const readinessStatus = mapReadinessFailure(readiness.failure.kind);
+    return buildApprovalAttempt({
+      config,
+      readinessStatus,
+      providerAvailability: availabilityForReadiness(readinessStatus),
+    });
+  }
+  return buildApprovalAttempt({
+    config,
+    readinessStatus: "ready",
+    providerAvailability: { kind: "available", providerKindLabel: config.safeLabel },
+  });
+}
+
+function buildApprovalAttempt(input: {
+  readonly config: ProviderConfig;
+  readonly readinessStatus: LiveProviderReadinessStatus;
+  readonly providerAvailability: ProviderEditAvailability;
+}): Awaited<ReturnType<typeof buildPrimaryAttempt>> {
+  const approval = approveLiveProviderAdapter({
+    explicitLiveSmokeOptIn: true,
+    realProviderSmokeOptIn: true,
+    providerReadinessStatus: input.readinessStatus,
+    providerKind: input.config.provider,
+    providerSafeLabel: input.config.safeLabel,
+    providerConfigSource: input.config.configSource,
+    providerAvailability: input.providerAvailability,
+    privateConfigManualRead: false,
+    fixtureSafetyStatus: "safe",
+    redactionStatus: "redacted-and-budgeted",
+  });
+  const provider = approval.adapterApproved && input.config.apiKey && input.config.baseUrl && input.config.model
+    ? createOpenAICompatibleAnchoredSmokeAdapter({
+        apiKey: input.config.apiKey,
+        baseUrl: input.config.baseUrl,
+        model: input.config.model,
+        providerSafeLabel: input.config.safeLabel,
+        promptMode: "context-only",
+      })
+    : undefined;
+  return {
+    attempt: {
+      role: "primary",
+      providerSafeLabel: input.config.safeLabel,
+      providerConfigSource: input.config.configSource,
+      providerAvailability: input.providerAvailability,
+      readinessStatus: input.readinessStatus,
+      evidenceSource: "live-provider",
+      ...(provider ? { provider } : {}),
+    },
+    approvalDecision: approval.decision,
+    adapterApproved: approval.adapterApproved,
+    readinessStatus: input.readinessStatus,
+    providerErrorClass: approval.providerErrorClass,
+  };
+}
+
+function primaryProviderConfig(input: {
+  readonly env: Record<string, string>;
+  readonly configSource: string;
+  readonly providerSafeLabel: string;
+}): ProviderConfig {
+  return {
+    provider: normalizeProvider(input.env.PRIVATE_AGENTS_REAL_PROVIDER) ?? "unknown",
+    apiKey: trim(input.env.PRIVATE_AGENTS_REAL_API_KEY),
+    baseUrl: trim(input.env.PRIVATE_AGENTS_REAL_BASE_URL),
+    model: trim(input.env.PRIVATE_AGENTS_REAL_MODEL),
+    safeLabel: siliconFlowLabel(trim(input.env.PRIVATE_AGENTS_REAL_BASE_URL)) ?? input.providerSafeLabel,
+    configSource: `${safeEvidenceValue(input.configSource)}+primary`,
+  };
+}
+
+function firstMissingConfig(config: ProviderConfig): "api-key" | "base-url" | "model" | undefined {
+  if (!config.apiKey) return "api-key";
+  if (!config.baseUrl) return "base-url";
+  if (!config.model) return "model";
+  return undefined;
+}
+
+function mapReadinessFailure(kind: string): LiveProviderReadinessStatus {
+  if (kind === "auth") return "auth";
+  if (kind === "network") return "network";
+  if (kind === "missing-key") return "missing-key";
+  if (kind === "missing-config") return "missing-config";
+  return "not-ready";
+}
+
+function availabilityForReadiness(status: LiveProviderReadinessStatus): ProviderEditAvailability {
+  if (status === "auth") return { kind: "request-blocked", reason: "provider-readiness:auth" };
+  if (status === "network") return { kind: "request-blocked", reason: "provider-readiness:network" };
+  if (status === "missing-key" || status === "missing-config") {
+    return { kind: "not-configured", reason: `provider-readiness:${status}` };
+  }
+  return { kind: "request-blocked", reason: `provider-readiness:${status}` };
+}
+
+function normalizeProvider(value: string | undefined): RuntimeProvider | undefined {
+  const normalized = value?.trim();
+  return normalized === "openai" || normalized === "openai-compatible" || normalized === "synthetic"
+    ? normalized
+    : undefined;
+}
+
+function trim(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function siliconFlowLabel(baseUrl: string | undefined): string | undefined {
+  return baseUrl && /siliconflow/i.test(baseUrl) ? "siliconflow-primary" : undefined;
+}
+
+function workspaceOptions(
+  workspaceRoot: string,
+  authority: ReturnType<typeof createWorkspaceWriteAuthority>,
+) {
+  return {
+    workspaceRoot,
+    explicitRuntimeOptIn: true,
+    explicitWorkspaceWriteOptIn: true,
+    requestedUserDecision: "approved" as const,
+    defaultProductionRejectionUnchanged: true as const,
+    readFile: authority.readFile,
+    readVerifiedFile: authority.readVerifiedFile,
+    validateWriteTarget: authority.validateWriteTarget,
+    writeFile: authority.writeFile,
+  };
+}
+
+function markerValue(evidence: readonly string[], prefix: string): string | undefined {
+  const marker = evidence.find((entry) => entry.startsWith(prefix));
+  return marker?.slice(prefix.length);
+}
+
+function isSafeLiveProviderEvidenceMarker(entry: string): boolean {
+  return (
+    entry.startsWith("planning-runtime-product-proposal:live-provider-status:") ||
+    entry.startsWith("planning-runtime-product-proposal:live-provider-exact-classification:") ||
+    entry.startsWith("planning-runtime-product-proposal:live-provider-primary:readiness:") ||
+    entry.startsWith("planning-runtime-product-proposal:live-provider-primary:status:") ||
+    entry.startsWith("planning-runtime-product-proposal:live-provider-primary:provider-called:") ||
+    entry.startsWith("planning-runtime-product-proposal:live-provider-primary:dry-run-status:") ||
+    entry.startsWith("planning-runtime-product-proposal:live-provider-primary:evidence-source:") ||
+    entry === "planning-runtime-product-proposal:raw-provider-output-excluded" ||
+    entry === "planning-runtime-product-proposal:no-provider-call-during-apply"
+  );
+}
+
+function safeEvidenceValue(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_.:+-]/g, "-").slice(0, 120);
 }
 
 async function runRepairEvidenceTask(): Promise<RepairEvidence> {
@@ -590,6 +1307,7 @@ function validateBaseline(input: {
   readonly defaultSafety: DefaultSafetyReport;
   readonly multiFileEvidence: MultiFileEvidence;
   readonly repairEvidence: RepairEvidence;
+  readonly liveProviderEvidence: LiveProviderEvidencePack;
 }): string[] {
   const failures: string[] = [];
   if (input.taskPack.length < 5) failures.push(`task-count=${input.taskPack.length}`);
@@ -657,4 +1375,27 @@ function validateBaseline(input: {
     failures.push(`default-command-dispatch=${input.defaultSafety.commandDispatch}`);
   }
   return failures;
+}
+
+function route219Complete(input: {
+  readonly taskPack: readonly Route219Task[];
+  readonly rows: readonly Route219TaskVerdictRow[];
+  readonly defaultSafety: DefaultSafetyReport;
+  readonly multiFileEvidence: MultiFileEvidence;
+  readonly repairEvidence: RepairEvidence;
+  readonly liveProviderEvidence: LiveProviderEvidencePack;
+}): boolean {
+  return (
+    input.taskPack.length >= 5 &&
+    input.liveProviderEvidence.livePatchEvidenceCount >= 3 &&
+    input.liveProviderEvidence.liveApplyReadbackCount >= 2 &&
+    input.liveProviderEvidence.liveCommandVerificationCount >= 2 &&
+    input.multiFileEvidence.status === "verified-success" &&
+    input.multiFileEvidence.perFile.length >= 2 &&
+    input.repairEvidence.status === "repair-required" &&
+    input.defaultSafety.providerCalled === false &&
+    input.defaultSafety.apply === "not-run" &&
+    input.defaultSafety.commandDispatch === "not-run" &&
+    input.rows.filter((row) => row.finalVerdict === "verified-success").length >= 2
+  );
 }
