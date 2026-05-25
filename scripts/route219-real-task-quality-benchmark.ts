@@ -275,6 +275,24 @@ const taskPack: readonly Route219Task[] = [
     needsLiveProviderPatch: false,
     needsSelectedWorkspaceApply: false,
   },
+  {
+    id: "result-surface-summary-label",
+    category: "feature-output",
+    moduleArea: "result/session surface",
+    description:
+      "Improve a compact result-surface fixture so a task verdict label moves from draft to summarized.",
+    whyItMatters:
+      "Route219 needs result/session-style verdict evidence in addition to planning and target-set fixtures.",
+    selectedFiles: [
+      "packages/ts-shell/src/orchestration/realTaskLoopResult.ts",
+      "packages/ts-shell/src/orchestration/realTaskLoopResult.test.ts",
+    ],
+    expectedVerificationCommand:
+      "npm test -w packages/ts-shell -- src/orchestration/realTaskLoopResult.test.ts",
+    repairTrigger: "missing result-surface summary keeps final task verdict evidence incomplete",
+    needsLiveProviderPatch: true,
+    needsSelectedWorkspaceApply: true,
+  },
 ];
 
 const liveTasks: readonly LiveTask[] = [
@@ -325,6 +343,22 @@ const liveTasks: readonly LiveTask[] = [
     exportName: "route219TargetSetMode",
     helperName: "route219TargetSetHelper",
     expectedValue: "per-file-evidence",
+  },
+  {
+    id: "result-surface-summary-label",
+    category: "feature-output",
+    moduleArea: "result/session surface",
+    prompt:
+      "Update the Route219 result surface fixture so route219ResultSurfaceMode changes from draft to summarized. Keep this single-file.",
+    targetPath: "packages/ts-shell/src/orchestration/route219ResultSurfaceMode.ts",
+    taskIntentSummary:
+      "Change only route219ResultSurfaceMode from draft to summarized.",
+    initialContent:
+      "import './route219ResultSurfaceHelper.js';\n\n" +
+      "export const route219ResultSurfaceMode = 'draft';\n",
+    exportName: "route219ResultSurfaceMode",
+    helperName: "route219ResultSurfaceHelper",
+    expectedValue: "summarized",
   },
 ];
 
