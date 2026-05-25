@@ -162,6 +162,36 @@ describe("realProviderProposalDryRun", () => {
     expect(result.changedFiles).toEqual([]);
   });
 
+  it("classifies current-content anchor misses and ambiguous anchors without writes", async () => {
+    const notFound = await runRealProviderProposalDryRun({
+      ...readyInput("old-text-not-found"),
+      provider: {
+        proposeEdit: () => ({
+          operationKind: "exact-fenced-replacement",
+          targets: [{ path: "src/app.ts", oldText: "missingOldText", newText: "startApp" }],
+        }),
+      },
+      currentContentByTargetLabel: new Map([["src/app.ts", "runApp\n"]]),
+    });
+    const multiple = await runRealProviderProposalDryRun({
+      ...readyInput("old-text-multiple"),
+      provider: {
+        proposeEdit: () => ({
+          operationKind: "exact-fenced-replacement",
+          targets: [{ path: "src/app.ts", oldText: "runApp", newText: "startApp" }],
+        }),
+      },
+      currentContentByTargetLabel: new Map([["src/app.ts", "runApp\nrunApp\n"]]),
+    });
+
+    expect(notFound.status).toBe("dry-run-review-required");
+    expect(notFound.evidence).toContain("provider-anchor-match:outcome:no-match");
+    expect(multiple.status).toBe("dry-run-review-required");
+    expect(multiple.evidence).toContain("provider-anchor-match:outcome:multiple-candidates-ambiguous");
+    expect(notFound.changedFiles).toEqual([]);
+    expect(multiple.changedFiles).toEqual([]);
+  });
+
   it("keeps unanchored malformed and unsafe fake-provider outputs no-write", async () => {
     const unanchored = await runRealProviderProposalDryRun({
       ...readyInput("unanchored"),

@@ -2,6 +2,10 @@ import type { SchemaVersion } from "../../../../contracts/typescript/types.js";
 import { OpenAIModelAdapter } from "../model-adapters/providers/openai/OpenAIModelAdapter.js";
 import type { NormalizedProviderError } from "../model-adapters/types.js";
 import type { ContextAwareProviderPromptContext } from "./contextAwareProviderPrompt.js";
+import {
+  buildProviderExactPatchSystemPrompt,
+  parseProviderExactPatchOutput,
+} from "./providerExactPatchContract.js";
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 import type { RealProviderProposalDryRunProvider } from "./realProviderProposalDryRun.js";
 
@@ -100,7 +104,7 @@ export function createOpenAICompatibleAnchoredSmokeAdapter(
         throw classifyAdapterError(error);
       }
 
-      return parseProviderProposal(text);
+      return parseProviderProposal(text, context);
     },
   };
 }
@@ -146,13 +150,8 @@ function buildSystemPrompt(
 ): string {
   if (mode === "context-only") {
     return [
-      "You generate review-only edit proposals for a no-write product-path smoke test.",
-      "Return JSON only. Do not use markdown fences.",
-      "Do not claim that files were changed. Do not run commands. Do not request apply.",
-      "The JSON shape is:",
-      '{"operationKind":"exact-fenced-replacement","targets":[{"path":"src/example.ts","summary":"...","oldText":"...","newText":"..."}],"confidence":"medium","riskSummary":"...","verificationPlan":["..."]}',
-      "Return exactly one target for the explicit target path.",
-      "Include oldText and newText only when the prompt provides enough exact current text; otherwise return a target-bound review-only proposal with path and summary only.",
+      buildProviderExactPatchSystemPrompt(),
+      "This is a dry-run proposal only; mutation authority is not granted.",
     ].join("\n");
   }
   return [
@@ -172,13 +171,14 @@ function buildUserPrompt(
   const common = [
     context.providerPrompt,
     "",
-    "Return exactly one exact-fenced-replacement target for the explicit target only.",
+    "Return exactly one exact patch for the explicit target only.",
     `Explicit target: ${context.target.pathLabel}`,
   ];
   if (mode === "context-only") {
     return [
       ...common,
-      "If exact replacement text is not available in the prompt, omit oldText/newText and keep the proposal review-only.",
+      "Preferred shape: {\"targetFile\":\"...\",\"oldText\":\"...\",\"newText\":\"...\",\"reason\":\"...\",\"verificationHint\":\"...\"}.",
+      "If exact replacement text is not available in the prompt, return {\"status\":\"review-only\",\"targetFile\":\"...\",\"reason\":\"...\"}.",
       "Do not invent anchors from files that were not included in the prompt.",
       "Return JSON only.",
     ].join("\n");
@@ -215,7 +215,24 @@ function requestsLocalCallSite(context: ContextAwareProviderPromptContext): bool
   return /local call site|bootMessage/i.test(`${context.userRequest}\n${context.providerPrompt}`);
 }
 
-function parseProviderProposal(text: string): ProviderEditRawProposal {
+function parseProviderProposal(
+  text: string,
+  context: ContextAwareProviderPromptContext,
+): ProviderEditRawProposal {
+  const parsedExact = parseProviderExactPatchOutput({
+    text,
+    explicitTargetLabels: [context.target.pathLabel],
+  });
+  if (parsedExact.ok) {
+    return parsedExact.rawProposal;
+  }
+  if (parsedExact.status === "target-mismatch") {
+    throw new OpenAICompatibleAnchoredSmokeProviderError(
+      "malformed-response",
+      "OpenAI-compatible anchored smoke provider returned a target-mismatched exact patch.",
+    );
+  }
+
   const jsonText = extractJsonObject(text.trim());
   if (!jsonText) {
     throw new OpenAICompatibleAnchoredSmokeProviderError(

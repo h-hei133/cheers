@@ -6,6 +6,7 @@ import { buildPlanningExactProposal } from "./planningExactProposal.js";
 import type { PlanningRuntimeResult } from "./planningRuntime.js";
 import type { PlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
 import { hashContent } from "./patchRecovery/recoveryAuthorityStore.js";
+import type { ProviderExactPatchClassification } from "./providerExactPatchContract.js";
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 import type { PlanningRuntimeProductLiveProviderProposal } from "./planningRuntimeProductExecution.js";
 import {
@@ -18,6 +19,10 @@ export type PlanningRuntimeProductProposalStatus =
   | "live-provider-config-failed"
   | "live-provider-network-blocked"
   | "live-provider-auth-failed"
+  | "live-provider-invalid-format"
+  | "live-provider-target-mismatch"
+  | "live-provider-old-text-not-found"
+  | "live-provider-old-text-multiple-matches"
   | "live-provider-failed"
   | "review-only"
   | "unsupported"
@@ -50,6 +55,10 @@ type LiveProviderTerminalClass =
   | "CONFIG-FAILED"
   | "AUTH-FAILED"
   | "NETWORK-BLOCKED"
+  | "INVALID-FORMAT"
+  | "TARGET-MISMATCH"
+  | "OLD-TEXT-NOT-FOUND"
+  | "OLD-TEXT-MULTIPLE-MATCHES"
   | "FAILED";
 
 type LiveProviderEvidenceSource =
@@ -276,6 +285,29 @@ async function prepareLiveProviderProposal(input: {
 
     if (isDryRunSuccess(dryRun)) {
       const exact = isExactReadyDryRun(dryRun);
+      const exactClass = classifyDryRunExactPatch(dryRun);
+      const terminalClass = liveProviderTerminalClassForExactPatch(exactClass);
+      if (!exact && terminalClass) {
+        return liveProviderFailure({
+          terminalClass,
+          providerCalled: true,
+          liveEvidenceSource: attempt.evidenceSource ?? "not-proven",
+          reason: `${terminalClass}: live provider exact patch was not anchorable against current target content.`,
+          nextAction:
+            "Refresh the target read evidence or request a unique exact oldText anchor before apply.",
+          evidence: [
+            ...attemptEvidence,
+            "planning-runtime-product-proposal:live-provider-status:provider-called",
+            `planning-runtime-product-proposal:live-provider-selected-attempt:${attempt.role}`,
+            `planning-runtime-product-proposal:live-provider-output:${dryRun.outputValidation.status}`,
+            `planning-runtime-product-proposal:live-provider-anchor:${dryRun.anchoredProposal.handoffReadiness}`,
+            `planning-runtime-product-proposal:live-provider-exact-classification:${exactClass}`,
+            `planning-runtime-product-proposal:live-provider-${attempt.role}:status:${terminalClass}`,
+            "planning-runtime-product-proposal:raw-provider-output-excluded",
+            "planning-runtime-product-proposal:no-provider-call-during-apply",
+          ],
+        });
+      }
       return proposalPreparation({
         status: exact ? "prepared-exact" : "review-only",
         source: "live-provider-proposal",
@@ -286,7 +318,7 @@ async function prepareLiveProviderProposal(input: {
         reason:
           exact
             ? "Live provider dry-run produced a validated exact proposal; apply still requires explicit confirmation and workspace authority."
-            : "Live provider dry-run produced a validated review-only proposal; exact apply remains blocked until review supplies anchors.",
+            : `Live provider dry-run remained review-only: ${describeReviewOnlyDryRun(dryRun)}.`,
         nextAction:
           "Review the provider proposal and anchored evidence before any explicit confirmation.",
         evidence: [
@@ -295,6 +327,7 @@ async function prepareLiveProviderProposal(input: {
           `planning-runtime-product-proposal:live-provider-selected-attempt:${attempt.role}`,
           `planning-runtime-product-proposal:live-provider-output:${dryRun.outputValidation.status}`,
           `planning-runtime-product-proposal:live-provider-anchor:${dryRun.anchoredProposal.handoffReadiness}`,
+          `planning-runtime-product-proposal:live-provider-exact-classification:${exactClass}`,
           "planning-runtime-product-proposal:raw-provider-output-excluded",
           "planning-runtime-product-proposal:no-provider-call-during-apply",
         ],
@@ -340,6 +373,7 @@ function liveProviderFailure(input: {
     nextAction: input.nextAction,
     evidence: [
       ...input.evidence,
+      `planning-runtime-product-proposal:live-provider-status:${input.terminalClass}`,
       `planning-runtime-product-proposal:provider-called:${input.providerCalled ?? false}`,
       "planning-runtime-product-proposal:raw-provider-output-excluded",
     ],
@@ -362,7 +396,7 @@ function buildLiveProviderPromptContext(input: {
     targetPath,
   })).slice(0, 12)}`;
   const providerPrompt = [
-    "Create a review-only provider edit proposal from Planning Runtime evidence.",
+    "Create an exact single-file patch proposal from Planning Runtime evidence.",
     `Request: ${input.planningResult.groundedAnalysis.summary}`,
     `Target: ${targetPath}`,
     `Expected change: ${input.handoff.expectedChangeSummary}`,
@@ -373,8 +407,11 @@ function buildLiveProviderPromptContext(input: {
     `Analysis brief: ${bundle.analysisBrief.briefId}`,
     `Task execution plan: ${bundle.taskExecutionPlan.executionPlanId}`,
     "Return JSON only. Do not use markdown fences.",
-    "Use operationKind exact-fenced-replacement when exact oldText/newText is known; otherwise return a target-bound review-only proposal with path and summary only.",
-    "Return targets only for explicit target paths from this prompt.",
+    "Preferred shape: {\"targetFile\":\"<explicit target>\",\"oldText\":\"<exact current text>\",\"newText\":\"<replacement text>\",\"reason\":\"<short reason>\",\"verificationHint\":\"<safe readback/test>\"}.",
+    "oldText must be copied from current read evidence and must identify one exact region in the selected target.",
+    "newText must be non-empty and bounded to that replacement only.",
+    "If exact oldText/newText cannot be produced from the provided evidence, return {\"status\":\"review-only\",\"targetFile\":\"<explicit target>\",\"reason\":\"<specific missing exact evidence>\"}.",
+    "Return only the explicit single target path from this prompt.",
     "Do not claim files were changed. Do not run commands. Do not include provider config, API keys, headers, or raw full file content.",
   ].join("\n");
 
@@ -398,7 +435,7 @@ function buildLiveProviderPromptContext(input: {
     },
     relatedContext: [],
     constraints: [
-      "review-only provider proposal",
+      "single-file exact patch provider proposal when evidence is sufficient",
       "explicit confirmation required before apply",
       "existing proof backend only",
       "no provider call during apply",
@@ -473,6 +510,19 @@ function classifyDryRunFailure(
 ): LiveProviderTerminalClass {
   if (dryRun.status === "dry-run-provider-not-configured") return "CONFIG-FAILED";
   if (dryRun.status === "dry-run-provider-unsupported") return "CONFIG-FAILED";
+  const exactClass = classifyDryRunExactPatch(dryRun);
+  switch (exactClass) {
+    case "invalid-format":
+      return "INVALID-FORMAT";
+    case "target-mismatch":
+      return "TARGET-MISMATCH";
+    case "old-text-not-found":
+      return "OLD-TEXT-NOT-FOUND";
+    case "old-text-multiple-matches":
+      return "OLD-TEXT-MULTIPLE-MATCHES";
+    default:
+      break;
+  }
   switch (dryRun.providerErrorClass) {
     case "auth":
       return "AUTH-FAILED";
@@ -496,13 +546,101 @@ function statusForLiveProviderFailure(
       return "live-provider-auth-failed";
     case "NETWORK-BLOCKED":
       return "live-provider-network-blocked";
+    case "INVALID-FORMAT":
+      return "live-provider-invalid-format";
+    case "TARGET-MISMATCH":
+      return "live-provider-target-mismatch";
+    case "OLD-TEXT-NOT-FOUND":
+      return "live-provider-old-text-not-found";
+    case "OLD-TEXT-MULTIPLE-MATCHES":
+      return "live-provider-old-text-multiple-matches";
     case "FAILED":
       return "live-provider-failed";
   }
 }
 
 function canUseFallbackAfter(terminalClass: LiveProviderTerminalClass): boolean {
-  return terminalClass !== "CONFIG-FAILED";
+  return terminalClass !== "CONFIG-FAILED" &&
+    terminalClass !== "INVALID-FORMAT" &&
+    terminalClass !== "TARGET-MISMATCH" &&
+    terminalClass !== "OLD-TEXT-NOT-FOUND" &&
+    terminalClass !== "OLD-TEXT-MULTIPLE-MATCHES";
+}
+
+function liveProviderTerminalClassForExactPatch(
+  classification: ProviderExactPatchClassification,
+): LiveProviderTerminalClass | undefined {
+  switch (classification) {
+    case "invalid-format":
+      return "INVALID-FORMAT";
+    case "target-mismatch":
+      return "TARGET-MISMATCH";
+    case "old-text-not-found":
+      return "OLD-TEXT-NOT-FOUND";
+    case "old-text-multiple-matches":
+      return "OLD-TEXT-MULTIPLE-MATCHES";
+    default:
+      return undefined;
+  }
+}
+
+function describeReviewOnlyDryRun(
+  dryRun: Extract<
+    RealProviderProposalDryRunResult,
+    { readonly providerCalled: true; readonly rawProposal: ProviderEditRawProposal }
+  >,
+): string {
+  const output = dryRun.outputValidation.status;
+  const anchor = dryRun.anchoredProposal.handoffReadiness;
+  const anchoring = dryRun.anchoringResult.status;
+  if (output === "partial-anchor") {
+    return `review-only because provider output was target-bound but missing complete oldText/newText anchors (${anchoring})`;
+  }
+  if (output === "unanchored-generated") {
+    return "review-only because provider output did not include exact target-bound anchors";
+  }
+  return `review-only because anchor=${anchor}, output=${output}, anchoring=${anchoring}`;
+}
+
+function classifyDryRunExactPatch(
+  dryRun: RealProviderProposalDryRunResult,
+): ProviderExactPatchClassification {
+  if (dryRun.status === "dry-run-provider-error") {
+    if (dryRun.providerErrorClass === "auth") return "auth-failed";
+    if (dryRun.providerErrorClass === "missing-key") return "config-failed";
+    if (dryRun.providerErrorClass === "network" || dryRun.providerErrorClass === "timeout") {
+      return "network-blocked";
+    }
+    return "provider-error";
+  }
+  if (
+    dryRun.status === "dry-run-provider-not-configured" ||
+    dryRun.status === "dry-run-provider-unsupported" ||
+    dryRun.status === "dry-run-missing-context"
+  ) {
+    return "config-failed";
+  }
+  if (dryRun.outputValidation?.targetBinding === "outside-context") return "target-mismatch";
+  if (
+    dryRun.outputValidation?.status === "malformed-output" ||
+    dryRun.outputValidation?.status === "empty-output" ||
+    dryRun.outputValidation?.status === "over-budget-output" ||
+    dryRun.outputValidation?.status === "unsafe-output" ||
+    dryRun.outputValidation?.status === "fuzzy-output" ||
+    dryRun.outputValidation?.status === "broad-refactor-output" ||
+    dryRun.outputValidation?.status === "unanchored-generated"
+  ) {
+    return "invalid-format";
+  }
+  if (dryRun.anchoringResult?.evidence.includes("provider-anchor-match:outcome:no-match")) {
+    return "old-text-not-found";
+  }
+  if (dryRun.anchoringResult?.evidence.includes("provider-anchor-match:outcome:multiple-candidates-ambiguous")) {
+    return "old-text-multiple-matches";
+  }
+  if (dryRun.status === "dry-run-exact-ready-no-write") return "exact-ready";
+  if (dryRun.status === "dry-run-review-required") return "review-only";
+  return "provider-error";
 }
 
 function isDryRunSuccess(

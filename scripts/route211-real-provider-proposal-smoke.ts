@@ -43,6 +43,7 @@ interface SmokeReport {
   readonly liveEvidenceSource: string;
   readonly liveProviderStatus: string;
   readonly liveProviderAnchor: string;
+  readonly exactClassification: string;
   readonly selectedAttempt: string;
   readonly fallbackPolicy: string;
   readonly fallbackCalled: boolean;
@@ -352,6 +353,11 @@ function projectReport(input: {
     liveProviderAnchor:
       markerValue(evidence, "planning-runtime-product-proposal:live-provider-anchor:") ??
       "not-run",
+    exactClassification:
+      markerValue(evidence, "planning-runtime-product-proposal:live-provider-exact-classification:") ??
+      terminalClassToRoute214Classification(
+        markerValue(evidence, "planning-runtime-product-proposal:live-provider-status:"),
+      ),
     selectedAttempt:
       markerValue(evidence, "planning-runtime-product-proposal:live-provider-selected-attempt:") ??
       "none",
@@ -386,6 +392,29 @@ function projectReport(input: {
     ...report,
     failures: validateReport(report),
   };
+}
+
+function terminalClassToRoute214Classification(value: string | undefined): string {
+  switch (value) {
+    case "INVALID-FORMAT":
+      return "invalid-format";
+    case "TARGET-MISMATCH":
+      return "target-mismatch";
+    case "OLD-TEXT-NOT-FOUND":
+      return "old-text-not-found";
+    case "OLD-TEXT-MULTIPLE-MATCHES":
+      return "old-text-multiple-matches";
+    case "NETWORK-BLOCKED":
+      return "network-blocked";
+    case "AUTH-FAILED":
+      return "auth-failed";
+    case "CONFIG-FAILED":
+      return "config-failed";
+    case "provider-called":
+      return "review-only";
+    default:
+      return "not-run";
+  }
 }
 
 function validateReport(report: SmokeReport): readonly string[] {

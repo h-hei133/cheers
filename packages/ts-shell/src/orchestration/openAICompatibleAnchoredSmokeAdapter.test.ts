@@ -20,22 +20,16 @@ describe("openAICompatibleAnchoredSmokeAdapter", () => {
       apiKey: "test-key",
       baseUrl: "https://api.siliconflow.cn/v1/",
       model: "deepseek-ai/DeepSeek-V4-Flash",
+      promptMode: "context-only",
       fetchImpl: async (input, init) => {
         requests.push(String(input));
         bodies.push(String(init?.body ?? ""));
         return new Response(sse(JSON.stringify({
-          operationKind: "exact-fenced-replacement",
-          targets: [
-            {
-              path: "src/smoke.ts",
-              summary: "rename startApp to runApp",
-              oldText: "export function startApp() {",
-              newText: "export function runApp() {",
-            },
-          ],
-          confidence: "high",
-          riskSummary: "review only",
-          verificationPlan: ["npm test -- smoke"],
+          targetFile: "src/smoke.ts",
+          oldText: "export function startApp() {",
+          newText: "export function runApp() {",
+          reason: "rename startApp to runApp",
+          verificationHint: "npm test -- smoke",
         })), {
           status: 200,
           headers: { "content-type": "text/event-stream" },
@@ -46,8 +40,8 @@ describe("openAICompatibleAnchoredSmokeAdapter", () => {
     const proposal = await adapter.proposeEdit(fixture.promptContext);
 
     expect(requests).toEqual(["https://api.siliconflow.cn/v1/chat/completions"]);
-    expect(bodies.join("\n")).toContain("Return exactly one target");
-    expect(bodies.join("\n")).toContain("Do not include unrelated functions or additional targets");
+    expect(bodies.join("\n")).toContain("targetFile");
+    expect(bodies.join("\n")).toContain("oldText");
     expect(proposal.operationKind).toBe("exact-fenced-replacement");
     expect(proposal.targets?.[0]?.path).toBe("src/smoke.ts");
     expect(proposal.targets?.[0]?.oldText).toBe("export function startApp() {");
@@ -63,30 +57,23 @@ describe("openAICompatibleAnchoredSmokeAdapter", () => {
       fetchImpl: async (_input, init) => {
         bodies.push(String(init?.body ?? ""));
         return new Response(sse(JSON.stringify({
-          operationKind: "exact-fenced-replacement",
-          targets: [
-            {
-              path: "src/smoke.ts",
-              summary: "rename startApp declaration and local call site",
-              oldText: [
-                "export function startApp() {",
-                "  return \"started\";",
-                "}",
-                "",
-                "export const bootMessage = startApp();",
-              ].join("\n"),
-              newText: [
-                "export function runApp() {",
-                "  return \"started\";",
-                "}",
-                "",
-                "export const bootMessage = runApp();",
-              ].join("\n"),
-            },
-          ],
-          confidence: "high",
-          riskSummary: "review only",
-          verificationPlan: ["safe readback"],
+          targetFile: "src/smoke.ts",
+          oldText: [
+            "export function startApp() {",
+            "  return \"started\";",
+            "}",
+            "",
+            "export const bootMessage = startApp();",
+          ].join("\n"),
+          newText: [
+            "export function runApp() {",
+            "  return \"started\";",
+            "}",
+            "",
+            "export const bootMessage = runApp();",
+          ].join("\n"),
+          reason: "rename startApp declaration and local call site",
+          verificationHint: "safe readback",
         })), {
           status: 200,
           headers: { "content-type": "text/event-stream" },

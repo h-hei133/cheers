@@ -500,6 +500,93 @@ describe("buildPlanningRuntimeProductProofInputs", () => {
     );
   }, 15000);
 
+  it("classifies live provider oldText misses and ambiguous anchors precisely", async () => {
+    const workspaceRoot = createWorkspace({
+      "src/planning/targetRanking.ts": [
+        "export function rankPlannerTargets(task: string) {",
+        TARGET_RANKING_OLD_TEXT,
+        TARGET_RANKING_OLD_TEXT,
+        "}",
+        "",
+      ].join("\n"),
+      "src/planning/targetRanking.test.ts":
+        "expect(rankPlannerTargets('planner target ranking')).toBe('targetRanking.ts');\n",
+    });
+    const planningResult = await readyPlanningResult(workspaceRoot);
+
+    const multiple = await preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff: planningResult.mutationHandoff,
+      planningResult,
+      liveProvider: {
+        optIn: true,
+        source: "runtime-option",
+        attempts: [
+          {
+            role: "primary",
+            providerSafeLabel: "focused-fake-primary",
+            providerConfigSource: "test-fixture",
+            providerAvailability: {
+              kind: "available",
+              providerKindLabel: "focused-fake-primary",
+            },
+            readinessStatus: "ready",
+            evidenceSource: "fake-provider",
+            provider: {
+              proposeEdit: () => exactProposal(),
+            },
+          },
+        ],
+      },
+    });
+    const missing = await preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff: planningResult.mutationHandoff,
+      planningResult,
+      liveProvider: {
+        optIn: true,
+        source: "runtime-option",
+        attempts: [
+          {
+            role: "primary",
+            providerSafeLabel: "focused-fake-primary",
+            providerConfigSource: "test-fixture",
+            providerAvailability: {
+              kind: "available",
+              providerKindLabel: "focused-fake-primary",
+            },
+            readinessStatus: "ready",
+            evidenceSource: "fake-provider",
+            provider: {
+              proposeEdit: () => ({
+                ...exactProposal(),
+                targets: [
+                  {
+                    path: "src/planning/targetRanking.ts",
+                    oldText: "missing old text",
+                    newText: "replacement",
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      },
+    });
+
+    expect(multiple.status).toBe("live-provider-old-text-multiple-matches");
+    expect(multiple.evidence).toContain(
+      "planning-runtime-product-proposal:live-provider-status:OLD-TEXT-MULTIPLE-MATCHES",
+    );
+    expect(multiple.evidence).toContain(
+      "planning-runtime-product-proposal:live-provider-primary:status:OLD-TEXT-MULTIPLE-MATCHES",
+    );
+    expect(missing.status).toBe("live-provider-old-text-not-found");
+    expect(missing.evidence).toContain(
+      "planning-runtime-product-proposal:live-provider-status:OLD-TEXT-NOT-FOUND",
+    );
+  }, 15000);
+
   it("builds selected workspace proof inputs only from explicit authority", async () => {
     const workspaceRoot = createWorkspace({
       "src/planning/targetRanking.ts": sourceContent(),
