@@ -367,15 +367,20 @@ try {
     ...validateLiveSingleFileReports(liveSingleFileReports),
     ...validateTargetSet(targetSet),
   ];
+  const routeCompletion = classifyRouteCompletion({
+    reports,
+    targetSet,
+    realLiveReports,
+    liveExactReadyCount,
+    liveApplyReadbackCount,
+    failures,
+  });
 
   console.log(JSON.stringify({
     route: "218",
     gate: "route218-real-authorized-coding-benchmark",
-    status: failures.length === 0
-      ? realLiveReports.length > 0
-        ? "PHASE1_LIVE_CROSS_MODULE"
-        : "PHASE0_PHASE2_BASELINE"
-      : "FAILED",
+    status: routeCompletion.status,
+    completionReasons: routeCompletion.reasons,
     providerStatus: realLiveReports.length > 0 ? "live-provider-attempted" : "fake-provider-only",
     liveProviderTouched: realLiveReports.some((report) => report.providerCalled),
     liveOptIn,
@@ -849,6 +854,76 @@ function validateTargetSet(targetSet: Awaited<ReturnType<typeof runTargetSetProp
   if (targetSet.readback !== "succeeded") failures.push(`target-set-readback=${targetSet.readback}`);
   if (targetSet.changedFiles.length !== 2) failures.push(`target-set-changed-count=${targetSet.changedFiles.length}`);
   return failures;
+}
+
+function classifyRouteCompletion(input: {
+  readonly reports: readonly ProductReport[];
+  readonly targetSet: Awaited<ReturnType<typeof runTargetSetProposalCase>>;
+  readonly realLiveReports: readonly LiveSingleFileReport[];
+  readonly liveExactReadyCount: number;
+  readonly liveApplyReadbackCount: number;
+  readonly failures: readonly string[];
+}): { readonly status: "COMPLETE" | "PARTIAL" | "FAILED"; readonly reasons: readonly string[] } {
+  if (input.failures.length > 0) {
+    return { status: "FAILED", reasons: input.failures };
+  }
+  const defaultReport = input.reports.find((report) => report.id === "default-no-provider-no-apply-no-command");
+  const selected = input.reports.find((report) => report.id === "selected-workspace-authorized-apply");
+  const command = input.reports.find((report) => report.id === "authorized-verification-command");
+  const repair = input.reports.find((report) => report.id === "verification-failure-repair-continuation");
+  const liveModules = new Set(input.realLiveReports.map((report) => report.moduleArea));
+  const taskCount = taskPack.length;
+  const complete =
+    taskCount >= 5 &&
+    input.realLiveReports.length >= 3 &&
+    liveModules.size >= 3 &&
+    input.liveExactReadyCount >= 2 &&
+    input.liveApplyReadbackCount >= 2 &&
+    (input.targetSet.apply === "target-set-applied" || input.targetSet.apply === "hunk-set-applied") &&
+    input.targetSet.perFileEvidence.length >= 2 &&
+    input.targetSet.perFileEvidence.every((file) =>
+      file.exactProposal === "ready" &&
+      file.apply === "applied" &&
+      file.verify === "readback-succeeded"
+    ) &&
+    selected?.applyState === "single-target-applied" &&
+    selected?.readback === "succeeded" &&
+    command?.command === "passed" &&
+    command?.commandDispatch === "existing-tool-runtime" &&
+    repair?.repair === "repair-continuation-created" &&
+    repair?.readback === "failed" &&
+    defaultReport?.providerCalled === false &&
+    defaultReport?.applyState === "not-run" &&
+    defaultReport?.commandDispatch === "not-run";
+  if (complete) {
+    return {
+      status: "COMPLETE",
+      reasons: [
+        "realistic-product-path-tasks>=5",
+        "cross-module-live-single-file-tasks=3",
+        "live-exact-apply-readback>=2",
+        "small-multi-file-per-file-exact-apply-readback",
+        "selected-workspace-authorized-apply",
+        "authorized-verification-command",
+        "repair-continuation-preserved-failure",
+        "default-no-provider-no-apply-no-command",
+      ],
+    };
+  }
+  return {
+    status: "PARTIAL",
+    reasons: [
+      `taskCount=${taskCount}`,
+      `realLiveReports=${input.realLiveReports.length}`,
+      `liveModules=${liveModules.size}`,
+      `liveExactReadyCount=${input.liveExactReadyCount}`,
+      `liveApplyReadbackCount=${input.liveApplyReadbackCount}`,
+      `targetSetApply=${input.targetSet.apply}`,
+      `selectedApply=${selected?.applyState ?? "missing"}`,
+      `verificationCommand=${command?.command ?? "missing"}`,
+      `repair=${repair?.repair ?? "missing"}`,
+    ],
+  };
 }
 
 async function seedWorkspace(id: string): Promise<string> {
