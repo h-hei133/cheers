@@ -574,18 +574,25 @@ async function runLiveProviderEvidencePack(): Promise<LiveProviderEvidencePack> 
     };
   }
   const canonical = canonicalProviderEnv(effective.env);
-  const config = primaryProviderConfig({
+  const primaryConfig = primaryProviderConfig({
     env: canonical.env,
     configSource: effective.configSource,
     providerSafeLabel: canonical.providerSafeLabel,
   });
+  const fallbackConfig = fallbackProviderConfig({
+    env: effective.env,
+    primary: primaryConfig,
+    configSource: effective.configSource,
+  });
+  const fallbackCandidate = fallbackConfig ? buildFallbackAttempt(fallbackConfig) : undefined;
+  const fallback = fallbackCandidate?.adapterApproved ? fallbackCandidate : undefined;
   const tasks: LiveTaskEvidence[] = [];
   for (const task of liveTasks) {
-    const primary = await buildPrimaryAttempt(config);
+    const primary = await buildPrimaryAttempt(primaryConfig);
     tasks.push(await runLiveTaskEvidence({
       task,
-      attempts: [primary.attempt],
-      fallbackEnabled: false,
+      attempts: [primary.attempt, ...(fallback ? [fallback.attempt] : [])],
+      fallbackEnabled: Boolean(fallback),
     }));
   }
   return {
@@ -896,6 +903,7 @@ async function buildPrimaryAttempt(config: ProviderConfig): Promise<{
   const missing = firstMissingConfig(config);
   if (missing) {
     return buildApprovalAttempt({
+      role: "primary",
       config,
       readinessStatus: missing === "api-key" ? "missing-key" : "missing-config",
       providerAvailability: { kind: "not-configured", reason: `${missing} is missing` },
@@ -903,6 +911,7 @@ async function buildPrimaryAttempt(config: ProviderConfig): Promise<{
   }
   if (config.provider !== "openai-compatible") {
     return buildApprovalAttempt({
+      role: "primary",
       config,
       readinessStatus: "unsupported",
       providerAvailability: { kind: "unsupported", reason: "Route219 supports openai-compatible only" },
@@ -917,12 +926,14 @@ async function buildPrimaryAttempt(config: ProviderConfig): Promise<{
   if (readiness.ok === false) {
     const readinessStatus = mapReadinessFailure(readiness.failure.kind);
     return buildApprovalAttempt({
+      role: "primary",
       config,
       readinessStatus,
       providerAvailability: availabilityForReadiness(readinessStatus),
     });
   }
   return buildApprovalAttempt({
+    role: "primary",
     config,
     readinessStatus: "ready",
     providerAvailability: { kind: "available", providerKindLabel: config.safeLabel },
@@ -930,6 +941,7 @@ async function buildPrimaryAttempt(config: ProviderConfig): Promise<{
 }
 
 function buildApprovalAttempt(input: {
+  readonly role: "primary" | "fallback";
   readonly config: ProviderConfig;
   readonly readinessStatus: LiveProviderReadinessStatus;
   readonly providerAvailability: ProviderEditAvailability;
@@ -957,7 +969,7 @@ function buildApprovalAttempt(input: {
     : undefined;
   return {
     attempt: {
-      role: "primary",
+      role: input.role,
       providerSafeLabel: input.config.safeLabel,
       providerConfigSource: input.config.configSource,
       providerAvailability: input.providerAvailability,
@@ -982,9 +994,75 @@ function primaryProviderConfig(input: {
     apiKey: trim(input.env.PRIVATE_AGENTS_REAL_API_KEY),
     baseUrl: trim(input.env.PRIVATE_AGENTS_REAL_BASE_URL),
     model: trim(input.env.PRIVATE_AGENTS_REAL_MODEL),
-    safeLabel: siliconFlowLabel(trim(input.env.PRIVATE_AGENTS_REAL_BASE_URL)) ?? input.providerSafeLabel,
+    safeLabel: siliconFlowLabel(trim(input.env.PRIVATE_AGENTS_REAL_BASE_URL), "primary") ?? input.providerSafeLabel,
     configSource: `${safeEvidenceValue(input.configSource)}+primary`,
   };
+}
+
+function fallbackProviderConfig(input: {
+  readonly env: Record<string, string>;
+  readonly primary: ProviderConfig;
+  readonly configSource: string;
+}): ProviderConfig | undefined {
+  const fallbackBaseUrl = getTrimmed(input.env, [
+    "PRIVATE_AGENTS_REAL_FALLBACK_BASE_URL",
+    "PRIVATE_AGENTS_PROVIDER_FALLBACK_BASE_URL",
+    "PRIVATE_AGENTS_FALLBACK_BASE_URL",
+    "OPENAI_COMPATIBLE_FALLBACK_BASE_URL",
+    "SILICONFLOW_FALLBACK_BASE_URL",
+  ]) ?? defaultSiliconFlowFallbackBaseUrl(input.primary.baseUrl);
+  if (!fallbackBaseUrl && !input.primary.apiKey && !input.primary.model) return undefined;
+  return {
+    provider: normalizeProvider(
+      getTrimmed(input.env, [
+        "PRIVATE_AGENTS_REAL_FALLBACK_PROVIDER",
+        "PRIVATE_AGENTS_FALLBACK_PROVIDER",
+        "SILICONFLOW_FALLBACK_PROVIDER",
+      ]) ?? input.primary.provider,
+    ) ?? "unknown",
+    apiKey: getTrimmed(input.env, [
+      "PRIVATE_AGENTS_REAL_FALLBACK_API_KEY",
+      "PRIVATE_AGENTS_PROVIDER_FALLBACK_API_KEY",
+      "PRIVATE_AGENTS_FALLBACK_API_KEY",
+      "OPENAI_COMPATIBLE_FALLBACK_API_KEY",
+      "SILICONFLOW_FALLBACK_API_KEY",
+    ]) ?? input.primary.apiKey,
+    baseUrl: fallbackBaseUrl,
+    model: getTrimmed(input.env, [
+      "PRIVATE_AGENTS_REAL_FALLBACK_MODEL",
+      "PRIVATE_AGENTS_PROVIDER_FALLBACK_MODEL",
+      "PRIVATE_AGENTS_FALLBACK_MODEL",
+      "OPENAI_COMPATIBLE_FALLBACK_MODEL",
+    ]) ?? input.primary.model,
+    safeLabel: siliconFlowLabel(fallbackBaseUrl, "fallback") ?? "openai-compatible-fallback",
+    configSource: `${safeEvidenceValue(input.configSource)}+fallback`,
+  };
+}
+
+function buildFallbackAttempt(config: ProviderConfig): Awaited<ReturnType<typeof buildPrimaryAttempt>> {
+  const missing = firstMissingConfig(config);
+  if (missing) {
+    return buildApprovalAttempt({
+      role: "fallback",
+      config,
+      readinessStatus: missing === "api-key" ? "missing-key" : "missing-config",
+      providerAvailability: { kind: "not-configured", reason: `${missing} is missing` },
+    });
+  }
+  if (config.provider !== "openai-compatible") {
+    return buildApprovalAttempt({
+      role: "fallback",
+      config,
+      readinessStatus: "unsupported",
+      providerAvailability: { kind: "unsupported", reason: "Route219 fallback supports openai-compatible only" },
+    });
+  }
+  return buildApprovalAttempt({
+    role: "fallback",
+    config,
+    readinessStatus: "ready",
+    providerAvailability: { kind: "available", providerKindLabel: config.safeLabel },
+  });
 }
 
 function firstMissingConfig(config: ProviderConfig): "api-key" | "base-url" | "model" | undefined {
@@ -1012,7 +1090,10 @@ function availabilityForReadiness(status: LiveProviderReadinessStatus): Provider
 }
 
 function normalizeProvider(value: string | undefined): RuntimeProvider | undefined {
-  const normalized = value?.trim();
+  const normalized = value?.trim().toLowerCase().replace(/_/g, "-");
+  if (normalized === "siliconflow" || normalized === "compatible" || normalized === "openaicompatible") {
+    return "openai-compatible";
+  }
   return normalized === "openai" || normalized === "openai-compatible" || normalized === "synthetic"
     ? normalized
     : undefined;
@@ -1023,8 +1104,22 @@ function trim(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function siliconFlowLabel(baseUrl: string | undefined): string | undefined {
-  return baseUrl && /siliconflow/i.test(baseUrl) ? "siliconflow-primary" : undefined;
+function getTrimmed(env: Record<string, string>, names: readonly string[]): string | undefined {
+  for (const name of names) {
+    const value = trim(env[name]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function defaultSiliconFlowFallbackBaseUrl(primaryBaseUrl: string | undefined): string | undefined {
+  if (!primaryBaseUrl) return undefined;
+  return /siliconflow/i.test(primaryBaseUrl) ? primaryBaseUrl : undefined;
+}
+
+function siliconFlowLabel(baseUrl: string | undefined, role: "primary" | "fallback"): string | undefined {
+  if (!baseUrl || !/siliconflow/i.test(baseUrl)) return undefined;
+  return role === "primary" ? "siliconflow-primary" : "siliconflow-fallback";
 }
 
 function workspaceOptions(
@@ -1050,14 +1145,18 @@ function markerValue(evidence: readonly string[], prefix: string): string | unde
 }
 
 function isSafeLiveProviderEvidenceMarker(entry: string): boolean {
+  const safeAttemptMarker = (role: "primary" | "fallback") =>
+    entry.startsWith(`planning-runtime-product-proposal:live-provider-${role}:readiness:`) ||
+    entry.startsWith(`planning-runtime-product-proposal:live-provider-${role}:status:`) ||
+    entry.startsWith(`planning-runtime-product-proposal:live-provider-${role}:provider-called:`) ||
+    entry.startsWith(`planning-runtime-product-proposal:live-provider-${role}:dry-run-status:`) ||
+    entry.startsWith(`planning-runtime-product-proposal:live-provider-${role}:evidence-source:`) ||
+    entry.startsWith(`planning-runtime-product-proposal:live-provider-${role}:skipped-`);
   return (
     entry.startsWith("planning-runtime-product-proposal:live-provider-status:") ||
     entry.startsWith("planning-runtime-product-proposal:live-provider-exact-classification:") ||
-    entry.startsWith("planning-runtime-product-proposal:live-provider-primary:readiness:") ||
-    entry.startsWith("planning-runtime-product-proposal:live-provider-primary:status:") ||
-    entry.startsWith("planning-runtime-product-proposal:live-provider-primary:provider-called:") ||
-    entry.startsWith("planning-runtime-product-proposal:live-provider-primary:dry-run-status:") ||
-    entry.startsWith("planning-runtime-product-proposal:live-provider-primary:evidence-source:") ||
+    safeAttemptMarker("primary") ||
+    safeAttemptMarker("fallback") ||
     entry === "planning-runtime-product-proposal:raw-provider-output-excluded" ||
     entry === "planning-runtime-product-proposal:no-provider-call-during-apply"
   );
