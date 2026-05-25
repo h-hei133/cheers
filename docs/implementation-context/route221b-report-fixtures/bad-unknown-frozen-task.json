@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "route": "route222-bad-unknown-frozen-task",
+  "routeType": "capability",
+  "finalStatus": "PARTIAL",
+  "independentAuditResult": "PASS",
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-task-does-not-exist",
+      "requiredClaim": "unknown",
+      "evidenceLevel": "partial",
+      "primaryCompleteEvidence": false,
+      "negativeControls": ["unknown frozen task rejected"],
+      "verdict": "PARTIAL"
+    }
+  ],
+  "routeLocalTasksAdded": [],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": []
+}

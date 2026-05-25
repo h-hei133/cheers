@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "route": "route222-sample",
+  "routeType": "capability",
+  "finalStatus": "PARTIAL",
+  "independentAuditResult": "PARTIAL",
+  "independentPassRerun": null,
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "requiredClaim": "repair-to-success",
+      "evidenceLevel": "partial",
+      "primaryCompleteEvidence": false,
+      "negativeControls": [
+        "repair continuation rejected as success",
+        "apply without verification rejected"
+      ],
+      "verdict": "PARTIAL"
+    },
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "requiredClaim": "task-relevant verification",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "negativeControls": [
+        "command-only bypass rejected"
+      ],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route222-focused-regression",
+      "purpose": "Protect a focused repair regression after frozen task verdicts.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "fake/focused-only",
+      "providerMode": "fake",
+      "repair": {
+        "continuationCreated": true,
+        "proposalCreated": true,
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "finalVerdict": "PARTIAL"
+    },
+    {
+      "taskId": "frozen-command-only-bypass-negative-control",
+      "evidenceLevel": "frozen-task-proven",
+      "providerEvidenceClass": "not-called",
+      "providerMode": "none",
+      "repair": {
+        "continuationCreated": false,
+        "proposalCreated": false,
+        "applied": false,
+        "postRepairVerification": "not-applicable",
+        "reportedRepairSuccess": false
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "rejected-command-only",
+        "reportedSuccess": false
+      },
+      "finalVerdict": "COMPLETE"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "route": "route222-bad-missing-negative-controls",
+  "routeType": "capability",
+  "finalStatus": "PARTIAL",
+  "independentAuditResult": "PASS",
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "requiredClaim": "task-relevant verification",
+      "evidenceLevel": "partial",
+      "primaryCompleteEvidence": false,
+      "negativeControls": ["command-only bypass rejected"],
+      "verdict": "PARTIAL"
+    }
+  ],
+  "routeLocalTasksAdded": [],
+  "taskVerdicts": []
+}

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "route": "route222-bad-route-local-primary",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "requiredClaim": "task-relevant verification",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "negativeControls": ["command-only bypass rejected"],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route222-local-primary",
+      "secondary": false,
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": true
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": []
+}

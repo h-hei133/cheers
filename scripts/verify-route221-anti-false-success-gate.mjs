@@ -14,6 +14,19 @@ const docs = {
   reportTemplate: 'docs/implementation-context/future-route-report-template-route221.md',
 }
 
+const reportFixtureDir = 'docs/implementation-context/route221b-report-fixtures'
+const goodReportFixture = `${reportFixtureDir}/good-report.json`
+const badReportFixtures = [
+  `${reportFixtureDir}/bad-unknown-frozen-task.json`,
+  `${reportFixtureDir}/bad-route-local-primary.json`,
+  `${reportFixtureDir}/bad-unknown-evidence-level.json`,
+  `${reportFixtureDir}/bad-missing-negative-controls.json`,
+  `${reportFixtureDir}/bad-partial-override.json`,
+  `${reportFixtureDir}/bad-repair-continuation-success.json`,
+  `${reportFixtureDir}/bad-apply-without-verification.json`,
+  `${reportFixtureDir}/bad-fake-focused-live.json`,
+]
+
 const knownEvidenceLevels = [
   'product-proven',
   'live-provider-proven',
@@ -71,6 +84,15 @@ const requiredSchemaPhrases = [
   'Audit `PARTIAL` cannot be overridden unless an independent rerun returns `PASS`.',
 ]
 
+const requiredNegativeControlKeys = [
+  'routeLocalBenchmarkOnlyCompleteRejected',
+  'fakeFocusedLabeledLiveRejected',
+  'repairContinuationLabeledRepairSuccessRejected',
+  'applyWithoutVerificationRejected',
+  'commandOnlyBypassRejected',
+  'auditPartialOverrideRejected',
+]
+
 function relPath(filePath) {
   return path.join(repoRoot, filePath)
 }
@@ -101,6 +123,43 @@ function assertFileExists(checks, name, filePath) {
 
 function arrayHasValue(value) {
   return Array.isArray(value) && value.length > 0
+}
+
+function parseArgs(argv) {
+  const args = { reports: [] }
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index]
+    if (arg === '--report') {
+      const reportPath = argv[index + 1]
+      if (!reportPath) throw new Error('--report requires a path')
+      args.reports.push(reportPath)
+      index += 1
+    } else if (arg === '--help' || arg === '-h') {
+      args.help = true
+    } else {
+      throw new Error(`unknown argument: ${arg}`)
+    }
+  }
+  return args
+}
+
+function printHelp() {
+  console.log('usage: node scripts/verify-route221-anti-false-success-gate.mjs [--report <path> ...]')
+  console.log('without --report, validates Route221 harness files plus built-in good/bad report fixtures')
+}
+
+function loadJsonFile(filePath) {
+  const absolutePath = path.isAbsolute(filePath) ? filePath : relPath(filePath)
+  return JSON.parse(fs.readFileSync(absolutePath, 'utf8'))
+}
+
+function loadTaskPack() {
+  return loadJsonFile(docs.tasks)
+}
+
+function schemaEvidenceLevels() {
+  const schema = readText(docs.schema)
+  return new Set(knownEvidenceLevels.filter((level) => schema.includes(`\`${level}\``)))
 }
 
 function validateTasks(checks) {
@@ -239,6 +298,8 @@ function validateTemplates(checks) {
     'Route-Local Tasks Added',
     'Evidence Classification',
     'Required Negative Controls',
+    'Machine-Checkable Report Artifact',
+    'npm run verify:route221-anti-false-success-gate -- --report',
     'If audit returned `PARTIAL`, rerun audit result',
     'Route-local evidence cannot be primary COMPLETE evidence.',
   ]
@@ -277,9 +338,187 @@ function validateTemplates(checks) {
   }
 }
 
+function collectEvidenceLevelsFromReport(report) {
+  const levels = []
+  for (const item of report.frozenTasksAttempted ?? []) {
+    if (typeof item.evidenceLevel === 'string') levels.push(['frozenTasksAttempted', item.id, item.evidenceLevel])
+  }
+  for (const item of report.routeLocalTasksAdded ?? []) {
+    if (typeof item.evidenceLevel === 'string') levels.push(['routeLocalTasksAdded', item.id, item.evidenceLevel])
+  }
+  for (const item of report.taskVerdicts ?? []) {
+    if (typeof item.evidenceLevel === 'string') levels.push(['taskVerdicts', item.taskId, item.evidenceLevel])
+  }
+  return levels
+}
+
+function validateRouteReport(report, options) {
+  const errors = []
+  const frozenTaskIds = options.frozenTaskIds
+  const evidenceLevels = options.evidenceLevels
+  const label = options.label
+
+  if (report === null || typeof report !== 'object' || Array.isArray(report)) {
+    return [`${label}: report must be a JSON object`]
+  }
+
+  const routeType = report.routeType ?? 'capability'
+  const finalStatus = report.finalStatus
+  const frozenTasks = report.frozenTasksAttempted
+  if (!arrayHasValue(frozenTasks)) {
+    errors.push(`${label}: frozenTasksAttempted must be a non-empty array`)
+  } else {
+    for (const task of frozenTasks) {
+      if (!frozenTaskIds.has(task.id)) {
+        errors.push(`${label}: unknown frozen task id ${task.id ?? '<missing>'}`)
+      }
+      if (!arrayHasValue(task.negativeControls)) {
+        errors.push(`${label}: frozen task ${task.id ?? '<missing>'} must include negativeControls`)
+      }
+    }
+  }
+
+  for (const [section, id, level] of collectEvidenceLevelsFromReport(report)) {
+    if (!evidenceLevels.has(level)) {
+      errors.push(`${label}: unknown evidence level ${level} in ${section}:${id ?? '<missing>'}`)
+    }
+  }
+
+  for (const routeLocalTask of report.routeLocalTasksAdded ?? []) {
+    if (routeLocalTask.secondary !== true) {
+      errors.push(`${label}: route-local task ${routeLocalTask.id ?? '<missing>'} must set secondary=true`)
+    }
+    if (routeLocalTask.evidenceLevel !== 'route-local-benchmark') {
+      errors.push(`${label}: route-local task ${routeLocalTask.id ?? '<missing>'} must use route-local-benchmark evidence`)
+    }
+    if (routeLocalTask.primaryCompleteEvidence !== false) {
+      errors.push(`${label}: route-local task ${routeLocalTask.id ?? '<missing>'} cannot be primary COMPLETE evidence`)
+    }
+  }
+
+  if (routeType === 'capability') {
+    if (report.requiredNegativeControls === undefined || report.requiredNegativeControls === null) {
+      errors.push(`${label}: capability report must include requiredNegativeControls`)
+    } else {
+      for (const key of requiredNegativeControlKeys) {
+        if (report.requiredNegativeControls[key] !== true) {
+          errors.push(`${label}: requiredNegativeControls.${key} must be true`)
+        }
+      }
+    }
+  }
+
+  if (report.independentAuditResult === 'PARTIAL' && finalStatus === 'COMPLETE') {
+    const rerun = report.independentPassRerun
+    if (!rerun || rerun.result !== 'PASS') {
+      errors.push(`${label}: audit PARTIAL cannot become COMPLETE without independentPassRerun.result=PASS`)
+    }
+  }
+
+  for (const verdict of report.taskVerdicts ?? []) {
+    if (verdict.taskId && !frozenTaskIds.has(verdict.taskId) && !String(verdict.taskId).startsWith('route')) {
+      errors.push(`${label}: task verdict references unknown task ${verdict.taskId}`)
+    }
+
+    const providerClass = String(verdict.providerEvidenceClass ?? '')
+    const providerMode = String(verdict.providerMode ?? '')
+    if (
+      verdict.evidenceLevel === 'live-provider-proven' &&
+      (/fake|focused/.test(providerClass) || /fake|synthetic/.test(providerMode))
+    ) {
+      errors.push(`${label}: fake/focused provider evidence cannot be live-provider-proven for ${verdict.taskId ?? '<missing>'}`)
+    }
+
+    const repair = verdict.repair ?? {}
+    if (repair.reportedRepairSuccess === true) {
+      const repairApplied = repair.applied === true
+      const repairVerified = repair.postRepairVerification === 'passed'
+      if (!repairApplied || !repairVerified) {
+        errors.push(`${label}: repair continuation/proposal alone cannot be reported as repair success for ${verdict.taskId ?? '<missing>'}`)
+      }
+    }
+
+    const apply = verdict.apply ?? {}
+    if (apply.reportedSuccess === true) {
+      const applied = apply.status === 'applied'
+      const verified = apply.verificationStatus === 'passed'
+      if (!applied || !verified) {
+        errors.push(`${label}: apply without passed verification cannot be reported as success for ${verdict.taskId ?? '<missing>'}`)
+      }
+    }
+  }
+
+  return errors
+}
+
+function validateReportFile(checks, filePath, options = {}) {
+  let report
+  try {
+    report = loadJsonFile(filePath)
+  } catch (error) {
+    fail(checks, `route-report-json:${filePath}`, error.message)
+    return false
+  }
+
+  const errors = validateRouteReport(report, {
+    frozenTaskIds: options.frozenTaskIds,
+    evidenceLevels: options.evidenceLevels,
+    label: filePath,
+  })
+  if (errors.length > 0) {
+    fail(checks, `route-report:${filePath}`, errors.join(' | '))
+    return false
+  }
+  pass(checks, `route-report:${filePath}`)
+  return true
+}
+
+function validateReportFixtures(checks, options) {
+  assertFileExists(checks, 'route221b-good-report-fixture-exists', goodReportFixture)
+  for (const fixture of badReportFixtures) {
+    assertFileExists(checks, `route221b-bad-report-fixture-exists:${path.basename(fixture)}`, fixture)
+  }
+  if (checks.some((check) => !check.ok)) return
+
+  validateReportFile(checks, goodReportFixture, options)
+
+  for (const fixture of badReportFixtures) {
+    let report
+    try {
+      report = loadJsonFile(fixture)
+    } catch (error) {
+      fail(checks, `route221b-bad-report-json:${fixture}`, error.message)
+      continue
+    }
+    const errors = validateRouteReport(report, {
+      frozenTaskIds: options.frozenTaskIds,
+      evidenceLevels: options.evidenceLevels,
+      label: fixture,
+    })
+    if (errors.length === 0) {
+      fail(checks, `route221b-bad-report-rejected:${path.basename(fixture)}`, 'bad report unexpectedly passed')
+    } else {
+      pass(checks, `route221b-bad-report-rejected:${path.basename(fixture)}`, errors[0])
+    }
+  }
+}
+
 function main() {
+  let args
+  try {
+    args = parseArgs(process.argv.slice(2))
+  } catch (error) {
+    console.error(error.message)
+    printHelp()
+    process.exit(1)
+  }
+  if (args.help) {
+    printHelp()
+    process.exit(0)
+  }
+
   console.log('gate name=route221-anti-false-success')
-  console.log('mode=static-harness')
+  console.log(args.reports.length > 0 ? 'mode=route-report' : 'mode=static-harness')
   console.log(`repo=${repoRoot}`)
 
   const checks = []
@@ -295,6 +534,23 @@ function main() {
   validateTasks(checks)
   validateSchema(checks)
   validateTemplates(checks)
+
+  let taskPack
+  try {
+    taskPack = loadTaskPack()
+  } catch (error) {
+    fail(checks, 'route-report-task-pack-load', error.message)
+  }
+  const frozenTaskIds = new Set((taskPack?.tasks ?? []).map((task) => task.id))
+  const evidenceLevels = schemaEvidenceLevels()
+
+  if (args.reports.length > 0) {
+    for (const reportPath of args.reports) {
+      validateReportFile(checks, reportPath, { frozenTaskIds, evidenceLevels })
+    }
+  } else {
+    validateReportFixtures(checks, { frozenTaskIds, evidenceLevels })
+  }
 
   const ok = checks.every((check) => check.ok)
   console.log(`[${ok ? 'pass' : 'fail'}] route221-anti-false-success-gate`)

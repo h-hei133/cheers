@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "route": "route222-bad-partial-override",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PARTIAL",
+  "independentPassRerun": {
+    "result": "not-run"
+  },
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "requiredClaim": "task-relevant verification",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "negativeControls": ["command-only bypass rejected"],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": []
+}

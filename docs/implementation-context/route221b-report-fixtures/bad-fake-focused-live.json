@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "route": "route222-bad-fake-focused-live",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-live-provider-opt-in-classification",
+      "requiredClaim": "live provider proof",
+      "evidenceLevel": "live-provider-proven",
+      "primaryCompleteEvidence": true,
+      "negativeControls": ["fake focused live rejected"],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-live-provider-opt-in-classification",
+      "evidenceLevel": "live-provider-proven",
+      "providerEvidenceClass": "fake/focused-only",
+      "providerMode": "fake",
+      "repair": {
+        "continuationCreated": false,
+        "proposalCreated": false,
+        "applied": false,
+        "postRepairVerification": "not-applicable",
+        "reportedRepairSuccess": false
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "finalVerdict": "COMPLETE"
+    }
+  ]
+}

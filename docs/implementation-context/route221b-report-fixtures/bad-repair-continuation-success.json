@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "route": "route222-bad-repair-continuation-success",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "requiredClaim": "repair-to-success",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": true,
+      "negativeControls": ["repair continuation rejected as success"],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-called",
+      "providerMode": "none",
+      "repair": {
+        "continuationCreated": true,
+        "proposalCreated": true,
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": true
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "finalVerdict": "COMPLETE"
+    }
+  ]
+}

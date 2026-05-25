@@ -54,6 +54,89 @@ not from route-local benchmark convenience.
 - Command-only bypass rejected:
 - Audit `PARTIAL` override rejected unless independent rerun returned `PASS`:
 
+## Machine-Checkable Report Artifact
+
+Future capability routes should also keep a small JSON report artifact that can
+be checked by `npm run verify:route221-anti-false-success-gate -- --report
+<path>`. The JSON artifact is intentionally static and should summarize the
+same facts as the human report.
+
+Required shape:
+
+```json
+{
+  "schemaVersion": 1,
+  "route": "route222",
+  "routeType": "capability",
+  "finalStatus": "PARTIAL",
+  "independentAuditResult": "PARTIAL",
+  "independentPassRerun": null,
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "requiredClaim": "repair-to-success",
+      "evidenceLevel": "partial",
+      "primaryCompleteEvidence": false,
+      "negativeControls": ["repair continuation rejected as success"],
+      "verdict": "PARTIAL"
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route222-focused-regression",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "fake/focused-only",
+      "providerMode": "fake",
+      "repair": {
+        "continuationCreated": true,
+        "proposalCreated": true,
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "finalVerdict": "PARTIAL"
+    }
+  ]
+}
+```
+
+Machine-checkable report rules:
+
+- Every frozen task id must exist in
+  `docs/implementation-context/frozen-capability-tasks-route221.json`.
+- Every evidence level must be defined by
+  `docs/implementation-context/capability-evidence-schema-route221.md`.
+- Capability reports must include `requiredNegativeControls`.
+- Route-local tasks must set `secondary: true`, use
+  `route-local-benchmark`, and set `primaryCompleteEvidence: false`.
+- If `independentAuditResult` is `PARTIAL`, a `COMPLETE` final status requires
+  `independentPassRerun.result: "PASS"`.
+- Fake or focused provider evidence must not use `live-provider-proven`.
+- Repair continuation or proposal alone must not set
+  `reportedRepairSuccess: true`.
+- Apply without passed verification must not set `reportedSuccess: true`.
+
 ## Reference Adoption
 
 Use `docs/implementation-context/reference-adoption-template-route221.md`.

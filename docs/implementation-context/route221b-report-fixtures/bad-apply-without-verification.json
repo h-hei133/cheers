@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "route": "route222-bad-apply-without-verification",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "requiredClaim": "selected workspace apply",
+      "evidenceLevel": "selected-workspace-proven",
+      "primaryCompleteEvidence": true,
+      "negativeControls": ["apply without verification rejected"],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "evidenceLevel": "selected-workspace-proven",
+      "providerEvidenceClass": "not-called",
+      "providerMode": "none",
+      "repair": {
+        "continuationCreated": false,
+        "proposalCreated": false,
+        "applied": false,
+        "postRepairVerification": "not-applicable",
+        "reportedRepairSuccess": false
+      },
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "not-run",
+        "reportedSuccess": true
+      },
+      "finalVerdict": "COMPLETE"
+    }
+  ]
+}
