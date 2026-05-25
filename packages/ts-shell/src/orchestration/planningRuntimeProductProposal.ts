@@ -63,6 +63,7 @@ type LiveProviderTerminalClass =
   | "OLD-TEXT-MULTIPLE-MATCHES"
   | "PROVIDER-OUTPUT-INSUFFICIENT"
   | "PATCH-AUTHOR-UNSUITABLE"
+  | "PROVIDER-ERROR"
   | "FAILED";
 
 type LiveProviderEvidenceSource =
@@ -175,6 +176,7 @@ async function prepareLiveProviderProposal(input: {
     workspaceRoot: input.workspaceRoot,
     handoff: input.handoff,
     planningResult: input.planningResult,
+    taskEvidence: input.liveProvider.taskEvidence,
     calibration: input.liveProvider.calibration,
   });
   const calibrationMode = input.liveProvider.calibration?.mode;
@@ -183,6 +185,9 @@ async function prepareLiveProviderProposal(input: {
     `planning-runtime-product-proposal:live-provider-source:${input.liveProvider.source}`,
     `planning-runtime-product-proposal:live-provider-attempt-count:${attempts.length}`,
     `planning-runtime-product-proposal:live-provider-fallback-policy:${input.liveProvider.fallbackPolicy?.enabled ? "enabled" : "disabled"}`,
+    ...(input.liveProvider.taskEvidence?.mode
+      ? [`planning-runtime-product-proposal:live-provider-task-evidence:${input.liveProvider.taskEvidence.mode}`]
+      : []),
     ...(calibrationMode
       ? [`planning-runtime-product-proposal:live-provider-calibration:${calibrationMode}`]
       : []),
@@ -341,7 +346,7 @@ async function prepareLiveProviderProposal(input: {
           "Review the provider proposal and anchored evidence before any explicit confirmation.",
         evidence: [
           ...attemptEvidence,
-          "planning-runtime-product-proposal:live-provider-status:provider-called",
+          `planning-runtime-product-proposal:live-provider-status:${exact ? "provider-called" : "REVIEW-ONLY"}`,
           `planning-runtime-product-proposal:live-provider-selected-attempt:${attempt.role}`,
           `planning-runtime-product-proposal:live-provider-output:${dryRun.outputValidation.status}`,
           `planning-runtime-product-proposal:live-provider-anchor:${dryRun.anchoredProposal.handoffReadiness}`,
@@ -413,6 +418,7 @@ function buildLiveProviderPromptContext(input: {
   readonly workspaceRoot: string;
   readonly handoff: PlanningMutationHandoffProjection;
   readonly planningResult?: PlanningRuntimeResult;
+  readonly taskEvidence?: PlanningRuntimeProductLiveProviderProposal["taskEvidence"];
   readonly calibration?: PlanningRuntimeProductLiveProviderProposal["calibration"];
 }): ContextAwareProviderPromptContext | undefined {
   const targetPath = input.handoff.targetPaths[0];
@@ -432,6 +438,14 @@ function buildLiveProviderPromptContext(input: {
         maxChars: input.calibration.targetContentMaxChars ?? 4000,
       })
     : undefined;
+  const taskEvidenceContent = input.taskEvidence?.mode === "single-file-exact-patch"
+    ? boundedTargetContent({
+        workspaceRoot: input.workspaceRoot,
+        targetPath,
+        maxChars: input.taskEvidence.targetContentMaxChars ?? 6000,
+      })
+    : undefined;
+  const suppliedTargetContent = calibrationContent ?? taskEvidenceContent;
   const providerPrompt = [
     "Create an exact single-file patch proposal from Planning Runtime evidence.",
     `Request: ${input.planningResult.groundedAnalysis.summary}`,
@@ -453,10 +467,25 @@ function buildLiveProviderPromptContext(input: {
     ...(input.calibration?.mode === "exact-patch-author"
       ? [
           "Calibration mode: answer whether you can act as a direct single-file exact patch author.",
-          calibrationContent
-            ? `Current target content for ${targetPath}:\n<<<ROUTE216_TARGET_CONTENT\n${calibrationContent}\nROUTE216_TARGET_CONTENT`
+          suppliedTargetContent
+            ? `Current target content for ${targetPath}:\n<<<ROUTE216_TARGET_CONTENT\n${suppliedTargetContent}\nROUTE216_TARGET_CONTENT`
             : "Current target content was not available; name that as the missingFact if you cannot produce oldText/newText.",
           "Use the supplied current target content as the only source for oldText.",
+        ]
+      : []),
+    ...(input.taskEvidence?.mode === "single-file-exact-patch"
+      ? [
+          "Route217 task mode: produce one exact oldText/newText patch for this real single-file task when the supplied target content is sufficient.",
+          ...(input.taskEvidence.taskIntentSummary
+            ? [`Route217 task intent: ${input.taskEvidence.taskIntentSummary}`]
+            : []),
+          suppliedTargetContent
+            ? `Current target content for ${targetPath}:\n<<<ROUTE217_TARGET_CONTENT\n${suppliedTargetContent}\nROUTE217_TARGET_CONTENT`
+            : "Current target content was not available; return review-only with missingFact=current target content.",
+          "Use the supplied current target content as the only source for oldText.",
+          "Return a single JSON object only. The first character must be { and the last character must be }.",
+          "Do not include prose, markdown, code fences, diffs, analysis text, or multiple alternatives.",
+          "If exact oldText/newText cannot be copied from the supplied target content, return review-only JSON with a concrete missingFact.",
         ]
       : []),
     "Do not claim files were changed. Do not run commands. Do not include provider config, API keys, headers, or content outside the supplied target evidence.",
@@ -519,7 +548,15 @@ function buildLiveProviderPromptContext(input: {
       ...(input.calibration?.mode === "exact-patch-author"
         ? [
             "planning-runtime-product-proposal:live-provider-calibration:exact-patch-author",
-            `planning-runtime-product-proposal:live-provider-target-content:${calibrationContent ? "included" : "missing"}`,
+            `planning-runtime-product-proposal:live-provider-target-content:${suppliedTargetContent ? "included" : "missing"}`,
+            "planning-runtime-product-proposal:live-provider-old-new-mandatory",
+          ]
+        : []),
+      ...(input.taskEvidence?.mode === "single-file-exact-patch"
+        ? [
+            "planning-runtime-product-proposal:live-provider-task-evidence:single-file-exact-patch",
+            `planning-runtime-product-proposal:live-provider-target-content:${suppliedTargetContent ? "included" : "missing"}`,
+            `planning-runtime-product-proposal:live-provider-task-intent:${input.taskEvidence.taskIntentSummary ? "included" : "missing"}`,
             "planning-runtime-product-proposal:live-provider-old-new-mandatory",
           ]
         : []),
@@ -586,7 +623,7 @@ function classifyDryRunFailure(
     case "timeout":
       return "NETWORK-BLOCKED";
     default:
-      return "FAILED";
+      return "PROVIDER-ERROR";
   }
 }
 
@@ -612,6 +649,8 @@ function statusForLiveProviderFailure(
       return "live-provider-output-insufficient";
     case "PATCH-AUTHOR-UNSUITABLE":
       return "live-provider-patch-author-unsuitable";
+    case "PROVIDER-ERROR":
+      return "live-provider-failed";
     case "FAILED":
       return "live-provider-failed";
   }

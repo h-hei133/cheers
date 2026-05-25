@@ -54,6 +54,11 @@ export interface PlanningRuntimeProductLiveProviderProposal {
     readonly enabled: boolean;
     readonly reason: string;
   };
+  readonly taskEvidence?: {
+    readonly mode: "single-file-exact-patch";
+    readonly targetContentMaxChars?: number;
+    readonly taskIntentSummary?: string;
+  };
   readonly calibration?: {
     readonly mode: "exact-patch-author";
     readonly targetContentMaxChars?: number;

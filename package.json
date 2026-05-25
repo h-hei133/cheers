@@ -64,6 +64,7 @@
     "verify:route214-live-provider-exact-patch-benchmark": "tsx scripts/route214-live-provider-exact-patch-benchmark.ts",
     "verify:route215-live-provider-patch-diagnostics-recovery": "tsx scripts/route215-live-provider-patch-diagnostics-recovery-benchmark.ts",
     "verify:route216-live-provider-exact-patch-calibration": "tsx scripts/route216-live-provider-exact-patch-calibration.ts",
+    "verify:route217-live-provider-real-single-file-task-expansion": "tsx scripts/route217-live-provider-real-single-file-task-expansion.ts",
     "demo:route207": "tsx scripts/route207-demo.ts",
     "verify:edit-capability-closeout": "node scripts/verify-edit-capability-closeout.mjs",
     "verify:browser-txn-gate": "node scripts/verify-browser-txn-gate.mjs",
