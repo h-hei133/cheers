@@ -54,6 +54,10 @@ export interface PlanningRuntimeProductLiveProviderProposal {
     readonly enabled: boolean;
     readonly reason: string;
   };
+  readonly calibration?: {
+    readonly mode: "exact-patch-author";
+    readonly targetContentMaxChars?: number;
+  };
 }
 
 export interface PlanningRuntimeProductExecutionOptions {

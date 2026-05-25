@@ -71,10 +71,13 @@ export function buildProviderExactPatchSystemPrompt(): string {
     "You generate exact single-file patch proposals for a no-write route.",
     "Return JSON only. Do not use markdown fences.",
     "Do not claim files were changed. Do not run commands. Do not request apply.",
-    "Preferred JSON shape:",
+    "Required JSON shape when the prompt includes current target content:",
     '{"targetFile":"src/example.ts","oldText":"exact current text","newText":"replacement text","reason":"short reason","verificationHint":"safe readback or test"}',
-    "If exact oldText/newText cannot be produced from the prompt, return:",
-    '{"status":"review-only","targetFile":"src/example.ts","reason":"specific missing exact evidence"}',
+    "oldText and newText are mandatory unless a required fact is missing.",
+    "oldText must be copied byte-for-byte from provided current target content.",
+    "If a required fact is missing, return review-only and name the missing fact:",
+    '{"status":"review-only","targetFile":"src/example.ts","missingFact":"specific missing exact evidence","reason":"why exact oldText/newText cannot be produced"}',
+    "Review-only is allowed only when a required fact is missing; do not use review-only for commentary or preference.",
     "Rules: exactly one targetFile, targetFile must equal the explicit target, oldText must be copied from provided current evidence, newText must be non-empty, no multi-file edits, no broad/fuzzy edits.",
   ].join("\n");
 }
@@ -148,6 +151,7 @@ export function parseProviderExactPatchOutput(input: {
         targetCandidateCount: resolved?.candidateCount ?? 0,
       });
     }
+    const missingFactPresent = concreteReviewOnlyMissingFact(candidate);
     const diagnostics = buildDiagnostics({
       parseStatus: "review-only",
       wrapperKind: extracted.wrapperKind,
@@ -160,6 +164,7 @@ export function parseProviderExactPatchOutput(input: {
         "provider-exact-patch-diagnostic:parse-status:review-only",
         `provider-exact-patch-diagnostic:wrapper:${extracted.wrapperKind}`,
         "provider-exact-patch-diagnostic:shape:review-only-json",
+        `provider-exact-patch-diagnostic:review-only-missing-fact-present:${missingFactPresent}`,
       ],
     });
     return {
@@ -170,7 +175,9 @@ export function parseProviderExactPatchOutput(input: {
         targets: [
           {
             path,
-            summary: stringField(candidate, "reason") ?? "provider returned review-only exact patch status",
+            summary: stringField(candidate, "missingFact") ??
+              stringField(candidate, "reason") ??
+              "provider returned review-only exact patch status",
           },
         ],
         confidence: parseConfidence(candidate.confidence),
@@ -279,6 +286,19 @@ export function parseProviderExactPatchOutput(input: {
       targetCandidateCount: resolved.candidateCount,
       oldTextPresent: oldText.length > 0,
       newTextPresent: newText.length > 0,
+      oldTextLength: oldText.length,
+      newTextLength: newText.length,
+    });
+  }
+  if (oldText === newText) {
+    return invalid("invalid-format", "Provider exact patch oldText and newText must differ.", [
+      "provider-exact-patch-contract:parse:unchanged-old-new",
+    ], {
+      wrapperKind: extracted.wrapperKind,
+      outputShapeKind: "exact-json",
+      targetCandidateCount: resolved.candidateCount,
+      oldTextPresent: true,
+      newTextPresent: true,
       oldTextLength: oldText.length,
       newTextLength: newText.length,
     });
@@ -699,6 +719,12 @@ function firstTargetPath(candidate: Record<string, unknown>): string | undefined
   if (!Array.isArray(targets)) return undefined;
   const first = targets.find(isRecord);
   return first && typeof first.path === "string" ? first.path : undefined;
+}
+
+function concreteReviewOnlyMissingFact(candidate: Record<string, unknown>): boolean {
+  const missingFact = stringField(candidate, "missingFact") ?? stringField(candidate, "reason");
+  if (!missingFact?.trim()) return false;
+  return /missing|not provided|unavailable|insufficient|required|needed|lack/i.test(missingFact);
 }
 
 function parseConfidence(value: unknown): ProviderEditRawProposal["confidence"] {

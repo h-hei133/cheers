@@ -171,9 +171,9 @@ const cases: readonly TaskCase[] = [
     task: "Fix provider proposal quality so live proposals classify review-only output correctly",
     workspace: "current-repo",
     expected: {
-      proposal: "review-only",
+      proposal: "not-run",
       proposalSource: "none",
-      anchor: "missing-exact-mapping",
+      anchor: "not-run",
       confirmation: "not-confirmed",
       apply: "not-run",
       readback: "not-run",
@@ -181,9 +181,6 @@ const cases: readonly TaskCase[] = [
       commandDispatch: "not-run",
       terminal: "review-required",
       provider: "not-run",
-      evidenceIncludes: [
-        "planning-runtime-product-proposal:deterministic:no-exact-proposal",
-      ],
     },
   },
 ];

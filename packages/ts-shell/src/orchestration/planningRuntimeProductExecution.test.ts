@@ -411,6 +411,117 @@ describe("buildPlanningRuntimeProductProofInputs", () => {
     expect(JSON.stringify(proposalPreparation.evidence)).not.toContain("task.trim().includes");
   }, 15000);
 
+  it("calibrates live provider patch author output as insufficient with deterministic-builder strategy", async () => {
+    const workspaceRoot = createWorkspace({
+      "src/planning/targetRanking.ts": sourceContent(),
+      "src/planning/targetRanking.test.ts":
+        "expect(rankPlannerTargets('planner target ranking')).toBe('targetRanking.ts');\n",
+    });
+    const planningResult = await readyPlanningResult(workspaceRoot);
+    const seenPrompts: string[] = [];
+
+    const proposalPreparation = await preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff: planningResult.mutationHandoff,
+      planningResult,
+      liveProvider: {
+        optIn: true,
+        source: "runtime-option",
+        calibration: {
+          mode: "exact-patch-author",
+        },
+        fallbackPolicy: {
+          enabled: true,
+          reason: "calibration may try fallback once after insufficient patch-author output",
+        },
+        attempts: [
+          {
+            role: "primary",
+            providerSafeLabel: "focused-fake-primary",
+            providerConfigSource: "test-fixture",
+            providerAvailability: {
+              kind: "available",
+              providerKindLabel: "focused-fake-primary",
+            },
+            readinessStatus: "ready",
+            evidenceSource: "fake-provider",
+            provider: {
+              proposeEdit: (context) => {
+                seenPrompts.push(context.providerPrompt);
+                return {
+                  operationKind: "generated-replacement",
+                  targets: [{ path: "src/planning/targetRanking.ts", summary: "missing old/new" }],
+                  diagnostics: [
+                    "provider-exact-patch-diagnostic:parse-status:review-only",
+                    "provider-exact-patch-diagnostic:wrapper:json",
+                    "provider-exact-patch-diagnostic:shape:review-only-json",
+                    "provider-exact-patch-diagnostic:target-matched:true",
+                    "provider-exact-patch-diagnostic:old-text-present:false",
+                    "provider-exact-patch-diagnostic:new-text-present:false",
+                    "provider-exact-patch-diagnostic:review-only-missing-fact-present:false",
+                    "provider-exact-patch-diagnostic:raw-content-excluded",
+                  ],
+                };
+              },
+            },
+          },
+          {
+            role: "fallback",
+            providerSafeLabel: "focused-fake-fallback",
+            providerConfigSource: "test-fixture",
+            providerAvailability: {
+              kind: "available",
+              providerKindLabel: "focused-fake-fallback",
+            },
+            readinessStatus: "ready",
+            evidenceSource: "fake-provider",
+            provider: {
+              proposeEdit: (context) => {
+                seenPrompts.push(context.providerPrompt);
+                return {
+                  operationKind: "generated-replacement",
+                  targets: [{ path: "src/planning/targetRanking.ts", summary: "missing exact fields" }],
+                  diagnostics: [
+                    "provider-exact-patch-diagnostic:parse-status:review-only",
+                    "provider-exact-patch-diagnostic:wrapper:json",
+                    "provider-exact-patch-diagnostic:shape:review-only-json",
+                    "provider-exact-patch-diagnostic:target-matched:true",
+                    "provider-exact-patch-diagnostic:old-text-present:false",
+                    "provider-exact-patch-diagnostic:new-text-present:false",
+                    "provider-exact-patch-diagnostic:review-only-missing-fact-present:true",
+                    "provider-exact-patch-diagnostic:raw-content-excluded",
+                  ],
+                };
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(seenPrompts).toHaveLength(2);
+    expect(seenPrompts[0]).toContain("Current target content for src/planning/targetRanking.ts");
+    expect(seenPrompts[0]).toContain(TARGET_RANKING_OLD_TEXT);
+    expect(proposalPreparation.status).toBe("live-provider-output-insufficient");
+    expect(proposalPreparation.providerCalled).toBe(true);
+    expect(proposalPreparation.rawProposal).toBeUndefined();
+    expect(proposalPreparation.evidence).toEqual(
+      expect.arrayContaining([
+        "planning-runtime-product-proposal:live-provider-calibration:exact-patch-author",
+        "planning-runtime-product-proposal:live-provider-target-content:included",
+        "planning-runtime-product-proposal:live-provider-primary:provider-called:true",
+        "planning-runtime-product-proposal:live-provider-primary:status:PROVIDER-OUTPUT-INSUFFICIENT",
+        "planning-runtime-product-proposal:live-provider-fallback:provider-called:true",
+        "planning-runtime-product-proposal:live-provider-fallback:status:PROVIDER-OUTPUT-INSUFFICIENT",
+        "planning-runtime-product-proposal:live-provider-status:PROVIDER-OUTPUT-INSUFFICIENT",
+        "planning-runtime-product-proposal:providerPatchRole:reviewer-or-planner",
+        "planning-runtime-product-proposal:exactPatchAuthor:deterministic-builder",
+        "planning-runtime-product-proposal:raw-provider-output-excluded",
+      ]),
+    );
+    expect(JSON.stringify(proposalPreparation.evidence)).not.toContain(TARGET_RANKING_OLD_TEXT);
+  }, 15000);
+
   it("keeps provider-call failures typed and no-write", async () => {
     const workspaceRoot = createWorkspace({
       "src/planning/targetRanking.ts": sourceContent(),

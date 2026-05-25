@@ -48,6 +48,27 @@ describe("providerExactPatchContract", () => {
     expect(result.status).toBe("review-only");
     expect(result.ok && result.rawProposal.targets?.[0]?.oldText).toBeUndefined();
     expect(result.ok && result.rawProposal.targets?.[0]?.newText).toBeUndefined();
+    expect(result.evidence).toContain(
+      "provider-exact-patch-diagnostic:review-only-missing-fact-present:true",
+    );
+    expect(JSON.stringify(result.evidence)).not.toContain("current oldText");
+  });
+
+  it("marks review-only without a concrete missing fact as insufficient evidence only", () => {
+    const result = parseProviderExactPatchOutput({
+      explicitTargetLabels: ["src/app.ts"],
+      text: JSON.stringify({
+        status: "review-only",
+        targetFile: "src/app.ts",
+        reason: "looks good overall",
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.status).toBe("review-only");
+    expect(result.evidence).toContain(
+      "provider-exact-patch-diagnostic:review-only-missing-fact-present:false",
+    );
   });
 
   it("recovers markdown-wrapped exact JSON with safe diagnostics", () => {
@@ -183,12 +204,36 @@ describe("providerExactPatchContract", () => {
     })).toMatchObject({ ok: false, status: "target-mismatch" });
   });
 
+  it("rejects unchanged exact JSON instead of marking a no-op exact-ready", () => {
+    const result = parseProviderExactPatchOutput({
+      explicitTargetLabels: ["src/app.ts"],
+      text: JSON.stringify({
+        targetFile: "src/app.ts",
+        oldText: "export const mode = 'same';",
+        newText: "export const mode = 'same';",
+      }),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe("invalid-format");
+    expect(result.evidence).toContain("provider-exact-patch-contract:parse:unchanged-old-new");
+    expect(result.diagnostics).toMatchObject({
+      oldTextPresent: true,
+      newTextPresent: true,
+      oldTextLength: "export const mode = 'same';".length,
+      newTextLength: "export const mode = 'same';".length,
+    });
+    expect(JSON.stringify(result.evidence)).not.toContain("export const mode");
+  });
+
   it("documents exact oldText/newText and review-only fallback in the prompt", () => {
     const prompt = buildProviderExactPatchSystemPrompt();
 
     expect(prompt).toContain("targetFile");
     expect(prompt).toContain("oldText");
     expect(prompt).toContain("newText");
+    expect(prompt).toContain("oldText and newText are mandatory");
+    expect(prompt).toContain("missingFact");
     expect(prompt).toContain("\"status\":\"review-only\"");
     expect(prompt).toContain("no multi-file edits");
   });

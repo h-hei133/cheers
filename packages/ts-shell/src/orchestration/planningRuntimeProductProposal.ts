@@ -19,6 +19,8 @@ export type PlanningRuntimeProductProposalStatus =
   | "live-provider-config-failed"
   | "live-provider-network-blocked"
   | "live-provider-auth-failed"
+  | "live-provider-output-insufficient"
+  | "live-provider-patch-author-unsuitable"
   | "live-provider-invalid-format"
   | "live-provider-target-mismatch"
   | "live-provider-old-text-not-found"
@@ -59,6 +61,8 @@ type LiveProviderTerminalClass =
   | "TARGET-MISMATCH"
   | "OLD-TEXT-NOT-FOUND"
   | "OLD-TEXT-MULTIPLE-MATCHES"
+  | "PROVIDER-OUTPUT-INSUFFICIENT"
+  | "PATCH-AUTHOR-UNSUITABLE"
   | "FAILED";
 
 type LiveProviderEvidenceSource =
@@ -171,12 +175,17 @@ async function prepareLiveProviderProposal(input: {
     workspaceRoot: input.workspaceRoot,
     handoff: input.handoff,
     planningResult: input.planningResult,
+    calibration: input.liveProvider.calibration,
   });
+  const calibrationMode = input.liveProvider.calibration?.mode;
   const commonEvidence = [
     "planning-runtime-product-proposal:live-provider-opt-in:true",
     `planning-runtime-product-proposal:live-provider-source:${input.liveProvider.source}`,
     `planning-runtime-product-proposal:live-provider-attempt-count:${attempts.length}`,
     `planning-runtime-product-proposal:live-provider-fallback-policy:${input.liveProvider.fallbackPolicy?.enabled ? "enabled" : "disabled"}`,
+    ...(calibrationMode
+      ? [`planning-runtime-product-proposal:live-provider-calibration:${calibrationMode}`]
+      : []),
     ...(input.liveProvider.fallbackPolicy?.reason
       ? [`planning-runtime-product-proposal:live-provider-fallback-reason:${safeEvidenceValue(input.liveProvider.fallbackPolicy.reason)}`]
       : []),
@@ -308,6 +317,15 @@ async function prepareLiveProviderProposal(input: {
           ],
         });
       }
+      if (!exact && calibrationMode === "exact-patch-author") {
+        lastTerminalClass = classifyExactPatchAuthorInsufficiency(dryRun);
+        attemptEvidence.push(
+          `planning-runtime-product-proposal:live-provider-${attempt.role}:status:${lastTerminalClass}`,
+          "planning-runtime-product-proposal:providerPatchRole:reviewer-or-planner",
+          "planning-runtime-product-proposal:exactPatchAuthor:deterministic-builder",
+        );
+        continue;
+      }
       return proposalPreparation({
         status: exact ? "prepared-exact" : "review-only",
         source: "live-provider-proposal",
@@ -334,7 +352,9 @@ async function prepareLiveProviderProposal(input: {
       });
     }
 
-    lastTerminalClass = classifyDryRunFailure(dryRun);
+    lastTerminalClass = calibrationMode === "exact-patch-author"
+      ? classifyExactPatchAuthorFailure(dryRun)
+      : classifyDryRunFailure(dryRun);
     attemptEvidence.push(
       `planning-runtime-product-proposal:live-provider-${attempt.role}:status:${lastTerminalClass}`,
     );
@@ -344,12 +364,21 @@ async function prepareLiveProviderProposal(input: {
     terminalClass: lastTerminalClass,
     providerCalled,
     liveEvidenceSource,
-    reason: `${lastTerminalClass}: live-provider proposal opt-in did not produce a usable provider proposal.`,
-    nextAction:
-      "Review provider readiness/fallback evidence; do not claim live provider success.",
+    reason: calibrationMode === "exact-patch-author"
+      ? `${lastTerminalClass}: live provider did not prove suitability as a direct exact patch author.`
+      : `${lastTerminalClass}: live-provider proposal opt-in did not produce a usable provider proposal.`,
+    nextAction: calibrationMode === "exact-patch-author"
+      ? "Use live provider output for review/planning and let the deterministic builder author exact oldText/newText patches."
+      : "Review provider readiness/fallback evidence; do not claim live provider success.",
     evidence: [
       ...attemptEvidence,
       `planning-runtime-product-proposal:live-provider-status:${lastTerminalClass}`,
+      ...(calibrationMode === "exact-patch-author"
+        ? [
+            "planning-runtime-product-proposal:providerPatchRole:reviewer-or-planner",
+            "planning-runtime-product-proposal:exactPatchAuthor:deterministic-builder",
+          ]
+        : []),
       "planning-runtime-product-proposal:raw-provider-output-excluded",
     ],
   });
@@ -384,6 +413,7 @@ function buildLiveProviderPromptContext(input: {
   readonly workspaceRoot: string;
   readonly handoff: PlanningMutationHandoffProjection;
   readonly planningResult?: PlanningRuntimeResult;
+  readonly calibration?: PlanningRuntimeProductLiveProviderProposal["calibration"];
 }): ContextAwareProviderPromptContext | undefined {
   const targetPath = input.handoff.targetPaths[0];
   const bundle = input.planningResult?.context.bundle;
@@ -395,6 +425,13 @@ function buildLiveProviderPromptContext(input: {
     handoffId: input.handoff.handoffId,
     targetPath,
   })).slice(0, 12)}`;
+  const calibrationContent = input.calibration?.mode === "exact-patch-author"
+    ? boundedTargetContent({
+        workspaceRoot: input.workspaceRoot,
+        targetPath,
+        maxChars: input.calibration.targetContentMaxChars ?? 4000,
+      })
+    : undefined;
   const providerPrompt = [
     "Create an exact single-file patch proposal from Planning Runtime evidence.",
     `Request: ${input.planningResult.groundedAnalysis.summary}`,
@@ -407,12 +444,22 @@ function buildLiveProviderPromptContext(input: {
     `Analysis brief: ${bundle.analysisBrief.briefId}`,
     `Task execution plan: ${bundle.taskExecutionPlan.executionPlanId}`,
     "Return JSON only. Do not use markdown fences.",
-    "Preferred shape: {\"targetFile\":\"<explicit target>\",\"oldText\":\"<exact current text>\",\"newText\":\"<replacement text>\",\"reason\":\"<short reason>\",\"verificationHint\":\"<safe readback/test>\"}.",
-    "oldText must be copied from current read evidence and must identify one exact region in the selected target.",
+    "Required shape when current target content is supplied: {\"targetFile\":\"<explicit target>\",\"oldText\":\"<exact current text>\",\"newText\":\"<replacement text>\",\"reason\":\"<short reason>\",\"verificationHint\":\"<safe readback/test>\"}.",
+    "oldText and newText are mandatory unless a required fact is missing.",
+    "oldText must be copied byte-for-byte from current read evidence and must identify one exact region in the selected target.",
     "newText must be non-empty and bounded to that replacement only.",
-    "If exact oldText/newText cannot be produced from the provided evidence, return {\"status\":\"review-only\",\"targetFile\":\"<explicit target>\",\"reason\":\"<specific missing exact evidence>\"}.",
+    "Review-only is allowed only if a required fact is missing; if so return {\"status\":\"review-only\",\"targetFile\":\"<explicit target>\",\"missingFact\":\"<specific missing fact>\",\"reason\":\"<why exact oldText/newText cannot be produced>\"}.",
     "Return only the explicit single target path from this prompt.",
-    "Do not claim files were changed. Do not run commands. Do not include provider config, API keys, headers, or raw full file content.",
+    ...(input.calibration?.mode === "exact-patch-author"
+      ? [
+          "Calibration mode: answer whether you can act as a direct single-file exact patch author.",
+          calibrationContent
+            ? `Current target content for ${targetPath}:\n<<<ROUTE216_TARGET_CONTENT\n${calibrationContent}\nROUTE216_TARGET_CONTENT`
+            : "Current target content was not available; name that as the missingFact if you cannot produce oldText/newText.",
+          "Use the supplied current target content as the only source for oldText.",
+        ]
+      : []),
+    "Do not claim files were changed. Do not run commands. Do not include provider config, API keys, headers, or content outside the supplied target evidence.",
   ].join("\n");
 
   return {
@@ -469,6 +516,13 @@ function buildLiveProviderPromptContext(input: {
       "planning-runtime-product-proposal:live-provider-plan-readiness:handoff-ready",
       "planning-runtime-product-proposal:live-provider-redacted-and-budgeted",
       "planning-runtime-product-proposal:live-provider-provider-config-excluded",
+      ...(input.calibration?.mode === "exact-patch-author"
+        ? [
+            "planning-runtime-product-proposal:live-provider-calibration:exact-patch-author",
+            `planning-runtime-product-proposal:live-provider-target-content:${calibrationContent ? "included" : "missing"}`,
+            "planning-runtime-product-proposal:live-provider-old-new-mandatory",
+          ]
+        : []),
     ],
   };
 }
@@ -554,6 +608,10 @@ function statusForLiveProviderFailure(
       return "live-provider-old-text-not-found";
     case "OLD-TEXT-MULTIPLE-MATCHES":
       return "live-provider-old-text-multiple-matches";
+    case "PROVIDER-OUTPUT-INSUFFICIENT":
+      return "live-provider-output-insufficient";
+    case "PATCH-AUTHOR-UNSUITABLE":
+      return "live-provider-patch-author-unsuitable";
     case "FAILED":
       return "live-provider-failed";
   }
@@ -565,6 +623,37 @@ function canUseFallbackAfter(terminalClass: LiveProviderTerminalClass): boolean 
     terminalClass !== "TARGET-MISMATCH" &&
     terminalClass !== "OLD-TEXT-NOT-FOUND" &&
     terminalClass !== "OLD-TEXT-MULTIPLE-MATCHES";
+}
+
+function classifyExactPatchAuthorInsufficiency(
+  dryRun: Extract<
+    RealProviderProposalDryRunResult,
+    { readonly providerCalled: true; readonly rawProposal: ProviderEditRawProposal }
+  >,
+): LiveProviderTerminalClass {
+  const diagnostics = dryRun.rawProposal.diagnostics ?? [];
+  const oldTextPresent = diagnostics.includes("provider-exact-patch-diagnostic:old-text-present:true");
+  const newTextPresent = diagnostics.includes("provider-exact-patch-diagnostic:new-text-present:true");
+  const missingFactPresent = diagnostics.includes(
+    "provider-exact-patch-diagnostic:review-only-missing-fact-present:true",
+  );
+  if (!oldTextPresent || !newTextPresent) return "PROVIDER-OUTPUT-INSUFFICIENT";
+  return missingFactPresent ? "PROVIDER-OUTPUT-INSUFFICIENT" : "PATCH-AUTHOR-UNSUITABLE";
+}
+
+function classifyExactPatchAuthorFailure(
+  dryRun: RealProviderProposalDryRunResult,
+): LiveProviderTerminalClass {
+  if (
+    dryRun.evidence.includes("provider-exact-patch-contract:parse:missing-required-field") ||
+    dryRun.evidence.includes("provider-exact-patch-contract:parse:empty-old-or-new") ||
+    dryRun.evidence.includes("provider-exact-patch-contract:parse:unchanged-old-new") ||
+    dryRun.evidence.includes("provider-exact-patch-diagnostic:old-text-present:false") ||
+    dryRun.evidence.includes("provider-exact-patch-diagnostic:new-text-present:false")
+  ) {
+    return "PROVIDER-OUTPUT-INSUFFICIENT";
+  }
+  return classifyDryRunFailure(dryRun);
 }
 
 function liveProviderTerminalClassForExactPatch(
@@ -728,6 +817,16 @@ function readWorkspaceFile(
   } catch {
     return undefined;
   }
+}
+
+function boundedTargetContent(input: {
+  readonly workspaceRoot: string;
+  readonly targetPath: string;
+  readonly maxChars: number;
+}): string | undefined {
+  const content = readWorkspaceFile(input.workspaceRoot, input.targetPath);
+  if (content === undefined || content.length > input.maxChars) return undefined;
+  return content;
 }
 
 function isSameOrInside(candidate: string, root: string): boolean {
