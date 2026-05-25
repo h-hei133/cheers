@@ -4,9 +4,12 @@ import os from "node:os";
 import path from "node:path";
 
 import { buildDiscoveryEditManifest } from "../packages/ts-shell/src/orchestration/discoveryEditManifest.js";
+import { buildAgentPlan } from "../packages/ts-shell/src/orchestration/agentPlan.js";
+import type { TargetedContextPacket } from "../packages/ts-shell/src/orchestration/contextPacket.js";
 import { createWorkspaceWriteAuthority } from "../packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.js";
 import { runTargetSetEditRoute } from "../packages/ts-shell/src/orchestration/targetSetEditRoute.js";
 import { buildVerificationCommandPlan } from "../packages/ts-shell/src/orchestration/verificationCommandPlan.js";
+import { runVerificationRepairLoop } from "../packages/ts-shell/src/orchestration/verificationRepairLoop.js";
 
 type TaskCategory =
   | "bugfix-behavior"
@@ -52,8 +55,12 @@ interface Route219TaskVerdictRow {
     | "task-relevant-selected-not-run"
     | "task-relevant-not-allowlisted"
     | "blocked";
-  readonly repair: "not-needed" | "not-run" | "repair-trigger-planned";
+  readonly repair: "not-needed" | "not-run" | "repair-required";
   readonly finalVerdict: TaskVerdict;
+  readonly originalFailure?: {
+    readonly targetPath: string;
+    readonly reason: string;
+  };
   readonly notProvenClaims: readonly string[];
 }
 
@@ -75,6 +82,21 @@ interface MultiFileEvidence {
     readonly apply: "applied" | "not-applied";
     readonly readback: "passed" | "failed";
   }[];
+  readonly evidence: readonly string[];
+}
+
+interface RepairEvidence {
+  readonly taskId: "repair-loop-original-failure-preserved";
+  readonly status: "repair-required" | "failed";
+  readonly repairState: string;
+  readonly originalFailurePreserved: boolean;
+  readonly originalFailure: {
+    readonly targetPath: string;
+    readonly reason: string;
+  };
+  readonly mutation: "not-run";
+  readonly providerCall: "not-run" | "proposal-only";
+  readonly changedFiles: readonly [];
   readonly evidence: readonly string[];
 }
 
@@ -181,19 +203,26 @@ const defaultSafety: DefaultSafetyReport = {
 };
 
 const multiFileEvidence = await runMultiFileEvidenceTask();
+const repairEvidence = await runRepairEvidenceTask();
 const rows = await Promise.all(taskPack.map((task) =>
-  buildBaselineVerdictRow(task, multiFileEvidence)
+  buildBaselineVerdictRow(task, multiFileEvidence, repairEvidence)
 ));
-const failures = validateBaseline({ taskPack, rows, defaultSafety, multiFileEvidence });
+const failures = validateBaseline({
+  taskPack,
+  rows,
+  defaultSafety,
+  multiFileEvidence,
+  repairEvidence,
+});
 const status = failures.length === 0 ? "PARTIAL" : "FAILED";
 
 console.log(JSON.stringify({
   route: "219",
   gate: "route219-real-task-quality-benchmark",
-  phase: "phase2-multi-file-task-quality",
+  phase: "phase3-verification-failure-repair-execution",
   status,
   statusReason: status === "PARTIAL"
-    ? "Task pack, default-safe baseline, task-relevant verification selection, and one multi-file apply/readback are established; live patch evidence, command verification execution, and repair execution are intentionally not yet proven."
+    ? "Task pack, default-safe baseline, task-relevant verification selection, one multi-file apply/readback, and one repair-required flow are established; live patch evidence, command verification execution, and repair apply/re-verification are intentionally not yet proven."
     : "Phase0 baseline invariants failed.",
   defaultSafety,
   counts: {
@@ -206,7 +235,7 @@ console.log(JSON.stringify({
     ).length,
     multiFileTasks: taskPack.filter((task) => task.selectedFiles.length > 1).length,
     multiFileAppliedAndVerified: multiFileEvidence.status === "verified-success" ? 1 : 0,
-    repairFlowReached: 0,
+    repairFlowReached: repairEvidence.status === "repair-required" ? 1 : 0,
   },
   taskPack: taskPack.map((task) => ({
     id: task.id,
@@ -220,6 +249,7 @@ console.log(JSON.stringify({
     likelyRepairTrigger: task.repairTrigger,
   })),
   multiFileEvidence,
+  repairEvidence,
   verdictTable: rows,
   topBlockers: [
     "focused task-relevant npm test commands can be selected, but dispatch still requires apply/readback and explicit runtime approval",
@@ -241,11 +271,12 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log("[pass] route219-real-task-quality-benchmark phase2-multi-file-task-quality");
+console.log("[pass] route219-real-task-quality-benchmark phase3-verification-failure-repair-execution");
 
 async function buildBaselineVerdictRow(
   task: Route219Task,
   multiFile: MultiFileEvidence,
+  repairEvidence: RepairEvidence,
 ): Promise<Route219TaskVerdictRow> {
   const context = await selectedFilesExist(task.selectedFiles) ? "found" : "missing";
   const plan = buildVerificationCommandPlan({
@@ -271,6 +302,26 @@ async function buildBaselineVerdictRow(
       ],
     };
   }
+  if (task.id === repairEvidence.taskId && repairEvidence.status === "repair-required") {
+    return {
+      taskId: task.id,
+      category: task.category,
+      context,
+      provider: "not-run-default-safe",
+      proposal: "not-run",
+      anchor: "not-run",
+      apply: "not-run",
+      verificationCommand: task.expectedVerificationCommand,
+      verification: "task-relevant-selected-not-run",
+      repair: "repair-required",
+      finalVerdict: "repair-required",
+      originalFailure: repairEvidence.originalFailure,
+      notProvenClaims: [
+        "repair apply and re-verification",
+        "task-relevant verification command passed",
+      ],
+    };
+  }
   const verification =
     plan.state === "not-allowlisted"
       ? "task-relevant-not-allowlisted"
@@ -287,9 +338,7 @@ async function buildBaselineVerdictRow(
     apply: "not-run",
     verificationCommand: task.expectedVerificationCommand,
     verification,
-    repair: task.category === "verification-failure-repair"
-      ? "repair-trigger-planned"
-      : "not-run",
+    repair: "not-run",
     finalVerdict: context === "found" ? "review-only" : "blocked",
     notProvenClaims: [
       ...(task.needsLiveProviderPatch ? ["live provider patch evidence"] : []),
@@ -298,6 +347,134 @@ async function buildBaselineVerdictRow(
       ...(task.category === "multi-file-coordinated" ? ["per-file apply/readback evidence"] : []),
       ...(task.category === "verification-failure-repair" ? ["repair apply and re-verification"] : []),
     ],
+  };
+}
+
+async function runRepairEvidenceTask(): Promise<RepairEvidence> {
+  const packet = repairPacketFixture();
+  const agentPlan = buildAgentPlan({
+    ownerCapability: "edit-patch",
+    taskKind: "edit-file",
+    requestedActionKind: "verify",
+    targetSummary: packet.targetSafeLabel,
+    contextPacketIds: [packet.packetId],
+    contextCompleteness: "complete",
+    confidence: "high",
+    executionReadiness: "ready",
+    missingFacts: [],
+    suggestedReads: [],
+    suggestedVerification: [
+      "npm test -w packages/ts-shell -- src/orchestration/verificationRepairBridge.test.ts src/orchestration/verificationRepairContext.test.ts",
+    ],
+    safeEvidenceMarkers: [],
+    mutationAuthority: "not-granted",
+    redactionStatus: "redacted-and-budgeted",
+    doNext: "review repair proposal",
+  });
+  const loop = await runVerificationRepairLoop({
+    sessionId: "sess_route219_repair_required",
+    prompt: "Route219 repair task: preserve failed verification and require review before repair apply.",
+    sourceEditTransactionId: "route219-repair-source-transaction",
+    sourceProposalId: "route219-repair-source-proposal",
+    contextPacket: packet,
+    agentPlan,
+    verification: {
+      status: "failed",
+      command:
+        "npm test -w packages/ts-shell -- src/orchestration/verificationRepairBridge.test.ts src/orchestration/verificationRepairContext.test.ts",
+      reason: "focused verification failed before repair",
+      selectionScope: "focused",
+      selectionSource: "auto-from-changes",
+      nextAction: "Create a review-gated repair context from the failed verification command.",
+    },
+    failedFiles: [
+      {
+        path: "packages/ts-shell/src/orchestration/verificationRepairBridge.ts",
+        reason: "focused verification failed before repair",
+      },
+    ],
+    changedFiles: [
+      "packages/ts-shell/src/orchestration/verificationRepairBridge.ts",
+    ],
+    runtimeReceiptMarkers: ["runtime-receipt-result:failed"],
+    availability: { kind: "available", providerKindLabel: "route219-fake-repair-provider" },
+    rawProposal: {
+      hunks: [
+        {
+          hunkId: "route219-repair-hunk",
+          targetPath: "packages/ts-shell/src/orchestration/verificationRepairBridge.ts",
+          oldText: "const repairState = 'failed';",
+          newText: "const repairState = 'repaired';",
+        },
+      ],
+    },
+  });
+  const repairRequired =
+    loop.context.status === "repair-loop-context-created" &&
+    (loop.plan.status === "repair-loop-review-required" ||
+      loop.plan.status === "repair-loop-proposal-created" ||
+      loop.plan.status === "repair-loop-ready-for-hunk-set-handoff") &&
+    loop.mutation === "not-run" &&
+    loop.evidence.includes("verification-repair-loop:no-automatic-repair");
+  const originalFailurePreserved = repairRequired && loop.context.failedFileLabels.length > 0;
+  const originalFailure = {
+    targetPath: "packages/ts-shell/src/orchestration/verificationRepairBridge.ts",
+    reason: "focused verification failed before repair",
+  };
+  return {
+    taskId: "repair-loop-original-failure-preserved",
+    status: repairRequired ? "repair-required" : "failed",
+    repairState: loop.plan.status,
+    originalFailurePreserved,
+    originalFailure,
+    mutation: loop.mutation,
+    providerCall: loop.evidence.includes("verification-repair-planner:provider-call:fake-or-opt-in")
+      ? "proposal-only"
+      : "not-run",
+    changedFiles: loop.changedFiles,
+    evidence: [
+      `route219-repair:context:${loop.context.status}`,
+      `route219-repair:state:${loop.plan.status}`,
+      `route219-repair:result:${loop.result.status}`,
+      `route219-repair:mutation:${loop.mutation}`,
+      `route219-repair:original-failure-preserved:${originalFailurePreserved ? "true" : "false"}`,
+      "route219-repair:raw-content-excluded",
+      ...loop.evidence.filter((entry) =>
+        entry.startsWith("verification-repair-loop:") ||
+        entry.startsWith("verification-repair-planner:") ||
+        entry.startsWith("verification-repair-result:state:")
+      ),
+    ],
+  };
+}
+
+function repairPacketFixture(): TargetedContextPacket {
+  return {
+    packetId: "ctx_route219_repair",
+    rootTargetFile: "packages/ts-shell/src/orchestration/verificationRepairBridge.ts",
+    targetSafeLabel: "packages/ts-shell/src/orchestration/verificationRepairBridge.ts",
+    targetKind: "explicit-code-target",
+    readBudget: {
+      limits: {
+        maxCandidateCount: 24,
+        maxFilesRead: 12,
+        maxBytesPerFile: 8000,
+        maxTotalBytes: 32000,
+      },
+      filesRead: 1,
+      bytesUsed: 120,
+      includedCount: 1,
+    },
+    contextSources: [],
+    selectedCandidateSummaries: [],
+    omittedCandidateSummaries: [],
+    confidence: "high",
+    completenessStatus: "complete",
+    freshnessFacts: ["context-freshness:read-during-current-turn"],
+    redactionStatus: "redacted-and-budgeted",
+    replaySafeSummary: "context-packet ctx_route219_repair",
+    mutationAuthority: "not-granted",
+    evidence: ["context-packet:id:ctx_route219_repair"],
   };
 }
 
@@ -412,6 +589,7 @@ function validateBaseline(input: {
   readonly rows: readonly Route219TaskVerdictRow[];
   readonly defaultSafety: DefaultSafetyReport;
   readonly multiFileEvidence: MultiFileEvidence;
+  readonly repairEvidence: RepairEvidence;
 }): string[] {
   const failures: string[] = [];
   if (input.taskPack.length < 5) failures.push(`task-count=${input.taskPack.length}`);
@@ -463,6 +641,15 @@ function validateBaseline(input: {
     file.readback === "passed"
   )) {
     failures.push("multi-file-per-file-evidence-incomplete");
+  }
+  if (input.repairEvidence.status !== "repair-required") {
+    failures.push(`repair-status=${input.repairEvidence.status}`);
+  }
+  if (!input.repairEvidence.originalFailurePreserved) {
+    failures.push("repair-original-failure-not-preserved");
+  }
+  if (input.repairEvidence.mutation !== "not-run") {
+    failures.push(`repair-mutation=${input.repairEvidence.mutation}`);
   }
   if (input.defaultSafety.providerCalled !== false) failures.push("default-provider-called");
   if (input.defaultSafety.apply !== "not-run") failures.push(`default-apply=${input.defaultSafety.apply}`);
