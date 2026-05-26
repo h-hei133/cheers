@@ -1,13 +1,19 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import type { ProviderEditRawProposal } from "../orchestration/providerEditProposal.js";
 import type { PlanningRuntimeProductExecutionOptions } from "../orchestration/planningRuntimeProductExecution.js";
+import { approveLiveProviderAdapter } from "../orchestration/liveProviderAdapterApproval.js";
+import { createOpenAICompatibleAnchoredSmokeAdapter } from "../orchestration/openAICompatibleAnchoredSmokeAdapter.js";
 import type { CliOptions } from "./cliArgs.js";
 
 export function buildCliPlanningMutationExecutionOptions(input: {
   readonly options: CliOptions;
   readonly workspaceRoot: string;
+  readonly providerCredentialResolution?: ProviderCredentialResolution;
+  readonly providerModeEnv?: string;
+  readonly realProviderSmokeOptIn?: boolean;
 }): PlanningRuntimeProductExecutionOptions | undefined {
   if (
     !input.options.planningMutationConfirm &&
@@ -66,9 +72,82 @@ export function buildCliPlanningMutationExecutionOptions(input: {
           liveProviderProposal: {
             optIn: true as const,
             source: "cli-flag" as const,
+            ...buildLiveProviderProposalOptions(input),
           },
         }
       : {}),
+  };
+}
+
+function buildLiveProviderProposalOptions(input: {
+  readonly providerCredentialResolution?: ProviderCredentialResolution;
+  readonly providerModeEnv?: string;
+  readonly realProviderSmokeOptIn?: boolean;
+}): Pick<
+  NonNullable<PlanningRuntimeProductExecutionOptions["liveProviderProposal"]>,
+  "attempts" | "fallbackPolicy" | "taskEvidence"
+> {
+  const resolution = input.providerCredentialResolution;
+  const credential = resolution?.credential;
+  const providerKind = resolution?.provider ?? "unknown";
+  const providerSafeLabel =
+    providerKind === "openai-compatible" ? "openai-compatible" : providerKind;
+  const configSource = credential?.source
+    ? `resolved-${credential.source}`
+    : "not-configured";
+  const providerAvailability = credential
+    ? { kind: "available" as const, providerKindLabel: providerSafeLabel }
+    : { kind: "not-configured" as const, reason: "resolved credential missing" };
+  const approval = approveLiveProviderAdapter({
+    explicitLiveSmokeOptIn: true,
+    realProviderSmokeOptIn: input.realProviderSmokeOptIn === true,
+    providerReadinessStatus:
+      credential && input.providerModeEnv !== "synthetic" ? "ready" : "not-ready",
+    providerKind,
+    providerSafeLabel,
+    providerConfigSource: configSource,
+    providerAvailability,
+    privateConfigManualRead: false,
+    fixtureSafetyStatus: "safe",
+    redactionStatus: "redacted-and-budgeted",
+  });
+
+  const provider =
+    approval.approved &&
+    credential?.authMode === "api-key" &&
+    credential.apiKey &&
+    credential.baseUrl &&
+    credential.model &&
+    providerKind === "openai-compatible"
+      ? createOpenAICompatibleAnchoredSmokeAdapter({
+          apiKey: credential.apiKey,
+          baseUrl: credential.baseUrl,
+          model: credential.model,
+          providerSafeLabel,
+          promptMode: "context-only",
+        })
+      : undefined;
+
+  return {
+    attempts: [
+      {
+        role: "primary",
+        providerSafeLabel,
+        providerConfigSource: configSource,
+        providerAvailability,
+        readinessStatus: approval.approved ? "ready" : "not-ready",
+        evidenceSource: approval.approved ? "live-provider" : "fake-provider",
+        ...(provider ? { provider } : {}),
+      },
+    ],
+    fallbackPolicy: {
+      enabled: false,
+      reason: "CLI live-provider product path runs one configured provider profile per process.",
+    },
+    taskEvidence: {
+      mode: "single-file-exact-patch",
+      targetContentMaxChars: 6000,
+    },
   };
 }
 

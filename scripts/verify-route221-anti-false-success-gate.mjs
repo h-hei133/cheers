@@ -567,7 +567,9 @@ function validatePrimaryEvidence(report, options) {
 }
 
 function isCapabilityLikeRouteType(routeType) {
-  return routeType === 'capability' || routeType === 'capstone-capability'
+  return routeType === 'capability' ||
+    routeType === 'capstone-capability' ||
+    routeType === 'live-provider-capstone'
 }
 
 function validateRouteReport(report, options) {
