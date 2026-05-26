@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "route": "route222",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "independentPassRerun": null,
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "requiredClaim": "repair-to-success",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "negativeControls": [
+        "repair continuation rejected as success",
+        "repair proposal rejected as repair applied",
+        "apply without post-repair verification rejected as success"
+      ],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route222-repair-to-success-product-harness",
+      "purpose": "Deterministically exercises the frozen repair task through current product modules.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false,
+      "regressionProtected": "verification failure -> proposal -> confirmation -> existing hunk-set apply -> post-repair verification"
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "context": {
+        "origin": "frozen",
+        "productPath": "verification repair context -> repair proposal review -> explicit selection confirmation -> proposal hunk-set route -> readback verification",
+        "allowedModuleArea": [
+          "packages/ts-shell/src/orchestration/patchResult/",
+          "packages/ts-shell/src/session/",
+          "packages/ts-shell/src/core/query/"
+        ]
+      },
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "providerProposal": {
+        "proposalSource": "deterministic route harness input",
+        "rawContentExcluded": true,
+        "liveProviderClaim": "not-proven"
+      },
+      "originalVerificationFailure": {
+        "status": "failed",
+        "preserved": true,
+        "reason": "route222 original fixture readback still had failing repair exports",
+        "runtimeDerived": true
+      },
+      "repairProposal": {
+        "proposalCreated": true,
+        "proposalId": "edit-repair-proposal-1382d85ca80b",
+        "reviewStatus": "ready-for-selection",
+        "noWrite": true,
+        "rawContentExcluded": true
+      },
+      "confirmation": {
+        "missingConfirmationState": "selection-required",
+        "explicitRepairConfirmation": true,
+        "confirmationState": "confirmed-exact-target-set",
+        "promptTextAloneGrantedAuthority": false
+      },
+      "repair": {
+        "continuationCreated": true,
+        "proposalCreated": true,
+        "applied": true,
+        "postRepairVerification": "passed",
+        "reportedRepairSuccess": true
+      },
+      "apply": {
+        "status": "applied",
+        "backendStatus": "hunk-set-applied",
+        "writerPath": "existing proposal hunk-set exact apply route",
+        "existingBackend": true,
+        "noNewWriter": true,
+        "fuzzyApply": false,
+        "automaticRepair": false,
+        "changedFiles": [
+          "packages/ts-shell/src/orchestration/route222RepairFixture.ts"
+        ],
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "postRepairVerification": "passed",
+        "relationToChangedFiles": "readback matched repaired target",
+        "reason": "route222 repaired fixture readback matched expected status and verification exports"
+      },
+      "sessionResultEvidence": {
+        "finalStatus": "completed",
+        "terminalClassification": "success",
+        "evidenceMarkers": [
+          "proposal-hunk-set-route:multi-hunk-exact-apply",
+          "verification-repair-result:state:repair-verification-succeeded",
+          "verification-repair-result:apply-route:existing-hunk-set-or-exact-lane",
+          "verification-repair-result:post-apply-verification:passed"
+        ]
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "live provider repair proposal",
+        "automatic repair",
+        "fuzzy apply",
+        "broad multi-file add/delete/move repair"
+      ]
+    }
+  ],
+  "negativeControlEvidence": {
+    "repairContinuationOnlySuccessRejected": true,
+    "repairProposalOnlySuccessRejected": true,
+    "applyWithoutPostRepairVerificationRejected": true,
+    "promptTextAloneAuthorityRejected": true,
+    "commandOnlyBypassRejectedByRoute221BFixture": true
+  },
+  "defaultPath": {
+    "provider": "not-called",
+    "apply": "not-run",
+    "command": "not-run"
+  },
+  "referenceAdoption": [
+    {
+      "capabilityArea": "repair-to-success",
+      "referenceRepo": "not-inspected",
+      "fileOrSubsystemInspected": "not-applicable",
+      "patternAdopted": "Existing target product modules were sufficient for this route.",
+      "localSeamChanged": "scripts/route222-repair-to-success.ts and route222 report artifact",
+      "patternRejected": "not-applicable",
+      "reason": "No concrete repair, verification, or report blocker required reference comparison.",
+      "evidenceProduced": "Route222 harness and Route221B report gate"
+    }
+  ],
+  "notProvenClaims": [
+    "live provider repair proposal",
+    "production default apply",
+    "automatic repair without confirmation",
+    "fuzzy repair apply",
+    "new writer behavior",
+    "broad edit engine repair"
+  ]
+}
