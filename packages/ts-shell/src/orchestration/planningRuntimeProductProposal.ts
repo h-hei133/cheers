@@ -263,36 +263,20 @@ async function prepareLiveProviderProposal(input: {
       continue;
     }
 
-    const dryRun = await runRealProviderProposalDryRun({
-      requestId: `route211-product-live-${attempt.role}-${input.handoff.handoffId}`,
-      dryRunOptIn: true,
+    const dryRunOutcome = await runLiveProviderAttemptWithContractRetry({
+      workspaceRoot: input.workspaceRoot,
+      handoff: input.handoff,
       promptContext,
-      explicitTargetLabels: input.handoff.targetPaths,
-      lifecycleId: promptContext.taskLifecycleId,
-      analysisBriefId: promptContext.analysisBriefId,
-      analysisQualityId: promptContext.analysisQualityId,
-      analysisQualityDecision: promptContext.analysisQualityDecision,
-      planQualityId: promptContext.planQualityId,
-      planQualityLevel: promptContext.planQualityLevel,
-      contextPacketId: promptContext.contextPacketId,
-      contextGraphId: promptContext.contextGraphId,
-      codeGraphTraceId: promptContext.codeGraphTraceId,
-      taskExecutionPlanId: promptContext.taskExecutionPlanId,
-      providerAvailability: attempt.providerAvailability,
-      redactionStatus: promptContext.redactionStatus,
-      provider: attempt.provider,
-      currentContentByTargetLabel: readCurrentContentByTargetLabel({
-        workspaceRoot: input.workspaceRoot,
-        targetPaths: input.handoff.targetPaths,
-      }),
-      inWorkspaceTargetLabels: input.handoff.targetPaths,
+      attempt,
+      calibrationMode,
     });
+    const dryRun = dryRunOutcome.dryRun;
     attemptEvidence.push(
-      ...dryRun.evidence,
+      ...dryRunOutcome.evidence,
       `planning-runtime-product-proposal:live-provider-${attempt.role}:dry-run-status:${dryRun.status}`,
       `planning-runtime-product-proposal:live-provider-${attempt.role}:provider-called:${dryRun.providerCalled}`,
     );
-    if (dryRun.providerCalled) {
+    if (dryRunOutcome.providerCalled) {
       providerCalled = true;
       liveEvidenceSource = attempt.evidenceSource ?? "not-proven";
     }
@@ -692,11 +676,127 @@ function statusForLiveProviderFailure(
 }
 
 function canUseFallbackAfter(terminalClass: LiveProviderTerminalClass): boolean {
-  return terminalClass !== "CONFIG-FAILED" &&
-    terminalClass !== "INVALID-FORMAT" &&
-    terminalClass !== "TARGET-MISMATCH" &&
-    terminalClass !== "OLD-TEXT-NOT-FOUND" &&
-    terminalClass !== "OLD-TEXT-MULTIPLE-MATCHES";
+  return terminalClass === "NETWORK-BLOCKED" ||
+    terminalClass === "PROVIDER-ERROR";
+}
+
+async function runLiveProviderAttemptWithContractRetry(input: {
+  readonly workspaceRoot: string;
+  readonly handoff: PlanningMutationHandoffProjection;
+  readonly promptContext: ContextAwareProviderPromptContext;
+  readonly attempt: NonNullable<PlanningRuntimeProductLiveProviderProposal["attempts"]>[number];
+  readonly calibrationMode?: PlanningRuntimeProductLiveProviderProposal["calibration"]["mode"];
+}): Promise<{
+  readonly dryRun: RealProviderProposalDryRunResult;
+  readonly providerCalled: boolean;
+  readonly evidence: readonly string[];
+}> {
+  const evidence: string[] = [];
+  const first = await runLiveProviderDryRunAttempt({
+    workspaceRoot: input.workspaceRoot,
+    handoff: input.handoff,
+    promptContext: input.promptContext,
+    attempt: input.attempt,
+    requestIdSuffix: "initial",
+  });
+  evidence.push(
+    ...first.evidence,
+    `planning-runtime-product-proposal:live-provider-${input.attempt.role}:contract-attempt:initial`,
+  );
+  const firstTerminalClass = input.calibrationMode === "exact-patch-author"
+    ? classifyExactPatchAuthorFailure(first)
+    : classifyDryRunFailure(first);
+  if (!shouldContractRetry(firstTerminalClass)) {
+    return {
+      dryRun: first,
+      providerCalled: first.providerCalled,
+      evidence,
+    };
+  }
+
+  evidence.push(
+    `planning-runtime-product-proposal:live-provider-${input.attempt.role}:contract-retry:started`,
+    `planning-runtime-product-proposal:live-provider-${input.attempt.role}:contract-retry-trigger:${firstTerminalClass}`,
+  );
+  const retry = await runLiveProviderDryRunAttempt({
+    workspaceRoot: input.workspaceRoot,
+    handoff: input.handoff,
+    promptContext: buildContractRepairPromptContext(input.promptContext),
+    attempt: input.attempt,
+    requestIdSuffix: "contract-retry-1",
+  });
+  evidence.push(
+    ...retry.evidence,
+    `planning-runtime-product-proposal:live-provider-${input.attempt.role}:contract-attempt:contract-retry-1`,
+    `planning-runtime-product-proposal:live-provider-${input.attempt.role}:contract-retry:finished`,
+  );
+  return {
+    dryRun: retry,
+    providerCalled: first.providerCalled || retry.providerCalled,
+    evidence,
+  };
+}
+
+async function runLiveProviderDryRunAttempt(input: {
+  readonly workspaceRoot: string;
+  readonly handoff: PlanningMutationHandoffProjection;
+  readonly promptContext: ContextAwareProviderPromptContext;
+  readonly attempt: NonNullable<PlanningRuntimeProductLiveProviderProposal["attempts"]>[number];
+  readonly requestIdSuffix: "initial" | "contract-retry-1";
+}): Promise<RealProviderProposalDryRunResult> {
+  return runRealProviderProposalDryRun({
+    requestId: `route211-product-live-${input.attempt.role}-${input.requestIdSuffix}-${input.handoff.handoffId}`,
+    dryRunOptIn: true,
+    promptContext: input.promptContext,
+    explicitTargetLabels: input.handoff.targetPaths,
+    lifecycleId: input.promptContext.taskLifecycleId,
+    analysisBriefId: input.promptContext.analysisBriefId,
+    analysisQualityId: input.promptContext.analysisQualityId,
+    analysisQualityDecision: input.promptContext.analysisQualityDecision,
+    planQualityId: input.promptContext.planQualityId,
+    planQualityLevel: input.promptContext.planQualityLevel,
+    contextPacketId: input.promptContext.contextPacketId,
+    contextGraphId: input.promptContext.contextGraphId,
+    codeGraphTraceId: input.promptContext.codeGraphTraceId,
+    taskExecutionPlanId: input.promptContext.taskExecutionPlanId,
+    providerAvailability: input.attempt.providerAvailability,
+    redactionStatus: input.promptContext.redactionStatus,
+    provider: input.attempt.provider,
+    currentContentByTargetLabel: readCurrentContentByTargetLabel({
+      workspaceRoot: input.workspaceRoot,
+      targetPaths: input.handoff.targetPaths,
+    }),
+    inWorkspaceTargetLabels: input.handoff.targetPaths,
+  });
+}
+
+function shouldContractRetry(terminalClass: LiveProviderTerminalClass): boolean {
+  return terminalClass === "INVALID-FORMAT" ||
+    terminalClass === "PROVIDER-OUTPUT-INSUFFICIENT";
+}
+
+function buildContractRepairPromptContext(
+  context: ContextAwareProviderPromptContext,
+): ContextAwareProviderPromptContext {
+  return {
+    ...context,
+    requestId: `${context.requestId}-contract-retry-1`,
+    providerPrompt: [
+      context.providerPrompt,
+      "",
+      "Contract repair retry 1 of 1.",
+      "Your prior response did not satisfy the exact patch JSON contract.",
+      "Return exactly one JSON object and nothing else.",
+      "Required shape: {\"targetFile\":\"<explicit target>\",\"oldText\":\"<exact current text copied from supplied target content>\",\"newText\":\"<replacement text>\",\"reason\":\"<short reason>\",\"verificationHint\":\"<safe verification>\"}.",
+      "If exact oldText/newText cannot be copied from supplied current target content, return {\"status\":\"review-only\",\"targetFile\":\"<explicit target>\",\"missingFact\":\"<specific missing fact>\",\"reason\":\"<why exact oldText/newText cannot be produced>\"}.",
+      "Do not include markdown fences, prose, diffs, multiple alternatives, or guessed anchors.",
+    ].join("\n"),
+    evidence: [
+      ...context.evidence,
+      "planning-runtime-product-proposal:live-provider-contract-retry:prompt:exact-json-only",
+      "planning-runtime-product-proposal:live-provider-contract-retry:max-attempts:1",
+    ],
+  };
 }
 
 function classifyExactPatchAuthorInsufficiency(

@@ -9,6 +9,7 @@ const RUN_COMMAND_ALLOWLIST = [
 const FOCUSED_TS_SHELL_TEST_COMMAND_ALLOWLIST = [
   "npm test -w packages/ts-shell -- src/orchestration/verificationCommandPlan.test.ts",
   "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+  "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts -t route227e-intentional-missing-test",
   "npm test -w packages/ts-shell -- src/orchestration/planningRuntimeProductExecution.test.ts",
   "npm test -w packages/ts-shell -- src/orchestration/verificationRepairBridge.test.ts src/orchestration/verificationRepairContext.test.ts",
   "npm test -w packages/ts-shell -- src/orchestration/targetSetEditRoute.test.ts src/orchestration/targetSetEditVerification.test.ts",

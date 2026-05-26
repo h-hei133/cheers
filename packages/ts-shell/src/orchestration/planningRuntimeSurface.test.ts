@@ -197,6 +197,21 @@ describe("projectPlanningRuntimeSurface", () => {
     expect(surface.contextAcquisition.mode).toBe("memory-reuse");
     expect(surface.contextAcquisition.stages.map((stage) => stage.name)).toContain("memory-reuse");
     expect(surface.contextAcquisition.budget.filesRead).toBe(0);
+    expect(surface.planningEvidence).toMatchObject({
+      candidateFiles: ["src/app.ts"],
+      filesRead: [],
+      readReasons: [],
+      missingFacts: ["call-site context missing"],
+      editTargets: ["src/app.ts"],
+      verificationIntent: "state=context-not-ready; command=npm test -- --help; readiness=not-ready",
+      contextBudget: {
+        candidateFiles: 1,
+        filesRead: 0,
+        bytesUsed: 0,
+        cacheStatus: "disabled",
+      },
+      memoryReuseStatus: "reused-memory",
+    });
     expect(surface.contextAcquisition.safety).toEqual({
       mutationAuthority: "not-granted",
       providerCall: "not-run",
@@ -223,6 +238,9 @@ describe("projectPlanningRuntimeSurface", () => {
     });
     expect(surface.evidence).toContain("planning-runtime-surface:raw-content-excluded");
     expect(surface.evidence).toContain("planning-runtime-surface:warnings:1");
+    expect(surface.evidence).toContain("planning-runtime-surface:candidate-files:1");
+    expect(surface.evidence).toContain("planning-runtime-surface:files-read:0");
+    expect(surface.evidence).toContain("planning-runtime-surface:memory-reuse:reused-memory");
     expect(surface.evidence).toContain("context-acquisition:mode:memory-reuse");
     expect(surface.evidence).toContain("context-acquisition:stage:memory-reuse");
   });

@@ -7551,6 +7551,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.finalOutput).toContain("State: confirmation-required");
     expect(result.finalOutput).toContain("Proposal state: prepared");
     expect(result.finalOutput).toContain("Anchor state: exact-ready");
+    expect(result.finalOutput).toContain("Anchor quality: exact-ready");
     expect(result.finalOutput).toContain("Confirmation state: confirmation-required");
     expect(result.finalOutput).toContain("Evidence source: planning-runtime-deterministic");
     expect(result.finalOutput).toContain("Provider call: not-run");

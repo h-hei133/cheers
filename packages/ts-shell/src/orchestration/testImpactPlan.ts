@@ -99,7 +99,7 @@ function buildVerificationCandidates(
     return [];
   }
   const targeted = likelyTestFiles.slice(0, 2).map((file) => {
-    const command = `npm test -- ${file}`;
+    const command = focusedTestCommandFor(file);
     return {
       command,
       source: "targeted-test" as const,
@@ -118,6 +118,13 @@ function buildVerificationCandidates(
     },
     ...targeted,
   ];
+}
+
+function focusedTestCommandFor(file: string): string {
+  const normalized = file.replace(/^packages\/ts-shell\//, "");
+  return normalized.startsWith("src/")
+    ? `npm test -w packages/ts-shell -- ${normalized}`
+    : `npm test -- ${file}`;
 }
 
 function classifyCommandReadiness(

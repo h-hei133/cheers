@@ -1,0 +1,323 @@
+{
+  "schemaVersion": 1,
+  "route": "route227b",
+  "routeType": "capability",
+  "finalStatus": "PARTIAL",
+  "independentAuditResult": "PARTIAL",
+  "productCapabilityChanged": {
+    "stablePlanningEvidenceSurface": "Planning Runtime product surface now exposes candidateFiles, filesRead, readReasons, missingFacts, editTargets, verificationIntent, contextBudget, and memoryReuseStatus.",
+    "productPath": "real CLI -> runMvpIntegratedFlow -> planning runtime product projection",
+    "providerCalled": false,
+    "applyAttempted": false
+  },
+  "primaryEvidence": {
+    "source": "not-proven",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+    "executionEntrypoint": "real-cli-product-path",
+    "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+    "routeLocalHarnessUsed": false,
+    "helperOnlyComposition": false,
+    "proposalSource": "not-applicable",
+    "confirmationSource": "none",
+    "verificationSource": "not-run"
+  },
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "planning product path is no-provider and no-apply by default",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "no live provider flag was present",
+        "provider and apply remained not-run"
+      ]
+    },
+    {
+      "id": "frozen-unsupported-broad-task-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "unsupported broad planning task does not become COMPLETE",
+      "evidenceLevel": "partial",
+      "primaryCompleteEvidence": false,
+      "verdict": "PARTIAL",
+      "negativeControls": [
+        "broad task must remain blocked, unsupported, or not-proven"
+      ]
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route227b-context-planning-product-path-driver",
+      "purpose": "Creates isolated workspaces and spawns real CLI print/session planning path; does not call planning helpers for primary evidence.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false
+    }
+  ],
+  "taskVerdicts": [
+    {
+      "taskId": "route227b-vague-bugfix",
+      "origin": "route227b-context-planning-elite-upgrade",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "candidateFiles": [
+        "src/planning/targetRanking.ts",
+        "src/planning/targetRanking.test.ts",
+        "package.json"
+      ],
+      "filesRead": [
+        "src/planning/targetRanking.ts",
+        "src/planning/targetRanking.test.ts"
+      ],
+      "readReasons": [
+        "src/planning/targetRanking.ts:explicit target:repo-intelligence",
+        "src/planning/targetRanking.test.ts:nearby test naming convention:context-graph"
+      ],
+      "missingFacts": [],
+      "editTargets": [
+        "src/planning/targetRanking.ts"
+      ],
+      "verificationIntent": "state=quality-blocked; command=src/planning/targetRanking.test.ts; kind=unsupported; readiness=not-ready",
+      "contextBudget": "candidateFiles:3;filesRead:2;bytesUsed:200;cache:disabled",
+      "memoryReuseStatus": "not-reused",
+      "broadUnsupported": false,
+      "finalVerdict": "COMPLETE",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "notProvenClaims": [
+        "mutation success",
+        "provider call"
+      ]
+    },
+    {
+      "taskId": "route227b-output-improvement",
+      "origin": "route227b-context-planning-elite-upgrade",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "candidateFiles": [],
+      "filesRead": [],
+      "readReasons": [],
+      "missingFacts": [],
+      "editTargets": [],
+      "verificationIntent": "none",
+      "contextBudget": "none",
+      "memoryReuseStatus": "none",
+      "broadUnsupported": false,
+      "finalVerdict": "PARTIAL",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "notProvenClaims": [
+        "complete planning task evidence",
+        "mutation success",
+        "provider call"
+      ]
+    },
+    {
+      "taskId": "route227b-test-related-task",
+      "origin": "route227b-context-planning-elite-upgrade",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "candidateFiles": [
+        "src/planning/targetRanking.ts",
+        "src/planning/targetRanking.test.ts",
+        "package.json"
+      ],
+      "filesRead": [
+        "src/planning/targetRanking.ts",
+        "src/planning/targetRanking.test.ts"
+      ],
+      "readReasons": [
+        "src/planning/targetRanking.ts:explicit target:repo-intelligence",
+        "src/planning/targetRanking.test.ts:nearby test naming convention:context-graph"
+      ],
+      "missingFacts": [],
+      "editTargets": [
+        "src/planning/targetRanking.ts"
+      ],
+      "verificationIntent": "state=quality-blocked; command=src/planning/targetRanking.test.ts; kind=unsupported; readiness=not-ready",
+      "contextBudget": "candidateFiles:3;filesRead:2;bytesUsed:200;cache:disabled",
+      "memoryReuseStatus": "not-reused",
+      "broadUnsupported": false,
+      "finalVerdict": "COMPLETE",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "notProvenClaims": [
+        "mutation success",
+        "provider call"
+      ]
+    },
+    {
+      "taskId": "route227b-multi-file-impact",
+      "origin": "route227b-context-planning-elite-upgrade",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "candidateFiles": [
+        "src/planning/targetRanking.ts",
+        "src/result/resultSurface.ts",
+        "src/planning/targetRanking.test.ts"
+      ],
+      "filesRead": [
+        "src/planning/targetRanking.ts",
+        "src/planning/targetRanking.test.ts"
+      ],
+      "readReasons": [
+        "src/planning/targetRanking.ts:explicit target:repo-intelligence",
+        "src/planning/targetRanking.test.ts:nearby test naming convention:context-graph"
+      ],
+      "missingFacts": [],
+      "editTargets": [
+        "src/planning/targetRanking.ts"
+      ],
+      "verificationIntent": "state=quality-blocked; command=src/planning/targetRanking.test.ts; kind=unsupported; readiness=not-ready",
+      "contextBudget": "candidateFiles:3;filesRead:2;bytesUsed:200;cache:disabled",
+      "memoryReuseStatus": "not-reused",
+      "broadUnsupported": false,
+      "finalVerdict": "COMPLETE",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "notProvenClaims": [
+        "mutation success",
+        "provider call"
+      ]
+    },
+    {
+      "taskId": "route227b-unsupported-broad-task",
+      "origin": "route227b-context-planning-elite-upgrade",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "candidateFiles": [],
+      "filesRead": [],
+      "readReasons": [],
+      "missingFacts": [],
+      "editTargets": [],
+      "verificationIntent": "none",
+      "contextBudget": "none",
+      "memoryReuseStatus": "none",
+      "broadUnsupported": false,
+      "finalVerdict": "PARTIAL",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "notProvenClaims": [
+        "complete planning task evidence",
+        "mutation success",
+        "provider call"
+      ]
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "requiredNegativeControlResults": {
+    "defaultLiveProviderDisabled": true,
+    "noDefaultApply": true,
+    "broadUnsupportedNotComplete": true,
+    "routeLocalPrimaryRejected": true
+  },
+  "notProvenClaims": [
+    "full Route227B task matrix complete",
+    "unsupported broad task negative control",
+    "durable cross-session memory reuse through real CLI",
+    "LSP-grade code graph",
+    "provider-assisted context acquisition",
+    "mutation or verification success"
+  ],
+  "independentAudit": {
+    "result": "PARTIAL",
+    "referencePolicy": "not-inspected; local planning runtime substrate was sufficient for this product surface upgrade.",
+    "finalVerdictReason": "Product CLI planning surface exposes the required fields, but the full task matrix or broad negative control remains not fully proven."
+  }
+}

@@ -1,0 +1,631 @@
+{
+  "schemaVersion": 1,
+  "route": "route227e",
+  "routeType": "capability",
+  "finalStatus": "PARTIAL",
+  "independentAuditResult": "PARTIAL",
+  "independentPassRerun": null,
+  "primaryEvidence": {
+    "source": "not-proven",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-command-only-bypass-negative-control",
+    "executionEntrypoint": "product-composition-root",
+    "productConsumer": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+    "routeLocalHarnessUsed": true,
+    "helperOnlyComposition": false,
+    "proposalSource": "not-applicable",
+    "confirmationSource": "explicit-authority-contract",
+    "verificationSource": "not-run"
+  },
+  "baselineVerificationMatrix": {
+    "implementationFileToFocusedTest": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+    "testFileToFocusedTest": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+    "packageFileToBuild": "npm run build -w packages/ts-shell",
+    "multiFileCoverage": "partially-covered",
+    "commandOnlyBypass": "insufficient-evidence",
+    "selectedNotRun": "approval-required",
+    "failingCommand": "blocked",
+    "notAllowlisted": "blocked"
+  },
+  "verificationTasksAttempted": [
+    {
+      "id": "focused-test-pass",
+      "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "verdict": "blocked",
+      "dispatchStatus": "dispatched",
+      "outcome": "blocked",
+      "failureClass": "environment-failed",
+      "allowlistStatus": "allowlisted",
+      "runtimeReceipts": 7,
+      "coverageStatus": "covered",
+      "coveredFiles": [
+        "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+      ],
+      "uncoveredFiles": [],
+      "notProvenClaims": [
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ],
+      "rawOutputExcluded": true
+    },
+    {
+      "id": "package-build-pass",
+      "selectedCommand": "npm run build -w packages/ts-shell",
+      "verdict": "blocked",
+      "dispatchStatus": "dispatched",
+      "outcome": "blocked",
+      "failureClass": "environment-failed",
+      "allowlistStatus": "allowlisted",
+      "runtimeReceipts": 7,
+      "coverageStatus": "covered",
+      "coveredFiles": [
+        "packages/ts-shell/src/session/SessionManager.ts"
+      ],
+      "uncoveredFiles": [],
+      "notProvenClaims": [
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ],
+      "rawOutputExcluded": true
+    },
+    {
+      "id": "failing-relevant-command",
+      "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts -t route227e-intentional-missing-test",
+      "verdict": "blocked",
+      "dispatchStatus": "dispatched",
+      "outcome": "blocked",
+      "failureClass": "environment-failed",
+      "allowlistStatus": "allowlisted",
+      "runtimeReceipts": 7,
+      "coverageStatus": "covered",
+      "coveredFiles": [
+        "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+      ],
+      "uncoveredFiles": [],
+      "notProvenClaims": [
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ],
+      "rawOutputExcluded": true
+    },
+    {
+      "id": "command-only-bypass",
+      "selectedCommand": "node --version",
+      "verdict": "insufficient-evidence",
+      "dispatchStatus": "dispatched",
+      "outcome": "success",
+      "failureClass": "none",
+      "allowlistStatus": "allowlisted",
+      "runtimeReceipts": 7,
+      "coverageStatus": "uncovered",
+      "coveredFiles": [],
+      "uncoveredFiles": [
+        "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+      ],
+      "notProvenClaims": [
+        "task verification by unrelated command",
+        "full changed-file verification coverage",
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ],
+      "rawOutputExcluded": true
+    },
+    {
+      "id": "selected-not-run",
+      "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "verdict": "approval-required",
+      "dispatchStatus": "not-run",
+      "outcome": "not-run",
+      "failureClass": "none",
+      "allowlistStatus": "allowlisted",
+      "runtimeReceipts": 0,
+      "coverageStatus": "covered",
+      "coveredFiles": [
+        "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+      ],
+      "uncoveredFiles": [],
+      "notProvenClaims": [
+        "selected command dispatch",
+        "runtime receipt",
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ],
+      "rawOutputExcluded": true
+    },
+    {
+      "id": "command-not-allowlisted",
+      "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/controlledEditOperationRoute.test.ts",
+      "verdict": "blocked",
+      "dispatchStatus": "not-run",
+      "outcome": "blocked",
+      "failureClass": "command-not-allowlisted",
+      "allowlistStatus": "not-allowlisted",
+      "runtimeReceipts": 0,
+      "coverageStatus": "covered",
+      "coveredFiles": [
+        "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts"
+      ],
+      "uncoveredFiles": [],
+      "notProvenClaims": [
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ],
+      "rawOutputExcluded": true
+    },
+    {
+      "id": "multi-file-partial-coverage",
+      "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "verdict": "blocked",
+      "dispatchStatus": "dispatched",
+      "outcome": "blocked",
+      "failureClass": "environment-failed",
+      "allowlistStatus": "allowlisted",
+      "runtimeReceipts": 7,
+      "coverageStatus": "partially-covered",
+      "coveredFiles": [
+        "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+      ],
+      "uncoveredFiles": [
+        "packages/ts-shell/src/orchestration/verificationCommandPlan.ts"
+      ],
+      "notProvenClaims": [
+        "full changed-file verification coverage",
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ],
+      "rawOutputExcluded": true
+    }
+  ],
+  "focusedTestSelectionEvidence": {
+    "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+    "ladder": [
+      {
+        "kind": "focused-test",
+        "command": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "state": "selected",
+        "reason": "Focused test command selected from changed-file/test adjacency.",
+        "coveredFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+        ],
+        "riskLevel": "low",
+        "approvalRequirement": "explicit-approval-required",
+        "evidence": [
+          "verification-ladder:focused-test:selected",
+          "verification-ladder:focused-test:command:npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+          "verification-ladder:focused-test:covered:packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+        ]
+      },
+      {
+        "kind": "package-build",
+        "command": "npm run build -w packages/ts-shell",
+        "state": "skipped",
+        "reason": "Package build is available as the typecheck/build fallback.",
+        "coveredFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+        ],
+        "riskLevel": "low",
+        "approvalRequirement": "explicit-approval-required",
+        "fallbackReason": "Skipped because a focused test candidate had higher confidence.",
+        "evidence": [
+          "verification-ladder:package-build:skipped",
+          "verification-ladder:package-build:command:npm run build -w packages/ts-shell",
+          "verification-ladder:package-build:covered:packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+        ]
+      }
+    ],
+    "confidence": "high",
+    "reason": "focused ts-shell orchestration test covers the matching changed file/test pair."
+  },
+  "commandDispatchEvidence": [
+    {
+      "id": "focused-test-pass",
+      "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "dispatchStatus": "dispatched",
+      "outcome": "blocked",
+      "runtimeReceipts": 7,
+      "allowlistStatus": "allowlisted"
+    },
+    {
+      "id": "package-build-pass",
+      "selectedCommand": "npm run build -w packages/ts-shell",
+      "dispatchStatus": "dispatched",
+      "outcome": "blocked",
+      "runtimeReceipts": 7,
+      "allowlistStatus": "allowlisted"
+    },
+    {
+      "id": "failing-relevant-command",
+      "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts -t route227e-intentional-missing-test",
+      "dispatchStatus": "dispatched",
+      "outcome": "blocked",
+      "runtimeReceipts": 7,
+      "allowlistStatus": "allowlisted"
+    },
+    {
+      "id": "command-only-bypass",
+      "selectedCommand": "node --version",
+      "dispatchStatus": "dispatched",
+      "outcome": "success",
+      "runtimeReceipts": 7,
+      "allowlistStatus": "allowlisted"
+    },
+    {
+      "id": "selected-not-run",
+      "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "dispatchStatus": "not-run",
+      "outcome": "not-run",
+      "runtimeReceipts": 0,
+      "allowlistStatus": "allowlisted"
+    },
+    {
+      "id": "command-not-allowlisted",
+      "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/controlledEditOperationRoute.test.ts",
+      "dispatchStatus": "not-run",
+      "outcome": "blocked",
+      "runtimeReceipts": 0,
+      "allowlistStatus": "not-allowlisted"
+    },
+    {
+      "id": "multi-file-partial-coverage",
+      "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "dispatchStatus": "dispatched",
+      "outcome": "blocked",
+      "runtimeReceipts": 7,
+      "allowlistStatus": "allowlisted"
+    }
+  ],
+  "failureClassificationEvidence": {
+    "failingRelevantCommand": {
+      "verdict": "blocked",
+      "failureClass": "environment-failed",
+      "repairEligible": false,
+      "rawOutputExcluded": true
+    },
+    "notAllowlisted": {
+      "verdict": "blocked",
+      "failureClass": "command-not-allowlisted",
+      "rawOutputExcluded": true
+    }
+  },
+  "multiFileCoverageEvidence": {
+    "aggregate": "partially-covered",
+    "perFile": [
+      {
+        "path": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+        "status": "covered",
+        "command": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "reason": "Selected verification command covers this changed file."
+      },
+      {
+        "path": "packages/ts-shell/src/orchestration/verificationCommandPlan.ts",
+        "status": "uncovered",
+        "reason": "Selected verification command does not cover this changed file."
+      }
+    ],
+    "finalVerdict": "blocked",
+    "oneCoveredFileCannotProveWholeTargetSet": true
+  },
+  "repairHandoffEvidence": {
+    "status": "repair-not-eligible",
+    "repairEligible": false,
+    "mutationAuthority": "not-granted",
+    "mutation": "not-run",
+    "providerCall": "not-run",
+    "noAutomaticRepair": true,
+    "rawOutputExcluded": true
+  },
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "command-only bypass rejected",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "expectedProductPath": "Verification planner or report must reject command-only bypass as task success.",
+      "negativeControls": [
+        "node --version or equivalent command-only proof must not complete a file-edit task."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "selected workspace verification coverage preserved",
+      "evidenceLevel": "partial",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Selected workspace authority -> exact hunk apply -> readback -> verification verdict.",
+      "negativeControls": [
+        "A proposal without confirmation is not success.",
+        "Apply without readback is not success."
+      ],
+      "verdict": "PARTIAL"
+    },
+    {
+      "id": "frozen-upper-bound-challenge-multi-file-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "multi-file uncovered targets remain not-proven",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "expectedProductPath": "Target-set route with exact hunks, per-file readback, and aggregate verdict following the weakest file result.",
+      "negativeControls": [
+        "One verified file plus one unverified file must not aggregate to COMPLETE.",
+        "Unsupported add/delete/move must remain separate claims."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-session-continuity-result-truth",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "result surface preserves verification status and not-proven claims",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "expectedProductPath": "Session durability and result mapping preserve terminal truthfulness across continuation.",
+      "negativeControls": [
+        "A resumed session must not erase failed verification.",
+        "A transcript summary must not promote not-proven claims."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "failed verification produces repair handoff but not repair success",
+      "evidenceLevel": "partial",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Verification failure -> repair proposal -> confirmation -> existing exact hunk apply -> post-repair verification.",
+      "negativeControls": [
+        "Repair continuation is not repair success.",
+        "Repair proposal is not repair applied."
+      ],
+      "verdict": "BLOCKED"
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route227e-product-verification-intelligence-runner",
+      "purpose": "Drives the product task-relevant verification route through focused, build, failure, blocked, and coverage scenarios.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false,
+      "regressionProtected": "focused-test-first ladder, package build fallback, command-only bypass, selected-not-run, not-allowlisted block, multi-file coverage, repair handoff"
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "route227e-focused-test-pass",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "verification": {
+        "source": "task-relevant-command",
+        "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "dispatchStatus": "dispatched",
+        "outcome": "blocked",
+        "failureClass": "environment-failed",
+        "coverageStatus": "covered",
+        "coveredFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+        ],
+        "uncoveredFiles": [],
+        "rawOutputExcluded": true
+      },
+      "finalVerdict": "BLOCKED",
+      "notProvenClaims": [
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ]
+    },
+    {
+      "taskId": "route227e-package-build-pass",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "verification": {
+        "source": "task-relevant-command",
+        "selectedCommand": "npm run build -w packages/ts-shell",
+        "dispatchStatus": "dispatched",
+        "outcome": "blocked",
+        "failureClass": "environment-failed",
+        "coverageStatus": "covered",
+        "coveredFiles": [
+          "packages/ts-shell/src/session/SessionManager.ts"
+        ],
+        "uncoveredFiles": [],
+        "rawOutputExcluded": true
+      },
+      "finalVerdict": "BLOCKED",
+      "notProvenClaims": [
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ]
+    },
+    {
+      "taskId": "route227e-failing-relevant-command",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "verification": {
+        "source": "task-relevant-command",
+        "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts -t route227e-intentional-missing-test",
+        "dispatchStatus": "dispatched",
+        "outcome": "blocked",
+        "failureClass": "environment-failed",
+        "coverageStatus": "covered",
+        "coveredFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+        ],
+        "uncoveredFiles": [],
+        "rawOutputExcluded": true
+      },
+      "finalVerdict": "BLOCKED",
+      "notProvenClaims": [
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ]
+    },
+    {
+      "taskId": "route227e-command-only-bypass",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "verification": {
+        "source": "task-relevant-command",
+        "selectedCommand": "node --version",
+        "dispatchStatus": "dispatched",
+        "outcome": "success",
+        "failureClass": "none",
+        "coverageStatus": "uncovered",
+        "coveredFiles": [],
+        "uncoveredFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+        ],
+        "rawOutputExcluded": true
+      },
+      "finalVerdict": "BLOCKED",
+      "notProvenClaims": [
+        "task verification by unrelated command",
+        "full changed-file verification coverage",
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ]
+    },
+    {
+      "taskId": "route227e-selected-not-run",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "verification": {
+        "source": "task-relevant-command",
+        "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "dispatchStatus": "not-run",
+        "outcome": "not-run",
+        "failureClass": "none",
+        "coverageStatus": "covered",
+        "coveredFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+        ],
+        "uncoveredFiles": [],
+        "rawOutputExcluded": true
+      },
+      "finalVerdict": "BLOCKED",
+      "notProvenClaims": [
+        "selected command dispatch",
+        "runtime receipt",
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ]
+    },
+    {
+      "taskId": "route227e-command-not-allowlisted",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "verification": {
+        "source": "task-relevant-command",
+        "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/controlledEditOperationRoute.test.ts",
+        "dispatchStatus": "not-run",
+        "outcome": "blocked",
+        "failureClass": "command-not-allowlisted",
+        "coverageStatus": "covered",
+        "coveredFiles": [
+          "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts"
+        ],
+        "uncoveredFiles": [],
+        "rawOutputExcluded": true
+      },
+      "finalVerdict": "BLOCKED",
+      "notProvenClaims": [
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ]
+    },
+    {
+      "taskId": "route227e-multi-file-partial-coverage",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "verification": {
+        "source": "task-relevant-command",
+        "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "dispatchStatus": "dispatched",
+        "outcome": "blocked",
+        "failureClass": "environment-failed",
+        "coverageStatus": "partially-covered",
+        "coveredFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+        ],
+        "uncoveredFiles": [
+          "packages/ts-shell/src/orchestration/verificationCommandPlan.ts"
+        ],
+        "rawOutputExcluded": true
+      },
+      "finalVerdict": "BLOCKED",
+      "notProvenClaims": [
+        "full changed-file verification coverage",
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ]
+    }
+  ],
+  "referenceAdoption": [
+    {
+      "capabilityArea": "verification intelligence",
+      "referenceRepo": "not-inspected",
+      "fileOrSubsystemInspected": "not-applicable",
+      "patternAdopted": "Local Route223/227B/227D verification substrate was sufficient.",
+      "localSeamChanged": "taskRelevantVerificationRoute, testImpactPlan, capabilityBoundaryProjection, verificationFailureClassifier",
+      "patternRejected": "not-applicable",
+      "reason": "No concrete blocker required reference comparison.",
+      "evidenceProduced": "Route227E product verification report and focused tests"
+    }
+  ],
+  "notProvenClaims": [
+    "product runtime command dispatch blocked by environment",
+    "live provider verification",
+    "automatic repair-to-success",
+    "arbitrary shell command verification",
+    "browser/MCP external verification",
+    "full repository verification sweep"
+  ]
+}

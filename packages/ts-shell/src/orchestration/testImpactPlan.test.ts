@@ -31,7 +31,7 @@ describe("buildTestImpactPlan", () => {
           readiness: "ready",
         }),
         expect.objectContaining({
-          command: "npm test -- src/target.test.ts",
+          command: "npm test -w packages/ts-shell -- src/target.test.ts",
           readiness: "not-allowlisted",
         }),
       ]),

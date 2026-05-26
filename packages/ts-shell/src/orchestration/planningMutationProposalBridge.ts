@@ -30,6 +30,33 @@ export type PlanningMutationProposalAnchorState =
   | "blocked"
   | "missing-exact-mapping";
 
+export type PlanningMutationProposalOperationType =
+  | "update-existing-file"
+  | "review-only-generated"
+  | "broad-refactor-preview"
+  | "unsupported-operation"
+  | "not-run";
+
+export type PlanningMutationProposalHandoffReadiness =
+  | "ready-for-review"
+  | "ready-for-authority"
+  | "ready-for-apply-after-authority"
+  | "blocked"
+  | "unsupported";
+
+export interface PlanningMutationProposalOrchestration {
+  readonly proposalSource: PlanningMutationProposalBridge["evidenceSource"];
+  readonly operationType: PlanningMutationProposalOperationType;
+  readonly targetFiles: readonly string[];
+  readonly anchorQuality: PlanningMutationProposalAnchorState;
+  readonly handoffReadiness: PlanningMutationProposalHandoffReadiness;
+  readonly authorityRequired: true;
+  readonly mutationAuthority: "not-granted";
+  readonly applyState: "not-run";
+  readonly verificationState: "not-run";
+  readonly notProvenClaims: readonly string[];
+}
+
 export interface PlanningMutationProposalBridge {
   readonly bridgeId: string;
   readonly sourceHandoffId: string;
@@ -56,6 +83,7 @@ export interface PlanningMutationProposalBridge {
     | "manual-proposal-json"
     | "planning-runtime-deterministic"
     | "live-provider-proposal";
+  readonly orchestration: PlanningMutationProposalOrchestration;
   readonly reason: string;
   readonly nextAction: string;
   readonly mutationAuthority: "not-granted";
@@ -196,6 +224,7 @@ export function buildPlanningMutationProposalBridge(input: {
         ? "unsupported"
         : "review-required",
     evidenceSource: input.evidenceSource ?? "focused-deterministic-proposal",
+    rawOperationKind: input.rawProposal.operationKind,
     anchoredProposal,
     anchoredReview,
     anchoredMappingByHunkId,
@@ -249,6 +278,7 @@ function baseBridge(input: {
   readonly anchorState: PlanningMutationProposalAnchorState;
   readonly confirmationState: PlanningMutationProposalBridge["confirmationState"];
   readonly evidenceSource: PlanningMutationProposalBridge["evidenceSource"];
+  readonly rawOperationKind?: ProviderEditRawProposal["operationKind"];
   readonly anchoredProposal?: ProviderAnchoredProposalManifest;
   readonly anchoredReview?: EditProposalReview;
   readonly anchoredMappingByHunkId?: ReadonlyMap<string, FencedEditMapping>;
@@ -275,6 +305,10 @@ function baseBridge(input: {
     `planning-proposal-bridge:anchor:${input.anchorState}`,
     `planning-proposal-bridge:confirmation:${input.confirmationState}`,
     `planning-proposal-bridge:evidence-source:${input.evidenceSource}`,
+    `planning-proposal-bridge:orchestration-source:${input.evidenceSource}`,
+    `planning-proposal-bridge:operation:${operationType(input)}`,
+    `planning-proposal-bridge:handoff-readiness:${handoffReadiness(input)}`,
+    "planning-proposal-bridge:authority-required:true",
     "planning-proposal-bridge:provider-call:not-run",
     "planning-proposal-bridge:apply:not-run",
     "planning-proposal-bridge:verification:not-run",
@@ -300,11 +334,80 @@ function baseBridge(input: {
     verificationState: "not-run",
     providerCall: "not-run",
     evidenceSource: input.evidenceSource,
+    orchestration: {
+      proposalSource: input.evidenceSource,
+      operationType: operationType(input),
+      targetFiles: targetFiles(input),
+      anchorQuality: input.anchorState,
+      handoffReadiness: handoffReadiness(input),
+      authorityRequired: true,
+      mutationAuthority: "not-granted",
+      applyState: "not-run",
+      verificationState: "not-run",
+      notProvenClaims: notProvenClaims(input),
+    },
     reason: input.reason,
     nextAction: input.nextAction,
     mutationAuthority: "not-granted",
     evidence,
   };
+}
+
+function targetFiles(input: {
+  readonly handoff: PlanningMutationHandoffProjection;
+  readonly anchoredProposal?: ProviderAnchoredProposalManifest;
+}): readonly string[] {
+  const anchoredTargets = input.anchoredProposal?.hunks
+    .map((hunk) => hunk.targetLabel)
+    .filter((target) => target.trim().length > 0) ?? [];
+  return unique(anchoredTargets.length > 0 ? anchoredTargets : input.handoff.targetPaths);
+}
+
+function operationType(input: {
+  readonly proposalState: PlanningMutationProposalBridge["proposalState"];
+  readonly anchorState: PlanningMutationProposalAnchorState;
+  readonly rawOperationKind?: ProviderEditRawProposal["operationKind"];
+  readonly anchoredProposal?: ProviderAnchoredProposalManifest;
+}): PlanningMutationProposalOperationType {
+  if (input.proposalState === "not-run") return "not-run";
+  if (input.proposalState === "invalid") {
+    return input.rawOperationKind === "broad-refactor"
+      ? "broad-refactor-preview"
+      : "unsupported-operation";
+  }
+  if (input.anchorState === "missing-exact-mapping" || input.anchorState === "review-only") {
+    return "review-only-generated";
+  }
+  if (input.anchorState === "exact-ready") return "update-existing-file";
+  return "unsupported-operation";
+}
+
+function handoffReadiness(input: {
+  readonly state: PlanningMutationProposalBridgeState;
+  readonly anchorState: PlanningMutationProposalAnchorState;
+  readonly confirmationState: PlanningMutationProposalBridge["confirmationState"];
+}): PlanningMutationProposalHandoffReadiness {
+  if (input.state === "unsupported") return "unsupported";
+  if (input.state === "anchoring-blocked" || input.state === "missing-context") return "blocked";
+  if (input.anchorState === "exact-ready" && input.confirmationState === "confirmation-required") {
+    return "ready-for-apply-after-authority";
+  }
+  if (input.confirmationState === "confirmation-required") return "ready-for-authority";
+  return "ready-for-review";
+}
+
+function notProvenClaims(input: {
+  readonly anchorState: PlanningMutationProposalAnchorState;
+  readonly confirmationState: PlanningMutationProposalBridge["confirmationState"];
+}): readonly string[] {
+  return [
+    ...(input.anchorState === "exact-ready" ? [] : ["exact anchor"]),
+    ...(input.confirmationState === "confirmation-required"
+      ? ["explicit authority not granted"]
+      : ["apply authority"]),
+    "apply executed",
+    "verification executed",
+  ];
 }
 
 function mapStoppedHandoffState(

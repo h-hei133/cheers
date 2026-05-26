@@ -1,0 +1,495 @@
+{
+  "schemaVersion": 1,
+  "route": "route227c",
+  "routeType": "proposal-orchestration-capability",
+  "finalStatus": "PARTIAL",
+  "independentAuditResult": "PARTIAL",
+  "independentPassRerun": null,
+  "productCapabilityChanged": {
+    "planningToPatchBridgeSurface": "Product proposal bridge now exposes proposal source, operation type, anchor quality, handoff readiness, authority-required, and not-proven claims.",
+    "productPath": "real CLI -> runMvpIntegratedFlow -> planning runtime product projection -> planningMutationProposalBridge",
+    "providerCalled": false,
+    "applyAttempted": false
+  },
+  "upstreamRouteEvidence": {
+    "route227a": {
+      "finalStatus": "BLOCKED",
+      "liveProviderExactReady": false
+    },
+    "route227b": {
+      "finalStatus": "PARTIAL",
+      "fullPlanningMatrixComplete": false
+    }
+  },
+  "primaryEvidence": {
+    "source": "not-proven",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+    "executionEntrypoint": "real-cli-product-path",
+    "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+    "routeLocalHarnessUsed": false,
+    "helperOnlyComposition": false,
+    "proposalSource": "deterministic-from-product-read-evidence",
+    "confirmationSource": "none",
+    "verificationSource": "not-run"
+  },
+  "proposalSourcesAttempted": [
+    {
+      "source": "planning-runtime-deterministic",
+      "taskCount": 1,
+      "evidenceLevel": "partial"
+    },
+    {
+      "source": "manual-proposal-json",
+      "taskCount": 1,
+      "evidenceLevel": "product-proven"
+    },
+    {
+      "source": "none",
+      "taskCount": 2,
+      "evidenceLevel": "partial"
+    }
+  ],
+  "productProposalTasksAttempted": [
+    {
+      "taskId": "route227c-review-only-planning-handoff",
+      "origin": "route227c-planning-to-patch-orchestrator",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "proposalSource": "planning-runtime-deterministic",
+      "operationType": "update-existing-file",
+      "anchorQuality": "exact-ready",
+      "handoffReadiness": "ready-for-apply-after-authority",
+      "authorityRequired": true,
+      "mutationAuthority": "not-granted",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "explicit authority not granted",
+        "apply executed",
+        "verification executed"
+      ]
+    },
+    {
+      "taskId": "route227c-manual-exact-proposal-review",
+      "origin": "route227c-planning-to-patch-orchestrator",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "proposalSource": "manual-proposal-json",
+      "operationType": "update-existing-file",
+      "anchorQuality": "exact-ready",
+      "handoffReadiness": "ready-for-apply-after-authority",
+      "authorityRequired": true,
+      "mutationAuthority": "not-granted",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "explicit authority not granted",
+        "apply executed",
+        "verification executed"
+      ]
+    },
+    {
+      "taskId": "route227c-second-exact-proposal-review",
+      "origin": "route227c-planning-to-patch-orchestrator",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "proposalSource": "none",
+      "operationType": "none",
+      "anchorQuality": "none",
+      "handoffReadiness": "none",
+      "authorityRequired": false,
+      "mutationAuthority": "not-granted",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "apply executed",
+        "verification executed"
+      ]
+    },
+    {
+      "taskId": "route227c-unsupported-broad-preview",
+      "origin": "route227c-planning-to-patch-orchestrator",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "proposalSource": "none",
+      "operationType": "none",
+      "anchorQuality": "none",
+      "handoffReadiness": "none",
+      "authorityRequired": false,
+      "mutationAuthority": "not-granted",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "apply executed",
+        "verification executed"
+      ]
+    }
+  ],
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "proposal handoff remains no-provider/no-apply by default",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "provider remained not-run",
+        "apply remained not-run"
+      ]
+    },
+    {
+      "id": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "proposal readiness does not imply selected workspace authority",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "authorityRequired remained visible",
+        "mutationAuthority remained not-granted"
+      ]
+    },
+    {
+      "id": "frozen-unsupported-broad-task-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "unsupported broad proposal remains blocked or preview-only",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "unsupported broad output did not become apply success"
+      ]
+    },
+    {
+      "id": "frozen-session-continuity-result-truth",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "proposal result surface preserves stopped/not-proven truth",
+      "evidenceLevel": "partial",
+      "primaryCompleteEvidence": false,
+      "verdict": "PARTIAL",
+      "negativeControls": [
+        "not-proven claims remained visible in the product output"
+      ]
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route227c-planning-to-patch-product-driver",
+      "purpose": "Creates isolated workspaces and spawns the real CLI product proposal path; classifications are evidence only.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "requiredNegativeControlResults": {
+    "proposalReadinessDoesNotGrantAuthority": true,
+    "liveProviderNotSilentlyUpgraded": true,
+    "planningPartialNotSilentlyUpgraded": true,
+    "unsupportedBroadNotSuccess": true,
+    "routeLocalPrimaryRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "route227c-review-only-planning-handoff",
+      "origin": "route227c-planning-to-patch-orchestrator",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "proposalSource": "planning-runtime-deterministic",
+      "operationType": "update-existing-file",
+      "anchorQuality": "exact-ready",
+      "handoffReadiness": "ready-for-apply-after-authority",
+      "authorityRequired": true,
+      "mutationAuthority": "not-granted",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "explicit authority not granted",
+        "apply executed",
+        "verification executed"
+      ]
+    },
+    {
+      "taskId": "route227c-manual-exact-proposal-review",
+      "origin": "route227c-planning-to-patch-orchestrator",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "proposalSource": "manual-proposal-json",
+      "operationType": "update-existing-file",
+      "anchorQuality": "exact-ready",
+      "handoffReadiness": "ready-for-apply-after-authority",
+      "authorityRequired": true,
+      "mutationAuthority": "not-granted",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "explicit authority not granted",
+        "apply executed",
+        "verification executed"
+      ]
+    },
+    {
+      "taskId": "route227c-second-exact-proposal-review",
+      "origin": "route227c-planning-to-patch-orchestrator",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "proposalSource": "none",
+      "operationType": "none",
+      "anchorQuality": "none",
+      "handoffReadiness": "none",
+      "authorityRequired": false,
+      "mutationAuthority": "not-granted",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "apply executed",
+        "verification executed"
+      ]
+    },
+    {
+      "taskId": "route227c-unsupported-broad-preview",
+      "origin": "route227c-planning-to-patch-orchestrator",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "proposalSource": "none",
+      "operationType": "none",
+      "anchorQuality": "none",
+      "handoffReadiness": "none",
+      "authorityRequired": false,
+      "mutationAuthority": "not-granted",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "apply executed",
+        "verification executed"
+      ]
+    }
+  ],
+  "proposalNormalizationEvidence": {
+    "representedSources": [
+      "planning-runtime-deterministic",
+      "manual-proposal-json",
+      "none"
+    ],
+    "exactReadyCount": 2,
+    "reviewOnlyCount": 0,
+    "unsupportedCount": 0
+  },
+  "anchorClassificationEvidence": {
+    "exactReadyCount": 2,
+    "anchorQualities": [
+      {
+        "taskId": "route227c-review-only-planning-handoff",
+        "anchorQuality": "exact-ready",
+        "handoffReadiness": "ready-for-apply-after-authority"
+      },
+      {
+        "taskId": "route227c-manual-exact-proposal-review",
+        "anchorQuality": "exact-ready",
+        "handoffReadiness": "ready-for-apply-after-authority"
+      },
+      {
+        "taskId": "route227c-second-exact-proposal-review",
+        "anchorQuality": "none",
+        "handoffReadiness": "none"
+      },
+      {
+        "taskId": "route227c-unsupported-broad-preview",
+        "anchorQuality": "none",
+        "handoffReadiness": "none"
+      }
+    ]
+  },
+  "reviewSurfaceEvidence": {
+    "sourceVisible": false,
+    "operationVisible": false,
+    "anchorQualityVisible": false,
+    "authorityRequiredVisible": false,
+    "notProvenVisible": true
+  },
+  "referenceAdoption": [
+    {
+      "capabilityArea": "planning-to-patch proposal orchestration",
+      "referenceRepo": "not-inspected",
+      "fileOrSubsystemInspected": "not-applicable",
+      "patternAdopted": "Local Route227A/B product path and existing proposal bridge seams were sufficient for this partial product surface upgrade.",
+      "localSeamChanged": "packages/ts-shell/src/orchestration/planningMutationProposalBridge.ts, planningRuntimeProductProjection.ts, and Route227C report driver",
+      "patternRejected": "not-applicable",
+      "reason": "No blocker required reference comparison.",
+      "evidenceProduced": "Route227C product CLI report and Route221 report gate"
+    }
+  ],
+  "notProvenClaims": [
+    "live provider exact-ready source remains not-proven because Route227A is not COMPLETE",
+    "full planning matrix remains not-proven because Route227B is not COMPLETE",
+    "repair proposal is not yet normalized through the same planning-to-patch bridge",
+    "multi-file proposal per-file status is not yet proven through the same product bridge",
+    "live-provider exact-ready proposal through Route227C",
+    "repair proposal success",
+    "multi-file apply success",
+    "proposal authority",
+    "apply executed",
+    "verification executed"
+  ],
+  "independentAudit": {
+    "result": "PARTIAL",
+    "finalVerdictReason": "Route227C product surface improved, but completion remains partial: live provider exact-ready source remains not-proven because Route227A is not COMPLETE; full planning matrix remains not-proven because Route227B is not COMPLETE; repair proposal is not yet normalized through the same planning-to-patch bridge; multi-file proposal per-file status is not yet proven through the same product bridge"
+  }
+}

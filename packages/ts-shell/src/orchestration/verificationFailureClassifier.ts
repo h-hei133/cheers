@@ -4,11 +4,13 @@ import type { VerificationCommandPlan } from "./verificationCommandPlan.js";
 export type VerificationFailureClass =
   | "test-failed"
   | "typecheck-failed"
+  | "build-failed"
   | "lint-failed"
   | "command-not-allowlisted"
   | "command-timed-out"
   | "command-blocked-by-policy"
   | "command-unavailable"
+  | "environment-failed"
   | "no-verification-command"
   | "invalid-runtime-receipt"
   | "unknown";
@@ -103,6 +105,18 @@ export function classifyVerificationCommandFailure(input: {
 
   const command = input.plan.command ?? "";
   const reason = result.projection.reason ?? result.error ?? result.output ?? "Verification command failed.";
+  if (
+    markers.some((entry) => entry.includes("daemon-unavailable")) ||
+    /daemon execution failed|stream was destroyed|environment failed/i.test(reason)
+  ) {
+    return classification({
+      failureClass: "environment-failed",
+      repairEligible: false,
+      reason,
+      nextAction: "Resolve verification runtime environment readiness before opening the repair loop.",
+      plan: input.plan,
+    });
+  }
   if (/\bnpm\s+test\b/i.test(command)) {
     return classification({
       failureClass: "test-failed",
@@ -112,7 +126,16 @@ export function classifyVerificationCommandFailure(input: {
       plan: input.plan,
     });
   }
-  if (/\b(?:tsc|typecheck|npm\s+run\s+build)\b/i.test(command)) {
+  if (/\bnpm\s+run\s+build\b/i.test(command)) {
+    return classification({
+      failureClass: "build-failed",
+      repairEligible: true,
+      reason,
+      nextAction: "Create a review-gated repair context from the failed build command.",
+      plan: input.plan,
+    });
+  }
+  if (/\b(?:tsc|typecheck)\b/i.test(command)) {
     return classification({
       failureClass: "typecheck-failed",
       repairEligible: true,

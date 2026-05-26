@@ -1,0 +1,1138 @@
+{
+  "schemaVersion": 1,
+  "route": "route227d",
+  "routeType": "edit-engine-capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "independentPassRerun": {
+    "result": "PASS",
+    "source": "Route227D driver invoked the accepted controlled edit operation composition root over existing workspace routes."
+  },
+  "productCapabilityChanged": {
+    "controlledEditOperationLayer": "Added a product composition layer over existing workspace create, multi-file update, and no-write preview routes.",
+    "noNewWriter": true,
+    "destructivePreviewFirst": true,
+    "providerCalled": false
+  },
+  "primaryEvidence": {
+    "source": "product-proven",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-lower-bound-stable-selected-workspace-authority-case",
+    "executionEntrypoint": "product-composition-root",
+    "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+    "routeLocalHarnessUsed": true,
+    "helperOnlyComposition": false,
+    "proposalSource": "deterministic-from-product-read-evidence",
+    "confirmationSource": "explicit-authority-contract",
+    "verificationSource": "runtime-readback"
+  },
+  "editOperationsAttempted": [
+    {
+      "operationType": "update-existing-file",
+      "taskCount": 1
+    },
+    {
+      "operationType": "create-file",
+      "taskCount": 2
+    },
+    {
+      "operationType": "unsupported-operation",
+      "taskCount": 1
+    },
+    {
+      "operationType": "multi-file-target-set",
+      "taskCount": 2
+    },
+    {
+      "operationType": "delete-file-preview",
+      "taskCount": 1
+    },
+    {
+      "operationType": "move-or-rename-preview",
+      "taskCount": 2
+    }
+  ],
+  "productEditTasksAttempted": [
+    {
+      "taskId": "route227d-update-existing-file",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "update-existing-file",
+      "previewOnly": false,
+      "mutationAuthority": "explicit-selected-workspace",
+      "changedFiles": [
+        "src/a.ts"
+      ],
+      "failedFiles": [],
+      "plannedFiles": [],
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "runtime-readback",
+        "status": "passed"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-create-file",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "create-file",
+      "previewOnly": false,
+      "mutationAuthority": "explicit-selected-workspace",
+      "changedFiles": [
+        "src/new.ts"
+      ],
+      "failedFiles": [],
+      "plannedFiles": [],
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "runtime-readback",
+        "status": "passed"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": true,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-unsafe-create-path",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "unsupported-operation",
+      "previewOnly": false,
+      "mutationAuthority": "explicit-selected-workspace",
+      "changedFiles": [],
+      "failedFiles": [
+        "(apply_patch)"
+      ],
+      "plannedFiles": [],
+      "apply": {
+        "status": "blocked",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "mutation success",
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-overwrite-create-blocked",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "create-file",
+      "previewOnly": false,
+      "mutationAuthority": "explicit-selected-workspace",
+      "changedFiles": [],
+      "failedFiles": [
+        "src/a.ts"
+      ],
+      "plannedFiles": [],
+      "apply": {
+        "status": "blocked",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "mutation success",
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-three-file-target-set",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "multi-file-target-set",
+      "previewOnly": false,
+      "mutationAuthority": "explicit-selected-workspace",
+      "changedFiles": [
+        "src/a.ts",
+        "src/b.ts",
+        "src/c.ts"
+      ],
+      "failedFiles": [],
+      "plannedFiles": [],
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "runtime-readback",
+        "status": "passed"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": true,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-partial-failure",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "multi-file-target-set",
+      "previewOnly": false,
+      "mutationAuthority": "explicit-selected-workspace",
+      "changedFiles": [
+        "src/a.ts"
+      ],
+      "failedFiles": [
+        "src/b.ts"
+      ],
+      "plannedFiles": [],
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "blocked",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "blocked"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "mutation success",
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-delete-preview",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "delete-file-preview",
+      "previewOnly": true,
+      "mutationAuthority": "not-granted",
+      "changedFiles": [],
+      "failedFiles": [
+        "(apply_patch)"
+      ],
+      "plannedFiles": [],
+      "apply": {
+        "status": "blocked",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "mutation success",
+        "preview is not apply",
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-move-preview",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "move-or-rename-preview",
+      "previewOnly": true,
+      "mutationAuthority": "not-granted",
+      "changedFiles": [],
+      "failedFiles": [
+        "(apply_patch)"
+      ],
+      "plannedFiles": [],
+      "apply": {
+        "status": "blocked",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "mutation success",
+        "preview is not apply",
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-broad-preview",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "move-or-rename-preview",
+      "previewOnly": true,
+      "mutationAuthority": "not-granted",
+      "changedFiles": [],
+      "failedFiles": [
+        "(apply_patch)"
+      ],
+      "plannedFiles": [],
+      "apply": {
+        "status": "blocked",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "mutation success",
+        "preview is not apply",
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    }
+  ],
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "default preview path remains no-provider/no-apply",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "provider was not called",
+        "preview-only operations did not write"
+      ]
+    },
+    {
+      "id": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "selected workspace authority gates write operations",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": true,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "write requires explicit selected-workspace authority",
+        "prompt text does not grant authority"
+      ]
+    },
+    {
+      "id": "frozen-upper-bound-challenge-multi-file-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "three-file exact target set records per-file evidence",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "one successful file cannot hide another failed file"
+      ]
+    },
+    {
+      "id": "frozen-unsupported-broad-task-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "broad refactor remains preview or blocked",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "broad preview is not mutation success"
+      ]
+    },
+    {
+      "id": "frozen-session-continuity-result-truth",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "partial failure remains stopped/not-proven",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "partial failure cannot become success",
+        "recovery available is not rollback executed"
+      ]
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route227d-controlled-edit-operation-driver",
+      "purpose": "Creates isolated workspaces and invokes the controlled edit operation product composition root; does not implement a writer.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "route227d-update-existing-file",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "update-existing-file",
+      "previewOnly": false,
+      "mutationAuthority": "explicit-selected-workspace",
+      "changedFiles": [
+        "src/a.ts"
+      ],
+      "failedFiles": [],
+      "plannedFiles": [],
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "runtime-readback",
+        "status": "passed"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-create-file",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "create-file",
+      "previewOnly": false,
+      "mutationAuthority": "explicit-selected-workspace",
+      "changedFiles": [
+        "src/new.ts"
+      ],
+      "failedFiles": [],
+      "plannedFiles": [],
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "runtime-readback",
+        "status": "passed"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": true,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-unsafe-create-path",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "unsupported-operation",
+      "previewOnly": false,
+      "mutationAuthority": "explicit-selected-workspace",
+      "changedFiles": [],
+      "failedFiles": [
+        "(apply_patch)"
+      ],
+      "plannedFiles": [],
+      "apply": {
+        "status": "blocked",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "mutation success",
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-overwrite-create-blocked",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "create-file",
+      "previewOnly": false,
+      "mutationAuthority": "explicit-selected-workspace",
+      "changedFiles": [],
+      "failedFiles": [
+        "src/a.ts"
+      ],
+      "plannedFiles": [],
+      "apply": {
+        "status": "blocked",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "mutation success",
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-three-file-target-set",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "multi-file-target-set",
+      "previewOnly": false,
+      "mutationAuthority": "explicit-selected-workspace",
+      "changedFiles": [
+        "src/a.ts",
+        "src/b.ts",
+        "src/c.ts"
+      ],
+      "failedFiles": [],
+      "plannedFiles": [],
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "runtime-readback",
+        "status": "passed"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": true,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-partial-failure",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "multi-file-target-set",
+      "previewOnly": false,
+      "mutationAuthority": "explicit-selected-workspace",
+      "changedFiles": [
+        "src/a.ts"
+      ],
+      "failedFiles": [
+        "src/b.ts"
+      ],
+      "plannedFiles": [],
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "blocked",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "blocked"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "mutation success",
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-delete-preview",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "delete-file-preview",
+      "previewOnly": true,
+      "mutationAuthority": "not-granted",
+      "changedFiles": [],
+      "failedFiles": [
+        "(apply_patch)"
+      ],
+      "plannedFiles": [],
+      "apply": {
+        "status": "blocked",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "mutation success",
+        "preview is not apply",
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-move-preview",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "move-or-rename-preview",
+      "previewOnly": true,
+      "mutationAuthority": "not-granted",
+      "changedFiles": [],
+      "failedFiles": [
+        "(apply_patch)"
+      ],
+      "plannedFiles": [],
+      "apply": {
+        "status": "blocked",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "mutation success",
+        "preview is not apply",
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    },
+    {
+      "taskId": "route227d-broad-preview",
+      "origin": "route227d-edit-engine-capability-expansion",
+      "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "executionEntrypoint": "product-composition-root",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "operationType": "move-or-rename-preview",
+      "previewOnly": true,
+      "mutationAuthority": "not-granted",
+      "changedFiles": [],
+      "failedFiles": [
+        "(apply_patch)"
+      ],
+      "plannedFiles": [],
+      "apply": {
+        "status": "blocked",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "snapshotRecovery": {
+        "recoveryAvailable": false,
+        "recoveryExecuted": false,
+        "atomicRollbackAvailable": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "mutation success",
+        "preview is not apply",
+        "provider execution",
+        "automatic rollback executed"
+      ]
+    }
+  ],
+  "perFileEvidence": [
+    {
+      "taskId": "route227d-update-existing-file",
+      "operationType": "update-existing-file",
+      "changedFiles": [
+        "src/a.ts"
+      ],
+      "failedFiles": [],
+      "plannedFiles": [],
+      "postWriteVerification": "passed"
+    },
+    {
+      "taskId": "route227d-create-file",
+      "operationType": "create-file",
+      "changedFiles": [
+        "src/new.ts"
+      ],
+      "failedFiles": [],
+      "plannedFiles": [],
+      "postWriteVerification": "passed"
+    },
+    {
+      "taskId": "route227d-unsafe-create-path",
+      "operationType": "unsupported-operation",
+      "changedFiles": [],
+      "failedFiles": [
+        "(apply_patch)"
+      ],
+      "plannedFiles": [],
+      "postWriteVerification": "not-run"
+    },
+    {
+      "taskId": "route227d-overwrite-create-blocked",
+      "operationType": "create-file",
+      "changedFiles": [],
+      "failedFiles": [
+        "src/a.ts"
+      ],
+      "plannedFiles": [],
+      "postWriteVerification": "not-run"
+    },
+    {
+      "taskId": "route227d-three-file-target-set",
+      "operationType": "multi-file-target-set",
+      "changedFiles": [
+        "src/a.ts",
+        "src/b.ts",
+        "src/c.ts"
+      ],
+      "failedFiles": [],
+      "plannedFiles": [],
+      "postWriteVerification": "passed"
+    },
+    {
+      "taskId": "route227d-partial-failure",
+      "operationType": "multi-file-target-set",
+      "changedFiles": [
+        "src/a.ts"
+      ],
+      "failedFiles": [
+        "src/b.ts"
+      ],
+      "plannedFiles": [],
+      "postWriteVerification": "blocked"
+    },
+    {
+      "taskId": "route227d-delete-preview",
+      "operationType": "delete-file-preview",
+      "changedFiles": [],
+      "failedFiles": [
+        "(apply_patch)"
+      ],
+      "plannedFiles": [],
+      "postWriteVerification": "not-run"
+    },
+    {
+      "taskId": "route227d-move-preview",
+      "operationType": "move-or-rename-preview",
+      "changedFiles": [],
+      "failedFiles": [
+        "(apply_patch)"
+      ],
+      "plannedFiles": [],
+      "postWriteVerification": "not-run"
+    },
+    {
+      "taskId": "route227d-broad-preview",
+      "operationType": "move-or-rename-preview",
+      "changedFiles": [],
+      "failedFiles": [
+        "(apply_patch)"
+      ],
+      "plannedFiles": [],
+      "postWriteVerification": "not-run"
+    }
+  ],
+  "snapshotRecoveryEvidence": [
+    {
+      "taskId": "route227d-update-existing-file",
+      "recoveryAvailable": false,
+      "recoveryExecuted": false,
+      "atomicRollbackAvailable": false
+    },
+    {
+      "taskId": "route227d-create-file",
+      "recoveryAvailable": true,
+      "recoveryExecuted": false,
+      "atomicRollbackAvailable": false
+    },
+    {
+      "taskId": "route227d-unsafe-create-path",
+      "recoveryAvailable": false,
+      "recoveryExecuted": false,
+      "atomicRollbackAvailable": false
+    },
+    {
+      "taskId": "route227d-overwrite-create-blocked",
+      "recoveryAvailable": false,
+      "recoveryExecuted": false,
+      "atomicRollbackAvailable": false
+    },
+    {
+      "taskId": "route227d-three-file-target-set",
+      "recoveryAvailable": true,
+      "recoveryExecuted": false,
+      "atomicRollbackAvailable": false
+    },
+    {
+      "taskId": "route227d-partial-failure",
+      "recoveryAvailable": false,
+      "recoveryExecuted": false,
+      "atomicRollbackAvailable": false
+    },
+    {
+      "taskId": "route227d-delete-preview",
+      "recoveryAvailable": false,
+      "recoveryExecuted": false,
+      "atomicRollbackAvailable": false
+    },
+    {
+      "taskId": "route227d-move-preview",
+      "recoveryAvailable": false,
+      "recoveryExecuted": false,
+      "atomicRollbackAvailable": false
+    },
+    {
+      "taskId": "route227d-broad-preview",
+      "recoveryAvailable": false,
+      "recoveryExecuted": false,
+      "atomicRollbackAvailable": false
+    }
+  ],
+  "previewEvidence": [
+    {
+      "taskId": "route227d-delete-preview",
+      "operationType": "delete-file-preview",
+      "changedFiles": [],
+      "reportedSuccess": false
+    },
+    {
+      "taskId": "route227d-move-preview",
+      "operationType": "move-or-rename-preview",
+      "changedFiles": [],
+      "reportedSuccess": false
+    },
+    {
+      "taskId": "route227d-broad-preview",
+      "operationType": "move-or-rename-preview",
+      "changedFiles": [],
+      "reportedSuccess": false
+    }
+  ],
+  "referenceAdoption": [
+    {
+      "capabilityArea": "controlled edit operation layer",
+      "referenceRepo": "not-inspected",
+      "fileOrSubsystemInspected": "not-applicable",
+      "patternAdopted": "Existing local workspace route modules were sufficient; no reference scan was required.",
+      "localSeamChanged": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts and Route227D report driver",
+      "patternRejected": "not-applicable",
+      "reason": "Subagent audits found existing create/multi/delete/move routes and authority boundaries.",
+      "evidenceProduced": "Route227D controlled edit report and focused tests"
+    }
+  ],
+  "notProvenClaims": [
+    "production default write",
+    "delete apply through Route227D",
+    "move apply through Route227D",
+    "broad refactor apply",
+    "fuzzy apply success",
+    "automatic rollback executed",
+    "live provider edit source"
+  ],
+  "independentAudit": {
+    "result": "PASS",
+    "finalVerdictReason": "Controlled create, update, and three-file target-set apply succeeded with readback; destructive operations stayed preview-only; partial failure stayed stopped."
+  }
+}

@@ -2,6 +2,7 @@ import { SandboxEnforcer } from "../sandbox/index.js";
 import { ToolDispatcher } from "../tools/dispatcher.js";
 import type { QueryEvent } from "../core/query/events.js";
 import type { ToolDispatcher as ToolDispatcherType } from "../tools/dispatcher.js";
+import { isAllowlistedRunCommand } from "./capabilityBoundaryProjection.js";
 import {
   buildVerificationCommandPlan,
   type VerificationCommandPlan,
@@ -26,14 +27,45 @@ export interface TaskRelevantVerificationAuthority {
 }
 
 export type CommandRelevanceStatus = "relevant" | "unrelated" | "not-selected";
+export type VerificationCoverageStatus = "covered" | "partially-covered" | "uncovered";
+export type VerificationLadderKind =
+  | "focused-test"
+  | "package-test"
+  | "package-build"
+  | "typecheck"
+  | "content-readback"
+  | "blocked";
+
+export interface VerificationLadderStep {
+  readonly kind: VerificationLadderKind;
+  readonly command?: string;
+  readonly state: "selected" | "skipped" | "blocked";
+  readonly reason: string;
+  readonly coveredFiles: readonly string[];
+  readonly riskLevel: "low" | "medium";
+  readonly approvalRequirement: "explicit-approval-required" | "not-applicable";
+  readonly fallbackReason?: string;
+  readonly evidence: readonly string[];
+}
+
+export interface PerFileVerificationCoverage {
+  readonly path: string;
+  readonly status: "covered" | "uncovered";
+  readonly command?: string;
+  readonly reason: string;
+}
 
 export interface TaskRelevantCommandPlan {
   readonly changedFiles: readonly string[];
   readonly candidateCommands: readonly string[];
   readonly selectedCommand?: string;
+  readonly verificationLadder: readonly VerificationLadderStep[];
   readonly relevanceStatus: CommandRelevanceStatus;
   readonly relevanceReason: string;
   readonly coveredFiles: readonly string[];
+  readonly uncoveredFiles: readonly string[];
+  readonly coverageStatus: VerificationCoverageStatus;
+  readonly perFileCoverage: readonly PerFileVerificationCoverage[];
   readonly coveredPackageArea?: string;
   readonly commandRiskLevel: "low" | "medium";
   readonly approvalRequirement: "explicit-approval-required";
@@ -46,6 +78,7 @@ export type TaskRelevantVerificationVerdict =
   | "verified"
   | "insufficient-evidence"
   | "verification-failed"
+  | "blocked"
   | "approval-required";
 
 export interface TaskRelevantVerificationResult {
@@ -112,7 +145,7 @@ export async function runTaskRelevantVerificationRoute(input: {
         "task-relevant-verification:dispatch:not-run",
       ]),
       `task-relevant-verification:authority:${input.authority.state}`,
-      `task-relevant-verification:dispatch:${run ? "dispatched" : "not-run"}`,
+      `task-relevant-verification:dispatch:${run?.toolResult ? "dispatched" : "not-run"}`,
       `task-relevant-verification:verdict:${verdict}`,
       "task-relevant-verification:provider-call:not-run",
       "task-relevant-verification:mutation:not-run",
@@ -122,7 +155,7 @@ export async function runTaskRelevantVerificationRoute(input: {
       taskId: input.taskId,
       commandPlan,
       authority: input.authority,
-      dispatchStatus: run ? "dispatched" : "not-run",
+      dispatchStatus: run?.toolResult ? "dispatched" : "not-run",
       ...(run ? { run } : {}),
       verdict,
       resultSurface: buildTaskRelevantVerificationSurface({
@@ -155,6 +188,10 @@ export function buildTaskRelevantCommandPlan(input: {
     input.candidateCommands && input.candidateCommands.length > 0
       ? input.candidateCommands.map((entry) => entry.trim()).filter(Boolean)
       : defaultCandidatesFor(changedFiles);
+  const verificationLadder = buildVerificationLadder({
+    changedFiles,
+    candidateCommands,
+  });
   const relevance = selectRelevantCommand(changedFiles, candidateCommands);
   const selectedCommand = relevance.selectedCommand ?? candidateCommands[0];
   const relevanceStatus =
@@ -169,14 +206,21 @@ export function buildTaskRelevantCommandPlan(input: {
       "runtime receipt marker",
       "command exit status",
       "changed-file relevance",
+      "per-file verification coverage",
       ...changedFiles,
     ],
+  });
+  const coverage = buildCoverage({
+    changedFiles,
+    coveredFiles: relevance.coveredFiles,
+    ...(selectedCommand ? { selectedCommand } : {}),
   });
 
   return {
     changedFiles,
     candidateCommands,
     ...(selectedCommand ? { selectedCommand } : {}),
+    verificationLadder,
     relevanceStatus,
     relevanceReason:
       relevanceStatus === "relevant"
@@ -185,6 +229,9 @@ export function buildTaskRelevantCommandPlan(input: {
           ? "Selected command can run but does not inspect or cover the changed files."
           : "No verification command candidate was selected.",
     coveredFiles: relevance.coveredFiles,
+    uncoveredFiles: coverage.uncoveredFiles,
+    coverageStatus: coverage.coverageStatus,
+    perFileCoverage: coverage.perFileCoverage,
     ...(relevance.coveredPackageArea ? { coveredPackageArea: relevance.coveredPackageArea } : {}),
     commandRiskLevel: "low",
     approvalRequirement: "explicit-approval-required",
@@ -194,7 +241,10 @@ export function buildTaskRelevantCommandPlan(input: {
     evidence: [
       `task-relevant-verification:changed-files:${changedFiles.join(",")}`,
       `task-relevant-verification:relevance:${relevanceStatus}`,
+      `task-relevant-verification:coverage:${coverage.coverageStatus}`,
+      `task-relevant-verification:uncovered-files:${coverage.uncoveredFiles.join(",") || "none"}`,
       ...(selectedCommand ? [`task-relevant-verification:selected-command:${selectedCommand}`] : []),
+      ...verificationLadder.flatMap((step) => step.evidence),
       ...relevance.evidence,
     ],
   };
@@ -237,7 +287,13 @@ function classifyTaskVerdict(input: {
       ? "insufficient-evidence"
       : "approval-required";
   }
+  if (input.run.result.outcome === "blocked" || input.run.result.outcome === "skipped") {
+    return "blocked";
+  }
   if (input.commandPlan.relevanceStatus !== "relevant") {
+    return "insufficient-evidence";
+  }
+  if (input.commandPlan.coverageStatus !== "covered") {
     return "insufficient-evidence";
   }
   if (input.run.result.outcome === "success") {
@@ -254,6 +310,9 @@ function buildNotProvenClaims(input: {
   const claims = new Set<string>();
   if (input.commandPlan.relevanceStatus !== "relevant") {
     claims.add("task verification by unrelated command");
+  }
+  if (input.commandPlan.coverageStatus !== "covered") {
+    claims.add("full changed-file verification coverage");
   }
   if (!input.run) {
     claims.add("selected command dispatch");
@@ -277,6 +336,7 @@ function buildTaskRelevantVerificationSurface(input: {
   readonly evidence: readonly string[];
 }): OrchestrationResult {
   const verified = input.verdict === "verified";
+  const relevantFailure = input.verdict === "verification-failed";
   const verification = input.run?.result.verification ?? {
     status: input.verdict === "approval-required" ? "blocked" as const : "skipped" as const,
     ...(input.commandPlan.selectedCommand ? { command: input.commandPlan.selectedCommand } : {}),
@@ -294,11 +354,16 @@ function buildTaskRelevantVerificationSurface(input: {
     changedFiles: [...input.commandPlan.changedFiles],
     failedFiles: verified ? [] : [{ path: "(verification)", reason: failedReason }],
     repair: {
-      status: input.verdict === "verification-failed" ? "failed" : "not-needed",
+      status: relevantFailure ? "failed" : "not-needed",
       attempts: 0,
       recoveredItems: [],
-      failedItems: input.verdict === "verification-failed" ? [...input.commandPlan.changedFiles] : [],
-      notes: input.verdict === "verification-failed" ? ["relevant verification command failed"] : [],
+      failedItems: relevantFailure ? [...input.commandPlan.changedFiles] : [],
+      notes: relevantFailure
+        ? [
+            "relevant verification command failed",
+            "repair-required handoff evidence available",
+          ]
+        : [],
     },
     continuation: {
       status: verified ? "first-pass-success" : "failed-after-bounded-continuation",
@@ -331,10 +396,15 @@ function buildTaskRelevantVerificationSurface(input: {
     verifiedFiles: verified ? [...input.commandPlan.coveredFiles] : [],
     unverifiedFiles: verified
       ? []
-      : input.commandPlan.changedFiles.map((file) => ({
-          path: file,
-          reason: failedReason,
-        })),
+      : input.commandPlan.uncoveredFiles.length > 0
+        ? input.commandPlan.uncoveredFiles.map((file) => ({
+            path: file,
+            reason: "No selected verification command covered this changed file.",
+          }))
+        : input.commandPlan.changedFiles.map((file) => ({
+            path: file,
+            reason: failedReason,
+          })),
     verification,
     evidence: [...input.evidence],
     ...(verified ? {} : { failureBoundary: `task-relevant-verification-${input.verdict}` }),
@@ -344,6 +414,10 @@ function buildTaskRelevantVerificationSurface(input: {
     `task-relevant verification ${input.verdict}.`,
     `Command: ${input.commandPlan.selectedCommand ?? "(none)"}`,
     `Relevance: ${input.commandPlan.relevanceStatus}`,
+    `Coverage: ${input.commandPlan.coverageStatus}`,
+    `Covered files: ${input.commandPlan.coveredFiles.join(", ") || "none"}`,
+    `Uncovered files: ${input.commandPlan.uncoveredFiles.join(", ") || "none"}`,
+    `Failure class: ${input.run?.result.failureClassification?.failureClass ?? "(none)"}`,
     `Runtime receipts: ${input.run?.result.runtimeReceiptMarkers.length ?? 0}`,
     `Not proven: ${input.notProvenClaims.join(", ")}`,
     "Raw output: excluded",
@@ -400,6 +474,75 @@ function selectRelevantCommand(
   };
 }
 
+function buildVerificationLadder(input: {
+  readonly changedFiles: readonly string[];
+  readonly candidateCommands: readonly string[];
+}): readonly VerificationLadderStep[] {
+  const focused = input.candidateCommands.find((command) =>
+    command.startsWith("npm test -w packages/ts-shell -- src/orchestration/"),
+  );
+  const packageBuild = input.candidateCommands.find((command) =>
+    command === "npm run build -w packages/ts-shell",
+  );
+  const steps: VerificationLadderStep[] = [];
+  steps.push(ladderStep({
+    kind: "focused-test",
+    selected: Boolean(focused),
+    changedFiles: input.changedFiles,
+    reason: focused
+      ? "Focused test command selected from changed-file/test adjacency."
+      : "No allowlisted focused test was available for the changed files.",
+    ...(focused ? { command: focused } : {}),
+  }));
+  steps.push(ladderStep({
+    kind: "package-build",
+    selected: !focused && Boolean(packageBuild),
+    changedFiles: input.changedFiles,
+    reason: packageBuild
+      ? "Package build is available as the typecheck/build fallback."
+      : "No package build fallback is available for this changed-file set.",
+    ...(packageBuild ? { command: packageBuild } : {}),
+    ...(focused ? { fallbackReason: "Skipped because a focused test candidate had higher confidence." } : {}),
+  }));
+  if (!focused && !packageBuild) {
+    steps.push(ladderStep({
+      kind: "blocked",
+      selected: true,
+      changedFiles: input.changedFiles,
+      reason: "No task-relevant allowlisted verification command exists.",
+    }));
+  }
+  return steps;
+}
+
+function ladderStep(input: {
+  readonly kind: VerificationLadderKind;
+  readonly command?: string;
+  readonly selected: boolean;
+  readonly changedFiles: readonly string[];
+  readonly reason: string;
+  readonly fallbackReason?: string;
+}): VerificationLadderStep {
+  const relevance = input.command
+    ? commandRelevance(input.command, input.changedFiles)
+    : { coveredFiles: [] as readonly string[] };
+  return {
+    kind: input.kind,
+    ...(input.command ? { command: input.command } : {}),
+    state: input.selected ? "selected" : input.command ? "skipped" : "blocked",
+    reason: input.reason,
+    coveredFiles: relevance.coveredFiles,
+    riskLevel: "low",
+    approvalRequirement: input.command ? "explicit-approval-required" : "not-applicable",
+    ...(input.fallbackReason ? { fallbackReason: input.fallbackReason } : {}),
+    evidence: [
+      `verification-ladder:${input.kind}:${input.selected ? "selected" : input.command ? "skipped" : "blocked"}`,
+      ...(input.command ? [`verification-ladder:${input.kind}:command:${input.command}`] : []),
+      `verification-ladder:${input.kind}:covered:${relevance.coveredFiles.join(",") || "none"}`,
+    ],
+  };
+}
+
 function commandRelevance(
   command: string,
   changedFiles: readonly string[],
@@ -418,11 +561,12 @@ function commandRelevance(
   }
 
   if (command.startsWith("npm test -w packages/ts-shell -- src/orchestration/")) {
+    const testPath = focusedTestTargetFromCommand(command);
     const coveredFiles = changedFiles.filter((file) =>
-      file.startsWith("packages/ts-shell/src/orchestration/"),
+      focusedTestCoversFile({ testPath, changedFile: file }),
     );
     return {
-      reason: "focused ts-shell orchestration test covers orchestration changed files.",
+      reason: "focused ts-shell orchestration test covers the matching changed file/test pair.",
       coveredFiles,
       coveredPackageArea: coveredFiles.length > 0 ? "packages/ts-shell/src/orchestration" : undefined,
     };
@@ -434,13 +578,79 @@ function commandRelevance(
   };
 }
 
+function focusedTestTargetFromCommand(command: string): string {
+  const rawTarget = command.slice("npm test -w packages/ts-shell -- ".length).trim();
+  return rawTarget.split(/\s+-t\s+/)[0] ?? rawTarget;
+}
+
 function defaultCandidatesFor(changedFiles: readonly string[]): readonly string[] {
+  const focused = focusedTestCandidatesFor(changedFiles);
   if (changedFiles.some((file) => file.startsWith("packages/ts-shell/"))) {
-    return ["npm run build -w packages/ts-shell"];
+    return [...focused, "npm run build -w packages/ts-shell"];
   }
-  return [];
+  return [...focused];
 }
 
 function normalizeChangedFiles(changedFiles: readonly string[]): readonly string[] {
   return [...new Set(changedFiles.map((file) => file.replace(/\\/g, "/").trim()).filter(Boolean))];
+}
+
+function focusedTestCandidatesFor(changedFiles: readonly string[]): readonly string[] {
+  return [...new Set(changedFiles.flatMap((file) => {
+    const normalized = file.replace(/^packages\/ts-shell\//, "");
+    if (!normalized.startsWith("src/orchestration/")) return [];
+    const testPath = normalized.endsWith(".test.ts")
+      ? normalized
+      : normalized.replace(/\.ts$/, ".test.ts");
+    if (testPath === normalized || testPath.endsWith(".test.ts")) {
+      const command = `npm test -w packages/ts-shell -- ${testPath}`;
+      return isAllowlistedRunCommand(command) ? command : [];
+    }
+    return [];
+  }))];
+}
+
+function focusedTestCoversFile(input: {
+  readonly testPath: string;
+  readonly changedFile: string;
+}): boolean {
+  const changed = input.changedFile.replace(/^packages\/ts-shell\//, "");
+  if (changed === input.testPath) return true;
+  if (!input.testPath.endsWith(".test.ts")) return false;
+  const implementationPath = input.testPath.replace(/\.test\.ts$/, ".ts");
+  return changed === implementationPath;
+}
+
+function buildCoverage(input: {
+  readonly changedFiles: readonly string[];
+  readonly coveredFiles: readonly string[];
+  readonly selectedCommand?: string;
+}): {
+  readonly coverageStatus: VerificationCoverageStatus;
+  readonly uncoveredFiles: readonly string[];
+  readonly perFileCoverage: readonly PerFileVerificationCoverage[];
+} {
+  const covered = new Set(input.coveredFiles);
+  const uncoveredFiles = input.changedFiles.filter((file) => !covered.has(file));
+  const coverageStatus =
+    input.changedFiles.length > 0 && uncoveredFiles.length === 0
+      ? "covered"
+      : input.coveredFiles.length > 0
+        ? "partially-covered"
+        : "uncovered";
+  return {
+    coverageStatus,
+    uncoveredFiles,
+    perFileCoverage: input.changedFiles.map((file) => {
+      const isCovered = covered.has(file);
+      return {
+        path: file,
+        status: isCovered ? "covered" as const : "uncovered" as const,
+        ...(isCovered && input.selectedCommand ? { command: input.selectedCommand } : {}),
+        reason: isCovered
+          ? "Selected verification command covers this changed file."
+          : "Selected verification command does not cover this changed file.",
+      };
+    }),
+  };
 }

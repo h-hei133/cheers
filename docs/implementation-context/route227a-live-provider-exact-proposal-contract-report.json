@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "route": "route227a",
+  "routeType": "live-provider-capstone",
+  "finalStatus": "PARTIAL",
+  "independentAuditResult": "PARTIAL",
+  "productCapabilityChanged": {
+    "providerExactContractRetry": "implemented in product proposal preparation",
+    "retryLimit": 1,
+    "retryTriggers": [
+      "INVALID-FORMAT",
+      "PROVIDER-OUTPUT-INSUFFICIENT"
+    ],
+    "fallbackPolicy": "fallback only after network/provider endpoint style failures; unsafe or insufficient provider output does not fallback",
+    "productPath": "real CLI -> runMvpIntegratedFlow -> planning runtime product proposal -> exact backend -> product verification"
+  },
+  "primaryEvidence": {
+    "source": "not-proven",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-live-provider-opt-in-classification",
+    "executionEntrypoint": "real-cli-product-path",
+    "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+    "routeLocalHarnessUsed": false,
+    "helperOnlyComposition": false,
+    "proposalSource": "live-provider",
+    "confirmationSource": "product-approval",
+    "verificationSource": "not-run"
+  },
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "default real CLI path has no provider and no apply",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "no live provider flag was present",
+        "provider and apply remained not-run"
+      ]
+    },
+    {
+      "id": "frozen-live-provider-opt-in-classification",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "explicit opt-in live provider classified honestly",
+      "evidenceLevel": "live-provider-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "PARTIAL",
+      "negativeControls": [
+        "live provider required CLI flag and approved real-provider smoke opt-in",
+        "raw provider output was not written to the report",
+        "provider-output-insufficient and invalid-format do not trigger fallback"
+      ]
+    },
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "command-only bypass remains rejected",
+      "evidenceLevel": "not-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "BLOCKED",
+      "negativeControls": [
+        "verification command did not dispatch before apply/readback proof"
+      ]
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route227a-live-provider-exact-proposal-contract-driver",
+      "purpose": "Creates isolated runtime homes and spawns the real CLI product path; does not call orchestration helpers directly for primary evidence.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false
+    }
+  ],
+  "liveProviderTasksAttempted": [
+    {
+      "id": "route227a-live-exact-single-file",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "providerProfile": "primary",
+      "providerCalled": true,
+      "contractRetry": {
+        "attempted": false,
+        "trigger": "none",
+        "maxAttempts": 1
+      },
+      "proposalValidation": "review-only",
+      "anchorQuality": "review-only",
+      "finalVerdict": "PARTIAL"
+    }
+  ],
+  "providerAttempts": [
+    {
+      "taskId": "route227a-live-exact-single-file",
+      "providerProfile": "primary",
+      "providerSafeLabel": "siliconflow-primary",
+      "configSource": "explicit-env+provider-env+primary",
+      "attempted": true,
+      "providerCalled": true,
+      "providerFailureClass": "auth",
+      "fallbackEligible": false,
+      "contractRetryAttempted": false,
+      "exitCode": 0,
+      "rawOutputRedactionStatus": "raw-provider-output-excluded"
+    }
+  ],
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "origin": "frozen",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "sessionResultEvidence": {
+        "sessionPersisted": true,
+        "terminalClassification": "stopped",
+        "durableStatus": "stopped"
+      },
+      "finalVerdict": "COMPLETE",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "task-relevant-command",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "notProvenClaims": [
+        "live provider success"
+      ]
+    },
+    {
+      "taskId": "frozen-command-only-bypass-negative-control",
+      "origin": "frozen",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "sessionResultEvidence": {
+        "sessionPersisted": true,
+        "terminalClassification": "stopped",
+        "durableStatus": "stopped"
+      },
+      "finalVerdict": "BLOCKED",
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "task-relevant-command",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "notProvenClaims": [
+        "live provider success"
+      ]
+    },
+    {
+      "taskId": "route227a-live-exact-single-file",
+      "origin": "route227a-live-provider-exact-proposal-contract",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "live-provider",
+      "providerMode": "real-provider-mode",
+      "providerProfile": "primary",
+      "providerCalled": true,
+      "providerFailureClass": "auth",
+      "contractRetry": {
+        "attempted": false,
+        "trigger": "none",
+        "maxAttempts": 1
+      },
+      "proposalValidation": "review-only",
+      "anchorQuality": "review-only",
+      "confirmation": {
+        "source": "product-approval",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "blocked",
+        "verificationStatus": "blocked",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "blocked"
+      },
+      "providerCallDuringApply": false,
+      "rawOutputRedactionStatus": "raw-provider-output-excluded",
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "verified live exact proposal success",
+        "apply success",
+        "provider call during apply",
+        "raw provider output"
+      ]
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "requiredNegativeControlResults": {
+    "defaultLiveProviderDisabled": true,
+    "commandOnlyBypassRejected": true,
+    "insufficientOutputFallbackSkipped": true,
+    "liveProviderNotDefault": true
+  },
+  "redactionChecks": {
+    "providerEnvPrinted": false,
+    "apiKeyPrinted": false,
+    "rawProviderOutputPrinted": false,
+    "oldTextPrintedInReport": false,
+    "newTextPrintedInReport": false,
+    "tempPathsPrintedInReport": false,
+    "reportContainsRawStdout": false
+  },
+  "notProvenClaims": [
+    "live provider exact proposal applied and verified",
+    "production default live provider",
+    "production workspace default write",
+    "provider call during apply",
+    "fuzzy apply as success",
+    "multi-file/add/delete/move live apply",
+    "repair-to-success after live verification failure"
+  ],
+  "independentAudit": {
+    "result": "PARTIAL",
+    "referencePolicy": "not-inspected; local Route226 evidence and local provider seams were sufficient.",
+    "finalVerdictReason": "Live provider was reached through product path, but verified exact apply success was not proven."
+  }
+}

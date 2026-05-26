@@ -9,17 +9,37 @@ import {
 } from "./taskRelevantVerificationRoute.js";
 
 describe("taskRelevantVerificationRoute", () => {
-  it("selects a package-relevant verification command from changed files", () => {
+  it("selects focused test before package build from changed implementation files", () => {
     const plan = buildTaskRelevantCommandPlan({
       changedFiles: ["packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"],
     });
 
-    expect(plan.selectedCommand).toBe("npm run build -w packages/ts-shell");
+    expect(plan.selectedCommand).toBe(
+      "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+    );
     expect(plan.relevanceStatus).toBe("relevant");
+    expect(plan.coverageStatus).toBe("covered");
     expect(plan.coveredFiles).toEqual([
       "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
     ]);
     expect(plan.verificationCommandPlan.state).toBe("ready");
+    expect(plan.verificationCommandPlan.commandKind).toBe("npm-test-focused");
+    expect(plan.verificationLadder[0]).toEqual(
+      expect.objectContaining({
+        kind: "focused-test",
+        state: "selected",
+      }),
+    );
+  });
+
+  it("falls back to package build when no focused test is allowlisted", () => {
+    const plan = buildTaskRelevantCommandPlan({
+      changedFiles: ["packages/ts-shell/src/session/SessionManager.ts"],
+    });
+
+    expect(plan.selectedCommand).toBe("npm run build -w packages/ts-shell");
+    expect(plan.relevanceStatus).toBe("relevant");
+    expect(plan.coverageStatus).toBe("covered");
     expect(plan.verificationCommandPlan.commandKind).toBe("npm-build-ts-shell");
   });
 
@@ -80,13 +100,79 @@ describe("taskRelevantVerificationRoute", () => {
     );
   });
 
+  it("does not let one focused test cover an entire multi-file target set", async () => {
+    const result = await runTaskRelevantVerificationRoute({
+      workspaceRoot: "/tmp/route227e",
+      taskId: "route227e-partial-coverage-negative-control",
+      sessionId: "sess_route227e_partial_coverage",
+      prompt: "Run focused verification for only one changed file.",
+      changedFiles: [
+        "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+        "packages/ts-shell/src/orchestration/verificationCommandPlan.ts",
+      ],
+      candidateCommands: [
+        "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      ],
+      authority: {
+        state: "explicitly-approved",
+        source: "explicit-authority-contract",
+        approvedCommand:
+          "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      },
+      dispatcher: fakeDispatcher(async (_toolName, args) =>
+        commandResult(String(args.command), "completed", 0, "focused test ok"),
+      ),
+    });
+
+    expect(result.dispatchStatus).toBe("dispatched");
+    expect(result.commandPlan.coverageStatus).toBe("partially-covered");
+    expect(result.commandPlan.uncoveredFiles).toEqual([
+      "packages/ts-shell/src/orchestration/verificationCommandPlan.ts",
+    ]);
+    expect(result.run?.result.outcome).toBe("success");
+    expect(result.verdict).toBe("insufficient-evidence");
+    expect(result.resultSurface.status).toBe("stopped_error");
+    expect(result.notProvenClaims).toContain("full changed-file verification coverage");
+  });
+
+  it("blocks not-allowlisted focused commands before runtime dispatch", async () => {
+    const dispatches: string[] = [];
+    const command =
+      "npm test -w packages/ts-shell -- src/orchestration/controlledEditOperationRoute.test.ts";
+    const result = await runTaskRelevantVerificationRoute({
+      workspaceRoot: "/tmp/route227e",
+      taskId: "route227e-not-allowlisted-focused-test",
+      sessionId: "sess_route227e_not_allowlisted",
+      prompt: "Reject a focused test that is not in the exact allowlist.",
+      changedFiles: ["packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts"],
+      candidateCommands: [command],
+      authority: {
+        state: "explicitly-approved",
+        source: "explicit-authority-contract",
+        approvedCommand: command,
+      },
+      dispatcher: fakeDispatcher(async (_toolName, args) => {
+        dispatches.push(String(args.command));
+        return commandResult(String(args.command), "completed", 0, "should not run");
+      }),
+    });
+
+    expect(dispatches).toEqual([]);
+    expect(result.dispatchStatus).toBe("not-run");
+    expect(result.commandPlan.relevanceStatus).toBe("relevant");
+    expect(result.commandPlan.verificationCommandPlan.state).toBe("not-allowlisted");
+    expect(result.run?.result.failureClassification?.failureClass).toBe("command-not-allowlisted");
+    expect(result.verdict).toBe("blocked");
+    expect(result.resultSurface.status).toBe("stopped_error");
+  });
+
   it("blocks success and marks repair evidence when a relevant command fails", async () => {
     const result = await runTaskRelevantVerificationRoute({
       workspaceRoot: "/tmp/route223",
       taskId: "failed-relevant-command-negative-control",
       sessionId: "sess_route223_failed",
       prompt: "Run relevant verification and preserve failure.",
-      changedFiles: ["packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"],
+      changedFiles: ["packages/ts-shell/src/session/SessionManager.ts"],
       authority: {
         state: "explicitly-approved",
         source: "explicit-authority-contract",
@@ -100,9 +186,13 @@ describe("taskRelevantVerificationRoute", () => {
     expect(result.dispatchStatus).toBe("dispatched");
     expect(result.commandPlan.relevanceStatus).toBe("relevant");
     expect(result.run?.result.outcome).toBe("failed");
+    expect(result.run?.result.failureClassification?.failureClass).toBe("build-failed");
     expect(result.verdict).toBe("verification-failed");
     expect(result.resultSurface.status).toBe("stopped_error");
     expect(result.resultSurface.codingResult?.repair.status).toBe("failed");
+    expect(result.resultSurface.codingResult?.repair.notes).toContain(
+      "repair-required handoff evidence available",
+    );
     expect(result.resultSurface.codingResult?.taskSatisfaction.verdict).toBe(
       "insufficient-evidence",
     );
@@ -118,10 +208,11 @@ describe("taskRelevantVerificationRoute", () => {
       authority: {
         state: "explicitly-approved",
         source: "explicit-authority-contract",
-        approvedCommand: "npm run build -w packages/ts-shell",
+        approvedCommand:
+          "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
       },
       dispatcher: fakeDispatcher(async (_toolName, args) =>
-        commandResult(String(args.command), "completed", 0, "build ok"),
+        commandResult(String(args.command), "completed", 0, "focused test ok"),
       ),
     });
 

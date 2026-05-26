@@ -18,6 +18,20 @@ describe("buildPlanningMutationProposalBridge", () => {
     expect(bridge.applyState).toBe("not-run");
     expect(bridge.verificationState).toBe("not-run");
     expect(bridge.evidenceSource).toBe("planning-handoff-summary");
+    expect(bridge.orchestration).toMatchObject({
+      proposalSource: "planning-handoff-summary",
+      operationType: "review-only-generated",
+      targetFiles: ["src/contextEngine.ts"],
+      anchorQuality: "missing-exact-mapping",
+      handoffReadiness: "ready-for-review",
+      authorityRequired: true,
+      mutationAuthority: "not-granted",
+      applyState: "not-run",
+      verificationState: "not-run",
+    });
+    expect(bridge.orchestration.notProvenClaims).toEqual(
+      expect.arrayContaining(["exact anchor", "apply authority", "apply executed", "verification executed"]),
+    );
     expect(bridge.proposalId).toMatch(/^generated-edit-/);
     expect(bridge.proposalReviewStatus).toBe("review-required");
     expect(bridge.evidence).toEqual(
@@ -26,6 +40,9 @@ describe("buildPlanningMutationProposalBridge", () => {
         "planning-proposal-bridge:proposal:prepared",
         "planning-proposal-bridge:anchor:missing-exact-mapping",
         "planning-proposal-bridge:confirmation:review-required",
+        "planning-proposal-bridge:operation:review-only-generated",
+        "planning-proposal-bridge:handoff-readiness:ready-for-review",
+        "planning-proposal-bridge:authority-required:true",
         "planning-proposal-bridge:provider-call:not-run",
         "planning-proposal-bridge:apply:not-run",
         "planning-proposal-bridge:verification:not-run",
@@ -64,9 +81,26 @@ describe("buildPlanningMutationProposalBridge", () => {
     expect(bridge.applyState).toBe("not-run");
     expect(bridge.verificationState).toBe("not-run");
     expect(bridge.evidenceSource).toBe("focused-deterministic-proposal");
+    expect(bridge.orchestration).toMatchObject({
+      proposalSource: "focused-deterministic-proposal",
+      operationType: "update-existing-file",
+      targetFiles: ["src/contextEngine.ts"],
+      anchorQuality: "exact-ready",
+      handoffReadiness: "ready-for-apply-after-authority",
+      authorityRequired: true,
+      mutationAuthority: "not-granted",
+      applyState: "not-run",
+      verificationState: "not-run",
+    });
+    expect(bridge.orchestration.notProvenClaims).toEqual(
+      expect.arrayContaining(["explicit authority not granted", "apply executed", "verification executed"]),
+    );
     expect(bridge.evidence).toEqual(
       expect.arrayContaining([
         "planning-proposal-bridge:existing-anchoring-infrastructure-consumed",
+        "planning-proposal-bridge:operation:update-existing-file",
+        "planning-proposal-bridge:handoff-readiness:ready-for-apply-after-authority",
+        "planning-proposal-bridge:authority-required:true",
         "provider-output-validation:status:valid-exact-single-target",
         "provider-anchor-extraction:status:exact-candidates",
         "provider-anchor-match:outcome:exact-match",
@@ -102,6 +136,7 @@ describe("buildPlanningMutationProposalBridge", () => {
     expect(bridge.proposalState).toBe("not-run");
     expect(bridge.anchorState).toBe("not-run");
     expect(bridge.confirmationState).toBe("not-requested");
+    expect(bridge.orchestration.handoffReadiness).toBe("blocked");
     expect(bridge.evidence).toContain("planning-proposal-bridge:handoff-not-ready");
     expect(bridge.evidence).toContain("planning-proposal-bridge:proposal:not-run");
   });
@@ -132,6 +167,13 @@ describe("buildPlanningMutationProposalBridge", () => {
     expect(bridge.providerCall).toBe("not-run");
     expect(bridge.applyState).toBe("not-run");
     expect(bridge.verificationState).toBe("not-run");
+    expect(bridge.orchestration).toMatchObject({
+      operationType: "broad-refactor-preview",
+      handoffReadiness: "unsupported",
+      mutationAuthority: "not-granted",
+      applyState: "not-run",
+      verificationState: "not-run",
+    });
     expect(bridge.evidence).toEqual(
       expect.arrayContaining([
         "planning-proposal-bridge:state:unsupported",

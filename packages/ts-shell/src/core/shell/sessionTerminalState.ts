@@ -9,6 +9,7 @@ import type { SessionContinuitySnapshot } from "../../session/SessionManager.js"
 import { projectSessionResultParity } from "../../session/sessionResultParity.js";
 import type { QueryEvent } from "../query/events.js";
 import type { RuntimeEventDigest } from "./sessionEventSurface.js";
+import { projectCliSessionProductSurface } from "./cliSessionProductSurface.js";
 import { renderExecutionSummaryBlock } from "./sessionEventSurface.js";
 import { selectPrintTerminalOutput } from "./sessionPrintOutputProjection.js";
 import { formatExplicitRestoreSummaryLines } from "./restoreSurfaceSummary.js";
@@ -87,6 +88,13 @@ export function renderSessionTerminalSurface(input: {
     renderCodingResultContract(input.renderer, terminalState.terminalCodingResult, {
       mode: "minimal",
     });
+    renderProductExperienceSurface(input.renderer, {
+      status: terminalState.terminalStatus,
+      terminalClassification: terminalState.terminalClassification,
+      terminalReason: terminalState.terminalReason,
+      terminalStopReason: terminalState.terminalStopReason,
+      codingResult: terminalState.terminalCodingResult,
+    });
     renderContinuationSeedSummary(input.renderer, {
       codingResult: terminalState.terminalCodingResult,
       notes: terminalState.terminalNotes,
@@ -136,6 +144,13 @@ export function renderSessionTerminalSurface(input: {
   });
   renderCodingResultContract(input.renderer, terminalState.terminalCodingResult, {
     mode: renderMode,
+  });
+  renderProductExperienceSurface(input.renderer, {
+    status: terminalState.terminalStatus,
+    terminalClassification: terminalState.terminalClassification,
+    terminalReason: terminalState.terminalReason,
+    terminalStopReason: terminalState.terminalStopReason,
+    codingResult: terminalState.terminalCodingResult,
   });
   renderContinuationSeedSummary(input.renderer, {
     codingResult: terminalState.terminalCodingResult,
@@ -497,6 +512,31 @@ function renderCodingResultContract(
     renderer.renderLine(`- Evidence: ${codingResult.evidence.join(" | ")}`);
   }
   renderer.renderLine("");
+}
+
+function renderProductExperienceSurface(
+  renderer: StreamingRenderer,
+  input: {
+    status: OrchestrationStatus;
+    terminalClassification: "success" | "stopped" | "error";
+    terminalReason: TerminalReason;
+    terminalStopReason?: string;
+    codingResult?: CodingResultSummary;
+  },
+): void {
+  const surface = projectCliSessionProductSurface({
+    status: input.status,
+    terminalClassification: input.terminalClassification,
+    terminalReason: input.terminalReason,
+    stopReason: input.terminalStopReason,
+    codingResult: input.codingResult,
+  });
+  if (!surface) {
+    return;
+  }
+  for (const line of surface.lines) {
+    renderer.renderLine(line);
+  }
 }
 
 function renderContinuationSeedSummary(

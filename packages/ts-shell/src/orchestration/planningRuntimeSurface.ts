@@ -41,6 +41,21 @@ export interface PlanningRuntimeSurface {
     readonly commandKind?: string;
     readonly readiness?: string;
   };
+  readonly planningEvidence: {
+    readonly candidateFiles: readonly string[];
+    readonly filesRead: readonly string[];
+    readonly readReasons: readonly string[];
+    readonly missingFacts: readonly string[];
+    readonly editTargets: readonly string[];
+    readonly verificationIntent: string;
+    readonly contextBudget: {
+      readonly candidateFiles: number;
+      readonly filesRead: number;
+      readonly bytesUsed: number;
+      readonly cacheStatus: string;
+    };
+    readonly memoryReuseStatus: "fresh-context" | "reused-memory" | "stale-memory-rejected" | "not-reused";
+  };
   readonly mutationHandoff: PlanningRuntimeResult["mutationHandoff"];
   readonly memory: {
     readonly id: string;
@@ -61,6 +76,18 @@ export function projectPlanningRuntimeSurface(
   result: PlanningRuntimeResult,
 ): PlanningRuntimeSurface {
   const contextAcquisition = projectContextAcquisition(result.context);
+  const verificationIntent = projectVerificationIntent(result);
+  const planningEvidence = {
+    candidateFiles: result.context.repo.candidates.slice(0, 10).map((candidate) => candidate.safeLabel),
+    filesRead: result.context.filesRead.map((file) => file.path),
+    readReasons: result.context.filesRead.map((file) => `${file.path}:${file.reason}:${file.source}`),
+    missingFacts: result.groundedAnalysis.missingFacts,
+    editTargets: result.editTargets.map((target) => target.path),
+    verificationIntent: formatVerificationEvidence(verificationIntent),
+    contextBudget: result.context.contextBudget,
+    memoryReuseStatus: memoryReuseStatus(result),
+  } satisfies PlanningRuntimeSurface["planningEvidence"];
+
   return {
     runtimeId: result.runtimeId,
     status: result.status,
@@ -87,7 +114,8 @@ export function projectPlanningRuntimeSurface(
     },
     executablePlan: result.executablePlan,
     editTargets: result.editTargets,
-    verificationIntent: projectVerificationIntent(result),
+    verificationIntent,
+    planningEvidence,
     mutationHandoff: result.mutationHandoff,
     memory: {
       id: result.continuationMemory.memoryId,
@@ -108,6 +136,9 @@ export function projectPlanningRuntimeSurface(
       `planning-runtime-surface:edit-targets:${result.editTargets.length}`,
       `planning-runtime-surface:missing-facts:${result.groundedAnalysis.missingFacts.length}`,
       `planning-runtime-surface:warnings:${result.groundedAnalysis.planningWarnings.length}`,
+      `planning-runtime-surface:candidate-files:${planningEvidence.candidateFiles.length}`,
+      `planning-runtime-surface:files-read:${planningEvidence.filesRead.length}`,
+      `planning-runtime-surface:memory-reuse:${planningEvidence.memoryReuseStatus}`,
       ...contextAcquisition.evidence,
       "planning-runtime-surface:mutation-authority:not-granted",
       "planning-runtime-surface:provider-call:not-run",
@@ -115,6 +146,28 @@ export function projectPlanningRuntimeSurface(
       "planning-runtime-surface:raw-content-excluded",
     ],
   };
+}
+
+function formatVerificationEvidence(
+  verificationIntent: PlanningRuntimeSurface["verificationIntent"],
+): string {
+  return [
+    `state=${verificationIntent.state}`,
+    verificationIntent.command ? `command=${verificationIntent.command}` : undefined,
+    verificationIntent.commandKind ? `kind=${verificationIntent.commandKind}` : undefined,
+    verificationIntent.readiness ? `readiness=${verificationIntent.readiness}` : undefined,
+  ].filter(Boolean).join("; ");
+}
+
+function memoryReuseStatus(
+  result: PlanningRuntimeResult,
+): PlanningRuntimeSurface["planningEvidence"]["memoryReuseStatus"] {
+  if (result.context.status === "reused-memory") return "reused-memory";
+  if (result.continuationMemory.invalidation.staleFiles.length > 0) {
+    return "stale-memory-rejected";
+  }
+  if (result.continuationMemory.fileReceipts.length > 0) return "not-reused";
+  return "fresh-context";
 }
 
 function projectVerificationIntent(result: PlanningRuntimeResult): PlanningRuntimeSurface["verificationIntent"] {

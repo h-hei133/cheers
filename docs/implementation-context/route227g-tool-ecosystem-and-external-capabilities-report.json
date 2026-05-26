@@ -1,0 +1,528 @@
+{
+  "schemaVersion": 1,
+  "route": "route227g",
+  "routeType": "tool-ecosystem-capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "independentPassRerun": {
+    "result": "PASS",
+    "source": "Route227G product ToolRuntime composition plus focused route assertions"
+  },
+  "primaryEvidence": {
+    "source": "product-proven",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+    "executionEntrypoint": "product-composition-root",
+    "productConsumer": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+    "routeLocalHarnessUsed": true,
+    "helperOnlyComposition": false,
+    "proposalSource": "not-applicable",
+    "confirmationSource": "none",
+    "verificationSource": "product-verification-route"
+  },
+  "toolTasksAttempted": [
+    {
+      "receiptId": "route227g:route227g-local-read:read",
+      "toolKind": "code-workspace-tool",
+      "toolName": "read",
+      "evidenceSource": "local-deterministic",
+      "policyDecision": "allowed",
+      "executionStatus": "succeeded",
+      "resultState": "completed",
+      "failureClass": "none",
+      "relevance": "context-evidence",
+      "localEvidenceOnly": true,
+      "externalLiveClaim": false,
+      "runtimeDerived": true
+    },
+    {
+      "receiptId": "route227g:route227g-local-mcp:mcp__stdioecho__echo_message",
+      "toolKind": "mcp-local-tool",
+      "toolName": "mcp__stdioEcho__echo_message",
+      "evidenceSource": "local-deterministic",
+      "policyDecision": "allowed",
+      "executionStatus": "succeeded",
+      "resultState": "completed",
+      "failureClass": "none",
+      "relevance": "verification-support",
+      "localEvidenceOnly": true,
+      "externalLiveClaim": false,
+      "runtimeDerived": true
+    },
+    {
+      "receiptId": "route227g:route227g-external-mcp-unavailable:mcp__externalsearch__search",
+      "toolKind": "mcp-external-tool",
+      "toolName": "mcp__externalSearch__search",
+      "evidenceSource": "external-unavailable",
+      "policyDecision": "not-applicable",
+      "executionStatus": "not-run",
+      "resultState": "stopped",
+      "failureClass": "mcp-unavailable",
+      "relevance": "missing-facts",
+      "localEvidenceOnly": false,
+      "externalLiveClaim": false,
+      "runtimeDerived": true
+    },
+    {
+      "receiptId": "route227g:route227g-browser-observe:browser.observe",
+      "toolKind": "browser-observation",
+      "toolName": "browser.observe",
+      "evidenceSource": "focused-fixture",
+      "policyDecision": "allowed",
+      "executionStatus": "failed",
+      "resultState": "failed",
+      "failureClass": "tool-execution-failed",
+      "relevance": "missing-facts",
+      "localEvidenceOnly": true,
+      "externalLiveClaim": false,
+      "runtimeDerived": true
+    },
+    {
+      "receiptId": "route227g:route227g-browser-action-blocked:browser.type",
+      "toolKind": "browser-action",
+      "toolName": "browser.type",
+      "evidenceSource": "blocked-unsafe",
+      "policyDecision": "blocked",
+      "executionStatus": "not-run",
+      "resultState": "stopped",
+      "failureClass": "tool-execution-failed",
+      "relevance": "verification-rejected",
+      "localEvidenceOnly": false,
+      "externalLiveClaim": false,
+      "runtimeDerived": true
+    },
+    {
+      "receiptId": "route227g:route227g-irrelevant-read:read",
+      "toolKind": "code-workspace-tool",
+      "toolName": "read",
+      "evidenceSource": "local-deterministic",
+      "policyDecision": "allowed",
+      "executionStatus": "succeeded",
+      "resultState": "completed",
+      "failureClass": "none",
+      "relevance": "irrelevant",
+      "localEvidenceOnly": true,
+      "externalLiveClaim": false,
+      "runtimeDerived": true
+    },
+    {
+      "receiptId": "route227g:route227g-unsupported-external:external.payments.charge",
+      "toolKind": "unsupported-external-action",
+      "toolName": "external.payments.charge",
+      "evidenceSource": "blocked-unsafe",
+      "policyDecision": "blocked",
+      "executionStatus": "not-run",
+      "resultState": "stopped",
+      "failureClass": "permission-blocked",
+      "relevance": "verification-rejected",
+      "localEvidenceOnly": false,
+      "externalLiveClaim": false,
+      "runtimeDerived": true
+    }
+  ],
+  "mcpEvidence": [
+    {
+      "receiptId": "route227g:route227g-local-mcp:mcp__stdioecho__echo_message",
+      "serverName": "stdioEcho",
+      "evidenceSource": "local-deterministic",
+      "resultState": "completed",
+      "notProvenClaims": [
+        "external-live mcp__stdioEcho__echo_message"
+      ]
+    },
+    {
+      "receiptId": "route227g:route227g-external-mcp-unavailable:mcp__externalsearch__search",
+      "serverName": "externalSearch",
+      "evidenceSource": "external-unavailable",
+      "resultState": "stopped",
+      "notProvenClaims": [
+        "external-live mcp__externalSearch__search"
+      ]
+    }
+  ],
+  "browserEvidence": [
+    {
+      "receiptId": "route227g:route227g-browser-observe:browser.observe",
+      "evidenceSource": "focused-fixture",
+      "policyDecision": "allowed",
+      "resultState": "failed",
+      "notProvenClaims": [
+        "external-live browser.observe"
+      ]
+    },
+    {
+      "receiptId": "route227g:route227g-browser-action-blocked:browser.type",
+      "evidenceSource": "blocked-unsafe",
+      "policyDecision": "blocked",
+      "resultState": "stopped",
+      "notProvenClaims": [
+        "external-live browser.type"
+      ]
+    }
+  ],
+  "toolReceiptEvidence": {
+    "receiptCount": 7,
+    "receiptIds": [
+      "route227g:route227g-local-read:read",
+      "route227g:route227g-local-mcp:mcp__stdioecho__echo_message",
+      "route227g:route227g-external-mcp-unavailable:mcp__externalsearch__search",
+      "route227g:route227g-browser-observe:browser.observe",
+      "route227g:route227g-browser-action-blocked:browser.type",
+      "route227g:route227g-irrelevant-read:read",
+      "route227g:route227g-unsupported-external:external.payments.charge"
+    ],
+    "redactionStatuses": [
+      "clean",
+      "clean",
+      "redacted",
+      "redacted",
+      "redacted",
+      "clean",
+      "redacted"
+    ],
+    "evidence": [
+      "tool-ecosystem:route227g:status:complete",
+      "tool-ecosystem:receipts:7",
+      "tool-ecosystem:planning-facts:1",
+      "tool-ecosystem:verification:supported",
+      "tool-ecosystem:session-result:stopped",
+      "tool-ecosystem:receipt:route227g:route227g-local-read:read",
+      "tool-ecosystem:intent:code-workspace-tool",
+      "tool-ecosystem:source:local-deterministic",
+      "tool-ecosystem:policy:allowed",
+      "tool-ecosystem:execution:succeeded",
+      "tool-ecosystem:result:completed",
+      "tool-ecosystem:relevance:context-evidence",
+      "tool-ecosystem:local-evidence-only",
+      "tool-ecosystem:no-external-live-claim",
+      "tool-ecosystem:receipt:route227g:route227g-local-mcp:mcp__stdioecho__echo_message",
+      "tool-ecosystem:intent:mcp-local-tool",
+      "tool-ecosystem:source:local-deterministic",
+      "tool-ecosystem:policy:allowed",
+      "tool-ecosystem:execution:succeeded",
+      "tool-ecosystem:result:completed",
+      "tool-ecosystem:relevance:verification-support",
+      "tool-ecosystem:local-evidence-only",
+      "tool-ecosystem:no-external-live-claim",
+      "tool-ecosystem:receipt:route227g:route227g-external-mcp-unavailable:mcp__externalsearch__search",
+      "tool-ecosystem:intent:mcp-external-tool",
+      "tool-ecosystem:source:external-unavailable",
+      "tool-ecosystem:policy:not-applicable",
+      "tool-ecosystem:execution:not-run",
+      "tool-ecosystem:result:stopped",
+      "tool-ecosystem:relevance:missing-facts",
+      "tool-ecosystem:nonlocal-evidence",
+      "tool-ecosystem:no-external-live-claim",
+      "runtime-receipt:mcp-runtime-failure",
+      "runtime-receipt:mcp-failure-class:tool-unavailable",
+      "runtime-receipt:mcp-failure-plane:tool-level",
+      "tool-ecosystem:receipt:route227g:route227g-browser-observe:browser.observe",
+      "tool-ecosystem:intent:browser-observation",
+      "tool-ecosystem:source:focused-fixture",
+      "tool-ecosystem:policy:allowed",
+      "tool-ecosystem:execution:failed",
+      "tool-ecosystem:result:failed",
+      "tool-ecosystem:relevance:missing-facts",
+      "tool-ecosystem:local-evidence-only",
+      "tool-ecosystem:no-external-live-claim",
+      "runtime-receipt:browser-runtime-status",
+      "runtime-receipt:browser-status:not-ready",
+      "route227g:browser-runtime-disabled",
+      "route227g:no-public-browser",
+      "browser-tool-policy:blocked",
+      "browser-tool-policy:reason:runtime-disabled",
+      "browser-tool-policy:no-public-web-default",
+      "browser-tool-policy:no-auth-session-persistence",
+      "route227g:browser-runtime-disabled",
+      "route227g:no-public-browser",
+      "browser-tool-policy:blocked",
+      "browser-tool-policy:reason:runtime-disabled",
+      "browser-tool-policy:no-public-web-default",
+      "browser-tool-policy:no-auth-session-persistence",
+      "route227g:browser-runtime-disabled",
+      "route227g:no-public-browser",
+      "browser-tool-policy:blocked",
+      "browser-tool-policy:reason:runtime-disabled",
+      "browser-tool-policy:no-public-web-default",
+      "browser-tool-policy:no-auth-session-persistence",
+      "browser-observation:stopped-before-runtime",
+      "browser-observation:raw-dom-excluded",
+      "browser-tool:no-raw-dom",
+      "browser-tool:no-screenshots-default",
+      "browser-tool:no-session-persistence",
+      "browser-tool:no-provider-or-model-call",
+      "browser-tool:no-mcp-live-backend",
+      "tool-ecosystem:receipt:route227g:route227g-browser-action-blocked:browser.type",
+      "tool-ecosystem:intent:browser-action",
+      "tool-ecosystem:source:blocked-unsafe",
+      "tool-ecosystem:policy:blocked",
+      "tool-ecosystem:execution:not-run",
+      "tool-ecosystem:result:stopped",
+      "tool-ecosystem:relevance:verification-rejected",
+      "tool-ecosystem:nonlocal-evidence",
+      "tool-ecosystem:no-external-live-claim",
+      "runtime-receipt:browser-runtime-status",
+      "runtime-receipt:browser-status:not-ready",
+      "route227g:browser-runtime-disabled",
+      "route227g:no-public-browser",
+      "browser-tool-policy:blocked",
+      "browser-tool-policy:reason:runtime-disabled",
+      "browser-tool-policy:no-public-web-default",
+      "browser-tool-policy:no-auth-session-persistence",
+      "route227g:browser-runtime-disabled",
+      "route227g:no-public-browser",
+      "browser-tool-policy:blocked",
+      "browser-tool-policy:reason:runtime-disabled",
+      "browser-tool-policy:no-public-web-default",
+      "browser-tool-policy:no-auth-session-persistence",
+      "route227g:browser-runtime-disabled",
+      "route227g:no-public-browser",
+      "browser-tool-policy:blocked",
+      "browser-tool-policy:reason:runtime-disabled",
+      "browser-tool-policy:no-public-web-default",
+      "browser-tool-policy:no-auth-session-persistence",
+      "browser-observation:stopped-before-runtime",
+      "browser-observation:raw-dom-excluded",
+      "browser-tool:no-raw-dom",
+      "browser-tool:no-screenshots-default",
+      "browser-tool:no-session-persistence",
+      "browser-tool:no-provider-or-model-call",
+      "browser-tool:no-mcp-live-backend",
+      "tool-ecosystem:receipt:route227g:route227g-irrelevant-read:read",
+      "tool-ecosystem:intent:code-workspace-tool",
+      "tool-ecosystem:source:local-deterministic",
+      "tool-ecosystem:policy:allowed",
+      "tool-ecosystem:execution:succeeded",
+      "tool-ecosystem:result:completed",
+      "tool-ecosystem:relevance:irrelevant",
+      "tool-ecosystem:local-evidence-only",
+      "tool-ecosystem:no-external-live-claim",
+      "tool-ecosystem:receipt:route227g:route227g-unsupported-external:external.payments.charge",
+      "tool-ecosystem:intent:unsupported-external-action",
+      "tool-ecosystem:source:blocked-unsafe",
+      "tool-ecosystem:policy:blocked",
+      "tool-ecosystem:execution:not-run",
+      "tool-ecosystem:result:stopped",
+      "tool-ecosystem:relevance:verification-rejected",
+      "tool-ecosystem:nonlocal-evidence",
+      "tool-ecosystem:no-external-live-claim",
+      "tool-runtime:allowlist-blocked",
+      "tool-planning:usable-receipts:1",
+      "tool-planning:missing-facts:2",
+      "tool-planning:provenance-required",
+      "tool-verification:supported-by-relevant-receipt",
+      "tool-verification:rejected:3",
+      "tool-ecosystem:local-fixture-not-external-live",
+      "tool-ecosystem:unsupported-actions-blocked",
+      "tool-ecosystem:not-proven-visible"
+    ]
+  },
+  "planningIntegrationEvidence": {
+    "facts": [
+      "read:local-deterministic:route227g:route227g-local-read:read"
+    ],
+    "missingFacts": [
+      "mcp__externalSearch__search:mcp-unavailable",
+      "browser.observe:tool-execution-failed"
+    ],
+    "evidence": [
+      "tool-planning:usable-receipts:1",
+      "tool-planning:missing-facts:2",
+      "tool-planning:provenance-required"
+    ]
+  },
+  "verificationIntegrationEvidence": {
+    "status": "supported",
+    "relevantReceiptIds": [
+      "route227g:route227g-local-mcp:mcp__stdioecho__echo_message"
+    ],
+    "rejectedReceiptIds": [
+      "route227g:route227g-browser-action-blocked:browser.type",
+      "route227g:route227g-irrelevant-read:read",
+      "route227g:route227g-unsupported-external:external.payments.charge"
+    ],
+    "reason": "tool evidence can support task result only when relevant and provenance-backed; supported receipts=1; rejected receipts=3",
+    "evidence": [
+      "tool-verification:supported-by-relevant-receipt",
+      "tool-verification:rejected:3"
+    ]
+  },
+  "sessionContinuationEvidence": {
+    "resultHandoffSummary": "turn=run-command; area=command; result=stopped; owner=tool",
+    "transcriptSafeTurnSummary": "turn run-command; area=command; mutation=mutation-blocked; result=stopped | read:local-deterministic:context-evidence | mcp__stdioEcho__echo_message:local-deterministic:verification-support | mcp__externalSearch__search:external-unavailable:missing-facts | browser.observe:focused-fixture:missing-facts | browser.type:blocked-unsafe:verification-rejected | external.payments.charge:blocked-unsafe:verification-rejected",
+    "evidenceIds": [
+      "tool-ecosystem:receipt:route227g:route227g-local-read:read",
+      "tool-ecosystem:intent:code-workspace-tool",
+      "tool-ecosystem:source:local-deterministic",
+      "tool-ecosystem:policy:allowed",
+      "tool-ecosystem:execution:succeeded",
+      "tool-ecosystem:result:completed",
+      "tool-ecosystem:relevance:context-evidence",
+      "tool-ecosystem:local-evidence-only",
+      "tool-ecosystem:no-external-live-claim",
+      "tool-ecosystem:receipt:route227g:route227g-local-mcp:mcp__stdioecho__echo_message",
+      "tool-ecosystem:intent:mcp-local-tool",
+      "tool-ecosystem:relevance:verification-support",
+      "tool-ecosystem:receipt:route227g:route227g-external-mcp-unavailable:mcp__externalsearch__search",
+      "tool-ecosystem:intent:mcp-external-tool",
+      "tool-ecosystem:source:external-unavailable",
+      "tool-ecosystem:policy:not-applicable",
+      "tool-ecosystem:execution:not-run",
+      "tool-ecosystem:result:stopped",
+      "tool-ecosystem:relevance:missing-facts",
+      "tool-ecosystem:nonlocal-evidence",
+      "runtime-receipt:mcp-runtime-failure",
+      "runtime-receipt:mcp-failure-class:tool-unavailable",
+      "runtime-receipt:mcp-failure-plane:tool-level",
+      "tool-ecosystem:receipt:route227g:route227g-browser-observe:browser.observe",
+      "tool-ecosystem:intent:browser-observation",
+      "tool-ecosystem:source:focused-fixture",
+      "tool-ecosystem:execution:failed",
+      "tool-ecosystem:result:failed",
+      "runtime-receipt:browser-runtime-status",
+      "runtime-receipt:browser-status:not-ready",
+      "route227g:browser-runtime-disabled",
+      "route227g:no-public-browser",
+      "browser-tool-policy:blocked",
+      "browser-tool-policy:reason:runtime-disabled",
+      "browser-tool-policy:no-public-web-default",
+      "browser-tool-policy:no-auth-session-persistence",
+      "browser-observation:stopped-before-runtime",
+      "browser-observation:raw-dom-excluded",
+      "browser-tool:no-raw-dom",
+      "browser-tool:no-screenshots-default",
+      "browser-tool:no-session-persistence",
+      "browser-tool:no-provider-or-model-call",
+      "browser-tool:no-mcp-live-backend",
+      "tool-ecosystem:receipt:route227g:route227g-browser-action-blocked:browser.type",
+      "tool-ecosystem:intent:browser-action",
+      "tool-ecosystem:source:blocked-unsafe",
+      "tool-ecosystem:policy:blocked",
+      "tool-ecosystem:relevance:verification-rejected",
+      "tool-ecosystem:receipt:route227g:route227g-unsupported-external:external.payments.charge",
+      "tool-ecosystem:intent:unsupported-external-action",
+      "tool-runtime:allowlist-blocked"
+    ],
+    "redaction": "redacted",
+    "doNextSummary": "Carry tool receipt provenance into the next turn without upgrading local or blocked evidence.",
+    "resultState": "stopped"
+  },
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "requiredClaim": "tool-ecosystem-truthfulness-guard",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "negativeControls": [
+        "Prompt text must not grant write authority.",
+        "No provider or apply path may run by default."
+      ],
+      "verdict": "guard-preserved"
+    },
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "requiredClaim": "tool-ecosystem-truthfulness-guard",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "negativeControls": [
+        "node --version or equivalent command-only proof must not complete a file-edit task."
+      ],
+      "verdict": "guard-preserved"
+    },
+    {
+      "id": "frozen-unsupported-broad-task-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "requiredClaim": "tool-ecosystem-truthfulness-guard",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "negativeControls": [
+        "Broad unsupported capability must not be accepted because a route-local fixture passed."
+      ],
+      "verdict": "guard-preserved"
+    },
+    {
+      "id": "frozen-session-continuity-result-truth",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "requiredClaim": "tool-ecosystem-truthfulness-guard",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "negativeControls": [
+        "A resumed session must not erase failed verification.",
+        "A transcript summary must not promote not-proven claims."
+      ],
+      "verdict": "guard-preserved"
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route227g-product-tool-runtime-runner",
+      "purpose": "Invokes ToolRuntime for local read, local MCP, unavailable external MCP, browser policy, irrelevant success, and unsupported external action.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "route227g-tool-ecosystem-product-path",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "providerCalled": false,
+      "finalVerdict": "tool-evidence-ready",
+      "toolReceipts": 7,
+      "negativeControls": {
+        "localFixtureNotExternalLive": true,
+        "unsupportedActionBlocked": true,
+        "irrelevantToolSuccessRejected": true,
+        "unavailableExternalMcpNotSuccess": true,
+        "browserSideEffectWithoutPolicyBlocked": true
+      },
+      "notProvenClaims": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution"
+      ]
+    }
+  ],
+  "referenceAdoption": [
+    {
+      "capabilityArea": "tool-ecosystem",
+      "referenceRepo": "not-inspected",
+      "fileOrSubsystemInspected": "not-applicable",
+      "patternAdopted": "Existing target tool/runtime/MCP/browser receipt substrate was sufficient.",
+      "localSeamChanged": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts and Route227G verifier script",
+      "patternRejected": "not-applicable",
+      "reason": "No blocker required reference repository comparison.",
+      "evidenceProduced": "Route227G product tool runtime report and focused tests"
+    }
+  ],
+  "defaultPath": {
+    "provider": "not-called",
+    "apply": "not-run",
+    "command": "not-run-without-tool-policy"
+  },
+  "notProvenClaims": [
+    "external-live read",
+    "external-live mcp__stdioEcho__echo_message",
+    "external-live mcp__externalSearch__search",
+    "external-live browser.observe",
+    "external-live browser.type",
+    "external-live external.payments.charge",
+    "external-live tool execution"
+  ]
+}

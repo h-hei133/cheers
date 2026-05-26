@@ -502,6 +502,7 @@ describe("buildPlanningRuntimeProductProofInputs", () => {
     expect(seenPrompts).toHaveLength(2);
     expect(seenPrompts[0]).toContain("Current target content for src/planning/targetRanking.ts");
     expect(seenPrompts[0]).toContain(TARGET_RANKING_OLD_TEXT);
+    expect(seenPrompts[1]).toContain("Contract repair retry 1 of 1.");
     expect(proposalPreparation.status).toBe("live-provider-output-insufficient");
     expect(proposalPreparation.providerCalled).toBe(true);
     expect(proposalPreparation.rawProposal).toBeUndefined();
@@ -510,12 +511,89 @@ describe("buildPlanningRuntimeProductProofInputs", () => {
         "planning-runtime-product-proposal:live-provider-calibration:exact-patch-author",
         "planning-runtime-product-proposal:live-provider-target-content:included",
         "planning-runtime-product-proposal:live-provider-primary:provider-called:true",
+        "planning-runtime-product-proposal:live-provider-primary:contract-retry:started",
+        "planning-runtime-product-proposal:live-provider-primary:contract-retry-trigger:PROVIDER-OUTPUT-INSUFFICIENT",
+        "planning-runtime-product-proposal:live-provider-primary:contract-retry:finished",
         "planning-runtime-product-proposal:live-provider-primary:status:PROVIDER-OUTPUT-INSUFFICIENT",
-        "planning-runtime-product-proposal:live-provider-fallback:provider-called:true",
-        "planning-runtime-product-proposal:live-provider-fallback:status:PROVIDER-OUTPUT-INSUFFICIENT",
+        "planning-runtime-product-proposal:live-provider-fallback:skipped-after-PROVIDER-OUTPUT-INSUFFICIENT",
         "planning-runtime-product-proposal:live-provider-status:PROVIDER-OUTPUT-INSUFFICIENT",
         "planning-runtime-product-proposal:providerPatchRole:reviewer-or-planner",
         "planning-runtime-product-proposal:exactPatchAuthor:deterministic-builder",
+        "planning-runtime-product-proposal:raw-provider-output-excluded",
+      ]),
+    );
+    expect(JSON.stringify(proposalPreparation.evidence)).not.toContain(TARGET_RANKING_OLD_TEXT);
+  }, 15000);
+
+  it("uses one contract repair retry for invalid live output before accepting exact JSON", async () => {
+    const workspaceRoot = createWorkspace({
+      "src/planning/targetRanking.ts": sourceContent(),
+      "src/planning/targetRanking.test.ts":
+        "expect(rankPlannerTargets('planner target ranking')).toBe('targetRanking.ts');\n",
+    });
+    const planningResult = await readyPlanningResult(workspaceRoot);
+    const seenPrompts: string[] = [];
+
+    const proposalPreparation = await preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff: planningResult.mutationHandoff,
+      planningResult,
+      liveProvider: {
+        optIn: true,
+        source: "runtime-option",
+        taskEvidence: {
+          mode: "single-file-exact-patch",
+          taskIntentSummary:
+            "Change only the planner predicate to trim task before checking planner.",
+        },
+        attempts: [
+          {
+            role: "primary",
+            providerSafeLabel: "focused-fake-primary",
+            providerConfigSource: "test-fixture",
+            providerAvailability: {
+              kind: "available",
+              providerKindLabel: "focused-fake-primary",
+            },
+            readinessStatus: "ready",
+            evidenceSource: "fake-provider",
+            provider: {
+              proposeEdit: (context) => {
+                seenPrompts.push(context.providerPrompt);
+                if (seenPrompts.length === 1) {
+                  return {
+                    operationKind: "fuzzy-replacement",
+                    targets: [{ path: "src/planning/targetRanking.ts", summary: "missing old/new" }],
+                    diagnostics: [
+                      "provider-exact-patch-diagnostic:parse-status:invalid-format",
+                      "provider-exact-patch-diagnostic:wrapper:json",
+                      "provider-exact-patch-diagnostic:shape:provider-proposal-json",
+                      "provider-exact-patch-diagnostic:old-text-present:false",
+                      "provider-exact-patch-diagnostic:new-text-present:false",
+                      "provider-exact-patch-diagnostic:raw-content-excluded",
+                    ],
+                  };
+                }
+                return exactProposal();
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(seenPrompts).toHaveLength(2);
+    expect(seenPrompts[1]).toContain("Contract repair retry 1 of 1.");
+    expect(proposalPreparation.status).toBe("prepared-exact");
+    expect(proposalPreparation.providerCalled).toBe(true);
+    expect(proposalPreparation.source).toBe("live-provider-proposal");
+    expect(proposalPreparation.evidence).toEqual(
+      expect.arrayContaining([
+        "planning-runtime-product-proposal:live-provider-primary:contract-retry:started",
+        "planning-runtime-product-proposal:live-provider-primary:contract-retry-trigger:INVALID-FORMAT",
+        "planning-runtime-product-proposal:live-provider-primary:contract-retry:finished",
+        "planning-runtime-product-proposal:live-provider-exact-classification:exact-ready",
+        "planning-runtime-product-proposal:live-provider-status:provider-called",
         "planning-runtime-product-proposal:raw-provider-output-excluded",
       ]),
     );

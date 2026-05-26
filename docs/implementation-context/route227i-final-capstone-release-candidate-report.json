@@ -1,0 +1,2111 @@
+{
+  "schemaVersion": 1,
+  "route": "route227i",
+  "routeType": "final-capstone-release-candidate",
+  "finalStatus": "PARTIAL",
+  "independentAuditResult": "PASS",
+  "independentPassRerun": {
+    "result": "PASS",
+    "source": "Route227I final inventory preserves weakest upstream evidence and passes Route221 report gate."
+  },
+  "primaryEvidence": {
+    "source": "not-proven",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-session-continuity-result-truth",
+    "executionEntrypoint": "product-runtime",
+    "productConsumer": "Route227A-H product paths listed in upstreamReports; Route227I is an inventory/report route.",
+    "routeLocalHarnessUsed": true,
+    "helperOnlyComposition": false,
+    "proposalSource": "not-applicable",
+    "confirmationSource": "none",
+    "verificationSource": "product-verification-route"
+  },
+  "upstreamReports": [
+    {
+      "route": "route227a",
+      "reportPath": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "finalStatus": "PARTIAL",
+      "independentAuditResult": "PARTIAL",
+      "primaryEvidence": {
+        "source": "not-proven",
+        "frozenTaskLoadedFromFile": true,
+        "frozenTaskId": "frozen-live-provider-opt-in-classification",
+        "executionEntrypoint": "real-cli-product-path",
+        "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+        "routeLocalHarnessUsed": false,
+        "helperOnlyComposition": false,
+        "proposalSource": "live-provider",
+        "confirmationSource": "product-approval",
+        "verificationSource": "not-run"
+      },
+      "notProvenClaims": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure"
+      ]
+    },
+    {
+      "route": "route227b",
+      "reportPath": "docs/implementation-context/route227b-context-planning-elite-upgrade-report.json",
+      "finalStatus": "PARTIAL",
+      "independentAuditResult": "PARTIAL",
+      "primaryEvidence": {
+        "source": "not-proven",
+        "frozenTaskLoadedFromFile": true,
+        "frozenTaskId": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+        "executionEntrypoint": "real-cli-product-path",
+        "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+        "routeLocalHarnessUsed": false,
+        "helperOnlyComposition": false,
+        "proposalSource": "not-applicable",
+        "confirmationSource": "none",
+        "verificationSource": "not-run"
+      },
+      "notProvenClaims": [
+        "full Route227B task matrix complete",
+        "unsupported broad task negative control",
+        "durable cross-session memory reuse through real CLI",
+        "LSP-grade code graph",
+        "provider-assisted context acquisition",
+        "mutation or verification success"
+      ]
+    },
+    {
+      "route": "route227c",
+      "reportPath": "docs/implementation-context/route227c-planning-to-patch-orchestrator-report.json",
+      "finalStatus": "PARTIAL",
+      "independentAuditResult": "PARTIAL",
+      "primaryEvidence": {
+        "source": "not-proven",
+        "frozenTaskLoadedFromFile": true,
+        "frozenTaskId": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+        "executionEntrypoint": "real-cli-product-path",
+        "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+        "routeLocalHarnessUsed": false,
+        "helperOnlyComposition": false,
+        "proposalSource": "deterministic-from-product-read-evidence",
+        "confirmationSource": "none",
+        "verificationSource": "not-run"
+      },
+      "notProvenClaims": [
+        "live provider exact-ready source remains not-proven because Route227A is not COMPLETE",
+        "full planning matrix remains not-proven because Route227B is not COMPLETE",
+        "repair proposal is not yet normalized through the same planning-to-patch bridge",
+        "multi-file proposal per-file status is not yet proven through the same product bridge",
+        "live-provider exact-ready proposal through Route227C",
+        "repair proposal success",
+        "multi-file apply success",
+        "proposal authority",
+        "apply executed",
+        "verification executed"
+      ]
+    },
+    {
+      "route": "route227d",
+      "reportPath": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "finalStatus": "COMPLETE",
+      "independentAuditResult": "PASS",
+      "primaryEvidence": {
+        "source": "product-proven",
+        "frozenTaskLoadedFromFile": true,
+        "frozenTaskId": "frozen-lower-bound-stable-selected-workspace-authority-case",
+        "executionEntrypoint": "product-composition-root",
+        "productConsumer": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+        "routeLocalHarnessUsed": true,
+        "helperOnlyComposition": false,
+        "proposalSource": "deterministic-from-product-read-evidence",
+        "confirmationSource": "explicit-authority-contract",
+        "verificationSource": "runtime-readback"
+      },
+      "notProvenClaims": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "route": "route227e",
+      "reportPath": "docs/implementation-context/route227e-verification-intelligence-upgrade-report.json",
+      "finalStatus": "PARTIAL",
+      "independentAuditResult": "PARTIAL",
+      "primaryEvidence": {
+        "source": "not-proven",
+        "frozenTaskLoadedFromFile": true,
+        "frozenTaskId": "frozen-command-only-bypass-negative-control",
+        "executionEntrypoint": "product-composition-root",
+        "productConsumer": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+        "routeLocalHarnessUsed": true,
+        "helperOnlyComposition": false,
+        "proposalSource": "not-applicable",
+        "confirmationSource": "explicit-authority-contract",
+        "verificationSource": "not-run"
+      },
+      "notProvenClaims": [
+        "product runtime command dispatch blocked by environment",
+        "live provider verification",
+        "automatic repair-to-success",
+        "arbitrary shell command verification",
+        "browser/MCP external verification",
+        "full repository verification sweep"
+      ]
+    },
+    {
+      "route": "route227f",
+      "reportPath": "docs/implementation-context/route227f-repair-iteration-product-loop-report.json",
+      "finalStatus": "COMPLETE",
+      "independentAuditResult": "PASS",
+      "primaryEvidence": {
+        "source": "product-proven",
+        "frozenTaskLoadedFromFile": true,
+        "frozenTaskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+        "executionEntrypoint": "product-composition-root",
+        "productConsumer": "packages/ts-shell/src/orchestration/verificationRepairIterationFlow.ts::runVerificationRepairIterationFlow",
+        "routeLocalHarnessUsed": true,
+        "helperOnlyComposition": false,
+        "proposalSource": "deterministic-from-failure-evidence",
+        "confirmationSource": "explicit-authority-contract",
+        "verificationSource": "task-relevant-command"
+      },
+      "notProvenClaims": [
+        "live provider repair proposal",
+        "arbitrary task repair from unstructured command output",
+        "browser/MCP repair",
+        "automatic multi-attempt repair loop",
+        "real CLI full repair iteration path"
+      ]
+    },
+    {
+      "route": "route227g",
+      "reportPath": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "finalStatus": "COMPLETE",
+      "independentAuditResult": "PASS",
+      "primaryEvidence": {
+        "source": "product-proven",
+        "frozenTaskLoadedFromFile": true,
+        "frozenTaskId": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+        "executionEntrypoint": "product-composition-root",
+        "productConsumer": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+        "routeLocalHarnessUsed": true,
+        "helperOnlyComposition": false,
+        "proposalSource": "not-applicable",
+        "confirmationSource": "none",
+        "verificationSource": "product-verification-route"
+      },
+      "notProvenClaims": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution"
+      ]
+    },
+    {
+      "route": "route227h",
+      "reportPath": "docs/implementation-context/route227h-cli-session-product-experience-report.json",
+      "finalStatus": "COMPLETE",
+      "independentAuditResult": "PASS",
+      "primaryEvidence": {
+        "source": "product-proven",
+        "frozenTaskLoadedFromFile": true,
+        "frozenTaskId": "frozen-session-continuity-result-truth",
+        "executionEntrypoint": "product-runtime",
+        "productConsumer": "packages/ts-shell/src/core/shell/sessionRuntime.ts::ShellSessionRuntime.executePrompt",
+        "routeLocalHarnessUsed": true,
+        "helperOnlyComposition": false,
+        "proposalSource": "not-applicable",
+        "confirmationSource": "none",
+        "verificationSource": "product-verification-route"
+      },
+      "notProvenClaims": [
+        "live provider exact proposal success",
+        "production default apply",
+        "external-live MCP/browser execution",
+        "provider execution during apply",
+        "broad edit engine repair"
+      ]
+    }
+  ],
+  "finalCapabilityMatrix": [
+    {
+      "capability": "context/planning",
+      "status": "PARTIAL",
+      "route": "route227b",
+      "evidenceSource": "docs/implementation-context/route227b-context-planning-elite-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "full Route227B task matrix complete",
+        "unsupported broad task negative control",
+        "durable cross-session memory reuse through real CLI",
+        "LSP-grade code graph",
+        "provider-assisted context acquisition",
+        "mutation or verification success",
+        "unsupported broad negative proof and durable cross-session memory reuse remain partial"
+      ]
+    },
+    {
+      "capability": "live provider exact proposal",
+      "status": "PARTIAL",
+      "route": "route227a",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "live provider path was reached, but applied-and-verified exact proposal success remains unproven"
+      ]
+    },
+    {
+      "capability": "deterministic proposal",
+      "status": "COMPLETE",
+      "route": "route227c",
+      "evidenceSource": "docs/implementation-context/route227c-planning-to-patch-orchestrator-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "limitations": [
+        "live provider exact-ready source remains not-proven because Route227A is not COMPLETE",
+        "full planning matrix remains not-proven because Route227B is not COMPLETE",
+        "repair proposal is not yet normalized through the same planning-to-patch bridge",
+        "multi-file proposal per-file status is not yet proven through the same product bridge",
+        "live-provider exact-ready proposal through Route227C",
+        "repair proposal success",
+        "multi-file apply success",
+        "proposal authority"
+      ]
+    },
+    {
+      "capability": "planning-to-patch orchestration",
+      "status": "PARTIAL",
+      "route": "route227c",
+      "evidenceSource": "docs/implementation-context/route227c-planning-to-patch-orchestrator-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "limitations": [
+        "live provider exact-ready source remains not-proven because Route227A is not COMPLETE",
+        "full planning matrix remains not-proven because Route227B is not COMPLETE",
+        "repair proposal is not yet normalized through the same planning-to-patch bridge",
+        "multi-file proposal per-file status is not yet proven through the same product bridge",
+        "live-provider exact-ready proposal through Route227C",
+        "repair proposal success",
+        "multi-file apply success",
+        "proposal authority"
+      ]
+    },
+    {
+      "capability": "exact update",
+      "status": "COMPLETE",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "capability": "create file",
+      "status": "COMPLETE",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "capability": "small multi-file apply",
+      "status": "COMPLETE",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "capability": "delete/move preview",
+      "status": "PARTIAL",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "delete and move apply remain preview-first, not applied capability"
+      ]
+    },
+    {
+      "capability": "broad refactor decomposition",
+      "status": "PARTIAL",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "broad refactor is preview/blocked, not unrestricted mutation"
+      ]
+    },
+    {
+      "capability": "verification command dispatch",
+      "status": "PARTIAL",
+      "route": "route227e",
+      "evidenceSource": "docs/implementation-context/route227e-verification-intelligence-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "limitations": [
+        "product runtime command dispatch blocked by environment",
+        "live provider verification",
+        "automatic repair-to-success",
+        "arbitrary shell command verification",
+        "browser/MCP external verification",
+        "full repository verification sweep",
+        "product runtime command dispatch was blocked by environment"
+      ]
+    },
+    {
+      "capability": "focused test selection",
+      "status": "PARTIAL",
+      "route": "route227e",
+      "evidenceSource": "docs/implementation-context/route227e-verification-intelligence-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "limitations": [
+        "product runtime command dispatch blocked by environment",
+        "live provider verification",
+        "automatic repair-to-success",
+        "arbitrary shell command verification",
+        "browser/MCP external verification",
+        "full repository verification sweep",
+        "selection logic exists but runtime dispatch did not prove pass"
+      ]
+    },
+    {
+      "capability": "repair-to-success",
+      "status": "COMPLETE",
+      "route": "route227f",
+      "evidenceSource": "docs/implementation-context/route227f-repair-iteration-product-loop-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/verificationRepairIterationFlow.ts::runVerificationRepairIterationFlow",
+      "limitations": [
+        "live provider repair proposal",
+        "arbitrary task repair from unstructured command output",
+        "browser/MCP repair",
+        "automatic multi-attempt repair loop",
+        "real CLI full repair iteration path"
+      ]
+    },
+    {
+      "capability": "CLI/session UX",
+      "status": "COMPLETE",
+      "route": "route227h",
+      "evidenceSource": "docs/implementation-context/route227h-cli-session-product-experience-report.json",
+      "productPath": "packages/ts-shell/src/core/shell/sessionRuntime.ts::ShellSessionRuntime.executePrompt",
+      "limitations": [
+        "live provider exact proposal success",
+        "production default apply",
+        "external-live MCP/browser execution",
+        "provider execution during apply",
+        "broad edit engine repair"
+      ]
+    },
+    {
+      "capability": "MCP/local tools",
+      "status": "COMPLETE",
+      "route": "route227g",
+      "evidenceSource": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+      "limitations": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution"
+      ]
+    },
+    {
+      "capability": "browser observation",
+      "status": "NOT-PROVEN",
+      "route": "route227g",
+      "evidenceSource": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+      "limitations": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution",
+        "browser runtime remained disabled; local/browser unavailable is not observation success"
+      ]
+    },
+    {
+      "capability": "external tool readiness",
+      "status": "NOT-PROVEN",
+      "route": "route227g",
+      "evidenceSource": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+      "limitations": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution",
+        "external-live MCP/browser execution remained not proven"
+      ]
+    },
+    {
+      "capability": "session continuation",
+      "status": "COMPLETE",
+      "route": "route227h",
+      "evidenceSource": "docs/implementation-context/route227h-cli-session-product-experience-report.json",
+      "productPath": "packages/ts-shell/src/core/shell/sessionRuntime.ts::ShellSessionRuntime.executePrompt",
+      "limitations": [
+        "live provider exact proposal success",
+        "production default apply",
+        "external-live MCP/browser execution",
+        "provider execution during apply",
+        "broad edit engine repair"
+      ]
+    },
+    {
+      "capability": "fallback provider",
+      "status": "NOT-PROVEN",
+      "route": "route227a",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "fallback policy was not promoted to success evidence"
+      ]
+    },
+    {
+      "capability": "production default write",
+      "status": "NOT-PROVEN",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "production default write remains intentionally not enabled"
+      ]
+    },
+    {
+      "capability": "fuzzy apply",
+      "status": "NOT-PROVEN",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "fuzzy apply success remains explicitly not proven"
+      ]
+    },
+    {
+      "capability": "add/delete/move apply",
+      "status": "PARTIAL",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "create-file is complete; delete/move apply remain not proven"
+      ]
+    },
+    {
+      "capability": "rollback",
+      "status": "NOT-PROVEN",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "automatic rollback executed remains not proven"
+      ]
+    },
+    {
+      "capability": "live multi-file provider",
+      "status": "NOT-PROVEN",
+      "route": "route227a",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "live multi-file provider apply was not attempted as success evidence"
+      ]
+    },
+    {
+      "capability": "long-session memory",
+      "status": "PARTIAL",
+      "route": "route227b",
+      "evidenceSource": "docs/implementation-context/route227b-context-planning-elite-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "full Route227B task matrix complete",
+        "unsupported broad task negative control",
+        "durable cross-session memory reuse through real CLI",
+        "LSP-grade code graph",
+        "provider-assisted context acquisition",
+        "mutation or verification success",
+        "durable cross-session memory reuse through real CLI remains not proven"
+      ]
+    }
+  ],
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "taskType": "lower-bound-stable",
+      "requiredClaim": "final release-candidate classification",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "TypeScript control-plane planning route with no provider call and no writer authority.",
+      "negativeControls": [
+        "Prompt text must not grant write authority.",
+        "No provider or apply path may run by default."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "taskType": "lower-bound-stable",
+      "requiredClaim": "final release-candidate classification",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Selected workspace authority -> exact hunk apply -> readback -> verification verdict.",
+      "negativeControls": [
+        "A proposal without confirmation is not success.",
+        "Apply without readback is not success."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-upper-bound-challenge-multi-file-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "taskType": "upper-bound-challenge",
+      "requiredClaim": "final release-candidate classification",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Target-set route with exact hunks, per-file readback, and aggregate verdict following the weakest file result.",
+      "negativeControls": [
+        "One verified file plus one unverified file must not aggregate to COMPLETE.",
+        "Unsupported add/delete/move must remain separate claims."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "taskType": "upper-bound-challenge",
+      "requiredClaim": "final release-candidate classification",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Verification failure -> repair proposal -> confirmation -> existing exact hunk apply -> post-repair verification.",
+      "negativeControls": [
+        "Repair continuation is not repair success.",
+        "Repair proposal is not repair applied."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "taskType": "negative-control",
+      "requiredClaim": "final release-candidate classification",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Verification planner or report must reject command-only bypass as task success.",
+      "negativeControls": [
+        "node --version or equivalent command-only proof must not complete a file-edit task."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-unsupported-broad-task-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "taskType": "unsupported-broad-task",
+      "requiredClaim": "final release-candidate classification",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Route gate must stop or split the task instead of reporting broad capability COMPLETE.",
+      "negativeControls": [
+        "Broad unsupported capability must not be accepted because a route-local fixture passed."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-live-provider-opt-in-classification",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "taskType": "live-provider-opt-in-case",
+      "requiredClaim": "final release-candidate classification",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Approved real-provider smoke script with PRIVATE_AGENTS_REAL_HOME as credential source and isolated HOME/USERPROFILE/test root.",
+      "negativeControls": [
+        "Fake provider output must not be classified as live-provider-proven.",
+        "Provider-network failure must not be classified as route failure without evidence."
+      ],
+      "verdict": "PARTIAL"
+    },
+    {
+      "id": "frozen-session-continuity-result-truth",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "taskType": "context-session-continuity-case",
+      "requiredClaim": "final release-candidate classification",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Session durability and result mapping preserve terminal truthfulness across continuation.",
+      "negativeControls": [
+        "A resumed session must not erase failed verification.",
+        "A transcript summary must not promote not-proven claims."
+      ],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "finalTasksAttempted": [
+    {
+      "id": "route227i-context-planning",
+      "capability": "context/planning",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227b-context-planning-elite-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "full Route227B task matrix complete",
+        "unsupported broad task negative control",
+        "durable cross-session memory reuse through real CLI",
+        "LSP-grade code graph",
+        "provider-assisted context acquisition",
+        "mutation or verification success",
+        "unsupported broad negative proof and durable cross-session memory reuse remain partial"
+      ]
+    },
+    {
+      "id": "route227i-live-provider-exact-proposal",
+      "capability": "live provider exact proposal",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "live provider path was reached, but applied-and-verified exact proposal success remains unproven"
+      ]
+    },
+    {
+      "id": "route227i-deterministic-proposal",
+      "capability": "deterministic proposal",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227c-planning-to-patch-orchestrator-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "limitations": [
+        "live provider exact-ready source remains not-proven because Route227A is not COMPLETE",
+        "full planning matrix remains not-proven because Route227B is not COMPLETE",
+        "repair proposal is not yet normalized through the same planning-to-patch bridge",
+        "multi-file proposal per-file status is not yet proven through the same product bridge",
+        "live-provider exact-ready proposal through Route227C",
+        "repair proposal success",
+        "multi-file apply success",
+        "proposal authority"
+      ]
+    },
+    {
+      "id": "route227i-planning-to-patch-orchestration",
+      "capability": "planning-to-patch orchestration",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227c-planning-to-patch-orchestrator-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "limitations": [
+        "live provider exact-ready source remains not-proven because Route227A is not COMPLETE",
+        "full planning matrix remains not-proven because Route227B is not COMPLETE",
+        "repair proposal is not yet normalized through the same planning-to-patch bridge",
+        "multi-file proposal per-file status is not yet proven through the same product bridge",
+        "live-provider exact-ready proposal through Route227C",
+        "repair proposal success",
+        "multi-file apply success",
+        "proposal authority"
+      ]
+    },
+    {
+      "id": "route227i-exact-update",
+      "capability": "exact update",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "id": "route227i-create-file",
+      "capability": "create file",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "id": "route227i-small-multi-file-apply",
+      "capability": "small multi-file apply",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "id": "route227i-delete-move-preview",
+      "capability": "delete/move preview",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "delete and move apply remain preview-first, not applied capability"
+      ]
+    },
+    {
+      "id": "route227i-broad-refactor-decomposition",
+      "capability": "broad refactor decomposition",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "broad refactor is preview/blocked, not unrestricted mutation"
+      ]
+    },
+    {
+      "id": "route227i-verification-command-dispatch",
+      "capability": "verification command dispatch",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227e-verification-intelligence-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "limitations": [
+        "product runtime command dispatch blocked by environment",
+        "live provider verification",
+        "automatic repair-to-success",
+        "arbitrary shell command verification",
+        "browser/MCP external verification",
+        "full repository verification sweep",
+        "product runtime command dispatch was blocked by environment"
+      ]
+    },
+    {
+      "id": "route227i-focused-test-selection",
+      "capability": "focused test selection",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227e-verification-intelligence-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "limitations": [
+        "product runtime command dispatch blocked by environment",
+        "live provider verification",
+        "automatic repair-to-success",
+        "arbitrary shell command verification",
+        "browser/MCP external verification",
+        "full repository verification sweep",
+        "selection logic exists but runtime dispatch did not prove pass"
+      ]
+    },
+    {
+      "id": "route227i-repair-to-success",
+      "capability": "repair-to-success",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227f-repair-iteration-product-loop-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/verificationRepairIterationFlow.ts::runVerificationRepairIterationFlow",
+      "limitations": [
+        "live provider repair proposal",
+        "arbitrary task repair from unstructured command output",
+        "browser/MCP repair",
+        "automatic multi-attempt repair loop",
+        "real CLI full repair iteration path"
+      ]
+    },
+    {
+      "id": "route227i-cli-session-ux",
+      "capability": "CLI/session UX",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227h-cli-session-product-experience-report.json",
+      "productPath": "packages/ts-shell/src/core/shell/sessionRuntime.ts::ShellSessionRuntime.executePrompt",
+      "limitations": [
+        "live provider exact proposal success",
+        "production default apply",
+        "external-live MCP/browser execution",
+        "provider execution during apply",
+        "broad edit engine repair"
+      ]
+    },
+    {
+      "id": "route227i-mcp-local-tools",
+      "capability": "MCP/local tools",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+      "limitations": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution"
+      ]
+    },
+    {
+      "id": "route227i-browser-observation",
+      "capability": "browser observation",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+      "limitations": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution",
+        "browser runtime remained disabled; local/browser unavailable is not observation success"
+      ]
+    },
+    {
+      "id": "route227i-external-tool-readiness",
+      "capability": "external tool readiness",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+      "limitations": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution",
+        "external-live MCP/browser execution remained not proven"
+      ]
+    },
+    {
+      "id": "route227i-session-continuation",
+      "capability": "session continuation",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227h-cli-session-product-experience-report.json",
+      "productPath": "packages/ts-shell/src/core/shell/sessionRuntime.ts::ShellSessionRuntime.executePrompt",
+      "limitations": [
+        "live provider exact proposal success",
+        "production default apply",
+        "external-live MCP/browser execution",
+        "provider execution during apply",
+        "broad edit engine repair"
+      ]
+    },
+    {
+      "id": "route227i-fallback-provider",
+      "capability": "fallback provider",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "fallback policy was not promoted to success evidence"
+      ]
+    },
+    {
+      "id": "route227i-production-default-write",
+      "capability": "production default write",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "production default write remains intentionally not enabled"
+      ]
+    },
+    {
+      "id": "route227i-fuzzy-apply",
+      "capability": "fuzzy apply",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "fuzzy apply success remains explicitly not proven"
+      ]
+    },
+    {
+      "id": "route227i-add-delete-move-apply",
+      "capability": "add/delete/move apply",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "create-file is complete; delete/move apply remain not proven"
+      ]
+    },
+    {
+      "id": "route227i-rollback",
+      "capability": "rollback",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "automatic rollback executed remains not proven"
+      ]
+    },
+    {
+      "id": "route227i-live-multi-file-provider",
+      "capability": "live multi-file provider",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "live multi-file provider apply was not attempted as success evidence"
+      ]
+    },
+    {
+      "id": "route227i-long-session-memory",
+      "capability": "long-session memory",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227b-context-planning-elite-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "full Route227B task matrix complete",
+        "unsupported broad task negative control",
+        "durable cross-session memory reuse through real CLI",
+        "LSP-grade code graph",
+        "provider-assisted context acquisition",
+        "mutation or verification success",
+        "durable cross-session memory reuse through real CLI remains not proven"
+      ]
+    }
+  ],
+  "liveProviderTasksAttempted": [
+    {
+      "id": "route227i-live-provider-exact-proposal",
+      "capability": "live provider exact proposal",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "live provider path was reached, but applied-and-verified exact proposal success remains unproven"
+      ]
+    },
+    {
+      "id": "route227i-fallback-provider",
+      "capability": "fallback provider",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "fallback policy was not promoted to success evidence"
+      ]
+    },
+    {
+      "id": "route227i-live-multi-file-provider",
+      "capability": "live multi-file provider",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "live multi-file provider apply was not attempted as success evidence"
+      ]
+    }
+  ],
+  "cliSessionTasksAttempted": [
+    {
+      "id": "route227i-cli-session-ux",
+      "capability": "CLI/session UX",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227h-cli-session-product-experience-report.json",
+      "productPath": "packages/ts-shell/src/core/shell/sessionRuntime.ts::ShellSessionRuntime.executePrompt",
+      "limitations": [
+        "live provider exact proposal success",
+        "production default apply",
+        "external-live MCP/browser execution",
+        "provider execution during apply",
+        "broad edit engine repair"
+      ]
+    },
+    {
+      "id": "route227i-session-continuation",
+      "capability": "session continuation",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227h-cli-session-product-experience-report.json",
+      "productPath": "packages/ts-shell/src/core/shell/sessionRuntime.ts::ShellSessionRuntime.executePrompt",
+      "limitations": [
+        "live provider exact proposal success",
+        "production default apply",
+        "external-live MCP/browser execution",
+        "provider execution during apply",
+        "broad edit engine repair"
+      ]
+    },
+    {
+      "id": "route227i-long-session-memory",
+      "capability": "long-session memory",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227b-context-planning-elite-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "full Route227B task matrix complete",
+        "unsupported broad task negative control",
+        "durable cross-session memory reuse through real CLI",
+        "LSP-grade code graph",
+        "provider-assisted context acquisition",
+        "mutation or verification success",
+        "durable cross-session memory reuse through real CLI remains not proven"
+      ]
+    }
+  ],
+  "editTasksAttempted": [
+    {
+      "id": "route227i-exact-update",
+      "capability": "exact update",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "id": "route227i-create-file",
+      "capability": "create file",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "id": "route227i-small-multi-file-apply",
+      "capability": "small multi-file apply",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "id": "route227i-delete-move-preview",
+      "capability": "delete/move preview",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "delete and move apply remain preview-first, not applied capability"
+      ]
+    },
+    {
+      "id": "route227i-broad-refactor-decomposition",
+      "capability": "broad refactor decomposition",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "broad refactor is preview/blocked, not unrestricted mutation"
+      ]
+    },
+    {
+      "id": "route227i-production-default-write",
+      "capability": "production default write",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "production default write remains intentionally not enabled"
+      ]
+    },
+    {
+      "id": "route227i-fuzzy-apply",
+      "capability": "fuzzy apply",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "fuzzy apply success remains explicitly not proven"
+      ]
+    },
+    {
+      "id": "route227i-add-delete-move-apply",
+      "capability": "add/delete/move apply",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "create-file is complete; delete/move apply remain not proven"
+      ]
+    },
+    {
+      "id": "route227i-rollback",
+      "capability": "rollback",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "automatic rollback executed remains not proven"
+      ]
+    },
+    {
+      "id": "route227i-live-multi-file-provider",
+      "capability": "live multi-file provider",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "live multi-file provider apply was not attempted as success evidence"
+      ]
+    }
+  ],
+  "verificationTasksAttempted": [
+    {
+      "id": "route227i-verification-command-dispatch",
+      "capability": "verification command dispatch",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227e-verification-intelligence-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "limitations": [
+        "product runtime command dispatch blocked by environment",
+        "live provider verification",
+        "automatic repair-to-success",
+        "arbitrary shell command verification",
+        "browser/MCP external verification",
+        "full repository verification sweep",
+        "product runtime command dispatch was blocked by environment"
+      ]
+    },
+    {
+      "id": "route227i-focused-test-selection",
+      "capability": "focused test selection",
+      "status": "PARTIAL",
+      "evidenceSource": "docs/implementation-context/route227e-verification-intelligence-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "limitations": [
+        "product runtime command dispatch blocked by environment",
+        "live provider verification",
+        "automatic repair-to-success",
+        "arbitrary shell command verification",
+        "browser/MCP external verification",
+        "full repository verification sweep",
+        "selection logic exists but runtime dispatch did not prove pass"
+      ]
+    }
+  ],
+  "repairTasksAttempted": [
+    {
+      "id": "route227i-repair-to-success",
+      "capability": "repair-to-success",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227f-repair-iteration-product-loop-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/verificationRepairIterationFlow.ts::runVerificationRepairIterationFlow",
+      "limitations": [
+        "live provider repair proposal",
+        "arbitrary task repair from unstructured command output",
+        "browser/MCP repair",
+        "automatic multi-attempt repair loop",
+        "real CLI full repair iteration path"
+      ]
+    }
+  ],
+  "toolTasksAttempted": [
+    {
+      "id": "route227i-mcp-local-tools",
+      "capability": "MCP/local tools",
+      "status": "COMPLETE",
+      "evidenceSource": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+      "limitations": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution"
+      ]
+    },
+    {
+      "id": "route227i-browser-observation",
+      "capability": "browser observation",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+      "limitations": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution",
+        "browser runtime remained disabled; local/browser unavailable is not observation success"
+      ]
+    },
+    {
+      "id": "route227i-external-tool-readiness",
+      "capability": "external tool readiness",
+      "status": "NOT-PROVEN",
+      "evidenceSource": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+      "limitations": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution",
+        "external-live MCP/browser execution remained not proven"
+      ]
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route227i-final-capstone-inventory-runner",
+      "purpose": "Reads Route227A-H reports plus frozen tasks and emits the final reality map and release summary.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false,
+      "regressionProtected": "Final status follows weakest upstream evidence; route-local report cannot upgrade PARTIAL/BLOCKED routes."
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "route227i-context-planning",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "PARTIAL",
+      "route": "route227b",
+      "evidenceSource": "docs/implementation-context/route227b-context-planning-elite-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "full Route227B task matrix complete",
+        "unsupported broad task negative control",
+        "durable cross-session memory reuse through real CLI",
+        "LSP-grade code graph",
+        "provider-assisted context acquisition",
+        "mutation or verification success",
+        "unsupported broad negative proof and durable cross-session memory reuse remain partial"
+      ]
+    },
+    {
+      "taskId": "route227i-live-provider-exact-proposal",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "PARTIAL",
+      "route": "route227a",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "live provider path was reached, but applied-and-verified exact proposal success remains unproven"
+      ]
+    },
+    {
+      "taskId": "route227i-deterministic-proposal",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "COMPLETE",
+      "route": "route227c",
+      "evidenceSource": "docs/implementation-context/route227c-planning-to-patch-orchestrator-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "limitations": [
+        "live provider exact-ready source remains not-proven because Route227A is not COMPLETE",
+        "full planning matrix remains not-proven because Route227B is not COMPLETE",
+        "repair proposal is not yet normalized through the same planning-to-patch bridge",
+        "multi-file proposal per-file status is not yet proven through the same product bridge",
+        "live-provider exact-ready proposal through Route227C",
+        "repair proposal success",
+        "multi-file apply success",
+        "proposal authority"
+      ]
+    },
+    {
+      "taskId": "route227i-planning-to-patch-orchestration",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "PARTIAL",
+      "route": "route227c",
+      "evidenceSource": "docs/implementation-context/route227c-planning-to-patch-orchestrator-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts -> planningMutationProposalBridge",
+      "limitations": [
+        "live provider exact-ready source remains not-proven because Route227A is not COMPLETE",
+        "full planning matrix remains not-proven because Route227B is not COMPLETE",
+        "repair proposal is not yet normalized through the same planning-to-patch bridge",
+        "multi-file proposal per-file status is not yet proven through the same product bridge",
+        "live-provider exact-ready proposal through Route227C",
+        "repair proposal success",
+        "multi-file apply success",
+        "proposal authority"
+      ]
+    },
+    {
+      "taskId": "route227i-exact-update",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "COMPLETE",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "taskId": "route227i-create-file",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "COMPLETE",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "taskId": "route227i-small-multi-file-apply",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "COMPLETE",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source"
+      ]
+    },
+    {
+      "taskId": "route227i-delete-move-preview",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "PARTIAL",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "delete and move apply remain preview-first, not applied capability"
+      ]
+    },
+    {
+      "taskId": "route227i-broad-refactor-decomposition",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "PARTIAL",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "broad refactor is preview/blocked, not unrestricted mutation"
+      ]
+    },
+    {
+      "taskId": "route227i-verification-command-dispatch",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "PARTIAL",
+      "route": "route227e",
+      "evidenceSource": "docs/implementation-context/route227e-verification-intelligence-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "limitations": [
+        "product runtime command dispatch blocked by environment",
+        "live provider verification",
+        "automatic repair-to-success",
+        "arbitrary shell command verification",
+        "browser/MCP external verification",
+        "full repository verification sweep",
+        "product runtime command dispatch was blocked by environment"
+      ]
+    },
+    {
+      "taskId": "route227i-focused-test-selection",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "PARTIAL",
+      "route": "route227e",
+      "evidenceSource": "docs/implementation-context/route227e-verification-intelligence-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "limitations": [
+        "product runtime command dispatch blocked by environment",
+        "live provider verification",
+        "automatic repair-to-success",
+        "arbitrary shell command verification",
+        "browser/MCP external verification",
+        "full repository verification sweep",
+        "selection logic exists but runtime dispatch did not prove pass"
+      ]
+    },
+    {
+      "taskId": "route227i-repair-to-success",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "COMPLETE",
+      "route": "route227f",
+      "evidenceSource": "docs/implementation-context/route227f-repair-iteration-product-loop-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/verificationRepairIterationFlow.ts::runVerificationRepairIterationFlow",
+      "limitations": [
+        "live provider repair proposal",
+        "arbitrary task repair from unstructured command output",
+        "browser/MCP repair",
+        "automatic multi-attempt repair loop",
+        "real CLI full repair iteration path"
+      ]
+    },
+    {
+      "taskId": "route227i-cli-session-ux",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "COMPLETE",
+      "route": "route227h",
+      "evidenceSource": "docs/implementation-context/route227h-cli-session-product-experience-report.json",
+      "productPath": "packages/ts-shell/src/core/shell/sessionRuntime.ts::ShellSessionRuntime.executePrompt",
+      "limitations": [
+        "live provider exact proposal success",
+        "production default apply",
+        "external-live MCP/browser execution",
+        "provider execution during apply",
+        "broad edit engine repair"
+      ]
+    },
+    {
+      "taskId": "route227i-mcp-local-tools",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "COMPLETE",
+      "route": "route227g",
+      "evidenceSource": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+      "limitations": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution"
+      ]
+    },
+    {
+      "taskId": "route227i-browser-observation",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "NOT-PROVEN",
+      "route": "route227g",
+      "evidenceSource": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+      "limitations": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution",
+        "browser runtime remained disabled; local/browser unavailable is not observation success"
+      ]
+    },
+    {
+      "taskId": "route227i-external-tool-readiness",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "NOT-PROVEN",
+      "route": "route227g",
+      "evidenceSource": "docs/implementation-context/route227g-tool-ecosystem-and-external-capabilities-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.ts::runToolEcosystemCapabilityRoute",
+      "limitations": [
+        "external-live read",
+        "external-live mcp__stdioEcho__echo_message",
+        "external-live mcp__externalSearch__search",
+        "external-live browser.observe",
+        "external-live browser.type",
+        "external-live external.payments.charge",
+        "external-live tool execution",
+        "external-live MCP/browser execution remained not proven"
+      ]
+    },
+    {
+      "taskId": "route227i-session-continuation",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "COMPLETE",
+      "route": "route227h",
+      "evidenceSource": "docs/implementation-context/route227h-cli-session-product-experience-report.json",
+      "productPath": "packages/ts-shell/src/core/shell/sessionRuntime.ts::ShellSessionRuntime.executePrompt",
+      "limitations": [
+        "live provider exact proposal success",
+        "production default apply",
+        "external-live MCP/browser execution",
+        "provider execution during apply",
+        "broad edit engine repair"
+      ]
+    },
+    {
+      "taskId": "route227i-fallback-provider",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "NOT-PROVEN",
+      "route": "route227a",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "fallback policy was not promoted to success evidence"
+      ]
+    },
+    {
+      "taskId": "route227i-production-default-write",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "NOT-PROVEN",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "production default write remains intentionally not enabled"
+      ]
+    },
+    {
+      "taskId": "route227i-fuzzy-apply",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "NOT-PROVEN",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "fuzzy apply success remains explicitly not proven"
+      ]
+    },
+    {
+      "taskId": "route227i-add-delete-move-apply",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "PARTIAL",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "create-file is complete; delete/move apply remain not proven"
+      ]
+    },
+    {
+      "taskId": "route227i-rollback",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "NOT-PROVEN",
+      "route": "route227d",
+      "evidenceSource": "docs/implementation-context/route227d-edit-engine-capability-expansion-report.json",
+      "productPath": "packages/ts-shell/src/orchestration/controlledEditOperationRoute.ts -> mutationRoutingProjection -> existing workspace create/multi/no-write routes",
+      "limitations": [
+        "production default write",
+        "delete apply through Route227D",
+        "move apply through Route227D",
+        "broad refactor apply",
+        "fuzzy apply success",
+        "automatic rollback executed",
+        "live provider edit source",
+        "automatic rollback executed remains not proven"
+      ]
+    },
+    {
+      "taskId": "route227i-live-multi-file-provider",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "NOT-PROVEN",
+      "route": "route227a",
+      "evidenceSource": "docs/implementation-context/route227a-live-provider-exact-proposal-contract-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "live provider exact proposal applied and verified",
+        "production default live provider",
+        "production workspace default write",
+        "provider call during apply",
+        "fuzzy apply as success",
+        "multi-file/add/delete/move live apply",
+        "repair-to-success after live verification failure",
+        "live multi-file provider apply was not attempted as success evidence"
+      ]
+    },
+    {
+      "taskId": "route227i-long-session-memory",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "finalVerdict": "PARTIAL",
+      "route": "route227b",
+      "evidenceSource": "docs/implementation-context/route227b-context-planning-elite-upgrade-report.json",
+      "productPath": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "limitations": [
+        "full Route227B task matrix complete",
+        "unsupported broad task negative control",
+        "durable cross-session memory reuse through real CLI",
+        "LSP-grade code graph",
+        "provider-assisted context acquisition",
+        "mutation or verification success",
+        "durable cross-session memory reuse through real CLI remains not proven"
+      ]
+    }
+  ],
+  "negativeControlEvidence": {
+    "noProviderNoApplyDefaultPreserved": true,
+    "commandOnlyBypassRejected": true,
+    "unsupportedBroadTaskNotSuccess": true,
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedNeverLive": true,
+    "applyWithoutAuthorityRejected": true,
+    "successWithoutVerificationRejected": true,
+    "repairSuccessRequiresOriginalFailureAndReverify": true,
+    "externalLocalToolEvidenceSeparated": true,
+    "finalStatusMatchesWeakestEvidence": true
+  },
+  "notProvenClaims": [
+    "full Route227B task matrix complete",
+    "unsupported broad task negative control",
+    "durable cross-session memory reuse through real CLI",
+    "LSP-grade code graph",
+    "provider-assisted context acquisition",
+    "mutation or verification success",
+    "unsupported broad negative proof and durable cross-session memory reuse remain partial",
+    "live provider exact proposal applied and verified",
+    "production default live provider",
+    "production workspace default write",
+    "provider call during apply",
+    "fuzzy apply as success",
+    "multi-file/add/delete/move live apply",
+    "repair-to-success after live verification failure",
+    "live provider path was reached, but applied-and-verified exact proposal success remains unproven",
+    "live provider exact-ready source remains not-proven because Route227A is not COMPLETE",
+    "full planning matrix remains not-proven because Route227B is not COMPLETE",
+    "repair proposal is not yet normalized through the same planning-to-patch bridge",
+    "multi-file proposal per-file status is not yet proven through the same product bridge",
+    "live-provider exact-ready proposal through Route227C",
+    "repair proposal success",
+    "multi-file apply success",
+    "proposal authority",
+    "production default write",
+    "delete apply through Route227D",
+    "move apply through Route227D",
+    "broad refactor apply",
+    "fuzzy apply success",
+    "automatic rollback executed",
+    "live provider edit source",
+    "delete and move apply remain preview-first, not applied capability",
+    "broad refactor is preview/blocked, not unrestricted mutation",
+    "product runtime command dispatch blocked by environment",
+    "live provider verification",
+    "automatic repair-to-success",
+    "arbitrary shell command verification",
+    "browser/MCP external verification",
+    "full repository verification sweep",
+    "product runtime command dispatch was blocked by environment",
+    "selection logic exists but runtime dispatch did not prove pass"
+  ],
+  "releaseCandidateSummary": {
+    "finalStatus": "PARTIAL",
+    "completeCapabilities": [
+      "deterministic proposal",
+      "exact update",
+      "create file",
+      "small multi-file apply",
+      "repair-to-success",
+      "CLI/session UX",
+      "MCP/local tools",
+      "session continuation"
+    ],
+    "partialCapabilities": [
+      "context/planning",
+      "live provider exact proposal",
+      "planning-to-patch orchestration",
+      "delete/move preview",
+      "broad refactor decomposition",
+      "verification command dispatch",
+      "focused test selection",
+      "add/delete/move apply",
+      "long-session memory"
+    ],
+    "blockedCapabilities": [],
+    "notProvenCapabilities": [
+      "browser observation",
+      "external tool readiness",
+      "fallback provider",
+      "production default write",
+      "fuzzy apply",
+      "rollback",
+      "live multi-file provider"
+    ],
+    "demoCommands": [
+      "npm run verify:route227d-edit-engine-capability-expansion",
+      "npm run verify:route227f-repair-iteration-product-loop",
+      "npm run verify:route227g-tool-ecosystem-and-external-capabilities",
+      "npm run verify:route227h-cli-session-product-experience",
+      "npm run verify:route227i-final-capstone-release-candidate"
+    ]
+  },
+  "referenceAdoption": [
+    {
+      "capabilityArea": "final release-candidate reporting",
+      "referenceRepo": "not-inspected",
+      "fileOrSubsystemInspected": "not-applicable",
+      "patternAdopted": "Local Route227A-H evidence was sufficient.",
+      "localSeamChanged": "route227i final report runner, final capability reality map, release candidate summary",
+      "patternRejected": "not-applicable",
+      "reason": "No final report format blocker required a reference comparison.",
+      "evidenceProduced": "Route227I report, final capability reality map, release candidate summary, Route221 gate"
+    }
+  ],
+  "validations": {
+    "routeSmoke": "npm run verify:route227i-final-capstone-release-candidate",
+    "route221Gate": "npm run verify:route221-anti-false-success-gate -- --report docs/implementation-context/route227i-final-capstone-release-candidate-report.json",
+    "resultContract": "npm run verify:result-contract",
+    "build": "npm run build -w packages/ts-shell",
+    "diffCheck": "git diff --check"
+  }
+}

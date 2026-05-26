@@ -1,0 +1,417 @@
+{
+  "schemaVersion": 1,
+  "route": "route227h",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "independentPassRerun": {
+    "result": "PASS",
+    "source": "Route227H product session runtime smoke plus Route221 report gate validation"
+  },
+  "primaryEvidence": {
+    "source": "product-proven",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-session-continuity-result-truth",
+    "executionEntrypoint": "product-runtime",
+    "productConsumer": "packages/ts-shell/src/core/shell/sessionRuntime.ts::ShellSessionRuntime.executePrompt",
+    "routeLocalHarnessUsed": true,
+    "helperOnlyComposition": false,
+    "proposalSource": "not-applicable",
+    "confirmationSource": "none",
+    "verificationSource": "product-verification-route"
+  },
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "cli-session-product-experience",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "TypeScript control-plane planning route with no provider call and no writer authority.",
+      "negativeControls": [
+        "Prompt text must not grant write authority.",
+        "No provider or apply path may run by default."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "cli-session-product-experience",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Selected workspace authority -> exact hunk apply -> readback -> verification verdict.",
+      "negativeControls": [
+        "A proposal without confirmation is not success.",
+        "Apply without readback is not success."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "cli-session-product-experience",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Verification failure -> repair proposal -> confirmation -> existing exact hunk apply -> post-repair verification.",
+      "negativeControls": [
+        "Repair continuation is not repair success.",
+        "Repair proposal is not repair applied."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "cli-session-product-experience",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Verification planner or report must reject command-only bypass as task success.",
+      "negativeControls": [
+        "node --version or equivalent command-only proof must not complete a file-edit task."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-unsupported-broad-task-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "cli-session-product-experience",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Route gate must stop or split the task instead of reporting broad capability COMPLETE.",
+      "negativeControls": [
+        "Broad unsupported capability must not be accepted because a route-local fixture passed."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-session-continuity-result-truth",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "cli-session-product-experience",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "expectedProductPath": "Session durability and result mapping preserve terminal truthfulness across continuation.",
+      "negativeControls": [
+        "A resumed session must not erase failed verification.",
+        "A transcript summary must not promote not-proven claims."
+      ],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route227h-product-session-runtime-smoke",
+      "purpose": "Drives ShellSessionRuntime print/interactive rendering with frozen task prompts and product CodingResult envelopes.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false,
+      "regressionProtected": "Task/Context/Plan/Proposal/Authority/Apply/Verification/Repair/Tools/Verdict/Not proven/Next action sections render through the product session terminal path."
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-session-continuity-result-truth",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "context": {
+        "origin": "frozen",
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "productPath": "ShellSessionRuntime.executePrompt -> query.completed -> renderSessionTerminalSurface -> projectCliSessionProductSurface",
+        "productConsumer": "packages/ts-shell/src/core/shell/sessionRuntime.ts::ShellSessionRuntime.executePrompt",
+        "sectionsRequired": [
+          "Task",
+          "Context",
+          "Plan",
+          "Proposal",
+          "Authority",
+          "Apply",
+          "Verification",
+          "Repair",
+          "Tools",
+          "Verdict",
+          "Not proven",
+          "Next action"
+        ]
+      },
+      "sessionOutputs": [
+        {
+          "id": "no-write-planning",
+          "frozenTaskId": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+          "outputMode": "print",
+          "terminalClassification": "stopped",
+          "expectedVerdict": "Stopped: explicit authority is required before continuing.",
+          "sectionsPresent": {
+            "Task": true,
+            "Context": true,
+            "Plan": true,
+            "Proposal": true,
+            "Authority": true,
+            "Apply": true,
+            "Verification": true,
+            "Repair": true,
+            "Tools": true,
+            "Verdict": true,
+            "Not proven": true,
+            "Next action": true
+          },
+          "productSurfaceRendered": true,
+          "notProvenRendered": true,
+          "nextActionRendered": true
+        },
+        {
+          "id": "review-ready-proposal",
+          "frozenTaskId": "frozen-lower-bound-stable-selected-workspace-authority-case",
+          "outputMode": "print",
+          "terminalClassification": "stopped",
+          "expectedVerdict": "Stopped: explicit authority is required before continuing.",
+          "sectionsPresent": {
+            "Task": true,
+            "Context": true,
+            "Plan": true,
+            "Proposal": true,
+            "Authority": true,
+            "Apply": true,
+            "Verification": true,
+            "Repair": true,
+            "Tools": true,
+            "Verdict": true,
+            "Not proven": true,
+            "Next action": true
+          },
+          "productSurfaceRendered": true,
+          "notProvenRendered": true,
+          "nextActionRendered": true
+        },
+        {
+          "id": "needs-authority-apply",
+          "frozenTaskId": "frozen-lower-bound-stable-selected-workspace-authority-case",
+          "outputMode": "interactive",
+          "terminalClassification": "stopped",
+          "expectedVerdict": "Stopped: explicit authority is required before continuing.",
+          "sectionsPresent": {
+            "Task": true,
+            "Context": true,
+            "Plan": true,
+            "Proposal": true,
+            "Authority": true,
+            "Apply": true,
+            "Verification": true,
+            "Repair": true,
+            "Tools": true,
+            "Verdict": true,
+            "Not proven": true,
+            "Next action": true
+          },
+          "productSurfaceRendered": true,
+          "notProvenRendered": true,
+          "nextActionRendered": true
+        },
+        {
+          "id": "authorized-apply-verification",
+          "frozenTaskId": "frozen-lower-bound-stable-selected-workspace-authority-case",
+          "outputMode": "print",
+          "terminalClassification": "success",
+          "expectedVerdict": "Verified success: relevant verification passed.",
+          "sectionsPresent": {
+            "Task": true,
+            "Context": true,
+            "Plan": true,
+            "Proposal": true,
+            "Authority": true,
+            "Apply": true,
+            "Verification": true,
+            "Repair": true,
+            "Tools": true,
+            "Verdict": true,
+            "Not proven": true,
+            "Next action": true
+          },
+          "productSurfaceRendered": true,
+          "notProvenRendered": true,
+          "nextActionRendered": true
+        },
+        {
+          "id": "verification-failure-repair-required",
+          "frozenTaskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+          "outputMode": "print",
+          "terminalClassification": "stopped",
+          "expectedVerdict": "Stopped: verification failed and repair or inspection is required.",
+          "sectionsPresent": {
+            "Task": true,
+            "Context": true,
+            "Plan": true,
+            "Proposal": true,
+            "Authority": true,
+            "Apply": true,
+            "Verification": true,
+            "Repair": true,
+            "Tools": true,
+            "Verdict": true,
+            "Not proven": true,
+            "Next action": true
+          },
+          "productSurfaceRendered": true,
+          "notProvenRendered": true,
+          "nextActionRendered": true
+        },
+        {
+          "id": "repair-to-success",
+          "frozenTaskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+          "outputMode": "print",
+          "terminalClassification": "success",
+          "expectedVerdict": "Verified success with repair: initial failure was repaired and re-verification passed.",
+          "sectionsPresent": {
+            "Task": true,
+            "Context": true,
+            "Plan": true,
+            "Proposal": true,
+            "Authority": true,
+            "Apply": true,
+            "Verification": true,
+            "Repair": true,
+            "Tools": true,
+            "Verdict": true,
+            "Not proven": true,
+            "Next action": true
+          },
+          "productSurfaceRendered": true,
+          "notProvenRendered": true,
+          "nextActionRendered": true
+        },
+        {
+          "id": "tool-receipt-not-proven",
+          "frozenTaskId": "frozen-session-continuity-result-truth",
+          "outputMode": "print",
+          "terminalClassification": "stopped",
+          "expectedVerdict": "Blocked: external tool evidence unavailable",
+          "sectionsPresent": {
+            "Task": true,
+            "Context": true,
+            "Plan": true,
+            "Proposal": true,
+            "Authority": true,
+            "Apply": true,
+            "Verification": true,
+            "Repair": true,
+            "Tools": true,
+            "Verdict": true,
+            "Not proven": true,
+            "Next action": true
+          },
+          "productSurfaceRendered": true,
+          "notProvenRendered": true,
+          "nextActionRendered": true
+        },
+        {
+          "id": "unsupported-broad-task",
+          "frozenTaskId": "frozen-unsupported-broad-task-negative-control",
+          "outputMode": "interactive",
+          "terminalClassification": "stopped",
+          "expectedVerdict": "Blocked: unsupported broad task",
+          "sectionsPresent": {
+            "Task": true,
+            "Context": true,
+            "Plan": true,
+            "Proposal": true,
+            "Authority": true,
+            "Apply": true,
+            "Verification": true,
+            "Repair": true,
+            "Tools": true,
+            "Verdict": true,
+            "Not proven": true,
+            "Next action": true
+          },
+          "productSurfaceRendered": true,
+          "notProvenRendered": true,
+          "nextActionRendered": true
+        },
+        {
+          "id": "command-only-bypass",
+          "frozenTaskId": "frozen-command-only-bypass-negative-control",
+          "outputMode": "print",
+          "terminalClassification": "stopped",
+          "expectedVerdict": "Blocked: command-only bypass rejected",
+          "sectionsPresent": {
+            "Task": true,
+            "Context": true,
+            "Plan": true,
+            "Proposal": true,
+            "Authority": true,
+            "Apply": true,
+            "Verification": true,
+            "Repair": true,
+            "Tools": true,
+            "Verdict": true,
+            "Not proven": true,
+            "Next action": true
+          },
+          "productSurfaceRendered": true,
+          "notProvenRendered": true,
+          "nextActionRendered": true
+        }
+      ],
+      "uxTruthfulness": {
+        "reviewReadyNotApplyReady": true,
+        "authorityRequiredNotSuccess": true,
+        "verificationFailureNotSuccess": true,
+        "repairProposalNotRepairSuccess": true,
+        "localToolNotExternalLive": true,
+        "commandOnlyBypassNotSuccess": true
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "Route227A live provider exact proposal remained downgraded unless separately proven",
+        "Route227B planning broad negative proof remained partial unless separately proven",
+        "Route227C preserves upstream provider downgrade",
+        "Route227E runtime dispatcher environment failure remained partial unless separately proven",
+        "external-live MCP/browser execution not proven by local fixture output"
+      ]
+    }
+  ],
+  "defaultPath": {
+    "provider": "not-called",
+    "apply": "not-run",
+    "command": "not-run"
+  },
+  "referenceAdoption": [
+    {
+      "capabilityArea": "CLI/session product experience",
+      "referenceRepo": "not-inspected",
+      "fileOrSubsystemInspected": "not-applicable",
+      "patternAdopted": "Local Route225-227G substrate was sufficient.",
+      "localSeamChanged": "cliSessionProductSurface, sessionTerminalState, Route227H smoke script",
+      "patternRejected": "not-applicable",
+      "reason": "No concrete UX blocker required external reference comparison.",
+      "evidenceProduced": "Route227H session runtime smoke and focused surface tests"
+    }
+  ],
+  "validations": {
+    "focusedUnit": "npm test -w packages/ts-shell -- src/core/shell/cliSessionProductSurface.test.ts",
+    "routeSmoke": "npm run verify:route227h-cli-session-product-experience",
+    "route221Gate": "npm run verify:route221-anti-false-success-gate -- --report docs/implementation-context/route227h-cli-session-product-experience-report.json"
+  },
+  "notProvenClaims": [
+    "live provider exact proposal success",
+    "production default apply",
+    "external-live MCP/browser execution",
+    "provider execution during apply",
+    "broad edit engine repair"
+  ]
+}

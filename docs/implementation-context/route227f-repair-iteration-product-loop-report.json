@@ -1,0 +1,460 @@
+{
+  "schemaVersion": 1,
+  "route": "route227f",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "independentPassRerun": {
+    "result": "PASS",
+    "source": "route227f product repair iteration assertions plus Route221 report gate validation"
+  },
+  "primaryEvidence": {
+    "source": "product-proven",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+    "executionEntrypoint": "product-composition-root",
+    "productConsumer": "packages/ts-shell/src/orchestration/verificationRepairIterationFlow.ts::runVerificationRepairIterationFlow",
+    "routeLocalHarnessUsed": true,
+    "helperOnlyComposition": false,
+    "proposalSource": "deterministic-from-failure-evidence",
+    "confirmationSource": "explicit-authority-contract",
+    "verificationSource": "task-relevant-command"
+  },
+  "repairTasksAttempted": [
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "originalFailureStatus": "failed",
+      "originalFailurePreserved": true,
+      "failedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "repairProposalSource": "deterministic-from-failure-evidence",
+      "repairReviewStatus": "ready-for-selection",
+      "repairConfirmationSource": "explicit-authority-contract",
+      "repairApplyStatus": "single-target-applied",
+      "postRepairVerificationSource": "same-relevant-command",
+      "postRepairVerificationStatus": "passed",
+      "sameVerificationCommandRerun": true,
+      "finalRepairVerdict": "verified-success-with-repair",
+      "retryCount": 1,
+      "maxRepairAttempts": 1
+    },
+    {
+      "taskId": "route227f-repair-failed-case",
+      "originalFailureStatus": "failed",
+      "originalFailurePreserved": true,
+      "failedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "repairProposalSource": "deterministic-from-failure-evidence",
+      "repairReviewStatus": "ready-for-selection",
+      "repairConfirmationSource": "explicit-authority-contract",
+      "repairApplyStatus": "single-target-applied",
+      "postRepairVerificationSource": "same-relevant-command",
+      "postRepairVerificationStatus": "failed",
+      "sameVerificationCommandRerun": true,
+      "finalRepairVerdict": "repair-failed",
+      "retryCount": 1,
+      "maxRepairAttempts": 1
+    },
+    {
+      "taskId": "route227f-repair-blocked-case",
+      "originalFailureStatus": "failed",
+      "originalFailurePreserved": true,
+      "failedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "repairProposalSource": "deterministic-from-failure-evidence",
+      "repairReviewStatus": "ready-for-selection",
+      "repairConfirmationSource": "explicit-authority-contract",
+      "repairApplyStatus": "single-target-applied",
+      "postRepairVerificationSource": "same-relevant-command",
+      "postRepairVerificationStatus": "blocked",
+      "sameVerificationCommandRerun": true,
+      "finalRepairVerdict": "repair-blocked",
+      "retryCount": 1,
+      "maxRepairAttempts": 1
+    }
+  ],
+  "repairIterationEvidence": {
+    "success": {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "originalFailureStatus": "failed",
+      "originalFailurePreserved": true,
+      "failedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "repairProposalSource": "deterministic-from-failure-evidence",
+      "repairReviewStatus": "ready-for-selection",
+      "repairConfirmationSource": "explicit-authority-contract",
+      "repairApplyStatus": "single-target-applied",
+      "postRepairVerificationSource": "same-relevant-command",
+      "postRepairVerificationStatus": "passed",
+      "sameVerificationCommandRerun": true,
+      "finalRepairVerdict": "verified-success-with-repair",
+      "retryCount": 1,
+      "maxRepairAttempts": 1
+    },
+    "failed": {
+      "taskId": "route227f-repair-failed-case",
+      "originalFailureStatus": "failed",
+      "originalFailurePreserved": true,
+      "failedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "repairProposalSource": "deterministic-from-failure-evidence",
+      "repairReviewStatus": "ready-for-selection",
+      "repairConfirmationSource": "explicit-authority-contract",
+      "repairApplyStatus": "single-target-applied",
+      "postRepairVerificationSource": "same-relevant-command",
+      "postRepairVerificationStatus": "failed",
+      "sameVerificationCommandRerun": true,
+      "finalRepairVerdict": "repair-failed",
+      "retryCount": 1,
+      "maxRepairAttempts": 1
+    },
+    "blocked": {
+      "taskId": "route227f-repair-blocked-case",
+      "originalFailureStatus": "failed",
+      "originalFailurePreserved": true,
+      "failedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "repairProposalSource": "deterministic-from-failure-evidence",
+      "repairReviewStatus": "ready-for-selection",
+      "repairConfirmationSource": "explicit-authority-contract",
+      "repairApplyStatus": "single-target-applied",
+      "postRepairVerificationSource": "same-relevant-command",
+      "postRepairVerificationStatus": "blocked",
+      "sameVerificationCommandRerun": true,
+      "finalRepairVerdict": "repair-blocked",
+      "retryCount": 1,
+      "maxRepairAttempts": 1
+    }
+  },
+  "postRepairVerificationEvidence": [
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "source": "same-relevant-command",
+      "sameVerificationCommandRerun": true,
+      "command": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "status": "passed",
+      "finalRepairVerdict": "verified-success-with-repair",
+      "runtimeDerived": true
+    },
+    {
+      "taskId": "route227f-repair-failed-case",
+      "source": "same-relevant-command",
+      "sameVerificationCommandRerun": true,
+      "command": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "status": "failed",
+      "finalRepairVerdict": "repair-failed",
+      "runtimeDerived": true
+    },
+    {
+      "taskId": "route227f-repair-blocked-case",
+      "source": "same-relevant-command",
+      "sameVerificationCommandRerun": true,
+      "command": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "status": "blocked",
+      "finalRepairVerdict": "repair-blocked",
+      "runtimeDerived": true
+    }
+  ],
+  "sessionContinuationEvidence": [
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "finalStatus": "completed",
+      "terminalClassification": "success",
+      "continuationStatus": "recovered-after-continuation",
+      "repairStatus": "recovered",
+      "originalFailurePreserved": true
+    },
+    {
+      "taskId": "route227f-repair-failed-case",
+      "finalStatus": "stopped_error",
+      "terminalClassification": "stopped",
+      "continuationStatus": "failed-after-bounded-continuation",
+      "repairStatus": "failed",
+      "originalFailurePreserved": true
+    },
+    {
+      "taskId": "route227f-repair-blocked-case",
+      "finalStatus": "stopped_error",
+      "terminalClassification": "stopped",
+      "continuationStatus": "failed-after-bounded-continuation",
+      "repairStatus": "failed",
+      "originalFailurePreserved": true
+    }
+  ],
+  "retryStopEvidence": [
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "retryCount": 1,
+      "maxRepairAttempts": 1,
+      "noInfiniteLoop": true,
+      "automaticSecondAttempt": false
+    },
+    {
+      "taskId": "route227f-repair-failed-case",
+      "retryCount": 1,
+      "maxRepairAttempts": 1,
+      "noInfiniteLoop": true,
+      "automaticSecondAttempt": false
+    },
+    {
+      "taskId": "route227f-repair-blocked-case",
+      "retryCount": 1,
+      "maxRepairAttempts": 1,
+      "noInfiniteLoop": true,
+      "automaticSecondAttempt": false
+    }
+  ],
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "verified-success-with-repair after apply and same-command re-verification",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "expectedProductPath": "Verification failure -> repair proposal -> confirmation -> existing exact hunk apply -> post-repair verification.",
+      "negativeControls": [
+        "Repair continuation is not repair success.",
+        "Repair proposal is not repair applied."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-session-continuity-result-truth",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "repair failed/blocked remains stopped and continuation-safe",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "expectedProductPath": "Session durability and result mapping preserve terminal truthfulness across continuation.",
+      "negativeControls": [
+        "A resumed session must not erase failed verification.",
+        "A transcript summary must not promote not-proven claims."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "command-only bypass remains rejected by Route227E dependency",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "expectedProductPath": "Verification planner or report must reject command-only bypass as task success.",
+      "negativeControls": [
+        "node --version or equivalent command-only proof must not complete a file-edit task."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "repair apply uses selected workspace authority and existing backend",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "expectedProductPath": "Selected workspace authority -> exact hunk apply -> readback -> verification verdict.",
+      "negativeControls": [
+        "A proposal without confirmation is not success.",
+        "Apply without readback is not success."
+      ],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route227f-product-repair-iteration-runner",
+      "purpose": "Drives the product repair iteration composition root through success, failed rerun, and blocked rerun scenarios.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false,
+      "regressionProtected": "original failure -> proposal -> explicit repair confirmation -> existing backend apply -> same-command re-verification -> final repair verdict"
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "originalVerificationFailure": {
+        "status": "failed",
+        "command": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "preserved": true,
+        "runtimeDerived": true,
+        "rawOutputExcluded": true
+      },
+      "repairProposal": {
+        "source": "deterministic-from-failure-evidence",
+        "proposalId": "edit-repair-proposal-1086fd0f1dcb",
+        "reviewStatus": "ready-for-selection",
+        "noWrite": true
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "missingConfirmationState": "selection-required",
+        "confirmationState": "confirmed-exact-single-target",
+        "separateFromInitialApplyConfirmation": true
+      },
+      "apply": {
+        "status": "single-target-applied",
+        "existingBackend": true,
+        "noNewWriter": true,
+        "fuzzyApply": false,
+        "providerCallDuringApply": false,
+        "changedFiles": [
+          "src/repair-success.ts"
+        ]
+      },
+      "postRepairVerification": {
+        "source": "same-relevant-command",
+        "status": "passed",
+        "command": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "sameVerificationCommandRerun": true,
+        "runtimeDerived": true
+      },
+      "retry": {
+        "retryCount": 1,
+        "maxRepairAttempts": 1
+      },
+      "finalRepairVerdict": "verified-success-with-repair",
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "live provider repair proposal",
+        "automatic repair",
+        "fuzzy repair apply"
+      ]
+    },
+    {
+      "taskId": "route227f-route227f-repair-failed-case",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "originalVerificationFailure": {
+        "status": "failed",
+        "command": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "preserved": true,
+        "runtimeDerived": true,
+        "rawOutputExcluded": true
+      },
+      "repairProposal": {
+        "source": "deterministic-from-failure-evidence",
+        "proposalId": "edit-repair-proposal-a8c43b691f10",
+        "reviewStatus": "ready-for-selection",
+        "noWrite": true
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "missingConfirmationState": "selection-required",
+        "confirmationState": "confirmed-exact-single-target",
+        "separateFromInitialApplyConfirmation": true
+      },
+      "apply": {
+        "status": "single-target-applied",
+        "existingBackend": true,
+        "noNewWriter": true,
+        "fuzzyApply": false,
+        "providerCallDuringApply": false,
+        "changedFiles": [
+          "src/repair-failed.ts"
+        ]
+      },
+      "postRepairVerification": {
+        "source": "same-relevant-command",
+        "status": "failed",
+        "command": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "sameVerificationCommandRerun": true,
+        "runtimeDerived": true
+      },
+      "retry": {
+        "retryCount": 1,
+        "maxRepairAttempts": 1
+      },
+      "finalRepairVerdict": "repair-failed",
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "repair success",
+        "post-repair verification passed"
+      ]
+    },
+    {
+      "taskId": "route227f-route227f-repair-blocked-case",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "originalVerificationFailure": {
+        "status": "failed",
+        "command": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "preserved": true,
+        "runtimeDerived": true,
+        "rawOutputExcluded": true
+      },
+      "repairProposal": {
+        "source": "deterministic-from-failure-evidence",
+        "proposalId": "edit-repair-proposal-a8fd913d0127",
+        "reviewStatus": "ready-for-selection",
+        "noWrite": true
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "missingConfirmationState": "selection-required",
+        "confirmationState": "confirmed-exact-single-target",
+        "separateFromInitialApplyConfirmation": true
+      },
+      "apply": {
+        "status": "single-target-applied",
+        "existingBackend": true,
+        "noNewWriter": true,
+        "fuzzyApply": false,
+        "providerCallDuringApply": false,
+        "changedFiles": [
+          "src/repair-blocked.ts"
+        ]
+      },
+      "postRepairVerification": {
+        "source": "same-relevant-command",
+        "status": "blocked",
+        "command": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "sameVerificationCommandRerun": true,
+        "runtimeDerived": true
+      },
+      "retry": {
+        "retryCount": 1,
+        "maxRepairAttempts": 1
+      },
+      "finalRepairVerdict": "repair-blocked",
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "repair success",
+        "post-repair verification passed"
+      ]
+    }
+  ],
+  "referenceAdoption": [
+    {
+      "capabilityArea": "repair iteration",
+      "referenceRepo": "not-inspected",
+      "fileOrSubsystemInspected": "not-applicable",
+      "patternAdopted": "Local Route222B/223/225/227E substrate was sufficient.",
+      "localSeamChanged": "verificationRepairIterationFlow and route227f report runner",
+      "patternRejected": "not-applicable",
+      "reason": "No concrete blocker required reference comparison.",
+      "evidenceProduced": "Route227F product repair iteration report and focused tests"
+    }
+  ],
+  "notProvenClaims": [
+    "live provider repair proposal",
+    "arbitrary task repair from unstructured command output",
+    "browser/MCP repair",
+    "automatic multi-attempt repair loop",
+    "real CLI full repair iteration path"
+  ]
+}
