@@ -132,6 +132,7 @@ const knownPrimaryEvidenceSources = [
 
 const productExecutionEntrypoints = [
   'product-runtime',
+  'real-cli-product-path',
   'product-composition-root',
   'route-gate',
 ]

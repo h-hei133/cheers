@@ -1,0 +1,476 @@
+{
+  "schemaVersion": 1,
+  "route": "route225",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "independentPassRerun": {
+    "result": "PASS",
+    "source": "Route225 script reran real CLI print/session path and Route221 report gate is required."
+  },
+  "primaryEvidence": {
+    "source": "selected-workspace-product-path",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-lower-bound-stable-selected-workspace-authority-case",
+    "executionEntrypoint": "real-cli-product-path",
+    "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+    "routeLocalHarnessUsed": false,
+    "helperOnlyComposition": false,
+    "proposalSource": "deterministic-from-product-read-evidence",
+    "confirmationSource": "product-approval",
+    "verificationSource": "task-relevant-command"
+  },
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "real CLI planning no-provider no-apply",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "prompt text did not grant mutation authority",
+        "provider and apply remained not-run"
+      ]
+    },
+    {
+      "id": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "real CLI selected workspace apply with readback",
+      "evidenceLevel": "selected-workspace-proven",
+      "primaryCompleteEvidence": true,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "selected workspace authority came from explicit CLI flag",
+        "apply success required readback verification"
+      ]
+    },
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "real CLI command-only bypass rejected",
+      "evidenceLevel": "not-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "BLOCKED",
+      "negativeControls": [
+        "node --version did not dispatch before applied proof existed"
+      ]
+    },
+    {
+      "id": "frozen-session-continuity-result-truth",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "session continuity preserves stopped reason and not-proven claims",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "continued session remained stopped",
+        "not-proven claims were not promoted"
+      ]
+    },
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "repair-required surface after blocked verification",
+      "evidenceLevel": "partial",
+      "primaryCompleteEvidence": false,
+      "verdict": "PARTIAL",
+      "negativeControls": [
+        "repair continuation was not reported as repair success",
+        "repair mutation remained not-run"
+      ]
+    }
+  ],
+  "productPathTasksAttempted": [
+    {
+      "id": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "finalVerdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "finalVerdict": "COMPLETE"
+    },
+    {
+      "id": "route225-task-relevant-verification-command",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "finalVerdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "finalVerdict": "BLOCKED"
+    },
+    {
+      "id": "frozen-session-continuity-result-truth",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "finalVerdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "finalVerdict": "PARTIAL"
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route225-real-cli-product-loop-driver",
+      "purpose": "Drives the real CLI print/session path and writes this report; it does not call orchestration helpers directly.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "origin": "frozen",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "sessionResultEvidence": {
+        "sessionPersisted": true,
+        "status": "error",
+        "terminalReason": "stopped_error",
+        "terminalClassification": "stopped",
+        "durableStatus": "stopped",
+        "lastContinuationReason": "handoff"
+      },
+      "finalVerdict": "COMPLETE",
+      "context": {
+        "status": "ready-for-handoff",
+        "providerCalled": false
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "review-ready"
+      },
+      "confirmation": {
+        "source": "none",
+        "explicitAuthority": false
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "notProvenClaims": [
+        "mutation success",
+        "provider execution",
+        "command execution"
+      ]
+    },
+    {
+      "taskId": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "origin": "frozen",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "selected-workspace-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "sessionResultEvidence": {
+        "sessionPersisted": true,
+        "status": "error",
+        "terminalReason": "stopped_error",
+        "terminalClassification": "stopped",
+        "durableStatus": "stopped",
+        "lastContinuationReason": "handoff"
+      },
+      "finalVerdict": "COMPLETE",
+      "context": {
+        "status": "ready-for-handoff",
+        "providerCalled": false
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "prepared-exact"
+      },
+      "confirmation": {
+        "source": "product-approval",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "runtime-readback",
+        "status": "passed"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "notProvenClaims": [
+        "live provider success",
+        "production default write"
+      ]
+    },
+    {
+      "taskId": "route225-task-relevant-verification-command",
+      "origin": "route225-product-path",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "sessionResultEvidence": {
+        "sessionPersisted": true,
+        "status": "error",
+        "terminalReason": "stopped_error",
+        "terminalClassification": "stopped",
+        "durableStatus": "stopped",
+        "lastContinuationReason": "handoff"
+      },
+      "finalVerdict": "COMPLETE",
+      "context": {
+        "status": "ready-for-handoff",
+        "providerCalled": false
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "prepared-exact"
+      },
+      "confirmation": {
+        "source": "product-approval",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "task-relevant-command",
+        "status": "passed",
+        "dispatch": "existing-tool-runtime"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "notProvenClaims": [
+        "command output alone without apply/readback"
+      ]
+    },
+    {
+      "taskId": "frozen-command-only-bypass-negative-control",
+      "origin": "frozen",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "sessionResultEvidence": {
+        "sessionPersisted": true,
+        "status": "error",
+        "terminalReason": "stopped_error",
+        "terminalClassification": "stopped",
+        "durableStatus": "stopped",
+        "lastContinuationReason": "handoff"
+      },
+      "finalVerdict": "BLOCKED",
+      "context": {
+        "status": "ready-for-handoff",
+        "providerCalled": false
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "prepared-exact"
+      },
+      "confirmation": {
+        "source": "none",
+        "explicitAuthority": false
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "task-relevant-command",
+        "status": "not-run",
+        "dispatch": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "notProvenClaims": [
+        "task verification by command-only bypass"
+      ]
+    },
+    {
+      "taskId": "frozen-session-continuity-result-truth",
+      "origin": "frozen",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "sessionResultEvidence": {
+        "sessionPersisted": true,
+        "status": "error",
+        "terminalReason": "stopped_error",
+        "terminalClassification": "stopped",
+        "durableStatus": "stopped",
+        "lastContinuationReason": "handoff"
+      },
+      "finalVerdict": "COMPLETE",
+      "context": {
+        "status": "continued-stopped-session",
+        "providerCalled": false
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "preserved"
+      },
+      "confirmation": {
+        "source": "none",
+        "explicitAuthority": false
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "priorSessionResultEvidence": {
+        "sessionPersisted": true,
+        "status": "error",
+        "terminalReason": "stopped_error",
+        "terminalClassification": "stopped",
+        "durableStatus": "stopped",
+        "lastContinuationReason": "handoff"
+      },
+      "notProvenClaims": [
+        "provider",
+        "authority",
+        "mutation",
+        "verification",
+        "recovery",
+        "terminal"
+      ]
+    },
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "origin": "frozen",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "partial",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "synthetic-provider-mode",
+      "providerCalled": false,
+      "sessionResultEvidence": {
+        "sessionPersisted": true,
+        "status": "error",
+        "terminalReason": "stopped_error",
+        "terminalClassification": "stopped",
+        "durableStatus": "stopped",
+        "lastContinuationReason": "handoff"
+      },
+      "finalVerdict": "PARTIAL",
+      "context": {
+        "status": "ready-for-handoff",
+        "providerCalled": false
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "prepared-exact"
+      },
+      "confirmation": {
+        "source": "product-approval",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "task-relevant-command",
+        "status": "blocked",
+        "dispatch": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false,
+        "status": "repair-continuation-created"
+      },
+      "notProvenClaims": [
+        "repair applied",
+        "post-repair verification passed",
+        "repair-to-success through CLI"
+      ]
+    }
+  ],
+  "notProvenClaims": [
+    "live provider proposal generation",
+    "production workspace default write",
+    "fuzzy apply",
+    "arbitrary add/delete/move",
+    "automatic repair mutation after repair continuation",
+    "repair-to-success through real CLI",
+    "browser or MCP runtime expansion"
+  ],
+  "independentAudit": {
+    "result": "PASS",
+    "evidence": "Primary task evidence came from spawned CLI print/session executions with isolated HOME and synthetic provider mode.",
+    "referencePolicy": "not-inspected; local Route224 and Route221 evidence was sufficient."
+  }
+}

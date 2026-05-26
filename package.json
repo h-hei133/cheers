@@ -72,6 +72,7 @@
     "verify:route222b-product-repair-to-success": "tsx scripts/route222b-product-repair-to-success.ts",
     "verify:route223-task-relevant-verification": "tsx scripts/route223-task-relevant-verification-dispatch.ts",
     "verify:route224-capstone-coding-agent-capability-sprint": "tsx scripts/route224-capstone-coding-agent-capability-sprint.ts",
+    "verify:route225-real-cli-product-loop": "tsx scripts/route225-real-cli-product-loop.ts",
     "demo:route207": "tsx scripts/route207-demo.ts",
     "verify:edit-capability-closeout": "node scripts/verify-edit-capability-closeout.mjs",
     "verify:browser-txn-gate": "node scripts/verify-browser-txn-gate.mjs",

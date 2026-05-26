@@ -45,6 +45,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/implementation-context/capability-flow-graph.md` | implementation-context | Human-readable capability flow overview. |  | Capability Flow Context |
 | `docs/implementation-context/capability-recipes.md` | implementation-context | Choosing route patterns and focused validation. |  | Capability Flow Context |
 | `docs/implementation-context/route222-repair-to-success-report.json` | implementation-context | Route222 machine-checkable repair-to-success evidence report. |  | Capability Flow Context |
+| `docs/implementation-context/route225-real-cli-product-loop-report.json` | implementation-context | Route225 machine-checkable real CLI product loop evidence report. |  | Capability Flow Context |
 
 ## Foundation Evidence
 

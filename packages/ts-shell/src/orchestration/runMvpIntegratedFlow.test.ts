@@ -8092,11 +8092,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       expect(result.finalOutput).toContain("Handoff state:");
       expect(result.finalOutput).toContain("Proposal/anchoring bridge:");
       if (scenario.taskKind === "write-file") {
-        expect(result.finalOutput).toContain("Backend lane: none");
-        expect(result.finalOutput).toContain("Execution lane after inputs: none");
-        expect(result.finalOutput).toContain("Proposal review: none");
-        expect(result.finalOutput).toMatch(/Handoff state: (unsupported|missing-context)/);
-        expect(result.finalOutput).toMatch(/State: (unsupported|missing-context)/);
+        expect(result.finalOutput).toContain("Backend lane: generated-edit-proposal-review-only");
+        expect(result.finalOutput).toContain("Execution lane after inputs: existing-exact-fenced-route");
+        expect(result.finalOutput).toContain("Proposal review: review-required");
+        expect(result.finalOutput).toContain("Handoff state: handoff-ready");
+        expect(result.finalOutput).toContain("Proposal state: prepared");
+        expect(result.finalOutput).toContain("Confirmation state: review-required");
       }
       expect(result.finalOutput).toContain("mutationAuthority=not-granted");
       expect(result.finalOutput).toContain("provider-called=false");
