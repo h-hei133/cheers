@@ -30,6 +30,7 @@ export type VerificationCommandKind =
   | "node-version"
   | "npm-test-help"
   | "npm-build-help"
+  | "npm-build-ts-shell"
   | "npm-test-focused"
   | "route-verifier"
   | "unsupported";
@@ -365,6 +366,8 @@ function classifyCommandKind(command: string | undefined): VerificationCommandKi
       return "npm-test-help";
     case "npm run build -- --help":
       return "npm-build-help";
+    case "npm run build -w packages/ts-shell":
+      return "npm-build-ts-shell";
     case "npm run verify:route219-real-task-quality-benchmark":
       return "route-verifier";
     default:

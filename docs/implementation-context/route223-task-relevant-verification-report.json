@@ -1,0 +1,562 @@
+{
+  "schemaVersion": 1,
+  "route": "route223",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "phaseCommits": [],
+  "filesChanged": [
+    "package.json",
+    "packages/ts-shell/src/orchestration/capabilityBoundaryProjection.ts",
+    "packages/ts-shell/src/orchestration/verificationCommandPlan.ts",
+    "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+    "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts",
+    "scripts/route223-task-relevant-verification-dispatch.ts",
+    "docs/implementation-context/route223-task-relevant-verification-report.json"
+  ],
+  "independentAuditResult": "PASS",
+  "independentPassRerun": {
+    "result": "PASS",
+    "source": "Route223 product composition assertions plus Route221C report gate validation"
+  },
+  "primaryEvidence": {
+    "source": "frozen-task-product-path",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-command-only-bypass-negative-control",
+    "executionEntrypoint": "product-composition-root",
+    "productConsumer": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+    "routeLocalHarnessUsed": true,
+    "helperOnlyComposition": false,
+    "proposalSource": "not-applicable",
+    "confirmationSource": "explicit-authority-contract",
+    "verificationSource": "task-relevant-command"
+  },
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "command-only bypass rejected by product task-relevance verdict",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "expectedProductPath": "Verification planner or report must reject command-only bypass as task success.",
+      "negativeControls": [
+        "node --version or equivalent command-only proof must not complete a file-edit task."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "selected workspace changed-file verification command dispatch",
+      "evidenceLevel": "selected-workspace-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Selected workspace authority -> exact hunk apply -> readback -> verification verdict.",
+      "negativeControls": [
+        "A proposal without confirmation is not success.",
+        "Apply without readback is not success."
+      ],
+      "verdict": "COMPLETE"
+    },
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "failed relevant verification command produces repair-required evidence",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "expectedProductPath": "Verification failure -> repair proposal -> confirmation -> existing exact hunk apply -> post-repair verification.",
+      "negativeControls": [
+        "Repair continuation is not repair success.",
+        "Repair proposal is not repair applied."
+      ],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route223-product-composition-runner",
+      "purpose": "Loads frozen tasks and invokes the product task-relevant verification route.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false,
+      "regressionProtected": "changed files -> relevant command plan -> explicit authority -> product runtime dispatch -> receipt -> verdict"
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "context": {
+        "origin": "frozen",
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "userPromptUsedAsDriver": true,
+        "productPath": "changed files -> task-relevant command plan -> explicit authority -> existing runtime dispatcher -> runtime receipt -> result/session verdict",
+        "productConsumer": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+        "allowedModuleArea": [
+          "packages/ts-shell/src/orchestration/patchResult/",
+          "packages/ts-shell/src/orchestration/patchApplication/",
+          "packages/ts-shell/src/orchestration/planning/"
+        ],
+        "changedFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+        ]
+      },
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "confirmation": {
+        "explicitApproval": true,
+        "confirmationSource": "explicit-authority-contract",
+        "approvedCommand": "npm run build -w packages/ts-shell",
+        "promptTextAloneGrantedAuthority": false
+      },
+      "apply": {
+        "status": "not-run",
+        "reportedSuccess": false,
+        "changedFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+        ],
+        "verificationStatus": "passed"
+      },
+      "verification": {
+        "source": "task-relevant-command",
+        "dispatchStatus": "dispatched",
+        "selectedCommand": "npm run build -w packages/ts-shell",
+        "relationToChangedFiles": "ts-shell package build covers changed files under packages/ts-shell.",
+        "relevanceStatus": "relevant",
+        "coveredFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+        ],
+        "exitCode": 0,
+        "outcome": "success",
+        "runtimeReceiptMarkers": 7,
+        "outputSummary": {
+          "stdout": "budgeted",
+          "stderr": "absent",
+          "rawOutputExcluded": true
+        },
+        "finalVerdict": "verified",
+        "fixtureReadbackOnly": false,
+        "markerOnly": false
+      },
+      "sessionResultEvidence": {
+        "finalStatus": "completed",
+        "terminalClassification": "success",
+        "taskSatisfaction": "satisfied",
+        "verificationStatus": "passed",
+        "evidenceMarkers": [
+          "task-relevant-verification:changed-files:packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts,packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts",
+          "task-relevant-verification:relevance:relevant",
+          "task-relevant-verification:selected-command:npm run build -w packages/ts-shell",
+          "task-relevant-verification:covered-files:packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts,packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts",
+          "task-relevant-verification:covered-package:packages/ts-shell",
+          "runtime-receipt-result:local-command:completed:command-succeeded: Command execution completed.",
+          "verification-command-result:outcome:success",
+          "task-relevant-verification:authority:explicitly-approved",
+          "task-relevant-verification:dispatch:dispatched",
+          "task-relevant-verification:verdict:verified",
+          "task-relevant-verification:provider-call:not-run",
+          "task-relevant-verification:mutation:not-run"
+        ],
+        "notProvenClaims": [
+          "provider execution",
+          "workspace mutation"
+        ]
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "provider execution",
+        "workspace mutation"
+      ]
+    },
+    {
+      "taskId": "frozen-command-only-bypass-negative-control",
+      "context": {
+        "origin": "frozen",
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "userPromptUsedAsDriver": true,
+        "productPath": "changed files -> task-relevant command plan -> explicit authority -> existing runtime dispatcher -> runtime receipt -> result/session verdict",
+        "productConsumer": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+        "allowedModuleArea": [
+          "packages/ts-shell/src/orchestration/",
+          "packages/ts-shell/src/core/query/"
+        ],
+        "changedFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+        ]
+      },
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "confirmation": {
+        "explicitApproval": true,
+        "confirmationSource": "explicit-authority-contract",
+        "approvedCommand": "node --version",
+        "promptTextAloneGrantedAuthority": false
+      },
+      "apply": {
+        "status": "not-run",
+        "reportedSuccess": false,
+        "changedFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+        ],
+        "verificationStatus": "passed"
+      },
+      "verification": {
+        "source": "task-relevant-command",
+        "dispatchStatus": "dispatched",
+        "selectedCommand": "node --version",
+        "relationToChangedFiles": "Selected command can run but does not inspect or cover the changed files.",
+        "relevanceStatus": "unrelated",
+        "coveredFiles": [],
+        "exitCode": 0,
+        "outcome": "success",
+        "runtimeReceiptMarkers": 7,
+        "outputSummary": {
+          "stdout": "budgeted",
+          "stderr": "absent",
+          "rawOutputExcluded": true
+        },
+        "finalVerdict": "insufficient-evidence",
+        "fixtureReadbackOnly": false,
+        "markerOnly": false
+      },
+      "sessionResultEvidence": {
+        "finalStatus": "stopped_error",
+        "terminalClassification": "stopped",
+        "taskSatisfaction": "insufficient-evidence",
+        "verificationStatus": "passed",
+        "evidenceMarkers": [
+          "task-relevant-verification:changed-files:packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts,packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts",
+          "task-relevant-verification:relevance:unrelated",
+          "task-relevant-verification:selected-command:node --version",
+          "task-relevant-verification:covered-files:none",
+          "runtime-receipt-result:local-command:completed:command-succeeded: Command execution completed.",
+          "verification-command-result:outcome:success",
+          "task-relevant-verification:authority:explicitly-approved",
+          "task-relevant-verification:dispatch:dispatched",
+          "task-relevant-verification:verdict:insufficient-evidence",
+          "task-relevant-verification:provider-call:not-run",
+          "task-relevant-verification:mutation:not-run"
+        ],
+        "notProvenClaims": [
+          "task verification by unrelated command",
+          "task success",
+          "provider execution",
+          "workspace mutation"
+        ]
+      },
+      "finalVerdict": "NOT_PROVEN",
+      "notProvenClaims": [
+        "task verification by unrelated command",
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ]
+    },
+    {
+      "taskId": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "scenarioId": "selected-not-run-negative-control",
+      "context": {
+        "origin": "frozen",
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "userPromptUsedAsDriver": true,
+        "productPath": "changed files -> task-relevant command plan -> explicit authority -> existing runtime dispatcher -> runtime receipt -> result/session verdict",
+        "productConsumer": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+        "allowedModuleArea": [
+          "packages/ts-shell/src/orchestration/patchResult/",
+          "packages/ts-shell/src/orchestration/patchApplication/",
+          "packages/ts-shell/src/orchestration/planning/"
+        ],
+        "changedFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+        ]
+      },
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "confirmation": {
+        "explicitApproval": false,
+        "confirmationSource": "none",
+        "approvedCommand": null,
+        "promptTextAloneGrantedAuthority": false
+      },
+      "apply": {
+        "status": "not-run",
+        "reportedSuccess": false,
+        "changedFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+        ],
+        "verificationStatus": "blocked"
+      },
+      "verification": {
+        "source": "task-relevant-command",
+        "dispatchStatus": "not-run",
+        "selectedCommand": "npm run build -w packages/ts-shell",
+        "relationToChangedFiles": "ts-shell package build covers changed files under packages/ts-shell.",
+        "relevanceStatus": "relevant",
+        "coveredFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+        ],
+        "outcome": "not-run",
+        "runtimeReceiptMarkers": 0,
+        "outputSummary": {
+          "stdout": "absent",
+          "stderr": "absent",
+          "rawOutputExcluded": true
+        },
+        "finalVerdict": "approval-required",
+        "fixtureReadbackOnly": false,
+        "markerOnly": false
+      },
+      "sessionResultEvidence": {
+        "finalStatus": "stopped_error",
+        "terminalClassification": "stopped",
+        "taskSatisfaction": "insufficient-evidence",
+        "verificationStatus": "blocked",
+        "evidenceMarkers": [
+          "task-relevant-verification:changed-files:packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts,packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts",
+          "task-relevant-verification:relevance:relevant",
+          "task-relevant-verification:selected-command:npm run build -w packages/ts-shell",
+          "task-relevant-verification:covered-files:packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts,packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts",
+          "task-relevant-verification:covered-package:packages/ts-shell",
+          "task-relevant-verification:dispatch:not-run",
+          "task-relevant-verification:authority:not-granted",
+          "task-relevant-verification:dispatch:not-run",
+          "task-relevant-verification:verdict:approval-required",
+          "task-relevant-verification:provider-call:not-run",
+          "task-relevant-verification:mutation:not-run"
+        ],
+        "notProvenClaims": [
+          "selected command dispatch",
+          "runtime receipt",
+          "task success",
+          "provider execution",
+          "workspace mutation"
+        ]
+      },
+      "finalVerdict": "NOT_PROVEN",
+      "notProvenClaims": [
+        "selected command dispatch",
+        "runtime receipt",
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ]
+    },
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "scenarioId": "failed-relevant-command-negative-control",
+      "context": {
+        "origin": "frozen",
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "userPromptUsedAsDriver": true,
+        "productPath": "changed files -> task-relevant command plan -> explicit authority -> existing runtime dispatcher -> runtime receipt -> result/session verdict",
+        "productConsumer": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+        "allowedModuleArea": [
+          "packages/ts-shell/src/orchestration/patchResult/",
+          "packages/ts-shell/src/session/",
+          "packages/ts-shell/src/core/query/"
+        ],
+        "changedFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+        ]
+      },
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "confirmation": {
+        "explicitApproval": true,
+        "confirmationSource": "explicit-authority-contract",
+        "approvedCommand": "npm run build -w packages/ts-shell",
+        "promptTextAloneGrantedAuthority": false
+      },
+      "repair": {
+        "continuationCreated": false,
+        "proposalCreated": false,
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false,
+        "repairRequiredEvidence": true
+      },
+      "apply": {
+        "status": "not-run",
+        "reportedSuccess": false,
+        "changedFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+        ],
+        "verificationStatus": "failed"
+      },
+      "verification": {
+        "source": "task-relevant-command",
+        "dispatchStatus": "dispatched",
+        "selectedCommand": "npm run build -w packages/ts-shell",
+        "relationToChangedFiles": "ts-shell package build covers changed files under packages/ts-shell.",
+        "relevanceStatus": "relevant",
+        "coveredFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+        ],
+        "exitCode": 1,
+        "outcome": "failed",
+        "runtimeReceiptMarkers": 7,
+        "outputSummary": {
+          "stdout": "absent",
+          "stderr": "budgeted",
+          "rawOutputExcluded": true
+        },
+        "finalVerdict": "verification-failed",
+        "fixtureReadbackOnly": false,
+        "markerOnly": false
+      },
+      "sessionResultEvidence": {
+        "finalStatus": "stopped_error",
+        "terminalClassification": "stopped",
+        "taskSatisfaction": "insufficient-evidence",
+        "verificationStatus": "failed",
+        "evidenceMarkers": [
+          "task-relevant-verification:changed-files:packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts,packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts",
+          "task-relevant-verification:relevance:relevant",
+          "task-relevant-verification:selected-command:npm run build -w packages/ts-shell",
+          "task-relevant-verification:covered-files:packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts,packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts",
+          "task-relevant-verification:covered-package:packages/ts-shell",
+          "runtime-receipt-result:local-command:failed:command-failed: Command execution did not complete successfully.",
+          "verification-command-result:outcome:failed",
+          "task-relevant-verification:authority:explicitly-approved",
+          "task-relevant-verification:dispatch:dispatched",
+          "task-relevant-verification:verdict:verification-failed",
+          "task-relevant-verification:provider-call:not-run",
+          "task-relevant-verification:mutation:not-run"
+        ],
+        "notProvenClaims": [
+          "task success",
+          "provider execution",
+          "workspace mutation"
+        ]
+      },
+      "finalVerdict": "REPAIR_REQUIRED",
+      "notProvenClaims": [
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ]
+    }
+  ],
+  "commandRelevanceEvidence": {
+    "changedFiles": [
+      "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+      "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+    ],
+    "candidateCommands": [
+      "npm run build -w packages/ts-shell"
+    ],
+    "selectedCommand": "npm run build -w packages/ts-shell",
+    "coveredFiles": [
+      "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+      "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.test.ts"
+    ],
+    "coveredPackageArea": "packages/ts-shell",
+    "relevanceReason": "ts-shell package build covers changed files under packages/ts-shell.",
+    "unrelatedCommandsInsufficientReason": "A zero exit code is not task verification unless the command covers the changed file or package area."
+  },
+  "dispatchReceiptEvidence": {
+    "relevantCommand": {
+      "command": "npm run build -w packages/ts-shell",
+      "dispatchStatus": "dispatched",
+      "outcome": "success",
+      "exitCode": 0,
+      "runtimeReceiptMarkers": 7,
+      "stdoutBudgetStatus": "budgeted",
+      "stderrBudgetStatus": "absent",
+      "rawOutputExcluded": true
+    },
+    "unrelatedPassingCommand": {
+      "command": "node --version",
+      "dispatchStatus": "dispatched",
+      "outcome": "success",
+      "exitCode": 0,
+      "runtimeReceiptMarkers": 7,
+      "stdoutBudgetStatus": "budgeted",
+      "stderrBudgetStatus": "absent",
+      "rawOutputExcluded": true
+    },
+    "failedRelevantCommand": {
+      "command": "npm run build -w packages/ts-shell",
+      "dispatchStatus": "dispatched",
+      "outcome": "failed",
+      "exitCode": 1,
+      "runtimeReceiptMarkers": 7,
+      "stdoutBudgetStatus": "absent",
+      "stderrBudgetStatus": "budgeted",
+      "rawOutputExcluded": true
+    },
+    "selectedNotRun": {
+      "dispatchStatus": "not-run",
+      "runtimeReceiptMarkers": 0
+    }
+  },
+  "negativeControlEvidence": {
+    "commandOnlyBypassRejected": true,
+    "selectedNotRunRejected": true,
+    "failedRelevantCommandRejected": true,
+    "routeLocalHarnessPrimaryRejected": true,
+    "fakeFocusedProductProofRejected": true,
+    "readbackOnlyVerificationRejected": true
+  },
+  "route221Gate": {
+    "command": "npm run verify:route221-anti-false-success-gate -- --report docs/implementation-context/route223-task-relevant-verification-report.json",
+    "latestKnownResult": "validated-by-required-gate-after-report-generation"
+  },
+  "defaultPath": {
+    "provider": "not-called",
+    "apply": "not-run",
+    "command": "not-run-without-explicit-authority-contract"
+  },
+  "referenceAdoption": [
+    {
+      "capabilityArea": "task-relevant verification dispatch",
+      "referenceRepo": "not-inspected",
+      "fileOrSubsystemInspected": "not-applicable",
+      "patternAdopted": "Existing target product runtime dispatcher and verification command result surface were sufficient.",
+      "localSeamChanged": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts and scripts/route223-task-relevant-verification-dispatch.ts",
+      "patternRejected": "not-applicable",
+      "reason": "No concrete dispatch, relevance, or report blocker required reference comparison.",
+      "evidenceProduced": "Route223 product composition report and Route221C report gate"
+    }
+  ],
+  "notProvenClaims": [
+    "live provider verification",
+    "production default command execution without explicit authority",
+    "workspace mutation",
+    "browser or MCP verification",
+    "arbitrary shell command verification",
+    "unrelated passing command as task success",
+    "selected but not dispatched command as task success"
+  ]
+}
