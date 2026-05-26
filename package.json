@@ -69,6 +69,7 @@
     "verify:route219-real-task-quality-benchmark": "tsx scripts/route219-real-task-quality-benchmark.ts",
     "verify:route221-anti-false-success-gate": "node scripts/verify-route221-anti-false-success-gate.mjs",
     "verify:route222-repair-to-success": "tsx scripts/route222-repair-to-success.ts",
+    "verify:route222b-product-repair-to-success": "tsx scripts/route222b-product-repair-to-success.ts",
     "demo:route207": "tsx scripts/route207-demo.ts",
     "verify:edit-capability-closeout": "node scripts/verify-edit-capability-closeout.mjs",
     "verify:browser-txn-gate": "node scripts/verify-browser-txn-gate.mjs",

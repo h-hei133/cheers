@@ -1,0 +1,195 @@
+{
+  "schemaVersion": 1,
+  "route": "route222b",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "independentPassRerun": {
+    "result": "PASS",
+    "source": "route222b product composition root assertions plus Route221C report gate validation"
+  },
+  "primaryEvidence": {
+    "source": "frozen-task-product-path",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+    "executionEntrypoint": "product-composition-root",
+    "productConsumer": "packages/ts-shell/src/orchestration/verificationRepairFlow.ts::runContentVerificationRepairFlow",
+    "routeLocalHarnessUsed": true,
+    "helperOnlyComposition": false,
+    "proposalSource": "deterministic-from-product-read-evidence",
+    "confirmationSource": "explicit-authority-contract",
+    "verificationSource": "product-verification-route"
+  },
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "repair-to-success",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "expectedProductPath": "Verification failure -> repair proposal -> confirmation -> existing exact hunk apply -> post-repair verification.",
+      "negativeControls": [
+        "Repair continuation is not repair success.",
+        "Repair proposal is not repair applied."
+      ],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route222b-product-composition-runner",
+      "purpose": "Loads the frozen task and invokes the product verification repair composition root.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false,
+      "regressionProtected": "frozen task -> product repair flow -> explicit confirmation -> existing hunk-set apply -> product post-repair verification"
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "context": {
+        "origin": "frozen",
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "userPromptUsedAsDriver": true,
+        "productPath": "product content verification -> verification repair context -> repair proposal review -> explicit selection confirmation -> proposal hunk-set route -> product post-repair verification",
+        "productConsumer": "packages/ts-shell/src/orchestration/verificationRepairFlow.ts::runContentVerificationRepairFlow",
+        "allowedModuleArea": [
+          "packages/ts-shell/src/orchestration/patchResult/",
+          "packages/ts-shell/src/session/",
+          "packages/ts-shell/src/core/query/"
+        ]
+      },
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "providerCallDuringApply": false,
+      "repairProposalDerivation": {
+        "proposalSource": "deterministic-from-product-read-evidence",
+        "basis": "runtime product read evidence and original verification mismatch summary",
+        "rawContentExcluded": true,
+        "hardcodedRouteProposal": false,
+        "fakeFocusedProposal": false
+      },
+      "originalVerificationFailure": {
+        "status": "failed",
+        "preserved": true,
+        "reason": "original product content verification failed for packages/ts-shell/src/orchestration/route222bRepairFixture.ts; mismatchedLineCount=2",
+        "mismatchedLineCount": 2,
+        "runtimeDerived": true,
+        "productVerificationRoute": true
+      },
+      "repairProposal": {
+        "proposalCreated": true,
+        "proposalId": "edit-repair-proposal-5ce49eeca560",
+        "reviewStatus": "ready-for-selection",
+        "noWrite": true,
+        "rawContentExcluded": true
+      },
+      "confirmation": {
+        "missingConfirmationState": "selection-required",
+        "explicitRepairConfirmation": true,
+        "confirmationState": "confirmed-exact-target-set",
+        "confirmationSource": "explicit-authority-contract",
+        "harnessBooleanConfirmation": false,
+        "promptTextAloneGrantedAuthority": false
+      },
+      "repair": {
+        "continuationCreated": true,
+        "proposalCreated": true,
+        "applied": true,
+        "postRepairVerification": "passed",
+        "reportedRepairSuccess": true
+      },
+      "apply": {
+        "status": "applied",
+        "backendStatus": "hunk-set-applied",
+        "writerPath": "existing proposal hunk-set exact apply route",
+        "existingBackend": true,
+        "noNewWriter": true,
+        "fuzzyApply": false,
+        "automaticRepair": false,
+        "changedFiles": [
+          "packages/ts-shell/src/orchestration/route222bRepairFixture.ts"
+        ],
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "postRepairVerification": "passed",
+        "source": "product-verification-route",
+        "relationToChangedFiles": "product content verification reran against the repaired target",
+        "reason": "post-repair product content verification passed for packages/ts-shell/src/orchestration/route222bRepairFixture.ts",
+        "fixtureReadbackOnly": false,
+        "markerOnly": false
+      },
+      "sessionResultEvidence": {
+        "finalStatus": "completed",
+        "terminalClassification": "success",
+        "evidenceMarkers": [
+          "proposal-hunk-set-route:multi-hunk-exact-apply",
+          "edit-repair-result:repair-verified-through-hunk-set",
+          "verification-repair-result:state:repair-verification-succeeded",
+          "verification-repair-result:apply-route:existing-hunk-set-or-exact-lane",
+          "verification-repair-result:post-apply-verification:passed"
+        ]
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "live provider repair proposal",
+        "automatic repair",
+        "fuzzy apply",
+        "broad multi-file add/delete/move repair"
+      ]
+    }
+  ],
+  "negativeControlEvidence": {
+    "repairContinuationOnlySuccessRejected": true,
+    "repairProposalOnlySuccessRejected": true,
+    "applyWithoutPostRepairVerificationRejected": true,
+    "harnessBooleanConfirmationRejected": true,
+    "promptTextAloneAuthorityRejected": true,
+    "fixtureReadbackOnlyVerificationRejected": true,
+    "commandOnlyBypassRejectedByRoute221Fixture": true
+  },
+  "route221Gate": {
+    "command": "npm run verify:route221-anti-false-success-gate -- --report docs/implementation-context/route222b-product-repair-to-success-report.json",
+    "latestKnownResult": "validated-by-required-gate-after-report-generation"
+  },
+  "defaultPath": {
+    "provider": "not-called",
+    "apply": "not-run-without-explicit-authority-contract",
+    "command": "not-run"
+  },
+  "referenceAdoption": [
+    {
+      "capabilityArea": "repair-to-success",
+      "referenceRepo": "not-inspected",
+      "fileOrSubsystemInspected": "not-applicable",
+      "patternAdopted": "Existing target product modules were sufficient for this product composition proof.",
+      "localSeamChanged": "packages/ts-shell/src/orchestration/verificationRepairFlow.ts and scripts/route222b-product-repair-to-success.ts",
+      "patternRejected": "not-applicable",
+      "reason": "No concrete repair, verification, or report blocker required reference comparison.",
+      "evidenceProduced": "Route222B product composition report and Route221C report gate"
+    }
+  ],
+  "notProvenClaims": [
+    "live provider repair proposal",
+    "production default apply",
+    "automatic repair without confirmation",
+    "fuzzy repair apply",
+    "new writer behavior",
+    "broad edit engine repair",
+    "provider execution during apply"
+  ]
+}
