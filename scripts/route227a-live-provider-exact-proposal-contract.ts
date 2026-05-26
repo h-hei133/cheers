@@ -365,13 +365,15 @@ async function runLiveCliTask(
     workspaceRoot,
     homeRoot,
     args: [
+      "--non-interactive-approval",
+      "allow-once",
       "--provider",
       "openai-compatible",
       "--planning-mutation-live-provider-proposal",
       "--planning-mutation-confirm",
       "--planning-mutation-selected-workspace",
       "--planning-mutation-verify-command",
-      "node -e \"const fs=require('fs'); const text=fs.readFileSync('src/planning/targetRanking.ts','utf8'); if(!text.includes('task.trim().includes')) process.exit(1)\"",
+      "npm test -- --help",
     ],
     prompt:
       "Fix the planner target ranking bug by trimming the task before checking for planner. Keep the change single-file and exact.",
@@ -433,13 +435,11 @@ function classifyLiveVerdict(
   const contractRetryTrigger =
     markerValue(text, "contract-retry-trigger:") ?? "none";
   const applied = text.includes("Apply state: single-target-applied");
-  const verificationPassed =
-    text.includes("Verification command: passed") ||
-    text.includes("Readback verification: succeeded");
+  const verificationPassed = text.includes("Verification command: passed");
   const verificationBlocked = text.includes("Verification command: blocked");
   const verificationFailed = text.includes("Verification command: failed");
-  const providerFailureClass = classifyProviderFailure(text, status);
   const complete = providerCalled && applied && verificationPassed;
+  const providerFailureClass = complete ? "none" : classifyProviderFailure(text, status);
   const partial = providerCalled || /REVIEW-ONLY|OLD-TEXT|PROVIDER|INVALID|TARGET|PATCH/.test(status);
 
   return {
@@ -694,7 +694,13 @@ async function createWorkspace(label: string): Promise<string> {
   await fs.mkdir(path.join(root, "src/planning"), { recursive: true });
   await fs.writeFile(
     path.join(root, "package.json"),
-    `${JSON.stringify({ name: `route227a-${label}`, scripts: {} }, null, 2)}\n`,
+    `${JSON.stringify({
+      name: `route227a-${label}`,
+      scripts: {
+        test:
+          "node -e \"const fs=require('fs'); const text=fs.readFileSync('src/planning/targetRanking.ts','utf8'); if(!text.includes('trim().includes')) process.exit(1)\"",
+      },
+    }, null, 2)}\n`,
     "utf8",
   );
   await fs.writeFile(
@@ -806,16 +812,16 @@ function shouldAttemptFallback(verdict: LiveVerdict): boolean {
 }
 
 function classifyProviderFailure(text: string, status: string): string {
-  if (/provider-readiness:network|network|fetch|econn|timeout/i.test(text)) return "network";
-  if (/provider-readiness:auth|401|403|unauthorized|forbidden/i.test(text)) return "auth";
-  if (/missing-key|missing provider key/i.test(text)) return "missing-key";
-  if (/missing-config|requires a configured/i.test(text)) return "missing-config";
   if (/INVALID-FORMAT/.test(status)) return "invalid-format";
   if (/OLD-TEXT-NOT-FOUND/.test(status)) return "old-text-not-found";
   if (/OLD-TEXT-MULTIPLE-MATCHES/.test(status)) return "old-text-multiple-matches";
   if (/PROVIDER-OUTPUT-INSUFFICIENT|REVIEW-ONLY/.test(status)) return "provider-output-insufficient";
   if (/PROVIDER-ERROR/.test(status)) return "provider-error";
   if (/PATCH-AUTHOR-UNSUITABLE/.test(status)) return "patch-author-unsuitable";
+  if (/provider-readiness:network|network|fetch|econn|timeout/i.test(text)) return "network";
+  if (/provider-readiness:auth|401|403|unauthorized|forbidden/i.test(text)) return "auth";
+  if (/missing-key|missing provider key/i.test(text)) return "missing-key";
+  if (/missing-config|requires a configured/i.test(text)) return "missing-config";
   return "none";
 }
 

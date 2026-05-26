@@ -88,9 +88,24 @@
         "trigger": "none",
         "maxAttempts": 1
       },
-      "proposalValidation": "review-only",
-      "anchorQuality": "review-only",
+      "proposalValidation": "live-provider-network-blocked",
+      "anchorQuality": "missing-exact-mapping",
       "finalVerdict": "PARTIAL"
+    },
+    {
+      "id": "route227a-live-exact-single-file",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "providerProfile": "fallback",
+      "providerCalled": false,
+      "contractRetry": {
+        "attempted": false,
+        "trigger": "none",
+        "maxAttempts": 1
+      },
+      "proposalValidation": "not-run",
+      "anchorQuality": "not-run",
+      "finalVerdict": "BLOCKED"
     }
   ],
   "providerAttempts": [
@@ -101,8 +116,21 @@
       "configSource": "explicit-env+provider-env+primary",
       "attempted": true,
       "providerCalled": true,
-      "providerFailureClass": "auth",
-      "fallbackEligible": false,
+      "providerFailureClass": "network",
+      "fallbackEligible": true,
+      "contractRetryAttempted": false,
+      "exitCode": 0,
+      "rawOutputRedactionStatus": "raw-provider-output-excluded"
+    },
+    {
+      "taskId": "route227a-live-exact-single-file",
+      "providerProfile": "fallback",
+      "providerSafeLabel": "siliconflow-fallback",
+      "configSource": "explicit-env+provider-env+fallback",
+      "attempted": true,
+      "providerCalled": false,
+      "providerFailureClass": "network",
+      "fallbackEligible": true,
       "contractRetryAttempted": false,
       "exitCode": 0,
       "rawOutputRedactionStatus": "raw-provider-output-excluded"
@@ -188,14 +216,14 @@
       "providerMode": "real-provider-mode",
       "providerProfile": "primary",
       "providerCalled": true,
-      "providerFailureClass": "auth",
+      "providerFailureClass": "network",
       "contractRetry": {
         "attempted": false,
         "trigger": "none",
         "maxAttempts": 1
       },
-      "proposalValidation": "review-only",
-      "anchorQuality": "review-only",
+      "proposalValidation": "live-provider-network-blocked",
+      "anchorQuality": "missing-exact-mapping",
       "confirmation": {
         "source": "product-approval",
         "explicitAuthority": true
@@ -212,6 +240,48 @@
       "providerCallDuringApply": false,
       "rawOutputRedactionStatus": "raw-provider-output-excluded",
       "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "verified live exact proposal success",
+        "apply success",
+        "provider call during apply",
+        "raw provider output"
+      ]
+    },
+    {
+      "taskId": "route227a-live-exact-single-file",
+      "origin": "route227a-live-provider-exact-proposal-contract",
+      "promptPathUsed": "CLI print/session product path",
+      "productConsumer": "packages/ts-shell/src/entrypoints/cli.tsx -> packages/ts-shell/src/core/shell/sessionRuntime.ts -> packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts -> packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "executionEntrypoint": "real-cli-product-path",
+      "evidenceLevel": "blocked",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "real-provider-mode",
+      "providerProfile": "fallback",
+      "providerCalled": false,
+      "providerFailureClass": "network",
+      "contractRetry": {
+        "attempted": false,
+        "trigger": "none",
+        "maxAttempts": 1
+      },
+      "proposalValidation": "not-run",
+      "anchorQuality": "not-run",
+      "confirmation": {
+        "source": "product-approval",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "providerCallDuringApply": false,
+      "rawOutputRedactionStatus": "raw-provider-output-excluded",
+      "finalVerdict": "BLOCKED",
       "notProvenClaims": [
         "verified live exact proposal success",
         "apply success",

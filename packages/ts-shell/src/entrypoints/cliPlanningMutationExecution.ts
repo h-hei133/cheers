@@ -11,6 +11,7 @@ import type { CliOptions } from "./cliArgs.js";
 export function buildCliPlanningMutationExecutionOptions(input: {
   readonly options: CliOptions;
   readonly workspaceRoot: string;
+  readonly prompt?: string;
   readonly providerCredentialResolution?: ProviderCredentialResolution;
   readonly providerModeEnv?: string;
   readonly realProviderSmokeOptIn?: boolean;
@@ -80,6 +81,7 @@ export function buildCliPlanningMutationExecutionOptions(input: {
 }
 
 function buildLiveProviderProposalOptions(input: {
+  readonly prompt?: string;
   readonly providerCredentialResolution?: ProviderCredentialResolution;
   readonly providerModeEnv?: string;
   readonly realProviderSmokeOptIn?: boolean;
@@ -147,6 +149,9 @@ function buildLiveProviderProposalOptions(input: {
     taskEvidence: {
       mode: "single-file-exact-patch",
       targetContentMaxChars: 6000,
+      ...(input.prompt?.trim()
+        ? { taskIntentSummary: input.prompt.trim().slice(0, 600) }
+        : {}),
     },
   };
 }

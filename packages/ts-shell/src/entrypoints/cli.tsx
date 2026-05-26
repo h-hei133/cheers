@@ -322,6 +322,7 @@ async function main(): Promise<void> {
         buildCliPlanningMutationExecutionOptions({
           options,
           workspaceRoot: runtimeContext.cwd,
+          prompt,
           providerCredentialResolution: resolvedCredential,
           providerModeEnv: process.env.PRIVATE_AGENTS_PROVIDER_MODE,
           realProviderSmokeOptIn:

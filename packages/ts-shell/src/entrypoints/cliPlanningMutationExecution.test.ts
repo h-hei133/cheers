@@ -101,6 +101,7 @@ describe("buildCliPlanningMutationExecutionOptions", () => {
     const workspaceRoot = createWorkspace();
     const result = buildCliPlanningMutationExecutionOptions({
       workspaceRoot,
+      prompt: "Trim planner input before target matching.",
       providerModeEnv: "real",
       realProviderSmokeOptIn: true,
       providerCredentialResolution: {
@@ -135,6 +136,10 @@ describe("buildCliPlanningMutationExecutionOptions", () => {
       evidenceSource: "live-provider",
     });
     expect(result?.liveProviderProposal?.attempts?.[0]?.provider).toBeDefined();
+    expect(result?.liveProviderProposal?.taskEvidence).toMatchObject({
+      mode: "single-file-exact-patch",
+      taskIntentSummary: "Trim planner input before target matching.",
+    });
   });
 
   it("rejects proposal files outside the selected workspace", () => {

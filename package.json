@@ -83,6 +83,7 @@
     "verify:route227g-tool-ecosystem-and-external-capabilities": "tsx scripts/route227g-tool-ecosystem-and-external-capabilities.ts",
     "verify:route227h-cli-session-product-experience": "tsx scripts/route227h-cli-session-product-experience.ts",
     "verify:route227i-final-capstone-release-candidate": "tsx scripts/route227i-final-capstone-release-candidate.ts",
+    "verify:route228-live-provider-exact-proposal-success-cut-through": "tsx scripts/route228-live-provider-exact-proposal-success-cut-through.ts",
     "demo:route207": "tsx scripts/route207-demo.ts",
     "verify:edit-capability-closeout": "node scripts/verify-edit-capability-closeout.mjs",
     "verify:browser-txn-gate": "node scripts/verify-browser-txn-gate.mjs",

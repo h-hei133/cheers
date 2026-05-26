@@ -600,6 +600,80 @@ describe("buildPlanningRuntimeProductProofInputs", () => {
     expect(JSON.stringify(proposalPreparation.evidence)).not.toContain(TARGET_RANKING_OLD_TEXT);
   }, 15000);
 
+  it("uses one contract repair retry for review-only live task output before accepting exact JSON", async () => {
+    const workspaceRoot = createWorkspace({
+      "src/planning/targetRanking.ts": sourceContent(),
+      "src/planning/targetRanking.test.ts":
+        "expect(rankPlannerTargets('planner target ranking')).toBe('targetRanking.ts');\n",
+    });
+    const planningResult = await readyPlanningResult(workspaceRoot);
+    const seenPrompts: string[] = [];
+
+    const proposalPreparation = await preparePlanningRuntimeProductProposal({
+      workspaceRoot,
+      handoff: planningResult.mutationHandoff,
+      planningResult,
+      liveProvider: {
+        optIn: true,
+        source: "runtime-option",
+        taskEvidence: {
+          mode: "single-file-exact-patch",
+          taskIntentSummary:
+            "Change only the planner predicate to trim task before checking planner.",
+        },
+        attempts: [
+          {
+            role: "primary",
+            providerSafeLabel: "focused-fake-primary",
+            providerConfigSource: "test-fixture",
+            providerAvailability: {
+              kind: "available",
+              providerKindLabel: "focused-fake-primary",
+            },
+            readinessStatus: "ready",
+            evidenceSource: "fake-provider",
+            provider: {
+              proposeEdit: (context) => {
+                seenPrompts.push(context.providerPrompt);
+                if (seenPrompts.length === 1) {
+                  return {
+                    operationKind: "generated-replacement",
+                    targets: [{ path: "src/planning/targetRanking.ts", summary: "missing exact fields" }],
+                    diagnostics: [
+                      "provider-exact-patch-diagnostic:parse-status:review-only",
+                      "provider-exact-patch-diagnostic:wrapper:json",
+                      "provider-exact-patch-diagnostic:shape:review-only-json",
+                      "provider-exact-patch-diagnostic:target-matched:true",
+                      "provider-exact-patch-diagnostic:old-text-present:false",
+                      "provider-exact-patch-diagnostic:new-text-present:false",
+                      "provider-exact-patch-diagnostic:review-only-missing-fact-present:true",
+                      "provider-exact-patch-diagnostic:raw-content-excluded",
+                    ],
+                  };
+                }
+                return exactProposal();
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(seenPrompts).toHaveLength(2);
+    expect(seenPrompts[1]).toContain("Contract repair retry 1 of 1.");
+    expect(proposalPreparation.status).toBe("prepared-exact");
+    expect(proposalPreparation.evidence).toEqual(
+      expect.arrayContaining([
+        "planning-runtime-product-proposal:live-provider-primary:contract-retry:started",
+        "planning-runtime-product-proposal:live-provider-primary:contract-retry-trigger:PROVIDER-OUTPUT-INSUFFICIENT",
+        "planning-runtime-product-proposal:live-provider-primary:contract-retry:finished",
+        "planning-runtime-product-proposal:live-provider-exact-classification:exact-ready",
+        "planning-runtime-product-proposal:live-provider-status:provider-called",
+      ]),
+    );
+    expect(JSON.stringify(proposalPreparation.evidence)).not.toContain(TARGET_RANKING_OLD_TEXT);
+  }, 15000);
+
   it("includes bounded target evidence for Route217 real single-file live tasks without calibration markers", async () => {
     const workspaceRoot = createWorkspace({
       "src/planning/targetRanking.ts": sourceContent(),

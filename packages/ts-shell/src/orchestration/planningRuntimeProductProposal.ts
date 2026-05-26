@@ -621,6 +621,9 @@ function classifyDryRunFailure(
   if (dryRun.status === "dry-run-provider-not-configured") return "CONFIG-FAILED";
   if (dryRun.status === "dry-run-provider-unsupported") return "CONFIG-FAILED";
   const exactClass = classifyDryRunExactPatch(dryRun);
+  if (exactClass === "review-only" && isReviewOnlyOutputInsufficient(dryRun)) {
+    return "PROVIDER-OUTPUT-INSUFFICIENT";
+  }
   switch (exactClass) {
     case "invalid-format":
       return "INVALID-FORMAT";
@@ -910,6 +913,20 @@ function classifyDryRunExactPatch(
   if (dryRun.status === "dry-run-exact-ready-no-write") return "exact-ready";
   if (dryRun.status === "dry-run-review-required") return "review-only";
   return "provider-error";
+}
+
+function isReviewOnlyOutputInsufficient(
+  dryRun: RealProviderProposalDryRunResult,
+): boolean {
+  if (dryRun.status !== "dry-run-review-required") return false;
+  const diagnostics = dryRun.rawProposal?.diagnostics ?? [];
+  return (
+    diagnostics.includes("provider-exact-patch-diagnostic:parse-status:review-only") ||
+    diagnostics.includes("provider-exact-patch-diagnostic:old-text-present:false") ||
+    diagnostics.includes("provider-exact-patch-diagnostic:new-text-present:false") ||
+    dryRun.outputValidation?.status === "partial-anchor" ||
+    dryRun.outputValidation?.status === "unanchored-generated"
+  );
 }
 
 function isDryRunSuccess(
