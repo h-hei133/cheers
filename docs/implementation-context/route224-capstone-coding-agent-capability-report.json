@@ -1,0 +1,872 @@
+{
+  "schemaVersion": 1,
+  "route": "route224",
+  "routeType": "capstone-capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "independentPassRerun": {
+    "result": "PASS",
+    "source": "route224 runner assertions plus Route221 anti-false-success report gate"
+  },
+  "upperBoundCapabilityIncreased": "Connected planning, deterministic proposal preparation, selected workspace exact apply, task-relevant command dispatch, repair-to-success, and final verdict evidence in one capstone pack.",
+  "lowerBoundSafetyPreserved": "Frozen no-provider/no-apply, selected authority, command-only bypass, unsupported broad task, and verification-failure repair controls remained explicitly classified.",
+  "primaryEvidence": {
+    "source": "frozen-task-product-path",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+    "executionEntrypoint": "product-composition-root",
+    "productConsumer": "packages/ts-shell/src/orchestration/verificationRepairFlow.ts::runContentVerificationRepairFlow",
+    "routeLocalHarnessUsed": true,
+    "helperOnlyComposition": false,
+    "proposalSource": "deterministic-from-product-read-evidence",
+    "confirmationSource": "explicit-authority-contract",
+    "verificationSource": "product-verification-route"
+  },
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "planning no-provider no-apply",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "prompt text does not grant mutation success"
+      ]
+    },
+    {
+      "id": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "selected workspace apply",
+      "evidenceLevel": "selected-workspace-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "prompt text does not grant mutation success"
+      ]
+    },
+    {
+      "id": "frozen-command-only-bypass-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "command-only bypass rejected",
+      "evidenceLevel": "not-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "BLOCKED",
+      "negativeControls": [
+        "zero exit code alone is insufficient"
+      ]
+    },
+    {
+      "id": "frozen-unsupported-broad-task-negative-control",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "unsupported broad task blocked",
+      "evidenceLevel": "blocked",
+      "primaryCompleteEvidence": false,
+      "verdict": "BLOCKED",
+      "negativeControls": [
+        "unsupported broad task must block"
+      ]
+    },
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "repair-to-success",
+      "evidenceLevel": "product-proven",
+      "primaryCompleteEvidence": true,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "repair proposal is not repair success",
+        "post-repair verification required"
+      ]
+    },
+    {
+      "id": "frozen-upper-bound-challenge-multi-file-case",
+      "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+      "origin": "frozen",
+      "requiredClaim": "multi-file apply",
+      "evidenceLevel": "benchmark-proven",
+      "primaryCompleteEvidence": false,
+      "verdict": "COMPLETE",
+      "negativeControls": [
+        "prompt text does not grant mutation success"
+      ]
+    }
+  ],
+  "capstoneTasksAttempted": [
+    {
+      "id": "route224-vague-bugfix-planning",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/planningRuntime.ts::runPlanningRuntime",
+      "evidenceLevel": "product-proven",
+      "finalVerdict": "COMPLETE",
+      "routeLocalPrimaryEvidence": false
+    },
+    {
+      "id": "route224-focused-output-proposal",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/planningRuntimeProductProposal.ts::preparePlanningRuntimeProductProposal",
+      "evidenceLevel": "product-proven",
+      "finalVerdict": "COMPLETE",
+      "routeLocalPrimaryEvidence": false
+    },
+    {
+      "id": "route224-selected-workspace-apply",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/targetSetEditRoute.ts::runTargetSetEditRoute",
+      "evidenceLevel": "selected-workspace-proven",
+      "finalVerdict": "COMPLETE",
+      "routeLocalPrimaryEvidence": false
+    },
+    {
+      "id": "route224-task-relevant-verification-task",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "evidenceLevel": "product-proven",
+      "finalVerdict": "COMPLETE",
+      "routeLocalPrimaryEvidence": false
+    },
+    {
+      "id": "route224-verification-failure-task",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "evidenceLevel": "partial",
+      "finalVerdict": "PARTIAL",
+      "routeLocalPrimaryEvidence": false
+    },
+    {
+      "id": "route224-repair-to-success-task",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/verificationRepairFlow.ts::runContentVerificationRepairFlow",
+      "evidenceLevel": "product-proven",
+      "finalVerdict": "COMPLETE",
+      "routeLocalPrimaryEvidence": false
+    },
+    {
+      "id": "route224-small-multi-file-task",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/targetSetEditRoute.ts::runTargetSetEditRoute",
+      "evidenceLevel": "benchmark-proven",
+      "finalVerdict": "COMPLETE",
+      "routeLocalPrimaryEvidence": false
+    },
+    {
+      "id": "route224-unsupported-broad-task",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/targetSetEditRoute.ts::runTargetSetEditRoute",
+      "evidenceLevel": "blocked",
+      "finalVerdict": "BLOCKED",
+      "routeLocalPrimaryEvidence": false
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route224-capstone-runner",
+      "purpose": "Loads frozen tasks, invokes product composition roots, asserts capstone requirements, and writes the machine-checkable report.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-lower-bound-stable-explicit-no-provider-no-apply",
+      "origin": "frozen",
+      "productConsumer": "packages/ts-shell/src/orchestration/planningRuntime.ts::runPlanningRuntime",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "context": {
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "status": "ready-for-handoff",
+        "evidenceMarkers": [
+          "planning-runtime:id:planning_runtime_6e72cf370113",
+          "planning-runtime:status:ready-for-handoff",
+          "planning-runtime:edit-targets:1",
+          "planning-runtime:mutation-authority:not-granted",
+          "planning-runtime:provider-call:not-run",
+          "planning-runtime:command-dispatch:not-run"
+        ]
+      },
+      "proposal": {
+        "source": "not-applicable",
+        "status": "not-run"
+      },
+      "confirmation": {
+        "source": "none",
+        "explicitAuthority": false
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "mutation success",
+        "provider execution",
+        "command execution"
+      ]
+    },
+    {
+      "taskId": "frozen-lower-bound-stable-selected-workspace-authority-case",
+      "origin": "frozen",
+      "productConsumer": "packages/ts-shell/src/orchestration/targetSetEditRoute.ts::runTargetSetEditRoute",
+      "evidenceLevel": "selected-workspace-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "context": {
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "expectedProductPath": "Selected workspace authority -> exact hunk apply -> readback -> verification verdict."
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "exact-target-set"
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "applied",
+        "backendStatus": "written",
+        "changedFiles": [
+          "src/selected.ts"
+        ],
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "runtime-readback",
+        "status": "passed",
+        "fixtureReadbackOnly": false,
+        "markerOnly": false
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "production default write",
+        "provider-authored patch"
+      ]
+    },
+    {
+      "taskId": "frozen-command-only-bypass-negative-control",
+      "origin": "frozen",
+      "productConsumer": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "evidenceLevel": "not-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "context": {
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "expectedProductPath": "Verification planner or report must reject command-only bypass as task success."
+      },
+      "proposal": {
+        "source": "not-applicable",
+        "status": "not-run"
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "product-verification-route",
+        "status": "insufficient-evidence",
+        "selectedCommand": "node --version",
+        "relevanceStatus": "unrelated"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "BLOCKED",
+      "notProvenClaims": [
+        "task verification by unrelated command",
+        "task success",
+        "provider execution",
+        "workspace mutation"
+      ]
+    },
+    {
+      "taskId": "frozen-unsupported-broad-task-negative-control",
+      "origin": "frozen",
+      "productConsumer": "packages/ts-shell/src/orchestration/targetSetEditRoute.ts::runTargetSetEditRoute",
+      "evidenceLevel": "blocked",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "context": {
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "expectedProductPath": "Route gate must stop or split the task instead of reporting broad capability COMPLETE."
+      },
+      "proposal": {
+        "source": "not-applicable",
+        "status": "blocked-unsupported-broad"
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "blocked"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "BLOCKED",
+      "notProvenClaims": [
+        "broad writer refactor",
+        "arbitrary add/delete/move",
+        "fuzzy apply"
+      ]
+    },
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "origin": "frozen",
+      "productConsumer": "packages/ts-shell/src/orchestration/verificationRepairFlow.ts::runContentVerificationRepairFlow",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "context": {
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "originalFailurePreserved": true
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "ready-for-selection",
+        "hardcodedRouteProposal": false
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "explicitAuthority": true,
+        "missingConfirmationState": "selection-required",
+        "confirmationState": "confirmed-exact-target-set",
+        "harnessBooleanConfirmation": false
+      },
+      "apply": {
+        "status": "applied",
+        "backendStatus": "hunk-set-applied",
+        "changedFiles": [
+          "src/repair.ts"
+        ],
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "product-verification-route",
+        "status": "passed",
+        "fixtureReadbackOnly": false,
+        "markerOnly": false
+      },
+      "repair": {
+        "continuationCreated": true,
+        "proposalCreated": true,
+        "applied": true,
+        "postRepairVerification": "passed",
+        "reportedRepairSuccess": true
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "automatic repair",
+        "live provider repair proposal",
+        "fuzzy repair apply"
+      ]
+    },
+    {
+      "taskId": "frozen-upper-bound-challenge-multi-file-case",
+      "origin": "frozen",
+      "productConsumer": "packages/ts-shell/src/orchestration/targetSetEditRoute.ts::runTargetSetEditRoute",
+      "evidenceLevel": "benchmark-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "context": {
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "expectedProductPath": "Target-set route with exact hunks, per-file readback, and aggregate verdict following the weakest file result.",
+        "perFileResults": [
+          {
+            "path": "src/multi-a.ts",
+            "status": "written",
+            "recoveryReadiness": "rollback-ready"
+          },
+          {
+            "path": "src/multi-b.ts",
+            "status": "written",
+            "recoveryReadiness": "rollback-ready"
+          }
+        ]
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "exact-target-set"
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "applied",
+        "backendStatus": "written",
+        "changedFiles": [
+          "src/multi-a.ts",
+          "src/multi-b.ts"
+        ],
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "runtime-readback",
+        "status": "passed",
+        "fixtureReadbackOnly": false,
+        "markerOnly": false
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "production default write",
+        "provider-authored patch"
+      ]
+    },
+    {
+      "taskId": "route224-vague-bugfix-planning",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/planningRuntime.ts::runPlanningRuntime",
+      "evidenceLevel": "product-proven",
+      "context": {
+        "planningStatus": "ready-for-handoff",
+        "editTargets": [
+          {
+            "path": "src/repair.ts",
+            "readiness": "ready-for-review",
+            "handoffRoute": "existing-proof-carrying-mutation-runtime"
+          }
+        ]
+      },
+      "proposal": {
+        "source": "planning-handoff-summary",
+        "status": "handoff-ready"
+      },
+      "confirmation": {
+        "source": "none",
+        "explicitAuthority": false
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "mutation success",
+        "provider-generated proposal"
+      ]
+    },
+    {
+      "taskId": "route224-focused-output-proposal",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/planningRuntimeProductProposal.ts::preparePlanningRuntimeProductProposal",
+      "evidenceLevel": "product-proven",
+      "context": {
+        "proposalPreparationId": "planning-product-proposal-d0f7b63ca2b8"
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "prepared-exact",
+        "providerCalled": false,
+        "rawContentExcluded": true
+      },
+      "confirmation": {
+        "source": "none",
+        "explicitAuthority": false
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "not-run"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "applied proposal",
+        "live provider proposal"
+      ]
+    },
+    {
+      "taskId": "route224-selected-workspace-apply",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/targetSetEditRoute.ts::runTargetSetEditRoute",
+      "evidenceLevel": "selected-workspace-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "context": {
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "expectedProductPath": "selected workspace authority -> exact apply -> readback verification"
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "exact-target-set"
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "applied",
+        "backendStatus": "written",
+        "changedFiles": [
+          "src/selected.ts"
+        ],
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "runtime-readback",
+        "status": "passed",
+        "fixtureReadbackOnly": false,
+        "markerOnly": false
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "production default write",
+        "provider-authored patch"
+      ]
+    },
+    {
+      "taskId": "route224-task-relevant-verification-task",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "evidenceLevel": "product-proven",
+      "context": {
+        "changedFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+        ]
+      },
+      "proposal": {
+        "source": "not-applicable",
+        "status": "not-run"
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "passed",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "task-relevant-command",
+        "status": "verified",
+        "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "dispatchStatus": "dispatched",
+        "relevanceStatus": "relevant"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "provider execution",
+        "workspace mutation"
+      ]
+    },
+    {
+      "taskId": "route224-verification-failure-task",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts::runTaskRelevantVerificationRoute",
+      "evidenceLevel": "partial",
+      "context": {
+        "changedFiles": [
+          "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"
+        ]
+      },
+      "proposal": {
+        "source": "not-applicable",
+        "status": "not-run"
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "passed",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "task-relevant-command",
+        "status": "verification-failed",
+        "selectedCommand": "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts -t route224-intentional-missing-test",
+        "dispatchStatus": "dispatched",
+        "relevanceStatus": "relevant"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "PARTIAL",
+      "notProvenClaims": [
+        "task success until repair is applied and reverified"
+      ]
+    },
+    {
+      "taskId": "route224-repair-to-success-task",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/verificationRepairFlow.ts::runContentVerificationRepairFlow",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "context": {
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "originalFailurePreserved": true
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "ready-for-selection",
+        "hardcodedRouteProposal": false
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "explicitAuthority": true,
+        "missingConfirmationState": "selection-required",
+        "confirmationState": "confirmed-exact-target-set",
+        "harnessBooleanConfirmation": false
+      },
+      "apply": {
+        "status": "applied",
+        "backendStatus": "hunk-set-applied",
+        "changedFiles": [
+          "src/repair.ts"
+        ],
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "product-verification-route",
+        "status": "passed",
+        "fixtureReadbackOnly": false,
+        "markerOnly": false
+      },
+      "repair": {
+        "continuationCreated": true,
+        "proposalCreated": true,
+        "applied": true,
+        "postRepairVerification": "passed",
+        "reportedRepairSuccess": true
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "automatic repair",
+        "live provider repair proposal",
+        "fuzzy repair apply"
+      ]
+    },
+    {
+      "taskId": "route224-small-multi-file-task",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/targetSetEditRoute.ts::runTargetSetEditRoute",
+      "evidenceLevel": "benchmark-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "context": {
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "expectedProductPath": "target-set exact apply with per-file verification",
+        "perFileResults": [
+          {
+            "path": "src/multi-a.ts",
+            "status": "written",
+            "recoveryReadiness": "rollback-ready"
+          },
+          {
+            "path": "src/multi-b.ts",
+            "status": "written",
+            "recoveryReadiness": "rollback-ready"
+          }
+        ]
+      },
+      "proposal": {
+        "source": "deterministic-from-product-read-evidence",
+        "status": "exact-target-set"
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "applied",
+        "backendStatus": "written",
+        "changedFiles": [
+          "src/multi-a.ts",
+          "src/multi-b.ts"
+        ],
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "verification": {
+        "source": "runtime-readback",
+        "status": "passed",
+        "fixtureReadbackOnly": false,
+        "markerOnly": false
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "COMPLETE",
+      "notProvenClaims": [
+        "production default write",
+        "provider-authored patch"
+      ]
+    },
+    {
+      "taskId": "route224-unsupported-broad-task",
+      "origin": "capstone-local",
+      "productConsumer": "packages/ts-shell/src/orchestration/targetSetEditRoute.ts::runTargetSetEditRoute",
+      "evidenceLevel": "blocked",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called-live-provider",
+      "providerCalled": false,
+      "context": {
+        "loadedFromFile": "docs/implementation-context/frozen-capability-tasks-route221.json",
+        "expectedProductPath": "route gate blocks unsupported broad task"
+      },
+      "proposal": {
+        "source": "not-applicable",
+        "status": "blocked-unsupported-broad"
+      },
+      "confirmation": {
+        "source": "explicit-authority-contract",
+        "explicitAuthority": true
+      },
+      "apply": {
+        "status": "not-run",
+        "verificationStatus": "not-run",
+        "reportedSuccess": false
+      },
+      "verification": {
+        "source": "not-run",
+        "status": "blocked"
+      },
+      "repair": {
+        "applied": false,
+        "postRepairVerification": "not-run",
+        "reportedRepairSuccess": false
+      },
+      "finalVerdict": "BLOCKED",
+      "notProvenClaims": [
+        "broad writer refactor",
+        "arbitrary add/delete/move",
+        "fuzzy apply"
+      ]
+    }
+  ],
+  "notProvenClaims": [
+    "live provider proposal generation",
+    "production workspace default write",
+    "fuzzy apply",
+    "arbitrary add/delete/move",
+    "automatic repair without explicit confirmation",
+    "browser or MCP runtime expansion"
+  ],
+  "negativeControlEvidence": {
+    "commandOnlyBypassRejected": true,
+    "unsupportedBroadTaskBlocked": true,
+    "repairProposalWithoutApplyRejected": true,
+    "routeLocalHarnessPrimaryRejected": true,
+    "selectedNotRunVerificationRejected": true
+  },
+  "referenceAdoption": [
+    {
+      "capabilityArea": "capstone loop",
+      "referenceRepo": "not-inspected",
+      "fileOrSubsystemInspected": "not-applicable",
+      "patternAdopted": "Existing product composition roots were sufficient; no reference scan was needed.",
+      "localSeamChanged": "scripts/route224-capstone-coding-agent-capability-sprint.ts and Route221 report gate capstone classification",
+      "patternRejected": "not-applicable",
+      "reason": "No blocker required reference comparison.",
+      "evidenceProduced": "Route224 capstone report and Route221 report gate"
+    }
+  ],
+  "validationIntent": [
+    "npm run verify:route224-capstone-coding-agent-capability-sprint",
+    "npm run verify:route221-anti-false-success-gate -- --report docs/implementation-context/route224-capstone-coding-agent-capability-report.json",
+    "npm run verify:route221-anti-false-success-gate",
+    "npm run verify:result-contract",
+    "npm run build -w packages/ts-shell"
+  ]
+}

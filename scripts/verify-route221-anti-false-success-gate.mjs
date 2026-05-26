@@ -473,7 +473,7 @@ function validatePrimaryEvidence(report, options) {
   const routeType = report.routeType ?? 'capability'
   const primaryEvidence = report.primaryEvidence
 
-  if (finalStatus === 'COMPLETE' && routeType === 'capability' && (primaryEvidence === undefined || primaryEvidence === null)) {
+  if (finalStatus === 'COMPLETE' && isCapabilityLikeRouteType(routeType) && (primaryEvidence === undefined || primaryEvidence === null)) {
     errors.push(`${label}: COMPLETE capability report must include primaryEvidence`)
     return errors
   }
@@ -565,6 +565,10 @@ function validatePrimaryEvidence(report, options) {
   return errors
 }
 
+function isCapabilityLikeRouteType(routeType) {
+  return routeType === 'capability' || routeType === 'capstone-capability'
+}
+
 function validateRouteReport(report, options) {
   const errors = []
   const frozenTaskIds = options.frozenTaskIds
@@ -609,7 +613,7 @@ function validateRouteReport(report, options) {
     }
   }
 
-  if (routeType === 'capability') {
+  if (isCapabilityLikeRouteType(routeType)) {
     if (report.requiredNegativeControls === undefined || report.requiredNegativeControls === null) {
       errors.push(`${label}: capability report must include requiredNegativeControls`)
     } else {
