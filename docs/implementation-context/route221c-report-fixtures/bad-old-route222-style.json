@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "route": "route222-old-style",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "independentPassRerun": null,
+  "primaryEvidence": {
+    "source": "frozen-task-product-path",
+    "frozenTaskLoadedFromFile": false,
+    "frozenTaskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+    "frozenTaskPromptHash": "sha256:old-route222-style",
+    "executionEntrypoint": "helper-composition",
+    "productConsumer": "scripts/route222-repair-to-success.ts",
+    "routeLocalHarnessUsed": true,
+    "helperOnlyComposition": true,
+    "proposalSource": "route-local-hardcoded",
+    "confirmationSource": "harness-boolean",
+    "verificationSource": "fixture-readback-only"
+  },
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "requiredClaim": "repair-to-success",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "negativeControls": [
+        "repair continuation rejected as success",
+        "repair proposal rejected as repair applied",
+        "apply without post-repair verification rejected as success"
+      ],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [
+    {
+      "id": "route222-repair-to-success-product-harness",
+      "purpose": "Deterministically exercises a focused repair harness.",
+      "secondary": true,
+      "evidenceLevel": "route-local-benchmark",
+      "primaryCompleteEvidence": false
+    }
+  ],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-proven",
+      "providerMode": "not-called",
+      "repair": {
+        "continuationCreated": true,
+        "proposalCreated": true,
+        "applied": true,
+        "postRepairVerification": "passed",
+        "reportedRepairSuccess": true
+      },
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "finalVerdict": "COMPLETE"
+    }
+  ]
+}

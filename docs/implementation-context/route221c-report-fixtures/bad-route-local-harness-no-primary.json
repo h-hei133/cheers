@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "route": "route221c-bad-route-local-harness-no-primary",
+  "routeType": "capability",
+  "finalStatus": "COMPLETE",
+  "independentAuditResult": "PASS",
+  "independentPassRerun": null,
+  "primaryEvidence": {
+    "source": "frozen-task-product-path",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+    "frozenTaskPromptHash": "sha256:fixture-bad-route-local-harness",
+    "executionEntrypoint": "product-composition-root",
+    "productConsumer": null,
+    "routeLocalHarnessUsed": true,
+    "helperOnlyComposition": false,
+    "proposalSource": "deterministic-from-failure-evidence",
+    "confirmationSource": "explicit-authority-contract",
+    "verificationSource": "product-verification-route"
+  },
+  "frozenTasksAttempted": [
+    {
+      "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "requiredClaim": "repair-to-success",
+      "evidenceLevel": "frozen-task-proven",
+      "primaryCompleteEvidence": true,
+      "negativeControls": ["repair continuation rejected as success"],
+      "verdict": "COMPLETE"
+    }
+  ],
+  "routeLocalTasksAdded": [],
+  "requiredNegativeControls": {
+    "routeLocalBenchmarkOnlyCompleteRejected": true,
+    "fakeFocusedLabeledLiveRejected": true,
+    "repairContinuationLabeledRepairSuccessRejected": true,
+    "applyWithoutVerificationRejected": true,
+    "commandOnlyBypassRejected": true,
+    "auditPartialOverrideRejected": true
+  },
+  "taskVerdicts": [
+    {
+      "taskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+      "evidenceLevel": "product-proven",
+      "providerEvidenceClass": "not-called",
+      "providerMode": "none",
+      "repair": {
+        "continuationCreated": true,
+        "proposalCreated": true,
+        "applied": true,
+        "postRepairVerification": "passed",
+        "reportedRepairSuccess": true
+      },
+      "apply": {
+        "status": "applied",
+        "verificationStatus": "passed",
+        "reportedSuccess": true
+      },
+      "finalVerdict": "COMPLETE"
+    }
+  ]
+}

@@ -55,6 +55,17 @@ relevant, set it to `not-applicable` with a reason.
 - A route-local benchmark may protect regressions but cannot be primary `COMPLETE` evidence.
 - Audit `PARTIAL` cannot be overridden unless an independent rerun returns `PASS`.
 
+## Primary Evidence Provenance
+
+Future route reports use `primaryEvidence` to make source claims
+machine-checkable. A frozen task id reference alone is not proof that the
+frozen task was loaded from the frozen task pack and consumed by a product path.
+When a report claims product or frozen `COMPLETE`, it must distinguish product
+runtime/composition/root evidence from helper-only or route-local-script
+evidence, repair proposals derived from failure evidence from hardcoded route
+text, product authority from harness booleans, and task-relevant verification
+from fixture readback or markers.
+
 ## Status Derivation
 
 Use this order when deriving route status:

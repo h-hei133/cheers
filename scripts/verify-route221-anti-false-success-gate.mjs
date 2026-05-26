@@ -27,6 +27,20 @@ const badReportFixtures = [
   `${reportFixtureDir}/bad-fake-focused-live.json`,
 ]
 
+const provenanceReportFixtureDir = 'docs/implementation-context/route221c-report-fixtures'
+const goodProvenanceReportFixture = `${provenanceReportFixtureDir}/good-provenance-report.json`
+const badProvenanceReportFixtures = [
+  `${provenanceReportFixtureDir}/bad-frozen-task-not-loaded.json`,
+  `${provenanceReportFixtureDir}/bad-route-local-benchmark-primary.json`,
+  `${provenanceReportFixtureDir}/bad-route-local-script-product-proven.json`,
+  `${provenanceReportFixtureDir}/bad-helper-only-product-proven.json`,
+  `${provenanceReportFixtureDir}/bad-hardcoded-repair-proposal.json`,
+  `${provenanceReportFixtureDir}/bad-harness-boolean-confirmation.json`,
+  `${provenanceReportFixtureDir}/bad-fixture-readback-verification.json`,
+  `${provenanceReportFixtureDir}/bad-route-local-harness-no-primary.json`,
+  `${provenanceReportFixtureDir}/bad-old-route222-style.json`,
+]
+
 const knownEvidenceLevels = [
   'product-proven',
   'live-provider-proven',
@@ -91,6 +105,66 @@ const requiredNegativeControlKeys = [
   'applyWithoutVerificationRejected',
   'commandOnlyBypassRejected',
   'auditPartialOverrideRejected',
+]
+
+const requiredPrimaryEvidenceFields = [
+  'source',
+  'frozenTaskLoadedFromFile',
+  'frozenTaskId',
+  'executionEntrypoint',
+  'productConsumer',
+  'routeLocalHarnessUsed',
+  'helperOnlyComposition',
+  'proposalSource',
+  'confirmationSource',
+  'verificationSource',
+]
+
+const knownPrimaryEvidenceSources = [
+  'frozen-task-product-path',
+  'product-proven',
+  'selected-workspace-product-path',
+  'live-provider-product-path',
+  'route-local-benchmark',
+  'focused-only',
+  'not-proven',
+]
+
+const productExecutionEntrypoints = [
+  'product-runtime',
+  'product-composition-root',
+  'route-gate',
+]
+
+const knownExecutionEntrypoints = [
+  ...productExecutionEntrypoints,
+  'helper-composition',
+  'route-local-script-only',
+]
+
+const knownProposalSources = [
+  'live-provider',
+  'deterministic-from-product-read-evidence',
+  'deterministic-from-failure-evidence',
+  'route-local-hardcoded',
+  'fake-focused',
+  'not-applicable',
+]
+
+const knownConfirmationSources = [
+  'product-approval',
+  'explicit-authority-contract',
+  'harness-boolean',
+  'none',
+]
+
+const knownVerificationSources = [
+  'task-relevant-command',
+  'product-verification-route',
+  'runtime-readback',
+  'fixture-readback-only',
+  'marker-only',
+  'not-run',
 ]
 
 function relPath(filePath) {
@@ -299,9 +373,15 @@ function validateTemplates(checks) {
     'Evidence Classification',
     'Required Negative Controls',
     'Machine-Checkable Report Artifact',
+    'Evidence Provenance',
+    'primaryEvidence',
     'npm run verify:route221-anti-false-success-gate -- --report',
     'If audit returned `PARTIAL`, rerun audit result',
     'Route-local evidence cannot be primary COMPLETE evidence.',
+    'Frozen task id reference is not proof that the frozen task definition was loaded.',
+    'Helper-only composition cannot be product-proven.',
+    'A hardcoded route-local repair proposal cannot prove frozen repair-to-success.',
+    'A harness boolean cannot prove product confirmation.',
   ]
   const missingReportPhrases = reportPhrases.filter((phrase) => !report.includes(phrase))
   if (missingReportPhrases.length > 0) {
@@ -350,6 +430,139 @@ function collectEvidenceLevelsFromReport(report) {
     if (typeof item.evidenceLevel === 'string') levels.push(['taskVerdicts', item.taskId, item.evidenceLevel])
   }
   return levels
+}
+
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function includesOneOf(value, needles) {
+  const text = String(value ?? '')
+  return needles.some((needle) => text.includes(needle))
+}
+
+function reportClaimsFrozenPrimaryComplete(report) {
+  return (report.frozenTasksAttempted ?? []).some((task) => task.primaryCompleteEvidence === true || task.evidenceLevel === 'frozen-task-proven')
+}
+
+function reportClaimsProductProven(report, primaryEvidence) {
+  if (primaryEvidence?.source === 'frozen-task-product-path' || primaryEvidence?.source === 'product-proven') {
+    return true
+  }
+  return collectEvidenceLevelsFromReport(report).some(([, , level]) => level === 'product-proven')
+}
+
+function reportClaimsFrozenRepairToSuccessComplete(report) {
+  const frozenRepairTaskComplete = (report.frozenTasksAttempted ?? []).some((task) => {
+    return task.primaryCompleteEvidence === true &&
+      task.verdict === 'COMPLETE' &&
+      includesOneOf(task.requiredClaim, ['repair-to-success'])
+  })
+  const repairVerdictComplete = (report.taskVerdicts ?? []).some((verdict) => {
+    return verdict.finalVerdict === 'COMPLETE' &&
+      (verdict.repair?.reportedRepairSuccess === true || includesOneOf(verdict.taskId, ['verification-failure-repair-case']))
+  })
+  return frozenRepairTaskComplete || repairVerdictComplete
+}
+
+function validatePrimaryEvidence(report, options) {
+  const errors = []
+  const label = options.label
+  const frozenTaskIds = options.frozenTaskIds
+  const finalStatus = report.finalStatus
+  const routeType = report.routeType ?? 'capability'
+  const primaryEvidence = report.primaryEvidence
+
+  if (finalStatus === 'COMPLETE' && routeType === 'capability' && (primaryEvidence === undefined || primaryEvidence === null)) {
+    errors.push(`${label}: COMPLETE capability report must include primaryEvidence`)
+    return errors
+  }
+  if (primaryEvidence === undefined || primaryEvidence === null) return errors
+  if (typeof primaryEvidence !== 'object' || Array.isArray(primaryEvidence)) {
+    errors.push(`${label}: primaryEvidence must be an object`)
+    return errors
+  }
+
+  for (const field of requiredPrimaryEvidenceFields) {
+    if (!(field in primaryEvidence)) {
+      errors.push(`${label}: primaryEvidence.${field} is required`)
+    }
+  }
+
+  const valueChecks = [
+    ['source', knownPrimaryEvidenceSources],
+    ['executionEntrypoint', knownExecutionEntrypoints],
+    ['proposalSource', knownProposalSources],
+    ['confirmationSource', knownConfirmationSources],
+    ['verificationSource', knownVerificationSources],
+  ]
+  for (const [field, values] of valueChecks) {
+    if (field in primaryEvidence && !values.includes(primaryEvidence[field])) {
+      errors.push(`${label}: primaryEvidence.${field} has unknown value ${primaryEvidence[field]}`)
+    }
+  }
+
+  for (const field of ['frozenTaskLoadedFromFile', 'routeLocalHarnessUsed', 'helperOnlyComposition']) {
+    if (field in primaryEvidence && typeof primaryEvidence[field] !== 'boolean') {
+      errors.push(`${label}: primaryEvidence.${field} must be boolean`)
+    }
+  }
+
+  if (primaryEvidence.frozenTaskId !== null && primaryEvidence.frozenTaskId !== undefined && !frozenTaskIds.has(primaryEvidence.frozenTaskId)) {
+    errors.push(`${label}: primaryEvidence.frozenTaskId must be a known frozen task id`)
+  }
+
+  if (finalStatus !== 'COMPLETE') return errors
+
+  const frozenPrimaryComplete = reportClaimsFrozenPrimaryComplete(report)
+  const productProven = reportClaimsProductProven(report, primaryEvidence)
+  const frozenRepairToSuccessComplete = reportClaimsFrozenRepairToSuccessComplete(report)
+
+  if (primaryEvidence.source === 'route-local-benchmark') {
+    errors.push(`${label}: primaryEvidence.source=route-local-benchmark cannot support COMPLETE`)
+  }
+
+  if (frozenPrimaryComplete) {
+    if (primaryEvidence.frozenTaskLoadedFromFile !== true) {
+      errors.push(`${label}: frozen task primary COMPLETE evidence must set primaryEvidence.frozenTaskLoadedFromFile=true`)
+    }
+    if (!frozenTaskIds.has(primaryEvidence.frozenTaskId)) {
+      errors.push(`${label}: frozen task primary COMPLETE evidence must identify a known primaryEvidence.frozenTaskId`)
+    }
+  }
+
+  if (productProven) {
+    if (primaryEvidence.executionEntrypoint === 'route-local-script-only') {
+      errors.push(`${label}: product-proven COMPLETE cannot use primaryEvidence.executionEntrypoint=route-local-script-only`)
+    }
+    if (primaryEvidence.helperOnlyComposition === true || primaryEvidence.executionEntrypoint === 'helper-composition') {
+      errors.push(`${label}: product-proven COMPLETE cannot use helper-only composition`)
+    }
+  }
+
+  if (frozenRepairToSuccessComplete) {
+    if (primaryEvidence.proposalSource === 'route-local-hardcoded' || primaryEvidence.proposalSource === 'fake-focused') {
+      errors.push(`${label}: frozen repair-to-success COMPLETE cannot use primaryEvidence.proposalSource=${primaryEvidence.proposalSource}`)
+    }
+    if (primaryEvidence.confirmationSource === 'harness-boolean') {
+      errors.push(`${label}: frozen repair-to-success COMPLETE cannot use primaryEvidence.confirmationSource=harness-boolean`)
+    }
+    if (['fixture-readback-only', 'marker-only', 'not-run'].includes(primaryEvidence.verificationSource)) {
+      errors.push(`${label}: frozen repair-to-success COMPLETE cannot use primaryEvidence.verificationSource=${primaryEvidence.verificationSource}`)
+    }
+  }
+
+  if (primaryEvidence.routeLocalHarnessUsed === true) {
+    const hasSeparateFrozenEvidence = primaryEvidence.frozenTaskLoadedFromFile === true && frozenTaskIds.has(primaryEvidence.frozenTaskId)
+    const hasSeparateProductEvidence = productExecutionEntrypoints.includes(primaryEvidence.executionEntrypoint) &&
+      primaryEvidence.helperOnlyComposition === false &&
+      isNonEmptyString(primaryEvidence.productConsumer)
+    if (!hasSeparateFrozenEvidence || !hasSeparateProductEvidence) {
+      errors.push(`${label}: route-local harness evidence requires separate primary frozen/product evidence for COMPLETE`)
+    }
+  }
+
+  return errors
 }
 
 function validateRouteReport(report, options) {
@@ -448,6 +661,8 @@ function validateRouteReport(report, options) {
     }
   }
 
+  errors.push(...validatePrimaryEvidence(report, { label, frozenTaskIds }))
+
   return errors
 }
 
@@ -499,6 +714,34 @@ function validateReportFixtures(checks, options) {
       fail(checks, `route221b-bad-report-rejected:${path.basename(fixture)}`, 'bad report unexpectedly passed')
     } else {
       pass(checks, `route221b-bad-report-rejected:${path.basename(fixture)}`, errors[0])
+    }
+  }
+
+  assertFileExists(checks, 'route221c-good-provenance-report-fixture-exists', goodProvenanceReportFixture)
+  for (const fixture of badProvenanceReportFixtures) {
+    assertFileExists(checks, `route221c-bad-provenance-report-fixture-exists:${path.basename(fixture)}`, fixture)
+  }
+  if (checks.some((check) => !check.ok)) return
+
+  validateReportFile(checks, goodProvenanceReportFixture, options)
+
+  for (const fixture of badProvenanceReportFixtures) {
+    let report
+    try {
+      report = loadJsonFile(fixture)
+    } catch (error) {
+      fail(checks, `route221c-bad-provenance-report-json:${fixture}`, error.message)
+      continue
+    }
+    const errors = validateRouteReport(report, {
+      frozenTaskIds: options.frozenTaskIds,
+      evidenceLevels: options.evidenceLevels,
+      label: fixture,
+    })
+    if (errors.length === 0) {
+      fail(checks, `route221c-bad-provenance-report-rejected:${path.basename(fixture)}`, 'bad report unexpectedly passed')
+    } else {
+      pass(checks, `route221c-bad-provenance-report-rejected:${path.basename(fixture)}`, errors[0])
     }
   }
 }

@@ -45,6 +45,32 @@ not from route-local benchmark convenience.
 - Focused/fake evidence:
 - Not-proven claims:
 
+## Evidence Provenance
+
+Frozen task id reference is not proof that the frozen task definition was loaded.
+Route reports must record where their primary evidence came from. Helper-only composition cannot be product-proven.
+A hardcoded route-local repair proposal cannot prove frozen repair-to-success.
+A harness boolean cannot prove product confirmation.
+
+Required primary evidence fields:
+
+| Field | Allowed values or shape | Meaning |
+|---|---|---|
+| `source` | `frozen-task-product-path`, `product-proven`, `selected-workspace-product-path`, `live-provider-product-path`, `route-local-benchmark`, `focused-only`, `not-proven` | The source class for the primary claim. `route-local-benchmark` and `focused-only` cannot support `COMPLETE`. |
+| `frozenTaskLoadedFromFile` | boolean | Whether the primary task was loaded from `docs/implementation-context/frozen-capability-tasks-route221.json`. |
+| `frozenTaskId` | known frozen task id or `null` | The frozen task used as the primary driver. A matching id string alone is insufficient. |
+| `executionEntrypoint` | `product-runtime`, `product-composition-root`, `route-gate`, `helper-composition`, `route-local-script-only` | The entrypoint that consumed the task. Product-proven evidence cannot be `route-local-script-only` or helper-only. |
+| `productConsumer` | module/function string or `null` | Product module, composition root, result surface, or route gate that consumed the task. Required when route-local harness evidence is also present. |
+| `routeLocalHarnessUsed` | boolean | Whether a same-route harness contributed evidence. If true, `COMPLETE` still needs separate frozen/product evidence. |
+| `helperOnlyComposition` | boolean | Whether evidence was assembled only from lower-level helpers. Must be false for product-proven `COMPLETE`. |
+| `proposalSource` | `live-provider`, `deterministic-from-product-read-evidence`, `deterministic-from-failure-evidence`, `route-local-hardcoded`, `fake-focused`, `not-applicable` | Repair proposal origin. `route-local-hardcoded` and `fake-focused` cannot prove frozen repair-to-success. |
+| `confirmationSource` | `product-approval`, `explicit-authority-contract`, `harness-boolean`, `none` | Authority source for apply/repair. `harness-boolean` cannot prove product confirmation. |
+| `verificationSource` | `task-relevant-command`, `product-verification-route`, `runtime-readback`, `fixture-readback-only`, `marker-only`, `not-run` | Post-action verification source. `fixture-readback-only`, `marker-only`, and `not-run` cannot prove frozen repair-to-success. |
+
+Per-task verdicts may include a narrower `primaryEvidence` override when a
+route has more than one independent evidence source. The route-level
+`primaryEvidence` still governs the final route status.
+
 ## Required Negative Controls
 
 - Route-local benchmark-only COMPLETE rejected:
@@ -71,6 +97,19 @@ Required shape:
   "finalStatus": "PARTIAL",
   "independentAuditResult": "PARTIAL",
   "independentPassRerun": null,
+  "primaryEvidence": {
+    "source": "not-proven",
+    "frozenTaskLoadedFromFile": true,
+    "frozenTaskId": "frozen-upper-bound-challenge-verification-failure-repair-case",
+    "frozenTaskPromptHash": "sha256-or-stable-fingerprint",
+    "executionEntrypoint": "helper-composition",
+    "productConsumer": null,
+    "routeLocalHarnessUsed": true,
+    "helperOnlyComposition": true,
+    "proposalSource": "route-local-hardcoded",
+    "confirmationSource": "harness-boolean",
+    "verificationSource": "fixture-readback-only"
+  },
   "frozenTasksAttempted": [
     {
       "id": "frozen-upper-bound-challenge-verification-failure-repair-case",
@@ -125,6 +164,18 @@ Machine-checkable report rules:
 
 - Every frozen task id must exist in
   `docs/implementation-context/frozen-capability-tasks-route221.json`.
+- `COMPLETE` capability reports must include `primaryEvidence`.
+- If a frozen task is primary `COMPLETE` evidence, `primaryEvidence` must show
+  `frozenTaskLoadedFromFile: true` and a known `frozenTaskId`.
+- Product-proven `COMPLETE` evidence cannot use
+  `executionEntrypoint: "route-local-script-only"` or helper-only composition.
+- Frozen repair-to-success `COMPLETE` cannot use a hardcoded/fake proposal,
+  harness-boolean confirmation, fixture-readback-only verification,
+  marker-only verification, or no verification.
+- If `routeLocalHarnessUsed` is true, `COMPLETE` still requires separate
+  primary frozen/product evidence.
+- `primaryEvidence.source: "route-local-benchmark"` cannot support
+  `COMPLETE`.
 - Every evidence level must be defined by
   `docs/implementation-context/capability-evidence-schema-route221.md`.
 - Capability reports must include `requiredNegativeControls`.
