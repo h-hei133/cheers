@@ -15,6 +15,10 @@ describe("buildPlanningMutationProposalBridge", () => {
     expect(bridge.anchorState).toBe("missing-exact-mapping");
     expect(bridge.confirmationState).toBe("review-required");
     expect(bridge.providerCall).toBe("not-run");
+    expect(bridge.providerProposalBoundary.provider.providerCalled).toBe(false);
+    expect(bridge.providerProposalBoundary.proposal.exactness).toBe("review-only");
+    expect(bridge.providerProposalBoundary.proposal.reviewState).toBe("review-only");
+    expect(bridge.providerProposalBoundary.proposal.applyState).toBe("not-run");
     expect(bridge.applyState).toBe("not-run");
     expect(bridge.verificationState).toBe("not-run");
     expect(bridge.evidenceSource).toBe("planning-handoff-summary");
@@ -44,6 +48,8 @@ describe("buildPlanningMutationProposalBridge", () => {
         "planning-proposal-bridge:handoff-readiness:ready-for-review",
         "planning-proposal-bridge:authority-required:true",
         "planning-proposal-bridge:provider-call:not-run",
+        "planning-proposal-bridge:provider-boundary:not-run",
+        "planning-proposal-bridge:proposal-boundary:review-only",
         "planning-proposal-bridge:apply:not-run",
         "planning-proposal-bridge:verification:not-run",
         "planning-proposal-bridge:mutation-authority:not-granted",
@@ -78,6 +84,10 @@ describe("buildPlanningMutationProposalBridge", () => {
     expect(bridge.anchoredProposal?.handoffReadiness).toBe("exact-single-target");
     expect(bridge.anchoredReview?.reviewStatus).toBe("ready-for-selection");
     expect(bridge.providerCall).toBe("not-run");
+    expect(bridge.providerProposalBoundary.proposal.exactness).toBe("exact-ready");
+    expect(bridge.providerProposalBoundary.proposal.mutationAuthority).toBe("not-granted");
+    expect(bridge.providerProposalBoundary.proposal.applyState).toBe("not-run");
+    expect(bridge.providerProposalBoundary.proposal.verificationState).toBe("not-run");
     expect(bridge.applyState).toBe("not-run");
     expect(bridge.verificationState).toBe("not-run");
     expect(bridge.evidenceSource).toBe("focused-deterministic-proposal");

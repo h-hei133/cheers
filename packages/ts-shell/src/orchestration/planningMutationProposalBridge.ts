@@ -14,6 +14,10 @@ import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 import { validateProviderOutput } from "./providerOutputValidator.js";
 import { hashContent } from "./patchRecovery/recoveryAuthorityStore.js";
 import type { PlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
+import {
+  projectProviderProposalBoundaryFromBridge,
+  type ProductProviderProposalBoundary,
+} from "../product/providerProposal/providerProposalFacade.js";
 
 export type PlanningMutationProposalBridgeState =
   | "planning-only"
@@ -77,6 +81,7 @@ export interface PlanningMutationProposalBridge {
   readonly applyState: "not-run";
   readonly verificationState: "not-run";
   readonly providerCall: "not-run";
+  readonly providerProposalBoundary: ProductProviderProposalBoundary;
   readonly evidenceSource:
     | "planning-handoff-summary"
     | "focused-deterministic-proposal"
@@ -316,6 +321,14 @@ function baseBridge(input: {
     "planning-proposal-bridge:raw-content-excluded",
     ...input.extraEvidence,
   ]);
+  const providerProposalBoundary = projectProviderProposalBoundaryFromBridge({
+    source: input.evidenceSource,
+    proposalState: input.proposalState,
+    anchorState: input.anchorState,
+    confirmationState: input.confirmationState,
+    targetFiles: targetFiles(input),
+    reason: input.reason,
+  });
 
   return {
     bridgeId,
@@ -333,6 +346,7 @@ function baseBridge(input: {
     applyState: "not-run",
     verificationState: "not-run",
     providerCall: "not-run",
+    providerProposalBoundary,
     evidenceSource: input.evidenceSource,
     orchestration: {
       proposalSource: input.evidenceSource,
@@ -349,7 +363,11 @@ function baseBridge(input: {
     reason: input.reason,
     nextAction: input.nextAction,
     mutationAuthority: "not-granted",
-    evidence,
+    evidence: unique([
+      ...evidence,
+      `planning-proposal-bridge:provider-boundary:${providerProposalBoundary.provider.readiness}`,
+      `planning-proposal-bridge:proposal-boundary:${providerProposalBoundary.proposal.exactness}`,
+    ]),
   };
 }
 

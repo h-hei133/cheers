@@ -10,6 +10,10 @@ import type { ProviderExactPatchClassification } from "./providerExactPatchContr
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 import type { PlanningRuntimeProductLiveProviderProposal } from "./planningRuntimeProductExecution.js";
 import {
+  projectProviderProposalBoundaryFromPreparation,
+  type ProductProviderProposalBoundary,
+} from "../product/providerProposal/providerProposalFacade.js";
+import {
   runRealProviderProposalDryRun,
   type RealProviderProposalDryRunResult,
 } from "./realProviderProposalDryRun.js";
@@ -48,6 +52,7 @@ export interface PlanningRuntimeProductProposalPreparation {
     | "fake-provider"
     | "default-safe"
     | "not-proven";
+  readonly providerProposalBoundary: ProductProviderProposalBoundary;
   readonly reason: string;
   readonly nextAction: string;
   readonly evidence: readonly string[];
@@ -971,7 +976,7 @@ function readCurrentContentByTargetLabel(input: {
 
 function proposalPreparation(input: Omit<
   PlanningRuntimeProductProposalPreparation,
-  "proposalPreparationId"
+  "proposalPreparationId" | "providerProposalBoundary"
 >): PlanningRuntimeProductProposalPreparation {
   const proposalPreparationId = `planning-product-proposal-${hashContent(JSON.stringify({
     status: input.status,
@@ -979,9 +984,20 @@ function proposalPreparation(input: Omit<
     targetPaths: input.rawProposal?.targets?.map((target) => target.path) ?? [],
     reason: input.reason,
   })).slice(0, 12)}`;
+  const providerProposalBoundary = projectProviderProposalBoundaryFromPreparation({
+    source: input.source,
+    status: input.status,
+    providerCalled: input.providerCalled,
+    liveOptIn: input.liveOptIn,
+    liveEvidenceSource: input.liveEvidenceSource,
+    targetFiles: input.rawProposal?.targets?.map((target) => target.path) ?? [],
+    evidence: input.evidence,
+    reason: input.reason,
+  });
   return {
     proposalPreparationId,
     ...input,
+    providerProposalBoundary,
     evidence: unique([
       `planning-runtime-product-proposal:id:${proposalPreparationId}`,
       `planning-runtime-product-proposal:status:${input.status}`,
@@ -989,6 +1005,8 @@ function proposalPreparation(input: Omit<
       `planning-runtime-product-proposal:provider-called:${input.providerCalled}`,
       `planning-runtime-product-proposal:live-opt-in:${input.liveOptIn}`,
       `planning-runtime-product-proposal:live-evidence-source:${input.liveEvidenceSource}`,
+      `planning-runtime-product-proposal:provider-boundary:${providerProposalBoundary.provider.readiness}`,
+      `planning-runtime-product-proposal:proposal-boundary:${providerProposalBoundary.proposal.exactness}`,
       ...input.evidence,
     ]),
   };
