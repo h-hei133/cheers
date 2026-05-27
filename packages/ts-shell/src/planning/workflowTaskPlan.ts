@@ -11,6 +11,7 @@ import {
   resolveReadWindowDirectiveForWorkflow,
   type ReadWindowDirective,
 } from "../context/readWindowContinuation.js";
+import { parseContinuationTransformEvidence } from "../evidence/continuationTransformEvidence.js";
 import {
   derivePromptPathTarget,
   hasExplicitExecutionIntent,
@@ -3516,7 +3517,7 @@ function inferReplaceDirectiveFromContinuity(input: {
     if (!entry) {
       continue;
     }
-    const parsed = parseTransformEvidence(entry);
+    const parsed = parseContinuationTransformEvidence(entry);
     if (!parsed) {
       continue;
     }
@@ -3531,41 +3532,6 @@ function inferReplaceDirectiveFromContinuity(input: {
   return undefined;
 }
 
-function parseTransformEvidence(
-  evidence: string,
-): { path: string; from: string; to: string } | undefined {
-  const directMatch = evidence.match(/^transform:(.+):(.+)=>(.+)$/i);
-  if (directMatch?.[1] && directMatch?.[2] && directMatch?.[3]) {
-    return {
-      path: directMatch[1].trim(),
-      from: directMatch[2].trim(),
-      to: directMatch[3].trim(),
-    };
-  }
-  const replanMatch = evidence.match(/^replan-transform:(.+):(.+)=>(.+)$/i);
-  if (replanMatch?.[1] && replanMatch?.[2] && replanMatch?.[3]) {
-    return {
-      path: replanMatch[1].trim(),
-      from: replanMatch[2].trim(),
-      to: replanMatch[3].trim(),
-    };
-  }
-  const rebindMatch = evidence.match(
-    /^rebind-transform:(.+):.+=>.+->(.+)=>(.+)$/i,
-  );
-  if (rebindMatch?.[1] && rebindMatch?.[2] && rebindMatch?.[3]) {
-    return {
-      path: rebindMatch[1].trim(),
-      from: rebindMatch[2].trim(),
-      to: rebindMatch[3].trim(),
-    };
-  }
-  // `rebind-blocker:*:stale-transform-already-applied` is retained for
-  // explainability/history, but must not be re-consumed as executable
-  // transform evidence on subsequent generic temporal follow-ups.
-  return undefined;
-}
-
 function collectContinuationTransforms(input: {
   readonly continuity: ContinuityStateLike;
   readonly preferredTarget?: string;
@@ -3576,7 +3542,7 @@ function collectContinuationTransforms(input: {
     : undefined;
   const transforms: ContinuationTransform[] = [];
   for (const entry of input.continuity.lastContinuationEvidence ?? []) {
-    const parsed = parseTransformEvidence(entry);
+    const parsed = parseContinuationTransformEvidence(entry);
     if (!parsed) {
       continue;
     }

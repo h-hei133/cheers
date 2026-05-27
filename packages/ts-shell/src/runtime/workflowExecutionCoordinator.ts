@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import type {
   GoogleAccountAuthConfig,
   OpenAIAccountAuthConfig,
@@ -25,10 +23,7 @@ import {
   type FreshnessObservability,
 } from "../evidence/freshnessEvidence.js";
 import { appendSingleFileEditRepairObservability } from "../evidence/turnEvidenceLedger.js";
-import {
-  projectWorkflowRuntimeResultContract,
-  truncateText,
-} from "../result/workflowRuntimeProjection.js";
+import { projectWorkflowRuntimeResultContract } from "../result/workflowRuntimeProjection.js";
 import {
   runApplyPatchRuntimeBridgeIfRequested,
   type ApplyPatchRuntimeRouteOptions,
@@ -42,28 +37,24 @@ import { runPlanningRuntimeStage } from "../planning/planningRuntimeStage.js";
 import {
   buildWorkflowTaskPlan,
   extractInlineContinuityContext,
-  rebindContinuationTargetToWorkspace,
 } from "../planning/workflowTaskPlan.js";
 import { isVerifyLikeCommand } from "../policy/commandIntentPolicy.js";
 import { runDirectCommandStage } from "../verification/commandStage.js";
 import {
-  applyWholeWordRename,
-  computeLineDelta,
   extractFencedContent,
   extractInlineWriteContent,
   extractLowRiskRenameRefactor,
   extractReplaceDirective,
-  extractSecondaryFileWrites,
   inferAlternativeReplaceDirective,
   isSafeGeneratedAlternativeDirective,
   isSafeReboundDirective,
   resolveMutationInstruction,
 } from "../edit/mutationInstructionPlanner.js";
+import { runLowRiskRenameStage } from "../edit/lowRiskRenameStage.js";
+import { runPrimaryMutationRuntimeStage } from "../edit/mutationRuntimeStage.js";
+import { runSecondaryWriteStage } from "../edit/secondaryWriteStage.js";
 import { runAnchoredProposalStage } from "../proposal/anchoredProposalStage.js";
-import {
-  shouldDegradeCrossFileRemaining,
-  shouldRetainCrossFileFailureInRemaining,
-} from "../repair/crossFileRepairPlanning.js";
+import { runCrossFileRepairStage } from "../repair/crossFileRepairStage.js";
 import {
   executeBrowserModulePlan,
 } from "../orchestration/browserModule.js";
@@ -77,10 +68,7 @@ import {
   planLowRiskVerification,
 } from "../orchestration/lowRiskVerificationPlanning.js";
 import { MultiAgentOrchestrator } from "../orchestration/MultiAgentOrchestrator.js";
-import {
-  executeFileMutationBranch,
-  summarizeFileMutationResults,
-} from "../orchestration/mutationExecution.js";
+import { summarizeFileMutationResults } from "../orchestration/mutationExecution.js";
 import type { FileMutationExecutionResult } from "../orchestration/mutationExecution.js";
 import {
   appendCurrentRequestScopeEvidence,
@@ -124,7 +112,6 @@ import type { TargetResolutionBlocker } from "../orchestration/targetResolution.
 import { classifyVerificationFailure } from "../orchestration/toolExecutionOutcomeProjection.js";
 import {
   buildWorkflowDecisionTrace,
-  type ContinuationTransform,
   type WorkflowTaskPlan,
 } from "../orchestration/workflowTaskPlanner.js";
 import type {
@@ -1175,244 +1162,77 @@ async function executeWorkflowTaskPlan(input: {
             : replaceDirective
               ? "replace"
               : "rewrite";
-      notes.push(`mutation transform: ${transformKind}`);
-      evidence.push(`edit-transform-kind:${targetPath}:${transformKind}`);
-      const primaryMutationToolName =
-        input.plan.taskKind === "write-file" ? "write" : "edit";
-      const primaryMutationTarget = path.isAbsolute(targetPath)
-        ? targetPath
-        : path.join(input.workspaceRoot, targetPath);
-      const currentMutationScope = deriveCurrentPermissionRequestFromToolInput({
-        toolName: primaryMutationToolName,
-        operation: "write",
-        target: primaryMutationTarget,
+      await runPrimaryMutationRuntimeStage({
+        plan: input.plan,
+        targetPath,
         workspaceRoot: input.workspaceRoot,
-        source: "approval-request",
-        lineageHint:
-          input.plan.taskKind === "write-file"
-            ? "write-file-primary"
-            : "edit-file-primary",
-      });
-      appendCurrentRequestScopeEvidence(evidence, currentMutationScope);
-      const mutation = await executeFileMutationBranch({
-        path: targetPath,
+        sessionId: input.sessionId,
+        turn: input.turn,
+        dispatcher: input.dispatcher,
+        aggregate: {
+          events,
+          notes,
+          changedFiles,
+          failedFiles,
+          patches,
+          evidence,
+          mutationResults,
+          appliedContentByPath,
+        },
         content: successfulMutationInstruction.content,
-        operation: input.plan.taskKind === "write-file" ? "append" : "replace",
         changedLines: successfulMutationInstruction.changedLines,
         addedLines: successfulMutationInstruction.addedLines,
         removedLines: successfulMutationInstruction.removedLines,
-        failureReason: "mutation failed",
-        appliedNote: `mutation applied: ${targetPath}`,
-        appliedEvidence: `edit/write applied on ${targetPath}`,
-        expectedContentBeforeWrite:
-          input.plan.taskKind === "edit-file" &&
-          typeof originalContent === "string"
-            ? originalContent
-            : undefined,
-        readContentBeforeWrite:
-          input.plan.taskKind === "edit-file" &&
-          typeof originalContent === "string"
-            ? async () => {
-                try {
-                  const absoluteTargetPath = path.isAbsolute(targetPath)
-                    ? targetPath
-                    : path.join(input.workspaceRoot, targetPath);
-                  return {
-                    success: true,
-                    content: fs.readFileSync(absoluteTargetPath, "utf8"),
-                  };
-                } catch (error) {
-                  return {
-                    success: false,
-                    error:
-                      error instanceof Error
-                        ? `stale-read: ${error.message}`
-                        : "stale-read: Could not verify the current file content before writing.",
-                  };
-                }
-              }
-            : undefined,
-        dispatch: () =>
-          dispatchRuntimeTool({
-            dispatcher: input.dispatcher,
-            events,
-            toolName: primaryMutationToolName,
-            taskId: `task_${input.sessionId}_${input.turn}_${primaryMutationToolName}`,
-            args: {
-              path: targetPath,
-              content: successfulMutationInstruction.content,
-            },
-            workspaceRoot: input.workspaceRoot,
-            sessionId: input.sessionId,
-            abortSignal: input.abortSignal,
-            requireApprovalEvent: true,
-          }),
+        originalContent,
+        transformKind,
+        ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
       });
-      mutationResults.push(mutation);
-      if (mutation.failedFile) {
-        failedFiles.push(mutation.failedFile);
-      }
-      if (mutation.changedFile) {
-        changedFiles.push(mutation.changedFile);
-      }
-      patches.push(mutation.patch);
-      if (mutation.note) {
-        notes.push(mutation.note);
-      }
-      if (mutation.evidence) {
-        evidence.push(mutation.evidence);
-      }
-      if (mutation.appliedContent) {
-        appliedContentByPath.set(
-          mutation.appliedContent.normalizedPath,
-          mutation.appliedContent.content,
-        );
-      }
     }
 
     if (!primarySkippedForCrossFile && changedFiles.includes(targetPath)) {
       if (lowRiskRenameRefactor) {
-        const processedRenamePaths = new Set([normalizePathLike(targetPath)]);
-        for (const renamePath of lowRiskRenameRefactor.paths) {
-          if (processedRenamePaths.has(normalizePathLike(renamePath))) {
-            continue;
-          }
-          processedRenamePaths.add(normalizePathLike(renamePath));
-          const renameRead = await dispatchRuntimeTool({
-            dispatcher: input.dispatcher,
+        await runLowRiskRenameStage({
+          rename: lowRiskRenameRefactor,
+          targetPath,
+          workspaceRoot: input.workspaceRoot,
+          sessionId: input.sessionId,
+          turn: input.turn,
+          dispatcher: input.dispatcher,
+          events,
+          aggregate: {
             events,
-            toolName: "read",
-            taskId: `task_${input.sessionId}_${input.turn}_rename_read_${hashStableId(renamePath)}`,
-            args: { path: renamePath },
-            workspaceRoot: input.workspaceRoot,
-            sessionId: input.sessionId,
-            abortSignal: input.abortSignal,
-            requireApprovalEvent: false,
-          });
-          if (!renameRead.success) {
-            const reason = renameRead.error ?? "rename target read failed";
-            failedFiles.push({ path: renamePath, reason });
-            patches.push({
-              path: renamePath,
-              operation: "replace",
-              status: "failed",
-              failureCode: "read-failed",
-              reason,
-            });
-            continue;
-          }
-          const renameContent = applyWholeWordRename(
-            renameRead.output ?? "",
-            lowRiskRenameRefactor.from,
-            lowRiskRenameRefactor.to,
-          );
-          if (renameContent === (renameRead.output ?? "")) {
-            continue;
-          }
-          const lineDelta = computeLineDelta(
-            renameRead.output ?? "",
-            renameContent,
-          );
-          const renameMutation = await executeFileMutationBranch({
-            path: renamePath,
-            content: renameContent,
-            operation: "replace",
-            changedLines: lineDelta.changedLines,
-            addedLines: lineDelta.addedLines,
-            removedLines: lineDelta.removedLines,
-            failureReason: "rename target edit failed",
-            appliedNote: `low-risk rename applied: ${renamePath}`,
-            appliedEvidence: `rename-refactor:${renamePath}:${lowRiskRenameRefactor.from}->${lowRiskRenameRefactor.to}`,
-            dispatch: () =>
-              dispatchRuntimeTool({
-                dispatcher: input.dispatcher,
-                events,
-                toolName: "edit",
-                taskId: `task_${input.sessionId}_${input.turn}_rename_edit_${hashStableId(renamePath)}`,
-                args: { path: renamePath, content: renameContent },
-                workspaceRoot: input.workspaceRoot,
-                sessionId: input.sessionId,
-                abortSignal: input.abortSignal,
-                requireApprovalEvent: true,
-              }),
-          });
-          mutationResults.push(renameMutation);
-          if (renameMutation.failedFile) {
-            failedFiles.push(renameMutation.failedFile);
-            patches.push(renameMutation.patch);
-            continue;
-          }
-          if (renameMutation.changedFile) {
-            changedFiles.push(renameMutation.changedFile);
-          }
-          patches.push(renameMutation.patch);
-          if (renameMutation.note) {
-            notes.push(renameMutation.note);
-          }
-          if (renameMutation.evidence) {
-            evidence.push(renameMutation.evidence);
-          }
-          if (renameMutation.appliedContent) {
-            appliedContentByPath.set(
-              renameMutation.appliedContent.normalizedPath,
-              renameMutation.appliedContent.content,
-            );
-          }
-        }
+            notes,
+            changedFiles,
+            failedFiles,
+            patches,
+            evidence,
+            mutationResults,
+            appliedContentByPath,
+          },
+          ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+        });
       }
 
-      const secondaryWrites = extractSecondaryFileWrites(
-        input.prompt,
+      await runSecondaryWriteStage({
+        prompt: input.prompt,
         targetPath,
-      );
-      for (const secondary of secondaryWrites) {
-        const lineCount = secondary.content.split("\n").length;
-        const secondaryMutation = await executeFileMutationBranch({
-          path: secondary.path,
-          content: secondary.content,
-          operation: "append",
-          changedLines: lineCount,
-          addedLines: lineCount,
-          removedLines: 0,
-          failureReason: "secondary write failed",
-          appliedNote: `secondary write applied: ${secondary.path}`,
-          appliedEvidence: `secondary write applied on ${secondary.path}`,
-          dispatch: () =>
-            dispatchRuntimeTool({
-              dispatcher: input.dispatcher,
-              events,
-              toolName: "write",
-              taskId: `task_${input.sessionId}_${input.turn}_write_${hashStableId(secondary.path)}`,
-              args: { path: secondary.path, content: secondary.content },
-              workspaceRoot: input.workspaceRoot,
-              sessionId: input.sessionId,
-              abortSignal: input.abortSignal,
-              requireApprovalEvent: true,
-            }),
-        });
-        mutationResults.push(secondaryMutation);
-        if (secondaryMutation.failedFile) {
-          failedFiles.push(secondaryMutation.failedFile);
-          patches.push(secondaryMutation.patch);
-          continue;
-        }
-        if (secondaryMutation.changedFile) {
-          changedFiles.push(secondaryMutation.changedFile);
-        }
-        patches.push(secondaryMutation.patch);
-        if (secondaryMutation.note) {
-          notes.push(secondaryMutation.note);
-        }
-        if (secondaryMutation.evidence) {
-          evidence.push(secondaryMutation.evidence);
-        }
-        if (secondaryMutation.appliedContent) {
-          appliedContentByPath.set(
-            secondaryMutation.appliedContent.normalizedPath,
-            secondaryMutation.appliedContent.content,
-          );
-        }
-      }
+        workspaceRoot: input.workspaceRoot,
+        sessionId: input.sessionId,
+        turn: input.turn,
+        dispatcher: input.dispatcher,
+        events,
+        aggregate: {
+          events,
+          notes,
+          changedFiles,
+          failedFiles,
+          patches,
+          evidence,
+          mutationResults,
+          appliedContentByPath,
+        },
+        ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+      });
     }
 
     if (
@@ -1422,272 +1242,32 @@ async function executeWorkflowTaskPlan(input: {
       (changedFiles.includes(targetPath) || primarySkippedForCrossFile) &&
       (input.plan.additionalTargetPaths?.length ?? 0) > 0
     ) {
-      const coordinatedTargets = input.plan.additionalTargetPaths ?? [];
-      notes.push(
-        `repair: cross-file coordinated repair candidates=${coordinatedTargets.join(", ")}`,
-      );
-      evidence.push(`repair-candidate-files:${coordinatedTargets.join(",")}`);
-      const processedCrossFilePaths = new Set<string>();
-      const remainingCrossFilePaths = new Set<string>();
-      const failedEntries: Array<{
-        path: string;
-        failureCode: "read-failed" | "patch-generation-failed" | "write-failed";
-        reason: string;
-      }> = [];
-      const skippedEntries: Array<{ path: string; reason: string }> = [];
-      for (const linkedPath of coordinatedTargets) {
-        const linkedRead = await dispatchRuntimeTool({
-          dispatcher: input.dispatcher,
+      const repairStage = await runCrossFileRepairStage({
+        plan: input.plan,
+        prompt: input.prompt,
+        targetPath,
+        replaceDirective,
+        workspaceRoot: input.workspaceRoot,
+        sessionId: input.sessionId,
+        turn: input.turn,
+        dispatcher: input.dispatcher,
+        aggregate: {
           events,
-          toolName: "read",
-          taskId: `task_${input.sessionId}_${input.turn}_cross_read_${linkedPath.replace(/[^\w.-]+/g, "_")}`,
-          args: { path: linkedPath },
-          workspaceRoot: input.workspaceRoot,
-          sessionId: input.sessionId,
-          abortSignal: input.abortSignal,
-          requireApprovalEvent: false,
-        });
-        if (!linkedRead.success) {
-          const reason = linkedRead.error ?? "cross-file read failed";
-          failedFiles.push({ path: linkedPath, reason });
-          failedEntries.push({
-            path: linkedPath,
-            failureCode: "read-failed",
-            reason,
-          });
-          if (shouldRetainCrossFileFailureInRemaining("read-failed", reason)) {
-            remainingCrossFilePaths.add(linkedPath);
-          } else {
-            processedCrossFilePaths.add(linkedPath);
-          }
-          patches.push({
-            path: linkedPath,
-            operation: "replace",
-            status: "failed",
-            failureCode: "read-failed",
-            reason,
-          });
-          continue;
-        }
-        const linkedContent = linkedRead.output ?? "";
-        if (!linkedContent.includes(replaceDirective.from)) {
-          const reason = "Replace source text not found in target file.";
-          notes.push(
-            `repair: cross-file patch generation failed for ${linkedPath} (${reason})`,
-          );
-          failedFiles.push({ path: linkedPath, reason });
-          failedEntries.push({
-            path: linkedPath,
-            failureCode: "patch-generation-failed",
-            reason,
-          });
-          if (
-            shouldRetainCrossFileFailureInRemaining(
-              "patch-generation-failed",
-              reason,
-            )
-          ) {
-            remainingCrossFilePaths.add(linkedPath);
-          } else {
-            processedCrossFilePaths.add(linkedPath);
-          }
-          patches.push({
-            path: linkedPath,
-            operation: "replace",
-            status: "failed",
-            failureCode: "patch-generation-failed",
-            reason,
-          });
-          continue;
-        }
-        const linkedInstruction = resolveMutationInstruction(
-          {
-            ...input.plan,
-            taskKind: "edit-file",
-            targetPath: linkedPath,
-          },
-          input.prompt,
-          linkedContent,
-          undefined,
-          replaceDirective,
-        );
-        if (isMutationInstructionFailure(linkedInstruction)) {
-          failedFiles.push({
-            path: linkedPath,
-            reason: linkedInstruction.reason,
-          });
-          failedEntries.push({
-            path: linkedPath,
-            failureCode: "patch-generation-failed",
-            reason: linkedInstruction.reason,
-          });
-          if (
-            shouldRetainCrossFileFailureInRemaining(
-              "patch-generation-failed",
-              linkedInstruction.reason,
-            )
-          ) {
-            remainingCrossFilePaths.add(linkedPath);
-          } else {
-            processedCrossFilePaths.add(linkedPath);
-          }
-          patches.push({
-            path: linkedPath,
-            operation: "replace",
-            status: "failed",
-            failureCode: "patch-generation-failed",
-            reason: linkedInstruction.reason,
-          });
-          continue;
-        }
-        const linkedMutationTarget = path.isAbsolute(linkedPath)
-          ? linkedPath
-          : path.join(input.workspaceRoot, linkedPath);
-        const currentLinkedMutationScope =
-          deriveCurrentPermissionRequestFromToolInput({
-            toolName: "edit",
-            operation: "write",
-            target: linkedMutationTarget,
-            workspaceRoot: input.workspaceRoot,
-            source: "approval-request",
-            lineageHint: "edit-file-cross",
-          });
-        appendCurrentRequestScopeEvidence(evidence, currentLinkedMutationScope);
-        const linkedMutation = await executeFileMutationBranch({
-          path: linkedPath,
-          content: linkedInstruction.content,
-          operation: "replace",
-          changedLines: linkedInstruction.changedLines,
-          addedLines: linkedInstruction.addedLines,
-          removedLines: linkedInstruction.removedLines,
-          failureReason: "cross-file mutation failed",
-          appliedNote: `repair: cross-file coordinated mutation applied on ${linkedPath}`,
-          appliedEvidence: `repair-cross-file applied on ${linkedPath}`,
-          recordAppliedContent: false,
-          dispatch: () =>
-            dispatchRuntimeTool({
-              dispatcher: input.dispatcher,
-              events,
-              toolName: "edit",
-              taskId: `task_${input.sessionId}_${input.turn}_cross_edit_${linkedPath.replace(/[^\w.-]+/g, "_")}`,
-              args: { path: linkedPath, content: linkedInstruction.content },
-              workspaceRoot: input.workspaceRoot,
-              sessionId: input.sessionId,
-              abortSignal: input.abortSignal,
-              requireApprovalEvent: true,
-            }),
-        });
-        mutationResults.push(linkedMutation);
-        if (linkedMutation.failedFile) {
-          failedFiles.push(linkedMutation.failedFile);
-          failedEntries.push({
-            path: linkedPath,
-            failureCode: "write-failed",
-            reason: linkedMutation.failedFile.reason,
-          });
-          if (
-            shouldRetainCrossFileFailureInRemaining(
-              "write-failed",
-              linkedMutation.failedFile.reason,
-            )
-          ) {
-            remainingCrossFilePaths.add(linkedPath);
-          } else {
-            processedCrossFilePaths.add(linkedPath);
-          }
-          patches.push(linkedMutation.patch);
-          continue;
-        }
-        if (linkedMutation.changedFile) {
-          changedFiles.push(linkedMutation.changedFile);
-        }
-        processedCrossFilePaths.add(linkedPath);
-        patches.push(linkedMutation.patch);
-        if (linkedMutation.note) {
-          notes.push(linkedMutation.note);
-        }
-        if (linkedMutation.evidence) {
-          evidence.push(linkedMutation.evidence);
-        }
-      }
-      const remainingCrossFileTargets = coordinatedTargets.filter((candidate) =>
-        remainingCrossFilePaths.has(candidate),
-      );
-      const degradationDecision = shouldDegradeCrossFileRemaining({
-        previousRemainingTargets: input.plan.previousRemainingTargets ?? [],
-        previousFailedEntries: input.plan.previousFailedEntries ?? [],
-        currentRemainingTargets: remainingCrossFileTargets,
-        currentFailedEntries: failedEntries,
+          notes,
+          changedFiles,
+          failedFiles,
+          patches,
+          evidence,
+          mutationResults,
+          appliedContentByPath,
+        },
+        ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
       });
-      if (degradationDecision.shouldDegrade) {
-        degradedCrossFileTargets = degradationDecision.degradedTargets;
-        crossFileDegradationReason = degradationDecision.reason;
-        for (const degradedPath of degradationDecision.degradedTargets) {
-          failedFiles.push({
-            path: degradedPath,
-            reason: `continuation-degraded: ${degradationDecision.reason}`,
-          });
-        }
-        notes.push(`repair degradation: ${degradationDecision.reason}`);
-        evidence.push(
-          `repair-degradation:triggered:${degradationDecision.degradedTargets.join(",")}`,
-        );
-        evidence.push("repair-degradation-no-progress:true");
-        evidence.push(
-          `repair-degradation-reason:${degradationDecision.reason}`,
-        );
-      }
-      crossFileRemainingTargets = remainingCrossFileTargets;
-      crossFileFailedByReason = failedEntries;
-      crossFileSkippedFiles = skippedEntries;
-      evidence.push(
-        `repair-processed-files:${
-          processedCrossFilePaths.size > 0
-            ? Array.from(processedCrossFilePaths).join(",")
-            : "(none)"
-        }`,
-      );
-      evidence.push(
-        `repair-remaining-files:${
-          degradationDecision.shouldDegrade
-            ? "(none)"
-            : remainingCrossFileTargets.length > 0
-              ? remainingCrossFileTargets.join(",")
-              : "(none)"
-        }`,
-      );
-      evidence.push(
-        `repair-failed-files:${
-          failedEntries.length > 0
-            ? failedEntries
-                .map(
-                  (entry) =>
-                    `${entry.path}::${entry.failureCode}::${truncateText(entry.reason, 80)}`,
-                )
-                .join("|")
-            : "(none)"
-        }`,
-      );
-      evidence.push(
-        `repair-skipped-files:${
-          skippedEntries.length > 0
-            ? skippedEntries
-                .map((entry) => `${entry.path}::${entry.reason}`)
-                .join("|")
-            : "(none)"
-        }`,
-      );
-      evidence.push(
-        `repair-outcome:${
-          degradationDecision.shouldDegrade
-            ? "degraded-terminal"
-            : remainingCrossFileTargets.length > 0
-              ? "partial-complete-with-remaining"
-              : failedEntries.length > 0
-                ? "partial-complete-with-failures"
-                : "completed"
-        }`,
-      );
+      crossFileRemainingTargets = repairStage.remainingTargets;
+      crossFileFailedByReason = repairStage.failedByReason;
+      crossFileSkippedFiles = repairStage.skippedFiles;
+      degradedCrossFileTargets = repairStage.degradedTargets;
+      crossFileDegradationReason = repairStage.degradationReason;
     }
   }
 
@@ -2515,100 +2095,6 @@ function uniqueStable(values: readonly string[]): string[] {
 
 function hashStableId(value: string): string {
   return computeFragmentFingerprint(value).slice(0, 12);
-}
-
-function inferReplaceDirectiveFromContinuity(input: {
-  readonly continuity: ContinuityStateLike;
-  readonly preferredTarget?: string;
-  readonly workspaceRoot: string;
-}): { from: string; to: string } | undefined {
-  const preferredTarget = input.preferredTarget
-    ? normalizePathLike(input.preferredTarget)
-    : undefined;
-  const continuityEvidence = input.continuity.lastContinuationEvidence ?? [];
-  for (let index = continuityEvidence.length - 1; index >= 0; index -= 1) {
-    const entry = continuityEvidence[index];
-    if (!entry) {
-      continue;
-    }
-    const parsed = parseTransformEvidence(entry);
-    if (!parsed) {
-      continue;
-    }
-    const reboundPath =
-      rebindContinuationTargetToWorkspace(parsed.path, input.workspaceRoot) ??
-      normalizePathLike(parsed.path);
-    if (preferredTarget && normalizePathLike(reboundPath) !== preferredTarget) {
-      continue;
-    }
-    return { from: parsed.from, to: parsed.to };
-  }
-  return undefined;
-}
-
-function parseTransformEvidence(
-  evidence: string,
-): { path: string; from: string; to: string } | undefined {
-  const directMatch = evidence.match(/^transform:(.+):(.+)=>(.+)$/i);
-  if (directMatch?.[1] && directMatch?.[2] && directMatch?.[3]) {
-    return {
-      path: directMatch[1].trim(),
-      from: directMatch[2].trim(),
-      to: directMatch[3].trim(),
-    };
-  }
-  const replanMatch = evidence.match(/^replan-transform:(.+):(.+)=>(.+)$/i);
-  if (replanMatch?.[1] && replanMatch?.[2] && replanMatch?.[3]) {
-    return {
-      path: replanMatch[1].trim(),
-      from: replanMatch[2].trim(),
-      to: replanMatch[3].trim(),
-    };
-  }
-  const rebindMatch = evidence.match(
-    /^rebind-transform:(.+):.+=>.+->(.+)=>(.+)$/i,
-  );
-  if (rebindMatch?.[1] && rebindMatch?.[2] && rebindMatch?.[3]) {
-    return {
-      path: rebindMatch[1].trim(),
-      from: rebindMatch[2].trim(),
-      to: rebindMatch[3].trim(),
-    };
-  }
-  // `rebind-blocker:*:stale-transform-already-applied` is retained for
-  // explainability/history, but must not be re-consumed as executable
-  // transform evidence on subsequent generic temporal follow-ups.
-  return undefined;
-}
-
-function collectContinuationTransforms(input: {
-  readonly continuity: ContinuityStateLike;
-  readonly preferredTarget?: string;
-  readonly workspaceRoot: string;
-}): ContinuationTransform[] {
-  const target = input.preferredTarget
-    ? normalizePathLike(input.preferredTarget)
-    : undefined;
-  const transforms: ContinuationTransform[] = [];
-  for (const entry of input.continuity.lastContinuationEvidence ?? []) {
-    const parsed = parseTransformEvidence(entry);
-    if (!parsed) {
-      continue;
-    }
-    const normalizedPath = normalizePathLike(
-      rebindContinuationTargetToWorkspace(parsed.path, input.workspaceRoot) ??
-        parsed.path,
-    );
-    if (target && normalizedPath !== target) {
-      continue;
-    }
-    transforms.push({
-      path: normalizedPath,
-      from: parsed.from,
-      to: parsed.to,
-    });
-  }
-  return transforms;
 }
 
 function isMutationInstructionFailure(
