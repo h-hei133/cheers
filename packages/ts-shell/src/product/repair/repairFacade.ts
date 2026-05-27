@@ -4,6 +4,8 @@ import {
   type ProductVerdict,
 } from "../evidence/verdictFacade.js";
 
+// Reset compatibility facade. Final ownership should live with repair
+// iteration and repair evidence modules.
 export const PRODUCT_REPAIR_FACADE_VERSION = "v1";
 
 export type ProductRepairApplyStatus =

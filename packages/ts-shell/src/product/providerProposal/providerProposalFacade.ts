@@ -1,5 +1,7 @@
 import type { ProductRedactionStatus } from "../evidence/verdictFacade.js";
 
+// Reset compatibility facade. Final ownership should live in provider/proposal
+// domain modules rather than a broad src/product bucket.
 export const PRODUCT_PROVIDER_PROPOSAL_FACADE_VERSION = "v1";
 
 export type ProductProviderMode =

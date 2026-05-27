@@ -1,3 +1,5 @@
+// Reset compatibility facade. Final ownership should move toward the durable
+// evidence/result domain once Route221/227/228 report compatibility is retired.
 export const PRODUCT_EVIDENCE_VERDICT_FACADE_VERSION = "v1";
 
 export type ProductEvidenceSource =

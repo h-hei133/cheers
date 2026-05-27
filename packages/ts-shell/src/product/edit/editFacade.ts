@@ -4,6 +4,8 @@ import {
   type ProductVerdict,
 } from "../evidence/verdictFacade.js";
 
+// Reset compatibility facade. Final ownership should live with edit authority,
+// apply, readback, and recovery modules.
 export const PRODUCT_EDIT_FACADE_VERSION = "v1";
 
 export type ProductEditOperationKind =

@@ -4,6 +4,8 @@ import {
   type ProductVerdict,
 } from "../evidence/verdictFacade.js";
 
+// Reset compatibility facade. Final ownership should live with verification
+// dispatch, command planning, and verifier receipt modules.
 export const PRODUCT_VERIFICATION_FACADE_VERSION = "v1";
 
 export type ProductVerificationAuthorityStatus =
