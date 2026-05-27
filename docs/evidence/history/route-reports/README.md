@@ -2,6 +2,9 @@
 
 Machine-checkable historical route reports remain at
 `docs/implementation-context/route*-report.json` for compatibility.
+Phase 2.5 Phase C moved only Route222-226 route documents, not their JSON
+reports, because the historical runners and Route221 report gate still consume
+those report paths directly.
 
 They are evidence history, not current product readiness. In particular:
 
@@ -15,4 +18,3 @@ Reset Route H created this namespace as the provenance index for a later report
 path migration. The reports were not moved in this checkpoint because current
 producers and report gates still reference `docs/implementation-context/`
 paths.
-

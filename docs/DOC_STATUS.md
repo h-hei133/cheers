@@ -42,6 +42,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/product-architecture-reset/phase2-final-physical-audit.md` | active | Checking Phase 2 final physical audit, runMvp baseline drift classification, and remaining reset debt. |  | Product Architecture Reset |
 | `docs/product-architecture-reset/runmvp-baseline-drift-register.md` | active | Checking Phase 2.5 Phase A runMvp baseline drift classification and trusted focused baseline. |  | Product Architecture Reset |
 | `docs/dev-history/routes/README.md` | historical | Finding route document quarantine status and route-history script namespace. |  | Product Architecture Reset |
+| `docs/dev-history/routes/route222*.md` through `docs/dev-history/routes/route226*.md` | historical | Reading quarantined Route222-226 route documents; old `docs/agent-routes/` paths are compatibility pointers. |  | Product Architecture Reset |
 | `docs/evidence/history/route-reports/README.md` | historical | Finding historical route report provenance and compatibility status. |  | Product Architecture Reset |
 
 ## Implementation Context
