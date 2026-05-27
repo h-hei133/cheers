@@ -19,7 +19,7 @@ or route-history readiness.
 | Agent scenario harness | `agentScenario*.ts`, `agentCliScenario*.ts` | Dev/eval harness | Keep in place; import-compatible move later only with focused tests. |
 | Browser transaction evidence | `browserTxn*.ts`, `browserTrace.test.ts`, `browserScore.test.ts` | Browser/evidence harness | Keep in place; covered by `verify:browser-txn-gate`. |
 | Browser runtime scenario fixtures | `browserRuntimeMvpScenarioFixtures.ts`, `browserRuntimeAdapterFixtures.ts` | Browser eval harness | Keep route-era labels as provenance. |
-| Browser eval benchmark model | `browserEvalBenchmarkModel.ts`, `browserEvalBenchmarkRunner.ts`, `browserEvalBenchmarkReport.ts` | Eval benchmark harness | Keep in place until a browser/eval namespace move preserves imports. |
+| Browser eval benchmark model | `eval/browser/benchmarkModel.ts`, `eval/browser/benchmarkRunner.ts`, `eval/browser/benchmarkReport.ts`; shims at `core/harness/browserEvalBenchmark*.ts` | Browser eval benchmark | Moved in Phase 2.5 Phase B; old imports preserved through re-export shims. |
 | Playwright closeout/runtime tests | `pwRuntime.test.ts`, `pwReal.test.ts`, `pwCloseout.test.ts`, `pwMcp.test.ts` | Browser harness tests | Keep default-safe; no live provider or public-web default. |
 | Public read-only smoke config | `browserPublicReadOnlyWebSmokeConfig.ts` | CLI smoke config adapter | Keep in place for compatibility; default remains controlled and opt-in. |
 
