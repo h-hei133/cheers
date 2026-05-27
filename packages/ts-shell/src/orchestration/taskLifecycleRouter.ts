@@ -36,6 +36,7 @@ export function routeTaskLifecycleRuntime(input: {
   const prompt = input.prompt.toLowerCase();
   const intentKind = classifyIntentKind(input.workflowPlan);
   const missingFacts = classifyMissingFacts(input.workflowPlan);
+  const lifecycleSurfaceRequested = hasLifecycleSurfaceCue(prompt);
 
   if (
     input.workflowPlan.taskKind === "edit-file" &&
@@ -60,7 +61,9 @@ export function routeTaskLifecycleRuntime(input: {
   }
 
   if (
-    (input.workflowPlan.taskKind === "edit-file" || input.workflowPlan.taskKind === "write-file") &&
+    (input.workflowPlan.taskKind === "edit-file" ||
+      input.workflowPlan.taskKind === "write-file" ||
+      input.workflowPlan.taskKind === "run-command") &&
     (input.workflowPlan.blockedReason || input.workflowPlan.targetMissing) &&
     !input.workflowPlan.contextPlanningRequested
   ) {
@@ -80,7 +83,10 @@ export function routeTaskLifecycleRuntime(input: {
     };
   }
 
-  if (input.workflowPlan.repairContextUsed || input.workflowPlan.continuationRepairReplan) {
+  if (
+    lifecycleSurfaceRequested &&
+    (input.workflowPlan.repairContextUsed || input.workflowPlan.continuationRepairReplan)
+  ) {
     return route({
       kind: "repair-readiness",
       intentKind,
@@ -90,7 +96,10 @@ export function routeTaskLifecycleRuntime(input: {
     });
   }
 
-  if (input.workflowPlan.verifyAfterEdit || input.workflowPlan.verifyCommand) {
+  if (
+    lifecycleSurfaceRequested &&
+    (input.workflowPlan.verifyAfterEdit || input.workflowPlan.verifyCommand)
+  ) {
     return route({
       kind: "verification-readiness",
       intentKind,
@@ -169,6 +178,12 @@ export function routeTaskLifecycleRuntime(input: {
       "task-lifecycle-router:mutation-authority:not-granted",
     ],
   };
+}
+
+function hasLifecycleSurfaceCue(prompt: string): boolean {
+  return /\b(?:task lifecycle|lifecycle|readiness|analysis brief|execution plan|plan quality|context packet|context graph|related files?|related tests?|suggested reads?|suggested verification|repair handoff|verification readiness)\b/.test(
+    prompt,
+  );
 }
 
 function route(input: {

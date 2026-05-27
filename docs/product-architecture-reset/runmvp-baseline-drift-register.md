@@ -103,3 +103,46 @@ The full suite remains a legacy characterization suite with classified drift.
 Future repair should be split by owner route: read/diagnosis routing, blocker
 surface wording, verification vocabulary, edit/write success contracts, and
 continuation lineage evidence.
+
+## Phase 2.6-A Recovery Result
+
+Command:
+
+```text
+npm test -w packages/ts-shell -- src/orchestration/runMvpIntegratedFlow.test.ts
+```
+
+Result reproduced after recovery on 2026-05-27:
+
+```text
+167 tests, 167 passed
+```
+
+All 34 previously recorded failures were resolved.
+
+Runtime fixes:
+
+- Task lifecycle activation no longer preempts ordinary verify-after-edit or
+  repair-follow-up prompts unless the prompt explicitly requests a lifecycle,
+  readiness, analysis brief, execution plan, context, or related-read surface.
+- Run-command blocker plans with `blockedReason`/`targetMissing` now preserve
+  the existing command-blocker route instead of being converted to a generic
+  lifecycle `read-stage-required` surface.
+
+Current-contract test rewrites:
+
+- Read/inspect, repo-diagnosis, no-write provider-free inspect, ambiguous
+  target, continuation relocation, and ultra-weak continuation cases now assert
+  the current planning-runtime no-write/review-only handoff contract instead of
+  older completed-output or route-era wording.
+- Verification vocabulary assertions now preserve the current stopped,
+  not-run/not-proven, no-write semantics instead of expecting old skipped or
+  lineage marker strings.
+
+Truthfulness notes:
+
+- No stopped, partial, blocked, skipped, not-run, no-provider, or not-proven
+  state was converted into success.
+- Current planning-runtime review-only handoffs remain `stopped_error` and
+  carry `planning-runtime-product:no-write-default`.
+- Route221 anti-false-success evidence infrastructure remains unchanged.

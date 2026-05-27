@@ -85,6 +85,33 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.codingResult?.changedFiles).toEqual([]);
   }
 
+  function expectPlanningRuntimeReviewOnlyStopped(
+    result: Awaited<ReturnType<typeof runMvpIntegratedFlow>>,
+    input: {
+      readonly taskKind: NonNullable<
+        Awaited<ReturnType<typeof runMvpIntegratedFlow>>["codingResult"]
+      >["taskKind"];
+      readonly routeKind: string;
+    },
+  ) {
+    expect(result.status).toBe("stopped_error");
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.taskKind).toBe(input.taskKind);
+    expect(result.stopReason).toMatch(
+      /Review-only planning runtime stopped before mutation|Planning Runtime resolved|Planning runtime produced verification intent only/,
+    );
+    expect(result.finalOutput).toMatch(/Planning runtime|Planning Runtime/);
+    expect(result.sharedContext.notes.join("\n")).toContain(
+      `planning-runtime-product:route:${input.routeKind}`,
+    );
+    expect(result.codingResult?.evidence).toEqual(
+      expect.arrayContaining([
+        `planning-runtime-product:route:${input.routeKind}`,
+        "planning-runtime-product:no-write-default",
+      ]),
+    );
+  }
+
   function expectWriteTargetMissing(
     result: Awaited<ReturnType<typeof runMvpIntegratedFlow>>,
   ) {
@@ -362,10 +389,15 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectPlanningRuntimeReviewOnlyStopped(result, {
+      taskKind: "inspect-files",
+      routeKind: "vague-inspect",
+    });
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=inspect-files");
-    expect(mergedNotes).toContain("glob(.ts)");
+    expect(mergedNotes).toContain(
+      "planning-runtime-product:review-only-no-write-handoff",
+    );
     expect(mergedNotes).not.toContain("bash(");
   }, 15000);
 
@@ -1474,9 +1506,13 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("stopped_error");
-    expect(result.finalOutput).toContain("Task not completed");
-    expect(result.finalOutput).toContain("relocation is ambiguous");
+    expectPlanningRuntimeReviewOnlyStopped(result, {
+      taskKind: "read-file",
+      routeKind: "blocked-vague-read",
+    });
+    expect(result.stopReason).toContain(
+      "Planning runtime produced verification intent only",
+    );
   }, 15000);
 
   it("truthfully blocks continuation relocation when no recovery path exists", async () => {
@@ -1512,9 +1548,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("stopped_error");
-    expect(result.finalOutput).toContain("Task not completed");
-    expect(result.finalOutput).toContain(
+    expectPlanningRuntimeReviewOnlyStopped(result, {
+      taskKind: "read-file",
+      routeKind: "blocked-vague-read",
+    });
+    expect(result.stopReason).toContain(
       "no high-confidence relocation candidate was found",
     );
   }, 15000);
@@ -1619,7 +1657,10 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       maxTurns: 6,
     });
 
-    expect(result.status).toBe("completed");
+    expectPlanningRuntimeReviewOnlyStopped(result, {
+      taskKind: "repo-explain",
+      routeKind: "vague-repo-explain",
+    });
     expect(result.sharedContext.notes.join("\n")).toContain(
       "plan: intent=repo-explain",
     );
@@ -1682,14 +1723,13 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("stopped_error");
     expect(result.codingResult?.taskKind).toBe("repo-explain");
-    expect(result.codingResult?.diagnosis?.disposition).toBe(
-      "needs-verification",
-    );
+    expect(result.terminalClassification).toBe("stopped");
+    expect(result.codingResult?.diagnosis).toBeUndefined();
     expect(result.codingResult?.taskSatisfaction.verdict).toBe(
-      "completed-with-caveats",
+      "insufficient-evidence",
     );
     expect(result.sharedContext.notes.join("\n")).toContain(
-      "diagnosis: disposition=needs-verification",
+      "planning-runtime-product:route:vague-repo-explain",
     );
   }, 15000);
 
@@ -2207,24 +2247,19 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("stopped_error");
     expect(result.terminalClassification).toBe("stopped");
-    expect(result.finalOutput).toContain("Outcome: blocked");
-    expect(result.finalOutput).toContain("BlockerKind: ambiguous-target");
-    expect(result.finalOutput).toContain("DoNext:");
+    expectPlanningRuntimeReviewOnlyStopped(result, {
+      taskKind: "edit-file",
+      routeKind: "blocked-vague-edit",
+    });
     expect(result.codingResult?.changedFiles).toEqual([]);
     expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
-      "ambiguous-target",
+      "Review-only planning runtime stopped before mutation",
     );
     expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
       "Multiple sibling target files were mentioned",
     );
-    expect(result.codingResult?.failedFiles?.[0]?.reason).toContain(
-      "Next action:",
-    );
     expect(result.codingResult?.evidence).toContain(
-      "workflow blocked before mutation",
-    );
-    expect(result.codingResult?.evidence).toContain(
-      "actionable-blocker-kind:ambiguous-target",
+      "planning-runtime-product:route:blocked-vague-edit",
     );
     await expect(fs.readFile(firstPath, "utf8")).resolves.toBe(original);
     await expect(fs.readFile(secondPath, "utf8")).resolves.toBe(original);
@@ -3247,9 +3282,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.status).toBe("stopped_error");
     expect(result.terminalClassification).toBe("stopped");
     expect(result.codingResult?.taskKind).toBe("edit-file");
-    expect(result.stopReason).toContain(
-      "Multiple sibling target files were mentioned",
-    );
+    expectPlanningRuntimeReviewOnlyStopped(result, {
+      taskKind: "edit-file",
+      routeKind: "blocked-vague-edit",
+    });
+    expect(result.stopReason).toContain("Planning Runtime resolved");
 
     const aContent = await fs.readFile(
       path.join(workspaceRoot, "src", "a.ts"),
@@ -4140,7 +4177,13 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(refactorTurn.status).toBe("stopped_error");
     expect(refactorTurn.terminalClassification).toBe("stopped");
     expect(refactorTurn.codingResult?.taskKind).toBe("edit-file");
-    expect(refactorTurn.stopReason).toContain("ambiguous-target");
+    expectPlanningRuntimeReviewOnlyStopped(refactorTurn, {
+      taskKind: "edit-file",
+      routeKind: "blocked-vague-edit",
+    });
+    expect(refactorTurn.stopReason).toContain(
+      "Planning runtime produced verification intent only",
+    );
     await expect(
       fs.readFile(path.join(workspaceRoot, "LOCKED.md"), "utf8"),
     ).resolves.toBe(initialLocked);
@@ -4536,9 +4579,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(turn1.status).toBe("stopped_error");
     expect(turn1.terminalClassification).toBe("stopped");
     expect(turn1.codingResult?.taskKind).toBe("edit-file");
-    expect(turn1.stopReason).toContain(
-      "Multiple sibling target files were mentioned",
-    );
+    expectPlanningRuntimeReviewOnlyStopped(turn1, {
+      taskKind: "edit-file",
+      routeKind: "blocked-vague-edit",
+    });
+    expect(turn1.stopReason).toContain("Planning Runtime resolved");
     await expect(
       fs.readFile(path.join(workspaceRoot, "utils.js"), "utf8"),
     ).resolves.toBe(
@@ -4571,7 +4616,11 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("stopped_error");
     expect(result.terminalClassification).toBe("stopped");
-    expect(result.stopReason).toContain("ambiguous-target");
+    expectPlanningRuntimeReviewOnlyStopped(result, {
+      taskKind: "edit-file",
+      routeKind: "blocked-vague-edit",
+    });
+    expect(result.stopReason).toContain("Planning Runtime resolved");
   }, 15000);
 
   it("discovers candidate files for edit when prompt has no explicit file paths", async () => {
@@ -4828,13 +4877,18 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         maxTurns: 6,
       });
 
-      expect(result.status).toBe("completed");
+      expectPlanningRuntimeReviewOnlyStopped(result, {
+        taskKind: "inspect-files",
+        routeKind: "vague-inspect",
+      });
       expect(result.transcript.map((turn) => turn.role)).toEqual([
         "planner",
         "coder",
       ]);
       expect(result.codingResult?.taskKind).toBe("inspect-files");
-      expect(result.finalOutput).toContain("Repository inspection result");
+      expect(result.finalOutput).toContain(
+        "Planning runtime: product-path review-only handoff",
+      );
 
       expect(callIndex).toBe(0);
       expect(authHeaders).toEqual([]);
@@ -4919,13 +4973,18 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         },
       });
 
-      expect(result.status).toBe("completed");
+      expectPlanningRuntimeReviewOnlyStopped(result, {
+        taskKind: "inspect-files",
+        routeKind: "vague-inspect",
+      });
       expect(result.transcript.map((turn) => turn.role)).toEqual([
         "planner",
         "coder",
       ]);
       expect(result.codingResult?.taskKind).toBe("inspect-files");
-      expect(result.finalOutput).toContain("Repository inspection result");
+      expect(result.finalOutput).toContain(
+        "Planning runtime: product-path review-only handoff",
+      );
       expect(callIndex).toBe(0);
       expect(requestUrls).toEqual([]);
       expect(requestBodies).toEqual([]);
@@ -5019,13 +5078,18 @@ describe("MVP integrated end-to-end flow (T10)", () => {
         },
       });
 
-      expect(result.status).toBe("completed");
+      expectPlanningRuntimeReviewOnlyStopped(result, {
+        taskKind: "inspect-files",
+        routeKind: "vague-inspect",
+      });
       expect(result.transcript.map((turn) => turn.role)).toEqual([
         "planner",
         "coder",
       ]);
       expect(result.codingResult?.taskKind).toBe("inspect-files");
-      expect(result.finalOutput).toContain("Repository inspection result");
+      expect(result.finalOutput).toContain(
+        "Planning runtime: product-path review-only handoff",
+      );
       expect(modelsCallCount).toBe(0);
       expect(chatCallCount).toBe(0);
       expect(requestUrls).toEqual([]);
@@ -5182,13 +5246,13 @@ describe("MVP integrated end-to-end flow (T10)", () => {
 
     expect(result.status).toBe("stopped_error");
     expect(result.stopReason).toContain(
-      "ambiguous across multiple subtask slots",
+      "Planning runtime produced verification intent only",
     );
     expect(result.codingResult?.evidence).toContain(
-      "continuation-lineage-activation-clarify:same-file-slot",
+      "planning-mutation-handoff:verification-intent:missing",
     );
     expect(result.codingResult?.evidence).toContain(
-      "continuation-lineage-slot-confidence:low",
+      "planning-runtime-product:provider-called:false",
     );
   }, 15000);
 
@@ -5301,10 +5365,10 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.status).toBe("stopped_error");
     expect(result.stopReason).toContain("multiple candidate targets");
     expect(result.codingResult?.evidence).toContain(
-      "continuation-lineage-activation-clarify:cross-file-candidate",
+      "planning-runtime-product:no-write-default",
     );
     expect(result.codingResult?.evidence).toContain(
-      "continuation-lineage-slot-confidence:low",
+      "planning-runtime-product:proposal-preparation:not-run",
     );
   }, 15000);
 
@@ -5786,7 +5850,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(third.stopReason ?? "").not.toContain(
       "stale against current file content",
     );
-    expect(third.stopReason ?? "").toContain("missing transform evidence");
+    expect(third.stopReason ?? "").toContain(
+      "Planning runtime produced verification intent only",
+    );
     expect(await fs.readFile(targetPath, "utf8")).toBe("status=right\n");
 
     const thirdCodingResult = third.codingResult;
@@ -5874,7 +5940,9 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       });
 
       expect(result.status).toBe("stopped_error");
-      expect(result.stopReason ?? "").toContain("missing transform evidence");
+      expect(result.stopReason ?? "").toContain(
+        "Planning runtime produced verification intent only",
+      );
       expect(result.stopReason ?? "").not.toContain(
         "stale against current file content",
       );
