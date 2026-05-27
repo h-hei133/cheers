@@ -6,24 +6,31 @@ import type {
   OpenAIAccountAuthConfig,
   RuntimeProvider,
 } from "../config/runtimeConfig.js";
-import { getRuntimeConfig } from "../config/runtimeConfig.js";
-import { CoreMcpGateway } from "../core/mcp/gateway.js";
-import { getPwRuntimeStatus, type PwRuntimeStatus } from "../core/context/pwRuntime.js";
+import type { PwRuntimeStatus } from "../core/context/pwRuntime.js";
 import {
   rebindPathLikeToWorkspace,
 } from "../core/paths/legacyRootRebase.js";
 import type { QueryEvent } from "../core/query/events.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { createComponentLogger, recordCount } from "../observability/index.js";
-import {
-  SandboxEnforcer,
-  type EscalationDecision,
-  type EscalationPrompt,
-  type EscalationResponse,
+import type {
+  EscalationDecision,
+  EscalationPrompt,
+  EscalationResponse,
 } from "../sandbox/index.js";
-import { ToolDispatcher } from "../tools/dispatcher.js";
-import { streamTurnRoleDraft } from "../turn/roleDraftStage.js";
-import { getWorkflowGitContext } from "../workflow/gitContext.js";
+import type { SandboxEnforcer } from "../sandbox/index.js";
+import type { ToolDispatcher } from "../tools/dispatcher.js";
+import {
+  buildIntegratedFlowEnvironment,
+  type IntegratedFlowEnvironment,
+} from "../runtime/integratedFlowEnvironment.js";
+import {
+  runApplyPatchRuntimeBridgeIfRequested,
+  type ApplyPatchRuntimeRouteOptions,
+} from "../edit/applyPatchRuntimeBridge.js";
+import { runProviderDraftStage } from "../provider/providerDraftStage.js";
+import { runPlanningRuntimeStage } from "../planning/planningRuntimeStage.js";
+import { runAnchoredProposalStage } from "../proposal/anchoredProposalStage.js";
 import {
   detectWorkflowBrowserPlan,
   executeBrowserModulePlan,
@@ -77,10 +84,6 @@ import {
 } from "./mutationExecution.js";
 import type { FileMutationExecutionResult } from "./mutationExecution.js";
 import {
-  projectApplyPatchRuntimeMutationRoute,
-  type ApplyPatchRuntimeRouteOptions,
-} from "./mutationRoutingProjection.js";
-import {
   appendCurrentRequestScopeEvidence,
   deriveCurrentPermissionRequestFromToolInput,
 } from "./approvalAuthorityProjection.js";
@@ -103,28 +106,17 @@ import {
   isPathOnlyReadRequest,
   parseRepoCandidateFiles,
   buildContextGraphPlanningBundle,
-  runPlanningRuntime,
   projectReadAmbiguousTargetStop,
   projectReadMissingTargetStop,
   projectReadOutOfWorkspaceTargetStop,
   recoverReadContinuationTarget,
   selectRepoExplainTarget,
 } from "./readInspectModule.js";
-import { projectPlanningRuntimeProductOutcome } from "./planningRuntimeProductProjection.js";
 import type { PlanningRuntimeProductExecutionOptions } from "./planningRuntimeProductExecution.js";
 import {
   buildAgentPlanResult,
   projectAgentPlanRuntimeOutcome,
 } from "./agentPlanResult.js";
-import { selectPlanningRuntimeProductRoute } from "./planningRuntimeProductRoute.js";
-import {
-  activateTaskLifecycle,
-  formatTaskLifecycleActivationOutput,
-} from "./taskLifecycleActivation.js";
-import {
-  runAnchoredProposalRuntime,
-  shouldActivateAnchoredProposalRuntimePrompt,
-} from "./anchoredProposalRuntime.js";
 import {
   planWorkflowVerification,
   planWorkflowVerificationRetry,
@@ -225,47 +217,40 @@ export async function runMvpIntegratedFlow(
   options: MvpIntegratedFlowOptions,
 ): Promise<OrchestrationResult> {
   const applyPatchRuntimeResult =
-    await runApplyPatchRuntimeRouteIfRequested(options);
+    await runApplyPatchRuntimeBridgeIfRequested({
+      sessionId: options.sessionId,
+      prompt: options.prompt,
+      workspaceRoot: options.workspaceRoot,
+      routeOptions: options.applyPatchRuntimeRoute,
+      ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
+    });
   if (applyPatchRuntimeResult) {
     return applyPatchRuntimeResult;
   }
 
   const logger = createComponentLogger("orchestration");
-  const workflowContext = getWorkflowGitContext(options.workspaceRoot);
-  const runtimeConfig = getRuntimeConfig(options.workspaceRoot);
-  const browserRuntimeStatus =
-    options.browserRuntimeStatus ?? await getPwRuntimeStatus();
-  const mcpGateway = new CoreMcpGateway(options.workspaceRoot);
-  const mcpSnapshot = await mcpGateway.snapshot();
-  const enforcer = new SandboxEnforcer({
+  const environment = await buildIntegratedFlowEnvironment({
     workspaceRoot: options.workspaceRoot,
     sessionId: options.sessionId,
-  });
-
-  if (options.escalationPromptHandler) {
-    enforcer.setEscalationPromptHandler(options.escalationPromptHandler);
-  } else if (options.escalationDecision) {
-    enforcer.setEscalationPromptHandler(async (prompt) => ({
-      promptId: prompt.id,
-      decision: options.escalationDecision,
-      respondedAt: Date.now(),
-      userComment: `Decision from runtime config: ${options.escalationDecision}`,
-    }));
-  }
-
-  const dispatcher = new ToolDispatcher(enforcer, {
-    mcpTools: mcpSnapshot.tools,
-    mcpGateway,
-    runtimeConfig,
-    browserRuntimeStatus,
+    ...(options.escalationPromptHandler
+      ? { escalationPromptHandler: options.escalationPromptHandler }
+      : {}),
+    ...(options.escalationDecision
+      ? { escalationDecision: options.escalationDecision }
+      : {}),
+    ...(options.browserRuntimeStatus
+      ? { browserRuntimeStatus: options.browserRuntimeStatus }
+      : {}),
+    escalationDecisionUserComment: (decision) =>
+      `Decision from runtime config: ${decision}`,
   });
   const runner = createIntegratedRunner(
     options.workspaceRoot,
-    dispatcher,
-    enforcer,
-    workflowContext,
-    mcpSnapshot,
-    browserRuntimeStatus,
+    environment.dispatcher,
+    environment.enforcer,
+    environment.workflowContext,
+    environment.mcpSnapshot,
+    environment.browserRuntimeStatus,
     options.providerMode ?? "synthetic",
     options.realProvider,
     options.agentMode ?? "build",
@@ -288,7 +273,7 @@ export async function runMvpIntegratedFlow(
     recordCount("orchestration.runs", 1, { status: result.status });
     return result;
   } finally {
-    enforcer.close();
+    environment.close();
   }
 }
 
@@ -296,7 +281,13 @@ export async function* streamMvpIntegratedFlow(
   options: MvpIntegratedFlowOptions,
 ): AsyncIterable<QueryEvent> {
   const applyPatchRuntimeResult =
-    await runApplyPatchRuntimeRouteIfRequested(options);
+    await runApplyPatchRuntimeBridgeIfRequested({
+      sessionId: options.sessionId,
+      prompt: options.prompt,
+      workspaceRoot: options.workspaceRoot,
+      routeOptions: options.applyPatchRuntimeRoute,
+      ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
+    });
   if (applyPatchRuntimeResult) {
     yield {
       type: "query.started",
@@ -307,40 +298,28 @@ export async function* streamMvpIntegratedFlow(
     return;
   }
 
-  const workflowContext = getWorkflowGitContext(options.workspaceRoot);
-  const runtimeConfig = getRuntimeConfig(options.workspaceRoot);
-  const browserRuntimeStatus =
-    options.browserRuntimeStatus ?? await getPwRuntimeStatus();
-  const mcpGateway = new CoreMcpGateway(options.workspaceRoot);
-  const mcpSnapshot = await mcpGateway.snapshot();
-  const enforcer = new SandboxEnforcer({
+  const environment = await buildIntegratedFlowEnvironment({
     workspaceRoot: options.workspaceRoot,
     sessionId: options.sessionId,
-  });
-  if (options.escalationPromptHandler) {
-    enforcer.setEscalationPromptHandler(options.escalationPromptHandler);
-  } else if (options.escalationDecision) {
-    enforcer.setEscalationPromptHandler(async (prompt) => ({
-      promptId: prompt.id,
-      decision: options.escalationDecision,
-      respondedAt: Date.now(),
-      userComment: `Synthetic ${options.escalationDecision} for integration flow`,
-    }));
-  }
-
-  const dispatcher = new ToolDispatcher(enforcer, {
-    mcpTools: mcpSnapshot.tools,
-    mcpGateway,
-    runtimeConfig,
-    browserRuntimeStatus,
+    ...(options.escalationPromptHandler
+      ? { escalationPromptHandler: options.escalationPromptHandler }
+      : {}),
+    ...(options.escalationDecision
+      ? { escalationDecision: options.escalationDecision }
+      : {}),
+    ...(options.browserRuntimeStatus
+      ? { browserRuntimeStatus: options.browserRuntimeStatus }
+      : {}),
+    escalationDecisionUserComment: (decision) =>
+      `Synthetic ${decision} for integration flow`,
   });
   const runner = createIntegratedRunner(
     options.workspaceRoot,
-    dispatcher,
-    enforcer,
-    workflowContext,
-    mcpSnapshot,
-    browserRuntimeStatus,
+    environment.dispatcher,
+    environment.enforcer,
+    environment.workflowContext,
+    environment.mcpSnapshot,
+    environment.browserRuntimeStatus,
     options.providerMode ?? "synthetic",
     options.realProvider,
     options.agentMode ?? "build",
@@ -356,69 +335,7 @@ export async function* streamMvpIntegratedFlow(
       runtimeSeed: options.runtimeSeed,
     });
   } finally {
-    enforcer.close();
-  }
-}
-
-async function runApplyPatchRuntimeRouteIfRequested(
-  options: MvpIntegratedFlowOptions,
-): Promise<OrchestrationResult | undefined> {
-  const routeOptions = options.applyPatchRuntimeRoute;
-  if (!routeOptions) {
-    return undefined;
-  }
-
-  return projectApplyPatchRuntimeMutationRoute({
-    sessionId: options.sessionId,
-    prompt: options.prompt,
-    workspaceRoot: options.workspaceRoot,
-    routeOptions,
-    getWorkspaceAuthority: () =>
-      createWorkspaceWriteAuthority(options.workspaceRoot),
-    readNoWriteRuntimeFile: readWorkspaceFile(options.workspaceRoot),
-    ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
-  });
-}
-
-function readWorkspaceFile(
-  workspaceRootInput: string,
-): (absolutePath: string) => string | undefined {
-  const workspaceRoot = path.resolve(workspaceRootInput);
-  return (absolutePath) => {
-    const resolved = path.resolve(absolutePath);
-    if (!pathStaysInsideWorkspace(workspaceRoot, resolved)) {
-      return undefined;
-    }
-    try {
-      return fs.readFileSync(resolved, "utf8");
-    } catch {
-      return undefined;
-    }
-  };
-}
-
-function pathStaysInsideWorkspace(
-  workspaceRoot: string,
-  absolutePath: string,
-): boolean {
-  const relative = path.relative(workspaceRoot, absolutePath);
-  return (
-    relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative)
-  );
-}
-
-function readAnchoredProposalCurrentContent(input: {
-  readonly workspaceRoot: string;
-  readonly targetPath?: string;
-  readonly targetLabel?: string;
-}): ReadonlyMap<string, string> | undefined {
-  if (!input.targetPath || !input.targetLabel) return undefined;
-  const absolutePath = path.resolve(input.workspaceRoot, input.targetPath);
-  if (!pathStaysInsideWorkspace(input.workspaceRoot, absolutePath)) return undefined;
-  try {
-    return new Map([[input.targetLabel, fs.readFileSync(absolutePath, "utf8")]]);
-  } catch {
-    return undefined;
+    environment.close();
   }
 }
 
@@ -426,8 +343,8 @@ function createIntegratedRunner(
   workspaceRoot: string,
   dispatcher: ToolDispatcher,
   enforcer: SandboxEnforcer,
-  workflowContext: ReturnType<typeof getWorkflowGitContext>,
-  mcpSnapshot: Awaited<ReturnType<CoreMcpGateway["snapshot"]>>,
+  workflowContext: IntegratedFlowEnvironment["workflowContext"],
+  mcpSnapshot: IntegratedFlowEnvironment["mcpSnapshot"],
   browserRuntimeStatus: PwRuntimeStatus,
   providerMode: "synthetic" | "real",
   realProvider?: MvpIntegratedFlowOptions["realProvider"],
@@ -499,7 +416,7 @@ function createIntegratedRunner(
           : undefined;
         const content =
           reflectiveOutput ??
-          (await streamTurnRoleDraft({
+          (await runProviderDraftStage({
             role,
             draft: cleanPrompt,
             providerMode,
@@ -589,7 +506,7 @@ function createIntegratedRunner(
       };
     }
 
-    const content = await streamTurnRoleDraft({
+    const content = await runProviderDraftStage({
       role,
       draft:
         "Review complete. Delivering streamed result and preserving safety guardrails.",
@@ -4122,119 +4039,37 @@ async function executeWorkflowTaskPlan(input: {
     evidence.push(...input.plan.continuationLineage!);
   }
   appendSingleFileEditRepairObservability(evidence, input.plan);
-  const planningRuntimeProductRoute = selectPlanningRuntimeProductRoute(input.plan, {
+  const planningRuntimeStage = await runPlanningRuntimeStage({
+    plan: input.plan,
     prompt: input.prompt,
+    workspaceRoot: input.workspaceRoot,
+    sessionId: input.sessionId,
+    turn: input.turn,
+    dispatcher: input.dispatcher,
+    events,
+    baseNotes: input.plan.blockedReason
+      ? [...notes, `blocker: ${input.plan.blockedReason}`]
+      : notes,
+    ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+    ...(input.planningMutationExecution
+      ? { planningMutationExecution: input.planningMutationExecution }
+      : {}),
   });
-  if (planningRuntimeProductRoute.shouldRun) {
-    if (input.plan.blockedReason) {
-      notes.push(`blocker: ${input.plan.blockedReason}`);
-    }
-    const planning = await runPlanningRuntime({
-      workspaceRoot: input.workspaceRoot,
-      userTask: input.prompt,
-      taskKindHint: planningRuntimeProductRoute.taskKind,
-    });
-    const projected = await projectPlanningRuntimeProductOutcome({
-      result: planning,
-      taskKind: planningRuntimeProductRoute.taskKind,
-      routeReason: planningRuntimeProductRoute.routeReason,
-      routeEvidence: planningRuntimeProductRoute.evidence,
-      productPath: "runMvpIntegratedFlow",
-      workspaceRoot: input.workspaceRoot,
-      sessionId: input.sessionId,
-      prompt: input.prompt,
-      execution: input.planningMutationExecution,
-      verificationRuntime: {
-        dispatcher: input.dispatcher,
-        events,
-        taskId: `planning_runtime_product_verify_${input.turn}`,
-        sessionId: input.sessionId,
-        ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
-      },
-    });
-    return {
-      events,
-      notes: [
-        ...notes,
-        `planning-runtime: ${planning.runtimeId}`,
-        `context-engine: ${planning.context.engineId}`,
-        `planning-runtime-status: ${planning.status}`,
-        "planning-runtime-product:path:runMvpIntegratedFlow",
-        ...planningRuntimeProductRoute.evidence,
-        "planning-runtime-product:review-only-no-write-handoff",
-      ],
-      ...projected,
-    };
+  if (planningRuntimeStage) {
+    return planningRuntimeStage;
   }
-  const taskLifecycleActivation = await activateTaskLifecycle({
+  const anchoredProposalStage = await runAnchoredProposalStage({
     workspaceRoot: input.workspaceRoot,
     prompt: input.prompt,
     workflowPlan: input.plan,
+    providerMode: input.providerMode,
+    sessionId: input.sessionId,
+    turn: input.turn,
+    events,
+    baseNotes: notes,
   });
-  if (taskLifecycleActivation) {
-    if (
-      input.providerMode === "synthetic" &&
-      shouldActivateAnchoredProposalRuntimePrompt(input.prompt)
-    ) {
-      const anchoredRuntime = await runAnchoredProposalRuntime({
-        requestId: `runmvp-${input.sessionId}-${input.turn}`,
-        sessionId: input.sessionId,
-        prompt: input.prompt,
-        taskActivation: taskLifecycleActivation,
-        dryRunMode: "fake",
-        currentContentByTargetLabel: readAnchoredProposalCurrentContent({
-          workspaceRoot: input.workspaceRoot,
-          targetPath: input.plan.targetPath,
-          targetLabel: taskLifecycleActivation.contextBundle?.packet.targetSafeLabel,
-        }),
-        inWorkspaceTargetLabels: taskLifecycleActivation.contextBundle
-          ? [taskLifecycleActivation.contextBundle.packet.targetSafeLabel]
-          : [],
-      });
-      return {
-        events,
-        notes: [
-          ...notes,
-          ...taskLifecycleActivation.notes,
-          anchoredRuntime.evalResult.replaySafeSummary,
-          anchoredRuntime.scorecard.replaySafeSummary,
-          anchoredRuntime.harnessTrace.replaySafeSummary,
-          anchoredRuntime.harnessScorecard.replaySafeSummary,
-          ...anchoredRuntime.evidence,
-        ],
-        codingResult: anchoredRuntime.orchestrationResult?.codingResult ?? {
-          ...taskLifecycleActivation.runtimeOutcome.codingResult,
-          evidence: [...anchoredRuntime.evidence],
-          continuation: {
-            ...taskLifecycleActivation.runtimeOutcome.codingResult.continuation,
-            evidence: [...anchoredRuntime.evidence],
-          },
-          taskSatisfaction: {
-            ...taskLifecycleActivation.runtimeOutcome.codingResult.taskSatisfaction,
-            observedEvidence: [...anchoredRuntime.evidence],
-          },
-        },
-        userFacingOutput: anchoredRuntime.output,
-      };
-    }
-    return {
-      events,
-      notes: [
-        ...notes,
-        ...taskLifecycleActivation.notes,
-      ],
-      codingResult: taskLifecycleActivation.runtimeOutcome.codingResult,
-      userFacingOutput: formatTaskLifecycleActivationOutput({
-        activation: taskLifecycleActivation,
-        baseOutput: taskLifecycleActivation.contextBundle
-          ? [
-              taskLifecycleActivation.contextBundle.packetResult.output,
-              "",
-              taskLifecycleActivation.contextBundle.graphResult.output,
-            ].join("\n")
-          : undefined,
-      }),
-    };
+  if (anchoredProposalStage) {
+    return anchoredProposalStage;
   }
   const discoveryEditRequest = buildDiscoveryEditRuntimeRequest({
     prompt: input.prompt,
