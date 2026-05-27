@@ -30,6 +30,9 @@ describe("runControlledEditOperationRoute", () => {
     expect(result.applyState).toBe("applied");
     expect(result.verificationState).toBe("passed");
     expect(result.reportedSuccess).toBe(true);
+    expect(result.productEdit.verdict.status).toBe("COMPLETE");
+    expect(result.productEdit.readbackStatus).toBe("verified");
+    expect(result.productEdit.applyIsVerificationSuccess).toBe(false);
     expect(result.result.codingResult?.perFilePatchPlan).toEqual(
       expect.objectContaining({
         creatorInvoked: true,
@@ -114,6 +117,8 @@ describe("runControlledEditOperationRoute", () => {
     expect(result.changedFiles).toEqual(["src/a.ts"]);
     expect(result.failedFiles).toEqual(["src/b.ts"]);
     expect(result.reportedSuccess).toBe(false);
+    expect(result.productEdit.verdict.status).toBe("BLOCKED");
+    expect(result.productEdit.oneFileSuccessCanHideAnotherFailure).toBe(false);
     expect(result.evidence).toContain("controlled-edit-operation-route:no-success-without-post-write-verification");
   });
 });

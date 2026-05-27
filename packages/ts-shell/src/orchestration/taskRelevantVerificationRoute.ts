@@ -15,6 +15,10 @@ import type {
   CodingResultSummary,
   OrchestrationResult,
 } from "./types.js";
+import {
+  projectVerificationReceipt,
+  type ProductVerificationReceipt,
+} from "../product/verification/verificationFacade.js";
 
 export type VerificationAuthorityState =
   | "explicitly-approved"
@@ -90,6 +94,7 @@ export interface TaskRelevantVerificationResult {
   readonly verdict: TaskRelevantVerificationVerdict;
   readonly resultSurface: OrchestrationResult;
   readonly notProvenClaims: readonly string[];
+  readonly productVerification: ProductVerificationReceipt;
   readonly evidence: readonly string[];
 }
 
@@ -150,6 +155,19 @@ export async function runTaskRelevantVerificationRoute(input: {
       "task-relevant-verification:provider-call:not-run",
       "task-relevant-verification:mutation:not-run",
     ];
+    const productVerification = projectVerificationReceipt({
+      selectedCommand: commandPlan.selectedCommand,
+      authority: input.authority.state,
+      dispatchStatus: run?.toolResult ? "dispatched" : "not-run",
+      runtimeStatus: run?.result.outcome,
+      relevanceStatus: commandPlan.relevanceStatus,
+      coverageStatus: commandPlan.coverageStatus,
+      coveredFiles: commandPlan.coveredFiles,
+      uncoveredFiles: commandPlan.uncoveredFiles,
+      failureClass: run?.result.failureClassification?.failureClass,
+      notProvenClaims,
+      verdictStatus: verdict,
+    });
 
     return {
       taskId: input.taskId,
@@ -168,6 +186,7 @@ export async function runTaskRelevantVerificationRoute(input: {
         evidence,
       }),
       notProvenClaims,
+      productVerification,
       evidence,
     };
   } finally {

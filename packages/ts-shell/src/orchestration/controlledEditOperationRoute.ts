@@ -3,6 +3,10 @@ import type { OrchestrationResult } from "./types.js";
 import { classifyBoundedApplyPatchCandidate } from "./patchResult/boundedApplyPatchCandidate.js";
 import type { MutationRoutingProjectionAuthority } from "./mutationRoutingProjection.js";
 import type { RecoveryAuthorityStoreConfig } from "./patchRecovery/recoveryAuthorityStore.js";
+import {
+  projectEditOperation,
+  type ProductEditOperationProjection,
+} from "../product/edit/editFacade.js";
 
 export type ControlledEditOperationKind =
   | "update-existing-file"
@@ -33,6 +37,7 @@ export interface ControlledEditOperationRouteResult {
   readonly recoveryExecuted: false;
   readonly atomicRollbackAvailable: false;
   readonly reportedSuccess: boolean;
+  readonly productEdit: ProductEditOperationProjection;
   readonly evidence: readonly string[];
 }
 
@@ -89,6 +94,31 @@ export async function runControlledEditOperationRoute(input: {
     result.terminalClassification === "success" &&
     perFilePlan?.successLike === true &&
     perFilePlan.postWriteVerification === "passed";
+  const productEdit = projectEditOperation({
+    operationKind,
+    mode: allowApply ? "selected-workspace-apply" : "preview-only",
+    authority: allowApply ? "explicit-selected-workspace" : "not-granted",
+    applyStatus: changedFiles.length > 0
+      ? "applied"
+      : result.status === "stopped_error"
+        ? "blocked"
+        : "not-run",
+    verificationState: verificationStatus === "passed"
+      ? "passed"
+      : verificationStatus === "failed"
+        ? "failed"
+        : result.status === "stopped_error" && changedFiles.length > 0
+          ? "blocked"
+          : "not-run",
+    changedFiles,
+    failedFiles,
+    plannedFiles,
+    recoveryAvailable: result.codingResult?.recoverySurface?.recoveryAvailable === true,
+    recoveryExecuted: false,
+    atomicRollbackAvailable: false,
+    providerCallDuringApply: false,
+    reportedSuccess,
+  });
   return {
     operationKind,
     mode: allowApply ? "selected-workspace-apply" : "preview-only",
@@ -115,6 +145,7 @@ export async function runControlledEditOperationRoute(input: {
     recoveryExecuted: false,
     atomicRollbackAvailable: false,
     reportedSuccess,
+    productEdit,
     evidence: [
       `controlled-edit-operation-route:operation:${operationKind}`,
       `controlled-edit-operation-route:mode:${allowApply ? "selected-workspace-apply" : "preview-only"}`,

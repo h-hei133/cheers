@@ -94,6 +94,8 @@ describe("taskRelevantVerificationRoute", () => {
     expect(result.commandPlan.relevanceStatus).toBe("relevant");
     expect(result.dispatchStatus).toBe("not-run");
     expect(result.verdict).toBe("approval-required");
+    expect(result.productVerification.verdict.status).toBe("NOT_PROVEN");
+    expect(result.productVerification.selectedNotRunIsSuccess).toBe(false);
     expect(result.resultSurface.status).toBe("stopped_error");
     expect(result.notProvenClaims).toEqual(
       expect.arrayContaining(["selected command dispatch", "runtime receipt", "task success"]),
@@ -131,6 +133,8 @@ describe("taskRelevantVerificationRoute", () => {
     ]);
     expect(result.run?.result.outcome).toBe("success");
     expect(result.verdict).toBe("insufficient-evidence");
+    expect(result.productVerification.verdict.status).toBe("NOT_PROVEN");
+    expect(result.productVerification.oneFileSuccessCanHideAnotherFailure).toBe(false);
     expect(result.resultSurface.status).toBe("stopped_error");
     expect(result.notProvenClaims).toContain("full changed-file verification coverage");
   });
@@ -217,6 +221,7 @@ describe("taskRelevantVerificationRoute", () => {
     });
 
     expect(result.verdict).toBe("verified");
+    expect(result.productVerification.verdict.status).toBe("COMPLETE");
     expect(result.resultSurface.status).toBe("completed");
     expect(result.resultSurface.codingResult?.verification.status).toBe("passed");
     expect(result.resultSurface.codingResult?.verifiedFiles).toEqual([

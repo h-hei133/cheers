@@ -36,6 +36,9 @@ describe("verificationRepairIterationFlow", () => {
       expect(result.applyStatus).toBe("single-target-applied");
       expect(result.sameVerificationCommandRerun).toBe(true);
       expect(result.postRepairVerification.status).toBe("passed");
+      expect(result.productRepair.verdict.status).toBe("COMPLETE");
+      expect(result.productRepair.repairProposalIsSuccess).toBe(false);
+      expect(result.productRepair.repairApplyWithoutReverifyIsSuccess).toBe(false);
       expect(result.unconfirmedResult.status).toBe("stopped_error");
       expect(result.unverifiedResult.status).toBe("stopped_error");
       expect(result.finalResult.status).toBe("completed");
@@ -85,6 +88,8 @@ describe("verificationRepairIterationFlow", () => {
 
       expect(result.finalRepairVerdict).toBe("repair-failed");
       expect(result.postRepairVerification.status).toBe("failed");
+      expect(result.productRepair.verdict.status).toBe("PARTIAL");
+      expect(result.productRepair.repairApplyWithoutReverifyIsSuccess).toBe(false);
       expect(result.finalResult.status).toBe("stopped_error");
       expect(result.notProvenClaims).toContain("repair success");
       expect(result.retryCount).toBe(1);

@@ -11,6 +11,10 @@ import {
 } from "./verificationRepairPlanner.js";
 import { buildVerificationRepairResult } from "./verificationRepairResult.js";
 import type { OrchestrationResult } from "./types.js";
+import {
+  projectRepairIteration,
+  type ProductRepairIterationProjection,
+} from "../product/repair/repairFacade.js";
 
 export type RepairIterationVerdict =
   | "verified-success-with-repair"
@@ -49,6 +53,7 @@ export interface VerificationRepairIterationResult {
   readonly finalResult: OrchestrationResult;
   readonly finalRepairVerdict: RepairIterationVerdict;
   readonly notProvenClaims: readonly string[];
+  readonly productRepair: ProductRepairIterationProjection;
   readonly evidence: readonly string[];
 }
 
@@ -254,6 +259,19 @@ export async function runVerificationRepairIterationFlow(input: {
     finalRepairVerdict === "verified-success-with-repair"
       ? ["live provider repair proposal", "automatic repair", "fuzzy repair apply"]
       : ["repair success", "post-repair verification passed"];
+  const productRepair = projectRepairIteration({
+    originalFailurePreserved: true,
+    repairProposalSource: "deterministic-from-failure-evidence",
+    confirmationSource: "explicit-authority-contract",
+    applyStatus: applyResult.status,
+    postRepairVerificationStatus: postRepairVerification.status,
+    sameVerificationCommandRerun: postRepairVerification.command === input.verificationCommand,
+    retryCount: 1,
+    maxRepairAttempts: 1,
+    changedFiles: applyResult.changedFiles,
+    notProvenClaims,
+    finalRepairVerdict,
+  });
 
   return {
     taskId: input.taskId,
@@ -277,6 +295,7 @@ export async function runVerificationRepairIterationFlow(input: {
     finalResult,
     finalRepairVerdict,
     notProvenClaims,
+    productRepair,
     evidence: [
       ...originalFailure.evidence,
       ...context.evidence,
