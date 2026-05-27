@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  projectWorkflowExecutionResultContract,
   projectWorkflowRuntimeResultContract,
   truncateText,
 } from "./workflowRuntimeProjection.js";
@@ -64,5 +65,44 @@ describe("workflowRuntimeProjection", () => {
 
   it("truncates long evidence text deterministically", () => {
     expect(truncateText("x".repeat(230))).toHaveLength(223);
+  });
+
+  it("adds failure repair fallback without turning failed mutation into success", () => {
+    const projection = projectWorkflowExecutionResultContract({
+      plan: {
+        taskKind: "edit-file",
+        targetPath: "src/a.ts",
+        verifyAfterEdit: false,
+        inspectFirst: false,
+      } as never,
+      workspaceRoot: "/tmp/workspace",
+      preRunGitChangeSet: {
+        insideGit: false,
+        root: undefined,
+        entries: [],
+        summary: "not a git repository",
+      },
+      changedFiles: [],
+      failedFiles: [{ path: "src/a.ts", reason: "patch failed" }],
+      patches: [],
+      verifiedFiles: [],
+      unverifiedFiles: [],
+      verification: {
+        status: "not-requested",
+        selectionScope: "none",
+        selectionSource: "not-requested",
+      },
+      repairNotes: [],
+      evidence: ["patch failed"],
+      degradedCrossFileTargets: [],
+      crossFileRemainingTargets: [],
+      crossFileFailedByReason: [],
+      crossFileSkippedFiles: [],
+    });
+
+    expect(projection.codingResult.status).not.toBe("success");
+    expect(projection.codingResult.repair.notes).toContain(
+      "operation failed; inspect failed items and rerun with clearer target/instruction",
+    );
   });
 });
