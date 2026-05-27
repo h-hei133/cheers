@@ -28,8 +28,24 @@ import {
   runApplyPatchRuntimeBridgeIfRequested,
   type ApplyPatchRuntimeRouteOptions,
 } from "../edit/applyPatchRuntimeBridge.js";
+import {
+  buildExplainTaskDelivery,
+  buildInspectFilesDelivery,
+  buildPurposeIoExplainDelivery,
+} from "../context/repoExplainStage.js";
 import { runProviderDraftStage } from "../provider/providerDraftStage.js";
 import { runPlanningRuntimeStage } from "../planning/planningRuntimeStage.js";
+import {
+  derivePromptPathTarget,
+  hasExplicitExecutionIntent,
+  hasPathLikeReference,
+  stripPathTokensForIntent,
+} from "../planning/promptTargetProjection.js";
+import {
+  detectVerifyCommand,
+  hasExternalVerifyOptOut,
+  isVerifyLikeCommand,
+} from "../policy/commandIntentPolicy.js";
 import { runAnchoredProposalStage } from "../proposal/anchoredProposalStage.js";
 import {
   detectWorkflowBrowserPlan,
@@ -7270,97 +7286,6 @@ function mergeGroundedRepairConstraints(
   }
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
-function buildInspectFilesDelivery(globOutput: string): string {
-  const files = globOutput
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  if (files.length === 0) {
-    return "Task not completed: inspection ran but no candidate files were found for the requested scope.";
-  }
-  const preview = files.slice(0, 20).join("\n");
-  return [
-    "Repository inspection result (candidate files):",
-    "```text",
-    preview,
-    "```",
-    files.length > 20
-      ? `Total matches: ${files.length}. Showing first 20 entries.`
-      : `Total matches: ${files.length}.`,
-  ].join("\n");
-}
-
-function buildExplainTaskDelivery(targetPath: string, content: string): string {
-  const lines = content.split(/\r?\n/);
-  const nonEmpty = lines
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  const preview = nonEmpty.slice(0, 5);
-  const signalHints: string[] = [];
-
-  if (/\b(import|from)\b/.test(content)) {
-    signalHints.push("imports dependencies/modules");
-  }
-  if (/\b(function|const|class|export)\b/.test(content)) {
-    signalHints.push("defines executable logic/API symbols");
-  }
-  if (/\b(test|describe|it\(|expect\()/i.test(content)) {
-    signalHints.push("contains test-related logic");
-  }
-  if (/\b(fetch|http|api|request)\b/i.test(content)) {
-    signalHints.push("contains request/network handling");
-  }
-
-  return [
-    `Explanation for ${targetPath}:`,
-    `- File appears to ${signalHints.length > 0 ? signalHints.join("; ") : "contain implementation/content logic based on inspected lines"}.`,
-    `- Non-empty lines: ${nonEmpty.length}.`,
-    preview.length > 0 ? "- Key excerpts:" : "- Key excerpts: none",
-    preview.length > 0 ? ["```text", preview.join("\n"), "```"].join("\n") : "",
-  ]
-    .filter((item) => item.length > 0)
-    .join("\n");
-}
-
-function buildPurposeIoExplainDelivery(
-  targetPath: string,
-  content: string,
-): string {
-  const lines = content
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  const inputHints = lines.filter((line) =>
-    /\b(input|args?|params?|request|payload|stdin|argv)\b/i.test(line),
-  );
-  const outputHints = lines.filter((line) =>
-    /\b(output|return|response|stdout|result)\b/i.test(line),
-  );
-  const roleHint = inferFileRoleHint(content);
-  return [
-    `Explanation for ${targetPath} (scoped to role + I/O):`,
-    `- Role: ${roleHint}.`,
-    `- Inputs: ${inputHints.length > 0 ? inputHints.slice(0, 2).join(" | ") : "No explicit input markers found in inspected lines."}`,
-    `- Outputs: ${outputHints.length > 0 ? outputHints.slice(0, 2).join(" | ") : "No explicit output markers found in inspected lines."}`,
-  ].join("\n");
-}
-
-function inferFileRoleHint(content: string): string {
-  if (/\b(test|describe|it\(|expect\()/i.test(content)) {
-    return "test verification logic";
-  }
-  if (/\b(fetch|request|api|http|endpoint)\b/i.test(content)) {
-    return "request/adapter flow";
-  }
-  if (/\b(interface|type|schema|zod)\b/i.test(content)) {
-    return "type/schema contract definition";
-  }
-  if (/\b(main|bootstrap|start|entry)\b/i.test(content)) {
-    return "entry/bootstrap orchestration";
-  }
-  return "general implementation logic";
-}
-
 function summarizeAsConclusionWithEvidence(
   content: string,
   evidenceCount: number,
@@ -8966,30 +8891,6 @@ function countDeliverableModeCues(prompt: string): number {
   return Number(hasRead) + Number(hasSummary) + Number(hasExplain);
 }
 
-function detectVerifyCommand(normalizedPrompt: string): string | undefined {
-  if (
-    normalizedPrompt.includes("node --version") ||
-    normalizedPrompt.includes("node version")
-  ) {
-    return "node --version";
-  }
-  if (/(test|\u6d4b\u8bd5)/i.test(normalizedPrompt)) {
-    return "npm test -- --help";
-  }
-  if (
-    /(build|\u6784\u5efa|\u7f16\u8bd1|\u68c0\u67e5)/i.test(normalizedPrompt)
-  ) {
-    return "npm run build -- --help";
-  }
-  return undefined;
-}
-
-function hasExternalVerifyOptOut(prompt: string): boolean {
-  return /\b(?:do\s+not|don't|without|no)\s+(?:run\s+)?(?:npm|tests?|build|cargo|external\s+commands?)\b/i.test(
-    prompt,
-  );
-}
-
 function extractLowRiskRenameRefactor(
   prompt: string,
 ): { from: string; to: string; paths: string[] } | undefined {
@@ -9123,12 +9024,6 @@ function sanitizeReplaceTarget(value: string): string {
     .replace(/\s+then\s+run\b[\s\S]*$/i, "")
     .replace(/\s+and\s+run\b[\s\S]*$/i, "")
     .trim();
-}
-
-function isVerifyLikeCommand(command: string): boolean {
-  return /(?:\bverify\b|\btest\b|\btests?\b|\bbuild\b|\blint\b|\bcheck\b|npm\s+test|npm\s+run\s+build|pnpm\s+test|yarn\s+test|vitest|jest|pytest|cargo\s+test|go\s+test)/i.test(
-    command,
-  );
 }
 
 function inferReplaceDirectiveFromContinuity(input: {
@@ -10363,72 +10258,4 @@ function normalizePathLike(value: string): string {
     .replace(/\\/g, "/")
     .replace(/^\.\/+/g, "")
     .trim();
-}
-
-function stripPathTokensForIntent(prompt: string): string {
-  return prompt
-    .replace(/["'`](?:\.{1,2}[\\/]|[A-Za-z]:[\\/]|\/)[^"'`]+["'`]/g, " ")
-    .replace(
-      /\b(?:[\w.-]+[\\/])+[\w.-]+\.(?:d\.ts|test\.(?:ts|tsx|jsx|js)|spec\.(?:ts|tsx|jsx|js)|[A-Za-z0-9]{1,8})\b/g,
-      " ",
-    )
-    .replace(/(?:\.{1,2}[\\/]|[A-Za-z]:[\\/]|\/)[^\s\u3002\uFF0C,;:!?]+/g, " ")
-    .replace(/\b[\w.-]+\.[A-Za-z0-9]{1,8}\b/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function hasPathLikeReference(prompt: string): boolean {
-  return /(?:[A-Za-z]:[\\/][^\s"'`<>|?*]+|\.{1,2}[\\/][^\s"'`<>|?*]+|\/[^\s"'`<>|?*]+|[A-Za-z0-9._-]+\.(?:d\.ts|test\.(?:ts|tsx|js|jsx)|spec\.(?:ts|tsx|js|jsx)|tsx|jsx|ts|js|py|go|rs|md|txt|json|log|yaml|yml|toml))(?:$|\s|[,.!?;:])/i.test(
-    prompt,
-  );
-}
-
-function derivePromptPathTarget(
-  prompt: string,
-  workspaceRoot: string,
-): {
-  raw: string;
-  cleaned: string;
-  absolutePath: string;
-  inWorkspace: boolean;
-} | null {
-  const quotedMatch = prompt.match(/["'`](\.{1,2}[\\/][^"'`]+?)["'`]/);
-  const unquotedMatch = prompt.match(
-    /(\.{1,2}[\\/][^\n\r]+?\.[A-Za-z0-9]+)(?=\s*(?:\u6587\u4ef6|\u5185\u5bb9|\u524d\s*\d+\s*\u884c|\u5728\u505a\u4ec0\u4e48|$|[\uFF0C,\u3002]))/u,
-  );
-  const raw = (quotedMatch?.[1] ?? unquotedMatch?.[1] ?? "").trim();
-  if (!raw) {
-    return null;
-  }
-
-  const cleaned = raw.replace(/[\uFF0C,\u3002.]+$/u, "").trim();
-  const absolutePath = path.resolve(workspaceRoot, cleaned);
-  const workspaceAbsolute = path.resolve(workspaceRoot);
-  const normalizedAbsolute = absolutePath.toLowerCase();
-  const normalizedWorkspace = workspaceAbsolute.toLowerCase();
-  const inWorkspace =
-    normalizedAbsolute === normalizedWorkspace ||
-    normalizedAbsolute.startsWith(
-      `${normalizedWorkspace}${path.sep.toLowerCase()}`,
-    );
-
-  return {
-    raw: cleaned,
-    cleaned,
-    absolutePath,
-    inWorkspace,
-  };
-}
-
-function hasExplicitExecutionIntent(
-  rawPrompt: string,
-  normalizedPrompt: string,
-): boolean {
-  const englishIntent = /\b(run|execute|command|bash|terminal)\b/i.test(
-    normalizedPrompt,
-  );
-  const chineseIntent =
-    /(?:\u8fd0\u884c|\u6267\u884c|\u547d\u4ee4|\u7ec8\u7aef)/u.test(rawPrompt);
-  return englishIntent || chineseIntent;
 }
