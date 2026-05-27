@@ -3,6 +3,13 @@
 This is a target physical architecture for future migration. It is not a
 current-state claim and should not be implemented in Route229.
 
+The reset productizes the whole repository around clear ownership boundaries.
+The `product/` directory shown below is a possible home for stable product
+domains, not a mandate to move every capability under
+`packages/ts-shell/src/product/`. Some final owners may remain in
+entrypoints/app/CLI, session, runtime adapters, contracts, or other
+domain-specific areas when that keeps responsibilities clearer.
+
 ## Target Top-Level Map
 
 ```text
@@ -52,7 +59,9 @@ cross-runtime semantic boundary. Python eval remains outside product runtime.
 
 ## Responsibilities That Become Directories
 
-The following should become stable product directories:
+The following should become stable product domains. They may become directories
+when that is the clearest final owner, or facades/adapters when an existing
+domain directory already owns the responsibility:
 
 - `turn`: agent turn kernel, high-level capability dispatch, turn receipts.
 - `context`: context acquisition, code graph summaries, planning packets.
@@ -94,6 +103,11 @@ Public product APIs should be explicit:
   entrypoints.
 - `product/session/index.ts` exposes session store, transcript, and
   continuation APIs.
+
+These paths are target examples, not required destinations for compatibility
+facades. Existing `src/product/*` facades from reset routes must be audited
+later as either final-domain APIs or temporary shims with a named migration
+target.
 
 Internal-only files should stay behind module-local `internal/` folders or
 non-exported paths. Scripts and tests should consume public facades unless they

@@ -6,6 +6,15 @@ Reduce CLI/session/runtime coupling through product facades and session-owned tr
 
 This route does not redesign UI. It clarifies ownership: CLI presents and collects intent; session persists transcript and continuation; result/evidence determines truth.
 
+For this route, "product facade" means a stable product boundary, not
+necessarily a new `packages/ts-shell/src/product/*` directory. Prefer the final
+domain owner for the seam: CLI presentation under entrypoints/app/CLI, session
+facts under `session`, result/verdict facts under the existing result owner, and
+turn invocation through the current turn compatibility facade. Do not create
+broad new `src/product/session` or `src/product/presentation` buckets unless the
+route documents them as temporary compatibility shims with a named final
+migration target.
+
 Expected final status: `COMPLETE`.
 
 ## Scope
@@ -50,6 +59,9 @@ Map current responsibilities:
 - result rendering
 
 Identify coupling that can be reduced by facade/shim.
+
+Classify any new seam as final-domain or temporary compatibility. If temporary,
+state the final owner it is preparing for.
 
 ### Phase 2: Session presentation facts
 

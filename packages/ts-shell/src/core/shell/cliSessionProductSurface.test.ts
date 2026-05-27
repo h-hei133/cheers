@@ -95,6 +95,41 @@ describe("CLI session product surface", () => {
     expect(surface?.lines.join("\n")).toContain("Tools: receipts=");
   });
 
+  it("keeps skipped verification as partial instead of CLI/session success", () => {
+    const result = codingResult({
+      changedFiles: ["cli-entry-tool-execution.txt"],
+      verification: {
+        status: "skipped",
+        selectionScope: "none",
+        selectionSource: "auto-from-changes",
+        reason:
+          "targeted verification skipped: changed files do not map to a supported allowlisted verification command",
+        nextAction:
+          "targeted verification skipped: changed files do not map to a supported allowlisted verification command",
+      },
+      taskSatisfaction: {
+        verdict: "completed-with-caveats",
+        reasons: ["write completed, verification skipped"],
+        requiredEvidence: ["task-relevant verification"],
+        observedEvidence: ["file write"],
+      },
+    });
+
+    const surface = projectCliSessionProductSurface({
+      status: "completed",
+      terminalClassification: "success",
+      terminalReason: "completed",
+      codingResult: result,
+    });
+
+    expect(surface?.verdict).toBe(
+      "Partial: some work completed, but required evidence is incomplete.",
+    );
+    expect(surface?.notProvenClaims).toContain("relevant verification did not pass");
+    expect(surface?.lines.join("\n")).toContain("- Verification: status=skipped");
+    expect(surface?.lines.join("\n")).not.toContain("Outcome: success");
+  });
+
   it("redacts raw content, provider homes, secrets, and raw edit text", () => {
     const result = codingResult({
       evidence: [

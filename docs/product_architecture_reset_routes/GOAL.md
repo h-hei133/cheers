@@ -46,6 +46,19 @@ The target structure should make these boundaries visible:
 - runtime / adapters / shared contracts
 - dev-only harness / evidence history / route history
 
+Product-owned architecture means productizing the whole repository around
+clear ownership boundaries. It does not mean moving every capability under
+`packages/ts-shell/src/product/`. Final ownership may live in domain-specific
+areas such as `entrypoints`/app CLI, `session`, `core/query` result surfaces,
+runtime adapters, tools, browser, MCP, contracts, and focused product modules.
+
+Compatibility facades introduced during Reset Routes B-E under
+`packages/ts-shell/src/product/*` are transitional compatibility surfaces unless
+a later route proves they are the final domain owner. Future routes should
+prefer the final domain owner for new seams: entrypoints/app/CLI, session,
+result, turn, evidence, provider, proposal, edit, verification, repair, policy,
+tools, browser, and MCP.
+
 The reset must preserve the project's main innovation:
 
 ```text

@@ -6,9 +6,9 @@ import { validateLightweightProviderCredential } from "../core/query/lightweight
 import type { QueryEvent } from "../core/query/events.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import {
-  streamMvpIntegratedFlow,
   type ApplyPatchRuntimeRouteOptions,
 } from "../orchestration/runMvpIntegratedFlow.js";
+import { streamProductTurn } from "../product/turn/turnFacade.js";
 import type { PlanningRuntimeProductExecutionOptions } from "../orchestration/planningRuntimeProductExecution.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
@@ -46,7 +46,7 @@ export interface CliRuntimeInvocationResult {
 }
 
 type IntegratedFlowRunner = (
-  input: Parameters<typeof streamMvpIntegratedFlow>[0],
+  input: Parameters<typeof streamProductTurn>[0],
 ) => AsyncIterable<QueryEvent>;
 type LightweightRunner = (
   input: Parameters<typeof streamLightweightChat>[0],
@@ -64,7 +64,7 @@ export interface CliRuntimeInvocationDependencies {
 
 const defaultCliRuntimeInvocationDependencies: CliRuntimeInvocationDependencies =
   {
-    streamIntegratedFlow: streamMvpIntegratedFlow,
+    streamIntegratedFlow: streamProductTurn,
     streamLightweight: streamLightweightChat,
     checkProviderReadiness: checkRealProviderReadiness,
     createReadinessTerminalEvent: createProviderReadinessCliTerminalEvent,

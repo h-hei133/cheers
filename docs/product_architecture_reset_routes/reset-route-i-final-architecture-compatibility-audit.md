@@ -6,6 +6,10 @@ Prove the architecture reset preserved current capability claims and did not pro
 
 This route is audit-only plus narrow compatibility fixes. It is not feature development.
 
+The final audit must also prove the reset reduced route-grown clutter and moved
+ownership toward final domain boundaries. It must not treat an extra
+compatibility layer as architectural completion by itself.
+
 Expected final status: `COMPLETE` if compatibility and truthfulness are preserved.
 
 ## Scope
@@ -63,6 +67,11 @@ Check:
 
 - product runtime does not import dev/history/docs
 - CLI/session use product facades where expected
+- compatibility facades introduced in Routes B-E are either final-domain owners
+  or are explicitly marked temporary with a final migration target
+- final ownership prefers entrypoints/app/CLI, session, result, turn, evidence,
+  provider, proposal, edit, verification, repair, policy, tools, browser, and
+  MCP instead of broad catch-all `src/product` buckets
 - provider does not import edit authority
 - edit does not import CLI presentation
 - result does not import route reports
@@ -75,6 +84,8 @@ Create or update a final reset compatibility artifact summarizing:
 
 - what changed
 - what stayed compatible
+- whether the reset reduced route-grown clutter or merely added compatibility
+  layers
 - what remains PARTIAL/BLOCKED/NOT-PROVEN
 - which routes are safe to start next
 

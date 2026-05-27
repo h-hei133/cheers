@@ -1,4 +1,8 @@
 import type { CodingResultSummary, OrchestrationStatus, TerminalReason } from "../../orchestration/types.js";
+import {
+  compactSessionPresentationText as compact,
+  projectSessionPresentationFacts,
+} from "../../session/sessionPresentationFacts.js";
 
 export interface CliSessionProductSurfaceInput {
   readonly status: OrchestrationStatus;
@@ -23,9 +27,13 @@ export function projectCliSessionProductSurface(
     return undefined;
   }
 
-  const notProvenClaims = extractNotProvenClaims(codingResult);
-  const verdict = humanVerdict(input, codingResult);
-  const nextAction = nextActionFor(input, codingResult);
+  const facts = projectSessionPresentationFacts(input);
+  if (!facts) {
+    return undefined;
+  }
+  const notProvenClaims = facts.notProvenClaims;
+  const verdict = facts.verdict;
+  const nextAction = facts.nextAction;
   const lines = [
     "Product experience",
     `- Task: ${codingResult.taskKind}`,
@@ -147,80 +155,7 @@ function toolSummary(codingResult: CodingResultSummary): string {
   ].filter(Boolean).join("; ");
 }
 
-function humanVerdict(
-  input: CliSessionProductSurfaceInput,
-  codingResult: CodingResultSummary,
-): string {
-  if (
-    codingResult.verification.status === "passed" &&
-    codingResult.repair.status === "recovered"
-  ) {
-    return "Verified success with repair: initial failure was repaired and re-verification passed.";
-  }
-  if (input.terminalClassification === "success" && codingResult.verification.status === "passed") {
-    return "Verified success: relevant verification passed.";
-  }
-  if (input.terminalClassification === "stopped" && authoritySummary(codingResult).startsWith("authority required")) {
-    return "Stopped: explicit authority is required before continuing.";
-  }
-  if (codingResult.verification.status === "failed") {
-    return "Stopped: verification failed and repair or inspection is required.";
-  }
-  if (codingResult.taskSatisfaction.verdict === "completed-with-caveats") {
-    return "Partial: some work completed, but required evidence is incomplete.";
-  }
-  if (input.terminalClassification !== "success") {
-    return `Blocked: ${compact(input.stopReason ?? input.terminalReason)}`;
-  }
-  if (codingResult.taskSatisfaction.verdict === "insufficient-evidence") {
-    return "Not proven: the system did not gather enough evidence to claim success.";
-  }
-  return "Completed: no additional verification was required.";
-}
-
-function extractNotProvenClaims(codingResult: CodingResultSummary): readonly string[] {
-  const claims = codingResult.evidence
-    .filter((entry) => entry.startsWith("not-proven:"))
-    .map((entry) => compact(entry.slice("not-proven:".length), 120));
-  if (codingResult.verification.status !== "passed") {
-    claims.push("relevant verification did not pass");
-  }
-  if (
-    codingResult.evidence.some((entry) => entry.includes("no-external-live-claim")) &&
-    !claims.includes("external-live tool execution")
-  ) {
-    claims.push("external-live tool execution");
-  }
-  return Array.from(new Set(claims)).slice(0, 8);
-}
-
-function nextActionFor(
-  input: CliSessionProductSurfaceInput,
-  codingResult: CodingResultSummary,
-): string {
-  return compact(
-    codingResult.verification.nextAction ??
-      codingResult.taskSatisfaction.reasons[0] ??
-      input.stopReason ??
-      "Continue with the next requested step.",
-    180,
-  );
-}
-
 function markerValue(evidence: readonly string[], prefix: string): string | undefined {
   const marker = evidence.find((entry) => entry.startsWith(prefix));
   return marker ? compact(marker.slice(prefix.length), 120) : undefined;
-}
-
-function compact(value: string, maxLength = 160): string {
-  return value
-    .replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]")
-    .replace(/<body[\s\S]*?<\/body>/gi, "[raw-content-excluded]")
-    .replace(/\b(raw[_ -]?provider[_ -]?output)\b\s*[:=]\s*\S+/gi, "$1=[redacted]")
-    .replace(/\b(oldText|newText)\b\s*[:=]\s*\S+/g, "$1=[redacted]")
-    .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*\S+/gi, "$1=[redacted]")
-    .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, maxLength);
 }

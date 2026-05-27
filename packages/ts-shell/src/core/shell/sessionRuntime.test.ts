@@ -498,7 +498,18 @@ describe("shell session runtime (W5)", () => {
               changedFiles: [],
               failedFiles: [],
               patches: [],
-              repair: { contextUsed: false },
+              repair: {
+                status: "not-needed",
+                attempts: 0,
+                recoveredItems: [],
+                failedItems: [],
+                notes: [],
+              },
+              continuation: {
+                status: "first-pass-success",
+                attempts: 0,
+                evidence: [],
+              },
               verification: {
                 status: "not-requested",
                 reason: "read-only task",
@@ -506,8 +517,10 @@ describe("shell session runtime (W5)", () => {
                   "Use the observed file context to request a specific edit.",
               },
               taskSatisfaction: {
-                verdict: "completed",
+                verdict: "satisfied",
                 reasons: ["Read/summarize task delivered requested content."],
+                requiredEvidence: ["requested file content"],
+                observedEvidence: ["read:sample.txt:1"],
               },
               evidence: ["read:sample.txt:1"],
               changeSet: {

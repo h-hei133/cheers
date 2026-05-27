@@ -330,11 +330,12 @@ async function runPrintToolExecutionSurface() {
 
   const requiredMarkers = [
     'Result',
-    'Outcome: success',
     'Action result',
     'Task: write-file',
     'Changed files: cli-entry-tool-execution.txt',
-    'Verification detail:',
+    'Verification: status=skipped',
+    'Verdict: Partial',
+    'Not proven: relevant verification did not pass',
     'Next action:',
   ]
   const missing = requiredMarkers.filter((marker) => !result.output.includes(marker))
