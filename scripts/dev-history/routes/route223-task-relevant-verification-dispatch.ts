@@ -4,17 +4,17 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { createCommandRuntimeReceipt } from "../packages/ts-shell/src/core/runtime/runtimeReceipt.js";
-import { projectRuntimeReceipt } from "../packages/ts-shell/src/core/runtime/runtimeReceiptProjection.js";
-import type { ToolDispatcher } from "../packages/ts-shell/src/tools/dispatcher.js";
+import { createCommandRuntimeReceipt } from "../../../packages/ts-shell/src/core/runtime/runtimeReceipt.js";
+import { projectRuntimeReceipt } from "../../../packages/ts-shell/src/core/runtime/runtimeReceiptProjection.js";
+import type { ToolDispatcher } from "../../../packages/ts-shell/src/tools/dispatcher.js";
 import type {
   ToolExecutionContext,
   ToolExecutionResult,
-} from "../packages/ts-shell/src/tools/types.js";
+} from "../../../packages/ts-shell/src/tools/types.js";
 import {
   runTaskRelevantVerificationRoute,
   type TaskRelevantVerificationResult,
-} from "../packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.js";
+} from "../../../packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.js";
 
 const frozenTaskPackPath = "docs/implementation-context/frozen-capability-tasks-route221.json";
 const reportPath = path.join(

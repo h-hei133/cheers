@@ -4,12 +4,12 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { ShellSessionRuntime } from "../packages/ts-shell/src/core/shell/sessionRuntime.js";
-import { SessionManager } from "../packages/ts-shell/src/session/SessionManager.js";
+import { ShellSessionRuntime } from "../../../packages/ts-shell/src/core/shell/sessionRuntime.js";
+import { SessionManager } from "../../../packages/ts-shell/src/session/SessionManager.js";
 import type {
   CodingResultSummary,
   OrchestrationResult,
-} from "../packages/ts-shell/src/orchestration/types.js";
+} from "../../../packages/ts-shell/src/orchestration/types.js";
 
 const reportPath = path.join(
   process.cwd(),

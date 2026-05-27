@@ -3,18 +3,18 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { checkRealProviderReadiness } from "../packages/ts-shell/src/core/shell/providerReadiness.js";
-import type { RuntimeProvider } from "../packages/ts-shell/src/config/runtimeConfig.js";
-import { approveLiveProviderAdapter } from "../packages/ts-shell/src/orchestration/liveProviderAdapterApproval.js";
-import type { LiveProviderReadinessStatus } from "../packages/ts-shell/src/orchestration/liveProviderAdapterApproval.js";
-import { createOpenAICompatibleAnchoredSmokeAdapter } from "../packages/ts-shell/src/orchestration/openAICompatibleAnchoredSmokeAdapter.js";
+import { checkRealProviderReadiness } from "../../../packages/ts-shell/src/core/shell/providerReadiness.js";
+import type { RuntimeProvider } from "../../../packages/ts-shell/src/config/runtimeConfig.js";
+import { approveLiveProviderAdapter } from "../../../packages/ts-shell/src/orchestration/liveProviderAdapterApproval.js";
+import type { LiveProviderReadinessStatus } from "../../../packages/ts-shell/src/orchestration/liveProviderAdapterApproval.js";
+import { createOpenAICompatibleAnchoredSmokeAdapter } from "../../../packages/ts-shell/src/orchestration/openAICompatibleAnchoredSmokeAdapter.js";
 import type {
   PlanningRuntimeProductExecutionOptions,
   PlanningRuntimeProductLiveProviderAttempt,
-} from "../packages/ts-shell/src/orchestration/planningRuntimeProductExecution.js";
-import type { ProviderEditAvailability } from "../packages/ts-shell/src/orchestration/providerEditPlanner.js";
-import type { ProviderEditRawProposal } from "../packages/ts-shell/src/orchestration/providerEditProposal.js";
-import { runMvpIntegratedFlow } from "../packages/ts-shell/src/orchestration/runMvpIntegratedFlow.js";
+} from "../../../packages/ts-shell/src/orchestration/planningRuntimeProductExecution.js";
+import type { ProviderEditAvailability } from "../../../packages/ts-shell/src/orchestration/providerEditPlanner.js";
+import type { ProviderEditRawProposal } from "../../../packages/ts-shell/src/orchestration/providerEditProposal.js";
+import { runMvpIntegratedFlow } from "../../../packages/ts-shell/src/orchestration/runMvpIntegratedFlow.js";
 import {
   approvedRealProviderHome,
   buildEffectiveProviderEnv,

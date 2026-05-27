@@ -14,6 +14,16 @@ surface map only; old commands remain supported compatibility aliases.
 | `verify:route-history:*` | Route-era verifiers and benchmarks kept for provenance. | Calls existing `verify:route*` commands; old names remain valid. |
 | `demo:route-history:*` | Route-era demos kept for provenance. | Calls the existing route demo command. |
 
+## Backing Script Namespaces
+
+Reset Route H moved historical `scripts/route*.ts` runners to
+`scripts/dev-history/routes/`. Package commands are the compatibility surface:
+old `verify:route*` aliases and new `verify:route-history:*` aliases both
+resolve to the moved scripts.
+
+`scripts/verify-route221-anti-false-success-gate.mjs` stayed at its old path
+because it is active evidence infrastructure, not simple route history.
+
 ## Active Evidence Exceptions
 
 `verify:route221-anti-false-success-gate` is route-named but remains active
@@ -44,4 +54,3 @@ Use a small representative set instead of sweeping all route-history commands:
 - Old route-history alias: `npm run verify:route205-repair-proof-chain`.
 - New route-history alias: `npm run verify:route-history:route205-repair-proof-chain`.
 - Provider opt-in check: inspect package scripts and do not run live provider.
-

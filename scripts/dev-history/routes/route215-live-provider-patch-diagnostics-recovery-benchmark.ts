@@ -3,10 +3,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { runMvpIntegratedFlow } from "../packages/ts-shell/src/orchestration/runMvpIntegratedFlow.js";
-import { parseProviderExactPatchOutput } from "../packages/ts-shell/src/orchestration/providerExactPatchContract.js";
-import type { PlanningRuntimeProductExecutionOptions } from "../packages/ts-shell/src/orchestration/planningRuntimeProductExecution.js";
-import type { ProviderEditRawProposal } from "../packages/ts-shell/src/orchestration/providerEditProposal.js";
+import { runMvpIntegratedFlow } from "../../../packages/ts-shell/src/orchestration/runMvpIntegratedFlow.js";
+import { parseProviderExactPatchOutput } from "../../../packages/ts-shell/src/orchestration/providerExactPatchContract.js";
+import type { PlanningRuntimeProductExecutionOptions } from "../../../packages/ts-shell/src/orchestration/planningRuntimeProductExecution.js";
+import type { ProviderEditRawProposal } from "../../../packages/ts-shell/src/orchestration/providerEditProposal.js";
 
 type ProductResult = Awaited<ReturnType<typeof runMvpIntegratedFlow>>;
 

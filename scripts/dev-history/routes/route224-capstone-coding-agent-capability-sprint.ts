@@ -4,14 +4,14 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { buildDiscoveryEditManifest } from "../packages/ts-shell/src/orchestration/discoveryEditManifest.js";
-import { createWorkspaceWriteAuthority } from "../packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.js";
-import { buildPlanningMutationHandoffProjection } from "../packages/ts-shell/src/orchestration/planningMutationHandoffProjection.js";
-import { runPlanningRuntime } from "../packages/ts-shell/src/orchestration/planningRuntime.js";
-import { preparePlanningRuntimeProductProposal } from "../packages/ts-shell/src/orchestration/planningRuntimeProductProposal.js";
-import { runTargetSetEditRoute } from "../packages/ts-shell/src/orchestration/targetSetEditRoute.js";
-import { runTaskRelevantVerificationRoute } from "../packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.js";
-import { runContentVerificationRepairFlow } from "../packages/ts-shell/src/orchestration/verificationRepairFlow.js";
+import { buildDiscoveryEditManifest } from "../../../packages/ts-shell/src/orchestration/discoveryEditManifest.js";
+import { createWorkspaceWriteAuthority } from "../../../packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.js";
+import { buildPlanningMutationHandoffProjection } from "../../../packages/ts-shell/src/orchestration/planningMutationHandoffProjection.js";
+import { runPlanningRuntime } from "../../../packages/ts-shell/src/orchestration/planningRuntime.js";
+import { preparePlanningRuntimeProductProposal } from "../../../packages/ts-shell/src/orchestration/planningRuntimeProductProposal.js";
+import { runTargetSetEditRoute } from "../../../packages/ts-shell/src/orchestration/targetSetEditRoute.js";
+import { runTaskRelevantVerificationRoute } from "../../../packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.js";
+import { runContentVerificationRepairFlow } from "../../../packages/ts-shell/src/orchestration/verificationRepairFlow.js";
 
 const frozenTaskPackPath = "docs/implementation-context/frozen-capability-tasks-route221.json";
 const reportRelativePath = "docs/implementation-context/route224-capstone-coding-agent-capability-report.json";

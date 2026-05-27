@@ -4,18 +4,18 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { buildAgentPlan } from "../packages/ts-shell/src/orchestration/agentPlan.js";
-import type { TargetedContextPacket } from "../packages/ts-shell/src/orchestration/contextPacket.js";
-import { applyEditProposalSelection } from "../packages/ts-shell/src/orchestration/editProposalApply.js";
-import { buildEditRepairProposalReview } from "../packages/ts-shell/src/orchestration/editProposalReview.js";
-import { selectEditProposalHunks } from "../packages/ts-shell/src/orchestration/editProposalSelection.js";
-import { createWorkspaceWriteAuthority } from "../packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.js";
-import { buildVerificationRepairContext } from "../packages/ts-shell/src/orchestration/verificationRepairContext.js";
+import { buildAgentPlan } from "../../../packages/ts-shell/src/orchestration/agentPlan.js";
+import type { TargetedContextPacket } from "../../../packages/ts-shell/src/orchestration/contextPacket.js";
+import { applyEditProposalSelection } from "../../../packages/ts-shell/src/orchestration/editProposalApply.js";
+import { buildEditRepairProposalReview } from "../../../packages/ts-shell/src/orchestration/editProposalReview.js";
+import { selectEditProposalHunks } from "../../../packages/ts-shell/src/orchestration/editProposalSelection.js";
+import { createWorkspaceWriteAuthority } from "../../../packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.js";
+import { buildVerificationRepairContext } from "../../../packages/ts-shell/src/orchestration/verificationRepairContext.js";
 import {
   planVerificationRepairHunkSetHandoff,
   planVerificationRepairLoop,
-} from "../packages/ts-shell/src/orchestration/verificationRepairPlanner.js";
-import { buildVerificationRepairResult } from "../packages/ts-shell/src/orchestration/verificationRepairResult.js";
+} from "../../../packages/ts-shell/src/orchestration/verificationRepairPlanner.js";
+import { buildVerificationRepairResult } from "../../../packages/ts-shell/src/orchestration/verificationRepairResult.js";
 
 const frozenTaskId = "frozen-upper-bound-challenge-verification-failure-repair-case";
 const targetPath = "packages/ts-shell/src/orchestration/route222RepairFixture.ts";

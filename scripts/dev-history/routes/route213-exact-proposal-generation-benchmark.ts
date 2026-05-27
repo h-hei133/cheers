@@ -3,55 +3,45 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { runMvpIntegratedFlow } from "../packages/ts-shell/src/orchestration/runMvpIntegratedFlow.js";
-import type { PlanningRuntimeProductExecutionOptions } from "../packages/ts-shell/src/orchestration/planningRuntimeProductExecution.js";
+import { runMvpIntegratedFlow } from "../../../packages/ts-shell/src/orchestration/runMvpIntegratedFlow.js";
+import type { PlanningRuntimeProductExecutionOptions } from "../../../packages/ts-shell/src/orchestration/planningRuntimeProductExecution.js";
 
 type ProductResult = Awaited<ReturnType<typeof runMvpIntegratedFlow>>;
 
 interface TaskCase {
   readonly id: string;
-  readonly type: "vague-bugfix" | "feature-output" | "verification";
   readonly task: string;
   readonly workspace: "current-repo" | "fixture";
   readonly execution?: PlanningRuntimeProductExecutionOptions;
   readonly escalationDecision?: "allow-once" | "deny";
   readonly expected: {
-    readonly candidateIncludes?: readonly string[];
-    readonly readIncludes?: readonly string[];
-    readonly handoff?: string;
-    readonly proposal?: string;
-    readonly anchor?: string;
-    readonly confirmation?: string;
-    readonly apply?: string;
-    readonly readback?: string;
-    readonly command?: string;
-    readonly commandDispatch?: string;
-    readonly repair?: string;
+    readonly proposal: string;
+    readonly proposalSource?: string;
+    readonly anchor: string;
+    readonly confirmation: string;
+    readonly apply: string;
+    readonly readback: string;
+    readonly command: string;
+    readonly commandDispatch: string;
+    readonly terminal: string;
+    readonly provider: string;
     readonly changedFiles?: readonly string[];
-    readonly blockerIncludes?: string;
+    readonly evidenceIncludes?: readonly string[];
   };
 }
 
 interface TaskReport {
   readonly id: string;
-  readonly type: TaskCase["type"];
-  readonly task: string;
   readonly productPath: boolean;
-  readonly candidates: readonly string[];
-  readonly reads: readonly string[];
-  readonly analysis: string;
-  readonly plan: string;
-  readonly handoff: string | null;
-  readonly readiness: string | null;
   readonly proposal: string;
+  readonly proposalSource: string | null;
   readonly provider: string;
   readonly anchor: string | null;
   readonly confirmation: string | null;
   readonly apply: string | null;
-  readonly verification: string | null;
+  readonly readback: string | null;
   readonly command: string | null;
   readonly commandDispatch: string | null;
-  readonly repair: string;
   readonly terminal: string | null;
   readonly changedFiles: readonly string[];
   readonly blocker: string;
@@ -65,7 +55,7 @@ process.env.DAEMON_ENABLED = "0";
 const testRoot = process.env.PRIVATE_AGENTS_TEST_ROOT?.trim() ||
   path.join(os.tmpdir(), "private-agents-test");
 await fs.mkdir(testRoot, { recursive: true });
-const auditRoot = await fs.mkdtemp(path.join(testRoot, "route212-audit-"));
+const auditRoot = await fs.mkdtemp(path.join(testRoot, "route213-audit-"));
 process.env.PRIVATE_AGENTS_AUDIT_LOG_PATH = path.join(
   auditRoot,
   ".sisyphus",
@@ -75,53 +65,50 @@ process.env.PRIVATE_AGENTS_AUDIT_LOG_PATH = path.join(
 
 const cases: readonly TaskCase[] = [
   {
-    id: "current-vague-bugfix-review-ready",
-    type: "vague-bugfix",
+    id: "route212-vague-bugfix-now-exact",
     task: "Fix planning runtime product output so confirmed apply results do not still look review-only",
     workspace: "current-repo",
     expected: {
-      candidateIncludes: [
-        "packages/ts-shell/src/orchestration/planningRuntimeProductProjection.ts",
-      ],
-      readIncludes: [
-        "packages/ts-shell/src/orchestration/planningRuntimeProductProjection.ts:explicit target",
-      ],
-      handoff: "handoff-ready",
       proposal: "prepared-exact",
+      proposalSource: "planning-runtime-deterministic",
       anchor: "exact-ready",
       confirmation: "not-confirmed",
       apply: "not-run",
       readback: "not-run",
       command: "not-requested",
       commandDispatch: "not-run",
-      repair: "not-needed",
-      blockerIncludes: "Exact-ready proposal needs explicit trusted confirmation",
+      terminal: "confirmation-required",
+      provider: "not-run",
+      evidenceIncludes: [
+        "planning-exact-proposal:prepared-exact",
+        "planning-exact-proposal:raw-content-excluded",
+        "planning-runtime-product-proposal:manual-json:not-required",
+      ],
     },
   },
   {
-    id: "current-feature-output-review-ready",
-    type: "feature-output",
+    id: "route212-feature-output-now-exact",
     task: "Improve repair loop result reporting so task results include provider anchor apply verification and repair status",
     workspace: "current-repo",
     expected: {
-      candidateIncludes: [
-        "packages/ts-shell/src/orchestration/realTaskLoopRepairChain.ts",
-      ],
-      handoff: "handoff-ready",
       proposal: "prepared-exact",
+      proposalSource: "planning-runtime-deterministic",
       anchor: "exact-ready",
       confirmation: "not-confirmed",
       apply: "not-run",
       readback: "not-run",
       command: "not-requested",
       commandDispatch: "not-run",
-      repair: "not-needed",
-      blockerIncludes: "Exact-ready proposal needs explicit trusted confirmation",
+      terminal: "confirmation-required",
+      provider: "not-run",
+      evidenceIncludes: [
+        "planning-exact-proposal:prepared-exact",
+        "planning-runtime-product-proposal:provider-called:false",
+      ],
     },
   },
   {
-    id: "fixture-confirmed-verification-command",
-    type: "verification",
+    id: "fixture-confirmed-controlled-apply-verifies",
     task: "Fix the planner target ranking bug and cover the adjacent test",
     workspace: "fixture",
     escalationDecision: "allow-once",
@@ -135,18 +122,65 @@ const cases: readonly TaskCase[] = [
       },
     },
     expected: {
-      candidateIncludes: ["src/planning/targetRanking.ts"],
-      readIncludes: ["src/planning/targetRanking.ts:explicit target"],
-      handoff: "handoff-ready",
       proposal: "prepared-exact",
+      proposalSource: "planning-runtime-deterministic",
       anchor: "exact-ready",
       confirmation: "trusted-confirmed",
       apply: "single-target-applied",
       readback: "succeeded",
       command: "passed",
       commandDispatch: "existing-tool-runtime",
-      repair: "not-needed",
+      terminal: "verification-succeeded",
+      provider: "not-run",
       changedFiles: ["src/planning/targetRanking.ts"],
+      evidenceIncludes: [
+        "planning-mutation-proof-handoff:existing-backend-consumed",
+        "planning-mutation-proof-handoff:no-new-writer",
+        "planning-mutation-proof-handoff:no-fuzzy-apply",
+        "planning-mutation-proof-verification:file:src/planning/targetRanking.ts:readback:passed",
+      ],
+    },
+  },
+  {
+    id: "fixture-live-opt-in-config-failed",
+    task: "Fix the planner target ranking bug and cover the adjacent test",
+    workspace: "fixture",
+    execution: {
+      liveProviderProposal: { optIn: true, source: "benchmark" },
+    },
+    expected: {
+      proposal: "live-provider-config-failed",
+      proposalSource: "none",
+      anchor: "missing-exact-mapping",
+      confirmation: "not-confirmed",
+      apply: "not-run",
+      readback: "not-run",
+      command: "not-requested",
+      commandDispatch: "not-run",
+      terminal: "provider-unavailable",
+      provider: "not-run",
+      evidenceIncludes: [
+        "planning-runtime-product-proposal:live-provider-status:CONFIG-FAILED",
+        "planning-runtime-product-proposal:live-provider-primary:not-run",
+        "planning-runtime-product-proposal:raw-provider-output-excluded",
+      ],
+    },
+  },
+  {
+    id: "unsupported-unmatched-target-review-only",
+    task: "Fix provider proposal quality so live proposals classify review-only output correctly",
+    workspace: "current-repo",
+    expected: {
+      proposal: "not-run",
+      proposalSource: "none",
+      anchor: "not-run",
+      confirmation: "not-confirmed",
+      apply: "not-run",
+      readback: "not-run",
+      command: "not-requested",
+      commandDispatch: "not-run",
+      terminal: "review-required",
+      provider: "not-run",
     },
   },
 ];
@@ -156,15 +190,17 @@ try {
   for (const taskCase of cases) {
     reports.push(await runTaskCase(taskCase));
   }
-
   const failures = reports.flatMap((report) =>
     report.failures.map((failure) => `${report.id}: ${failure}`),
   );
   console.log(JSON.stringify({
-    route: "212",
-    gate: "route212-real-task-capability-sprint",
-    providerStatus: "not-run",
+    route: "213",
+    gate: "route213-exact-proposal-generation-benchmark",
+    beforeBlocker: "review-only/missing-exact-mapping",
+    afterBlocker: "exact-ready/confirmation-required for bounded product tasks",
+    providerStatus: "explicit-opt-in-config-failed-in-default-benchmark",
     realProviderTouched: false,
+    defaultProvider: "not-run",
     defaultApply: "not-run",
     defaultCommandDispatch: "not-run",
     reports,
@@ -175,7 +211,7 @@ try {
     }
     process.exit(1);
   }
-  console.log("[pass] route212-real-task-capability-sprint");
+  console.log("[pass] route213-exact-proposal-generation-benchmark");
 } finally {
   await fs.rm(auditRoot, { recursive: true, force: true });
   restoreEnv("DAEMON_ENABLED", originalDaemonEnabled);
@@ -188,7 +224,7 @@ async function runTaskCase(taskCase: TaskCase): Promise<TaskReport> {
     : await seedVerificationFixture(taskCase.id);
   try {
     const result = await runMvpIntegratedFlow({
-      sessionId: `sess_route212_${taskCase.id.replace(/[^a-z0-9_]/gi, "_")}`,
+      sessionId: `sess_route213_${taskCase.id.replace(/[^a-z0-9_]/gi, "_")}`,
       prompt: taskCase.task,
       workspaceRoot,
       escalationDecision: taskCase.escalationDecision ?? "deny",
@@ -196,10 +232,10 @@ async function runTaskCase(taskCase: TaskCase): Promise<TaskReport> {
       maxTurns: 4,
       ...(taskCase.execution ? { planningMutationExecution: taskCase.execution } : {}),
     });
-    const report = projectReport({ taskCase, result });
+    const report = projectReport({ id: taskCase.id, result });
     return {
       ...report,
-      failures: validateReport({ taskCase, report }),
+      failures: validateReport({ taskCase, report, evidence: result.codingResult?.evidence ?? [] }),
     };
   } finally {
     if (taskCase.workspace === "fixture") {
@@ -209,47 +245,30 @@ async function runTaskCase(taskCase: TaskCase): Promise<TaskReport> {
 }
 
 function projectReport(input: {
-  readonly taskCase: TaskCase;
+  readonly id: string;
   readonly result: ProductResult;
 }): TaskReport {
-  const finalOutput = input.result.finalOutput ?? "";
-  const evidence = input.result.codingResult?.evidence ?? [];
-  const candidates = unique(
-    evidence
-      .filter((entry) => entry.startsWith("planning-runtime-product:candidate:"))
-      .map((entry) => entry.slice("planning-runtime-product:candidate:".length)),
-  );
-  const reads = unique(
-    evidence
-      .filter((entry) => entry.startsWith("planning-runtime-product:read-reason:"))
-      .map((entry) => entry.slice("planning-runtime-product:read-reason:".length)),
-  );
+  const result = input.result;
+  const finalOutput = result.finalOutput ?? "";
+  const evidence = result.codingResult?.evidence ?? [];
   const proposal =
     markerValue(evidence, "planning-runtime-product:proposal-preparation:") ??
     "not-proven";
   return {
-    id: input.taskCase.id,
-    type: input.taskCase.type,
-    task: input.taskCase.task,
+    id: input.id,
     productPath: evidence.includes("planning-runtime-product:path:runMvpIntegratedFlow"),
-    candidates,
-    reads,
-    analysis: extractLineValue(finalOutput, "Confidence:") ?? "not-proven",
-    plan: extractExecutablePlanSummary(finalOutput) ?? "not-proven",
-    handoff: extractLineValue(finalOutput, "Handoff state:"),
-    readiness: extractLineValue(finalOutput, "Readiness:"),
     proposal,
+    proposalSource: extractLineValue(finalOutput, "Product proposal source:"),
     provider: evidence.includes("provider-called=true") ? "called" : "not-run",
     anchor: extractLineValue(finalOutput, "Anchor state:"),
     confirmation: extractLineValue(finalOutput, "Explicit confirmation:"),
     apply: extractLineValue(finalOutput, "Apply state:"),
-    verification: extractLineValue(finalOutput, "Readback verification:"),
+    readback: extractLineValue(finalOutput, "Readback verification:"),
     command: extractLineValue(finalOutput, "Verification command:"),
     commandDispatch: extractLineValue(finalOutput, "Verification command dispatch:"),
-    repair: markerValue(evidence, "planning-runtime-product-repair:state:") ?? "not-proven",
     terminal: extractLineValue(finalOutput, "Terminal result:"),
-    changedFiles: input.result.codingResult?.changedFiles ?? [],
-    blocker: input.result.codingResult?.failedFiles[0]?.reason ?? "none",
+    changedFiles: result.codingResult?.changedFiles ?? [],
+    blocker: result.codingResult?.failedFiles[0]?.reason ?? "none",
     failures: [],
   };
 }
@@ -257,50 +276,50 @@ function projectReport(input: {
 function validateReport(input: {
   readonly taskCase: TaskCase;
   readonly report: TaskReport;
+  readonly evidence: readonly string[];
 }): readonly string[] {
   const failures: string[] = [];
   const expected = input.taskCase.expected;
   if (!input.report.productPath) failures.push("productPath=false");
-  for (const candidate of expected.candidateIncludes ?? []) {
-    if (!input.report.candidates.includes(candidate)) {
-      failures.push(`missing candidate ${candidate}`);
-    }
+  compare("proposal", input.report.proposal, expected.proposal, failures);
+  if (expected.proposalSource) {
+    compare("proposalSource", input.report.proposalSource, expected.proposalSource, failures);
   }
-  for (const read of expected.readIncludes ?? []) {
-    if (!input.report.reads.includes(read)) {
-      failures.push(`missing read ${read}`);
-    }
-  }
-  compareOptional("handoff", input.report.handoff, expected.handoff, failures);
-  compareOptional("proposal", input.report.proposal, expected.proposal, failures);
-  compareOptional("anchor", input.report.anchor, expected.anchor, failures);
-  compareOptional("confirmation", input.report.confirmation, expected.confirmation, failures);
-  compareOptional("apply", input.report.apply, expected.apply, failures);
-  compareOptional("readback", input.report.verification, expected.readback, failures);
-  compareOptional("command", input.report.command, expected.command, failures);
-  compareOptional("commandDispatch", input.report.commandDispatch, expected.commandDispatch, failures);
-  compareOptional("repair", input.report.repair, expected.repair, failures);
-  if (expected.blockerIncludes && !input.report.blocker.includes(expected.blockerIncludes)) {
-    failures.push(`blocker=${input.report.blocker}`);
-  }
+  compare("provider", input.report.provider, expected.provider, failures);
+  compare("anchor", input.report.anchor, expected.anchor, failures);
+  compare("confirmation", input.report.confirmation, expected.confirmation, failures);
+  compare("apply", input.report.apply, expected.apply, failures);
+  compare("readback", input.report.readback, expected.readback, failures);
+  compare("command", input.report.command, expected.command, failures);
+  compare("commandDispatch", input.report.commandDispatch, expected.commandDispatch, failures);
+  compare("terminal", input.report.terminal, expected.terminal, failures);
   if (expected.changedFiles) {
-    for (const file of expected.changedFiles) {
-      if (!input.report.changedFiles.includes(file)) {
-        failures.push(`missing changed file ${file}`);
-      }
+    compare(
+      "changedFiles",
+      input.report.changedFiles.join(","),
+      expected.changedFiles.join(","),
+      failures,
+    );
+  } else if (input.report.changedFiles.length > 0) {
+    failures.push(`unexpectedChangedFiles=${input.report.changedFiles.join(",")}`);
+  }
+  for (const marker of expected.evidenceIncludes ?? []) {
+    if (!input.evidence.includes(marker)) {
+      failures.push(`missingEvidence=${marker}`);
     }
   }
-  if (input.taskCase.workspace === "current-repo" && input.report.changedFiles.length > 0) {
-    failures.push(`current repo changed files reported: ${input.report.changedFiles.join(",")}`);
-  }
-  if (input.taskCase.workspace === "current-repo" && input.report.provider !== "not-run") {
-    failures.push("current repo provider called");
+  if (
+    input.evidence.some((entry) =>
+      /api[_-]?key|authorization|bearer|provider\.env/i.test(entry),
+    )
+  ) {
+    failures.push("secret-like-evidence-leak");
   }
   return failures;
 }
 
 async function seedVerificationFixture(id: string): Promise<string> {
-  const root = await fs.mkdtemp(path.join(testRoot, `${id}-`));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), `route213-${id}-`));
   await fs.mkdir(path.join(root, "src", "planning"), { recursive: true });
   await fs.writeFile(
     path.join(root, "package.json"),
@@ -322,35 +341,26 @@ async function seedVerificationFixture(id: string): Promise<string> {
   return root;
 }
 
-function extractExecutablePlanSummary(output: string): string | undefined {
-  const lines = output.split("\n");
-  const index = lines.findIndex((line) => line === "Executable plan:");
-  if (index < 0) return undefined;
-  return lines[index + 1]?.replace(/^Summary:\s*/, "");
+function markerValue(evidence: readonly string[], prefix: string): string | null {
+  const marker = evidence.find((entry) => entry.startsWith(prefix));
+  return marker ? marker.slice(prefix.length) : null;
 }
 
 function extractLineValue(output: string, label: string): string | null {
-  const line = output.split("\n").find((entry) => entry.startsWith(label));
-  return line ? line.slice(label.length).trim() : null;
+  const line = output.split(/\r?\n/).find((entry) => entry.startsWith(label));
+  if (!line) return null;
+  return line.slice(label.length).trim();
 }
 
-function markerValue(evidence: readonly string[], prefix: string): string | undefined {
-  return evidence.find((entry) => entry.startsWith(prefix))?.slice(prefix.length);
-}
-
-function compareOptional(
-  name: string,
+function compare(
+  label: string,
   actual: string | null,
-  expected: string | undefined,
+  expected: string,
   failures: string[],
 ): void {
-  if (expected !== undefined && actual !== expected) {
-    failures.push(`${name}=${actual ?? "missing"} expected ${expected}`);
+  if (actual !== expected) {
+    failures.push(`${label}=${actual ?? "null"} expected ${expected}`);
   }
-}
-
-function unique(values: readonly string[]): readonly string[] {
-  return Array.from(new Set(values.filter((value) => value.trim().length > 0)));
 }
 
 function restoreEnv(name: string, value: string | undefined): void {

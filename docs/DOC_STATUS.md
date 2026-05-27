@@ -36,6 +36,8 @@ It does not claim every historical note is perfectly classified.
 | `docs/architecture/reference-module-matrix.md` | module-reference | Targeted reference comparison for module boundaries. |  | Capability Contract Architecture |
 | `docs/architecture/reference-architecture-maps.md` | historical | Recovering reference-repo analysis behind the atlas. |  | Capability Contract Architecture |
 | `docs/product-architecture-reset/script-command-index.md` | active | Checking grouped package-script aliases and Route G command compatibility. |  | Product Architecture Reset |
+| `docs/dev-history/routes/README.md` | historical | Finding route document quarantine status and route-history script namespace. |  | Product Architecture Reset |
+| `docs/evidence/history/route-reports/README.md` | historical | Finding historical route report provenance and compatibility status. |  | Product Architecture Reset |
 
 ## Implementation Context
 

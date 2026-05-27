@@ -4,15 +4,15 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { CoreMcpGateway } from "../packages/ts-shell/src/core/mcp/gateway.js";
-import { ToolRuntime } from "../packages/ts-shell/src/core/tools/runtime.js";
-import type { PwRuntimeStatus } from "../packages/ts-shell/src/core/context/pwRuntime.js";
-import { SandboxEnforcer } from "../packages/ts-shell/src/sandbox/sandboxEnforcer.js";
+import { CoreMcpGateway } from "../../../packages/ts-shell/src/core/mcp/gateway.js";
+import { ToolRuntime } from "../../../packages/ts-shell/src/core/tools/runtime.js";
+import type { PwRuntimeStatus } from "../../../packages/ts-shell/src/core/context/pwRuntime.js";
+import { SandboxEnforcer } from "../../../packages/ts-shell/src/sandbox/sandboxEnforcer.js";
 import {
   classifyToolIntent,
   runToolEcosystemCapabilityRoute,
   type ToolEcosystemTaskInput,
-} from "../packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.js";
+} from "../../../packages/ts-shell/src/orchestration/toolEcosystemCapabilityRoute.js";
 
 const reportPath = path.join(
   process.cwd(),

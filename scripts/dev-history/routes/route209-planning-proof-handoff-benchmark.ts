@@ -3,10 +3,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { buildPlanningMutationHandoffProjection } from "../packages/ts-shell/src/orchestration/planningMutationHandoffProjection.js";
-import { runPlanningMutationProofRoute } from "../packages/ts-shell/src/orchestration/planningMutationProofRoute.js";
-import { runMvpIntegratedFlow } from "../packages/ts-shell/src/orchestration/runMvpIntegratedFlow.js";
-import { createWorkspaceWriteAuthority } from "../packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.js";
+import { buildPlanningMutationHandoffProjection } from "../../../packages/ts-shell/src/orchestration/planningMutationHandoffProjection.js";
+import { runPlanningMutationProofRoute } from "../../../packages/ts-shell/src/orchestration/planningMutationProofRoute.js";
+import { runMvpIntegratedFlow } from "../../../packages/ts-shell/src/orchestration/runMvpIntegratedFlow.js";
+import { createWorkspaceWriteAuthority } from "../../../packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.js";
 
 type ProductResult = Awaited<ReturnType<typeof runMvpIntegratedFlow>>;
 

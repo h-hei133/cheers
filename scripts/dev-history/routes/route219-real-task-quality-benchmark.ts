@@ -5,27 +5,27 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { checkRealProviderReadiness } from "../packages/ts-shell/src/core/shell/providerReadiness.js";
-import type { RuntimeProvider } from "../packages/ts-shell/src/config/runtimeConfig.js";
-import { buildDiscoveryEditManifest } from "../packages/ts-shell/src/orchestration/discoveryEditManifest.js";
-import { buildAgentPlan } from "../packages/ts-shell/src/orchestration/agentPlan.js";
-import type { TargetedContextPacket } from "../packages/ts-shell/src/orchestration/contextPacket.js";
-import { approveLiveProviderAdapter } from "../packages/ts-shell/src/orchestration/liveProviderAdapterApproval.js";
-import type { LiveProviderReadinessStatus } from "../packages/ts-shell/src/orchestration/liveProviderAdapterApproval.js";
-import { createOpenAICompatibleAnchoredSmokeAdapter } from "../packages/ts-shell/src/orchestration/openAICompatibleAnchoredSmokeAdapter.js";
-import { createWorkspaceWriteAuthority } from "../packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.js";
-import { buildPlanningMutationHandoffProjection } from "../packages/ts-shell/src/orchestration/planningMutationHandoffProjection.js";
-import { runPlanningMutationProofRoute } from "../packages/ts-shell/src/orchestration/planningMutationProofRoute.js";
-import type { ProviderEditAvailability } from "../packages/ts-shell/src/orchestration/providerEditPlanner.js";
-import { runPlanningRuntime } from "../packages/ts-shell/src/orchestration/planningRuntime.js";
+import { checkRealProviderReadiness } from "../../../packages/ts-shell/src/core/shell/providerReadiness.js";
+import type { RuntimeProvider } from "../../../packages/ts-shell/src/config/runtimeConfig.js";
+import { buildDiscoveryEditManifest } from "../../../packages/ts-shell/src/orchestration/discoveryEditManifest.js";
+import { buildAgentPlan } from "../../../packages/ts-shell/src/orchestration/agentPlan.js";
+import type { TargetedContextPacket } from "../../../packages/ts-shell/src/orchestration/contextPacket.js";
+import { approveLiveProviderAdapter } from "../../../packages/ts-shell/src/orchestration/liveProviderAdapterApproval.js";
+import type { LiveProviderReadinessStatus } from "../../../packages/ts-shell/src/orchestration/liveProviderAdapterApproval.js";
+import { createOpenAICompatibleAnchoredSmokeAdapter } from "../../../packages/ts-shell/src/orchestration/openAICompatibleAnchoredSmokeAdapter.js";
+import { createWorkspaceWriteAuthority } from "../../../packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.js";
+import { buildPlanningMutationHandoffProjection } from "../../../packages/ts-shell/src/orchestration/planningMutationHandoffProjection.js";
+import { runPlanningMutationProofRoute } from "../../../packages/ts-shell/src/orchestration/planningMutationProofRoute.js";
+import type { ProviderEditAvailability } from "../../../packages/ts-shell/src/orchestration/providerEditPlanner.js";
+import { runPlanningRuntime } from "../../../packages/ts-shell/src/orchestration/planningRuntime.js";
 import {
   preparePlanningRuntimeProductProposal,
   type PlanningRuntimeProductProposalPreparation,
-} from "../packages/ts-shell/src/orchestration/planningRuntimeProductProposal.js";
-import type { PlanningRuntimeProductLiveProviderAttempt } from "../packages/ts-shell/src/orchestration/planningRuntimeProductExecution.js";
-import { runTargetSetEditRoute } from "../packages/ts-shell/src/orchestration/targetSetEditRoute.js";
-import { buildVerificationCommandPlan } from "../packages/ts-shell/src/orchestration/verificationCommandPlan.js";
-import { runVerificationRepairLoop } from "../packages/ts-shell/src/orchestration/verificationRepairLoop.js";
+} from "../../../packages/ts-shell/src/orchestration/planningRuntimeProductProposal.js";
+import type { PlanningRuntimeProductLiveProviderAttempt } from "../../../packages/ts-shell/src/orchestration/planningRuntimeProductExecution.js";
+import { runTargetSetEditRoute } from "../../../packages/ts-shell/src/orchestration/targetSetEditRoute.js";
+import { buildVerificationCommandPlan } from "../../../packages/ts-shell/src/orchestration/verificationCommandPlan.js";
+import { runVerificationRepairLoop } from "../../../packages/ts-shell/src/orchestration/verificationRepairLoop.js";
 import {
   approvedRealProviderHome,
   buildEffectiveProviderEnv,

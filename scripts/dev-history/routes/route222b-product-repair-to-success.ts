@@ -7,7 +7,7 @@ import path from "node:path";
 import {
   runContentVerificationRepairFlow,
   type ContentRepairFlowResult,
-} from "../packages/ts-shell/src/orchestration/verificationRepairFlow.js";
+} from "../../../packages/ts-shell/src/orchestration/verificationRepairFlow.js";
 
 const frozenTaskPackPath = "docs/implementation-context/frozen-capability-tasks-route221.json";
 const frozenTaskId = "frozen-upper-bound-challenge-verification-failure-repair-case";

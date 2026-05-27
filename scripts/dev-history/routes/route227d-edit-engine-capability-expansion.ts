@@ -7,8 +7,8 @@ import path from "node:path";
 import {
   runControlledEditOperationRoute,
   type ControlledEditOperationRouteResult,
-} from "../packages/ts-shell/src/orchestration/controlledEditOperationRoute.js";
-import { createWorkspaceWriteAuthority } from "../packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.js";
+} from "../../../packages/ts-shell/src/orchestration/controlledEditOperationRoute.js";
+import { createWorkspaceWriteAuthority } from "../../../packages/ts-shell/src/orchestration/patchResult/workspaceAuthority.js";
 
 type FinalStatus = "COMPLETE" | "PARTIAL" | "BLOCKED";
 

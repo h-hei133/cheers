@@ -7,7 +7,7 @@ import {
   runVerificationRepairIterationFlow,
   type RepairIterationVerification,
   type VerificationRepairIterationResult,
-} from "../packages/ts-shell/src/orchestration/verificationRepairIterationFlow.js";
+} from "../../../packages/ts-shell/src/orchestration/verificationRepairIterationFlow.js";
 
 const frozenTaskPackPath = "docs/implementation-context/frozen-capability-tasks-route221.json";
 const reportPath = path.join(

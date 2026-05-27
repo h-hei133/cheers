@@ -2,13 +2,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { buildAgentPlan } from "../packages/ts-shell/src/orchestration/agentPlan.js";
-import type { TargetedContextPacket } from "../packages/ts-shell/src/orchestration/contextPacket.js";
+import { buildAgentPlan } from "../../../packages/ts-shell/src/orchestration/agentPlan.js";
+import type { TargetedContextPacket } from "../../../packages/ts-shell/src/orchestration/contextPacket.js";
 import {
   runTaskRelevantVerificationRoute,
   type TaskRelevantVerificationResult,
-} from "../packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.js";
-import { bridgeVerificationCommandToRepairLoop } from "../packages/ts-shell/src/orchestration/verificationRepairBridge.js";
+} from "../../../packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.js";
+import { bridgeVerificationCommandToRepairLoop } from "../../../packages/ts-shell/src/orchestration/verificationRepairBridge.js";
 
 const reportPath = path.join(
   process.cwd(),

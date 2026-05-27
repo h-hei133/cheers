@@ -2,9 +2,9 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { runPlanningRuntime } from "../packages/ts-shell/src/orchestration/planningRuntime.js";
-import type { ContextWorkingMemory } from "../packages/ts-shell/src/orchestration/contextMemory.js";
-import { projectPlanningRuntimeSurface } from "../packages/ts-shell/src/orchestration/planningRuntimeSurface.js";
+import { runPlanningRuntime } from "../../../packages/ts-shell/src/orchestration/planningRuntime.js";
+import type { ContextWorkingMemory } from "../../../packages/ts-shell/src/orchestration/contextMemory.js";
+import { projectPlanningRuntimeSurface } from "../../../packages/ts-shell/src/orchestration/planningRuntimeSurface.js";
 
 interface DemoCase {
   readonly label: string;
