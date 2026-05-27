@@ -33,12 +33,10 @@ import {
   runApplyPatchRuntimeBridgeIfRequested,
   type ApplyPatchRuntimeRouteOptions,
 } from "../edit/applyPatchRuntimeBridge.js";
-import { buildReadTaskDelivery } from "../context/readDeliveryProjection.js";
 import { computeFragmentFingerprint } from "../context/readWindowContinuation.js";
-import {
-  buildExplainTaskDelivery,
-  buildInspectFilesDelivery,
-} from "../context/repoExplainStage.js";
+import { runInspectFilesStage } from "../context/inspectFilesStage.js";
+import { runReadRuntimeStage } from "../context/readRuntimeStage.js";
+import { runRepoExplainRuntimeStage } from "../context/repoExplainRuntimeStage.js";
 import { runProviderDraftStage } from "../provider/providerDraftStage.js";
 import { runPlanningRuntimeStage } from "../planning/planningRuntimeStage.js";
 import {
@@ -89,21 +87,13 @@ import {
   deriveCurrentPermissionRequestFromToolInput,
 } from "../orchestration/approvalAuthorityProjection.js";
 import { reconcileFileMutationSummary } from "../orchestration/mutationResultAggregation.js";
-import { formatPatchFailureReason } from "../orchestration/patchMutationLane.js";
-import { createWorkspaceWriteAuthority } from "../orchestration/patchResult/workspaceAuthority.js";
 import {
   projectWorkflowBlockedOutcome,
   projectWorkflowRuntimeOutcome,
 } from "../orchestration/resultSurfaceModule.js";
 import {
-  inferRepoDiagnosis,
-  inferRepoEvidenceRole,
-  parseRepoCandidateFiles,
   buildContextGraphPlanningBundle,
-  projectReadAmbiguousTargetStop,
-  projectReadMissingTargetStop,
   projectReadOutOfWorkspaceTargetStop,
-  selectRepoExplainTarget,
 } from "../orchestration/readInspectModule.js";
 import type { PlanningRuntimeProductExecutionOptions } from "../orchestration/planningRuntimeProductExecution.js";
 import {
@@ -117,16 +107,8 @@ import {
   projectSkippedWorkflowVerification,
   projectWorkflowCommandVerification,
 } from "../orchestration/verificationModule.js";
-import {
-  buildDiscoveryEditPlanResult,
-  buildFencedEditReplacementRouteResult,
-  buildTargetSetEditRouteResult,
-  planDiscoveryEdit,
-  runFencedEditReplacementRoute,
-  runTargetSetEditRoute,
-  selectFencedEditReplacementActivation,
-} from "../orchestration/editPatchModule.js";
-import { buildDiscoveryEditRuntimeRequest } from "../orchestration/discoveryEditRuntime.js";
+import { runDiscoveryEditRuntimeStage } from "../edit/discoveryEditRuntimeStage.js";
+import { runFencedEditRuntimeStage } from "../edit/fencedEditRuntimeStage.js";
 import {
   buildActionResultSeedDecisionTrace,
   mergeContinuationState,
@@ -562,228 +544,32 @@ async function executeWorkflowTaskPlan(input: {
   if (anchoredProposalStage) {
     return anchoredProposalStage;
   }
-  const discoveryEditRequest = buildDiscoveryEditRuntimeRequest({
+  const discoveryEditStage = await runDiscoveryEditRuntimeStage({
+    plan: input.plan,
     prompt: input.prompt,
     workspaceRoot: input.workspaceRoot,
-    targetPath: input.plan.targetPath,
+    sessionId: input.sessionId,
+    enforcer: input.enforcer,
+    events,
+    baseNotes: notes,
+    ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
   });
-  if (discoveryEditRequest) {
-    const discoveryPlan = planDiscoveryEdit(discoveryEditRequest);
-    if (
-      discoveryPlan.status !== "ready-for-handoff" &&
-      discoveryPlan.status !== "ready-for-target-set"
-    ) {
-      const result = buildDiscoveryEditPlanResult({
-        sessionId: input.sessionId,
-        prompt: input.prompt,
-        plan: discoveryPlan,
-      });
-      return {
-        events,
-        notes: [
-          ...notes,
-          "discovery-edit: manifest produced without mutation",
-          discoveryPlan.manifest.transcriptSummary,
-          ...discoveryPlan.evidence,
-        ],
-        codingResult: result.codingResult!,
-        userFacingOutput: result.finalOutput,
-      };
-    }
-
-    if (discoveryPlan.status === "ready-for-target-set") {
-      const workspaceAuthority = createWorkspaceWriteAuthority(input.workspaceRoot);
-      const approvalResults = [];
-      for (const targetPath of discoveryPlan.confirmedTargetSet) {
-        const absoluteTarget = path.isAbsolute(targetPath)
-          ? targetPath
-          : path.join(input.workspaceRoot, targetPath);
-        approvalResults.push(
-          await input.enforcer.checkAndEnforce("edit", {
-            scope: "filesystem",
-            operation: "write",
-            target: absoluteTarget,
-            workspaceRoot: input.workspaceRoot,
-          }),
-        );
-      }
-      const allApproved = approvalResults.every((approval) => approval.allowed);
-      const route = await runTargetSetEditRoute({
-        workspaceRoot: input.workspaceRoot,
-        manifest: discoveryPlan.manifest,
-        confirmedTargetSet: discoveryPlan.confirmedTargetSet,
-        mapping: discoveryPlan.mapping,
-        maxFiles: 3,
-        explicitRuntimeOptIn: true,
-        explicitWorkspaceWriteOptIn: true,
-        requestedUserDecision: allApproved ? "approved" : "denied",
-        defaultProductionRejectionUnchanged: true,
-        readFile: workspaceAuthority.readFile,
-        readVerifiedFile: workspaceAuthority.readVerifiedFile,
-        validateWriteTarget: workspaceAuthority.validateWriteTarget,
-        writeFile: workspaceAuthority.writeFile,
-        ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
-      });
-      const result = buildTargetSetEditRouteResult({
-        sessionId: input.sessionId,
-        prompt: input.prompt,
-        route: {
-          ...route,
-          evidence: [
-            discoveryPlan.manifest.transcriptSummary,
-            ...discoveryPlan.evidence,
-            "discovery-edit-handoff:target-set-edit-route",
-            ...route.evidence,
-          ],
-        },
-      });
-      return {
-        events,
-        notes: [
-          ...notes,
-          `discovery-edit: confirmed target-set=${discoveryPlan.confirmedTargetSet.join(",")}`,
-          `discovery-edit: permission=${allApproved ? "approved" : "denied"}`,
-          discoveryPlan.manifest.transcriptSummary,
-          ...discoveryPlan.evidence,
-          ...route.evidence,
-        ],
-        codingResult: result.codingResult!,
-        userFacingOutput: result.finalOutput,
-      };
-    }
-
-    const workspaceAuthority = createWorkspaceWriteAuthority(input.workspaceRoot);
-    const absoluteTarget = path.isAbsolute(discoveryPlan.confirmation.targetPath)
-      ? discoveryPlan.confirmation.targetPath
-      : path.join(input.workspaceRoot, discoveryPlan.confirmation.targetPath);
-    const approval = await input.enforcer.checkAndEnforce("edit", {
-      scope: "filesystem",
-      operation: "write",
-      target: absoluteTarget,
-      workspaceRoot: input.workspaceRoot,
-    });
-    const route = await runFencedEditReplacementRoute({
-      workspaceRoot: input.workspaceRoot,
-      targetPath: discoveryPlan.confirmation.targetPath,
-      mapping: discoveryPlan.mapping,
-      explicitRuntimeOptIn: true,
-      explicitWorkspaceWriteOptIn: true,
-      requestedUserDecision: approval.allowed ? "approved" : "denied",
-      defaultProductionRejectionUnchanged: true,
-      readFile: workspaceAuthority.readFile,
-      readVerifiedFile: workspaceAuthority.readVerifiedFile,
-      validateWriteTarget: workspaceAuthority.validateWriteTarget,
-      writeFile: workspaceAuthority.writeFile,
-      ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
-    });
-    const activatedRoute = {
-      ...route,
-      evidence: [
-        discoveryPlan.manifest.transcriptSummary,
-        ...discoveryPlan.evidence,
-        "discovery-edit-handoff:existing-fenced-route",
-        ...route.evidence,
-      ],
-    };
-    const result = buildFencedEditReplacementRouteResult({
-      sessionId: input.sessionId,
-      prompt: input.prompt,
-      route: activatedRoute,
-    });
-    return {
-      events,
-      notes: [
-        ...notes,
-        `discovery-edit: confirmed target=${discoveryPlan.confirmation.targetPath}`,
-        `discovery-edit: permission=${approval.allowed ? "approved" : "denied"}`,
-        discoveryPlan.manifest.transcriptSummary,
-        ...discoveryPlan.evidence,
-        ...activatedRoute.evidence,
-      ],
-      codingResult: result.codingResult!,
-      userFacingOutput: result.finalOutput,
-    };
+  if (discoveryEditStage) {
+    return discoveryEditStage;
   }
-  const fencedActivation = selectFencedEditReplacementActivation({
+
+  const fencedEditStage = await runFencedEditRuntimeStage({
+    plan: input.plan,
     prompt: input.prompt,
-    ...(input.plan.targetPath ? { targetPath: input.plan.targetPath } : {}),
-    ...(input.plan.replaceFrom && input.plan.replaceTo
-      ? {
-          replaceDirective: {
-            from: input.plan.replaceFrom,
-            to: input.plan.replaceTo,
-          },
-        }
-      : {}),
-    hasMultipleTargets:
-      (input.plan.additionalTargetPaths?.length ?? 0) > 0 ||
-      /(?:\s|^)(?:and|,)\s+[\w./\\-]+\.(?:ts|tsx|js|jsx|py|go|rs|md|txt|json|yaml|yml)\b/i.test(
-        input.prompt,
-      ),
+    workspaceRoot: input.workspaceRoot,
+    sessionId: input.sessionId,
+    enforcer: input.enforcer,
+    events,
+    baseNotes: notes,
+    ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
   });
-  if (fencedActivation.status === "stopped") {
-    const result = buildFencedEditReplacementRouteResult({
-      sessionId: input.sessionId,
-      prompt: input.prompt,
-      route: fencedActivation.route,
-    });
-    return {
-      events,
-      notes: [
-        ...notes,
-        "fenced-edit-activation: stopped before mutation",
-        ...fencedActivation.evidence,
-      ],
-      codingResult: result.codingResult!,
-      userFacingOutput: result.finalOutput,
-    };
-  }
-  if (fencedActivation.status === "selected") {
-    const workspaceAuthority = createWorkspaceWriteAuthority(input.workspaceRoot);
-    const absoluteTarget = path.isAbsolute(fencedActivation.targetPath)
-      ? fencedActivation.targetPath
-      : path.join(input.workspaceRoot, fencedActivation.targetPath);
-    const approval = await input.enforcer.checkAndEnforce("edit", {
-      scope: "filesystem",
-      operation: "write",
-      target: absoluteTarget,
-      workspaceRoot: input.workspaceRoot,
-    });
-    const route = await runFencedEditReplacementRoute({
-      workspaceRoot: input.workspaceRoot,
-      targetPath: fencedActivation.targetPath,
-      mapping: fencedActivation.mapping,
-      explicitRuntimeOptIn: true,
-      explicitWorkspaceWriteOptIn: true,
-      requestedUserDecision: approval.allowed ? "approved" : "denied",
-      defaultProductionRejectionUnchanged: true,
-      readFile: workspaceAuthority.readFile,
-      readVerifiedFile: workspaceAuthority.readVerifiedFile,
-      validateWriteTarget: workspaceAuthority.validateWriteTarget,
-      writeFile: workspaceAuthority.writeFile,
-      ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
-    });
-    const activatedRoute = {
-      ...route,
-      evidence: [...fencedActivation.evidence, ...route.evidence],
-    };
-    const result = buildFencedEditReplacementRouteResult({
-      sessionId: input.sessionId,
-      prompt: input.prompt,
-      route: activatedRoute,
-    });
-    return {
-      events,
-      notes: [
-        ...notes,
-        `fenced-edit-activation: selected target=${fencedActivation.targetPath}`,
-        `fenced-edit-activation: permission=${approval.allowed ? "approved" : "denied"}`,
-        ...fencedActivation.evidence,
-        ...activatedRoute.evidence,
-      ],
-      codingResult: result.codingResult!,
-      userFacingOutput: result.finalOutput,
-    };
+  if (fencedEditStage) {
+    return fencedEditStage;
   }
   let crossFileRemainingTargets: string[] = [];
   let crossFileFailedByReason: Array<{
@@ -915,223 +701,32 @@ async function executeWorkflowTaskPlan(input: {
   const fileConstraints = extractFileConstraintAssertions(input.prompt);
   const unchangedAssertions = fileConstraints.unchangedAssertions;
   const protectedSnapshots = new Map<string, string>();
-  if (
-    input.plan.inspectFirst &&
-    input.plan.targetPath &&
-    (input.plan.taskKind === "edit-file" || input.plan.taskKind === "read-file")
-  ) {
-    const readStep = await dispatchRuntimeTool({
-      dispatcher: input.dispatcher,
-      events,
-      toolName: "read",
-      taskId: `task_${input.sessionId}_${input.turn}_read`,
-      args: { path: input.plan.targetPath },
-      workspaceRoot: input.workspaceRoot,
-      sessionId: input.sessionId,
-      abortSignal: input.abortSignal,
-      requireApprovalEvent: false,
-    });
-    if (!readStep.success) {
-      const rawReason = readStep.error ?? "read failed";
-      const reason =
-        input.plan.replaceFrom && input.plan.replaceTo
-          ? formatPatchFailureReason({
-              ok: false,
-              failureCode: "patch-target-missing",
-              failureReason: "patch-target-missing",
-              explanation:
-                "Patch target could not be read before applying replace.",
-              reason: "Patch target could not be read before applying replace.",
-              matchedCount: 0,
-              nextAction:
-                "Check that the target file exists and rerun with an explicit in-workspace path.",
-            })
-          : rawReason;
-      notes.push(`inspect failed: ${reason}`);
-      if (input.plan.replaceFrom && input.plan.replaceTo) {
-        patches.push({
-          path: input.plan.targetPath,
-          operation: "replace",
-          status: "failed",
-          failureCode: "patch-target-missing",
-          reason,
-        });
-      }
-      failedFiles.push({ path: input.plan.targetPath, reason });
-      const inspectFailureTaskReason =
-        input.plan.taskKind === "read-file"
-          ? "Read/inspect step failed; no files changed."
-          : "Inspect step failed; mutation skipped.";
-      const inspectFailureRepairNotes =
-        input.plan.replaceFrom && input.plan.replaceTo
-          ? [reason]
-          : ["inspect step failed before edit"];
-      return {
-        events,
-        notes,
-        ...projectWorkflowRuntimeOutcome({
-          taskKind: input.plan.taskKind,
-          changedFiles,
-          failedFiles,
-          patches,
-          verifiedFiles,
-          unverifiedFiles,
-          verification: {
-            status: "skipped",
-            reason: "inspect failed before edit",
-            selectionScope: "none",
-            selectionSource: "not-requested",
-          },
-          repairNotes: inspectFailureRepairNotes,
-          evidence: [`read failed: ${reason}`],
-          taskVerdict: "insufficient-evidence",
-          taskReasons: [inspectFailureTaskReason],
-          userFacingOutput: `Task not completed: failed to read ${input.plan.targetPath}. Reason: ${reason}`,
-        }),
-      };
-    }
-    originalContent = readStep.output ?? "";
-    notes.push(`tool: read file ${input.plan.targetPath}`);
-    evidence.push(`inspect: read ${input.plan.targetPath}`);
-    if (input.plan.taskKind === "edit-file" && unchangedAssertions.length > 0) {
-      for (const assertion of unchangedAssertions) {
-        const readProtected = await dispatchRuntimeTool({
-          dispatcher: input.dispatcher,
-          events,
-          toolName: "read",
-          taskId: `task_${input.sessionId}_${input.turn}_protected_read_${hashStableId(assertion.path)}`,
-          args: { path: assertion.path },
-          workspaceRoot: input.workspaceRoot,
-          sessionId: input.sessionId,
-          abortSignal: input.abortSignal,
-          requireApprovalEvent: false,
-        });
-        if (readProtected.success) {
-          protectedSnapshots.set(assertion.path, readProtected.output ?? "");
-          notes.push(`protected snapshot captured: ${assertion.path}`);
-          evidence.push(`verify-unchanged-snapshot:${assertion.path}`);
-        } else {
-          notes.push(
-            `protected snapshot unavailable: ${assertion.path} (${readProtected.error ?? "read failed"})`,
-          );
-        }
-      }
-    }
-    if (input.plan.taskKind === "read-file") {
-      const readDelivery = buildReadTaskDelivery({
-        prompt: input.prompt,
-        targetPath: input.plan.targetPath,
-        content: originalContent,
-        preferredMode: input.plan.groundedDeliverableMode,
-        requestedLines: input.plan.readLineCount,
-        lineOffset: input.plan.readLineOffset,
-        readFragmentLineIndexes: input.plan.readFragmentLineIndexes,
-        readFragmentRanges: input.plan.readFragmentRanges,
-        readFragmentSourceWindowStart: input.plan.readFragmentSourceWindowStart,
-        readFragmentSourceWindowEnd: input.plan.readFragmentSourceWindowEnd,
-        readFragmentFingerprint: input.plan.readFragmentFingerprint,
-        readFilter: input.plan.readFilter,
-        repairInstruction: input.plan.repairInstruction,
-      });
-      if (input.plan.contextPlanningRequested) {
-        const planning = await buildContextGraphPlanningBundle({
-          workspaceRoot: input.workspaceRoot,
-          targetPath: input.plan.targetPath,
-          workflowPlan: input.plan,
-        });
-        const agentPlanResult = buildAgentPlanResult(planning.agentPlan);
-        const planningReady = planning.agentPlan.executionReadiness === "ready";
-        const planningReason = planningReady
-          ? "Agent plan is ready for the existing read/context route."
-          : planning.agentPlan.doNext;
-        return {
-          events,
-          notes: [
-            ...notes,
-            `context-packet: ${planning.packet.packetId}`,
-            `context-graph: ${planning.graph.graphId}`,
-            `test-impact: ${planning.testImpact.impactPlanId}`,
-            planning.packet.replaySafeSummary,
-            planning.graph.replaySafeSummary,
-            planning.testImpact.replaySafeSummary,
-            planning.agentPlan.replaySafeSummary,
-          ],
-          ...projectWorkflowRuntimeOutcome({
-            taskKind: "read-file",
-            changedFiles,
-            failedFiles: planningReady
-              ? []
-              : [{ path: input.plan.targetPath, reason: planningReason }],
-            patches,
-            verifiedFiles,
-            unverifiedFiles,
-            verification: {
-              status: "not-requested",
-              reason: "read-only context packet",
-              selectionScope: "none",
-              selectionSource: "not-requested",
-            },
-            repairNotes,
-            evidence: [
-              ...evidence,
-              ...readDelivery.evidenceMarkers,
-              ...planning.packetResult.evidence,
-              ...planning.graphResult.evidence,
-              ...agentPlanResult.evidence,
-            ],
-            taskVerdict:
-              readDelivery.completed && planningReady
-                ? "satisfied"
-                : "insufficient-evidence",
-            taskReasons: [
-              readDelivery.completed
-                ? "Read/summarize task delivered requested content."
-                : "Read step succeeded but no user-facing delivery could be produced.",
-              planningReason,
-            ],
-            userFacingOutput: [
-              readDelivery.output,
-              "",
-              planning.packetResult.output,
-              "",
-              planning.graphResult.output,
-              "",
-              agentPlanResult.output,
-            ].join("\n"),
-          }),
-        };
-      }
-      return {
-        events,
-        notes,
-        ...projectWorkflowRuntimeOutcome({
-          taskKind: "read-file",
-          changedFiles,
-          failedFiles,
-          patches,
-          verifiedFiles,
-          unverifiedFiles,
-          verification: {
-            status: "not-requested",
-            reason: "read-only task",
-            selectionScope: "none",
-            selectionSource: "not-requested",
-          },
-          repairNotes,
-          evidence: [...evidence, ...readDelivery.evidenceMarkers],
-          taskVerdict: readDelivery.completed
-            ? "satisfied"
-            : "insufficient-evidence",
-          taskReasons: [
-            readDelivery.completed
-              ? "Read/summarize task delivered requested content."
-              : readDelivery.output.length > 0
-                ? readDelivery.output
-                : "Read step succeeded but no user-facing delivery could be produced.",
-          ],
-          userFacingOutput: readDelivery.output,
-        }),
-      };
+  const readRuntimeStage = await runReadRuntimeStage({
+    plan: input.plan,
+    prompt: input.prompt,
+    dispatcher: input.dispatcher,
+    events,
+    notes,
+    changedFiles,
+    failedFiles,
+    patches,
+    verifiedFiles,
+    unverifiedFiles,
+    repairNotes,
+    evidence,
+    unchangedAssertions,
+    sessionId: input.sessionId,
+    turn: input.turn,
+    workspaceRoot: input.workspaceRoot,
+    ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+  });
+  if (readRuntimeStage?.kind === "terminal") {
+    return readRuntimeStage.result;
+  }
+  if (readRuntimeStage?.kind === "continue") {
+    originalContent = readRuntimeStage.originalContent;
+    for (const [snapshotPath, snapshotContent] of readRuntimeStage.protectedSnapshots) {
+      protectedSnapshots.set(snapshotPath, snapshotContent);
     }
   }
   if (input.plan.taskKind === "write-file" && unchangedAssertions.length > 0) {
@@ -1159,279 +754,47 @@ async function executeWorkflowTaskPlan(input: {
     }
   }
 
-  if (input.plan.taskKind === "inspect-files") {
-    const globStep = await dispatchRuntimeTool({
-      dispatcher: input.dispatcher,
-      events,
-      toolName: "glob",
-      taskId: `task_${input.sessionId}_${input.turn}_glob`,
-      args: { pattern: ".ts" },
-      workspaceRoot: input.workspaceRoot,
-      sessionId: input.sessionId,
-      abortSignal: input.abortSignal,
-      requireApprovalEvent: false,
-    });
-    if (globStep.success) {
-      const delivery = buildInspectFilesDelivery(globStep.output ?? "");
-      const inspectCompleted = !delivery.startsWith("Task not completed:");
-      notes.push("inspect candidates collected via glob(.ts)");
-      evidence.push("inspect: glob(.ts) executed");
-      return {
-        events,
-        notes,
-        ...projectWorkflowRuntimeOutcome({
-          taskKind: "inspect-files",
-          changedFiles,
-          failedFiles,
-          patches,
-          verifiedFiles,
-          unverifiedFiles,
-          verification: {
-            status: "not-requested",
-            reason: "inspect-only task",
-            selectionScope: "none",
-            selectionSource: "not-requested",
-          },
-          repairNotes,
-          evidence,
-          taskVerdict: inspectCompleted ? "satisfied" : "insufficient-evidence",
-          taskReasons: [
-            inspectCompleted
-              ? "Repository inspection executed."
-              : "Repository inspection produced no candidate files for requested scope.",
-          ],
-          userFacingOutput: delivery,
-        }),
-      };
-    }
-    const reason = globStep.error ?? "glob failed";
-    notes.push(`inspect failed: ${reason}`);
-    failedFiles.push({ path: "(workspace)", reason });
-    return {
-      events,
-      notes,
-      ...projectWorkflowRuntimeOutcome({
-        taskKind: "inspect-files",
-        changedFiles,
-        failedFiles,
-        patches,
-        verifiedFiles,
-        unverifiedFiles,
-        verification: {
-          status: "skipped",
-          reason: "inspect failed",
-          selectionScope: "none",
-          selectionSource: "not-requested",
-        },
-        repairNotes: ["inspect stage failed"],
-        evidence: [`glob failed: ${reason}`],
-        taskVerdict: "insufficient-evidence",
-        taskReasons: ["Could not inspect repository files."],
-        userFacingOutput: `Task not completed: repository inspection failed. Reason: ${reason}`,
-      }),
-    };
+  const inspectFilesStage = await runInspectFilesStage({
+    plan: input.plan,
+    dispatcher: input.dispatcher,
+    events,
+    notes,
+    changedFiles,
+    failedFiles,
+    patches,
+    verifiedFiles,
+    unverifiedFiles,
+    repairNotes,
+    evidence,
+    sessionId: input.sessionId,
+    turn: input.turn,
+    workspaceRoot: input.workspaceRoot,
+    ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+  });
+  if (inspectFilesStage) {
+    return inspectFilesStage;
   }
 
-  if (input.plan.taskKind === "repo-explain") {
-    const globStep = await dispatchRuntimeTool({
-      dispatcher: input.dispatcher,
-      events,
-      toolName: "glob",
-      taskId: `task_${input.sessionId}_${input.turn}_repo_explain_glob`,
-      args: { pattern: ".ts" },
-      workspaceRoot: input.workspaceRoot,
-      sessionId: input.sessionId,
-      abortSignal: input.abortSignal,
-      requireApprovalEvent: false,
-    });
-    const candidateFiles = globStep.success
-      ? parseRepoCandidateFiles(globStep.output ?? "")
-      : [];
-    if (globStep.success) {
-      notes.push("tool: approved glob(.ts) for repo diagnosis");
-      evidence.push("repo-explain: glob(.ts) executed");
-    } else {
-      notes.push(
-        `repo-explain glob failed: ${globStep.error ?? "glob failed"}`,
-      );
-    }
-
-    let targetPath = input.plan.targetPath;
-    let targetContent: string | undefined;
-
-    if (!targetPath && candidateFiles.length > 0) {
-      const inspectedCandidates: Array<{ path: string; content: string }> = [];
-      for (const candidatePath of candidateFiles.slice(0, 20)) {
-        const readCandidate = await dispatchRuntimeTool({
-          dispatcher: input.dispatcher,
-          events,
-          toolName: "read",
-          taskId: `task_${input.sessionId}_${input.turn}_repo_explain_candidate_${hashStableId(candidatePath)}`,
-          args: { path: candidatePath },
-          workspaceRoot: input.workspaceRoot,
-          sessionId: input.sessionId,
-          abortSignal: input.abortSignal,
-          requireApprovalEvent: false,
-        });
-        if (readCandidate.success) {
-          inspectedCandidates.push({
-            path: candidatePath,
-            content: readCandidate.output ?? "",
-          });
-        }
-      }
-      const selected = selectRepoExplainTarget({
-        prompt: input.prompt,
-        candidates: inspectedCandidates,
-      });
-      targetPath = selected?.path;
-      targetContent = selected?.content;
-    }
-
-    if (!targetPath) {
-      const targetStop =
-        candidateFiles.length > 1
-          ? projectReadAmbiguousTargetStop({
-              candidates: candidateFiles,
-              reason:
-                "Repo explain needs one high-confidence evidence target, but multiple candidates matched. Provide an explicit in-workspace file path.",
-              doNext: "Provide an explicit in-workspace file path.",
-            })
-          : projectReadMissingTargetStop({
-              reason:
-                "Repo explain requires an explicit in-workspace file target for truthful delivery.",
-              doNext: "Provide an explicit in-workspace file path.",
-            });
-      const reason = targetStop.reason;
-      return {
-        events,
-        notes: [...notes, "repo-explain missing explicit target"],
-        ...projectWorkflowRuntimeOutcome({
-          taskKind: "repo-explain",
-          changedFiles,
-          failedFiles: [
-            {
-              path: "(missing-target)",
-              reason,
-            },
-          ],
-          patches,
-          verifiedFiles,
-          unverifiedFiles,
-          verification: {
-            status: "skipped",
-            reason: "repo-explain target missing",
-            selectionScope: "none",
-            selectionSource: "not-requested",
-          },
-          repairNotes: ["Provide explicit file path for explanation task."],
-          evidence,
-          taskVerdict: "insufficient-evidence",
-          taskReasons: ["Explanation target was not resolved."],
-          userFacingOutput:
-            `Task not completed: ${reason}`,
-        }),
-      };
-    }
-
-    if (targetContent === undefined) {
-      const readStep = await dispatchRuntimeTool({
-        dispatcher: input.dispatcher,
-        events,
-        toolName: "read",
-        taskId: `task_${input.sessionId}_${input.turn}_repo_explain_read`,
-        args: { path: targetPath },
-        workspaceRoot: input.workspaceRoot,
-        sessionId: input.sessionId,
-        abortSignal: input.abortSignal,
-        requireApprovalEvent: false,
-      });
-      if (!readStep.success) {
-        const reason = readStep.error ?? "read failed";
-        return {
-          events,
-          notes: [...notes, `repo-explain read failed: ${reason}`],
-          ...projectWorkflowRuntimeOutcome({
-            taskKind: "repo-explain",
-            changedFiles,
-            failedFiles: [{ path: targetPath, reason }],
-            patches,
-            verifiedFiles,
-            unverifiedFiles,
-            verification: {
-              status: "skipped",
-              reason: "repo-explain read failed",
-              selectionScope: "none",
-              selectionSource: "not-requested",
-            },
-            repairNotes: ["Could not read target file for explanation."],
-            evidence: [`repo-explain read failed: ${reason}`],
-            taskVerdict: "insufficient-evidence",
-            taskReasons: ["Target file could not be read for explanation."],
-            userFacingOutput: `Task not completed: failed to read ${targetPath}. Reason: ${reason}`,
-          }),
-        };
-      }
-      targetContent = readStep.output ?? "";
-    }
-
-    notes.push("tool: read diagnosis evidence");
-    evidence.push(`repo-explain: read ${targetPath}`);
-    const explainOutput = buildExplainTaskDelivery(targetPath, targetContent);
-    const disposition = inferRepoDiagnosis({ prompt: input.prompt });
-    const outcome = projectWorkflowRuntimeOutcome({
-      taskKind: "repo-explain",
-      changedFiles,
-      failedFiles,
-      patches,
-      verifiedFiles,
-      unverifiedFiles,
-      verification: {
-        status: "not-requested",
-        reason: "repo-explain read-only task",
-        selectionScope: "none",
-        selectionSource: "not-requested",
-      },
-      repairNotes,
-      evidence,
-      taskVerdict:
-        disposition === "needs-verification"
-          ? "completed-with-caveats"
-          : "satisfied",
-      taskReasons: [
-        disposition === "needs-verification"
-          ? "Repo diagnosis is grounded in inspected files but still needs verification."
-          : "Repo explanation delivered from inspected file content.",
-      ],
-      userFacingOutput: explainOutput,
-    });
-    outcome.codingResult.diagnosis = {
-      disposition,
-      reason:
-        disposition === "needs-verification"
-          ? "Symptom-oriented diagnosis requires verification after evidence collection."
-          : "Explanation is grounded in inspected repository evidence.",
-      searchPattern: ".ts",
-      candidateFiles,
-      evidenceFiles: [targetPath],
-      evidenceNodes: [
-        {
-          path: targetPath,
-          role: inferRepoEvidenceRole({ targetPath }),
-          score: 1,
-        },
-      ],
-      evidenceLinks: [],
-    };
-    return {
-      events,
-      notes: [
-        ...notes,
-        `repo-explain delivered: ${targetPath}`,
-        `diagnosis: disposition=${disposition}`,
-      ],
-      ...outcome,
-    };
+  const repoExplainStage = await runRepoExplainRuntimeStage({
+    plan: input.plan,
+    prompt: input.prompt,
+    dispatcher: input.dispatcher,
+    events,
+    notes,
+    changedFiles,
+    failedFiles,
+    patches,
+    verifiedFiles,
+    unverifiedFiles,
+    repairNotes,
+    evidence,
+    sessionId: input.sessionId,
+    turn: input.turn,
+    workspaceRoot: input.workspaceRoot,
+    ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
+  });
+  if (repoExplainStage) {
+    return repoExplainStage;
   }
 
   if (
