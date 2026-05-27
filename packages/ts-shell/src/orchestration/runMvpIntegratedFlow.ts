@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { SchemaVersion } from "../../../../contracts/typescript/types.js";
 import type {
   GoogleAccountAuthConfig,
   OpenAIAccountAuthConfig,
@@ -15,7 +14,6 @@ import {
 } from "../core/paths/legacyRootRebase.js";
 import type { QueryEvent } from "../core/query/events.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
-import { OpenAIModelAdapter } from "../model-adapters/providers/openai/OpenAIModelAdapter.js";
 import { createComponentLogger, recordCount } from "../observability/index.js";
 import {
   SandboxEnforcer,
@@ -24,6 +22,7 @@ import {
   type EscalationResponse,
 } from "../sandbox/index.js";
 import { ToolDispatcher } from "../tools/dispatcher.js";
+import { streamTurnRoleDraft } from "../turn/roleDraftStage.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import {
   detectWorkflowBrowserPlan,
@@ -195,8 +194,6 @@ import type {
 } from "./types.js";
 
 export type { ApplyPatchRuntimeRouteOptions } from "./mutationRoutingProjection.js";
-
-const CONTRACT_VERSION: SchemaVersion = "1.0.0";
 
 export interface MvpIntegratedFlowOptions {
   readonly sessionId: string;
@@ -502,12 +499,12 @@ function createIntegratedRunner(
           : undefined;
         const content =
           reflectiveOutput ??
-          (await streamRoleDraft(
+          (await streamTurnRoleDraft({
             role,
-            cleanPrompt,
+            draft: cleanPrompt,
             providerMode,
             realProvider,
-          ));
+          }));
 
         if (agentMode === "plan") {
           return {
@@ -592,12 +589,13 @@ function createIntegratedRunner(
       };
     }
 
-    const content = await streamRoleDraft(
+    const content = await streamTurnRoleDraft({
       role,
-      "Review complete. Delivering streamed result and preserving safety guardrails.",
+      draft:
+        "Review complete. Delivering streamed result and preserving safety guardrails.",
       providerMode,
       realProvider,
-    );
+    });
     return {
       role,
       content,
@@ -10588,59 +10586,6 @@ function derivePromptPathTarget(
   };
 }
 
-async function streamRoleDraft(
-  role: "planner" | "coder" | "reviewer",
-  draft: string,
-  providerMode: "synthetic" | "real",
-  realProvider?: MvpIntegratedFlowOptions["realProvider"],
-): Promise<string> {
-  const requestModel = resolveRequestModel(providerMode, realProvider);
-  const adapter =
-    providerMode === "real"
-      ? createRealProviderAdapter(realProvider)
-      : new OpenAIModelAdapter(
-          { provider: "openai", apiKey: "local-mvp-test-key" },
-          async () =>
-            new Response(createSyntheticSseBody(draft), {
-              status: 200,
-              headers: { "content-type": "text/event-stream" },
-            }),
-        );
-
-  let text = "";
-  for await (const event of adapter.streamResponse({
-    schemaVersion: CONTRACT_VERSION,
-    model: requestModel,
-    messages: [{ role: "user", content: draft }],
-  })) {
-    if (event.type === "content.delta") {
-      text += event.delta;
-    }
-  }
-
-  return text.trim();
-}
-
-function createRealProviderAdapter(
-  realProvider?: MvpIntegratedFlowOptions["realProvider"],
-): OpenAIModelAdapter {
-  const apiKey =
-    realProvider?.apiKey?.trim() ?? process.env.OPENAI_API_KEY?.trim();
-  const accountAccess = realProvider?.accountAuth?.accessToken?.trim();
-  if (!apiKey && !accountAccess) {
-    throw new Error(
-      "OPENAI_API_KEY is required for the real provider path unless an account-auth connection is active. Use /connect login openai --account to create one.",
-    );
-  }
-
-  return new OpenAIModelAdapter({
-    provider: (realProvider?.provider ?? "openai") as RuntimeProvider,
-    apiKey,
-    accountAuth: realProvider?.accountAuth,
-    baseUrl: realProvider?.baseUrl,
-  });
-}
-
 function hasExplicitExecutionIntent(
   rawPrompt: string,
   normalizedPrompt: string,
@@ -10651,53 +10596,4 @@ function hasExplicitExecutionIntent(
   const chineseIntent =
     /(?:\u8fd0\u884c|\u6267\u884c|\u547d\u4ee4|\u7ec8\u7aef)/u.test(rawPrompt);
   return englishIntent || chineseIntent;
-}
-function resolveRequestModel(
-  providerMode: "synthetic" | "real",
-  realProvider?: MvpIntegratedFlowOptions["realProvider"],
-): string {
-  if (providerMode !== "real") {
-    return "gpt-4.1-mini";
-  }
-
-  const configuredModel = realProvider?.model?.trim();
-  if (configuredModel) {
-    return configuredModel;
-  }
-
-  if (realProvider?.provider === "openai" && realProvider?.accountAuth) {
-    return "gpt-5.4";
-  }
-
-  return "gpt-4.1-mini";
-}
-
-function createSyntheticSseBody(content: string): ReadableStream<Uint8Array> {
-  const encoder = new TextEncoder();
-  const first = content.slice(0, Math.ceil(content.length / 2));
-  const second = content.slice(Math.ceil(content.length / 2));
-
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(
-        encoder.encode(
-          `data: ${JSON.stringify({
-            model: "gpt-4.1-mini",
-            choices: [{ delta: { content: first } }],
-          })}\n\n`,
-        ),
-      );
-      controller.enqueue(
-        encoder.encode(
-          `data: ${JSON.stringify({
-            model: "gpt-4.1-mini",
-            choices: [{ delta: { content: second }, finish_reason: "stop" }],
-            usage: { prompt_tokens: 5, completion_tokens: 8, total_tokens: 13 },
-          })}\n\n`,
-        ),
-      );
-      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-      controller.close();
-    },
-  });
 }

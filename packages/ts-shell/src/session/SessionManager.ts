@@ -98,6 +98,12 @@ import {
   type RuntimeSeedOptions,
 } from "./sessionReplayBuilder.js";
 import {
+  projectRecentProjectContexts,
+  projectSortedSessionReentrySummaries,
+  selectRecoveryTrustBoundaryBlock,
+  selectSuggestedRecoverySessionIdFromSessions,
+} from "./sessionRecoverySelection.js";
+import {
   buildActionHandoffSummary,
   buildSeedInfluenceHandoffSummary,
   buildSessionResumeContext,
@@ -115,7 +121,6 @@ import {
 import {
   projectRecoveryTrustBoundaryBlock,
   projectSessionReentrySummary,
-  scoreSessionReentrySummary,
 } from "./sessionSummaryProjection.js";
 import type {
   ApprovalAuditMemoryState,
@@ -1100,99 +1105,38 @@ export class SessionManager {
   }
 
   listRecentProjectContexts(limit: number = 8): ProjectContextSummary[] {
-    const aggregate = new Map<string, ProjectContextSummary>();
-    const sessions = this.listSessions();
-    for (const session of sessions) {
-      const summary = this.describeSessionReentry(session.id);
-      const reentryRecoverable =
-        (summary.status === "interrupted" || summary.status === "error") &&
-        summary.recoverable;
-      const current = aggregate.get(summary.projectRoot);
-      if (!current) {
-        aggregate.set(summary.projectRoot, {
-          projectRoot: summary.projectRoot,
-          lastUpdatedAt: summary.updatedAt,
-          lastSessionId: summary.id,
-          sessionCount: 1,
-          recoverableCount: reentryRecoverable ? 1 : 0,
-          lastSessionTitle: summary.title,
-        });
-        continue;
-      }
-
-      const shouldReplaceLast =
-        new Date(summary.updatedAt).getTime() >
-        new Date(current.lastUpdatedAt).getTime();
-      aggregate.set(summary.projectRoot, {
-        projectRoot: current.projectRoot,
-        lastUpdatedAt: shouldReplaceLast ? summary.updatedAt : current.lastUpdatedAt,
-        lastSessionId: shouldReplaceLast ? summary.id : current.lastSessionId,
-        sessionCount: current.sessionCount + 1,
-        recoverableCount: current.recoverableCount + (reentryRecoverable ? 1 : 0),
-        lastSessionTitle:
-          shouldReplaceLast && summary.title ? summary.title : current.lastSessionTitle,
-      });
-    }
-
-    const ordered = Array.from(aggregate.values()).sort(
-      (left, right) =>
-        new Date(right.lastUpdatedAt).getTime() -
-        new Date(left.lastUpdatedAt).getTime(),
-    );
-    return ordered.slice(0, limit);
+    return projectRecentProjectContexts({
+      summaries: this.listSessions().map((session) =>
+        this.describeSessionReentry(session.id),
+      ),
+      limit,
+    });
   }
 
   listReentrySummaries(input?: {
     readonly limit?: number;
     readonly preferredProjectRoot?: string;
   }): SessionReentrySummary[] {
-    const preferredProjectRoot = input?.preferredProjectRoot?.trim();
-    const summaries = this.listSessions().map((session) =>
-      this.describeSessionReentry(session.id),
-    );
-
-    const scored = summaries.map((summary) => ({
-      summary,
-      score: scoreSessionReentrySummary({ summary, preferredProjectRoot }),
-    }));
-    scored.sort((left, right) => right.score - left.score);
-    const sorted = scored.map((item) => item.summary);
-
-    if (!input?.limit || input.limit <= 0) {
-      return sorted;
-    }
-
-    return sorted.slice(0, input.limit);
+    return projectSortedSessionReentrySummaries({
+      summaries: this.listSessions().map((session) =>
+        this.describeSessionReentry(session.id),
+      ),
+      preferredProjectRoot: input?.preferredProjectRoot,
+      limit: input?.limit,
+    });
   }
 
   getSuggestedRecoverySession(input?: {
     readonly preferredProjectRoot?: string;
   }): Session | null {
-    const preferredProjectRoot = input?.preferredProjectRoot?.trim();
-    if (!preferredProjectRoot) {
-      return (
-        this.listSessions().find((session) => {
-          if (session.status !== "interrupted" && session.status !== "error") {
-            return false;
-          }
-
-          return this.evaluateRecoveryTrustBoundary(session).recoverable;
-        }) ?? null
-      );
-    }
-
-    const preferredRecoverable = this.listReentrySummaries({
-      preferredProjectRoot,
-    }).find(
-      (summary) =>
-        summary.recoverable &&
-        summary.projectRoot.trim() === preferredProjectRoot,
-    );
-
-    if (preferredRecoverable) {
-      return this.load(preferredRecoverable.id);
-    }
-    return null;
+    const sessionId = selectSuggestedRecoverySessionIdFromSessions({
+      sessions: this.listSessions(),
+      preferredProjectRoot: input?.preferredProjectRoot,
+      evaluate: (session) => this.evaluateRecoveryTrustBoundary(session),
+      projectPreferredSummaries: (preferredProjectRoot) =>
+        this.listReentrySummaries({ preferredProjectRoot }),
+    });
+    return sessionId ? this.load(sessionId) : null;
   }
 
   rebindSessionProjectRoot(sessionId: string, nextProjectRoot: string): Session {
@@ -1302,33 +1246,11 @@ export class SessionManager {
   getRecoveryTrustBoundaryBlock(input?: {
     readonly preferredProjectRoot?: string;
   }): RecoveryTrustBoundaryBlock | null {
-    const preferredProjectRoot = input?.preferredProjectRoot?.trim();
-    const sessions = this.listSessions();
-    const orderedSessions = preferredProjectRoot
-      ? [
-          ...sessions.filter(
-            (session) =>
-              session.projectRoot.trim() === preferredProjectRoot,
-          ),
-          ...sessions.filter(
-            (session) =>
-              session.projectRoot.trim() !== preferredProjectRoot,
-          ),
-        ]
-      : sessions;
-
-    for (const session of orderedSessions) {
-      if (session.status !== "interrupted" && session.status !== "error") {
-        continue;
-      }
-
-      const trustBoundary = this.evaluateRecoveryTrustBoundary(session);
-      if (!trustBoundary.recoverable && trustBoundary.block) {
-        return trustBoundary.block;
-      }
-    }
-
-    return null;
+    return selectRecoveryTrustBoundaryBlock({
+      sessions: this.listSessions(),
+      preferredProjectRoot: input?.preferredProjectRoot,
+      evaluate: (session) => this.evaluateRecoveryTrustBoundary(session),
+    });
   }
 
   describeSessionReentry(sessionId: string): SessionReentrySummary {
