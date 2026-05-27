@@ -291,7 +291,7 @@ export {
   type VerificationCommandPlan,
   type VerificationCommandPlanState,
   type VerificationCommandSource,
-} from "./verificationCommandPlan.js";
+} from "../verification/verificationCommandPlan.js";
 export {
   classifyVerificationCommandFailure,
   type VerificationFailureClass,

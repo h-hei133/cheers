@@ -8,7 +8,7 @@ import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import {
   type ApplyPatchRuntimeRouteOptions,
 } from "../orchestration/runMvpIntegratedFlow.js";
-import { streamProductTurn } from "../product/turn/turnFacade.js";
+import { streamProductTurn } from "../turn/turnFacade.js";
 import type { PlanningRuntimeProductExecutionOptions } from "../orchestration/planningRuntimeProductExecution.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";

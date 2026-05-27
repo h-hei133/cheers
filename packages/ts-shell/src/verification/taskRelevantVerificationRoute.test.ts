@@ -11,16 +11,16 @@ import {
 describe("taskRelevantVerificationRoute", () => {
   it("selects focused test before package build from changed implementation files", () => {
     const plan = buildTaskRelevantCommandPlan({
-      changedFiles: ["packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"],
+      changedFiles: ["packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts"],
     });
 
     expect(plan.selectedCommand).toBe(
-      "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+      "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
     );
     expect(plan.relevanceStatus).toBe("relevant");
     expect(plan.coverageStatus).toBe("covered");
     expect(plan.coveredFiles).toEqual([
-      "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+      "packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts",
     ]);
     expect(plan.verificationCommandPlan.state).toBe("ready");
     expect(plan.verificationCommandPlan.commandKind).toBe("npm-test-focused");
@@ -50,7 +50,7 @@ describe("taskRelevantVerificationRoute", () => {
       taskId: "frozen-command-only-bypass-negative-control",
       sessionId: "sess_route223_bypass",
       prompt: "Run a harmless unrelated command and claim verification.",
-      changedFiles: ["packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"],
+      changedFiles: ["packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts"],
       candidateCommands: ["node --version"],
       authority: {
         state: "explicitly-approved",
@@ -81,7 +81,7 @@ describe("taskRelevantVerificationRoute", () => {
       taskId: "selected-not-run-negative-control",
       sessionId: "sess_route223_not_run",
       prompt: "Select verification but do not grant authority.",
-      changedFiles: ["packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"],
+      changedFiles: ["packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts"],
       authority: {
         state: "not-granted",
         source: "none",
@@ -109,17 +109,17 @@ describe("taskRelevantVerificationRoute", () => {
       sessionId: "sess_route227e_partial_coverage",
       prompt: "Run focused verification for only one changed file.",
       changedFiles: [
-        "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
-        "packages/ts-shell/src/orchestration/verificationCommandPlan.ts",
+        "packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts",
+        "packages/ts-shell/src/verification/verificationCommandPlan.ts",
       ],
       candidateCommands: [
-        "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
       ],
       authority: {
         state: "explicitly-approved",
         source: "explicit-authority-contract",
         approvedCommand:
-          "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+          "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
       },
       dispatcher: fakeDispatcher(async (_toolName, args) =>
         commandResult(String(args.command), "completed", 0, "focused test ok"),
@@ -129,7 +129,7 @@ describe("taskRelevantVerificationRoute", () => {
     expect(result.dispatchStatus).toBe("dispatched");
     expect(result.commandPlan.coverageStatus).toBe("partially-covered");
     expect(result.commandPlan.uncoveredFiles).toEqual([
-      "packages/ts-shell/src/orchestration/verificationCommandPlan.ts",
+      "packages/ts-shell/src/verification/verificationCommandPlan.ts",
     ]);
     expect(result.run?.result.outcome).toBe("success");
     expect(result.verdict).toBe("insufficient-evidence");
@@ -208,12 +208,12 @@ describe("taskRelevantVerificationRoute", () => {
       taskId: "route223-positive-relevance",
       sessionId: "sess_route223_success",
       prompt: "Verify changed file with relevant command.",
-      changedFiles: ["packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"],
+      changedFiles: ["packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts"],
       authority: {
         state: "explicitly-approved",
         source: "explicit-authority-contract",
         approvedCommand:
-          "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+          "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
       },
       dispatcher: fakeDispatcher(async (_toolName, args) =>
         commandResult(String(args.command), "completed", 0, "focused test ok"),
@@ -225,7 +225,7 @@ describe("taskRelevantVerificationRoute", () => {
     expect(result.resultSurface.status).toBe("completed");
     expect(result.resultSurface.codingResult?.verification.status).toBe("passed");
     expect(result.resultSurface.codingResult?.verifiedFiles).toEqual([
-      "packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts",
+      "packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts",
     ]);
     expect(result.evidence).toEqual(
       expect.arrayContaining([

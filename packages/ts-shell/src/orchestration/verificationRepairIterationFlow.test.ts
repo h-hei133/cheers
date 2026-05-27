@@ -23,7 +23,7 @@ describe("verificationRepairIterationFlow", () => {
         taskId: "frozen-upper-bound-challenge-verification-failure-repair-case",
         sessionId: "sess_route227f_success",
         prompt: "Repair after failed task-relevant verification.",
-        verificationCommand: "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        verificationCommand: "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
         verify: contentVerifier(),
       });
 
@@ -68,7 +68,7 @@ describe("verificationRepairIterationFlow", () => {
         taskId: "route227f-repair-failed-case",
         sessionId: "sess_route227f_failed",
         prompt: "Repair applies but re-verification still fails.",
-        verificationCommand: "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        verificationCommand: "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
         verify: async (input) => {
           const base = await contentVerifier()(input);
           if (input.phase === "post-repair") {

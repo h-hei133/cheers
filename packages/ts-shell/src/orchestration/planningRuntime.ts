@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import { buildVerificationCommandPlan, type VerificationCommandPlan } from "./verificationCommandPlan.js";
+import { buildVerificationCommandPlan, type VerificationCommandPlan } from "../verification/verificationCommandPlan.js";
 import { buildGroundedPlanningProjection } from "./groundedPlanningProjection.js";
 import {
   buildPlanningMutationHandoffProjection,

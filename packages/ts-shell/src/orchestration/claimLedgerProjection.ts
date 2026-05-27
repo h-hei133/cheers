@@ -2,7 +2,7 @@ import { hashContent } from "./patchRecovery/recoveryAuthorityStore.js";
 import {
   assertNoProductVerdictSuccessUpgrade,
   projectRuntimeTerminalVerdict,
-} from "../product/evidence/verdictFacade.js";
+} from "../evidence/verdictFacade.js";
 
 export type ClaimLedgerEvidenceSource =
   | "default-safe"

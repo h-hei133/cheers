@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentPlan } from "./agentPlan.js";
-import { buildCodeGraphImpact } from "./codeGraphImpact.js";
-import { normalizeCodeGraphFacts } from "./codeGraphFacts.js";
-import { buildCodeGraphTrace } from "./codeGraphTrace.js";
-import { buildContextGraph } from "./contextGraph.js";
-import { buildPlanQuality } from "./planQuality.js";
+import { buildAgentPlan } from "../orchestration/agentPlan.js";
+import { buildCodeGraphImpact } from "../orchestration/codeGraphImpact.js";
+import { normalizeCodeGraphFacts } from "../orchestration/codeGraphFacts.js";
+import { buildCodeGraphTrace } from "../orchestration/codeGraphTrace.js";
+import { buildContextGraph } from "../orchestration/contextGraph.js";
+import { buildPlanQuality } from "../orchestration/planQuality.js";
 import { buildVerificationCommandPlan } from "./verificationCommandPlan.js";
 
 describe("verificationCommandPlan", () => {
@@ -68,7 +68,7 @@ describe("verificationCommandPlan", () => {
   it("selects focused task-relevant ts-shell test commands without granting dispatch", () => {
     const plan = buildVerificationCommandPlan({
       explicitCommand:
-        "npm test -w packages/ts-shell -- src/orchestration/verificationCommandPlan.test.ts",
+        "npm test -w packages/ts-shell -- src/verification/verificationCommandPlan.test.ts",
       sourceProposalId: "proposal_route219",
     });
 
@@ -101,7 +101,7 @@ describe("verificationCommandPlan", () => {
   it("keeps shell metacharacters outside the focused test allowlist", () => {
     const plan = buildVerificationCommandPlan({
       explicitCommand:
-        "npm test -w packages/ts-shell -- src/orchestration/verificationCommandPlan.test.ts; echo unsafe",
+        "npm test -w packages/ts-shell -- src/verification/verificationCommandPlan.test.ts; echo unsafe",
       sourceProposalId: "proposal_route219_unsafe",
     });
 

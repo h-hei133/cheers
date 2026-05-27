@@ -6,13 +6,13 @@ describe("verificationFacade", () => {
   it("projects fully covered dispatched success as verified", () => {
     const receipt = projectVerificationReceipt({
       selectedCommand:
-        "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
       authority: "explicitly-approved",
       dispatchStatus: "dispatched",
       runtimeStatus: "success",
       relevanceStatus: "relevant",
       coverageStatus: "covered",
-      coveredFiles: ["packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"],
+      coveredFiles: ["packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts"],
       uncoveredFiles: [],
       notProvenClaims: [],
       verdictStatus: "verified",
@@ -26,13 +26,13 @@ describe("verificationFacade", () => {
   it("does not treat selected-but-not-run as success", () => {
     const receipt = projectVerificationReceipt({
       selectedCommand:
-        "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
+        "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
       authority: "not-granted",
       dispatchStatus: "not-run",
       runtimeStatus: "not-run",
       relevanceStatus: "relevant",
       coverageStatus: "covered",
-      coveredFiles: ["packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts"],
+      coveredFiles: ["packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts"],
       uncoveredFiles: [],
       notProvenClaims: ["selected command dispatch", "runtime receipt"],
       verdictStatus: "approval-required",

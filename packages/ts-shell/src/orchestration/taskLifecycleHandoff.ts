@@ -9,7 +9,7 @@ import type { CodingVerificationSummary } from "./types.js";
 import {
   buildVerificationCommandPlan,
   type VerificationCommandPlan,
-} from "./verificationCommandPlan.js";
+} from "../verification/verificationCommandPlan.js";
 import {
   buildVerificationRepairContext,
   type VerificationRepairContext,

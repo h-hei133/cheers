@@ -7,9 +7,9 @@ const RUN_COMMAND_ALLOWLIST = [
 ] as const;
 
 const FOCUSED_TS_SHELL_TEST_COMMAND_ALLOWLIST = [
-  "npm test -w packages/ts-shell -- src/orchestration/verificationCommandPlan.test.ts",
-  "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts",
-  "npm test -w packages/ts-shell -- src/orchestration/taskRelevantVerificationRoute.test.ts -t route227e-intentional-missing-test",
+  "npm test -w packages/ts-shell -- src/verification/verificationCommandPlan.test.ts",
+  "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
+  "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts -t route227e-intentional-missing-test",
   "npm test -w packages/ts-shell -- src/orchestration/planningRuntimeProductExecution.test.ts",
   "npm test -w packages/ts-shell -- src/orchestration/verificationRepairBridge.test.ts src/orchestration/verificationRepairContext.test.ts",
   "npm test -w packages/ts-shell -- src/orchestration/targetSetEditRoute.test.ts src/orchestration/targetSetEditVerification.test.ts",
@@ -80,7 +80,7 @@ export function isAllowlistedFocusedTsShellTestCommand(command: string): boolean
 export function blockedCommandReason(command: string): string {
   return [
     `Run-command intent is not allowed in the MVP allowlist: ${command}`,
-    `Allowed commands: ${RUN_COMMAND_ALLOWLIST.join(", ")}, npm test -w packages/ts-shell -- src/orchestration/<test>.test.ts`,
+    `Allowed commands: ${RUN_COMMAND_ALLOWLIST.join(", ")}, npm test -w packages/ts-shell -- src/verification/<test>.test.ts`,
     "Please rephrase your request to one of the allowed command intents.",
   ].join(" ");
 }

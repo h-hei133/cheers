@@ -5,7 +5,7 @@ import type { PlanningRuntimeProductVerificationCommand } from "./planningRuntim
 import {
   buildVerificationCommandPlan,
   type VerificationCommandPlan,
-} from "./verificationCommandPlan.js";
+} from "../verification/verificationCommandPlan.js";
 import {
   buildVerificationCommandResult,
   type VerificationCommandResult,

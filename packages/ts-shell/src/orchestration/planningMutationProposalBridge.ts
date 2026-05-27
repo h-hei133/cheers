@@ -17,7 +17,7 @@ import type { PlanningMutationHandoffProjection } from "./planningMutationHandof
 import {
   projectProviderProposalBoundaryFromBridge,
   type ProductProviderProposalBoundary,
-} from "../product/providerProposal/providerProposalFacade.js";
+} from "../proposal/providerProposalFacade.js";
 
 export type PlanningMutationProposalBridgeState =
   | "planning-only"

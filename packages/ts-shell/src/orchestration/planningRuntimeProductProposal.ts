@@ -12,7 +12,7 @@ import type { PlanningRuntimeProductLiveProviderProposal } from "./planningRunti
 import {
   projectProviderProposalBoundaryFromPreparation,
   type ProductProviderProposalBoundary,
-} from "../product/providerProposal/providerProposalFacade.js";
+} from "../proposal/providerProposalFacade.js";
 import {
   runRealProviderProposalDryRun,
   type RealProviderProposalDryRunResult,
