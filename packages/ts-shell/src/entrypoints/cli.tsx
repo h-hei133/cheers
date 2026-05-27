@@ -2,10 +2,6 @@
 import process from "node:process";
 import * as readline from "node:readline";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
-import {
-  CoreMcpGateway,
-  McpGatewayBlockedError,
-} from "../core/mcp/gateway.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import {
   bootstrapShellRuntime,
@@ -52,6 +48,7 @@ import {
   buildCliCommandExecution as resolveTurnInputForExecution,
   normalizePromptForExecution,
 } from "./cliCommandExecutionBridge.js";
+import { printCliDoctor } from "./cliDoctor.js";
 import {
   formatAgentModeStatusLines,
   formatAgentModeUpdatedLines,
@@ -64,6 +61,7 @@ import { resolveCliMode } from "./cliModeDispatch.js";
 import { buildCliPlanningMutationExecutionOptions } from "./cliPlanningMutationExecution.js";
 import { runCliPrintMode } from "./cliPrintModeRunner.js";
 import { runCliStdinMode } from "./cliStdinModeRunner.js";
+import { createCliMcpGateway, runCliMcpCommand } from "./cliMcpModule.js";
 import {
   applyPatchDecisionFromApprovalMode,
   createCliEscalationPromptHandler,
@@ -87,13 +85,6 @@ import {
   runCliWorkspaceCommand,
 } from "./cliWorkspaceModule.js";
 import { projectCliStartupPlan } from "./cliStartupPlan.js";
-import {
-  renderMcpBlockedContract,
-  renderMcpDoctorControlPlane,
-  renderMcpRefreshControlPlane,
-  renderMcpStatusControlPlane,
-  renderMcpToolsControlPlane,
-} from "./mcpControlCliSurface.js";
 import {
   renderSessionCommandMap,
   renderUserHelp,
@@ -189,7 +180,7 @@ async function main(): Promise<void> {
   })();
   const runtimeContext = bootstrap.context;
   resolvedCredential = resolveCredentialSnapshot();
-  let mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+  let mcpGateway = createCliMcpGateway(runtimeContext.cwd);
 
   const stdinTransportMode = resolveStdinTransportMode({
     stdinIsTty: Boolean(process.stdin.isTTY),
@@ -537,7 +528,7 @@ async function main(): Promise<void> {
           },
         });
         interactiveTurnNumber = resumeBridge.turnNumber;
-        mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+        mcpGateway = createCliMcpGateway(runtimeContext.cwd);
         refreshInteractivePromptChrome();
         rl.prompt();
         return;
@@ -560,7 +551,7 @@ async function main(): Promise<void> {
           printMode: false,
           readline: rl,
           onSessionSwitched: () => {
-            mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+            mcpGateway = createCliMcpGateway(runtimeContext.cwd);
             refreshInteractivePromptChrome();
           },
         });
@@ -577,7 +568,7 @@ async function main(): Promise<void> {
           workspaceTarget: slashResult.workspaceTarget,
           printMode: false,
           onProjectContextSwitched: () => {
-            mcpGateway = new CoreMcpGateway(runtimeContext.cwd);
+            mcpGateway = createCliMcpGateway(runtimeContext.cwd);
             refreshInteractivePromptChrome();
           },
         });
@@ -586,51 +577,12 @@ async function main(): Promise<void> {
       }
 
       if (isShellAction(slashResult, "show-mcp")) {
-        const mcpAction = slashResult.mcpAction ?? "status";
-        const mcpTarget = slashResult.mcpTarget?.trim();
-        try {
-          if (mcpAction === "refresh") {
-            const refreshTarget =
-              !mcpTarget || mcpTarget.toLowerCase() === "all"
-                ? "all"
-                : mcpTarget;
-            const snapshot = await mcpGateway.refresh(refreshTarget);
-            renderMcpRefreshControlPlane(renderer, snapshot, refreshTarget);
-            rl.prompt();
-            return;
-          }
-
-          const snapshot = await mcpGateway.snapshot();
-          if (mcpAction === "tools") {
-            renderMcpToolsControlPlane(renderer, snapshot, mcpTarget);
-            rl.prompt();
-            return;
-          }
-          if (mcpAction === "doctor") {
-            renderMcpDoctorControlPlane(renderer, snapshot, mcpTarget);
-            rl.prompt();
-            return;
-          }
-          renderMcpStatusControlPlane(renderer, snapshot);
-        } catch (error) {
-          if (error instanceof McpGatewayBlockedError) {
-            renderMcpBlockedContract(renderer, {
-              blockerKind: error.blockerKind,
-              reason: error.message,
-              doNext: error.doNext,
-            });
-          } else {
-            renderMcpBlockedContract(renderer, {
-              blockerKind: "unknown",
-              reason:
-                error instanceof Error
-                  ? `MCP control plane failed: ${error.message}`
-                  : `MCP control plane failed: ${String(error)}`,
-              doNext:
-                "Run /mcp refresh all to reload server connections, then retry your MCP command.",
-            });
-          }
-        }
+        await runCliMcpCommand({
+          renderer,
+          gateway: mcpGateway,
+          mcpAction: slashResult.mcpAction,
+          mcpTarget: slashResult.mcpTarget,
+        });
         rl.prompt();
         return;
       }
@@ -776,31 +728,6 @@ async function main(): Promise<void> {
   }
 
   rl.prompt();
-}
-
-function printCliDoctor(targetCwd: string, launchCwd: string): void {
-  const runtimeConfig = getRuntimeConfig(targetCwd);
-  const gitContext = getWorkflowGitContext(targetCwd);
-  console.log("Private Coding Agents CLI Doctor");
-  console.log(`Node: ${process.version}`);
-  console.log(
-    `Execution path: ${isRustDaemonEnabled() ? "rust-daemon" : "ts-local"}`,
-  );
-  console.log(`Provider: ${runtimeConfig.provider}`);
-  console.log(`Max turns: ${runtimeConfig.maxTurns}`);
-  console.log(
-    `Config sources: ${runtimeConfig.configSources.join(", ") || "none"}`,
-  );
-  console.log(`Launch directory: ${launchCwd}`);
-  console.log(`Target workspace: ${targetCwd}`);
-  if (gitContext.insideGit) {
-    console.log(`Git branch: ${gitContext.branch ?? "unknown"}`);
-    console.log(`Workspace clean: ${gitContext.isClean ? "yes" : "no"}`);
-    console.log(`Git root: ${gitContext.root ?? "unknown"}`);
-  }
-  console.log(
-    "Tip: run `npm run doctor` from the repo root for full environment diagnostics.",
-  );
 }
 
 async function readStdinToEnd(): Promise<string | null> {

@@ -2,10 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import * as readline from "node:readline";
-import {
-  CoreMcpGateway,
-  McpGatewayBlockedError,
-} from "../core/mcp/gateway.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
 import { runResumeLikeShellAction } from "../core/shell/continueShellActionRuntime.js";
 import {
@@ -45,6 +41,7 @@ import {
   normalizePromptForExecution,
 } from "./cliCommandExecutionBridge.js";
 import { formatCliContextTag } from "./cliInteractiveLoopState.js";
+import { createCliMcpGateway, runCliMcpCommand } from "./cliMcpModule.js";
 import {
   runCliRuntimeInvocation,
   type CliApplyPatchRuntimeRouteOptions,
@@ -52,13 +49,6 @@ import {
 import type { PlanningRuntimeProductExecutionOptions } from "../orchestration/planningRuntimeProductExecution.js";
 import { runCliSessionCommand, switchRuntimeSessionProjectContext } from "./cliSessionModule.js";
 import { runCliWorkspaceCommand } from "./cliWorkspaceModule.js";
-import {
-  renderMcpBlockedContract,
-  renderMcpDoctorControlPlane,
-  renderMcpRefreshControlPlane,
-  renderMcpStatusControlPlane,
-  renderMcpToolsControlPlane,
-} from "./mcpControlCliSurface.js";
 import { renderUserHelp, renderSessionCommandMap } from "./slashCommandRegistry.js";
 
 export async function* streamOrchestratedResponse(
@@ -301,7 +291,7 @@ export async function runNonInteractivePrompt(options: {
     if (resolved.slashResult.action === "show-mcp") {
       await runCliMcpCommand({
         renderer: options.renderer,
-        cwd: options.runtimeContext.cwd,
+        gateway: createCliMcpGateway(options.runtimeContext.cwd),
         mcpAction: resolved.slashResult.mcpAction,
         mcpTarget: resolved.slashResult.mcpTarget,
       });
@@ -551,54 +541,5 @@ export async function runReplayPromptScript(options: {
         options.setActiveNonInteractiveApprovalMode,
       nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
     });
-  }
-}
-
-async function runCliMcpCommand(input: {
-  readonly renderer: StreamingRenderer;
-  readonly cwd: string;
-  readonly mcpAction?: "status" | "tools" | "doctor" | "refresh";
-  readonly mcpTarget?: string;
-}): Promise<void> {
-  const mcpAction = input.mcpAction ?? "status";
-  const mcpTarget = input.mcpTarget?.trim();
-  const mcpGateway = new CoreMcpGateway(input.cwd);
-  try {
-    if (mcpAction === "refresh") {
-      const refreshTarget =
-        !mcpTarget || mcpTarget.toLowerCase() === "all" ? "all" : mcpTarget;
-      const snapshot = await mcpGateway.refresh(refreshTarget);
-      renderMcpRefreshControlPlane(input.renderer, snapshot, refreshTarget);
-      return;
-    }
-
-    const snapshot = await mcpGateway.snapshot();
-    if (mcpAction === "tools") {
-      renderMcpToolsControlPlane(input.renderer, snapshot, mcpTarget);
-      return;
-    }
-    if (mcpAction === "doctor") {
-      renderMcpDoctorControlPlane(input.renderer, snapshot, mcpTarget);
-      return;
-    }
-    renderMcpStatusControlPlane(input.renderer, snapshot);
-  } catch (error) {
-    if (error instanceof McpGatewayBlockedError) {
-      renderMcpBlockedContract(input.renderer, {
-        blockerKind: error.blockerKind,
-        reason: error.message,
-        doNext: error.doNext,
-      });
-    } else {
-      renderMcpBlockedContract(input.renderer, {
-        blockerKind: "unknown",
-        reason:
-          error instanceof Error
-            ? `MCP control plane failed: ${error.message}`
-            : `MCP control plane failed: ${String(error)}`,
-        doNext:
-          "Run /mcp refresh all to reload server connections, then retry your MCP command.",
-      });
-    }
   }
 }
