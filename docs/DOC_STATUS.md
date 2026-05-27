@@ -37,6 +37,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/architecture/reference-architecture-maps.md` | historical | Recovering reference-repo analysis behind the atlas. |  | Capability Contract Architecture |
 | `docs/product-architecture-reset/script-command-index.md` | active | Checking grouped package-script aliases and Route G command compatibility. |  | Product Architecture Reset |
 | `docs/product-architecture-reset/final-compatibility-audit.md` | active | Checking final reset compatibility, remaining route clutter, and validation ledger. |  | Product Architecture Reset |
+| `docs/product-architecture-reset/phase2-readiness-note.md` | active | Checking Phase 2 Goal 0 readiness, corrected current-state assumptions, and Goal 1 start boundary. |  | Product Architecture Reset |
 | `docs/dev-history/routes/README.md` | historical | Finding route document quarantine status and route-history script namespace. |  | Product Architecture Reset |
 | `docs/evidence/history/route-reports/README.md` | historical | Finding historical route report provenance and compatibility status. |  | Product Architecture Reset |
 

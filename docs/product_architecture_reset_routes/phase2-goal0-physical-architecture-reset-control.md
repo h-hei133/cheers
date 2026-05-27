@@ -28,6 +28,20 @@ Assume Phase 1 has completed:
 
 These are foundations, not final architecture.
 
+Goal 0 readiness note:
+
+- Current readiness is tracked in
+  `docs/product-architecture-reset/phase2-readiness-note.md`.
+- Treat Route A inventory as the Phase 1 starting snapshot. Its counts and
+  top-level route-runner locations predate Routes G/H and must not override the
+  final compatibility audit or current filesystem state.
+- As of Goal 0, the current route-runner fact is: historical
+  `scripts/route*.ts` runners are under `scripts/dev-history/routes/`, while
+  active or compatibility-bound verifier wrappers can remain top-level.
+- Do not infer that Phase 1 compatibility facades are final domain ownership.
+  Phase 2 Goal 1 must inspect current imports and move only with compatibility
+  shims.
+
 ## Core Correction
 
 Do not treat packages/ts-shell/src/product/ as the final home for every capability.
@@ -250,4 +264,3 @@ Goal 0 should only verify and, if needed, refine Phase 2 execution readiness.
 It should not perform Goal 1 migration.
 
 Goal 0 may update this file or add a short Phase 2 status note if current repo facts differ.
-
