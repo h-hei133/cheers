@@ -1,6 +1,6 @@
 import type { QueryEvent } from "../core/query/events.js";
 import type { CodingResultSummary, CodingWriteEffect } from "../orchestration/types.js";
-import type { SessionMessage } from "./SessionManager.js";
+import type { SessionMessage } from "./schema/sessionMessage.js";
 import type {
   SeedInfluenceDiagnostic,
 } from "./sessionContinuityTypes.js";

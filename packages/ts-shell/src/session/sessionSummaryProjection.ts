@@ -1,10 +1,10 @@
-import type { Session } from "./SessionManager.js";
 import type {
   RecoverySnapshot,
   RecoveryTrustBoundaryBlock,
   SessionReentrySummary,
   SessionResumeEligibility,
 } from "./SessionManager.js";
+import type { Session } from "./schema/sessionRecord.js";
 import type { SessionContinuitySnapshot } from "./sessionContinuityTypes.js";
 
 export function projectSessionReentrySummary(input: {

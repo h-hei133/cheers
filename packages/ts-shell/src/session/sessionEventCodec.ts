@@ -1,5 +1,5 @@
 import type { QueryEvent } from "../core/query/events.js";
-import type { SessionMessage } from "./SessionManager.js";
+import type { SessionMessage } from "./schema/sessionMessage.js";
 
 export type TranscriptLifecycleEventName =
   | "run-started"

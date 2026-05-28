@@ -1,4 +1,4 @@
-import type { Session } from "./SessionManager.js";
+import type { Session } from "./schema/sessionRecord.js";
 
 export interface CurrentSessionSelectionRecord {
   readonly sessionId: string;

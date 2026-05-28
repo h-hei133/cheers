@@ -20,9 +20,9 @@ import type {
 import type {
   RecoverySnapshot,
   ReplayPlan,
-  SessionMessage,
-  TranscriptEvent,
 } from "./SessionManager.js";
+import type { SessionMessage } from "./schema/sessionMessage.js";
+import type { TranscriptEvent } from "./sessionEventCodec.js";
 
 export interface ReplayTranscriptState {
   readonly status: "active" | "interrupted" | "completed" | "error" | "terminated";

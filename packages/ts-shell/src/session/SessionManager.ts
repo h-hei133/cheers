@@ -8,7 +8,6 @@
  */
 
 import * as fs from "node:fs";
-import * as path from "node:path";
 import type { QueryEvent } from "../core/query/events.js";
 import type {
   QueryRuntimeRecoveryBoundary,
@@ -37,9 +36,7 @@ import {
 } from "./approvalMemoryCodec.js";
 import type {
   CurrentSessionSelectionResolution,
-  CurrentSessionSelectionStore,
 } from "./currentSessionSelection.js";
-import { projectDurableStatus } from "./durableStatusProjection.js";
 import { buildMutationContinuityState } from "./mutationContinuityState.js";
 import {
   projectApprovalMemoryPersistence,
@@ -54,9 +51,6 @@ import {
   createLifecycleTranscriptEvent,
   createMessageTranscriptEvent,
   createQueryTranscriptEvent,
-  decodeTranscriptLine,
-  encodeTranscriptEvent,
-  transcriptEventToSessionMessage,
   type TranscriptEvent,
 } from "./sessionEventCodec.js";
 import {
@@ -80,16 +74,21 @@ import {
   normalizeWriteEffect,
   parseSeedInfluence,
 } from "./sessionContinuityModule.js";
+import type { SessionMessage } from "./schema/sessionMessage.js";
+import type { Session } from "./schema/sessionRecord.js";
+import type {
+  SessionStateSnapshot,
+  SessionStateSnapshotOverrides,
+  TerminalPersistence,
+} from "./schema/sessionStateSnapshot.js";
 import {
-  projectSessionMetadata,
-} from "./sessionMetadataProjection.js";
+  buildSessionStateSnapshot,
+} from "./schema/sessionStateSnapshot.js";
 import {
-  projectCurrentSessionRegistryResolution,
-  projectCurrentSessionSelectionStore,
-  readSessionRegistryStore,
-  removeCurrentSessionSelectionFromStore,
-  writeSessionRegistryStore,
-} from "./sessionRegistry.js";
+  clearCurrentSessionSelectionForProject,
+  resolveCurrentSessionForProject as resolveCurrentSessionFromRegistry,
+  setCurrentSessionSelection,
+} from "./store/currentSessionRegistry.js";
 import {
   buildResumeReplayInput,
   buildSessionReplayPlan,
@@ -117,7 +116,21 @@ import {
   projectSessionFileLayout,
   validateSessionId,
   type SessionStoreLayout,
-} from "./sessionStore.js";
+} from "./store/sessionFileLayout.js";
+import { writeJsonFileAtomic } from "./store/sessionFileStore.js";
+import {
+  deleteSessionRecord,
+  loadSessionRecord,
+  sessionExistsAtLayout,
+  writeSessionMetadataRecord,
+  writeSessionRecord,
+} from "./store/sessionStore.js";
+import {
+  readStateSnapshotRequired,
+  readStateSnapshotSafely,
+  withSessionStateLock,
+  writeSessionState,
+} from "./store/sessionStateStore.js";
 import {
   projectRecoveryTrustBoundaryBlock,
   projectSessionReentrySummary,
@@ -139,7 +152,6 @@ import {
 } from "./permissionRequestMemoryCodec.js";
 import {
   normalizeProjectBinding,
-  normalizeProjectRootKey,
   projectSessionBinding,
   type WorkspaceRootMode,
 } from "./projectBindingPolicy.js";
@@ -151,6 +163,11 @@ import {
 import {
   deriveStoppedSessionContinuitySurface,
 } from "./stoppedSessionContinuity.js";
+import {
+  appendSessionTurn,
+  appendTranscriptEvent,
+  readTranscriptEvents,
+} from "./transcript/sessionTranscript.js";
 
 export type { CurrentSessionSelectionResolution } from "./currentSessionSelection.js";
 export type {
@@ -158,30 +175,10 @@ export type {
   SessionContinuitySnapshot,
 } from "./sessionContinuityTypes.js";
 export type { TranscriptEvent } from "./sessionEventCodec.js";
-
-export interface SessionMessage {
-  role: "user" | "assistant";
-  content: string;
-  timestamp?: string;
-}
+export type { SessionMessage } from "./schema/sessionMessage.js";
 
 export type { WorkspaceRootMode } from "./projectBindingPolicy.js";
-
-export interface Session {
-  id: string;
-  projectRoot: string;
-  rootMode?: WorkspaceRootMode;
-  requestedWorkspaceRoot?: string;
-  targetPathBase?: string;
-  gitRoot?: string | null;
-  title?: string;
-  createdAt: string;
-  updatedAt: string;
-  status: "active" | "interrupted" | "completed" | "error" | "terminated";
-  turns: SessionMessage[];
-  pendingPrompt?: string;
-  lastError?: string;
-}
+export type { Session } from "./schema/sessionRecord.js";
 
 export interface SessionReentrySummary {
   readonly id: string;
@@ -222,33 +219,6 @@ export interface ProjectContextSummary {
   readonly lastSessionTitle?: string;
 }
 
-interface SessionMetadata {
-  id: string;
-  projectRoot: string;
-  rootMode?: WorkspaceRootMode;
-  requestedWorkspaceRoot?: string;
-  targetPathBase?: string;
-  gitRoot?: string | null;
-  title?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface SessionStateSnapshot {
-  status: Session["status"];
-  projectRoot?: string;
-  pendingPrompt?: string;
-  lastError?: string;
-  workingMemory?: unknown;
-  durableStatus?: "success" | "stopped" | "error";
-  runPhase?: "idle" | "prompt-persisted" | "turn-active";
-  interruptedKind?: "prompt" | "turn";
-  terminalReason?: TerminalReason;
-  terminalClassification?: TerminalClassification;
-  lastContinuationReason?: ContinuationReason;
-  pendingLifecycle?: DurableLifecycleIndex;
-}
-
 interface TranscriptRepairContext {
   readonly sessionId: string;
   readonly state: SessionStateSnapshot;
@@ -270,12 +240,6 @@ export interface RecoverySnapshot {
   readonly lastAssistantMessage?: SessionMessage;
   readonly lastLifecycleEvent?: Extract<TranscriptEvent, { type: "lifecycle" }>;
   readonly transcriptEvents: TranscriptEvent[];
-}
-
-interface TerminalPersistence {
-  readonly terminalReason?: TerminalReason;
-  readonly terminalClassification?: TerminalClassification;
-  readonly lastContinuationReason?: ContinuationReason;
 }
 
 export interface ReplayPlan {
@@ -316,16 +280,11 @@ export interface SessionResumeEligibility {
 }
 
 export class SessionManager {
-  private static readonly STATE_IO_MAX_ATTEMPTS = 6;
-  private static readonly STATE_IO_RETRY_DELAY_MS = 12;
-  private static readonly STATE_LOCK_TIMEOUT_MS = 1200;
-  private static readonly STATE_LOCK_RETRY_DELAY_MS = 20;
   private static readonly AUTO_COMPACT_TURN_THRESHOLD = 12;
   private static readonly APPROVAL_AUDIT_HISTORY_LIMIT = 16;
   private readonly storeLayout: SessionStoreLayout;
   private sessionsDir: string;
   private readonly currentSessionStorePath: string;
-  private lastCurrentSessionStoreReadError: string | null = null;
   private readonly warnedUnreadableSessionDirs = new Set<string>();
   private didWarnListSessionsFailure = false;
 
@@ -391,7 +350,12 @@ export class SessionManager {
     if (!sessionId?.trim()) {
       return false;
     }
-    return fs.existsSync(this.getSessionDir(sessionId.trim()));
+    return sessionExistsAtLayout(
+      projectSessionFileLayout({
+        sessionsDir: this.sessionsDir,
+        sessionId: sessionId.trim(),
+      }),
+    );
   }
 
   getCurrentSessionForProject(projectRoot: string): Session | null {
@@ -402,86 +366,28 @@ export class SessionManager {
   resolveCurrentSessionForProject(
     projectRoot: string,
   ): CurrentSessionSelectionResolution {
-    const normalizedProjectRoot = this.normalizeProjectRootKey(projectRoot);
-    const store = this.readCurrentSessionStore();
-    const storeReadError = this.lastCurrentSessionStoreReadError;
-    const selection = store.byProjectRoot[normalizedProjectRoot];
-    if (!selection?.sessionId?.trim()) {
-      const unselectedProjection = projectCurrentSessionRegistryResolution({
-        projectRoot,
-        normalizedProjectRoot,
-        storeReadError,
-        selection,
-      });
-      return unselectedProjection.resolution;
-    }
-    if (!this.sessionExists(selection.sessionId)) {
-      const missingProjection = projectCurrentSessionRegistryResolution({
-        projectRoot,
-        normalizedProjectRoot,
-        storeReadError,
-        selection,
-        sessionExists: false,
-      });
-      this.removeCurrentSessionSelection(normalizedProjectRoot);
-      return missingProjection.resolution;
-    }
-
-    try {
-      const session = this.load(selection.sessionId);
-      const sessionProjectRoot = session.projectRoot || normalizedProjectRoot;
-      const selectedProjection = projectCurrentSessionRegistryResolution({
-        projectRoot,
-        normalizedProjectRoot,
-        storeReadError,
-        selection,
-        sessionExists: true,
-        session,
-        sessionProjectRoot,
-        normalizedSessionProjectRoot: this.normalizeProjectRootKey(sessionProjectRoot),
-      });
-      if (!selectedProjection.resolution.ok) {
-        this.removeCurrentSessionSelection(normalizedProjectRoot);
-        return selectedProjection.resolution;
-      }
-      return selectedProjection.resolution;
-    } catch (error) {
-      const failedProjection = projectCurrentSessionRegistryResolution({
-        projectRoot,
-        normalizedProjectRoot,
-        storeReadError,
-        selection,
-        sessionExists: true,
-        loadError: error,
-      });
-      this.removeCurrentSessionSelection(normalizedProjectRoot);
-      return failedProjection.resolution;
-    }
+    return resolveCurrentSessionFromRegistry({
+      storePath: this.currentSessionStorePath,
+      projectRoot,
+      sessionExists: (sessionId) => this.sessionExists(sessionId),
+      loadSession: (sessionId) => this.load(sessionId),
+    });
   }
 
   setCurrentSessionForProject(projectRoot: string, sessionId: string): void {
-    const normalizedProjectRoot = this.normalizeProjectRootKey(projectRoot);
-    const normalizedSessionId = sessionId.trim();
-    if (!normalizedProjectRoot || !normalizedSessionId) {
-      return;
-    }
-
-    const current = this.readCurrentSessionStore();
-    const next = projectCurrentSessionSelectionStore({
-      current,
-      normalizedProjectRoot,
-      sessionId: normalizedSessionId,
+    setCurrentSessionSelection({
+      storePath: this.currentSessionStorePath,
+      projectRoot,
+      sessionId,
       updatedAt: new Date().toISOString(),
     });
-    this.writeCurrentSessionStore(next);
   }
 
   clearCurrentSessionForProject(projectRoot: string): void {
-    const normalizedProjectRoot = this.normalizeProjectRootKey(projectRoot);
-    if (!normalizedProjectRoot) {
-      return;
-    }
-    this.removeCurrentSessionSelection(normalizedProjectRoot);
+    clearCurrentSessionSelectionForProject({
+      storePath: this.currentSessionStorePath,
+      projectRoot,
+    });
   }
 
   createNewWithId(
@@ -601,19 +507,14 @@ export class SessionManager {
 
   addTurn(sessionId: string, message: SessionMessage): void {
     const session = this.load(sessionId);
-    const timestamp = new Date().toISOString();
-    const nextMessage: SessionMessage & { timestamp: string } = {
-      ...message,
-      timestamp,
-    };
-    session.turns.push(nextMessage);
-    session.updatedAt = timestamp;
-    this.appendTranscriptEvent(
-      sessionId,
-      createMessageTranscriptEvent(nextMessage),
-    );
-    this.writeSessionMetadata(session);
-    this.writeSessionState(session);
+    appendSessionTurn({
+      session,
+      message,
+      timestamp: new Date().toISOString(),
+      append: (event) => this.appendTranscriptEvent(sessionId, event),
+      writeMetadata: (nextSession) => this.writeSessionMetadata(nextSession),
+      writeState: (nextSession) => this.writeSessionState(nextSession),
+    });
   }
 
   recordApprovalAuditDecision(
@@ -797,11 +698,13 @@ export class SessionManager {
   }
 
   deleteSession(sessionId: string): void {
-    const sessionDir = this.getSessionDir(sessionId);
-    if (!fs.existsSync(sessionDir)) {
-      throw new Error(`Session ${sessionId} not found`);
-    }
-    fs.rmSync(sessionDir, { recursive: true, force: true });
+    deleteSessionRecord({
+      sessionId,
+      layout: projectSessionFileLayout({
+        sessionsDir: this.sessionsDir,
+        sessionId,
+      }),
+    });
   }
 
   saveError(
@@ -948,16 +851,7 @@ export class SessionManager {
   }
 
   getTranscriptEvents(sessionId: string): TranscriptEvent[] {
-    const transcriptPath = this.getTranscriptPath(sessionId);
-    if (!fs.existsSync(transcriptPath)) {
-      return [];
-    }
-
-    return fs
-      .readFileSync(transcriptPath, "utf8")
-      .split("\n")
-      .filter(Boolean)
-      .map(decodeTranscriptLine);
+    return readTranscriptEvents(this.getTranscriptPath(sessionId));
   }
 
   getRecoverySnapshot(sessionId: string): RecoverySnapshot {
@@ -1209,38 +1103,6 @@ export class SessionManager {
     this.writeSessionState(session);
     this.setCurrentSessionForProject(session.projectRoot, session.id);
     return session;
-  }
-
-  private normalizeProjectRootKey(projectRoot: string): string {
-    return normalizeProjectRootKey(projectRoot);
-  }
-
-  private readCurrentSessionStore(): CurrentSessionSelectionStore {
-    const result = readSessionRegistryStore(this.currentSessionStorePath);
-    this.lastCurrentSessionStoreReadError = result.readError;
-    return result.store;
-  }
-
-  private writeCurrentSessionStore(store: CurrentSessionSelectionStore): void {
-    writeSessionRegistryStore({
-      storePath: this.currentSessionStorePath,
-      store,
-    });
-  }
-
-  private removeCurrentSessionSelection(normalizedProjectRoot: string): void {
-    const current = this.readCurrentSessionStore();
-    if (!current.byProjectRoot[normalizedProjectRoot]) {
-      return;
-    }
-
-    const next = removeCurrentSessionSelectionFromStore({
-      current,
-      normalizedProjectRoot,
-    });
-    if (next) {
-      this.writeCurrentSessionStore(next);
-    }
   }
 
   getRecoveryTrustBoundaryBlock(input?: {
@@ -2103,47 +1965,36 @@ export class SessionManager {
   }
 
   private writeSession(session: Session): void {
-    const sessionDir = this.getSessionDir(session.id);
-    if (!fs.existsSync(sessionDir)) {
-      fs.mkdirSync(sessionDir, { recursive: true });
-    }
-
-    if (!fs.existsSync(this.getTranscriptPath(session.id))) {
-      fs.writeFileSync(this.getTranscriptPath(session.id), "", "utf8");
-    }
-
-    this.writeSessionMetadata(session);
-    this.writeSessionState(session);
+    writeSessionRecord({
+      session,
+      layout: projectSessionFileLayout({
+        sessionsDir: this.sessionsDir,
+        sessionId: session.id,
+      }),
+    });
   }
 
   private writeSessionMetadata(session: Session): void {
-    const metadata: SessionMetadata = projectSessionMetadata(session);
-    fs.writeFileSync(
-      this.getMetadataPath(session.id),
-      JSON.stringify(metadata, null, 2),
-      "utf8",
-    );
+    writeSessionMetadataRecord({
+      session,
+      layout: projectSessionFileLayout({
+        sessionsDir: this.sessionsDir,
+        sessionId: session.id,
+      }),
+    });
   }
 
   private writeSessionState(
     session: Session,
-    overrides?: Partial<
-      Pick<
-        SessionStateSnapshot,
-        | "runPhase"
-        | "interruptedKind"
-        | "terminalReason"
-        | "terminalClassification"
-        | "lastContinuationReason"
-        | "pendingLifecycle"
-      >
-    >,
+    overrides?: SessionStateSnapshotOverrides,
   ): void {
-    this.withSessionStateLock(session.id, () => {
-      const statePath = this.getStatePath(session.id);
-      const current = this.readStateSnapshotSafely(statePath);
-      const snapshot = this.buildSessionStateSnapshot(session, current, overrides);
-      this.writeJsonFileAtomic(statePath, snapshot);
+    writeSessionState({
+      session,
+      layout: projectSessionFileLayout({
+        sessionsDir: this.sessionsDir,
+        sessionId: session.id,
+      }),
+      overrides,
     });
   }
 
@@ -2151,11 +2002,7 @@ export class SessionManager {
     sessionId: string,
     event: TranscriptEvent,
   ): void {
-    fs.appendFileSync(
-      this.getTranscriptPath(sessionId),
-      `${encodeTranscriptEvent(event)}\n`,
-      "utf8",
-    );
+    appendTranscriptEvent(this.getTranscriptPath(sessionId), event);
   }
 
   private findCompensatedLifecycleEvent(
@@ -2274,130 +2121,24 @@ export class SessionManager {
   }
 
   private load(sessionId: string): Session {
-    const sessionDir = this.getSessionDir(sessionId);
-    const metadataPath = this.getMetadataPath(sessionId);
-    const statePath = this.getStatePath(sessionId);
-    const transcriptPath = this.getTranscriptPath(sessionId);
-
-    if (
-      !fs.existsSync(sessionDir) ||
-      !fs.existsSync(metadataPath) ||
-      !fs.existsSync(transcriptPath)
-    ) {
-      throw new Error(`Session ${sessionId} not found`);
-    }
-
-    try {
-      const metadata = this.readJsonFileWithRetry<SessionMetadata>(metadataPath, {
-        required: true,
-        parseErrorDetail: `Failed to load session ${sessionId}`,
-      });
-      const state = this.readStateSnapshotRequired(statePath);
-      const transcriptLines = fs
-        .readFileSync(transcriptPath, "utf8")
-        .split("\n")
-        .filter(Boolean);
-      const parsedEvents = transcriptLines.map((line) =>
-        transcriptEventToSessionMessage(decodeTranscriptLine(line)) ?? null,
-      );
-      const turns: SessionMessage[] = parsedEvents.filter(
-        (event): event is SessionMessage => event !== null,
-      );
-
-      return {
-        id: metadata.id,
-        projectRoot:
-          metadata.projectRoot?.trim() ||
-          state.projectRoot?.trim() ||
-          process.cwd(),
-        ...(metadata.rootMode ? { rootMode: metadata.rootMode } : {}),
-        ...(metadata.requestedWorkspaceRoot?.trim()
-          ? { requestedWorkspaceRoot: metadata.requestedWorkspaceRoot.trim() }
-          : {}),
-        ...(metadata.targetPathBase?.trim()
-          ? { targetPathBase: metadata.targetPathBase.trim() }
-          : {}),
-        ...(Object.prototype.hasOwnProperty.call(metadata, "gitRoot")
-          ? { gitRoot: metadata.gitRoot?.trim() || null }
-          : {}),
-        title: metadata.title,
-        createdAt: metadata.createdAt,
-        updatedAt: metadata.updatedAt,
-        status: state.status,
-        pendingPrompt: state.pendingPrompt,
-        lastError: state.lastError,
-        turns,
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to load session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    return loadSessionRecord({
+      sessionId,
+      layout: projectSessionFileLayout({
+        sessionsDir: this.sessionsDir,
+        sessionId,
+      }),
+      cwd: process.cwd(),
+    });
   }
 
   private readStateSnapshotSafely(
     statePath: string,
   ): SessionStateSnapshot | undefined {
-    return this.readJsonFileWithRetry<SessionStateSnapshot>(statePath, {
-      required: false,
-      parseErrorDetail: "Invalid state snapshot",
-    });
+    return readStateSnapshotSafely(statePath);
   }
 
   private readStateSnapshotRequired(statePath: string): SessionStateSnapshot {
-    const state = this.readJsonFileWithRetry<SessionStateSnapshot>(statePath, {
-      required: true,
-      parseErrorDetail: `Failed to load session state from ${statePath}`,
-    });
-    if (!state) {
-      throw new Error(`Session state missing at ${statePath}`);
-    }
-    return state;
-  }
-
-  private readJsonFileWithRetry<T>(
-    filePath: string,
-    options: { required: boolean; parseErrorDetail: string },
-  ): T | undefined {
-    const maxAttempts = SessionManager.STATE_IO_MAX_ATTEMPTS;
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      try {
-        if (!fs.existsSync(filePath)) {
-          if (options.required && attempt === maxAttempts) {
-            throw new Error(`File missing at ${filePath}`);
-          }
-          if (!options.required) {
-            return undefined;
-          }
-          this.sleepBlocking(SessionManager.STATE_IO_RETRY_DELAY_MS);
-          continue;
-        }
-        const raw = fs.readFileSync(filePath, "utf8").trim();
-        if (raw.length === 0) {
-          if (options.required && attempt === maxAttempts) {
-            throw new Error(`File empty at ${filePath}`);
-          }
-          if (!options.required) {
-            return undefined;
-          }
-          this.sleepBlocking(SessionManager.STATE_IO_RETRY_DELAY_MS);
-          continue;
-        }
-        return JSON.parse(raw) as T;
-      } catch (error) {
-        if (!this.isTransientIoError(error) || attempt === maxAttempts) {
-          if (error instanceof Error && /Unexpected token|JSON/.test(error.message)) {
-            if (!options.required) {
-              return undefined;
-            }
-            throw new Error(`${options.parseErrorDetail}: ${error.message}`);
-          }
-          throw error;
-        }
-        this.sleepBlocking(SessionManager.STATE_IO_RETRY_DELAY_MS);
-      }
-    }
-    return undefined;
+    return readStateSnapshotRequired(statePath);
   }
 
   private buildSessionStateSnapshot(
@@ -2415,167 +2156,20 @@ export class SessionManager {
       >
     >,
   ): SessionStateSnapshot {
-    return {
-      status: session.status,
-      projectRoot: session.projectRoot,
-      pendingPrompt: session.pendingPrompt,
-      lastError: session.lastError,
-      runPhase:
-        overrides && Object.prototype.hasOwnProperty.call(overrides, "runPhase")
-          ? overrides.runPhase
-          : (current?.runPhase ?? "idle"),
-      interruptedKind:
-        overrides &&
-        Object.prototype.hasOwnProperty.call(overrides, "interruptedKind")
-          ? overrides.interruptedKind
-          : current?.interruptedKind,
-      terminalReason:
-        overrides &&
-        Object.prototype.hasOwnProperty.call(overrides, "terminalReason")
-          ? overrides.terminalReason
-          : current?.terminalReason,
-      terminalClassification:
-        overrides &&
-        Object.prototype.hasOwnProperty.call(
-          overrides,
-          "terminalClassification",
-        )
-          ? overrides.terminalClassification
-          : current?.terminalClassification,
-      durableStatus: projectDurableStatus(
-        overrides &&
-          Object.prototype.hasOwnProperty.call(
-            overrides,
-            "terminalClassification",
-          )
-          ? overrides.terminalClassification
-          : current?.terminalClassification,
-        session.status,
-      ),
-      lastContinuationReason:
-        overrides &&
-        Object.prototype.hasOwnProperty.call(
-          overrides,
-          "lastContinuationReason",
-        )
-          ? overrides.lastContinuationReason
-          : current?.lastContinuationReason,
-      pendingLifecycle:
-        overrides &&
-        Object.prototype.hasOwnProperty.call(overrides, "pendingLifecycle")
-          ? overrides.pendingLifecycle
-          : (current?.pendingLifecycle ?? createEmptyLifecycleIndex()),
-      workingMemory: current?.workingMemory,
-    };
+    return buildSessionStateSnapshot(session, current, overrides);
   }
 
   private withSessionStateLock<T>(sessionId: string, action: () => T): T {
-    const lockPath = this.getStateLockPath(sessionId);
-    return this.withFileLock(lockPath, action);
-  }
-
-  private withFileLock<T>(lockPath: string, action: () => T): T {
-    const directory = path.dirname(lockPath);
-    if (!fs.existsSync(directory)) {
-      fs.mkdirSync(directory, { recursive: true });
-    }
-
-    const startedAt = Date.now();
-    while (true) {
-      let fd: number | undefined;
-      try {
-        fd = fs.openSync(lockPath, "wx");
-        try {
-          return action();
-        } finally {
-          if (fd !== undefined) {
-            fs.closeSync(fd);
-            fd = undefined;
-          }
-          try {
-            fs.rmSync(lockPath, { force: true });
-          } catch {
-            // ignore lock cleanup race
-          }
-        }
-      } catch (error) {
-        if (!this.isTransientLockError(error)) {
-          throw error;
-        }
-        const elapsed = Date.now() - startedAt;
-        if (elapsed >= SessionManager.STATE_LOCK_TIMEOUT_MS) {
-          throw new Error(`Session state lock timeout at ${lockPath}`);
-        }
-        this.sleepBlocking(SessionManager.STATE_LOCK_RETRY_DELAY_MS);
-      } finally {
-        if (fd !== undefined) {
-          try {
-            fs.closeSync(fd);
-          } catch {
-            // already closed
-          }
-        }
-      }
-    }
-  }
-
-  private sleepBlocking(milliseconds: number): void {
-    if (milliseconds <= 0) {
-      return;
-    }
-    const slot = new Int32Array(new SharedArrayBuffer(4));
-    Atomics.wait(slot, 0, 0, milliseconds);
-  }
-
-  private isTransientLockError(error: unknown): boolean {
-    if (!(error instanceof Error)) {
-      return false;
-    }
-    const code = (error as NodeJS.ErrnoException).code;
-    return code === "EEXIST" || code === "EPERM" || code === "EBUSY";
-  }
-
-  private isTransientIoError(error: unknown): boolean {
-    if (!(error instanceof Error)) {
-      return false;
-    }
-    const code = (error as NodeJS.ErrnoException).code;
-    return (
-      code === "ENOENT" ||
-      code === "EPERM" ||
-      code === "EBUSY" ||
-      code === "EMFILE" ||
-      code === "ENFILE"
+    return withSessionStateLock(
+      projectSessionFileLayout({
+        sessionsDir: this.sessionsDir,
+        sessionId,
+      }),
+      action,
     );
   }
 
   private writeJsonFileAtomic(filePath: string, payload: unknown): void {
-    const directory = path.dirname(filePath);
-    if (!fs.existsSync(directory)) {
-      fs.mkdirSync(directory, { recursive: true });
-    }
-
-    const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-    const serialized = JSON.stringify(payload, null, 2);
-    const tempFd = fs.openSync(tempPath, "w");
-    try {
-      fs.writeFileSync(tempFd, serialized, "utf8");
-      fs.fsyncSync(tempFd);
-    } finally {
-      fs.closeSync(tempFd);
-    }
-
-    try {
-      fs.renameSync(tempPath, filePath);
-    } catch (error) {
-      if (!this.isTransientIoError(error)) {
-        throw error;
-      }
-      fs.writeFileSync(filePath, serialized, "utf8");
-    } finally {
-      if (fs.existsSync(tempPath)) {
-        fs.rmSync(tempPath, { force: true });
-      }
-    }
+    writeJsonFileAtomic(filePath, payload);
   }
 }

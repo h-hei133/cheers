@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Session } from "./SessionManager.js";
+import type { Session } from "./schema/sessionRecord.js";
 import {
   createEmptyCurrentSessionSelectionStore,
   parseCurrentSessionSelectionStore,

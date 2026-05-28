@@ -1,9 +1,9 @@
 import type {
   ProjectContextSummary,
   RecoveryTrustBoundaryBlock,
-  Session,
   SessionReentrySummary,
 } from "./SessionManager.js";
+import type { Session } from "./schema/sessionRecord.js";
 import { scoreSessionReentrySummary } from "./sessionSummaryProjection.js";
 
 export function projectRecentProjectContexts(input: {
