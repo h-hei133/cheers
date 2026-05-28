@@ -23,7 +23,8 @@
               ↓                  ↓
       ┌───────────────┐  ┌──────────────────┐
       │ Model API     │  │ Rust Daemon      │
-      │ (OpenAI)      │  │ (execution plane)│
+      │ (opt-in       │  │ (optional native │
+      │ provider path)│  │ executor path)   │
       │               │  │                  │
       │ Provider      │  │ • Execution      │
       │ Adapter       │  │ • Timeout/Cancel │
@@ -46,7 +47,7 @@
       ─────────────────────────────────────────
       • TS ↔ Model API: OpenAI streaming protocol
       • TS ↔ Rust daemon: runtime-protocol.schema.json
-      • TS ↔ Python eval: subprocess + JSON (offline only)
+      • Python eval: offline-only evaluation artifacts, not product runtime
 ```
 
 ---
