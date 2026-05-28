@@ -34,7 +34,8 @@ Add dependency checks when physical structure exists:
 - Provider must not import edit authority.
 - Edit must not import CLI/session presentation.
 - Python eval must not own TS control-plane semantics.
-- Rust must stay execution-plane.
+- Rust must stay an opt-in native executor candidate until concrete code paths
+  prove broader execution ownership.
 
 These can start as lightweight import scans before becoming a full dependency
 graph checker.

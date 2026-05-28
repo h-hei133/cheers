@@ -184,9 +184,9 @@ Severity levels: `high`, `medium`, `low`.
   execution request/result/status structures.
 - Product architecture problem: duplicated cross-runtime shapes can become
   parallel contracts unless their adapter role is explicit and tested.
-- Affected modules: contracts, Rust execution plane, TS daemon/runtime bridge.
+- Affected modules: contracts, Rust native executor candidate, TS daemon/runtime bridge.
 - Severity: medium.
 - Migration target: contract conformance audit and adapter-local type policy.
 - Suggested phase: final compatibility audit or a dedicated contracts route.
-- Risk if ignored: TS/Rust payload semantics drift during execution-plane
+- Risk if ignored: TS/Rust payload semantics drift during execution-boundary
   cleanup.

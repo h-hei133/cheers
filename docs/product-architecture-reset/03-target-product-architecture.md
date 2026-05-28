@@ -54,7 +54,9 @@ packages/ts-shell/src/
     test-utils/
 ```
 
-`packages/rust-core/src` remains the execution plane. `contracts` remains the
+Execution remains an explicit boundary, currently implemented mostly in
+TypeScript. `packages/rust-core/src` remains the native executor candidate for
+OS/process/sandbox/isolation-critical needs. `contracts` remains the
 cross-runtime semantic boundary. Python eval remains outside product runtime.
 
 ## Responsibilities That Become Directories
@@ -189,4 +191,4 @@ Future reset phases should forbid:
 - Provider modules importing edit authority or workspace writers.
 - Python eval owning TypeScript session, replay, permission, or runtime
   durability semantics.
-- Rust execution plane owning TypeScript orchestration policy.
+- Rust native executor paths owning TypeScript orchestration policy.

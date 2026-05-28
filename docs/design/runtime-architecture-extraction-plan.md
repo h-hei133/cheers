@@ -148,7 +148,8 @@ Rejected Claude Code ideas:
 - UI-specific permission dialogs and remote session machinery are not applicable
   to this repository's narrower CLI/runtime boundary.
 - This project should not mirror Claude Code's file layout; it should preserve
-  the existing TS control plane, Rust execution plane, and contracts boundary.
+  the existing TS product runtime/control plane, explicit execution boundary,
+  Rust native executor candidate, and contracts boundary.
 
 Search terms used for opencode:
 
@@ -1336,8 +1337,8 @@ All implementation routes must preserve:
 - provider config and secrets are never printed
 - MCP evidence remains local/deterministic unless a future explicit route
   changes that claim
-- TypeScript control plane owns runtime/session/CLI semantics
-- Rust remains execution plane
+- TypeScript product runtime/control plane owns runtime/session/CLI semantics
+- Rust remains a native executor candidate until concrete execution paths prove broader ownership
 - contracts boundary remains explicit
 - local TypeScript imports keep `.js` suffixes
 

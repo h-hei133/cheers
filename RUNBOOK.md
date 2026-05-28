@@ -7,9 +7,10 @@
 
 ## Runtime shape (current)
 
-- **TypeScript control plane**: shell/session/orchestration/recovery/permission UX/MCP routing/output contract
-- **Rust execution plane**: command execution, timeout/cancel, sandbox preflight
-- **contracts boundary**: TS↔Rust payload and lifecycle semantic compatibility
+- **TypeScript product runtime/control plane**: shell/session/orchestration/recovery/permission UX/MCP routing/output contract and most current execution adapters
+- **Execution boundary**: explicit runtime interface currently implemented mostly in TypeScript
+- **Rust native executor candidate**: opt-in daemon path for command execution, timeout/cancel, and sandbox preflight when enabled
+- **contracts boundary**: serialized schemas, lifecycle states, permission semantics, and execution events for real cross-runtime consumers
 
 ## Provider and connection command baseline
 

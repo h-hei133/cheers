@@ -1,6 +1,7 @@
 import { createBackpressureController } from '../../runtime/backpressure.js'
 import { createComponentLogger, recordCount } from '../../observability/index.js'
 import type { RuntimeConfig } from '../../config/runtimeConfig.js'
+import type { ExecutionService } from '../../runtime/execution/executionService.js'
 import type { SandboxEnforcer } from '../../sandbox/sandboxEnforcer.js'
 import {
   isAllowlistedTool,
@@ -42,6 +43,7 @@ export class ToolRuntime {
       mcpGateway?: CoreMcpGateway
       runtimeConfig?: RuntimeConfig
       browserRuntimeStatus?: PwRuntimeStatus
+      executionService?: ExecutionService
     },
   ) {
     this.approvalFlow = new ToolApprovalFlow(enforcer)

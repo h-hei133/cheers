@@ -174,7 +174,7 @@ Potential ownership options:
 - TypeScript control plane: owns user-visible recovery policy, route state,
   result projection, and session continuity. This is necessary but not enough
   for low-level filesystem guarantees.
-- Rust execution plane: could own lower-level atomic file operation helpers in
+- Rust native executor candidate: could own lower-level atomic file operation helpers in
   a later implementation, but moving control-plane semantics into Rust would
   violate the current architecture boundary.
 - Filesystem journal: likely the smallest target-specific mechanism for

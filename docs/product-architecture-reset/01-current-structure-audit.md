@@ -7,14 +7,15 @@ old architecture docs as historical input only.
 
 Current package boundaries:
 
-- `packages/ts-shell`: TypeScript control plane, CLI, session, query,
+- `packages/ts-shell`: TypeScript product runtime/control plane, CLI, session, query,
   orchestration, tools, browser/MCP, model adapter surfaces, tests, harnesses,
-  and many route-era product proof modules.
-- `packages/rust-core`: Rust execution plane with `executor.rs`, `lib.rs`, and
-  `bin/daemon.rs`.
-- `contracts`: cross-runtime schema and generated/runtime types for TypeScript,
-  Rust, Python, and contract tests.
-- `packages/python-eval`: evaluation layer, not a runtime orchestration owner.
+  current execution adapters, and many route-era product proof modules.
+- `packages/rust-core`: opt-in native executor candidate with `executor.rs`,
+  `lib.rs`, and `bin/daemon.rs`.
+- `contracts`: cross-runtime schemas, lifecycle states, permission semantics,
+  execution events, generated/runtime types, and contract tests.
+- `packages/python-eval`: offline evaluation layer, not a runtime orchestration
+  owner.
 
 `packages/ts-shell/src` currently has about 1300 TS/TSX files:
 
@@ -29,8 +30,8 @@ The rough product runtime exists, but tests, harnesses, route proof modules, and
 historical capability slices are interleaved with runtime modules.
 
 `packages/rust-core/src` is structurally small by comparison: `executor.rs`,
-`lib.rs`, and `bin/daemon.rs`. It currently fits the execution-plane role more
-cleanly than the TypeScript tree fits the control-plane role.
+`lib.rs`, and `bin/daemon.rs`. It currently fits an opt-in native executor
+candidate role; it does not prove Rust is the default execution plane.
 
 `contracts` is a real cross-runtime boundary with TypeScript, Rust, Python,
 schema, validator, and tests. One structural concern remains: Rust execution

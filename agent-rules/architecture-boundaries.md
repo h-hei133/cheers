@@ -2,9 +2,9 @@
 
 Preserve responsibility boundaries even when a shortcut would make a demo path appear usable.
 
-## TypeScript Control Plane
+## TypeScript Product Runtime And Control Plane
 
-TypeScript owns:
+TypeScript is the primary product runtime and control plane. It owns:
 
 - shell and interactive CLI
 - session lifecycle and continuity
@@ -16,30 +16,51 @@ TypeScript owns:
 - result mapping
 - terminal/session surface
 - high-level capability routing
+- most current execution adapters
 
-Keep control-plane semantics in TypeScript.
+Keep product runtime and control-plane semantics in TypeScript.
 
-## Rust Execution Plane
+## Execution Boundary
 
-Rust owns execution-plane responsibility:
+Execution is an explicit boundary/interface. In the current codebase it is implemented mostly in TypeScript, with a Rust daemon path available only where the active code path opts into it.
+
+The TypeScript execution boundary should own runtime-neutral request/result/event shapes for:
+
+- command execution
+- cancellation
+- file reads and writes
+- apply patch or workspace mutation handoff
+- sandbox or preflight decisions
+- permission and capability requirements
+
+New direct external side effects must go through the current owner module or a documented execution/file/workspace boundary. Do not scatter `child_process`, writable `fs`, shell/PTY, browser process, MCP process, or runtime network side effects into unrelated product modules.
+
+## Rust Native Executor Candidate
+
+Rust is a future native executor candidate for responsibilities that need:
 
 - daemon behavior
-- command execution
-- timeout and cancellation
+- OS/process guarantees
+- timeout, cancellation, and process tree cleanup reliability
 - sandbox preflight
 - low-level execution isolation
+- PTY/process lifecycle reliability
+- single-binary distribution
+- security-sensitive execution audit
 
-Do not move shell, session, replay, recovery, permission, or result semantics into Rust for convenience.
+Do not claim Rust owns the current execution plane unless the concrete code path proves it. Do not move shell, session, replay, recovery, permission, result semantics, or product orchestration into Rust for convenience.
 
 ## Contracts Boundary
 
-`contracts` carries shared protocol, lifecycle, boundary, and semantic constraints across TypeScript and Rust.
+`contracts` carries serialized schemas, execution events, lifecycle states, permission/request/response semantics, and versioning rules across runtimes when there is a real cross-runtime consumer.
 
 Contract changes must keep producer and consumer semantics aligned.
 
+`contracts` must not contain business orchestration, model/provider calls, shell helpers, file-system helpers, UI helpers, test mock convenience, or runtime side-effect code.
+
 ## Python Eval Layer
 
-`packages/python-eval/` is an evaluation layer. Do not move orchestration, replay, recovery, permission, runtime durability, or runtime ownership into Python eval for local convenience.
+`packages/python-eval/` is offline evaluation only. It may read traces, datasets, and evaluation artifacts, but it must not own production orchestration, permissions, replay, recovery, persistence, agent loop, runtime side effects, or production tool lifecycle.
 
 ## Domain Ownership
 

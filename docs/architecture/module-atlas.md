@@ -997,7 +997,7 @@ This project can combine:
 - truthful result/session surfaces
 - deterministic and opt-in verification gates
 - browser transaction/eval evidence
-- TS control plane and Rust execution plane
+- TS product runtime/control plane and Rust native executor candidate
 
 The innovation should be a capability lifecycle architecture where every capability is independently testable and produces reusable evidence for result, session, and eval surfaces.
 

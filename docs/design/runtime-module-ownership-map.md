@@ -145,8 +145,8 @@ Claude Code items not applicable here:
   remote session machinery, mature interactive UI structure, and forked-agent
   state are outside this project's current runtime boundary.
 - This project should not mirror Claude Code's layout. The current TypeScript
-  control plane, Rust execution plane, and `contracts/` boundary remain the
-  source of truth.
+  product runtime/control plane, explicit execution boundary, Rust native
+  executor candidate, and `contracts/` boundary remain the source of truth.
 
 opencode search keywords:
 

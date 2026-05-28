@@ -1,13 +1,7 @@
-import { promises as fs } from 'node:fs'
-import path from 'node:path'
-import { exec as execCallback } from 'node:child_process'
-import { promisify } from 'node:util'
 import {
-  checkRustDaemonAvailability,
-  executeLocally,
-  executeViaRustDaemon,
-  isRustDaemonEnabled,
-} from '../../daemon/client.js'
+  createDefaultExecutionService,
+  type ExecutionService,
+} from '../../runtime/execution/executionService.js'
 import { McpGatewayBlockedError, type CoreMcpGateway } from '../mcp/gateway.js'
 import {
   classifyMcpFailure,
@@ -26,8 +20,6 @@ import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
 import { buildExecutionFailedResult } from './toolPolicyResult.js'
 import { approvedResult, deniedResult } from './toolResultLifecycle.js'
-
-const exec = promisify(execCallback)
 
 type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 
@@ -51,91 +43,85 @@ function inferFailureKind(result: {
   }
 }
 
-async function recursiveList(root: string): Promise<string[]> {
-  const entries = await fs.readdir(root, { withFileTypes: true })
-  const files = await Promise.all(
-    entries.map(async entry => {
-      const fullPath = path.join(root, entry.name)
-      if (entry.isDirectory()) {
-        return recursiveList(fullPath)
-      }
-      return [fullPath]
-    }),
-  )
-  return files.flat()
-}
-
-async function runLocalCommand(
+async function runCommandTool(
+  executionService: ExecutionService,
   command: string,
   context: ToolExecutionContext,
-  metadata: Record<string, unknown>,
 ) {
-  const result = await executeLocally({
+  const result = await executionService.runCommand({
     command: process.platform === 'win32' ? 'cmd' : 'sh',
     args: process.platform === 'win32' ? ['/C', command] : ['-c', command],
     cwd: context.workspaceRoot,
+    workspaceRoot: context.workspaceRoot,
     timeoutMs: 30_000,
+    abortSignal: context.abortSignal,
   })
   const receipt = createCommandRuntimeReceipt({
+    runtimeKind: result.executionPath === 'rust-daemon' ? 'daemon' : 'local-command',
     command,
     status: result.status,
-    executionPath: 'ts-local',
+    executionPath: result.executionPath,
     exitCode: result.exitCode,
     stdout: result.stdout,
     stderr: result.stderr,
     timeoutMs: 30_000,
+    reason: result.recoveryReason,
+    evidence: result.recoveryReason ? ['runtime-receipt:daemon-unavailable'] : undefined,
   })
 
   return {
     success: result.status === 'completed',
-    output: `${result.stdout}${result.stderr}`.trim(),
+    output: result.executionPath === 'rust-daemon'
+      ? result.stdout
+      : `${result.stdout}${result.stderr}`.trim(),
     error: result.status === 'completed' ? undefined : result.stderr,
     metadata: {
-      ...metadata,
+      executionPath: result.executionPath,
       status: result.status,
       exitCode: result.exitCode,
       failureKind: inferFailureKind(result),
+      daemonInstanceId: result.daemonInstanceId,
+      daemonPid: result.daemonPid,
+      daemonRequestSeq: result.daemonRequestSeq,
+      daemonExecutionId: result.daemonExecutionId,
+      recoveryReason: result.recoveryReason,
       runtimeReceipt: projectRuntimeReceipt(receipt),
     },
   }
 }
 
-function daemonUnavailableResult(
+async function runGitCommand(
+  executionService: ExecutionService,
   command: string,
   context: ToolExecutionContext,
-  reason: string,
 ) {
-  const receipt = createCommandRuntimeReceipt({
-    runtimeKind: 'daemon',
-    command,
-    status: 'failed',
-    executionPath: 'rust-daemon',
-    exitCode: null,
-    reason,
-    evidence: ['runtime-receipt:daemon-unavailable'],
+  const result = await executionService.runCommand({
+    command: process.platform === 'win32' ? 'cmd' : 'sh',
+    args: process.platform === 'win32' ? ['/C', command] : ['-c', command],
+    cwd: context.workspaceRoot,
+    workspaceRoot: context.workspaceRoot,
+    timeoutMs: 30_000,
+    abortSignal: context.abortSignal,
   })
-  return {
-    success: false,
-    output: '',
-    error: reason,
-    metadata: {
-      executionPath: 'rust-daemon',
-      status: 'failed',
-      exitCode: null,
-      failureKind: 'execution_failure' as const,
-      recoveryReason: reason,
-      blockedCommand: command,
-      workspaceRoot: context.workspaceRoot,
-      runtimeReceipt: projectRuntimeReceipt(receipt),
-    },
+  if (result.status === 'completed') {
+    return approvedResult(result.stdout.trim())
   }
+  return deniedResult(result.stderr || result.recoveryReason || 'Command failed', {
+    executionPath: result.executionPath,
+    status: result.status,
+    exitCode: result.exitCode,
+    failureKind: inferFailureKind(result),
+    recoveryReason: result.recoveryReason,
+  })
 }
 
 export function createCoreToolRegistry(options?: {
   mcpTools?: readonly McpToolDescriptor[]
   mcpGateway?: CoreMcpGateway
   browserRuntimeStatus?: PwRuntimeStatus
+  executionService?: ExecutionService
 }): ReadonlyMap<string, ToolDefinition> {
+  const executionService = options?.executionService ?? createDefaultExecutionService()
   const tools: ToolDefinition[] = [
     {
       name: 'read',
@@ -148,7 +134,7 @@ export function createCoreToolRegistry(options?: {
       },
       async execute(args, context) {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
-        return approvedResult(await fs.readFile(target, 'utf8'))
+        return approvedResult(await executionService.readTextFile(target))
       },
     },
     {
@@ -163,8 +149,7 @@ export function createCoreToolRegistry(options?: {
       async execute(args, context) {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
         const content = typeof args.content === 'string' ? args.content : ''
-        await fs.mkdir(path.dirname(target), { recursive: true })
-        await fs.writeFile(target, content, 'utf8')
+        await executionService.writeTextFile(target, content)
         return approvedResult(target)
       },
     },
@@ -180,7 +165,7 @@ export function createCoreToolRegistry(options?: {
       async execute(args, context) {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
         const content = typeof args.content === 'string' ? args.content : ''
-        await fs.writeFile(target, content, 'utf8')
+        await executionService.writeTextFile(target, content)
         return approvedResult(target)
       },
     },
@@ -192,7 +177,7 @@ export function createCoreToolRegistry(options?: {
       async execute(args, context) {
         const pattern = typeof args.pattern === 'string' ? args.pattern : ''
         const suffix = pattern.replace(/^\*+/, '')
-        const files = await recursiveList(context.workspaceRoot)
+        const files = await executionService.listFilesRecursive(context.workspaceRoot)
         const matches = suffix ? files.filter(file => file.endsWith(suffix)) : files
         return approvedResult(matches.join('\n'))
       },
@@ -208,58 +193,7 @@ export function createCoreToolRegistry(options?: {
       },
       async execute(args, context) {
         const command = typeof args.command === 'string' ? args.command : ''
-        if (isRustDaemonEnabled()) {
-          const availability = checkRustDaemonAvailability()
-          if (availability.available) {
-            try {
-              const daemonResult = await executeViaRustDaemon({
-                command: process.platform === 'win32' ? 'cmd' : 'sh',
-                args: process.platform === 'win32' ? ['/C', command] : ['-c', command],
-                cwd: context.workspaceRoot,
-                workspaceRoot: context.workspaceRoot,
-                timeoutMs: 30_000,
-                abortSignal: context.abortSignal,
-              })
-              const receipt = createCommandRuntimeReceipt({
-                runtimeKind: 'daemon',
-                command,
-                status: daemonResult.status,
-                executionPath: 'rust-daemon',
-                exitCode: daemonResult.exitCode,
-                stdout: daemonResult.stdout,
-                stderr: daemonResult.stderr,
-                timeoutMs: 30_000,
-              })
-              return {
-                success: daemonResult.status === 'completed',
-                output: daemonResult.stdout,
-                error: daemonResult.status === 'completed' ? undefined : daemonResult.stderr,
-                metadata: {
-                  executionPath: 'rust-daemon',
-                  status: daemonResult.status,
-                  exitCode: daemonResult.exitCode,
-                  failureKind: inferFailureKind(daemonResult),
-                  daemonInstanceId: daemonResult.daemonInstanceId,
-                  daemonPid: daemonResult.daemonPid,
-                  daemonRequestSeq: daemonResult.daemonRequestSeq,
-                  daemonExecutionId: daemonResult.daemonExecutionId,
-                  runtimeReceipt: projectRuntimeReceipt(receipt),
-                },
-              }
-            } catch (error) {
-              const reason = error instanceof Error ? error.message : String(error)
-              return daemonUnavailableResult(command, context, `Rust daemon execution failed: ${reason}`)
-            }
-          }
-
-          return daemonUnavailableResult(
-            command,
-            context,
-            availability.reason ?? 'Rust daemon unavailable',
-          )
-        }
-
-        return runLocalCommand(command, context, { executionPath: 'ts-local' })
+        return runCommandTool(executionService, command, context)
       },
     },
     {
@@ -272,8 +206,7 @@ export function createCoreToolRegistry(options?: {
         },
       },
       async execute(_args, context) {
-        const { stdout } = await exec('git status --short', { cwd: context.workspaceRoot })
-        return approvedResult(stdout.trim())
+        return runGitCommand(executionService, 'git status --short', context)
       },
     },
     {
@@ -286,8 +219,7 @@ export function createCoreToolRegistry(options?: {
         },
       },
       async execute(_args, context) {
-        const { stdout } = await exec('git diff', { cwd: context.workspaceRoot })
-        return approvedResult(stdout.trim())
+        return runGitCommand(executionService, 'git diff', context)
       },
     },
   ]

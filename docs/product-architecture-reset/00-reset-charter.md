@@ -38,8 +38,9 @@ product path:
 - Session lifecycle, transcript, compact, continue, replay, and persistence.
 - Agent loop, planning, provider proposal, edit, verification, repair, result
   mapping, tool execution, browser/MCP boundaries, and runtime receipts.
-- Rust execution-plane command execution, timeout, cancel, and sandbox
-  preflight.
+- Explicit execution-boundary command execution, timeout, cancel, and sandbox
+  preflight, currently implemented mostly in TypeScript with Rust as an opt-in
+  native executor candidate.
 - Shared contracts across TypeScript, Rust, and any eval consumers.
 
 Route-era material means code, scripts, reports, and documents whose primary

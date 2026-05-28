@@ -37,7 +37,7 @@ moving them.
 | `packages/ts-shell/src/core/context/browserRuntimeGauntletManifest.ts` | product-runtime / dev-harness / inspect-further | Runtime-adjacent browser gauntlet manifest. | Medium | Browser runtime or eval manifest after review. | Phase D/G. | Yes if used as evidence | Determine product vs eval owner before move. | `gauntlet` suggests route/eval history. |
 | `packages/ts-shell/src/core/context/projectMemoryCandidate*.ts` | product-runtime | Project memory candidate extraction/surface/quality. | Low | Product memory/context surface. | Keep. | No | None. | `candidate` is durable product vocabulary here; do not quarantine solely by keyword. |
 | `packages/ts-shell/src/test-utils/**` and `packages/ts-shell/src/session/__tests__/**` | product-test / dev-harness | Test helpers and session tests. | Low to medium | Product test support. | Keep; classify in Phase G if needed. | No | Keep imports. | Not route-history by path. |
-| `packages/rust-core/src/*` | product-runtime | Rust execution plane: executor, lib, daemon. | Low | Execution-plane runtime. | Keep. | No | Contract alignment tests. | No route-era filenames found. |
+| `packages/rust-core/src/*` | product-runtime | Rust native executor candidate: executor, lib, daemon. | Low | Opt-in execution boundary runtime. | Keep. | No | Contract alignment tests. | No route-era filenames found. |
 | `contracts/*`, `contracts/tests/*` | product-runtime / product-test | Cross-runtime protocol, generated/runtime types, contract tests. | Low | Contracts boundary. | Keep; final audit may verify drift. | No | Keep TS/Rust/Python alignment. | No route-era filenames found. |
 
 ## Route-Keyword Source Paths
@@ -92,5 +92,5 @@ Observed route/history-keyword paths under `packages/ts-shell/src`:
 | `core/harness/**` | move later | Dev/eval harness should move only after product facades and import review. |
 | Browser gauntlet/MVP harness files | inspect further | Product-vs-eval owner must be decided before moves. |
 | `projectMemoryCandidate*.ts` | keep | `candidate` is product vocabulary here. |
-| `packages/rust-core/src/*` | keep | Clean execution-plane product surface. |
+| `packages/rust-core/src/*` | keep | Clean native-executor-candidate product surface. |
 | `contracts/*` | keep | Cross-runtime semantic boundary. |

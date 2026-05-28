@@ -334,9 +334,9 @@ If session file corrupted:
    - unresolved approvals/tools are kept inside the existing `state.json`
    - there is no separate lifecycle database or sidecar index file
 
-5. Rust remains execution-plane-only
-   - these replay/recovery/terminal-classification semantics intentionally stay in TS control plane
-   - Rust continues to focus on command execution, timeout/cancel, and sandbox preflight rather than shell/session ownership
+5. Rust remains a native executor candidate only
+   - these replay/recovery/terminal-classification semantics intentionally stay in the TS product runtime/control plane
+   - Rust focuses on opt-in command execution, timeout/cancel, and sandbox preflight paths rather than shell/session ownership
 
 6. Python not in critical path
    - This is intentional (offline only)

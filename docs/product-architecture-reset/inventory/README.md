@@ -32,7 +32,7 @@ atlas material is historical input only.
 | Root `verify:route*` scripts | 32 | Historical route verifier namespace. |
 | `packages/ts-shell/src` TS/TSX files | 1304 | Product runtime, product tests, harnesses, fixtures, route-era proof surfaces. |
 | `packages/ts-shell/src` tests | 520 | Product tests and route/frozen evidence tests are currently colocated. |
-| `packages/rust-core/src` files | 3 | Clean execution-plane source surface. |
+| `packages/rust-core/src` files | 3 | Clean native-executor-candidate source surface. |
 | `contracts/` files | 22 | Cross-runtime contracts and contract tests. |
 
 ## Classification Vocabulary

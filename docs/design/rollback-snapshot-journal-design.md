@@ -199,7 +199,7 @@ Ownership split:
 
 - TS control plane owns route eligibility, approval binding, operation ordering,
   journal lifecycle, rollback policy, result projection, and continuity wording.
-- Rust execution plane may later own lower-level atomic filesystem primitives
+- Rust native executor candidate may later own lower-level atomic filesystem primitives
   only after TS defines the semantic contract.
 - Git/checkpoint layer is postponed until a separate design covers project-wide
   restore behavior.
