@@ -86,16 +86,16 @@ describe("verificationCommandPlan", () => {
     );
   });
 
-  it("selects the Route219 benchmark verifier without widening shell access", () => {
+  it("maps the Route219 benchmark verifier to a product task-quality command kind", () => {
     const plan = buildVerificationCommandPlan({
       explicitCommand: "npm run verify:route219-real-task-quality-benchmark",
       sourceProposalId: "proposal_route219_benchmark",
     });
 
     expect(plan.state).toBe("ready");
-    expect(plan.commandKind).toBe("route-verifier");
+    expect(plan.commandKind).toBe("task-quality-verifier");
     expect(plan.allowlistStatus).toBe("allowlisted");
-    expect(plan.evidence).toContain("verification-command-plan:kind:route-verifier");
+    expect(plan.evidence).toContain("verification-command-plan:kind:task-quality-verifier");
   });
 
   it("keeps shell metacharacters outside the focused test allowlist", () => {

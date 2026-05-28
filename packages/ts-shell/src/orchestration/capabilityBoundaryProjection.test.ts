@@ -20,6 +20,7 @@ describe("capability boundary projection", () => {
     expect(isAllowlistedRunCommand(
       "npm test -w packages/ts-shell -- src/orchestration/doesNotExist.test.ts",
     )).toBe(false);
+    expect(isAllowlistedRunCommand("npm run verify:route219-real-task-quality-benchmark")).toBe(true);
     expect(isAllowlistedRunCommand("npm publish")).toBe(false);
   });
 

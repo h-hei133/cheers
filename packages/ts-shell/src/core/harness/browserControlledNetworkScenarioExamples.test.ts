@@ -78,6 +78,9 @@ describe("browser controlled-network scenario examples", () => {
     const output = renderBrowserExternalNetworkExecutionSurface(result);
 
     expect(result.status).toBe("controlled-network-executed");
+    expect(server.runId).toBe("controlled-network-harness");
+    expect(createBrowserControlledNetworkRunnerManifest({ allowedLoopbackOrigin: server.origin }).runId).toBe("controlled-network-harness");
+    expect(result.controlledNetworkReceipt?.safeSummary).not.toContain("route118");
     expect(result.controlledNetworkReceipt?.executed).toBe(true);
     expect(result.controlledNetworkReceipt?.publicNetwork).toBe(false);
     expect(output).toContain("Controlled browser network execution");
@@ -247,7 +250,7 @@ describe("browser controlled-network scenario examples", () => {
         url: actionKind === "navigate" ? target : undefined,
         target,
         extractionGoal: actionKind === "extract" ? target : undefined,
-        userIntentSummary: `Route 118 ${actionKind} ${target}`,
+        userIntentSummary: `Controlled network ${actionKind} ${target}`,
         requiresNetwork: target.startsWith("http"),
         requiresAuth: actionKind === "auth",
       }),

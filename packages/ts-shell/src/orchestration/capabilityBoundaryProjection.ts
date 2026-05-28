@@ -1,9 +1,13 @@
+import {
+  ROUTE219_TASK_QUALITY_BENCHMARK_COMMAND,
+} from "../verification/taskQualityBenchmarkCommand.js";
+
 const RUN_COMMAND_ALLOWLIST = [
   "node --version",
   "npm test -- --help",
   "npm run build -- --help",
   "npm run build -w packages/ts-shell",
-  "npm run verify:route219-real-task-quality-benchmark",
+  ROUTE219_TASK_QUALITY_BENCHMARK_COMMAND,
 ] as const;
 
 const FOCUSED_TS_SHELL_TEST_COMMAND_ALLOWLIST = [

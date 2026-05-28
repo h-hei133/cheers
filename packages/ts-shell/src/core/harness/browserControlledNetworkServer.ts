@@ -10,7 +10,7 @@ export interface BrowserControlledNetworkServer {
 export async function createBrowserControlledNetworkServer(input: {
   readonly runId?: string;
 } = {}): Promise<BrowserControlledNetworkServer> {
-  const runId = input.runId ?? "route118-controlled-network";
+  const runId = input.runId ?? "controlled-network-harness";
   const requests: string[] = [];
   const server = http.createServer((request, response) => {
     const url = request.url ?? "/";
@@ -29,11 +29,11 @@ export async function createBrowserControlledNetworkServer(input: {
     }
     if (url.startsWith("/extract")) {
       response.writeHead(200, { "content-type": "text/html; charset=utf-8", "x-route-run-id": runId });
-      response.end(`<!doctype html><title>Extract ${runId}</title><main>controlled extraction summary route118</main>`);
+      response.end(`<!doctype html><title>Extract ${runId}</title><main>controlled extraction summary</main>`);
       return;
     }
     response.writeHead(200, { "content-type": "text/html; charset=utf-8", "x-route-run-id": runId });
-    response.end(`<!doctype html><title>Controlled ${runId}</title><main>controlled observe summary route118</main>`);
+    response.end(`<!doctype html><title>Controlled ${runId}</title><main>controlled observe summary</main>`);
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);

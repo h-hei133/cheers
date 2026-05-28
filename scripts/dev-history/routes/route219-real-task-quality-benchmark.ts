@@ -30,7 +30,7 @@ import {
   approvedRealProviderHome,
   buildEffectiveProviderEnv,
   canonicalProviderEnv,
-} from "./real-provider-smokes/approvedProviderEnv.mjs";
+} from "../../real-provider-smokes/approvedProviderEnv.mjs";
 
 type TaskCategory =
   | "bugfix-behavior"

@@ -78,7 +78,7 @@ export function createBrowserControlledNetworkRunnerManifest(input: {
     runnerMode: "controlled-network-test",
     allowedLoopbackOrigin: input.allowedLoopbackOrigin,
     allowedActionKinds: input.allowedActionKinds ?? ["navigate", "observe", "extract"],
-    runId: sanitizeId(input.runId ?? "route118-controlled-network"),
+    runId: sanitizeId(input.runId ?? "controlled-network-harness"),
     timeoutMs: input.timeoutMs ?? 1500,
     outputBudgetBytes: input.outputBudgetBytes ?? 2048,
     evidenceContract: "safe-summary-only",

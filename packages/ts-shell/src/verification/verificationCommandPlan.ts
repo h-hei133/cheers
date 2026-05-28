@@ -15,6 +15,7 @@ import type { TaskLifecycle } from "../orchestration/taskLifecycle.js";
 import type { AnalysisQualityGateResult } from "../orchestration/analysisQualityGate.js";
 import type { TaskContextSufficiency } from "../orchestration/taskContextSufficiency.js";
 import { evaluatePlanQualityGate } from "../orchestration/planQualityGate.js";
+import { isTaskQualityBenchmarkCommand } from "./taskQualityBenchmarkCommand.js";
 
 export type VerificationCommandPlanState =
   | "ready"
@@ -32,7 +33,7 @@ export type VerificationCommandKind =
   | "npm-build-help"
   | "npm-build-ts-shell"
   | "npm-test-focused"
-  | "route-verifier"
+  | "task-quality-verifier"
   | "unsupported";
 
 export type VerificationCommandSource =
@@ -368,9 +369,10 @@ function classifyCommandKind(command: string | undefined): VerificationCommandKi
       return "npm-build-help";
     case "npm run build -w packages/ts-shell":
       return "npm-build-ts-shell";
-    case "npm run verify:route219-real-task-quality-benchmark":
-      return "route-verifier";
     default:
+      if (command && isTaskQualityBenchmarkCommand(command)) {
+        return "task-quality-verifier";
+      }
       return "unsupported";
   }
 }
