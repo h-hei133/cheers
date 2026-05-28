@@ -17,11 +17,7 @@ import {
   createEmptyLifecycleIndex,
   type DurableLifecycleIndex,
 } from "../core/tools/toolResultLifecycle.js";
-import type {
-  ContinuationReason,
-  TerminalClassification,
-  TerminalReason,
-} from "../orchestration/types.js";
+import type { ContinuationReason } from "../orchestration/types.js";
 import type {
   CurrentSessionSelectionResolution,
 } from "./currentSessionSelection.js";
@@ -31,17 +27,10 @@ import {
 } from "./approval/sessionApprovalMemory.js";
 import { applySessionCompactRetention } from "./sessionCompactModule.js";
 import {
-  hasContinuationEvidence as snapshotHasContinuationEvidence,
-  hasDeterministicTerminalEvidence as snapshotHasDeterministicTerminalEvidence,
-} from "./sessionContinuationProjection.js";
-import {
   createLifecycleTranscriptEvent,
   createMessageTranscriptEvent,
   type TranscriptEvent,
 } from "./sessionEventCodec.js";
-import {
-  findLastQueryCompletionEvent,
-} from "./sessionContinuityModule.js";
 import type { SessionMessage } from "./schema/sessionMessage.js";
 import type { Session } from "./schema/sessionRecord.js";
 import type {
@@ -59,15 +48,16 @@ import {
 } from "./store/currentSessionRegistry.js";
 import type { RuntimeSeedOptions } from "./sessionReplayBuilder.js";
 import {
-  projectRecentProjectContexts,
   projectSortedSessionReentrySummaries,
   selectRecoveryTrustBoundaryBlock,
   selectSuggestedRecoverySessionIdFromSessions,
-} from "./sessionRecoverySelection.js";
+} from "./recovery/sessionRecoverySelection.js";
+import { projectRecentProjectContexts } from "./recovery/projectContextSummary.js";
+import type { ProjectContextSummary } from "./recovery/projectContextSummary.js";
 import {
   buildSessionResumeContext,
   buildSessionResumeSnapshot,
-} from "./sessionResumeContextBuilder.js";
+} from "./continuation/sessionPromptContinuity.js";
 import {
   createSessionId,
   createSessionStoreLayout,
@@ -90,23 +80,31 @@ import {
   withSessionStateLock,
   writeSessionState,
 } from "./store/sessionStateStore.js";
+import { projectSessionReentrySummary } from "./presentation/sessionReentrySurface.js";
+import type { SessionReentrySummary } from "./presentation/sessionReentrySurface.js";
 import {
-  projectRecoveryTrustBoundaryBlock,
-  projectSessionReentrySummary,
-} from "./sessionSummaryProjection.js";
+  formatListSessionsFailureWarning,
+  formatUnreadableSessionDirectoryWarning,
+} from "./presentation/sessionWarningSurface.js";
+import type { RecoveryTrustBoundaryBlock } from "./recovery/recoveryTrustBoundary.js";
+import { projectRecoveryTrustBoundaryBlock } from "./recovery/recoveryTrustBoundary.js";
+import {
+  evaluateSessionResumeEligibility,
+  type SessionResumeEligibility,
+} from "./recovery/sessionResumeEligibility.js";
 import type {
   ApprovalAuditMemoryState,
   SessionContinuitySnapshot,
 } from "./sessionContinuityTypes.js";
 import {
-  normalizeProjectBinding,
   projectSessionBinding,
   type WorkspaceRootMode,
 } from "./projectBindingPolicy.js";
 import {
   projectRebasedSessionRoot,
-  projectRootRebase,
-} from "./projectRootRebaseProjection.js";
+  projectSessionRootRebase,
+} from "./continuation/sessionRootRebase.js";
+import { applySessionWorkspaceBinding } from "./store/sessionProjectBinding.js";
 import { buildSessionContinuitySnapshot } from "./continuation/sessionContinuitySnapshot.js";
 import { normalizeLegacyPermissionStateForSession } from "./continuation/legacyPermissionRebase.js";
 import { extractSeedInfluenceFromQueryResult } from "./continuation/sessionSeedInfluence.js";
@@ -145,6 +143,18 @@ export type { TranscriptEvent } from "./sessionEventCodec.js";
 export type { SessionMessage } from "./schema/sessionMessage.js";
 export type { RecoverySnapshot } from "./recovery/sessionRecoverySnapshot.js";
 export type {
+  RecoveryTrustBoundaryBlock,
+} from "./recovery/recoveryTrustBoundary.js";
+export type {
+  SessionResumeEligibility,
+} from "./recovery/sessionResumeEligibility.js";
+export type {
+  ProjectContextSummary,
+} from "./recovery/projectContextSummary.js";
+export type {
+  SessionReentrySummary,
+} from "./presentation/sessionReentrySurface.js";
+export type {
   ReplayPlan,
   TranscriptRepairContext,
 } from "./replay/sessionReplayFacade.js";
@@ -152,72 +162,12 @@ export type {
 export type { WorkspaceRootMode } from "./projectBindingPolicy.js";
 export type { Session } from "./schema/sessionRecord.js";
 
-export interface SessionReentrySummary {
-  readonly id: string;
-  readonly title?: string;
-  readonly status: Session["status"];
-  readonly projectRoot: string;
-  readonly createdAt: string;
-  readonly updatedAt: string;
-  readonly pendingPrompt?: string;
-  readonly runPhase?: "idle" | "prompt-persisted" | "turn-active";
-  readonly lastError?: string;
-  readonly durableStatus?: "success" | "stopped" | "error";
-  readonly terminalReason?: TerminalReason;
-  readonly terminalClassification?: TerminalClassification;
-  readonly lastUserMessage?: string;
-  readonly lastAssistantMessage?: string;
-  readonly recoverable: boolean;
-  readonly resumeDisposition:
-    | "fully-resumable"
-    | "partially-resumable"
-    | "not-resumable";
-  readonly autoResumeReady: boolean;
-  readonly resumeDetail: string;
-  readonly stagedRepairStepCount?: number;
-  readonly stagedRepairCompletedStep?: number;
-  readonly stagedRepairBlockedStep?: number;
-  readonly stagedRepairNextStep?: number;
-  readonly blockedReason?: RecoveryTrustBoundaryBlock["reason"];
-  readonly blockedDetail?: string;
-}
-
-export interface ProjectContextSummary {
-  readonly projectRoot: string;
-  readonly lastUpdatedAt: string;
-  readonly lastSessionId: string;
-  readonly sessionCount: number;
-  readonly recoverableCount: number;
-  readonly lastSessionTitle?: string;
-}
-
 export type ResumeResult =
   | { ok: true; session: Session }
   | { ok: false; error: string; recoveryHint: string };
 
 export interface ResumeOptions {
   readonly mode?: "runtime-recovery" | "continuity-only";
-}
-
-export interface RecoveryTrustBoundaryBlock {
-  readonly sessionId: string;
-  readonly reason:
-    | "session-corrupt"
-    | "terminal-evidence-indeterminate"
-    | "continuation-evidence-missing";
-  readonly detail: string;
-  readonly recoveryHint: string;
-}
-
-export interface SessionResumeEligibility {
-  readonly recoverable: boolean;
-  readonly disposition:
-    | "fully-resumable"
-    | "partially-resumable"
-    | "not-resumable";
-  readonly autoResumeReady: boolean;
-  readonly detail: string;
-  readonly block?: RecoveryTrustBoundaryBlock;
 }
 
 export class SessionManager {
@@ -789,14 +739,12 @@ export class SessionManager {
       }
 
       if (newlyUnreadableSessionDirs.length > 0) {
-        const sample = newlyUnreadableSessionDirs.slice(0, 3);
-        const remainder = newlyUnreadableSessionDirs.length - sample.length;
-        const suffix = remainder > 0 ? ` (+${remainder} more)` : "";
-        const label =
-          newlyUnreadableSessionDirs.length === 1 ? "directory" : "directories";
-        console.warn(
-          `Skipped ${newlyUnreadableSessionDirs.length} unreadable session ${label}: ${sample.join(", ")}${suffix}`,
-        );
+        const warning = formatUnreadableSessionDirectoryWarning({
+          sessionDirs: newlyUnreadableSessionDirs,
+        });
+        if (warning) {
+          console.warn(warning);
+        }
       }
 
       return sessions.sort(
@@ -807,7 +755,10 @@ export class SessionManager {
       if (!this.didWarnListSessionsFailure) {
         this.didWarnListSessionsFailure = true;
         console.warn(
-          `Failed to list sessions in ${this.sessionsDir}: ${error instanceof Error ? error.message : String(error)}`,
+          formatListSessionsFailureWarning({
+            sessionsDir: this.sessionsDir,
+            error,
+          }),
         );
       }
       return [];
@@ -871,18 +822,18 @@ export class SessionManager {
         return;
       }
 
-      const rebaseProjection = projectRootRebase({
-        value: current.workingMemory,
+      const currentRebaseProjection = projectSessionRootRebase({
+        workingMemory: current.workingMemory,
         previousRoot,
-        nextRoot: normalizedRoot,
+        nextProjectRoot,
       });
 
       this.writeJsonFileAtomic(statePath, {
         ...current,
-        projectRoot: normalizedRoot,
-        ...(rebaseProjection.workingMemory !== undefined
+        projectRoot: currentRebaseProjection.projectRoot,
+        ...(currentRebaseProjection.workingMemory !== undefined
           ? {
-              workingMemory: rebaseProjection.workingMemory,
+              workingMemory: currentRebaseProjection.workingMemory,
             }
           : {}),
       } satisfies SessionStateSnapshot);
@@ -902,23 +853,11 @@ export class SessionManager {
     },
   ): Session {
     const session = this.load(sessionId);
-    const decision = normalizeProjectBinding(binding);
-    if (decision.projectRoot) {
-      session.projectRoot = decision.projectRoot;
-    }
-    if (decision.rootMode) {
-      session.rootMode = decision.rootMode;
-    }
-    if (decision.requestedWorkspaceRoot) {
-      session.requestedWorkspaceRoot = decision.requestedWorkspaceRoot;
-    }
-    if (decision.targetPathBase) {
-      session.targetPathBase = decision.targetPathBase;
-    }
-    if (Object.prototype.hasOwnProperty.call(decision, "gitRoot")) {
-      session.gitRoot = decision.gitRoot ?? null;
-    }
-    session.updatedAt = new Date().toISOString();
+    applySessionWorkspaceBinding({
+      session,
+      binding,
+      updatedAt: new Date().toISOString(),
+    });
     this.writeSessionMetadata(session);
     this.writeSessionState(session);
     this.setCurrentSessionForProject(session.projectRoot, session.id);
@@ -1003,154 +942,12 @@ export class SessionManager {
   private evaluateRecoveryTrustBoundary(
     session: Session,
   ): SessionResumeEligibility {
-    if (session.status !== "interrupted" && session.status !== "error") {
-      return {
-        recoverable: false,
-        disposition: "not-resumable",
-        autoResumeReady: false,
-        detail: "Session is not in interrupted/error state",
-        block: this.createRecoveryTrustBoundaryBlock(
-          session,
-          "continuation-evidence-missing",
-          "session is not interrupted or error",
-        ),
-      };
-    }
-
-    let snapshot: RecoverySnapshot;
-    try {
-      snapshot = this.getRecoverySnapshot(session.id);
-    } catch (error) {
-      return {
-        recoverable: false,
-        disposition: "not-resumable",
-        autoResumeReady: false,
-        detail: "Session data is unreadable",
-        block: this.createRecoveryTrustBoundaryBlock(
-          session,
-          "session-corrupt",
-          `session data is unreadable (${error instanceof Error ? error.message : String(error)})`,
-        ),
-      };
-    }
-
-    const hasContinuationEvidence = snapshotHasContinuationEvidence(snapshot);
-    const hasResumeContextEvidence = this.hasResumeContextEvidence(snapshot);
-    const hasInterruptedLifecycleEvidence =
-      snapshot.lastLifecycleEvent?.event === "run-interrupted";
-    const hasPendingPrompt =
-      typeof snapshot.pendingPrompt === "string" &&
-      snapshot.pendingPrompt.trim().length > 0;
-    const hasPendingLifecycle =
-      Object.keys(snapshot.pendingLifecycle.pendingApprovals).length > 0 ||
-      Object.keys(snapshot.pendingLifecycle.pendingTools).length > 0;
-    const hasTurnRecoverySignal =
-      snapshot.interruptedKind === "turn" ||
-      snapshot.runPhase === "turn-active" ||
-      hasPendingLifecycle ||
-      hasInterruptedLifecycleEvidence;
-    const hasPromptRecoverySignal =
-      snapshot.interruptedKind === "prompt" ||
-      snapshot.runPhase === "prompt-persisted";
-
-    if (session.status === "interrupted") {
-      if (hasPendingPrompt && (hasTurnRecoverySignal || hasPromptRecoverySignal)) {
-        return {
-          recoverable: true,
-          disposition: "fully-resumable",
-          autoResumeReady: true,
-          detail: "Pending prompt and interruption evidence are available",
-        };
-      }
-
-      if (hasTurnRecoverySignal || hasContinuationEvidence || hasResumeContextEvidence) {
-        return {
-          recoverable: true,
-          disposition: "partially-resumable",
-          autoResumeReady: false,
-          detail:
-            "Context can be resumed, but no pending prompt exists for automatic continuation",
-        };
-      }
-
-      return {
-        recoverable: false,
-        disposition: "not-resumable",
-        autoResumeReady: false,
-        detail: "Interrupted state has no continuation evidence",
-        block: this.createRecoveryTrustBoundaryBlock(
-          session,
-          "continuation-evidence-missing",
-          "interrupted state has no continuation evidence",
-        ),
-      };
-    }
-
-    if (snapshot.durableStatus === "stopped") {
-      return {
-        recoverable: false,
-        disposition: "not-resumable",
-        autoResumeReady: false,
-        detail: "Durable status is stopped",
-        block: this.createRecoveryTrustBoundaryBlock(
-          session,
-          "continuation-evidence-missing",
-          "durable status is stopped and cannot continue",
-        ),
-      };
-    }
-
-    if (!snapshotHasDeterministicTerminalEvidence(snapshot)) {
-      return {
-        recoverable: false,
-        disposition: "not-resumable",
-        autoResumeReady: false,
-        detail: "Terminal evidence is indeterminate",
-        block: this.createRecoveryTrustBoundaryBlock(
-          session,
-          "terminal-evidence-indeterminate",
-          "terminal evidence is indeterminate",
-        ),
-      };
-    }
-
-    if (!hasContinuationEvidence) {
-      return {
-        recoverable: false,
-        disposition: "not-resumable",
-        autoResumeReady: false,
-        detail: "Error state has no continuation evidence",
-        block: this.createRecoveryTrustBoundaryBlock(
-          session,
-          "continuation-evidence-missing",
-          "error state has no continuation evidence",
-        ),
-      };
-    }
-
-    return {
-      recoverable: true,
-      disposition: "partially-resumable",
-      autoResumeReady: false,
-      detail:
-        "Error-session context is resumable for follow-up, but not auto-resumable",
-    };
-  }
-
-  private hasResumeContextEvidence(snapshot: RecoverySnapshot): boolean {
-    const hasLastMessages =
-      Boolean(snapshot.lastUserMessage?.content?.trim()) ||
-      Boolean(snapshot.lastAssistantMessage?.content?.trim());
-    const hasCompletedTurn =
-      findLastQueryCompletionEvent(snapshot.transcriptEvents) !== undefined;
-    const hasRepairEvidence =
-      snapshot.repairSummary.insertedPromptMessage ||
-      snapshot.repairSummary.insertedQueryStarted ||
-      snapshot.repairSummary.insertedRunInterrupted ||
-      snapshot.repairSummary.ignoredDuplicateTurnStarts > 0 ||
-      snapshot.repairSummary.ignoredUnpairedTurnCompletions > 0 ||
-      snapshot.repairSummary.ignoredRoleMismatchedTurnCompletions > 0;
-    return hasLastMessages || hasCompletedTurn || hasRepairEvidence;
+    return evaluateSessionResumeEligibility({
+      session,
+      loadRecoverySnapshot: (sessionId) => this.getRecoverySnapshot(sessionId),
+      createBlock: (targetSession, reason, detail) =>
+        this.createRecoveryTrustBoundaryBlock(targetSession, reason, detail),
+    });
   }
 
   private createRecoveryTrustBoundaryBlock(
