@@ -37,6 +37,8 @@ It does not claim every historical note is perfectly classified.
 | `docs/architecture/reference-architecture-maps.md` | historical | Recovering reference-repo analysis behind the atlas. |  | Capability Contract Architecture |
 | `docs/product-architecture-reset/script-command-index.md` | active | Checking grouped package-script aliases and Route G command compatibility. |  | Product Architecture Reset |
 | `docs/product-architecture-reset/final-compatibility-audit.md` | active | Checking final reset compatibility, remaining route clutter, and validation ledger. |  | Product Architecture Reset |
+| `docs/product-architecture-reset/executionBoundary/README.md` | active | Checking current TypeScript-first runtime, explicit execution boundary, Rust-ready optional executor path, contracts boundary, and Python offline-eval isolation. |  | Product Architecture Reset |
+| `docs/product-architecture-reset/documentation-refresh/route230-important-docs-refresh.md` | active | Checking which durable docs were refreshed after the architecture reset and which docs remain intentionally historical. |  | Product Architecture Reset |
 | `docs/product-architecture-reset/phase2-readiness-note.md` | active | Checking Phase 2 Goal 0 readiness, corrected current-state assumptions, and Goal 1 start boundary. |  | Product Architecture Reset |
 | `docs/product-architecture-reset/harness-eval-artifact-index.md` | active | Checking Phase 2 Goal 3 harness/eval artifact ownership and compatibility before moving harness files. |  | Product Architecture Reset |
 | `docs/product-architecture-reset/phase2-final-physical-audit.md` | active | Checking Phase 2 final physical audit, runMvp baseline drift classification, and remaining reset debt. |  | Product Architecture Reset |

@@ -11,6 +11,12 @@
 - **Execution boundary**: explicit runtime interface currently implemented mostly in TypeScript
 - **Rust native executor candidate**: opt-in daemon path for command execution, timeout/cancel, and sandbox preflight when enabled
 - **contracts boundary**: serialized schemas, lifecycle states, permission semantics, and execution events for real cross-runtime consumers
+- **Python eval boundary**: `packages/python-eval/` is offline evaluation only, not production runtime
+
+Route-era readiness ledgers and commit-specific closeout snapshots in this file
+are historical evidence. Current product truth comes from current code, focused
+validation, `AGENTS.md`, `agent-rules/`, and the product architecture reset
+execution-boundary docs.
 
 ## Provider and connection command baseline
 
@@ -165,65 +171,25 @@ unknown/unverified, unsupported patch shape, and no-mutation surfaces. It must
 remain projection-only: no provider access, no file I/O, no writer invocation,
 and no session schema changes.
 
-### Current readiness snapshot
+### Readiness evidence policy
 
-The latest release-readiness closeout after `e03acbd Fix stopped continue CLI
-parity` supports limited dogfood readiness, not broad/general release.
+Do not treat old route closeout snapshots, commit hashes, or historical route
+reports as current readiness. A readiness claim is current only when the
+relevant verifier has run and passed for the current worktree and the claim
+scope matches the verifier scope.
 
-Green deterministic evidence from the closeout sweep:
+Durable claim boundaries:
 
-- full `src/cli-baseline.test.ts`: 54/54 passed
-- `npm run verify:cli-entry`: passed
-- `npm run verify:release:core`: passed
-- `npm run verify:real-user-capabilities -- --tier=mvp`: passed
-- `npm run verify:real-user-capabilities -- --suite=candidate-mutation`: passed
-- `npm run verify:real-user-capabilities -- --candidate-mutation-failure-taxonomy-self-test`:
-  passed locally
-- `npm run verify:real-user-capabilities:two-file-cli-evidence`: passed with
-  deterministic exactly-two-file CLI/user-entry evidence
-- `npm run verify:real-user-capabilities:unsupported-patch-e2e`: passed with
-  deterministic real-model-like unsupported output stopped/error evidence
-- `npm run verify:real-user-capabilities -- --suite=candidate-mutation
-  --include-real --dry-run`: passed without touching the provider
-- `npm run verify:mutation-recovery:followup`: passed
-- `npm run verify:mutation-continuity:compact`: passed
-- `npm run verify:session-durability:long`: synthetic deterministic
-  compact/reload/`/continue` durability gate passed
-- `npm run verify:provider-readiness:real`: default skip/pass without loading
-  provider credentials
-- `npm run verify:provider-readiness:real -- --classification-self-test`:
-  passed locally
-- `npm run verify:result-contract`: passed
-- `npm run build -w packages/ts-shell`: passed
-
-Readiness claims allowed by this evidence:
-
-- limited dogfood readiness is green for the current deterministic stack
-- candidate mutation dogfood is green only through the explicit opt-in synthetic
-  suite
-- opt-in real-provider candidate mutation happy paths have passed for bounded
-  selected-workspace single-file update, single-file create, and exactly-two-file
-  update; these remain non-default evidence
-- dry-run/listing modes must not load credentials or contact a provider
-- deterministic failure taxonomy and unsupported real-model-like patch E2E
-  evidence show unsupported/malformed/post-write failures stop instead of
-  becoming success claims
-- release-readiness prerequisites are green for the deterministic
-  release-candidate surface, but broad/general release is not claimed
-
-Do not widen these claims:
-
-- MVP is still only the selected-workspace, single-file, existing `Update File`
-  synthetic gate
-- candidate create and exactly-two-file update are not MVP/default behavior
-- `verify:session-durability:long` is synthetic process-boundary long-session
-  durability evidence, not proof of arbitrary long real-provider sessions
-- no rollback, atomic multi-file transaction, 4+ writes, 3+ mixed operation
-  writes, multi-delete, multi-move beyond exactly-two mixed lanes, broad
-  `apply_patch`, arbitrary mutation, provider/auth change, CLI/session schema
-  change, external/user-configured MCP readiness, true real-model unsupported
-  patch coverage, live TTY product readiness, or default real-provider gate is
-  implied
+- deterministic or synthetic evidence does not prove live-provider readiness
+- live-provider opt-in evidence does not make provider use the default
+- provider-called is not proposal success
+- exact-ready is not write authority
+- write authority is not verification success
+- apply without verification is not verified success
+- skipped, blocked, not-run, partial, failed, timeout, no-provider, and
+  not-proven states must not become success
+- historical Route221/227/228 reports remain compatibility/evidence-history
+  surfaces unless current product code and validation prove the same behavior
 
 ### Current main-path gate layering
 

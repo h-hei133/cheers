@@ -1,5 +1,29 @@
 # Architecture Overview
 
+## Current Boundary Summary
+
+The product runtime is TypeScript-first. TypeScript owns the shell, session,
+orchestration, query loop, permission UX, recovery, replay, runtime durability,
+result mapping, terminal/session surface, provider-facing adapters, tool
+runtime, MCP integration, browser control surfaces, and most current execution
+adapters.
+
+Execution is an explicit boundary/interface. The current boundary is represented
+in TypeScript by `packages/ts-shell/src/runtime/execution/executionService.ts`,
+which can route command execution to the TypeScript local path or the optional
+Rust daemon path according to runtime configuration.
+
+Rust is a native executor candidate and optional execution path for low-level
+OS/process/sandbox/isolation, timeout/cancellation, daemon, distribution, and
+audit-critical responsibilities. Rust is not the current default execution
+plane unless a concrete runtime path enables and proves it.
+
+`contracts/` carries cross-runtime schemas, lifecycle states, permission
+semantics, serialized events, and protocol surfaces. It must not own product
+orchestration or side-effect helpers.
+
+`packages/python-eval/` is offline evaluation only, not production runtime.
+
 ## System Design
 
 ```
@@ -35,12 +59,12 @@
               │                                 │
               ↓                                 ↓
       ┌──────────────┐            ┌─────────────────────┐
-      │ Provider     │            │ Offline Research    │
+      │ Provider     │            │ Offline Evaluation  │
       │ Capability   │            │ (python-eval)       │
       │ Negotiation  │            │                     │
-      └──────────────┘            │ • Document parse    │
+      └──────────────┘            │ • Trace/dataset eval│
                                   │ • Schema validate   │
-                                  │ • Utilities         │
+                                  │ • Offline utilities │
                                   └─────────────────────┘
 
       Contract Boundaries (versioned schemas):
@@ -110,9 +134,46 @@ When `DAEMON_ENABLED=1`:
 - TS remains the owner of shell/session/orchestration/permission UX semantics
 - TS receives execution results through the versioned contract envelope
 
-Fallback if daemon unavailable:
-- Automatically switch to TS execution path
-- Seamless recovery without user intervention
+If the Rust daemon path is enabled but unavailable:
+- The execution service reports a failed `rust-daemon` result with recovery
+  reason metadata.
+- The TypeScript local execution path remains the normal path when the daemon
+  is disabled.
+- Do not describe the Rust daemon as the default execution plane or as a
+  guaranteed transparent fallback path.
+
+---
+
+## Post-Reset Owner Modules
+
+- `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts` is a thin
+  compatibility wrapper that delegates to the runtime coordinator.
+- `packages/ts-shell/src/runtime/workflowExecutionCoordinator.ts` owns runtime
+  workflow coordination and transaction ordering.
+- `packages/ts-shell/src/planning/workflowTaskPlan.ts` owns task-plan
+  construction and planning facts.
+- `packages/ts-shell/src/entrypoints/cli.tsx` is an executable shim; reusable
+  CLI contracts belong under `packages/ts-shell/src/cli/`.
+- `packages/ts-shell/src/session/SessionManager.ts` is a legitimate session
+  lifecycle manager. It should not be hollowed out, but concrete store,
+  transcript, recovery, replay, continuation, approval, presentation, and schema
+  details should live in their focused session owner modules.
+- Current product domains for new behavior include `edit/`, `edit/result/`,
+  `evidence/`, `result/`, `verification/`, `repair/`, `context/`, `provider/`,
+  and `proposal/`.
+- Compatibility shims must stay thin and delegate to owner modules.
+
+## Evidence And Truthfulness Rules
+
+Provider output is a claim, not fact. `provider-called` is not proposal success,
+`exact-ready` is not write authority, write authority is not verification
+success, apply without verification is not verified success, repair proposal is
+not repair success, and repair apply without re-verification is not repair
+success.
+
+Skipped, blocked, not-run, partial, failed, timeout, no-provider, and not-proven
+states must remain distinct and must not be upgraded into success. Redaction and
+report-safe projections must stay intact.
 
 ---
 
@@ -339,11 +400,11 @@ If session file corrupted:
    - these replay/recovery/terminal-classification semantics intentionally stay in the TS product runtime/control plane
    - Rust focuses on opt-in command execution, timeout/cancel, and sandbox preflight paths rather than shell/session ownership
 
-6. Python not in critical path
+6. Python eval is offline only
    - This is intentional (offline only)
    - Fits local-first model
 
-6. Single-machine only
+7. Single-machine only
    - No distributed agent coordination
    - Fine for solo maintainer use case
 

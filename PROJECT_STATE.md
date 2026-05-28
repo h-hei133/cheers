@@ -1,5 +1,28 @@
 ﻿# PROJECT_STATE.md
 
+## Route230 Current-Truth Note
+
+This file is a durable orientation aid, not an automatic source of current
+runtime truth. Treat sections that record route closeouts, commit-specific
+evidence, or "latest implemented delta" snapshots as historical unless current
+code and current validation still prove them.
+
+Current architecture truth after the product architecture reset:
+
+- TypeScript is the primary product runtime and control plane.
+- Execution is an explicit boundary/interface, currently implemented mostly in
+  TypeScript.
+- Rust is an optional native executor candidate/path for OS, process, sandbox,
+  isolation, timeout/cancellation, daemon, distribution, and audit-sensitive
+  responsibilities. Rust is not the default current execution plane unless a
+  specific code path opts into it and proves that path.
+- `contracts/` carries cross-runtime schemas, lifecycle states, permission
+  semantics, serialized events, and protocol surfaces. It does not own business
+  orchestration or side-effect helpers.
+- `packages/python-eval/` is offline evaluation only, not production runtime.
+- Historical route reports and readiness snapshots are evidence history, not
+  current product truth by themselves.
+
 ## 1. Current Stage Positioning
 
 - Project name: private-coding-agents
@@ -38,9 +61,9 @@ Boundary rules:
 - only modify and validate code in the private repo
 - keep TS/Rust/contracts boundaries intact
 
-## 3. Architectural Position (unchanged)
+## 3. Architectural Position
 
-### TypeScript = control plane
+### TypeScript = product runtime and control plane
 
 Includes:
 
@@ -51,19 +74,38 @@ Includes:
 - recovery and permission UX
 - MCP capability routing
 - terminal rendering contract and output boundary
+- most current execution adapters
 
-### Rust = execution plane
+### Execution boundary = explicit interface
+
+The current execution boundary is product-owned in TypeScript. It routes command
+and file side effects through owner modules such as
+`packages/ts-shell/src/runtime/execution/executionService.ts` where applicable.
+
+### Rust = optional native executor candidate/path
 
 Includes:
 
-- daemon execution backend
-- command execution / timeout / cancel
-- sandbox preflight
-- execution responsibility only
+- opt-in daemon execution backend
+- command execution / timeout / cancel where the runtime configuration enables
+  the Rust path
+- sandbox preflight and low-level process responsibilities
+- future OS/process/isolation/distribution-critical execution responsibilities
+
+Do not describe Rust as the current default execution plane unless the concrete
+runtime path proves it.
 
 ### contracts = cross-runtime semantic boundary
 
 - protocol, lifecycle, and payload compatibility across runtimes
+- schemas, permission semantics, serialized events, and versioned protocol
+  surfaces only when there is a real cross-runtime consumer
+
+### Python eval = offline evaluation only
+
+- `packages/python-eval/` may own offline evaluation artifacts and tests
+- it must not own production orchestration, permissions, replay, recovery,
+  persistence, agent-loop semantics, side effects, or tool lifecycle
 
 ## 4. Current Product Mainline
 
@@ -76,7 +118,13 @@ The primary user-visible mainline is now:
 5. Result block stays minimal and actionable in compact mode
 6. Session remains ready for next turn with clear boundaries
 
-## 5. Latest Implemented Delta (through 2026-05-15)
+## 5. Historical Implemented Delta Snapshot (through 2026-05-15)
+
+The sections below were written before the product architecture reset and are
+kept as historical evidence. Use current code, `AGENTS.md`, `agent-rules/`, and
+`docs/product-architecture-reset/executionBoundary/` for present architecture
+boundaries. Do not treat the route-numbered closeout records below as current
+readiness unless a current verifier run proves the same claim.
 
 ### Current release-claims audit after Routes 01-08
 
