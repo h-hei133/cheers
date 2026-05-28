@@ -1,4 +1,5 @@
 import type { RuntimePhase } from "../runtime/runtimePhase.js";
+import type { RuntimeExecutionReceiptProjection } from "../runtime/execution/executionReceipt.js";
 import type { RuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
 
 export type RuntimeSavePointRedactionStatus = "report-safe" | "redacted";
@@ -13,8 +14,17 @@ export interface RuntimeSavePointInput {
     readonly terminalClassification?: string;
     readonly terminalReason?: string;
   };
+  readonly executionReceipts?: readonly RuntimeExecutionReceiptProjection[];
   readonly pendingNextTurnFacts?: readonly string[];
   readonly notProvenClaims?: readonly string[];
+}
+
+export interface RuntimeSavePointExecutionReceipt {
+  readonly receiptId: string;
+  readonly executionStatus: "success" | "failure";
+  readonly errorClass: string;
+  readonly redactionStatus: RuntimeSavePointRedactionStatus;
+  readonly evidenceCorrelationId: string;
 }
 
 export interface RuntimeEvidenceSavePoint {
@@ -29,6 +39,7 @@ export interface RuntimeEvidenceSavePoint {
     readonly terminalClassification?: string;
     readonly terminalReason?: string;
   };
+  readonly executionReceipts: readonly RuntimeSavePointExecutionReceipt[];
   readonly pendingNextTurnFacts: readonly string[];
   readonly notProvenClaims: readonly string[];
   readonly redaction: {
@@ -68,6 +79,15 @@ export function createEvidenceOnlySavePoint(
           : {}),
       }
     : undefined;
+  const executionReceipts = (input.executionReceipts ?? []).map((receipt) =>
+    Object.freeze({
+      receiptId: sanitizeEvidenceId(receipt.receiptId, redactions),
+      executionStatus: receipt.executionStatus,
+      errorClass: sanitizeEvidenceId(receipt.errorClass, redactions),
+      redactionStatus: receipt.redaction.status,
+      evidenceCorrelationId: sanitizeEvidenceId(receipt.evidenceCorrelationId, redactions),
+    }),
+  );
   return deepFreeze({
     id: `${input.turnSnapshot.id}:save-point`,
     phase: input.phase,
@@ -76,6 +96,7 @@ export function createEvidenceOnlySavePoint(
     sessionPersistenceStatus: input.sessionPersistenceStatus ?? "not-recorded",
     resultProjectionStatus: "observed-not-verdict",
     ...(observedResult ? { observedResult: Object.freeze(observedResult) } : {}),
+    executionReceipts: Object.freeze(executionReceipts),
     pendingNextTurnFacts: Object.freeze(
       (input.pendingNextTurnFacts ?? []).map((fact) =>
         sanitizeEvidenceId(fact, redactions),

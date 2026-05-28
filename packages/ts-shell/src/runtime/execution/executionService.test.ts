@@ -59,7 +59,17 @@ describe('execution service boundary', () => {
       status: 'completed',
       exitCode: 0,
       executionPath: 'ts-local',
+      errorClass: 'success',
       stdout: expect.stringContaining('execution-service'),
+    })
+    expect(result.receipt).toMatchObject({
+      caller: 'execution-service-test',
+      operationKind: 'command.run',
+      authorityMode: 'command-allowlisted',
+      executionStatus: 'success',
+      errorClass: 'success',
+      exitCode: 0,
+      notProvenClaims: expect.arrayContaining(['terminal-task-success']),
     })
     expect(result.events).toEqual([
       expect.objectContaining({

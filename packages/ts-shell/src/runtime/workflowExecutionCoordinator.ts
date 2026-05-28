@@ -23,6 +23,7 @@ import {
   type FreshnessObservability,
 } from "../evidence/freshnessEvidence.js";
 import { createEvidenceOnlySavePoint } from "../evidence/runtimeSavePoint.js";
+import type { RuntimeExecutionReceiptProjection } from "./execution/executionReceipt.js";
 import { appendSingleFileEditRepairObservability } from "../evidence/turnEvidenceLedger.js";
 import { projectWorkflowExecutionResultContract } from "../result/workflowRuntimeProjection.js";
 import { transitionRuntimePhase } from "./runtimePhase.js";
@@ -437,6 +438,7 @@ function createIntegratedRunner(
             terminalClassification: execution.codingResult?.verification.status,
             terminalReason: execution.codingResult?.taskKind,
           },
+          executionReceipts: execution.executionReceipts ?? [],
           pendingNextTurnFacts: [
             workflowPlan.usedRestoredState
               ? "continuation-state-consumed"
@@ -497,6 +499,7 @@ interface WorkflowExecutionResult {
   readonly notes: string[];
   readonly codingResult: CodingResultSummary;
   readonly userFacingOutput: string;
+  readonly executionReceipts?: readonly RuntimeExecutionReceiptProjection[];
 }
 
 async function executeWorkflowTaskPlan(input: {
@@ -522,6 +525,7 @@ async function executeWorkflowTaskPlan(input: {
   const unverifiedFiles: Array<{ path: string; reason: string }> = [];
   const repairNotes: string[] = [];
   const evidence: string[] = [];
+  const executionReceipts: RuntimeExecutionReceiptProjection[] = [];
   const provenanceCollector = createToolRuntimeProvenanceCollector();
   const preRunGitChangeSet = snapshotGitChangeSet(input.workspaceRoot);
   const appliedContentByPath = new Map<string, string>();
@@ -880,6 +884,7 @@ async function executeWorkflowTaskPlan(input: {
     });
     dispatchedRunCommand = commandStage.dispatchedRunCommand;
     verification = commandStage.verification;
+    executionReceipts.push(...commandStage.executionReceipts);
   }
 
   const verificationStage = await runWorkflowVerificationStage({
@@ -935,6 +940,7 @@ async function executeWorkflowTaskPlan(input: {
     notes,
     codingResult: resultContract.codingResult,
     userFacingOutput: resultContract.userFacingOutput,
+    executionReceipts,
   };
 }
 

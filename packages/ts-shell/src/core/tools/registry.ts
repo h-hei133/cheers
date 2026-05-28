@@ -18,6 +18,7 @@ import {
 } from '../runtime/runtimeReceipt.js'
 import { projectRuntimeReceipt } from '../runtime/runtimeReceiptProjection.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
+import { createCommandToolResultSplit } from '../../tools/resultSplit.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
 import { buildExecutionFailedResult } from './toolPolicyResult.js'
 import { approvedResult, deniedResult } from './toolResultLifecycle.js'
@@ -89,24 +90,41 @@ async function runCommandTool(
     reason: result.recoveryReason,
     evidence: result.recoveryReason ? ['runtime-receipt:daemon-unavailable'] : undefined,
   })
+  const modelVisibleOutput = result.executionPath === 'rust-daemon'
+    ? result.stdout
+    : `${result.stdout}${result.stderr}`.trim()
+  const split = createCommandToolResultSplit({
+    content: modelVisibleOutput,
+    receipt: result.receipt,
+    runtimeFacts: {
+      executionPath: result.executionPath,
+      status: result.status,
+      exitCode: result.exitCode,
+      errorClass: result.errorClass,
+      legacyFailureKind: inferFailureKind(result),
+    },
+  })
 
   return {
     success: result.status === 'completed',
-    output: result.executionPath === 'rust-daemon'
-      ? result.stdout
-      : `${result.stdout}${result.stderr}`.trim(),
+    output: modelVisibleOutput,
     error: result.status === 'completed' ? undefined : result.stderr,
+    content: split.content,
+    details: split.details,
+    reportSafe: split.reportSafe,
     metadata: {
       executionPath: result.executionPath,
       status: result.status,
       exitCode: result.exitCode,
       failureKind: inferFailureKind(result),
+      errorClass: result.errorClass,
       daemonInstanceId: result.daemonInstanceId,
       daemonPid: result.daemonPid,
       daemonRequestSeq: result.daemonRequestSeq,
       daemonExecutionId: result.daemonExecutionId,
       recoveryReason: result.recoveryReason,
       runtimeReceipt: projectRuntimeReceipt(receipt),
+      executionReceipt: result.receipt,
     },
   }
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createRuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
+import { createCommandExecutionReceipt } from "../runtime/execution/executionReceipt.js";
 import { createEvidenceOnlySavePoint } from "./runtimeSavePoint.js";
 
 describe("runtime evidence save point", () => {
@@ -78,5 +79,55 @@ describe("runtime evidence save point", () => {
     );
     expect(JSON.stringify(savePoint)).not.toContain('"success":true');
   });
-});
 
+  it("references execution receipts without turning observed facts into verdict success", () => {
+    const snapshot = createRuntimeTurnSnapshot({
+      sessionId: "sess-receipt-save-point",
+      turn: 4,
+      phase: "turn",
+      workspaceRoot: "/tmp/workspace",
+      providerOptIn: false,
+    });
+    const receipt = createCommandExecutionReceipt({
+      request: {
+        operationKind: "command.run",
+        command: "sh",
+        args: ["-c", "printf ok"],
+        cwd: "/tmp/workspace",
+        workspaceRoot: "/tmp/workspace",
+        authority: {
+          mode: "command-allowlisted",
+          source: "tool-runtime-approval",
+          reason: "test authority",
+        },
+        caller: "core-tool:bash",
+        reason: "test save point receipt",
+        reportSafeCommand: "printf ok",
+      },
+      result: {
+        status: "completed",
+        exitCode: 0,
+        stdout: "ok",
+        stderr: "",
+      },
+    });
+
+    const savePoint = createEvidenceOnlySavePoint({
+      turnSnapshot: snapshot,
+      phase: "save_point",
+      evidenceIds: ["verification:not-run"],
+      executionReceipts: [receipt],
+    });
+
+    expect(savePoint.executionReceipts).toEqual([
+      expect.objectContaining({
+        receiptId: receipt.receiptId,
+        executionStatus: "success",
+        errorClass: "success",
+        evidenceCorrelationId: "execution-receipt:success:completed",
+      }),
+    ]);
+    expect(savePoint.terminalSuccessClaim).toBe(false);
+    expect(savePoint.notProvenClaims).toContain("verification-success");
+  });
+});

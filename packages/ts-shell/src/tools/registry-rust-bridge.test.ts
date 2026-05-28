@@ -104,6 +104,18 @@ describe('tool registry rust bridge', () => {
 
     expect(result.success).toBe(true)
     expect(result.output?.toLowerCase()).toContain('ts-local')
+    expect(result.content?.toLowerCase()).toContain('ts-local')
+    expect(result.details?.executionReceipt).toMatchObject({
+      executionStatus: 'success',
+      errorClass: 'success',
+      authorityMode: 'command-allowlisted',
+    })
+    expect(result.reportSafe?.executionReceipt).toMatchObject({
+      executionStatus: 'success',
+      errorClass: 'success',
+      outputSummaryRedactionStatus: 'report-safe',
+    })
+    expect(result.reportSafe?.notProvenClaims).toContain('terminal-task-success')
     expect(result.metadata).toMatchObject({ executionPath: 'ts-local' })
     expect(result.metadata?.runtimeReceipt).toMatchObject({
       resultSummary: expect.stringContaining('local-command:completed:command-succeeded'),
@@ -261,5 +273,39 @@ describe('tool registry rust bridge', () => {
       exitCode: null,
       failureKind: 'sandbox_preflight',
     })
+  })
+
+  it('keeps command failure details report-safe without leaking raw output', async () => {
+    process.env.DAEMON_ENABLED = '1'
+    vi.resetModules()
+    vi.doMock('../daemon/client.js', () => ({
+      executeViaRustDaemon: vi.fn().mockResolvedValue({
+        status: 'failed',
+        exitCode: 7,
+        stdout: 'raw provider output hidden reasoning sk-1234567890',
+        stderr: '/home/wang/.private-agents-real/config.json token=secret-value',
+        failureKind: 'execution_failure',
+      }),
+      isRustDaemonEnabled: () => true,
+      checkRustDaemonAvailability: () => ({ available: true }),
+    }))
+
+    const { createMvpToolRegistry } = await import('./registry.js')
+    const registry = createMvpToolRegistry()
+    const bashTool = registry.get('bash')
+    if (!bashTool) {
+      throw new Error('bash tool missing from registry')
+    }
+
+    const result = await bashTool.execute(
+      { command: 'echo ignored' },
+      { taskId: 'task_report_safe_failure', workspaceRoot },
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.details?.executionReceipt?.errorClass).toBe('command_failed')
+    expect(result.reportSafe?.redactionStatus).toBe('redacted')
+    expect(JSON.stringify(result.reportSafe)).not.toMatch(/secret-value|hidden reasoning|sk-1234567890|private-agents-real/)
+    expect(result.content).toContain('raw provider output')
   })
 })

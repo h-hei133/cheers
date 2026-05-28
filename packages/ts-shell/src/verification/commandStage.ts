@@ -1,4 +1,5 @@
 import type { QueryEvent } from "../core/query/events.js";
+import type { RuntimeExecutionReceiptProjection } from "../runtime/execution/executionReceipt.js";
 import type { ToolDispatcher } from "../tools/dispatcher.js";
 import {
   appendCurrentRequestScopeEvidence,
@@ -33,6 +34,7 @@ export async function runDirectCommandStage(input: {
 }): Promise<{
   readonly verification: CodingVerificationSummary;
   readonly dispatchedRunCommand: string;
+  readonly executionReceipts: readonly RuntimeExecutionReceiptProjection[];
 }> {
   const command = input.plan.directCommand ?? "node --version";
   const currentRequestScope = deriveCurrentPermissionRequestFromToolInput({
@@ -48,6 +50,7 @@ export async function runDirectCommandStage(input: {
     input.failedFiles.push({ path: "(command)", reason: input.plan.blockedReason });
     return {
       dispatchedRunCommand: command,
+      executionReceipts: [],
       verification: {
         status: "skipped",
         reason: input.plan.blockedReason,
@@ -113,5 +116,29 @@ export async function runDirectCommandStage(input: {
       reason: verification.reason ?? "command failed",
     });
   }
-  return { verification, dispatchedRunCommand: command };
+  return {
+    verification,
+    dispatchedRunCommand: command,
+    executionReceipts: readExecutionReceiptProjection(commandResult.metadata?.executionReceipt),
+  };
+}
+
+function readExecutionReceiptProjection(
+  value: unknown,
+): readonly RuntimeExecutionReceiptProjection[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return [];
+  }
+  const candidate = value as Partial<RuntimeExecutionReceiptProjection>;
+  if (
+    typeof candidate.receiptId === "string" &&
+    typeof candidate.executionStatus === "string" &&
+    typeof candidate.errorClass === "string" &&
+    typeof candidate.evidenceCorrelationId === "string" &&
+    candidate.redaction &&
+    typeof candidate.redaction === "object"
+  ) {
+    return [candidate as RuntimeExecutionReceiptProjection];
+  }
+  return [];
 }

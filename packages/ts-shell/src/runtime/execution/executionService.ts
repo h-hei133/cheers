@@ -7,6 +7,14 @@ import {
   isRustDaemonEnabled,
   type NormalizedExecutionResult,
 } from '../../daemon/client.js'
+import {
+  classifyCommandExecutionOutcome,
+  type ExecutionErrorClass,
+} from './executionErrorTaxonomy.js'
+import {
+  createCommandExecutionReceipt,
+  type RuntimeExecutionReceiptProjection,
+} from './executionReceipt.js'
 
 export type ExecutionPath = 'ts-local' | 'rust-daemon'
 export type ExecutionOperationKind =
@@ -124,6 +132,8 @@ export type ExecutionEvent =
 export interface CommandExecutionResult extends NormalizedExecutionResult {
   readonly executionPath: ExecutionPath
   readonly events: readonly ExecutionEvent[]
+  readonly errorClass: ExecutionErrorClass
+  readonly receipt: RuntimeExecutionReceiptProjection
   readonly daemonInstanceId?: string
   readonly daemonPid?: number
   readonly daemonRequestSeq?: number
@@ -175,21 +185,14 @@ async function runCommand(request: CommandExecutionRequest): Promise<CommandExec
     const availability = checkRustDaemonAvailability()
     if (!availability.available) {
       const recoveryReason = availability.reason ?? 'Rust daemon unavailable'
-      return {
+      return withCommandExecutionProjection(request, 'rust-daemon', {
         status: 'failed',
         exitCode: null,
         stdout: '',
         stderr: recoveryReason,
         failureKind: 'execution_failure',
-        executionPath: 'rust-daemon',
         recoveryReason,
-        events: commandEvents(request, 'rust-daemon', {
-          status: 'failed',
-          exitCode: null,
-          failureKind: 'execution_failure',
-          recoveryReason,
-        }),
-      }
+      })
     }
 
     try {
@@ -201,33 +204,20 @@ async function runCommand(request: CommandExecutionRequest): Promise<CommandExec
         timeoutMs: request.timeoutMs,
         abortSignal: request.abortSignal,
       })
-      return {
+      return withCommandExecutionProjection(request, 'rust-daemon', {
         ...daemonResult,
-        executionPath: 'rust-daemon',
-        events: commandEvents(request, 'rust-daemon', {
-          status: daemonResult.status,
-          exitCode: daemonResult.exitCode,
-          failureKind: daemonResult.failureKind,
-        }),
-      }
+      })
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
       const recoveryReason = `Rust daemon execution failed: ${reason}`
-      return {
+      return withCommandExecutionProjection(request, 'rust-daemon', {
         status: 'failed',
         exitCode: null,
         stdout: '',
         stderr: recoveryReason,
         failureKind: 'execution_failure',
-        executionPath: 'rust-daemon',
         recoveryReason,
-        events: commandEvents(request, 'rust-daemon', {
-          status: 'failed',
-          exitCode: null,
-          failureKind: 'execution_failure',
-          recoveryReason,
-        }),
-      }
+      })
     }
   }
 
@@ -238,13 +228,38 @@ async function runCommand(request: CommandExecutionRequest): Promise<CommandExec
     timeoutMs: request.timeoutMs,
   })
 
+  return withCommandExecutionProjection(request, 'ts-local', localResult)
+}
+
+function withCommandExecutionProjection(
+  request: CommandExecutionRequest,
+  executionPath: ExecutionPath,
+  result: NormalizedExecutionResult & { readonly recoveryReason?: string },
+): CommandExecutionResult {
+  const classification = classifyCommandExecutionOutcome({
+    status: result.status,
+    exitCode: result.exitCode,
+    failureKind: result.failureKind,
+    authorityMode: request.authority.mode,
+    stderr: result.stderr,
+    recoveryReason: result.recoveryReason,
+  })
+  const projected = {
+    ...result,
+    executionPath,
+    errorClass: classification.errorClass,
+  }
   return {
-    ...localResult,
-    executionPath: 'ts-local',
-    events: commandEvents(request, 'ts-local', {
-      status: localResult.status,
-      exitCode: localResult.exitCode,
-      failureKind: localResult.failureKind,
+    ...projected,
+    events: commandEvents(request, executionPath, {
+      status: result.status,
+      exitCode: result.exitCode,
+      failureKind: result.failureKind,
+      recoveryReason: result.recoveryReason,
+    }),
+    receipt: createCommandExecutionReceipt({
+      request,
+      result: projected,
     }),
   }
 }
