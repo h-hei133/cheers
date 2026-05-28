@@ -38,6 +38,99 @@ export type CommandRequest = BaseMessage<'command.request'> & {
   correlationId?: string
 }
 
+export type ExecutionAuthorityMode =
+  | 'none-required'
+  | 'read-only'
+  | 'preview'
+  | 'permission-pending'
+  | 'denied'
+  | 'approved-for-write'
+  | 'command-allowlisted'
+  | 'sandbox-approved'
+  | 'sandbox-rejected'
+  | 'unknown-transitional'
+
+export type ExecutionAuthoritySource =
+  | 'tool-runtime-approval'
+  | 'workspace-authority'
+  | 'daemon-sandbox'
+  | 'none'
+  | 'unknown-transitional'
+
+export type ExecutionPath = 'ts-local' | 'rust-daemon'
+export type ExecutionStatus = 'completed' | 'failed' | 'timeout' | 'cancelled'
+export type ExecutionFailureKind =
+  | 'sandbox_preflight'
+  | 'execution_failure'
+  | 'timeout'
+  | 'cancelled'
+
+export type ExecutionCommandRequest = {
+  operationKind: 'command.run'
+  command: string
+  args: readonly string[]
+  cwd: string
+  workspaceRoot: string
+  authority: {
+    mode: ExecutionAuthorityMode
+    source: ExecutionAuthoritySource
+    reason: string
+  }
+  caller: string
+  reason: string
+  reportSafeCommand: string
+  timeoutMs?: number
+}
+
+export type ExecutionEvent =
+  | {
+      kind: 'execution.started'
+      operationKind: 'command.run'
+      executionPath: ExecutionPath
+      authorityMode: ExecutionAuthorityMode
+      caller: string
+      reportSafeCommand: string
+      timeoutMs?: number
+    }
+  | {
+      kind: 'execution.exited'
+      operationKind: 'command.run'
+      executionPath: ExecutionPath
+      authorityMode: ExecutionAuthorityMode
+      status: 'completed'
+      exitCode: number | null
+    }
+  | {
+      kind: 'execution.failed' | 'execution.timed_out' | 'execution.cancelled'
+      operationKind: 'command.run'
+      executionPath: ExecutionPath
+      authorityMode: ExecutionAuthorityMode
+      status: 'failed' | 'timeout' | 'cancelled'
+      exitCode: number | null
+      failureKind: ExecutionFailureKind
+      recoveryReason?: string
+    }
+
+export type ExecutionCommandResult = {
+  status: ExecutionStatus
+  exitCode: number | null
+  stdout: string
+  stderr: string
+  failureKind?: ExecutionFailureKind
+  executionPath: ExecutionPath
+  events: readonly ExecutionEvent[]
+}
+
+export type ExecutionCommandContract = BaseMessage<'execution.command.contract'> & {
+  request: ExecutionCommandRequest
+  results: {
+    completed: ExecutionCommandResult & { status: 'completed' }
+    failed: ExecutionCommandResult & { status: 'failed'; failureKind: ExecutionFailureKind }
+    timedOut: ExecutionCommandResult & { status: 'timeout'; failureKind: 'timeout' }
+    cancelled: ExecutionCommandResult & { status: 'cancelled'; failureKind: 'cancelled' }
+  }
+}
+
 export type TaskStatus =
   | 'pending'
   | 'running'
@@ -119,6 +212,7 @@ export type CancellationRequest = BaseMessage<'task.cancel'> & {
 
 export type RuntimeProtocolMessage =
   | CommandRequest
+  | ExecutionCommandContract
   | TaskLifecycleEvent
   | StreamChunk
   | RuntimeErrorPayload

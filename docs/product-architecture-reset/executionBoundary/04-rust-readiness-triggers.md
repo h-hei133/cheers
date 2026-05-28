@@ -22,6 +22,8 @@ Current TypeScript boundary readiness:
 
 - `ExecutionService` request types now carry explicit authority metadata and caller/reason fields.
 - `CommandExecutionResult` includes structured execution events for started, exited, failed, timed out, and cancelled outcomes.
-- Contracts schema elevation should wait for a real cross-runtime consumer that needs the authority/event shape serialized outside the TypeScript runtime boundary. The trigger is a Rust daemon protocol or contract fixture that consumes the same authority/event fields directly.
+- `contracts/tests/fixtures/valid/execution.command.contract.json` is the minimal shared serialized fixture for ExecutionService command request/result/event semantics.
+- Rust smoke validation parses that fixture and asserts key authority, status, and event fields, without moving product runtime behavior into Rust.
+- Further schema expansion should wait for a real cross-runtime consumer that needs additional authority/event fields serialized outside the TypeScript runtime boundary.
 
 Until a runtime path proves otherwise, Rust is a native executor candidate and opt-in execution path, not the default execution plane.

@@ -28,6 +28,40 @@ const PERMISSION_SCOPE_MODES = new Set([
   'system',
 ])
 const PERMISSION_DECISIONS = new Set(['allow', 'deny', 'ask'])
+const EXECUTION_AUTHORITY_MODES = new Set([
+  'none-required',
+  'read-only',
+  'preview',
+  'permission-pending',
+  'denied',
+  'approved-for-write',
+  'command-allowlisted',
+  'sandbox-approved',
+  'sandbox-rejected',
+  'unknown-transitional',
+])
+const EXECUTION_AUTHORITY_SOURCES = new Set([
+  'tool-runtime-approval',
+  'workspace-authority',
+  'daemon-sandbox',
+  'none',
+  'unknown-transitional',
+])
+const EXECUTION_PATHS = new Set(['ts-local', 'rust-daemon'])
+const EXECUTION_STATUSES = new Set(['completed', 'failed', 'timeout', 'cancelled'])
+const EXECUTION_FAILURE_KINDS = new Set([
+  'sandbox_preflight',
+  'execution_failure',
+  'timeout',
+  'cancelled',
+])
+const EXECUTION_EVENT_KINDS = new Set([
+  'execution.started',
+  'execution.exited',
+  'execution.failed',
+  'execution.timed_out',
+  'execution.cancelled',
+])
 
 const KIND_REQUIRED_FIELDS = {
   'command.request': [
@@ -38,6 +72,7 @@ const KIND_REQUIRED_FIELDS = {
     'requestedBy',
     'issuedAt',
   ],
+  'execution.command.contract': ['request', 'results'],
   'task.lifecycle': ['eventId', 'taskId', 'status', 'timestamp'],
   'stream.chunk': [
     'streamId',
@@ -69,6 +104,7 @@ const KIND_REQUIRED_FIELDS = {
 
 const KIND_OPTIONAL_FIELDS = {
   'command.request': ['correlationId'],
+  'execution.command.contract': [],
   'task.lifecycle': ['previousStatus', 'message', 'progress'],
   'stream.chunk': [],
   'runtime.error': ['taskId', 'details'],
@@ -184,6 +220,9 @@ export function validatePayload(payload) {
         return [failure('E_FIELD_INVALID_TYPE', 'issuedAt must be an integer >= 0', '/issuedAt')]
       }
       return []
+    }
+    case 'execution.command.contract': {
+      return validateExecutionCommandContract(payload)
     }
     case 'task.lifecycle': {
       if (!TASK_STATUSES.has(payload.status)) {
@@ -301,4 +340,178 @@ export function validatePayload(payload) {
     default:
       return [failure('E_KIND_INVALID', 'kind is invalid or unsupported', '/kind')]
   }
+}
+
+function validateExecutionCommandContract(payload) {
+  if (!isObject(payload.request)) {
+    return [failure('E_FIELD_INVALID_TYPE', 'request must be an object', '/request')]
+  }
+  const requestFailure = validateExecutionCommandRequest(payload.request, '/request')
+  if (requestFailure) {
+    return [requestFailure]
+  }
+
+  if (!isObject(payload.results)) {
+    return [failure('E_FIELD_INVALID_TYPE', 'results must be an object', '/results')]
+  }
+  for (const key of ['completed', 'failed', 'timedOut', 'cancelled']) {
+    if (!isObject(payload.results[key])) {
+      return [
+        failure(
+          'E_FIELD_REQUIRED',
+          `results.${key} is required for execution.command.contract`,
+          `/results/${key}`,
+        ),
+      ]
+    }
+    const resultFailure = validateExecutionCommandResult(payload.results[key], `/results/${key}`)
+    if (resultFailure) {
+      return [resultFailure]
+    }
+  }
+
+  const expectedStatuses = {
+    completed: 'completed',
+    failed: 'failed',
+    timedOut: 'timeout',
+    cancelled: 'cancelled',
+  }
+  for (const [key, expectedStatus] of Object.entries(expectedStatuses)) {
+    if (payload.results[key].status !== expectedStatus) {
+      return [
+        failure(
+          'E_FIELD_INVALID_VALUE',
+          `results.${key}.status must be ${expectedStatus}`,
+          `/results/${key}/status`,
+        ),
+      ]
+    }
+  }
+
+  return []
+}
+
+function validateExecutionCommandRequest(request, basePath) {
+  const required = [
+    'operationKind',
+    'command',
+    'args',
+    'cwd',
+    'workspaceRoot',
+    'authority',
+    'caller',
+    'reason',
+    'reportSafeCommand',
+  ]
+  for (const field of required) {
+    if (request[field] === undefined) {
+      return failure('E_FIELD_REQUIRED', `${field} is required`, `${basePath}/${field}`)
+    }
+  }
+  if (request.operationKind !== 'command.run') {
+    return failure('E_FIELD_INVALID_VALUE', 'operationKind must be command.run', `${basePath}/operationKind`)
+  }
+  if (
+    !isString(request.command) ||
+    !Array.isArray(request.args) ||
+    !request.args.every(isString) ||
+    !isString(request.cwd) ||
+    !isString(request.workspaceRoot) ||
+    !isString(request.caller) ||
+    !isString(request.reason) ||
+    !isString(request.reportSafeCommand)
+  ) {
+    return failure('E_FIELD_INVALID_TYPE', 'command request fields are invalid', basePath)
+  }
+  if (request.timeoutMs !== undefined && !isInteger(request.timeoutMs)) {
+    return failure('E_FIELD_INVALID_TYPE', 'timeoutMs must be an integer >= 0', `${basePath}/timeoutMs`)
+  }
+  if (!isObject(request.authority)) {
+    return failure('E_FIELD_INVALID_TYPE', 'authority must be an object', `${basePath}/authority`)
+  }
+  if (!EXECUTION_AUTHORITY_MODES.has(request.authority.mode)) {
+    return failure('E_FIELD_INVALID_VALUE', 'authority.mode is invalid', `${basePath}/authority/mode`)
+  }
+  if (!EXECUTION_AUTHORITY_SOURCES.has(request.authority.source)) {
+    return failure('E_FIELD_INVALID_VALUE', 'authority.source is invalid', `${basePath}/authority/source`)
+  }
+  if (!isString(request.authority.reason)) {
+    return failure('E_FIELD_INVALID_TYPE', 'authority.reason must be a string', `${basePath}/authority/reason`)
+  }
+  if (hasVagueAuthorityBoolean(request)) {
+    return failure('E_FIELD_INVALID_VALUE', 'execution authority must not use vague boolean fields', basePath)
+  }
+  return null
+}
+
+function validateExecutionCommandResult(result, basePath) {
+  if (
+    !EXECUTION_STATUSES.has(result.status) ||
+    !(Number.isInteger(result.exitCode) || result.exitCode === null) ||
+    !isString(result.stdout) ||
+    !isString(result.stderr) ||
+    !EXECUTION_PATHS.has(result.executionPath) ||
+    !Array.isArray(result.events)
+  ) {
+    return failure('E_FIELD_INVALID_TYPE', 'execution result fields are invalid', basePath)
+  }
+  if (result.failureKind !== undefined && !EXECUTION_FAILURE_KINDS.has(result.failureKind)) {
+    return failure('E_FIELD_INVALID_VALUE', 'failureKind is invalid', `${basePath}/failureKind`)
+  }
+  if (result.status !== 'completed' && result.failureKind === undefined) {
+    return failure('E_FIELD_REQUIRED', 'failureKind is required for non-completed results', `${basePath}/failureKind`)
+  }
+  for (const [index, event] of result.events.entries()) {
+    const eventFailure = validateExecutionEvent(event, `${basePath}/events/${index}`)
+    if (eventFailure) {
+      return eventFailure
+    }
+  }
+  return null
+}
+
+function validateExecutionEvent(event, basePath) {
+  if (!isObject(event)) {
+    return failure('E_FIELD_INVALID_TYPE', 'execution event must be an object', basePath)
+  }
+  if (!EXECUTION_EVENT_KINDS.has(event.kind)) {
+    return failure('E_FIELD_INVALID_VALUE', 'execution event kind is invalid', `${basePath}/kind`)
+  }
+  if (event.operationKind !== 'command.run') {
+    return failure('E_FIELD_INVALID_VALUE', 'event operationKind must be command.run', `${basePath}/operationKind`)
+  }
+  if (!EXECUTION_PATHS.has(event.executionPath)) {
+    return failure('E_FIELD_INVALID_VALUE', 'event executionPath is invalid', `${basePath}/executionPath`)
+  }
+  if (!EXECUTION_AUTHORITY_MODES.has(event.authorityMode)) {
+    return failure('E_FIELD_INVALID_VALUE', 'event authorityMode is invalid', `${basePath}/authorityMode`)
+  }
+  if (event.kind === 'execution.started') {
+    if (!isString(event.caller) || !isString(event.reportSafeCommand)) {
+      return failure('E_FIELD_REQUIRED', 'started event requires caller and reportSafeCommand', basePath)
+    }
+    return null
+  }
+  if (!EXECUTION_STATUSES.has(event.status) || !(Number.isInteger(event.exitCode) || event.exitCode === null)) {
+    return failure('E_FIELD_INVALID_TYPE', 'terminal event status or exitCode is invalid', basePath)
+  }
+  if (event.kind !== 'execution.exited' && !EXECUTION_FAILURE_KINDS.has(event.failureKind)) {
+    return failure('E_FIELD_REQUIRED', 'failure event requires failureKind', `${basePath}/failureKind`)
+  }
+  return null
+}
+
+function hasVagueAuthorityBoolean(value) {
+  if (!isObject(value)) {
+    return false
+  }
+  for (const [key, item] of Object.entries(value)) {
+    if (['allowed', 'approved', 'enabled', 'safe'].includes(key) && typeof item === 'boolean') {
+      return true
+    }
+    if (isObject(item) && hasVagueAuthorityBoolean(item)) {
+      return true
+    }
+  }
+  return false
 }

@@ -9,6 +9,9 @@
       "$ref": "#/$defs/CommandRequest"
     },
     {
+      "$ref": "#/$defs/ExecutionCommandContract"
+    },
+    {
       "$ref": "#/$defs/TaskLifecycleEvent"
     },
     {
@@ -123,6 +126,279 @@
         },
         "correlationId": {
           "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExecutionAuthorityMode": {
+      "type": "string",
+      "enum": [
+        "none-required",
+        "read-only",
+        "preview",
+        "permission-pending",
+        "denied",
+        "approved-for-write",
+        "command-allowlisted",
+        "sandbox-approved",
+        "sandbox-rejected",
+        "unknown-transitional"
+      ]
+    },
+    "ExecutionAuthoritySource": {
+      "type": "string",
+      "enum": [
+        "tool-runtime-approval",
+        "workspace-authority",
+        "daemon-sandbox",
+        "none",
+        "unknown-transitional"
+      ]
+    },
+    "ExecutionPath": {
+      "type": "string",
+      "enum": [
+        "ts-local",
+        "rust-daemon"
+      ]
+    },
+    "ExecutionStatus": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "failed",
+        "timeout",
+        "cancelled"
+      ]
+    },
+    "ExecutionFailureKind": {
+      "type": "string",
+      "enum": [
+        "sandbox_preflight",
+        "execution_failure",
+        "timeout",
+        "cancelled"
+      ]
+    },
+    "ExecutionCommandRequest": {
+      "type": "object",
+      "required": [
+        "operationKind",
+        "command",
+        "args",
+        "cwd",
+        "workspaceRoot",
+        "authority",
+        "caller",
+        "reason",
+        "reportSafeCommand"
+      ],
+      "properties": {
+        "operationKind": {
+          "const": "command.run"
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workspaceRoot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority": {
+          "type": "object",
+          "required": [
+            "mode",
+            "source",
+            "reason"
+          ],
+          "properties": {
+            "mode": {
+              "$ref": "#/$defs/ExecutionAuthorityMode"
+            },
+            "source": {
+              "$ref": "#/$defs/ExecutionAuthoritySource"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "caller": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reportSafeCommand": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExecutionEvent": {
+      "type": "object",
+      "required": [
+        "kind",
+        "operationKind",
+        "executionPath",
+        "authorityMode"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "execution.started",
+            "execution.exited",
+            "execution.failed",
+            "execution.timed_out",
+            "execution.cancelled"
+          ]
+        },
+        "operationKind": {
+          "const": "command.run"
+        },
+        "executionPath": {
+          "$ref": "#/$defs/ExecutionPath"
+        },
+        "authorityMode": {
+          "$ref": "#/$defs/ExecutionAuthorityMode"
+        },
+        "caller": {
+          "type": "string"
+        },
+        "reportSafeCommand": {
+          "type": "string"
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "$ref": "#/$defs/ExecutionStatus"
+        },
+        "exitCode": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "failureKind": {
+          "$ref": "#/$defs/ExecutionFailureKind"
+        },
+        "recoveryReason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExecutionCommandResult": {
+      "type": "object",
+      "required": [
+        "status",
+        "exitCode",
+        "stdout",
+        "stderr",
+        "executionPath",
+        "events"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/ExecutionStatus"
+        },
+        "exitCode": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "failureKind": {
+          "$ref": "#/$defs/ExecutionFailureKind"
+        },
+        "executionPath": {
+          "$ref": "#/$defs/ExecutionPath"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExecutionEvent"
+          },
+          "minItems": 2
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExecutionCommandContract": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/BaseMessage"
+        }
+      ],
+      "required": [
+        "schemaVersion",
+        "kind",
+        "request",
+        "results"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "const": "execution.command.contract"
+        },
+        "request": {
+          "$ref": "#/$defs/ExecutionCommandRequest"
+        },
+        "results": {
+          "type": "object",
+          "required": [
+            "completed",
+            "failed",
+            "timedOut",
+            "cancelled"
+          ],
+          "properties": {
+            "completed": {
+              "$ref": "#/$defs/ExecutionCommandResult"
+            },
+            "failed": {
+              "$ref": "#/$defs/ExecutionCommandResult"
+            },
+            "timedOut": {
+              "$ref": "#/$defs/ExecutionCommandResult"
+            },
+            "cancelled": {
+              "$ref": "#/$defs/ExecutionCommandResult"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

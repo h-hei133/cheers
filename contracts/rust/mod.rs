@@ -44,6 +44,125 @@ pub struct CommandRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExecutionAuthorityMode {
+    NoneRequired,
+    ReadOnly,
+    Preview,
+    PermissionPending,
+    Denied,
+    ApprovedForWrite,
+    CommandAllowlisted,
+    SandboxApproved,
+    SandboxRejected,
+    UnknownTransitional,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExecutionAuthoritySource {
+    ToolRuntimeApproval,
+    WorkspaceAuthority,
+    DaemonSandbox,
+    None,
+    UnknownTransitional,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExecutionPath {
+    TsLocal,
+    RustDaemon,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionStatus {
+    Completed,
+    Failed,
+    Timeout,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionFailureKind {
+    SandboxPreflight,
+    ExecutionFailure,
+    Timeout,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionAuthority {
+    pub mode: ExecutionAuthorityMode,
+    pub source: ExecutionAuthoritySource,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionCommandRequest {
+    pub operation_kind: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub cwd: String,
+    pub workspace_root: String,
+    pub authority: ExecutionAuthority,
+    pub caller: String,
+    pub reason: String,
+    pub report_safe_command: String,
+    pub timeout_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionEvent {
+    pub kind: String,
+    pub operation_kind: String,
+    pub execution_path: ExecutionPath,
+    pub authority_mode: ExecutionAuthorityMode,
+    pub caller: Option<String>,
+    pub report_safe_command: Option<String>,
+    pub timeout_ms: Option<u64>,
+    pub status: Option<ExecutionStatus>,
+    pub exit_code: Option<i32>,
+    pub failure_kind: Option<ExecutionFailureKind>,
+    pub recovery_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionCommandResult {
+    pub status: ExecutionStatus,
+    pub exit_code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+    pub failure_kind: Option<ExecutionFailureKind>,
+    pub execution_path: ExecutionPath,
+    pub events: Vec<ExecutionEvent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionCommandContractResults {
+    pub completed: ExecutionCommandResult,
+    pub failed: ExecutionCommandResult,
+    pub timed_out: ExecutionCommandResult,
+    pub cancelled: ExecutionCommandResult,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionCommandContract {
+    pub schema_version: String,
+    pub kind: String,
+    pub request: ExecutionCommandRequest,
+    pub results: ExecutionCommandContractResults,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum TaskStatus {
     Pending,
@@ -165,6 +284,7 @@ pub struct CancellationRequest {
 #[serde(untagged)]
 pub enum RuntimeProtocolMessage {
     CommandRequest(CommandRequest),
+    ExecutionCommandContract(ExecutionCommandContract),
     TaskLifecycleEvent(TaskLifecycleEvent),
     StreamChunk(StreamChunk),
     RuntimeError(RuntimeError),

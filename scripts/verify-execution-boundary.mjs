@@ -117,6 +117,25 @@ if (!/runtime\/execution\/executionService\.js/.test(coreToolRegistryContent)) {
   failures.push('packages/ts-shell/src/core/tools/registry.ts: core tool side effects must route through ExecutionService')
 }
 
+const executionContractFixturePath = path.join(
+  root,
+  'contracts/tests/fixtures/valid/execution.command.contract.json',
+)
+try {
+  const fixture = JSON.parse(await fs.readFile(executionContractFixturePath, 'utf8'))
+  if (fixture.kind !== 'execution.command.contract') {
+    failures.push('contracts/tests/fixtures/valid/execution.command.contract.json: execution contract fixture kind is required')
+  }
+  if (fixture.request?.operationKind !== 'command.run') {
+    failures.push('contracts/tests/fixtures/valid/execution.command.contract.json: request.operationKind must be command.run')
+  }
+  if (usesVagueAuthorityBoolean(fixture.request ?? {})) {
+    failures.push('contracts/tests/fixtures/valid/execution.command.contract.json: execution authority must use precise enum states, not vague booleans')
+  }
+} catch (error) {
+  failures.push(`contracts/tests/fixtures/valid/execution.command.contract.json: fixture must be readable JSON (${error instanceof Error ? error.message : String(error)})`)
+}
+
 const contractFiles = await listFiles(path.join(root, 'contracts'), file => {
   const ext = path.extname(file)
   return sourceExtensions.has(ext)
@@ -196,5 +215,19 @@ function importsForbiddenProjectSurface(content) {
 }
 
 function usesVagueAuthorityBoolean(content) {
-  return /\b(?:allowed|approved|enabled|safe)\??:\s*boolean\b/.test(content)
+  if (typeof content === 'string') {
+    return /\b(?:allowed|approved|enabled|safe)\??:\s*boolean\b/.test(content)
+  }
+  if (!content || typeof content !== 'object' || Array.isArray(content)) {
+    return false
+  }
+  for (const [key, value] of Object.entries(content)) {
+    if (['allowed', 'approved', 'enabled', 'safe'].includes(key) && typeof value === 'boolean') {
+      return true
+    }
+    if (usesVagueAuthorityBoolean(value)) {
+      return true
+    }
+  }
+  return false
 }

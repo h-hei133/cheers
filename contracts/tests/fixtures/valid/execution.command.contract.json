@@ -1,0 +1,132 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "execution.command.contract",
+  "request": {
+    "operationKind": "command.run",
+    "command": "sh",
+    "args": ["-c", "printf execution-contract"],
+    "cwd": "/workspace",
+    "workspaceRoot": "/workspace",
+    "authority": {
+      "mode": "command-allowlisted",
+      "source": "tool-runtime-approval",
+      "reason": "ToolRuntime allowlist and process permission checks passed before ExecutionService was called."
+    },
+    "caller": "core-tool:bash",
+    "reason": "Execute an approved shell command tool request inside the workspace.",
+    "reportSafeCommand": "printf execution-contract",
+    "timeoutMs": 30000
+  },
+  "results": {
+    "completed": {
+      "status": "completed",
+      "exitCode": 0,
+      "stdout": "execution-contract",
+      "stderr": "",
+      "executionPath": "ts-local",
+      "events": [
+        {
+          "kind": "execution.started",
+          "operationKind": "command.run",
+          "executionPath": "ts-local",
+          "authorityMode": "command-allowlisted",
+          "caller": "core-tool:bash",
+          "reportSafeCommand": "printf execution-contract",
+          "timeoutMs": 30000
+        },
+        {
+          "kind": "execution.exited",
+          "operationKind": "command.run",
+          "executionPath": "ts-local",
+          "authorityMode": "command-allowlisted",
+          "status": "completed",
+          "exitCode": 0
+        }
+      ]
+    },
+    "failed": {
+      "status": "failed",
+      "exitCode": 7,
+      "stdout": "",
+      "stderr": "execution failed",
+      "failureKind": "execution_failure",
+      "executionPath": "ts-local",
+      "events": [
+        {
+          "kind": "execution.started",
+          "operationKind": "command.run",
+          "executionPath": "ts-local",
+          "authorityMode": "command-allowlisted",
+          "caller": "core-tool:bash",
+          "reportSafeCommand": "printf execution-contract",
+          "timeoutMs": 30000
+        },
+        {
+          "kind": "execution.failed",
+          "operationKind": "command.run",
+          "executionPath": "ts-local",
+          "authorityMode": "command-allowlisted",
+          "status": "failed",
+          "exitCode": 7,
+          "failureKind": "execution_failure"
+        }
+      ]
+    },
+    "timedOut": {
+      "status": "timeout",
+      "exitCode": null,
+      "stdout": "",
+      "stderr": "Command timed out",
+      "failureKind": "timeout",
+      "executionPath": "ts-local",
+      "events": [
+        {
+          "kind": "execution.started",
+          "operationKind": "command.run",
+          "executionPath": "ts-local",
+          "authorityMode": "command-allowlisted",
+          "caller": "core-tool:bash",
+          "reportSafeCommand": "printf execution-contract",
+          "timeoutMs": 30000
+        },
+        {
+          "kind": "execution.timed_out",
+          "operationKind": "command.run",
+          "executionPath": "ts-local",
+          "authorityMode": "command-allowlisted",
+          "status": "timeout",
+          "exitCode": null,
+          "failureKind": "timeout"
+        }
+      ]
+    },
+    "cancelled": {
+      "status": "cancelled",
+      "exitCode": null,
+      "stdout": "",
+      "stderr": "Command cancelled",
+      "failureKind": "cancelled",
+      "executionPath": "rust-daemon",
+      "events": [
+        {
+          "kind": "execution.started",
+          "operationKind": "command.run",
+          "executionPath": "rust-daemon",
+          "authorityMode": "command-allowlisted",
+          "caller": "core-tool:bash",
+          "reportSafeCommand": "printf execution-contract",
+          "timeoutMs": 30000
+        },
+        {
+          "kind": "execution.cancelled",
+          "operationKind": "command.run",
+          "executionPath": "rust-daemon",
+          "authorityMode": "command-allowlisted",
+          "status": "cancelled",
+          "exitCode": null,
+          "failureKind": "cancelled"
+        }
+      ]
+    }
+  }
+}

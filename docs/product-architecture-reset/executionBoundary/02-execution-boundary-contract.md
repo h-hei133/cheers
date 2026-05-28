@@ -22,6 +22,12 @@ Command results preserve:
 - Rust daemon metadata when present
 - recovery reason when the daemon path could not start or respond
 
+Serialized cross-runtime fixture:
+
+- `contracts/tests/fixtures/valid/execution.command.contract.json` captures the minimal ExecutionService command request/result/event shape for TypeScript and Rust consumers.
+- The fixture covers operation kind, authority mode/source, caller, reason, report-safe command projection, cwd/workspace root, timeout, completed/failed/timeout/cancelled results, and started/terminal execution events.
+- It is contract data only. It does not execute commands, authorize writes, call providers, or change the Rust daemon opt-in path.
+
 Current caller:
 
 - `packages/ts-shell/src/core/tools/registry.ts` routes read/write/edit/glob/bash/git-status/git-diff through the execution service.

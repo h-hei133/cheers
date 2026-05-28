@@ -273,6 +273,11 @@ fn map_join_result(
 }
 
 #[cfg(test)]
+#[allow(dead_code, non_camel_case_types)]
+#[path = "../../../contracts/rust/mod.rs"]
+mod runtime_contracts;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -296,6 +301,60 @@ mod tests {
     #[test]
     fn test_rust_smoke_initialization() {
         assert!(contract_schema_exists());
+    }
+
+    #[test]
+    fn test_parse_execution_command_contract_fixture() {
+        let raw = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../contracts/tests/fixtures/valid/execution.command.contract.json"
+        ));
+        let fixture: runtime_contracts::ExecutionCommandContract =
+            serde_json::from_str(raw).expect("execution command contract fixture parses");
+
+        assert_eq!(fixture.kind, "execution.command.contract");
+        assert_eq!(fixture.request.operation_kind, "command.run");
+        assert_eq!(
+            fixture.request.authority.mode,
+            runtime_contracts::ExecutionAuthorityMode::CommandAllowlisted
+        );
+        assert_eq!(fixture.request.caller, "core-tool:bash");
+        assert_eq!(fixture.request.workspace_root, "/workspace");
+        assert_eq!(fixture.request.cwd, "/workspace");
+        assert_eq!(fixture.request.timeout_ms, Some(30_000));
+        assert_eq!(
+            fixture.results.completed.status,
+            runtime_contracts::ExecutionStatus::Completed
+        );
+        assert_eq!(fixture.results.completed.exit_code, Some(0));
+        assert_eq!(
+            fixture.results.failed.failure_kind,
+            Some(runtime_contracts::ExecutionFailureKind::ExecutionFailure)
+        );
+        assert_eq!(
+            fixture.results.timed_out.status,
+            runtime_contracts::ExecutionStatus::Timeout
+        );
+        assert_eq!(
+            fixture.results.cancelled.status,
+            runtime_contracts::ExecutionStatus::Cancelled
+        );
+
+        let event_kinds: Vec<&str> = fixture
+            .results
+            .completed
+            .events
+            .iter()
+            .chain(fixture.results.failed.events.iter())
+            .chain(fixture.results.timed_out.events.iter())
+            .chain(fixture.results.cancelled.events.iter())
+            .map(|event| event.kind.as_str())
+            .collect();
+        assert!(event_kinds.contains(&"execution.started"));
+        assert!(event_kinds.contains(&"execution.exited"));
+        assert!(event_kinds.contains(&"execution.failed"));
+        assert!(event_kinds.contains(&"execution.timed_out"));
+        assert!(event_kinds.contains(&"execution.cancelled"));
     }
 
     #[tokio::test]

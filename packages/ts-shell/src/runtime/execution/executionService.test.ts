@@ -2,7 +2,13 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createDefaultExecutionService } from './executionService.js'
+import executionCommandContractFixture from '../../../../../contracts/tests/fixtures/valid/execution.command.contract.json'
+import {
+  createDefaultExecutionService,
+  type CommandExecutionRequest,
+  type CommandExecutionResult,
+  type ExecutionEvent,
+} from './executionService.js'
 
 const originalDaemonEnabled = process.env.DAEMON_ENABLED
 let workspaceRoot: string | undefined
@@ -105,4 +111,69 @@ describe('execution service boundary', () => {
       reportSafeTarget: workspaceRoot,
     })).resolves.toContain(target)
   })
+
+  it('validates the shared execution command contract fixture against boundary semantics', () => {
+    expect(executionCommandContractFixture.kind).toBe('execution.command.contract')
+
+    const request = executionCommandContractFixture.request as CommandExecutionRequest
+    expect(request).toMatchObject({
+      operationKind: 'command.run',
+      workspaceRoot: '/workspace',
+      cwd: '/workspace',
+      authority: {
+        mode: 'command-allowlisted',
+        source: 'tool-runtime-approval',
+      },
+      caller: 'core-tool:bash',
+      reportSafeCommand: 'printf execution-contract',
+      timeoutMs: 30_000,
+    })
+    expect(request.reason.length).toBeGreaterThan(0)
+    expect(request.authority.reason.length).toBeGreaterThan(0)
+    expect(hasVagueAuthorityBoolean(request)).toBe(false)
+
+    const completed = executionCommandContractFixture.results.completed as CommandExecutionResult
+    const failed = executionCommandContractFixture.results.failed as CommandExecutionResult
+    const timedOut = executionCommandContractFixture.results.timedOut as CommandExecutionResult
+    const cancelled = executionCommandContractFixture.results.cancelled as CommandExecutionResult
+
+    expect(completed.status).toBe('completed')
+    expect(completed.exitCode).toBe(0)
+    expect(failed).toMatchObject({ status: 'failed', failureKind: 'execution_failure' })
+    expect(timedOut).toMatchObject({ status: 'timeout', failureKind: 'timeout' })
+    expect(cancelled).toMatchObject({ status: 'cancelled', failureKind: 'cancelled' })
+
+    const allEvents = [
+      ...completed.events,
+      ...failed.events,
+      ...timedOut.events,
+      ...cancelled.events,
+    ] as readonly ExecutionEvent[]
+    expect(allEvents.map(event => event.kind)).toEqual(expect.arrayContaining([
+      'execution.started',
+      'execution.exited',
+      'execution.failed',
+      'execution.timed_out',
+      'execution.cancelled',
+    ]))
+    for (const event of allEvents) {
+      expect(event.operationKind).toBe('command.run')
+      expect(event.authorityMode).toBe('command-allowlisted')
+    }
+  })
 })
+
+function hasVagueAuthorityBoolean(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+  for (const [key, item] of Object.entries(value)) {
+    if (['allowed', 'approved', 'enabled', 'safe'].includes(key) && typeof item === 'boolean') {
+      return true
+    }
+    if (hasVagueAuthorityBoolean(item)) {
+      return true
+    }
+  }
+  return false
+}
