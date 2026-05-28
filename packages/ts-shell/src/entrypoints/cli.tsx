@@ -1,27 +1,32 @@
 #!/usr/bin/env node
 import process from "node:process";
 import * as readline from "node:readline";
+import {
+  createCliBootstrapRuntimeContext,
+  createCliRootContext,
+  logCliBootstrapSessionInitialized,
+} from "../cli/bootstrap/cliBootstrapContext.js";
+import {
+  projectAndRenderCliStartupSurface,
+} from "../cli/bootstrap/cliStartupSurface.js";
+import {
+  renderProjectedLines,
+} from "../cli/output/projectedLineRenderer.js";
+import {
+  runCliPrintModeRouter,
+} from "../cli/print/printModeRouter.js";
+import {
+  captureCliStdinPrompts,
+} from "../cli/print/stdinPromptCapture.js";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
-import {
-  bootstrapShellRuntime,
-  SessionBootstrapError,
-} from "../core/shell/bootstrap.js";
 import {
   runResumeLikeShellAction,
 } from "../core/shell/continueShellActionRuntime.js";
 import {
-  renderRootBindingDiagnostics,
-  renderStartupSurface,
-} from "../core/shell/startupSurfaceRenderer.js";
-import {
   resolveProviderCredential,
   type ProviderCredentialResolution,
 } from "../core/shell/providerCredentials.js";
-import {
-  buildNonInteractivePrompts,
-  resolveStdinTransportMode,
-} from "../core/shell/printPromptInput.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
 import {
   isResumeLikeShellAction,
@@ -31,18 +36,14 @@ import {
   handleShellClose,
   handleShellSigint,
 } from "../core/shell/signalHandlers.js";
-import { isRustDaemonEnabled } from "../daemon/client.js";
 import {
   createComponentLogger,
   createTraceContext,
   setGlobalTraceContext,
 } from "../observability/index.js";
-import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 import type {
   ApprovalAuditMemoryState,
 } from "../session/SessionManager.js";
-import { SessionManager } from "../session/SessionManager.js";
-import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import { parseCliArgs, type CliOptions } from "./cliArgs.js";
 import {
   buildCliCommandExecution as resolveTurnInputForExecution,
@@ -57,10 +58,7 @@ import {
   formatWorkspaceInfoLines,
 } from "./cliDisplayProjection.js";
 import { buildPersistentShellPrompt } from "./cliInteractiveLoopState.js";
-import { resolveCliMode } from "./cliModeDispatch.js";
 import { buildCliPlanningMutationExecutionOptions } from "./cliPlanningMutationExecution.js";
-import { runCliPrintMode } from "./cliPrintModeRunner.js";
-import { runCliStdinMode } from "./cliStdinModeRunner.js";
 import { createCliMcpGateway, runCliMcpCommand } from "./cliMcpModule.js";
 import {
   applyPatchDecisionFromApprovalMode,
@@ -69,9 +67,6 @@ import {
 } from "./cliApprovalModule.js";
 import {
   executeResolvedPromptTurn,
-  runNonInteractivePrompt,
-  runNonTtyPromptStream,
-  runReplayPromptScript,
   streamOrchestratedResponse,
 } from "./cliRuntimeModule.js";
 import { runCliPermissionCommand } from "./cliPermissionModule.js";
@@ -81,10 +76,8 @@ import {
 } from "./cliSessionModule.js";
 import {
   isWorkspaceInfoPromptStrict,
-  resolveTargetProjectRoot,
   runCliWorkspaceCommand,
 } from "./cliWorkspaceModule.js";
-import { projectCliStartupPlan } from "./cliStartupPlan.js";
 import {
   renderSessionCommandMap,
   renderUserHelp,
@@ -111,16 +104,10 @@ async function main(): Promise<void> {
 
   const options: CliOptions = parsedCliArgs.args.options;
 
-  const runtimeBaseDir = resolveTargetProjectRoot(
-    launchCwd,
-    options.projectPath,
-  );
-  const gitContext = getWorkflowGitContext(runtimeBaseDir);
-  const workspaceRoot = gitContext.root ?? runtimeBaseDir;
-  const runtimeConfig = getRuntimeConfig(workspaceRoot);
+  const rootContext = createCliRootContext({ launchCwd, options });
 
   if (parsedCliArgs.args.doctorRequested) {
-    printCliDoctor(workspaceRoot, launchCwd);
+    printCliDoctor(rootContext.workspaceRoot, launchCwd);
     return;
   }
 
@@ -132,112 +119,38 @@ async function main(): Promise<void> {
     });
   let resolvedCredential: ProviderCredentialResolution;
 
-  const sessionManager = new SessionManager();
-  const renderer = new StreamingRenderer();
-  const recoveryCandidate = !options.sessionId
-    ? sessionManager.getSuggestedRecoverySession({
-        preferredProjectRoot: workspaceRoot,
-      })
-    : null;
-  const recoveryCandidateSummary = recoveryCandidate
-    ? sessionManager.describeSessionReentry(recoveryCandidate.id)
-    : null;
-  const recoveryBlockedNotice =
-    !options.sessionId && !recoveryCandidate
-      ? sessionManager.getRecoveryTrustBoundaryBlock({
-          preferredProjectRoot: workspaceRoot,
-        })
-      : null;
-  const bootstrap = (() => {
-    try {
-      return bootstrapShellRuntime({
-        cwd: workspaceRoot,
-        launchCwd,
-        runtimeConfig,
-        gitContext,
-        requestedWorkspaceRoot: runtimeBaseDir,
-        sessionManager,
-        renderer,
-        requestedSessionId: options.sessionId,
-        allowSessionRootMigration: options.migrateSessionRoot === true,
-        emitLifecycleMessages: false,
-      });
-    } catch (error) {
-      if (error instanceof SessionBootstrapError) {
-        if (error.rootBindingDiagnostics.length > 0) {
-          renderer.renderLine(
-            "Session bootstrap blocked by root binding diagnostics.",
-          );
-          renderRootBindingDiagnostics(renderer, error.rootBindingDiagnostics);
-        } else {
-          console.error(error.message);
-          console.error(error.recoveryHint);
-        }
-        process.exit(1);
-      }
-      throw error;
-    }
-  })();
-  const runtimeContext = bootstrap.context;
-  resolvedCredential = resolveCredentialSnapshot();
-  let mcpGateway = createCliMcpGateway(runtimeContext.cwd);
-
-  const stdinTransportMode = resolveStdinTransportMode({
-    stdinIsTty: Boolean(process.stdin.isTTY),
-    printMode: Boolean(options.printMode),
-    hasReplayFile: Boolean(options.replayFile),
-    hasPromptArg: Boolean(options.promptArg?.trim()),
-  });
-  const pipedInput =
-    stdinTransportMode === "capture-batch" ? await readStdinToEnd() : null;
-  const nonInteractivePrompts = buildNonInteractivePrompts(
-    options.promptArg,
-    pipedInput,
-  );
-  const cliModePlan = resolveCliMode({
-    options,
-    stdinTransportMode,
-    nonInteractivePromptCount: nonInteractivePrompts.length,
-  });
-  const startupPlan = projectCliStartupPlan({
-    options,
-    cliModePlan,
-    stdinTransportMode,
-    nonInteractivePromptCount: nonInteractivePrompts.length,
+  const bootstrapRuntime = createCliBootstrapRuntimeContext({
     launchCwd,
-    runtimeBaseDir,
-    workspaceRoot,
-    projectRoot: runtimeContext.projectRoot,
-    rootMode: runtimeContext.rootMode,
+    options,
+    rootContext,
+    writeError: console.error,
+    exit: process.exit,
+  });
+  const {
+    sessionManager,
+    renderer,
+    recoveryCandidate,
+    runtimeContext,
+  } = bootstrapRuntime;
+  resolvedCredential = resolveCredentialSnapshot();
+  let mcpGateway = bootstrapRuntime.mcpGateway;
+
+  const stdinPromptCapture = await captureCliStdinPrompts({
+    options,
+    stdin: process.stdin,
+  });
+  projectAndRenderCliStartupSurface({
+    options,
+    cliModePlan: stdinPromptCapture.cliModePlan,
+    stdinTransportMode: stdinPromptCapture.stdinTransportMode,
+    nonInteractivePromptCount:
+      stdinPromptCapture.nonInteractivePrompts.length,
+    launchCwd,
+    bootstrapRuntime,
     providerCredentialResolution: resolvedCredential,
     providerModeEnv: process.env.PRIVATE_AGENTS_PROVIDER_MODE,
-    maxTurns: runtimeContext.runtimeConfig.maxTurns,
   });
-  const showStartupSurface =
-    !options.printMode &&
-    !options.replayFile &&
-    nonInteractivePrompts.length === 0 &&
-    stdinTransportMode !== "capture-batch";
-
-  if (showStartupSurface) {
-    renderStartupSurface(renderer, {
-      runtimeContext,
-      sessionManager,
-      lifecycleNotices: bootstrap.lifecycleNotices,
-      recoveryCandidate,
-      recoveryCandidateSummary: recoveryCandidateSummary ?? undefined,
-      recoveryBlockedNotice: recoveryBlockedNotice ?? undefined,
-      provider: startupPlan.provider.provider,
-      model: startupPlan.provider.model,
-      maxTurns: startupPlan.maxTurns,
-      executionPath: isRustDaemonEnabled() ? "rust-daemon" : "ts-local",
-      stdinTransportMode: startupPlan.stdinTransportMode,
-    });
-  }
-  logger.info("CLI session initialized", {
-    sessionId: runtimeContext.session.id,
-    phases: bootstrap.phases.join(" -> "),
-  });
+  logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
 
   let rl: readline.Interface | null = null;
   let interactiveTurnNumber = 0;
@@ -323,95 +236,21 @@ async function main(): Promise<void> {
     },
   });
 
-  if (cliModePlan.kind === "replay") {
-    await runReplayPromptScript({
-      replayFile: cliModePlan.replayFile,
-      sessionManager,
-      runtimeContext,
-      renderer,
-      sessionRuntime,
-      logger,
-      printMode: Boolean(options.printMode),
-      fallbackSessionId: recoveryCandidate?.id,
-      lifecycleNotices: bootstrap.lifecycleNotices,
-      setActiveNonInteractiveApprovalMode: (mode) => {
-        activeNonInteractiveApprovalMode = mode;
-      },
-      nonInteractiveCliApprovalMode: options.nonInteractiveApproval,
-    });
-    return;
-  }
-
-  if (cliModePlan.kind === "stdin-stream") {
-    await runCliStdinMode({
-      mode: "stream-live",
-      runStream: () =>
-        runNonTtyPromptStream({
-          sessionManager,
-          runtimeContext,
-          renderer,
-          sessionRuntime,
-          logger,
-          fallbackSessionId: recoveryCandidate?.id,
-          lifecycleNotices: bootstrap.lifecycleNotices,
-          setActiveNonInteractiveApprovalMode: (mode) => {
-            activeNonInteractiveApprovalMode = mode;
-          },
-          nonInteractiveCliApprovalMode: options.nonInteractiveApproval,
-        }),
-    });
-    return;
-  }
-
-  if (cliModePlan.kind === "print") {
-    await runCliPrintMode({
-      prompts: nonInteractivePrompts,
-      writeError: console.error,
-      exit: process.exit,
-      runPrompt: (prompt) =>
-        runNonInteractivePrompt({
-          prompt,
-          sessionManager,
-          runtimeContext,
-          renderer,
-          sessionRuntime,
-          logger,
-          printMode: true,
-          fallbackSessionId: recoveryCandidate?.id,
-          lifecycleNotices: bootstrap.lifecycleNotices,
-          setActiveNonInteractiveApprovalMode: (mode) => {
-            activeNonInteractiveApprovalMode = mode;
-          },
-          nonInteractiveCliApprovalMode: options.nonInteractiveApproval,
-        }),
-    });
-    return;
-  }
-
-  if (cliModePlan.kind === "stdin-batch") {
-    await runCliStdinMode({
-      mode: "batch",
-      prompts: nonInteractivePrompts,
-      pipedInput,
-      sessionId: runtimeContext.session.id,
-      renderLine: (line) => renderer.renderLine(line),
-      runPrompt: (prompt) =>
-        runNonInteractivePrompt({
-          prompt,
-          sessionManager,
-          runtimeContext,
-          renderer,
-          sessionRuntime,
-          logger,
-          printMode: false,
-          fallbackSessionId: recoveryCandidate?.id,
-          lifecycleNotices: bootstrap.lifecycleNotices,
-          setActiveNonInteractiveApprovalMode: (mode) => {
-            activeNonInteractiveApprovalMode = mode;
-          },
-          nonInteractiveCliApprovalMode: options.nonInteractiveApproval,
-        }),
-    });
+  const handledPrintMode = await runCliPrintModeRouter({
+    cliModePlan: stdinPromptCapture.cliModePlan,
+    options,
+    nonInteractivePrompts: stdinPromptCapture.nonInteractivePrompts,
+    pipedInput: stdinPromptCapture.pipedInput,
+    bootstrapRuntime,
+    sessionRuntime,
+    logger,
+    writeError: console.error,
+    exit: process.exit,
+    setActiveNonInteractiveApprovalMode: (mode) => {
+      activeNonInteractiveApprovalMode = mode;
+    },
+  });
+  if (handledPrintMode) {
     return;
   }
 
@@ -728,28 +567,6 @@ async function main(): Promise<void> {
   }
 
   rl.prompt();
-}
-
-async function readStdinToEnd(): Promise<string | null> {
-  try {
-    let content = "";
-    process.stdin.setEncoding("utf8");
-    for await (const chunk of process.stdin) {
-      content += chunk;
-    }
-    return content.length > 0 ? content : "";
-  } catch {
-    return "";
-  }
-}
-
-function renderProjectedLines(
-  renderer: { renderLine(line: string): void },
-  lines: readonly string[],
-): void {
-  for (const line of lines) {
-    renderer.renderLine(line);
-  }
 }
 
 main().catch((error) => {

@@ -1,0 +1,41 @@
+import type { StructuredLogger } from "../../observability/index.js";
+import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
+import type {
+  CliBootstrapRuntimeContext,
+} from "../bootstrap/cliBootstrapContext.js";
+import type { ApprovalModeObject } from "../../entrypoints/cliApprovalModule.js";
+import type { CliOptions } from "../../entrypoints/cliArgs.js";
+import {
+  runReplayPromptScript,
+} from "../../entrypoints/cliRuntimeModule.js";
+
+export interface RunCliReplayModeInput {
+  readonly replayFile: string;
+  readonly bootstrapRuntime: CliBootstrapRuntimeContext;
+  readonly sessionRuntime: ShellSessionRuntime;
+  readonly logger: StructuredLogger;
+  readonly printMode: boolean;
+  readonly setActiveNonInteractiveApprovalMode: (
+    mode: ApprovalModeObject | undefined,
+  ) => void;
+  readonly nonInteractiveCliApprovalMode: CliOptions["nonInteractiveApproval"];
+}
+
+export async function runCliReplayMode(
+  input: RunCliReplayModeInput,
+): Promise<void> {
+  await runReplayPromptScript({
+    replayFile: input.replayFile,
+    sessionManager: input.bootstrapRuntime.sessionManager,
+    runtimeContext: input.bootstrapRuntime.runtimeContext,
+    renderer: input.bootstrapRuntime.renderer,
+    sessionRuntime: input.sessionRuntime,
+    logger: input.logger,
+    printMode: input.printMode,
+    fallbackSessionId: input.bootstrapRuntime.recoveryCandidate?.id,
+    lifecycleNotices: input.bootstrapRuntime.bootstrap.lifecycleNotices,
+    setActiveNonInteractiveApprovalMode:
+      input.setActiveNonInteractiveApprovalMode,
+    nonInteractiveCliApprovalMode: input.nonInteractiveCliApprovalMode,
+  });
+}
