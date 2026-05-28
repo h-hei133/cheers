@@ -1,7 +1,10 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { buildWorkflowTaskPlan } from "./workflowTaskPlan.js";
+import {
+  buildWorkflowTaskPlan,
+  extractInlineContinuityContext,
+} from "./workflowTaskPlan.js";
 
 describe("workflowTaskPlan", () => {
   it("keeps non-allowlisted command intent blocked at planning time", () => {
@@ -27,5 +30,19 @@ describe("workflowTaskPlan", () => {
     expect(plan.taskKind).toBe("read-file");
     expect(plan.targetPath).toBe("package.json");
     expect(plan.verifyAfterEdit).toBe(false);
+  });
+
+  it("keeps inline continuity parser available through the planning facade", () => {
+    const parsed = extractInlineContinuityContext(
+      [
+        "continue",
+        "[FOLLOW-UP CONTINUITY CONTEXT]",
+        "recent-target-files: src/a.ts",
+        "[END CONTINUITY CONTEXT]",
+      ].join("\n"),
+    );
+
+    expect(parsed.cleanPrompt).toBe("continue");
+    expect(parsed.inlineState.recentTargetFiles).toEqual(["src/a.ts"]);
   });
 });

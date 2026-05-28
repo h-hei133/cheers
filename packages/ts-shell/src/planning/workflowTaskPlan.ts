@@ -1,32 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
-import { rebindPathLikeToWorkspace } from "../core/paths/legacyRootRebase.js";
 import {
   computeFragmentFingerprint,
   computeFragmentFingerprintFromIndexes,
   extractLastReadDeliveredFragmentFromContinuity,
   extractLastReadWindowFromContinuity,
   hasLocalSliceExplainCue,
-  normalizeReadFragmentLineIndexes,
   resolveReadWindowDirectiveForWorkflow,
   type ReadWindowDirective,
 } from "../context/readWindowContinuation.js";
 import { parseContinuationTransformEvidence } from "../evidence/continuationTransformEvidence.js";
-import {
-  derivePromptPathTarget,
-  hasExplicitExecutionIntent,
-  hasPathLikeReference,
-  stripPathTokensForIntent,
-} from "./promptTargetProjection.js";
-import {
-  detectVerifyCommand,
-  hasExternalVerifyOptOut,
-} from "../policy/commandIntentPolicy.js";
+import { hasPathLikeReference } from "./promptTargetProjection.js";
 import {
   extractFencedContent,
   extractInlineWriteContent,
   extractLowRiskRenameRefactor,
-  extractReplaceDirective,
   resolveMutationInstruction,
 } from "../edit/mutationInstructionPlanner.js";
 import { selectMutationTargetFromPrompt } from "../edit/mutationTargetSelection.js";
@@ -34,7 +22,6 @@ import {
   detectGroundedDeliverableMode,
   inferGroundedDeliverableModeFromContinuity,
   normalizeGroundedRepairInstruction,
-  parseGroundedRepairConstraints,
 } from "../repair/groundedAnswerRepair.js";
 import { detectWorkflowBrowserPlan } from "../orchestration/browserModule.js";
 import {
@@ -64,14 +51,12 @@ import {
 } from "../orchestration/doNextProjection.js";
 import { projectProviderDiagnosticHandoff } from "../orchestration/providerModule.js";
 import {
-  classifyReadInspectRequest,
   inferRepoDiagnosis,
   isPathOnlyReadRequest,
   projectReadMissingTargetStop,
   projectReadOutOfWorkspaceTargetStop,
   recoverReadContinuationTarget,
 } from "../orchestration/readInspectModule.js";
-import { stripVerificationTailForTarget } from "../orchestration/verificationModule.js";
 import {
   classifyEditExpectationContract,
   isWriteExpectationPrompt,
@@ -84,63 +69,36 @@ import {
   type ContinuityStateLike,
   type GroundedDeliverableMode,
 } from "../orchestration/runtimeHandoffProjection.js";
-import { resolveTaskTargets } from "../orchestration/targetResolution.js";
-import type { TargetResolutionBlocker } from "../orchestration/targetResolution.js";
 import {
   buildWorkflowDecisionTrace,
   type ContinuationTransform,
   type GroundedDeliverableConstraints,
   type GroundedRepairInstruction,
   type GroundedRepairStage,
-  type ReflectiveStateQueryKind,
   type SingleFileEditFailureReason,
   type SingleFileEditRepairPayloadKind,
   type WorkflowTaskPlan,
 } from "../orchestration/workflowTaskPlanner.js";
-import { projectWorkflowIntent } from "../orchestration/workflowIntentProjection.js";
+import {
+  extractWorkflowTaskIntentSignals,
+  isAmbiguousGroundedRepairFollowUp,
+  isPostEditReadOnlyVerifyFollowUp,
+  isTemporalSuccessorCuePrompt,
+  isUltraWeakContinuationFollowUpPrompt,
+  isWeakSeedTargetCarryoverPrompt,
+} from "./workflowIntentSignals.js";
+import {
+  resolveWorkflowTargetPlanning,
+  shouldBlockMutationForTargetResolution,
+} from "./workflowTargetPlanning.js";
+import {
+  isUsableContinuationTargetPath,
+  rebindContinuationTargetToWorkspace,
+} from "../session/continuationTargetRebase.js";
+import { deriveWorkflowTurnContinuationFacts } from "../session/turnContinuationFacts.js";
 
-interface WorkflowTaskIntentSignals {
-  readonly normalized: string;
-  readonly intentPrompt: string;
-  readonly groundedIntentPrompt: string;
-  readonly hasContextSeedPrefix: boolean;
-  readonly hasExplicitBoundaryResetPrompt: boolean;
-  readonly hasFileReadIntent: boolean;
-  readonly hasTargetedFileReadIntent: boolean;
-  readonly hasRepositoryInspectIntent: boolean;
-  readonly hasSummarizeIntent: boolean;
-  readonly hasExplainIntent: boolean;
-  readonly hasReflectiveExplainStateQuestion: boolean;
-  readonly hasReflectiveExplainContinuation: boolean;
-  readonly hasReflectiveExplainQuery: boolean;
-  readonly detectedReflectiveStateQueryKind?: ReflectiveStateQueryKind;
-  readonly reflectiveStateQueryKind?: ReflectiveStateQueryKind;
-  readonly hasReflectiveActionCue: boolean;
-  readonly hasPriorLocalExplainEvidence: boolean;
-  readonly hasRecoverableReadFragmentEvidence: boolean;
-  readonly hasLocalExplainCue: boolean;
-  readonly hasGroundedReadLikeIntent: boolean;
-  readonly hasGroundedConstraintCue: boolean;
-  readonly hasCreateIntent: boolean;
-  readonly hasEditIntentRaw: boolean;
-  readonly hasEditIntent: boolean;
-  readonly hasVerifyIntent: boolean;
-  readonly hasCorrectionCue: boolean;
-  readonly hasExecutionCorrectionCue: boolean;
-  readonly hasAnswerRepairCue: boolean;
-  readonly isAmbiguousRepairFollowUp: boolean;
-  readonly hasDiagnosisIntent: boolean;
-  readonly hasWeakRepairFollowUp: boolean;
-  readonly avoidPreviousDirection: boolean;
-  readonly hasCrossFileCue: boolean;
-  readonly hasVerifyContinuationCue: boolean;
-  readonly verifyCommand?: string;
-  readonly preferTestOverBuild: boolean;
-  readonly effectiveVerifyCommand?: string;
-  readonly effectiveReplaceDirectiveFromPrompt?: { from: string; to: string };
-  readonly hasExecutionIntent: boolean;
-  readonly unsupportedCommand?: string;
-}
+export { extractInlineContinuityContext } from "../session/inlineContinuityContext.js";
+export { rebindContinuationTargetToWorkspace } from "../session/continuationTargetRebase.js";
 
 export function buildWorkflowTaskPlan(
   prompt: string,
@@ -195,19 +153,16 @@ export function buildWorkflowTaskPlan(
     hasExecutionIntent,
     unsupportedCommand,
   } = extractWorkflowTaskIntentSignals(prompt, continuity);
-  let targetResolution = resolveTaskTargets(prompt, workspaceRoot);
-  if (targetResolution.blocker && hasVerifyIntent) {
-    const mutationTargetPrompt = stripVerificationTailForTarget(prompt);
-    if (mutationTargetPrompt && mutationTargetPrompt !== prompt.trim()) {
-      const mutationTargetResolution = resolveTaskTargets(
-        mutationTargetPrompt,
-        workspaceRoot,
-      );
-      if (!mutationTargetResolution.blocker && mutationTargetResolution.primaryTarget) {
-        targetResolution = mutationTargetResolution;
-      }
-    }
-  }
+  const {
+    targetResolution,
+    promptPathTarget,
+    explicitPrimaryTarget,
+    hasExplicitPathReference,
+  } = resolveWorkflowTargetPlanning({
+    prompt,
+    workspaceRoot,
+    hasVerifyIntent,
+  });
   const browserPlan = detectWorkflowBrowserPlan({
     prompt,
     continuityState: continuity,
@@ -249,27 +204,32 @@ export function buildWorkflowTaskPlan(
     continuity,
     workspaceRoot,
   });
-  const promptPathTarget = derivePromptPathTarget(prompt, workspaceRoot);
-  const explicitPrimaryTarget = targetResolution.primaryTarget;
-  const hasExplicitPathReference =
-    Boolean(promptPathTarget || explicitPrimaryTarget) ||
-    targetResolution.targets.length > 0 ||
-    hasPathLikeReference(prompt);
   const hasImplicitPathOnlyReadIntent =
     !hasFileReadIntent &&
     !hasSummarizeIntent &&
     !hasExplainIntent &&
     hasExplicitPathReference &&
     isPathOnlyReadRequest(prompt);
-  const seedActionKind = continuity.lastActionResultSeed?.actionKind;
-  const hasActionResultSeed = Boolean(continuity.lastActionResultSeed);
+  const diagnosticHandoffProjection = projectProviderDiagnosticHandoff(continuity);
+  const diagnosticHandoffEvidence =
+    diagnosticHandoffProjection.diagnosticHandoff;
+  const {
+    seedActionKind,
+    hasActionResultSeed,
+    seedWasReadLike,
+    lastTaskWasReadLike,
+    lastTaskWasMutationLike,
+    seedVerificationStatus,
+    diagnosticVerifyStatus,
+    diagnosticHasVerifySignal,
+  } = deriveWorkflowTurnContinuationFacts({
+    continuity,
+    diagnosticHandoffEvidence,
+  });
   const seedIgnoredExplicitTargetLineage =
     hasActionResultSeed && hasExplicitPathReference
       ? ["seedInfluence=ignored-explicit-target"]
       : undefined;
-  const diagnosticHandoffProjection = projectProviderDiagnosticHandoff(continuity);
-  const diagnosticHandoffEvidence =
-    diagnosticHandoffProjection.diagnosticHandoff;
   const hasDiagnosticVerifyHandoffCue =
     Boolean(diagnosticHandoffEvidence?.command) &&
     hasVerifyIntent &&
@@ -293,20 +253,6 @@ export function buildWorkflowTaskPlan(
     ignoredExplicitTargetLineage.length > 0
       ? ignoredExplicitTargetLineage
       : undefined;
-  const seedWasReadLike =
-    seedActionKind === "read-file" ||
-    seedActionKind === "repo-explain" ||
-    seedActionKind === "inspect-files";
-  const lastTaskWasReadLike =
-    continuity.lastTaskKind === "read-file" ||
-    continuity.lastTaskKind === "repo-explain" ||
-    continuity.lastTaskKind === "inspect-files" ||
-    seedWasReadLike;
-  const lastTaskWasMutationLike =
-    continuity.lastTaskKind === "edit-file" ||
-    continuity.lastTaskKind === "write-file" ||
-    continuity.lastMutationVerificationLineage?.actionKind === "edit-file" ||
-    continuity.lastMutationVerificationLineage?.actionKind === "write-file";
   const hasPostEditReadOnlyVerifyPrompt =
     isPostEditReadOnlyVerifyFollowUp(prompt);
   const hasWeakSeedTargetCarryoverCue =
@@ -328,19 +274,10 @@ export function buildWorkflowTaskPlan(
     !hasExecutionIntent &&
     !effectiveReplaceDirectiveFromPrompt &&
     !extractFencedContent(prompt);
-  const seedVerificationStatus =
-    continuity.lastActionResultSeed?.verification?.status?.trim().toLowerCase();
   const seedVerifySignalLineage =
     seedVerificationStatus && seedVerificationStatus !== "not-requested"
       ? ["seedInfluence=verify-signal"]
       : undefined;
-  const diagnosticVerifyStatus =
-    diagnosticHandoffEvidence?.status?.trim().toLowerCase();
-  const diagnosticHasVerifySignal = Boolean(
-    diagnosticHandoffEvidence?.command &&
-      diagnosticVerifyStatus &&
-      diagnosticVerifyStatus !== "not-requested",
-  );
   const verifyContinuationLineage = [
     ...(seedVerifySignalLineage ?? []),
     ...(diagnosticHandoffLineage ?? []),
@@ -2019,681 +1956,6 @@ function shouldBuildContextPlanningSurface(prompt: string): boolean {
   );
 }
 
-function removeNegatedMutationInstructions(prompt: string): string {
-  return prompt
-    .replace(
-      /\b(?:do\s+not|don't|dont|never)\s+(?:edit|modify|change|touch|update|write|replace|fix)\b[^.!?\n]*(?:[.!?]|$)/gi,
-      " ",
-    )
-    .replace(
-      /\bno\s+(?:edits?|modifications?|changes?|writes?|replacements?|fixes?)\b[^.!?\n]*(?:[.!?]|$)/gi,
-      " ",
-    );
-}
-
-function extractWorkflowTaskIntentSignals(
-  prompt: string,
-  continuity: ContinuityStateLike,
-): WorkflowTaskIntentSignals {
-  const normalized = prompt.toLowerCase();
-  const intentPrompt = stripPathTokensForIntent(prompt);
-  const groundedIntentPrompt = intentPrompt.length > 0 ? intentPrompt : prompt;
-  const hasContextSeedPrefix =
-    /^\s*(?:previous|prior|last)\s+task\s+context\s*:/i.test(prompt);
-  const hasExplicitBoundaryResetPrompt =
-    /\b(?:do\s+not|don't|not)\s+continue\s+(?:the\s+)?old\s+edit\b/i.test(
-      prompt,
-    ) || /\bboundary\s+reset\b/i.test(prompt);
-  const readInspectIntent = classifyReadInspectRequest(groundedIntentPrompt);
-  const hasFileReadIntent = readInspectIntent.hasFileReadIntent;
-  const hasTargetedFileReadIntent =
-    readInspectIntent.hasTargetedFileReadIntent;
-  const hasRepositoryInspectIntent =
-    readInspectIntent.hasRepositoryInspectIntent;
-  const hasSummarizeIntent =
-    /(?:summari[sz]e|summary|\u603b\u7ed3|\u6458\u8981|\u6982\u8ff0)/i.test(
-      groundedIntentPrompt,
-    );
-  const hasExplainIntent =
-    /(?:\bexplain\b|what .* does|\u89e3\u91ca|\u5728\u505a\u4ec0\u4e48)/i.test(
-      groundedIntentPrompt,
-    );
-  const workflowIntentProjection = projectWorkflowIntent(
-    groundedIntentPrompt,
-    continuity,
-  );
-  const hasReflectiveExplainStateQuestion =
-    workflowIntentProjection.hasReflectiveExplainStateQuestion;
-  const hasReflectiveExplainContinuation =
-    isReflectiveExplainContinuationPrompt(groundedIntentPrompt);
-  const hasReflectiveExplainQuery =
-    hasReflectiveExplainStateQuestion || hasReflectiveExplainContinuation;
-  const detectedReflectiveStateQueryKind =
-    workflowIntentProjection.detectedReflectiveStateQueryKind;
-  const reflectiveStateQueryKind =
-    workflowIntentProjection.reflectiveStateQueryKind;
-  const hasReflectiveActionCue =
-    workflowIntentProjection.hasReflectiveActionCue;
-  const hasPriorLocalExplainEvidence =
-    hasWorkflowLocalExplainEvidence(continuity);
-  const hasRecoverableReadFragmentEvidence =
-    hasWorkflowReadFragmentEvidence(continuity);
-  const hasLocalExplainCue =
-    hasExplainIntent &&
-    (hasLocalSliceExplainCue(groundedIntentPrompt) ||
-      (hasReflectiveExplainContinuation &&
-        (hasPriorLocalExplainEvidence || hasRecoverableReadFragmentEvidence)));
-  const hasGroundedReadLikeIntent =
-    hasFileReadIntent || hasSummarizeIntent || hasExplainIntent;
-  const hasGroundedConstraintCue =
-    parseGroundedRepairConstraints(groundedIntentPrompt) !== undefined;
-  const hasCreateIntent =
-    /(?:create|new file|\u65b0\u589e|\u521b\u5efa|\u65b0\u5efa|\u5199\u4e00\u4e2a)/i.test(
-      intentPrompt,
-    );
-  const mutationIntentPrompt = removeNegatedMutationInstructions(intentPrompt);
-  const hasEditIntentRaw =
-    /(?:\bedit\b|modify|update|fix|change|repair|replace|swap|\badd\b|\binsert\b|\bappend\b|continue fixing|continue repairing|\u4fee\u6539|\u4fee\u590d|\u6539\u4e00\u4e0b|\u6539\u6210|\u6539\u4e3a|\u66ff\u6362|\u66ff\u6362\u4e3a|\u7ee7\u7eed\u4fee)/i.test(
-      mutationIntentPrompt,
-    );
-  const hasEditIntent =
-    hasEditIntentRaw &&
-    !hasContextSeedPrefix &&
-    !hasExplicitBoundaryResetPrompt;
-  const hasVerifyIntent =
-    /(?:verify|test|build|lint|check|\u9a8c\u8bc1|\u6d4b\u8bd5|\u6784\u5efa|\u7f16\u8bd1|\u68c0\u67e5)/i.test(
-      intentPrompt,
-    );
-  const hasCorrectionCue = isCorrectionFollowUpPrompt(prompt);
-  const hasExecutionCorrectionCue = isExecutionCorrectionFollowUpPrompt(prompt);
-  const hasAnswerRepairCue = isAnswerRepairFollowUpPrompt(prompt);
-  const isAmbiguousRepairFollowUp = isAmbiguousGroundedRepairFollowUp(prompt);
-  const hasDiagnosisIntent =
-    /(?:why|how|where|which file|implemented|\u4e3a\u4ec0\u4e48|\u600e\u4e48|\u5728\u54ea|\u54ea\u4e2a\u6587\u4ef6|\u5b9e\u73b0)/i.test(
-      groundedIntentPrompt,
-    );
-  const hasWeakRepairFollowUp = isWeakRepairFollowUpPrompt(prompt);
-  const avoidPreviousDirection = isAvoidPreviousDirectionPrompt(prompt);
-  const hasCrossFileCue = isCrossFileRepairFollowUpPrompt(prompt);
-  const hasVerifyContinuationCue = isVerifyContinuationFollowUpPrompt(prompt);
-  const verifyCommand = hasExternalVerifyOptOut(prompt)
-    ? undefined
-    : detectVerifyCommand(normalized);
-  const preferTestOverBuild = prefersTestOverBuildInFollowUp(prompt);
-  const effectiveVerifyCommand =
-    preferTestOverBuild && hasVerifyIntent
-      ? "npm test -- --help"
-      : verifyCommand;
-  const effectiveReplaceDirectiveFromPrompt = extractReplaceDirective(prompt);
-  const hasExecutionIntent = hasExplicitExecutionIntent(prompt, normalized);
-  const unsupportedCommand = detectUnsupportedCommandIntent(normalized);
-
-  return {
-    normalized,
-    intentPrompt,
-    groundedIntentPrompt,
-    hasContextSeedPrefix,
-    hasExplicitBoundaryResetPrompt,
-    hasFileReadIntent,
-    hasTargetedFileReadIntent,
-    hasRepositoryInspectIntent,
-    hasSummarizeIntent,
-    hasExplainIntent,
-    hasReflectiveExplainStateQuestion,
-    hasReflectiveExplainContinuation,
-    hasReflectiveExplainQuery,
-    detectedReflectiveStateQueryKind,
-    reflectiveStateQueryKind,
-    hasReflectiveActionCue,
-    hasPriorLocalExplainEvidence,
-    hasRecoverableReadFragmentEvidence,
-    hasLocalExplainCue,
-    hasGroundedReadLikeIntent,
-    hasGroundedConstraintCue,
-    hasCreateIntent,
-    hasEditIntentRaw,
-    hasEditIntent,
-    hasVerifyIntent,
-    hasCorrectionCue,
-    hasExecutionCorrectionCue,
-    hasAnswerRepairCue,
-    isAmbiguousRepairFollowUp,
-    hasDiagnosisIntent,
-    hasWeakRepairFollowUp,
-    avoidPreviousDirection,
-    hasCrossFileCue,
-    hasVerifyContinuationCue,
-    verifyCommand,
-    preferTestOverBuild,
-    effectiveVerifyCommand,
-    effectiveReplaceDirectiveFromPrompt,
-    hasExecutionIntent,
-    unsupportedCommand,
-  };
-}
-
-export function extractInlineContinuityContext(prompt: string): {
-  cleanPrompt: string;
-  inlineState: ContinuityStateLike;
-} {
-  const match = prompt.match(
-    /\[FOLLOW-UP CONTINUITY CONTEXT\]([\s\S]*?)\[END CONTINUITY CONTEXT\]/i,
-  );
-  if (!match) {
-    return {
-      cleanPrompt: prompt,
-      inlineState: {},
-    };
-  }
-
-  const block = match[1] ?? "";
-  const inlineState: ContinuityStateLike = {};
-  const targetMatch = block.match(/recent-target-files:\s*(.+)/i);
-  if (targetMatch?.[1]) {
-    inlineState.recentTargetFiles = targetMatch[1]
-      .split(",")
-      .map((entry) => normalizePathLike(entry.trim()))
-      .filter((entry) => entry.length > 0);
-  }
-  const failedMatch = block.match(/recent-failed-files:\s*(.+)/i);
-  if (failedMatch?.[1]) {
-    inlineState.recentFailedFiles = failedMatch[1]
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0)
-      .map((entry) => ({
-        path: normalizePathLike((entry.split("(")[0] ?? entry).trim()),
-        reason: entry,
-      }));
-  }
-  const evidenceMatch = block.match(/last-continuation-evidence:\s*(.+)/i);
-  if (evidenceMatch?.[1]) {
-    inlineState.lastContinuationEvidence = evidenceMatch[1]
-      .split("|")
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
-  }
-  const deliverableModeMatch = block.match(
-    /last-grounded-deliverable-mode:\s*(.+)/i,
-  );
-  if (deliverableModeMatch?.[1]) {
-    const mode = deliverableModeMatch[1].trim().toLowerCase();
-    if (mode === "read" || mode === "summary" || mode === "explain") {
-      inlineState.lastGroundedDeliverableMode = mode;
-    }
-  }
-  const deliveredLinesMatch = block.match(
-    /last-read-delivered-lines:\s*(\d+)/i,
-  );
-  if (deliveredLinesMatch?.[1]) {
-    const parsed = Number.parseInt(deliveredLinesMatch[1], 10);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      inlineState.lastReadDeliveredLines = parsed;
-    }
-  }
-  const readWindowStartMatch = block.match(/last-read-window-start:\s*(\d+)/i);
-  if (readWindowStartMatch?.[1]) {
-    const parsed = Number.parseInt(readWindowStartMatch[1], 10);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      inlineState.lastReadWindowStart = parsed;
-    }
-  }
-  const readWindowEndMatch = block.match(/last-read-window-end:\s*(\d+)/i);
-  if (readWindowEndMatch?.[1]) {
-    const parsed = Number.parseInt(readWindowEndMatch[1], 10);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      inlineState.lastReadWindowEnd = parsed;
-    }
-  }
-  const readWindowSizeMatch = block.match(/last-read-window-size:\s*(\d+)/i);
-  if (readWindowSizeMatch?.[1]) {
-    const parsed = Number.parseInt(readWindowSizeMatch[1], 10);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      inlineState.lastReadWindowSize = parsed;
-    }
-  }
-  const readFragmentStartMatch = block.match(
-    /last-read-fragment-start:\s*(\d+)/i,
-  );
-  if (readFragmentStartMatch?.[1]) {
-    const parsed = Number.parseInt(readFragmentStartMatch[1], 10);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      inlineState.lastReadFragmentStart = parsed;
-    }
-  }
-  const readFragmentEndMatch = block.match(/last-read-fragment-end:\s*(\d+)/i);
-  if (readFragmentEndMatch?.[1]) {
-    const parsed = Number.parseInt(readFragmentEndMatch[1], 10);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      inlineState.lastReadFragmentEnd = parsed;
-    }
-  }
-  const readFragmentIndexesMatch = block.match(
-    /last-read-fragment-line-indexes:\s*([0-9,\s]+)/i,
-  );
-  if (readFragmentIndexesMatch?.[1]) {
-    const parsed = normalizeReadFragmentLineIndexes(
-      readFragmentIndexesMatch[1]
-        .split(",")
-        .map((value) => Number.parseInt(value.trim(), 10)),
-    );
-    if (parsed.length > 0) {
-      inlineState.lastReadFragmentLineIndexes = parsed;
-    }
-  }
-  const readFragmentRangesMatch = block.match(
-    /last-read-fragment-ranges:\s*([0-9;,\s-]+)/i,
-  );
-  if (readFragmentRangesMatch?.[1]) {
-    const ranges = readFragmentRangesMatch[1]
-      .split(";")
-      .map((value) => value.trim())
-      .filter((value) => value.length > 0);
-    if (ranges.length > 0) {
-      inlineState.lastReadFragmentRanges = ranges;
-    }
-  }
-  const readFragmentSourceStartMatch = block.match(
-    /last-read-fragment-source-window-start:\s*(\d+)/i,
-  );
-  if (readFragmentSourceStartMatch?.[1]) {
-    const parsed = Number.parseInt(readFragmentSourceStartMatch[1], 10);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      inlineState.lastReadFragmentSourceWindowStart = parsed;
-    }
-  }
-  const readFragmentSourceEndMatch = block.match(
-    /last-read-fragment-source-window-end:\s*(\d+)/i,
-  );
-  if (readFragmentSourceEndMatch?.[1]) {
-    const parsed = Number.parseInt(readFragmentSourceEndMatch[1], 10);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      inlineState.lastReadFragmentSourceWindowEnd = parsed;
-    }
-  }
-  const readFilterMatch = block.match(
-    /last-read-filter:\s*(none|function-definitions)/i,
-  );
-  if (readFilterMatch?.[1]) {
-    inlineState.lastReadFilter = readFilterMatch[1].trim().toLowerCase() as
-      | "none"
-      | "function-definitions";
-  }
-  const readFragmentFingerprintMatch = block.match(
-    /last-read-fragment-fingerprint:\s*([0-9a-f]{64})/i,
-  );
-  if (readFragmentFingerprintMatch?.[1]) {
-    inlineState.lastReadFragmentFingerprint = readFragmentFingerprintMatch[1]
-      .trim()
-      .toLowerCase();
-  }
-  const stagedStepCountMatch = block.match(
-    /last-staged-repair-steps:\s*(\d+)/i,
-  );
-  if (stagedStepCountMatch?.[1]) {
-    const parsed = Number.parseInt(stagedStepCountMatch[1], 10);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      inlineState.lastStagedRepairStepCount = parsed;
-    }
-  }
-  const stagedCompletedStepMatch = block.match(
-    /last-staged-repair-completed-step:\s*(\d+)/i,
-  );
-  if (stagedCompletedStepMatch?.[1]) {
-    const parsed = Number.parseInt(stagedCompletedStepMatch[1], 10);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      inlineState.lastStagedRepairCompletedStep = parsed;
-    }
-  }
-  const stagedBlockedStepMatch = block.match(
-    /last-staged-repair-blocked-step:\s*(\d+)/i,
-  );
-  if (stagedBlockedStepMatch?.[1]) {
-    const parsed = Number.parseInt(stagedBlockedStepMatch[1], 10);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      inlineState.lastStagedRepairBlockedStep = parsed;
-    }
-  }
-  const stagedNextStepMatch = block.match(
-    /last-staged-repair-next-step:\s*(\d+)/i,
-  );
-  if (stagedNextStepMatch?.[1]) {
-    const parsed = Number.parseInt(stagedNextStepMatch[1], 10);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      inlineState.lastStagedRepairNextStep = parsed;
-    }
-  }
-  const answerDefectMatch = block.match(/last-answer-defect:\s*(.+)/i);
-  if (answerDefectMatch?.[1]) {
-    const defect = answerDefectMatch[1].trim();
-    if (defect.length > 0) {
-      inlineState.lastAnswerDefect = defect;
-    }
-  }
-  const lastFailureMatch = block.match(/last-failure:\s*(.+)/i);
-  if (lastFailureMatch?.[1]) {
-    const failure = lastFailureMatch[1].trim();
-    if (failure.length > 0) {
-      inlineState.lastFailure = failure;
-    }
-  }
-  const lastVerificationCommandMatch = block.match(
-    /last-verification-command:\s*(.+)/i,
-  );
-  if (lastVerificationCommandMatch?.[1]) {
-    const command = lastVerificationCommandMatch[1].trim();
-    if (command.length > 0) {
-      inlineState.lastVerificationCommand = command;
-    }
-  }
-  const lastVerificationReasonMatch = block.match(
-    /last-verification-reason:\s*(.+)/i,
-  );
-  if (lastVerificationReasonMatch?.[1]) {
-    const reason = lastVerificationReasonMatch[1].trim();
-    if (reason.length > 0) {
-      inlineState.lastVerificationReason = reason;
-    }
-  }
-  const lastVerificationBlockerKindMatch = block.match(
-    /last-verification-blocker-kind:\s*(.+)/i,
-  );
-  if (lastVerificationBlockerKindMatch?.[1]) {
-    const kind = lastVerificationBlockerKindMatch[1].trim();
-    if (kind.length > 0) {
-      inlineState.lastVerificationBlockerKind = kind;
-    }
-  }
-  const lastVerificationNextActionMatch = block.match(
-    /last-verification-next-action:\s*(.+)/i,
-  );
-  if (lastVerificationNextActionMatch?.[1]) {
-    const nextAction = lastVerificationNextActionMatch[1].trim();
-    if (nextAction.length > 0) {
-      inlineState.lastVerificationNextAction = nextAction;
-    }
-  }
-  const lastVerificationResumeEligibleMatch = block.match(
-    /last-verification-resume-eligible:\s*(.+)/i,
-  );
-  if (lastVerificationResumeEligibleMatch?.[1]) {
-    const normalized = lastVerificationResumeEligibleMatch[1]
-      .trim()
-      .toLowerCase();
-    if (["yes", "true", "1"].includes(normalized)) {
-      inlineState.lastVerificationResumeEligible = true;
-    } else if (["no", "false", "0"].includes(normalized)) {
-      inlineState.lastVerificationResumeEligible = false;
-    }
-  }
-  const lastApprovalDecisionMatch = block.match(
-    /last-approval-decision:\s*(.+)/i,
-  );
-  if (lastApprovalDecisionMatch?.[1]) {
-    const decision = lastApprovalDecisionMatch[1].trim().toLowerCase();
-    if (
-      decision === "deny" ||
-      decision === "allow-once" ||
-      decision === "allow-always"
-    ) {
-      inlineState.lastApprovalDecision = decision;
-    }
-  }
-  const lastApprovalDecisionSourceMatch = block.match(
-    /last-approval-decision-source:\s*(.+)/i,
-  );
-  if (lastApprovalDecisionSourceMatch?.[1]) {
-    const source = lastApprovalDecisionSourceMatch[1].trim();
-    if (source.length > 0) {
-      inlineState.lastApprovalDecisionSource = source;
-    }
-  }
-  const lastApprovalPersistentMatch = block.match(
-    /last-approval-persistent:\s*(.+)/i,
-  );
-  if (lastApprovalPersistentMatch?.[1]) {
-    const normalized = lastApprovalPersistentMatch[1].trim().toLowerCase();
-    if (["yes", "true", "1"].includes(normalized)) {
-      inlineState.lastApprovalPersistent = true;
-    } else if (["no", "false", "0"].includes(normalized)) {
-      inlineState.lastApprovalPersistent = false;
-    }
-  }
-  const lastApprovalCacheEffectMatch = block.match(
-    /last-approval-cache-effect:\s*(.+)/i,
-  );
-  if (lastApprovalCacheEffectMatch?.[1]) {
-    const cacheEffect = lastApprovalCacheEffectMatch[1].trim();
-    if (cacheEffect.length > 0) {
-      inlineState.lastApprovalCacheEffect = cacheEffect;
-    }
-  }
-  const lastApprovalProjectRootMatch = block.match(
-    /last-approval-project-root:\s*(.+)/i,
-  );
-  if (lastApprovalProjectRootMatch?.[1]) {
-    const approvalRoot = lastApprovalProjectRootMatch[1].trim();
-    if (approvalRoot.length > 0) {
-      inlineState.lastApprovalProjectRoot = approvalRoot;
-    }
-  }
-  const lastApprovalCacheKeyMatch = block.match(
-    /last-approval-cache-key:\s*(.+)/i,
-  );
-  if (lastApprovalCacheKeyMatch?.[1]) {
-    const cacheKey = lastApprovalCacheKeyMatch[1].trim();
-    if (cacheKey.length > 0) {
-      inlineState.lastApprovalCacheKey = cacheKey;
-    }
-  }
-  const lastApprovalScopeMatch = block.match(/last-approval-scope:\s*(.+)/i);
-  if (lastApprovalScopeMatch?.[1]) {
-    const scope = lastApprovalScopeMatch[1].trim();
-    if (scope.length > 0) {
-      inlineState.lastApprovalScope = scope;
-    }
-  }
-  const lastApprovalLineageMatch = block.match(
-    /last-approval-lineage:\s*(.+)/i,
-  );
-  if (lastApprovalLineageMatch?.[1]) {
-    const lineage = lastApprovalLineageMatch[1].trim();
-    if (lineage.length > 0) {
-      inlineState.lastApprovalLineage = lineage;
-    }
-  }
-  const lastApprovalChannelMatch = block.match(
-    /last-approval-channel:\s*(.+)/i,
-  );
-  if (lastApprovalChannelMatch?.[1]) {
-    const channel = lastApprovalChannelMatch[1].trim().toLowerCase();
-    if (channel === "interactive" || channel === "non-interactive") {
-      inlineState.lastApprovalChannel = channel;
-    }
-  }
-  const lastApprovalInputKeyMatch = block.match(
-    /last-approval-input-key:\s*(.+)/i,
-  );
-  if (lastApprovalInputKeyMatch?.[1]) {
-    const inputKey = lastApprovalInputKeyMatch[1].trim().toLowerCase();
-    if (
-      inputKey === "y" ||
-      inputKey === "a" ||
-      inputKey === "n" ||
-      inputKey === "other"
-    ) {
-      inlineState.lastApprovalInputKey = inputKey;
-    }
-  }
-  const lastApprovalStopReasonMatch = block.match(
-    /last-approval-stop-reason:\s*(.+)/i,
-  );
-  if (lastApprovalStopReasonMatch?.[1]) {
-    const stopReason = lastApprovalStopReasonMatch[1].trim();
-    if (stopReason.length > 0) {
-      inlineState.lastApprovalStopReason = stopReason;
-    }
-  }
-  const lastApprovalRecordedAtMatch = block.match(
-    /last-approval-recorded-at:\s*(.+)/i,
-  );
-  if (lastApprovalRecordedAtMatch?.[1]) {
-    const recordedAt = lastApprovalRecordedAtMatch[1].trim();
-    if (recordedAt.length > 0) {
-      inlineState.lastApprovalRecordedAt = recordedAt;
-    }
-  }
-  const lastPermissionRequestToolMatch = block.match(
-    /last-permission-request-tool:\s*(.+)/i,
-  );
-  if (lastPermissionRequestToolMatch?.[1]) {
-    const tool = lastPermissionRequestToolMatch[1].trim().toLowerCase();
-    if (tool.length > 0) {
-      inlineState.lastPermissionRequestToolName = tool;
-    }
-  }
-  const lastPermissionRequestOperationMatch = block.match(
-    /last-permission-request-operation:\s*(.+)/i,
-  );
-  if (lastPermissionRequestOperationMatch?.[1]) {
-    const operation = lastPermissionRequestOperationMatch[1]
-      .trim()
-      .toLowerCase();
-    if (operation.length > 0) {
-      inlineState.lastPermissionRequestOperation = operation;
-    }
-  }
-  const lastPermissionRequestTargetMatch = block.match(
-    /last-permission-request-target:\s*(.+)/i,
-  );
-  if (lastPermissionRequestTargetMatch?.[1]) {
-    const target = lastPermissionRequestTargetMatch[1].trim();
-    if (target.length > 0) {
-      inlineState.lastPermissionRequestTarget = target;
-    }
-  }
-  const lastPermissionRequestProcessMatch = block.match(
-    /last-permission-request-process:\s*(.+)/i,
-  );
-  if (lastPermissionRequestProcessMatch?.[1]) {
-    const process = lastPermissionRequestProcessMatch[1].trim().toLowerCase();
-    if (process.length > 0) {
-      inlineState.lastPermissionRequestProcess = process;
-    }
-  }
-  const lastPermissionRequestScopeKeyMatch = block.match(
-    /last-permission-request-scope-key:\s*(.+)/i,
-  );
-  if (lastPermissionRequestScopeKeyMatch?.[1]) {
-    const scopeKey = lastPermissionRequestScopeKeyMatch[1].trim().toLowerCase();
-    if (scopeKey.length > 0) {
-      inlineState.lastPermissionRequestScopeKey = scopeKey;
-    }
-  }
-  const lastPermissionRequestScopeLabelMatch = block.match(
-    /last-permission-request-scope-label:\s*(.+)/i,
-  );
-  if (lastPermissionRequestScopeLabelMatch?.[1]) {
-    const scopeLabel = lastPermissionRequestScopeLabelMatch[1].trim();
-    if (scopeLabel.length > 0) {
-      inlineState.lastPermissionRequestScopeLabel = scopeLabel;
-    }
-  }
-  const lastPermissionRequestCacheKeyMatch = block.match(
-    /last-permission-request-cache-key:\s*(.+)/i,
-  );
-  if (lastPermissionRequestCacheKeyMatch?.[1]) {
-    const cacheKey = lastPermissionRequestCacheKeyMatch[1].trim();
-    if (cacheKey.length > 0) {
-      inlineState.lastPermissionRequestCacheKey = cacheKey;
-    }
-  }
-  const lastPermissionRequestProjectRootMatch = block.match(
-    /last-permission-request-project-root:\s*(.+)/i,
-  );
-  if (lastPermissionRequestProjectRootMatch?.[1]) {
-    const root = lastPermissionRequestProjectRootMatch[1].trim();
-    if (root.length > 0) {
-      inlineState.lastPermissionRequestProjectRoot = root;
-    }
-  }
-  const lastPermissionRequestSourceMatch = block.match(
-    /last-permission-request-source:\s*(.+)/i,
-  );
-  if (lastPermissionRequestSourceMatch?.[1]) {
-    const source = lastPermissionRequestSourceMatch[1].trim().toLowerCase();
-    if (source === "verification-command" || source === "approval-request") {
-      inlineState.lastPermissionRequestSource = source;
-    }
-  }
-  const lastPermissionRequestLineageMatch = block.match(
-    /last-permission-request-lineage:\s*(.+)/i,
-  );
-  if (lastPermissionRequestLineageMatch?.[1]) {
-    const lineage = lastPermissionRequestLineageMatch[1].trim();
-    if (lineage.length > 0) {
-      inlineState.lastPermissionRequestLineage = lineage;
-    }
-  }
-  const lastRequestScopeCacheKeyMatch = block.match(
-    /last-request-scope-cache-key:\s*(.+)/i,
-  );
-  if (lastRequestScopeCacheKeyMatch?.[1]) {
-    const cacheKey = lastRequestScopeCacheKeyMatch[1].trim();
-    if (cacheKey.length > 0) {
-      inlineState.lastRequestScopeCacheKey = cacheKey;
-    }
-  }
-  const lastRequestScopeLabelMatch = block.match(
-    /last-request-scope-label:\s*(.+)/i,
-  );
-  if (lastRequestScopeLabelMatch?.[1]) {
-    const scope = lastRequestScopeLabelMatch[1].trim();
-    if (scope.length > 0) {
-      inlineState.lastRequestScopeLabel = scope;
-    }
-  }
-  const lastRequestScopeProjectRootMatch = block.match(
-    /last-request-scope-project-root:\s*(.+)/i,
-  );
-  if (lastRequestScopeProjectRootMatch?.[1]) {
-    const root = lastRequestScopeProjectRootMatch[1].trim();
-    if (root.length > 0) {
-      inlineState.lastRequestScopeProjectRoot = root;
-    }
-  }
-  const lastRequestScopeSourceMatch = block.match(
-    /last-request-scope-source:\s*(.+)/i,
-  );
-  if (lastRequestScopeSourceMatch?.[1]) {
-    const source = lastRequestScopeSourceMatch[1].trim().toLowerCase();
-    if (source === "verification-command" || source === "approval-request") {
-      inlineState.lastRequestScopeSource = source;
-    }
-  }
-  const lastRepairStatusMatch = block.match(/last-repair-status:\s*(.+)/i);
-  if (lastRepairStatusMatch?.[1]) {
-    const status = lastRepairStatusMatch[1].trim();
-    if (status.length > 0) {
-      inlineState.lastRepairStatus = status;
-    }
-  }
-  const lastContinuationStatusMatch = block.match(
-    /last-continuation-status:\s*(.+)/i,
-  );
-  if (lastContinuationStatusMatch?.[1]) {
-    const status = lastContinuationStatusMatch[1].trim();
-    if (status.length > 0) {
-      inlineState.lastContinuationStatus = status;
-    }
-  }
-
-  return {
-    cleanPrompt: prompt.replace(match[0], "").trim(),
-    inlineState,
-  };
-}
-
 function resolveSingleFileEditFailureRepairContext(
   continuity: ContinuityStateLike,
   workspaceRoot: string,
@@ -2840,33 +2102,6 @@ function resolveSingleFileEditRepairPayloadKind(input: {
     return "fenced-content";
   }
   return undefined;
-}
-
-export function rebindContinuationTargetToWorkspace(
-  candidatePath: string,
-  workspaceRoot: string,
-): string | undefined {
-  const normalizedCandidate = normalizePathLike(candidatePath ?? "");
-  if (!isUsableContinuationTargetPath(normalizedCandidate)) {
-    return undefined;
-  }
-  return rebindPathLikeToWorkspace(normalizedCandidate, workspaceRoot);
-}
-
-function isUsableContinuationTargetPath(candidate: string): boolean {
-  if (!candidate) {
-    return false;
-  }
-  const lowered = candidate.toLowerCase();
-  if (
-    lowered === "(missing-target)" ||
-    lowered === "(unknown)" ||
-    lowered === "(workspace)" ||
-    lowered.includes("(missing-target)")
-  ) {
-    return false;
-  }
-  return true;
 }
 
 function hasCrossFileEvidenceSignalInContinuity(
@@ -3290,166 +2525,6 @@ function resolveContinuationReopenTarget(input: {
 }
 
 
-function isCorrectionFollowUpPrompt(prompt: string): boolean {
-  return /(?:\u4e0d\u662f\u8fd9\u4e2a\u610f\u601d|\u6211\u8981\u7684\u662f|\u4e0d\u662f.*\u800c\u662f|\u4e0d\u662f\u8fd9\u4e48\u6539|\u4fdd\u7559.*\u4e0d\u52a8|\u53ea\u6539\u7b2c[\u4e00\u4e8c\u4e09\u56db\d]+\u884c|\u91cd\u7b54\u4e0a\u4e00\u9898|\u7ee7\u7eed\u521a\u624d\u90a3\u4e2a\u6587\u4ef6|\u4e0d\u662f\u65b9\u6cd5|correction:|directly summarize|not this meaning|redo previous answer|revise last answer|not that edit)/i.test(
-    prompt,
-  );
-}
-
-function isAnswerRepairFollowUpPrompt(prompt: string): boolean {
-  return /(?:so where is your summary|where(?:'s| is)\s+(?:the|your)\s+(?:summary|explanation)|go on with the summary|continue the summary|continue the explanation|i asked for .*summary|i asked for .*explain|not file info, summarize content|give the actual summary|so your summary\?|so your explanation\?|所以你的总结呢|我要的是内容总结|不是文件信息|直接给摘要|继续解释刚才那个文件|继续总结刚才那个文件)/i.test(
-    prompt,
-  );
-}
-
-function isAmbiguousGroundedRepairFollowUp(prompt: string): boolean {
-  const normalized = prompt.trim().toLowerCase();
-  if (!normalized) {
-    return false;
-  }
-  if (normalized.length > 24) {
-    return false;
-  }
-  return /^(then\??|go on|continue|and then\??|\u7ee7\u7eed|\u7136\u540e\u5462|\u63a5\u7740\u5462|\u518d\u7ee7\u7eed)$/.test(
-    normalized,
-  );
-}
-
-function isExecutionCorrectionFollowUpPrompt(prompt: string): boolean {
-  return /(?:\u4e0d\u662f\u8fd9\u4e48\u6539|\u4fdd\u7559.*\u4e0d\u52a8|\u53ea\u6539\u7b2c[\u4e00\u4e8c\u4e09\u56db\d]+\u884c|\u7ee7\u7eed\u4fee\u521a\u624d\u90a3\u4e2a\u5931\u8d25|\u6309\u521a\u624d\u90a3\u4e2a\u7ed3\u679c\u7ee7\u7eed|not that edit|keep signature|don't overwrite|continue fixing the previous failure|continue that failed fix)/i.test(
-    prompt,
-  );
-}
-
-function prefersTestOverBuildInFollowUp(prompt: string): boolean {
-  return /(?:\u5148\u522b\u8dd1\s*build|\u5148\u770b\s*test|\u5148\u4fee\s*test|dont run build|don't run build|run tests first|test first)/i.test(
-    prompt,
-  );
-}
-
-function isVerifyContinuationFollowUpPrompt(prompt: string): boolean {
-  return /(?:\b(?:continue|rerun|re-run|retry|run|execute)\b.*\b(?:verify|verification|test|tests|build|lint|check)\b|\b(?:verify|verification|test|tests|build|lint|check)\b.*\b(?:again|retry|rerun|re-run|continue)\b|\u7ee7\u7eed.*(?:\u9a8c\u8bc1|\u6d4b\u8bd5|\u6784\u5efa|\u7f16\u8bd1|\u68c0\u67e5)|\u91cd\u8dd1.*(?:\u6d4b\u8bd5|\u6784\u5efa|\u7f16\u8bd1)|\u518d\u8dd1.*(?:\u6d4b\u8bd5|\u6784\u5efa|\u7f16\u8bd1))/i.test(
-    prompt,
-  );
-}
-
-function isPostEditReadOnlyVerifyFollowUp(prompt: string): boolean {
-  const normalized = prompt.toLowerCase();
-  const hasVerifyOrCheck =
-    /\b(?:verify|verification|check|confirm|ensure|make sure)\b/i.test(
-      normalized,
-    ) || /(?:\u9a8c\u8bc1|\u68c0\u67e5|\u786e\u8ba4)/i.test(normalized);
-  if (!hasVerifyOrCheck) {
-    return false;
-  }
-  const referencesPriorEdit =
-    /\b(?:last|previous|prior|recent)\s+(?:change|edit|modification|update)\b/i.test(
-      normalized,
-    ) ||
-    /\b(?:changed file|changed files|the change|the edit)\b/i.test(
-      normalized,
-    ) ||
-    /(?:\u4e0a\u4e00\u6b21|\u521a\u624d|\u4e0a\u8f6e).*(?:\u4fee\u6539|\u6539\u52a8)/i.test(
-      normalized,
-    );
-  const readOnlyCheck =
-    /\b(?:contains|include|includes|has|matches|stays|remains)\b/i.test(
-      normalized,
-    ) ||
-    /\b(?:do not|don't|dont|without)\s+(?:edit|modify|change|touch|write|replace|fix)\b/i.test(
-      normalized,
-    ) ||
-    /(?:\u5305\u542b|\u4e0d\u8981\s*(?:\u4fee\u6539|\u5199\u5165|\u66ff\u6362))/i.test(
-      normalized,
-    );
-  return referencesPriorEdit || readOnlyCheck;
-}
-
-function isWeakSeedTargetCarryoverPrompt(prompt: string): boolean {
-  const normalized = prompt.trim().toLowerCase();
-  if (!normalized || normalized.length > 80) {
-    return false;
-  }
-  return /^(?:check it|verify again|what next|what's next|fix it|continue|go on|proceed|do the next step)$/i.test(
-    normalized,
-  );
-}
-
-function isWeakRepairFollowUpPrompt(prompt: string): boolean {
-  return /(?:use the failure above|same file.*not that fix|not the right fix|wrong direction|fix the real issue|continue repairing it|continue fixing it|不要再走刚才那个错误方向|同一个文件.*不是那个修法|基于上一次失败继续修复)/i.test(
-    prompt,
-  );
-}
-
-function isUltraWeakContinuationFollowUpPrompt(prompt: string): boolean {
-  const normalized = prompt.trim().toLowerCase();
-  if (!normalized || normalized.length > 40) {
-    return false;
-  }
-  if (
-    /^(?:thanks|thank you|thx|ok|okay|got it|sounds good|great|nice|understood|收到|好的|明白了)$/i.test(
-      normalized,
-    )
-  ) {
-    return false;
-  }
-  return /^(?:keep going|go on|do it|finish it|keep at it|go ahead|carry on|继续|接着|继续吧|继续做|接着做|做吧|继续一下)$/i.test(
-    normalized,
-  );
-}
-
-function isTemporalSuccessorCuePrompt(prompt: string): boolean {
-  const firstMeaningfulLine =
-    prompt
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .find((line) => line.length > 0) ?? "";
-  const normalized = firstMeaningfulLine
-    .trim()
-    .toLowerCase()
-    .replace(/[!?。！？]+$/g, "")
-    .trim();
-  if (!normalized || normalized.length > 24) {
-    return false;
-  }
-  const words = normalized.split(/\s+/).filter((word) => word.length > 0);
-  if (words.length === 0 || words.length > 4) {
-    return false;
-  }
-  const allowedWords = new Set([
-    "next",
-    "then",
-    "what",
-    "what's",
-    "whats",
-    "is",
-    "after",
-    "that",
-    "and",
-  ]);
-  for (const word of words) {
-    if (!allowedWords.has(word)) {
-      return false;
-    }
-  }
-  const hasNext = words.includes("next");
-  const hasThen = words.includes("then");
-  const hasAfterThat = words.includes("after") && words.includes("that");
-  return hasNext || hasThen || hasAfterThat;
-}
-
-function isAvoidPreviousDirectionPrompt(prompt: string): boolean {
-  return /(?:same file.*not that (?:fix|change)|同一个文件.*不是那个修法|同文件.*不是那个改法)/i.test(
-    prompt,
-  );
-}
-
-function isCrossFileRepairFollowUpPrompt(prompt: string): boolean {
-  return /(?:complete the rest|rest of files|other files|source\s*\+\s*test|source\s*\+\s*helper|source\s*\+\s*config|补齐其余文件|连同测试一起修|同步辅助文件|同步配置)/i.test(
-    prompt,
-  );
-}
-
 function extractKeyTerms(content: string): string[] {
   const tokens = (content.match(/[A-Za-z_][A-Za-z0-9_]{3,}/g) ?? [])
     .map((token) => token.toLowerCase())
@@ -3473,10 +2548,6 @@ function extractKeyTerms(content: string): string[] {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
     .map(([token]) => token);
-}
-
-function isReflectiveExplainContinuationPrompt(prompt: string): boolean {
-  return /(?:continue explaining that part|继续解释这部分)/i.test(prompt);
 }
 
 function isRepairContinuationFollowUpPrompt(prompt: string): boolean {
@@ -3566,26 +2637,6 @@ function isMutationInstructionFailure(
   instruction: ReturnType<typeof resolveMutationInstruction>,
 ): instruction is { ok: false; reason: string } {
   return instruction.ok === false;
-}
-
-function shouldBlockMutationForTargetResolution(input: {
-  readonly blocker: TargetResolutionBlocker;
-  readonly hasCorrectionCue: boolean;
-  readonly hasCreateIntent: boolean;
-  readonly hasEditIntent: boolean;
-  readonly hasExecutionCorrectionCue: boolean;
-  readonly hasFencedContent: boolean;
-  readonly hasReplaceDirective: boolean;
-}): boolean {
-  return (
-    input.blocker.code === "ambiguous-target" &&
-    (input.hasCorrectionCue ||
-      input.hasCreateIntent ||
-      input.hasEditIntent ||
-      input.hasExecutionCorrectionCue ||
-      input.hasFencedContent ||
-      input.hasReplaceDirective)
-  );
 }
 
 function normalizePathLike(value: string): string {
