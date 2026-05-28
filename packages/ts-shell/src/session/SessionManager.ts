@@ -18,32 +18,21 @@ import {
   type DurableLifecycleIndex,
 } from "../core/tools/toolResultLifecycle.js";
 import type {
-  CodingResultSummary,
-  CodingWriteEffect,
   ContinuationReason,
   TerminalClassification,
   TerminalReason,
 } from "../orchestration/types.js";
-import { deriveActionableFailureContinuity } from "./actionableFailureContinuity.js";
-import {
-  projectApprovalAudit,
-} from "./approvalAuditProjection.js";
-import {
-  decodeApprovalMemory,
-  decodeApprovalMemoryHistory,
-} from "./approvalMemoryCodec.js";
 import type {
   CurrentSessionSelectionResolution,
 } from "./currentSessionSelection.js";
-import { buildMutationContinuityState } from "./mutationContinuityState.js";
 import {
-  projectApprovalMemoryPersistence,
-} from "./sessionApprovalMemoryModule.js";
+  SESSION_APPROVAL_AUDIT_HISTORY_LIMIT,
+  recordSessionApprovalAuditDecision,
+} from "./approval/sessionApprovalMemory.js";
 import { applySessionCompactRetention } from "./sessionCompactModule.js";
 import {
   hasContinuationEvidence as snapshotHasContinuationEvidence,
   hasDeterministicTerminalEvidence as snapshotHasDeterministicTerminalEvidence,
-  selectContinuationEvidenceForSnapshot,
 } from "./sessionContinuationProjection.js";
 import {
   createLifecycleTranscriptEvent,
@@ -51,25 +40,7 @@ import {
   type TranscriptEvent,
 } from "./sessionEventCodec.js";
 import {
-  collectRecentCodingResults,
-  compactContinuityText,
-  extractGroundedDeliverableMode,
-  extractLastAnswerDefect,
-  extractLastReadDeliveredLines,
-  extractLastReadFragment,
-  extractLastReadWindow,
-  extractSeedInfluenceFromStrings,
-  extractStagedRepairProgress,
-  extractSummaryBoolean,
-  extractSummaryString,
-  findLastCodingCompletionEvent,
-  findLastLifecycleEvent,
   findLastQueryCompletionEvent,
-  findLastTurnContent,
-  normalizeOptionalBoolean,
-  normalizeOptionalString,
-  normalizeWriteEffect,
-  parseSeedInfluence,
 } from "./sessionContinuityModule.js";
 import type { SessionMessage } from "./schema/sessionMessage.js";
 import type { Session } from "./schema/sessionRecord.js";
@@ -94,11 +65,8 @@ import {
   selectSuggestedRecoverySessionIdFromSessions,
 } from "./sessionRecoverySelection.js";
 import {
-  buildActionHandoffSummary,
-  buildSeedInfluenceHandoffSummary,
   buildSessionResumeContext,
   buildSessionResumeSnapshot,
-  buildSuccessHandoffDiagnostic,
 } from "./sessionResumeContextBuilder.js";
 import {
   createSessionId,
@@ -128,32 +96,20 @@ import {
 } from "./sessionSummaryProjection.js";
 import type {
   ApprovalAuditMemoryState,
-  PermissionRequestMemoryState,
-  RequestScopeMemoryState,
-  SeedInfluenceDiagnostic,
   SessionContinuitySnapshot,
 } from "./sessionContinuityTypes.js";
-import {
-  extractLastPermissionRequestFromEvidence,
-  extractLastRequestScopeFromEvidence,
-  parsePermissionRequestMemory,
-  parseRequestScopeMemory,
-  resolvePermissionRequestMemory,
-  resolveRequestScopeMemory,
-} from "./permissionRequestMemoryCodec.js";
 import {
   normalizeProjectBinding,
   projectSessionBinding,
   type WorkspaceRootMode,
 } from "./projectBindingPolicy.js";
 import {
-  normalizeLegacyPermissionWorkingMemory,
   projectRebasedSessionRoot,
   projectRootRebase,
 } from "./projectRootRebaseProjection.js";
-import {
-  deriveStoppedSessionContinuitySurface,
-} from "./stoppedSessionContinuity.js";
+import { buildSessionContinuitySnapshot } from "./continuation/sessionContinuitySnapshot.js";
+import { normalizeLegacyPermissionStateForSession } from "./continuation/legacyPermissionRebase.js";
+import { extractSeedInfluenceFromQueryResult } from "./continuation/sessionSeedInfluence.js";
 import {
   appendSessionTurn,
   appendTranscriptEvent,
@@ -266,7 +222,8 @@ export interface SessionResumeEligibility {
 
 export class SessionManager {
   private static readonly AUTO_COMPACT_TURN_THRESHOLD = 12;
-  private static readonly APPROVAL_AUDIT_HISTORY_LIMIT = 16;
+  private static readonly APPROVAL_AUDIT_HISTORY_LIMIT =
+    SESSION_APPROVAL_AUDIT_HISTORY_LIMIT;
   private readonly storeLayout: SessionStoreLayout;
   private sessionsDir: string;
   private readonly currentSessionStorePath: string;
@@ -509,22 +466,17 @@ export class SessionManager {
     },
   ): void {
     const session = this.load(sessionId);
-    const recordedAt = decision.recordedAt ?? new Date().toISOString();
-    this.withSessionStateLock(session.id, () => {
-      const statePath = this.getStatePath(session.id);
-      const current = this.readStateSnapshotSafely(statePath);
-      const approvalMemory = projectApprovalMemoryPersistence({
-        currentWorkingMemory: current?.workingMemory,
-        sessionProjectRoot: session.projectRoot,
-        decision,
-        recordedAt,
-        historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
-      });
-      const snapshot = this.buildSessionStateSnapshot(session, current);
-      this.writeJsonFileAtomic(statePath, {
-        ...snapshot,
-        workingMemory: approvalMemory.workingMemory,
-      } satisfies SessionStateSnapshot);
+    const statePath = this.getStatePath(session.id);
+    recordSessionApprovalAuditDecision({
+      session,
+      decision,
+      recordedAt: decision.recordedAt ?? new Date().toISOString(),
+      historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
+      withStateLock: (targetSessionId, update) =>
+        this.withSessionStateLock(targetSessionId, update),
+      readCurrentSnapshot: () => this.readStateSnapshotSafely(statePath),
+      buildSnapshot: (current) => this.buildSessionStateSnapshot(session, current),
+      writeSnapshot: (snapshot) => this.writeJsonFileAtomic(statePath, snapshot),
     });
   }
 
@@ -1008,434 +960,29 @@ export class SessionManager {
       session,
       this.readStateSnapshotSafely(this.getStatePath(sessionId)),
     );
-    const recoverySnapshot = this.getRecoverySnapshot(sessionId);
-    const transcriptEvents = this.getTranscriptEvents(sessionId);
-    const lastRunErrorEvent = findLastLifecycleEvent(
-      transcriptEvents,
-      "run-error",
-    );
-    const lastQueryCompletion = findLastQueryCompletionEvent(transcriptEvents);
-    const lastCodingCompletion =
-      findLastCodingCompletionEvent(transcriptEvents);
-    const lastCodingResult = lastCodingCompletion?.event.result.codingResult;
-    const recentCodingResults = collectRecentCodingResults(
-      transcriptEvents,
-      4,
-    );
-    const lastGroundedDeliverableMode =
-      extractGroundedDeliverableMode(lastCodingResult?.continuation.evidence);
-    const lastReadDeliveredLines = extractLastReadDeliveredLines(
-      lastCodingResult?.continuation.evidence,
-    );
-    const lastReadWindow = extractLastReadWindow(
-      lastCodingResult?.continuation.evidence,
-    );
-    const lastReadFragment = extractLastReadFragment(
-      lastCodingResult?.continuation.evidence,
-    );
-    const stagedRepairProgress = extractStagedRepairProgress(
-      lastCodingResult?.continuation.evidence,
-    );
-    const lastRequestScope = extractLastRequestScopeFromEvidence(
-      lastCodingResult?.continuation.evidence,
-    );
-    const lastRequestScopeFromMemory = parseRequestScopeMemory(
-      stateSnapshot?.workingMemory,
-    );
-    const lastPermissionRequest = extractLastPermissionRequestFromEvidence(
-      lastCodingResult?.continuation.evidence,
-    );
-    const lastPermissionRequestFromMemory =
-      parsePermissionRequestMemory(stateSnapshot?.workingMemory);
-    const resolvedLastPermissionRequest = resolvePermissionRequestMemory({
-      evidence: lastPermissionRequest,
-      memory: lastPermissionRequestFromMemory,
-      sessionProjectRoot: session.projectRoot,
+    return buildSessionContinuitySnapshot({
+      session,
+      stateSnapshot,
+      recoverySnapshot: this.getRecoverySnapshot(sessionId),
+      transcriptEvents: this.getTranscriptEvents(sessionId),
+      approvalHistoryLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
     });
-    const resolvedLastRequestScope = resolveRequestScopeMemory({
-      evidence: lastRequestScope,
-      memory: lastRequestScopeFromMemory,
-      sessionProjectRoot: session.projectRoot,
-    });
-    const lastApprovalAudit = decodeApprovalMemory(
-      stateSnapshot?.workingMemory,
-    );
-    const lastApprovalHistory = decodeApprovalMemoryHistory(
-      stateSnapshot?.workingMemory,
-      { historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT },
-    );
-    const approvalProvenanceItems =
-      lastCodingResult?.provenance?.approvalDecisions ?? [];
-    const lastApprovalProvenance =
-      approvalProvenanceItems[approvalProvenanceItems.length - 1];
-    const toolExecutionProvenanceItems =
-      lastCodingResult?.provenance?.toolExecutions ?? [];
-    const lastToolExecutionProvenance =
-      toolExecutionProvenanceItems[toolExecutionProvenanceItems.length - 1];
-    const lastAnswerDefect =
-      extractLastAnswerDefect(lastCodingResult) ?? undefined;
-    const lastStoppedSessionContinuity =
-      deriveStoppedSessionContinuitySurface(lastCodingResult);
-    const lastWriteContinuity =
-      lastStoppedSessionContinuity?.writeContinuity ??
-      this.extractWriteContinuityFromMemory(stateSnapshot?.workingMemory);
-    const lastActionHandoffSummary =
-      buildActionHandoffSummary(lastCodingResult?.lastActionResultSeed) ??
-      this.extractActionHandoffSummaryFromMemory(stateSnapshot?.workingMemory);
-    const lastSeedInfluence =
-      this.extractSeedInfluenceFromQueryResult(lastQueryCompletion?.event.result) ??
-      this.extractSeedInfluenceFromMemory(stateSnapshot?.workingMemory);
-    const lastSeedInfluenceHandoffSummary =
-      buildSeedInfluenceHandoffSummary(
-        lastCodingResult?.lastActionResultSeed,
-        lastSeedInfluence,
-      ) ??
-      this.extractSeedInfluenceHandoffSummaryFromMemory(
-        stateSnapshot?.workingMemory,
-      );
-    const lastFailureHandoffDiagnostic =
-      lastStoppedSessionContinuity?.failureHandoffDiagnostic ??
-      this.extractFailureHandoffDiagnosticFromMemory(
-        stateSnapshot?.workingMemory,
-      );
-    const lastActionableFailure =
-      lastStoppedSessionContinuity?.actionableFailure ??
-      deriveActionableFailureContinuity(lastCodingResult);
-    const lastSuccessHandoffDiagnostic =
-      buildSuccessHandoffDiagnostic(lastCodingResult) ??
-      this.extractSuccessHandoffDiagnosticFromMemory(
-        stateSnapshot?.workingMemory,
-      );
-    const continuityTerminalSource =
-      lastQueryCompletion?.event.result.terminalClassification === "success" &&
-      lastCodingCompletion?.event.result.terminalClassification &&
-      lastCodingCompletion.event.result.terminalClassification !== "success"
-        ? lastCodingCompletion
-        : lastQueryCompletion;
-    const lastUserIntent =
-      recoverySnapshot.lastUserMessage?.content ??
-      findLastTurnContent(session.turns, "user");
-    const mutationContinuity = buildMutationContinuityState({
-      lastCodingResult,
-      recentCodingResults,
-      lastUserIntent,
-    });
-
-    const unresolvedItems: string[] = [];
-    const lastFailure =
-      session.lastError?.trim() ||
-      lastRunErrorEvent?.detail?.trim() ||
-      continuityTerminalSource?.event.result.stopReason?.trim();
-    if (lastFailure) {
-      unresolvedItems.push(`last-error:${lastFailure}`);
-    }
-    if (
-      continuityTerminalSource?.event.result.terminalClassification &&
-      continuityTerminalSource.event.result.terminalClassification !== "success"
-    ) {
-      unresolvedItems.push(
-        `terminal:${continuityTerminalSource.event.result.terminalClassification} (${continuityTerminalSource.event.result.terminalReason})`,
-      );
-      if (continuityTerminalSource.event.result.stopReason?.trim()) {
-        unresolvedItems.push(
-          `stop-reason:${compactContinuityText(continuityTerminalSource.event.result.stopReason, 180)}`,
-        );
-      }
-    } else if (lastRunErrorEvent?.detail?.trim()) {
-      unresolvedItems.push(
-        `previous-run-error:${compactContinuityText(lastRunErrorEvent.detail, 180)}`,
-      );
-    }
-    if ((lastCodingResult?.failedFiles.length ?? 0) > 0) {
-      unresolvedItems.push(
-        `failed-files:${lastCodingResult?.failedFiles
-          .slice(0, 4)
-          .map((entry) => `${entry.path} (${entry.reason})`)
-          .join(", ")}`,
-      );
-    }
-    if (
-      lastCodingResult?.taskSatisfaction.verdict &&
-      lastCodingResult.taskSatisfaction.verdict !== "satisfied"
-    ) {
-      unresolvedItems.push(
-        `task-satisfaction:${lastCodingResult.taskSatisfaction.verdict}`,
-      );
-    }
-    if (
-      lastCodingResult?.verification.status &&
-      lastCodingResult.verification.status !== "passed"
-    ) {
-      unresolvedItems.push(`verify:${lastCodingResult.verification.status}`);
-    }
-    if (
-      lastCodingResult?.repair.status &&
-      lastCodingResult.repair.status === "failed"
-    ) {
-      unresolvedItems.push("repair:failed");
-    }
-    if (
-      lastCodingResult?.continuation.status &&
-      lastCodingResult.continuation.status ===
-        "failed-after-bounded-continuation"
-    ) {
-      unresolvedItems.push("continuation:failed-after-bounded-continuation");
-    }
-    const freshnessHistoryCount =
-      recentCodingResults.length +
-      mutationContinuity.recentFailedFiles.length +
-      (lastCodingResult?.continuation.evidence.length ?? 0) +
-      unresolvedItems.length;
-
-    return {
-      sessionId: session.id,
-      projectRoot: session.projectRoot,
-      lastUserIntent,
-      lastAssistantOutput:
-        recoverySnapshot.lastAssistantMessage?.content ??
-        findLastTurnContent(session.turns, "assistant"),
-      lastTerminalClassification:
-        continuityTerminalSource?.event.result.terminalClassification ??
-        recoverySnapshot.terminalClassification,
-      lastTerminalReason:
-        continuityTerminalSource?.event.result.terminalReason ??
-        recoverySnapshot.terminalReason,
-      lastFailure,
-      lastTaskKind: lastCodingResult?.taskKind,
-      ...(lastCodingResult?.lastActionResultSeed
-        ? { lastActionResultSeed: lastCodingResult.lastActionResultSeed }
-        : {}),
-      ...(lastWriteContinuity?.writerStarted !== undefined
-        ? { lastWriterStarted: lastWriteContinuity.writerStarted }
-        : {}),
-      ...(lastWriteContinuity?.writeEffect
-        ? { lastWriteEffect: lastWriteContinuity.writeEffect }
-        : {}),
-      ...(lastWriteContinuity?.requiresUserInspection !== undefined
-        ? {
-            lastWriteRequiresUserInspection:
-              lastWriteContinuity.requiresUserInspection,
-          }
-        : {}),
-      ...(lastWriteContinuity?.target
-        ? { lastWriteEffectTarget: lastWriteContinuity.target }
-        : {}),
-      ...(lastActionHandoffSummary ? { lastActionHandoffSummary } : {}),
-      ...(lastSeedInfluence ? { lastSeedInfluence } : {}),
-      ...(lastSeedInfluenceHandoffSummary
-        ? { lastSeedInfluenceHandoffSummary }
-        : {}),
-      ...(lastFailureHandoffDiagnostic
-        ? { lastFailureHandoffDiagnostic }
-        : {}),
-      ...(lastSuccessHandoffDiagnostic
-        ? { lastSuccessHandoffDiagnostic }
-        : {}),
-      lastGroundedDeliverableMode,
-      ...(lastReadDeliveredLines !== undefined
-        ? { lastReadDeliveredLines }
-        : {}),
-      ...(lastReadWindow.start !== undefined
-        ? { lastReadWindowStart: lastReadWindow.start }
-        : {}),
-      ...(lastReadWindow.end !== undefined
-        ? { lastReadWindowEnd: lastReadWindow.end }
-        : {}),
-      ...(lastReadWindow.size !== undefined
-        ? { lastReadWindowSize: lastReadWindow.size }
-        : {}),
-      ...(lastReadFragment.start !== undefined
-        ? { lastReadFragmentStart: lastReadFragment.start }
-        : {}),
-      ...(lastReadFragment.end !== undefined
-        ? { lastReadFragmentEnd: lastReadFragment.end }
-        : {}),
-      ...(lastReadFragment.lineIndexes?.length
-        ? { lastReadFragmentLineIndexes: lastReadFragment.lineIndexes }
-        : {}),
-      ...(lastReadFragment.ranges?.length
-        ? { lastReadFragmentRanges: lastReadFragment.ranges }
-        : {}),
-      ...(lastReadFragment.sourceWindowStart !== undefined
-        ? { lastReadFragmentSourceWindowStart: lastReadFragment.sourceWindowStart }
-        : {}),
-      ...(lastReadFragment.sourceWindowEnd !== undefined
-        ? { lastReadFragmentSourceWindowEnd: lastReadFragment.sourceWindowEnd }
-        : {}),
-      ...(lastReadFragment.fingerprint
-        ? { lastReadFragmentFingerprint: lastReadFragment.fingerprint }
-        : {}),
-      ...(lastReadFragment.filter
-        ? { lastReadFilter: lastReadFragment.filter }
-        : {}),
-      ...(stagedRepairProgress.stepCount !== undefined
-        ? { lastStagedRepairStepCount: stagedRepairProgress.stepCount }
-        : {}),
-      ...(stagedRepairProgress.completedStep !== undefined
-        ? { lastStagedRepairCompletedStep: stagedRepairProgress.completedStep }
-        : {}),
-      ...(stagedRepairProgress.blockedStep !== undefined
-        ? { lastStagedRepairBlockedStep: stagedRepairProgress.blockedStep }
-        : {}),
-      ...(stagedRepairProgress.nextStep !== undefined
-        ? { lastStagedRepairNextStep: stagedRepairProgress.nextStep }
-        : {}),
-      ...(lastAnswerDefect ? { lastAnswerDefect } : {}),
-      recentChangedFiles: mutationContinuity.recentChangedFiles,
-      recentTargetFiles: mutationContinuity.recentTargetFiles,
-      recentFailedFiles: mutationContinuity.recentFailedFiles,
-      recentVerifiedFiles: mutationContinuity.recentVerifiedFiles,
-      lastVerificationStatus: lastCodingResult?.verification.status,
-      lastVerificationCommand: lastCodingResult?.verification.command,
-      lastVerificationReason: lastCodingResult?.verification.reason,
-      lastVerificationBlockerKind:
-        lastActionableFailure?.blockerKind ??
-        lastCodingResult?.verification.blockerKind,
-      lastVerificationNextAction:
-        lastActionableFailure?.nextAction ??
-        lastCodingResult?.verification.nextAction,
-      ...(lastCodingResult?.verification.status === "blocked"
-      && lastCodingResult.verification.blockerKind === "approval-denied"
-      && Boolean(lastCodingResult.verification.command?.trim())
-        ? { lastVerificationResumeEligible: true }
-        : {}),
-      ...projectApprovalAudit(lastApprovalAudit),
-      ...(lastApprovalHistory.length > 0
-        ? { lastApprovalHistory }
-        : {}),
-      ...(lastApprovalProvenance
-        ? {
-            lastApprovalProvenanceKind: lastApprovalProvenance.kind,
-            lastApprovalProvenanceSource: lastApprovalProvenance.source,
-            lastApprovalProvenanceToolName: lastApprovalProvenance.toolName,
-            lastApprovalProvenanceTaskId: lastApprovalProvenance.taskId,
-          }
-        : {}),
-      ...(lastToolExecutionProvenance
-        ? {
-            lastToolExecutionProvenanceKind: lastToolExecutionProvenance.kind,
-            lastToolExecutionProvenanceSource:
-              lastToolExecutionProvenance.source,
-            lastToolExecutionProvenanceToolName:
-              lastToolExecutionProvenance.toolName,
-            lastToolExecutionProvenanceTaskId:
-              lastToolExecutionProvenance.taskId,
-            ...(lastToolExecutionProvenance.failureBoundary
-              ? {
-                  lastToolExecutionFailureBoundary:
-                    lastToolExecutionProvenance.failureBoundary,
-                }
-              : {}),
-          }
-        : {}),
-      ...(resolvedLastPermissionRequest.toolName
-        ? { lastPermissionRequestToolName: resolvedLastPermissionRequest.toolName }
-        : {}),
-      ...(resolvedLastPermissionRequest.operation
-        ? { lastPermissionRequestOperation: resolvedLastPermissionRequest.operation }
-        : {}),
-      ...(resolvedLastPermissionRequest.target
-        ? { lastPermissionRequestTarget: resolvedLastPermissionRequest.target }
-        : {}),
-      ...(resolvedLastPermissionRequest.process
-        ? { lastPermissionRequestProcess: resolvedLastPermissionRequest.process }
-        : {}),
-      ...(resolvedLastPermissionRequest.scopeKey
-        ? { lastPermissionRequestScopeKey: resolvedLastPermissionRequest.scopeKey }
-        : {}),
-      ...(resolvedLastPermissionRequest.scopeLabel
-        ? { lastPermissionRequestScopeLabel: resolvedLastPermissionRequest.scopeLabel }
-        : {}),
-      ...(resolvedLastPermissionRequest.cacheKey
-        ? { lastPermissionRequestCacheKey: resolvedLastPermissionRequest.cacheKey }
-        : {}),
-      ...(resolvedLastPermissionRequest.projectRoot
-        ? {
-            lastPermissionRequestProjectRoot:
-              resolvedLastPermissionRequest.projectRoot,
-          }
-        : {}),
-      ...(resolvedLastPermissionRequest.source
-        ? { lastPermissionRequestSource: resolvedLastPermissionRequest.source }
-        : {}),
-      ...(resolvedLastPermissionRequest.lineage
-        ? { lastPermissionRequestLineage: resolvedLastPermissionRequest.lineage }
-        : {}),
-      ...(resolvedLastRequestScope.cacheKey
-        ? { lastRequestScopeCacheKey: resolvedLastRequestScope.cacheKey }
-        : {}),
-      ...(resolvedLastRequestScope.scopeLabel
-        ? { lastRequestScopeLabel: resolvedLastRequestScope.scopeLabel }
-        : {}),
-      ...(resolvedLastRequestScope.projectRoot
-        ? { lastRequestScopeProjectRoot: resolvedLastRequestScope.projectRoot }
-        : {}),
-      ...(resolvedLastRequestScope.source
-        ? { lastRequestScopeSource: resolvedLastRequestScope.source }
-        : {}),
-      lastRepairStatus: lastCodingResult?.repair.status,
-      lastRepairNotes: (lastCodingResult?.repair.notes ?? []).slice(0, 6),
-      lastContinuationStatus: lastCodingResult?.continuation.status,
-      lastContinuationEvidence: selectContinuationEvidenceForSnapshot(
-        lastCodingResult?.continuation.evidence ?? [],
-      ),
-      lastTaskSatisfactionVerdict: lastCodingResult?.taskSatisfaction.verdict,
-      lastTaskSatisfactionReasons: (
-        lastCodingResult?.taskSatisfaction.reasons ?? []
-      ).slice(0, 6),
-      unresolvedItems,
-      ...(freshnessHistoryCount > 0 ? { freshnessHistoryCount } : {}),
-    };
   }
 
   private normalizeLegacyPermissionStateForSession(
     session: Session,
     snapshot: SessionStateSnapshot | undefined,
   ): SessionStateSnapshot | undefined {
-    if (!snapshot?.workingMemory) {
-      return snapshot;
-    }
-    const normalizedWorkingMemory = normalizeLegacyPermissionWorkingMemory({
-      workingMemory: snapshot.workingMemory,
-      sessionProjectRoot: session.projectRoot,
+    const statePath = this.getStatePath(session.id);
+    return normalizeLegacyPermissionStateForSession({
+      session,
+      snapshot,
+      withStateLock: (targetSessionId, update) =>
+        this.withSessionStateLock(targetSessionId, update),
+      readLatestSnapshot: () => this.readStateSnapshotSafely(statePath),
+      writeSnapshot: (nextSnapshot) =>
+        this.writeJsonFileAtomic(statePath, nextSnapshot),
     });
-    if (normalizedWorkingMemory === snapshot.workingMemory) {
-      return snapshot;
-    }
-
-    let normalizedSnapshot: SessionStateSnapshot = {
-      ...snapshot,
-      projectRoot: session.projectRoot,
-      workingMemory: normalizedWorkingMemory,
-    };
-
-    this.withSessionStateLock(session.id, () => {
-      const statePath = this.getStatePath(session.id);
-      const latest = this.readStateSnapshotSafely(statePath);
-      if (!latest?.workingMemory) {
-        this.writeJsonFileAtomic(statePath, normalizedSnapshot);
-        return;
-      }
-      const rebasedLatestWorkingMemory = normalizeLegacyPermissionWorkingMemory({
-        workingMemory: latest.workingMemory,
-        sessionProjectRoot: session.projectRoot,
-      });
-      if (rebasedLatestWorkingMemory === latest.workingMemory) {
-        normalizedSnapshot = {
-          ...latest,
-          projectRoot: session.projectRoot,
-        };
-        return;
-      }
-      normalizedSnapshot = {
-        ...latest,
-        projectRoot: session.projectRoot,
-        workingMemory: rebasedLatestWorkingMemory,
-      };
-      this.writeJsonFileAtomic(statePath, normalizedSnapshot);
-    });
-
-    return normalizedSnapshot;
   }
 
   buildPromptContinuityContext(
@@ -1453,219 +1000,6 @@ export class SessionManager {
     const snapshot = this.buildContinuitySnapshot(sessionId);
     return buildSessionResumeSnapshot({ currentPrompt, snapshot });
   }
-
-  private extractActionHandoffSummaryFromMemory(
-    workingMemory: unknown,
-  ): string | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    if (
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-    ) {
-      const continuity = root.continuity as Record<string, unknown>;
-      const candidate = normalizeOptionalString(
-        continuity.lastActionHandoffSummary,
-      );
-      if (candidate) {
-        return candidate;
-      }
-    }
-    const summaryEntries = Array.isArray(root.summary)
-      ? root.summary.filter((entry): entry is string => typeof entry === "string")
-      : [];
-    for (const entry of summaryEntries) {
-      const normalized = entry.trim().startsWith("- ")
-        ? entry.trim().slice(2).trim()
-        : entry.trim();
-      const prefix = "last-action-handoff-summary:";
-      if (normalized.toLowerCase().startsWith(prefix)) {
-        const value = normalized.slice(prefix.length).trim();
-        if (value) {
-          return value;
-        }
-      }
-    }
-    return undefined;
-  }
-
-  private extractWriteContinuityFromMemory(
-    workingMemory: unknown,
-  ):
-    | {
-        readonly writerStarted?: boolean;
-        readonly writeEffect?: CodingWriteEffect;
-        readonly requiresUserInspection?: boolean;
-        readonly target?: string;
-      }
-    | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    const continuity =
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-        ? (root.continuity as Record<string, unknown>)
-        : undefined;
-    const summaryEntries = Array.isArray(root.summary)
-      ? root.summary.filter((entry): entry is string => typeof entry === "string")
-      : [];
-    const writerStarted =
-      normalizeOptionalBoolean(continuity?.lastWriterStarted) ??
-      extractSummaryBoolean(summaryEntries, "last-writer-started");
-    const requiresUserInspection =
-      normalizeOptionalBoolean(
-        continuity?.lastWriteRequiresUserInspection,
-      ) ??
-      extractSummaryBoolean(
-        summaryEntries,
-        "last-write-requires-user-inspection",
-      );
-    const writeEffect = normalizeWriteEffect(
-      continuity?.lastWriteEffect,
-    ) ?? normalizeWriteEffect(
-      extractSummaryString(summaryEntries, "last-write-effect"),
-    );
-    const target =
-      normalizeOptionalString(continuity?.lastWriteEffectTarget) ??
-      extractSummaryString(summaryEntries, "last-write-effect-target");
-    if (
-      writerStarted === undefined &&
-      requiresUserInspection === undefined &&
-      writeEffect === undefined &&
-      !target
-    ) {
-      return undefined;
-    }
-    return {
-      ...(writerStarted !== undefined ? { writerStarted } : {}),
-      ...(requiresUserInspection !== undefined
-        ? { requiresUserInspection }
-        : {}),
-      ...(writeEffect ? { writeEffect } : {}),
-      ...(target ? { target } : {}),
-    };
-  }
-
-  private extractSeedInfluenceHandoffSummaryFromMemory(
-    workingMemory: unknown,
-  ): string | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    if (
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-    ) {
-      const continuity = root.continuity as Record<string, unknown>;
-      const candidate = normalizeOptionalString(
-        continuity.lastSeedInfluenceHandoffSummary,
-      );
-      if (candidate) {
-        return candidate;
-      }
-    }
-    const summaryEntries = Array.isArray(root.summary)
-      ? root.summary.filter((entry): entry is string => typeof entry === "string")
-      : [];
-    for (const entry of summaryEntries) {
-      const normalized = entry.trim().startsWith("- ")
-        ? entry.trim().slice(2).trim()
-        : entry.trim();
-      const prefix = "last-seed-influence-handoff-summary:";
-      if (normalized.toLowerCase().startsWith(prefix)) {
-        const value = normalized.slice(prefix.length).trim();
-        if (value) {
-          return value;
-        }
-      }
-    }
-    return undefined;
-  }
-
-  private extractFailureHandoffDiagnosticFromMemory(
-    workingMemory: unknown,
-  ): string | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    if (
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-    ) {
-      const continuity = root.continuity as Record<string, unknown>;
-      const candidate = normalizeOptionalString(
-        continuity.lastFailureHandoffDiagnostic,
-      );
-      if (candidate) {
-        return candidate;
-      }
-    }
-    const summaryEntries = Array.isArray(root.summary)
-      ? root.summary.filter((entry): entry is string => typeof entry === "string")
-      : [];
-    for (const entry of summaryEntries) {
-      const normalized = entry.trim().startsWith("- ")
-        ? entry.trim().slice(2).trim()
-        : entry.trim();
-      const prefix = "last-failure-handoff-diagnostic:";
-      if (normalized.toLowerCase().startsWith(prefix)) {
-        const value = normalized.slice(prefix.length).trim();
-        if (value) {
-          return value;
-        }
-      }
-    }
-    return undefined;
-  }
-
-  private extractSuccessHandoffDiagnosticFromMemory(
-    workingMemory: unknown,
-  ): string | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    if (
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-    ) {
-      const continuity = root.continuity as Record<string, unknown>;
-      const candidate = normalizeOptionalString(
-        continuity.lastSuccessHandoffDiagnostic,
-      );
-      if (candidate) {
-        return candidate;
-      }
-    }
-    const summaryEntries = Array.isArray(root.summary)
-      ? root.summary.filter((entry): entry is string => typeof entry === "string")
-      : [];
-    for (const entry of summaryEntries) {
-      const normalized = entry.trim().startsWith("- ")
-        ? entry.trim().slice(2).trim()
-        : entry.trim();
-      const prefix = "last-success-handoff-diagnostic:";
-      if (normalized.toLowerCase().startsWith(prefix)) {
-        const value = normalized.slice(prefix.length).trim();
-        if (value) {
-          return value;
-        }
-      }
-    }
-    return undefined;
-  }
-
   private evaluateRecoveryTrustBoundary(
     session: Session,
   ): SessionResumeEligibility {
@@ -1911,52 +1245,11 @@ export class SessionManager {
       turnThreshold: SessionManager.AUTO_COMPACT_TURN_THRESHOLD,
       historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
       now: new Date().toISOString(),
-      seedInfluence: this.extractSeedInfluenceFromQueryResult(
+      seedInfluence: extractSeedInfluenceFromQueryResult(
         event.type === "query.completed" ? event.result : undefined,
       ),
     });
   }
-
-  private extractSeedInfluenceFromQueryResult(
-    result: Extract<QueryEvent, { type: "query.completed" }>["result"] | undefined,
-  ): SeedInfluenceDiagnostic | undefined {
-    if (!result) {
-      return undefined;
-    }
-    return extractSeedInfluenceFromStrings([
-      ...(result.sharedContext.notes ?? []),
-      ...(result.codingResult?.evidence ?? []),
-      ...(result.codingResult?.continuation.evidence ?? []),
-      ...(result.codingResult?.repair.notes ?? []),
-    ]);
-  }
-
-  private extractSeedInfluenceFromMemory(
-    workingMemory: unknown,
-  ): SeedInfluenceDiagnostic | undefined {
-    if (!workingMemory || typeof workingMemory !== "object") {
-      return undefined;
-    }
-    const root = workingMemory as Record<string, unknown>;
-    if (
-      root.continuity &&
-      typeof root.continuity === "object" &&
-      !Array.isArray(root.continuity)
-    ) {
-      const continuity = root.continuity as Record<string, unknown>;
-      const fromContinuity = parseSeedInfluence(
-        normalizeOptionalString(continuity.lastSeedInfluence),
-      );
-      if (fromContinuity) {
-        return fromContinuity;
-      }
-    }
-    const summaryEntries = Array.isArray(root.summary)
-      ? root.summary.filter((entry): entry is string => typeof entry === "string")
-      : [];
-    return extractSeedInfluenceFromStrings(summaryEntries);
-  }
-
   private load(sessionId: string): Session {
     return loadSessionRecord({
       sessionId,
