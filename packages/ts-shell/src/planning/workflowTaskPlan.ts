@@ -5,10 +5,18 @@ import {
   computeFragmentFingerprintFromIndexes,
   extractLastReadDeliveredFragmentFromContinuity,
   extractLastReadWindowFromContinuity,
-  hasLocalSliceExplainCue,
   resolveReadWindowDirectiveForWorkflow,
   type ReadWindowDirective,
 } from "../context/readWindowContinuation.js";
+import {
+  buildInspectFilesPlan,
+  buildReadOnlyPlan,
+} from "../context/readIntentPlanning.js";
+import { buildPathlessReadContinuationBlockedPlan } from "../context/readContinuationPlanning.js";
+import {
+  buildGroundedReadMissingTargetPlan,
+  buildGroundedReadOutOfWorkspacePlan,
+} from "../context/readTargetPlanning.js";
 import { parseContinuationTransformEvidence } from "../evidence/continuationTransformEvidence.js";
 import { hasPathLikeReference } from "./promptTargetProjection.js";
 import {
@@ -17,7 +25,22 @@ import {
   extractLowRiskRenameRefactor,
   resolveMutationInstruction,
 } from "../edit/mutationInstructionPlanner.js";
-import { selectMutationTargetFromPrompt } from "../edit/mutationTargetSelection.js";
+import {
+  buildLocalMutationScopeBlockedPlan,
+  resolveMutationScopePlanning,
+} from "../edit/mutationScopePlanning.js";
+import {
+  buildMissingMutationTargetPlan,
+  buildOutOfWorkspaceMutationTargetPlan,
+  buildUnclearEditTransformPlan,
+  buildUnsupportedDiscoveryEditPlan,
+  selectMutationIntentTarget,
+} from "../edit/mutationIntentPlanning.js";
+import {
+  resolveSingleFileEditFailureRepairContext,
+  resolveSingleFileEditFailureRepairContextAbandonment,
+  resolveSingleFileEditRepairPayloadKind,
+} from "../repair/singleFileRepairPlanning.js";
 import {
   detectGroundedDeliverableMode,
   inferGroundedDeliverableModeFromContinuity,
@@ -45,16 +68,11 @@ import {
   type VerifyContinuationObject,
 } from "../orchestration/continuationModule.js";
 import { buildReflectiveStateQueryResponse } from "../orchestration/continuationPlanning.js";
-import {
-  formatEditExecutionFailure,
-  formatTargetResolutionBlockerReason,
-} from "../orchestration/doNextProjection.js";
+import { formatTargetResolutionBlockerReason } from "../orchestration/doNextProjection.js";
 import { projectProviderDiagnosticHandoff } from "../orchestration/providerModule.js";
 import {
   inferRepoDiagnosis,
   isPathOnlyReadRequest,
-  projectReadMissingTargetStop,
-  projectReadOutOfWorkspaceTargetStop,
   recoverReadContinuationTarget,
 } from "../orchestration/readInspectModule.js";
 import {
@@ -75,8 +93,6 @@ import {
   type GroundedDeliverableConstraints,
   type GroundedRepairInstruction,
   type GroundedRepairStage,
-  type SingleFileEditFailureReason,
-  type SingleFileEditRepairPayloadKind,
   type WorkflowTaskPlan,
 } from "../orchestration/workflowTaskPlanner.js";
 import {
@@ -504,10 +520,12 @@ export function buildWorkflowTaskPlan(
   const hasWriteExpectationIntent =
     !hasCreateIntent && isWriteExpectationPrompt(prompt);
   const hasWriteTaskIntent = hasCreateIntent || hasWriteExpectationIntent;
-  const mutationIntentTarget =
-    hasWriteTaskIntent || hasEditIntent
-      ? selectMutationTargetFromPrompt(prompt, targetResolution.targets)
-      : undefined;
+  const mutationIntentTarget = selectMutationIntentTarget({
+    prompt,
+    targets: targetResolution.targets,
+    hasWriteTaskIntent,
+    hasEditIntent,
+  });
   const primaryTarget =
     mutationIntentTarget ??
     (explicitHasExtension ? explicitPrimaryTarget : null) ??
@@ -587,51 +605,17 @@ export function buildWorkflowTaskPlan(
   );
   const readFragmentDirective =
     extractLastReadDeliveredFragmentFromContinuity(continuity);
-  const hasLocalMutationCue =
-    hasLocalSliceExplainCue(prompt) &&
-    (hasEditIntent ||
-      hasExecutionCorrectionCue ||
-      (hasContinuationCue &&
-        !hasGroundedReadLikeIntent &&
-        !hasVerifyIntent &&
-        !hasDiagnosisIntent));
-  const hasMutationScopeEvidence =
-    (readFragmentDirective.lineIndexes?.length ?? 0) > 0 ||
-    (readFragmentDirective.ranges?.length ?? 0) > 0 ||
-    (readFragmentDirective.sourceWindowStart !== undefined &&
-      readFragmentDirective.sourceWindowEnd !== undefined);
-  const mutationScopeFields =
-    hasLocalMutationCue && hasMutationScopeEvidence
-      ? {
-          ...(readFragmentDirective.lineIndexes?.length
-            ? { mutationScopeLineIndexes: readFragmentDirective.lineIndexes }
-            : {}),
-          ...(readFragmentDirective.ranges?.length
-            ? { mutationScopeRanges: readFragmentDirective.ranges }
-            : {}),
-          ...(readFragmentDirective.sourceWindowStart !== undefined
-            ? {
-                mutationScopeSourceWindowStart:
-                  readFragmentDirective.sourceWindowStart,
-              }
-            : {}),
-          ...(readFragmentDirective.sourceWindowEnd !== undefined
-            ? {
-                mutationScopeSourceWindowEnd:
-                  readFragmentDirective.sourceWindowEnd,
-              }
-            : {}),
-          ...(readFragmentDirective.fingerprint
-            ? { mutationScopeFingerprint: readFragmentDirective.fingerprint }
-            : {}),
-        }
-      : {};
-  const mutationScopeRequiredFields =
-    hasLocalMutationCue && !hasCreateIntent
-      ? { mutationScopeRequired: true }
-      : {};
-  const readLineCount = readWindowDirective.lineCount;
-  const readLineOffset = readWindowDirective.lineOffset;
+  const mutationScopePlanning = resolveMutationScopePlanning({
+    prompt,
+    readFragment: readFragmentDirective,
+    hasEditIntent,
+    hasExecutionCorrectionCue,
+    hasContinuationCue,
+    hasGroundedReadLikeIntent,
+    hasVerifyIntent,
+    hasDiagnosisIntent,
+    hasCreateIntent,
+  });
   const failedTransforms = collectContinuationTransforms({
     continuity,
     preferredTarget: primaryTarget?.cleaned,
@@ -1195,8 +1179,7 @@ export function buildWorkflowTaskPlan(
         repairInstruction: normalizedRepairInstruction,
       };
     }
-    return {
-      taskKind: "read-file",
+    return buildReadOnlyPlan({
       reason: continuity.lastAnswerDefect
         ? `answer-repair follow-up on prior defect: ${continuity.lastAnswerDefect}`
         : "answer-repair follow-up on previous grounded response",
@@ -1206,35 +1189,13 @@ export function buildWorkflowTaskPlan(
         effectiveGroundedDeliverableMode ??
         continuity.lastGroundedDeliverableMode ??
         "read",
-      ...(readLineCount !== undefined ? { readLineCount } : {}),
-      ...(readLineOffset !== undefined ? { readLineOffset } : {}),
-      ...(readFragmentDirective.lineIndexes?.length
-        ? { readFragmentLineIndexes: readFragmentDirective.lineIndexes }
-        : {}),
-      ...(readFragmentDirective.ranges?.length
-        ? { readFragmentRanges: readFragmentDirective.ranges }
-        : {}),
-      ...(readFragmentDirective.sourceWindowStart !== undefined
-        ? {
-            readFragmentSourceWindowStart:
-              readFragmentDirective.sourceWindowStart,
-          }
-        : {}),
-      ...(readFragmentDirective.sourceWindowEnd !== undefined
-        ? { readFragmentSourceWindowEnd: readFragmentDirective.sourceWindowEnd }
-        : {}),
-      ...(readFragmentDirective.fingerprint
-        ? { readFragmentFingerprint: readFragmentDirective.fingerprint }
-        : {}),
-      ...(readFragmentDirective.filter
-        ? { readFilter: readFragmentDirective.filter }
-        : {}),
-      inspectFirst: true,
-      verifyAfterEdit: false,
+      readWindow: readWindowDirective,
+      readFragment: readFragmentDirective,
+      includeReadFragment: true,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
       continuationLineage: readContinuationLineageOrUndefined,
-    };
+    });
   }
 
   if (
@@ -1243,37 +1204,25 @@ export function buildWorkflowTaskPlan(
     !primaryTarget &&
     readContinuityRecovery.blockedReason
   ) {
-    return {
-      taskKind: "read-file",
-      reason: "pathless read follow-up could not recover continuation target",
-      inspectFirst: true,
-      verifyAfterEdit: false,
+    return buildPathlessReadContinuationBlockedPlan({
       blockedReason: readContinuityRecovery.blockedReason,
-      targetMissing: true,
-      usedRestoredState: Boolean(rawContinuityTargetPath),
+      rawContinuityTargetPath,
       continuationLineage: readContinuationLineageOrUndefined,
-    };
+    });
   }
 
   if (
-    hasLocalMutationCue &&
-    !hasMutationScopeEvidence &&
+    mutationScopePlanning.hasLocalMutationCue &&
+    !mutationScopePlanning.hasMutationScopeEvidence &&
     !explicitPrimaryTarget &&
     !promptPathTarget &&
     continuity.lastGroundedDeliverableMode === "explain" &&
     !hasGroundedReadLikeIntent &&
     !hasVerifyIntent
   ) {
-    return {
-      taskKind: "edit-file",
-      reason: "local mutation follow-up lacks explain fragment scope evidence",
-      inspectFirst: true,
-      verifyAfterEdit: false,
-      blockedReason:
-        "This follow-up refers to the previously explained part, but no reliable local fragment is available to mutate. Re-read/re-explain the target slice or provide an explicit file path and transform.",
-      targetMissing: false,
+    return buildLocalMutationScopeBlockedPlan({
       usedRestoredState,
-    };
+    });
   }
 
   if (
@@ -1298,28 +1247,24 @@ export function buildWorkflowTaskPlan(
             replaceTo: effectiveReplaceDirective.to,
           }
         : {}),
-      ...mutationScopeFields,
-      ...mutationScopeRequiredFields,
+      ...mutationScopePlanning.fields,
+      ...mutationScopePlanning.requiredFields,
       usedRestoredState,
     };
   }
 
   if (hasContinuationCue && hasFileReadIntent && primaryTarget?.inWorkspace) {
-    return {
-      taskKind: "read-file",
+    return buildReadOnlyPlan({
       reason: usedRestoredState
         ? "pathless read follow-up resolved from restored session state"
         : "read follow-up resolved from explicit target",
       targetPath: primaryTarget.cleaned,
       groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      ...(readLineCount !== undefined ? { readLineCount } : {}),
-      ...(readLineOffset !== undefined ? { readLineOffset } : {}),
-      inspectFirst: true,
-      verifyAfterEdit: false,
+      readWindow: readWindowDirective,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
       continuationLineage: readContinuationLineageOrUndefined,
-    };
+    });
   }
 
   if (
@@ -1332,8 +1277,7 @@ export function buildWorkflowTaskPlan(
     !hasVerifyIntent &&
     !hasDiagnosisIntent
   ) {
-    return {
-      taskKind: "read-file",
+    return buildReadOnlyPlan({
       reason:
         "ambiguous short follow-up resolved to active read-like continuation target",
       targetPath: primaryTarget.cleaned,
@@ -1341,52 +1285,23 @@ export function buildWorkflowTaskPlan(
         effectiveGroundedDeliverableMode ??
         continuity.lastGroundedDeliverableMode ??
         "read",
-      ...(readLineCount !== undefined ? { readLineCount } : {}),
-      ...(readLineOffset !== undefined ? { readLineOffset } : {}),
-      ...(readFragmentDirective.lineIndexes?.length
-        ? { readFragmentLineIndexes: readFragmentDirective.lineIndexes }
-        : {}),
-      ...(readFragmentDirective.ranges?.length
-        ? { readFragmentRanges: readFragmentDirective.ranges }
-        : {}),
-      ...(readFragmentDirective.sourceWindowStart !== undefined
-        ? {
-            readFragmentSourceWindowStart:
-              readFragmentDirective.sourceWindowStart,
-          }
-        : {}),
-      ...(readFragmentDirective.sourceWindowEnd !== undefined
-        ? { readFragmentSourceWindowEnd: readFragmentDirective.sourceWindowEnd }
-        : {}),
-      ...(readFragmentDirective.fingerprint
-        ? { readFragmentFingerprint: readFragmentDirective.fingerprint }
-        : {}),
-      ...(readFragmentDirective.filter
-        ? { readFilter: readFragmentDirective.filter }
-        : {}),
-      inspectFirst: true,
-      verifyAfterEdit: false,
+      readWindow: readWindowDirective,
+      readFragment: readFragmentDirective,
+      includeReadFragment: true,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
-    };
+    });
   }
 
   if (hasGroundedReadLikeIntent && hasExplicitPathReference && !primaryTarget) {
-    const targetStop = projectReadMissingTargetStop({
-      reason:
-        "Grounded read/summarize/explain request included a path reference, but no resolvable target was found. Provide a valid in-workspace file path.",
-      doNext: "Provide a valid in-workspace file path.",
-    });
-    return {
-      taskKind: "read-file",
+    return buildGroundedReadMissingTargetPlan({
       reason:
         "grounded read/summarize/explain requires a resolvable target path",
-      inspectFirst: true,
-      verifyAfterEdit: false,
-      blockedReason: targetStop.reason,
-      targetMissing: true,
+      stopReason:
+        "Grounded read/summarize/explain request included a path reference, but no resolvable target was found. Provide a valid in-workspace file path.",
+      doNext: "Provide a valid in-workspace file path.",
       usedRestoredState,
-    };
+    });
   }
 
   if (
@@ -1394,23 +1309,10 @@ export function buildWorkflowTaskPlan(
     primaryTarget &&
     !primaryTarget.inWorkspace
   ) {
-    const targetStop = projectReadOutOfWorkspaceTargetStop({
+    return buildGroundedReadOutOfWorkspacePlan({
       targetPath: primaryTarget.cleaned,
-      reason:
-        "Grounded read/summarize/explain target is outside current workspace. Attach/switch project or provide an in-workspace path.",
-      doNext: "Attach/switch project or provide an in-workspace path.",
-    });
-    return {
-      taskKind: "read-file",
-      reason:
-        "grounded read/summarize/explain target resolved outside workspace",
-      targetPath: primaryTarget.cleaned,
-      inspectFirst: true,
-      verifyAfterEdit: false,
-      blockedReason: targetStop.reason,
-      targetMissing: true,
       usedRestoredState,
-    };
+    });
   }
 
   if (
@@ -1456,56 +1358,41 @@ export function buildWorkflowTaskPlan(
     !hasCreateIntent &&
     !hasExecutionCorrectionCue
   ) {
-    return {
-      taskKind: "read-file",
+    return buildReadOnlyPlan({
       reason:
         "explicit read intent takes precedence over inherited mutation context",
       targetPath: primaryTarget.cleaned,
       groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      ...(readLineCount !== undefined ? { readLineCount } : {}),
-      ...(readLineOffset !== undefined ? { readLineOffset } : {}),
-      ...(shouldBuildContextPlanningSurface(prompt)
-        ? {
-            contextPlanningRequested: true,
-            contextPlanningReason: "explicit-context-packet" as const,
-          }
-        : {}),
-      inspectFirst: true,
-      verifyAfterEdit: false,
+      readWindow: readWindowDirective,
+      contextPrompt: prompt,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
       continuationLineage: ignoredExplicitTargetLineageOrUndefined,
-    };
+    });
   }
 
   if (hasPostEditReadOnlyVerifyCue && primaryTarget?.inWorkspace) {
-    return {
-      taskKind: "read-file",
+    return buildReadOnlyPlan({
       reason:
         "post-edit verify/check follow-up resolved as read-only continuation",
       targetPath: primaryTarget.cleaned,
       groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      inspectFirst: true,
-      verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
       continuationLineage: mutationVerificationLineage,
-    };
+    });
   }
 
   if (hasSeedReadOnlyCheckCue && primaryTarget?.inWorkspace) {
-    return {
-      taskKind: "read-file",
+    return buildReadOnlyPlan({
       reason:
         "seed-driven read-only check follow-up reused action result target",
       targetPath: primaryTarget.cleaned,
       groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      inspectFirst: true,
-      verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
       continuationLineage: ["seedInfluence=target-carryover"],
-    };
+    });
   }
 
   if (
@@ -1519,17 +1406,14 @@ export function buildWorkflowTaskPlan(
     !effectiveReplaceDirectiveFromPrompt &&
     !extractFencedContent(prompt)
   ) {
-    return {
-      taskKind: "read-file",
+    return buildReadOnlyPlan({
       reason: "diagnostic-driven weak follow-up reused handoff target",
       targetPath: primaryTarget.cleaned,
       groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      inspectFirst: true,
-      verifyAfterEdit: false,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
       continuationLineage: diagnosticHandoffLineage,
-    };
+    });
   }
 
   if (
@@ -1543,19 +1427,15 @@ export function buildWorkflowTaskPlan(
     !hasVerifyIntent &&
     !effectiveReplaceDirective
   ) {
-    return {
-      taskKind: "read-file",
+    return buildReadOnlyPlan({
       reason: "reflective next-step handoff reused read continuity target",
       targetPath: primaryTarget.cleaned,
       groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      ...(readLineCount !== undefined ? { readLineCount } : {}),
-      ...(readLineOffset !== undefined ? { readLineOffset } : {}),
-      inspectFirst: true,
-      verifyAfterEdit: false,
+      readWindow: readWindowDirective,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
       continuationLineage: ignoredExplicitTargetLineageOrUndefined,
-    };
+    });
   }
 
   if (hasContinuationExecutionIntent && primaryTarget?.inWorkspace) {
@@ -1648,8 +1528,8 @@ export function buildWorkflowTaskPlan(
               editFailureRepairContextAbandonment.failedTargetCandidates.length,
           }
         : {}),
-      ...(!hasCreateIntent ? mutationScopeFields : {}),
-      ...(!hasCreateIntent ? mutationScopeRequiredFields : {}),
+      ...(!hasCreateIntent ? mutationScopePlanning.fields : {}),
+      ...(!hasCreateIntent ? mutationScopePlanning.requiredFields : {}),
       usedRestoredState,
       previousRemainingTargets,
       previousFailedEntries,
@@ -1691,15 +1571,10 @@ export function buildWorkflowTaskPlan(
   }
 
   if (editExpectationContract.reasonCode === "unsupported-discovery-edit") {
-    return {
-      taskKind: "edit-file",
-      reason: "discovery edit is outside current write/edit contract",
-      inspectFirst: true,
-      verifyAfterEdit: false,
-      blockedReason: `Discovery edit is unsupported in the current bounded edit contract. ${editExpectationContract.doNext}`,
-      targetMissing: true,
+    return buildUnsupportedDiscoveryEditPlan({
+      doNext: editExpectationContract.doNext,
       usedRestoredState,
-    };
+    });
   }
 
   if (hasExecutionIntent && unsupportedCommand) {
@@ -1731,48 +1606,24 @@ export function buildWorkflowTaskPlan(
 
   if (hasWriteTaskIntent || hasEditIntent) {
     if (!primaryTarget) {
-      return {
-        taskKind: hasWriteTaskIntent ? "write-file" : "edit-file",
-        reason: "write/edit intent without resolvable target",
-        inspectFirst: !hasWriteTaskIntent,
-        verifyAfterEdit: hasVerifyIntent,
-        ...(effectiveVerifyCommand
-          ? { verifyCommand: effectiveVerifyCommand }
-          : {}),
-        blockedReason: hasWriteTaskIntent
-          ? `Target file is required for write task. ${editExpectationContract.doNext}`
-          : formatEditExecutionFailure({
-              failureReason: "edit-target-missing",
-              explanation:
-                "The edit request did not identify one unique in-workspace target file.",
-              nextAction:
-                "Rerun with exactly one target file path, for example: Edit src/example.ts and replace '<current text>' with '<desired text>'.",
-            }),
-        targetMissing: true,
-        ...(effectiveReplaceDirective
-          ? {
-              replaceFrom: effectiveReplaceDirective.from,
-              replaceTo: effectiveReplaceDirective.to,
-            }
-          : {}),
+      return buildMissingMutationTargetPlan({
+        hasWriteTaskIntent,
+        hasVerifyIntent,
+        verifyCommand: effectiveVerifyCommand,
+        replaceDirective: effectiveReplaceDirective,
+        editDoNext: editExpectationContract.doNext,
         usedRestoredState,
-      };
+      });
     }
 
     if (!primaryTarget.inWorkspace) {
-      return {
-        taskKind: hasWriteTaskIntent ? "write-file" : "edit-file",
-        reason: "target resolved outside workspace",
-        inspectFirst: !hasWriteTaskIntent,
-        verifyAfterEdit: hasVerifyIntent,
-        ...(effectiveVerifyCommand
-          ? { verifyCommand: effectiveVerifyCommand }
-          : {}),
+      return buildOutOfWorkspaceMutationTargetPlan({
+        hasWriteTaskIntent,
+        hasVerifyIntent,
+        verifyCommand: effectiveVerifyCommand,
         targetPath: primaryTarget.cleaned,
-        blockedReason:
-          "Resolved target is outside current workspace. Attach/switch project or provide an in-workspace path.",
         usedRestoredState,
-      };
+      });
     }
 
     if (
@@ -1781,24 +1632,10 @@ export function buildWorkflowTaskPlan(
       !extractFencedContent(prompt) &&
       !extractLowRiskRenameRefactor(prompt)
     ) {
-      return {
-        taskKind: "edit-file",
-        reason: "edit intent needs targeted context planning before mutation",
+      return buildUnclearEditTransformPlan({
         targetPath: primaryTarget.cleaned,
-        inspectFirst: false,
-        verifyAfterEdit: false,
-        blockedReason: formatEditExecutionFailure({
-          failureReason: "edit-transform-unclear",
-          explanation:
-            "Missing concrete edit transform. A targeted context packet is required before planning this edit.",
-          nextAction:
-            "Inspect suggested reads and rerun with an exact replacement or confirmed proposal.",
-        }),
-        targetMissing: false,
-        contextPlanningRequested: true,
-        contextPlanningReason: "missing-edit-context",
         usedRestoredState,
-      };
+      });
     }
 
     return {
@@ -1818,33 +1655,24 @@ export function buildWorkflowTaskPlan(
             replaceTo: effectiveReplaceDirective.to,
           }
         : {}),
-      ...(!hasCreateIntent ? mutationScopeFields : {}),
-      ...(!hasCreateIntent ? mutationScopeRequiredFields : {}),
+      ...(!hasCreateIntent ? mutationScopePlanning.fields : {}),
+      ...(!hasCreateIntent ? mutationScopePlanning.requiredFields : {}),
       usedRestoredState,
       continuationLineage: ignoredExplicitTargetLineageOrUndefined,
     };
   }
 
   if (hasFileReadIntent && primaryTarget?.inWorkspace) {
-    return {
-      taskKind: "read-file",
+    return buildReadOnlyPlan({
       reason: "read/inspect intent with explicit target",
       targetPath: primaryTarget.cleaned,
       groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      ...(readLineCount !== undefined ? { readLineCount } : {}),
-      ...(readLineOffset !== undefined ? { readLineOffset } : {}),
-      ...(shouldBuildContextPlanningSurface(prompt)
-        ? {
-            contextPlanningRequested: true,
-            contextPlanningReason: "explicit-context-packet" as const,
-          }
-        : {}),
-      inspectFirst: true,
-      verifyAfterEdit: false,
+      readWindow: readWindowDirective,
+      contextPrompt: prompt,
       usedRestoredState,
       repairInstruction: normalizedRepairInstruction,
       continuationLineage: ignoredExplicitTargetLineageOrUndefined,
-    };
+    });
   }
 
   if (
@@ -1854,91 +1682,48 @@ export function buildWorkflowTaskPlan(
     !hasCreateIntent &&
     !hasExecutionIntent
   ) {
-    return {
-      taskKind: "read-file",
+    return buildReadOnlyPlan({
       reason: "path-only prompt resolved as grounded read",
       targetPath: primaryTarget.cleaned,
       groundedDeliverableMode: "read",
-      ...(readLineCount !== undefined ? { readLineCount } : {}),
-      inspectFirst: true,
-      verifyAfterEdit: false,
+      readWindow: { lineCount: readWindowDirective.lineCount },
       usedRestoredState,
-    };
+    });
   }
 
   if ((hasSummarizeIntent || hasExplainIntent) && primaryTarget?.inWorkspace) {
     const effectiveRepairInstruction = hasLocalExplainCue
       ? { ...normalizedRepairInstruction, targetMode: "explain" as const }
       : normalizedRepairInstruction;
-    return {
-      taskKind: "read-file",
+    return buildReadOnlyPlan({
       reason: "summarize/explain intent with explicit target",
       targetPath: primaryTarget.cleaned,
       groundedDeliverableMode:
         (hasLocalExplainCue ? "explain" : effectiveGroundedDeliverableMode) ??
         (hasExplainIntent ? "explain" : "summary"),
-      ...(readLineCount !== undefined ? { readLineCount } : {}),
-      ...(readLineOffset !== undefined ? { readLineOffset } : {}),
-      ...(shouldBuildContextPlanningSurface(prompt)
-        ? {
-            contextPlanningRequested: true,
-            contextPlanningReason: "explicit-context-packet" as const,
-          }
-        : {}),
-      ...(hasLocalExplainCue && readFragmentDirective.lineIndexes?.length
-        ? { readFragmentLineIndexes: readFragmentDirective.lineIndexes }
-        : {}),
-      ...(hasLocalExplainCue && readFragmentDirective.ranges?.length
-        ? { readFragmentRanges: readFragmentDirective.ranges }
-        : {}),
-      ...(hasLocalExplainCue &&
-      readFragmentDirective.sourceWindowStart !== undefined
-        ? {
-            readFragmentSourceWindowStart:
-              readFragmentDirective.sourceWindowStart,
-          }
-        : {}),
-      ...(hasLocalExplainCue &&
-      readFragmentDirective.sourceWindowEnd !== undefined
-        ? { readFragmentSourceWindowEnd: readFragmentDirective.sourceWindowEnd }
-        : {}),
-      ...(hasLocalExplainCue && readFragmentDirective.fingerprint
-        ? { readFragmentFingerprint: readFragmentDirective.fingerprint }
-        : {}),
-      ...(hasLocalExplainCue && readFragmentDirective.filter
-        ? { readFilter: readFragmentDirective.filter }
-        : {}),
-      inspectFirst: true,
-      verifyAfterEdit: false,
+      readWindow: readWindowDirective,
+      readFragment: readFragmentDirective,
+      includeReadFragment: hasLocalExplainCue,
+      contextPrompt: prompt,
       usedRestoredState,
       repairInstruction: effectiveRepairInstruction,
-    };
+    });
   }
 
   if (hasFileReadIntent) {
     if (hasTargetedFileReadIntent && !hasRepositoryInspectIntent) {
-      const targetStop = projectReadMissingTargetStop({
-        reason:
+      return buildGroundedReadMissingTargetPlan({
+        reason: "targeted read intent requires explicit readable target",
+        stopReason:
           "I can read the file, but I still need an explicit in-workspace file path.",
         doNext: "Provide an explicit in-workspace file path.",
-      });
-      return {
-        taskKind: "read-file",
-        reason: "targeted read intent requires explicit readable target",
-        inspectFirst: true,
-        verifyAfterEdit: false,
-        blockedReason: targetStop.reason,
-        targetMissing: true,
         usedRestoredState,
-      };
+      });
     }
-    return {
-      taskKind: "inspect-files",
+    return buildInspectFilesPlan({
       reason: "read/inspect intent without explicit in-workspace target",
-      inspectFirst: true,
-      verifyAfterEdit: false,
       usedRestoredState,
-    };
+    });
   }
 
   return {
@@ -1948,160 +1733,6 @@ export function buildWorkflowTaskPlan(
     verifyAfterEdit: false,
     usedRestoredState,
   };
-}
-
-function shouldBuildContextPlanningSurface(prompt: string): boolean {
-  return /\b(?:context packet|targeted context|planning context|related files|related tests|suggested reads|missing context|plan(?:ning)? surface|analysis brief|execution plan|analy[sz]e|plan)\b/i.test(
-    prompt,
-  );
-}
-
-function resolveSingleFileEditFailureRepairContext(
-  continuity: ContinuityStateLike,
-  workspaceRoot: string,
-):
-  | { failureReason: SingleFileEditFailureReason; targetPath?: string }
-  | undefined {
-  if (continuity.lastTaskKind !== "edit-file") {
-    return undefined;
-  }
-
-  const failureReason = extractSingleFileEditFailureReason(continuity);
-  if (!failureReason) {
-    return undefined;
-  }
-
-  const targetCandidates = new Set<string>();
-  const addCandidate = (rawCandidate: string | undefined): void => {
-    const candidate = normalizePathLike(rawCandidate ?? "");
-    if (!isUsableContinuationTargetPath(candidate)) {
-      return;
-    }
-    const rebound = rebindContinuationTargetToWorkspace(
-      candidate,
-      workspaceRoot,
-    );
-    if (rebound) {
-      targetCandidates.add(rebound);
-    }
-  };
-
-  addCandidate(
-    deriveWorkflowContinuationTarget({
-      continuity,
-      workspaceRoot,
-    }),
-  );
-  for (const entry of continuity.recentFailedFiles ?? []) {
-    addCandidate(entry.path);
-  }
-  for (const entry of continuity.recentTargetFiles ?? []) {
-    addCandidate(entry);
-  }
-
-  if (failureReason === "edit-target-missing") {
-    return {
-      failureReason,
-      ...(targetCandidates.size === 1
-        ? { targetPath: [...targetCandidates][0] }
-        : {}),
-    };
-  }
-
-  if (targetCandidates.size !== 1) {
-    return undefined;
-  }
-
-  return {
-    failureReason,
-    targetPath: [...targetCandidates][0],
-  };
-}
-
-function resolveSingleFileEditFailureRepairContextAbandonment(
-  continuity: ContinuityStateLike,
-  workspaceRoot: string,
-):
-  | {
-      reason: "multiple-failed-targets";
-      failureReason: SingleFileEditFailureReason;
-      failedTargetCandidates: readonly string[];
-    }
-  | undefined {
-  if (continuity.lastTaskKind !== "edit-file") {
-    return undefined;
-  }
-
-  const failureReason = extractSingleFileEditFailureReason(continuity);
-  if (!failureReason) {
-    return undefined;
-  }
-
-  const failedTargetCandidates = new Set<string>();
-  for (const entry of continuity.recentFailedFiles ?? []) {
-    const candidate = normalizePathLike(entry.path ?? "");
-    if (!isUsableContinuationTargetPath(candidate)) {
-      continue;
-    }
-    const rebound = rebindContinuationTargetToWorkspace(
-      candidate,
-      workspaceRoot,
-    );
-    if (rebound) {
-      failedTargetCandidates.add(rebound);
-    }
-  }
-
-  if (failedTargetCandidates.size <= 1) {
-    return undefined;
-  }
-
-  return {
-    reason: "multiple-failed-targets",
-    failureReason,
-    failedTargetCandidates: [...failedTargetCandidates],
-  };
-}
-
-function extractSingleFileEditFailureReason(
-  continuity: ContinuityStateLike,
-): SingleFileEditFailureReason | undefined {
-  const evidence = [
-    continuity.lastFailure ?? "",
-    ...(continuity.recentFailedFiles ?? []).flatMap((entry) => [
-      entry.path,
-      entry.reason,
-    ]),
-    ...(continuity.lastContinuationEvidence ?? []),
-    ...(continuity.unresolvedItems ?? []),
-  ].join("\n");
-  const match = evidence.match(
-    /\b(edit-target-missing|edit-transform-unclear|patch-from-not-found|patch-ambiguous|patch-target-missing)\b/i,
-  );
-  return match?.[1]?.toLowerCase() as SingleFileEditFailureReason | undefined;
-}
-
-function resolveSingleFileEditRepairPayloadKind(input: {
-  failureReason: SingleFileEditFailureReason;
-  prompt: string;
-  hasEditIntent: boolean;
-  replaceDirective?: { from: string; to: string };
-  fencedContent?: string;
-}): SingleFileEditRepairPayloadKind | undefined {
-  if (
-    input.failureReason === "edit-target-missing" &&
-    hasPathLikeReference(input.prompt) &&
-    (input.hasEditIntent || input.replaceDirective || input.fencedContent)
-  ) {
-    return "target-path-with-transform";
-  }
-  if (input.replaceDirective) {
-    return "replace-directive";
-  }
-  if (input.fencedContent) {
-    return "fenced-content";
-  }
-  return undefined;
 }
 
 function hasCrossFileEvidenceSignalInContinuity(
