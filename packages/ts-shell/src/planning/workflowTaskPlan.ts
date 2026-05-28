@@ -9,10 +9,10 @@ import {
   buildInspectFilesPlan,
   buildReadOnlyPlan,
 } from "../context/readIntentPlanning.js";
+import { buildWorkflowReadPlanBranch } from "../context/workflowReadPlanBranch.js";
 import { buildPathlessReadContinuationBlockedPlan } from "../context/readContinuationPlanning.js";
 import {
   buildGroundedReadMissingTargetPlan,
-  buildGroundedReadOutOfWorkspacePlan,
 } from "../context/readTargetPlanning.js";
 import { hasPathLikeReference } from "./promptTargetProjection.js";
 import {
@@ -111,7 +111,7 @@ import {
   shouldBlockMutationForTargetResolution,
 } from "./workflowTargetPlanning.js";
 import { rebindContinuationTargetToWorkspace } from "../session/continuationTargetRebase.js";
-import { deriveWorkflowTurnContinuationFacts } from "../session/turnContinuationFacts.js";
+import { deriveWorkflowPlanningContinuitySignals } from "../session/continuation/workflowPlanningContinuity.js";
 import { buildCommandIntentPlan } from "../verification/commandIntentPlanning.js";
 import { buildVerifyContinuationPlanning } from "../verification/verifyContinuationPlanning.js";
 
@@ -224,90 +224,38 @@ export function buildWorkflowTaskPlan(
   const diagnosticHandoffProjection = projectProviderDiagnosticHandoff(continuity);
   const diagnosticHandoffEvidence =
     diagnosticHandoffProjection.diagnosticHandoff;
-  const {
-    seedActionKind,
-    hasActionResultSeed,
-    seedWasReadLike,
-    lastTaskWasReadLike,
-    lastTaskWasMutationLike,
-    seedVerificationStatus,
-    diagnosticVerifyStatus,
-    diagnosticHasVerifySignal,
-  } = deriveWorkflowTurnContinuationFacts({
-    continuity,
-    diagnosticHandoffEvidence,
-  });
-  const seedIgnoredExplicitTargetLineage =
-    hasActionResultSeed && hasExplicitPathReference
-      ? ["seedInfluence=ignored-explicit-target"]
-      : undefined;
-  const hasDiagnosticVerifyHandoffCue =
-    Boolean(diagnosticHandoffEvidence?.command) &&
-    hasVerifyIntent &&
-    !hasExplicitPathReference;
-  const hasWeakDiagnosticHandoffCue =
-    Boolean(diagnosticHandoffEvidence) &&
-    isWeakSeedTargetCarryoverPrompt(prompt) &&
-    !hasExplicitPathReference;
-  const diagnosticHandoffLineage =
-    (hasWeakDiagnosticHandoffCue || hasDiagnosticVerifyHandoffCue) &&
-    diagnosticHandoffEvidence
-      ? diagnosticHandoffProjection.lineage
-      : undefined;
-  const ignoredExplicitTargetLineage = [
-    ...(seedIgnoredExplicitTargetLineage ?? []),
-    ...(diagnosticHandoffEvidence && hasExplicitPathReference
-      ? ["diagnosticHandoff=ignored-explicit-target"]
-      : []),
-  ];
-  const ignoredExplicitTargetLineageOrUndefined =
-    ignoredExplicitTargetLineage.length > 0
-      ? ignoredExplicitTargetLineage
-      : undefined;
   const hasPostEditReadOnlyVerifyPrompt =
     isPostEditReadOnlyVerifyFollowUp(prompt);
   const hasWeakSeedTargetCarryoverCue =
     isWeakSeedTargetCarryoverPrompt(prompt) && !hasExplicitPathReference;
-  const hasPostEditReadOnlyVerifyCue =
-    hasPostEditReadOnlyVerifyPrompt &&
-    lastTaskWasMutationLike &&
-    !hasCorrectionCue &&
-    !hasCreateIntent &&
-    !hasExecutionIntent &&
-    !effectiveReplaceDirectiveFromPrompt &&
-    !extractFencedContent(prompt);
-  const hasSeedReadOnlyCheckCue =
-    (hasPostEditReadOnlyVerifyPrompt || hasWeakSeedTargetCarryoverCue) &&
-    seedWasReadLike &&
-    !hasEditIntent &&
-    !hasCorrectionCue &&
-    !hasCreateIntent &&
-    !hasExecutionIntent &&
-    !effectiveReplaceDirectiveFromPrompt &&
-    !extractFencedContent(prompt);
-  const seedVerifySignalLineage =
-    seedVerificationStatus && seedVerificationStatus !== "not-requested"
-      ? ["seedInfluence=verify-signal"]
-      : undefined;
-  const verifyContinuationLineage = [
-    ...(seedVerifySignalLineage ?? []),
-    ...(diagnosticHandoffLineage ?? []),
-  ];
-  const verifyContinuationLineageOrUndefined =
-    verifyContinuationLineage.length > 0
-      ? verifyContinuationLineage
-      : undefined;
-  const lastTaskHadVerifySignal =
-    continuity.lastVerificationStatus === "failed" ||
-    continuity.lastVerificationStatus === "blocked" ||
-    continuity.lastVerificationStatus === "skipped" ||
-    Boolean(seedVerificationStatus && seedVerificationStatus !== "not-requested") ||
-    diagnosticHasVerifySignal ||
-    (continuity.unresolvedItems ?? []).some(
-      (entry) =>
-        entry.toLowerCase().startsWith("verify:") &&
-        !entry.toLowerCase().includes("not-requested"),
-    );
+  const {
+    lastTaskWasReadLike,
+    lastTaskWasMutationLike,
+    hasDiagnosticVerifyHandoffCue,
+    hasWeakDiagnosticHandoffCue,
+    diagnosticHandoffLineage,
+    ignoredExplicitTargetLineageOrUndefined,
+    hasPostEditReadOnlyVerifyCue,
+    hasSeedReadOnlyCheckCue,
+    verifyContinuationLineageOrUndefined,
+    lastTaskHadVerifySignal,
+  } = deriveWorkflowPlanningContinuitySignals({
+    continuity,
+    diagnosticHandoffEvidence,
+    diagnosticHandoffProjectionLineage: diagnosticHandoffProjection.lineage,
+    hasVerifyIntent,
+    hasExplicitPathReference,
+    hasPostEditReadOnlyVerifyPrompt,
+    hasWeakSeedTargetCarryoverCue,
+    hasCorrectionCue,
+    hasCreateIntent,
+    hasExecutionIntent,
+    hasEditIntent,
+    hasEffectiveReplaceDirectiveFromPrompt: Boolean(
+      effectiveReplaceDirectiveFromPrompt,
+    ),
+    hasFencedContent: Boolean(extractFencedContent(prompt)),
+  });
   const mutationVerificationLineage =
     buildPostEditVerifyContinuationLineage(continuity);
   const previousRemainingTargets =
@@ -1199,189 +1147,51 @@ export function buildWorkflowTaskPlan(
     };
   }
 
-  if (hasContinuationCue && hasFileReadIntent && primaryTarget?.inWorkspace) {
-    return buildReadOnlyPlan({
-      reason: usedRestoredState
-        ? "pathless read follow-up resolved from restored session state"
-        : "read follow-up resolved from explicit target",
-      targetPath: primaryTarget.cleaned,
-      groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      readWindow: readWindowDirective,
-      usedRestoredState,
-      repairInstruction: normalizedRepairInstruction,
-      continuationLineage: readContinuationLineageOrUndefined,
-    });
-  }
-
-  if (
-    isAmbiguousRepairFollowUp &&
-    !hasCrossFileUltraWeakFollowUp &&
-    lastTaskWasReadLike &&
-    primaryTarget?.inWorkspace &&
-    !hasEditIntent &&
-    !hasCreateIntent &&
-    !hasVerifyIntent &&
-    !hasDiagnosisIntent
-  ) {
-    return buildReadOnlyPlan({
-      reason:
-        "ambiguous short follow-up resolved to active read-like continuation target",
-      targetPath: primaryTarget.cleaned,
-      groundedDeliverableMode:
-        effectiveGroundedDeliverableMode ??
-        continuity.lastGroundedDeliverableMode ??
-        "read",
-      readWindow: readWindowDirective,
-      readFragment: readFragmentDirective,
-      includeReadFragment: true,
-      usedRestoredState,
-      repairInstruction: normalizedRepairInstruction,
-    });
-  }
-
-  if (hasGroundedReadLikeIntent && hasExplicitPathReference && !primaryTarget) {
-    return buildGroundedReadMissingTargetPlan({
-      reason:
-        "grounded read/summarize/explain requires a resolvable target path",
-      stopReason:
-        "Grounded read/summarize/explain request included a path reference, but no resolvable target was found. Provide a valid in-workspace file path.",
-      doNext: "Provide a valid in-workspace file path.",
-      usedRestoredState,
-    });
-  }
-
-  if (
-    hasGroundedReadLikeIntent &&
-    primaryTarget &&
-    !primaryTarget.inWorkspace
-  ) {
-    return buildGroundedReadOutOfWorkspacePlan({
-      targetPath: primaryTarget.cleaned,
-      usedRestoredState,
-    });
-  }
-
-  if (
-    hasDiagnosisIntent &&
-    !hasExecutionIntent &&
-    !hasEditIntent &&
-    !hasCreateIntent &&
-    (hasExplainIntent ||
-      /\b(?:repository|repo|runtime|session|implementation|implemented)\b/i.test(
-        groundedIntentPrompt,
-      ) ||
-      /\b(?:fail|fails|failing|error|errors|exception|boom|intermittently)\b/i.test(
-        groundedIntentPrompt,
-      ))
-  ) {
-    return {
-      taskKind: "repo-explain",
-      reason: "repo diagnosis intent",
-      targetPath: primaryTarget?.inWorkspace ? primaryTarget.cleaned : undefined,
-      inspectFirst: true,
-      verifyAfterEdit: false,
-      usedRestoredState,
-    };
-  }
-
-  if ((hasSummarizeIntent || hasExplainIntent) && !primaryTarget?.inWorkspace) {
-    return {
-      taskKind: "read-file",
-      reason: "grounded summarize/explain requires explicit readable target",
-      inspectFirst: true,
-      verifyAfterEdit: false,
-      blockedReason:
-        "Summarize/explain requests require an explicit readable target file. Provide the file path in this workspace.",
-      targetMissing: true,
-      usedRestoredState,
-    };
-  }
-
-  if (
-    hasFileReadIntent &&
-    primaryTarget?.inWorkspace &&
-    !hasEditIntent &&
-    !hasCreateIntent &&
-    !hasExecutionCorrectionCue
-  ) {
-    return buildReadOnlyPlan({
-      reason:
-        "explicit read intent takes precedence over inherited mutation context",
-      targetPath: primaryTarget.cleaned,
-      groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      readWindow: readWindowDirective,
-      contextPrompt: prompt,
-      usedRestoredState,
-      repairInstruction: normalizedRepairInstruction,
-      continuationLineage: ignoredExplicitTargetLineageOrUndefined,
-    });
-  }
-
-  if (hasPostEditReadOnlyVerifyCue && primaryTarget?.inWorkspace) {
-    return buildReadOnlyPlan({
-      reason:
-        "post-edit verify/check follow-up resolved as read-only continuation",
-      targetPath: primaryTarget.cleaned,
-      groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      usedRestoredState,
-      repairInstruction: normalizedRepairInstruction,
-      continuationLineage: mutationVerificationLineage,
-    });
-  }
-
-  if (hasSeedReadOnlyCheckCue && primaryTarget?.inWorkspace) {
-    return buildReadOnlyPlan({
-      reason:
-        "seed-driven read-only check follow-up reused action result target",
-      targetPath: primaryTarget.cleaned,
-      groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      usedRestoredState,
-      repairInstruction: normalizedRepairInstruction,
-      continuationLineage: ["seedInfluence=target-carryover"],
-    });
-  }
-
-  if (
-    hasWeakDiagnosticHandoffCue &&
-    primaryTarget?.inWorkspace &&
-    !hasEditIntent &&
-    !hasCorrectionCue &&
-    !hasCreateIntent &&
-    !hasExecutionIntent &&
-    !hasVerifyIntent &&
-    !effectiveReplaceDirectiveFromPrompt &&
-    !extractFencedContent(prompt)
-  ) {
-    return buildReadOnlyPlan({
-      reason: "diagnostic-driven weak follow-up reused handoff target",
-      targetPath: primaryTarget.cleaned,
-      groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      usedRestoredState,
-      repairInstruction: normalizedRepairInstruction,
-      continuationLineage: diagnosticHandoffLineage,
-    });
-  }
-
-  if (
-    reflectiveStateQueryKind === "next-step" &&
-    hasReflectiveActionCue &&
-    lastTaskWasReadLike &&
-    primaryTarget?.inWorkspace &&
-    !hasEditIntent &&
-    !hasCreateIntent &&
-    !hasRepairContinuationCue &&
-    !hasVerifyIntent &&
-    !effectiveReplaceDirective
-  ) {
-    return buildReadOnlyPlan({
-      reason: "reflective next-step handoff reused read continuity target",
-      targetPath: primaryTarget.cleaned,
-      groundedDeliverableMode: effectiveGroundedDeliverableMode ?? "read",
-      readWindow: readWindowDirective,
-      usedRestoredState,
-      repairInstruction: normalizedRepairInstruction,
-      continuationLineage: ignoredExplicitTargetLineageOrUndefined,
-    });
+  const readPlanBranch = buildWorkflowReadPlanBranch({
+    prompt,
+    primaryTarget,
+    continuityLastGroundedDeliverableMode:
+      continuity.lastGroundedDeliverableMode,
+    hasContinuationCue,
+    hasFileReadIntent,
+    hasExplicitPathReference,
+    hasGroundedReadLikeIntent,
+    hasDiagnosisIntent,
+    hasExecutionIntent,
+    hasEditIntent,
+    hasCreateIntent,
+    hasExecutionCorrectionCue,
+    hasExplainIntent,
+    hasSummarizeIntent,
+    groundedIntentPrompt,
+    isAmbiguousRepairFollowUp,
+    hasCrossFileUltraWeakFollowUp,
+    lastTaskWasReadLike,
+    hasVerifyIntent,
+    hasPostEditReadOnlyVerifyCue,
+    hasSeedReadOnlyCheckCue,
+    hasWeakDiagnosticHandoffCue,
+    hasCorrectionCue,
+    hasEffectiveReplaceDirectiveFromPrompt: Boolean(
+      effectiveReplaceDirectiveFromPrompt,
+    ),
+    hasFencedContent: Boolean(extractFencedContent(prompt)),
+    reflectiveStateQueryKind,
+    hasReflectiveActionCue,
+    hasRepairContinuationCue,
+    hasEffectiveReplaceDirective: Boolean(effectiveReplaceDirective),
+    effectiveGroundedDeliverableMode,
+    readWindowDirective,
+    readFragmentDirective,
+    normalizedRepairInstruction,
+    readContinuationLineage: readContinuationLineageOrUndefined,
+    ignoredExplicitTargetLineage: ignoredExplicitTargetLineageOrUndefined,
+    mutationVerificationLineage,
+    diagnosticHandoffLineage,
+    usedRestoredState,
+  });
+  if (readPlanBranch) {
+    return readPlanBranch;
   }
 
   if (hasContinuationExecutionIntent && primaryTarget?.inWorkspace) {
