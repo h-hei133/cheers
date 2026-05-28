@@ -68,14 +68,11 @@ import type {
 import {
   type WorkspaceRootMode,
 } from "./projectBindingPolicy.js";
-import {
-  projectRebasedSessionRoot,
-  projectSessionRootRebase,
-} from "./continuation/sessionRootRebase.js";
 import { applySessionWorkspaceBinding } from "./store/sessionProjectBinding.js";
 import { buildSessionContinuitySnapshot } from "./continuation/sessionContinuitySnapshot.js";
 import { normalizeLegacyPermissionStateForSession } from "./continuation/legacyPermissionRebase.js";
 import { extractSeedInfluenceFromQueryResult } from "./continuation/sessionSeedInfluence.js";
+import { rebindSessionProjectRootContinuity } from "./continuation/sessionProjectRootRebind.js";
 import {
   appendSessionTurn,
   appendTranscriptEvent,
@@ -518,40 +515,23 @@ export class SessionManager {
 
   rebindSessionProjectRoot(sessionId: string, nextProjectRoot: string): Session {
     const session = this.store.load(sessionId);
-    const previousRoot = session.projectRoot;
-    const normalizedRoot = projectRebasedSessionRoot(nextProjectRoot);
-    session.projectRoot = normalizedRoot;
-    session.updatedAt = new Date().toISOString();
-    this.store.writeSessionMetadata(session);
-    this.store.withSessionStateLock(session.id, () => {
-      const statePath = this.store.statePath(session.id);
-      const current = this.store.readStateSnapshotSafely(statePath);
-      if (!current) {
-        this.store.writeJsonFileAtomic(
-          statePath,
-          this.buildSessionStateSnapshot(session, undefined),
-        );
-        return;
-      }
-
-      const currentRebaseProjection = projectSessionRootRebase({
-        workingMemory: current.workingMemory,
-        previousRoot,
-        nextProjectRoot,
-      });
-
-      this.store.writeJsonFileAtomic(statePath, {
-        ...current,
-        projectRoot: currentRebaseProjection.projectRoot,
-        ...(currentRebaseProjection.workingMemory !== undefined
-          ? {
-              workingMemory: currentRebaseProjection.workingMemory,
-            }
-          : {}),
-      } satisfies SessionStateSnapshot);
+    const statePath = this.store.statePath(session.id);
+    const rebound = rebindSessionProjectRootContinuity({
+      session,
+      nextProjectRoot,
+      updatedAt: new Date().toISOString(),
+      writeSessionMetadata: (nextSession) =>
+        this.store.writeSessionMetadata(nextSession),
+      withStateLock: (targetSessionId, update) =>
+        this.store.withSessionStateLock(targetSessionId, update),
+      readStateSnapshot: () => this.store.readStateSnapshotSafely(statePath),
+      buildStateSnapshot: (nextSession, current) =>
+        this.buildSessionStateSnapshot(nextSession, current),
+      writeStateSnapshot: (snapshot) =>
+        this.store.writeJsonFileAtomic(statePath, snapshot),
     });
-    this.setCurrentSessionForProject(normalizedRoot, session.id);
-    return session;
+    this.setCurrentSessionForProject(rebound.projectRoot, rebound.id);
+    return rebound;
   }
 
   updateSessionWorkspaceBinding(
