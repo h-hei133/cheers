@@ -1,4 +1,5 @@
 import path from "node:path";
+import { writeMixedFileOperations } from "../../edit/multifile/mixedFileOperationWriter.js";
 import {
   captureRecoveryAuthorityRecords,
   type RecoveryAuthorityCaptureBatchResult,
@@ -492,7 +493,10 @@ export async function runMixedFileWriteRoute(
     });
   }
 
-  const applied = await applyMixedOperations(options, verification.plan.operations);
+  const applied = await writeMixedFileOperations(
+    options,
+    verification.plan.operations,
+  );
   if (applied.ok === false) {
     const phase: WorkspaceWriteFailurePhase =
       applied.postWriteVerification === "failed"
@@ -1312,136 +1316,6 @@ function firstMoveContentEditFailure(
       "Move File in this guarded mixed lane must preserve source content exactly; content edits during move are not enabled.",
     nextAction:
       "Regenerate a pure Move File operation and use a separate update operation on a distinct file if content must change.",
-  };
-}
-
-type MixedApplyResult =
-  | {
-      readonly ok: true;
-      readonly changedFiles: readonly string[];
-      readonly failedFiles: readonly [];
-      readonly postWriteVerification: "passed";
-    }
-  | {
-      readonly ok: false;
-      readonly changedFiles: readonly string[];
-      readonly failedFiles: readonly PatchFailure[];
-      readonly postWriteVerification: "blocked" | "failed";
-    };
-
-async function applyMixedOperations(
-  options: MixedFileWriteRouteOptions,
-  operations: readonly VerifiedPatchFileOperation[],
-): Promise<MixedApplyResult> {
-  const changedFiles: string[] = [];
-  // Route 48/62 intentionally uses parsed patch order after all preflight checks.
-  // Conflict guards make the bounded operations independent, so preserving parsed
-  // order is deterministic without implying rollback or atomicity.
-  for (const operation of operations) {
-    const applied = await applyOneOperation(options, operation);
-    if (applied.ok === false) {
-      return {
-        ok: false,
-        changedFiles,
-        failedFiles: applied.failedFiles,
-        postWriteVerification: applied.postWriteVerification,
-      };
-    }
-    changedFiles.push(applied.changedFile);
-  }
-  return {
-    ok: true,
-    changedFiles,
-    failedFiles: [],
-    postWriteVerification: "passed",
-  };
-}
-
-type OneOperationApplyResult =
-  | {
-      readonly ok: true;
-      readonly changedFile: string;
-    }
-  | {
-      readonly ok: false;
-      readonly failedFiles: readonly PatchFailure[];
-      readonly postWriteVerification: "blocked" | "failed";
-    };
-
-async function applyOneOperation(
-  options: MixedFileWriteRouteOptions,
-  operation: VerifiedPatchFileOperation,
-): Promise<OneOperationApplyResult> {
-  const patchOperation = operation.operation;
-  try {
-    switch (patchOperation.kind) {
-      case "update":
-        await options.writeFile(patchOperation.path, operation.plannedContent ?? "");
-        if (options.readVerifiedFile(patchOperation.path) !== operation.plannedContent) {
-          return postWriteFailure(patchOperation.path, "update");
-        }
-        return { ok: true, changedFile: patchOperation.path };
-      case "add":
-        await options.createFileExclusive(
-          patchOperation.path,
-          operation.plannedContent ?? "",
-        );
-        if (options.readVerifiedFile(patchOperation.path) !== operation.plannedContent) {
-          return postWriteFailure(patchOperation.path, "create");
-        }
-        return { ok: true, changedFile: patchOperation.path };
-      case "move":
-        await options.moveFileExclusive(patchOperation.path, patchOperation.moveTo);
-        if (
-          options.readVerifiedFile(patchOperation.path) !== undefined ||
-          options.readVerifiedFile(patchOperation.moveTo) !== operation.originalContent
-        ) {
-          return postWriteFailure(patchOperation.moveTo, "move");
-        }
-        return { ok: true, changedFile: patchOperation.moveTo };
-      case "delete":
-        await options.deleteFile(patchOperation.path);
-        if (options.readVerifiedFile(patchOperation.path) !== undefined) {
-          return postWriteFailure(patchOperation.path, "delete");
-        }
-        return { ok: true, changedFile: patchOperation.path };
-    }
-  } catch (error) {
-    return {
-      ok: false,
-      failedFiles: [
-        {
-          code: "patch-apply-write-failed",
-          path: targetPathForOperation(patchOperation),
-          message:
-            error instanceof Error
-              ? `Patch mixed write failed: ${error.message}`
-              : "Patch mixed write failed.",
-          nextAction:
-            "Inspect/re-read all attempted paths before retrying; no rollback was attempted.",
-        },
-      ],
-      postWriteVerification: "blocked",
-    };
-  }
-}
-
-function postWriteFailure(
-  targetPath: string,
-  operation: "update" | "create" | "move" | "delete",
-): OneOperationApplyResult {
-  return {
-    ok: false,
-    failedFiles: [
-      {
-        code: "patch-apply-write-failed",
-        path: targetPath,
-        message: `Patch mixed ${operation} post-write verification failed.`,
-        nextAction:
-          "Inspect/re-read all attempted paths before retrying; no rollback was attempted.",
-      },
-    ],
-    postWriteVerification: "failed",
   };
 }
 

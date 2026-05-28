@@ -1,5 +1,7 @@
 // Reset compatibility facade. Final ownership should move toward the durable
 // evidence/result domain once Route221/227/228 report compatibility is retired.
+export { projectHistoricalReportVerdict } from "./compatibility/historicalReportVerdict.js";
+
 export const PRODUCT_EVIDENCE_VERDICT_FACADE_VERSION = "v1";
 
 export type ProductEvidenceSource =
@@ -274,99 +276,6 @@ export function projectProductVerdictFromClaims(input: {
     notProvenReasons: ["No explicit success claim was provided."],
     partialReasons: failedReasons,
     blockedReasons,
-  });
-}
-
-export function projectHistoricalReportVerdict(input: {
-  readonly routeId?: string;
-  readonly reportPath?: string;
-  readonly finalStatus?: string;
-  readonly independentAuditResult?: string;
-  readonly independentPassRerunResult?: string;
-  readonly redaction?: ProductRedactionStatus;
-  readonly cleanup?: ProductCleanupStatus;
-}): ProductVerdict {
-  const provenance: ProductEvidenceProvenance = {
-    source: "historical-report",
-    ...(input.routeId ? { routeId: input.routeId } : {}),
-    ...(input.reportPath ? { reportPath: input.reportPath } : {}),
-    adapter: "historical-report-verdict",
-  };
-  const finalStatus = input.finalStatus;
-  const auditPartialWithoutPass =
-    input.independentAuditResult === "PARTIAL" &&
-    finalStatus === "COMPLETE" &&
-    input.independentPassRerunResult !== "PASS";
-
-  if (auditPartialWithoutPass) {
-    return productVerdict({
-      status: "PARTIAL",
-      terminalClassification: "stopped",
-      reason:
-        "Historical report audit was PARTIAL and has no independent PASS rerun.",
-      provenance,
-      redaction: input.redaction ?? "unknown",
-      cleanup: input.cleanup ?? "unknown",
-      notProvenReasons: [],
-      partialReasons: [
-        "Audit PARTIAL cannot be projected as COMPLETE without independent PASS rerun.",
-      ],
-      blockedReasons: [],
-    });
-  }
-
-  if (finalStatus === "COMPLETE") {
-    return productVerdict({
-      status: "COMPLETE",
-      terminalClassification: "success",
-      reason: "Historical report finalStatus is COMPLETE.",
-      provenance,
-      redaction: input.redaction ?? "unknown",
-      cleanup: input.cleanup ?? "unknown",
-      notProvenReasons: [],
-      partialReasons: [],
-      blockedReasons: [],
-    });
-  }
-
-  if (finalStatus === "BLOCKED") {
-    return productVerdict({
-      status: "BLOCKED",
-      terminalClassification: "stopped",
-      reason: "Historical report finalStatus is BLOCKED.",
-      provenance,
-      redaction: input.redaction ?? "unknown",
-      cleanup: input.cleanup ?? "unknown",
-      notProvenReasons: [],
-      partialReasons: [],
-      blockedReasons: ["Historical report finalStatus is BLOCKED."],
-    });
-  }
-
-  if (finalStatus === "PARTIAL") {
-    return productVerdict({
-      status: "PARTIAL",
-      terminalClassification: "stopped",
-      reason: "Historical report finalStatus is PARTIAL.",
-      provenance,
-      redaction: input.redaction ?? "unknown",
-      cleanup: input.cleanup ?? "unknown",
-      notProvenReasons: [],
-      partialReasons: ["Historical report finalStatus is PARTIAL."],
-      blockedReasons: [],
-    });
-  }
-
-  return productVerdict({
-    status: "NOT_PROVEN",
-    terminalClassification: "stopped",
-    reason: "Historical report finalStatus is missing or unknown.",
-    provenance,
-    redaction: input.redaction ?? "unknown",
-    cleanup: input.cleanup ?? "unknown",
-    notProvenReasons: ["Historical report finalStatus is missing or unknown."],
-    partialReasons: [],
-    blockedReasons: [],
   });
 }
 
