@@ -2,27 +2,119 @@
 
 ## Purpose
 
-Align the language architecture with current reality and make the future execution boundary enforceable.
+Fix the language architecture boundary before continuing feature development.
 
-The project is currently TypeScript-first. Rust exists, but it is not yet the real execution plane. Python is evaluation-only. The previous wording "TypeScript = control plane, Rust = execution plane" is too strong for the current codebase and can become architectural fiction.
+The project is currently TypeScript-first. Rust exists and has real executor-related pieces, but Rust is not yet the current default execution plane. Python is offline evaluation only. The previous wording that TypeScript is the control plane and Rust is the execution plane is too strong for current code reality.
 
-This route must correct that.
+This route must align documentation, implementation boundaries, and enforcement checks.
 
-The goal is not to write more Rust.
+This route does not try to make Rust larger for appearance. It makes the TypeScript execution boundary real and Rust-ready.
 
-The goal is to make execution boundaries real inside the current TypeScript-first architecture so Rust can later take over OS/process/isolation-critical execution without rewriting the agent product runtime.
+## Current Architecture Decision
 
-## Core Decision
-
-Use this current architecture wording:
+Use this wording going forward:
 
 - TypeScript is the primary product runtime and control plane.
 - Execution is an explicit boundary/interface, currently implemented mostly in TypeScript.
-- Rust is a future native executor candidate for OS/process/sandbox/isolation/distribution-critical responsibilities.
-- Contracts are serialized schemas, lifecycle states, permission semantics, and execution events shared across runtimes when there is a real cross-runtime consumer.
-- Python is offline eval only and must not participate in production runtime semantics.
+- Rust is a native executor candidate for OS, process, sandbox, isolation, cancellation, timeout, daemon, distribution, and audit needs.
+- Contracts carry serialized cross-runtime schemas, lifecycle states, permission semantics, and execution events when there is a real cross-runtime consumer.
+- Python is offline evaluation only and must not own production runtime semantics.
 
-Do not claim Rust owns the execution plane until the code proves it.
+Do not claim Rust is the current default execution plane unless runtime code proves that claim.
+
+## Combined Phase Structure
+
+This route combines the previous five conceptual phases into three execution phases:
+
+### Phase A: Reality Alignment And Documentation
+
+Update architecture wording and create documentation under:
+
+docs/product-architecture-reset/executionBoundary/
+
+Required files:
+
+- README.md
+- 00-current-language-reality.md
+- 01-side-effect-entrypoint-inventory.md
+- 02-execution-boundary-contract.md
+- 03-boundary-enforcement-plan.md
+- 04-rust-readiness-triggers.md
+- 05-python-eval-isolation.md
+
+The documentation must explain:
+
+- current TypeScript-first runtime reality
+- current Rust role
+- current contracts role
+- current Python eval isolation
+- current side-effect owners
+- what makes the execution boundary real
+- what triggers future Rust expansion
+
+### Phase B: Execution Boundary And Side-Effect Inventory
+
+Create or strengthen the execution boundary in TypeScript.
+
+If an existing abstraction is already the right boundary, document it and strengthen it.
+
+If the boundary is missing or too weak, add a minimal runtime-neutral TypeScript boundary in the correct owner location, expected to be near:
+
+packages/ts-shell/src/runtime/execution/
+
+The boundary should cover at least:
+
+- run command
+- read text file
+- write text file
+- list files or glob-style reads if used by tools
+- structured command results or execution events
+- timeout, cancellation, and failure classification where current code supports them
+
+Do not invent a large unused abstraction.
+
+The boundary must be used by at least one real runtime path. Prefer moving core tool command and file side effects through it when safe.
+
+Inventory side-effect entrypoints:
+
+- child_process, spawn, exec, execFile
+- writable fs operations such as writeFile, rm, unlink, mkdir, rename, appendFile
+- apply patch and workspace mutation paths
+- shell and PTY execution
+- browser process and browser external runner side effects
+- MCP process side effects
+- runtime network side effects where relevant
+- provider fetch side effects where relevant
+
+Classify each as:
+
+- sanctioned owner
+- transitional owner
+- forbidden direct usage
+- test or fixture only
+- future migration candidate
+
+### Phase C: Boundary Enforcement And Validation
+
+Add or update a lightweight enforcement check.
+
+Acceptable implementation:
+
+- a script under scripts/
+- a focused test
+- an existing validation command extension
+
+The check must cover at least:
+
+- no production TypeScript runtime import from packages/python-eval
+- no production TypeScript runtime import from docs, scripts, dev-history, or route reports
+- no direct child_process import outside sanctioned execution or process owners
+- no direct writable fs operations outside sanctioned file, workspace, session, browser, config, or execution owners
+- contracts must not import product runtime or control-plane modules
+
+Use explicit allowlists for current owners.
+
+The scanner is a guardrail, not a broad architecture theorem. Keep exceptions narrow and documented.
 
 ## Required Reading
 
@@ -30,281 +122,208 @@ Read before editing:
 
 - root AGENTS.md
 - agent-rules/architecture-boundaries.md
-- agent-rules/development-workflow.md
-- agent-rules/file-placement-and-naming.md
+- agent-rules/provider-and-secret-boundary.md
 - agent-rules/evidence-and-truthfulness.md
 - agent-rules/testing-and-validation.md
-- current TypeScript runtime/execution/command/file-write modules
+- current TypeScript runtime execution, command, file, tool, patch, browser, MCP modules
 - current Rust package under packages/rust-core
 - current contracts package
 - packages/python-eval if present
-- current package scripts related to build/test/verification
+- current package scripts related to verification
 
 Use current code as truth.
 
-## Output Documentation
+## Documentation Wording Requirements
 
-Create:
+Replace over-strong language such as:
 
-```text
-docs/product-architecture-reset/executionBoundary/
-````
+TypeScript equals control plane and Rust equals execution plane
 
-Required docs:
+with current-reality wording:
 
-```text
-README.md
-00-current-language-reality.md
-01-side-effect-entrypoint-inventory.md
-02-execution-boundary-contract.md
-03-boundary-enforcement-plan.md
-04-rust-readiness-triggers.md
-05-python-eval-isolation.md
-```
+TypeScript is the primary product runtime and control plane. Execution is an explicit boundary currently implemented mostly in TypeScript. Rust is a native executor candidate for OS, process, sandbox, isolation, daemon, timeout, cancellation, distribution, and audit-critical responsibilities.
 
-## Required Code/Rule Work
+The docs must not imply Rust is unused. They must describe Rust as a real candidate and optional executor path where current code supports that.
 
-This route must do more than write docs.
-
-It must add or verify enforceable boundaries.
-
-Expected work:
-
-1. Update root AGENTS.md and agent-rules/architecture-boundaries.md to replace over-strong Rust execution-plane wording with TypeScript-first / Rust-ready wording.
-2. Audit direct external side effects in TypeScript:
-
-   * child_process / spawn / exec
-   * fs write/delete/mkdir/rename operations
-   * apply patch / write file / workspace mutation
-   * PTY / shell / command execution
-   * browser or MCP side effects
-   * network calls if used as runtime side effects
-3. Identify current sanctioned side-effect owners and unsanctioned direct usage.
-4. Add or confirm an ExecutionService / execution adapter boundary.
-5. Add or confirm structured execution event and request types.
-6. Add an enforceable boundary check or focused test that prevents new direct side-effect imports outside allowed owners.
-7. Ensure Python eval is not imported by production runtime packages.
-8. Ensure contracts do not become a business-logic or IO-helper dumping ground.
+The docs must not imply Python eval is part of production runtime.
 
 ## Execution Boundary Requirements
 
-Do not create a ceremonial interface that nobody can use.
+The boundary must not be ceremonial.
 
-If an equivalent execution abstraction already exists, document it and strengthen it.
+It must satisfy at least one of these:
 
-If no equivalent exists, add a minimal runtime-neutral TypeScript interface in the correct owner location, for example:
+- existing real runtime callers use it
+- this route moves real command or file tool calls through it
+- an existing boundary is made explicit and enforced by scan or tests
 
-```text
-packages/ts-shell/src/runtime/execution/
-```
+The route should prefer a minimal but real boundary over a large unused abstraction.
 
-or another current-code-justified runtime owner.
+Where possible, represent execution results with structured fields instead of raw strings only.
 
-The boundary should represent concepts like:
+Important concepts:
 
-* run command
-* cancel command
-* read file
-* write file
-* apply patch
-* sandbox/preflight check
-* structured execution events
-* permission/capability requirement
+- execution path
+- completed
+- failed
+- timeout
+- cancelled
+- exit code
+- stdout
+- stderr
+- failure kind
+- recovery reason when fallback happens
+- sandbox rejection if current code supports it
+- permission requirement if current code supports it
 
-Do not force all runtime callers to migrate in this route unless safe.
+Do not change existing user-visible behavior unless required to preserve boundary correctness.
 
-A minimal first step is acceptable only if it is enforceable:
-
-* a stable interface exists
-* sanctioned side-effect owners are listed
-* direct forbidden imports are scanned
-* future violations fail a check
-* current exceptions are narrow and documented
-
-## Permission Boundary Requirements
+## Permission And Write Boundary Requirements
 
 Do not hide write authority behind booleans or prompt text.
 
-Where this route touches execution or write types, preserve or introduce explicit concepts such as:
+Where touched, preserve explicit concepts:
 
-* permission token
-* authority token
-* dry-run
-* preview
-* permission-pending
-* denied
-* approved-for-write
-* write-success
-* execution-started
-* execution-exited
-* execution-timed-out
-* execution-cancelled
-* sandbox-rejected
+- dry-run
+- preview
+- permission-pending
+- denied
+- blocked
+- approved-for-write
+- write-success
+- verification-not-run
+- verification-failed
+- verification-passed
+- sandbox-rejected
+- execution-timeout
+- execution-cancelled
 
 Do not weaken existing authority semantics.
+
+Do not convert stopped, blocked, partial, skipped, not-run, no-provider, failed, timeout, or not-proven into success.
 
 ## Contracts Boundary Requirements
 
 Contracts may contain:
 
-* schemas
-* event types
-* permission/request/response types
-* lifecycle states
-* serialization/versioning rules
+- schemas
+- event types
+- permission request and response types
+- lifecycle states
+- serialization rules
+- versioning rules
+- cross-runtime semantic invariants
 
 Contracts must not contain:
 
-* business orchestration
-* model calls
-* shell helpers
-* file system helpers
-* UI helpers
-* test mock convenience
-* runtime side-effect code
+- business orchestration
+- model calls
+- shell helpers
+- file system helpers
+- UI helpers
+- runtime side-effect code
+- test mock convenience
 
-If the current contracts package is too small to justify changes, do not force new contract files. Document the current state and the trigger for future contract elevation.
+If the current contracts package should not change in this route, document why and keep it untouched.
 
 ## Rust Boundary Requirements
 
 Do not migrate logic to Rust just to satisfy the old design.
 
-Rust should only own responsibilities that need:
+Rust expansion should be triggered by real needs such as:
 
-* OS/process guarantees
-* process tree cleanup
-* cancellation/timeout reliability
-* sandbox or isolation enforcement
-* PTY/process lifecycle reliability
-* single-binary distribution
-* security-sensitive execution audit
+- OS or process guarantees
+- reliable process tree cleanup
+- cancellation or timeout reliability
+- sandbox or isolation enforcement
+- PTY or process lifecycle reliability
+- single-binary distribution
+- security-sensitive execution audit
+- daemon reliability
 
-This route may add a small Rust contract smoke only if the current repo already has a reasonable Rust/contracts path and it is low-risk. Otherwise, document the trigger and do not add Rust code.
+This route may add a tiny Rust smoke only if the current repo already has a low-risk path for it. Otherwise, document Rust readiness triggers and do not touch Rust code.
 
 ## Python Boundary Requirements
 
-Python is offline eval only.
+Python is offline evaluation only.
 
-Python may read traces, datasets, and evaluation artifacts.
+Python may read traces, datasets, evaluation artifacts, and write evaluation outputs.
 
 Python must not own:
 
-* production orchestration
-* permissions
-* replay
-* recovery
-* persistence
-* agent loop
-* runtime side effects
-* production tool lifecycle
+- production orchestration
+- permissions
+- replay
+- recovery
+- runtime persistence
+- agent loop execution
+- production tool lifecycle
+- production runtime side effects
 
-Add or verify an import/dependency check that production runtime packages do not import Python eval.
+Add or confirm an enforcement check that production runtime packages do not import Python eval.
 
-## Boundary Enforcement
-
-Add or update a lightweight boundary check if practical.
-
-Acceptable forms:
-
-* script that scans forbidden imports
-* test that scans source files
-* existing validation command extended with execution-boundary checks
-* package script alias for the boundary check if useful
-
-The check should cover at least:
-
-* no production runtime import from packages/python-eval
-* no direct child_process import outside sanctioned execution owners
-* no direct fs write/delete/mkdir/rename outside sanctioned file/workspace owners
-* no production runtime import from docs/scripts/dev-history/route reports
-* contracts package does not import runtime/control-plane modules
-
-Existing exceptions must be explicit and narrow.
-
-Do not create a huge brittle scanner that blocks known legitimate files without a documented allowlist.
-
-## Non-Goals
+## Strict Non-Goals
 
 Do not:
 
-* add features
-* run live provider
-* rewrite command execution behavior
-* rewrite file write behavior
-* migrate execution to Rust broadly
-* move Python eval into runtime
-* change provider defaults
-* change production write defaults
-* change package scripts unless adding a narrow verification alias
-* weaken evidence/verdict truthfulness
-* break existing tests
-* mass-format unrelated files
-
-## Required Phases
-
-### Phase A: Reality Alignment
-
-Update architecture wording in AGENTS/rules and create current-language reality docs.
-
-### Phase B: Side-Effect Inventory
-
-Create side-effect entrypoint inventory with sanctioned owners, direct usages, exceptions, and next actions.
-
-### Phase C: Execution Boundary
-
-Add or strengthen the ExecutionService / execution adapter boundary. Do not create unused ceremony. If an existing abstraction is already the correct boundary, document and expose it clearly.
-
-### Phase D: Boundary Enforcement
-
-Add or update a lightweight scan/test for dependency direction and forbidden side-effect imports.
-
-### Phase E: Validation
-
-Run appropriate checks.
+- add product features
+- run live provider
+- migrate broadly to Rust
+- move Python into runtime
+- change provider defaults
+- change production write defaults
+- change package scripts unless adding a narrow verification alias is clearly needed
+- weaken evidence or verdict truthfulness
+- change CLI/session/product output behavior
+- rewrite command execution behavior broadly
+- rewrite patch or workspace write behavior broadly
+- mass-format unrelated files
 
 ## Validation
 
 Required:
 
-* path existence check for executionBoundary docs
-* focused tests for added/changed execution boundary code
-* boundary scan/test if added
-* npm run build -w packages/ts-shell if TypeScript code changed
-* npm run test -w packages/rust-core or equivalent only if Rust code changed
-* contracts tests only if contracts changed
-* git diff --check
-* git status --short --branch
-
-If package scripts are changed, validate old behavior and new alias if added.
+- path existence check for docs/product-architecture-reset/executionBoundary files
+- focused tests for any added or changed execution boundary code
+- boundary enforcement script or test
+- npm run build -w packages/ts-shell if TypeScript code changed
+- contracts tests only if contracts changed
+- Rust tests only if Rust files changed
+- git diff --check
+- git status --short --branch
 
 Do not run live provider.
+
+If package scripts are changed, validate the old behavior and the new alias.
 
 ## Completion Criteria
 
 COMPLETE requires:
 
-* AGENTS/rules no longer overclaim Rust as current execution plane
-* docs/product-architecture-reset/executionBoundary docs exist
-* side-effect inventory exists
-* execution boundary is either implemented or existing boundary is clearly documented and strengthened
-* boundary enforcement scan/test exists or is explicitly integrated into an existing check
-* Python eval is confirmed offline-only from runtime dependency perspective
-* contracts boundary is clarified
-* no product behavior change unless explicitly justified as boundary preservation
-* validation passes
+- architecture wording no longer overclaims Rust as current default execution plane
+- executionBoundary docs exist and are non-empty
+- side-effect inventory exists
+- execution boundary is implemented or an existing boundary is clearly documented and strengthened
+- at least one real runtime path uses the execution boundary, unless a stronger existing use is documented
+- boundary enforcement scan or test exists
+- Python eval isolation is checked
+- contracts dependency direction is clarified and checked
+- no product behavior or defaults changed except internal boundary routing
+- validation passes
 
 PARTIAL if:
 
-* only docs change and no enforceable boundary check exists
-* side-effect inventory is incomplete
-* execution boundary remains purely aspirational
-* Rust/Python/contracts wording remains misleading
+- only docs change and no enforcement exists
+- side-effect inventory is incomplete
+- execution boundary remains purely aspirational
+- Rust, Python, or contracts wording remains misleading
+- validation is skipped without reason
 
 BLOCKED if:
 
-* current execution side effects are too scattered to safely classify
-* enforcement would require broad runtime rewrite
-* boundary changes would alter product behavior
+- current side effects are too scattered to classify safely
+- enforcement requires broad runtime rewrite
+- boundary changes would alter product behavior
 
 ## Commit
 
@@ -322,14 +341,14 @@ Include:
 
 1. Final status
 2. Wording changes
-3. Side-effect inventory summary
-4. Execution boundary added or confirmed
-5. Boundary enforcement added
-6. Rust readiness status
-7. Python eval isolation status
-8. Contracts boundary status
-9. Product behavior changed yes/no
-10. Validation results
-11. Remaining boundary debt
-12. Commit hash if committed
-
+3. Execution boundary added or confirmed
+4. Real runtime path routed through the boundary
+5. Side-effect inventory summary
+6. Boundary enforcement added
+7. Rust readiness status
+8. Python eval isolation status
+9. Contracts boundary status
+10. Product behavior changed yes/no
+11. Validation results
+12. Remaining boundary debt
+13. Commit hash if committed
