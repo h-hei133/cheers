@@ -7,14 +7,12 @@
  * - state.json      -> mutable runtime state snapshot
  */
 
-import * as fs from "node:fs";
 import type { QueryEvent } from "../core/query/events.js";
 import type {
   QueryRuntimeRecoveryBoundary,
   QueryRuntimeStateSeed,
 } from "../core/query/runtimeState.js";
 import {
-  createEmptyLifecycleIndex,
   type DurableLifecycleIndex,
 } from "../core/tools/toolResultLifecycle.js";
 import type { ContinuationReason } from "../orchestration/types.js";
@@ -26,11 +24,7 @@ import {
   recordSessionApprovalAuditDecision,
 } from "./approval/sessionApprovalMemory.js";
 import { applySessionCompactRetention } from "./sessionCompactModule.js";
-import {
-  createLifecycleTranscriptEvent,
-  createMessageTranscriptEvent,
-  type TranscriptEvent,
-} from "./sessionEventCodec.js";
+import { type TranscriptEvent } from "./sessionEventCodec.js";
 import type { SessionMessage } from "./schema/sessionMessage.js";
 import type { Session } from "./schema/sessionRecord.js";
 import type {
@@ -66,6 +60,10 @@ import {
   validateSessionId,
   type SessionStoreLayout,
 } from "./store/sessionFileLayout.js";
+import {
+  createSession,
+  createSessionWithId,
+} from "./store/sessionCreation.js";
 import { writeJsonFileAtomic } from "./store/sessionFileStore.js";
 import {
   deleteSessionRecord,
@@ -75,6 +73,10 @@ import {
   writeSessionRecord,
 } from "./store/sessionStore.js";
 import {
+  listSessionRecords,
+  type SessionListWarningState,
+} from "./store/sessionListStore.js";
+import {
   readStateSnapshotRequired,
   readStateSnapshotSafely,
   withSessionStateLock,
@@ -82,10 +84,6 @@ import {
 } from "./store/sessionStateStore.js";
 import { projectSessionReentrySummary } from "./presentation/sessionReentrySurface.js";
 import type { SessionReentrySummary } from "./presentation/sessionReentrySurface.js";
-import {
-  formatListSessionsFailureWarning,
-  formatUnreadableSessionDirectoryWarning,
-} from "./presentation/sessionWarningSurface.js";
 import type { RecoveryTrustBoundaryBlock } from "./recovery/recoveryTrustBoundary.js";
 import { projectRecoveryTrustBoundaryBlock } from "./recovery/recoveryTrustBoundary.js";
 import {
@@ -97,7 +95,6 @@ import type {
   SessionContinuitySnapshot,
 } from "./sessionContinuityTypes.js";
 import {
-  projectSessionBinding,
   type WorkspaceRootMode,
 } from "./projectBindingPolicy.js";
 import {
@@ -126,6 +123,12 @@ import {
   type RecoverySnapshot,
 } from "./recovery/sessionRecoverySnapshot.js";
 import {
+  resumeSession,
+  tryResumeSession,
+  type SessionResumeOptions,
+  type SessionResumeResult,
+} from "./recovery/sessionResume.js";
+import {
   buildReplayPlan,
   normalizeSessionReplayTranscript,
   repairSessionReplayTranscript,
@@ -133,6 +136,18 @@ import {
   type TranscriptRepairContext,
 } from "./replay/sessionReplayFacade.js";
 import { buildSessionRuntimeStateSeed } from "./replay/sessionRuntimeSeed.js";
+import {
+  markSessionRecoveryReentry,
+  markSessionRunStarted,
+  markSessionTurnActive,
+  saveSessionInterrupted,
+  saveSessionTerminated,
+} from "./lifecycle/sessionLifecycleStore.js";
+import { persistSessionUserPromptBarrier } from "./lifecycle/sessionPromptBarrier.js";
+import {
+  saveSessionCompleted,
+  saveSessionError,
+} from "./lifecycle/sessionTerminalStore.js";
 
 export type { CurrentSessionSelectionResolution } from "./currentSessionSelection.js";
 export type {
@@ -162,13 +177,9 @@ export type {
 export type { WorkspaceRootMode } from "./projectBindingPolicy.js";
 export type { Session } from "./schema/sessionRecord.js";
 
-export type ResumeResult =
-  | { ok: true; session: Session }
-  | { ok: false; error: string; recoveryHint: string };
+export type ResumeResult = SessionResumeResult;
 
-export interface ResumeOptions {
-  readonly mode?: "runtime-recovery" | "continuity-only";
-}
+export interface ResumeOptions extends SessionResumeOptions {}
 
 export class SessionManager {
   private static readonly AUTO_COMPACT_TURN_THRESHOLD = 12;
@@ -177,8 +188,10 @@ export class SessionManager {
   private readonly storeLayout: SessionStoreLayout;
   private sessionsDir: string;
   private readonly currentSessionStorePath: string;
-  private readonly warnedUnreadableSessionDirs = new Set<string>();
-  private didWarnListSessionsFailure = false;
+  private readonly listWarningState: SessionListWarningState = {
+    warnedUnreadableSessionDirs: new Set<string>(),
+    didWarnListSessionsFailure: false,
+  };
 
   constructor() {
     this.storeLayout = createSessionStoreLayout();
@@ -223,11 +236,53 @@ export class SessionManager {
     }).statePath;
   }
 
-  private getStateLockPath(sessionId: string): string {
-    return projectSessionFileLayout({
-      sessionsDir: this.sessionsDir,
-      sessionId,
-    }).stateLockPath;
+  private createSessionCreationCallbacks() {
+    return {
+      sessionExists: (sessionId: string) => this.sessionExists(sessionId),
+      validateSessionId,
+      createSessionId: () => this.generateSessionId(),
+      writeSession: (session: Session) => this.writeSession(session),
+      setCurrentSessionForProject: (projectRoot: string, sessionId: string) =>
+        this.setCurrentSessionForProject(projectRoot, sessionId),
+      now: () => new Date().toISOString(),
+    };
+  }
+
+  private createSessionResumeCallbacks() {
+    return {
+      sessionDirExists: (sessionId: string) =>
+        sessionExistsAtLayout(
+          projectSessionFileLayout({
+            sessionsDir: this.sessionsDir,
+            sessionId,
+          }),
+        ),
+      sessionDir: (sessionId: string) => this.getSessionDir(sessionId),
+      loadSession: (sessionId: string) => this.load(sessionId),
+      writeSessionMetadata: (session: Session) =>
+        this.writeSessionMetadata(session),
+      setCurrentSessionForProject: (projectRoot: string, sessionId: string) =>
+        this.setCurrentSessionForProject(projectRoot, sessionId),
+      evaluateRecoveryTrustBoundary: (session: Session) =>
+        this.evaluateRecoveryTrustBoundary(session),
+      cwd: () => process.cwd(),
+      now: () => new Date().toISOString(),
+    };
+  }
+
+  private createSessionLifecycleCallbacks() {
+    return {
+      loadSession: (sessionId: string) => this.load(sessionId),
+      appendTranscriptEvent: (sessionId: string, event: TranscriptEvent) =>
+        this.appendTranscriptEvent(sessionId, event),
+      writeSessionMetadata: (session: Session) =>
+        this.writeSessionMetadata(session),
+      writeSessionState: (
+        session: Session,
+        overrides?: SessionStateSnapshotOverrides,
+      ) => this.writeSessionState(session, overrides),
+      now: () => new Date().toISOString(),
+    };
   }
 
   getSessionFilePath(sessionId: string): string {
@@ -292,24 +347,12 @@ export class SessionManager {
       readonly gitRoot?: string | null;
     },
   ): Session {
-    const normalizedId = validateSessionId(sessionId);
-    if (this.sessionExists(normalizedId)) {
-      throw new Error(`Session ${normalizedId} already exists`);
-    }
-    const now = new Date().toISOString();
-    const binding = projectSessionBinding({ projectRoot, options });
-    const session: Session = {
-      id: normalizedId,
-      ...binding,
-      title: undefined,
-      createdAt: now,
-      updatedAt: now,
-      status: "active",
-      turns: [],
-    };
-    this.writeSession(session);
-    this.setCurrentSessionForProject(projectRoot, session.id);
-    return session;
+    return createSessionWithId({
+      callbacks: this.createSessionCreationCallbacks(),
+      sessionId,
+      projectRoot,
+      options,
+    });
   }
 
   createNew(
@@ -321,47 +364,19 @@ export class SessionManager {
       readonly gitRoot?: string | null;
     },
   ): Session {
-    const now = new Date().toISOString();
-    const binding = projectSessionBinding({ projectRoot, options });
-    const session: Session = {
-      id: this.generateSessionId(),
-      ...binding,
-      title: undefined,
-      createdAt: now,
-      updatedAt: now,
-      status: "active",
-      turns: [],
-    };
-
-    this.writeSession(session);
-    this.setCurrentSessionForProject(projectRoot, session.id);
-    return session;
+    return createSession({
+      callbacks: this.createSessionCreationCallbacks(),
+      projectRoot,
+      options,
+    });
   }
 
   resume(sessionId: string, projectRoot?: string): Session {
-    const sessionDir = this.getSessionDir(sessionId);
-    if (!fs.existsSync(sessionDir)) {
-      throw new Error(`Session ${sessionId} not found`);
-    }
-
-    try {
-      const session = this.load(sessionId);
-      if (!session.projectRoot?.trim() && projectRoot?.trim()) {
-        session.projectRoot = projectRoot.trim();
-      }
-      session.status = "active";
-      session.updatedAt = new Date().toISOString();
-      this.writeSessionMetadata(session);
-      this.setCurrentSessionForProject(
-        session.projectRoot || projectRoot || process.cwd(),
-        session.id,
-      );
-      return session;
-    } catch (error) {
-      throw new Error(
-        `Failed to resume session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    return resumeSession(
+      this.createSessionResumeCallbacks(),
+      sessionId,
+      projectRoot,
+    );
   }
 
   tryResume(
@@ -369,32 +384,12 @@ export class SessionManager {
     projectRoot?: string,
     options?: ResumeOptions,
   ): ResumeResult {
-    try {
-      const session = this.load(sessionId);
-      const mode = options?.mode ?? "runtime-recovery";
-      if (mode === "runtime-recovery") {
-        const trustBoundary = this.evaluateRecoveryTrustBoundary(session);
-        if (!trustBoundary.recoverable && trustBoundary.block) {
-          return {
-            ok: false,
-            error: `Session ${sessionId} is not recoverable: ${trustBoundary.block.detail}`,
-            recoveryHint: trustBoundary.block.recoveryHint,
-          };
-        }
-      }
-
-      return { ok: true, session: this.resume(sessionId, projectRoot) };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      return {
-        ok: false,
-        error: errorMessage.includes("Failed to resume session")
-          ? errorMessage
-          : `Failed to resume session ${sessionId}: ${errorMessage}`,
-        recoveryHint: `Session ${sessionId} could not be restored. Start a fresh session or inspect ${this.getSessionDir(sessionId)}.`,
-      };
-    }
+    return tryResumeSession(
+      this.createSessionResumeCallbacks(),
+      sessionId,
+      projectRoot,
+      options,
+    );
   }
 
   addTurn(sessionId: string, message: SessionMessage): void {
@@ -431,148 +426,57 @@ export class SessionManager {
   }
 
   markRunStarted(sessionId: string, prompt: string): void {
-    const session = this.load(sessionId);
-    session.status = "active";
-    delete session.lastError;
-    session.pendingPrompt = prompt;
-    session.updatedAt = new Date().toISOString();
-    this.appendTranscriptEvent(
-      sessionId,
-      createLifecycleTranscriptEvent({
-        event: "run-started",
-        timestamp: session.updatedAt,
-        detail: prompt,
-      }),
-    );
-    this.writeSessionMetadata(session);
-    this.writeSessionState(session, {
-      terminalReason: undefined,
-      terminalClassification: undefined,
-      lastContinuationReason: undefined,
-      pendingLifecycle: createEmptyLifecycleIndex(),
-    });
+    markSessionRunStarted(this.createSessionLifecycleCallbacks(), sessionId, prompt);
   }
 
   persistUserPromptBarrier(sessionId: string, prompt: string): void {
     const session = this.load(sessionId);
     const timestamp = new Date().toISOString();
-    const nextMessage: SessionMessage & { timestamp: string } = {
-      role: "user",
-      content: prompt,
+    persistSessionUserPromptBarrier({
+      session,
+      prompt,
       timestamp,
-    };
-
-    session.status = "active";
-    delete session.lastError;
-    session.pendingPrompt = prompt;
-    session.updatedAt = timestamp;
-    session.turns.push(nextMessage);
-
-    this.appendTranscriptEvent(
-      sessionId,
-      createLifecycleTranscriptEvent({
-        event: "run-started",
-        timestamp,
-        detail: prompt,
-      }),
-    );
-    this.appendTranscriptEvent(
-      sessionId,
-      createMessageTranscriptEvent(nextMessage),
-    );
-
-    this.writeSessionMetadata(session);
-    this.writeSessionState(session, {
-      runPhase: "prompt-persisted",
-      interruptedKind: undefined,
-      terminalReason: undefined,
-      terminalClassification: undefined,
-      lastContinuationReason: undefined,
-      pendingLifecycle: createEmptyLifecycleIndex(),
+      appendTranscriptEvent: (event) =>
+        this.appendTranscriptEvent(sessionId, event),
+      writeSessionMetadata: (nextSession) =>
+        this.writeSessionMetadata(nextSession),
+      writeSessionState: (nextSession, overrides) =>
+        this.writeSessionState(nextSession, overrides),
     });
   }
 
   markTurnActive(sessionId: string): void {
-    const session = this.load(sessionId);
-    delete session.lastError;
-    session.updatedAt = new Date().toISOString();
-    this.writeSessionMetadata(session);
-    this.writeSessionState(session, {
-      runPhase: "turn-active",
-      interruptedKind: undefined,
-      terminalReason: undefined,
-      terminalClassification: undefined,
-      lastContinuationReason: undefined,
-      pendingLifecycle: createEmptyLifecycleIndex(),
-    });
+    markSessionTurnActive(this.createSessionLifecycleCallbacks(), sessionId);
   }
 
   markRecoveryReentry(
     sessionId: string,
     boundary: QueryRuntimeRecoveryBoundary,
   ): void {
-    const session = this.load(sessionId);
-    session.status = "active";
-    delete session.lastError;
-    session.updatedAt = new Date().toISOString();
-    this.writeSessionMetadata(session);
-    this.writeSessionState(session, {
-      runPhase:
-        boundary === "mid-turn-reentry" ? "turn-active" : "prompt-persisted",
-      interruptedKind: boundary === "mid-turn-reentry" ? "turn" : "prompt",
-      terminalReason: undefined,
-      terminalClassification: undefined,
-      lastContinuationReason: undefined,
-    });
+    markSessionRecoveryReentry(
+      this.createSessionLifecycleCallbacks(),
+      sessionId,
+      boundary,
+    );
   }
 
   saveInterrupted(
     sessionId: string,
     interruptedKind: "prompt" | "turn" = "prompt",
   ): void {
-    const session = this.load(sessionId);
-    session.status = "interrupted";
-    delete session.lastError;
-    session.updatedAt = new Date().toISOString();
-    this.appendTranscriptEvent(
+    saveSessionInterrupted(
+      this.createSessionLifecycleCallbacks(),
       sessionId,
-      createLifecycleTranscriptEvent({
-        event: "run-interrupted",
-        timestamp: session.updatedAt,
-        detail: session.pendingPrompt,
-      }),
-    );
-    this.writeSessionMetadata(session);
-    this.writeSessionState(session, {
       interruptedKind,
-      terminalReason: undefined,
-      terminalClassification: undefined,
-      lastContinuationReason: undefined,
-    });
+    );
   }
 
   saveCompleted(sessionId: string, terminal?: TerminalPersistence): void {
-    const session = this.load(sessionId);
-    session.status = "completed";
-    delete session.lastError;
-    delete session.pendingPrompt;
-    session.updatedAt = new Date().toISOString();
-    this.appendTranscriptEvent(
+    saveSessionCompleted(
+      this.createSessionLifecycleCallbacks(),
       sessionId,
-      createLifecycleTranscriptEvent({
-        event: "run-completed",
-        timestamp: session.updatedAt,
-      }),
+      terminal,
     );
-    this.writeSessionMetadata(session);
-    this.writeSessionState(session, {
-      runPhase: "idle",
-      interruptedKind: undefined,
-      terminalReason: terminal?.terminalReason ?? "completed",
-      terminalClassification: terminal?.terminalClassification ?? "success",
-      lastContinuationReason: terminal?.lastContinuationReason,
-      pendingLifecycle: createEmptyLifecycleIndex(),
-    });
   }
 
   renameSession(sessionId: string, title: string): Session {
@@ -599,57 +503,16 @@ export class SessionManager {
     error: string,
     terminal?: TerminalPersistence,
   ): void {
-    const session = this.load(sessionId);
-    const terminalClassification = terminal?.terminalClassification ?? "error";
-    session.status = "error";
-    delete session.pendingPrompt;
-    if (terminalClassification === "stopped") {
-      delete session.lastError;
-    } else {
-      session.lastError = error;
-    }
-    session.updatedAt = new Date().toISOString();
-    this.appendTranscriptEvent(
+    saveSessionError(
+      this.createSessionLifecycleCallbacks(),
       sessionId,
-      createLifecycleTranscriptEvent({
-        event: "run-error",
-        timestamp: session.updatedAt,
-        detail: error,
-      }),
+      error,
+      terminal,
     );
-    this.writeSessionMetadata(session);
-    this.writeSessionState(session, {
-      runPhase: "idle",
-      interruptedKind: undefined,
-      terminalReason: terminal?.terminalReason,
-      terminalClassification,
-      lastContinuationReason: terminal?.lastContinuationReason,
-      pendingLifecycle: createEmptyLifecycleIndex(),
-    });
   }
 
   saveTerminated(sessionId: string): void {
-    const session = this.load(sessionId);
-    session.status = "terminated";
-    delete session.lastError;
-    delete session.pendingPrompt;
-    session.updatedAt = new Date().toISOString();
-    this.appendTranscriptEvent(
-      sessionId,
-      createLifecycleTranscriptEvent({
-        event: "run-terminated",
-        timestamp: session.updatedAt,
-      }),
-    );
-    this.writeSessionMetadata(session);
-    this.writeSessionState(session, {
-      runPhase: "idle",
-      interruptedKind: undefined,
-      terminalReason: undefined,
-      terminalClassification: undefined,
-      lastContinuationReason: undefined,
-      pendingLifecycle: createEmptyLifecycleIndex(),
-    });
+    saveSessionTerminated(this.createSessionLifecycleCallbacks(), sessionId);
   }
 
   reconcilePendingLifecycle(sessionId: string): DurableLifecycleIndex {
@@ -718,51 +581,12 @@ export class SessionManager {
   }
 
   listSessions(): Session[] {
-    try {
-      const entries = fs.readdirSync(this.sessionsDir, { withFileTypes: true });
-      const sessions: Session[] = [];
-      const newlyUnreadableSessionDirs: string[] = [];
-
-      for (const entry of entries) {
-        if (!entry.isDirectory()) {
-          continue;
-        }
-
-        try {
-          sessions.push(this.load(entry.name));
-        } catch (error) {
-          if (!this.warnedUnreadableSessionDirs.has(entry.name)) {
-            this.warnedUnreadableSessionDirs.add(entry.name);
-            newlyUnreadableSessionDirs.push(entry.name);
-          }
-        }
-      }
-
-      if (newlyUnreadableSessionDirs.length > 0) {
-        const warning = formatUnreadableSessionDirectoryWarning({
-          sessionDirs: newlyUnreadableSessionDirs,
-        });
-        if (warning) {
-          console.warn(warning);
-        }
-      }
-
-      return sessions.sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-      );
-    } catch (error) {
-      if (!this.didWarnListSessionsFailure) {
-        this.didWarnListSessionsFailure = true;
-        console.warn(
-          formatListSessionsFailureWarning({
-            sessionsDir: this.sessionsDir,
-            error,
-          }),
-        );
-      }
-      return [];
-    }
+    return listSessionRecords({
+      sessionsDir: this.sessionsDir,
+      loadSession: (sessionId) => this.load(sessionId),
+      warningState: this.listWarningState,
+      warn: (message) => console.warn(message),
+    });
   }
 
   listRecentSessions(limit: number = 5): Session[] {
