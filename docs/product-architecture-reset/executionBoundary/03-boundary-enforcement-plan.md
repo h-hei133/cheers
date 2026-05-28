@@ -15,6 +15,9 @@ It enforces:
 - no production runtime imports from `packages/python-eval`
 - no production runtime imports from docs, scripts, dev-history, or route report surfaces
 - no `contracts/` dependency on runtime package modules
+- the TypeScript execution boundary exports explicit authority modes and structured execution events
+- core tool side effects continue to route through `ExecutionService`
+- execution authority semantics do not regress to vague boolean fields such as `allowed`, `approved`, `enabled`, or `safe`
 
 The allowlists are deliberately explicit. If a new owner is justified, update both the scanner allowlist and this documentation with the owner responsibility. If a caller is only adding behavior inside an existing domain, prefer routing through the current owner rather than widening the allowlist.
 

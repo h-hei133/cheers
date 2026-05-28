@@ -99,6 +99,24 @@ for (const file of productionTsFiles) {
   }
 }
 
+const executionServicePath = path.join(root, 'packages/ts-shell/src/runtime/execution/executionService.ts')
+const executionServiceContent = await fs.readFile(executionServicePath, 'utf8')
+if (!/export type ExecutionAuthorityMode\s*=/.test(executionServiceContent)) {
+  failures.push('packages/ts-shell/src/runtime/execution/executionService.ts: execution boundary must export enum-like authority modes')
+}
+if (!/export type ExecutionEvent\s*=/.test(executionServiceContent)) {
+  failures.push('packages/ts-shell/src/runtime/execution/executionService.ts: execution boundary must export structured execution event union')
+}
+if (usesVagueAuthorityBoolean(executionServiceContent)) {
+  failures.push('packages/ts-shell/src/runtime/execution/executionService.ts: execution authority must use precise enum states, not vague booleans')
+}
+
+const coreToolRegistryPath = path.join(root, 'packages/ts-shell/src/core/tools/registry.ts')
+const coreToolRegistryContent = await fs.readFile(coreToolRegistryPath, 'utf8')
+if (!/runtime\/execution\/executionService\.js/.test(coreToolRegistryContent)) {
+  failures.push('packages/ts-shell/src/core/tools/registry.ts: core tool side effects must route through ExecutionService')
+}
+
 const contractFiles = await listFiles(path.join(root, 'contracts'), file => {
   const ext = path.extname(file)
   return sourceExtensions.has(ext)
@@ -175,4 +193,8 @@ function importsForbiddenProjectSurface(content) {
     .filter(line => /\bimport\b|\brequire\(/.test(line))
     .join('\n')
   return /(?:^|['"/])(?:docs|scripts|dev-history|route-reports)(?:['"/])/.test(importLines)
+}
+
+function usesVagueAuthorityBoolean(content) {
+  return /\b(?:allowed|approved|enabled|safe)\??:\s*boolean\b/.test(content)
 }

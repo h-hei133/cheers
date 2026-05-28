@@ -1,5 +1,6 @@
 import {
   createDefaultExecutionService,
+  type ExecutionAuthority,
   type ExecutionService,
 } from '../../runtime/execution/executionService.js'
 import { McpGatewayBlockedError, type CoreMcpGateway } from '../mcp/gateway.js'
@@ -22,6 +23,21 @@ import { buildExecutionFailedResult } from './toolPolicyResult.js'
 import { approvedResult, deniedResult } from './toolResultLifecycle.js'
 
 type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
+const TOOL_APPROVED_READ_AUTHORITY: ExecutionAuthority = {
+  mode: 'read-only',
+  source: 'tool-runtime-approval',
+  reason: 'ToolRuntime approved the filesystem read before ExecutionService was called.',
+}
+const TOOL_APPROVED_WRITE_AUTHORITY: ExecutionAuthority = {
+  mode: 'approved-for-write',
+  source: 'tool-runtime-approval',
+  reason: 'ToolRuntime approved the filesystem write before ExecutionService was called.',
+}
+const TOOL_APPROVED_COMMAND_AUTHORITY: ExecutionAuthority = {
+  mode: 'command-allowlisted',
+  source: 'tool-runtime-approval',
+  reason: 'ToolRuntime allowlist and process permission checks passed before ExecutionService was called.',
+}
 
 function inferFailureKind(result: {
   status: 'completed' | 'failed' | 'timeout' | 'cancelled'
@@ -49,10 +65,15 @@ async function runCommandTool(
   context: ToolExecutionContext,
 ) {
   const result = await executionService.runCommand({
+    operationKind: 'command.run',
     command: process.platform === 'win32' ? 'cmd' : 'sh',
     args: process.platform === 'win32' ? ['/C', command] : ['-c', command],
     cwd: context.workspaceRoot,
     workspaceRoot: context.workspaceRoot,
+    authority: TOOL_APPROVED_COMMAND_AUTHORITY,
+    caller: 'core-tool:bash',
+    reason: 'Execute an approved shell command tool request inside the workspace.',
+    reportSafeCommand: command,
     timeoutMs: 30_000,
     abortSignal: context.abortSignal,
   })
@@ -96,10 +117,15 @@ async function runGitCommand(
   context: ToolExecutionContext,
 ) {
   const result = await executionService.runCommand({
+    operationKind: 'command.run',
     command: process.platform === 'win32' ? 'cmd' : 'sh',
     args: process.platform === 'win32' ? ['/C', command] : ['-c', command],
     cwd: context.workspaceRoot,
     workspaceRoot: context.workspaceRoot,
+    authority: TOOL_APPROVED_COMMAND_AUTHORITY,
+    caller: `core-tool:${command === 'git status --short' ? 'git-status' : 'git-diff'}`,
+    reason: 'Execute an approved read-only git inspection command inside the workspace.',
+    reportSafeCommand: command,
     timeoutMs: 30_000,
     abortSignal: context.abortSignal,
   })
@@ -134,7 +160,15 @@ export function createCoreToolRegistry(options?: {
       },
       async execute(args, context) {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
-        return approvedResult(await executionService.readTextFile(target))
+        return approvedResult(await executionService.readTextFile({
+          operationKind: 'file.read',
+          absolutePath: target,
+          workspaceRoot: context.workspaceRoot,
+          authority: TOOL_APPROVED_READ_AUTHORITY,
+          caller: 'core-tool:read',
+          reason: 'Read an approved workspace file target.',
+          reportSafeTarget: target,
+        }))
       },
     },
     {
@@ -149,7 +183,16 @@ export function createCoreToolRegistry(options?: {
       async execute(args, context) {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
         const content = typeof args.content === 'string' ? args.content : ''
-        await executionService.writeTextFile(target, content)
+        await executionService.writeTextFile({
+          operationKind: 'file.write',
+          absolutePath: target,
+          content,
+          workspaceRoot: context.workspaceRoot,
+          authority: TOOL_APPROVED_WRITE_AUTHORITY,
+          caller: 'core-tool:write',
+          reason: 'Write an approved workspace file target.',
+          reportSafeTarget: target,
+        })
         return approvedResult(target)
       },
     },
@@ -165,7 +208,16 @@ export function createCoreToolRegistry(options?: {
       async execute(args, context) {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
         const content = typeof args.content === 'string' ? args.content : ''
-        await executionService.writeTextFile(target, content)
+        await executionService.writeTextFile({
+          operationKind: 'file.write',
+          absolutePath: target,
+          content,
+          workspaceRoot: context.workspaceRoot,
+          authority: TOOL_APPROVED_WRITE_AUTHORITY,
+          caller: 'core-tool:edit',
+          reason: 'Replace an approved workspace file target.',
+          reportSafeTarget: target,
+        })
         return approvedResult(target)
       },
     },
@@ -177,7 +229,15 @@ export function createCoreToolRegistry(options?: {
       async execute(args, context) {
         const pattern = typeof args.pattern === 'string' ? args.pattern : ''
         const suffix = pattern.replace(/^\*+/, '')
-        const files = await executionService.listFilesRecursive(context.workspaceRoot)
+        const files = await executionService.listFilesRecursive({
+          operationKind: 'file.list',
+          absoluteRoot: context.workspaceRoot,
+          workspaceRoot: context.workspaceRoot,
+          authority: TOOL_APPROVED_READ_AUTHORITY,
+          caller: 'core-tool:glob',
+          reason: 'List approved workspace files for glob matching.',
+          reportSafeTarget: context.workspaceRoot,
+        })
         const matches = suffix ? files.filter(file => file.endsWith(suffix)) : files
         return approvedResult(matches.join('\n'))
       },
