@@ -18,16 +18,19 @@ import {
 import {
   captureCliStdinPrompts,
 } from "../cli/print/stdinPromptCapture.js";
-import { getRuntimeConfig } from "../config/runtimeConfig.js";
+import {
+  createCliApprovalModeState,
+} from "../cli/approval/cliApprovalModeState.js";
+import {
+  createCliProviderRuntimeBridge,
+} from "../cli/provider/cliProviderRuntimeBridge.js";
+import {
+  createCliSessionRuntime,
+} from "../cli/runtime/cliSessionRuntimeFactory.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import {
   runResumeLikeShellAction,
 } from "../core/shell/continueShellActionRuntime.js";
-import {
-  resolveProviderCredential,
-  type ProviderCredentialResolution,
-} from "../core/shell/providerCredentials.js";
-import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
 import {
   isResumeLikeShellAction,
   isShellAction,
@@ -41,9 +44,6 @@ import {
   createTraceContext,
   setGlobalTraceContext,
 } from "../observability/index.js";
-import type {
-  ApprovalAuditMemoryState,
-} from "../session/SessionManager.js";
 import { parseCliArgs, type CliOptions } from "./cliArgs.js";
 import {
   buildCliCommandExecution as resolveTurnInputForExecution,
@@ -58,16 +58,9 @@ import {
   formatWorkspaceInfoLines,
 } from "./cliDisplayProjection.js";
 import { buildPersistentShellPrompt } from "./cliInteractiveLoopState.js";
-import { buildCliPlanningMutationExecutionOptions } from "./cliPlanningMutationExecution.js";
 import { createCliMcpGateway, runCliMcpCommand } from "./cliMcpModule.js";
 import {
-  applyPatchDecisionFromApprovalMode,
-  createCliEscalationPromptHandler,
-  type ApprovalModeObject,
-} from "./cliApprovalModule.js";
-import {
   executeResolvedPromptTurn,
-  streamOrchestratedResponse,
 } from "./cliRuntimeModule.js";
 import { runCliPermissionCommand } from "./cliPermissionModule.js";
 import {
@@ -89,7 +82,7 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const launchCwd = process.cwd();
   const approvalTrustPolicy = new ApprovalTrustPolicy();
-  let activeNonInteractiveApprovalMode: ApprovalModeObject | undefined;
+  const approvalModeState = createCliApprovalModeState();
   let pendingEscPressAt: number | null = null;
 
   const parsedCliArgs = parseCliArgs(args, { cwd: launchCwd });
@@ -111,14 +104,6 @@ async function main(): Promise<void> {
     return;
   }
 
-  const resolveCredentialSnapshot = (): ProviderCredentialResolution =>
-    resolveProviderCredential({
-      runtimeConfig: getRuntimeConfig(runtimeContext.projectRoot),
-      cliProvider: options.provider,
-      cliApiKey: options.apiKey,
-    });
-  let resolvedCredential: ProviderCredentialResolution;
-
   const bootstrapRuntime = createCliBootstrapRuntimeContext({
     launchCwd,
     options,
@@ -132,7 +117,12 @@ async function main(): Promise<void> {
     recoveryCandidate,
     runtimeContext,
   } = bootstrapRuntime;
-  resolvedCredential = resolveCredentialSnapshot();
+  const providerRuntimeBridge = createCliProviderRuntimeBridge({
+    projectRoot: runtimeContext.projectRoot,
+    options,
+  });
+  const resolvedCredential =
+    providerRuntimeBridge.resolveCredentialSnapshot();
   let mcpGateway = bootstrapRuntime.mcpGateway;
 
   const stdinPromptCapture = await captureCliStdinPrompts({
@@ -148,92 +138,23 @@ async function main(): Promise<void> {
     launchCwd,
     bootstrapRuntime,
     providerCredentialResolution: resolvedCredential,
-    providerModeEnv: process.env.PRIVATE_AGENTS_PROVIDER_MODE,
+    providerModeEnv: providerRuntimeBridge.providerModeEnv(),
   });
   logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
 
   let rl: readline.Interface | null = null;
   let interactiveTurnNumber = 0;
 
-  const sessionRuntime = new ShellSessionRuntime({
+  const sessionRuntime = createCliSessionRuntime({
     sessionManager,
     renderer,
-    runPrompt: (prompt, signal, runtimeSeed, continuityState) => {
-      resolvedCredential = resolveCredentialSnapshot();
-      const escalationPromptHandler = createCliEscalationPromptHandler(
-        renderer,
-        rl,
-        () => sessionRuntime.getViewMode(),
-        approvalTrustPolicy,
-        () => runtimeContext.projectRoot,
-        () =>
-          !process.stdin.isTTY ? options.nonInteractiveApproval : undefined,
-        () => activeNonInteractiveApprovalMode,
-        (record) => {
-          const payload: Omit<ApprovalAuditMemoryState, "recordedAt"> = {
-            decision: record.decision,
-            decisionSource: record.decisionSource,
-            persistent: record.persistent,
-            cacheEffect: record.cacheEffect,
-            projectRoot: record.projectRoot,
-            cacheKey: record.cacheKey,
-            scopeLabel: record.scopeLabel,
-            ...(record.lineage ? { lineage: record.lineage } : {}),
-            ...(record.stopReason ? { stopReason: record.stopReason } : {}),
-            ...(record.channel ? { channel: record.channel } : {}),
-            ...(record.inputKey &&
-            (record.inputKey === "y" ||
-              record.inputKey === "a" ||
-              record.inputKey === "n" ||
-              record.inputKey === "other")
-              ? { inputKey: record.inputKey }
-              : {}),
-          };
-          sessionManager.recordApprovalAuditDecision(
-            runtimeContext.session.id,
-            payload,
-          );
-        },
-      );
-      return streamOrchestratedResponse(
-        prompt,
-        runtimeContext.session.id,
-        runtimeContext.cwd,
-        signal,
-        runtimeContext.runtimeConfig.maxTurns,
-        escalationPromptHandler,
-        resolvedCredential,
-        sessionRuntime.getAgentMode(),
-        runtimeSeed,
-        continuityState,
-        options.applyPatchRuntimeRoute === true ||
-          options.applyPatchWorkspaceWrite === true
-          ? {
-              explicitRuntimeOptIn: true,
-              requestedUserDecision: applyPatchDecisionFromApprovalMode(
-                options.nonInteractiveApproval,
-              ),
-              runtimeSource: "production-adjacent",
-              ...(options.applyPatchWorkspaceWrite === true
-                ? {
-                    workspaceWrite: {
-                      explicitWorkspaceWriteOptIn: true,
-                    },
-                  }
-                : {}),
-            }
-          : undefined,
-        buildCliPlanningMutationExecutionOptions({
-          options,
-          workspaceRoot: runtimeContext.cwd,
-          prompt,
-          providerCredentialResolution: resolvedCredential,
-          providerModeEnv: process.env.PRIVATE_AGENTS_PROVIDER_MODE,
-          realProviderSmokeOptIn:
-            process.env.PRIVATE_AGENTS_REAL_PROVIDER_SMOKE?.trim() === "1",
-        }),
-      );
-    },
+    runtimeContext,
+    options,
+    approvalTrustPolicy,
+    approvalModeState,
+    providerRuntimeBridge,
+    getReadline: () => rl,
+    isStdinTty: () => Boolean(process.stdin.isTTY),
   });
 
   const handledPrintMode = await runCliPrintModeRouter({
@@ -247,7 +168,7 @@ async function main(): Promise<void> {
     writeError: console.error,
     exit: process.exit,
     setActiveNonInteractiveApprovalMode: (mode) => {
-      activeNonInteractiveApprovalMode = mode;
+      approvalModeState.set(mode);
     },
   });
   if (handledPrintMode) {
@@ -354,7 +275,7 @@ async function main(): Promise<void> {
               continuityState: turnInput.continuityState,
               sessionManager,
               setActiveNonInteractiveApprovalMode: (mode) => {
-                activeNonInteractiveApprovalMode = mode;
+                approvalModeState.set(mode);
               },
               runtimeContext,
               sessionRuntime,
@@ -495,7 +416,7 @@ async function main(): Promise<void> {
           effectivePrompt: resolved.effectivePrompt,
           sessionManager,
           setActiveNonInteractiveApprovalMode: (mode) => {
-            activeNonInteractiveApprovalMode = mode;
+            approvalModeState.set(mode);
           },
           runtimeContext,
           sessionRuntime,
