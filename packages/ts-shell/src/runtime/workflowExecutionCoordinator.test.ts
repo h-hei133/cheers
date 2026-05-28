@@ -3,6 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import type { RuntimeEvidenceSavePoint } from "../evidence/runtimeSavePoint.js";
+import type { RuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
 import { runMvpIntegratedFlow } from "./workflowExecutionCoordinator.js";
 
 describe("workflowExecutionCoordinator", () => {
@@ -25,11 +27,18 @@ describe("workflowExecutionCoordinator", () => {
       "utf8",
     );
 
+    const snapshots: RuntimeTurnSnapshot[] = [];
+    const savePoints: RuntimeEvidenceSavePoint[] = [];
+
     const result = await runMvpIntegratedFlow({
       sessionId: "runtime_coordinator_read",
       prompt: "Read package.json first 2 lines",
       workspaceRoot,
       maxTurns: 6,
+      runtimeTurnBoundary: {
+        onTurnSnapshot: (snapshot) => snapshots.push(snapshot),
+        onEvidenceSavePoint: (savePoint) => savePoints.push(savePoint),
+      },
     });
 
     expect(result.status).toBe("completed");
@@ -37,5 +46,21 @@ describe("workflowExecutionCoordinator", () => {
     expect(result.codingResult?.changedFiles).toEqual([]);
     expect(result.codingResult?.verification.status).toBe("not-requested");
     expect(result.finalOutput).toContain("workflow-coordinator");
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0]).toMatchObject({
+      sessionId: "runtime_coordinator_read",
+      phase: "turn",
+      provider: {
+        mode: "synthetic",
+        optIn: false,
+      },
+    });
+    expect(savePoints).toHaveLength(1);
+    expect(savePoints[0]).toMatchObject({
+      phase: "save_point",
+      turnSnapshotId: snapshots[0]?.id,
+      resultProjectionStatus: "observed-not-verdict",
+      terminalSuccessClaim: false,
+    });
   });
 });

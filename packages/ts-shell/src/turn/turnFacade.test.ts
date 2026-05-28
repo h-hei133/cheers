@@ -5,7 +5,9 @@ import {
   runProductTurn,
   streamProductTurn,
 } from "./turnFacade.js";
-import type { OrchestrationResult } from "../../orchestration/types.js";
+import { createEvidenceOnlySavePoint } from "../evidence/runtimeSavePoint.js";
+import type { OrchestrationResult } from "../orchestration/types.js";
+import { createRuntimeTurnSnapshot } from "./turnSnapshot.js";
 
 describe("turnFacade", () => {
   it("wraps the legacy integrated flow without changing its result", async () => {
@@ -38,6 +40,58 @@ describe("turnFacade", () => {
       terminalClassification: "success",
       resultSessionCliSuccessUpgrade: false,
     });
+    expect(turn.runtimeBoundary).toEqual({
+      snapshots: [],
+      savePoints: [],
+    });
+  });
+
+  it("collects runtime boundary snapshot and save-point projections without changing terminal truth", async () => {
+    const result = orchestrationResult({
+      status: "stopped_error",
+      terminalClassification: "stopped",
+      terminalReason: "stopped_error",
+      evidence: ["verification:not-run"],
+    });
+    const turn = await runProductTurn(
+      {
+        sessionId: "sess-boundary",
+        prompt: "edit file",
+        workspaceRoot: "/tmp/workspace",
+      },
+      {
+        runIntegratedFlow: async (input) => {
+          const snapshot = createRuntimeTurnSnapshot({
+            sessionId: input.sessionId,
+            turn: 1,
+            phase: "turn",
+            workspaceRoot: input.workspaceRoot,
+            providerOptIn: false,
+          });
+          input.runtimeTurnBoundary?.onTurnSnapshot?.(snapshot);
+          input.runtimeTurnBoundary?.onEvidenceSavePoint?.(
+            createEvidenceOnlySavePoint({
+              turnSnapshot: snapshot,
+              phase: "save_point",
+              evidenceIds: ["verification:not-run"],
+              resultProjection: {
+                status: "insufficient-evidence",
+                terminalClassification: "stopped",
+                terminalReason: "stopped_error",
+              },
+            }),
+          );
+          return result;
+        },
+      },
+    );
+
+    expect(turn.result).toBe(result);
+    expect(turn.handoff.terminalClassification).toBe("stopped");
+    expect(turn.handoff.resultSessionCliSuccessUpgrade).toBe(false);
+    expect(turn.runtimeBoundary.snapshots).toHaveLength(1);
+    expect(turn.runtimeBoundary.savePoints).toHaveLength(1);
+    expect(turn.runtimeBoundary.savePoints[0]?.terminalSuccessClaim).toBe(false);
   });
 
   it("preserves stopped and partial handoff facts instead of creating success", () => {

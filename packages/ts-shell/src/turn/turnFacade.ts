@@ -1,4 +1,5 @@
 import type { QueryEvent } from "../core/query/events.js";
+import type { RuntimeEvidenceSavePoint } from "../evidence/runtimeSavePoint.js";
 import {
   runMvpIntegratedFlow,
   streamMvpIntegratedFlow,
@@ -6,6 +7,8 @@ import {
   type MvpIntegratedFlowOptions,
 } from "../orchestration/runMvpIntegratedFlow.js";
 import type { OrchestrationResult } from "../orchestration/types.js";
+import type { RuntimeTurnBoundaryObserver } from "../runtime/turnBoundary.js";
+import type { RuntimeTurnSnapshot } from "./turnSnapshot.js";
 
 export const PRODUCT_TURN_FACADE_VERSION = "v1";
 
@@ -48,6 +51,12 @@ export interface ProductTurnResult {
   readonly capabilityDecision: ProductTurnCapabilityDecision;
   readonly result: OrchestrationResult;
   readonly handoff: ProductTurnResultHandoff;
+  readonly runtimeBoundary: ProductTurnRuntimeBoundaryProjection;
+}
+
+export interface ProductTurnRuntimeBoundaryProjection {
+  readonly snapshots: readonly RuntimeTurnSnapshot[];
+  readonly savePoints: readonly RuntimeEvidenceSavePoint[];
 }
 
 export interface ProductTurnRuntimeDependencies {
@@ -69,13 +78,28 @@ export async function runProductTurn(
   dependencies: ProductTurnRuntimeDependencies = {},
 ): Promise<ProductTurnResult> {
   const runIntegratedFlow = dependencies.runIntegratedFlow ?? runMvpIntegratedFlow;
-  const result = await runIntegratedFlow(input);
+  const snapshots: RuntimeTurnSnapshot[] = [];
+  const savePoints: RuntimeEvidenceSavePoint[] = [];
+  const result = await runIntegratedFlow({
+    ...input,
+    runtimeTurnBoundary: composeRuntimeTurnBoundaryObservers(
+      input.runtimeTurnBoundary,
+      {
+        onTurnSnapshot: (snapshot) => snapshots.push(snapshot),
+        onEvidenceSavePoint: (savePoint) => savePoints.push(savePoint),
+      },
+    ),
+  });
   return {
     facadeVersion: PRODUCT_TURN_FACADE_VERSION,
     context: projectProductTurnContext(input),
     capabilityDecision: projectProductTurnCapabilityDecision(input),
     result,
     handoff: projectProductTurnResultHandoff(result),
+    runtimeBoundary: {
+      snapshots,
+      savePoints,
+    },
   };
 }
 
@@ -130,5 +154,21 @@ export function projectProductTurnResultHandoff(
     unverifiedFiles: (result.codingResult?.unverifiedFiles ?? []).map((entry) => entry.path),
     evidenceCount: result.codingResult?.evidence?.length ?? 0,
     resultSessionCliSuccessUpgrade: false,
+  };
+}
+
+function composeRuntimeTurnBoundaryObservers(
+  first: RuntimeTurnBoundaryObserver | undefined,
+  second: RuntimeTurnBoundaryObserver,
+): RuntimeTurnBoundaryObserver {
+  return {
+    onTurnSnapshot: (snapshot) => {
+      first?.onTurnSnapshot?.(snapshot);
+      second.onTurnSnapshot?.(snapshot);
+    },
+    onEvidenceSavePoint: (savePoint) => {
+      first?.onEvidenceSavePoint?.(savePoint);
+      second.onEvidenceSavePoint?.(savePoint);
+    },
   };
 }

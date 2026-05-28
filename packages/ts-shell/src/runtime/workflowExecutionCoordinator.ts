@@ -22,8 +22,16 @@ import {
   buildFreshnessObservability,
   type FreshnessObservability,
 } from "../evidence/freshnessEvidence.js";
+import { createEvidenceOnlySavePoint } from "../evidence/runtimeSavePoint.js";
 import { appendSingleFileEditRepairObservability } from "../evidence/turnEvidenceLedger.js";
 import { projectWorkflowExecutionResultContract } from "../result/workflowRuntimeProjection.js";
+import { transitionRuntimePhase } from "./runtimePhase.js";
+import {
+  notifyRuntimeEvidenceSavePoint,
+  notifyRuntimeTurnSnapshot,
+  type RuntimeTurnBoundaryObserver,
+} from "./turnBoundary.js";
+import { createRuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
 import {
   runApplyPatchRuntimeBridgeIfRequested,
   type ApplyPatchRuntimeRouteOptions,
@@ -116,6 +124,7 @@ export interface MvpIntegratedFlowOptions {
   readonly applyPatchRuntimeRoute?: ApplyPatchRuntimeRouteOptions;
   readonly browserRuntimeStatus?: PwRuntimeStatus;
   readonly planningMutationExecution?: PlanningRuntimeProductExecutionOptions;
+  readonly runtimeTurnBoundary?: RuntimeTurnBoundaryObserver;
 }
 
 export async function runMvpIntegratedFlow(
@@ -162,6 +171,7 @@ export async function runMvpIntegratedFlow(
     options.abortSignal,
     options.continuityState,
     options.planningMutationExecution,
+    options.runtimeTurnBoundary,
   );
 
   try {
@@ -257,6 +267,7 @@ function createIntegratedRunner(
   abortSignal?: AbortSignal,
   continuityState?: unknown,
   planningMutationExecution?: PlanningRuntimeProductExecutionOptions,
+  runtimeTurnBoundary?: RuntimeTurnBoundaryObserver,
 ): (input: AgentExecutionInput) => Promise<AgentExecutionOutput> {
   return async ({ role, sharedContext, turn }) => {
     if (role === "planner") {
@@ -311,6 +322,32 @@ function createIntegratedRunner(
         ...buildWorkflowDecisionTrace(workflowPlan),
         ...buildActionResultSeedDecisionTrace(mergedContinuityState),
       ];
+      const turnPhase = transitionRuntimePhase("prompt", "turn");
+      const turnSnapshot = createRuntimeTurnSnapshot({
+        sessionId: sharedContext.sessionId,
+        turn,
+        phase: turnPhase.status === "accepted" ? turnPhase.to : "aborted",
+        workspaceRoot,
+        providerMode,
+        providerOptIn: providerMode === "real",
+        ...(realProvider?.model ? { modelLabel: realProvider.model } : {}),
+        agentMode,
+        capabilityFlags: [
+          `task-kind:${workflowPlan.taskKind}`,
+          `browser-runtime:${browserRuntimeStatus.status}`,
+          ...(workflowPlan.verifyAfterEdit ? ["verify-after-edit"] : []),
+          ...(workflowPlan.inspectFirst ? ["inspect-first"] : []),
+        ],
+        planningMutationExecution: planningMutationExecution
+          ? "provided"
+          : "not-provided",
+        executionBoundaryMode: "ExecutionService",
+        ...(workflowPlan.usedRestoredState
+          ? { continuationIdentity: "restored-session-state" }
+          : {}),
+        evidenceCorrelationIds: freshnessObservability.evidence,
+      });
+      notifyRuntimeTurnSnapshot(runtimeTurnBoundary, turnSnapshot);
       if (workflowPlan.taskKind === "chat") {
         const reflectiveOutput = workflowPlan.reflectiveStateQueryKind
           ? buildReflectiveStateQueryResponse({
@@ -378,6 +415,35 @@ function createIntegratedRunner(
         abortSignal,
         planningMutationExecution,
       });
+      const toolResultBatchPhase = transitionRuntimePhase(
+        turnSnapshot.phase,
+        "tool_result_batch",
+      );
+      const savePointPhase = transitionRuntimePhase(
+        toolResultBatchPhase.status === "accepted"
+          ? toolResultBatchPhase.to
+          : turnSnapshot.phase,
+        "save_point",
+      );
+      notifyRuntimeEvidenceSavePoint(
+        runtimeTurnBoundary,
+        createEvidenceOnlySavePoint({
+          turnSnapshot,
+          phase: savePointPhase.status === "accepted" ? savePointPhase.to : "aborted",
+          evidenceIds: execution.codingResult?.evidence ?? [],
+          sessionPersistenceStatus: "not-recorded",
+          resultProjection: {
+            status: execution.codingResult?.taskSatisfaction.verdict,
+            terminalClassification: execution.codingResult?.verification.status,
+            terminalReason: execution.codingResult?.taskKind,
+          },
+          pendingNextTurnFacts: [
+            workflowPlan.usedRestoredState
+              ? "continuation-state-consumed"
+              : "continuation-state-not-consumed",
+          ],
+        }),
+      );
       const notes = [
         `plan: intent=${workflowPlan.taskKind} reason=${workflowPlan.reason}`,
         ...decisionTrace,
