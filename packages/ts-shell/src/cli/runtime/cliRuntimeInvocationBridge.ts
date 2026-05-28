@@ -9,7 +9,7 @@ import type { SessionContinuitySnapshot } from "../../session/SessionManager.js"
 import {
   applyPatchDecisionFromApprovalMode,
 } from "../../entrypoints/cliApprovalModule.js";
-import type { CliOptions } from "../../entrypoints/cliArgs.js";
+import type { CliOptions } from "../options/cliOptions.js";
 import {
   runCliRuntimeInvocation,
   type CliApplyPatchRuntimeRouteOptions,

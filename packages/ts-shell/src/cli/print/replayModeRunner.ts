@@ -3,8 +3,8 @@ import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type {
   CliBootstrapRuntimeContext,
 } from "../bootstrap/cliBootstrapContext.js";
-import type { ApprovalModeObject } from "../../entrypoints/cliApprovalModule.js";
-import type { CliOptions } from "../../entrypoints/cliArgs.js";
+import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
+import type { CliOptions } from "../options/cliOptions.js";
 import {
   runReplayPromptScript,
 } from "../../entrypoints/cliRuntimeModule.js";

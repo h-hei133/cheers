@@ -1,6 +1,6 @@
 import type {
   ApprovalModeObject,
-} from "../../entrypoints/cliApprovalModule.js";
+} from "./approvalModeContract.js";
 
 export interface CliApprovalModeState {
   readonly get: () => ApprovalModeObject | undefined;

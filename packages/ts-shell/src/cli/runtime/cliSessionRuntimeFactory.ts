@@ -6,7 +6,7 @@ import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionManager } from "../../session/SessionManager.js";
-import type { CliOptions } from "../../entrypoints/cliArgs.js";
+import type { CliOptions } from "../options/cliOptions.js";
 import {
   createCliApprovalEscalationBridge,
 } from "../approval/cliApprovalEscalationBridge.js";

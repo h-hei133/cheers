@@ -35,11 +35,6 @@ import type {
 import {
   buildSessionStateSnapshot,
 } from "./schema/sessionStateSnapshot.js";
-import {
-  clearCurrentSessionSelectionForProject,
-  resolveCurrentSessionForProject as resolveCurrentSessionFromRegistry,
-  setCurrentSessionSelection,
-} from "./store/currentSessionRegistry.js";
 import type { RuntimeSeedOptions } from "./sessionReplayBuilder.js";
 import {
   projectSortedSessionReentrySummaries,
@@ -53,42 +48,18 @@ import {
   buildSessionResumeSnapshot,
 } from "./continuation/sessionPromptContinuity.js";
 import {
-  createSessionId,
-  createSessionStoreLayout,
-  ensureSessionStoreLayout,
-  projectSessionFileLayout,
   validateSessionId,
-  type SessionStoreLayout,
 } from "./store/sessionFileLayout.js";
 import {
   createSession,
   createSessionWithId,
 } from "./store/sessionCreation.js";
-import { writeJsonFileAtomic } from "./store/sessionFileStore.js";
-import {
-  deleteSessionRecord,
-  loadSessionRecord,
-  sessionExistsAtLayout,
-  writeSessionMetadataRecord,
-  writeSessionRecord,
-} from "./store/sessionStore.js";
-import {
-  listSessionRecords,
-  type SessionListWarningState,
-} from "./store/sessionListStore.js";
-import {
-  readStateSnapshotRequired,
-  readStateSnapshotSafely,
-  withSessionStateLock,
-  writeSessionState,
-} from "./store/sessionStateStore.js";
+import { SessionStoreAccess } from "./store/sessionStoreAccess.js";
 import { projectSessionReentrySummary } from "./presentation/sessionReentrySurface.js";
 import type { SessionReentrySummary } from "./presentation/sessionReentrySurface.js";
 import type { RecoveryTrustBoundaryBlock } from "./recovery/recoveryTrustBoundary.js";
-import { projectRecoveryTrustBoundaryBlock } from "./recovery/recoveryTrustBoundary.js";
-import {
-  evaluateSessionResumeEligibility,
-  type SessionResumeEligibility,
+import type {
+  SessionResumeEligibility,
 } from "./recovery/sessionResumeEligibility.js";
 import type {
   ApprovalAuditMemoryState,
@@ -115,13 +86,12 @@ import {
   applySessionQueryEventToState,
 } from "./transcript/sessionQueryEventPersistence.js";
 import {
-  findCompensatedLifecycleEvent,
-} from "./recovery/sessionLifecycleReadModel.js";
-import { reconcileSessionPendingLifecycle } from "./recovery/sessionLifecycleReconciliation.js";
-import {
-  buildSessionRecoverySnapshot,
-  type RecoverySnapshot,
-} from "./recovery/sessionRecoverySnapshot.js";
+  buildRecoverySnapshotForSession,
+  evaluateRecoveryTrustBoundaryForSession,
+  projectRecoveryTrustBoundaryBlockForSession,
+  reconcilePendingLifecycleForSession,
+} from "./recovery/sessionRecoveryRuntime.js";
+import type { RecoverySnapshot } from "./recovery/sessionRecoverySnapshot.js";
 import {
   resumeSession,
   tryResumeSession,
@@ -129,13 +99,15 @@ import {
   type SessionResumeResult,
 } from "./recovery/sessionResume.js";
 import {
-  buildReplayPlan,
-  normalizeSessionReplayTranscript,
-  repairSessionReplayTranscript,
   type ReplayPlan,
   type TranscriptRepairContext,
 } from "./replay/sessionReplayFacade.js";
-import { buildSessionRuntimeStateSeed } from "./replay/sessionRuntimeSeed.js";
+import {
+  buildReplayPlanForSession,
+  buildRuntimeStateSeedForSession,
+  normalizeReplayTranscript,
+  repairReplayTranscript,
+} from "./replay/sessionReplayRuntime.js";
 import {
   markSessionRecoveryReentry,
   markSessionRunStarted,
@@ -185,63 +157,18 @@ export class SessionManager {
   private static readonly AUTO_COMPACT_TURN_THRESHOLD = 12;
   private static readonly APPROVAL_AUDIT_HISTORY_LIMIT =
     SESSION_APPROVAL_AUDIT_HISTORY_LIMIT;
-  private readonly storeLayout: SessionStoreLayout;
-  private sessionsDir: string;
-  private readonly currentSessionStorePath: string;
-  private readonly listWarningState: SessionListWarningState = {
-    warnedUnreadableSessionDirs: new Set<string>(),
-    didWarnListSessionsFailure: false,
-  };
+  private readonly store: SessionStoreAccess;
 
   constructor() {
-    this.storeLayout = createSessionStoreLayout();
-    this.sessionsDir = this.storeLayout.sessionsDir;
-    this.currentSessionStorePath = this.storeLayout.currentSessionStorePath;
-    this.ensureSessionsDir();
-  }
-
-  private ensureSessionsDir(): void {
-    ensureSessionStoreLayout(this.storeLayout);
-  }
-
-  private generateSessionId(): string {
-    return createSessionId();
-  }
-
-  private getSessionDir(sessionId: string): string {
-    return projectSessionFileLayout({
-      sessionsDir: this.sessionsDir,
-      sessionId,
-    }).sessionDir;
-  }
-
-  private getMetadataPath(sessionId: string): string {
-    return projectSessionFileLayout({
-      sessionsDir: this.sessionsDir,
-      sessionId,
-    }).metadataPath;
-  }
-
-  private getTranscriptPath(sessionId: string): string {
-    return projectSessionFileLayout({
-      sessionsDir: this.sessionsDir,
-      sessionId,
-    }).transcriptPath;
-  }
-
-  private getStatePath(sessionId: string): string {
-    return projectSessionFileLayout({
-      sessionsDir: this.sessionsDir,
-      sessionId,
-    }).statePath;
+    this.store = new SessionStoreAccess();
   }
 
   private createSessionCreationCallbacks() {
     return {
       sessionExists: (sessionId: string) => this.sessionExists(sessionId),
       validateSessionId,
-      createSessionId: () => this.generateSessionId(),
-      writeSession: (session: Session) => this.writeSession(session),
+      createSessionId: () => this.store.createSessionId(),
+      writeSession: (session: Session) => this.store.writeSession(session),
       setCurrentSessionForProject: (projectRoot: string, sessionId: string) =>
         this.setCurrentSessionForProject(projectRoot, sessionId),
       now: () => new Date().toISOString(),
@@ -251,16 +178,11 @@ export class SessionManager {
   private createSessionResumeCallbacks() {
     return {
       sessionDirExists: (sessionId: string) =>
-        sessionExistsAtLayout(
-          projectSessionFileLayout({
-            sessionsDir: this.sessionsDir,
-            sessionId,
-          }),
-        ),
-      sessionDir: (sessionId: string) => this.getSessionDir(sessionId),
-      loadSession: (sessionId: string) => this.load(sessionId),
+        this.store.sessionExists(sessionId),
+      sessionDir: (sessionId: string) => this.store.sessionDir(sessionId),
+      loadSession: (sessionId: string) => this.store.load(sessionId),
       writeSessionMetadata: (session: Session) =>
-        this.writeSessionMetadata(session),
+        this.store.writeSessionMetadata(session),
       setCurrentSessionForProject: (projectRoot: string, sessionId: string) =>
         this.setCurrentSessionForProject(projectRoot, sessionId),
       evaluateRecoveryTrustBoundary: (session: Session) =>
@@ -272,69 +194,47 @@ export class SessionManager {
 
   private createSessionLifecycleCallbacks() {
     return {
-      loadSession: (sessionId: string) => this.load(sessionId),
+      loadSession: (sessionId: string) => this.store.load(sessionId),
       appendTranscriptEvent: (sessionId: string, event: TranscriptEvent) =>
         this.appendTranscriptEvent(sessionId, event),
       writeSessionMetadata: (session: Session) =>
-        this.writeSessionMetadata(session),
+        this.store.writeSessionMetadata(session),
       writeSessionState: (
         session: Session,
         overrides?: SessionStateSnapshotOverrides,
-      ) => this.writeSessionState(session, overrides),
+      ) => this.store.writeSessionState(session, overrides),
       now: () => new Date().toISOString(),
     };
   }
 
   getSessionFilePath(sessionId: string): string {
-    return this.getMetadataPath(sessionId);
+    return this.store.metadataPath(sessionId);
   }
 
   getSessionDirPath(sessionId: string): string {
-    return this.getSessionDir(sessionId);
+    return this.store.sessionDir(sessionId);
   }
 
   sessionExists(sessionId: string): boolean {
-    if (!sessionId?.trim()) {
-      return false;
-    }
-    return sessionExistsAtLayout(
-      projectSessionFileLayout({
-        sessionsDir: this.sessionsDir,
-        sessionId: sessionId.trim(),
-      }),
-    );
+    return this.store.sessionExists(sessionId);
   }
 
   getCurrentSessionForProject(projectRoot: string): Session | null {
-    const resolution = this.resolveCurrentSessionForProject(projectRoot);
-    return resolution.ok ? resolution.session : null;
+    return this.store.getCurrentSessionForProject(projectRoot);
   }
 
   resolveCurrentSessionForProject(
     projectRoot: string,
   ): CurrentSessionSelectionResolution {
-    return resolveCurrentSessionFromRegistry({
-      storePath: this.currentSessionStorePath,
-      projectRoot,
-      sessionExists: (sessionId) => this.sessionExists(sessionId),
-      loadSession: (sessionId) => this.load(sessionId),
-    });
+    return this.store.resolveCurrentSessionForProject(projectRoot);
   }
 
   setCurrentSessionForProject(projectRoot: string, sessionId: string): void {
-    setCurrentSessionSelection({
-      storePath: this.currentSessionStorePath,
-      projectRoot,
-      sessionId,
-      updatedAt: new Date().toISOString(),
-    });
+    this.store.setCurrentSessionForProject(projectRoot, sessionId);
   }
 
   clearCurrentSessionForProject(projectRoot: string): void {
-    clearCurrentSessionSelectionForProject({
-      storePath: this.currentSessionStorePath,
-      projectRoot,
-    });
+    this.store.clearCurrentSessionForProject(projectRoot);
   }
 
   createNewWithId(
@@ -393,14 +293,14 @@ export class SessionManager {
   }
 
   addTurn(sessionId: string, message: SessionMessage): void {
-    const session = this.load(sessionId);
+    const session = this.store.load(sessionId);
     appendSessionTurn({
       session,
       message,
       timestamp: new Date().toISOString(),
       append: (event) => this.appendTranscriptEvent(sessionId, event),
-      writeMetadata: (nextSession) => this.writeSessionMetadata(nextSession),
-      writeState: (nextSession) => this.writeSessionState(nextSession),
+      writeMetadata: (nextSession) => this.store.writeSessionMetadata(nextSession),
+      writeState: (nextSession) => this.store.writeSessionState(nextSession),
     });
   }
 
@@ -410,18 +310,18 @@ export class SessionManager {
       readonly recordedAt?: string;
     },
   ): void {
-    const session = this.load(sessionId);
-    const statePath = this.getStatePath(session.id);
+    const session = this.store.load(sessionId);
+    const statePath = this.store.statePath(session.id);
     recordSessionApprovalAuditDecision({
       session,
       decision,
       recordedAt: decision.recordedAt ?? new Date().toISOString(),
       historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
       withStateLock: (targetSessionId, update) =>
-        this.withSessionStateLock(targetSessionId, update),
-      readCurrentSnapshot: () => this.readStateSnapshotSafely(statePath),
+        this.store.withSessionStateLock(targetSessionId, update),
+      readCurrentSnapshot: () => this.store.readStateSnapshotSafely(statePath),
       buildSnapshot: (current) => this.buildSessionStateSnapshot(session, current),
-      writeSnapshot: (snapshot) => this.writeJsonFileAtomic(statePath, snapshot),
+      writeSnapshot: (snapshot) => this.store.writeJsonFileAtomic(statePath, snapshot),
     });
   }
 
@@ -430,7 +330,7 @@ export class SessionManager {
   }
 
   persistUserPromptBarrier(sessionId: string, prompt: string): void {
-    const session = this.load(sessionId);
+    const session = this.store.load(sessionId);
     const timestamp = new Date().toISOString();
     persistSessionUserPromptBarrier({
       session,
@@ -439,9 +339,9 @@ export class SessionManager {
       appendTranscriptEvent: (event) =>
         this.appendTranscriptEvent(sessionId, event),
       writeSessionMetadata: (nextSession) =>
-        this.writeSessionMetadata(nextSession),
+        this.store.writeSessionMetadata(nextSession),
       writeSessionState: (nextSession, overrides) =>
-        this.writeSessionState(nextSession, overrides),
+        this.store.writeSessionState(nextSession, overrides),
     });
   }
 
@@ -480,22 +380,16 @@ export class SessionManager {
   }
 
   renameSession(sessionId: string, title: string): Session {
-    const session = this.load(sessionId);
+    const session = this.store.load(sessionId);
     const normalized = title.trim();
     session.title = normalized.length > 0 ? normalized : undefined;
     session.updatedAt = new Date().toISOString();
-    this.writeSessionMetadata(session);
+    this.store.writeSessionMetadata(session);
     return session;
   }
 
   deleteSession(sessionId: string): void {
-    deleteSessionRecord({
-      sessionId,
-      layout: projectSessionFileLayout({
-        sessionsDir: this.sessionsDir,
-        sessionId,
-      }),
-    });
+    this.store.deleteSession(sessionId);
   }
 
   saveError(
@@ -517,10 +411,9 @@ export class SessionManager {
 
   reconcilePendingLifecycle(sessionId: string): DurableLifecycleIndex {
     const snapshot = this.getRecoverySnapshot(sessionId);
-    return reconcileSessionPendingLifecycle({
+    return reconcilePendingLifecycleForSession({
       snapshot,
-      findCompensatedLifecycleEvent: (input) =>
-        this.findCompensatedLifecycleEvent(sessionId, input),
+      transcriptEvents: this.getTranscriptEvents(sessionId),
       applyQueryEventToState: (event) =>
         this.applyQueryEventToState(sessionId, event),
       appendQueryEvent: (event) => this.appendQueryEvent(sessionId, event),
@@ -542,38 +435,38 @@ export class SessionManager {
   }
 
   getTranscriptEvents(sessionId: string): TranscriptEvent[] {
-    return readTranscriptEvents(this.getTranscriptPath(sessionId));
+    return readTranscriptEvents(this.store.transcriptPath(sessionId));
   }
 
   getRecoverySnapshot(sessionId: string): RecoverySnapshot {
-    return buildSessionRecoverySnapshot({
+    return buildRecoverySnapshotForSession({
       sessionId,
-      session: this.load(sessionId),
-      state: this.readStateSnapshotRequired(this.getStatePath(sessionId)),
+      session: this.store.load(sessionId),
+      state: this.store.readStateSnapshotRequired(this.store.statePath(sessionId)),
       transcriptEvents: this.getTranscriptEvents(sessionId),
     });
   }
 
   normalizeTranscriptEvents(events: TranscriptEvent[]): TranscriptEvent[] {
-    return normalizeSessionReplayTranscript(events);
+    return normalizeReplayTranscript(events);
   }
 
   repairTranscriptEvents(
     events: TranscriptEvent[],
     context: TranscriptRepairContext,
   ): TranscriptEvent[] {
-    return repairSessionReplayTranscript(events, context);
+    return repairReplayTranscript(events, context);
   }
 
   getReplayPlan(sessionId: string): ReplayPlan {
-    return buildReplayPlan(this.getRecoverySnapshot(sessionId));
+    return buildReplayPlanForSession(this.getRecoverySnapshot(sessionId));
   }
 
   buildRuntimeStateSeed(
     sessionId: string,
     options: RuntimeSeedOptions = {},
   ): QueryRuntimeStateSeed {
-    return buildSessionRuntimeStateSeed({
+    return buildRuntimeStateSeedForSession({
       sessionId,
       snapshot: this.getRecoverySnapshot(sessionId),
       options,
@@ -581,12 +474,7 @@ export class SessionManager {
   }
 
   listSessions(): Session[] {
-    return listSessionRecords({
-      sessionsDir: this.sessionsDir,
-      loadSession: (sessionId) => this.load(sessionId),
-      warningState: this.listWarningState,
-      warn: (message) => console.warn(message),
-    });
+    return this.store.listSessions();
   }
 
   listRecentSessions(limit: number = 5): Session[] {
@@ -625,21 +513,21 @@ export class SessionManager {
       projectPreferredSummaries: (preferredProjectRoot) =>
         this.listReentrySummaries({ preferredProjectRoot }),
     });
-    return sessionId ? this.load(sessionId) : null;
+    return sessionId ? this.store.load(sessionId) : null;
   }
 
   rebindSessionProjectRoot(sessionId: string, nextProjectRoot: string): Session {
-    const session = this.load(sessionId);
+    const session = this.store.load(sessionId);
     const previousRoot = session.projectRoot;
     const normalizedRoot = projectRebasedSessionRoot(nextProjectRoot);
     session.projectRoot = normalizedRoot;
     session.updatedAt = new Date().toISOString();
-    this.writeSessionMetadata(session);
-    this.withSessionStateLock(session.id, () => {
-      const statePath = this.getStatePath(session.id);
-      const current = this.readStateSnapshotSafely(statePath);
+    this.store.writeSessionMetadata(session);
+    this.store.withSessionStateLock(session.id, () => {
+      const statePath = this.store.statePath(session.id);
+      const current = this.store.readStateSnapshotSafely(statePath);
       if (!current) {
-        this.writeJsonFileAtomic(
+        this.store.writeJsonFileAtomic(
           statePath,
           this.buildSessionStateSnapshot(session, undefined),
         );
@@ -652,7 +540,7 @@ export class SessionManager {
         nextProjectRoot,
       });
 
-      this.writeJsonFileAtomic(statePath, {
+      this.store.writeJsonFileAtomic(statePath, {
         ...current,
         projectRoot: currentRebaseProjection.projectRoot,
         ...(currentRebaseProjection.workingMemory !== undefined
@@ -676,14 +564,14 @@ export class SessionManager {
       readonly gitRoot?: string | null;
     },
   ): Session {
-    const session = this.load(sessionId);
+    const session = this.store.load(sessionId);
     applySessionWorkspaceBinding({
       session,
       binding,
       updatedAt: new Date().toISOString(),
     });
-    this.writeSessionMetadata(session);
-    this.writeSessionState(session);
+    this.store.writeSessionMetadata(session);
+    this.store.writeSessionState(session);
     this.setCurrentSessionForProject(session.projectRoot, session.id);
     return session;
   }
@@ -699,7 +587,7 @@ export class SessionManager {
   }
 
   describeSessionReentry(sessionId: string): SessionReentrySummary {
-    const session = this.load(sessionId);
+    const session = this.store.load(sessionId);
     const trustBoundary = this.evaluateRecoveryTrustBoundary(session);
     const recoverySnapshot = this.getRecoverySnapshot(sessionId);
     const continuitySnapshot = this.buildContinuitySnapshot(sessionId);
@@ -713,15 +601,15 @@ export class SessionManager {
   }
 
   getSessionResumeEligibility(sessionId: string): SessionResumeEligibility {
-    const session = this.load(sessionId);
+    const session = this.store.load(sessionId);
     return this.evaluateRecoveryTrustBoundary(session);
   }
 
   buildContinuitySnapshot(sessionId: string): SessionContinuitySnapshot {
-    const session = this.load(sessionId);
+    const session = this.store.load(sessionId);
     const stateSnapshot = this.normalizeLegacyPermissionStateForSession(
       session,
-      this.readStateSnapshotSafely(this.getStatePath(sessionId)),
+      this.store.readStateSnapshotSafely(this.store.statePath(sessionId)),
     );
     return buildSessionContinuitySnapshot({
       session,
@@ -736,15 +624,15 @@ export class SessionManager {
     session: Session,
     snapshot: SessionStateSnapshot | undefined,
   ): SessionStateSnapshot | undefined {
-    const statePath = this.getStatePath(session.id);
+    const statePath = this.store.statePath(session.id);
     return normalizeLegacyPermissionStateForSession({
       session,
       snapshot,
       withStateLock: (targetSessionId, update) =>
-        this.withSessionStateLock(targetSessionId, update),
-      readLatestSnapshot: () => this.readStateSnapshotSafely(statePath),
+        this.store.withSessionStateLock(targetSessionId, update),
+      readLatestSnapshot: () => this.store.readStateSnapshotSafely(statePath),
       writeSnapshot: (nextSnapshot) =>
-        this.writeJsonFileAtomic(statePath, nextSnapshot),
+        this.store.writeJsonFileAtomic(statePath, nextSnapshot),
     });
   }
 
@@ -766,7 +654,7 @@ export class SessionManager {
   private evaluateRecoveryTrustBoundary(
     session: Session,
   ): SessionResumeEligibility {
-    return evaluateSessionResumeEligibility({
+    return evaluateRecoveryTrustBoundaryForSession({
       session,
       loadRecoverySnapshot: (sessionId) => this.getRecoverySnapshot(sessionId),
       createBlock: (targetSession, reason, detail) =>
@@ -779,45 +667,11 @@ export class SessionManager {
     reason: RecoveryTrustBoundaryBlock["reason"],
     detail: string,
   ): RecoveryTrustBoundaryBlock {
-    return projectRecoveryTrustBoundaryBlock({
+    return projectRecoveryTrustBoundaryBlockForSession({
       sessionId: session.id,
-      sessionDir: this.getSessionDir(session.id),
+      sessionDir: this.store.sessionDir(session.id),
       reason,
       detail,
-    });
-  }
-
-  private writeSession(session: Session): void {
-    writeSessionRecord({
-      session,
-      layout: projectSessionFileLayout({
-        sessionsDir: this.sessionsDir,
-        sessionId: session.id,
-      }),
-    });
-  }
-
-  private writeSessionMetadata(session: Session): void {
-    writeSessionMetadataRecord({
-      session,
-      layout: projectSessionFileLayout({
-        sessionsDir: this.sessionsDir,
-        sessionId: session.id,
-      }),
-    });
-  }
-
-  private writeSessionState(
-    session: Session,
-    overrides?: SessionStateSnapshotOverrides,
-  ): void {
-    writeSessionState({
-      session,
-      layout: projectSessionFileLayout({
-        sessionsDir: this.sessionsDir,
-        sessionId: session.id,
-      }),
-      overrides,
     });
   }
 
@@ -825,34 +679,24 @@ export class SessionManager {
     sessionId: string,
     event: TranscriptEvent,
   ): void {
-    appendTranscriptEvent(this.getTranscriptPath(sessionId), event);
-  }
-
-  private findCompensatedLifecycleEvent(
-    sessionId: string,
-    input:
-      | { type: "approval.resolved"; taskId: string; toolName: string }
-      | { type: "tool.result"; taskId: string; toolName: string },
-  ):
-    | Extract<QueryEvent, { type: "approval.resolved" | "tool.result" }>
-    | undefined {
-    return findCompensatedLifecycleEvent(this.getTranscriptEvents(sessionId), input);
+    appendTranscriptEvent(this.store.transcriptPath(sessionId), event);
   }
 
   private applyQueryEventToState(sessionId: string, event: QueryEvent): void {
-    const session = this.load(sessionId);
+    const session = this.store.load(sessionId);
     applySessionQueryEventToState({
       session,
       event,
-      withSessionStateLock: (write) => this.withSessionStateLock(sessionId, write),
+      withSessionStateLock: (write) =>
+        this.store.withSessionStateLock(sessionId, write),
       readCurrentState: () =>
-        this.readStateSnapshotSafely(this.getStatePath(sessionId)),
+        this.store.readStateSnapshotSafely(this.store.statePath(sessionId)),
       buildSessionStateSnapshot: (nextSession, current, overrides) =>
         this.buildSessionStateSnapshot(nextSession, current, overrides),
       applyAutoCompactRetention: (workingMemory, queryEvent) =>
         this.applyAutoCompactRetention(workingMemory, queryEvent),
       writeSnapshot: (snapshot) =>
-        this.writeJsonFileAtomic(this.getStatePath(sessionId), snapshot),
+        this.store.writeJsonFileAtomic(this.store.statePath(sessionId), snapshot),
     });
   }
 
@@ -871,27 +715,6 @@ export class SessionManager {
       ),
     });
   }
-  private load(sessionId: string): Session {
-    return loadSessionRecord({
-      sessionId,
-      layout: projectSessionFileLayout({
-        sessionsDir: this.sessionsDir,
-        sessionId,
-      }),
-      cwd: process.cwd(),
-    });
-  }
-
-  private readStateSnapshotSafely(
-    statePath: string,
-  ): SessionStateSnapshot | undefined {
-    return readStateSnapshotSafely(statePath);
-  }
-
-  private readStateSnapshotRequired(statePath: string): SessionStateSnapshot {
-    return readStateSnapshotRequired(statePath);
-  }
-
   private buildSessionStateSnapshot(
     session: Session,
     current: SessionStateSnapshot | undefined,
@@ -908,19 +731,5 @@ export class SessionManager {
     >,
   ): SessionStateSnapshot {
     return buildSessionStateSnapshot(session, current, overrides);
-  }
-
-  private withSessionStateLock<T>(sessionId: string, action: () => T): T {
-    return withSessionStateLock(
-      projectSessionFileLayout({
-        sessionsDir: this.sessionsDir,
-        sessionId,
-      }),
-      action,
-    );
-  }
-
-  private writeJsonFileAtomic(filePath: string, payload: unknown): void {
-    writeJsonFileAtomic(filePath, payload);
   }
 }

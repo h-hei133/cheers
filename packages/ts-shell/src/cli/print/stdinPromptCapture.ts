@@ -4,7 +4,7 @@ import {
   resolveStdinTransportMode,
 } from "../../core/shell/printPromptInput.js";
 import type { StdinTransportMode } from "../../core/shell/printPromptInput.js";
-import type { CliOptions } from "../../entrypoints/cliArgs.js";
+import type { CliOptions } from "../options/cliOptions.js";
 import {
   resolveCliMode,
   type CliModePlan,

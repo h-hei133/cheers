@@ -1,6 +1,6 @@
 import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
 import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBridge.js";
-import type { CliOptions } from "../../entrypoints/cliArgs.js";
+import type { CliOptions } from "../options/cliOptions.js";
 import { buildCliPlanningMutationExecutionOptions } from "../../entrypoints/cliPlanningMutationExecution.js";
 import type { PlanningRuntimeProductExecutionOptions } from "../../orchestration/planningRuntimeProductExecution.js";
 

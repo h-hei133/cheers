@@ -10,7 +10,7 @@ import { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { StructuredLogger } from "../../observability/index.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { getWorkflowGitContext } from "../../workflow/gitContext.js";
-import type { CliOptions } from "../../entrypoints/cliArgs.js";
+import type { CliOptions } from "../options/cliOptions.js";
 import {
   createCliMcpGateway,
   type CliMcpGateway,

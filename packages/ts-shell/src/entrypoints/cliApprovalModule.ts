@@ -4,6 +4,7 @@ import { applyInteractiveApprovalDecisionWiring } from "../core/shell/interactiv
 import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
+import type { ApprovalModeObject } from "../cli/approval/approvalModeContract.js";
 import {
   createApprovalResponse,
   formatAllowOnceAppliedLine,
@@ -27,19 +28,7 @@ import {
 } from "./approvalPromptBridge.js";
 import type { CliApplyPatchRuntimeRouteOptions } from "./cliRuntimeInvocation.js";
 
-export interface ApprovalModeObject {
-  readonly mode: "deny" | "allow-once" | "allow-always";
-  readonly persistent: boolean;
-  readonly source:
-    | "prompt-explicit-verify-lineage"
-    | "prompt-ambiguous-verify-lineage";
-  readonly verifyLineage: "blocked-verify-resume";
-  readonly command?: string;
-  readonly commandCwd?: string;
-  readonly targetPath?: string;
-  readonly executableNow: boolean;
-  readonly missingFields: readonly string[];
-}
+export type { ApprovalModeObject } from "../cli/approval/approvalModeContract.js";
 
 interface NonInteractiveApprovalDecisionPlan {
   readonly source: ApprovalDecisionSource;

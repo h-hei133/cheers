@@ -7,7 +7,7 @@ import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionManager } from "../../session/SessionManager.js";
-import type { ApprovalModeObject } from "../../entrypoints/cliApprovalModule.js";
+import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import {
   createCliMcpGateway,
   type CliMcpGateway,

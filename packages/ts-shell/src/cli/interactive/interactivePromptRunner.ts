@@ -5,7 +5,7 @@ import type { ResumeLikeShellAction } from "../../core/shell/shellActionBridge.j
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionManager } from "../../session/SessionManager.js";
-import type { ApprovalModeObject } from "../../entrypoints/cliApprovalModule.js";
+import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import {
   executeResolvedPromptTurn,
 } from "../../entrypoints/cliRuntimeModule.js";

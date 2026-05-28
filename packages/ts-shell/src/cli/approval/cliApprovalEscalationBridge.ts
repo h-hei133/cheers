@@ -3,8 +3,8 @@ import type { Interface as ReadlineInterface } from "node:readline";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import {
   createCliEscalationPromptHandler,
-  type ApprovalModeObject,
 } from "../../entrypoints/cliApprovalModule.js";
+import type { ApprovalModeObject } from "./approvalModeContract.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { EscalationPrompt, EscalationResponse } from "../../sandbox/index.js";
 import type { SessionManager } from "../../session/SessionManager.js";

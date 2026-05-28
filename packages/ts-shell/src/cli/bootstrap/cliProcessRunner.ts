@@ -7,7 +7,8 @@ import {
   createTraceContext,
   setGlobalTraceContext,
 } from "../../observability/index.js";
-import { parseCliArgs, type CliOptions } from "../../entrypoints/cliArgs.js";
+import { parseCliArgs } from "../../entrypoints/cliArgs.js";
+import type { CliOptions } from "../options/cliOptions.js";
 import { printCliDoctor } from "../../entrypoints/cliDoctor.js";
 import {
   createCliApprovalModeState,

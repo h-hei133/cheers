@@ -4,7 +4,7 @@ import {
 } from "../../core/shell/startupSurfaceRenderer.js";
 import type { StdinTransportMode } from "../../core/shell/printPromptInput.js";
 import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
-import type { CliOptions } from "../../entrypoints/cliArgs.js";
+import type { CliOptions } from "../options/cliOptions.js";
 import type { CliModePlan } from "../../entrypoints/cliModeDispatch.js";
 import {
   projectCliStartupPlan,

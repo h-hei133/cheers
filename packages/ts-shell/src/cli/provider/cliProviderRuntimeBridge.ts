@@ -5,7 +5,7 @@ import {
   resolveProviderCredential,
   type ProviderCredentialResolution,
 } from "../../core/shell/providerCredentials.js";
-import type { CliOptions } from "../../entrypoints/cliArgs.js";
+import type { CliOptions } from "../options/cliOptions.js";
 
 export interface CliProviderRuntimeBridge {
   readonly resolveCredentialSnapshot: () => ProviderCredentialResolution;
