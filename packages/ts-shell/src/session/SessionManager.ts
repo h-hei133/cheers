@@ -11,11 +11,9 @@ import * as fs from "node:fs";
 import type { QueryEvent } from "../core/query/events.js";
 import type {
   QueryRuntimeRecoveryBoundary,
-  QueryRuntimeRepairSummary,
   QueryRuntimeStateSeed,
 } from "../core/query/runtimeState.js";
 import {
-  applyLifecycleEventToIndex,
   createEmptyLifecycleIndex,
   type DurableLifecycleIndex,
 } from "../core/tools/toolResultLifecycle.js";
@@ -50,7 +48,6 @@ import {
 import {
   createLifecycleTranscriptEvent,
   createMessageTranscriptEvent,
-  createQueryTranscriptEvent,
   type TranscriptEvent,
 } from "./sessionEventCodec.js";
 import {
@@ -89,13 +86,7 @@ import {
   resolveCurrentSessionForProject as resolveCurrentSessionFromRegistry,
   setCurrentSessionSelection,
 } from "./store/currentSessionRegistry.js";
-import {
-  buildResumeReplayInput,
-  buildSessionReplayPlan,
-  normalizeReplayTranscriptEvents,
-  prepareReplayTranscript,
-  type RuntimeSeedOptions,
-} from "./sessionReplayBuilder.js";
+import type { RuntimeSeedOptions } from "./sessionReplayBuilder.js";
 import {
   projectRecentProjectContexts,
   projectSortedSessionReentrySummaries,
@@ -168,6 +159,26 @@ import {
   appendTranscriptEvent,
   readTranscriptEvents,
 } from "./transcript/sessionTranscript.js";
+import {
+  appendSessionQueryEvent,
+  applySessionQueryEventToState,
+} from "./transcript/sessionQueryEventPersistence.js";
+import {
+  findCompensatedLifecycleEvent,
+} from "./recovery/sessionLifecycleReadModel.js";
+import { reconcileSessionPendingLifecycle } from "./recovery/sessionLifecycleReconciliation.js";
+import {
+  buildSessionRecoverySnapshot,
+  type RecoverySnapshot,
+} from "./recovery/sessionRecoverySnapshot.js";
+import {
+  buildReplayPlan,
+  normalizeSessionReplayTranscript,
+  repairSessionReplayTranscript,
+  type ReplayPlan,
+  type TranscriptRepairContext,
+} from "./replay/sessionReplayFacade.js";
+import { buildSessionRuntimeStateSeed } from "./replay/sessionRuntimeSeed.js";
 
 export type { CurrentSessionSelectionResolution } from "./currentSessionSelection.js";
 export type {
@@ -176,6 +187,11 @@ export type {
 } from "./sessionContinuityTypes.js";
 export type { TranscriptEvent } from "./sessionEventCodec.js";
 export type { SessionMessage } from "./schema/sessionMessage.js";
+export type { RecoverySnapshot } from "./recovery/sessionRecoverySnapshot.js";
+export type {
+  ReplayPlan,
+  TranscriptRepairContext,
+} from "./replay/sessionReplayFacade.js";
 
 export type { WorkspaceRootMode } from "./projectBindingPolicy.js";
 export type { Session } from "./schema/sessionRecord.js";
@@ -217,37 +233,6 @@ export interface ProjectContextSummary {
   readonly sessionCount: number;
   readonly recoverableCount: number;
   readonly lastSessionTitle?: string;
-}
-
-interface TranscriptRepairContext {
-  readonly sessionId: string;
-  readonly state: SessionStateSnapshot;
-  readonly pendingPrompt?: string;
-  readonly updatedAt: string;
-}
-
-export interface RecoverySnapshot {
-  readonly pendingPrompt?: string;
-  readonly runPhase?: "idle" | "prompt-persisted" | "turn-active";
-  readonly interruptedKind?: "prompt" | "turn";
-  readonly durableStatus?: "success" | "stopped" | "error";
-  readonly terminalReason?: TerminalReason;
-  readonly terminalClassification?: TerminalClassification;
-  readonly lastContinuationReason?: ContinuationReason;
-  readonly pendingLifecycle: DurableLifecycleIndex;
-  readonly repairSummary: QueryRuntimeRepairSummary;
-  readonly lastUserMessage?: SessionMessage;
-  readonly lastAssistantMessage?: SessionMessage;
-  readonly lastLifecycleEvent?: Extract<TranscriptEvent, { type: "lifecycle" }>;
-  readonly transcriptEvents: TranscriptEvent[];
-}
-
-export interface ReplayPlan {
-  readonly normalizedTranscriptEvents: TranscriptEvent[];
-  readonly replayMessages: SessionMessage[];
-  readonly continuationPrompt?: string;
-  readonly requiresAssistantSentinel: boolean;
-  readonly repairSummary: QueryRuntimeRepairSummary;
 }
 
 export type ResumeResult =
@@ -767,86 +752,27 @@ export class SessionManager {
 
   reconcilePendingLifecycle(sessionId: string): DurableLifecycleIndex {
     const snapshot = this.getRecoverySnapshot(sessionId);
-    for (const pendingApproval of Object.values(
-      snapshot.pendingLifecycle.pendingApprovals,
-    )) {
-      const compensatedApproval = this.findCompensatedLifecycleEvent(
-        sessionId,
-        {
-          type: "approval.resolved",
-          toolName: pendingApproval.toolName,
-          taskId: pendingApproval.taskId,
-        },
-      );
-
-      if (compensatedApproval) {
-        this.applyQueryEventToState(sessionId, compensatedApproval);
-        continue;
-      }
-
-      this.appendQueryEvent(sessionId, {
-        type: "approval.resolved",
-        toolName: pendingApproval.toolName,
-        taskId: pendingApproval.taskId,
-        outcome: "denied",
-        compensated: true,
-      });
-    }
-    for (const pendingTool of Object.values(
-      snapshot.pendingLifecycle.pendingTools,
-    )) {
-      const compensatedTool = this.findCompensatedLifecycleEvent(sessionId, {
-        type: "tool.result",
-        toolName: pendingTool.toolName,
-        taskId: pendingTool.taskId,
-      });
-
-      if (compensatedTool) {
-        this.applyQueryEventToState(sessionId, compensatedTool);
-        continue;
-      }
-
-      this.appendQueryEvent(sessionId, {
-        type: "tool.result",
-        toolName: pendingTool.toolName,
-        taskId: pendingTool.taskId,
-        success: false,
-        compensated: true,
-      });
-    }
-
-    return this.getRecoverySnapshot(sessionId).pendingLifecycle;
+    return reconcileSessionPendingLifecycle({
+      snapshot,
+      findCompensatedLifecycleEvent: (input) =>
+        this.findCompensatedLifecycleEvent(sessionId, input),
+      applyQueryEventToState: (event) =>
+        this.applyQueryEventToState(sessionId, event),
+      appendQueryEvent: (event) => this.appendQueryEvent(sessionId, event),
+      readPendingLifecycle: () =>
+        this.getRecoverySnapshot(sessionId).pendingLifecycle,
+    });
   }
 
   appendQueryEvent(sessionId: string, event: QueryEvent): void {
-    if (this.isDuplicateDurableResolutionEvent(sessionId, event)) {
-      return;
-    }
-
-    this.appendTranscriptEvent(
-      sessionId,
-      createQueryTranscriptEvent({
-        event,
-        timestamp: new Date().toISOString(),
-      }),
-    );
-    this.applyQueryEventToState(sessionId, event);
-  }
-
-  private isDuplicateDurableResolutionEvent(
-    sessionId: string,
-    event: QueryEvent,
-  ): boolean {
-    if (event.type !== "approval.resolved" && event.type !== "tool.result") {
-      return false;
-    }
-
-    return this.getTranscriptEvents(sessionId).some((existing) => {
-      if (existing.type !== "query-event") {
-        return false;
-      }
-
-      return JSON.stringify(existing.event) === JSON.stringify(event);
+    appendSessionQueryEvent({
+      event,
+      timestamp: new Date().toISOString(),
+      transcriptEvents: this.getTranscriptEvents(sessionId),
+      appendTranscriptEvent: (transcriptEvent) =>
+        this.appendTranscriptEvent(sessionId, transcriptEvent),
+      applyQueryEventToState: (queryEvent) =>
+        this.applyQueryEventToState(sessionId, queryEvent),
     });
   }
 
@@ -855,92 +781,34 @@ export class SessionManager {
   }
 
   getRecoverySnapshot(sessionId: string): RecoverySnapshot {
-    const session = this.load(sessionId);
-    const state = this.readStateSnapshotRequired(this.getStatePath(sessionId));
-    const replayPreparation = this.prepareReplayTranscript(
-      this.normalizeTranscriptEvents(this.getTranscriptEvents(sessionId)),
-      {
-        sessionId,
-        state,
-        pendingPrompt: session.pendingPrompt,
-        updatedAt: session.updatedAt,
-      },
-    );
-    const transcriptEvents = replayPreparation.transcriptEvents;
-    const messageEvents = transcriptEvents.filter(
-      (event): event is Extract<TranscriptEvent, { type: "message" }> =>
-        event.type === "message",
-    );
-    const lifecycleEvents = transcriptEvents.filter(
-      (event): event is Extract<TranscriptEvent, { type: "lifecycle" }> =>
-        event.type === "lifecycle",
-    );
-    const readModelLifecycle =
-      this.deriveLifecycleIndexFromTranscript(transcriptEvents);
-
-    const lastUserMessage = [...messageEvents]
-      .reverse()
-      .find((event) => event.role === "user");
-    const lastAssistantMessage = [...messageEvents]
-      .reverse()
-      .find((event) => event.role === "assistant");
-
-    return {
-      pendingPrompt: session.pendingPrompt,
-      runPhase: state.runPhase,
-      interruptedKind: state.interruptedKind,
-      durableStatus: state.durableStatus,
-      terminalReason: state.terminalReason,
-      terminalClassification: state.terminalClassification,
-      lastContinuationReason: state.lastContinuationReason,
-      pendingLifecycle: readModelLifecycle,
-      repairSummary: replayPreparation.repairSummary,
-      lastUserMessage,
-      lastAssistantMessage,
-      lastLifecycleEvent: lifecycleEvents[lifecycleEvents.length - 1],
-      transcriptEvents,
-    };
-  }
-
-  private deriveLifecycleIndexFromTranscript(
-    events: TranscriptEvent[],
-  ): DurableLifecycleIndex {
-    return events.reduce<DurableLifecycleIndex>((index, event) => {
-      if (event.type !== "query-event") {
-        return index;
-      }
-
-      return applyLifecycleEventToIndex(index, event.event);
-    }, createEmptyLifecycleIndex());
+    return buildSessionRecoverySnapshot({
+      sessionId,
+      session: this.load(sessionId),
+      state: this.readStateSnapshotRequired(this.getStatePath(sessionId)),
+      transcriptEvents: this.getTranscriptEvents(sessionId),
+    });
   }
 
   normalizeTranscriptEvents(events: TranscriptEvent[]): TranscriptEvent[] {
-    return normalizeReplayTranscriptEvents(events);
+    return normalizeSessionReplayTranscript(events);
   }
 
   repairTranscriptEvents(
     events: TranscriptEvent[],
     context: TranscriptRepairContext,
   ): TranscriptEvent[] {
-    return this.prepareReplayTranscript(events, context).transcriptEvents;
-  }
-
-  private prepareReplayTranscript(
-    events: TranscriptEvent[],
-    context: TranscriptRepairContext,
-  ) {
-    return prepareReplayTranscript(events, context);
+    return repairSessionReplayTranscript(events, context);
   }
 
   getReplayPlan(sessionId: string): ReplayPlan {
-    return buildSessionReplayPlan(this.getRecoverySnapshot(sessionId));
+    return buildReplayPlan(this.getRecoverySnapshot(sessionId));
   }
 
   buildRuntimeStateSeed(
     sessionId: string,
     options: RuntimeSeedOptions = {},
   ): QueryRuntimeStateSeed {
-    return buildResumeReplayInput({
+    return buildSessionRuntimeStateSeed({
       sessionId,
       snapshot: this.getRecoverySnapshot(sessionId),
       options,
@@ -2013,54 +1881,23 @@ export class SessionManager {
   ):
     | Extract<QueryEvent, { type: "approval.resolved" | "tool.result" }>
     | undefined {
-    return this.getTranscriptEvents(sessionId).find(
-      (
-        event,
-      ): event is Extract<TranscriptEvent, { type: "query-event" }> & {
-        event: Extract<
-          QueryEvent,
-          { type: "approval.resolved" | "tool.result" }
-        >;
-      } => {
-        if (event.type !== "query-event") {
-          return false;
-        }
-
-        if (event.event.type !== input.type) {
-          return false;
-        }
-
-        if (
-          event.event.taskId !== input.taskId ||
-          event.event.toolName !== input.toolName
-        ) {
-          return false;
-        }
-
-        return true;
-      },
-    )?.event;
+    return findCompensatedLifecycleEvent(this.getTranscriptEvents(sessionId), input);
   }
 
   private applyQueryEventToState(sessionId: string, event: QueryEvent): void {
     const session = this.load(sessionId);
-    this.withSessionStateLock(sessionId, () => {
-      const statePath = this.getStatePath(sessionId);
-      const current = this.readStateSnapshotSafely(statePath);
-      const nextWorkingMemory = this.applyAutoCompactRetention(
-        current?.workingMemory,
-        event,
-      );
-      const snapshot = this.buildSessionStateSnapshot(session, current, {
-        pendingLifecycle: applyLifecycleEventToIndex(
-          current?.pendingLifecycle ?? createEmptyLifecycleIndex(),
-          event,
-        ),
-      });
-      if (nextWorkingMemory !== undefined) {
-        snapshot.workingMemory = nextWorkingMemory;
-      }
-      this.writeJsonFileAtomic(statePath, snapshot);
+    applySessionQueryEventToState({
+      session,
+      event,
+      withSessionStateLock: (write) => this.withSessionStateLock(sessionId, write),
+      readCurrentState: () =>
+        this.readStateSnapshotSafely(this.getStatePath(sessionId)),
+      buildSessionStateSnapshot: (nextSession, current, overrides) =>
+        this.buildSessionStateSnapshot(nextSession, current, overrides),
+      applyAutoCompactRetention: (workingMemory, queryEvent) =>
+        this.applyAutoCompactRetention(workingMemory, queryEvent),
+      writeSnapshot: (snapshot) =>
+        this.writeJsonFileAtomic(this.getStatePath(sessionId), snapshot),
     });
   }
 

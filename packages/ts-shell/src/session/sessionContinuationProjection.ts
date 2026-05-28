@@ -1,4 +1,4 @@
-import type { RecoverySnapshot } from "./SessionManager.js";
+import type { RecoverySnapshot } from "./recovery/sessionRecoverySnapshot.js";
 
 const unsafeContinuationEvidencePattern =
   /(raw-dom|raw DOM|<html|<\/|authorization|api[_-]?key|token|secret|cookie|private-agents-real|BEGIN [A-Z ]*PRIVATE KEY|raw-file|file-dump)/i;

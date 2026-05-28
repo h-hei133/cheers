@@ -1,9 +1,9 @@
 import type {
-  RecoverySnapshot,
   RecoveryTrustBoundaryBlock,
   SessionReentrySummary,
   SessionResumeEligibility,
 } from "./SessionManager.js";
+import type { RecoverySnapshot } from "./recovery/sessionRecoverySnapshot.js";
 import type { Session } from "./schema/sessionRecord.js";
 import type { SessionContinuitySnapshot } from "./sessionContinuityTypes.js";
 
