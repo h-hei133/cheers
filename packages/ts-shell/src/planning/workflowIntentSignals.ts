@@ -11,13 +11,18 @@ import {
   detectVerifyCommand,
   hasExternalVerifyOptOut,
 } from "../policy/commandIntentPolicy.js";
+import {
+  isPostEditReadOnlyVerifyFollowUp,
+  isVerifyContinuationFollowUpPrompt,
+  prefersTestOverBuildInFollowUp,
+} from "../verification/verifyContinuationPlanning.js";
+import { detectUnsupportedCommandForPlanning } from "../verification/commandIntentPlanning.js";
 import { extractReplaceDirective } from "../edit/mutationInstructionPlanner.js";
 import { parseGroundedRepairConstraints } from "../repair/groundedAnswerRepair.js";
 import {
   hasExplicitExecutionIntent,
   stripPathTokensForIntent,
 } from "./promptTargetProjection.js";
-import { detectUnsupportedCommandIntent } from "../orchestration/capabilityBoundaryProjection.js";
 
 export interface WorkflowTaskIntentSignals {
   readonly normalized: string;
@@ -169,7 +174,7 @@ export function extractWorkflowTaskIntentSignals(
       : verifyCommand;
   const effectiveReplaceDirectiveFromPrompt = extractReplaceDirective(prompt);
   const hasExecutionIntent = hasExplicitExecutionIntent(prompt, normalized);
-  const unsupportedCommand = detectUnsupportedCommandIntent(normalized);
+  const unsupportedCommand = detectUnsupportedCommandForPlanning(normalized);
 
   return {
     normalized,
@@ -246,49 +251,11 @@ export function isExecutionCorrectionFollowUpPrompt(prompt: string): boolean {
   );
 }
 
-export function prefersTestOverBuildInFollowUp(prompt: string): boolean {
-  return /(?:\u5148\u522b\u8dd1\s*build|\u5148\u770b\s*test|\u5148\u4fee\s*test|dont run build|don't run build|run tests first|test first)/i.test(
-    prompt,
-  );
-}
-
-export function isVerifyContinuationFollowUpPrompt(prompt: string): boolean {
-  return /(?:\b(?:continue|rerun|re-run|retry|run|execute)\b.*\b(?:verify|verification|test|tests|build|lint|check)\b|\b(?:verify|verification|test|tests|build|lint|check)\b.*\b(?:again|retry|rerun|re-run|continue)\b|\u7ee7\u7eed.*(?:\u9a8c\u8bc1|\u6d4b\u8bd5|\u6784\u5efa|\u7f16\u8bd1|\u68c0\u67e5)|\u91cd\u8dd1.*(?:\u6d4b\u8bd5|\u6784\u5efa|\u7f16\u8bd1)|\u518d\u8dd1.*(?:\u6d4b\u8bd5|\u6784\u5efa|\u7f16\u8bd1))/i.test(
-    prompt,
-  );
-}
-
-export function isPostEditReadOnlyVerifyFollowUp(prompt: string): boolean {
-  const normalized = prompt.toLowerCase();
-  const hasVerifyOrCheck =
-    /\b(?:verify|verification|check|confirm|ensure|make sure)\b/i.test(
-      normalized,
-    ) || /(?:\u9a8c\u8bc1|\u68c0\u67e5|\u786e\u8ba4)/i.test(normalized);
-  if (!hasVerifyOrCheck) {
-    return false;
-  }
-  const referencesPriorEdit =
-    /\b(?:last|previous|prior|recent)\s+(?:change|edit|modification|update)\b/i.test(
-      normalized,
-    ) ||
-    /\b(?:changed file|changed files|the change|the edit)\b/i.test(
-      normalized,
-    ) ||
-    /(?:\u4e0a\u4e00\u6b21|\u521a\u624d|\u4e0a\u8f6e).*(?:\u4fee\u6539|\u6539\u52a8)/i.test(
-      normalized,
-    );
-  const readOnlyCheck =
-    /\b(?:contains|include|includes|has|matches|stays|remains)\b/i.test(
-      normalized,
-    ) ||
-    /\b(?:do not|don't|dont|without)\s+(?:edit|modify|change|touch|write|replace|fix)\b/i.test(
-      normalized,
-    ) ||
-    /(?:\u5305\u542b|\u4e0d\u8981\s*(?:\u4fee\u6539|\u5199\u5165|\u66ff\u6362))/i.test(
-      normalized,
-    );
-  return referencesPriorEdit || readOnlyCheck;
-}
+export {
+  isPostEditReadOnlyVerifyFollowUp,
+  isVerifyContinuationFollowUpPrompt,
+  prefersTestOverBuildInFollowUp,
+} from "../verification/verifyContinuationPlanning.js";
 
 export function isWeakSeedTargetCarryoverPrompt(prompt: string): boolean {
   const normalized = prompt.trim().toLowerCase();

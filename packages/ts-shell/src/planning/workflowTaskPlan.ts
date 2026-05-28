@@ -1,7 +1,4 @@
-import fs from "node:fs";
-import path from "node:path";
 import {
-  computeFragmentFingerprint,
   computeFragmentFingerprintFromIndexes,
   extractLastReadDeliveredFragmentFromContinuity,
   extractLastReadWindowFromContinuity,
@@ -17,13 +14,11 @@ import {
   buildGroundedReadMissingTargetPlan,
   buildGroundedReadOutOfWorkspacePlan,
 } from "../context/readTargetPlanning.js";
-import { parseContinuationTransformEvidence } from "../evidence/continuationTransformEvidence.js";
 import { hasPathLikeReference } from "./promptTargetProjection.js";
 import {
   extractFencedContent,
   extractInlineWriteContent,
   extractLowRiskRenameRefactor,
-  resolveMutationInstruction,
 } from "../edit/mutationInstructionPlanner.js";
 import {
   buildLocalMutationScopeBlockedPlan,
@@ -42,30 +37,39 @@ import {
   resolveSingleFileEditRepairPayloadKind,
 } from "../repair/singleFileRepairPlanning.js";
 import {
+  deriveCrossFileRepairCandidates,
+  extractCrossFileFailureEntriesFromContinuity,
+  extractCrossFileStateListFromContinuityEvidence,
+  hasCrossFileContinuationContextInContinuity,
+  hasCrossFileEvidenceSignalInContinuity,
+} from "../repair/crossFileRepairPlanning.js";
+import {
+  hasDegradedContinuationEvidenceInState,
+  isAtypicalReopenFollowUpPrompt,
+  isDegradedReopenFollowUpPrompt,
+  resolveContinuationReopenTarget,
+} from "../repair/degradedReopenPlanning.js";
+import {
+  collectContinuationTransforms,
+  inferReplaceDirectiveFromContinuity,
+  isRepairContinuationFollowUpPrompt,
+} from "../repair/repairContinuationPlanning.js";
+import {
   detectGroundedDeliverableMode,
   inferGroundedDeliverableModeFromContinuity,
   normalizeGroundedRepairInstruction,
 } from "../repair/groundedAnswerRepair.js";
-import { detectWorkflowBrowserPlan } from "../orchestration/browserModule.js";
-import {
-  blockedCommandReason,
-  detectCommand,
-  detectUnsupportedCommandIntent,
-  isAllowlistedRunCommand,
-} from "../orchestration/capabilityBoundaryProjection.js";
+import { buildBrowserIntentPlan } from "../browser/browserIntentPlanning.js";
 import {
   buildWorkflowContinuationLineage,
   buildWorkflowRepairContinuation,
-  buildWorkflowVerifyContinuation,
   classifyWorkflowContinuationIntent,
   deriveWorkflowContinuationTarget,
   hasWorkflowLocalExplainEvidence,
   hasWorkflowReadFragmentEvidence,
   inferWorkflowVerifyCommand,
-  isWorkflowVerifyResumeEligible,
   projectWorkflowLineageActivation,
   type RepairContinuationObject,
-  type VerifyContinuationObject,
 } from "../orchestration/continuationModule.js";
 import { buildReflectiveStateQueryResponse } from "../orchestration/continuationPlanning.js";
 import { formatTargetResolutionBlockerReason } from "../orchestration/doNextProjection.js";
@@ -89,7 +93,6 @@ import {
 } from "../orchestration/runtimeHandoffProjection.js";
 import {
   buildWorkflowDecisionTrace,
-  type ContinuationTransform,
   type GroundedDeliverableConstraints,
   type GroundedRepairInstruction,
   type GroundedRepairStage,
@@ -107,11 +110,10 @@ import {
   resolveWorkflowTargetPlanning,
   shouldBlockMutationForTargetResolution,
 } from "./workflowTargetPlanning.js";
-import {
-  isUsableContinuationTargetPath,
-  rebindContinuationTargetToWorkspace,
-} from "../session/continuationTargetRebase.js";
+import { rebindContinuationTargetToWorkspace } from "../session/continuationTargetRebase.js";
 import { deriveWorkflowTurnContinuationFacts } from "../session/turnContinuationFacts.js";
+import { buildCommandIntentPlan } from "../verification/commandIntentPlanning.js";
+import { buildVerifyContinuationPlanning } from "../verification/verifyContinuationPlanning.js";
 
 export { extractInlineContinuityContext } from "../session/inlineContinuityContext.js";
 export { rebindContinuationTargetToWorkspace } from "../session/continuationTargetRebase.js";
@@ -179,19 +181,12 @@ export function buildWorkflowTaskPlan(
     workspaceRoot,
     hasVerifyIntent,
   });
-  const browserPlan = detectWorkflowBrowserPlan({
+  const browserPlan = buildBrowserIntentPlan({
     prompt,
-    continuityState: continuity,
+    continuity,
   });
   if (browserPlan) {
-    return {
-      taskKind: "browser",
-      reason: browserPlan.reason,
-      browserPlan,
-      inspectFirst: false,
-      verifyAfterEdit: false,
-      usedRestoredState: Boolean(browserPlan.continuationSummary),
-    };
+    return browserPlan;
   }
   if (
     targetResolution.blocker &&
@@ -637,9 +632,9 @@ export function buildWorkflowTaskPlan(
     !hasAnswerRepairCue &&
     (hasCrossFileEvidenceSignal || hasCrossFileContinuationContext);
   const selectedReopenTargetPath = continuationReopenDecision.selectedTarget;
-  const selectedReopenTargetExists = selectedReopenTargetPath
-    ? fs.existsSync(path.resolve(workspaceRoot, selectedReopenTargetPath))
-    : false;
+  const selectedReopenTargetExists = Boolean(
+    selectedReopenTargetPath && continuationReopenDecision.selectedTargetExists,
+  );
   const hasSingleRecoverableCrossFileReopenTarget = Boolean(
     hasCrossFileUltraWeakFollowUp &&
     continuationReopenDecision.selectedTarget &&
@@ -696,13 +691,27 @@ export function buildWorkflowTaskPlan(
     (hasCrossFileEvidenceSignal ||
       hasCrossFileContinuationContext ||
       continuationReopenDecision.enabled);
-  const hasVerifyLineageHint = Boolean(
-    inferWorkflowVerifyCommand(continuity),
-  );
+  const verifyContinuationPlanning = buildVerifyContinuationPlanning({
+    continuity,
+    primaryTargetPath: primaryTarget?.cleaned,
+    primaryTargetInWorkspace: primaryTarget?.inWorkspace === true,
+    rawContinuityTargetPath,
+    effectiveVerifyCommand,
+    hasVerifyContinuationCue,
+    hasDiagnosticVerifyHandoffCue,
+    reflectiveStateQueryKind,
+    hasReflectiveActionCue,
+    hasVerifyIntent,
+    hasExecutionCorrectionCue,
+    lastTaskHadVerifySignal,
+    workspaceRoot,
+    usedRestoredState,
+    continuationLineage: verifyContinuationLineageOrUndefined,
+  });
+  const hasVerifyLineageHint =
+    verifyContinuationPlanning.hasVerifyLineageHint;
   const hasBlockedVerifyResumeContext =
-    continuity.lastVerificationStatus === "blocked" &&
-    Boolean(inferWorkflowVerifyCommand(continuity)) &&
-    isWorkflowVerifyResumeEligible(continuity);
+    verifyContinuationPlanning.hasBlockedVerifyResumeContext;
   const inferredTransformDirective =
     failedTransforms.length > 0
       ? {
@@ -751,30 +760,6 @@ export function buildWorkflowTaskPlan(
           continuityReplaceDirectiveForExecution ??
           inferredTransformDirective ??
           interruptedGoalRepairDirective,
-      })
-    : undefined;
-  const hasVerifyContinuationStateSignal =
-    hasDiagnosticVerifyHandoffCue ||
-    lastTaskHadVerifySignal ||
-    hasVerifyLineageHint ||
-    Boolean(rawContinuityTargetPath);
-  const hasVerifyObjectCue =
-    (hasVerifyContinuationCue ||
-      hasDiagnosticVerifyHandoffCue ||
-      (reflectiveStateQueryKind === "next-step" &&
-        hasReflectiveActionCue &&
-        (hasVerifyIntent || hasBlockedVerifyResumeContext))) &&
-    (hasExecutionCorrectionCue || hasVerifyContinuationStateSignal);
-  const verifyContinuationTargetPath = primaryTarget?.inWorkspace
-    ? primaryTarget.cleaned
-    : hasVerifyObjectCue
-      ? rawContinuityTargetPath
-      : undefined;
-  const verifyObject = hasVerifyObjectCue
-    ? buildWorkflowVerifyContinuation({
-        continuity,
-        targetPath: verifyContinuationTargetPath,
-        command: effectiveVerifyCommand,
       })
     : undefined;
   const allowWeakFollowUpInheritedTransform =
@@ -941,47 +926,8 @@ export function buildWorkflowTaskPlan(
     };
   }
 
-  if (verifyObject && hasVerifyObjectCue) {
-    if (
-      verifyObject.commandCwd &&
-      normalizePathLike(verifyObject.commandCwd) !==
-        normalizePathLike(workspaceRoot)
-    ) {
-      return {
-        taskKind: "run-command",
-        reason:
-          "verify continuation requested, but structured verify object points to a different workspace authority",
-        inspectFirst: false,
-        verifyAfterEdit: false,
-        blockedReason:
-          "Verify continuation is unavailable: rebased workspace authority mismatch for verify command cwd.",
-        targetMissing: !verifyObject.targetPath,
-        usedRestoredState,
-      };
-    }
-    if (!verifyObject.executableNow) {
-      return {
-        taskKind: "run-command",
-        reason:
-          "verify continuation requested, but structured verify object is incomplete",
-        inspectFirst: false,
-        verifyAfterEdit: false,
-        blockedReason: `Verify continuation is unavailable: missing ${verifyObject.missingFields.join(", ")}.`,
-        targetMissing: !verifyObject.targetPath,
-        usedRestoredState,
-      };
-    }
-    return {
-      taskKind: "run-command",
-      reason:
-        "verify continuation resolved from structured blocker/failure lineage",
-      targetPath: verifyObject.targetPath,
-      inspectFirst: false,
-      verifyAfterEdit: false,
-      directCommand: verifyObject.command,
-      usedRestoredState,
-      continuationLineage: verifyContinuationLineageOrUndefined,
-    };
+  if (verifyContinuationPlanning.plan) {
+    return verifyContinuationPlanning.plan;
   }
 
   if (
@@ -1577,31 +1523,14 @@ export function buildWorkflowTaskPlan(
     });
   }
 
-  if (hasExecutionIntent && unsupportedCommand) {
-    return {
-      taskKind: "run-command",
-      reason: "execution intent outside allowlist",
-      inspectFirst: false,
-      verifyAfterEdit: false,
-      directCommand: unsupportedCommand,
-      blockedReason: blockedCommandReason(unsupportedCommand),
-      usedRestoredState,
-    };
-  }
-
-  if (hasExecutionIntent) {
-    const command = detectCommand(normalized);
-    return {
-      taskKind: "run-command",
-      reason: "explicit run-command intent",
-      inspectFirst: false,
-      verifyAfterEdit: false,
-      directCommand: command,
-      ...(isAllowlistedRunCommand(command)
-        ? {}
-        : { blockedReason: blockedCommandReason(command) }),
-      usedRestoredState,
-    };
+  const commandIntentPlan = buildCommandIntentPlan({
+    normalizedPrompt: normalized,
+    hasExecutionIntent,
+    unsupportedCommand,
+    usedRestoredState,
+  });
+  if (commandIntentPlan) {
+    return commandIntentPlan;
   }
 
   if (hasWriteTaskIntent || hasEditIntent) {
@@ -1733,541 +1662,6 @@ export function buildWorkflowTaskPlan(
     verifyAfterEdit: false,
     usedRestoredState,
   };
-}
-
-function hasCrossFileEvidenceSignalInContinuity(
-  continuity: ContinuityStateLike,
-): boolean {
-  const explicitRemaining = extractCrossFileStateListFromContinuityEvidence(
-    continuity,
-    "repair-remaining-files:",
-  );
-  if (explicitRemaining.length > 0) {
-    return true;
-  }
-  if ((continuity.recentFailedFiles?.length ?? 0) > 1) {
-    return true;
-  }
-  const unresolved = (continuity.unresolvedItems ?? [])
-    .join(" | ")
-    .toLowerCase();
-  if (/failed-files:.*[,，]/.test(unresolved)) {
-    return true;
-  }
-  return (continuity.recentChangedFiles?.length ?? 0) > 1;
-}
-
-function deriveCrossFileRepairCandidates(
-  continuity: ContinuityStateLike,
-  primaryTarget?: string,
-): string[] {
-  if (!primaryTarget) {
-    return [];
-  }
-  const normalizedPrimary = normalizePathLike(primaryTarget);
-  const explicitRemaining = extractCrossFileStateListFromContinuityEvidence(
-    continuity,
-    "repair-remaining-files:",
-  ).filter((candidate) => candidate !== normalizedPrimary);
-  if (explicitRemaining.length > 0) {
-    return explicitRemaining.slice(0, 2);
-  }
-  const processedFromEvidence = new Set(
-    extractProcessedCrossFilePathsFromContinuity(continuity),
-  );
-  const primaryDir = path.posix.dirname(normalizedPrimary);
-  const pool = Array.from(
-    new Set([
-      ...(continuity.recentFailedFiles ?? []).map((item) =>
-        normalizePathLike(item.path),
-      ),
-      ...(continuity.recentChangedFiles ?? []).map((item) =>
-        normalizePathLike(item),
-      ),
-      ...(continuity.recentTargetFiles ?? []).map((item) =>
-        normalizePathLike(item),
-      ),
-    ]),
-  ).filter(
-    (item) =>
-      item.length > 0 &&
-      item !== normalizedPrimary &&
-      !processedFromEvidence.has(item),
-  );
-  const scoreFile = (candidate: string): number => {
-    let score = 0;
-    if (path.posix.dirname(candidate) === primaryDir) {
-      score += 2;
-    }
-    if (/\b(test|spec)\b|\.test\.|\.spec\./i.test(candidate)) {
-      score += 3;
-    }
-    if (/\b(helper|util|config|map|fixture)\b/i.test(candidate)) {
-      score += 2;
-    }
-    if (candidate.endsWith(".md")) {
-      score -= 1;
-    }
-    return score;
-  };
-  return pool
-    .map((candidate) => ({ candidate, score: scoreFile(candidate) }))
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 2)
-    .map((entry) => entry.candidate);
-}
-
-function hasCrossFileContinuationContextInContinuity(
-  continuity: ContinuityStateLike,
-): boolean {
-  return (
-    extractCrossFileStateListFromContinuityEvidence(
-      continuity,
-      "repair-candidate-files:",
-    ).length > 0 ||
-    extractCrossFileStateListFromContinuityEvidence(
-      continuity,
-      "repair-processed-files:",
-    ).length > 0 ||
-    extractCrossFileStateListFromContinuityEvidence(
-      continuity,
-      "repair-remaining-files:",
-    ).length > 0 ||
-    (continuity.lastContinuationEvidence ?? []).some((entry) =>
-      entry.startsWith("repair-cross-file"),
-    )
-  );
-}
-
-function extractProcessedCrossFilePathsFromContinuity(
-  continuity: ContinuityStateLike,
-): string[] {
-  const entries = continuity.lastContinuationEvidence ?? [];
-  const processed = new Set(
-    extractCrossFileStateListFromContinuityEvidence(
-      continuity,
-      "repair-processed-files:",
-    ),
-  );
-  for (const token of entries) {
-    const normalizedToken = token.trim();
-    const appliedMatch = normalizedToken.match(
-      /^repair-cross-file applied on (.+)$/i,
-    );
-    if (appliedMatch?.[1]) {
-      processed.add(normalizePathLike(appliedMatch[1]));
-    }
-  }
-  return Array.from(processed).filter((item) => item.length > 0);
-}
-
-function extractCrossFileStateListFromContinuityEvidence(
-  continuity: ContinuityStateLike,
-  prefix: string,
-): string[] {
-  const entries = continuity.lastContinuationEvidence ?? [];
-  const marker = entries.find((entry) =>
-    entry.toLowerCase().startsWith(prefix.toLowerCase()),
-  );
-  if (!marker) {
-    return [];
-  }
-  const markerIndex = marker.indexOf(":");
-  const payload = markerIndex >= 0 ? marker.slice(markerIndex + 1).trim() : "";
-  if (!payload || payload === "(none)") {
-    return [];
-  }
-  return payload
-    .split(",")
-    .map((item) => normalizePathLike(item))
-    .filter((item) => item.length > 0);
-}
-
-function extractCrossFileFailureEntriesFromContinuity(
-  continuity: ContinuityStateLike,
-): Array<{
-  path: string;
-  failureCode: "read-failed" | "patch-generation-failed" | "write-failed";
-  reason: string;
-}> {
-  const entries = continuity.lastContinuationEvidence ?? [];
-  const marker = entries.find((entry) =>
-    entry.toLowerCase().startsWith("repair-failed-files:"),
-  );
-  if (!marker) {
-    return [];
-  }
-  const markerIndex = marker.indexOf(":");
-  const payload = markerIndex >= 0 ? marker.slice(markerIndex + 1).trim() : "";
-  if (!payload || payload === "(none)") {
-    return [];
-  }
-  const parsed: Array<{
-    path: string;
-    failureCode: "read-failed" | "patch-generation-failed" | "write-failed";
-    reason: string;
-  }> = [];
-  for (const token of payload.split("|")) {
-    const [rawPath, rawCode, rawReason] = token.split("::");
-    const pathCandidate = normalizePathLike((rawPath ?? "").trim());
-    const codeCandidate = (rawCode ?? "").trim().toLowerCase();
-    const reasonCandidate = (rawReason ?? "").trim();
-    if (!pathCandidate || !reasonCandidate) {
-      continue;
-    }
-    if (
-      codeCandidate !== "read-failed" &&
-      codeCandidate !== "patch-generation-failed" &&
-      codeCandidate !== "write-failed"
-    ) {
-      continue;
-    }
-    parsed.push({
-      path: pathCandidate,
-      failureCode: codeCandidate,
-      reason: reasonCandidate,
-    });
-  }
-  return parsed;
-}
-
-function hasDegradedContinuationEvidenceInState(
-  continuity: ContinuityStateLike,
-): boolean {
-  const evidence = continuity.lastContinuationEvidence ?? [];
-  if (
-    evidence.some((entry) =>
-      entry.toLowerCase().startsWith("repair-outcome:degraded-terminal"),
-    )
-  ) {
-    return true;
-  }
-  return (continuity.unresolvedItems ?? []).some((entry) =>
-    entry.toLowerCase().includes("degraded"),
-  );
-}
-
-function hasContinuationStateSignalsInState(
-  continuity: ContinuityStateLike,
-  previousRemainingTargets: readonly string[],
-  previousFailedEntries: ReadonlyArray<{
-    path: string;
-    failureCode: "read-failed" | "patch-generation-failed" | "write-failed";
-    reason: string;
-  }>,
-): boolean {
-  return (
-    previousRemainingTargets.length > 0 ||
-    previousFailedEntries.length > 0 ||
-    (continuity.recentTargetFiles?.length ?? 0) > 0 ||
-    (continuity.recentFailedFiles?.length ?? 0) > 0 ||
-    (continuity.lastContinuationEvidence?.length ?? 0) > 0
-  );
-}
-
-function isAtypicalReopenFollowUpPrompt(prompt: string): boolean {
-  const lowered = prompt.toLowerCase();
-  const lexicalSignals = [
-    "use the previous failure",
-    "use the failed one",
-    "try again",
-    "continue but not that",
-    "repair the other one",
-    "finish the rest",
-    "not that one",
-    "the other related file",
-  ];
-  if (lexicalSignals.some((signal) => lowered.includes(signal))) {
-    return true;
-  }
-  return /(?:\u7528\u4e0a\u4e00\u6b21\u5931\u8d25|\u518d\u8bd5\u4e00\u6b21|\u7ee7\u7eed\u4fee|\u8865\u9f50\u5269\u4e0b|\u4e0d\u662f\u90a3\u4e2a)/i.test(
-    prompt,
-  );
-}
-
-function isDegradedReopenFollowUpPrompt(prompt: string): boolean {
-  return /(?:continue repairing it|continue fixing it|try again|finish the rest|fix the .* one|use the previous failure|use the failure above|not that one|the other related file|继续修|接着修|再试一次|补齐剩下|用上一次失败)/i.test(
-    prompt,
-  );
-}
-
-function resolveContinuationReopenTarget(input: {
-  continuity: ContinuityStateLike;
-  prompt: string;
-  workspaceRoot: string;
-  enabled: boolean;
-  degradedOnly: boolean;
-}): {
-  enabled: boolean;
-  selectedTarget?: string;
-  candidates: string[];
-  reason?: string;
-  candidateSourceSummary?: string;
-  prunedCandidateSummary?: string[];
-} {
-  if (!input.enabled) {
-    return { enabled: false, candidates: [] };
-  }
-  const remaining = extractCrossFileStateListFromContinuityEvidence(
-    input.continuity,
-    "repair-remaining-files:",
-  );
-  const failed = extractCrossFileFailureEntriesFromContinuity(
-    input.continuity,
-  ).map((entry) => normalizePathLike(entry.path));
-  const processed = extractCrossFileStateListFromContinuityEvidence(
-    input.continuity,
-    "repair-processed-files:",
-  ).map((entry) => normalizePathLike(entry));
-  const primaryCandidates: Array<{ path: string; source: string }> = [
-    ...remaining.map((candidate) => ({ path: candidate, source: "remaining" })),
-    ...failed.map((candidate) => ({ path: candidate, source: "failed" })),
-    ...(input.continuity.recentFailedFiles ?? []).map((entry) => ({
-      path: normalizePathLike(entry.path),
-      source: "recent-failed",
-    })),
-  ];
-  const fallbackCandidates: Array<{ path: string; source: string }> = (
-    input.continuity.recentTargetFiles ?? []
-  ).map((entry) => ({
-    path: normalizePathLike(entry),
-    source: "recent-target",
-  }));
-  const workspaceAbsolute = path.resolve(input.workspaceRoot);
-  const normalizedWorkspace = workspaceAbsolute.toLowerCase();
-  const sourceCounts = new Map<string, number>();
-  const pruned: string[] = [];
-  const candidateMap = new Map<string, { path: string; source: string }>();
-
-  const appendCandidate = (rawEntry: { path: string; source: string }) => {
-    const candidate = normalizePathLike(rawEntry.path ?? "");
-    if (!candidate || !isUsableContinuationTargetPath(candidate)) {
-      if (candidate) {
-        pruned.push(`${candidate}::placeholder`);
-      }
-      return;
-    }
-    const absolute = path.resolve(input.workspaceRoot, candidate);
-    const normalizedAbsolute = absolute.toLowerCase();
-    const inWorkspace =
-      normalizedAbsolute === normalizedWorkspace ||
-      normalizedAbsolute.startsWith(
-        `${normalizedWorkspace}${path.sep.toLowerCase()}`,
-      );
-    if (!inWorkspace) {
-      pruned.push(`${candidate}::outside-workspace`);
-      return;
-    }
-    if (processed.includes(candidate)) {
-      pruned.push(`${candidate}::already-processed`);
-      return;
-    }
-    if (fs.existsSync(absolute)) {
-      try {
-        if (fs.statSync(absolute).isDirectory()) {
-          pruned.push(`${candidate}::directory-target`);
-          return;
-        }
-      } catch {
-        // Ignore transient stat failures and keep candidate for later execution checks.
-      }
-    }
-    const dedupKey = candidate.toLowerCase();
-    if (candidateMap.has(dedupKey)) {
-      pruned.push(`${candidate}::duplicate`);
-      return;
-    }
-    sourceCounts.set(
-      rawEntry.source,
-      (sourceCounts.get(rawEntry.source) ?? 0) + 1,
-    );
-    candidateMap.set(dedupKey, { path: candidate, source: rawEntry.source });
-  };
-  for (const rawEntry of primaryCandidates) {
-    appendCandidate(rawEntry);
-  }
-  if (candidateMap.size === 0) {
-    for (const rawEntry of fallbackCandidates) {
-      appendCandidate(rawEntry);
-    }
-  }
-
-  const candidates = Array.from(candidateMap.values()).map(
-    (entry) => entry.path,
-  );
-  const candidateSourceSummary = Array.from(sourceCounts.entries())
-    .map(([source, count]) => `${source}=${count}`)
-    .join(",");
-  const prunedCandidateSummary = Array.from(new Set(pruned)).slice(0, 10);
-  if (candidates.length === 0) {
-    return {
-      enabled: true,
-      candidates: [],
-      reason: input.degradedOnly
-        ? "degraded-session follow-up had no recoverable candidate target"
-        : "mixed/degraded continuation follow-up had no recoverable candidate target",
-      candidateSourceSummary,
-      prunedCandidateSummary,
-    };
-  }
-  const loweredPrompt = input.prompt.toLowerCase();
-  const lexical = candidates.filter(
-    (candidate) =>
-      candidate
-        .split("/")
-        .some((part) => loweredPrompt.includes(part.toLowerCase())) ||
-      (loweredPrompt.includes("config") && candidate.includes("config")) ||
-      (loweredPrompt.includes("test") && /test|spec/i.test(candidate)),
-  );
-  if (lexical.length === 1) {
-    return {
-      enabled: true,
-      selectedTarget: lexical[0],
-      candidates,
-      reason: input.degradedOnly
-        ? "degraded-session reopen matched lexical cue with a single candidate"
-        : "continuation reopen matched lexical cue with a single candidate",
-      candidateSourceSummary,
-      prunedCandidateSummary,
-    };
-  }
-  if (candidates.length === 1) {
-    return {
-      enabled: true,
-      selectedTarget: candidates[0],
-      candidates,
-      reason: input.degradedOnly
-        ? "degraded-session reopen recovered single candidate target from remaining/failure evidence"
-        : "continuation reopen recovered single candidate target from remaining/failure evidence",
-      candidateSourceSummary,
-      prunedCandidateSummary,
-    };
-  }
-  return {
-    enabled: true,
-    candidates,
-    reason: input.degradedOnly
-      ? "degraded-session reopen remains ambiguous across multiple candidates; explicit target required"
-      : "continuation reopen remains ambiguous across multiple candidates; explicit target required",
-    candidateSourceSummary,
-    prunedCandidateSummary,
-  };
-}
-
-
-function extractKeyTerms(content: string): string[] {
-  const tokens = (content.match(/[A-Za-z_][A-Za-z0-9_]{3,}/g) ?? [])
-    .map((token) => token.toLowerCase())
-    .filter(
-      (token) =>
-        ![
-          "this",
-          "that",
-          "with",
-          "from",
-          "const",
-          "function",
-          "return",
-        ].includes(token),
-    );
-  const freq = new Map<string, number>();
-  for (const token of tokens) {
-    freq.set(token, (freq.get(token) ?? 0) + 1);
-  }
-  return Array.from(freq.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
-    .map(([token]) => token);
-}
-
-function isRepairContinuationFollowUpPrompt(prompt: string): boolean {
-  return /(?:\bcontinue fixing(?:\s+that)?\b|\bthen continue(?:\s+fixing)?\b|\bwhy did it stop[^\n]*continue\b|\bwhat should we do next[^\n]*continue fixing\b|刚才为什么停了.*继续修|那继续修|继续修这个|就按刚才那个继续修|按这个继续修|那就按这个继续修)/i.test(
-    prompt,
-  );
-}
-
-function uniqueStable(values: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const value of values) {
-    const key = normalizePathLike(value);
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    result.push(value);
-  }
-  return result;
-}
-
-function hashStableId(value: string): string {
-  return computeFragmentFingerprint(value).slice(0, 12);
-}
-
-function inferReplaceDirectiveFromContinuity(input: {
-  readonly continuity: ContinuityStateLike;
-  readonly preferredTarget?: string;
-  readonly workspaceRoot: string;
-}): { from: string; to: string } | undefined {
-  const preferredTarget = input.preferredTarget
-    ? normalizePathLike(input.preferredTarget)
-    : undefined;
-  const continuityEvidence = input.continuity.lastContinuationEvidence ?? [];
-  for (let index = continuityEvidence.length - 1; index >= 0; index -= 1) {
-    const entry = continuityEvidence[index];
-    if (!entry) {
-      continue;
-    }
-    const parsed = parseContinuationTransformEvidence(entry);
-    if (!parsed) {
-      continue;
-    }
-    const reboundPath =
-      rebindContinuationTargetToWorkspace(parsed.path, input.workspaceRoot) ??
-      normalizePathLike(parsed.path);
-    if (preferredTarget && normalizePathLike(reboundPath) !== preferredTarget) {
-      continue;
-    }
-    return { from: parsed.from, to: parsed.to };
-  }
-  return undefined;
-}
-
-function collectContinuationTransforms(input: {
-  readonly continuity: ContinuityStateLike;
-  readonly preferredTarget?: string;
-  readonly workspaceRoot: string;
-}): ContinuationTransform[] {
-  const target = input.preferredTarget
-    ? normalizePathLike(input.preferredTarget)
-    : undefined;
-  const transforms: ContinuationTransform[] = [];
-  for (const entry of input.continuity.lastContinuationEvidence ?? []) {
-    const parsed = parseContinuationTransformEvidence(entry);
-    if (!parsed) {
-      continue;
-    }
-    const normalizedPath = normalizePathLike(
-      rebindContinuationTargetToWorkspace(parsed.path, input.workspaceRoot) ??
-        parsed.path,
-    );
-    if (target && normalizedPath !== target) {
-      continue;
-    }
-    transforms.push({
-      path: normalizedPath,
-      from: parsed.from,
-      to: parsed.to,
-    });
-  }
-  return transforms;
-}
-
-function isMutationInstructionFailure(
-  instruction: ReturnType<typeof resolveMutationInstruction>,
-): instruction is { ok: false; reason: string } {
-  return instruction.ok === false;
 }
 
 function normalizePathLike(value: string): string {
