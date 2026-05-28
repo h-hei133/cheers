@@ -1,8 +1,5 @@
 import { hashContent } from "./patchRecovery/recoveryAuthorityStore.js";
-import {
-  assertNoProductVerdictSuccessUpgrade,
-  projectRuntimeTerminalVerdict,
-} from "../evidence/verdictFacade.js";
+import { assertClaimLedgerVerdictNoSuccessUpgrade } from "../evidence/projection/claimLedgerVerdictProjection.js";
 
 export type ClaimLedgerEvidenceSource =
   | "default-safe"
@@ -231,27 +228,11 @@ export function buildClaimLedgerProjection(input: {
     repair,
     notProvenClaims,
   });
-  const productVerdict = projectRuntimeTerminalVerdict({
-    terminalStatus: terminal.status,
-    resultStatus: terminal.resultStatus,
-    liveSuccess: terminal.liveSuccess,
-    reason: terminal.reason,
-    ...(terminal.blocker ? { blocker: terminal.blocker } : {}),
-    provenance: {
-      source: "product-runtime",
-      adapter: "claim-ledger",
-    },
-    redaction: "raw-content-excluded",
-    cleanup: cleanupStatusFromClaims({
-      snapshotStatus: input.snapshotStatus,
-      recoveryStatus: input.recoveryStatus,
-    }),
-    notProvenReasons: notProvenClaims.map((claim) => claim.blocker),
-  });
-  assertNoProductVerdictSuccessUpgrade({
-    legacyLiveSuccess: terminal.liveSuccess,
-    legacyTerminalClassification: terminal.liveSuccess ? "success" : "stopped",
-    verdict: productVerdict,
+  assertClaimLedgerVerdictNoSuccessUpgrade({
+    terminal,
+    notProvenClaims,
+    snapshotStatus: input.snapshotStatus,
+    recoveryStatus: input.recoveryStatus,
   });
   const ledgerId = buildLedgerId({
     taskLoopId: input.taskLoopId,
@@ -332,19 +313,6 @@ export function buildClaimLedgerProjection(input: {
       "claim-ledger:raw-content-excluded",
     ],
   };
-}
-
-function cleanupStatusFromClaims(input: {
-  readonly snapshotStatus: "not-run" | "created" | "blocked";
-  readonly recoveryStatus: "not-run" | "available" | "blocked";
-}): "clean" | "not-run" | "unknown" {
-  if (input.snapshotStatus === "created" && input.recoveryStatus === "available") {
-    return "clean";
-  }
-  if (input.snapshotStatus === "not-run" && input.recoveryStatus === "not-run") {
-    return "not-run";
-  }
-  return "unknown";
 }
 
 function projectProviderClaim(input: {

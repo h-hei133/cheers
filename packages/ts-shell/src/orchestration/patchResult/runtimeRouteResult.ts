@@ -7,8 +7,8 @@ import type {
   CodingResultSummary,
   OrchestrationResult,
 } from "../types.js";
+import { projectPerFilePatchResult } from "../../edit/result/perFilePatchResultProjection.js";
 import type { NoWriteRuntimeRoute } from "./noWriteRuntimeRoute.js";
-import { projectPerFilePatchResult } from "./perFilePatchPlan.js";
 
 export function buildNoWriteRuntimeRouteResult(input: {
   readonly sessionId: string;

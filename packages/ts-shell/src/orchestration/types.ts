@@ -1,6 +1,6 @@
 import type { QueryEvent } from '../core/query/events.js'
 import type { RecoverySurfaceSummary } from './patchRecovery/recoverySurfaceProjection.js'
-import type { PerFilePatchResultProjection } from './patchResult/perFilePatchPlan.js'
+import type { PerFilePatchResultProjection } from '../edit/result/perFilePatchResultProjection.js'
 
 export type AgentRole = 'planner' | 'coder' | 'reviewer'
 export type ContinuationReason = 'handoff' | 'retryable-error'
