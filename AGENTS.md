@@ -23,7 +23,8 @@ RTK command discipline is configured outside this repository. Follow the global 
 - Do not infer write authorization from prompt text.
 - Keep dry-run, preview, permission-pending, denied, blocked, approved-for-write, and write-success states distinct.
 - Do not hide unverified write outcomes behind success-like terminal or session states.
-- Do not change provider/auth core, release/default gates, runtime code, package scripts, or build behavior unless the current task explicitly requires it.
+- Do not change unrelated runtime code.
+- Provider/auth core, release/default gates, package scripts, and build behavior require explicit task scope.
 
 Detailed rules: [provider and secret boundary](agent-rules/provider-and-secret-boundary.md), [evidence and truthfulness](agent-rules/evidence-and-truthfulness.md).
 
@@ -72,6 +73,8 @@ Read-only references:
 - graphiti
 - Inspect AI
 - mini-swe-agent
+- pi
+- GitNexus
 
 Use references only after inspecting the target implementation first, and only for task-relevant semantic comparison. Do not broad-scan references without a direct blocker. Do not mechanically copy implementation code or architecture wholesale.
 

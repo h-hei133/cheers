@@ -24,6 +24,8 @@ Only the target repository may be modified.
 /home/wang/projects/graphiti
 /home/wang/projects/inspect_ai
 /home/wang/projects/mini-swe-agent
+/home/wang/projects/pi
+/home/wang/projects/GitNexus
 ```
 
 ## What Each Reference Is Useful For
@@ -39,6 +41,8 @@ Only the target repository may be modified.
 - graphiti: temporal/entity graph memory, relationship extraction, invalidation, and graph-backed recall comparison.
 - Inspect AI: eval harness, task/scorer separation, sandbox/tool execution, transcript, and report/score comparison.
 - mini-swe-agent: lightweight agent loop, CLI trajectory, subprocess/tool evidence, benchmark scenarios, and failure-report comparison.
+- pi: coding-agent/reference project for agent/runtime architecture comparison; exact useful parts must be determined by targeted inspection when a task needs it.
+- GitNexus: coding-agent/reference project for repository intelligence, graph/context, or developer workflow comparison; exact useful parts must be determined by targeted inspection when a task needs it.
 
 ## When To Inspect References
 
@@ -69,3 +73,4 @@ Expected workflow:
 - Do not use references for large architecture audits without a direct task.
 - Do not mechanically copy implementation code.
 - Do not copy architecture wholesale when the target repository has different ownership boundaries.
+- When the target repository already has a post-reset owner module, preserve the target owner even if a reference repository groups behavior differently.

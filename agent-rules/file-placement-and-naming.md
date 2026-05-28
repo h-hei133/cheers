@@ -12,15 +12,29 @@ Code must live in the owning module or domain. Directory names should carry doma
 - Keep invariants close to the code that owns them.
 - Move related tests with new modules when practical.
 
-Use minimal wiring only in central files such as:
+Keep compatibility and executable shims thin:
 
 ```text
 packages/ts-shell/src/entrypoints/cli.tsx
-packages/ts-shell/src/session/SessionManager.ts
 packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts
 ```
 
-Do not place policy logic, writer boundary logic, permission semantics, provider-gate semantics, or result/session mapping logic directly in central files when a focused module can own it.
+`packages/ts-shell/src/session/SessionManager.ts` is a rightful domain manager, not a hollow facade. It may retain real session lifecycle coordination, public API compatibility, dependency assembly, transaction ordering, and cross-session coordination.
+
+Move only concrete subdomain implementation details into focused session modules such as:
+
+```text
+packages/ts-shell/src/session/store/
+packages/ts-shell/src/session/transcript/
+packages/ts-shell/src/session/recovery/
+packages/ts-shell/src/session/replay/
+packages/ts-shell/src/session/continuation/
+packages/ts-shell/src/session/approval/
+packages/ts-shell/src/session/presentation/
+packages/ts-shell/src/session/schema/
+```
+
+Do not place policy logic, writer boundary logic, permission semantics, provider-gate semantics, or result/session mapping logic directly in compatibility shims when a focused module can own it.
 
 ## Naming
 
@@ -77,3 +91,4 @@ Before adding a file, identify:
 - Compatibility shims must remain thin.
 - They should delegate, re-export, or adapt names only.
 - They must not gain business logic.
+- Distinguish compatibility shims from rightful domain managers. Domain managers may coordinate real ownership responsibilities when that coordination is part of their public contract.
