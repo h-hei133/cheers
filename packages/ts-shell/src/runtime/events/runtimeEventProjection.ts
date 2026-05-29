@@ -4,6 +4,10 @@ import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
 import type { StaticResourceProjection } from "../resources/staticResourceProjection.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import type { ToolExecutionResult } from "../../tools/types.js";
+import type {
+  ToolAfterObservationAnnotation,
+  ToolBeforePolicyDecision,
+} from "../../tools/interception.js";
 import type { RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import type { RuntimeExecutionReceiptProjection } from "../execution/executionReceipt.js";
 
@@ -12,6 +16,11 @@ export type RuntimeProjectionEventType =
   | "phase-observed"
   | "execution-receipt-observed"
   | "tool-result-observed"
+  | "tool-policy-decision-observed"
+  | "tool-authority-requested"
+  | "tool-call-blocked"
+  | "tool-result-annotated"
+  | "tool-interception-unsupported"
   | "save-point-observed"
   | "result-facts-observed"
   | "resource-projection-observed"
@@ -61,6 +70,8 @@ export function projectRuntimeEvents(input: {
   readonly turnSnapshot?: RuntimeTurnSnapshot;
   readonly executionReceipts?: readonly RuntimeExecutionReceiptProjection[];
   readonly toolResults?: readonly ToolExecutionResult[];
+  readonly toolPolicyDecisions?: readonly ToolBeforePolicyDecision[];
+  readonly toolResultAnnotations?: readonly ToolAfterObservationAnnotation[];
   readonly savePoint?: RuntimeEvidenceSavePoint;
   readonly resultFacts?: RuntimeResultFactsProjection;
   readonly resourceProjection?: StaticResourceProjection;
@@ -89,6 +100,44 @@ export function projectRuntimeEvents(input: {
         },
       }),
     );
+  };
+  const appendToolPolicyDecision = (decision: ToolBeforePolicyDecision) => {
+    const facts = {
+      decisionId: decision.decisionId,
+      interceptionId: decision.intent.interceptionId,
+      toolId: decision.intent.toolId,
+      toolKind: decision.intent.toolKind,
+      caller: decision.intent.caller,
+      operationKind: decision.intent.operationKind,
+      decisionStatus: decision.status,
+      policySource: decision.policySource,
+      authorityMode: decision.intent.authorityMode,
+      authorityRequirement: decision.authorityRequirement,
+      riskLevel: decision.intent.riskLevel,
+      redactionStatus: decision.redactionStatus,
+      hookPolicyOutcomeCount: decision.hookPolicyOutcomes.length,
+      forbiddenOutcomeCount: decision.forbiddenOutcomes.length,
+      terminalSuccessClaim: false,
+    };
+    append("tool-policy-decision-observed", facts, decision.notProvenClaims);
+
+    if (decision.status === "request_authority") {
+      append(
+        "tool-authority-requested",
+        facts,
+        decision.notProvenClaims,
+      );
+    }
+    if (decision.status === "block" || decision.status === "rejected") {
+      append("tool-call-blocked", facts, decision.notProvenClaims);
+    }
+    if (decision.status === "unsupported") {
+      append(
+        "tool-interception-unsupported",
+        facts,
+        decision.notProvenClaims,
+      );
+    }
   };
 
   if (input.turnSnapshot) {
@@ -146,6 +195,30 @@ export function projectRuntimeEvents(input: {
         "terminal-success",
         ...(result.reportSafe?.notProvenClaims ?? []),
       ],
+    );
+  }
+
+  for (const decision of input.toolPolicyDecisions ?? []) {
+    appendToolPolicyDecision(decision);
+  }
+
+  for (const annotation of input.toolResultAnnotations ?? []) {
+    append(
+      "tool-result-annotated",
+      {
+        annotationId: annotation.annotationId,
+        decisionId: annotation.decisionId,
+        toolId: annotation.toolId,
+        resultStatus: annotation.resultStatus,
+        executionReceiptId: annotation.executionReceiptId,
+        resultDetailsId: annotation.resultDetailsId,
+        redactionStatus: annotation.redactionStatus,
+        annotationCount: annotation.annotations.length,
+        nextActionSuggestionCount: annotation.nextActionSuggestions.length,
+        blockedFollowUp: annotation.blockedFollowUp,
+        terminalSuccessClaim: false,
+      },
+      annotation.notProvenClaims,
     );
   }
 
@@ -346,8 +419,8 @@ export function projectRuntimeEvents(input: {
 
 const REDACTION_EXCLUSIONS = [
   "api-keys",
-  "provider.env",
-  "raw-provider-output",
+  "provider-env",
+  "provider-output",
   "oldText",
   "newText",
   "unredacted-command-output",
@@ -407,10 +480,10 @@ function sanitizeText(input: string): { readonly value: string; readonly redacte
   value = value.replace(/\bauthorization[:=][^\s;,)]+/gi, "authorization=[secret-redacted]");
   value = value.replace(/\bapi[_-]?key[:=][^\s;,)]+/gi, "apiKey=[secret-redacted]");
   value = value.replace(/\bauth(?:orization)?[_-]?header[:=][^\n\r]*/gi, "authHeader=[secret-redacted]");
-  value = value.replace(/\bprovider\.env\b[^\n\r]*/gi, "provider.env=[redacted]");
+  value = value.replace(/\bprovider\.env\b[^\n\r]*/gi, "provider-env=[redacted]");
   value = value.replace(/\boldText[:=][\s\S]*?(?=\snewText[:=]|$)/gi, "oldText=[raw-content-excluded]");
   value = value.replace(/\bnewText[:=][^\n\r]*/gi, "newText=[raw-content-excluded]");
-  value = value.replace(/\braw provider output[:=][^\n\r]*/gi, "raw-provider-output=[raw-content-excluded]");
+  value = value.replace(/\braw provider output[:=][^\n\r]*/gi, "provider-output=[raw-content-excluded]");
   value = value.replace(/\bhidden reasoning[:=]?[^\n\r]*/gi, "hidden-reasoning=[raw-content-excluded]");
   value = value.replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]");
   return { value, redacted: value !== before };

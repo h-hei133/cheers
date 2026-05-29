@@ -36,4 +36,50 @@ describe("runtime execution receipt projection", () => {
     expect(serialized).not.toMatch(/secret-value|raw-before|hidden reasoning|sk-1234567890|Bearer abc|private-agents-real/);
     expect(serialized).toContain("[secret-redacted]");
   });
+
+  it("carries before-tool authority metadata without claiming terminal success", () => {
+    const receipt = createCommandExecutionReceipt({
+      request: {
+        operationKind: "command.run",
+        command: "sh",
+        args: ["-c", "printf ok"],
+        cwd: "/workspace",
+        workspaceRoot: "/workspace",
+        authority: {
+          mode: "command-allowlisted",
+          source: "tool-runtime-approval",
+          reason: "test authority",
+        },
+        caller: "core-tool:bash",
+        reason: "test receipt",
+        reportSafeCommand: "printf ok",
+        policy: {
+          decisionId: "tool-policy-decision:test",
+          decisionStatus: "allow",
+          policySource: "tool-runtime-approval",
+          authorityRequirement: "command-allowlisted",
+          redactionStatus: "report-safe",
+          reportSafeSummary: "printf ok",
+          terminalSuccessClaim: false,
+          notProvenClaims: ["terminal-success", "tool-success"],
+        },
+      },
+      result: {
+        status: "completed",
+        exitCode: 0,
+        stdout: "ok",
+        stderr: "",
+      },
+    });
+
+    expect(receipt.policy).toMatchObject({
+      decisionStatus: "allow",
+      authorityRequirement: "command-allowlisted",
+      terminalSuccessClaim: false,
+    });
+    expect(receipt.notProvenClaims).toEqual(
+      expect.arrayContaining(["terminal-success", "tool-success"]),
+    );
+    expect(JSON.stringify(receipt)).not.toContain('"success":true');
+  });
 });

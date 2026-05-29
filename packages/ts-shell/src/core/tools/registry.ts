@@ -19,6 +19,12 @@ import {
 import { projectRuntimeReceipt } from '../runtime/runtimeReceiptProjection.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { createCommandToolResultSplit } from '../../tools/resultSplit.js'
+import {
+  createToolAfterObservationAnnotation,
+  createToolBeforePolicyDecision,
+  createToolInterceptionIntent,
+  executionPolicyMetadataFromToolDecision,
+} from '../../tools/interception.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
 import { buildExecutionFailedResult } from './toolPolicyResult.js'
 import { approvedResult, deniedResult } from './toolResultLifecycle.js'
@@ -65,6 +71,25 @@ async function runCommandTool(
   command: string,
   context: ToolExecutionContext,
 ) {
+  const toolIntent = createToolInterceptionIntent({
+    toolId: 'bash',
+    toolKind: 'core-tool',
+    caller: 'core-tool:bash',
+    operationKind: 'command.run',
+    requestedActionSummary: command,
+    authorityMode: TOOL_APPROVED_COMMAND_AUTHORITY.mode,
+    riskLevel: 'high',
+    input: { command },
+    notProvenClaims: ['command-result-success'],
+  })
+  const beforeDecision = createToolBeforePolicyDecision({
+    intent: toolIntent,
+    status: 'allow',
+    reason: 'ToolRuntime allowlist and process permission checks passed before ExecutionService was called.',
+    policySource: 'tool-runtime-approval',
+    authorityRequirement: TOOL_APPROVED_COMMAND_AUTHORITY.mode,
+    reportSafeSummary: command,
+  })
   const result = await executionService.runCommand({
     operationKind: 'command.run',
     command: process.platform === 'win32' ? 'cmd' : 'sh',
@@ -77,6 +102,7 @@ async function runCommandTool(
     reportSafeCommand: command,
     timeoutMs: 30_000,
     abortSignal: context.abortSignal,
+    policy: executionPolicyMetadataFromToolDecision(beforeDecision),
   })
   const receipt = createCommandRuntimeReceipt({
     runtimeKind: result.executionPath === 'rust-daemon' ? 'daemon' : 'local-command',
@@ -93,6 +119,20 @@ async function runCommandTool(
   const modelVisibleOutput = result.executionPath === 'rust-daemon'
     ? result.stdout
     : `${result.stdout}${result.stderr}`.trim()
+  const afterAnnotation = createToolAfterObservationAnnotation({
+    decision: beforeDecision,
+    toolId: 'bash',
+    resultStatus: result.status === 'completed'
+      ? 'tool-success-observed'
+      : 'tool-failure-observed',
+    executionReceipt: result.receipt,
+    resultDetailsId: result.receipt.receiptId,
+    annotations: ['execution-service:receipt-observed'],
+    nextActionSuggestions: result.status === 'completed'
+      ? []
+      : ['Inspect the execution receipt error class before retrying.'],
+    reportSafeSummary: result.receipt.requestedActionSummary,
+  })
   const split = createCommandToolResultSplit({
     content: modelVisibleOutput,
     receipt: result.receipt,
@@ -102,6 +142,10 @@ async function runCommandTool(
       exitCode: result.exitCode,
       errorClass: result.errorClass,
       legacyFailureKind: inferFailureKind(result),
+    },
+    toolInterception: {
+      beforeDecision,
+      afterAnnotation,
     },
   })
 

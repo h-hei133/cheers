@@ -7,6 +7,7 @@ import type {
   CommandExecutionRequest,
   CommandExecutionResult,
   ExecutionAuthorityMode,
+  ExecutionPolicyMetadata,
   ExecutionOperationKind,
 } from './executionService.js'
 
@@ -27,6 +28,7 @@ export interface RuntimeExecutionReceiptProjection {
   readonly evidenceCorrelationId: string
   readonly turnSnapshotId?: string
   readonly savePointId?: string
+  readonly policy?: ExecutionPolicyMetadata
   readonly notProvenClaims: readonly string[]
   readonly redaction: {
     readonly status: ExecutionReceiptRedactionStatus
@@ -52,6 +54,9 @@ export function createCommandExecutionReceipt(input: {
   )
   const caller = sanitizeWithTracking(input.request.caller, redactions, 120)
   const outputSummary = summarizeCommandOutput(input.result, redactions)
+  const policy = input.request.policy
+    ? sanitizeExecutionPolicy(input.request.policy, redactions)
+    : undefined
   const classification = classifyCommandExecutionOutcome({
     status: input.result.status,
     exitCode: input.result.exitCode,
@@ -85,17 +90,35 @@ export function createCommandExecutionReceipt(input: {
     evidenceCorrelationId: `execution-receipt:${classification.errorClass}:${input.result.status}`,
     ...(input.turnSnapshotId ? { turnSnapshotId: input.turnSnapshotId } : {}),
     ...(input.savePointId ? { savePointId: input.savePointId } : {}),
+    ...(policy ? { policy } : {}),
     notProvenClaims: Object.freeze([
       'terminal-task-success',
       'provider-success',
       'verification-success',
       'repair-success',
+      ...(policy?.notProvenClaims ?? []),
     ]),
     redaction: Object.freeze({
       status: redactionStatus,
       redactions: Object.freeze(Array.from(redactions).sort()),
     }),
     ...(outputSummary ? { outputSummary } : {}),
+  })
+}
+
+function sanitizeExecutionPolicy(
+  policy: ExecutionPolicyMetadata,
+  redactions: Set<string>,
+): ExecutionPolicyMetadata {
+  return Object.freeze({
+    decisionId: sanitizeWithTracking(policy.decisionId, redactions, 160),
+    decisionStatus: sanitizeWithTracking(policy.decisionStatus, redactions, 80),
+    policySource: sanitizeWithTracking(policy.policySource, redactions, 120),
+    authorityRequirement: policy.authorityRequirement,
+    redactionStatus: policy.redactionStatus,
+    reportSafeSummary: sanitizeWithTracking(policy.reportSafeSummary, redactions, 180),
+    terminalSuccessClaim: false,
+    notProvenClaims: Object.freeze([...policy.notProvenClaims]),
   })
 }
 

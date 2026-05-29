@@ -7,6 +7,11 @@ import { projectStaticResourceRegistry } from "../resources/staticResourceProjec
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
+import {
+  createToolAfterObservationAnnotation,
+  createToolBeforePolicyDecision,
+  createToolInterceptionIntent,
+} from "../../tools/interception.js";
 import { projectRuntimeEvents } from "./runtimeEventProjection.js";
 
 describe("runtime event projection", () => {
@@ -345,5 +350,99 @@ describe("runtime event projection", () => {
         "terminal-success",
       ]),
     );
+  });
+
+  it("projects tool policy decisions and annotations as observation-only events", () => {
+    const allowDecision = createToolBeforePolicyDecision({
+      intent: createToolInterceptionIntent({
+        toolId: "bash",
+        caller: "test",
+        operationKind: "command.run",
+        requestedActionSummary: "printf ok",
+        authorityMode: "command-allowlisted",
+      }),
+      status: "allow",
+      reason: "allowed",
+      policySource: "test-policy",
+    });
+    const authorityDecision = createToolBeforePolicyDecision({
+      intent: createToolInterceptionIntent({
+        toolId: "write",
+        caller: "test",
+        operationKind: "file.write",
+        requestedActionSummary: "write file",
+        authorityMode: "permission-pending",
+      }),
+      status: "request_authority",
+      reason: "approval required",
+      policySource: "test-policy",
+      authorityRequirement: "permission-pending",
+    });
+    const blockDecision = createToolBeforePolicyDecision({
+      intent: createToolInterceptionIntent({
+        toolId: "bash",
+        caller: "test",
+        operationKind: "command.run",
+        requestedActionSummary: "raw provider output: hidden reasoning sk-1234567890",
+        authorityMode: "denied",
+      }),
+      status: "block",
+      reason: "blocked provider.env=/home/wang/.private-agents-real/provider.env",
+      policySource: "test-policy",
+      authorityRequirement: "denied",
+    });
+    const unsupportedDecision = createToolBeforePolicyDecision({
+      intent: createToolInterceptionIntent({
+        toolId: "mcp__missing__tool",
+        toolKind: "mcp",
+        caller: "test",
+        operationKind: "tool.dispatch",
+        requestedActionSummary: "unsupported tool",
+      }),
+      status: "unsupported",
+      reason: "unsupported interception seam",
+      policySource: "test-policy",
+    });
+    const annotation = createToolAfterObservationAnnotation({
+      decision: allowDecision,
+      toolId: "bash",
+      resultStatus: "tool-success-observed",
+      annotations: ["annotation observed"],
+      nextActionSuggestions: ["keep terminal success evidence separate"],
+      reportSafeSummary: "printf ok",
+    });
+
+    const events = projectRuntimeEvents({
+      toolPolicyDecisions: [
+        allowDecision,
+        authorityDecision,
+        blockDecision,
+        unsupportedDecision,
+      ],
+      toolResultAnnotations: [annotation],
+    });
+    const serialized = JSON.stringify(events);
+
+    expect(events.map((event) => event.type)).toEqual([
+      "tool-policy-decision-observed",
+      "tool-policy-decision-observed",
+      "tool-authority-requested",
+      "tool-policy-decision-observed",
+      "tool-call-blocked",
+      "tool-policy-decision-observed",
+      "tool-interception-unsupported",
+      "tool-result-annotated",
+    ]);
+    expect(
+      events.every((event) => event.facts.terminalSuccessClaim !== true),
+    ).toBe(true);
+    expect(serialized).not.toMatch(
+      /hidden reasoning|sk-1234567890|private-agents-real|provider\.env/i,
+    );
+    expect(serialized).not.toContain('"success":true');
+    expect(
+      events.find((event) => event.type === "tool-authority-requested")
+        ?.notProvenClaims,
+    ).toContain("terminal-success");
   });
 });

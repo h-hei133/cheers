@@ -48,6 +48,17 @@ export interface ExecutionAuthority {
   readonly reason: string
 }
 
+export interface ExecutionPolicyMetadata {
+  readonly decisionId: string
+  readonly decisionStatus: string
+  readonly policySource: string
+  readonly authorityRequirement: ExecutionAuthorityMode
+  readonly redactionStatus: 'report-safe' | 'redacted'
+  readonly reportSafeSummary: string
+  readonly terminalSuccessClaim: false
+  readonly notProvenClaims: readonly string[]
+}
+
 interface ExecutionRequestMetadata<K extends ExecutionOperationKind> {
   readonly operationKind: K
   readonly workspaceRoot: string
@@ -55,6 +66,7 @@ interface ExecutionRequestMetadata<K extends ExecutionOperationKind> {
   readonly caller: string
   readonly reason: string
   readonly reportSafeTarget?: string
+  readonly policy?: ExecutionPolicyMetadata
 }
 
 export interface CommandExecutionRequest {
@@ -69,6 +81,7 @@ export interface CommandExecutionRequest {
   readonly reportSafeCommand: string
   readonly timeoutMs?: number
   readonly abortSignal?: AbortSignal
+  readonly policy?: ExecutionPolicyMetadata
 }
 
 export interface TextFileReadExecutionRequest extends ExecutionRequestMetadata<'file.read'> {
