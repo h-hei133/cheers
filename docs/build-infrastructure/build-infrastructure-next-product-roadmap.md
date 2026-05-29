@@ -20,6 +20,16 @@ Goal:
 - Use the loop trajectory as an observation and handoff surface for real CLI
   coding turns.
 
+Immediate seam from PL001 audit:
+
+- `workflowExecutionCoordinator` should be the primary emission seam for loop
+  trajectory observations because it already sees the current product turn,
+  task-plan stages, provider mode, runtime events, execution receipts, save
+  point boundary, and result contract.
+- `ShellSessionRuntime` and presentation should consume/render those
+  observations only after owner-domain facts exist; they should not become loop
+  fact owners.
+
 Owner domains:
 
 - `runtime`
@@ -48,6 +58,17 @@ Existing infrastructure to reuse:
 - runtime events and JSON event stream
 - product surface view model and terminal renderer
 - result/evidence truthfulness surfaces
+
+First implementation grouping:
+
+- coordinator-level trajectory observation
+- provider/model metadata attachment when already available
+- tool policy, tool result split, and execution receipt attachment when already
+  produced by current stages
+- save point, session active path, and context rebuild projection attachment
+- runtime event and JSON event stream projection
+- product surface rendering with visible not-proven claims
+- result truthfulness tests proving observation does not change verdict
 
 Forbidden shortcuts:
 
