@@ -43,6 +43,11 @@ It does not claim every historical note is perfectly classified.
 | `docs/product-architecture-reset/harness-eval-artifact-index.md` | active | Checking Phase 2 Goal 3 harness/eval artifact ownership and compatibility before moving harness files. |  | Product Architecture Reset |
 | `docs/product-architecture-reset/phase2-final-physical-audit.md` | active | Checking Phase 2 final physical audit, runMvp baseline drift classification, and remaining reset debt. |  | Product Architecture Reset |
 | `docs/product-architecture-reset/runmvp-baseline-drift-register.md` | active | Checking Phase 2.5 Phase A runMvp baseline drift classification and trusted focused baseline. |  | Product Architecture Reset |
+| `docs/build-infrastructure/bi006-deep-audit-summary.md` | historical | Reading BI006 final audit conclusion, created document list, Pi docs status, and recommended next build-infrastructure route. |  | Build Infrastructure |
+| `docs/build-infrastructure/build-infrastructure-route-index.md` | historical | Reading completed BI001-BI005 summaries and BI007+ grouping after the Pi deep audit. |  | Build Infrastructure |
+| `docs/build-infrastructure/pi-deep-audit-uncovered-patterns.md` | historical | Reading BI006 pattern-by-pattern Pi audit evidence and local uncovered-pattern status. |  | Build Infrastructure |
+| `docs/build-infrastructure/pi-next-direction-map.md` | historical | Reading BI006 prioritized next-direction map with owner domains, risks, and validation approach. |  | Build Infrastructure |
+| `docs/build-infrastructure/pi-pattern-rejection-and-delay-log.md` | historical | Reading BI006 delayed and rejected Pi patterns plus blind-copy risks. |  | Build Infrastructure |
 | `docs/dev-history/routes/README.md` | historical | Finding route document quarantine status and route-history script namespace. |  | Product Architecture Reset |
 | `docs/dev-history/routes/route222*.md` through `docs/dev-history/routes/route226*.md` | historical | Reading quarantined Route222-226 route documents; old `docs/agent-routes/` paths are compatibility pointers. |  | Product Architecture Reset |
 | `docs/evidence/history/route-reports/README.md` | historical | Finding historical route report provenance and compatibility status. |  | Product Architecture Reset |
