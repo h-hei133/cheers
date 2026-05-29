@@ -1,6 +1,7 @@
 import type { CodingResultSummary, OrchestrationStatus, TerminalReason } from "../orchestration/types.js";
 import type { ProviderRegistryProjection } from "../provider/providerRegistry.js";
 import type { RuntimeProjectionEvent } from "../runtime/events/runtimeEventProjection.js";
+import type { LoopTrajectoryProjection } from "../runtime/loop/trajectoryProjection.js";
 import type { PackageInventoryProjection } from "../runtime/resources/packageInventory.js";
 import type { StaticResourceProjection } from "../runtime/resources/staticResourceProjection.js";
 import {
@@ -12,6 +13,7 @@ import type { SessionTreeProjection } from "../session/sessionTreeProjection.js"
 export type ProductSurfaceSectionKind =
   | "task"
   | "context"
+  | "turn"
   | "plan"
   | "proposal"
   | "authority"
@@ -19,6 +21,8 @@ export type ProductSurfaceSectionKind =
   | "verification"
   | "repair"
   | "tools"
+  | "execution"
+  | "save_point"
   | "resources"
   | "provider"
   | "packages"
@@ -90,31 +94,34 @@ export interface ProductSurfaceInput {
   readonly providerRegistry?: ProviderRegistryProjection;
   readonly runtimeEvents?: readonly RuntimeProjectionEvent[];
   readonly sessionProjection?: SessionTreeProjection;
+  readonly loopTrajectory?: LoopTrajectoryProjection;
 }
 
 export function projectProductSurfaceViewModel(
   input: ProductSurfaceInput,
 ): ProductSurfaceViewModel | undefined {
   const codingResult = input.codingResult;
-  if (!codingResult) {
+  if (!codingResult && !input.loopTrajectory) {
     return undefined;
   }
 
-  const sessionFacts = projectSessionPresentationFacts(input);
-  if (!sessionFacts) {
+  const sessionFacts = codingResult ? projectSessionPresentationFacts(input) : undefined;
+  if (codingResult && !sessionFacts) {
     return undefined;
   }
 
   const sections = [
-    taskSection(codingResult),
-    contextSection(codingResult),
-    planSection(codingResult),
-    proposalSection(codingResult),
-    authoritySection(codingResult),
-    applySection(codingResult),
-    verificationSection(codingResult),
-    repairSection(codingResult),
-    toolsSection(codingResult),
+    ...(codingResult ? [
+      taskSection(codingResult),
+      contextSection(codingResult),
+      planSection(codingResult),
+      proposalSection(codingResult),
+      authoritySection(codingResult),
+      applySection(codingResult),
+      verificationSection(codingResult),
+      repairSection(codingResult),
+      toolsSection(codingResult),
+    ] : loopTrajectorySections(input)),
     ...resourceSections(input),
     ...providerSections(input),
     ...packageSections(input),
@@ -123,40 +130,140 @@ export function projectProductSurfaceViewModel(
     section({
       kind: "verdict",
       title: "Verdict",
-      severity: verdictSeverity(sessionFacts.truthStatus),
-      status: verdictStatus(sessionFacts.truthStatus),
-      summary: sessionFacts.verdict,
+      severity: sessionFacts ? verdictSeverity(sessionFacts.truthStatus) : "not_proven",
+      status: sessionFacts ? verdictStatus(sessionFacts.truthStatus) : "not_proven",
+      summary: sessionFacts?.verdict ??
+        `loopState=${input.loopTrajectory?.finalObservedFacts.loopState ?? "not-observed"}; terminalSuccessClaim=false`,
     }),
     section({
       kind: "not_proven",
       title: "Not proven",
-      severity: sessionFacts.notProvenClaims.length > 0 ? "not_proven" : "info",
-      status: sessionFacts.notProvenClaims.length > 0 ? "not_proven" : "observed",
-      summary: sessionFacts.notProvenClaims.length > 0
-        ? sessionFacts.notProvenClaims.join("; ")
+      severity: (sessionFacts?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "info",
+      status: (sessionFacts?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "observed",
+      summary: (sessionFacts?.notProvenClaims.length ?? 0) > 0
+        ? sessionFacts!.notProvenClaims.join("; ")
+        : (input.loopTrajectory?.notProvenClaims.length ?? 0) > 0
+          ? input.loopTrajectory!.notProvenClaims.slice(0, 8).join("; ")
         : "none",
-      notProvenClaims: sessionFacts.notProvenClaims,
+      notProvenClaims: sessionFacts?.notProvenClaims ??
+        input.loopTrajectory?.notProvenClaims ?? [],
     }),
     section({
       kind: "next_action",
       title: "Next action",
-      severity: sessionFacts.truthStatus === "verified-success" ||
+      severity: sessionFacts && (sessionFacts.truthStatus === "verified-success" ||
         sessionFacts.truthStatus === "verified-repaired-success"
+      )
         ? "success"
         : "info",
       status: "observed",
-      summary: sessionFacts.nextAction,
+      summary: sessionFacts?.nextAction ??
+        "keep loop trajectory observation separate from terminal success",
     }),
   ];
 
   return {
     sections,
-    verdict: sessionFacts.verdict,
-    notProvenClaims: sessionFacts.notProvenClaims,
-    nextAction: sessionFacts.nextAction,
+    verdict: sessionFacts?.verdict ??
+      `loopState=${input.loopTrajectory?.finalObservedFacts.loopState ?? "not-observed"}`,
+    notProvenClaims: sessionFacts?.notProvenClaims ??
+      input.loopTrajectory?.notProvenClaims ?? [],
+    nextAction: sessionFacts?.nextAction ??
+      "keep loop trajectory observation separate from terminal success",
     redaction: sections.some((item) => item.redaction !== "none") ? "applied" : "none",
     terminalSuccessClaim: false,
   };
+}
+
+function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSection[] {
+  const trajectory = input.loopTrajectory;
+  if (!trajectory) {
+    return [];
+  }
+  const stage = (kind: string) =>
+    trajectory.stages.find((item) => item.category === kind);
+  const observed = (kind: string) => stage(kind)?.observationStatus ?? "not_proven";
+  return [
+    section({
+      kind: "task",
+      title: "Task",
+      severity: "info",
+      status: "observed",
+      summary: `loop=${trajectory.loopId}; terminalSuccessClaim=false`,
+    }),
+    section({
+      kind: "turn",
+      title: "Turn",
+      severity: observed("turn-snapshot") === "observed" ? "info" : "not_proven",
+      status: observed("turn-snapshot") === "observed" ? "observed" : "not_proven",
+      summary: `turns=${trajectory.turnIds.length}; snapshots=${trajectory.snapshotIds.length}`,
+      machineEventCorrelationIds: stage("turn-snapshot")?.eventIds ?? [],
+      notProvenClaims: stage("turn-snapshot")?.notProvenClaims ?? [],
+    }),
+    section({
+      kind: "provider",
+      title: "Provider",
+      severity: "not_proven",
+      status: "not_proven",
+      summary: `metadata=${trajectory.providerMetadataIds.length}; providerCalled=not-proven`,
+      notProvenClaims: stage("provider-metadata")?.notProvenClaims ?? ["provider-called"],
+    }),
+    section({
+      kind: "tools",
+      title: "Tools",
+      severity: observed("tool-result-details") === "observed" ? "info" : "not_proven",
+      status: observed("tool-result-details") === "observed" ? "observed" : "not_proven",
+      summary: `policyDecisions=${trajectory.toolPolicyIds.length}; receipts=${trajectory.receiptIds.length}; toolSuccess=not-proven`,
+      notProvenClaims: [
+        ...(stage("tool-call-batch")?.notProvenClaims ?? []),
+        ...(stage("tool-result-details")?.notProvenClaims ?? []),
+      ],
+    }),
+    section({
+      kind: "execution",
+      title: "Execution",
+      severity: trajectory.receiptIds.length > 0 ? "info" : "not_proven",
+      status: trajectory.receiptIds.length > 0 ? "observed" : "not_proven",
+      summary: `receipts=${trajectory.receiptIds.length}; commandSuccess=not-proven`,
+      machineEventCorrelationIds: stage("execution-receipt")?.eventIds ?? [],
+      notProvenClaims: stage("execution-receipt")?.notProvenClaims ?? [],
+    }),
+    section({
+      kind: "save_point",
+      title: "Save point",
+      severity: trajectory.savePointIds.length > 0 ? "info" : "not_proven",
+      status: trajectory.savePointIds.length > 0 ? "observed" : "not_proven",
+      summary: `savePoints=${trajectory.savePointIds.length}; savePointSuccess=not-proven`,
+      machineEventCorrelationIds: stage("save-point")?.eventIds ?? [],
+      notProvenClaims: stage("save-point")?.notProvenClaims ?? [],
+    }),
+    section({
+      kind: "session",
+      title: "Session",
+      severity: trajectory.sessionProjectionIds.length > 0 ? "info" : "not_proven",
+      status: trajectory.sessionProjectionIds.length > 0 ? "observed" : "not_proven",
+      summary: `projections=${trajectory.sessionProjectionIds.length}; storageBackedBranching=not-proven`,
+      notProvenClaims: stage("session-active-path")?.notProvenClaims ?? [],
+    }),
+    section({
+      kind: "context",
+      title: "Context",
+      severity: trajectory.contextRebuildProjectionIds.length > 0 ? "info" : "not_proven",
+      status: trajectory.contextRebuildProjectionIds.length > 0 ? "observed" : "not_proven",
+      summary: `rebuildProjections=${trajectory.contextRebuildProjectionIds.length}; raw-context=excluded`,
+      redaction: "excluded",
+      notProvenClaims: stage("context-rebuild-projection")?.notProvenClaims ?? [],
+    }),
+    section({
+      kind: "events",
+      title: "Events",
+      severity: "info",
+      status: "observed",
+      summary: `events=${trajectory.events.length}; jsonStream=${trajectory.jsonEventStream.length}; terminalSuccessClaim=false`,
+      machineEventCorrelationIds: trajectory.eventIds,
+      notProvenClaims: stage("runtime-events")?.notProvenClaims ?? [],
+    }),
+  ];
 }
 
 function taskSection(codingResult: CodingResultSummary): ProductSurfaceSection {

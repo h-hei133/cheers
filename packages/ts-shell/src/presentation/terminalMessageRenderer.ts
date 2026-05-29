@@ -17,6 +17,7 @@ export interface TerminalMessageRenderResult {
 const SECTION_ORDER = [
   "task",
   "context",
+  "turn",
   "plan",
   "proposal",
   "authority",
@@ -24,6 +25,8 @@ const SECTION_ORDER = [
   "verification",
   "repair",
   "tools",
+  "execution",
+  "save_point",
   "resources",
   "provider",
   "packages",

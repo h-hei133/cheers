@@ -5,6 +5,8 @@ import {
   unknownProviderCompatibilityFlags,
 } from "../provider/providerRegistry.js";
 import { projectRuntimeEvents } from "../runtime/events/runtimeEventProjection.js";
+import { runAgentLoopContract } from "../runtime/loop/agentLoopContract.js";
+import { projectLoopTrajectory } from "../runtime/loop/trajectoryProjection.js";
 import {
   projectPackageResourceInventory,
   type PackageManifestContract,
@@ -154,6 +156,52 @@ describe("product surface view model", () => {
     expect(compact).not.toContain("Outcome: success");
     expect(detailed).toContain("not_proven: relevant verification did not pass");
     expect(detailed).toContain("status: not_run");
+  });
+
+  it("renders loop trajectory summaries without turning observations into success", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess_surface_loop",
+      workspaceRoot: "/workspace",
+      prompt: "summarize trajectory",
+      providerOptIn: false,
+      modelBoundary: async () => ({
+        responseId: "response-surface-loop",
+        stopReason: "stop",
+      }),
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "surface-loop",
+      prompt: "summarize trajectory",
+      loop,
+    });
+
+    const viewModel = projectProductSurfaceViewModel({
+      status: "stopped",
+      terminalClassification: "stopped",
+      terminalReason: "waiting_for_input",
+      loopTrajectory: trajectory,
+    });
+    const rendered = renderTerminalMessage(viewModel!, { mode: "detailed" }).lines.join("\n");
+
+    expect(viewModel?.sections.map((section) => section.kind)).toEqual([
+      "task",
+      "turn",
+      "provider",
+      "tools",
+      "execution",
+      "save_point",
+      "session",
+      "context",
+      "events",
+      "verdict",
+      "not_proven",
+      "next_action",
+    ]);
+    expect(viewModel?.terminalSuccessClaim).toBe(false);
+    expect(rendered).toContain("[not_proven] Provider:");
+    expect(rendered).toContain("[not_proven] Verdict:");
+    expect(rendered).toContain("terminalSuccessClaim=false");
+    expect(rendered).not.toContain("Outcome: success");
   });
 
   it("redacts unsafe raw output, provider config, patch payloads, and hidden reasoning", () => {

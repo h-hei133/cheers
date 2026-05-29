@@ -48,7 +48,19 @@ export type RuntimeProjectionEventType =
   | "agent-loop-delivery-delivered"
   | "agent-loop-stopped"
   | "agent-loop-aborted"
-  | "agent-loop-failed";
+  | "agent-loop-failed"
+  | "loop-input-observed"
+  | "loop-turn-snapshot-observed"
+  | "loop-provider-boundary-observed"
+  | "loop-tool-policy-observed"
+  | "loop-tool-result-observed"
+  | "loop-execution-receipt-observed"
+  | "loop-save-point-observed"
+  | "loop-next-turn-prepared"
+  | "loop-session-context-projected"
+  | "loop-product-surface-projected"
+  | "loop-stopped"
+  | "loop-waiting";
 
 export interface RuntimeProjectionEvent {
   readonly id: string;
