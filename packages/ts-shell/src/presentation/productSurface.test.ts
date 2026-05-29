@@ -204,6 +204,48 @@ describe("product surface view model", () => {
     expect(rendered).not.toContain("Outcome: success");
   });
 
+  it("renders coding result and loop observation sections together without changing verdict truth", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess_surface_combined",
+      workspaceRoot: "/workspace",
+      prompt: "run command",
+      providerOptIn: false,
+      modelBoundary: async () => ({
+        responseId: "response-surface-combined",
+        stopReason: "stop",
+      }),
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "surface-combined",
+      prompt: "run command",
+      loop,
+    });
+
+    const viewModel = projectProductSurfaceViewModel({
+      status: "completed",
+      terminalClassification: "success",
+      terminalReason: "completed",
+      codingResult: codingResult({
+        taskSatisfaction: {
+          verdict: "insufficient-evidence",
+          reasons: ["tool result is observation only"],
+          requiredEvidence: ["verification"],
+          observedEvidence: ["tool-result"],
+        },
+      }),
+      loopTrajectory: trajectory,
+    });
+    const rendered = renderTerminalMessage(viewModel!, { mode: "detailed" }).lines.join("\n");
+
+    expect(viewModel?.sections.map((section) => section.kind)).toEqual(
+      expect.arrayContaining(["apply", "verification", "turn", "provider", "events"]),
+    );
+    expect(viewModel?.verdict).toContain("did not gather enough evidence");
+    expect(viewModel?.terminalSuccessClaim).toBe(false);
+    expect(rendered).toContain("providerCalled=not-proven");
+    expect(rendered).not.toContain("Outcome: success");
+  });
+
   it("redacts unsafe raw output, provider config, patch payloads, and hidden reasoning", () => {
     const viewModel = projectProductSurfaceViewModel({
       status: "stopped_error",

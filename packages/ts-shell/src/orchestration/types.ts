@@ -1,6 +1,7 @@
 import type { QueryEvent } from '../core/query/events.js'
 import type { RecoverySurfaceSummary } from './patchRecovery/recoverySurfaceProjection.js'
 import type { PerFilePatchResultProjection } from '../edit/result/perFilePatchResultProjection.js'
+import type { LoopTrajectoryProjection } from '../runtime/loop/trajectoryProjection.js'
 
 export type AgentRole = 'planner' | 'coder' | 'reviewer'
 export type ContinuationReason = 'handoff' | 'retryable-error'
@@ -276,6 +277,7 @@ export interface AgentExecutionOutput {
   readonly notes?: readonly string[]
   readonly events?: readonly QueryEvent[]
   readonly codingResult?: CodingResultSummary
+  readonly loopTrajectory?: LoopTrajectoryProjection
 }
 
 export type OrchestrationStatus = TerminalReason
@@ -290,6 +292,7 @@ export interface OrchestrationResult {
   readonly sharedContext: Readonly<SharedContext>
   readonly finalOutput: string
   readonly codingResult?: CodingResultSummary
+  readonly loopTrajectory?: LoopTrajectoryProjection
 }
 
 export interface OrchestratorOptions {

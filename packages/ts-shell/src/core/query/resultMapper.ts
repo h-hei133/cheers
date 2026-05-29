@@ -11,6 +11,9 @@ export function mapTerminalToOrchestrationResult(
 ): OrchestrationResult {
   const latestCodingResult =
     state.transcript[state.transcript.length - 1]?.codingResult;
+  const latestLoopTrajectory =
+    [...state.transcript].reverse().find((turn) => turn.loopTrajectory)
+      ?.loopTrajectory;
   const codingResult = latestCodingResult
     ? {
         ...latestCodingResult,
@@ -39,5 +42,6 @@ export function mapTerminalToOrchestrationResult(
     sharedContext: state.sharedContext,
     finalOutput: state.transcript[state.transcript.length - 1]?.content ?? "",
     codingResult,
+    loopTrajectory: latestLoopTrajectory,
   };
 }

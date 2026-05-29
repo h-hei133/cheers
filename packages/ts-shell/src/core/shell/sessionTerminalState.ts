@@ -4,6 +4,7 @@ import type {
   OrchestrationStatus,
   TerminalReason,
 } from "../../orchestration/types.js";
+import type { LoopTrajectoryProjection } from "../../runtime/loop/trajectoryProjection.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionContinuitySnapshot } from "../../session/SessionManager.js";
 import { projectSessionResultParity } from "../../session/sessionResultParity.js";
@@ -22,6 +23,7 @@ export interface SessionTerminalState {
   terminalClassification: "success" | "stopped" | "error";
   lastContinuationReason?: ContinuationReason;
   terminalCodingResult?: CodingResultSummary;
+  terminalLoopTrajectory?: LoopTrajectoryProjection;
   terminalNotes: readonly string[];
   sawTerminalEvent: boolean;
 }
@@ -52,6 +54,7 @@ export function applyTerminalQueryEvent(
   state.terminalClassification = event.result.terminalClassification;
   state.lastContinuationReason = event.result.lastContinuationReason;
   state.terminalCodingResult = event.result.codingResult;
+  state.terminalLoopTrajectory = event.result.loopTrajectory;
   state.terminalNotes = event.result.sharedContext.notes;
 }
 
@@ -94,6 +97,7 @@ export function renderSessionTerminalSurface(input: {
       terminalReason: terminalState.terminalReason,
       terminalStopReason: terminalState.terminalStopReason,
       codingResult: terminalState.terminalCodingResult,
+      loopTrajectory: terminalState.terminalLoopTrajectory,
     });
     renderContinuationSeedSummary(input.renderer, {
       codingResult: terminalState.terminalCodingResult,
@@ -151,6 +155,7 @@ export function renderSessionTerminalSurface(input: {
     terminalReason: terminalState.terminalReason,
     terminalStopReason: terminalState.terminalStopReason,
     codingResult: terminalState.terminalCodingResult,
+    loopTrajectory: terminalState.terminalLoopTrajectory,
   });
   renderContinuationSeedSummary(input.renderer, {
     codingResult: terminalState.terminalCodingResult,
@@ -522,6 +527,7 @@ function renderProductExperienceSurface(
     terminalReason: TerminalReason;
     terminalStopReason?: string;
     codingResult?: CodingResultSummary;
+    loopTrajectory?: LoopTrajectoryProjection;
   },
 ): void {
   const surface = projectCliSessionProductSurface({
@@ -530,6 +536,7 @@ function renderProductExperienceSurface(
     terminalReason: input.terminalReason,
     stopReason: input.terminalStopReason,
     codingResult: input.codingResult,
+    loopTrajectory: input.loopTrajectory,
   });
   if (!surface) {
     return;

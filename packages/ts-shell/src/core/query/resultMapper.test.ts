@@ -2,6 +2,42 @@ import { describe, expect, it } from "vitest";
 import { mapTerminalToOrchestrationResult } from "./resultMapper.js";
 
 describe("mapTerminalToOrchestrationResult", () => {
+  it("passes through the latest loop trajectory without changing terminal truth", () => {
+    const loopTrajectory = {
+      loopId: "mapper-loop",
+      terminalSuccessClaim: false,
+    };
+    const fakeState = {
+      transcript: [
+        {
+          role: "coder",
+          content: "observed",
+          loopTrajectory,
+        },
+        {
+          role: "reviewer",
+          content: "done",
+        },
+      ],
+      sharedContext: {
+        sessionId: "sess_mapper_loop",
+        initialPrompt: "prompt",
+        notes: [],
+        handoffs: [],
+      },
+      lastContinuationReason: undefined,
+    } as never;
+
+    const result = mapTerminalToOrchestrationResult(fakeState, {
+      terminalReason: "completed",
+      terminalClassification: "success",
+    } as never);
+
+    expect(result.loopTrajectory).toBe(loopTrajectory);
+    expect(result.terminalClassification).toBe("success");
+    expect(result.status).toBe("completed");
+  });
+
   it("preserves explicit terminalClassification when provided", () => {
     const fakeState = {
       transcript: [],

@@ -22,9 +22,18 @@ import {
   buildFreshnessObservability,
   type FreshnessObservability,
 } from "../evidence/freshnessEvidence.js";
-import { createEvidenceOnlySavePoint } from "../evidence/runtimeSavePoint.js";
+import {
+  createEvidenceOnlySavePoint,
+  type RuntimeEvidenceSavePoint,
+} from "../evidence/runtimeSavePoint.js";
 import type { RuntimeExecutionReceiptProjection } from "./execution/executionReceipt.js";
+import type { AgentLoopContractProjection } from "./loop/agentLoopContract.js";
+import {
+  projectLoopTrajectory,
+  type LoopTrajectoryProjection,
+} from "./loop/trajectoryProjection.js";
 import { appendSingleFileEditRepairObservability } from "../evidence/turnEvidenceLedger.js";
+import { projectProviderRegistry } from "../provider/providerRegistry.js";
 import { projectWorkflowExecutionResultContract } from "../result/workflowRuntimeProjection.js";
 import { transitionRuntimePhase } from "./runtimePhase.js";
 import {
@@ -33,6 +42,7 @@ import {
   type RuntimeTurnBoundaryObserver,
 } from "./turnBoundary.js";
 import { createRuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
+import type { RuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
 import {
   runApplyPatchRuntimeBridgeIfRequested,
   type ApplyPatchRuntimeRouteOptions,
@@ -426,26 +436,34 @@ function createIntegratedRunner(
           : turnSnapshot.phase,
         "save_point",
       );
-      notifyRuntimeEvidenceSavePoint(
-        runtimeTurnBoundary,
-        createEvidenceOnlySavePoint({
-          turnSnapshot,
-          phase: savePointPhase.status === "accepted" ? savePointPhase.to : "aborted",
-          evidenceIds: execution.codingResult?.evidence ?? [],
-          sessionPersistenceStatus: "not-recorded",
-          resultProjection: {
-            status: execution.codingResult?.taskSatisfaction.verdict,
-            terminalClassification: execution.codingResult?.verification.status,
-            terminalReason: execution.codingResult?.taskKind,
-          },
-          executionReceipts: execution.executionReceipts ?? [],
-          pendingNextTurnFacts: [
-            workflowPlan.usedRestoredState
-              ? "continuation-state-consumed"
-              : "continuation-state-not-consumed",
-          ],
-        }),
-      );
+      const savePoint = createEvidenceOnlySavePoint({
+        turnSnapshot,
+        phase: savePointPhase.status === "accepted" ? savePointPhase.to : "aborted",
+        evidenceIds: execution.codingResult?.evidence ?? [],
+        sessionPersistenceStatus: "not-recorded",
+        resultProjection: {
+          status: execution.codingResult?.taskSatisfaction.verdict,
+          terminalClassification: execution.codingResult?.verification.status,
+          terminalReason: execution.codingResult?.taskKind,
+        },
+        executionReceipts: execution.executionReceipts ?? [],
+        pendingNextTurnFacts: [
+          workflowPlan.usedRestoredState
+            ? "continuation-state-consumed"
+            : "continuation-state-not-consumed",
+        ],
+      });
+      notifyRuntimeEvidenceSavePoint(runtimeTurnBoundary, savePoint);
+      const loopTrajectory = projectProductPathLoopTrajectory({
+        sessionId: sharedContext.sessionId,
+        prompt: cleanPrompt,
+        turn,
+        turnSnapshot,
+        savePoint,
+        providerMode,
+        realProvider,
+        execution,
+      });
       const notes = [
         `plan: intent=${workflowPlan.taskKind} reason=${workflowPlan.reason}`,
         ...decisionTrace,
@@ -462,6 +480,7 @@ function createIntegratedRunner(
           events: execution.events,
           notes,
           codingResult: execution.codingResult,
+          loopTrajectory,
         };
       }
 
@@ -476,6 +495,7 @@ function createIntegratedRunner(
             : []),
         ],
         codingResult: execution.codingResult,
+        loopTrajectory,
       };
     }
 
@@ -491,6 +511,161 @@ function createIntegratedRunner(
       content,
       notes: [`reviewer: handoffs=${sharedContext.handoffs.length}`],
     };
+  };
+}
+
+function projectProductPathLoopTrajectory(input: {
+  readonly sessionId: string;
+  readonly prompt: string;
+  readonly turn: number;
+  readonly turnSnapshot: RuntimeTurnSnapshot;
+  readonly savePoint: RuntimeEvidenceSavePoint;
+  readonly providerMode: "synthetic" | "real";
+  readonly realProvider?: MvpIntegratedFlowOptions["realProvider"];
+  readonly execution: WorkflowExecutionResult;
+}): LoopTrajectoryProjection {
+  const executionReceipts = input.execution.executionReceipts ?? [];
+  const loop: AgentLoopContractProjection = {
+    state: input.execution.codingResult ? "stopped" : "failed",
+    stopReason: "model-stop",
+    turns: [
+      {
+        turn: input.turn,
+        snapshot: input.turnSnapshot,
+        modelBoundary: {
+          responseId: `workflow-response-${hashStableId(`${input.sessionId}:${input.turn}`)}`,
+          stopReason: input.execution.codingResult ? "stop" : "failed",
+          toolCallCount: executionReceipts.length,
+        },
+        ...(executionReceipts.length > 0
+          ? {
+              toolResultBatch: {
+                id: `workflow-tool-results-${hashStableId(`${input.sessionId}:${input.turn}`)}`,
+                callBatchId: `workflow-tool-calls-${hashStableId(`${input.sessionId}:${input.turn}`)}`,
+                results: [],
+                executionReceipts,
+                failedToolCallIds: [],
+                terminate: true,
+              },
+            }
+          : {}),
+        savePoint: input.savePoint,
+        nextTurn: {
+          prepared: false,
+          pendingFacts: input.savePoint.pendingNextTurnFacts,
+        },
+        terminalSuccessClaim: false,
+        notProvenClaims: [
+          "terminal-success",
+          "provider-success",
+          "tool-success",
+          "execution-success",
+          "next-turn-success",
+        ],
+      },
+    ],
+    pendingDelivery: {
+      steer: 0,
+      followUp: 0,
+      nextTurn: input.savePoint.pendingNextTurnFacts.length,
+    },
+    events: [],
+    terminalSuccessClaim: false,
+    notProvenClaims: [
+      "terminal-success",
+      "provider-success",
+      "tool-success",
+      "execution-success",
+    ],
+  };
+
+  return projectLoopTrajectory({
+    loopId: `product-path:${input.sessionId}`,
+    prompt: input.prompt,
+    loop,
+    providerRegistry: projectProviderRegistry({
+      providers: [
+        {
+          providerId: input.providerMode === "real"
+            ? input.realProvider?.provider ?? "real-provider"
+            : "synthetic",
+          safeLabel: input.providerMode === "real"
+            ? input.realProvider?.provider ?? "real-provider"
+            : "synthetic-provider",
+          providerKind:
+            input.realProvider?.provider === "openai" ||
+              input.realProvider?.provider === "anthropic" ||
+              input.realProvider?.provider === "google" ||
+              input.realProvider?.provider === "openai-compatible"
+              ? input.realProvider.provider
+              : "unknown",
+          endpointClass: input.realProvider?.provider === "openai-compatible"
+            ? "openai-compatible"
+            : input.providerMode === "real"
+              ? "default"
+              : "unknown",
+          authMode: input.providerMode === "real"
+            ? input.realProvider?.accountAuth
+              ? "account-auth"
+              : input.realProvider?.apiKey
+                ? "api-key"
+                : "unknown"
+            : "none",
+          defaultEnabled: false,
+          requiresExplicitOptIn: true,
+          supportsFallback: "unknown",
+          compatibility: providerCompatibilityNotProven(),
+          riskLevel: input.providerMode === "real" ? "medium" : "low",
+        },
+      ],
+      models: input.realProvider?.model
+        ? [
+            {
+              modelId: input.realProvider.model,
+              safeLabel: input.realProvider.model,
+              providerId: input.realProvider.provider,
+              family: input.realProvider.provider,
+              compatibility: providerCompatibilityNotProven(),
+              knownLimitations: ["model-compatibility-not-proven-by-loop-observation"],
+            },
+          ]
+        : [],
+    }),
+    resultFacts: input.execution.codingResult
+      ? {
+          status: input.execution.codingResult.taskSatisfaction.verdict,
+          terminalClassification: input.execution.codingResult.verification.status,
+          terminalReason: input.execution.codingResult.taskKind,
+          verdictSource: "result",
+        }
+      : {
+          status: "unsupported",
+          terminalClassification: "unsupported",
+          terminalReason: "missing-coding-result",
+          verdictSource: "unknown",
+        },
+  });
+}
+
+function providerCompatibilityNotProven() {
+  return {
+    developerRole: "unknown" as const,
+    systemRole: "unknown" as const,
+    toolCalls: "unknown" as const,
+    parallelToolCalls: "unknown" as const,
+    structuredJsonOutput: "unknown" as const,
+    streaming: "unknown" as const,
+    reasoningEffort: "unknown" as const,
+    strictMessageRoles: "unknown" as const,
+    openAICompatibleShape: "unknown" as const,
+    customHeaders: "unknown" as const,
+    providerSpecificQuirks: [],
+    notProvenClaims: [
+      "provider-called",
+      "model-compatibility-proven",
+      "provider-success",
+      "terminal-success",
+    ],
   };
 }
 

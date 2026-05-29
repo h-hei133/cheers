@@ -62,5 +62,110 @@ describe("workflowExecutionCoordinator", () => {
       resultProjectionStatus: "observed-not-verdict",
       terminalSuccessClaim: false,
     });
+    expect(result.loopTrajectory).toBeDefined();
+    expect(result.loopTrajectory?.turnIds).toEqual(["turn:2"]);
+    expect(result.loopTrajectory?.snapshotIds).toEqual([snapshots[0]?.id]);
+    expect(result.loopTrajectory?.savePointIds).toEqual([savePoints[0]?.id]);
+    expect(result.loopTrajectory?.providerMetadataIds).toContain("synthetic");
+    expect(result.loopTrajectory?.terminalSuccessClaim).toBe(false);
+    expect(result.loopTrajectory?.finalObservedFacts).toMatchObject({
+      loopState: "stopped",
+      terminalSuccessClaim: false,
+    });
+    expect(result.loopTrajectory?.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "provider-success",
+        "tool-success",
+        "execution-success",
+        "terminal-success",
+      ]),
+    );
+    expect(
+      result.loopTrajectory?.stages.find(
+        (stage) => stage.category === "before-tool-policy",
+      )?.observationStatus,
+    ).toBe("not_proven");
+    expect(result.loopTrajectory?.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "loop-input-observed",
+        "loop-provider-boundary-observed",
+        "loop-save-point-observed",
+        "loop-product-surface-projected",
+      ]),
+    );
+    expect(result.loopTrajectory?.jsonEventStream.map((entry) => entry.order)).toEqual(
+      Array.from(
+        { length: result.loopTrajectory?.jsonEventStream.length ?? 0 },
+        (_, index) => index + 1,
+      ),
+    );
+    expect(
+      result.loopTrajectory?.jsonEventStream.every(
+        (entry) => entry.truthfulness.terminalSuccessClaim === false,
+      ),
+    ).toBe(true);
+  });
+
+  it("attaches execution receipts without upgrading command success", async () => {
+    const result = await runMvpIntegratedFlow({
+      sessionId: "runtime_coordinator_command",
+      prompt: "Run node --version",
+      workspaceRoot,
+      escalationDecision: "allow-once",
+      maxTurns: 6,
+    });
+
+    expect(result.codingResult?.taskKind).toBe("run-command");
+    expect(result.codingResult?.verification.status).toBe("passed");
+    expect(result.loopTrajectory?.receiptIds.length).toBeGreaterThan(0);
+    expect(
+      result.loopTrajectory?.events.some(
+        (event) => event.type === "loop-execution-receipt-observed",
+      ),
+    ).toBe(true);
+    expect(
+      result.loopTrajectory?.notProvenClaims,
+    ).toEqual(expect.arrayContaining(["execution-success", "terminal-success"]));
+    expect(result.loopTrajectory?.terminalSuccessClaim).toBe(false);
+  }, 15000);
+
+  it("redacts unsafe prompt and provider labels in product-path observations", async () => {
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "redaction-workspace" }, null, 2),
+      "utf8",
+    );
+
+    const result = await runMvpIntegratedFlow({
+      sessionId: "runtime_coordinator_redaction",
+      prompt:
+        "Read package.json first 1 line with token=sk-1234567890 and oldText=SECRET",
+      workspaceRoot,
+      providerMode: "real",
+      realProvider: {
+        provider: "openai-compatible",
+        apiKey: "sk-not-serialized-123456789",
+        model: "/home/wang/.private-agents-real/model-secret",
+      },
+      maxTurns: 6,
+    });
+
+    const serialized = JSON.stringify(result.loopTrajectory);
+    expect(serialized).not.toContain("sk-1234567890");
+    expect(serialized).not.toContain("sk-not-serialized");
+    expect(serialized).not.toContain("/home/wang/.private-agents-real");
+    expect(serialized).not.toContain("oldText=SECRET");
+    expect(result.loopTrajectory?.redaction.status).toBe("redacted");
+    expect(result.loopTrajectory?.providerMetadataIds).toContain(
+      "openai-compatible",
+    );
+    expect(result.loopTrajectory?.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "provider-called",
+        "provider-success",
+        "auth-secret-available",
+        "terminal-success",
+      ]),
+    );
   });
 });
